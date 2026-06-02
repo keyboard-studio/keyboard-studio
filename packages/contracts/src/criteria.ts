@@ -7,7 +7,7 @@ export type CriteriaBand =
   | "red-checklist"; // band 4: manual pre-submit checklist
 
 export interface Criterion {
-  /** Stable ID from criteria.md (e.g. "SS12"). */
+  /** Stable ID derived from the criteria.md section number and rule slug (e.g. "1.1-no-files-outside-keyboard-folder"). */
   id: string;
   /** criteria.md section heading the rule lives under. */
   section: string;
