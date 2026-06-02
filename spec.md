@@ -702,7 +702,7 @@ These two remaining mismatches are **the value of the validation pass** — they
 
 2. **Scaffolding.** Project scaffolder duplicates the chosen base into an in-memory virtual FS, applies the full template-cleanup pipeline (identity reset, NCAPS strip, `[CAPS]` deletion, `&CasedKeys` insertion, touch-layout cleanup), and runs Layer C hygiene. The scaffolded project is clean-by-construction before the user touches anything.
 
-3. **Survey — Phase A (Identity + routing).** User enters language name, BCP47 tag (with langtags.json lookup), display name, copyright holder. System detects script group (QWERTY/QWERTZ, AZERTY, or non-Roman) from BCP47 + base choice and confirms with the user. This routes all subsequent phases.
+3. **Survey — Phase A (Identity + routing).** User enters language name, BCP47 tag (with langtags.json lookup), display name, copyright holder. System detects script group (QWERTY/QWERTZ, AZERTY, or non-Roman) from BCP47 + base choice and confirms with the user. This routes all subsequent phases. Phase A also surfaces v1's desktop-first authoring posture (Decision 6, Sec 14) — mobile-primary authors are notified that the survey is anchored to physical-keyboard mental-model answers before they invest survey time. The touch layout is still produced in Phase E.
 
 4. **Survey — Phase B (Character coverage + strategy axes).** User pastes or lists target characters. Studio diffs against the base keyboard output set and, for each new character, the user states which key it lives on and under what modifier. Crucially, this phase also **computes the discovery axes** (Sec 7.1): the character count fixes A1 (scale), the diff and a few plain-language follow-ups fix A3 (phonetic intuition), A4 (diacritic behavior), and A7 (spare-key availability). The output method is **not** assumed to be simple substitution — Phase B feeds the axis vector to the strategy selector (Sec 7.2), which picks the right strategy. A simple one-key-per-character swap (S-01) is only the result when the inventory is tiny and phonetic; larger or diacritic-heavy inventories route to deadkey composition (S-02), mnemonic spelling (S-05), diacritic cycling (S-07), context-sensitive clusters (S-09), and so on.
 
@@ -920,6 +920,10 @@ Rationale: The original three-band model collapsed the scaffolder-bake and Layer
 Decision: CJK and Ethiopic are confirmed excluded from v1. The Three-group routing section (Sec 9) renders a "not yet supported" stub for these scripts. The out-of-scope list (Sec 16) reflects this. These script families are candidates for sprint 2 pattern-library work.
 Rationale: Reorder patterns for CJK and Ethiopic require specialist curation that is not complete. Shipping a silent empty gallery would mislead users; a stub with an explanation is the correct v1 behavior.
 
+**Decision 6 — Desktop-first authoring scope.**
+Decision: v1 supports desktop-first authoring only. The survey, strategy selector, and gallery are anchored to physical-keyboard KMN rules; the touch layout is scaffolded from the desktop OSK in Phase E (no reverse touch-to-desktop derivation in v1). Authors whose primary deployment is mobile are surfaced this posture at Phase A before they invest survey time and may continue with the desktop-first flow (still receiving a derived touch layout). Touch-first authoring is a v1.1 candidate.
+Rationale: The strategy framework (Sec 7) and the seven discovery axes (Sec 7.1) elicit physical-keyboard mental-model answers — key names like `K_QUOTE`, modifier-plane availability, base-layout collisions. Inverting the data flow to touch-first requires touch-first strategy variants that are not yet curated and would expand v1 scope materially. Mobile-first authoring is a known v1.1 work-item, not a silent gap.
+
 ---
 
 ## 15. Acceptance scenarios
@@ -966,6 +970,7 @@ Rationale: Reorder patterns for CJK and Ethiopic require specialist curation tha
 - **Triage tool for traditional submissions** — a separate project that reuses `@keymanapp/kmn-validator` and `@keymanapp/keyboard-lint`; not part of keyboard-studio.
 - **LDML output** — deferred until the LDML-to-touch build path lands in the Keyman toolchain. Emission format is locked to KMN + `.keyman-touch-layout`.
 - **Mobile-app integration** — `oem/` updates, partner CSV updates, partner-organization bundle workflows.
+- **Touch-first authoring path** — v1 supports desktop-first authoring only (Decision 6, Sec 14). The survey, strategy selector, and gallery are anchored to physical-keyboard mental-model answers; the touch layout is scaffolded from the desktop OSK in Phase E with no reverse derivation. Mobile-primary authors are surfaced this at Phase A and may continue with the desktop-first flow (still receiving a derived touch layout). Touch-first authoring is a v1.1 candidate.
 - **Hosting and deployment** — infrastructure is left to the operator; this project ships a static SPA.
 - **CJK and Ethiopic reorder patterns in v1** — confirmed excluded; see Sec 14, decision 5. Target: sprint 2 pattern-library work.
 - **Multi-language `welcome.htm` variants** — LLM-generated variants for multiple languages; post-v1.
