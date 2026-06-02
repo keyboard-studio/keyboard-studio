@@ -14,18 +14,19 @@
 4. [System overview](#4-system-overview)
 5. [Pattern schema](#5-pattern-schema)
 6. [Worked example](#6-worked-example)
-7. [Data flow](#7-data-flow)
-8. [Three-group routing](#8-three-group-routing)
-9. [Validator and lint engine](#9-validator-and-lint-engine)
-10. [criteria.md compliance](#10-criteriamd-compliance)
-11. [Output artifacts](#11-output-artifacts)
-12. [Team boundaries](#12-team-boundaries)
-13. [Open questions — resolved decisions](#13-open-questions--resolved-decisions)
-14. [Acceptance scenarios](#14-acceptance-scenarios)
-15. [Out of scope](#15-out-of-scope)
-16. [Glossary](#16-glossary)
-17. [Revision policy](#17-revision-policy)
-18. [Reference](#18-reference)
+7. [Strategy selection](#7-strategy-selection)
+8. [Data flow](#8-data-flow)
+9. [Three-group routing](#9-three-group-routing)
+10. [Validator and lint engine](#10-validator-and-lint-engine)
+11. [criteria.md compliance](#11-criteriamd-compliance)
+12. [Output artifacts](#12-output-artifacts)
+13. [Team boundaries](#13-team-boundaries)
+14. [Open questions — resolved decisions](#14-open-questions--resolved-decisions)
+15. [Acceptance scenarios](#15-acceptance-scenarios)
+16. [Out of scope](#16-out-of-scope)
+17. [Glossary](#17-glossary)
+18. [Revision policy](#18-revision-policy)
+19. [Reference](#19-reference)
 
 ---
 
@@ -88,12 +89,19 @@ keyboard-studio
 |
 +-- authoring engine           [engine/content]
 |   +-- survey                            Six-phase branching questionnaire; LLM maps answers to
-|   |                                     slot values; plain-language throughout.
-|   +-- gallery                           Show-by-example mini-keyboards; user taps and picks;
-|                                         each entry is a validated KMN skeleton with named slots.
+|   |                                     slot values and to the seven discovery axes (Sec 7);
+|   |                                     plain-language throughout.
+|   +-- strategy selector       [engine/content]
+|   |                                     Consumes the discovery axes; runs the decision tree
+|   |                                     (Sec 7) to pick a primary output strategy (S-01..S-12)
+|   |                                     plus secondaries; ranks which patterns the gallery shows.
+|   +-- gallery                           Show-by-example mini-keyboards; surfaces the selected
+|                                         strategy's patterns first; user taps and picks; each
+|                                         entry is a validated KMN skeleton with named slots.
 |
 +-- pattern-library loader     [content]  Parameterized, human-reviewed KMN skeletons for desktop,
-|                                         touch, and reorder interactions; mined from release/,
+|                                         touch, and reorder interactions; each tagged with the
+|                                         strategy card (Sec 7) it implements; mined from release/,
 |                                         curated, slot-parameterized, test-vector-verified.
 |
 +-- studio UI shell            [engine]   Two-pane SPA; survey left, live preview right; phase
@@ -117,7 +125,7 @@ keyboard-studio
 
 ## 5. Pattern schema
 
-This schema is the Day-1 contract. Any change to field names or types requires a joint session (issue #5). Breaking changes to the `Pattern` interface require a major version bump (see Sec 17).
+This schema is the Day-1 contract. Any change to field names or types requires a joint session (issue #5). Breaking changes to the `Pattern` interface require a major version bump (see Sec 18). The optional `strategyId` and `combinesWith` fields are **proposed** additions that link each pattern to the strategy catalog (Sec 7); they are non-breaking (optional) but, per the same policy, are not locked until the Day-1 #5 session ratifies them.
 
 ```ts
 /** Canonical Pattern schema — packages/contracts/src/pattern.ts */
@@ -171,6 +179,20 @@ export interface Pattern {
    * or base-keyboard IDs.
    */
   appliesTo: string[];
+  /**
+   * The strategy card (S-01..S-12, Sec 7.3) this pattern implements.
+   * The strategy selector uses this to map a decision-tree result to the
+   * pattern(s) the gallery should surface.
+   * PROPOSED ADDITION — pending Day-1 issue #5 sign-off (see Sec 18 revision policy).
+   */
+  strategyId?: string;
+  /**
+   * Secondary strategy cards this pattern commonly combines with (e.g. ["S-04"]).
+   * Mirrors the "Combines well with" line on each strategy card (Sec 7.3) and the
+   * "+ secondaries" output of the decision tree (Sec 7.2).
+   * PROPOSED ADDITION — pending Day-1 issue #5 sign-off.
+   */
+  combinesWith?: string[];
   /** Survey questions that fill the named slots in kmnFragment. */
   questions: PatternQuestion[];
   /**
@@ -226,6 +248,8 @@ description: >
   acute, grave, and circumflex input on QWERTY/QWERTZ layouts.
 category: desktop
 appliesTo: []   # empty = unrestricted; offered to all groups
+strategyId: "S-02"        # Deadkey composition (Sec 7.3)
+combinesWith: ["S-04"]    # parallel-store lookup collapses the post-deadkey table
 
 questions:
   - id: triggerKey
@@ -303,7 +327,371 @@ Substitution is deterministic and reproducible: given the same answer map, the s
 
 ---
 
-## 7. Data flow
+## 7. Strategy selection
+
+Character coverage is **not** "simple substitution." Choosing how a character is output — a bare key swap, a deadkey-then-base composition, an ASCII transliteration, a tone cycle, a context-sensitive cluster, an OS IME callout — is the core decision the studio makes for the user. This section is that recommendation engine.
+
+The survey does not emit output rules directly. It computes a seven-axis description of the keyboard's needs (Sec 7.1), runs a decision tree over those axes (Sec 7.2) to choose a **primary output strategy** (one of S-01..S-12) plus likely **secondaries**, and surfaces the matching gallery patterns for the user to confirm by example. The pattern library (Sec 5) is the implementation layer: each `Pattern` names the strategy it implements via `strategyId`, so a decision-tree result maps directly to the patterns the gallery shows first.
+
+**Scope note.** The strategy catalog (Sec 7.3) describes **physical-keyboard (desktop) KMN rules**. Touch counterparts are produced from each pattern's `touchLayoutFragment` and Phase E (Sec 8); packaging from Phase G. The catalog is the desktop-rule layer of the fuller v1 pipeline — not a separate, narrower product. (The strategy framework was originally drafted physical-keyboard-only; in the studio it is embedded in the full touch + packaging flow.)
+
+### 7.1 Discovery axes
+
+Seven dimensions describe a keyboard-design need well enough to pick a strategy. Each is a value the **survey** computes — there is no separate interview script. The last column gives the survey phase that elicits the axis and the plain-language question used.
+
+| # | Axis | Allowed values | Meaning & survey elicitation |
+|---|------|----------------|------------------------------|
+| A1 | **Scale** | tiny (<5) / small (5–20) / medium (20–100) / large (100–300) / massive (1000+) | How many *new* characters the keyboard adds beyond a stock physical layout. **Phase B:** "Roughly how many new characters does your keyboard need — ones not already on a standard physical keyboard?" |
+| A2 | **Script class** | alphabetic / abugida / abjad / syllabary / logographic | Structural class of the writing system; drives one-char-per-key vs. cluster-shaped output. **Phase A** (Three-group routing, Sec 9) detects this from the BCP47 script subtag + base; confirmed in plain language: "What writing system does the keyboard produce?" |
+| A3 | **Phonetic intuition** | strong / weak | Strong = the user thinks "I'd type a Latin spelling of the sound." Weak = mapping is shape- or modifier-based. **Phase B/C:** "When you picture typing a special character — type the Latin spelling of the sound, or press a key that looks like it / a modifier + base key?" |
+| A4 | **Diacritic behavior** | none / stacking-combining / replacing-cycling / multi-family | How marks behave on a base. Cycling = a repeated mark key replaces the previous mark (Vietnamese-style). **Phase B/C:** "Do your characters have accent marks or tones — none, stacking, tone marks that replace on a second press, or many different accent families used together?" |
+| A5 | **Multi-mode** | single / two-orthography | Whether the keyboard exposes a runtime toggle between two orthographic styles (e.g. dotted vs. bar-under Yoruba). **Phase A/C:** "Does your language have more than one written form users switch between?" |
+| A6 | **Constraint enforcement** | none / soft / loud | What happens on an invalid sequence. Loud = audible beep; soft = silent suppression. **Phase C:** "Should the keyboard reject obviously invalid input — no, silently, or with a beep?" |
+| A7 | **Spare-key availability** | many / RAlt only / fully booked | How crowded the base layout is; fully booked → need a modifier plane. **Phase B:** "What's the physical base layout, and does it have unused keys?" |
+
+**A2a — cluster sensitivity (abugida/abjad only).** If A2 is abugida or abjad, one follow-up resolves whether output depends on prior context (Arabic positional forms, Indic reph/conjuncts, syllabary ligatures): "Does the keyboard need to choose different output based on what was typed before?" Yes → clusters needed; No → clusters not needed. The answer gates decision rule 2 (Sec 7.2).
+
+### 7.2 Decision tree
+
+Ordered rules. The first matching rule fixes the **primary** strategy; rules 8–9 add **secondaries**; rule 11 is the fallback.
+
+| # | Condition | Primary | Add secondaries |
+|---|-----------|---------|-----------------|
+| 1 | A1=massive AND A2=logographic | **S-12** DLL IME callout | — |
+| 2 | A2=abjad OR (A2=abugida AND cluster sensitivity=yes) | **S-09** Context-sensitive cluster | + S-05 if A3=strong |
+| 3 | A4=replacing-cycling | **S-07** Diacritic cycle | + S-04 |
+| 4 | A5=two-orthography | **S-11** Stateful option toggle | (wraps whichever strategy fits the per-mode rules) |
+| 5 | A3=strong AND A1 ∈ {medium, large} | **S-05** Mnemonic spelling | + S-04 |
+| 6 | A4=multi-family AND A1=large | **S-06** Chained deadkeys (two-tier) | + S-04 |
+| 7 | A4=stacking-combining AND A1 ∈ {small, medium} | **S-02** Deadkey composition | + S-04 |
+| 8 | A6=loud | (whatever above) | + **S-10** Constraints + beep |
+| 9 | A7=fully booked | (whatever above) | + **S-08** RAlt modifier-layer |
+| 10 | A1=tiny AND A3=strong | **S-01** Simple swap | — |
+| 11 | (fallback) | **S-03** Sequence replace | — |
+
+```mermaid
+flowchart TD
+    Start([Survey complete: axis vector ready]) --> R1{A1=massive AND<br/>A2=logographic?}
+    R1 -- yes --> S12[/"<b>S-12</b> DLL IME callout"/]
+    R1 -- no --> R2{A2=abjad OR<br/>(A2=abugida AND clusters needed)?}
+    R2 -- yes --> S09[/"<b>S-09</b> Context-sensitive cluster<br/>+ S-05 if A3=strong"/]
+    R2 -- no --> R3{A4=replacing-cycling?}
+    R3 -- yes --> S07[/"<b>S-07</b> Diacritic cycle<br/>+ S-04"/]
+    R3 -- no --> R4{A5=two-orthography?}
+    R4 -- yes --> S11[/"<b>S-11</b> Stateful option toggle<br/>(wraps inner strategy)"/]
+    R4 -- no --> R5{A3=strong AND<br/>A1 in medium,large?}
+    R5 -- yes --> S05[/"<b>S-05</b> Mnemonic spelling<br/>+ S-04"/]
+    R5 -- no --> R6{A4=multi-family AND<br/>A1=large?}
+    R6 -- yes --> S06[/"<b>S-06</b> Chained deadkeys<br/>+ S-04"/]
+    R6 -- no --> R7{A4=stacking-combining AND<br/>A1 in small,medium?}
+    R7 -- yes --> S02[/"<b>S-02</b> Deadkey composition<br/>+ S-04"/]
+    R7 -- no --> R10{A1=tiny AND<br/>A3=strong?}
+    R10 -- yes --> S01[/"<b>S-01</b> Simple swap"/]
+    R10 -- no --> S03[/"<b>S-03</b> Sequence replace<br/>(fallback)"/]
+
+    S12 --> Sec
+    S09 --> Sec
+    S07 --> Sec
+    S11 --> Sec
+    S05 --> Sec
+    S06 --> Sec
+    S02 --> Sec
+    S01 --> Sec
+    S03 --> Sec
+
+    Sec{{"Add-on rules"}}
+    Sec --> R8{A6=loud?}
+    R8 -- yes --> Add10[/"+ S-10 Constraints + beep"/]
+    R8 -- no --> R9
+    Add10 --> R9{A7=fully booked?}
+    R9 -- yes --> Add08[/"+ S-08 RAlt modifier-layer"/]
+    R9 -- no --> Done([Recommendation set])
+    Add08 --> Done
+
+    classDef primary fill:#dde9ff,stroke:#3060c0,color:#000
+    classDef addon fill:#fff2cc,stroke:#b58900,color:#000
+    classDef decision fill:#f5f5f5,stroke:#666,color:#000
+    class S01,S02,S03,S05,S06,S07,S09,S11,S12 primary
+    class Add08,Add10 addon
+    class R1,R2,R3,R4,R5,R6,R7,R8,R9,R10,Sec decision
+```
+
+**Prose summary.** Massive logographic → only the OS IME is fast enough; delegate (S-12). Indic/Arabic-shaped scripts need context-aware cluster rules (S-09); phonetic ones add mnemonic spelling. Tonal cycling (S-07) is neither stacking nor deadkey. Dual orthography (S-11) wraps a state toggle around the inner strategy. Big phonetic alphabets (S-05) — let the user type spellings, collapsed with `any`/`index`. Big diacritic palettes (S-06) — two-tier deadkey: first key picks the family, second the base. Small accent-heavy Latin (S-02) — classic deadkey composition. Loud feedback (S-10) and fully-booked layouts (S-08) are add-ons, never the whole answer. A handful of phonetic additions (S-01) — just swap them in. Otherwise (S-03) — short ASCII sequences expand to single chars.
+
+**Encoding.** The tree may be encoded as JSON/TS rules in `packages/contracts` or reasoned over by the LLM directly against this table; both are valid (pick per studio architecture). The strategy selector returns `{ primary: strategyId, secondaries: strategyId[] }`, which the gallery resolves to patterns via the `strategyId` / `combinesWith` fields (Sec 5).
+
+### 7.3 Strategy catalog (S-01..S-12)
+
+Each card is self-contained and citable by ID. Snippets are verbatim from `keymanapp/keyboards` (paths shown). The **Pattern mapping** line ties the card to the library: a pattern with that `strategyId` is what the gallery surfaces when the tree selects this strategy.
+
+#### S-01 Simple swap
+
+**When to use:** A1=tiny, A3=strong, A4=none. 1–5 extra characters mapping cleanly onto unused keys.
+**When to avoid:** More than ~5 characters; any case where the new character should *combine* with prior input.
+**Combines well with:** Nothing — one rule per character by definition.
+**Pattern mapping:** `strategyId: "S-01"`; `combinesWith: []`.
+
+```
+store(&VERSION) '9.0'
+begin Unicode > use(main)
+group(main) using keys
+
++ [K_Q] > 'ɛ'
++ [SHIFT K_Q] > 'Ɛ'
+```
+
+**Real exemplar:** `release/a/akan/source/akan.kmn` — Akan (Twi/Fante) adds exactly `ɛ` and `ɔ` on the unused `q` and `c` keys.
+
+#### S-02 Deadkey composition
+
+**When to use:** A1 ∈ {small, medium}, A4=stacking-combining, A3=strong. User types a diacritic-naming key (`'`, `` ` ``, `:`) then a base letter.
+**When to avoid:** When the diacritic should *replace* a previous one (S-07); when many families explode the table (S-06).
+**Combines well with:** S-04 (collapse the post-deadkey table); S-08 (when the trigger needs RAlt).
+**Pattern mapping:** `strategyId: "S-02"`; `combinesWith: ["S-04", "S-08"]`. (This is the Sec 6 worked example, `latin_deadkey_acute_single`.)
+
+```
+store(graveK) 'aeiouAEIOU'
+store(graveO) 'àèìòùÀÈÌÒÙ'
+
++ '`' > dk(grave)
+dk(grave) + any(graveK) > index(graveO, 2)
+dk(grave) + any(keys)   > '`' context(2)    c restore on miss
+```
+
+**Real exemplar:** `release/sil/sil_euro_latin/source/sil_euro_latin.kmn` — 92 deadkey rules cover virtually every European Latin diacritic.
+
+#### S-03 Sequence replace
+
+**When to use:** A1 small to medium; user prefers short ASCII suffixes (`<`, `>`, `=`) to a deadkey flow. Common for IPA-style alphabets with no obvious "diacritic" key.
+**When to avoid:** When the user must see intermediate state (deadkey commits nothing until the second key); sequences of more than 2–3 keys (S-05 is more legible).
+**Combines well with:** S-04 (parallel lookup tables); S-05 (longer sequences in the same keyboard).
+**Pattern mapping:** `strategyId: "S-03"`; `combinesWith: ["S-04", "S-05"]`.
+
+```
+store(equalD) 'a' 'e' 'i' 'o'
+store(equalU) U+1D43 U+1D49 U+1DD0 U+1D52    c superscript variants
+
+any(equalD) + '=' > index(equalU, 1)
+```
+
+**Real exemplar:** `release/sil/sil_ipa/source/sil_ipa.kmn` — `<`, `=`, `>` modifiers attach to a preceding base letter.
+
+#### S-04 Parallel-store lookup (`any` + `index`)
+
+**When to use:** Any positional mapping table of more than ~6 entries. A **building block**, not usually a primary — it makes S-02/S-03/S-05/S-06 maintainable.
+**When to avoid:** Sparse / non-positional mappings; define separate stores per subset instead of leaving gaps.
+**Combines well with:** Everything except S-01 and S-12.
+**Pattern mapping:** `strategyId: "S-04"`; offered only as a secondary (never a tree primary).
+
+```
+store(K_lc1)  "a"    "b"    "c"    "d"
+store(lc1)    U+0251 U+0253 U+0188 U+0257
+
+dk(family) + any(K_lc1) > index(lc1, 2)
+```
+
+**Real exemplar:** `release/sil/sil_pan_africa_mnemonic/source/sil_pan_africa_mnemonic.kmn`.
+
+#### S-05 Mnemonic spelling / transliteration
+
+**When to use:** A3=strong, A1 ∈ {medium, large}. User types an ASCII transliteration; common for IPA, ITRANS, Sanskrit, romanized Greek.
+**When to avoid:** When the user doesn't know the romanization scheme (S-02/S-06 with visual deadkey feedback is gentler).
+**Combines well with:** S-04, S-09 (script also needs cluster rules), S-11 (two romanization schemes).
+**Pattern mapping:** `strategyId: "S-05"`; `combinesWith: ["S-04", "S-09", "S-11"]`.
+
+```
++ "a"      > "अ"
+"अ" + "a"  > "आ"        c second 'a' lengthens
++ "A"      > "आ"
+```
+
+**Real exemplar:** `release/itrans/itrans_devanagari_hindi/source/itrans_devanagari_hindi.kmn` — `saMskRRta` → `संस्कृत`.
+
+#### S-06 Chained deadkeys (two-tier)
+
+**When to use:** A4=multi-family AND A1=large; or alphabetic scripts where one base key has multiple legitimate outputs and the next key disambiguates. First key picks the *family*, second the *base*.
+**When to avoid:** A single diacritic family (S-02 suffices); when the user can't predict the family key.
+**Combines well with:** S-04 (essential for the per-family table), S-08 (RAlt to host the family keys).
+**Pattern mapping:** `strategyId: "S-06"`; `combinesWith: ["S-04", "S-08"]`.
+
+```
++ [K_LBRKT]                > dk(family_grave)
++ [SHIFT K_LBRKT]          > dk(family_acute)
+
+dk(family_grave) + any(K_vowels) > index(grave_out, 2)
+dk(family_acute) + any(K_vowels) > index(acute_out, 2)
+```
+
+**Real exemplar:** `release/a/armenian_mnemonic_r/source/armenian_mnemonic_r.kmn`; pan-African two-tier family selection in `release/sil/sil_pan_africa_mnemonic/source/sil_pan_africa_mnemonic.kmn`.
+
+#### S-07 Diacritic cycle
+
+**When to use:** A4=replacing-cycling. Tonal languages where the same mark key, pressed again, **replaces** the existing tone rather than stacking.
+**When to avoid:** Genuinely stacked diacritics (S-02); when cycle order isn't obvious (use explicit tone keys).
+**Combines well with:** S-04 (parallel stores per tone state), smart-backspace (Sec 7.4.A).
+**Pattern mapping:** `strategyId: "S-07"`; `combinesWith: ["S-04"]`.
+
+```
+store(vowels)       'aeiou'
+store(vowels_sac)   'áéíóú'      c acute
+store(vowels_huyen) 'àèìòù'      c grave
+
+any(vowels)     + 's' > index(vowels_sac, 1)
+any(vowels_sac) + 's' > index(vowels, 1) 's'      c second press cancels
+any(vowels_sac) + 'f' > index(vowels_huyen, 1)    c f swaps acute → grave
+```
+
+**Real exemplar:** `release/v/vietnamese_telex/source/vietnamese_telex.kmn` — the canonical TELEX cycling pattern.
+
+#### S-08 RAlt modifier-layer
+
+**When to use:** A7=fully booked (or RAlt only). Always an **add-on** — a second plane of characters (symbols, currency, math, rare letters).
+**When to avoid:** As a primary strategy. Discoverability is poor; on macOS, RAlt collides with Option-key shortcuts.
+**Combines well with:** Every primary strategy.
+**Pattern mapping:** `strategyId: "S-08"`; offered only as a secondary (rules 9).
+
+```
++ [RALT K_SLASH]   > U+0301
++ [RALT K_PERIOD]  > '·'
++ [RALT K_COMMA]   > '''
+```
+
+**Real exemplar:** `release/r/russian_mnemonic_r/source/russian_mnemonic_r.kmn`.
+
+#### S-09 Context-sensitive cluster formation
+
+**When to use:** A2 ∈ {abugida, abjad}. Output depends on prior input: Indic *reph*/conjuncts, Arabic hamza-bearing alif variants, positional forms.
+**When to avoid:** Purely alphabetic Latin/Cyrillic (S-02 / S-05 are simpler).
+**Combines well with:** S-05 (romanized input), S-04 (consonant/matra tables), smart-backspace (Sec 7.4.A).
+**Pattern mapping:** `strategyId: "S-09"`; `combinesWith: ["S-05", "S-04"]`.
+
+```
+any(ConsonantsU) + "R" > U+0930 U+094D index(ConsonantsU, 1)
+any(BaseLetter) + 'g' > index(BaseLetter_modified, 1)
+```
+
+**Real exemplar (abugida — Indic *reph*):** `release/sil/sil_devanagari_phonetic/source/sil_devanagari_phonetic.kmn`.
+**Real exemplar (abjad — Arabic hamza):** `release/a/arabic_izza/source/arabic_izza.kmn`.
+
+#### S-10 Constraints + beep
+
+**When to use:** A6=loud. Clusters where users need active feedback that they typed something illegal (e.g. an acute on a consonant that can't take it).
+**When to avoid:** When the invalid combination is rare (the constraint group adds overhead); when `beep` would annoy in long-form typing.
+**Combines well with:** Every primary strategy — a separate `group(constraints)` invoked before `group(main)`.
+**Pattern mapping:** `strategyId: "S-10"`; offered only as a secondary (rule 8).
+
+```
+begin Unicode > use(constraints)
+
+group(constraints) using keys
+any(nonBaseChar) + any(diacriticsKeys) > context beep
+nomatch > use(main)
+
+group(main) using keys
+... real rules ...
+```
+
+**Real exemplar:** `release/el/el_pasifika/source/el_pasifika.kmn` — Polynesian Latin + macron/acute/diaeresis; beeps on invalid base+diacritic combinations.
+
+#### S-11 Stateful option toggle
+
+**When to use:** A5=two-orthography. One keyboard, two written conventions, runtime toggle (Yoruba dotted vs. barred, Hindi vs. Sanskrit implicit-final-a).
+**When to avoid:** When the modes differ widely enough that one shared rule set becomes unmaintainable — ship two keyboards.
+**Combines well with:** Any primary strategy (S-11 wraps `if(style='X')` around its rules).
+**Pattern mapping:** `strategyId: "S-11"`; wraps an inner strategy named in `combinesWith`.
+
+```
+store(style) 'dot'
+
+if(style='dot') + [CTRL '.'] > set(style='bar')
+if(style='bar') + [CTRL '.'] > set(style='dot')
+
+if(style='dot') + 'Z' > U+1E62
+if(style='bar') + 'Z' > U+0053 U+0329
+```
+
+**Real exemplar:** `release/sil/sil_yoruba8/source/sil_yoruba8.kmn` — `Ctrl+.` toggles dotted-below vs. bar-below styles.
+
+#### S-12 DLL IME callout
+
+**When to use:** A1=massive AND A2=logographic. Tens of thousands of Han characters — too large for Keyman rules; delegate to a native IME.
+**When to avoid:** Anywhere else. Locks the keyboard to one OS (Windows) and a shipped DLL — incompatible with cross-platform Keyman targets.
+**Combines well with:** Nothing — a thin shim.
+**Pattern mapping:** `strategyId: "S-12"`; `combinesWith: []`.
+
+```
+store(DLLFunction) "KeymnIMX.DLL:FindGlyph"
+
++ any(VKeys)  > call(DLLFunction)
+nomatch       > call(DLLFunction)
+```
+
+**Real exemplar:** `release/c/cs_pinyin/source/cs_pinyin.kmn` — 100k+ Han characters via Pinyin lookup, delegated to a Windows DLL.
+
+### 7.4 Building blocks
+
+Applied **inside** the strategies above, never chosen independently. The studio invokes them as a keyboard grows.
+
+**7.4.A Smart-backspace / atomic cluster deletion** — recognise a composed cluster in context and delete it as one unit. Use whenever a strategy produces multi-codepoint output (S-02, S-06, S-07, S-09).
+```
+any(bar) U+0329 + [K_BKSP] > nul
+any(dot+nsl) any(ac.all) + [K_BKSP] > nul
+```
+
+**7.4.B `nul` swallow** — disables a key entirely; suppress unused QWERTY keys, or silently drop an invalid sequence (the soft-constraint counterpart to S-10).
+```
+store(disabled) "QWRYUIPASFGHKLZCVBM"
++ any(disabled) > nul
+```
+
+**7.4.C `outs()` store composition** — expand one store inside another to build composite tables without repetition ("all decorated vowels", "everything-but-the-grave-set").
+```
+store(grv.all) outs(base) outs(grv) outs(acu) outs(crc) outs(mac)
+```
+
+**7.4.D `notany()` + `context(N)` deadkey fallback** — when the key after a deadkey isn't an expected continuation, emit the bare base and put the typed key back. Essential for any deadkey strategy (S-02, S-06).
+```
+dk(grave) notany(graveK) > '`' context(2)
+```
+
+**7.4.E `nomatch` group routing** — catch-all that routes unmatched input to another group (constraints → main, main → NFC, main → DLL). Used in every multi-group strategy.
+```
+nomatch > use(main)
+```
+
+**7.4.F Multi-group pipeline** — `begin Unicode > use(constraints)`; `constraints` filters then `nomatch > use(main)`; `main` works then `nomatch > use(NFC)`. Compose around any combination of primaries.
+
+### 7.5 Self-check / validation table
+
+The decision tree must agree with the strategy each exemplar actually uses. This round-trip is the **regression suite**: if "Tree → strategy" disagrees with "Actual primary," the tree is wrong, not the keyboard. Re-run it after any edit to 7.1/7.2/7.3.
+
+| Exemplar | A1 | A2 | A3 | A4 | A5 | A6 | A7 | Tree → strategy | Actual primary |
+|----------|----|----|----|----|----|----|----|-----------------|----------------|
+| `release/a/akan/` | tiny | alphabetic | strong | none | single | none | many | rule 10 → S-01 | S-01 ✓ |
+| `release/sil/sil_euro_latin/` | large | alphabetic | strong | multi-family | single | none | RAlt only | rule 6 → S-06 | S-02 + S-04/S-08 ✗ |
+| `release/sil/sil_ipa/` | medium | alphabetic | strong | none | single | none | many | rule 5 → S-05 + S-04 | S-03 + S-04 ✗ |
+| `release/sil/sil_devanagari_phonetic/` | medium | abugida | strong | none | single | none | many | rule 2 → S-09 + S-05 | S-09 + S-05 ✓ |
+| `release/v/vietnamese_telex/` | medium | alphabetic | strong | replacing-cycling | single | none | many | rule 3 → S-07 + S-04 | S-07 ✓ |
+| `release/sil/sil_yoruba8/` | medium | alphabetic | strong | multi-family | two-orthography | none | many | rule 4 → S-11 wrap | S-11 ✓ |
+| `release/a/armenian_mnemonic_r/` | medium | alphabetic | weak | none | single | none | RAlt only | rule 11 → S-03 ✗ | S-06 + S-08 ✗ |
+| `release/el/el_pasifika/` | small | alphabetic | strong | stacking-combining | single | loud | many | rule 7 → S-02 + rule 8 → +S-10 | S-02 + S-10 ✓ |
+| `release/c/cs_pinyin/` | massive | logographic | weak | none | single | none | many | rule 1 → S-12 | S-12 ✓ |
+| `release/itrans/itrans_devanagari_hindi/` | large | abugida | strong | none | two-orthography | none | many | rule 2 → S-09 + S-05; rule 4 wraps S-11 | S-09 + S-05 + S-11 ✓ |
+| `release/sil/sil_pan_africa_mnemonic/` | large | alphabetic | weak | multi-family | single | none | many | rule 6 → S-06 + S-04 | S-06 + S-04 ✓ |
+| `release/a/arabic_izza/` | medium | abjad | weak | none | single | none | many | rule 2 → S-09 | S-09 ✓ |
+| `release/r/russian_mnemonic_r/` | medium | alphabetic | weak | none | single | none | RAlt only | rule 11 → S-03 ✗ | S-06 + S-08 ✗ |
+
+**Known mismatches (intended v1.1 work, not bugs).** Four exemplars don't round-trip cleanly; each marks a tree gap to fix in v1.1:
+
+- **EuroLatin** and **Armenian/Russian mnemonic**: when A2=alphabetic, A1=large, A4=multi-family, the tree should prefer **S-02 with broad parallel stores** (EuroLatin) or **S-06 + S-08** (Armenian/Russian) depending on A3. Add an A3 tie-breaker inside rules 6/7.
+- **IPA**: A3=strong but the user prefers *sequence modifiers* (`<`, `=`, `>`) to mnemonic spelling. Add a sub-axis distinguishing "spell the sound" from "decorate with suffix keys."
+- **Armenian / Russian fallback**: A3=weak alphabetic-with-collisions currently falls to S-03; should route to S-06 + S-08. Add a rule between 7 and 8: `if A2=alphabetic AND A3=weak AND collisions=yes → S-06 + S-08`.
+
+These four are **the value of the validation pass** — they pinpoint where v1 needs work before release.
+
+---
+
+## 8. Data flow
 
 1. **Base selection.** User opens studio; base-keyboard browser fetches `keymanapp/keyboards` index via GitHub API, highlights `release/basic/` as the default pool. User picks a base (or accepts US-English fallback).
 
@@ -311,9 +699,9 @@ Substitution is deterministic and reproducible: given the same answer map, the s
 
 3. **Survey — Phase A (Identity + routing).** User enters language name, BCP47 tag (with langtags.json lookup), display name, copyright holder. System detects script group (QWERTY/QWERTZ, AZERTY, or non-Roman) from BCP47 + base choice and confirms with the user. This routes all subsequent phases.
 
-4. **Survey — Phase B (Character coverage).** User pastes or lists target characters. Studio diffs against base keyboard output set; for each new character, user states which key it lives on and under what modifier. Emits simple substitution rules.
+4. **Survey — Phase B (Character coverage + strategy axes).** User pastes or lists target characters. Studio diffs against the base keyboard output set and, for each new character, the user states which key it lives on and under what modifier. Crucially, this phase also **computes the discovery axes** (Sec 7.1): the character count fixes A1 (scale), the diff and a few plain-language follow-ups fix A3 (phonetic intuition), A4 (diacritic behavior), and A7 (spare-key availability). The output method is **not** assumed to be simple substitution — Phase B feeds the axis vector to the strategy selector (Sec 7.2), which picks the right strategy. A simple one-key-per-character swap (S-01) is only the result when the inventory is tiny and phonetic; larger or diacritic-heavy inventories route to deadkey composition (S-02), mnemonic spelling (S-05), diacritic cycling (S-07), context-sensitive clusters (S-09), and so on.
 
-5. **Gallery — Phase C (Special inputs).** User sees live mini-keyboards demonstrating interaction patterns (deadkeys, longpress menus, rotas, modifier layers, etc.). Standard patterns for the script group appear first; less common ones are behind "show me more." User taps each demo, picks those that match their language, fills plain-language slot questions. Each selected pattern is inserted as a validated KMN skeleton.
+5. **Gallery — Phase C (Special inputs).** Driven by the strategy selector's result (primary + secondaries, Sec 7.2). The gallery surfaces the **recommended strategy's** patterns first as live mini-keyboards (e.g. a deadkey demo for S-02, a tone-cycle demo for S-07); secondary and less-common strategies sit behind "show me more." This phase also resolves the remaining axes that need a judgment call — A5 (multi-mode), A6 (constraint enforcement), and A2a (cluster sensitivity) — which can add S-11, S-10, or S-09 to the recommendation. User taps each demo, confirms the ones that match their language, and fills plain-language slot questions. Each selected pattern is inserted as a validated KMN skeleton tagged with its `strategyId`.
 
 6. **Gallery/auto — Phase C' (Reordering).** (C-prime.) QWERTY/QWERTZ and AZERTY groups get NFD normalization auto-emitted unless the base already has a reorder scheme. Non-Roman groups see a curated reorder gallery (pre-base vowel, halant/conjunct, tone-mark, subscript stacking) and pick the pattern matching their script family.
 
@@ -333,7 +721,7 @@ Substitution is deterministic and reproducible: given the same answer map, the s
 
 ---
 
-## 8. Three-group routing
+## 9. Three-group routing
 
 The survey branches at Phase A based on BCP47 tag, base-keyboard choice, and user confirmation. The three groups share the same phase structure but differ in authoring emphasis, reordering load, and `&CasedKeys` content.
 
@@ -341,9 +729,11 @@ The survey branches at Phase A based on BCP47 tag, base-keyboard choice, and use
 |---|---|---|---|---|
 | QWERTY / QWERTZ | `release/basic/*`, English/German-family | Character substitution, diacritics via deadkeys, occasional RALT/AltGr | `[K_A]..[K_Z]` | NFD normalization; auto-emitted unless base has its own scheme |
 | AZERTY | French/Francophone-Africa bases | Position remapping (Q<->A, W<->Z), shifted digits, heavy AltGr layer | `[K_A]..[K_Z] [K_0]..[K_9] [K_HYPHEN] [K_EQUAL] [K_LBRKT] [K_RBRKT] [K_BKSLASH] [K_QUOTE] [K_COMMA] [K_PERIOD] [K_SLASH] [K_COLON]` | NFD normalization; auto-emitted unless base has its own scheme |
-| Non-Roman | Curated bases per script family (Indic, Arabic, Hebrew, SEA, etc.) | Character mapping, heavy reordering, script-specific OSK conventions | Typically omitted; survey confirms per script (see decision in Sec 13) | Gallery-picked: pre-base vowel, halant/conjunct, tone-mark, subscript stacking |
+| Non-Roman | Curated bases per script family (Indic, Arabic, Hebrew, SEA, etc.) | Character mapping, heavy reordering, script-specific OSK conventions | Typically omitted; survey confirms per script (see decision in Sec 14) | Gallery-picked: pre-base vowel, halant/conjunct, tone-mark, subscript stacking |
 
 **Routing decision.** Group is detected automatically from the BCP47 script subtag and the chosen base keyboard, then confirmed with the user in a single plain-language step before the survey continues. Non-Roman group is further sub-routed to a script-family branch (Indic, Arabic, SEA, etc.) that controls which reorder patterns are shown in Phase C'.
+
+The three groups are the coarse expression of discovery axis **A2 (script class, Sec 7.1)**: QWERTY/QWERTZ and AZERTY are both *alphabetic*; the Non-Roman group spans *abugida / abjad / syllabary / logographic*, which the strategy selector then refines (e.g. abugida + cluster sensitivity → S-09). Routing narrows the field; the decision tree (Sec 7.2) picks the specific output strategy within it.
 
 **Reorder priority order.** (1) Adopt the base keyboard's existing reorder scheme if present. (2) Otherwise, for QWERTY/QWERTZ and AZERTY, auto-emit a standard NFD-normalization `group(reorder)`. (3) For non-Roman, present the curated reorder pattern gallery; user picks the pattern matching their script's behavior. The LLM maps user intent to slot values; it does not author group chains from scratch.
 
@@ -351,7 +741,7 @@ The survey branches at Phase A based on BCP47 tag, base-keyboard choice, and use
 
 ---
 
-## 9. Validator and lint engine
+## 10. Validator and lint engine
 
 The validator is the sole arbiter of what the survey and LLM are allowed to emit. Existing keyboards in `release/` are not treated as authoritative — the corpus contains both clean and defective patterns, and bad patterns must not survive by inertia.
 
@@ -363,7 +753,7 @@ The validator is the sole arbiter of what the survey and LLM are allowed to emit
 | B | Style / canonical form | Per-compile (TS AST rules) | `@keymanapp/kmn-validator` |
 | C | Repo hygiene (criteria.md) | Per-phase-exit + at submit | `@keymanapp/keyboard-lint` |
 
-**Lint and compile cycle.** One debounce cycle (300 ms) runs two concurrent microtasks: the TS-check pass and the WASM oracle. A TS-check error suppresses the WASM call; a WASM diagnostic always supersedes a conflicting TS diagnostic. This is the resolved single-cycle design (see Sec 13, decision 3).
+**Lint and compile cycle.** One debounce cycle (300 ms) runs two concurrent microtasks: the TS-check pass and the WASM oracle. A TS-check error suppresses the WASM call; a WASM diagnostic always supersedes a conflicting TS diagnostic. This is the resolved single-cycle design (see Sec 14, decision 3).
 
 ### Layer A: the 14 compiler checks
 
@@ -405,9 +795,9 @@ Note: checks #1-9 are portable to TypeScript and run per-keystroke. Checks #10-1
 
 ---
 
-## 10. criteria.md compliance
+## 11. criteria.md compliance
 
-The ~200 criteria in `criteria.md` are classified into four enforcement bands (see Sec 13, decision 4 for the authoritative band definition):
+The ~200 criteria in `criteria.md` are classified into four enforcement bands (see Sec 14, decision 4 for the authoritative band definition):
 
 **Green — by construction.** The scaffolder and validator enforce these automatically. The user never sees them as explicit questions because they cannot be violated through the studio's UI.
 
@@ -421,11 +811,11 @@ The ~200 criteria in `criteria.md` are classified into four enforcement bands (s
 | Yellow | ~60 | "BCP47 tag is correct for the language/script" (SS12) — requires langtags.json lookup and linguistic judgment | Phase A survey asks for the tag; studio cross-checks against langtags.json and flags mismatches for user review |
 | Red | ~15 | "If a third party submits a patch to an existing keyboard, original author was consulted" (SS14) — requires direct author communication | Final checklist item in PR submission flow; PR body includes a reminder block |
 
-The exact green/yellow count split is a Day-1 sync item (issue #6). Counts above are estimates; the final triage (Sec 12) produces authoritative numbers.
+The exact green/yellow count split is a Day-1 sync item (issue #6). Counts above are estimates; the final triage (Sec 13) produces authoritative numbers.
 
 ---
 
-## 11. Output artifacts
+## 12. Output artifacts
 
 ### Virtual filesystem (in-memory, emitted at output time)
 
@@ -463,7 +853,7 @@ Compiled artifacts (`.kmx`, `.kvk`, `.js`) are produced by the in-browser compil
 
 ---
 
-## 12. Team boundaries
+## 13. Team boundaries
 
 ### Engine team owns
 
@@ -489,7 +879,7 @@ Compiled artifacts (`.kmx`, `.kvk`, `.js`) are produced by the in-browser compil
 
 Three contract-lock issues must be resolved in a single joint session before either team begins implementation work:
 
-- **#5** — Lock the Pattern schema (field names, types, placeholder syntax). This spec's TypeScript interface is the proposed starting point.
+- **#5** — Lock the Pattern schema (field names, types, placeholder syntax). This spec's TypeScript interface is the proposed starting point, **including the proposed `strategyId` and `combinesWith` fields (Sec 5)** that link each pattern to the strategy catalog (Sec 7); the session ratifies or drops them.
 - **#6** — Triage criteria.md into auto-fix (scaffolder/Layer C), template-bake (always-clean output), yellow-survey, and red-checklist. Final counts are inputs to the scaffolder spec and the Layer C implementation.
 - **#8** — Define service interfaces in `packages/contracts` (VirtualFS shape, LintFinding type, SurveyPhaseResult, PatternMatch). Both teams build to these interfaces.
 
@@ -497,9 +887,9 @@ After Day 1, engine and content teams work in parallel. The Day-4 integration mi
 
 ---
 
-## 13. Open questions — resolved decisions
+## 14. Open questions — resolved decisions
 
-The following items were open at the time of the initial draft. Each is now a binding decision for v1. Revisiting any decision requires an explicit revision request following the process in Sec 17.
+The following items were open at the time of the initial draft. Each is now a binding decision for v1. Revisiting any decision requires an explicit revision request following the process in Sec 18.
 
 **Decision 1 — Partial slot-fill.**
 Decision: Block submission when a required slot is unfilled. Allow an optional slot to remain empty only if the substituted fragment still passes Layer A validation. The validator adjudicates mechanically; no heuristic or LLM judgment is involved.
@@ -522,12 +912,12 @@ Decision: Four bands, not three:
 Rationale: The original three-band model collapsed the scaffolder-bake and Layer C enforcement into one "green" band. Separating them clarifies the implementation boundary: band 1 is scaffolder work; band 2 is lint-engine work.
 
 **Decision 5 — CJK and Ethiopic v1 status.**
-Decision: CJK and Ethiopic are confirmed excluded from v1. The Three-group routing section (Sec 8) renders a "not yet supported" stub for these scripts. The out-of-scope list (Sec 15) reflects this. These script families are candidates for sprint 2 pattern-library work.
+Decision: CJK and Ethiopic are confirmed excluded from v1. The Three-group routing section (Sec 9) renders a "not yet supported" stub for these scripts. The out-of-scope list (Sec 16) reflects this. These script families are candidates for sprint 2 pattern-library work.
 Rationale: Reorder patterns for CJK and Ethiopic require specialist curation that is not complete. Shipping a silent empty gallery would mislead users; a stub with an explanation is the correct v1 behavior.
 
 ---
 
-## 14. Acceptance scenarios
+## 15. Acceptance scenarios
 
 ### Scenario A: Latin QWERTY keyboard with a deadkey
 
@@ -566,20 +956,24 @@ Rationale: Reorder patterns for CJK and Ethiopic require specialist curation tha
 
 ---
 
-## 15. Out of scope
+## 16. Out of scope
 
 - **Triage tool for traditional submissions** — a separate project that reuses `@keymanapp/kmn-validator` and `@keymanapp/keyboard-lint`; not part of keyboard-studio.
 - **LDML output** — deferred until the LDML-to-touch build path lands in the Keyman toolchain. Emission format is locked to KMN + `.keyman-touch-layout`.
 - **Mobile-app integration** — `oem/` updates, partner CSV updates, partner-organization bundle workflows.
 - **Hosting and deployment** — infrastructure is left to the operator; this project ships a static SPA.
-- **CJK and Ethiopic reorder patterns in v1** — confirmed excluded; see Sec 13, decision 5. Target: sprint 2 pattern-library work.
+- **CJK and Ethiopic reorder patterns in v1** — confirmed excluded; see Sec 14, decision 5. Target: sprint 2 pattern-library work.
 - **Multi-language `welcome.htm` variants** — LLM-generated variants for multiple languages; post-v1.
 - **Editing existing keyboards** — the studio creates new keyboards from a base; it does not support round-tripping or editing an uploaded `.kmn`.
 - **`.kpj.user` or build-folder management beyond what the scaffolder strips** — cleanup is one-time at scaffold time.
+- **Predictive text / wordlists (`.model.ts`)** — the strategy catalog (Sec 7) covers input rules only; lexical models are a separate artifact, post-v1.
+- **Migration of legacy binary keyboards** — the studio authors from KMN sources; it does not import compiled `.kmx`/`.kmn` binaries.
+
+Note: touch/mobile layouts and `.kmp`/`.kvks`/`.keyboard_info` generation are **in** scope (Phases E, D, G) — the strategy framework (Sec 7) was originally drafted physical-keyboard-only, but in the studio it is the desktop-rule layer of the full pipeline (see Sec 7 scope note).
 
 ---
 
-## 16. Glossary
+## 17. Glossary
 
 **BCP47.** Internet standard tag format for identifying human languages and scripts. Example: `tyv` (Tuvan), `hi-Deva` (Hindi in Devanagari script). Used throughout for language and script identification.
 
@@ -587,11 +981,15 @@ Rationale: Reorder patterns for CJK and Ethiopic require specialist curation tha
 
 **deadkey.** A KMN mechanism in which pressing a key emits no character immediately but sets a named state that modifies the next keystroke. Written as `deadkey(name)` in KMN context positions; `dk()` is a synonym.
 
+**decision tree.** The ordered rule set (Sec 7.2) that maps a keyboard's discovery-axis values to a primary output strategy (S-01..S-12) plus secondaries. The strategy selector runs it; its output drives which gallery patterns are shown.
+
+**discovery axis.** One of the seven dimensions (A1–A7, Sec 7.1) the survey computes to describe a keyboard's input-method needs (scale, script class, phonetic intuition, diacritic behavior, multi-mode, constraint enforcement, spare-key availability). The axis vector is the decision tree's input.
+
 **identity propagation.** The scaffolder step that resets the base keyboard's identifier fields — keyboard name, BCP47 language tag, copyright line, and version — to values for the new keyboard being authored. Prevents base-keyboard metadata from appearing in the submitted keyboard.
 
 **kmnFragment.** The KMN rule text embedded in a Pattern record, containing `{{slotId}}` placeholders that the scaffolder replaces with user-supplied values.
 
-**Layer A / Layer B / Layer C.** The three validation layers in the lint engine. Layer A: structural and semantic validity (14 compiler checks). Layer B: style and canonical form (TS AST rules). Layer C: repo hygiene against criteria.md checkpoints. See Sec 9 for details.
+**Layer A / Layer B / Layer C.** The three validation layers in the lint engine. Layer A: structural and semantic validity (14 compiler checks). Layer B: style and canonical form (TS AST rules). Layer C: repo hygiene against criteria.md checkpoints. See Sec 10 for details.
 
 **NCAPS.** A Keyman modifier keyword that suppresses `CAPS LOCK` behavior on a rule. A known scaffolding hygiene issue is leftover `NCAPS` modifiers in base keyboards that should be stripped.
 
@@ -601,19 +999,21 @@ Rationale: Reorder patterns for CJK and Ethiopic require specialist curation tha
 
 **store.** A KMN named sequence of characters or virtual keys, declared with `store(name) '...'`. Stores are referenced in rules via `any(name)` and `index(name, N)`.
 
+**strategy card / strategy ID.** A strategy card (Sec 7.3) is a self-contained, citable description of one `.kmn` output method, identified by a strategy ID (`S-01`..`S-12`). A `Pattern` (Sec 5) names the card it implements via its `strategyId` field.
+
 **virtual FS.** The in-memory filesystem the scaffolder builds during authoring. Mirrors the directory structure expected by `keymanapp/keyboards`. Serialized to `.zip` for download or committed directly for the OAuth PR path.
 
 **WASM.** WebAssembly. The binary format used to run `kmcmplib` (the Keyman compiler) in-browser. Enables 100-300 ms warm recompile without a server round-trip.
 
 ---
 
-## 17. Revision policy
+## 18. Revision policy
 
-This spec evolves via explicit revision requests tracked in the keyboard-studio issue tracker. Changes to prose sections (data flow, scenarios, out-of-scope list) may be made by the spec maintainer following a single-reviewer approval. Changes to the Pattern schema (Sec 5) require a joint engine+content session (the same threshold as the Day-1 contract lock); breaking field changes — renames, type changes, removals — require a major version bump of the `Pattern` interface and a corresponding update to `packages/contracts`. Changes to resolved decisions in Sec 13 require an explicit revision request citing the original decision and the new evidence; they may not be re-opened informally. The following items are tracked for a v1.1 revision cycle and are not in scope for v1: risk and dependencies section, performance targets table, and accessibility section.
+This spec evolves via explicit revision requests tracked in the keyboard-studio issue tracker. Changes to prose sections (data flow, scenarios, out-of-scope list) may be made by the spec maintainer following a single-reviewer approval. Changes to the Pattern schema (Sec 5) require a joint engine+content session (the same threshold as the Day-1 contract lock); breaking field changes — renames, type changes, removals — require a major version bump of the `Pattern` interface and a corresponding update to `packages/contracts`. Changes to resolved decisions in Sec 14 require an explicit revision request citing the original decision and the new evidence; they may not be re-opened informally. The following items are tracked for a v1.1 revision cycle and are not in scope for v1: risk and dependencies section, performance targets table, and accessibility section.
 
 ---
 
-## 18. Reference
+## 19. Reference
 
 | Document | Location |
 |---|---|
@@ -621,9 +1021,10 @@ This spec evolves via explicit revision requests tracked in the keyboard-studio 
 | Validator / lint architecture (14 compiler checks) | `docs/lint.md` in the keyboard-studio repo, or https://github.com/MattGyverLee/keyboard-studio/blob/main/docs/lint.md |
 | PR review criteria (~200 checkpoints, green/yellow/red) | `docs/criteria.md` in the keyboard-studio repo, or https://github.com/MattGyverLee/keyboard-studio/blob/main/docs/criteria.md |
 | Template-cleanup recipe (scaffolder source of truth) | `docs/making-a-template.md` in the keyboard-studio repo, or https://github.com/MattGyverLee/keyboard-studio/blob/main/docs/making-a-template.md |
+| `.kmn` strategy framework (discovery axes, decision tree, strategy cards S-01..S-12) | Merged into Sec 7 of this spec. `strategy tree/strategies.md` is retained only as a stub pointer — do not treat it as a separate source. |
 | GitHub repository | https://github.com/MattGyverLee/keyboard-studio |
 | Issue tracker | https://github.com/MattGyverLee/keyboard-studio/issues |
 
 Issues #5, #6, #8, and #31 are the critical-path items. Do not reference individual issues in shipped code comments; cross-link via commit messages and PR bodies.
 
-This spec is maintained under the revision policy in Sec 17. The next scheduled review is at the Day-4 integration milestone (issue #31).
+This spec is maintained under the revision policy in Sec 18. The next scheduled review is at the Day-4 integration milestone (issue #31).

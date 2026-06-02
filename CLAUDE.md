@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-**Pre-implementation.** As of 2026-06-02 the repo contains no application code — only the v1.0 spec, its sign-off record, and dispatcher stubs for the LEX review crew. Day-1 joint session (issues #5, #6, #8) has not yet started. Do not assume `packages/`, build scripts, or tests exist; check before referencing them.
+**Pre-implementation.** As of 2026-06-02 the repo contains no application code — only the v1.0 spec (which now includes the `.kmn` strategy framework, merged in as §7), its sign-off record, and dispatcher stubs for the LEX review crew. (`strategy tree/strategies.md` is a superseded stub.) Day-1 joint session (issues #5, #6, #8) has not yet started. Do not assume `packages/`, build scripts, or tests exist; check before referencing them.
 
 When implementation begins, this file should be updated with build/test/lint commands and a real architecture map. Until then, keep it small and pointed at the spec.
 
@@ -13,8 +13,11 @@ When implementation begins, this file should be updated with build/test/lint com
 - **`spec.md`** — the v1.0 spec (signed off; 18 sections). Treat as authoritative for scope, schema, validator layering, team boundaries, and resolved decisions.
 - **`docs/spec-signoff.md`** — review-cycle log and decision summary (D1–D5). Use this to see *why* a spec section reads the way it does before proposing changes.
 - **`README.md`** — one-line external description; do not expand without reason.
+- **`strategy tree/strategies.md`** — **superseded.** Merged into `spec.md §7`; now a stub pointer only. Do not edit it or treat it as a source.
 
-The spec embeds external docs by reference (Sec 18): `docs/KM-Questionnaire.md`, `docs/lint.md`, `docs/criteria.md`, `docs/making-a-template.md`. These live in the planned repo layout but are not yet in this working copy — fetch from `https://github.com/MattGyverLee/keyboard-studio` if needed.
+**Relationship between `spec.md` and `strategies.md` (resolved — merged).** The two documents have been unified: the `.kmn` strategy framework (seven discovery axes A1–A7, the decision tree, the S-01…S-12 strategy catalog, building blocks, and the validation table) now lives in **`spec.md` Section 7 (Strategy selection)**. It is wired into the rest of the spec: the survey computes the axes (§7.1), the strategy selector runs the decision tree (§7.2) to pick a strategy, and each `Pattern` (§5) links to its strategy card via the proposed optional `strategyId` / `combinesWith` fields (pending Day-1 issue #5 sign-off). The §7.5 validation table is a self-consistency regression suite — four mismatches are *intentionally* documented as known v1.1 gaps; keep §7.1/§7.2/§7.3 and that table mutually consistent across any edit.
+
+The spec embeds external docs by reference (Sec 19): `docs/KM-Questionnaire.md`, `docs/lint.md`, `docs/criteria.md`, `docs/making-a-template.md`. These live in the planned repo layout but are not yet in this working copy — fetch from `https://github.com/MattGyverLee/keyboard-studio` if needed.
 
 ## Planned architecture (from spec)
 
