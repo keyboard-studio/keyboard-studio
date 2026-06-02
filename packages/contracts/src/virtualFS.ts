@@ -12,6 +12,11 @@ export interface VirtualFS {
   set(path: string, content: Uint8Array | string, isBinary?: boolean): void;
   delete(path: string): boolean;
   list(prefix?: string): string[];
-  /** Serialize to a .zip Blob for the download delivery path (spec section 12). */
-  serializeZip(): Promise<Blob>;
+  /**
+   * Returns raw zip bytes. Browser callers wrap in
+   * `new Blob([bytes], { type: 'application/zip' })` at the download site;
+   * Node callers (compiler service, vitest) consume the bytes directly.
+   * See spec section 12 for the output-artifact contract.
+   */
+  serializeZip(): Promise<Uint8Array>;
 }
