@@ -2,7 +2,7 @@
 
 **Spec version:** 1.0
 **Date:** 2026-06-02
-**Spec file:** keyboard-studio-spec-draft.md (1031 lines, 19 sections)
+**Spec file:** keyboard-studio-spec-draft.md (1044 lines, 19 sections)
 **Reviewer crew:** lex-doc (drafting + revision), lex-qc, lex-domain, lex-synthesis
 (lex-verification was not used — this was a doc-authoring cycle; no code or tests to verify.)
 
@@ -42,6 +42,7 @@ Three items noted in the spec's Revision policy (Sec 18) — Risk/dependencies s
 ## Post-Sign-Off Amendments
 
 - **2026-06-02 (v1.0.1):** Added Decision 6 (desktop-first authoring scope) after pre-implementation review identified the mobile-first phase-order gap as a v1 BLOCKER (lex-domain Cycle 1). Also added §7.1 sub-axis A7a (full-remap detection) and §7.2 rule 8 (alphabetic full-remap → S-06 + S-04 + S-08) to close the Armenian/Cyrillic mis-routing BLOCKER from the same review.
+- **2026-06-02 (v1.0.2, Cycle 3 close-out — Day-1 contract lock APPROVED):** LEX crew 3-cycle review (lex-domain, lex-doc, lex-qc, lex-verification) closed APPROVED. Locked contract surface in `packages/contracts`: Pattern (with `strategyId: StrategyId` / `combinesWith: StrategyId[]`), PatternMatch (optional strategyId), DiscoveryAxisVector (camelCase fields per §7.1; A2a + A7a sub-axes), VirtualFS (`serializeZip(): Promise<Uint8Array>` — Node + browser portable), `makePattern()` factory + `PatternInit`, `ALL_STRATEGY_IDS`, `StrategyId` union. Spec §5 amended in v1.0.2 to use StrategyId in the Pattern interface (was `string`). §7.5 Armenian and Russian rows corrected to S-06 + S-04 + S-08 with new S-04 building-block legend note. §7.2 prose updated with rule-11 description. Build status: typecheck/test/build all exit 0; 7/7 tests pass. Two micro-cleanups (this commit's predecessor): spec.md S-08 card "rules 9" → "rule 10" typo; pattern.test.ts non-null assertions on bare ALL_STRATEGY_IDS index access. Parallel engine + content team phase cleared to start per spec §13.
 
 ---
 

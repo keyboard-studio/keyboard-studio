@@ -10,7 +10,11 @@ export type PatternMatchReason =
 
 export interface PatternMatch {
   patternId: string;
-  strategyId: StrategyId;
+  /**
+   * Optional. Set once the strategy selector resolves a match; absent during
+   * pre-resolution candidate enumeration.
+   */
+  strategyId?: StrategyId;
   /** 1 = top of gallery; ascending. */
   rank: number;
   reason: PatternMatchReason;

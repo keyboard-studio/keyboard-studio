@@ -183,16 +183,16 @@ export interface Pattern {
    * The strategy card (S-01..S-12, Sec 7.3) this pattern implements.
    * The strategy selector uses this to map a decision-tree result to the
    * pattern(s) the gallery should surface.
-   * PROPOSED ADDITION — pending Day-1 issue #5 sign-off (see Sec 18 revision policy).
+   * @see spec.md §5, §7.3
    */
-  strategyId?: string;
+  strategyId?: StrategyId;
   /**
    * Secondary strategy cards this pattern commonly combines with (e.g. ["S-04"]).
    * Mirrors the "Combines well with" line on each strategy card (Sec 7.3) and the
    * "+ secondaries" output of the decision tree (Sec 7.2).
-   * PROPOSED ADDITION — pending Day-1 issue #5 sign-off.
+   * @see spec.md §5, §7.3
    */
-  combinesWith?: string[];
+  combinesWith?: StrategyId[];
   /** Survey questions that fill the named slots in kmnFragment. */
   questions: PatternQuestion[];
   /**
@@ -230,6 +230,8 @@ export interface Pattern {
   reviewDate: string;
 }
 ```
+
+`StrategyId` is the union `'S-01' | 'S-02' | ... | 'S-12'` exported from `@keyboard-studio/contracts`; see §7.3 for the strategy catalog.
 
 **`appliesTo` semantics.** An empty array (`[]`) means the pattern is unrestricted and will be offered to all script groups. A non-empty array lists BCP47 script subtags (e.g. `"Latn"`, `"Deva"`) or base-keyboard IDs; the pattern is then offered only to projects matching at least one listed value.
 
@@ -355,7 +357,7 @@ Seven dimensions describe a keyboard-design need well enough to pick a strategy.
 
 ### 7.2 Decision tree
 
-Ordered rules. The first matching rule fixes the **primary** strategy; rules 9–10 add **secondaries**; rule 12 is the fallback.
+Ordered rules. The first matching rule fixes the **primary** strategy; rules 9–10 add **secondaries**; rule 11 is a late-primary fallback for tiny phonetic additions; rule 12 is the catch-all fallback.
 
 | # | Condition | Primary | Add secondaries |
 |---|-----------|---------|-----------------|
@@ -554,7 +556,7 @@ any(vowels_sac) + 'f' > index(vowels_huyen, 1)    c f swaps acute → grave
 **When to use:** A7=fully booked (or RAlt only). Always an **add-on** — a second plane of characters (symbols, currency, math, rare letters).
 **When to avoid:** As a primary strategy. Discoverability is poor; on macOS, RAlt collides with Option-key shortcuts.
 **Combines well with:** Every primary strategy.
-**Pattern mapping:** `strategyId: "S-08"`; offered only as a secondary (rules 9).
+**Pattern mapping:** `strategyId: "S-08"`; offered only as a secondary (rule 10).
 
 ```
 + [RALT K_SLASH]   > U+0301
@@ -679,13 +681,15 @@ The decision tree must agree with the strategy each exemplar actually uses. This
 | `release/sil/sil_devanagari_phonetic/` | medium | abugida | strong | none | single | none | many | — | rule 2 → S-09 + S-05 | S-09 + S-05 ✓ |
 | `release/v/vietnamese_telex/` | medium | alphabetic | strong | replacing-cycling | single | none | many | addition | rule 3 → S-07 + S-04 | S-07 ✓ |
 | `release/sil/sil_yoruba8/` | medium | alphabetic | strong | multi-family | two-orthography | none | many | addition | rule 4 → S-11 wrap | S-11 ✓ |
-| `release/a/armenian_mnemonic_r/` | medium | alphabetic | weak | none | single | none | RAlt only | full-remap | rule 8 → S-06 + S-04 + S-08 | S-06 + S-08 ✓ |
+| `release/a/armenian_mnemonic_r/` | medium | alphabetic | weak | none | single | none | RAlt only | full-remap | rule 8 → S-06 + S-04 + S-08 | S-06 + S-04 + S-08 ✓ |
 | `release/el/el_pasifika/` | small | alphabetic | strong | stacking-combining | single | loud | many | addition | rule 7 → S-02 + rule 9 → +S-10 | S-02 + S-10 ✓ |
 | `release/c/cs_pinyin/` | massive | logographic | weak | none | single | none | many | — | rule 1 → S-12 | S-12 ✓ |
 | `release/itrans/itrans_devanagari_hindi/` | large | abugida | strong | none | two-orthography | none | many | — | rule 2 → S-09 + S-05; rule 4 wraps S-11 | S-09 + S-05 + S-11 ✓ |
 | `release/sil/sil_pan_africa_mnemonic/` | large | alphabetic | weak | multi-family | single | none | many | addition | rule 6 → S-06 + S-04 | S-06 + S-04 ✓ |
 | `release/a/arabic_izza/` | medium | abjad | weak | none | single | none | many | — | rule 2 → S-09 | S-09 ✓ |
-| `release/r/russian_mnemonic_r/` | medium | alphabetic | weak | none | single | none | RAlt only | full-remap | rule 8 → S-06 + S-04 + S-08 | S-06 + S-08 ✓ |
+| `release/r/russian_mnemonic_r/` | medium | alphabetic | weak | none | single | none | RAlt only | full-remap | rule 8 → S-06 + S-04 + S-08 | S-06 + S-04 + S-08 ✓ |
+
+Note: S-04 (`any`/`index` table mechanism) is structurally embedded in every S-06 deployment; rows that list S-06 implicitly include S-04.
 
 **Known mismatches (intended v1.1 work, not bugs).** Rule 8 (added in v1.0.1) closed the alphabetic full-remap gap; Armenian and Russian mnemonic now round-trip correctly. Two exemplars still don't round-trip; each marks a tree gap to fix in v1.1:
 
