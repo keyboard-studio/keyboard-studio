@@ -333,7 +333,7 @@ Character coverage is **not** "simple substitution." Choosing how a character is
 
 The survey does not emit output rules directly. It computes a seven-axis description of the keyboard's needs (Sec 7.1), runs a decision tree over those axes (Sec 7.2) to choose a **primary output strategy** (one of S-01..S-12) plus likely **secondaries**, and surfaces the matching gallery patterns for the user to confirm by example. The pattern library (Sec 5) is the implementation layer: each `Pattern` names the strategy it implements via `strategyId`, so a decision-tree result maps directly to the patterns the gallery shows first.
 
-**Scope note.** The strategy catalog (Sec 7.3) describes **physical-keyboard (desktop) KMN rules**. Touch counterparts are produced from each pattern's `touchLayoutFragment` and Phase E (Sec 8); packaging from Phase G. The catalog is the desktop-rule layer of the fuller v1 pipeline — not a separate, narrower product. (The strategy framework was originally drafted physical-keyboard-only; in the studio it is embedded in the full touch + packaging flow.)
+**Scope note.** The strategy catalog (Sec 7.3) describes **physical-keyboard (desktop) KMN rules**. Touch counterparts are produced from each pattern's `touchLayoutFragment` and Phase E (Sec 8); packaging from Phase G. The catalog is the desktop-rule layer of the fuller v1 pipeline — not a separate, narrower product. (The strategy framework was originally drafted physical-keyboard-only; in the studio it is embedded in the full touch + packaging flow.) v1 is desktop-first by design (Decision 6, Sec 14); touch-first authoring is a v1.1 candidate.
 
 ### 7.1 Discovery axes
 
@@ -351,9 +351,11 @@ Seven dimensions describe a keyboard-design need well enough to pick a strategy.
 
 **A2a — cluster sensitivity (abugida/abjad only).** If A2 is abugida or abjad, one follow-up resolves whether output depends on prior context (Arabic positional forms, Indic reph/conjuncts, syllabary ligatures): "Does the keyboard need to choose different output based on what was typed before?" Yes → clusters needed; No → clusters not needed. The answer gates decision rule 2 (Sec 7.2).
 
+**A7a — full-remap detection (alphabetic only).** If A2 is alphabetic, one follow-up resolves the keyboard's posture toward the base layout: "Will the keys on your keyboard mostly show the same letters as the base layout (with just a few additions or changes), or will every key display a different letter?" Full-remap → every key reassigned (Russian/Armenian/Greek mnemonic style); addition → most base keys unchanged (Akan-style additive layout). The answer gates the new decision rule 8 (Sec 7.2). For Latin-target alphabetic keyboards on a Latin base, the answer defaults to addition; non-Latin alphabetic targets on a Latin base (Cyrillic, Armenian, Greek, Coptic, Cherokee, Adlam, etc.) are the typical full-remap case.
+
 ### 7.2 Decision tree
 
-Ordered rules. The first matching rule fixes the **primary** strategy; rules 8–9 add **secondaries**; rule 11 is the fallback.
+Ordered rules. The first matching rule fixes the **primary** strategy; rules 9–10 add **secondaries**; rule 12 is the fallback.
 
 | # | Condition | Primary | Add secondaries |
 |---|-----------|---------|-----------------|
@@ -364,10 +366,11 @@ Ordered rules. The first matching rule fixes the **primary** strategy; rules 8�
 | 5 | A3=strong AND A1 ∈ {medium, large} | **S-05** Mnemonic spelling | + S-04 |
 | 6 | A4=multi-family AND A1=large | **S-06** Chained deadkeys (two-tier) | + S-04 |
 | 7 | A4=stacking-combining AND A1 ∈ {small, medium} | **S-02** Deadkey composition | + S-04 |
-| 8 | A6=loud | (whatever above) | + **S-10** Constraints + beep |
-| 9 | A7=fully booked | (whatever above) | + **S-08** RAlt modifier-layer |
-| 10 | A1=tiny AND A3=strong | **S-01** Simple swap | — |
-| 11 | (fallback) | **S-03** Sequence replace | — |
+| 8 | A2=alphabetic AND A7a=full-remap | **S-06** Chained deadkeys (alt-plane mnemonic) | + S-04, + S-08 |
+| 9 | A6=loud | (whatever above) | + **S-10** Constraints + beep |
+| 10 | A7=fully booked | (whatever above) | + **S-08** RAlt modifier-layer |
+| 11 | A1=tiny AND A3=strong | **S-01** Simple swap | — |
+| 12 | (fallback) | **S-03** Sequence replace | — |
 
 ```mermaid
 flowchart TD
@@ -385,9 +388,11 @@ flowchart TD
     R6 -- yes --> S06[/"<b>S-06</b> Chained deadkeys<br/>+ S-04"/]
     R6 -- no --> R7{A4=stacking-combining AND<br/>A1 in small,medium?}
     R7 -- yes --> S02[/"<b>S-02</b> Deadkey composition<br/>+ S-04"/]
-    R7 -- no --> R10{A1=tiny AND<br/>A3=strong?}
-    R10 -- yes --> S01[/"<b>S-01</b> Simple swap"/]
-    R10 -- no --> S03[/"<b>S-03</b> Sequence replace<br/>(fallback)"/]
+    R7 -- no --> R8{A2=alphabetic AND<br/>A7a=full-remap?}
+    R8 -- yes --> S06full[/"<b>S-06</b> Chained deadkeys<br/>+ S-04, + S-08"/]
+    R8 -- no --> R11{A1=tiny AND<br/>A3=strong?}
+    R11 -- yes --> S01[/"<b>S-01</b> Simple swap"/]
+    R11 -- no --> S03[/"<b>S-03</b> Sequence replace<br/>(fallback)"/]
 
     S12 --> Sec
     S09 --> Sec
@@ -395,28 +400,29 @@ flowchart TD
     S11 --> Sec
     S05 --> Sec
     S06 --> Sec
+    S06full --> Sec
     S02 --> Sec
     S01 --> Sec
     S03 --> Sec
 
     Sec{{"Add-on rules"}}
-    Sec --> R8{A6=loud?}
-    R8 -- yes --> Add10[/"+ S-10 Constraints + beep"/]
-    R8 -- no --> R9
-    Add10 --> R9{A7=fully booked?}
-    R9 -- yes --> Add08[/"+ S-08 RAlt modifier-layer"/]
-    R9 -- no --> Done([Recommendation set])
+    Sec --> R9{A6=loud?}
+    R9 -- yes --> Add10[/"+ S-10 Constraints + beep"/]
+    R9 -- no --> R10
+    Add10 --> R10{A7=fully booked?}
+    R10 -- yes --> Add08[/"+ S-08 RAlt modifier-layer"/]
+    R10 -- no --> Done([Recommendation set])
     Add08 --> Done
 
     classDef primary fill:#dde9ff,stroke:#3060c0,color:#000
     classDef addon fill:#fff2cc,stroke:#b58900,color:#000
     classDef decision fill:#f5f5f5,stroke:#666,color:#000
-    class S01,S02,S03,S05,S06,S07,S09,S11,S12 primary
+    class S01,S02,S03,S05,S06,S06full,S07,S09,S11,S12 primary
     class Add08,Add10 addon
-    class R1,R2,R3,R4,R5,R6,R7,R8,R9,R10,Sec decision
+    class R1,R2,R3,R4,R5,R6,R7,R8,R9,R10,R11,Sec decision
 ```
 
-**Prose summary.** Massive logographic → only the OS IME is fast enough; delegate (S-12). Indic/Arabic-shaped scripts need context-aware cluster rules (S-09); phonetic ones add mnemonic spelling. Tonal cycling (S-07) is neither stacking nor deadkey. Dual orthography (S-11) wraps a state toggle around the inner strategy. Big phonetic alphabets (S-05) — let the user type spellings, collapsed with `any`/`index`. Big diacritic palettes (S-06) — two-tier deadkey: first key picks the family, second the base. Small accent-heavy Latin (S-02) — classic deadkey composition. Loud feedback (S-10) and fully-booked layouts (S-08) are add-ons, never the whole answer. A handful of phonetic additions (S-01) — just swap them in. Otherwise (S-03) — short ASCII sequences expand to single chars.
+**Prose summary.** Massive logographic → only the OS IME is fast enough; delegate (S-12). Indic/Arabic-shaped scripts need context-aware cluster rules (S-09); phonetic ones add mnemonic spelling. Tonal cycling (S-07) is neither stacking nor deadkey. Dual orthography (S-11) wraps a state toggle around the inner strategy. Big phonetic alphabets (S-05) — let the user type spellings, collapsed with `any`/`index`. Big diacritic palettes (S-06) — two-tier deadkey: first key picks the family, second the base. Small accent-heavy Latin (S-02) — classic deadkey composition. Non-Latin alphabetic full-remap (Russian/Armenian/Greek mnemonic) — chained deadkeys for case-and-diacritic alternates (S-06) plus an RAlt modifier plane (S-08) for the lesser-used letters. Loud feedback (S-10) and fully-booked layouts (S-08) are add-ons, never the whole answer. A handful of phonetic additions (S-01) — just swap them in. Otherwise (S-03) — short ASCII sequences expand to single chars.
 
 **Encoding.** The tree may be encoded as JSON/TS rules in `packages/contracts` or reasoned over by the LLM directly against this table; both are valid (pick per studio architecture). The strategy selector returns `{ primary: strategyId, secondaries: strategyId[] }`, which the gallery resolves to patterns via the `strategyId` / `combinesWith` fields (Sec 5).
 
@@ -665,29 +671,28 @@ nomatch > use(main)
 
 The decision tree must agree with the strategy each exemplar actually uses. This round-trip is the **regression suite**: if "Tree → strategy" disagrees with "Actual primary," the tree is wrong, not the keyboard. Re-run it after any edit to 7.1/7.2/7.3.
 
-| Exemplar | A1 | A2 | A3 | A4 | A5 | A6 | A7 | Tree → strategy | Actual primary |
-|----------|----|----|----|----|----|----|----|-----------------|----------------|
-| `release/a/akan/` | tiny | alphabetic | strong | none | single | none | many | rule 10 → S-01 | S-01 ✓ |
-| `release/sil/sil_euro_latin/` | large | alphabetic | strong | multi-family | single | none | RAlt only | rule 6 → S-06 | S-02 + S-04/S-08 ✗ |
-| `release/sil/sil_ipa/` | medium | alphabetic | strong | none | single | none | many | rule 5 → S-05 + S-04 | S-03 + S-04 ✗ |
-| `release/sil/sil_devanagari_phonetic/` | medium | abugida | strong | none | single | none | many | rule 2 → S-09 + S-05 | S-09 + S-05 ✓ |
-| `release/v/vietnamese_telex/` | medium | alphabetic | strong | replacing-cycling | single | none | many | rule 3 → S-07 + S-04 | S-07 ✓ |
-| `release/sil/sil_yoruba8/` | medium | alphabetic | strong | multi-family | two-orthography | none | many | rule 4 → S-11 wrap | S-11 ✓ |
-| `release/a/armenian_mnemonic_r/` | medium | alphabetic | weak | none | single | none | RAlt only | rule 11 → S-03 ✗ | S-06 + S-08 ✗ |
-| `release/el/el_pasifika/` | small | alphabetic | strong | stacking-combining | single | loud | many | rule 7 → S-02 + rule 8 → +S-10 | S-02 + S-10 ✓ |
-| `release/c/cs_pinyin/` | massive | logographic | weak | none | single | none | many | rule 1 → S-12 | S-12 ✓ |
-| `release/itrans/itrans_devanagari_hindi/` | large | abugida | strong | none | two-orthography | none | many | rule 2 → S-09 + S-05; rule 4 wraps S-11 | S-09 + S-05 + S-11 ✓ |
-| `release/sil/sil_pan_africa_mnemonic/` | large | alphabetic | weak | multi-family | single | none | many | rule 6 → S-06 + S-04 | S-06 + S-04 ✓ |
-| `release/a/arabic_izza/` | medium | abjad | weak | none | single | none | many | rule 2 → S-09 | S-09 ✓ |
-| `release/r/russian_mnemonic_r/` | medium | alphabetic | weak | none | single | none | RAlt only | rule 11 → S-03 ✗ | S-06 + S-08 ✗ |
+| Exemplar | A1 | A2 | A3 | A4 | A5 | A6 | A7 | A7a | Tree → strategy | Actual primary |
+|----------|----|----|----|----|----|----|----|-----|-----------------|----------------|
+| `release/a/akan/` | tiny | alphabetic | strong | none | single | none | many | addition | rule 11 → S-01 | S-01 ✓ |
+| `release/sil/sil_euro_latin/` | large | alphabetic | strong | multi-family | single | none | RAlt only | addition | rule 6 → S-06 | S-02 + S-04/S-08 ✗ |
+| `release/sil/sil_ipa/` | medium | alphabetic | strong | none | single | none | many | addition | rule 5 → S-05 + S-04 | S-03 + S-04 ✗ |
+| `release/sil/sil_devanagari_phonetic/` | medium | abugida | strong | none | single | none | many | — | rule 2 → S-09 + S-05 | S-09 + S-05 ✓ |
+| `release/v/vietnamese_telex/` | medium | alphabetic | strong | replacing-cycling | single | none | many | addition | rule 3 → S-07 + S-04 | S-07 ✓ |
+| `release/sil/sil_yoruba8/` | medium | alphabetic | strong | multi-family | two-orthography | none | many | addition | rule 4 → S-11 wrap | S-11 ✓ |
+| `release/a/armenian_mnemonic_r/` | medium | alphabetic | weak | none | single | none | RAlt only | full-remap | rule 8 → S-06 + S-04 + S-08 | S-06 + S-08 ✓ |
+| `release/el/el_pasifika/` | small | alphabetic | strong | stacking-combining | single | loud | many | addition | rule 7 → S-02 + rule 9 → +S-10 | S-02 + S-10 ✓ |
+| `release/c/cs_pinyin/` | massive | logographic | weak | none | single | none | many | — | rule 1 → S-12 | S-12 ✓ |
+| `release/itrans/itrans_devanagari_hindi/` | large | abugida | strong | none | two-orthography | none | many | — | rule 2 → S-09 + S-05; rule 4 wraps S-11 | S-09 + S-05 + S-11 ✓ |
+| `release/sil/sil_pan_africa_mnemonic/` | large | alphabetic | weak | multi-family | single | none | many | addition | rule 6 → S-06 + S-04 | S-06 + S-04 ✓ |
+| `release/a/arabic_izza/` | medium | abjad | weak | none | single | none | many | — | rule 2 → S-09 | S-09 ✓ |
+| `release/r/russian_mnemonic_r/` | medium | alphabetic | weak | none | single | none | RAlt only | full-remap | rule 8 → S-06 + S-04 + S-08 | S-06 + S-08 ✓ |
 
-**Known mismatches (intended v1.1 work, not bugs).** Four exemplars don't round-trip cleanly; each marks a tree gap to fix in v1.1:
+**Known mismatches (intended v1.1 work, not bugs).** Rule 8 (added in v1.0.1) closed the alphabetic full-remap gap; Armenian and Russian mnemonic now round-trip correctly. Two exemplars still don't round-trip; each marks a tree gap to fix in v1.1:
 
-- **EuroLatin** and **Armenian/Russian mnemonic**: when A2=alphabetic, A1=large, A4=multi-family, the tree should prefer **S-02 with broad parallel stores** (EuroLatin) or **S-06 + S-08** (Armenian/Russian) depending on A3. Add an A3 tie-breaker inside rules 6/7.
+- **EuroLatin**: A2=alphabetic, A1=large, A4=multi-family, A3=strong, A7a=addition. Tree picks **S-06 (two-tier chained deadkeys)** but the actual keyboard uses **S-02 with broad parallel stores**. Add an A3-and-scale tie-breaker inside rule 6 that prefers S-02 + broad S-04 over S-06 when the diacritic families are independent rather than nested.
 - **IPA**: A3=strong but the user prefers *sequence modifiers* (`<`, `=`, `>`) to mnemonic spelling. Add a sub-axis distinguishing "spell the sound" from "decorate with suffix keys."
-- **Armenian / Russian fallback**: A3=weak alphabetic-with-collisions currently falls to S-03; should route to S-06 + S-08. Add a rule between 7 and 8: `if A2=alphabetic AND A3=weak AND collisions=yes → S-06 + S-08`.
 
-These four are **the value of the validation pass** — they pinpoint where v1 needs work before release.
+These two remaining mismatches are **the value of the validation pass** — they pinpoint where v1 needs work before release. They are not v1 blockers: EuroLatin and IPA are expert-authored, well outside the target user's profile, and the strategies the tree picks (S-06 for EuroLatin, S-05 for IPA) produce working keyboards even if they differ from what SIL chose.
 
 ---
 
