@@ -13,7 +13,7 @@ Seven dimensions describe a keyboard-design need well enough to pick a strategy.
 | # | Axis | Allowed values | What it means |
 |---|---|---|---|
 | A1 | **Scale** | tiny (<5) / small (5–20) / medium (20–100) / large (100–300) / massive (1000+) | How many *new* characters or character forms the keyboard adds beyond a stock physical layout. |
-| A2 | **Script class** | alphabetic / abugida / abjad / syllabary / logographic | Structural class of the target writing system. Drives whether output is one-char-per-key or cluster-shaped. |
+| A2 | **Script class** | alphabetic / abugida / abjad / syllabary / logographic | Structural class of the target writing system. Drives whether output is one-char-per-key or cluster-shaped, and whether follow-up cluster behavior matters for abugida/abjad scripts. |
 | A3 | **Phonetic intuition** | strong / weak | Strong = the user thinks "I'd type a Latin spelling of the sound." Weak = mapping is arbitrary, shape-based, or modifier-based. |
 | A4 | **Diacritic behavior** | none / stacking-combining / replacing-cycling / multi-family | How diacritics behave on a vowel/consonant. Cycling means a repeated mark key replaces the previous mark (Vietnamese-style). |
 | A5 | **Multi-mode** | single / two-orthography | Whether the keyboard exposes a runtime toggle between two orthographic styles (e.g. dotted vs. bar-under Yoruba). |
@@ -34,11 +34,15 @@ A linear question sequence the Studio asks. Each question maps to one axis. Phra
    - thousands → **massive**
 
 **Q2 (A2 Script class).** *What writing system does the keyboard produce?*
-   - Latin or Cyrillic with extra letters → **alphabetic**
-   - An Indian, Tibetan, or Ethiopian-style script where consonants carry an inherent vowel → **abugida**
+   - Latin or Cyrillic with extra letters (for example Polish, Turkish, Serbian Latin) → **alphabetic**
+   - An Indian, Tibetan, or Ethiopian-style script where consonants carry an inherent vowel (for example Devanagari, Amharic) → **abugida**
    - Arabic, Hebrew, or similar (consonants written, vowels optional or as diacritics) → **abjad**
-   - Korean or other true syllabary → **syllabary**
-   - Chinese-style characters → **logographic**
+   - Korean Hangul or Cherokee → **syllabary**
+   - Chinese-style characters (Han) → **logographic**
+
+**Q2a (cluster sensitivity, for abugida/abjad scripts).** *Does the keyboard need to choose different output based on what was typed before, such as Arabic positional forms, Indic reph/conjuncts, or syllabary ligatures?*
+   - Yes → **clusters needed**
+   - No → **clusters not needed**
 
 **Q3 (A3 Phonetic intuition).** *When you picture typing one of the special characters, which is closer to how you'd reach for it?*
    - "I'd type the Latin spelling of the sound" → **strong**
@@ -64,7 +68,7 @@ A linear question sequence the Studio asks. Each question maps to one axis. Phra
    - Base layout is full but AltGr/RAlt is free → **RAlt only**
    - Every key is already assigned → **fully booked**
 
-After Q7, walk the decision tree (§3) to a **primary strategy** plus likely **secondaries**, and surface the matching cards (§4) for the user to confirm.
+If Q2 was abugida or abjad, answer Q2a before walking the decision tree (§3) to a **primary strategy** plus likely **secondaries**, and surface the matching cards (§4) for the user to confirm.
 
 ---
 
@@ -75,7 +79,7 @@ Ordered rules. First matching rule fixes the **primary** strategy. Rules 8–9 a
 | # | Condition | Primary | Add secondaries |
 |---|---|---|---|
 | 1 | A1=massive AND A2=logographic | **S-12** DLL IME callout | — |
-| 2 | A2=abjad OR (A2=abugida AND clusters needed) | **S-09** Context-sensitive cluster | + S-05 if A3=strong |
+| 2 | A2=abjad OR (A2=abugida AND cluster sensitivity=yes) | **S-09** Context-sensitive cluster | + S-05 if A3=strong |
 | 3 | A4=replacing-cycling | **S-07** Diacritic cycle | + S-04 |
 | 4 | A5=two-orthography | **S-11** Stateful option toggle | (wraps whichever strategy fits the per-mode rules) |
 | 5 | A3=strong AND A1 ∈ {medium, large} | **S-05** Mnemonic spelling | + S-04 |
@@ -92,7 +96,7 @@ Ordered rules. First matching rule fixes the **primary** strategy. Rules 8–9 a
 flowchart TD
     Start([User finishes interview]) --> R1{A1=massive AND<br/>A2=logographic?}
     R1 -- yes --> S12[/"<b>S-12</b> DLL IME callout"/]
-    R1 -- no --> R2{A2=abjad OR<br/>A2=abugida+clusters?}
+    R1 -- no --> R2{A2=abjad OR<br/>(A2=abugida AND clusters needed)?}
     R2 -- yes --> S09[/"<b>S-09</b> Context-sensitive cluster<br/>+ S-05 if A3=strong"/]
     R2 -- no --> R3{A4=replacing-cycling?}
     R3 -- yes --> S07[/"<b>S-07</b> Diacritic cycle<br/>+ S-04"/]
