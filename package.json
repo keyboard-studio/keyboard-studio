@@ -8,6 +8,8 @@
     "node": ">=20"
   },
   "scripts": {
+    "fetch-kmcmplib": "node scripts/fetch-kmcmplib.mjs",
+    "prebuild": "pnpm run fetch-kmcmplib",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",

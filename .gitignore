@@ -35,3 +35,6 @@ Thumbs.db
 __pycache__/
 *.pyc
 *.pyo
+
+# kmcmplib fetch output (generated; do not commit)
+packages/compiler/wasm/*.wasm

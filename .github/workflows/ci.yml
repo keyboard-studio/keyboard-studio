@@ -33,6 +33,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Fetch kmcmplib (prod)
+        run: pnpm run fetch-kmcmplib
+        env:
+          KEYBOARD_STUDIO_KMCMPLIB_SOURCE: prod
+
       - name: Typecheck (all packages)
         run: pnpm -r typecheck
 
