@@ -10,7 +10,14 @@ removePhone = True  # Set to True if you want to remove the phone layout
 test = False
 
 def process_modifier_key(lid, key, type):
+    """Mutate `key` in-place to canonical modifier-key form.
 
+    Returns (key, changed) where `changed` is True if any mutation occurred.
+    The outer loop uses `changed` to decide whether to write the touch-layout
+    JSON back to disk; the previous `modified = True` local inside this
+    function never propagated to the outer scope (issue #112).
+    """
+    changed = False
     if key.get("id") in ["K_LCONTROL", "K_RCONTROL", "K_CONTROL","K_ALT", "K_RALT", "K_LALT"] and key.get("sp") != '9':
         if type == "subkey":
             print(f"Processing subkey {key.get('id')} in layer {lid}")
@@ -24,12 +31,12 @@ def process_modifier_key(lid, key, type):
             key["text"] = "*Ctrl*"
             if "ctrl-shift" in layers:
                 key["nextlayer"] = "ctrl-shift"
-                modified = True
+                changed = True
             else:
                 key["nextlayer"] = "ctrl"
             if "crtl" in lid or "control" in lid:
                 key["sp"] = 2
-                modified = True
+                changed = True
             print(f"{id} in {lid} layer")
         elif text in ["*alt*", "ralt", "rightalt"]:
             print(f"{id} in {lid} layer")
@@ -49,14 +56,14 @@ def process_modifier_key(lid, key, type):
                     key["nextlayer"] = "caps"
                     key["sp"] = 2
                     key["text"] = "*RAlt*"
-                modified = True
+                changed = True
             else:
                 key["id"] = "K_RALT"
                 key["text"] = "*RAlt*"
                 if lid == "shift":
                     if "rightalt-shift" in layers:
                         key["nextlayer"] = "rightalt-shift"
-                        modified = True
+                        changed = True
                     else:
                         key["nextlayer"] = "rightalt"
                 elif lid == "default":
@@ -117,8 +124,8 @@ def process_modifier_key(lid, key, type):
                 "nextlayer": target_caps
             }] """
 
-        modified = True
-    return key
+        changed = True
+    return key, changed
 
 # --- K_SYMBOLS placement algorithm ---
 # Picks one (row, column, width, mode) per keyboard that works across all
@@ -365,13 +372,19 @@ for dirpath, _, filenames in os.walk(root_folder):
                                 lid = layer.get("id", "")
                                 for row in layer.get("row", []):
                                     for key in row.get("key", []):
-                                        key = process_modifier_key(lid, key, "key")
+                                        key, m = process_modifier_key(lid, key, "key")
+                                        if m:
+                                            modified = True
                                         if key is not None and key.get("sk") is not None:
                                             for sk in key.get("sk", None):
-                                                sk = process_modifier_key(lid, sk, "subkey")
+                                                sk, m = process_modifier_key(lid, sk, "subkey")
+                                                if m:
+                                                    modified = True
                                         if key is not None and key.get("mt") is not None:
                                             for mt in key.get("multitap", None):
-                                                mt = process_modifier_key(lid, mt, "multitap")
+                                                mt, m = process_modifier_key(lid, mt, "multitap")
+                                                if m:
+                                                    modified = True
 
                             # Use multitap on K_SHIFT for caps transition
                             for layer in layers:

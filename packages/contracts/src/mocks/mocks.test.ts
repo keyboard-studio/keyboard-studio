@@ -440,12 +440,6 @@ describe("makeMockVirtualFS", () => {
     expect(sourceFiles.length).toBe(2);
     expect(sourceFiles.every((p) => p.startsWith("source/"))).toBe(true);
   });
-
-  it("serializeZip returns a Uint8Array", async () => {
-    const fs = makeMockVirtualFS([]);
-    const bytes = await fs.serializeZip();
-    expect(bytes).toBeInstanceOf(Uint8Array);
-  });
 });
 
 // ---------------------------------------------------------------------------

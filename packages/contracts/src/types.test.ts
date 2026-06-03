@@ -62,13 +62,6 @@ describe("VirtualFS interface", () => {
     expect(sources.every((p) => p.startsWith("source/"))).toBe(true);
   });
 
-  it("serializeZip returns a Uint8Array (Node-portable)", async () => {
-    const fs: VirtualFS = makeMockVirtualFS([]);
-    fs.set("a.txt", "hi");
-    const bytes = await fs.serializeZip();
-    expect(bytes).toBeInstanceOf(Uint8Array);
-  });
-
   it("VirtualFSEntry shape: path/isBinary required, content typed", () => {
     const e: VirtualFSEntry = {
       path: "source/x.kmn",

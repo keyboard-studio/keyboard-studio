@@ -215,7 +215,14 @@ def process_kmn_file(filepath):
     caps_sensitive_keys = scan_caps_sensitive_keys(outputs)
     
     # Remove "NCAPS " and lines containing "[CAPS"
-    if caps_sensitive_keys is not [] and caps_sensitive_keys is not None:
+    # Truthy check: empty list is falsy and None is falsy, so this filters
+    # both "no caps-sensitive keys found" and "scan failed / not called yet".
+    # Previous form used `is not []`, which is identity comparison against
+    # a FRESH empty list every evaluation - always True, so the NCAPS-strip
+    # block fired even when no CAPS distinctions existed, silently changing
+    # `[NCAPS K_X]` -> `[K_X]` without inserting compensating `store(&CasedKeys)`.
+    # See issue #113.
+    if caps_sensitive_keys:
         lines = [line.replace("NCAPS ","") for line in lines if "[CAPS" not in line]
 
         # Check if store(&CasedKeys) already present

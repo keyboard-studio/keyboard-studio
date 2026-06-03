@@ -7,16 +7,18 @@ export interface VirtualFSEntry {
   isBinary: boolean;
 }
 
+/**
+ * In-memory virtual filesystem. The studio's source-of-truth for keyboard
+ * source files during authoring; serialized to a zip ONLY through
+ * {@link OutputService.toZip} (which strips compiled artifacts before
+ * delegating to a free serializer). Direct serialization is intentionally
+ * NOT on this interface — see #97. Callers that want a zip must go
+ * through `OutputService.toZip`, which is the safe path that honors
+ * criteria SS1 (no compiled artifacts in PRs, spec §12).
+ */
 export interface VirtualFS {
   get(path: string): VirtualFSEntry | undefined;
   set(path: string, content: Uint8Array | string, isBinary?: boolean): void;
   delete(path: string): boolean;
   list(prefix?: string): string[];
-  /**
-   * Returns raw zip bytes. Browser callers wrap in
-   * `new Blob([bytes], { type: 'application/zip' })` at the download site;
-   * Node callers (compiler service, vitest) consume the bytes directly.
-   * See spec section 12 for the output-artifact contract.
-   */
-  serializeZip(): Promise<Uint8Array>;
 }

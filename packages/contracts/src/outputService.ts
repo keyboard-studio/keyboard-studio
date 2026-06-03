@@ -77,10 +77,12 @@ export interface OutputService {
    * (§12 layout); binary entries are stored uncompressed, text entries
    * deflated.
    *
-   * Note: `VirtualFS.serializeZip()` exists for direct FS serialization;
-   * `OutputService.toZip()` is the output-layer entry point that may
-   * apply additional transformations (e.g. strip compiled artifacts,
-   * inject `NEXT_STEPS.md`) before delegating to `serializeZip`.
+   * `toZip` is the ONLY supported path to serialize the virtual FS — direct
+   * serialization is intentionally not exposed on `VirtualFS` (see #97).
+   * Implementations apply criteria SS1's output-time transforms here:
+   * strip compiled artifacts (`.kmx`, `.kvk`, `.js`), inject
+   * `NEXT_STEPS.md`, etc., before producing the zip bytes. This is the
+   * safe path; consumers cannot accidentally produce a non-compliant zip.
    *
    * @param fs - Virtual FS snapshot to serialize.
    * @returns Raw zip bytes.

@@ -29,10 +29,6 @@ export function makeMockVirtualFS(
       if (prefix === undefined) return keys;
       return keys.filter((k) => k.startsWith(prefix));
     },
-    serializeZip(): Promise<Uint8Array> {
-      // Return an empty zip stub (no real zip library in contracts).
-      return Promise.resolve(new Uint8Array(0));
-    },
   };
 }
 
