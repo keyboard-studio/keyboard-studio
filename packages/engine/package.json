@@ -1,0 +1,34 @@
+{
+  "name": "@keyboard-studio/engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Engine services for keyboard-studio: validator, compiler, scaffolder.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@keyboard-studio/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vitest": "^2.0.5"
+  }
+}
