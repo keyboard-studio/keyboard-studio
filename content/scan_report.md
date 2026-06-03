@@ -32,6 +32,20 @@ Syllabics. **Strategies observed:** S-01 through S-10 from the spec §7 catalog 
 (stateful orthography toggle) shows up only in passing as touch-layer state; S-12 (logographic IME
 callout) does not appear because no CJK keyboard is in the popular set.
 
+**Known-rough set (negative fixtures for `@keymanapp/keyboard-lint`):** 4 keyboards from
+`experimental/`, all Layer-A valid (they compile and run — rough, not broken). Criteria exercised:
+
+| Criterion | Description | Keyboards |
+|---|---|---|
+| 3.6 | HISTORY.md top version != .kmn version | elfdalian |
+| 4.5 | LICENSE.md copyright line malformed | elfdalian, gff_geez_emufi, wancho, alkelang |
+| 5.2 | Version string embedded in user-facing doc | elfdalian, gff_geez_emufi, wancho, alkelang |
+| 6 | readme.htm missing from source/ | gff_geez_emufi, alkelang |
+| 7.2 | targets lists platforms alongside `any` | elfdalian |
+
+Groups covered: QWERTY/QWERTZ Latin (elfdalian), mobile-touch Latin (alkelang), Non-Roman
+syllabary/abugida (gff_geez_emufi: Ethiopic; wancho: Wancho script).
+
 ### Two intentional gaps relative to the issue's literal coverage targets
 
 The popularity-driven selection does not hit two of the originally suggested minimums. They are
@@ -40,10 +54,14 @@ recorded openly here rather than papered over, so a follow-up pass can fill them
 1. **AZERTY breadth.** Only one AZERTY keyboard (Cameroon AZERTY) made the popular cut. The Francophone
    Africa AZERTY family is large (e.g. the Senegal, Mali and Tchad AZERTY keyboards) and additional
    examples can be added if AZERTY-specific coverage is needed.
-2. **"Known-rough" examples.** All twenty were chosen as clean references, and on inspection none is
-   outright defective. Four carry small, honestly-noted caveats (flagged `clean (caveat: …)` below),
-   but a couple of deliberately *rough* keyboards should be scanned later to exercise the linter's
-   negative cases.
+2. **"Known-rough" examples.** All twenty clean keyboards were chosen as positive references; none
+   is outright defective. This gap is now closed: four deliberately rough keyboards from
+   `keymanapp/keyboards experimental/` — elfdalian, gff_geez_emufi, wancho, alkelang — have been
+   scanned with `scan_hygiene.py` and documented in the [Known-rough keyboards](#known-rough-keyboards)
+   section below. Together they exercise criteria {3.6, 4.5, 5.2, 6, 7.2} and serve as the
+   negative-fixture corpus for `@keymanapp/keyboard-lint`. A fifth keyboard, hong_kong (3.6:
+   HISTORY '2.1' != .kmn '2.2'), is reserved as a second version-skew example if additional
+   coverage is needed.
 
 ### How to read each entry
 
@@ -500,3 +518,128 @@ the Windows layout rather than a hand-crafted design, which is why it makes no a
 keying mistakes. The honest caveat is that, being a minimal machine import, its own package notes steer
 users toward the smarter Khmer Angkor keyboard, which auto-corrects errors. Technically it is still tidy
 — proper copyright, real version and a Khmer display map (lines 16-18).
+
+---
+
+# Known-rough keyboards
+
+These four keyboards are approved as negative-fixture references for the keyboard-lint validator
+(`@keymanapp/keyboard-lint`). Each is Layer-A valid — the keyboard compiles and runs correctly —
+but carries one or more hygiene flags that the linter's Layer-C checks should catch and FAIL.
+They come from `keymanapp/keyboards experimental/` and were detected with `content/tools/scan_hygiene.py`,
+which encodes the green-band (deterministic) checks of [criteria.md](../docs/criteria.md); flag
+strings below are quoted verbatim from `content/hygiene_report.csv`.
+
+The lint fixtures themselves are deferred until `@keymanapp/keyboard-lint` is scaffolded (the package
+does not yet exist). When it is, each fixture's `criterionId` must match the criteria catalog exactly
+(e.g. `3.6`, `4.5`, `5.2`, `6`/`6.1-readme-htm-exists`, `7.2`), one finding per tripped criterion.
+
+## elfdalian
+- **Display name / downloads:** Övdalsk — experimental; no keyman.com download count
+- **Language(s) / script:** Elfdalian (Övdalsk), a conservative North Germanic variety spoken in Älvdalen, Dalarna, Sweden; Latin script with a large inventory of ogonek and ring-ogonek letters (ą, ą̊, ę, į, ų and capitals) plus eth (Đ)
+- **Group:** QWERTY/QWERTZ
+- **Strategy:** S-08 Alt modifier-layer (+ S-01 simple swap on the remapped bracket key)
+- **Axes:** A1=small · A2=alphabetic · A3=weak (positional Alt-layer) · A4=none (precomposed output) · A6=none · A7=Alt layer only
+- **Quality:** rough
+- **Rough:** 3.6 — HISTORY.md top version '1.05' != .kmn version '1.0.5'
+- **Rough:** 4.5 — LICENSE.md has no well-formed copyright line
+- **Rough:** 5.2 — version string 'Version 1.05' embedded in README.md
+- **Rough:** 7.2 — targets lists `mobile` alongside `any`
+- **Scan flag:** green · `HISTORY.md top version '1.05' != .kmn version '1.0.5'`
+- **Scan flag:** green · `LICENSE.md has no well-formed 'Copyright © <year> <holder>' line`
+- **Scan flag:** green · `version number embedded in user-facing README.md ('Version 1.05')`
+- **Scan flag:** green · `targets lists platforms alongside 'any': 'any mobile'`
+- **Lint expectation:** FAIL `3.6`, `4.5`, `5.2`, `7.2`
+- **Source:** experimental/e/elfdalian/source/elfdalian.kmn
+
+Elfdalian is a highly archaic North Germanic variety spoken by a few thousand people in the Älvdalen
+municipality of Dalarna, Sweden. Its orthography preserves vowels and consonants lost from standard
+Swedish, including several ogonek letters, a ring-ogonek (ą̊) and the eth (Đ). The keyboard maps these
+special letters onto Alt-modified positions of an otherwise standard QWERTY layout (elfdalian.kmn
+lines 27-40), and reassigns the bracket key to produce å directly. Because each key emits a single
+precomposed character, the design is effectively a positional swap reached through an Alt plane — close
+to S-01 in spirit, layered via S-08. The header records that it began as a Google Input Tools
+conversion (line 1). It is a perfectly usable keyboard, but it shows four independent hygiene problems
+at once, which makes it the richest single negative fixture: the changelog version '1.05' is written
+differently from the source's '1.0.5'; the licence file lacks the exact `Copyright © <year> <holder>`
+line; the README repeats the version number; and the targets line says `any mobile`, where `any`
+already covers mobile.
+
+## gff_geez_emufi
+- **Display name / downloads:** Geʾez EMUFI — experimental; no keyman.com download count
+- **Language(s) / script:** Geʾez (Classical Ethiopic, ISO 639-2 gez) in the Ethiopic Fidel syllabary; companion to the EMUFI "Geʾez Manuscript Zemen" font, which carries manuscript letter-forms not yet in Unicode
+- **Group:** Non-Roman (syllabary / abugida)
+- **Strategy:** S-05 mnemonic transliteration (+ S-03 sequence replace for consonant+vowel reshaping)
+- **Axes:** A1=large · A2=syllabary · A2a=yes · A3=strong (phonetic Latin input) · A4=none · A5=single · A6=none · A7=fully-booked
+- **Quality:** rough
+- **Rough:** 4.5 — LICENSE.md has no well-formed copyright line
+- **Rough:** 5.2 — version 'Version 1.0' in README.md *and* 'v1.2' in source/welcome.htm (two-source inconsistency)
+- **Rough:** 6 — readme.htm missing from source/
+- **Scan flag:** green · `LICENSE.md has no well-formed 'Copyright © <year> <holder>' line`
+- **Scan flag:** green · `version number embedded in user-facing README.md ('Version 1.0')`
+- **Scan flag:** green · `version number embedded in user-facing source/welcome.htm ('v1.2')`
+- **Scan flag:** green · `readme.htm missing from source/ (shown on package install)`
+- **Lint expectation:** FAIL `4.5`, `5.2` (×2 — README and welcome.htm), `6`
+- **Source:** experimental/gff/gff_geez_emufi/source/gff_geez_emufi.kmn
+
+Geʾez is the classical liturgical language of the Ethiopian and Eritrean Orthodox Tewahedo churches,
+written in the Ethiopic Fidel syllabary shared with Amharic and Tigrinya. This keyboard accompanies the
+EMUFI manuscript-font project, which supplies punctuation, numeral forms and letter variants found in
+manuscripts but not yet standardised in Unicode. Input follows the standard Geʾez Frontier Foundation
+mnemonic convention: the typist enters a consonant's Latin sound followed by a vowel, and the keyboard
+replaces the pair with the correct Ethiopic syllable. Because the target font uses some Private Use Area
+codepoints for manuscript-only forms, the keyboard belongs in `experimental/`. Its roughness is mostly
+documentary: the licence file lacks the exact copyright line, and the version number is stated in two
+user-facing places that disagree — the README says 'Version 1.0' while welcome.htm says 'v1.2'. It is
+also missing `source/readme.htm`, so the package-install splash would be blank.
+
+## wancho
+- **Display name / downloads:** Wancho — experimental; no keyman.com download count
+- **Language(s) / script:** Wancho, a Tibeto-Burman language of Arunachal Pradesh and Nagaland, NE India; Wancho script (Unicode U+1E2C0–U+1E2FF, added in Unicode 12.0)
+- **Group:** Non-Roman (alphabetic, direct map)
+- **Strategy:** S-01 simple swap (one Wancho character per key, no context rules)
+- **Axes:** A1=small · A2=alphabetic · A3=weak (positional map) · A4=none · A6=none · A7=fully-booked
+- **Quality:** rough
+- **Rough:** 4.5 — LICENSE.md has no well-formed copyright line
+- **Rough:** 5.2 — version string 'Version 1.0' embedded in README.md
+- **Scan flag:** green · `LICENSE.md has no well-formed 'Copyright © <year> <holder>' line`
+- **Scan flag:** green · `version number embedded in user-facing README.md ('Version 1.0')`
+- **Lint expectation:** FAIL `4.5`, `5.2`
+- **Source:** experimental/w/wancho/source/wancho.kmn
+
+Wancho is spoken by roughly fifty thousand people in the hill districts of Arunachal Pradesh and
+Nagaland in northeast India. Its script was devised by community scholar Banwang Losu and added to
+Unicode in version 12.0 (2019). The keyboard is a straightforward direct mapping — each physical key
+produces a fixed Wancho letter, digit or punctuation mark, with Shift giving variant forms — so it is
+pure S-01 with no context rules or dead keys. That simplicity makes it a clean negative fixture for
+file-level hygiene without any engine-complexity noise. Two issues are present: the licence file lacks
+the required `Copyright © <year> <holder>` line, and the README embeds the version string 'Version
+1.0'. The `.kmn` copyright store reads `© 2020 Banwang Losu` — the symbol is there but the literal word
+"Copyright" is absent, exactly the pattern the 4.5 check targets.
+
+## alkelang
+- **Display name / downloads:** Àlkèláŋg — experimental; no keyman.com download count
+- **Language(s) / script:** Bafut (bfd) and related Cameroonian Grassfields languages; Latin script with IPA extensions (ɓ, ɗ, ɛ, ɔ, ŋ and others) for tone-language phonetics
+- **Group:** QWERTY/QWERTZ (mobile-first; the header calls it an AZERTY mobile/tablet layout, but the `.kmn` is a touch-layout keyboard with no hardware base rules)
+- **Strategy:** S-08 modifier/layer (touch layers: default, shift, numeric, IPA) with an S-10 layer-state PostKeystroke group
+- **Axes:** A1=small · A2=alphabetic · A3=strong (phonetic IPA layer) · A4=none · A5=multi (numeric + IPA layers) · A6=soft · A7=fully-booked (touch layers)
+- **Quality:** rough
+- **Rough:** 4.5 — LICENSE.md has no well-formed copyright line
+- **Rough:** 5.2 — version string 'Version : 1.0' embedded in README.md
+- **Rough:** 6 — readme.htm missing from source/
+- **Scan flag:** green · `LICENSE.md has no well-formed 'Copyright © <year> <holder>' line`
+- **Scan flag:** green · `version number embedded in user-facing README.md ('Version : 1.0')`
+- **Scan flag:** green · `readme.htm missing from source/ (shown on package install)`
+- **Lint expectation:** FAIL `4.5`, `5.2`, `6`
+- **Source:** experimental/a/alkelang/source/alkelang.kmn
+
+Àlkèláŋg is a touch-first keyboard for Bafut, a Grassfields Bantu language of the North West Region of
+Cameroon, and related languages of the same area. The `.kmn` header describes it as an "AZERTY mobile
+et tablet" layout with suggestions, authored by SOSA Developments under the MIT licence. In practice it
+is primarily a touch keyboard: it provides a full IPA extension layer reached by a dedicated layer key,
+giving typists the phonetic letters (ɓ, ɗ, ɛ, ɔ, ŋ and others) that the General Alphabet of Cameroonian
+Languages requires (alkelang.kmn stores `ipa_keys` / `ipa_shift_keys`), and a PostKeystroke group keeps
+the keyboard on the correct layer after each keypress. As the second Latin-script keyboard in the rough
+set it complements elfdalian. Three documentary issues are present: the licence holder is written
+`(C) NIBANN ENGINEERING` with no `©` and no year; the README embeds 'Version : 1.0'; and
+`source/readme.htm` is missing.
