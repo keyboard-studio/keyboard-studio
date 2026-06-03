@@ -24,8 +24,9 @@ export interface CompilerService {
    * Compile the keyboard identified by `keyboardId` from the given virtual FS
    * snapshot using the kmcmplib WASM binary.
    *
-   * Produces `.kmx`, `.kvk`, and `.js` artifacts as blob URLs (see
-   * `CompileArtifact.blobUrl`). Diagnostics in the result are Layer A
+   * Produces `.kmx`, `.kvk`, and `.js` artifacts as URLs (see
+   * `CompileArtifact.url` — browser blob URLs or Node file:// / data: URIs
+   * depending on the host environment). Diagnostics in the result are Layer A
    * WASM-oracle findings and supersede any conflicting TS-check findings
    * for the same location (Decision 3, §14).
    *

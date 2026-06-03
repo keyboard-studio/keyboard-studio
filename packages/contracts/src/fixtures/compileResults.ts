@@ -9,25 +9,25 @@ import { validatorFindings } from "./lintFindings";
  * all three severity bands.
  *
  * The artifacts simulate a successful kmcmplib WASM run for "my_keyboard";
- * blob URLs are static placeholders (real ones would be created via
- * URL.createObjectURL in the browser).
+ * URLs are static blob-URL placeholders (real ones would be created via
+ * URL.createObjectURL in the browser, or be file:// / data: URIs in Node).
  */
 export const mixedDiagnosticsResult: CompileResult = {
   success: false, // false because an error-level finding is present
   artifacts: [
     {
       filename: "my_keyboard.kmx",
-      blobUrl: "blob:http://localhost/mock-kmx-00000000-0000-0000-0000-000000000001",
+      url: "blob:http://localhost/mock-kmx-00000000-0000-0000-0000-000000000001",
       sizeBytes: 2048,
     },
     {
       filename: "my_keyboard.kvk",
-      blobUrl: "blob:http://localhost/mock-kvk-00000000-0000-0000-0000-000000000002",
+      url: "blob:http://localhost/mock-kvk-00000000-0000-0000-0000-000000000002",
       sizeBytes: 512,
     },
     {
       filename: "my_keyboard.js",
-      blobUrl: "blob:http://localhost/mock-js-00000000-0000-0000-0000-000000000003",
+      url: "blob:http://localhost/mock-js-00000000-0000-0000-0000-000000000003",
       sizeBytes: 8192,
     },
   ],

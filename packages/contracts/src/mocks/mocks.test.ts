@@ -274,11 +274,11 @@ describe("mockCompiler", () => {
     expect(result.artifacts.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("compile artifact has filename, blobUrl, and sizeBytes", async () => {
+  it("compile artifact has filename, url, and sizeBytes", async () => {
     const result = await mockCompiler.compile(scaffoldedFS, "my_keyboard");
     const a = result.artifacts[0]!;
     expect(typeof a.filename).toBe("string");
-    expect(typeof a.blobUrl).toBe("string");
+    expect(typeof a.url).toBe("string");
     expect(typeof a.sizeBytes).toBe("number");
   });
 

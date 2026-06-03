@@ -88,7 +88,7 @@ keyboard-studio
 |                                         new keyboard being authored).
 |
 +-- authoring engine           [engine/content]
-|   +-- survey                            Six-phase branching questionnaire; LLM maps answers to
+|   +-- survey                            Eight-phase branching questionnaire (A, B, C, C-prime, D, E, F, G — see §8); LLM maps answers to
 |   |                                     slot values and to the seven discovery axes (Sec 7);
 |   |                                     plain-language throughout.
 |   +-- strategy selector       [engine/content]
