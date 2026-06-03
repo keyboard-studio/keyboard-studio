@@ -107,6 +107,28 @@ which combinations exist. It is a clean example, with a proper cased-keys declar
 populated copyright and visual-keyboard reference, and a helpful on-screen message telling users how to
 reach the extra characters (line 4).
 
+## sil_cameroon_azerty
+- **Display name / downloads:** Cameroon AZERTY — 2,233/mo
+- **Language(s) / script:** Latin script with the General Alphabet of Cameroonian Languages, on a French AZERTY base
+- **Group:** AZERTY
+- **Strategy:** S-08 RAlt modifier-layer (+ S-06 chained deadkeys, + S-02 deadkey composition, + S-04 parallel-store lookup, + S-10 constraints + beep)
+- **Axes:** A1=medium · A2=alphabetic · A3=strong · A4=multi-family · A6=loud (beep) · A7=fully-booked
+- **Quality:** clean (caveat: legacy NCAPS/CAPS rule pairs on the slash key, lines 264-267)
+- **Source:** release/sil/sil_cameroon_azerty/source/sil_cameroon_azerty.kmn
+
+This is the French-keyboard counterpart to Cameroon QWERTY, for the very large population of Cameroon
+that learned typing on a French AZERTY layout. The base follows AZERTY conventions — A and Q are
+swapped, Z and W are swapped, and the digit row produces French accented letters and symbols directly
+(sil_cameroon_azerty.kmn lines 40-99, 101, 182). As with its sibling, the right-hand Alt key opens a
+plane of African letters (lines 102-230), and special tone and accent marks sit on the bracket and
+quote keys. Its most distinctive feature is a richer two-step "dead key" system inherited from French
+typing: pressing a French accent key first, then a vowel, composes letters such as ã, ñ, ê or ä through
+several paired lookup tables (lines 366-400), and an exclamation-mark prefix opens a large general
+character menu. Invalid combinations beep (e.g. lines 43, 86, 233). It is well-built — proper cased
+keys (line 11), populated copyright, named author and website — though it still carries a pair of older
+explicit Caps-Lock-state rules on the slash key (lines 264-267) that modern keyboards usually handle
+automatically, hence the minor caveat.
+
 ## el_naija
 - **Display name / downloads:** Naija Type (package name "Naija NFD") — 1,010/mo
 - **Language(s) / script:** Latin script for Nigerian languages (Igbo, Yoruba, Hausa, Efik, Tiv and many more), with tone marks and below-base dots
@@ -262,31 +284,6 @@ clean example with an authored copyright and a worked typing example in its pack
 ---
 
 # Non-Latin-script keyboards
-
-## sil_cameroon_azerty
-- **Display name / downloads:** Cameroon AZERTY — 2,233/mo
-- **Language(s) / script:** Latin script with the General Alphabet of Cameroonian Languages, on a French AZERTY base
-- **Group:** AZERTY
-- **Strategy:** S-08 RAlt modifier-layer (+ S-06 chained deadkeys, + S-02 deadkey composition, + S-04 parallel-store lookup, + S-10 constraints + beep)
-- **Axes:** A1=medium · A2=alphabetic · A3=strong · A4=multi-family · A6=loud (beep) · A7=fully-booked
-- **Quality:** clean (caveat: legacy NCAPS/CAPS rule pairs on the slash key, lines 264-267)
-- **Source:** release/sil/sil_cameroon_azerty/source/sil_cameroon_azerty.kmn
-
-This is the French-keyboard counterpart to Cameroon QWERTY, for the very large population of Cameroon
-that learned typing on a French AZERTY layout. The base follows AZERTY conventions — A and Q are
-swapped, Z and W are swapped, and the digit row produces French accented letters and symbols directly
-(sil_cameroon_azerty.kmn lines 40-99, 101, 182). As with its sibling, the right-hand Alt key opens a
-plane of African letters (lines 102-230), and special tone and accent marks sit on the bracket and
-quote keys. Its most distinctive feature is a richer two-step "dead key" system inherited from French
-typing: pressing a French accent key first, then a vowel, composes letters such as ã, ñ, ê or ä through
-several paired lookup tables (lines 366-400), and an exclamation-mark prefix opens a large general
-character menu. Invalid combinations beep (e.g. lines 43, 86, 233). It is well-built — proper cased
-keys (line 11), populated copyright, named author and website — though it still carries a pair of older
-explicit Caps-Lock-state rules on the slash key (lines 264-267) that modern keyboards usually handle
-automatically, hence the minor caveat.
-
-*(This keyboard is listed here, alongside its script peers, because it is the scan's sole AZERTY
-example; it is Latin-script and shares the General Alphabet of its QWERTY sibling above.)*
 
 ## gff_amharic
 - **Display name / downloads:** GFF Amharic — 5,362/mo
