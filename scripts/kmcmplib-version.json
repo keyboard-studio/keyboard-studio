@@ -1,8 +1,8 @@
 {
-  "_comment": "Pinned kmcmplib acquisition config. See issue #125 to replace placeholder values.",
-  "version": "17.0.286",
-  "sha256": "PLACEHOLDER_REPLACE_WITH_ACTUAL_SHA256",
-  "urlTemplate": "https://github.com/keymanapp/keyman/releases/download/release%2F{version}/kmcmplib.wasm",
-  "devBuildCmd": "bash build.sh --target kmcmplib",
-  "devArtifactPath": "developer/build/release/wasm/kmcmplib.wasm"
+  "_comment": "Pinned kmcmplib acquisition config. prod fetches the wasm bundled inside @keymanapp/kmc-kmn from the jsDelivr npm CDN; dev builds the kmcmplib target from a sibling keymanapp/keyman checkout.",
+  "version": "19.0.240-alpha",
+  "sha256": "3cb5454666cd70411d8940f4365236d1d8543a59a1ef9004467a109a8ff8f1e2",
+  "urlTemplate": "https://cdn.jsdelivr.net/npm/@keymanapp/kmc-kmn@{version}/build/src/import/kmcmplib/wasm-host.wasm",
+  "devBuildCmd": "./build.sh @/developer/src/kmcmplib:wasm --release",
+  "devArtifactPath": "developer/src/kmcmplib/build/wasm/release/src/wasm-host.wasm"
 }
