@@ -187,10 +187,18 @@ export interface Pattern {
    */
   strategyId?: StrategyId;
   /**
-   * Secondary strategy cards this pattern commonly combines with (e.g. ["S-04"]).
-   * Mirrors the "Combines well with" line on each strategy card (Sec 7.3) and the
-   * "+ secondaries" output of the decision tree (Sec 7.2).
+   * Pattern-author-declared partner strategies — the "Combines well with"
+   * line on the pattern's strategy card (Sec 7.3). These are STRUCTURAL
+   * pairings the pattern author endorses (e.g. S-02 deadkey patterns
+   * usually pair with S-04 parallel-store lookup).
+   *
+   * This field is NOT the same as `StrategyRecommendation.secondaries`
+   * from the §7.2 decision tree, which are AXIS-CONDITIONAL secondaries
+   * added at recommendation time (rules 9/10: + S-10 on A6=loud,
+   * + S-08 on A7=fully-booked). The gallery's full secondary set for a
+   * given (recommendation, pattern) pair is the union of the two.
    * @see spec.md §5, §7.3
+   * @see Sec 7.2 — `StrategyRecommendation.secondaries` (axis-conditional)
    */
   combinesWith?: StrategyId[];
   /** Survey questions that fill the named slots in kmnFragment. */
@@ -373,6 +381,13 @@ Ordered rules. The first matching rule fixes the **primary** strategy; rules 9�
 | 10 | A7=fully booked | (whatever above) | + **S-08** RAlt modifier-layer |
 | 11 | A1=tiny AND A3=strong | **S-01** Simple swap | — |
 | 12 | (fallback) | **S-03** Sequence replace | — |
+
+**Firing order — important.** The table is numbered 1-12 but rules do NOT fire in raw 1→12 sequence. The actual order an implementation runs is:
+
+1. **Primary-fixing pass.** Try rules 1-8 in order; the first matching rule sets `primary`. If none of 1-8 match, try rule 11 (`A1=tiny AND A3=strong`); if it matches, primary is S-01. Otherwise rule 12 (catch-all) sets primary to S-03.
+2. **Secondary-adding pass.** Regardless of which primary was chosen, rules 9 (A6=loud → +S-10) and 10 (A7=fully-booked → +S-08) fire to APPEND axis-conditional secondaries to `StrategyRecommendation.secondaries`. These rules never set the primary — see {@link PrimaryRuleNumber} in `packages/contracts` which excludes 9 and 10 from valid `triggeredRule` values.
+
+An implementation that walked the table top-to-bottom and halted on the first match would mis-categorize keyboards where rule 9 (A6=loud) fires before any 1-8 match — they'd be left with no primary. The Mermaid diagram below shows the correct flow (R1-R8 → R11 → R12 chain for primary, then `Sec → R9 → R10` for add-ons).
 
 ```mermaid
 flowchart TD
@@ -806,21 +821,24 @@ Note: checks #1-9 are portable to TypeScript and run per-keystroke. Checks #10-1
 
 ## 11. criteria.md compliance
 
-The ~200 criteria in `criteria.md` are classified into four enforcement bands (see Sec 14, decision 4 for the authoritative band definition):
+The 133 criteria in `criteria.md` are classified into four enforcement bands per Decision 4 (Sec 14). The Day-1 triage is recorded as a typed `Criterion[]` in `packages/contracts/data/criteria.json`; per-band rationale and any flagged-for-re-review entries live in `packages/contracts/data/criteria-summary.md`.
 
-**Green — by construction.** The scaffolder and validator enforce these automatically. The user never sees them as explicit questions because they cannot be violated through the studio's UI.
+**Band 1 — scaffolder-bake.** The scaffolder makes violation impossible at template-fill time. The user never sees these as explicit checks because the bad state cannot exist in their virtual FS.
 
-**Yellow — via survey.** These require reading and understanding content, consulting a public resource (langtags, Ethnologue, an organization's website), or making a judgment call. The survey surfaces them as plain-language questions at the relevant phase.
+**Band 2 — layer-c-enforce.** The user could violate during authoring; the lint engine catches it on every 300 ms debounce cycle. Layer C blocks phase progression on `error`/`fatal`.
 
-**Red — at submit.** These require out-of-band information that no public source records (e.g. original-author permission for a third-party patch). They appear as a final checklist before PR submission; the user must check them off manually. The PR body flags them for the reviewer.
+**Band 3 — yellow-survey.** Requires reading and understanding content, consulting a public resource (langtags, Ethnologue, organization website, `s.keyman.com`), or making a judgment call. Surfaced as plain-language survey questions at the relevant phase.
 
-| Band | Count (approx.) | Example criterion | Enforcement |
+**Band 4 — red-checklist.** Requires out-of-band information no public source records (e.g. original-author permission for a third-party patch). Pre-submit manual checklist; the PR body flags them for the reviewer.
+
+| Band | Count | Example criterion | Enforcement |
 |---|---|---|---|
-| Green | ~115 | "No leading zeros in version components" (SS2) — regex-checkable, auto-fixable | Scaffolder resets version to `1.0`; Layer C blocks any version with leading zeros |
-| Yellow | ~60 | "BCP47 tag is correct for the language/script" (SS12) — requires langtags.json lookup and linguistic judgment | Phase A survey asks for the tag; studio cross-checks against langtags.json and flags mismatches for user review |
-| Red | ~15 | "If a third party submits a patch to an existing keyboard, original author was consulted" (SS14) — requires direct author communication | Final checklist item in PR submission flow; PR body includes a reminder block |
+| scaffolder-bake | 38 | "No leading zeros in version components" — regex-checkable, auto-fixable | Scaffolder resets version to `1.0`; further violations cannot be authored. |
+| layer-c-enforce | 58 | "BCP47 tag well-formed; modifier names consistent across `.kmn`/`.kvks`/`.keyman-touch-layout`" | Layer C lint engine; blocks phase progression on `error`. |
+| yellow-survey | 33 | "BCP47 tag is correct for the language/script" — requires langtags.json lookup and linguistic judgment | Phase A survey asks for the tag; studio cross-checks against langtags.json and flags mismatches for user review. |
+| red-checklist | 4 | "If a third party submits a patch to an existing keyboard, original author was consulted" — requires direct author communication | Final checklist item in PR submission flow; PR body includes a reminder block. |
 
-The exact green/yellow count split is a Day-1 sync item (issue #6). Counts above are estimates; the final triage (Sec 13) produces authoritative numbers.
+Source-of-truth for the band assignments is `packages/contracts/data/criteria.json` (loadable via `import { ALL_CRITERIA } from "@keyboard-studio/contracts"` or the dedicated `/criteria` subpath). The Day-1 triage closed as issue #6.
 
 ---
 

@@ -1,6 +1,6 @@
 # Working Agreement
 
-> Temporary norms for the keyboard-studio sprint. Expires end of week; revisit if the project continues.
+> Norms for the keyboard-studio sprint. Revisit on a rolling basis as the project evolves.
 > Resolves [#7](https://github.com/MattGyverLee/keyboard-studio/issues/7).
 
 ## Teams and Leads
@@ -37,7 +37,7 @@ If a blocker is unresolved for more than 4 hours, post a comment tagging both le
 ## Acceptance Criteria (from issue #7)
 
 - [ ] Standup time confirmed by both leads
-- [ ] Communication channels designated (Slack — see above)
-- [ ] Norms documented in this file
+- [x] Communication channels designated (Slack — see above)
+- [x] Norms documented in this file
 - [ ] Both leads acknowledge this agreement
 - [ ] First standup held on Day 1 afternoon
