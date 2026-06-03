@@ -120,6 +120,162 @@ def process_modifier_key(lid, key, type):
         modified = True
     return key
 
+# --- K_SYMBOLS placement algorithm ---
+# Picks one (row, column, width, mode) per keyboard that works across all
+# non-symbol layers, so layer switches don't move keys around. Strategy 1
+# shrinks the spacebar (taking row-slack into account); Strategy 2 replaces
+# a trailing filler key on a row that has slack vs the layer's widest row.
+KEY_PAD = 15  # Keyman per-key gutter that counts toward effective row width
+DEFAULT_KEY_WIDTH = 100
+MIN_SPACE_WIDTH = 500
+MIN_USABLE_SYM_WIDTH = 80
+
+
+def _key_w(k):
+    w = k.get("width", DEFAULT_KEY_WIDTH)
+    try:
+        return int(w) if str(w).strip() != "" else DEFAULT_KEY_WIDTH
+    except (TypeError, ValueError):
+        return DEFAULT_KEY_WIDTH
+
+
+def _row_effective_total(row):
+    ks = row.get("key", [])
+    return sum(_key_w(k) for k in ks) + KEY_PAD * len(ks)
+
+
+def _layer_row_totals(layer):
+    return [_row_effective_total(r) for r in layer.get("row", [])]
+
+
+def _is_filler_key(k):
+    if k.get("sp") == 10:
+        return True
+    if _key_w(k) <= 20:
+        return True
+    kid = str(k.get("id", ""))
+    if kid.startswith("T_new_") and _key_w(k) <= 50:
+        return True
+    return False
+
+
+def _try_shrink_space_plan(non_symbol_layers, ri):
+    space_positions = []
+    for l in non_symbol_layers:
+        keys = l["row"][ri].get("key", [])
+        pos = next((i for i, k in enumerate(keys) if k.get("id") == "K_SPACE"), -1)
+        space_positions.append(pos)
+    if any(p < 0 for p in space_positions) or len(set(space_positions)) != 1:
+        return None
+    space_idx = space_positions[0]
+
+    lopt_positions = []
+    for l in non_symbol_layers:
+        keys = l["row"][ri].get("key", [])
+        pos = next((i for i, k in enumerate(keys) if k.get("id") == "K_LOPT"), -1)
+        lopt_positions.append(pos)
+    if all(p >= 0 for p in lopt_positions) and len(set(lopt_positions)) == 1:
+        insert_col = lopt_positions[0] + 1
+        target_w = min(_key_w(l["row"][ri]["key"][lopt_positions[0]]) for l in non_symbol_layers)
+    else:
+        insert_col = space_idx
+        target_w = DEFAULT_KEY_WIDTH
+
+    sym_effective_w = target_w + KEY_PAD
+    slacks = []
+    for l in non_symbol_layers:
+        totals = _layer_row_totals(l)
+        slacks.append((max(totals) - totals[ri]) if totals else 0)
+    min_slack = min(slacks) if slacks else 0
+    space_shrink = max(0, sym_effective_w - min_slack)
+
+    for l in non_symbol_layers:
+        sp_w = _key_w(l["row"][ri]["key"][space_idx])
+        if sp_w - space_shrink < MIN_SPACE_WIDTH:
+            return None
+
+    return {
+        "mode": "shrink_space",
+        "row_idx": ri,
+        "insert_col": insert_col,
+        "space_idx": space_idx,
+        "sym_width": target_w,
+        "space_shrink": space_shrink,
+    }
+
+
+def _try_replace_filler_plan(non_symbol_layers, ri):
+    keys_per = [l["row"][ri].get("key", []) for l in non_symbol_layers]
+    if not all(keys_per) or len(set(len(ks) for ks in keys_per)) != 1:
+        return None
+    last_keys = [ks[-1] for ks in keys_per]
+    if not all(_is_filler_key(k) for k in last_keys):
+        return None
+    slacks = []
+    for l in non_symbol_layers:
+        totals = _layer_row_totals(l)
+        slacks.append(max(totals) - totals[ri])
+    min_slack = min(slacks)
+    filler_min_w = min(_key_w(k) for k in last_keys)
+    sym_w = filler_min_w + min_slack
+    if sym_w < MIN_USABLE_SYM_WIDTH:
+        return None
+    return {
+        "mode": "replace_filler",
+        "row_idx": ri,
+        "col_idx": len(keys_per[0]) - 1,
+        "sym_width": sym_w,
+    }
+
+
+def _find_symbol_plan(non_symbol_layers):
+    if not non_symbol_layers:
+        return None
+    if any(
+        k.get("id") == "K_SYMBOLS"
+        for l in non_symbol_layers
+        for r in l.get("row", [])
+        for k in r.get("key", [])
+    ):
+        return {"mode": "already_present"}
+    n_rows = min(len(l.get("row", [])) for l in non_symbol_layers)
+    for ri in range(n_rows):
+        plan = _try_shrink_space_plan(non_symbol_layers, ri)
+        if plan:
+            return plan
+    for ri in range(n_rows):
+        plan = _try_replace_filler_plan(non_symbol_layers, ri)
+        if plan:
+            return plan
+    return {"mode": "no_fit"}
+
+
+def _apply_symbol_plan(non_symbol_layers, plan):
+    if not plan or plan.get("mode") in ("already_present", "no_fit", None):
+        return 0
+    n = 0
+    ri = plan["row_idx"]
+    for l in non_symbol_layers:
+        lid = l.get("id", "")
+        nextlayer = "symbol-caps" if "caps" in lid else "symbol"
+        keys = l["row"][ri]["key"]
+        sym_key = {
+            "id": "K_SYMBOLS",
+            "text": "*Symbol*",
+            "sp": 1,
+            "width": plan["sym_width"],
+            "nextlayer": nextlayer,
+        }
+        if plan["mode"] == "shrink_space":
+            si = plan["space_idx"]
+            keys[si]["width"] = _key_w(keys[si]) - plan["space_shrink"]
+            keys.insert(plan["insert_col"], sym_key)
+        elif plan["mode"] == "replace_filler":
+            keys[plan["col_idx"]] = sym_key
+        n += 1
+    return n
+
+
 # Load symbols layer data from files
 with open("symbols.json", "r", encoding="utf-8") as f:
     symbols_layer = json.load(f)
@@ -267,6 +423,38 @@ for dirpath, _, filenames in os.walk(root_folder):
                                 layers.append(copy.deepcopy(symbol_caps_layer))
                                 modified = True
                                 print(f'Appended "{symbol_caps_layer.get("id")}" layer to {full_path}')
+
+                # Insert K_SYMBOLS link keys onto every non-symbol layer.
+                # Picks one consistent (row, column) across all non-symbol layers
+                # so keys do not move when switching layers.
+                if addSymbols:
+                    for device in ["tablet", "phone"]:
+                        if device in data and "layer" in data[device]:
+                            layers = data[device]["layer"]
+                            non_symbol = [l for l in layers if l.get("id") not in ("symbol", "symbol-caps")]
+                            plan = _find_symbol_plan(non_symbol)
+                            if plan is None:
+                                continue
+                            mode = plan.get("mode")
+                            if mode == "already_present":
+                                continue
+                            if mode == "no_fit":
+                                print(f'[SKIP] K_SYMBOLS placement (no fit) for {device} of {full_path}')
+                                continue
+                            count = _apply_symbol_plan(non_symbol, plan)
+                            if count:
+                                modified = True
+                                if mode == "shrink_space":
+                                    print(
+                                        f'Inserted K_SYMBOLS into {count} {device} layers of {full_path} '
+                                        f'(row {plan["row_idx"]} col {plan["insert_col"]} w={plan["sym_width"]} '
+                                        f'space_shrink={plan["space_shrink"]})'
+                                    )
+                                else:
+                                    print(
+                                        f'Replaced trailing filler with K_SYMBOLS in {count} {device} layers of {full_path} '
+                                        f'(row {plan["row_idx"]} col {plan["col_idx"]} w={plan["sym_width"]})'
+                                    )
 
                 if modified and not test:
                     with open(full_path, "w", encoding="utf-8") as f:
