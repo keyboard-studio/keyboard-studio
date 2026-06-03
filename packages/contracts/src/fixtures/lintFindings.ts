@@ -24,6 +24,20 @@ export const layerAFindings: LintFinding[] = [
     location: { file: "source/my_keyboard.kmn", line: 5, column: 1 },
     hint: "Replace 'KMW_RTL' with the canonical '&RightToLeft' system store.",
   },
+  {
+    // The supplementary finding the WASM oracle attaches when it cannot
+    // load kmcmplib and is degrading to TS-only checks. Distinct from
+    // KM_FATAL_MISSING_WASM_MODULE: the fatal blocks compile; this warn
+    // surfaces alongside successful TS-only results so the user knows the
+    // WASM-only checks (#10–#14) were skipped this cycle.
+    code: "KM_WARN_ORACLE_UNAVAILABLE",
+    severity: "warning",
+    layer: "A",
+    message:
+      "WASM oracle unavailable — only TS-portable checks (#1–#9) ran. " +
+      "Findings for the 5 WASM-only checks may be missing.",
+    hint: "Reload the studio to retry; if the failure persists, file a bug.",
+  },
 ];
 
 /**
