@@ -1,6 +1,25 @@
 // see spec.md section 8 step 1 / section 11 — BaseKeyboard data type
 
 /**
+ * Keyman platform-target identifiers used in the `.kps` package
+ * Files-block targets list and on {@link BaseKeyboard.targets}.
+ *
+ * The union is closed: the studio supports exactly these platforms.
+ * The previous bare `string[]` typing on `targets` allowed typos
+ * like `"windoze"` to compile (#99); narrowing here catches them at
+ * the construction site.
+ *
+ * @see spec.md §12 (.kps Files block)
+ */
+export type KeymanPlatformTarget =
+  | "windows"
+  | "macosx"
+  | "linux"
+  | "web"
+  | "mobile"
+  | "tablet";
+
+/**
  * A keyboard entry from the keymanapp/keyboards release tree.
  * Populated by BaseBrowserService (step 1 of the §8 pipeline) and carried
  * into the scaffolder (§11) as the immutable source of truth for identity
@@ -38,7 +57,7 @@ export interface BaseKeyboard {
    * Subset of: "windows" | "macosx" | "linux" | "web" | "mobile" | "tablet".
    * @see spec.md §12 (.kps Files block maps to these)
    */
-  targets: string[];
+  targets: KeymanPlatformTarget[];
 
   /** Human-readable name shown in the base-browser picker. */
   displayName: string;
@@ -71,7 +90,7 @@ export type BaseKeyboardInit = {
   id: string;
   path: string;
   script: string;
-  targets: string[];
+  targets: KeymanPlatformTarget[];
   displayName: string;
   version: string;
   sourceUrl?: string;

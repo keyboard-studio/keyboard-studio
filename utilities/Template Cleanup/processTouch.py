@@ -363,7 +363,17 @@ for dirpath, _, filenames in os.walk(root_folder):
                                 if lid != "default" and "caps" not in lid.lower():
                                     for row in layer.get("row", []):
                                         for key in row.get("key", []):
-                                            if key.get("sp") not in [1, 2, 8]:  # 1: special, 2: shift, 8: blank
+                                            # Skip non-tappable key types per keyman-touch-layout schema:
+                                            #   1 = modifier / frame key
+                                            #   2 = selected modifier key
+                                            #   8 = deadkey (highlighted differently)
+                                            #   9 = blank key (no key cap)
+                                            #  10 = spacer (occupies width but isn't a key)
+                                            # The previous skip list `[1, 2, 8]` with comment
+                                            # "8: blank" was wrong on both fronts: 8 is deadkey, and
+                                            # blanks/spacers (sp=9, sp=10) were inappropriately
+                                            # getting nextlayer="default" added. See #111.
+                                            if key.get("sp") not in [1, 2, 8, 9, 10]:
                                                 if key.get("nextlayer") is None: # != "default":
                                                     key["nextlayer"] = "default"
                                                     modified = True
@@ -380,8 +390,13 @@ for dirpath, _, filenames in os.walk(root_folder):
                                                 sk, m = process_modifier_key(lid, sk, "subkey")
                                                 if m:
                                                     modified = True
-                                        if key is not None and key.get("mt") is not None:
-                                            for mt in key.get("multitap", None):
+                                        # The canonical keyman-touch-layout field is `multitap`,
+                                        # NOT `mt`. The previous guard `key.get("mt")` always
+                                        # returned None, so this block never executed — modifier
+                                        # keys inside multitap arrays were silently skipped.
+                                        # See #110.
+                                        if key is not None and key.get("multitap") is not None:
+                                            for mt in key.get("multitap"):
                                                 mt, m = process_modifier_key(lid, mt, "multitap")
                                                 if m:
                                                     modified = True

@@ -1,7 +1,7 @@
 // see spec.md section 8 step 1 — BaseBrowserService mock
 
 import type { BaseBrowserService } from "../baseBrowser";
-import type { BaseKeyboard } from "../baseKeyboard";
+import type { BaseKeyboard, KeymanPlatformTarget } from "../baseKeyboard";
 import {
   sampleBaseKeyboards,
   basicKbdus,
@@ -31,7 +31,7 @@ export const mockBaseBrowser: BaseBrowserService = {
 
   search(
     query: string,
-    opts?: { script?: string; target?: string }
+    opts?: { script?: string; target?: KeymanPlatformTarget }
   ): Promise<BaseKeyboard[]> {
     const q = query.toLowerCase();
     let results = sampleBaseKeyboards.filter((kb) => {
