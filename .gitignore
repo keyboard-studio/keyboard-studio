@@ -38,3 +38,6 @@ __pycache__/
 
 # kmcmplib fetch output (generated; do not commit)
 packages/compiler/wasm/*.wasm
+
+# kbgen vendored CLDR exemplars (725 files; regenerate via utilities/kbgen/fetch-data.js)
+utilities/kbgen/data/cldr/
