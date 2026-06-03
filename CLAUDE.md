@@ -43,11 +43,11 @@ If a task seems to require schema-breaking changes, surface this to the user bef
 
 Spec Sec 16. CJK and Ethiopic reorder patterns, LDML output, mobile-app integration, hosting, multi-language `welcome.htm` variants, editing existing keyboards, `.kpj.user` management, touch-first authoring (Decision 6). The Three-group routing (Sec 9) explicitly renders a "not yet supported" stub for CJK/Ethiopic — do not silently empty the gallery.
 
-## LEX crew
+## KM crew
 
-`Agents/lex-*.md` are slash-command dispatchers that invoke the corresponding subagent. The dispatch protocol — including `lex-lead`'s `dispatch_plan` block format and the requirement that the main session execute the plan and re-invoke `lex-lead` until no plan is returned — lives in the user's global CLAUDE.md, not here. Don't duplicate it.
+`Agents/km-*.md` are slash-command dispatchers that invoke the corresponding subagent. The dispatch protocol — including `km-lead`'s `dispatch_plan` block format and the requirement that the main session execute the plan and re-invoke `km-lead` until no plan is returned — lives in the user's global CLAUDE.md, not here. Don't duplicate it.
 
-Use the LEX crew for review cycles on spec or code changes; `docs/spec-signoff.md` is the model for what a completed cycle looks like.
+Use the KM crew for review cycles on spec or code changes; `docs/spec-signoff.md` is the model for what a completed cycle looks like.
 
 ## Conventions
 
