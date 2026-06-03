@@ -1,9 +1,12 @@
 import json
 import os
+import sys
 import copy
 
-# Set your root folder path here
-root_folder = "D:\\Github\\_Projects\\_KM\\keyboards\\release\\basic"  # Change to your desired root path
+# Accept the corpus root as the first CLI argument so the script doesn't have to
+# be edited to point at a different keymanapp/keyboards checkout (see #114).
+# Matches the pattern processKMN.py and previewSymbolKey.py already use.
+root_folder = sys.argv[1] if len(sys.argv) > 1 else "D:\\Github\\_Projects\\_KM\\keyboards\\release\\basic"
 currentLanguage = ""
 addSymbols = True  # Set to False if you don't want to add symbols layer
 removePhone = True  # Set to True if you want to remove the phone layout

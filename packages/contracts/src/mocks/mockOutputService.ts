@@ -1,6 +1,11 @@
 // see spec.md section 12 — OutputService mock
 
-import type { OutputService, PublishPROptions, PublishPRResult } from "../outputService";
+import type {
+  OutputService,
+  PublishPROptions,
+  PublishPRResult,
+  VerifyTokenResult,
+} from "../outputService";
 import type { VirtualFS } from "../virtualFS";
 
 /**
@@ -15,6 +20,35 @@ export const mockOutputService: OutputService = {
     // in tests. It exists only to satisfy `Uint8Array` typing on the mock return.
     const emptyZip = new Uint8Array([0x50, 0x4b, 0x05, 0x06]);
     return Promise.resolve(emptyZip);
+  },
+
+  verifyToken(token: string): Promise<VerifyTokenResult> {
+    // Mock policy:
+    //  - empty token -> ok:false, no login, no scopes
+    //  - token starting with "ghp_" or "github_pat_" -> ok:true with the
+    //    full required scope set (`public_repo`); login is the literal "mock-user"
+    //  - any other token -> ok:false, scopes:["read:user"], missingScopes:["public_repo"]
+    if (token === "") {
+      return Promise.resolve({
+        ok: false,
+        scopes: [],
+        missingScopes: ["public_repo"],
+      });
+    }
+    if (token.startsWith("ghp_") || token.startsWith("github_pat_")) {
+      return Promise.resolve({
+        ok: true,
+        login: "mock-user",
+        scopes: ["public_repo"],
+        missingScopes: [],
+      });
+    }
+    return Promise.resolve({
+      ok: false,
+      login: "mock-user",
+      scopes: ["read:user"],
+      missingScopes: ["public_repo"],
+    });
   },
 
   publishPR(

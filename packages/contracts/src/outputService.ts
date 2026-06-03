@@ -50,6 +50,40 @@ export interface PublishPRResult {
 }
 
 /**
+ * Discriminated union of failure modes the publish-PR pipeline can hit.
+ *
+ * The UI surface differs sharply by `kind` — "auth" → re-auth button;
+ * "scope" → "this token needs `public_repo`"; "rate-limit" → countdown;
+ * "branch-exists" → branch-rename prompt; "network" → check connection
+ * banner. Stringly-typed errors force the UI to pattern-match messages,
+ * which is brittle.
+ *
+ * @see spec.md §12 "GitHub OAuth fork+PR"
+ */
+export type PublishPRError =
+  | { kind: "auth"; message: string }
+  | { kind: "scope"; message: string; required: readonly string[] }
+  | { kind: "rate-limit"; message: string; retryAfterSeconds: number }
+  | { kind: "branch-exists"; message: string; branchName: string }
+  | { kind: "network"; message: string }
+  | { kind: "unknown"; message: string; cause?: unknown };
+
+/** Result returned by {@link OutputService.verifyToken}. */
+export interface VerifyTokenResult {
+  /** True when the token has all scopes needed for fork+PR. */
+  ok: boolean;
+  /** GitHub login (`X-OAuth-Scopes` header user) the token belongs to. */
+  login?: string;
+  /** OAuth scopes the token actually has. */
+  scopes: readonly string[];
+  /**
+   * Scopes that are missing for fork+PR (i.e. `public_repo`). Empty
+   * array when `ok: true`.
+   */
+  missingScopes: readonly string[];
+}
+
+/**
  * Service contract for the output / submit path.
  *
  * Two delivery modes (§12):
@@ -91,6 +125,27 @@ export interface OutputService {
   toZip(fs: VirtualFS): Promise<Uint8Array>;
 
   /**
+   * Verify the OAuth token before invoking the destructive fork+PR flow.
+   *
+   * Calls GitHub's `GET /user` to read the authenticated login and the
+   * `X-OAuth-Scopes` header. Returns a {@link VerifyTokenResult} the UI
+   * can use to gate the submit button: when `ok: false`, surface a
+   * "re-authenticate" or "add scope" prompt instead of starting the fork.
+   *
+   * Required scopes for fork+PR are `public_repo` (or `repo` for private
+   * forks). Implementations enumerate the missing scopes in
+   * {@link VerifyTokenResult.missingScopes} so the UI can show a precise
+   * remediation message.
+   *
+   * @param token - GitHub OAuth access token to verify.
+   * @returns Scope-verification result; never rejects on a valid HTTP
+   *   response. Promise rejects only on network errors with a
+   *   {@link PublishPRError} of kind `"network"`.
+   * @see spec.md §12
+   */
+  verifyToken(token: string): Promise<VerifyTokenResult>;
+
+  /**
    * Fork `keymanapp/keyboards`, push the virtual FS source tree to a new
    * branch, and open a draft PR.
    *
@@ -98,9 +153,17 @@ export interface OutputService {
    * artifacts are excluded (criteria SS1, §12). The PR is opened in
    * draft state so the author can review before requesting review.
    *
+   * Pre-check the token with {@link verifyToken} before calling this —
+   * scope/auth failures here cost a network round-trip and a half-started
+   * fork.
+   *
    * @param fs - Virtual FS snapshot to publish (source files only).
    * @param opts - GitHub OAuth credentials and PR metadata.
    * @returns URLs and commit SHA of the created PR.
+   * @throws Rejects with a {@link PublishPRError}-typed object so the UI
+   *   can `switch` on `err.kind` to choose recovery. Implementations
+   *   MUST reject with this shape (not bare `Error`) so callers don't
+   *   have to string-match.
    * @see spec.md §12 "GitHub OAuth fork+PR"
    */
   publishPR(fs: VirtualFS, opts: PublishPROptions): Promise<PublishPRResult>;

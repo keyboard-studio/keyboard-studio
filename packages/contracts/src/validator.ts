@@ -4,6 +4,31 @@
 import type { LintFinding } from "./lintFinding";
 
 /**
+ * Cross-fragment project state {@link ValidatorService.validateFragment}
+ * can use to detect collisions a fragment cannot see in isolation.
+ *
+ * Spec §10 Layer A checks #2 (duplicate groups) and #3 (duplicate stores)
+ * are project-scoped; a fragment that declares `store(graveK)` validates
+ * in isolation but conflicts at merge time if the project already has a
+ * store of the same name. Pass the project's current declared names here
+ * so the fragment validator can flag the collision BEFORE merge.
+ *
+ * All sets use case-insensitive comparison (the §10 checks are case-
+ * insensitive per the upstream `validation.cpp` rules). Implementations
+ * should normalize before adding to the sets.
+ *
+ * @see spec.md §10 Layer A checks #2, #3, #5, #6
+ */
+export interface FragmentValidationContext {
+  /** Store names already declared in the project (case-insensitive). */
+  existingStores: ReadonlySet<string>;
+  /** Group names already declared in the project (case-insensitive). */
+  existingGroups: ReadonlySet<string>;
+  /** Deadkey names already declared. Empty set is fine for new projects. */
+  existingDeadkeys: ReadonlySet<string>;
+}
+
+/**
  * Service contract for the Layer A (validity) and Layer B (style) validator.
  * Packaged as `@keymanapp/kmn-validator`.
  *
@@ -53,12 +78,20 @@ export interface ValidatorService {
    * @param kmnFragment - KMN rule fragment with all `{{slotId}}` replaced.
    * @param slots - The substitution map (slotId -> resolved value) for
    *   diagnostic context messages; not re-applied here, just carried forward.
+   * @param projectContext - Optional cross-fragment project state. When
+   *   provided, Layer A checks #2 (duplicate groups) and #3 (duplicate
+   *   stores) consult the project's existing names and flag fragment
+   *   declarations that would collide at merge time. When omitted, the
+   *   fragment is validated in isolation — fine for the first fragment in
+   *   a project, but downstream merges may surface late.
    * @returns Findings scoped to the fragment; locations are fragment-relative.
    * @see spec.md §6 placeholder substitution semantics
    * @see spec.md §10
+   * @see FragmentValidationContext
    */
   validateFragment(
     kmnFragment: string,
-    slots: Record<string, string>
+    slots: Record<string, string>,
+    projectContext?: FragmentValidationContext
   ): Promise<LintFinding[]>;
 }

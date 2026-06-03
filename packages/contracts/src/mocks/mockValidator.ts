@@ -1,6 +1,9 @@
 // see spec.md section 10 — ValidatorService mock
 
-import type { ValidatorService } from "../validator";
+import type {
+  ValidatorService,
+  FragmentValidationContext,
+} from "../validator";
 import type { LintFinding } from "../lintFinding";
 import { validatorFindings } from "../fixtures/index";
 
@@ -19,9 +22,13 @@ export const mockValidator: ValidatorService = {
 
   validateFragment(
     _kmnFragment: string,
-    _slots: Record<string, string>
+    _slots: Record<string, string>,
+    _projectContext?: FragmentValidationContext
   ): Promise<LintFinding[]> {
     // For a fragment, return only the Layer A findings (no style pass on fragments).
+    // A real implementation would also consult _projectContext.existingStores /
+    // existingGroups / existingDeadkeys to flag merge-time duplicate-name
+    // collisions that a fragment can't see in isolation (#90).
     const fragmentFindings = validatorFindings.filter((f) => f.layer === "A");
     return Promise.resolve([...fragmentFindings]);
   },
