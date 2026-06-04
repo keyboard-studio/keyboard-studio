@@ -158,8 +158,6 @@ touchLayoutFragment: |
     ]
   }
 
-reorderRules: null
-
 tests:
   - input: ["K_GRAVE", "K_QUOTE", "K_A"]
     expectedOutput: "à"
@@ -301,7 +299,7 @@ validatedForFamilies:
 sourceKeyboards:
   - "release/t/thamizha_bamini/source/thamizha_bamini.kmn#L168-L172"
 
-frequency_in_corpus: 1
+frequencyInCorpus: 1
 
 reviewedBy: "keyboard-studio-content-team"
 reviewDate: "2026-06-04"

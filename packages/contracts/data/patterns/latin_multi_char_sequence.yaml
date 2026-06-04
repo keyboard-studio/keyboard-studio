@@ -137,8 +137,7 @@ touchLayoutFragment: |
     ]
   }
 
-reorderRules: null
-frequency_in_corpus: 5
+frequencyInCorpus: 5
 
 tests:
   - input: ["K_N"]
