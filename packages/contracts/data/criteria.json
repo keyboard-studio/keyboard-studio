@@ -1,0 +1,800 @@
+[
+  {
+    "id": "1.1-no-files-outside-keyboard-folder",
+    "section": "1. Repository hygiene",
+    "band": "layer-c-enforce",
+    "description": "No files modified outside the keyboard's own folder"
+  },
+  {
+    "id": "1.2-keyboard-under-release-or-experimental",
+    "section": "1. Repository hygiene",
+    "band": "scaffolder-bake",
+    "description": "Keyboard folder lives under `release/` or `experimental/`"
+  },
+  {
+    "id": "1.3-keyboard-under-organizing-folder",
+    "section": "1. Repository hygiene",
+    "band": "scaffolder-bake",
+    "description": "Keyboard sits under an alphabetic or org-code organizing subfolder, not at the root of `release/`/`experimental/`"
+  },
+  {
+    "id": "1.4-no-source-files-at-repo-root",
+    "section": "1. Repository hygiene",
+    "band": "scaffolder-bake",
+    "description": "No source files placed at the repository root"
+  },
+  {
+    "id": "1.5-keyboard-id-not-already-used",
+    "section": "1. Repository hygiene",
+    "band": "layer-c-enforce",
+    "description": "The keyboard ID (folder name) is not already used in `experimental/`, `legacy/`, or `release/`"
+  },
+  {
+    "id": "1.6-id-does-not-contain-keyboard",
+    "section": "1. Repository hygiene",
+    "band": "layer-c-enforce",
+    "description": "Keyboard ID, folder name, and display name do not contain the word \"keyboard\""
+  },
+  {
+    "id": "1.7-no-keyboard-info-file",
+    "section": "1. Repository hygiene",
+    "band": "scaffolder-bake",
+    "description": "No `keyboard.info` file in the keyboard folder"
+  },
+  {
+    "id": "1.8-no-duplicate-docs-subfolder",
+    "section": "1. Repository hygiene",
+    "band": "scaffolder-bake",
+    "description": "No `docs/` or similar subfolder containing duplicate HISTORY/README/INSTALL files"
+  },
+  {
+    "id": "1.9-no-duplicate-source-files",
+    "section": "1. Repository hygiene",
+    "band": "layer-c-enforce",
+    "description": "No duplicate copies of the same source file inside the keyboard folder"
+  },
+  {
+    "id": "1.10-kpj-current-format",
+    "section": "1. Repository hygiene",
+    "band": "scaffolder-bake",
+    "description": "`.kpj` file uses the current/newest project-file format"
+  },
+  {
+    "id": "1.11-no-kpj-user-committed",
+    "section": "1. Repository hygiene",
+    "band": "scaffolder-bake",
+    "description": "No `.kpj.user` file committed"
+  },
+  {
+    "id": "1.12-no-build-folder-committed",
+    "section": "1. Repository hygiene",
+    "band": "scaffolder-bake",
+    "description": "No `build/` folder contents committed"
+  },
+  {
+    "id": "1.13-no-stray-scratch-files",
+    "section": "1. Repository hygiene",
+    "band": "layer-c-enforce",
+    "description": "No stray scratch or test files in the keyboard folder"
+  },
+  {
+    "id": "2.1-version-bumped-if-package-changed",
+    "section": "2. Version bumping",
+    "band": "layer-c-enforce",
+    "description": "If any file that ships in the package was modified, the keyboard version was bumped"
+  },
+  {
+    "id": "2.2-version-not-required-if-only-nonpackage",
+    "section": "2. Version bumping",
+    "band": "layer-c-enforce",
+    "description": "If only non-package files were modified, a version bump is not required"
+  },
+  {
+    "id": "2.3-version-numeric-dot-separated",
+    "section": "2. Version bumping",
+    "band": "layer-c-enforce",
+    "description": "Version number is dot-separated and entirely numeric (SemVer or CalVer)"
+  },
+  {
+    "id": "2.4-no-leading-zero-in-version-component",
+    "section": "2. Version bumping",
+    "band": "layer-c-enforce",
+    "description": "No version component has a leading zero"
+  },
+  {
+    "id": "2.5-no-v-prefix-or-labels",
+    "section": "2. Version bumping",
+    "band": "layer-c-enforce",
+    "description": "Version has no `v` prefix and no non-numeric labels"
+  },
+  {
+    "id": "2.6-new-version-strictly-greater",
+    "section": "2. Version bumping",
+    "band": "layer-c-enforce",
+    "description": "New version is strictly greater than the previously deployed version"
+  },
+  {
+    "id": "2.7-kpj-version-not-bumped",
+    "section": "2. Version bumping",
+    "band": "layer-c-enforce",
+    "description": "The `.kpj` file's `<Version>` field has not been bumped (it's the file-format version, not keyboard version)"
+  },
+  {
+    "id": "3.1-history-file-exists",
+    "section": "3. `HISTORY.md`",
+    "band": "scaffolder-bake",
+    "description": "`HISTORY.md` file exists"
+  },
+  {
+    "id": "3.2-history-header-sensible",
+    "section": "3. `HISTORY.md`",
+    "band": "yellow-survey",
+    "description": "HISTORY.md header is sensible"
+  },
+  {
+    "id": "3.3-history-recent-change-at-top",
+    "section": "3. `HISTORY.md`",
+    "band": "layer-c-enforce",
+    "description": "Most recent change entry is at the top of the file"
+  },
+  {
+    "id": "3.4-history-cumulative",
+    "section": "3. `HISTORY.md`",
+    "band": "layer-c-enforce",
+    "description": "HISTORY.md is cumulative — prior entries are preserved, not overwritten"
+  },
+  {
+    "id": "3.5-history-entry-format",
+    "section": "3. `HISTORY.md`",
+    "band": "layer-c-enforce",
+    "description": "Each entry follows `<version> (<YYYY-MM-DD>)` format underlined with hyphens and bullet items"
+  },
+  {
+    "id": "3.6-history-version-matches-kmn",
+    "section": "3. `HISTORY.md`",
+    "band": "layer-c-enforce",
+    "description": "Top HISTORY.md entry version matches the version in the `.kmn` file"
+  },
+  {
+    "id": "3.7-history-bullets-no-deleted-files",
+    "section": "3. `HISTORY.md`",
+    "band": "layer-c-enforce",
+    "description": "HISTORY.md bullets do not reference files that no longer exist in the keyboard"
+  },
+  {
+    "id": "4.1-copyright-present-with-year",
+    "section": "4. `LICENSE.md` (copyright)",
+    "band": "scaffolder-bake",
+    "description": "Copyright statement is present with year(s)"
+  },
+  {
+    "id": "4.2-copyright-year-range-if-multiyear",
+    "section": "4. `LICENSE.md` (copyright)",
+    "band": "yellow-survey",
+    "description": "If updated across multiple years, copyright uses a year range"
+  },
+  {
+    "id": "4.3-copyright-holder-is-authorized",
+    "section": "4. `LICENSE.md` (copyright)",
+    "band": "red-checklist",
+    "description": "Copyright holder is the author or a legal entity they are authorized to claim"
+  },
+  {
+    "id": "4.4-org-legal-name-current",
+    "section": "4. `LICENSE.md` (copyright)",
+    "band": "yellow-survey",
+    "description": "If an organization is named, its current legal name is used"
+  },
+  {
+    "id": "4.5-copyright-syntax-exact",
+    "section": "4. `LICENSE.md` (copyright)",
+    "band": "scaffolder-bake",
+    "description": "Copyright line follows exact syntax: `Copyright (C) <year> <holder>`"
+  },
+  {
+    "id": "4.6-copyright-year-not-in-kmn-or-kps",
+    "section": "4. `LICENSE.md` (copyright)",
+    "band": "scaffolder-bake",
+    "description": "Copyright year is not embedded in the `.kmn` or `.kps` copyright strings"
+  },
+  {
+    "id": "4.7-copyright-holder-consistent-across-files",
+    "section": "4. `LICENSE.md` (copyright)",
+    "band": "layer-c-enforce",
+    "description": "Copyright holder name is identical across `LICENSE.md`, `.kmn`, `.kps`, `README.md`, and `HISTORY.md`"
+  },
+  {
+    "id": "4.8-year-range-starts-at-original",
+    "section": "4. `LICENSE.md` (copyright)",
+    "band": "layer-c-enforce",
+    "description": "If a year range is used, it starts at the original year and extends to the current year"
+  },
+  {
+    "id": "5.1-readme-good-header",
+    "section": "5. `README.md`",
+    "band": "yellow-survey",
+    "description": "README.md has a good header"
+  },
+  {
+    "id": "5.2-no-version-in-readme-or-docs",
+    "section": "5. `README.md`",
+    "band": "scaffolder-bake",
+    "description": "No version number embedded in README.md, readme.htm, welcome.htm, or help .php"
+  },
+  {
+    "id": "5.3-no-copyright-in-readme-or-docs",
+    "section": "5. `README.md`",
+    "band": "scaffolder-bake",
+    "description": "No copyright year/statement in README.md, readme.htm, or welcome.htm"
+  },
+  {
+    "id": "5.4-readme-description-sensible",
+    "section": "5. `README.md`",
+    "band": "yellow-survey",
+    "description": "README.md description makes sense"
+  },
+  {
+    "id": "5.5-readme-keyman-home-link",
+    "section": "5. `README.md`",
+    "band": "scaffolder-bake",
+    "description": "README.md includes link to `https://keyman.com/keyboards/<file_name>`"
+  },
+  {
+    "id": "5.6-readme-help-link",
+    "section": "5. `README.md`",
+    "band": "scaffolder-bake",
+    "description": "README.md includes link to `http://help.keyman.com/keyboard/<file_name>`"
+  },
+  {
+    "id": "5.7-readme-targets-match-kmn",
+    "section": "5. `README.md`",
+    "band": "layer-c-enforce",
+    "description": "Targets listed in README.md match those in the `.kmn`"
+  },
+  {
+    "id": "6.1-readme-htm-exists",
+    "section": "6. Documentation files (`source/`)",
+    "band": "scaffolder-bake",
+    "description": "`readme.htm` exists in `source/`"
+  },
+  {
+    "id": "6.2-readme-htm-short",
+    "section": "6. Documentation files (`source/`)",
+    "band": "yellow-survey",
+    "description": "`readme.htm` content is short — just a brief description"
+  },
+  {
+    "id": "6.3-welcome-htm-exists",
+    "section": "6. Documentation files (`source/`)",
+    "band": "scaffolder-bake",
+    "description": "`welcome.htm` exists in `source/`"
+  },
+  {
+    "id": "6.4-welcome-htm-describes-usage",
+    "section": "6. Documentation files (`source/`)",
+    "band": "yellow-survey",
+    "description": "`welcome.htm` describes how to use the keyboard"
+  },
+  {
+    "id": "6.5-welcome-htm-no-install-instructions",
+    "section": "6. Documentation files (`source/`)",
+    "band": "yellow-survey",
+    "description": "`welcome.htm` does not include instructions for installing Keyman — references help URLs instead"
+  },
+  {
+    "id": "6.6-welcome-htm-lang-attribute",
+    "section": "6. Documentation files (`source/`)",
+    "band": "scaffolder-bake",
+    "description": "`<html lang=\"...\">` attribute in `welcome.htm` matches the keyboard's primary BCP47 tag"
+  },
+  {
+    "id": "6.7-welcome-htm-not-political",
+    "section": "6. Documentation files (`source/`)",
+    "band": "yellow-survey",
+    "description": "`welcome.htm` content is not political or self-promoting"
+  },
+  {
+    "id": "7.1-kmn-version-matches-history",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "`.kmn` version matches `HISTORY.md` top entry"
+  },
+  {
+    "id": "7.2-targets-any-alone",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "`.kmn` targets line uses `any` alone, not combined with individual platform names"
+  },
+  {
+    "id": "7.3-targets-no-unsupported-mobile",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "`.kmn` targets do not include `mobile` unless a touch layout exists"
+  },
+  {
+    "id": "7.4-modifier-names-consistent",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "Modifier key names consistent across `.kmn`, `.kvks`, and `.keyman-touch-layout`"
+  },
+  {
+    "id": "7.5-ralt-usealtgr-tag",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "If keyboard uses RALT, the `.kvks` includes the `usealtgr` tag"
+  },
+  {
+    "id": "7.6-compiles-no-errors-no-warnings",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "Keyboard compiles with no errors and no warnings"
+  },
+  {
+    "id": "7.7-display-name-no-underscores",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "yellow-survey",
+    "description": "Keyboard display name is a readable phrase, not the underscore-separated ID"
+  },
+  {
+    "id": "7.8-rtl-flag-matches-script",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "yellow-survey",
+    "description": "RTL flag in `.kmn`/`.kps` matches the script's actual writing direction"
+  },
+  {
+    "id": "7.9-bitmap-not-template-placeholder",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "`store(&BITMAP)` references the actual keyboard `.ico`, not a placeholder like `qaa.ico`"
+  },
+  {
+    "id": "7.10-kmn-stores-balanced-syntax",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "All `.kmn` string-literal stores have balanced quotes and valid syntax"
+  },
+  {
+    "id": "7.11-author-in-kps-not-kmn",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "scaffolder-bake",
+    "description": "Author name belongs in the `.kps`, not in a `.kmn` Author store"
+  },
+  {
+    "id": "7.12-pua-in-experimental",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "If keyboard uses PUA codepoints, it is in `experimental/`"
+  },
+  {
+    "id": "7.13-pua-documentation",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "yellow-survey",
+    "description": "If keyboard uses PUA codepoints, documentation explicitly states characters/script are not in Unicode"
+  },
+  {
+    "id": "7.14-pua-font-displaymap",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "If keyboard ships a PUA-encoded font, `.kmn` includes `store(&DISPLAYMAP)` path"
+  },
+  {
+    "id": "7.15-osk-reviewed",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "yellow-survey",
+    "description": "OSK has been reviewed for rules, output characters, and layout consistency"
+  },
+  {
+    "id": "7.16-kvks-not-blank",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "The `.kvks` on-screen keyboard layout is populated, not blank"
+  },
+  {
+    "id": "7.17-osk-font-selected",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "yellow-survey",
+    "description": "If a special font is needed for output characters, an appropriate font is selected in the OSK"
+  },
+  {
+    "id": "7.18-touch-layout-reviewed",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "yellow-survey",
+    "description": "Touch layout reviewed for layers, output, and fingering"
+  },
+  {
+    "id": "7.19-identical-phone-tablet-deduplicated",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "If both phone and tablet touch layouts are identical, removal of one was requested"
+  },
+  {
+    "id": "7.20-same-font-phone-tablet",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "Same font is selected for phone and tablet layouts"
+  },
+  {
+    "id": "7.21-compiles-no-errors",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "Keyboard compiles with no errors (build-output context)"
+  },
+  {
+    "id": "8.1-kps-includes-kmx",
+    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+    "band": "scaffolder-bake",
+    "description": "Compiled `.kmx` is listed in the `.kps` package"
+  },
+  {
+    "id": "8.2-kps-includes-kvk",
+    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+    "band": "scaffolder-bake",
+    "description": "Compiled `.kvk` is listed in the `.kps` package"
+  },
+  {
+    "id": "8.3-kps-includes-js-if-mobile",
+    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+    "band": "scaffolder-bake",
+    "description": "Compiled `.js` is listed if a mobile layout exists"
+  },
+  {
+    "id": "8.4-kps-includes-license-md",
+    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+    "band": "scaffolder-bake",
+    "description": "`LICENSE.md` is listed in the `.kps` package"
+  },
+  {
+    "id": "8.5-kps-includes-readme-htm",
+    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+    "band": "scaffolder-bake",
+    "description": "`readme.htm` is listed in the `.kps` package"
+  },
+  {
+    "id": "8.6-kps-includes-welcome-and-graphics",
+    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+    "band": "scaffolder-bake",
+    "description": "`welcome.htm` and associated graphics are listed in the `.kps` package"
+  },
+  {
+    "id": "8.7-kps-includes-required-fonts",
+    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+    "band": "layer-c-enforce",
+    "description": "All required fonts with all typefaces listed in the `.kps`"
+  },
+  {
+    "id": "8.8-kps-no-php-file",
+    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+    "band": "scaffolder-bake",
+    "description": "No `.php` help file listed in the `.kps` package"
+  },
+  {
+    "id": "8.9-kps-no-help-folder-files",
+    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+    "band": "scaffolder-bake",
+    "description": "No files from the `help/` folder listed in the `.kps` package"
+  },
+  {
+    "id": "8.10-kps-no-uncompiled-sources",
+    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+    "band": "scaffolder-bake",
+    "description": "No uncompiled sources (.kmn, .ico, .kvks, .keyman-touch-layout, .kps) listed in the `.kps`"
+  },
+  {
+    "id": "8.11-kps-no-displaymap-json",
+    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+    "band": "scaffolder-bake",
+    "description": "No font display-map `.json` files listed in the `.kps`"
+  },
+  {
+    "id": "8.12-kps-no-industry-fonts",
+    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+    "band": "layer-c-enforce",
+    "description": "No industry fonts (Arial, Times, Tahoma, etc.) in the package"
+  },
+  {
+    "id": "8.13-kps-targets-match-compiled",
+    "section": "8. Package contents (`.kps` → Packaging tab → Files)",
+    "band": "layer-c-enforce",
+    "description": "Targets declared in `.kmn` match compiled files listed in the `.kps`"
+  },
+  {
+    "id": "9.1-font-license-nonempty",
+    "section": "9. Font licensing",
+    "band": "layer-c-enforce",
+    "description": "Every bundled font has a non-empty license field in the `.kps`"
+  },
+  {
+    "id": "9.2-font-license-open-identifier",
+    "section": "9. Font licensing",
+    "band": "layer-c-enforce",
+    "description": "Font license identifier matches a known Open license (OFL, GPL, MIT, Apache, CC-BY, etc.)"
+  },
+  {
+    "id": "9.3-font-license-genuinely-open",
+    "section": "9. Font licensing",
+    "band": "yellow-survey",
+    "description": "Font license text/spirit is genuinely Open, not just labeled \"freeware\""
+  },
+  {
+    "id": "9.4-shared-font-in-shared-folder",
+    "section": "9. Font licensing",
+    "band": "layer-c-enforce",
+    "description": "If a font is used by more than one keyboard, it lives under `shared/fonts`"
+  },
+  {
+    "id": "9.5-shared-font-current-path",
+    "section": "9. Font licensing",
+    "band": "yellow-survey",
+    "description": "Shared font path points to the current/newest shared-fonts location, not a deprecated duplicate"
+  },
+  {
+    "id": "9.6-no-woff-fonts",
+    "section": "9. Font licensing",
+    "band": "layer-c-enforce",
+    "description": "No `.woff` or web-only font formats in keyboard packages"
+  },
+  {
+    "id": "9.7-pua-font-submitted-to-skeyman",
+    "section": "9. Font licensing",
+    "band": "yellow-survey",
+    "description": "If an experimental keyboard ships a PUA font, the font has been submitted to `s.keyman.com`"
+  },
+  {
+    "id": "10.1-kps-font-selected",
+    "section": "10. Package metadata (`.kps`)",
+    "band": "scaffolder-bake",
+    "description": "Font is selected in the `.kps` Keyboards tab if a font is included in Files"
+  },
+  {
+    "id": "10.2-kps-language-tags-selected",
+    "section": "10. Package metadata (`.kps`)",
+    "band": "scaffolder-bake",
+    "description": "Language tag(s) are selected in the `.kps` Keyboards tab"
+  },
+  {
+    "id": "10.3-kps-tags-minimal",
+    "section": "10. Package metadata (`.kps`)",
+    "band": "yellow-survey",
+    "description": "Language tags are minimal — no unnecessary script/region subtags"
+  },
+  {
+    "id": "10.4-kps-unusual-tag-flagged",
+    "section": "10. Package metadata (`.kps`)",
+    "band": "yellow-survey",
+    "description": "If the tag is new or unusual, it is flagged for possible submission to langtags/Ethnologue"
+  },
+  {
+    "id": "10.5-kps-conlang-flagged",
+    "section": "10. Package metadata (`.kps`)",
+    "band": "yellow-survey",
+    "description": "If keyboard is for a constructed language, it is flagged for special review"
+  },
+  {
+    "id": "10.6-kps-numeric-region-flagged",
+    "section": "10. Package metadata (`.kps`)",
+    "band": "layer-c-enforce",
+    "description": "If the language tag includes numeric regional codes, it is flagged for special review"
+  },
+  {
+    "id": "10.7-kps-details-files-selected",
+    "section": "10. Package metadata (`.kps`)",
+    "band": "scaffolder-bake",
+    "description": "`readme.htm`, `welcome.htm`, and `LICENSE.md` are selected in the `.kps` Details tab License field"
+  },
+  {
+    "id": "10.8-kps-follow-keyboard-version",
+    "section": "10. Package metadata (`.kps`)",
+    "band": "scaffolder-bake",
+    "description": "\"Follow keyboard version\" is selected in the `.kps` Details tab"
+  },
+  {
+    "id": "10.9-kps-description-nonempty",
+    "section": "10. Package metadata (`.kps`)",
+    "band": "scaffolder-bake",
+    "description": "Description field is present and non-empty in the `.kps`"
+  },
+  {
+    "id": "10.10-kps-description-meaningful",
+    "section": "10. Package metadata (`.kps`)",
+    "band": "yellow-survey",
+    "description": "Description is meaningful (becomes the keyboard home page content)"
+  },
+  {
+    "id": "10.11-kps-no-spelling-errors",
+    "section": "10. Package metadata (`.kps`)",
+    "band": "yellow-survey",
+    "description": "No spelling errors in user-facing `.kps` text fields (Description, Author name, WebSite text)"
+  },
+  {
+    "id": "11.1-php-exists-with-header",
+    "section": "11. Online help (`source/help/<name>.php`)",
+    "band": "scaffolder-bake",
+    "description": "`<name>.php` file exists and has the proper PHP header"
+  },
+  {
+    "id": "11.2-php-osk-all-layers",
+    "section": "11. Online help (`source/help/<name>.php`)",
+    "band": "layer-c-enforce",
+    "description": "If using OSK syntax, all desktop and mobile layers are listed in `data-states`"
+  },
+  {
+    "id": "11.3-php-style-inside-header",
+    "section": "11. Online help (`source/help/<name>.php`)",
+    "band": "scaffolder-bake",
+    "description": "All style information is inside the PHP header, not outside it"
+  },
+  {
+    "id": "11.4-php-no-closing-body-html",
+    "section": "11. Online help (`source/help/<name>.php`)",
+    "band": "scaffolder-bake",
+    "description": "`.php` does not contain closing `</body>` or `</html>` tags"
+  },
+  {
+    "id": "11.5-php-htm-html-wellformed",
+    "section": "11. Online help (`source/help/<name>.php`)",
+    "band": "layer-c-enforce",
+    "description": "HTML in `welcome.htm` and `.php` is well-formed — balanced tags, proper headings, no unclosed elements"
+  },
+  {
+    "id": "11.6-php-osk-data-states-all-layers",
+    "section": "11. Online help (`source/help/<name>.php`)",
+    "band": "layer-c-enforce",
+    "description": "`.php` `data-states` attribute lists every layer defined in the `.kmn` and touch layout"
+  },
+  {
+    "id": "11.7-php-pagename-format",
+    "section": "11. Online help (`source/help/<name>.php`)",
+    "band": "layer-c-enforce",
+    "description": "`.php` `pagename` follows the standard help-site format"
+  },
+  {
+    "id": "11.8-php-osk-image-constrained",
+    "section": "11. Online help (`source/help/<name>.php`)",
+    "band": "yellow-survey",
+    "description": "OSK graphics either use Keyman-generated form or custom images have width constraints"
+  },
+  {
+    "id": "11.9-php-htm-body-parity",
+    "section": "11. Online help (`source/help/<name>.php`)",
+    "band": "layer-c-enforce",
+    "description": "`welcome.htm` and `.php` body content are identical after stripping headers and normalizing whitespace"
+  },
+  {
+    "id": "11.10-php-htm-style-parity",
+    "section": "11. Online help (`source/help/<name>.php`)",
+    "band": "layer-c-enforce",
+    "description": "CSS in `welcome.htm` and `.php` are identical modulo non-rendering whitespace"
+  },
+  {
+    "id": "12.1-bcp47-tag-correct",
+    "section": "12. Language tagging (BCP47)",
+    "band": "yellow-survey",
+    "description": "BCP47 tag is correct for the language and script"
+  },
+  {
+    "id": "12.2-no-iso-639-5-codes",
+    "section": "12. Language tagging (BCP47)",
+    "band": "layer-c-enforce",
+    "description": "No ISO 639-5 collective language codes used"
+  },
+  {
+    "id": "12.3-no-numeric-region-unless-contrastive",
+    "section": "12. Language tagging (BCP47)",
+    "band": "layer-c-enforce",
+    "description": "No numeric regional codes unless explicitly contrastive"
+  },
+  {
+    "id": "12.4-no-001-region",
+    "section": "12. Language tagging (BCP47)",
+    "band": "layer-c-enforce",
+    "description": "Region code `001` is never used in BCP47 tags"
+  },
+  {
+    "id": "12.5-script-mismatch-flagged",
+    "section": "12. Language tagging (BCP47)",
+    "band": "yellow-survey",
+    "description": "If a language uses a different script than what langtags currently records, the mismatch is flagged"
+  },
+  {
+    "id": "12.6-script-mismatch-submitted-to-langtags",
+    "section": "12. Language tagging (BCP47)",
+    "band": "yellow-survey",
+    "description": "A flagged script mismatch has been submitted to langtags"
+  },
+  {
+    "id": "13.1-pua-keyboard-in-experimental",
+    "section": "13. Encoding / script issues",
+    "band": "layer-c-enforce",
+    "description": "PUA codepoint use means keyboard is in `experimental/`"
+  },
+  {
+    "id": "13.2-pua-notices-in-docs",
+    "section": "13. Encoding / script issues",
+    "band": "yellow-survey",
+    "description": "PUA codepoint use means explicit PUA notices appear in readme.htm, welcome.htm, .php, and .kps description"
+  },
+  {
+    "id": "13.3-no-unencoded-script-codepoint-reuse",
+    "section": "13. Encoding / script issues",
+    "band": "yellow-survey",
+    "description": "Keyboard does not reuse existing codepoints for unencoded scripts; if it does, warnings are in place"
+  },
+  {
+    "id": "13.4-no-math-latin-lookalikes",
+    "section": "13. Encoding / script issues",
+    "band": "layer-c-enforce",
+    "description": "No mathematical Latin look-alike characters (U+1D400-U+1D7FF) in keyboard output"
+  },
+  {
+    "id": "13.5-math-latin-not-spoofing",
+    "section": "13. Encoding / script issues",
+    "band": "yellow-survey",
+    "description": "If math-Latin or other Latin look-alikes are present, the use case does not look like spoofing"
+  },
+  {
+    "id": "14.1-third-party-patch-author-consulted",
+    "section": "14. Authorship / change provenance",
+    "band": "red-checklist",
+    "description": "If a third party submits a patch to an existing keyboard, the original author was consulted and approved"
+  },
+  {
+    "id": "15.1-relicense-permission-granted",
+    "section": "15. Deprecating a keyboard",
+    "band": "red-checklist",
+    "description": "Original author has granted permission to relicense under MIT"
+  },
+  {
+    "id": "15.2-new-keyboard-created-in-release",
+    "section": "15. Deprecating a keyboard",
+    "band": "layer-c-enforce",
+    "description": "New keyboard has been created in `release/` (renamed if needed)"
+  },
+  {
+    "id": "15.3-legacy-listed-as-deprecated-in-kps",
+    "section": "15. Deprecating a keyboard",
+    "band": "layer-c-enforce",
+    "description": "Legacy package ID is listed in the new keyboard's `.kps` Related packages as Deprecated"
+  },
+  {
+    "id": "15.4-deprecated-md-created",
+    "section": "15. Deprecating a keyboard",
+    "band": "layer-c-enforce",
+    "description": "A `DEPRECATED.md` file exists in the legacy keyboard's folder naming the replacement"
+  },
+  {
+    "id": "15.5-php-title-includes-deprecated",
+    "section": "15. Deprecating a keyboard",
+    "band": "layer-c-enforce",
+    "description": "The deprecated keyboard's help `.php` title includes \"(deprecated)\""
+  },
+  {
+    "id": "16.1-partner-notes-followed",
+    "section": "16. Partner-organization packages",
+    "band": "yellow-survey",
+    "description": "Partner package's \"note for keyboard maintainers\" has been followed"
+  },
+  {
+    "id": "16.2-partner-keyboards-csv-updated",
+    "section": "16. Partner-organization packages",
+    "band": "layer-c-enforce",
+    "description": "Keyboard version has been updated in the partner's `keyboards.csv` under `oem/`"
+  },
+  {
+    "id": "17.1-build-trigger-pr-comments-resolved",
+    "section": "17. Build trigger",
+    "band": "yellow-survey",
+    "description": "Author has resolved all PR comments before triggering a TeamCity build"
+  },
+  {
+    "id": "17.2-new-author-local-pull",
+    "section": "17. Build trigger",
+    "band": "red-checklist",
+    "description": "For a new author's first PR, the PR was pulled locally and checked thoroughly"
+  },
+  {
+    "id": "17.3-build-issues-fed-back",
+    "section": "17. Build trigger",
+    "band": "yellow-survey",
+    "description": "After the build runs, any issues it catches that local review missed were fed back to the author"
+  }
+]

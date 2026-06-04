@@ -23,6 +23,24 @@ export interface PatternQuestion {
   options?: Array<{ value: string; label: string }>;
   /** Default value pre-filled when the base keyboard suggests one. */
   default?: string;
+  /**
+   * Whether this slot must be filled before a Pattern can be applied.
+   *
+   * - `required: true` (or field omitted — defaults to true) — the validator
+   *   blocks submission when the slot is empty post-substitution
+   *   (spec §14 Decision 1).
+   * - `required: false` — the substituted fragment is allowed to leave this
+   *   slot empty IF the result still passes Layer A validation
+   *   (spec §14 Decision 1 explicit carve-out for "optional slot").
+   *
+   * The validator adjudicates mechanically using this field; no heuristic
+   * or LLM judgment is involved. Omitting the field implies `required: true`
+   * (the safe default — every slot is required unless explicitly marked
+   * optional).
+   *
+   * @see spec.md §14 Decision 1
+   */
+  required?: boolean;
 }
 
 export interface TestVector {
@@ -130,7 +148,7 @@ export type PatternInit = {
  * optional keys so the result is a clean `Pattern` value.
  */
 export function makePattern(init: PatternInit): Pattern {
-  const result: Record<string, unknown> = {
+  return {
     id: init.id,
     title: init.title,
     description: init.description,
@@ -143,11 +161,11 @@ export function makePattern(init: PatternInit): Pattern {
     sourceKeyboards: init.sourceKeyboards,
     reviewedBy: init.reviewedBy,
     reviewDate: init.reviewDate,
+    ...(init.strategyId !== undefined ? { strategyId: init.strategyId } : {}),
+    ...(init.combinesWith !== undefined ? { combinesWith: init.combinesWith } : {}),
+    ...(init.touchLayoutFragment !== undefined
+      ? { touchLayoutFragment: init.touchLayoutFragment }
+      : {}),
+    ...(init.reorderRules !== undefined ? { reorderRules: init.reorderRules } : {}),
   };
-  if (init.strategyId !== undefined) result["strategyId"] = init.strategyId;
-  if (init.combinesWith !== undefined) result["combinesWith"] = init.combinesWith;
-  if (init.touchLayoutFragment !== undefined)
-    result["touchLayoutFragment"] = init.touchLayoutFragment;
-  if (init.reorderRules !== undefined) result["reorderRules"] = init.reorderRules;
-  return result as unknown as Pattern;
 }

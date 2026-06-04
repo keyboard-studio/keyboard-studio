@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 1180" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12">
+  <!-- =============== DEFS =============== -->
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#444"/>
+    </marker>
+    <marker id="arrowDashed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#888"/>
+    </marker>
+    <style>
+      .title    { font-size: 22px; font-weight: 700; fill: #1a1a1a; }
+      .subtitle { font-size: 12px; fill: #555; }
+      .box      { stroke-width: 1.5; rx: 6; ry: 6; }
+      .engine   { fill: #e8f1fb; stroke: #2e6ec0; }
+      .content  { fill: #ebf7ec; stroke: #2e8540; }
+      .contract { fill: #fff5d6; stroke: #b88914; }
+      .external { fill: #ececec; stroke: #6b6b6b; }
+      .group    { fill: #fafbfc; stroke: #c0c4cc; stroke-dasharray: 4 3; }
+      .label    { font-size: 13px; font-weight: 600; fill: #1a1a1a; }
+      .sub      { font-size: 10.5px; fill: #444; }
+      .tag      { font-size: 9.5px; font-weight: 700; letter-spacing: 0.5px; fill: #fff; }
+      .flow     { stroke: #444; stroke-width: 1.6; fill: none; }
+      .flow-dashed { stroke: #888; stroke-width: 1.3; fill: none; stroke-dasharray: 5 3; }
+      .legend-text { font-size: 11.5px; fill: #222; }
+    </style>
+  </defs>
+
+  <!-- =============== HEADER =============== -->
+  <text x="40" y="40" class="title">keyboard-studio — Planned System Architecture</text>
+  <text x="40" y="58" class="subtitle">Per spec.md v1.0 §4, §8, §10, §11, §12, §13. Boxes color-coded by team ownership (§13).</text>
+
+  <!-- =============== LEGEND =============== -->
+  <g transform="translate(960, 28)">
+    <rect x="0" y="0" width="320" height="64" rx="5" ry="5" fill="#ffffff" stroke="#c0c4cc"/>
+    <rect x="10" y="10" width="14" height="14" class="box engine"/>
+    <text x="30" y="22" class="legend-text">Engine team</text>
+    <rect x="120" y="10" width="14" height="14" class="box content"/>
+    <text x="140" y="22" class="legend-text">Content team</text>
+    <rect x="230" y="10" width="14" height="14" class="box contract"/>
+    <text x="250" y="22" class="legend-text">Contracts</text>
+    <rect x="10" y="38" width="14" height="14" class="box external"/>
+    <text x="30" y="50" class="legend-text">External / 3rd-party</text>
+    <line x1="170" y1="45" x2="200" y2="45" class="flow"/>
+    <text x="206" y="50" class="legend-text">data flow</text>
+    <line x1="260" y1="45" x2="290" y2="45" class="flow-dashed"/>
+    <text x="296" y="50" class="legend-text">feedback</text>
+  </g>
+
+  <!-- =============== USER =============== -->
+  <g transform="translate(560, 80)">
+    <rect x="0" y="0" width="200" height="50" class="box external"/>
+    <text x="100" y="22" text-anchor="middle" class="label">Keyboard author (user)</text>
+    <text x="100" y="38" text-anchor="middle" class="sub">browser-based SPA, no install</text>
+  </g>
+
+  <!-- =============== SPA SHELL =============== -->
+  <g>
+    <rect x="60" y="155" width="1200" height="120" class="box group"/>
+    <text x="80" y="175" class="label">Studio UI shell  —  two-pane SPA  (§4)</text>
+    <text x="80" y="190" class="sub">phase navigation · lint-chip display · submit / download buttons · blocks submit on any warning</text>
+
+    <!-- Survey/gallery pane -->
+    <g transform="translate(90, 205)">
+      <rect x="0" y="0" width="360" height="55" class="box engine"/>
+      <text x="180" y="22" text-anchor="middle" class="label">Survey + Gallery pane (left)</text>
+      <text x="180" y="40" text-anchor="middle" class="sub">8 phases (A-G), plain language, live mini-keyboards</text>
+    </g>
+
+    <!-- Editor / hidden state -->
+    <g transform="translate(480, 205)">
+      <rect x="0" y="0" width="320" height="55" class="box engine"/>
+      <text x="160" y="22" text-anchor="middle" class="label">Authoring state (virtual FS)</text>
+      <text x="160" y="40" text-anchor="middle" class="sub">in-memory only; no disk writes until output</text>
+    </g>
+
+    <!-- Live preview pane -->
+    <g transform="translate(830, 205)">
+      <rect x="0" y="0" width="400" height="55" class="box engine"/>
+      <text x="200" y="22" text-anchor="middle" class="label">Live preview pane (right)</text>
+      <text x="200" y="40" text-anchor="middle" class="sub">KeymanWeb embed · OSK + textarea · lint chips</text>
+    </g>
+  </g>
+
+  <!-- User → SPA arrow -->
+  <line x1="660" y1="130" x2="660" y2="155" class="flow" marker-end="url(#arrow)"/>
+
+  <!-- =============== AUTHORING ENGINE STRIP =============== -->
+  <g>
+    <rect x="60" y="300" width="1200" height="220" class="box group"/>
+    <text x="80" y="320" class="label">Authoring engine  —  scaffold, survey, strategy, gallery  (§4, §7, §8)</text>
+
+    <!-- Base browser -->
+    <g transform="translate(90, 340)">
+      <rect x="0" y="0" width="180" height="80" class="box engine"/>
+      <text x="90" y="22" text-anchor="middle" class="label">Base-keyboard browser</text>
+      <text x="90" y="40" text-anchor="middle" class="sub">GitHub API client</text>
+      <text x="90" y="56" text-anchor="middle" class="sub">filters release/basic/</text>
+      <text x="90" y="72" text-anchor="middle" class="sub">offline US-English fallback</text>
+    </g>
+
+    <!-- Scaffolder -->
+    <g transform="translate(295, 340)">
+      <rect x="0" y="0" width="200" height="80" class="box engine"/>
+      <text x="100" y="22" text-anchor="middle" class="label">Project scaffolder</text>
+      <text x="100" y="40" text-anchor="middle" class="sub">identity reset · NCAPS strip</text>
+      <text x="100" y="56" text-anchor="middle" class="sub">[CAPS] delete · &amp;CasedKeys</text>
+      <text x="100" y="72" text-anchor="middle" class="sub">touch-layout cleanup (Band 1)</text>
+    </g>
+
+    <!-- Survey (8 phases) -->
+    <g transform="translate(520, 340)">
+      <rect x="0" y="0" width="220" height="80" class="box engine"/>
+      <text x="110" y="22" text-anchor="middle" class="label">Survey engine (Phases A-G)</text>
+      <text x="110" y="40" text-anchor="middle" class="sub">A identity · B coverage + axes</text>
+      <text x="110" y="56" text-anchor="middle" class="sub">C special · C' reorder · D-G</text>
+      <text x="110" y="72" text-anchor="middle" class="sub">computes A1-A7 discovery axes</text>
+    </g>
+
+    <!-- Strategy selector -->
+    <g transform="translate(765, 340)">
+      <rect x="0" y="0" width="220" height="80" class="box engine"/>
+      <text x="110" y="22" text-anchor="middle" class="label">Strategy selector  (§7)</text>
+      <text x="110" y="40" text-anchor="middle" class="sub">decision tree on A1-A7</text>
+      <text x="110" y="56" text-anchor="middle" class="sub">picks primary + secondaries</text>
+      <text x="110" y="72" text-anchor="middle" class="sub">from S-01..S-12 catalog</text>
+    </g>
+
+    <!-- Gallery -->
+    <g transform="translate(1010, 340)">
+      <rect x="0" y="0" width="220" height="80" class="box engine"/>
+      <text x="110" y="22" text-anchor="middle" class="label">Gallery (live demos)</text>
+      <text x="110" y="40" text-anchor="middle" class="sub">show-by-example mini-keyboards</text>
+      <text x="110" y="56" text-anchor="middle" class="sub">ranked by strategy match</text>
+      <text x="110" y="72" text-anchor="middle" class="sub">tap-to-insert pattern skeletons</text>
+    </g>
+
+    <!-- LLM mapper (engine+content boundary) -->
+    <g transform="translate(295, 435)">
+      <rect x="0" y="0" width="445" height="70" class="box content"/>
+      <text x="222" y="22" text-anchor="middle" class="label">LLM survey→slot mapper</text>
+      <text x="222" y="40" text-anchor="middle" class="sub">maps plain-language answers to PatternQuestion slot values + discovery axes</text>
+      <text x="222" y="58" text-anchor="middle" class="sub">grounded on Keyman reference index  (content team owns prompts + grounding)</text>
+    </g>
+
+    <!-- Pattern library -->
+    <g transform="translate(765, 435)">
+      <rect x="0" y="0" width="465" height="70" class="box content"/>
+      <text x="232" y="22" text-anchor="middle" class="label">Pattern library  (parameterized KMN skeletons)</text>
+      <text x="232" y="40" text-anchor="middle" class="sub">desktop · touch · reorder  · tagged with strategyId  · test-vector verified</text>
+      <text x="232" y="58" text-anchor="middle" class="sub">mined from release/, curated, slot-parameterized  (content team)</text>
+    </g>
+
+    <!-- Arrows inside authoring strip -->
+    <line x1="270" y1="380" x2="295" y2="380" class="flow" marker-end="url(#arrow)"/>
+    <line x1="495" y1="380" x2="520" y2="380" class="flow" marker-end="url(#arrow)"/>
+    <line x1="740" y1="380" x2="765" y2="380" class="flow" marker-end="url(#arrow)"/>
+    <line x1="985" y1="380" x2="1010" y2="380" class="flow" marker-end="url(#arrow)"/>
+    <!-- Pattern lib feeds gallery -->
+    <line x1="1120" y1="435" x2="1120" y2="420" class="flow" marker-end="url(#arrow)"/>
+    <!-- LLM ↔ survey -->
+    <line x1="630" y1="435" x2="630" y2="420" class="flow-dashed" marker-end="url(#arrow)"/>
+  </g>
+
+  <!-- SPA ↔ authoring engine -->
+  <line x1="660" y1="275" x2="660" y2="300" class="flow" marker-end="url(#arrow)"/>
+
+  <!-- =============== DEBOUNCE LOOP =============== -->
+  <g>
+    <rect x="60" y="555" width="1200" height="200" class="box group"/>
+    <text x="80" y="575" class="label">Single 300 ms debounce cycle  (Decision D3, §10)  —  TS check + WASM oracle run as concurrent microtasks</text>
+
+    <!-- Trigger -->
+    <g transform="translate(90, 600)">
+      <rect x="0" y="0" width="160" height="60" class="box engine"/>
+      <text x="80" y="24" text-anchor="middle" class="label">Edit event</text>
+      <text x="80" y="42" text-anchor="middle" class="sub">any change to .kmn / slots</text>
+    </g>
+
+    <!-- Debounce -->
+    <g transform="translate(280, 600)">
+      <rect x="0" y="0" width="130" height="60" class="box engine"/>
+      <text x="65" y="24" text-anchor="middle" class="label">300 ms debounce</text>
+      <text x="65" y="42" text-anchor="middle" class="sub">single timer</text>
+    </g>
+
+    <!-- TS validator (Layer A 9 + Layer B) -->
+    <g transform="translate(450, 580)">
+      <rect x="0" y="0" width="330" height="70" class="box engine"/>
+      <text x="165" y="22" text-anchor="middle" class="label">@keymanapp/kmn-validator  (TS)</text>
+      <text x="165" y="40" text-anchor="middle" class="sub">Layer A: 9 portable checks · Layer B: style AST</text>
+      <text x="165" y="58" text-anchor="middle" class="sub">per-keystroke; TS error suppresses WASM call</text>
+    </g>
+
+    <!-- WASM oracle (Layer A remaining 5) -->
+    <g transform="translate(450, 670)">
+      <rect x="0" y="0" width="330" height="55" class="box engine"/>
+      <text x="165" y="22" text-anchor="middle" class="label">Compiler service  (WASM kmcmplib oracle)</text>
+      <text x="165" y="40" text-anchor="middle" class="sub">Layer A: 5 deep checks · WASM diagnostic supersedes TS</text>
+    </g>
+
+    <!-- Layer C (hygiene) -->
+    <g transform="translate(810, 580)">
+      <rect x="0" y="0" width="240" height="70" class="box engine"/>
+      <text x="120" y="22" text-anchor="middle" class="label">@keymanapp/keyboard-lint</text>
+      <text x="120" y="40" text-anchor="middle" class="sub">Layer C: criteria.md hygiene</text>
+      <text x="120" y="58" text-anchor="middle" class="sub">per-phase-exit + at submit</text>
+    </g>
+
+    <!-- Findings → UI -->
+    <g transform="translate(1080, 600)">
+      <rect x="0" y="0" width="150" height="120" class="box engine"/>
+      <text x="75" y="22" text-anchor="middle" class="label">LintFinding[]</text>
+      <text x="75" y="42" text-anchor="middle" class="sub">green  silent</text>
+      <text x="75" y="60" text-anchor="middle" class="sub">yellow  survey Q</text>
+      <text x="75" y="78" text-anchor="middle" class="sub">red  blocks submit</text>
+      <text x="75" y="100" text-anchor="middle" class="sub">→ lint chips + PR body</text>
+    </g>
+
+    <!-- Arrows in debounce loop -->
+    <line x1="250" y1="630" x2="280" y2="630" class="flow" marker-end="url(#arrow)"/>
+    <line x1="410" y1="630" x2="450" y2="615" class="flow" marker-end="url(#arrow)"/>
+    <line x1="410" y1="630" x2="450" y2="697" class="flow" marker-end="url(#arrow)"/>
+    <line x1="780" y1="615" x2="810" y2="615" class="flow" marker-end="url(#arrow)"/>
+    <line x1="780" y1="697" x2="1080" y2="697" class="flow" marker-end="url(#arrow)"/>
+    <line x1="1050" y1="615" x2="1080" y2="630" class="flow" marker-end="url(#arrow)"/>
+    <!-- Findings back to UI (feedback loop) -->
+    <path d="M1155,600 C1155,540 760,540 660,275" class="flow-dashed" marker-end="url(#arrowDashed)"/>
+  </g>
+
+  <!-- Authoring → debounce -->
+  <line x1="170" y1="520" x2="170" y2="600" class="flow" marker-end="url(#arrow)"/>
+
+  <!-- =============== VIRTUAL FS + OUTPUT =============== -->
+  <g>
+    <rect x="60" y="790" width="1200" height="240" class="box group"/>
+    <text x="80" y="810" class="label">Virtual filesystem  &amp;  output paths  (§11, §12)</text>
+
+    <!-- Virtual FS -->
+    <g transform="translate(90, 830)">
+      <rect x="0" y="0" width="420" height="180" class="box engine"/>
+      <text x="210" y="22" text-anchor="middle" class="label">In-memory virtual FS  (mirrors keymanapp/keyboards layout)</text>
+      <text x="20"  y="48" class="sub">release/&lt;letter&gt;/&lt;id&gt;/</text>
+      <text x="35"  y="64" class="sub">source/  &lt;id&gt;.kmn  ·  .kps  ·  .kvks  ·  .keyman-touch-layout</text>
+      <text x="55"  y="80" class="sub">welcome.htm  ·  readme.htm  ·  &lt;id&gt;.ico  ·  help/&lt;id&gt;.php</text>
+      <text x="35"  y="100" class="sub">LICENSE.md  ·  HISTORY.md  ·  README.md</text>
+      <text x="35"  y="116" class="sub">tests/  &lt;id&gt;_tests.kmn  (round-trip vectors)</text>
+      <text x="20"  y="142" class="sub">Compiled  .kmx  /  .kvk  /  .js  produced in browser</text>
+      <text x="20"  y="158" class="sub">included in .zip; not committed to PR (criteria SS1)</text>
+    </g>
+
+    <!-- Zip output -->
+    <g transform="translate(540, 830)">
+      <rect x="0" y="0" width="320" height="80" class="box engine"/>
+      <text x="160" y="22" text-anchor="middle" class="label">Download .zip</text>
+      <text x="160" y="40" text-anchor="middle" class="sub">virtual FS serialized + compiled artifacts</text>
+      <text x="160" y="58" text-anchor="middle" class="sub">+ NEXT_STEPS.md  ·  no auth required</text>
+    </g>
+
+    <!-- GitHub PR -->
+    <g transform="translate(540, 930)">
+      <rect x="0" y="0" width="320" height="80" class="box engine"/>
+      <text x="160" y="22" text-anchor="middle" class="label">GitHub OAuth fork + draft PR</text>
+      <text x="160" y="40" text-anchor="middle" class="sub">fork keymanapp/keyboards · branch add/&lt;id&gt;</text>
+      <text x="160" y="58" text-anchor="middle" class="sub">PR body auto-generated from lint results</text>
+    </g>
+
+    <!-- External targets -->
+    <g transform="translate(890, 830)">
+      <rect x="0" y="0" width="340" height="80" class="box external"/>
+      <text x="170" y="22" text-anchor="middle" class="label">User download (filesystem)</text>
+      <text x="170" y="40" text-anchor="middle" class="sub">end-user installs via Keyman Desktop / mobile</text>
+      <text x="170" y="60" text-anchor="middle" class="sub">or contributes via manual PR</text>
+    </g>
+
+    <g transform="translate(890, 930)">
+      <rect x="0" y="0" width="340" height="80" class="box external"/>
+      <text x="170" y="22" text-anchor="middle" class="label">keymanapp/keyboards  (upstream)</text>
+      <text x="170" y="40" text-anchor="middle" class="sub">Keyman reviewer takes over from draft PR</text>
+      <text x="170" y="60" text-anchor="middle" class="sub">criteria.md compliance reviewed against PR body</text>
+    </g>
+
+    <!-- Arrows -->
+    <line x1="510" y1="870" x2="540" y2="870" class="flow" marker-end="url(#arrow)"/>
+    <line x1="510" y1="970" x2="540" y2="970" class="flow" marker-end="url(#arrow)"/>
+    <line x1="860" y1="870" x2="890" y2="870" class="flow" marker-end="url(#arrow)"/>
+    <line x1="860" y1="970" x2="890" y2="970" class="flow" marker-end="url(#arrow)"/>
+  </g>
+
+  <!-- Authoring & debounce → Virtual FS -->
+  <line x1="660" y1="755" x2="660" y2="790" class="flow" marker-end="url(#arrow)"/>
+
+  <!-- =============== CONTRACTS BUS =============== -->
+  <g>
+    <rect x="60" y="1050" width="1200" height="100" class="box contract"/>
+    <text x="80" y="1072" class="label">packages/contracts  (Day-1 lock, §5, §13 issue #8)</text>
+    <text x="80" y="1092" class="sub">shared TypeScript types both teams build to. Schema changes require a major version bump + joint engine+content session.</text>
+    <g font-size="11" fill="#1a1a1a">
+      <text x="80"  y="1118">·  Pattern  ·  PatternQuestion  ·  TestVector  ·  StrategyId</text>
+      <text x="430" y="1118">·  LintFinding  ·  SurveyAnswer  ·  SurveyPhaseResult</text>
+      <text x="800" y="1118">·  VirtualFS  ·  Criterion[]  ·  CompileResult</text>
+    </g>
+    <text x="80" y="1138" class="sub">Mock services + 101 vitest specs live alongside the types; engine and content packages depend on contracts only.</text>
+  </g>
+
+  <!-- Contracts dashed lines to consumers -->
+  <line x1="660" y1="1030" x2="660" y2="1050" class="flow-dashed" marker-end="url(#arrowDashed)" marker-start="url(#arrowDashed)"/>
+
+  <!-- =============== EXTERNAL SOURCES (left side annotations) =============== -->
+  <g transform="translate(60, 80)">
+    <rect x="0" y="0" width="180" height="50" class="box external"/>
+    <text x="90" y="22" text-anchor="middle" class="label">keymanapp/keyboards</text>
+    <text x="90" y="38" text-anchor="middle" class="sub">GitHub release/ index</text>
+  </g>
+  <line x1="240" y1="105" x2="370" y2="105" class="flow-dashed"/>
+  <line x1="305" y1="105" x2="180" y2="340" class="flow-dashed" marker-end="url(#arrowDashed)"/>
+
+  <g transform="translate(1080, 80)">
+    <rect x="0" y="0" width="200" height="50" class="box external"/>
+    <text x="100" y="22" text-anchor="middle" class="label">kmcmplib  (Keyman)</text>
+    <text x="100" y="38" text-anchor="middle" class="sub">compiled to WASM, loaded once</text>
+  </g>
+  <line x1="1180" y1="130" x2="780" y2="697" class="flow-dashed" marker-end="url(#arrowDashed)"/>
+
+</svg>

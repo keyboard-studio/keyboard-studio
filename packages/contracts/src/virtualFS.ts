@@ -7,16 +7,40 @@ export interface VirtualFSEntry {
   isBinary: boolean;
 }
 
+/**
+ * In-memory virtual filesystem. The studio's source-of-truth for keyboard
+ * source files during authoring; serialized to a zip ONLY through
+ * {@link OutputService.toZip} (which strips compiled artifacts before
+ * delegating to a free serializer). Direct serialization is intentionally
+ * NOT on this interface — see #97. Callers that want a zip must go
+ * through `OutputService.toZip`, which is the safe path that honors
+ * criteria SS1 (no compiled artifacts in PRs, spec §12).
+ */
 export interface VirtualFS {
   get(path: string): VirtualFSEntry | undefined;
-  set(path: string, content: Uint8Array | string, isBinary?: boolean): void;
+  /**
+   * Set or overwrite an entry at `path`.
+   *
+   * Returns the previous entry if `path` already existed (so callers can
+   * tell user-edited-existing from user-created-new), or `undefined` for
+   * a fresh path. Mirrors {@link delete}'s did-it-exist signal for
+   * symmetry.
+   */
+  set(
+    path: string,
+    content: Uint8Array | string,
+    isBinary?: boolean
+  ): VirtualFSEntry | undefined;
   delete(path: string): boolean;
   list(prefix?: string): string[];
   /**
-   * Returns raw zip bytes. Browser callers wrap in
-   * `new Blob([bytes], { type: 'application/zip' })` at the download site;
-   * Node callers (compiler service, vitest) consume the bytes directly.
-   * See spec section 12 for the output-artifact contract.
+   * Return entry snapshots filtered by prefix — equivalent to
+   * `list(prefix).map((p) => get(p)!)` but in one call, without the
+   * non-null assertion, and in O(n) rather than O(n²) for callers that
+   * iterate every entry (e.g. `OutputService.toZip` walking the tree).
+   *
+   * @param prefix - Optional path prefix; omitted → all entries.
+   * @returns An array of `VirtualFSEntry` snapshots. Order is unspecified.
    */
-  serializeZip(): Promise<Uint8Array>;
+  entries(prefix?: string): VirtualFSEntry[];
 }

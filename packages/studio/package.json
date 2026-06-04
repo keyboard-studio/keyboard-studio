@@ -1,0 +1,29 @@
+{
+  "name": "@keyboard-studio/studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The spec'd authoring SPA. Two-pane survey + live preview per spec.md §4 (issue #22 et al). For the working compile/preview pipeline reference, see @keyboard-studio/studio-poc.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@keyboard-studio/contracts": "workspace:*",
+    "@keyboard-studio/engine": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^6.0.3",
+    "vite": "^7.0.0",
+    "vitest": "^4.1.6"
+  }
+}

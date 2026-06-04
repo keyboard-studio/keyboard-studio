@@ -22,6 +22,7 @@
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
   body {
+    position: relative;
     margin: 0;
     font-family: var(--sans);
     background: var(--bg);
@@ -43,7 +44,7 @@
       radial-gradient(900px 500px at 90% 0%, rgba(210,168,255,0.14), transparent 55%),
       var(--bg);
   }
-  .hero-inner { padding: 84px 0 64px; }
+  .hero-inner { position: relative; z-index: 1; padding: calc(50px + var(--kb-scale, 1) * 190px) 0 64px; }
   .badge {
     display: inline-flex; align-items: center; gap: 8px;
     font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
@@ -54,7 +55,7 @@
   }
   .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 10px var(--warn); }
   h1 {
-    font-size: clamp(2.4rem, 6vw, 4rem); line-height: 1.05; margin: 22px 0 12px;
+    font-size: clamp(2.4rem, 6vw, 4rem); line-height: 1.05; margin: 22px 0 12px; padding-bottom: 0.15em;
     font-weight: 800; letter-spacing: -0.02em;
     background: linear-gradient(90deg, #fff 20%, var(--accent) 70%, var(--accent-3));
     -webkit-background-clip: text; background-clip: text; color: transparent;
@@ -160,11 +161,117 @@
     .pipe { grid-template-columns: 1fr 1fr; }
     .feat-grid, .who-grid { grid-template-columns: 1fr; }
   }
+
+  /* ---------- 3D Spinning Keyboard ---------- */
+  #kb3d-wrap {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    z-index: 0;
+    pointer-events: none;
+    width: 320px;
+    height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform-origin: top center;
+    perspective: 500px;
+  }
+  #kb3d {
+    background: #0a1428;
+    border: 1px solid rgba(0, 185, 255, 0.38);
+    border-radius: 14px;
+    padding: 12px 14px 11px;
+    width: 296px;
+    position: relative;
+    will-change: transform;
+    transform-style: preserve-3d;
+    box-shadow:
+      0 0 28px rgba(0, 160, 255, 0.32),
+      0 0 65px rgba(0, 100, 220, 0.15);
+  }
+  #kb3d::before {
+    content: '';
+    position: absolute;
+    left: -1px; right: -1px; bottom: -1px;
+    height: 14px;
+    background: #040e1e;
+    border: 1px solid rgba(0, 100, 180, 0.3);
+    border-top: none;
+    border-radius: 0 0 14px 14px;
+    transform-origin: 50% 0%;
+    transform: rotateX(-90deg);
+  }
+  .kb-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 4px;
+    justify-content: center;
+    transform-style: preserve-3d;
+  }
+  .kk {
+    font-family: var(--mono);
+    font-size: 11px;
+    min-width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    background: rgba(0, 110, 210, 0.14);
+    border: 1px solid rgba(0, 185, 255, 0.40);
+    border-bottom: 2px solid rgba(0, 120, 220, 0.55);
+    border-radius: 4px;
+    color: var(--accent);
+    text-shadow: 0 0 8px rgba(110, 168, 254, 0.70);
+    padding: 0 3px;
+    letter-spacing: 0;
+    position: relative;
+    transform-style: preserve-3d;
+    box-shadow:
+      0 0 6px rgba(0, 160, 255, 0.20),
+      inset 0 0 5px rgba(0, 150, 255, 0.08);
+  }
+  .kk::after {
+    content: '';
+    position: absolute;
+    left: -1px; right: -1px; bottom: 0;
+    height: 5px;
+    background: #031020;
+    border-left: 1px solid rgba(0, 130, 220, 0.25);
+    border-right: 1px solid rgba(0, 130, 220, 0.25);
+    border-bottom: 1px solid rgba(0, 80, 170, 0.4);
+    transform-origin: 50% 0%;
+    transform: rotateX(-90deg);
+  }
+  .kk.kw { min-width: 36px; }
+  .kk.ksp { min-width: 138px; }
 </style>
 </head>
 <body>
 
 <header class="hero">
+  <div id="kb3d-wrap" aria-hidden="true">
+    <div id="kb3d">
+      <div class="kb-row">
+        <span class="kk">Q</span><span class="kk">W</span><span class="kk">E</span>
+        <span class="kk">R</span><span class="kk">T</span><span class="kk">Y</span>
+        <span class="kk">U</span><span class="kk">I</span><span class="kk">O</span>
+        <span class="kk">P</span>
+      </div>
+      <div class="kb-row">
+        <span class="kk">A</span><span class="kk">S</span><span class="kk">D</span>
+        <span class="kk">F</span><span class="kk">G</span><span class="kk">H</span>
+        <span class="kk">J</span><span class="kk">K</span><span class="kk">L</span>
+      </div>
+      <div class="kb-row">
+        <span class="kk kw">⇧</span><span class="kk">Z</span><span class="kk">X</span>
+        <span class="kk">C</span><span class="kk">V</span><span class="kk">B</span>
+        <span class="kk">N</span><span class="kk">M</span><span class="kk kw">⏎</span>
+      </div>
+      <div class="kb-row">
+        <span class="kk ksp"></span>
+      </div>
+    </div>
+  </div>
   <div class="wrap hero-inner">
     <span class="badge"><span class="dot"></span> Coming soon &middot; Design phase</span>
     <h1>Keyboard Studio</h1>
@@ -454,5 +561,49 @@
   </div>
 </footer>
 
+<script>
+(function () {
+  var wrap = document.getElementById('kb3d-wrap');
+  var el   = document.getElementById('kb3d');
+  var rx = 0, ry = 0, rz = 0;
+  var vx = 0.55, vy = 0.9, vz = 0.28;
+  var dvx = 0.004, dvy = -0.006, dvz = 0.003;
+
+  var visible = true;
+
+  function setScale() {
+    var s = Math.max(0.38, Math.min(1, window.innerWidth / 1100));
+    wrap.style.transform = 'translateX(-50%) scale(' + s + ')';
+    document.body.style.setProperty('--kb-scale', s);
+  }
+  setScale();
+
+  var resizePending = false;
+  window.addEventListener('resize', function () {
+    if (!resizePending) {
+      resizePending = true;
+      requestAnimationFrame(function () { setScale(); resizePending = false; });
+    }
+  });
+
+  new IntersectionObserver(function (entries) {
+    visible = entries[0].isIntersecting;
+    if (visible) requestAnimationFrame(tick);
+  }, { threshold: 0 }).observe(wrap);
+
+  function tick() {
+    if (!visible) return;
+    vx += dvx; vy += dvy; vz += dvz;
+    if (Math.abs(vx) > 1.4) dvx *= -1;
+    if (Math.abs(vy) > 1.8) dvy *= -1;
+    if (Math.abs(vz) > 0.7) dvz *= -1;
+    rx += vx; ry += vy; rz += vz;
+    el.style.transform =
+      'rotateX(' + rx + 'deg) rotateY(' + ry + 'deg) rotateZ(' + rz + 'deg)';
+    requestAnimationFrame(tick);
+  }
+  tick();
+})();
+</script>
 </body>
 </html>

@@ -1,0 +1,84 @@
+{
+  "sha": "deadbeef1234567890abcdef1234567890abcdef",
+  "url": "https://api.github.com/repos/keymanapp/keyboards/git/trees/deadbeef1234567890abcdef1234567890abcdef",
+  "tree": [
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "size": 256,
+      "url": "https://api.github.com/repos/keymanapp/keyboards/git/blobs/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "path": "release/b/basic_kbdus",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "url": "https://api.github.com/repos/keymanapp/keyboards/git/trees/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "path": "release/b/basic_kbdus/basic_kbdus.kmn",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "size": 1024,
+      "url": "https://api.github.com/repos/keymanapp/keyboards/git/blobs/cccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "path": "release/b/basic_kbdus/basic_kbdus.kps",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dddddddddddddddddddddddddddddddddddddddd",
+      "size": 512,
+      "url": "https://api.github.com/repos/keymanapp/keyboards/git/blobs/dddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "path": "release/s/sil_euro_latin",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "url": "https://api.github.com/repos/keymanapp/keyboards/git/trees/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "path": "release/s/sil_euro_latin/sil_euro_latin.kmn",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ffffffffffffffffffffffffffffffffffffffff",
+      "size": 2048,
+      "url": "https://api.github.com/repos/keymanapp/keyboards/git/blobs/ffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "path": "release/s/sil_euro_latin/sil_euro_latin.kps",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1111111111111111111111111111111111111111",
+      "size": 768,
+      "url": "https://api.github.com/repos/keymanapp/keyboards/git/blobs/1111111111111111111111111111111111111111"
+    },
+    {
+      "path": "release/s/sil_devanagari_phonetic",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2222222222222222222222222222222222222222",
+      "url": "https://api.github.com/repos/keymanapp/keyboards/git/trees/2222222222222222222222222222222222222222"
+    },
+    {
+      "path": "release/s/sil_devanagari_phonetic/sil_devanagari_phonetic.kmn",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3333333333333333333333333333333333333333",
+      "size": 3072,
+      "url": "https://api.github.com/repos/keymanapp/keyboards/git/blobs/3333333333333333333333333333333333333333"
+    },
+    {
+      "path": "release/s/sil_devanagari_phonetic/sil_devanagari_phonetic.kps",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4444444444444444444444444444444444444444",
+      "size": 896,
+      "url": "https://api.github.com/repos/keymanapp/keyboards/git/blobs/4444444444444444444444444444444444444444"
+    }
+  ],
+  "truncated": false
+}

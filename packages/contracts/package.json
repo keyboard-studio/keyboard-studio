@@ -10,11 +10,24 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./mocks": {
+      "types": "./dist/mocks/index.d.ts",
+      "import": "./dist/mocks/index.js"
+    },
+    "./fixtures": {
+      "types": "./dist/fixtures/index.d.ts",
+      "import": "./dist/fixtures/index.js"
+    },
+    "./criteria": {
+      "types": "./dist/criteriaData.d.ts",
+      "import": "./dist/criteriaData.js"
     }
   },
   "files": [
     "dist",
     "src",
+    "data",
     "README.md"
   ],
   "scripts": {
@@ -25,7 +38,7 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
-    "typescript": "^5.4.5",
-    "vitest": "^2.0.5"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.6"
   }
 }

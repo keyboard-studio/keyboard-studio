@@ -1,10 +1,43 @@
+# Node / pnpm
 node_modules/
-dist/
-.turbo/
-*.tsbuildinfo
 .pnpm-store/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Tooling caches
+.turbo/
+.vite/
+.cache/
+.eslintcache
 coverage/
+
+# Environment files (never commit)
+.env
+.env.*
+!.env.example
+*.local
+
+# Logs
+*.log
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Editors / IDEs
 .vscode/
 .idea/
-*.log
+
+# Python (utilities/)
+__pycache__/
+*.pyc
+*.pyo
+
+# kmcmplib fetch output (generated; do not commit)
+packages/compiler/wasm/*.wasm
+
+# kbgen vendored CLDR exemplars (725 files; regenerate via utilities/kbgen/fetch-data.js)
+utilities/kbgen/data/cldr/

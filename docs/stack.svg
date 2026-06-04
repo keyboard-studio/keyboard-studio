@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 1180" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#444"/>
+    </marker>
+    <marker id="arrowGrey" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#888"/>
+    </marker>
+    <style>
+      .title    { font-size: 22px; font-weight: 700; fill: #1a1a1a; }
+      .subtitle { font-size: 12px; fill: #555; }
+      .h        { font-size: 14px; font-weight: 700; fill: #1a1a1a; }
+      .label    { font-size: 13px; font-weight: 600; fill: #1a1a1a; }
+      .sub      { font-size: 10.5px; fill: #333; }
+      .mono     { font-family: Consolas, "Courier New", monospace; font-size: 10.5px; fill: #1a1a1a; }
+      .box      { stroke-width: 1.5; rx: 6; ry: 6; }
+      .built    { fill: #ebf7ec; stroke: #2e8540; }
+      .planned  { fill: #fffaf0; stroke: #c77a1c; stroke-dasharray: 5 3; }
+      .tool     { fill: #e8f1fb; stroke: #2e6ec0; }
+      .runtime  { fill: #f0eaff; stroke: #6a4ec0; }
+      .external { fill: #ececec; stroke: #6b6b6b; }
+      .contract { fill: #fff5d6; stroke: #b88914; }
+      .group    { fill: #fafbfc; stroke: #c0c4cc; stroke-dasharray: 4 3; }
+      .flow     { stroke: #444; stroke-width: 1.4; fill: none; }
+      .flow-grey{ stroke: #888; stroke-width: 1.2; fill: none; stroke-dasharray: 5 3; }
+      .legend-text { font-size: 11.5px; fill: #222; }
+    </style>
+  </defs>
+
+  <!-- =============== HEADER =============== -->
+  <text x="40" y="40" class="title">keyboard-studio — Underlying Stack &amp; Build Architecture</text>
+  <text x="40" y="58" class="subtitle">pnpm workspaces · TypeScript 6 (strict, ESM) · Vite · Vitest · WASM · GitHub Actions. State as of 2026-06-03: only `contracts` is built.</text>
+
+  <!-- =============== LEGEND =============== -->
+  <g transform="translate(900, 28)">
+    <rect x="0" y="0" width="380" height="64" rx="5" ry="5" fill="#ffffff" stroke="#c0c4cc"/>
+    <rect x="10"  y="10" width="14" height="14" class="box built"/>
+    <text x="30"  y="22" class="legend-text">Built / shipping</text>
+    <rect x="135" y="10" width="14" height="14" class="box planned"/>
+    <text x="155" y="22" class="legend-text">Planned (skeleton only)</text>
+    <rect x="290" y="10" width="14" height="14" class="box contract"/>
+    <text x="310" y="22" class="legend-text">Contracts</text>
+    <rect x="10"  y="38" width="14" height="14" class="box tool"/>
+    <text x="30"  y="50" class="legend-text">Build / dev tooling</text>
+    <rect x="155" y="38" width="14" height="14" class="box runtime"/>
+    <text x="175" y="50" class="legend-text">Runtime</text>
+    <rect x="240" y="38" width="14" height="14" class="box external"/>
+    <text x="260" y="50" class="legend-text">External / upstream</text>
+  </g>
+
+  <!-- ============================================================
+       SOURCE-OF-TRUTH LAYER (left column)
+       ============================================================ -->
+  <g>
+    <rect x="40" y="100" width="380" height="320" class="box group"/>
+    <text x="60" y="120" class="h">1.  Repository &amp; package layout</text>
+
+    <g transform="translate(60, 140)">
+      <rect x="0" y="0" width="340" height="36" class="box tool"/>
+      <text x="170" y="22" text-anchor="middle" class="label">pnpm-workspace.yaml  ·  packages/*</text>
+    </g>
+
+    <g transform="translate(60, 188)">
+      <rect x="0" y="0" width="340" height="50" class="box tool"/>
+      <text x="170" y="20" text-anchor="middle" class="label">tsconfig.base.json  (strict, ES2022, ESM)</text>
+      <text x="170" y="38" text-anchor="middle" class="sub">noUncheckedIndexedAccess · exactOptionalPropertyTypes · verbatimModuleSyntax</text>
+    </g>
+
+    <g transform="translate(60, 250)">
+      <rect x="0" y="0" width="340" height="36" class="box tool"/>
+      <text x="170" y="22" text-anchor="middle" class="label">root package.json  ·  pnpm -r {build|test|typecheck}</text>
+    </g>
+
+    <g transform="translate(60, 298)">
+      <rect x="0" y="0" width="340" height="50" class="box tool"/>
+      <text x="170" y="20" text-anchor="middle" class="label">ESLint 10  +  Prettier 3</text>
+      <text x="170" y="38" text-anchor="middle" class="sub">@typescript-eslint/{parser,plugin}  ·  format on src/**/*.{ts,tsx,json,md}</text>
+    </g>
+
+    <g transform="translate(60, 360)">
+      <rect x="0" y="0" width="340" height="50" class="box tool"/>
+      <text x="170" y="20" text-anchor="middle" class="label">Vitest 4  (per-package configs)</text>
+      <text x="170" y="38" text-anchor="middle" class="sub">root vitest.config.ts intentionally empty — pnpm -r delegates</text>
+    </g>
+  </g>
+
+  <!-- ============================================================
+       PACKAGES COLUMN
+       ============================================================ -->
+  <g>
+    <rect x="445" y="100" width="495" height="600" class="box group"/>
+    <text x="465" y="120" class="h">2.  Workspace packages  (packages/*)</text>
+
+    <!-- contracts (built) -->
+    <g transform="translate(465, 140)">
+      <rect x="0" y="0" width="455" height="180" class="box contract"/>
+      <text x="227" y="22" text-anchor="middle" class="label">@keyboard-studio/contracts   (BUILT)</text>
+      <text x="14"  y="44" class="sub">v0.1.0 · private · ESM · ~2,500 LOC types + mocks + fixtures + 101 vitest specs</text>
+      <text x="14"  y="62" class="mono">exports:  "."   "./mocks"   "./fixtures"   "./criteria"</text>
+      <text x="14"  y="82" class="sub">Subpath modules:</text>
+      <text x="28"  y="98"  class="mono">pattern.ts · strategy.ts · axes.ts · lintFinding.ts · virtualFS.ts</text>
+      <text x="28"  y="114" class="mono">criteria.ts · criteriaData.ts (133 entries) · surveyPhaseResult.ts</text>
+      <text x="28"  y="130" class="mono">scaffolder.ts · validator.ts · lintEngine.ts · compiler.ts · compileResult.ts</text>
+      <text x="28"  y="146" class="mono">baseBrowser.ts · baseKeyboard.ts · patternLibrary.ts · patternMatch.ts · outputService.ts</text>
+      <text x="14"  y="168" class="sub">Build:  tsc -b   ·   Test:  vitest run   ·   Both teams import from here only.</text>
+    </g>
+
+    <!-- engine (planned) -->
+    <g transform="translate(465, 340)">
+      <rect x="0" y="0" width="220" height="80" class="box planned"/>
+      <text x="110" y="22" text-anchor="middle" class="label">@keyboard-studio/engine</text>
+      <text x="110" y="40" text-anchor="middle" class="sub">survey runner · strategy selector</text>
+      <text x="110" y="56" text-anchor="middle" class="sub">300 ms debounce orchestrator</text>
+      <text x="110" y="72" text-anchor="middle" class="sub">planned — skeleton not built</text>
+    </g>
+
+    <!-- scaffolder (planned) -->
+    <g transform="translate(700, 340)">
+      <rect x="0" y="0" width="220" height="80" class="box planned"/>
+      <text x="110" y="22" text-anchor="middle" class="label">@keyboard-studio/scaffolder</text>
+      <text x="110" y="40" text-anchor="middle" class="sub">template-cleanup pipeline</text>
+      <text x="110" y="56" text-anchor="middle" class="sub">identity reset · virtual FS init</text>
+      <text x="110" y="72" text-anchor="middle" class="sub">planned</text>
+    </g>
+
+    <!-- validator / lint (planned, distributed as @keymanapp) -->
+    <g transform="translate(465, 435)">
+      <rect x="0" y="0" width="455" height="86" class="box planned"/>
+      <text x="227" y="22" text-anchor="middle" class="label">@keymanapp/kmn-validator   +   @keymanapp/keyboard-lint</text>
+      <text x="227" y="40" text-anchor="middle" class="sub">Layer A (validity, 9 TS + 5 WASM)  ·  Layer B (style AST)  ·  Layer C (criteria.md hygiene)</text>
+      <text x="227" y="58" text-anchor="middle" class="sub">Distributed as Keyman npm packages so other tools can reuse the same checks</text>
+      <text x="227" y="76" text-anchor="middle" class="sub">planned — shape locked in spec §10; implementation deferred to Phases 1-3</text>
+    </g>
+
+    <!-- compiler service (planned) -->
+    <g transform="translate(465, 535)">
+      <rect x="0" y="0" width="220" height="80" class="box planned"/>
+      <text x="110" y="22" text-anchor="middle" class="label">@keyboard-studio/compiler</text>
+      <text x="110" y="40" text-anchor="middle" class="sub">loads kmcmplib WASM once</text>
+      <text x="110" y="56" text-anchor="middle" class="sub">emits blob-URL artifacts</text>
+      <text x="110" y="72" text-anchor="middle" class="sub">planned</text>
+    </g>
+
+    <!-- studio SPA (planned) -->
+    <g transform="translate(700, 535)">
+      <rect x="0" y="0" width="220" height="80" class="box planned"/>
+      <text x="110" y="22" text-anchor="middle" class="label">@keyboard-studio/studio</text>
+      <text x="110" y="40" text-anchor="middle" class="sub">SPA — two-pane shell</text>
+      <text x="110" y="56" text-anchor="middle" class="sub">Vite + (React or solid TBD)</text>
+      <text x="110" y="72" text-anchor="middle" class="sub">planned</text>
+    </g>
+
+    <!-- Dependency arrows: all planned packages depend on contracts -->
+    <g stroke="#b88914" fill="none" stroke-width="1.2" stroke-dasharray="3 3">
+      <line x1="575" y1="340" x2="575" y2="320" marker-end="url(#arrowGrey)"/>
+      <line x1="810" y1="340" x2="810" y2="320" marker-end="url(#arrowGrey)"/>
+      <line x1="692" y1="435" x2="692" y2="320" marker-end="url(#arrowGrey)"/>
+      <line x1="575" y1="535" x2="575" y2="521" marker-end="url(#arrowGrey)"/>
+      <line x1="810" y1="535" x2="810" y2="521" marker-end="url(#arrowGrey)"/>
+    </g>
+    <text x="935" y="430" class="sub" fill="#b88914" transform="rotate(-90, 935, 430)">depend on contracts</text>
+
+    <!-- Utilities (Python — separate stack) -->
+    <g transform="translate(465, 635)">
+      <rect x="0" y="0" width="455" height="55" class="box built"/>
+      <text x="227" y="22" text-anchor="middle" class="label">utilities/Template Cleanup/   (Python 3, built)</text>
+      <text x="227" y="40" text-anchor="middle" class="sub">processKMN.py · processTouch.py · previewSymbolKey.py — author-side data prep, NOT runtime</text>
+    </g>
+  </g>
+
+  <!-- ============================================================
+       RUNTIME COLUMN (right)
+       ============================================================ -->
+  <g>
+    <rect x="965" y="100" width="320" height="600" class="box group"/>
+    <text x="985" y="120" class="h">3.  Runtime targets</text>
+
+    <!-- Dev runtime -->
+    <g transform="translate(985, 140)">
+      <rect x="0" y="0" width="280" height="86" class="box runtime"/>
+      <text x="140" y="22" text-anchor="middle" class="label">Dev runtime  —  Node 22 (CI), &gt;=20 (local)</text>
+      <text x="140" y="40" text-anchor="middle" class="sub">runs Vite dev server, Vitest, tsc -b</text>
+      <text x="140" y="58" text-anchor="middle" class="sub">no host-disk writes for keyboard FS</text>
+      <text x="140" y="76" text-anchor="middle" class="sub">(virtual FS lives in memory)</text>
+    </g>
+
+    <!-- Prod runtime: browser -->
+    <g transform="translate(985, 240)">
+      <rect x="0" y="0" width="280" height="220" class="box runtime"/>
+      <text x="140" y="22" text-anchor="middle" class="label">Production runtime  —  Modern browser</text>
+      <text x="14"  y="44" class="sub">SPA bundle (Vite-built ESM):</text>
+      <text x="28"  y="60" class="mono">- studio shell · survey · gallery · editor</text>
+      <text x="28"  y="76" class="mono">- in-memory VirtualFS · 300 ms debouncer</text>
+      <text x="14"  y="98" class="sub">Loaded into the page:</text>
+      <text x="28"  y="114" class="mono">- kmcmplib.wasm    (Keyman compiler oracle)</text>
+      <text x="28"  y="130" class="mono">- KeymanWeb        (live OSK + text preview)</text>
+      <text x="14"  y="152" class="sub">Browser APIs used:</text>
+      <text x="28"  y="168" class="mono">- fetch                (GitHub REST/GraphQL)</text>
+      <text x="28"  y="184" class="mono">- URL.createObjectURL  (blob-URL compiled artifacts)</text>
+      <text x="28"  y="200" class="mono">- Web Storage          (draft persistence, TBD)</text>
+    </g>
+
+    <!-- External services -->
+    <g transform="translate(985, 480)">
+      <rect x="0" y="0" width="280" height="86" class="box external"/>
+      <text x="140" y="22" text-anchor="middle" class="label">External services (browser-side)</text>
+      <text x="140" y="40" text-anchor="middle" class="sub">GitHub REST/GraphQL  ·  OAuth public_repo</text>
+      <text x="140" y="58" text-anchor="middle" class="sub">fetches keymanapp/keyboards index;</text>
+      <text x="140" y="76" text-anchor="middle" class="sub">forks + branches + opens draft PR</text>
+    </g>
+
+    <!-- Upstream sources -->
+    <g transform="translate(985, 580)">
+      <rect x="0" y="0" width="280" height="100" class="box external"/>
+      <text x="140" y="22" text-anchor="middle" class="label">Upstream Keyman sources</text>
+      <text x="140" y="40" text-anchor="middle" class="sub">keymanapp/kmcmplib (C++ -> WASM build)</text>
+      <text x="140" y="58" text-anchor="middle" class="sub">keymanapp/keyman-web (KeymanWeb)</text>
+      <text x="140" y="76" text-anchor="middle" class="sub">keymanapp/keyboards (release/ corpus)</text>
+      <text x="140" y="94" text-anchor="middle" class="sub">pulled at runtime or vendored — TBD</text>
+    </g>
+  </g>
+
+  <!-- ============================================================
+       BUILD &amp; CI PIPELINE (bottom)
+       ============================================================ -->
+  <g>
+    <rect x="40" y="730" width="1245" height="220" class="box group"/>
+    <text x="60" y="750" class="h">4.  Build pipeline  (local  &lt;-&gt;  GitHub Actions CI)</text>
+
+    <!-- Local dev loop -->
+    <g transform="translate(60, 775)">
+      <rect x="0" y="0" width="220" height="65" class="box tool"/>
+      <text x="110" y="22" text-anchor="middle" class="label">Local dev</text>
+      <text x="110" y="40" text-anchor="middle" class="sub">pnpm install --frozen-lockfile</text>
+      <text x="110" y="56" text-anchor="middle" class="sub">vitest watch · tsc -b --watch</text>
+    </g>
+
+    <!-- typecheck -->
+    <g transform="translate(310, 775)">
+      <rect x="0" y="0" width="180" height="65" class="box tool"/>
+      <text x="90" y="22" text-anchor="middle" class="label">pnpm -r typecheck</text>
+      <text x="90" y="40" text-anchor="middle" class="sub">tsc --noEmit per package</text>
+      <text x="90" y="56" text-anchor="middle" class="sub">via project references</text>
+    </g>
+
+    <!-- test -->
+    <g transform="translate(520, 775)">
+      <rect x="0" y="0" width="180" height="65" class="box tool"/>
+      <text x="90" y="22" text-anchor="middle" class="label">pnpm -r test</text>
+      <text x="90" y="40" text-anchor="middle" class="sub">vitest run per package</text>
+      <text x="90" y="56" text-anchor="middle" class="sub">101 specs (contracts)</text>
+    </g>
+
+    <!-- build -->
+    <g transform="translate(730, 775)">
+      <rect x="0" y="0" width="180" height="65" class="box tool"/>
+      <text x="90" y="22" text-anchor="middle" class="label">pnpm -r build</text>
+      <text x="90" y="40" text-anchor="middle" class="sub">tsc -b emits dist/</text>
+      <text x="90" y="56" text-anchor="middle" class="sub">SPA: Vite bundle (planned)</text>
+    </g>
+
+    <!-- artifacts -->
+    <g transform="translate(940, 775)">
+      <rect x="0" y="0" width="160" height="65" class="box built"/>
+      <text x="80" y="22" text-anchor="middle" class="label">Artifacts</text>
+      <text x="80" y="40" text-anchor="middle" class="sub">.d.ts + .js (contracts)</text>
+      <text x="80" y="56" text-anchor="middle" class="sub">SPA bundle (future)</text>
+    </g>
+
+    <!-- arrows along the pipeline -->
+    <line x1="280" y1="807" x2="310" y2="807" class="flow" marker-end="url(#arrow)"/>
+    <line x1="490" y1="807" x2="520" y2="807" class="flow" marker-end="url(#arrow)"/>
+    <line x1="700" y1="807" x2="730" y2="807" class="flow" marker-end="url(#arrow)"/>
+    <line x1="910" y1="807" x2="940" y2="807" class="flow" marker-end="url(#arrow)"/>
+
+    <!-- CI row -->
+    <g transform="translate(60, 870)">
+      <rect x="0" y="0" width="1040" height="55" class="box tool"/>
+      <text x="14"  y="22" class="label">.github/workflows/ci.yml  —  GitHub Actions  (ubuntu-latest, Node 22, pnpm 9)</text>
+      <text x="14"  y="40" class="mono">push/PR to main  -&gt;  pnpm install --frozen-lockfile  -&gt;  pnpm -r typecheck  -&gt;  pnpm -r test  -&gt;  pnpm -r build</text>
+    </g>
+
+    <!-- arrow from local to CI -->
+    <line x1="170" y1="840" x2="170" y2="870" class="flow-grey" marker-end="url(#arrowGrey)"/>
+    <text x="180" y="858" class="sub" fill="#666">git push</text>
+
+    <!-- Output destinations -->
+    <g transform="translate(1120, 775)">
+      <rect x="0" y="0" width="165" height="150" class="box external"/>
+      <text x="82" y="22" text-anchor="middle" class="label">Distribution</text>
+      <text x="82" y="44" text-anchor="middle" class="sub">contracts: private</text>
+      <text x="82" y="60" text-anchor="middle" class="sub">(workspace import)</text>
+      <text x="82" y="86" text-anchor="middle" class="sub">@keymanapp/* lint:</text>
+      <text x="82" y="102" text-anchor="middle" class="sub">npm under Keyman org</text>
+      <text x="82" y="128" text-anchor="middle" class="sub">studio SPA: static host</text>
+      <text x="82" y="144" text-anchor="middle" class="sub">(hosting decision TBD)</text>
+    </g>
+    <line x1="1100" y1="897" x2="1120" y2="897" class="flow" marker-end="url(#arrow)"/>
+  </g>
+
+  <!-- ============================================================
+       FOOTNOTES
+       ============================================================ -->
+  <g>
+    <rect x="40" y="975" width="1245" height="180" class="box group"/>
+    <text x="60" y="995" class="h">5.  Key invariants / non-obvious facts</text>
+
+    <text x="60"  y="1020" class="sub">- <tspan font-weight="700">No second debounce timer.</tspan> Decision D3 (§10): TS check + WASM oracle share one 300 ms cycle as concurrent microtasks; WASM diagnostic supersedes TS.</text>
+    <text x="60"  y="1040" class="sub">- <tspan font-weight="700">No host-disk writes during authoring.</tspan> The virtual FS lives in browser memory; serialization happens only at the .zip or GitHub-PR boundary (§11).</text>
+    <text x="60"  y="1060" class="sub">- <tspan font-weight="700">Contracts are the only shared dependency between teams.</tspan> Engine and content packages depend on @keyboard-studio/contracts; never on each other (§13).</text>
+    <text x="60"  y="1080" class="sub">- <tspan font-weight="700">Schema change =&gt; major version bump of contracts.</tspan> Pattern / LintFinding / VirtualFS field names + types are locked Day-1 (§5, §17).</text>
+    <text x="60"  y="1100" class="sub">- <tspan font-weight="700">CI is intentionally minimal.</tspan> Typecheck + test + build only; no lint / coverage / matrix yet. Extend as packages land (per ci.yml comment).</text>
+    <text x="60"  y="1120" class="sub">- <tspan font-weight="700">Python utilities are author-side.</tspan> utilities/Template Cleanup/*.py runs once when curating templates; never inside the studio runtime.</text>
+    <text x="60"  y="1140" class="sub">- <tspan font-weight="700">TypeScript settings are aggressive.</tspan> strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes + verbatimModuleSyntax — code must satisfy all.</text>
+  </g>
+
+</svg>

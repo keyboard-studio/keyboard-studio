@@ -4,6 +4,7 @@ import { makePattern } from "./pattern";
 import type { DiscoveryAxisVector } from "./axes";
 import type { PatternMatch } from "./patternMatch";
 import { ALL_STRATEGY_IDS } from "./strategy";
+import { makeCompileResult } from "./compileResult";
 
 describe("Pattern", () => {
   it("constructs the spec section 6 worked example (latin_deadkey_acute_single)", () => {
@@ -163,5 +164,88 @@ describe("Pattern", () => {
     const last = ALL_STRATEGY_IDS[ALL_STRATEGY_IDS.length - 1]!;
     expect(first).toBe("S-01");
     expect(last).toBe("S-12");
+  });
+});
+
+describe("makePattern optional-field handling (#78)", () => {
+  const requiredOnly = {
+    id: "x",
+    title: "x",
+    description: "x",
+    category: "desktop" as const,
+    appliesTo: [] as string[],
+    questions: [],
+    kmnFragment: "",
+    tests: [],
+    validatedForFamilies: [],
+    sourceKeyboards: [],
+    reviewedBy: "test",
+    reviewDate: "2026-06-02",
+  };
+
+  it("strips undefined optional fields from the result object", () => {
+    const p = makePattern(requiredOnly);
+    // Under exactOptionalPropertyTypes, omitted optionals must be ABSENT
+    // from the result, not present-but-undefined.
+    expect("strategyId" in p).toBe(false);
+    expect("combinesWith" in p).toBe(false);
+    expect("touchLayoutFragment" in p).toBe(false);
+    expect("reorderRules" in p).toBe(false);
+  });
+
+  it("preserves optional fields when provided", () => {
+    const p = makePattern({
+      ...requiredOnly,
+      strategyId: "S-02",
+      combinesWith: ["S-04"],
+      touchLayoutFragment: "{}",
+      reorderRules: "// no reorder\n",
+    });
+    expect(p.strategyId).toBe("S-02");
+    expect(p.combinesWith).toEqual(["S-04"]);
+    expect(p.touchLayoutFragment).toBe("{}");
+    expect(p.reorderRules).toBe("// no reorder\n");
+  });
+});
+
+describe("makeCompileResult", () => {
+  it("returns a shape-conforming CompileResult", () => {
+    const r = makeCompileResult({
+      success: true,
+      artifacts: [
+        { filename: "foo.kmx", url: "blob:mock", sizeBytes: 1024 },
+      ],
+      diagnostics: [],
+      compileMs: 137,
+      isWarmCompile: true,
+    });
+    expect(r.success).toBe(true);
+    expect(r.artifacts).toHaveLength(1);
+    expect(r.diagnostics).toEqual([]);
+    expect(r.compileMs).toBe(137);
+    expect(r.isWarmCompile).toBe(true);
+  });
+
+  it("preserves all required fields verbatim (no field drop)", () => {
+    const r = makeCompileResult({
+      success: false,
+      artifacts: [],
+      diagnostics: [
+        {
+          code: "KM_ERROR_TEST",
+          severity: "error",
+          layer: "A",
+          message: "test diagnostic",
+        },
+      ],
+      compileMs: 200,
+      isWarmCompile: false,
+    });
+    expect(r.success).toBe(false);
+    expect(r.artifacts).toEqual([]);
+    expect(r.diagnostics).toHaveLength(1);
+    expect(r.diagnostics[0]?.code).toBe("KM_ERROR_TEST");
+    expect(r.compileMs).toBe(200);
+    expect(r.isWarmCompile).toBe(false);
   });
 });
