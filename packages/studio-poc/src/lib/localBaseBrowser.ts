@@ -10,7 +10,11 @@
 // The mock backend at @keyboard-studio/contracts/mocks#mockBaseBrowser
 // remains for tests + air-gapped runs.
 
-import type { BaseBrowserService, BaseKeyboard } from "@keyboard-studio/contracts";
+import type {
+  BaseBrowserService,
+  BaseKeyboard,
+  KeymanPlatformTarget,
+} from "@keyboard-studio/contracts";
 
 const LIST_ENDPOINT = "/local-kbd-api/list";
 
@@ -42,7 +46,10 @@ export const localBaseBrowser: BaseBrowserService = {
   async listAll(): Promise<BaseKeyboard[]> {
     return fetchCatalog();
   },
-  async search(query, opts) {
+  async search(
+    query: string,
+    opts?: { script?: string; target?: KeymanPlatformTarget },
+  ): Promise<BaseKeyboard[]> {
     const all = await fetchCatalog();
     const q = query.toLowerCase();
     return all.filter((k) => {
@@ -56,7 +63,7 @@ export const localBaseBrowser: BaseBrowserService = {
       return matchesQuery && matchesScript && matchesTarget;
     });
   },
-  async getById(id) {
+  async getById(id: string): Promise<BaseKeyboard | undefined> {
     const all = await fetchCatalog();
     return all.find((k) => k.id === id);
   },

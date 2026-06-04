@@ -1,9 +1,9 @@
 {
-  "name": "@keyboard-studio/studio",
+  "name": "@keyboard-studio/studio-poc",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "The spec'd authoring SPA. Two-pane survey + live preview per spec.md §4 (issue #22 et al). For the working compile/preview pipeline reference, see @keyboard-studio/studio-poc.",
+  "description": "POC dev interface — in-browser kmcmplib + kmw-compiler + KMW iframe preview. Keep as a working reference; the real spec'd UI lives in @keyboard-studio/studio.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
