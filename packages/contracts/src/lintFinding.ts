@@ -66,6 +66,17 @@ export type LintCode =
   | `KM_INFO_${string}`
   | `KM_LINT_${string}`;
 
+/**
+ * Provenance of a {@link LintFinding}. `"upstream"` means the finding was
+ * present in a fetched release-tree source file before the user made any
+ * edit; the chip rail renders these muted and excludes them from the
+ * submit-block threshold until the file is touched. Omit (or set
+ * `"authored"`) for findings the user caused.
+ *
+ * @see CLAUDE.md "Issue closure policy" / #39 cycle-3 km-validator review
+ */
+export type LintFindingOrigin = "authored" | "upstream";
+
 export interface LintFinding {
   /**
    * Studio-namespaced lint code (e.g. `"KM_ERROR_DUPLICATE_STORE"`).
@@ -78,4 +89,10 @@ export interface LintFinding {
   location?: SourceLocation;
   /** Optional plain-language remediation surfaced as a lint chip. */
   hint?: string;
+  /**
+   * Provenance of this finding. When `"upstream"`, the chip rail mutes
+   * the finding and does not count it toward the Submit-blocked threshold.
+   * Default (absent) is `"authored"`.
+   */
+  origin?: LintFindingOrigin;
 }

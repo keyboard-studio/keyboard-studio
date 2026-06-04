@@ -9,13 +9,13 @@ import type { BaseKeyboard } from "../baseKeyboard";
  */
 export const basicKbdus: BaseKeyboard = makeBaseKeyboard({
   id: "basic_kbdus",
-  path: "release/b/basic_kbdus",
+  path: "release/basic/basic_kbdus",
   script: "Latn",
   targets: ["windows", "macosx", "linux", "web"],
   displayName: "US English (Basic)",
   version: "1.0",
   sourceUrl:
-    "https://github.com/keymanapp/keyboards/tree/master/release/b/basic_kbdus",
+    "https://github.com/keymanapp/keyboards/tree/master/release/basic/basic_kbdus",
 });
 
 /**
