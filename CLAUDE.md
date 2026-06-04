@@ -47,9 +47,43 @@ Spec Sec 16. CJK and Ethiopic reorder patterns, LDML output, mobile-app integrat
 
 ## KM crew
 
-`Agents/km-*.md` are slash-command dispatchers that invoke the corresponding subagent. The dispatch protocol — including `km-lead`'s `dispatch_plan` block format and the requirement that the main session execute the plan and re-invoke `km-lead` until no plan is returned — lives in the user's global CLAUDE.md, not here. Don't duplicate it.
+The KM crew is a 16-specialist review/build pipeline coordinated by **`/km-lead`**. Files under `.claude/agents/km-*.md` define each specialist; `.claude/commands/km-*.md` and `skills/km-*.md` are the entry points.
 
-Use the KM crew for review cycles on spec or code changes; `docs/spec-signoff.md` is the model for what a completed cycle looks like.
+### How /km-lead operates (different from /lex-lead)
+
+`/km-lead` does **not** run as an isolated subagent. It loads a team-lead playbook into the **main session's** context — the main session adopts the lead role, plans the work, and spawns specialists itself via the Agent tool. Unlike `/lex-lead` (which is a subagent that emits a `dispatch_plan` YAML block for the main session to parse and execute), km-lead has no planner/executor separation: planner and executor are the same actor.
+
+**dispatch_plan as transparency.** Even though there's no second actor to consume it, km-lead **must write a `dispatch_plan` block before every cycle's dispatch** so the user can see — and interrupt — exactly which specialists are about to be spawned, with which prompts. The block is followed in the **same response** by the actual parallel Agent calls that execute it. Required for every dispatch, including single-specialist cycles.
+
+Format mirrors lex-lead's (`cycle:`, `rationale:`, `groups:` with `mode: parallel | sequential`, `tasks:` with `subagent_type`, `prompt`, `expected_artifact`), but the `on_return:` field is omitted — the same session synthesizes the returned reports.
+
+### Branch policy
+
+One feature branch per km-lead cycle. Convention: `km/<short-task-slug>` (e.g. `km/wasm-oracle-wrapper`, `km/issue-39-preview`).
+
+- `/km-lead` opens the branch at cycle 1 (or confirms an existing branch if continuing prior work) and names it in the dispatch_plan rationale.
+- All specialist commits during the cycle target that branch.
+- `/km-archivist` opens a PR against `main` at cycle close with `closes #N` if there's an associated issue.
+- **Direct-to-main is permitted only when the user explicitly authorizes it** for the specific commit (e.g. "just commit it direct to main"). Implicit authorization (running `/km-lead`) is not enough.
+
+When in doubt, branch.
+
+### Issue closure policy
+
+When a cycle lands work that touches a tracked issue (`#N`), the closing specialist — usually `/km-archivist` at PR open, but also `/km-lead` for direct-to-main commits — must reconcile what shipped against the issue's acceptance-criteria checkboxes:
+
+1. **Enumerate the AC checkboxes.** `gh issue view N --json body` and walk the `- [ ]` list. If the issue has no checkboxes, this policy does not apply.
+2. **Verify each one against the diff.** A checkbox is *done* only if the shipped change actually satisfies it — not if "we meant to" or "it's covered by another PR." Run the relevant command, read the relevant file, or call the relevant specialist (typically `/km-verification`) to confirm.
+3. **Check the boxes that are done.** `gh issue edit N --body "<updated>"` with the verified boxes flipped to `- [x]`. Leave a one-line note in the issue or PR body explaining which boxes flipped and which didn't.
+4. **Pick the right closing keyword.**
+   - **All boxes checked** → `closes #N` in the PR or commit message.
+   - **Some boxes still open** → `refs #N` (not `closes`), and the issue stays open. Do not check boxes you haven't verified.
+
+The point: an issue with half its checkboxes flipped is more honest than one closed prematurely or one left fully unchecked despite real progress. Partial closures are normal; silent partial closures are the bug.
+
+### Use the crew for…
+
+Review cycles on spec or code changes; coordinated multi-specialist refactors; anything that benefits from parallel specialist perspectives. `docs/spec-signoff.md` is the model for what a completed cycle looks like.
 
 ## Conventions
 

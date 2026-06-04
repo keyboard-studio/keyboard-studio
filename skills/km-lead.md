@@ -139,7 +139,7 @@ Pick a pattern as a starting point, but adapt — these are not rigid scripts.
 
 **When to include `km-synthesis`:** any cycle where new code lands. Skip it only when the change is tiny and localized (a one-line fix, a typo, a docs-only change). When in doubt, include it — duplication and integration drift compound silently.
 
-**When to include `km-domain` and `km-keyman` together:** any cycle that touches a `Pattern.kmnFragment`, a `.kmn` file, the §9 three-group routing, or script-specific scaffolding. The "API design / Pattern review" pattern above is the canonical case; extend it whenever code crosses into linguistic or Keyman-runtime territory.
+**When to include `km-domain` and `km-keyman` together:** any cycle that touches a `Pattern.kmnFragment`, a `.kmn` file, the §9 three-group routing, or script-specific scaffolding. The "New Pattern" pattern above is the canonical case; extend it whenever code crosses into linguistic or Keyman-runtime territory.
 
 ## Decision framework
 

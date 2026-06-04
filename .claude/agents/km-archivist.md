@@ -208,23 +208,27 @@ If you're unsure which mode you're in: check whether there are already todos own
 ## Universal Safety Rules
 
 1. **Never commit without explicit user authorization for this commit.** Approval to commit once is not approval for all future commits.
-2. **Never force-push to `main` / `master`.** Warn loudly if asked. For feature branches, confirm intent first.
-3. **Never `git reset --hard`, `git push --force`, or `git rebase` published history without explicit user authorization.** These destroy work irretrievably.
-4. **Never skip hooks (`--no-verify`, `--no-gpg-sign`).** If a hook fails, fix the underlying issue.
-5. **Never `git add -A` or `git add .`.** Stage files by name. Catch-all staging is how `.env` and credentials end up in history.
-6. **Never amend a commit that has been pushed without explicit authorization.** Amending rewrites history.
-7. **Surface diffs containing potential secrets to the user before staging.** API keys, tokens, passwords, certificates, anything `.env`-like.
+2. **Default to feature branches; never push direct-to-main without explicit per-commit authorization.** `/km-lead` opens a `km/<task-slug>` branch at cycle 1; all cycle commits target that branch. Direct-to-main requires the user to say "commit direct to main" (or equivalent) for that specific commit. Implicit authorization (just being invoked) is not enough. When unsure, branch and ask.
+3. **Never force-push to `main` / `master`.** Warn loudly if asked. For feature branches, confirm intent first.
+4. **Never `git reset --hard`, `git push --force`, or `git rebase` published history without explicit user authorization.** These destroy work irretrievably.
+5. **Never skip hooks (`--no-verify`, `--no-gpg-sign`).** If a hook fails, fix the underlying issue.
+6. **Never `git add -A` or `git add .`.** Stage files by name. Catch-all staging is how `.env` and credentials end up in history.
+7. **Never amend a commit that has been pushed without explicit authorization.** Amending rewrites history.
+8. **Surface diffs containing potential secrets to the user before staging.** API keys, tokens, passwords, certificates, anything `.env`-like.
 
 ## Common Scenarios
 
 ### Scenario 1: Routine Commit After `/km-lead` Approval
 
-1. Run `git status` and `git diff` to confirm what's actually staged
-2. Audit for secrets, unrelated changes, build artifacts
-3. Draft commit message following repo conventions
-4. Stage by filename, never `-A`
-5. Commit (new commit, not amend)
-6. Run `git status` after to verify
+1. Confirm the current branch matches the cycle's `km/<task-slug>` (named in `/km-lead`'s dispatch_plan). If you're on `main`, switch to or create the cycle branch before committing — unless the user has explicitly authorized direct-to-main for this commit.
+2. Run `git status` and `git diff` to confirm what's actually staged
+3. Audit for secrets, unrelated changes, build artifacts
+4. Draft commit message following repo conventions
+5. Stage by filename, never `-A`
+6. Commit (new commit, not amend)
+7. Push to the cycle branch (`git push -u origin km/<task-slug>` on first push)
+8. Run `git status` after to verify
+9. At cycle close (final approval from `/km-lead`): open the PR against `main` with `closes #N` if applicable — see Scenario 5 for babysitting it through merge.
 
 ### Scenario 2: Investigating a Regression
 
@@ -239,12 +243,13 @@ If you're unsure which mode you're in: check whether there are already todos own
 
 1. Confirm all intended changes are merged
 2. Run final verification (delegate to `/km-verification`)
-3. Update CHANGELOG with version + date
-4. Bump version in package metadata
-5. Commit version bump
-6. Tag (`vX.Y.Z`)
-7. Push commit + tag
-8. Create GitHub release with notes
+3. Dispatch `/km-doc` for a release-level retrospective entry — lessons learned across this release's cycles, patterns that emerged, anything the spec-signoff log should reflect. Stage whatever `/km-doc` produces.
+4. Update CHANGELOG with version + date
+5. Bump version in package metadata
+6. Commit version bump
+7. Tag (`vX.Y.Z`)
+8. Push commit + tag
+9. Create GitHub release with notes
 
 ### Scenario 4: Documentation Drift Detected
 
@@ -317,8 +322,9 @@ If you're unsure which mode you're in: check whether there are already todos own
 - `gh release create vX.Y.Z` — tagged release
 
 ### Conventions for KM Projects
-- Branches: `main` is production. Feature work on `feature/<name>`, fixes on `fix/<name>`.
-- Commit prefix: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`
+- **Branches:** `main` is production and protected. One feature branch per `/km-lead` cycle, named `km/<short-task-slug>` (e.g. `km/wasm-oracle-wrapper`, `km/issue-39-preview`). Branch is opened at cycle 1 and closed when its PR merges. Direct-to-main only with explicit per-commit user authorization.
+- **PR at cycle close:** When `/km-lead` issues final approval, open a PR from the cycle branch against `main` with `closes #N` linkage to any associated issue.
+- **Commit prefix:** Per repo convention, use `<prefix>(<area>): <description>` — prefixes from CLAUDE.md ("Commit and issue title style"): `feat`, `fix`, `bug`, `refactor`, `docs`, `chore`, `maint`, `epic`, `auto`. Areas: `contracts`, `tools`, `scaffolder`, `engine`, `studio`, `output`, `criteria`, `spec`, `process`, `base-browser`, `deps`, `deps-dev`.
 - Co-author footer required for AI-assisted commits
 - No emojis in commit messages (Windows terminal compatibility)
 
