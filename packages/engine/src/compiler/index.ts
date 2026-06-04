@@ -23,7 +23,7 @@ import { parseKpjFlags, type CompilerOptions } from "./parseKpjFlags.js";
 // Lazy kmc-kmn import + compiler singleton
 // ---------------------------------------------------------------------------
 
-interface KmnCompilerLike {
+export interface KmnCompilerLike {
   init(callbacks: unknown, options: unknown): Promise<boolean>;
   run(
     infile: string,
@@ -97,6 +97,20 @@ export async function init(): Promise<void> {
 /** Synchronous ready check. */
 export function isReady(): boolean {
   return _compiler !== null;
+}
+
+/**
+ * Return the kmc-kmn KmnCompiler constructor, initializing the module
+ * (and its WASM dependency) on first call. Lets the validator oracle
+ * share the same cached kmc-kmn module/WASM as the compiler.
+ */
+export async function getKmnCompilerCtor(): Promise<new () => KmnCompilerLike> {
+  if (_compilerCtor !== null) return _compilerCtor;
+  await init();
+  if (_compilerCtor === null) {
+    throw new CompilerLoadError("kmc-kmn ctor missing after init");
+  }
+  return _compilerCtor;
 }
 
 // ---------------------------------------------------------------------------

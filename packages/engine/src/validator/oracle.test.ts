@@ -44,7 +44,8 @@ describe("validateWithOracle (default oracle, WASM stubbed out)", () => {
   });
 
   it("appends KM_WARN_ORACLE_UNAVAILABLE once when WASM load fails", async () => {
-    const findings = await validateWithOracle(knownBadSource);
+    const downOracle = _createOracle(null);
+    const findings = await downOracle.lint(knownBadSource);
     const unavailable = findings.filter(
       (f) => f.code === "KM_WARN_ORACLE_UNAVAILABLE"
     );
