@@ -10,6 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Update this file as new package skeletons land. Keep build/test/lint commands and the architecture map below in sync with reality.
 
+**Delivery-option progress lives in [`docs/github_flow.md`](docs/github_flow.md) — Status section.** Whenever work lands that advances Option A (user-fork/app-managed PR), Option B (org-mediated PR), or Option C (ZIP download), update that table and the progress bar before closing the issue or merging the PR. The scaffolder and VirtualFS serialisation rows in the prerequisites table also need updating as those land.
+
 ## Source of truth
 
 - **`spec.md`** — the v1.0 spec (signed off; 19 sections). Treat as authoritative for scope, schema, validator layering, team boundaries, and resolved decisions.
