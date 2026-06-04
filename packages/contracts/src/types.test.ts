@@ -357,7 +357,7 @@ describe("criteria.json schema conformance", () => {
     expect(unique.size).toBe(ids.length);
   });
 
-  it("matches the expected per-band counts from the close-out (38/58/33/4)", () => {
+  it("matches the expected per-band counts (45/65/36/6 after section-18 DISCUS)", () => {
     const counts = records.reduce<Record<string, number>>((acc, c) => {
       acc[c.band] = (acc[c.band] ?? 0) + 1;
       return acc;
@@ -366,8 +366,47 @@ describe("criteria.json schema conformance", () => {
     Object.keys(counts).forEach((k) => {
       expect(validBands).toContain(k);
     });
-    // Total matches the count documented in criteria-summary.md.
-    expect(records.length).toBe(133);
+    // 133 original repo-hygiene criteria + 12 section-18 DISCUS design
+    // heuristics (7 layer-c-enforce + 3 yellow-survey + 2 red-checklist).
+    expect(records.length).toBe(145);
+  });
+
+  it("section-18 DISCUS rows are present, tagged with a valid principle, and banded correctly", () => {
+    const validPrinciples = [
+      "discoverability",
+      "intuition",
+      "simplicity",
+      "consistency",
+      "usability",
+      "standards",
+    ];
+    const section18 = records.filter((c) =>
+      c.section.startsWith("18.")
+    );
+    expect(section18.length).toBe(12);
+    section18.forEach((c) => {
+      expect(validPrinciples, `${c.id}.principle`).toContain(c.principle);
+    });
+    // The seven auto-checkable heuristics are layer-c-enforce.
+    expect(
+      section18.filter((c) => c.band === "layer-c-enforce").length
+    ).toBe(7);
+  });
+
+  it("every principle-tagged record uses a valid DiscusPrinciple value", () => {
+    const validPrinciples = [
+      "discoverability",
+      "intuition",
+      "simplicity",
+      "consistency",
+      "usability",
+      "standards",
+    ];
+    records
+      .filter((c) => c.principle !== undefined)
+      .forEach((c) =>
+        expect(validPrinciples, `${c.id}.principle`).toContain(c.principle)
+      );
   });
 });
 
@@ -378,7 +417,7 @@ describe("criteria.json schema conformance", () => {
 describe("criteriaData loader (#116)", () => {
   it("ALL_CRITERIA is a non-empty readonly Criterion[]", () => {
     expect(Array.isArray(ALL_CRITERIA)).toBe(true);
-    expect(ALL_CRITERIA.length).toBe(133);
+    expect(ALL_CRITERIA.length).toBe(145);
   });
 
   it("CRITERIA_BY_BAND partitions ALL_CRITERIA across the four bands", () => {
