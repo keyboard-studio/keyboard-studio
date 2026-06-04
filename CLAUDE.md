@@ -21,6 +21,8 @@ Update this file as new package skeletons land. Keep build/test/lint commands an
 
 The spec embeds external docs by reference (Sec 19): `docs/KM-Questionnaire.md`, `docs/lint.md`, `docs/criteria.md`, `docs/making-a-template.md`. These live in the planned repo layout but are not yet in this working copy — fetch from `https://github.com/MattGyverLee/keyboard-studio` if needed.
 
+**Keyboard phonebook.** When you need to locate or look up a keyboard this project references — by name, language, author, or where its source lives on disk — consult [docs/keyboard-index.md](docs/keyboard-index.md) **first**. It maps each acknowledged keyboard to its BCP47 languages, author, and relative path. The keyboards themselves live in the sibling `keymanapp/keyboards` checkout at `../keyboards`, not in this repo. **Keeping the phonebook current is mandatory, not optional:** it indexes only keyboards already referenced, so whenever you introduce, cite, or otherwise reference a keyboard that is not yet in the table, you MUST add its row in the same change (read the keyboard's `<id>.kps` for name, BCP47 languages, and author — see the "Keep this current" recipe in that file). Treat a stale phonebook as a defect.
+
 ## Planned architecture (from spec)
 
 These are *targets*, not present state. Use them when scaffolding new work; do not invent deviations.
