@@ -16,9 +16,6 @@ combinesWith:
   - "S-02"
   - "S-05"
   - "S-06"
-  # Note: S-11 wraps any primary strategy per spec §7.3 line 623. S-05 explicitly lists
-  # S-11 in its combinesWith (spec §7.3 line 523). S-02 and S-06 do not reciprocally
-  # declare S-11, which is a documentation gap in the spec cards — not a blocker for this pattern.
 
 questions:
   - id: optionStoreName

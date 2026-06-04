@@ -469,8 +469,8 @@ group(main) using keys
 
 **When to use:** A1 ∈ {small, medium}, A4=stacking-combining, A3=strong. User types a diacritic-naming key (`'`, `` ` ``, `:`) then a base letter.
 **When to avoid:** When the diacritic should *replace* a previous one (S-07); when many families explode the table (S-06).
-**Combines well with:** S-04 (collapse the post-deadkey table); S-08 (when the trigger needs RAlt).
-**Pattern mapping:** `strategyId: "S-02"`; `combinesWith: ["S-04", "S-08"]`. (This is the Sec 6 worked example, `latin_deadkey_acute_single`.)
+**Combines well with:** S-04 (collapse the post-deadkey table); S-08 (when the trigger needs RAlt); S-11 (when the keyboard toggles between orthographic variants at runtime).
+**Pattern mapping:** `strategyId: "S-02"`; `combinesWith: ["S-04", "S-08", "S-11"]`. (This is the Sec 6 worked example, `latin_deadkey_acute_single`.)
 
 ```
 store(graveK) 'aeiouAEIOU'
@@ -534,8 +534,8 @@ dk(family) + any(K_lc1) > index(lc1, 2)
 
 **When to use:** A4=multi-family AND A1=large; or alphabetic scripts where one base key has multiple legitimate outputs and the next key disambiguates. First key picks the *family*, second the *base*.
 **When to avoid:** A single diacritic family (S-02 suffices); when the user can't predict the family key.
-**Combines well with:** S-04 (essential for the per-family table), S-08 (RAlt to host the family keys).
-**Pattern mapping:** `strategyId: "S-06"`; `combinesWith: ["S-04", "S-08"]`.
+**Combines well with:** S-04 (essential for the per-family table), S-08 (RAlt to host the family keys), S-11 (when the keyboard toggles between orthographic variants at runtime).
+**Pattern mapping:** `strategyId: "S-06"`; `combinesWith: ["S-04", "S-08", "S-11"]`.
 
 ```
 + [K_LBRKT]                > dk(family_grave)
