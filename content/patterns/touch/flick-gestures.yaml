@@ -13,7 +13,9 @@ category: touch
 appliesTo: []
 priority: 3
 group_visibility: any
-strategyId: "S-08"
+# strategyId omitted: flick is a touch-layout gesture mechanism (flick JSON
+# object), not the desktop S-08 RAlt modifier-layer strategy from spec §7.3.
+combinesWith: []
 
 questions:
   - id: hostKey
@@ -72,7 +74,7 @@ tests:
     expectedOutput: "a"
     description: "plain tap on K_A still produces a (flick does not affect tap)"
 
-validatedForFamilies: ["Latn"]
+validatedForFamilies: ["Latn", "Khmr"]
 sourceKeyboards:
   - "release/t/triqui_itunyoso"
   - "release/k/komono_ci"

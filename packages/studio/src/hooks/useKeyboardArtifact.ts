@@ -105,13 +105,20 @@ export function useKeyboardArtifact(
     // Step 0: Lazily load the engine module once.
     if (!engineLoadAttempted.current) {
       engineLoadAttempted.current = true;
-      const mod = await loadEngine();
-      engineRef.current = mod;
-      if (mod) {
-        await mod.init();
-      } else {
-        // [SCAFFOLD] Fall back to mock compiler while engine is unbuilt.
-        await mockCompiler.init();
+      try {
+        const mod = await loadEngine();
+        engineRef.current = mod;
+        if (mod) {
+          await mod.init();
+        } else {
+          // [SCAFFOLD] Fall back to mock compiler while engine is unbuilt.
+          await mockCompiler.init();
+        }
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : "WASM engine failed to load";
+        setStage({ kind: "error", step: "vfs", message });
+        return;
       }
     }
 

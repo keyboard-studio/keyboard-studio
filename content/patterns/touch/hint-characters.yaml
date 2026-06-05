@@ -14,7 +14,9 @@ category: touch
 appliesTo: []
 priority: 2
 group_visibility: any
-strategyId: "S-08"
+# strategyId omitted: hint is a touch-layout discoverability property (hint JSON
+# field), not the desktop S-08 RAlt modifier-layer strategy from spec §7.3.
+combinesWith: []
 
 questions:
   - id: hostKey

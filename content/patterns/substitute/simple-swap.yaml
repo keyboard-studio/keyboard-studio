@@ -10,7 +10,7 @@ description: >
   character. No deadkeys, no deadkey followup sequences, no diacritics, no case
   variants. Straight substitution.
 category: substitute
-appliesTo: ["Latn", "Cyrl", "Arab", "Deva", "Taml"]
+appliesTo: ["Latn", "Cyrl", "Arab"]
 priority: 1
 group_visibility: all
 strategyId: "S-01"
@@ -45,7 +45,7 @@ questions:
       Find Unicode codepoints at unicode.org or copy from a reference keyboard.
     answerType: text
 
-  - id: characterDescriptions
+  - id: swapCharDescriptions
     prompt: >
       For each character you're adding, provide a brief description for the user.
       Format: character,description

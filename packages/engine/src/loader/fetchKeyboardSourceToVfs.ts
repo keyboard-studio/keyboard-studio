@@ -36,8 +36,13 @@ const DEFAULT_OPTIONS: Required<CompilerOptions> = {
 async function getText(
   url: string,
   fetchImpl: typeof fetch,
-): Promise<{ ok: boolean; status: number; text?: string }> {
-  const r = await fetchImpl(url);
+): Promise<{ ok: boolean; status: number; text?: string; networkError?: string }> {
+  let r: Response;
+  try {
+    r = await fetchImpl(url);
+  } catch (err) {
+    return { ok: false, status: 0, networkError: String(err) };
+  }
   if (!r.ok) return { ok: false, status: r.status };
   return { ok: true, status: r.status, text: await r.text() };
 }
@@ -45,8 +50,13 @@ async function getText(
 async function getBytes(
   url: string,
   fetchImpl: typeof fetch,
-): Promise<{ ok: boolean; status: number; bytes?: Uint8Array }> {
-  const r = await fetchImpl(url);
+): Promise<{ ok: boolean; status: number; bytes?: Uint8Array; networkError?: string }> {
+  let r: Response;
+  try {
+    r = await fetchImpl(url);
+  } catch (err) {
+    return { ok: false, status: 0, networkError: String(err) };
+  }
   if (!r.ok) return { ok: false, status: r.status };
   const ab = await r.arrayBuffer();
   return { ok: true, status: r.status, bytes: new Uint8Array(ab) };
@@ -75,8 +85,11 @@ export async function fetchKeyboardSourceToVfs(
   const kmnUrl = `${baseUrl}/source/${baseKeyboard.id}.kmn`;
   const kmnResp = await getText(kmnUrl, fetchImpl);
   if (!kmnResp.ok || kmnResp.text === undefined) {
+    const detail = kmnResp.networkError
+      ? `network error: ${kmnResp.networkError}`
+      : `HTTP ${kmnResp.status}`;
     throw new Error(
-      `fetchKeyboardSourceToVfs: required .kmn not found at ${kmnUrl} (HTTP ${kmnResp.status})`,
+      `fetchKeyboardSourceToVfs: required .kmn not found at ${kmnUrl} (${detail})`,
     );
   }
   const kmnVfsPath = `source/${baseKeyboard.id}.kmn`;
@@ -97,14 +110,17 @@ export async function fetchKeyboardSourceToVfs(
 
   for (const r of depResults) {
     if (!r.ok || r.bytes === undefined) {
+      const detail = r.networkError
+        ? `network error: ${r.networkError}`
+        : `HTTP ${r.status}`;
       if (r.store.required) {
         throw new Error(
           `fetchKeyboardSourceToVfs: required sibling ` +
-            `&${r.store.storeName} '${r.store.path}' not found at ${r.url} (HTTP ${r.status})`,
+            `&${r.store.storeName} '${r.store.path}' not found at ${r.url} (${detail})`,
         );
       }
       warnings.push(
-        `optional sibling &${r.store.storeName} '${r.store.path}' missing (HTTP ${r.status})`,
+        `optional sibling &${r.store.storeName} '${r.store.path}' missing (${detail})`,
       );
       continue;
     }
@@ -131,7 +147,10 @@ export async function fetchKeyboardSourceToVfs(
     vfs.set(kpjVfsPath, kpjResp.text);
     filesLoaded.push(kpjVfsPath);
   } else {
-    warnings.push(`.kpj not found at ${kpjUrl} (HTTP ${kpjResp.status}); defaults applied`);
+    const detail = kpjResp.networkError
+      ? `network error: ${kpjResp.networkError}`
+      : `HTTP ${kpjResp.status}`;
+    warnings.push(`.kpj not found at ${kpjUrl} (${detail}); defaults applied`);
   }
 
   // The KMW .js is produced by `CompilerService.compile()` running

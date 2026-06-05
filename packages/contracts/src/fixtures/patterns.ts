@@ -129,6 +129,13 @@ export const latinDeadkeyAcuteSingle: Pattern = makePattern({
   ],
   reviewedBy: "keyboard-studio-content-team",
   reviewDate: "2026-06-04",
+  provenance: [
+    {
+      keyboard: "release/basic/basic_kbdfr",
+      rule: "+ [K_QUOTE] + any(dk_bases) > index(dk_output, 2)",
+      notes: "Canonical S-02 deadkey implementation used as the spec §6 worked example.",
+    },
+  ],
 });
 
 /**

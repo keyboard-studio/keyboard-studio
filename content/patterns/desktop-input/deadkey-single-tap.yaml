@@ -98,7 +98,8 @@ frequency_in_corpus: "12/20 scanned keyboards use S-02 (6 as primary strategy, 6
 provenance:
   - keyboard: "release/sil/sil_euro_latin/source/sil_euro_latin.kmn"
     line: 130
-    rule: '"'"'"' dk(1) + any(acuteK) > index(acuteO, 3)'
+    rule: |
+      "'" dk(1) + any(acuteK) > index(acuteO, 3)
     note: >
       Apostrophe as acute deadkey trigger; parallel-list lookup over all accented vowels
       and consonants. 92 dk() rules total. Primary S-02 example in the spec §6 writeup.

@@ -7,13 +7,14 @@
 id: sea_stack_reorder
 title: "Subscript consonants reorder: type after base, display below"
 description: >
-  Southeast Asian scripts (Khmer, Burmese, Lao, Thai) use subscript consonants
+  Southeast Asian scripts (Khmer, Burmese, Lao) use subscript consonants
   to build consonant clusters. Subscripts are typed after the base consonant
   but must be stored before vowel signs so they render below the base.
   This pattern handles the reordering of subscripts, vowels, and tone marks
-  to match the Unicode canonical order for syllables in these scripts.
+  to match the Unicode canonical order for syllables in these scripts. Thai
+  does not use a coeng-style subscript marker and is excluded from this pattern.
 category: reorder
-appliesTo: ["Khmr", "Mymr", "Laoo", "Thai", "Sinh"]
+appliesTo: ["Khmr", "Mymr", "Laoo", "Sinh"]
 priority: 3
 group_visibility: non-roman
 strategyId: "S-09"

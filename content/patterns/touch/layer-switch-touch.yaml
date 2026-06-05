@@ -12,7 +12,9 @@ category: touch
 appliesTo: []
 priority: 1
 group_visibility: any
-strategyId: "S-13"
+# strategyId omitted: touch layer-switch is a touch-layout mechanism (nextlayer
+# JSON property), not an S-01..S-12 output strategy from spec §7.3. There is no
+# S-13 in the current strategy catalog.
 combinesWith: []
 
 questions:

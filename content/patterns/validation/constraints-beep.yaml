@@ -17,7 +17,7 @@ appliesTo: ["Latn", "Deva", "Taml", "Arab", "Cyrl"]
 priority: 2
 group_visibility: all
 strategyId: "S-10"
-combinesWith: ~
+combinesWith: []
 
 questions:
   - id: validBaseCharacters

@@ -16,7 +16,11 @@ category: touch
 appliesTo: []
 priority: 3
 group_visibility: any
-strategyId: "S-08"
+# strategyId omitted: multitap is a touch-runtime mechanism (multitap JSON array),
+# not the desktop S-08 RAlt modifier-layer strategy from spec §7.3. The file's
+# own notes acknowledge it is closer to S-07 (diacritic cycle) but the mapping
+# is inexact; omitting is cleaner than forcing a wrong S-0x assignment.
+combinesWith: []
 
 questions:
   - id: hostKey

@@ -26,8 +26,10 @@ export function createOutputService(): OutputService {
     toZip,
 
     verifyToken(_token: string): Promise<VerifyTokenResult> {
-      throw new Error(
-        "[output] verifyToken not implemented — use createGitHubOutputService"
+      return Promise.reject(
+        new Error(
+          "[output] verifyToken not implemented — use createGitHubOutputService"
+        )
       );
     },
 
@@ -35,8 +37,10 @@ export function createOutputService(): OutputService {
       _fs: VirtualFS,
       _opts: PublishPROptions
     ): Promise<PublishPRResult> {
-      throw new Error(
-        "[output] publishPR not implemented — use createGitHubOutputService"
+      return Promise.reject(
+        new Error(
+          "[output] publishPR not implemented — use createGitHubOutputService"
+        )
       );
     },
   };

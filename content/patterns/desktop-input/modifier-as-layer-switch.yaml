@@ -59,7 +59,7 @@ tests:
     expectedOutput: "e"
     description: "the same key without the held layer is unchanged"
 
-validatedForFamilies: ["Latn"]
+validatedForFamilies: ["Latn", "Cyrl"]
 sourceKeyboards:
   - "release/sil/sil_cameroon_azerty"
   - "release/sil/sil_euro_latin"
