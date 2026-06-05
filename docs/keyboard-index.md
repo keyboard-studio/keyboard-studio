@@ -51,7 +51,9 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Eastern Congo | `sil_eastern_congo` | `ln`, `alz`, `rwm`, `asv`, `avu`, `bbm`, `bdh`, `bcp`, `bxg`, `bbe`, `bnx`, `brm`, `bkf`, `bmb`, `bct` … (+86 more) | © SIL Global | `../keyboards/release/sil/sil_eastern_congo` |
 | SIL Ethiopic Power-G | `sil_ethiopic_power_g` | `am`, `bst`, `bcq`, `gdl-Ethi`, `mdx`, `gez`, `guk-Ethi`, `kxc-Ethi`, `suq-Ethi`, `tig`, `zay-Ethi`, `mul-Ethi` | SIL Ethiopia | `../keyboards/release/sil/sil_ethiopic_power_g` |
 | EuroLatin (SIL) | `sil_euro_latin` | `aae`, `acf`, `act`, `af`, `aig`, `ale`, `aln`, `an`, `ang`, `ast`, `azd`, `azn`, `azz`, `bah`, `bar` … (+341 more) | Copyright (c) SIL Global | `../keyboards/release/sil/sil_euro_latin` |
+| Hebrew (SIL) | `sil_hebrew` | `hbo` | © SIL Global | `../keyboards/release/sil/sil_hebrew` |
 | IPA (SIL) | `sil_ipa` | `und-Latn` | Martin Hosken, Lorna Evans | `../keyboards/release/sil/sil_ipa` |
+| Khmer (SIL) | `sil_khmer` | `km`, `brb`, `cmo-Khmr`, `jra-Khmr`, `kdt-Khmr`, `krr`, `krv`, `kxm-Khmr`, `tpu` | D. Kanjahn | `../keyboards/release/sil/sil_khmer` |
 | Myanmar3 (SIL) | `sil_myanmar_my3` | `my` | © SIL Global | `../keyboards/release/sil/sil_myanmar_my3` |
 | Pan Africa Mnemonic (SIL) | `sil_pan_africa_mnemonic` | `bjt`, `bin`, `efi`, `ee`, `fon`, `ff`, `fub-Latn`, `fue`, `fuh`, `ha`, `idu`, `ig`, `dyu`, `kbp`, `kr` … (+12 more) | Lorna Evans | `../keyboards/release/sil/sil_pan_africa_mnemonic` |
 | Telugu Winscript (NLCI) | `nlci_telugu_winscript` | `te` | Binila Sanki, SG NLCI | `../keyboards/release/nlci/nlci_telugu_winscript` |
