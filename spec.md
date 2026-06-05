@@ -236,6 +236,22 @@ export interface Pattern {
   reviewedBy: string;
   /** ISO date of review. Format: YYYY-MM-DD. */
   reviewDate: string;
+  /** Frequency of this pattern in corpus data (optional numeric indicator). */
+  frequencyInCorpus?: number;
+
+  // Content-layer fields — present in YAML source files; may be stripped by loader before engine use.
+
+  /**
+   * Source keyboards with example rules that demonstrate this pattern.
+   * content-layer only; loader may omit when constructing engine Pattern objects.
+   */
+  provenance?: Array<{ keyboard: string; rule?: string; notes?: string }>;
+
+  /**
+   * A demonstration KMN snippet or description string showing the pattern in action.
+   * content-layer only; loader may omit when constructing engine Pattern objects.
+   */
+  demo?: string | null;
 }
 ```
 

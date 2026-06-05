@@ -120,6 +120,26 @@ export interface Pattern {
   reviewDate: string;
   /** Frequency of this pattern in corpus data (optional numeric indicator). */
   frequencyInCorpus?: number;
+
+  // Content-layer fields — present in YAML source files; may be stripped by loader before engine use.
+
+  /**
+   * Source keyboards with example rules that demonstrate this pattern.
+   * Each entry names a keyboard path and optionally a specific rule excerpt
+   * and explanatory notes.
+   * content-layer only; loader may omit when constructing engine Pattern objects.
+   */
+  provenance?: Array<{
+    keyboard: string;
+    rule?: string;
+    notes?: string;
+  }>;
+
+  /**
+   * A demonstration KMN snippet or description string showing the pattern in action.
+   * content-layer only; loader may omit when constructing engine Pattern objects.
+   */
+  demo?: string | null;
 }
 
 /**
@@ -144,6 +164,12 @@ export type PatternInit = {
   reviewedBy: string;
   reviewDate: string;
   frequencyInCorpus?: number;
+  provenance?: Array<{
+    keyboard: string;
+    rule?: string;
+    notes?: string;
+  }>;
+  demo?: string | null;
 };
 
 /**
@@ -171,5 +197,7 @@ export function makePattern(init: PatternInit): Pattern {
       : {}),
     ...(init.reorderRules !== undefined ? { reorderRules: init.reorderRules } : {}),
     ...(init.frequencyInCorpus !== undefined ? { frequencyInCorpus: init.frequencyInCorpus } : {}),
+    ...(init.provenance !== undefined ? { provenance: init.provenance } : {}),
+    ...(init.demo !== undefined ? { demo: init.demo } : {}),
   };
 }
