@@ -177,7 +177,8 @@
     "id": "4.3-copyright-holder-is-authorized",
     "section": "4. `LICENSE.md` (copyright)",
     "band": "red-checklist",
-    "description": "Copyright holder is the author or a legal entity they are authorized to claim"
+    "description": "Copyright holder is the author or a legal entity they are authorized to claim",
+    "preSubmitChecklistText": "The copyright holder named in LICENSE.md is the author or a legal entity the author is authorized to represent"
   },
   {
     "id": "4.4-org-legal-name-current",
@@ -735,13 +736,15 @@
     "id": "14.1-third-party-patch-author-consulted",
     "section": "14. Authorship / change provenance",
     "band": "red-checklist",
-    "description": "If a third party submits a patch to an existing keyboard, the original author was consulted and approved"
+    "description": "If a third party submits a patch to an existing keyboard, the original author was consulted and approved",
+    "preSubmitChecklistText": "If this is a patch to another author's keyboard, the original author was consulted and has approved the change before this PR was opened"
   },
   {
     "id": "15.1-relicense-permission-granted",
     "section": "15. Deprecating a keyboard",
     "band": "red-checklist",
-    "description": "Original author has granted permission to relicense under MIT"
+    "description": "Original author has granted permission to relicense under MIT",
+    "preSubmitChecklistText": "The original author has confirmed permission to relicense this keyboard under MIT — written confirmation is referenced in this PR or on file"
   },
   {
     "id": "15.2-new-keyboard-created-in-release",
@@ -789,7 +792,8 @@
     "id": "17.2-new-author-local-pull",
     "section": "17. Build trigger",
     "band": "red-checklist",
-    "description": "For a new author's first PR, the PR was pulled locally and checked thoroughly"
+    "description": "For a new author's first PR, the PR was pulled locally and checked thoroughly",
+    "preSubmitChecklistText": "For a first-time contributor: this PR has been pulled locally and the build verified clean before triggering TeamCity"
   },
   {
     "id": "17.3-build-issues-fed-back",
