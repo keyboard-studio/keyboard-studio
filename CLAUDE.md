@@ -51,24 +51,54 @@ Spec Sec 16. CJK and Ethiopic reorder patterns, LDML output, mobile-app integrat
 
 ## KM crew
 
-The KM crew is a 16-specialist review/build pipeline coordinated by **`/km-lead`**. Files under `.claude/agents/km-*.md` define each specialist; `.claude/commands/km-*.md` and `skills/km-*.md` are the entry points.
+The KM crew is a specialist pipeline coordinated by **`/km-lead`**. Agent definitions live in `.claude/agents/km-*.md`; slash-command entry points live in `.claude/commands/km-*.md`.
 
-### How /km-lead operates (different from /lex-lead)
+### The one skill: `/km-lead`
 
-`/km-lead` does **not** run as an isolated subagent. It loads a team-lead playbook into the **main session's** context — the main session adopts the lead role, plans the work, and spawns specialists itself via the Agent tool. Unlike `/lex-lead` (which is a subagent that emits a `dispatch_plan` YAML block for the main session to parse and execute), km-lead has no planner/executor separation: planner and executor are the same actor.
+`/km-lead` is the **only** KM crew member invoked as a Skill. It loads a team-lead playbook into the **main session's** context. The main session adopts the lead role, plans the work, and spawns all other specialists as Agent subagents. It is not itself a subagent.
 
-**dispatch_plan as transparency.** Even though there's no second actor to consume it, km-lead **must write a `dispatch_plan` block before every cycle's dispatch** so the user can see — and interrupt — exactly which specialists are about to be spawned, with which prompts. The block is followed in the **same response** by the actual parallel Agent calls that execute it. Required for every dispatch, including single-specialist cycles.
+Use `/km-lead` when starting any coordinated team task. For brief, one-off tasks where the main session needs to temporarily act as a single specialist (e.g. a quick archivist action), you may invoke the individual skill — but when running a team task through km-lead, **always use the other roles as Agent subagent_types, never as skills**.
 
-Format mirrors lex-lead's (`cycle:`, `rationale:`, `groups:` with `mode: parallel | sequential`, `tasks:` with `subagent_type`, `prompt`, `expected_artifact`), but the `on_return:` field is omitted — the same session synthesizes the returned reports.
+### All other km-* roles: Agent subagent_types
+
+Every specialist except km-lead is defined in `.claude/agents/` and should be invoked via `Agent({ subagent_type: "<name>", prompt: "..." })`. The individual `/km-*` slash commands exist for one-off use only.
+
+**Implementation**
+- `km-programmer` — implements code changes across the TS monorepo (contracts, scaffolder, engine, validator)
+- `km-frontend` — SPA front-end (TypeScript + React + Vite); three-pane layout, 300 ms debounce, VirtualFS authoring
+- `km-simplify` — refactor specialist; removes dead code, consolidates duplication
+
+**Domain expertise**
+- `km-domain` — master linguist; script/layout/normalization/IME-design decisions
+- `km-keyman` — Keyman / `.kmn` / `kmcmplib` expert; Pattern schema semantics, 14 Layer-A checks
+- `km-strategy` — owns spec §7 strategy framework (A1–A7, decision tree, S-01..S-12, §7.5)
+- `km-validator` — validator-layer specialist; spec §10 three-layer architecture, Layer A/B/C checks
+- `km-output` — output / scaffolder / VirtualFS specialist; spec §11/§12, zip, GitHub OAuth fork+PR
+- `km-author` — original-intent reviewer; keymanapp/keyman upstream parity, `.kmn` idioms
+
+**Quality gates**
+- `km-qc` — code-quality review; style, complexity, error handling, test coverage
+- `km-verification` — verifies a change does what it claims; runs tests, produces pre/post evidence
+- `km-testing` — vitest + Playwright suite engineer; fixtures, round-trip test vectors
+- `km-synthesis` — integration-fit reviewer; checks new code against existing patterns, flags duplication
+
+**Coordination & documentation**
+- `km-archivist` — git commits, PR creation, AC reconciliation, CHANGELOG, release cuts
+- `km-doc` — maintains `docs/`, spec-signoff log, module docstrings
+- `km-README` — read-only crew roster reference
+
+### How /km-lead operates
+
+`/km-lead` loads the team-lead playbook into the main session. km-lead plans work, writes a `dispatch_plan` YAML block before every cycle so the user can see what's about to fire, then immediately calls the Agent tool to execute it in the same response. Independent specialists in the same cycle run in parallel.
 
 ### Branch policy
 
-One feature branch per km-lead cycle. Convention: `km/<short-task-slug>` (e.g. `km/wasm-oracle-wrapper`, `km/issue-39-preview`).
+One feature branch per km-lead cycle. Convention: `km/<short-task-slug>`.
 
-- `/km-lead` opens the branch at cycle 1 (or confirms an existing branch if continuing prior work) and names it in the dispatch_plan rationale.
+- Open the branch at cycle 1. State it in the dispatch_plan `branch:` field.
 - All specialist commits during the cycle target that branch.
-- `/km-archivist` opens a PR against `main` at cycle close with `closes #N` if there's an associated issue.
-- **Direct-to-main is permitted only when the user explicitly authorizes it** for the specific commit (e.g. "just commit it direct to main"). Implicit authorization (running `/km-lead`) is not enough.
+- `km-archivist` opens a PR against `main` at cycle close with `closes #N` or `refs #N` per the issue closure policy below.
+- **Direct-to-main only when the user explicitly authorizes it** for that specific commit.
 
 When in doubt, branch.
 
