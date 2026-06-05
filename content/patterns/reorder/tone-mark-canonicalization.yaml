@@ -1,0 +1,304 @@
+# tone-mark-canonicalization.yaml
+# Tone mark canonicalization pattern for Southeast Asian scripts
+# Strategy: S-09 (Context-sensitive cluster formation)
+# Priority 3 — complex, script-specific pattern.
+
+id: tone_mark_canonicalization
+title: "Tone mark canonicalization: reorder to canonical position"
+description: >
+  Southeast Asian scripts (Thai, Lao, Vietnamese tone-rich variants) use tone
+  marks that must appear in a fixed position relative to the syllable, regardless
+  of typing order. For example, in Thai, the mai tho (tone 2) mark must appear
+  above the consonant, even if the user types: consonant, vowel, tone mark.
+  This pattern reorders tone marks to their canonical position using context
+  rules, ensuring the rendered output always has the correct visual appearance.
+category: reorder
+appliesTo: ["Thai", "Laoo", "Vietu"]
+priority: 3
+group_visibility: non-roman
+strategyId: "S-09"
+combinesWith: []
+
+questions:
+  - id: toneMarkCodepoints
+    prompt: >
+      List all tone marks used in your script.
+      Format: one per line, comma-separated: tone_name,unicode_codepoint
+
+      Example for Thai:
+        mai_tho,U+0E48      (tone 2, grave accent)
+        mai_tri,U+0E49      (tone 3, acute accent)
+        mai_chatha,U+0E4A   (tone 4, vertical line)
+        mai_kham,U+0E4B     (tone 5, circumflex)
+
+      Example for Lao:
+        mai_kho,U+0EC8      (tone 2)
+        mai_tho,U+0EC9      (tone 3)
+        mai_khang,U+0ECA    (tone 4)
+        mai_chantha,U+0ECB  (tone 5)
+
+      Find codepoints at unicode.org or in the exemplar keyboard.
+    answerType: text
+
+  - id: baseCharacterClasses
+    prompt: >
+      Which character classes can tone marks attach to?
+      Format: class_name,characters_or_codepoint_range
+
+      Example for Thai (tone marks attach to vowels and consonants):
+        thai_vowels,U+0E30 U+0E31 U+0E32 U+0E33 U+0E34 U+0E35 U+0E36 U+0E37
+        thai_consonants,U+0E01-U+0E2E
+
+      Tone marks typically attach to:
+      - Vowels (in diphthong structures)
+      - Consonants (in monosyllabic words)
+      - Consonant + vowel sequences
+
+      List the characters that can precede a tone mark in canonical order.
+    answerType: text
+
+  - id: canonicalPosition
+    prompt: >
+      What is the canonical position for tone marks?
+      Format: brief description + reordering example
+
+      Example for Thai:
+        Tone marks appear AFTER the base consonant and vowels, but BEFORE any
+        final consonant or diacritical modifiers.
+
+        Typing order:  cons + vowel + tone → stored as cons + vowel + tone
+        Typing order:  tone + cons + vowel → stored as cons + vowel + tone
+        Typing order:  cons + tone + vowel → stored as cons + vowel + tone
+
+      In all cases, the tone mark moves to after the vowel (or base, if no vowel).
+
+      Describe how your script canonicalizes tone mark position.
+    answerType: text
+
+  - id: reorderRules
+    prompt: >
+      Describe the context rules needed to reorder tone marks.
+      Format: plain-language description of the pattern
+
+      Example for Thai:
+        If a tone mark appears before a vowel, move it after:
+          tone_mark + any(vowels) > any(vowels) tone_mark
+
+        If a tone mark appears after a consonant before a vowel, move it after vowel:
+          any(consonants) tone_mark + any(vowels) > any(consonants) any(vowels) tone_mark
+
+      List all such rules so the pattern generator can emit them.
+    answerType: text
+    required: false
+
+kmnFragment: |
+  c Tone mark canonicalization for Southeast Asian scripts (S-09)
+  c Reorder tone marks to canonical position (typically after base + vowel).
+  c Type: tone marks appear in any order; stored in canonical order.
+
+  store(toneMarks) '{{toneMarkCodepoints}}'
+  store(baseCharacters) '{{baseCharacterClasses}}'
+
+  begin Unicode > use(main)
+
+  group(main) using keys
+  c Tone mark reordering rules: move tone marks to canonical position
+  {{toneMarkReorderRules}}
+
+reorderRules: |
+  c Tone mark canonicalization rules (context-based)
+  c Example for Thai:
+  c   any(toneMarks) any(baseCharacters) > any(baseCharacters) context(1)
+  {{kmnRules}}
+
+touchLayoutFragment: null
+
+tests:
+  - input: ["U+0E04", "U+0E48", "U+0E30"]
+    expectedOutput: "ขา่"
+    description: >
+      Thai: type kho (U+0E04) + tone 2 (U+0E48) + short a (U+0E30).
+      The tone mark is reordered to after the vowel: ขา่.
+  - input: ["U+0E48", "U+0E04", "U+0E30"]
+    expectedOutput: "ขา่"
+    description: >
+      Thai: type tone 2 first, then kho, then short a. Reordering rule
+      moves the tone to after the vowel, producing the same output: ขา่.
+  - input: ["U+0E04", "U+0E30", "U+0E48"]
+    expectedOutput: "ขา่"
+    description: >
+      Thai: type kho, short a, then tone 2. No reordering needed;
+      output is already canonical: ขา่.
+
+validatedForFamilies: ["Thai"]
+sourceKeyboards:
+  - "release/sil/sil_lao_2008_basic/source/sil_lao_2008_basic.kmn"
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-06-05"
+
+# ---------------------------------------------------------------------------
+# Extended metadata — YAML-only; not part of the TypeScript Pattern interface
+# ---------------------------------------------------------------------------
+
+frequency_in_corpus: "Common in Thai, Lao, and tone-rich Vietnamese keyboards"
+
+notes: >
+  Tone mark canonicalization is distinct from subscript reordering (S-09 sea-stack-reorder):
+  - **Subscript reordering**: base consonant + coeng marker + subscript consonant + vowel
+    (the subscript is stored BEFORE the vowel for display below)
+  - **Tone mark canonicalization**: base character + vowel + tone mark
+    (the tone mark is stored AFTER the vowel, appearing ABOVE the syllable)
+
+  Both use context rules and both are S-09 (Context-sensitive cluster formation),
+  but they address different visual/structural requirements.
+
+  **Why tone marks need reordering:**
+  Thai and Lao use tone marks to distinguish word meanings. The tone mark must
+  appear in a visually consistent position (above the syllable) for readability,
+  regardless of the order the user typed it. This is a user-experience issue:
+  if the user types tone mark first, the keyboard should still produce a readable
+  output with the tone mark in the right position.
+
+  **Common mistakes to avoid:**
+
+  1. **Confusing tone mark position with storage order**
+     The tone mark appears ABOVE the syllable (visual), but is stored AFTER the
+     vowel (canonical Unicode order). The context rule makes this transparent to
+     the user.
+
+  2. **Not accounting for all possible typing orders**
+     If the user can type: cons + vowel + tone, tone + cons + vowel, cons + tone + vowel,
+     etc., you need a rule for each combination. Missing one leads to incorrect output.
+
+  3. **Forgetting about multi-vowel sequences**
+     Some Thai words have complex vowel sequences (diphthongs like เ...อ).
+     The tone mark must be positioned relative to the ENTIRE vowel sequence,
+     not just the first vowel.
+
+  4. **Not handling multiple tone marks**
+     Some rare Thai combinations use two tone marks. Your reordering rules must
+     handle tone-mark-to-tone-mark ordering as well as tone-mark-to-base ordering.
+
+  5. **Testing only the "happy path"**
+     Test every possible typing order: tone first, tone last, tone in the middle.
+     Also test with consonant clusters, diphthongs, and vowel-less syllables.
+
+  **Testing checklist:**
+  Before submitting, verify:
+  - [ ] KMN compiles with zero errors
+  - [ ] Tone mark appears in correct position regardless of typing order
+  - [ ] Multi-vowel sequences position tone mark correctly
+  - [ ] All tone mark / consonant / vowel combinations tested
+  - [ ] Visual output matches exemplar keyboard
+  - [ ] Tone mark Unicode order matches canonical (no compat substitutions)
+
+provenance:
+  - keyboard: "release/sil/sil_lao_2008_basic/source/sil_lao_2008_basic.kmn"
+    note: >
+      SIL Lao 2008 Basic keyboard. Demonstrates tone mark canonicalization for Lao.
+      Uses context rules to reorder tone marks to canonical position after base + vowel.
+      Key rules (lines ~200–220) show the pattern:
+        any(toneMarks) any(baseChars) > any(baseChars) context(1)
+      This moves a tone mark from before the base to after the base.
+
+demo:
+  filled_kmn: |
+    c Tone mark canonicalization demo: Thai
+    c Type tone marks in any order; they reorder to canonical position (after vowel)
+
+    store(&VERSION) '10.0'
+    store(&NAME) 'Tone Mark Canon Demo'
+    store(&TARGETS) 'any'
+
+    store(toneMarks) U+0E48 U+0E49 U+0E4A U+0E4B     c Thai tones
+    store(consonants) U+0E01 U+0E02 U+0E04 U+0E05    c Thai consonants (partial)
+    store(vowels) U+0E30 U+0E31 U+0E32 U+0E33        c Thai vowels (partial)
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+    c Tone mark rules: type tone, then consonant → reorder to canonical
+    any(toneMarks) + any(consonants) > any(consonants) context(1)
+
+    c Tone mark rules: tone, consonant, vowel → reorder to canonical
+    any(consonants) any(toneMarks) + any(vowels) > any(consonants) any(vowels) context(2)
+
+    c Base rules (consonants and vowels pass through)
+    + any(consonants) > context
+    + any(vowels) > context
+    + any(toneMarks) > context
+
+  sample_keys:
+    - keys: ["U+0E04", "U+0E48", "U+0E30"]
+      output: "ขา่"
+      note: "kho + tone 2 + short a → canonical: kho + short a + tone 2"
+    - keys: ["U+0E48", "U+0E04", "U+0E30"]
+      output: "ขา่"
+      note: "tone 2 first → reordered to canonical position"
+    - keys: ["U+0E04", "U+0E30", "U+0E48"]
+      output: "ขา่"
+      note: "already canonical; no reordering needed"
+
+  sample_output: >
+    Type Thai syllables with tone marks in any order. The keyboard reorders
+    tone marks to their canonical position (after the vowel) automatically.
+    Visual output always shows the tone mark above the syllable, regardless of
+    the order you typed it. This ensures readability and consistency.
+
+skeleton:
+  kmn_template: |
+    c Tone mark canonicalization ({{language}})
+    c {{sourceKeyboard}} pattern
+
+    store(&VERSION) '10.0'
+    store(&NAME) '{{keyboardName}}'
+    store(&TARGETS) 'any'
+
+    store(toneMarks) {{toneMarkCodepoints}}
+    store(baseCharacters) {{baseCharacterClasses}}
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+    c Reorder tone marks from before base to after vowel
+    {{toneMarkReorderRules}}
+
+    c Base character rules (pass through)
+    + any(baseCharacters) > context
+    + any(toneMarks) > context
+
+  note: >
+    The core pattern: `any(toneMarks) + any(baseCharacters) > any(baseCharacters) context(1)`
+    moves a tone mark that appears before a base character to after it.
+
+    For tone mark + base + vowel: use multi-character context matching and reordering.
+
+  parameters:
+    - id: language
+      description: >
+        Language name (e.g., "Thai", "Lao").
+    - id: sourceKeyboard
+      description: >
+        Reference keyboard this pattern is based on.
+        Example: release/sil/sil_lao_2008_basic/source/sil_lao_2008_basic.kmn
+    - id: keyboardName
+      description: >
+        Display name for the keyboard being authored.
+        Example: "Thai"
+    - id: toneMarkCodepoints
+      description: >
+        Unicode codepoints for all tone marks in the script.
+        Example for Thai: U+0E48 U+0E49 U+0E4A U+0E4B
+    - id: baseCharacterClasses
+      description: >
+        Character classes (consonants, vowels) that tone marks attach to.
+        Example for Thai:
+        store(consonants) U+0E01-U+0E2E
+        store(vowels) U+0E30 U+0E31 U+0E32 U+0E33
+    - id: toneMarkReorderRules
+      description: >
+        Rules that move tone marks to canonical position. Format (one per line):
+        any(toneMarks) + any(baseCharacters) > any(baseCharacters) context(1)
+
+        For more complex patterns (tone + base + vowel):
+        any(baseCharacters) any(toneMarks) + any(vowels) > any(baseCharacters) any(vowels) context(2)
