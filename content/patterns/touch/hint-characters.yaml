@@ -1,0 +1,177 @@
+# hint-characters.yaml
+# Touch pattern: small glyph shown in the corner of a touch key revealing what
+# the longpress (or flick) will produce. Improves discoverability.
+# Strategy: S-08 (layer expansion — hint is the discoverability signal for sk/flick).
+# Priority 2 — secondary touch gallery pattern; pairs with longpress-alternates.
+
+id: hint_characters
+title: "Show a small letter in the corner of a key"
+description: >
+  Display a small hint character in the corner of a touch key so the user can
+  see at a glance what a long-press or swipe will produce. The hint is a
+  discoverability aid only — it does not change what the key types.
+category: touch
+appliesTo: []
+priority: 2
+group_visibility: any
+strategyId: "S-08"
+combinesWith: ["S-08"]
+
+questions:
+  - id: hostKey
+    prompt: "Which key should display the hint? (virtual-key name, e.g. K_A)"
+    answerType: key-name
+    default: "K_A"
+
+  - id: hintText
+    prompt: >
+      The small character (or short string) to show in the key corner.
+      Usually the first longpress alternate or the primary flick output.
+      Keep it to 1–2 characters for readability.
+    answerType: char-single
+
+kmnFragment: |
+  c Hint characters are defined entirely in the touch-layout JSON (hint field).
+  c No KMN rules are required for this pattern.
+
+touchLayoutFragment: |
+  {
+    "id": "{{hostKey}}",
+    "hint": "{{hintText}}"
+  }
+
+reorderRules: null
+
+tests:
+  - input: ["K_A"]
+    expectedOutput: "a"
+    description: "plain tap on K_A still produces a (hint does not affect key output)"
+
+validatedForFamilies: ["Latn", "Arab"]
+sourceKeyboards:
+  - "release/i/ibono_chwerty"
+  - "release/w/winchus"
+  - "release/b/balochi_urdu"
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-06-05"
+
+# ---------------------------------------------------------------------------
+# Extended metadata — YAML-only; not part of the TypeScript Pattern interface
+# ---------------------------------------------------------------------------
+
+frequency_in_corpus: "67/~200 scanned touch keyboards use hint fields; common in both Latin and Arabic-script keyboards"
+
+notes: >
+  The hint string is purely visual — the Keyman runtime renders it in a small
+  font in the key corner but it has no effect on key output. Authors typically
+  set hint to the first sk (longpress) alternate or the primary flick direction
+  so users know what hidden characters exist without opening a popup first.
+  This pattern is almost always used together with longpress-alternates (C-5)
+  or flick-gestures (C-7); it adds no behaviour on its own.
+
+provenance:
+  - keyboard: "release/i/ibono_chwerty/source/ibono_chwerty.keyman-touch-layout"
+    note: >
+      Tablet layout (Ibọnọ, Niger-Congo, BCP47 ibn). Author: Rogers Katelem Edeh.
+      K_E text='e', hint='*', sk has 4 alternates. K_W text='w', hint='\\', sk
+      has 2 alternates. K_Q text='ch' (digraph key), hint='q', sk has 1 alternate.
+      Shows hint used to signal the presence of sk alternates — the hint is the
+      first or most-salient alternate, not necessarily the first in the sk array.
+    rule: '"hint": "*"  (on K_E, which has sk: [è, ê, ë, ẹ])'
+  - keyboard: "release/w/winchus/source/winchus.keyman-touch-layout"
+    note: >
+      Phone layout (Winchus/Quechua, Peru/Bolivia, BCP47 qu). Author: Alex Castille Larkin (SIL).
+      K_Q text='q', hint='+ 1', sk=['1'], flick=['n','ne']. K_E text='e',
+      hint='+ 3', sk=['ɛ','è','ë'], flick=['n','e','ne']. The hint string uses
+      '+ N' to signal how many hidden characters exist — a convention rather than
+      a Keyman feature. Shows that hint can be an instructional string, not just
+      a single character.
+    rule: '"hint": "+ 3"  (on K_E, signaling 3 hidden alternates)'
+  - keyboard: "release/b/balochi_urdu/source/balochi_urdu.keyman-touch-layout"
+    note: >
+      Phone layout (Balochi Urdu script, BCP47 bal). Copyright: © SIL Global.
+      K_R text='د' (dal), hint='ڈ' (ddal), sk=['ڈ','ذ']. K_O text='ج' (jeem),
+      hint='چ' (cheh), sk=['چ','ژ','ث']. The hint is always the first sk entry —
+      the most phonetically-related character. Clean Arabic-script example of
+      the one-hint-equals-first-alternate convention.
+    rule: '"hint": "ڈ"  (on K_R dal key, first sk entry is ddal)'
+
+demo:
+  filled_kmn: |
+    c Demo: Hint character on K_A showing a-acute in the corner
+    c The small 'á' in the corner signals that long-pressing A reveals accented variants.
+    c No KMN rules needed — hint is set in the touch layout JSON.
+
+    store(&VERSION) '10.0'
+    store(&NAME) 'Hint Characters Demo'
+    store(&TARGETS) 'phone tablet'
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+
+    c (no rules — hint and sk behaviour defined in touch layout JSON below)
+
+  touch_layout_fragment: |
+    {
+      "phone": {
+        "font": "Tahoma",
+        "layer": [
+          {
+            "id": "default",
+            "row": [
+              {
+                "id": 1,
+                "key": [
+                  {
+                    "id": "K_A",
+                    "text": "a",
+                    "hint": "á",
+                    "sk": [
+                      { "id": "U_00E1", "text": "á" },
+                      { "id": "U_00E0", "text": "à" },
+                      { "id": "U_00E2", "text": "â" }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+
+  sample_keys:
+    - keys: ["K_A (visual)"]
+      output: "corner shows: á"
+      note: "the hint 'á' is visible in the key corner before the user interacts"
+    - keys: ["(hold K_A)"]
+      output: "popup: á à â"
+      note: "long-press reveals the full sk popup; hint previewed the first entry"
+
+  sample_output: >
+    The key shows 'a' large and 'á' small in the corner. Hold the key to see
+    á, à, â in a popup. The hint told the user what to expect before pressing.
+
+skeleton:
+  touch_layout_template: |
+    {
+      "id": "{{hostKey}}",
+      "hint": "{{hintText}}",
+      "sk": [
+        { "id": "U_XXXX", "text": "{{hintText}}" }
+      ]
+    }
+
+  parameters:
+    - id: hostKey
+      description: >
+        Virtual-key name for the key that shows the hint (e.g. K_A, K_E).
+        One skeleton block per key.
+    - id: hintText
+      description: >
+        The small string displayed in the key corner. Typically 1 character
+        (the first or most prominent longpress/flick output). Can be a short
+        string like '+ 3' to signal count rather than a specific character.
+        The Keyman runtime renders this in a small font; strings longer than
+        2–3 characters will be clipped on small screens.
