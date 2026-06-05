@@ -1,0 +1,290 @@
+# simple-swap.yaml
+# Simple one-to-one character substitution
+# Strategy: S-01 (Simple swap)
+# Priority 1 — the simplest pattern; used only for tiny additions.
+
+id: simple_swap
+title: "Simple swap: keystroke → single character"
+description: >
+  Map 1–5 new characters onto unused keys. Each keystroke produces exactly one
+  character. No deadkeys, no deadkey followup sequences, no diacritics, no case
+  variants. Straight substitution.
+category: substitute
+appliesTo: ["Latn", "Cyrl", "Arab", "Deva", "Taml"]
+priority: 1
+group_visibility: all
+strategyId: "S-01"
+combinesWith: []
+
+questions:
+  - id: keystrokeCharacterMap
+    prompt: >
+      Map each keystroke to the character it produces.
+      Format: one entry per line, comma-separated: keystroke,unicode_codepoint
+
+      Keystroke format:
+        [K_X]           — unmodified key (where X is the virtual key name)
+        [SHIFT K_X]     — with Shift
+        [RALT K_X]      — with RAlt/AltGr
+        [CTRL K_X]      — with Ctrl
+
+      **Finding virtual key names:**
+      The K_ prefix maps to QWERTY physical positions:
+        Top row: K_Q K_W K_E K_R K_T K_Y K_U K_I K_O K_P
+        Home row: K_A K_S K_D K_F K_G K_H K_J K_K K_L
+        Bottom row: K_Z K_X K_C K_V K_B K_N K_M
+        Punctuation: K_COMMA K_PERIOD K_SLASH K_SEMICOLON K_QUOTE
+        See Keyman docs at keyman.com for the complete virtual-key reference.
+
+      Example for Akan (adds ɛ and ɔ):
+        [K_Q],U+025B
+        [K_C],U+0254
+        [SHIFT K_Q],U+0190
+        [SHIFT K_C],U+0186
+
+      Find Unicode codepoints at unicode.org or copy from a reference keyboard.
+    answerType: text
+
+  - id: characterDescriptions
+    prompt: >
+      For each character you're adding, provide a brief description for the user.
+      Format: character,description
+
+      Example:
+        ɛ,Latin small letter open e (like the 'e' in 'met')
+        ɔ,Latin small letter open o (like the 'o' in 'dog')
+
+      These descriptions appear in the help docs and on-screen hints.
+    answerType: text
+    required: false
+
+kmnFragment: |
+  c Simple character substitution (S-01)
+  c Each keystroke maps to exactly one character.
+  c No deadkeys, no combining, no case variants.
+
+  begin Unicode > use(main)
+
+  group(main) using keys
+  {{kmnRules}}
+
+touchLayoutFragment: |
+  c Touch layout for S-01 is auto-populated from the desktop rules.
+  c For each character you add, the touch layout should mirror the desktop key position.
+  c Example: if you added ɛ to K_Q on desktop, the touch layout shows ɛ on the Q key.
+  c
+  c No special touch groups (longpress, layer-switch) are needed for S-01;
+  c the character simply appears on the key's default layer.
+  c
+  c If a character is uncommon, consider a longpress menu instead:
+  c   (longpress on Q: [ɛ, Ɛ, ɜ, ...])
+  c But for tiny additions, just show it on the base layer.
+
+notes: >
+  **When the decision tree picks S-01:**
+  The decision tree (spec.md §7.2, rule 11) selects S-01 when:
+  - A1 = tiny (fewer than 5 new characters) AND
+  - A3 = strong (the user thinks "I'd type a Latin spelling of the sound") AND
+  - A4 = none (no diacritics, no tone marks, no combining)
+
+  This is rare. Most keyboards either (1) have more characters (→ S-02/S-05),
+  or (2) the characters are better organized via deadkeys or sequences.
+
+  **Use S-01 only when:**
+  - Total new characters ≤ 5
+  - Each character has its own dedicated, *unused* key
+  - No case variants, diacritics, combining marks, or cycling
+  - You are confident no future additions are anticipated
+
+  **When to NOT use S-01:**
+  - 6+ new characters → S-02 (deadkey composition) or S-05 (mnemonic spelling)
+  - Characters share diacritic patterns → S-02 (deadkey + base)
+  - Characters share modifier + base patterns → S-05 (sequences: "aa" → "ā")
+  - Any character combines with prior input → S-02, S-05, or S-07 (cycling)
+  - No spare keys, only RAlt available → Still use S-08 modifier-layer as secondary
+
+tests:
+  - input: ["[K_Q]"]
+    expectedOutput: "ɛ"
+    description: >
+      Akan: pressing Q produces ɛ (Latin small letter open e)
+  - input: ["[K_C]"]
+    expectedOutput: "ɔ"
+    description: >
+      Akan: pressing C produces ɔ (Latin small letter open o)
+  - input: ["[SHIFT K_Q]"]
+    expectedOutput: "Ɛ"
+    description: >
+      Akan: pressing Shift+Q produces Ɛ (uppercase)
+
+validatedForFamilies: ["Latn"]
+sourceKeyboards:
+  - "release/a/akan/source/akan.kmn"
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-06-05"
+
+# ---------------------------------------------------------------------------
+# Extended metadata — YAML-only; not part of the TypeScript Pattern interface
+# ---------------------------------------------------------------------------
+
+frequency_in_corpus: "Minimal; only languages with <5 new characters and unused keys"
+
+notes_extended: >
+  Simple swap is the fallback for tiny, phonetically-straightforward additions.
+  It is rarely the right choice because most keyboards need more than 5 characters,
+  or the characters are easier typed via deadkeys or sequences.
+
+  **Why S-01 is rarely used:**
+  Most languages have either (1) more than 5 new characters (→ S-02/S-05), or
+  (2) unused keys are precious and reserved for future growth (→ deadkey is safer).
+  S-01 is chosen only when both conditions hold: tiny inventory AND confident
+  that no future additions are anticipated.
+
+  **Common mistakes to avoid:**
+
+  1. **Forgetting case variants**
+     If your language distinguishes ɛ/Ɛ or ɔ/Ɔ, you MUST include Shift variants.
+     Missing case variants means users cannot type uppercase — a critical bug.
+
+  2. **Using RAlt when you have spare keys**
+     S-01 assumes unused QWERTY keys are available. If you're considering RALT,
+     use S-02 (deadkey) instead — it's cleaner and more discoverable.
+
+  3. **Adding more than 5 characters**
+     Once you exceed 5, the 1-character-per-key pattern becomes unmaintainable.
+     Pivot to S-02 (deadkey) or S-05 (transliteration) immediately.
+
+  4. **Mixing S-01 with diacritics**
+     Do NOT try to add "à" by mapping it directly — that is still S-01, not S-02.
+     But if you need à, è, é, etc., switch to S-02 (deadkey + base).
+
+  5. **Not testing case, accents, and punctuation**
+     Compile your KMN and test every character you added. Also verify that
+     existing base-layout keys still work as expected (you're not overwriting them).
+
+  **Testing checklist:**
+  Before submitting, verify:
+  - [ ] KMN compiles with zero errors (kmc build keyboard.kmn)
+  - [ ] Each unmodified key produces the correct character
+  - [ ] Each Shift variant produces the correct uppercase (if applicable)
+  - [ ] All existing QWERTY keys still work (you didn't accidentally override them)
+  - [ ] Total new characters ≤ 5
+  - [ ] No diacritics, combining marks, or context-dependent rules
+  - [ ] Character descriptions are clear and user-facing (not technical jargon)
+
+  **Akan exemplar analysis:**
+  The Akan keyboard adds just two characters (ɛ and ɔ) to a base US layout.
+  Both map to visually similar keys (q for open-e, c for open-o), both have
+  case variants (Shift+Q → Ɛ, Shift+C → Ɔ), and the author had unused keys
+  available. This is the canonical S-01 case.
+
+  **When NOT to use S-01 — contrasts:**
+
+  Example: Yorùbá has three tone marks (acute, grave, dot-below). If the inventory
+  is 5 new characters (3 tones × vowels), DO NOT use S-01 — the combining behavior
+  (tone + vowel) is too complex. Use S-07 (cycling) instead.
+
+  Example: Tamil has 4 pre-base vowels (ி, ெ, ே, ை). DO NOT use S-01 (one key per vowel),
+  because pre-base vowels must reorder before the consonant in stored order. Use
+  S-09 (context-sensitive cluster) with the indic-pre-base-vowel reorder pattern.
+
+provenance:
+  - keyboard: "release/a/akan/source/akan.kmn"
+    note: >
+      Akan (Twi/Fante). Adds exactly ɛ and ɔ via simple key swaps.
+      Lines 8–11: store(&VERSION), store(&NAME), store(&COPYRIGHT), store(&LANGUAGE).
+      Lines 13–16: Simple rules mapping [K_Q] → ɛ, [K_C] → ɔ, and case variants.
+      This keyboard is THE reference for S-01: minimal, clear, and exemplary.
+      See spec.md §7.3 S-01 Simple swap for full context.
+
+demo:
+  filled_kmn: |
+    c Simple swap demo: two new characters on unused keys
+    c Akan adds ɛ (open-e) and ɔ (open-o) to a US base
+
+    store(&VERSION) '10.0'
+    store(&NAME) 'Simple Swap Demo'
+    store(&TARGETS) 'any'
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+    c New characters on unused keys
+    + [K_Q] > U+025B      c ɛ (open e)
+    + [K_C] > U+0254      c ɔ (open o)
+
+    c Case variants
+    + [SHIFT K_Q] > U+0190   c Ɛ (open E)
+    + [SHIFT K_C] > U+0186   c Ɔ (open O)
+
+  sample_keys:
+    - keys: ["K_Q"]
+      output: "ɛ"
+      note: "Q key produces ɛ"
+    - keys: ["SHIFT K_Q"]
+      output: "Ɛ"
+      note: "Shift+Q produces uppercase Ɛ"
+    - keys: ["K_C"]
+      output: "ɔ"
+      note: "C key produces ɔ"
+
+  sample_output: >
+    Type Q to get ɛ, or Shift+Q for Ɛ. Type C to get ɔ, or Shift+C for Ɔ.
+    Each key produces exactly one character. No deadkeys, no sequences.
+
+  anti_example: |
+    c WRONG: Do not use S-01 for this
+    c If you need both base character AND diacritic variants (à, á, â, ã)
+    c Use S-02 (deadkey) instead:
+    c   + [`] > dk(grave)
+    c   dk(grave) + any(vowels) > index(graveVowels, 2)
+    c This is cleaner than assigning each accented vowel its own key.
+
+    c WRONG: Do not use S-01 if characters build on prior context
+    c If you need "aa" → "ā" (length vowel), use S-05 (mnemonic):
+    c   + "a" > "अ"
+    c   "अ" + "a" > "आ"
+    c This is not a simple swap; it's a sequence rule.
+
+skeleton:
+  kmn_template: |
+    c Simple character substitution ({{language}})
+    c {{sourceKeyboard}} pattern
+
+    store(&VERSION) '10.0'
+    store(&NAME) '{{keyboardName}}'
+    store(&TARGETS) 'any'
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+    c New characters — one keystroke per character
+    {{characterRules}}
+
+  note: >
+    Each rule follows the pattern: `+ [KEY] > U+XXXX` where KEY is a virtual key
+    name (e.g., K_Q, K_C) and U+XXXX is the Unicode codepoint of the character.
+    Include Shift variants if the language has uppercase forms of the characters.
+
+  parameters:
+    - id: language
+      description: >
+        Language name (e.g., "Akan", "Twi").
+    - id: sourceKeyboard
+      description: >
+        Reference keyboard this pattern is based on.
+        Example: release/a/akan/source/akan.kmn
+    - id: keyboardName
+      description: >
+        Display name for the keyboard being authored.
+        Example: "Akan Twi"
+    - id: characterRules
+      description: >
+        One rule per character. Format (one per line):
+        + [K_X] > U+XXXX   c description
+
+        Example for Akan:
+        + [K_Q] > U+025B   c ɛ open e
+        + [K_C] > U+0254   c ɔ open o
+        + [SHIFT K_Q] > U+0190   c Ɛ open E
+        + [SHIFT K_C] > U+0186   c Ɔ open O
