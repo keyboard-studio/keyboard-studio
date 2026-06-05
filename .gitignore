@@ -41,3 +41,6 @@ packages/compiler/wasm/*.wasm
 
 # kbgen vendored CLDR exemplars (725 files; regenerate via utilities/kbgen/fetch-data.js)
 utilities/kbgen/data/cldr/
+
+# CodeGraph local index (dhigby/codegraph)
+.codegraph/
