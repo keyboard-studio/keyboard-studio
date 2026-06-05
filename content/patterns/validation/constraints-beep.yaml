@@ -1,0 +1,332 @@
+# constraints-beep.yaml
+# Constraints + beep validation pattern
+# Strategy: S-10 (Constraints + beep)
+# Priority 2 — add-on secondary; modifies any primary strategy.
+
+id: constraints_beep
+title: "Constraints + beep: reject invalid sequences with audio feedback"
+description: >
+  Add input validation to any primary strategy. Invalid base-diacritic or
+  character-cluster combinations trigger a beep and suppression. The user
+  receives immediate audio feedback that they typed something the keyboard
+  doesn't support. Works with S-02 (deadkeys), S-05 (transliteration), S-07
+  (cycling), S-09 (clusters) — any strategy where some combinations are valid
+  and others are not.
+category: validation
+appliesTo: ["Latn", "Deva", "Taml", "Arab", "Cyrl"]
+priority: 2
+group_visibility: all
+strategyId: "S-10"
+combinesWith: ~
+
+questions:
+  - id: validBaseCharacters
+    prompt: >
+      Which base characters (consonants, vowels, syllables) can accept diacritics?
+      Format: one per line, comma-separated: base_character_or_keystroke,unicode_codepoint
+
+      Example for Polynesian Latin (el_pasifika):
+        a,U+0061
+        e,U+0065
+        i,U+0069
+        o,U+006F
+        u,U+0075
+        (uppercase variants omitted here for brevity)
+
+      You can also list consonants if your constraint is on specific bases:
+        t,U+0074
+        n,U+006E
+        l,U+006C
+    answerType: text
+
+  - id: validDiacriticMarks
+    prompt: >
+      Which diacritics can be applied?
+      Format: one per line, comma-separated: diacritic_name,unicode_codepoint
+
+      Example for Polynesian Latin:
+        macron,U+0304
+        acute,U+0301
+        diaeresis,U+0308
+        grave,U+0300
+
+      These marks can be typed via deadkey, modifier-key, or sequence rule.
+    answerType: text
+
+  - id: invalidCombinations
+    prompt: >
+      List any explicitly INVALID combinations (optional).
+      Format: base,diacritic → reject
+
+      Example for el_pasifika:
+        consonant + acute → INVALID (accents only on vowels)
+        vowel + macron → valid for some vowels, invalid for others
+
+      If not specified, any base + diacritic that isn't in the main rule set
+      is considered invalid and will trigger the beep.
+    answerType: text
+    required: false
+
+kmnFragment: |
+  c Constraints + beep validation (S-10)
+  c Add to any primary strategy: place before main group.
+  c Invalid sequences trigger beep + suppression.
+
+  store(validBases) '{{validBaseCharacters}}'
+  store(validDiacritics) '{{validDiacriticMarks}}'
+
+  begin Unicode > use(constraints)
+
+  group(constraints) using keys
+  c Constraint rules: invalid base+diacritic → beep + suppress
+  {{constraintRules}}
+
+  nomatch > use(main)
+
+  group(main) using keys
+  c Your primary strategy rules go here
+  {{primaryStrategyRules}}
+
+touchLayoutFragment: null
+
+notes: >
+  **When the decision tree picks S-10:**
+  The decision tree (spec.md §7.2, rule 9) adds S-10 as a secondary when:
+  - A6 = loud (user wants active feedback on invalid input)
+
+  S-10 is NEVER a primary strategy. It is always paired with another strategy
+  (S-02, S-05, S-07, S-09, etc.) that handles the valid combinations. The
+  constraints group sits BEFORE the main group and rejects invalid sequences
+  before they reach the primary rules.
+
+  **Use S-10 when:**
+  - The primary strategy allows many combinations, but some are invalid
+  - Example: deadkey + any character → most work, but consonant + acute is wrong
+  - The user benefits from immediate feedback (beep) that they made a mistake
+  - Invalid sequences would cause confusion or render incorrectly if allowed
+
+  **When to NOT use S-10:**
+  - All combinations are valid (no constraints needed) → don't add S-10
+  - Invalid sequences are rare → soft constraint (silent suppression) is gentler
+  - The user expects to see intermediate state (deadkey commits on invalid) → S-02 is better
+  - The primary strategy already handles constraints → don't double-constrain
+
+tests:
+  - input: ["a", "acute_key"]
+    expectedOutput: "á"
+    description: >
+      Polynesian: vowel (a) + acute diacritic → valid output á. No beep.
+  - input: ["t", "acute_key"]
+    expectedOutput: "t + beep + nothing"
+    description: >
+      Polynesian: consonant (t) + acute diacritic → INVALID. Beep sounds;
+      no output. Prevents invalid accent-on-consonant combinations.
+  - input: ["a", "macron_key"]
+    expectedOutput: "ā"
+    description: >
+      Polynesian: vowel (a) + macron → valid. Macron is allowed on vowels.
+      No beep.
+
+validatedForFamilies: ["Latn"]
+sourceKeyboards:
+  - "release/el/el_pasifika/source/el_pasifika.kmn"
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-06-05"
+
+# ---------------------------------------------------------------------------
+# Extended metadata — YAML-only; not part of the TypeScript Pattern interface
+# ---------------------------------------------------------------------------
+
+frequency_in_corpus: "Used with ~30% of surveyed keyboards; especially common with deadkey + diacritic strategies"
+
+notes_extended: >
+  S-10 is a quality-of-life secondary. It doesn't enable new characters; it
+  prevents bad ones. The beep tells the user "you typed something I can't
+  produce" rather than silently dropping the keystroke or producing garbage.
+
+  **Why S-10 is useful:**
+  - Polynesian languages (el_pasifika) have strict diacritic rules: macron
+    and acute on vowels only, never on consonants. A constraint group
+    prevents users from typing "tá" (consonant + acute).
+  - Tamil and Telugu have strict consonant-cluster rules. Not every consonant
+    can precede every other consonant. Constraints prevent invalid clusters.
+  - Arabic has position-dependent forms (initial, medial, final). A constraint
+    can enforce context: "medial form only appears after a connector letter."
+
+  **Common mistakes to avoid:**
+
+  1. **Not understanding constraint vs. fallback**
+     Constraint (S-10): invalid input → beep + reject (nothing output)
+     Fallback (soft constraint): invalid input → silently suppress or emit base
+
+     Choose based on whether the user should hear feedback or not.
+
+  2. **Over-constraining**
+     If 95% of combinations are valid and 5% are invalid, the constraint group
+     is tiny and efficient. But if 50% are invalid, you have a design problem —
+     consider using S-06 (chained deadkeys) or S-09 (clusters) instead.
+
+  3. **Not testing the beep**
+     The beep is audio feedback. Verify it works on the target platform
+     (Windows: Windows.Media.Sounds; macOS: NSSound; Linux: depends on DE).
+     Some systems silence system beeps — that's okay; the constraint still works.
+
+  4. **Forgetting the nomatch fallthrough**
+     Your constraints group MUST end with `nomatch > use(main)` or the
+     primary rules will never fire. This is the critical pattern:
+       group(constraints) { constraint rules... } nomatch > use(main)
+
+  5. **Conflicting rules in constraints and main**
+     If constraints says "a + acute → beep" but main says "a + acute → á",
+     the constraint wins and the user never sees á. Verify that your
+     constraint list and main rules are consistent.
+
+  **Testing checklist:**
+  Before submitting, verify:
+  - [ ] Constraints group exists and fires before main group
+  - [ ] Invalid combinations trigger beep (audible on speaker/headphones)
+  - [ ] nomatch > use(main) present so valid sequences fall through
+  - [ ] Valid sequences still produce correct output (not rejected by constraints)
+  - [ ] KMN compiles with zero errors
+  - [ ] No rule in constraints contradicts a rule in main
+
+provenance:
+  - keyboard: "release/el/el_pasifika/source/el_pasifika.kmn"
+    note: >
+      Pasifika (Enabling Languages, SIL). Polynesian Latin + macron/acute/diaeresis.
+      The canonical S-10 + S-02 combination exemplar.
+
+      Constraints (lines ~40–60): any(nonVowels) + deadkey → beep
+      This prevents users from typing consonant + diacritic, which would be invalid.
+
+      Main group (lines ~70+): vowel + deadkey → diacritic-vowel variant
+      Valid deadkey compositions like á, ē, ü produce output.
+
+      The interaction is critical: constraints reject first, main handles valid cases.
+      This is the reference implementation for S-10.
+
+demo:
+  filled_kmn: |
+    c Constraints + beep demo: Polynesian Latin
+    c Valid: vowel + diacritic → accented vowel
+    c Invalid: consonant + diacritic → beep + reject
+
+    store(&VERSION) '10.0'
+    store(&NAME) 'Constraints+Beep Demo'
+    store(&TARGETS) 'any'
+
+    store(vowels) 'aeiouAEIOU'
+    store(consonants) 'bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ'
+
+    begin Unicode > use(constraints)
+
+    group(constraints) using keys
+    c Reject consonant + diacritic combinations
+    any(consonants) U+0301 > context beep      c consonant + acute → beep
+    any(consonants) U+0304 > context beep      c consonant + macron → beep
+    any(consonants) U+0308 > context beep      c consonant + diaeresis → beep
+
+    nomatch > use(main)
+
+    group(main) using keys
+    c Deadkey for acute
+    + [K_QUOTE] > dk(acute)
+    dk(acute) + 'a' > U+00E1     c á
+    dk(acute) + 'e' > U+00E9     c é
+    dk(acute) + 'i' > U+00ED     c í
+    dk(acute) + 'o' > U+00F3     c ó
+    dk(acute) + 'u' > U+00FA     c ú
+
+    c Deadkey for macron
+    + [K_MINUS] > dk(macron)
+    dk(macron) + 'a' > U+0101    c ā
+    dk(macron) + 'e' > U+0113    c ē
+    dk(macron) + 'i' > U+012B    c ī
+    dk(macron) + 'o' > U+014D    c ō
+    dk(macron) + 'u' > U+016B    c ū
+
+  sample_keys:
+    - keys: ["'", "a"]
+      output: "á"
+      note: "Deadkey acute + vowel a → á (valid, no beep)"
+    - keys: ["'", "t"]
+      output: "t + beep"
+      note: "Deadkey acute + consonant t → beep + reject (invalid)"
+    - keys: ["-", "e"]
+      output: "ē"
+      note: "Deadkey macron + vowel e → ē (valid, no beep)"
+
+  sample_output: >
+    Type a deadkey (acute or macron) followed by a vowel to get an accented vowel:
+    á, é, ī, ō, ū, etc. If you accidentally press a deadkey and then a consonant,
+    you'll hear a beep — the keyboard rejects that combination. Then press a vowel
+    to get a valid accented character.
+
+skeleton:
+  kmn_template: |
+    c Constraints + beep validation ({{language}})
+    c Add to {{sourceKeyboard}} primary strategy
+
+    store(&VERSION) '10.0'
+    store(&NAME) '{{keyboardName}} + Constraints'
+    store(&TARGETS) 'any'
+
+    store(validBases) '{{validBaseCharacters}}'
+    store(validDiacritics) '{{validDiacriticMarks}}'
+
+    begin Unicode > use(constraints)
+
+    group(constraints) using keys
+    c Reject invalid base + diacritic combinations
+    {{constraintRules}}
+
+    nomatch > use(main)
+
+    group(main) using keys
+    c Your primary strategy rules (S-02, S-05, S-07, S-09, etc.)
+    {{primaryStrategyRules}}
+
+  note: >
+    The constraint group runs BEFORE main. If any rule in constraints fires,
+    its output (beep + context or beep + nul) is final — main never runs for
+    that keystroke. If no constraint rule matches, nomatch > use(main) passes
+    control to the primary strategy.
+
+    Key pattern: `any(invalidBases) + [KEY] > context beep`
+    This outputs the context (previous keystroke) unchanged and sounds a beep.
+
+  parameters:
+    - id: language
+      description: >
+        Language name (e.g., "Polynesian", "Devanagari").
+    - id: sourceKeyboard
+      description: >
+        Reference keyboard this constraint wraps around.
+        Example: release/el/el_pasifika/source/el_pasifika.kmn
+    - id: keyboardName
+      description: >
+        Display name for the keyboard being authored.
+        Example: "Pasifika"
+    - id: validBaseCharacters
+      description: >
+        Characters that can accept diacritics. Usually vowels or specific bases.
+        Example for Polynesian: aeiouAEIOU
+    - id: validDiacriticMarks
+      description: >
+        Diacritics that are valid in your language.
+        Example for Polynesian: U+0301 (acute), U+0304 (macron), U+0308 (diaeresis)
+    - id: constraintRules
+      description: >
+        Rules that reject invalid combinations. Format (one per line):
+        any(invalidBases) + [KEY] > context beep
+
+        Example for Polynesian (consonants + diacritic → invalid):
+        any(consonants) U+0301 > context beep
+        any(consonants) U+0304 > context beep
+        any(consonants) U+0308 > context beep
+    - id: primaryStrategyRules
+      description: >
+        Your main keyboard rules (deadkey composition, transliteration, etc.).
+        Example for S-02 deadkey composition:
+        + [K_QUOTE] > dk(acute)
+        dk(acute) + any(vowels) > index(vowels_acute, 2)
