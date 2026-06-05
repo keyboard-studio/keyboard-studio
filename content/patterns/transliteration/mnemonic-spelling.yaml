@@ -1,0 +1,319 @@
+# mnemonic-spelling.yaml
+# Mnemonic spelling / transliteration pattern
+# Strategy: S-05 (Mnemonic spelling / transliteration)
+# Priority 2 — used for medium to large phonetically-intuitive inventories.
+
+id: mnemonic_spelling
+title: "Mnemonic spelling: type ASCII, get target character"
+description: >
+  User types an ASCII transliteration scheme (phonetically intuitive Latin
+  spelling) and the keyboard expands it to the target character. Common for
+  IPA, ITRANS (Sanskrit), romanized Greek, and any language where the user
+  naturally thinks "I'd spell it this way." Multi-keystroke sequences build
+  context-sensitive variants (e.g., "aa" → "ā" for length vowels, "RR" → "ṛ"
+  for retroflex).
+category: transliteration
+appliesTo: ["Deva", "Taml", "Arab", "Latn", "Grek"]
+priority: 2
+group_visibility: all
+strategyId: "S-05"
+combinesWith: ["S-04", "S-09", "S-11"]
+
+questions:
+  - id: transliterationScheme
+    prompt: >
+      Define your transliteration scheme: ASCII sequences → target characters.
+      Format: one entry per line, comma-separated: ascii_sequence,unicode_codepoint
+
+      **Single-keystroke mappings (base characters):**
+        a,U+0905
+        i,U+0907
+        u,U+0909
+
+      **Multi-keystroke context-sensitive mappings (variants/length):**
+        a a,U+0906        c second 'a' lengthens to ā
+        i i,U+0908        c second 'i' lengthens to ī
+        R R,U+0943        c 'RR' produces retroflex vowel ṛ
+
+      **Combining marks / modifiers (accents, tone marks):**
+        m `,U+0902        c anusvara (nasal mark)
+        n ~,U+0903        c visarga (aspiration mark)
+
+      Order matters: longer sequences should be listed BEFORE their prefixes.
+      Example: list "RR" before "R" so "RR" is matched first.
+
+      Find Unicode codepoints at unicode.org or in the exemplar keyboard source.
+    answerType: text
+
+  - id: sequenceOrdering
+    prompt: >
+      When you have overlapping sequences (e.g., "a" and "aa", "R" and "RR"),
+      list the LONGER sequence first. The keyboard engine matches left-to-right
+      and greedily (takes the first match), so order determines priority.
+
+      Example:
+        WRONG order:  a,U+0905  /  aa,U+0906  → "aa" will never match
+        RIGHT order:  aa,U+0906  /  a,U+0905  → "aa" matches first, then single "a"
+
+      Have you arranged your sequences by length (longest first)?
+    answerType: text
+    required: false
+
+  - id: characterDescriptions
+    prompt: >
+      For each sequence, describe the output character in user-facing language.
+      Format: ascii_sequence,description
+
+      Example for ITRANS:
+        a,schwa (short a sound, like in 'about')
+        aa,long a (like in 'father')
+        R,retroflex r (r with tongue curled back)
+        RR,retroflex long r
+
+      These descriptions appear in help docs and on-screen hints.
+    answerType: text
+    required: false
+
+kmnFragment: |
+  c Mnemonic spelling / transliteration (S-05)
+  c User types ASCII sequences; keyboard expands to target characters.
+  c Longer sequences are matched first (greedy left-to-right).
+
+  store(transliterations) '{{transliterationMap}}'
+  store(outputs) '{{outputCharacters}}'
+
+  begin Unicode > use(main)
+
+  group(main) using keys
+  c Context-sensitive sequence rules
+  c Pattern: ascii_sequence + next_char > expanded_output / context
+  {{kmnRules}}
+
+touchLayoutFragment: null
+
+notes: >
+  **When the decision tree picks S-05:**
+  The decision tree (spec.md §7.2, rule 5) selects S-05 when:
+  - A3 = strong (user thinks "I'd type a Latin spelling of the sound")
+  - A1 ∈ {medium, large} (20–300+ new characters)
+
+  If these conditions hold, S-05 is the primary strategy, often with S-04
+  (parallel stores) and/or S-09 (cluster rules) as secondaries.
+
+  **Use S-05 when:**
+  - You have a phonetic transliteration scheme (ITRANS, IPA modifier keys, etc.)
+  - The user naturally maps sounds to ASCII letters
+  - More than ~5 characters (S-01 is too rigid, deadkeys are tedious)
+  - Sequences build variants naturally (aa → ā, RR → ṛ, etc.)
+  - The user is comfortable with multi-keystroke rules
+
+  **When to NOT use S-05:**
+  - Single simple deadkey + base → S-02 (deadkey composition)
+  - No transliteration scheme available → S-02 (deadkey) or S-08 (RAlt menu)
+  - Characters don't follow phonetic patterns → pick a mnemonic layout instead
+  - Only 1–5 characters needed → S-01 (simple swap)
+
+tests:
+  - input: ["i", "t", "r", "a", "n", "s"]
+    expectedOutput: "इत्रांस"
+    description: >
+      ITRANS: typing "itrans" (phonetic Hindi spelling) produces हिंदी-like output.
+      Each keystroke is mapped per the transliteration scheme.
+  - input: ["a", "a"]
+    expectedOutput: "आ"
+    description: >
+      ITRANS length vowel: second 'a' after 'a' produces long ā (U+0906).
+      Context rule: a + a > ā.
+  - input: ["R", "R"]
+    expectedOutput: "ṛṛ"
+    description: >
+      ITRANS retroflex: "RR" produces the retroflex vowel ṛ (U+0943).
+      Context rule: R + R > ṛ.
+
+validatedForFamilies: ["Deva", "Taml"]
+sourceKeyboards:
+  - "release/itrans/itrans_devanagari_hindi/source/itrans_devanagari_hindi.kmn"
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-06-05"
+
+# ---------------------------------------------------------------------------
+# Extended metadata — YAML-only; not part of the TypeScript Pattern interface
+# ---------------------------------------------------------------------------
+
+frequency_in_corpus: "Common for scholarly/technical keyboards: IPA, ITRANS, romanized Arabic, etc."
+
+notes_extended: >
+  S-05 is the workhorse for phonetically-intuitive large inventories. It scales
+  well because the user types in a natural scheme (ITRANS, IPA modifiers) and
+  the keyboard does the expansion. Authors define rules once, then the pattern
+  adapts to any similar language.
+
+  **Why S-05 is powerful:**
+  - Reduces cognitive load: user types phonetically, not memorizes key positions
+  - Scales to 100+ characters with clean, maintainable rules
+  - Naturally handles variants: "aa" for length, "RR" for emphatic, etc.
+  - Works across multiple languages (same transliteration scheme)
+
+  **Common mistakes to avoid:**
+
+  1. **Not ordering sequences by length**
+     If you list "a" before "aa", the engine will match "a" first and never see "aa".
+     ALWAYS list longer sequences first.
+
+  2. **Forgetting context-sensitive rules**
+     If "aa" should expand to ā but "a" to अ, you MUST define both rules.
+     Without the second "a" context rule, single "a" won't match anything.
+
+  3. **Missing fallback rules**
+     What happens if the user types an invalid sequence (e.g., "xx" in ITRANS)?
+     Include a fallback: any(invalidKey) > invalidKey (emit the keystroke as-is).
+
+  4. **Not validating Unicode codepoints**
+     Copy-paste errors in U+XXXX are common. Verify every codepoint in the
+     exemplar keyboard or unicode.org before committing.
+
+  5. **Mixing incompatible transliteration schemes**
+     ITRANS and Velthuis (another Devanagari scheme) use different keystroke
+     conventions. Pick ONE scheme and stick with it. Don't mix "aa" (ITRANS)
+     with "@" (Velthuis) in the same keyboard.
+
+  **Testing checklist:**
+  Before submitting, verify:
+  - [ ] KMN compiles with zero errors (kmc build keyboard.kmn)
+  - [ ] Every transliteration sequence produces the correct output
+  - [ ] Longer sequences are matched before their prefixes (order preserved)
+  - [ ] Context-sensitive rules fire correctly (aa → ā, RR → ṛ)
+  - [ ] Invalid sequences don't crash; they either emit as-is or suppress
+  - [ ] All Unicode codepoints verified in the exemplar keyboard
+  - [ ] Character descriptions are clear and user-facing
+
+provenance:
+  - keyboard: "release/itrans/itrans_devanagari_hindi/source/itrans_devanagari_hindi.kmn"
+    note: >
+      ITRANS Devanagari (Shree Devi Kumar). The canonical S-05 exemplar.
+      Maps ASCII sequences to Devanagari: "a" → अ, "aa" → आ, "i" → इ, "ii" → ई, etc.
+      Also handles consonants with diacritics: "R" → ऱ (retroflex), "T" → ट (dental),
+      and nasals: "m" → म, "N" → ण.
+
+      Key insight: ITRANS uses doubled vowels for length (aa, ii, uu) and
+      capital consonants for retroflex/dental variants (R, T, L, D, N).
+      This is why sequence ordering is critical: "RR" must be checked before "R".
+
+demo:
+  filled_kmn: |
+    c Mnemonic spelling demo: ITRANS Devanagari
+    c Type ASCII sequences; keyboard expands to Devanagari characters
+
+    store(&VERSION) '10.0'
+    store(&NAME) 'ITRANS Demo'
+    store(&TARGETS) 'any'
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+    c Base vowels
+    + 'a' > U+0905      c अ (schwa)
+    + 'i' > U+0907      c इ (short i)
+    + 'u' > U+0909      c उ (short u)
+
+    c Length vowels (context-sensitive)
+    U+0905 + 'a' > U+0906      c a + a → आ (long a)
+    U+0907 + 'i' > U+0908      c i + i → ई (long i)
+    U+0909 + 'u' > U+090A      c u + u → ऊ (long u)
+
+    c Consonants
+    + 'k' > U+0915      c क
+    + 'g' > U+0917      c ग
+    + 'n' > U+0928      c न
+
+    c Retroflex (capital letters)
+    + 'R' > U+0943      c ṛ (retroflex vowel)
+    + 'T' > U+0920      c ट (retroflex t)
+
+  sample_keys:
+    - keys: ["i", "t", "r", "a", "n", "s"]
+      output: "इत्रांस"
+      note: "ITRANS: 'itrans' → हिंदी (Sanskrit for 'Hindi')"
+    - keys: ["a", "a"]
+      output: "आ"
+      note: "Length vowel: 'aa' → long ā (U+0906)"
+    - keys: ["R", "R"]
+      output: "ṛṛ"
+      note: "Retroflex: 'RR' → retroflex vowel (U+0943)"
+
+  sample_output: >
+    Type ITRANS sequences: 'a' → अ, 'aa' → आ, 'ka' → क, 'kaa' → का, etc.
+    The keyboard expands ASCII into Devanagari in real time. Multi-keystroke
+    sequences (context rules) handle length vowels, retroflex consonants, and
+    nasals. Type phonetically; the keyboard handles the script conversion.
+
+skeleton:
+  kmn_template: |
+    c Mnemonic spelling / transliteration ({{language}})
+    c {{sourceKeyboard}} pattern
+
+    store(&VERSION) '10.0'
+    store(&NAME) '{{keyboardName}}'
+    store(&TARGETS) 'any'
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+    c Base characters (single keystrokes)
+    {{baseCharacterRules}}
+
+    c Length / variant rules (context-sensitive, longer sequences first)
+    {{contextRules}}
+
+    c Fallback (optional; suppress or emit invalid sequences)
+    {{fallbackRule}}
+
+  note: >
+    Each base rule follows: `+ 'sequence' > U+XXXX`
+    Each context rule follows: `U+XXXX + 'sequence' > U+YYYY` (match prior context)
+
+    Order matters: longer sequences first. Example:
+      U+0905 + 'a' > U+0906      c aa → ā
+      + 'a' > U+0905             c a → अ
+
+    If you omit the second rule, single 'a' will never match anything.
+
+  parameters:
+    - id: language
+      description: >
+        Language name (e.g., "Hindi", "Sanskrit", "Devanagari IPA").
+    - id: sourceKeyboard
+      description: >
+        Reference keyboard this pattern is based on.
+        Example: release/itrans/itrans_devanagari_hindi/source/itrans_devanagari_hindi.kmn
+    - id: keyboardName
+      description: >
+        Display name for the keyboard being authored.
+        Example: "Hindi ITRANS"
+    - id: baseCharacterRules
+      description: >
+        One rule per transliteration base sequence. Format (one per line):
+        + 'sequence' > U+XXXX   c description
+
+        Example for ITRANS:
+        + 'a' > U+0905   c अ schwa
+        + 'i' > U+0907   c इ short i
+        + 'u' > U+0909   c उ short u
+        + 'k' > U+0915   c क
+        + 'g' > U+0917   c ग
+        + 'R' > U+0943   c ṛ retroflex
+    - id: contextRules
+      description: >
+        Context-sensitive rules for multi-keystroke sequences (length, variants).
+        IMPORTANT: longer sequences must come BEFORE their prefixes.
+
+        Example for ITRANS (order matters!):
+        U+0905 + 'a' > U+0906   c a + a → आ (long a)
+        U+0907 + 'i' > U+0908   c i + i → ई (long i)
+        U+0909 + 'u' > U+090A   c u + u → ऊ (long u)
+    - id: fallbackRule
+      description: >
+        Optional: what happens if the user types an invalid sequence?
+        Suppress silently: any(allKeys) > nul
+        Emit as-is: any(allKeys) > context(1)
+        Beep + suppress: any(allKeys) > context(1) beep
