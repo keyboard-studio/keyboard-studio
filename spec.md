@@ -443,7 +443,9 @@ flowchart TD
 
 **Encoding.** The tree may be encoded as JSON/TS rules in `packages/contracts` or reasoned over by the LLM directly against this table; both are valid (pick per studio architecture). The strategy selector returns `{ primary: strategyId, secondaries: strategyId[] }`, which the gallery resolves to patterns via the `strategyId` / `combinesWith` fields (Sec 5).
 
-### 7.3 Strategy catalog (S-01..S-12)
+**Touch keyboards and S-13.** The rules above are desktop-oriented — they model character-entry strategies driven by the A1–A7 axis vector. Touch keyboards need an additional structural choice: a dedicated layer-switch key that swaps the entire visible keyboard layout (default, shift, numeric, symbol, alt-script). This is not an A1–A7 character-entry strategy; it is a touch layout feature. Any touch keyboard with more than one named layer uses **S-13 Touch layer switch** as a structural wrapper alongside whichever character-entry strategy (S-01–S-09) governs the content of each layer. S-13 is chosen outside this decision tree, triggered by the presence of multiple entries in the touch layout's `"layer":` array.
+
+### 7.3 Strategy catalog (S-01..S-13)
 
 Each card is self-contained and citable by ID. Snippets are verbatim from `keymanapp/keyboards` (paths shown). The **Pattern mapping** line ties the card to the library: a pattern with that `strategyId` is what the gallery surfaces when the tree selects this strategy.
 
@@ -469,8 +471,8 @@ group(main) using keys
 
 **When to use:** A1 ∈ {small, medium}, A4=stacking-combining, A3=strong. User types a diacritic-naming key (`'`, `` ` ``, `:`) then a base letter.
 **When to avoid:** When the diacritic should *replace* a previous one (S-07); when many families explode the table (S-06).
-**Combines well with:** S-04 (collapse the post-deadkey table); S-08 (when the trigger needs RAlt).
-**Pattern mapping:** `strategyId: "S-02"`; `combinesWith: ["S-04", "S-08"]`. (This is the Sec 6 worked example, `latin_deadkey_acute_single`.)
+**Combines well with:** S-04 (collapse the post-deadkey table); S-08 (when the trigger needs RAlt); S-11 (when the keyboard toggles between orthographic variants at runtime).
+**Pattern mapping:** `strategyId: "S-02"`; `combinesWith: ["S-04", "S-08", "S-11"]`. (This is the Sec 6 worked example, `latin_deadkey_acute_single`.)
 
 ```
 store(graveK) 'aeiouAEIOU'
@@ -534,8 +536,8 @@ dk(family) + any(K_lc1) > index(lc1, 2)
 
 **When to use:** A4=multi-family AND A1=large; or alphabetic scripts where one base key has multiple legitimate outputs and the next key disambiguates. First key picks the *family*, second the *base*.
 **When to avoid:** A single diacritic family (S-02 suffices); when the user can't predict the family key.
-**Combines well with:** S-04 (essential for the per-family table), S-08 (RAlt to host the family keys).
-**Pattern mapping:** `strategyId: "S-06"`; `combinesWith: ["S-04", "S-08"]`.
+**Combines well with:** S-04 (essential for the per-family table), S-08 (RAlt to host the family keys), S-11 (when the keyboard toggles between orthographic variants at runtime).
+**Pattern mapping:** `strategyId: "S-06"`; `combinesWith: ["S-04", "S-08", "S-11"]`.
 
 ```
 + [K_LBRKT]                > dk(family_grave)
@@ -651,6 +653,38 @@ nomatch       > call(DLLFunction)
 
 **Real exemplar:** `release/c/cs_pinyin/source/cs_pinyin.kmn` — 100k+ Han characters via Pinyin lookup, delegated to a Windows DLL.
 
+#### S-13 Touch layer switch
+
+**When to use:** Any touch keyboard with more than one named layer (numeric, symbol, alt-script, shift-alternate). The switch key uses `"nextlayer":` in the Keyman touch layout JSON to swap the visible layer — no KMN rules are required for the layer switch itself.
+**When to avoid:** Desktop-only keyboards; single-layer touch keyboards.
+**Combines well with:** S-01, S-02, S-03, S-05, S-06, S-07, S-08, S-09 — whichever character-entry strategy governs the content within each layer. S-13 is structural: it wraps the content strategy rather than replacing it.
+**Pattern mapping:** `strategyId: "S-13"`; `combinesWith: []` (the pattern document leaves the choice of content strategy to the author — any S-01–S-09 combination is valid).
+
+```json
+{
+  "layer": [
+    { "id": "default", "row": [
+        { "id": 1, "key": [
+            { "id": "K_A", "text": "a" },
+            { "id": "T_switch_num", "text": "123", "sp": 1, "nextlayer": "numbers" }
+          ]
+        }
+      ]
+    },
+    { "id": "numbers", "row": [
+        { "id": 1, "key": [
+            { "id": "T_1", "text": "1" },
+            { "id": "T_switch_def", "text": "ABC", "sp": 1, "nextlayer": "default" }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Real exemplar:** `release/sil/sil_ipa/source/sil_ipa.keyman-touch-layout` — five named layers (`default`, `shift`, `numeric`, `diacritic`, `supersub`); dedicated switch keys on each layer use `"nextlayer":` to navigate the full layer set.
+
 ### 7.4 Building blocks
 
 Applied **inside** the strategies above, never chosen independently. The studio invokes them as a keyboard grows.
@@ -713,6 +747,14 @@ Note: S-04 (`any`/`index` table mechanism) is structurally embedded in every S-0
 
 These two remaining mismatches are **the value of the validation pass** — they pinpoint where v1 needs work before release. They are not v1 blockers: EuroLatin and IPA are expert-authored, well outside the target user's profile, and the strategies the tree picks (S-06 for EuroLatin, S-05 for IPA) produce working keyboards even if they differ from what SIL chose.
 
+**Touch strategy validation (S-13).** S-13 is not reached by the desktop decision tree above — it is selected whenever a touch keyboard's layout JSON defines more than one named layer. The A1–A7 axes do not apply; the confirmation criterion is simply the presence of `"nextlayer":` on one or more keys.
+
+| Exemplar | Touch layers | S-13 confirmed |
+|----------|--------------|----------------|
+| `release/sil/sil_ipa/` | 5 layers: `default`, `shift`, `numeric`, `diacritic`, `supersub` | ✓ |
+| `release/sil/sil_khmer/` | 4 layers: `default`, `shift`, `ctrl-alt`, `shift-ctrl-alt` | ✓ |
+| `release/sil/sil_hebrew/` | 4 layers: `default`, `shift`, `rightalt`, `rightalt-shift` | ✓ |
+
 ---
 
 ## 8. Data flow
@@ -721,9 +763,18 @@ These two remaining mismatches are **the value of the validation pass** — they
 
 2. **Scaffolding.** Project scaffolder duplicates the chosen base into an in-memory virtual FS, applies the full template-cleanup pipeline (identity reset, NCAPS strip, `[CAPS]` deletion, `&CasedKeys` insertion, touch-layout cleanup), and runs Layer C hygiene. The scaffolded project is clean-by-construction before the user touches anything.
 
-3. **Survey — Phase A (Identity + routing).** User enters language name, BCP47 tag (with langtags.json lookup), display name, copyright holder. System detects script group (QWERTY/QWERTZ, AZERTY, or non-Roman) from BCP47 + base choice and confirms with the user. This routes all subsequent phases. Phase A also surfaces v1's desktop-first authoring posture (Decision 6, Sec 14) — mobile-primary authors are notified that the survey is anchored to physical-keyboard mental-model answers before they invest survey time. The touch layout is still produced in Phase E.
+3. **Survey — Phase A (Identity + routing).** User enters language name, localized language name (autonym), BCP47 tag (with langtags.json lookup), display name, copyright holder. System detects script group (QWERTY/QWERTZ, AZERTY, or non-Roman) from BCP47 + base choice and confirms with the user. This routes all subsequent phases. Phase A also surfaces v1's desktop-first authoring posture (Decision 6, Sec 14) — mobile-primary authors are notified that the survey is anchored to physical-keyboard mental-model answers before they invest survey time. The touch layout is still produced in Phase E. Phase A optionally collects **provenance metadata** (`KeyboardProvenance` in `@keyboard-studio/contracts`) — requester identity and contact, language-community representative, speaker count, language status, regions, existing tools, orthography link, casing notes, and free-form notes (the intake fields carried over from the legacy manual request form). Provenance is **non-gating**: it never blocks a phase exit or the submit button, and is serialized into the package / PR body for attribution and contact at output (Sec 12), never into the `.kmn`. The localized name is the one provenance field that may also feed a build artifact (the `.kps` / `welcome.htm` display). This is metadata capture only — it is distinct from the out-of-scope triage tool (Sec 16) and implies no request queue or assignment workflow.
 
 4. **Survey — Phase B (Character coverage + strategy axes).** User pastes or lists target characters. Studio diffs against the base keyboard output set and, for each new character, the user states which key it lives on and under what modifier. Crucially, this phase also **computes the discovery axes** (Sec 7.1): the character count fixes A1 (scale), the diff and a few plain-language follow-ups fix A3 (phonetic intuition), A4 (diacritic behavior), and A7 (spare-key availability). The output method is **not** assumed to be simple substitution — Phase B feeds the axis vector to the strategy selector (Sec 7.2), which picks the right strategy. A simple one-key-per-character swap (S-01) is only the result when the inventory is tiny and phonetic; larger or diacritic-heavy inventories route to deadkey composition (S-02), mnemonic spelling (S-05), diacritic cycling (S-07), context-sensitive clusters (S-09), and so on.
+
+To seed this phase the studio offers several **character-discovery** methods (`CharacterDiscoveryService`). No single source is assumed available, so the methods are complementary and the inventory may be built from any combination:
+
+- **Manual** — list the characters by hand. Always available.
+- **Text sample** — paste a corpus; the studio grapheme-segments it, ranks the distinct characters by frequency, and diffs them against the base output set.
+- **Linguist agent** (the orthography / authoritative-source method) — given the language name + BCP47 tag, an LLM linguist agent synthesizes a structured, NFC-normalized inventory from CLDR `exemplarCharacters` cross-referenced with orthography references (language academies, Omniglot, trusted corpora). It returns core and auxiliary alphabets (with case pairs), mandatory diacritic/ligature bundles, language-specific punctuation, and numerals — usually the single most reliable signal for which characters a language needs. A **deterministic CLDR cross-check** then flags divergences (a character the agent added that CLDR/orthography don't attest; a CLDR-attested character the agent dropped), and the result is presented to the user for confirmation — never trusted silently. The prompt template lives in `docs/prompts/character-inventory-linguist.md`; the structured result is the `LinguistInventory` contract type.
+- **Visual picker** — browse a script-scoped grid (seeded from the language's CLDR exemplar characters, falling back to the script's Unicode block) and click the characters to include. This is the fallback when the author has neither text nor a language the agent can resolve.
+
+Whatever the method, the result pre-fills the target-character inventory, which the user confirms or edits; the strategy selector (Sec 7.2) then runs over the confirmed set. Discovery is **character enumeration only** — no wordlist or prediction model is built (Sec 16); frequency, where a method provides it, is advisory and may hint key placement. (The picker and the linguist agent's cross-check reuse the same pinned Unicode/CLDR signal as the kbgen placement seeder.) **Normalization note:** the linguist inventory is NFC for character identification and display; how the keyboard normalizes its *output* (e.g. the NFD reorder auto-emitted for Latin groups in Phase C' below) is a separate, later concern and is not constrained by the inventory's NFC form.
 
 5. **Gallery — Phase C (Special inputs).** Driven by the strategy selector's result (primary + secondaries, Sec 7.2). The gallery surfaces the **recommended strategy's** patterns first as live mini-keyboards (e.g. a deadkey demo for S-02, a tone-cycle demo for S-07); secondary and less-common strategies sit behind "show me more." This phase also resolves the remaining axes that need a judgment call — A5 (multi-mode), A6 (constraint enforcement), and A2a (cluster sensitivity) — which can add S-11, S-10, or S-09 to the recommendation. User taps each demo, confirms the ones that match their language, and fills plain-language slot questions. Each selected pattern is inserted as a validated KMN skeleton tagged with its `strategyId`.
 
@@ -869,7 +920,7 @@ Compiled artifacts (`.kmx`, `.kvk`, `.js`) are produced by the in-browser compil
 
 ### Two delivery modes
 
-**Download `.zip`.** The virtual FS is serialized to a zip archive. A `NEXT_STEPS.md` is appended explaining how to submit to `keymanapp/keyboards`. Works without a GitHub account.
+**Download `.zip`.** The virtual FS is serialized to a zip archive. A `NEXT_STEPS.md` is appended explaining how to submit to `keymanapp/keyboards`; any supplied provenance metadata (Sec 8 Phase A) is rendered into `NEXT_STEPS.md` for the submitter's reference. Works without a GitHub account.
 
 **GitHub OAuth fork+PR.** User authenticates via GitHub OAuth (`public_repo` scope). Studio forks `keymanapp/keyboards` under the user's account, creates branch `add/<id>`, commits the virtual FS source tree (no compiled artifacts), and opens a draft PR. The PR body is auto-generated:
 
@@ -877,6 +928,7 @@ Compiled artifacts (`.kmx`, `.kvk`, `.js`) are produced by the in-browser compil
 - Yellow items: listed by criteria.md section with the relevant field values the studio emitted.
 - Red items: listed as a manual checklist for the author to complete.
 - Copyright attestation: "I confirm I am the copyright holder or am authorized to submit on behalf of `<holder>`."
+- Provenance metadata (when supplied): requester and language-community contact, speaker count, language status, regions, orthography link, and notes — rendered for reviewer context. Non-gating; never written into the `.kmn` source.
 
 ---
 
@@ -899,7 +951,7 @@ Compiled artifacts (`.kmx`, `.kvk`, `.js`) are produced by the in-browser compil
 - Pattern library (mining, curation, slot parameterization, test vectors)
 - Survey question text (all `prompt` strings in PatternQuestion)
 - Gallery ordering and "show me more" threshold decisions
-- LLM prompt templates and grounding context (Keyman reference index build)
+- LLM prompt templates and grounding context (Keyman reference index build); prompt templates live in `docs/prompts/` (e.g. the Phase B character-inventory linguist agent, `docs/prompts/character-inventory-linguist.md`)
 - criteria.md triage: assigning final green/yellow/red classification to each checkpoint
 
 ### Day-1 joint session (blocking — parallel work cannot start until resolved)
@@ -998,7 +1050,7 @@ Rationale: The strategy framework (Sec 7) and the seven discovery axes (Sec 7.1)
 - **Multi-language `welcome.htm` variants** — LLM-generated variants for multiple languages; post-v1.
 - **Editing existing keyboards** — the studio creates new keyboards from a base; it does not support round-tripping or editing an uploaded `.kmn`.
 - **`.kpj.user` or build-folder management beyond what the scaffolder strips** — cleanup is one-time at scaffold time.
-- **Predictive text / wordlists (`.model.ts`)** — the strategy catalog (Sec 7) covers input rules only; lexical models are a separate artifact, post-v1.
+- **Predictive text / wordlists (`.model.ts`)** — the strategy catalog (Sec 7) covers input rules only; lexical models are a separate artifact, post-v1. (A pasted text sample *is* used in Phase B for **character discovery** — enumerating which characters the keyboard must support — which is in scope, Sec 8. Only the wordlist / frequency *model* is deferred.)
 - **Migration of legacy binary keyboards** — the studio authors from KMN sources; it does not import compiled `.kmx`/`.kmn` binaries.
 
 Note: touch/mobile layouts and `.kmp`/`.kvks`/`.keyboard_info` generation are **in** scope (Phases E, D, G) — the strategy framework (Sec 7) was originally drafted physical-keyboard-only, but in the studio it is the desktop-rule layer of the full pipeline (see Sec 7 scope note).

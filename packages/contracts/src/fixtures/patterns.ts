@@ -5,7 +5,8 @@ import type { Pattern } from "../pattern";
 
 /**
  * The spec §6 worked example: latin deadkey producing accented characters.
- * Strategy S-02 (deadkey), commonly combines with S-04 (RAlt layer).
+ * Strategy S-02 (deadkey), commonly combines with S-04 (collapse the post-deadkey table), S-08 (NFD reorder),
+ * and S-11 (shift-accessed).
  * Category "desktop" — lives in the desktop gallery.
  */
 export const latinDeadkeyAcuteSingle: Pattern = makePattern({
@@ -16,7 +17,7 @@ export const latinDeadkeyAcuteSingle: Pattern = makePattern({
   category: "desktop",
   appliesTo: [],
   strategyId: "S-02",
-  combinesWith: ["S-04"],
+  combinesWith: ["S-04", "S-08", "S-11"],
   questions: [
     {
       id: "triggerKey",
@@ -34,36 +35,91 @@ export const latinDeadkeyAcuteSingle: Pattern = makePattern({
       id: "baseLetters",
       prompt: "Which base letters take this accent?",
       answerType: "char-list",
+      default: "aeiouAEIOU",
     },
     {
       id: "accentedForms",
       prompt: "List the accented forms in the same order as the base letters.",
       answerType: "char-list",
+      default: "áéíóúÁÉÍÓÚ",
+    },
+    {
+      id: "descriptionOfAccent",
+      prompt: "Optional: short human-readable name for this accent (shown in documentation and UI).",
+      answerType: "text",
+      default: "acute",
+      required: false,
     },
   ],
   kmnFragment:
-    "store(dk_acute_bases)  '{{baseLetters}}'\n" +
-    "store(dk_acute_output) '{{accentedForms}}'\n\n" +
-    "+ [{{triggerKey}}] > deadkey(acute)\n" +
-    "deadkey(acute) + any(dk_acute_bases) > index(dk_acute_output, 2)\n" +
-    "deadkey(acute) + [{{triggerKey}}] > '{{accentChar}}'\n",
+    "c ---- S-02 Single deadkey stores -----------------------------------------------\n" +
+    "c Both stores MUST have the same element count; the scaffolder enforces this at\n" +
+    "c Layer A slot-fill validation (spec §10 Check #1).\n" +
+    "store(dk_bases)  '{{baseLetters}}'\n" +
+    "store(dk_output) '{{accentedForms}}'\n\n" +
+    "group(main) using keys\n\n" +
+    "c ---- Trigger key arms the deadkey -------------------------------------------\n" +
+    "c Pressing {{triggerKey}} alone commits nothing; it arms a deadkey state.\n" +
+    "+ [{{triggerKey}}] > deadkey(accent)\n\n" +
+    "match > use(deadkeys)\n\n" +
+    "group(deadkeys) using keys\n\n" +
+    "c ---- Resolution: deadkey + base letter → accented form -----------------------\n" +
+    "c The deadkey followed by a character in dk_bases produces the precomposed output.\n" +
+    "c index() offset N=2: position 1 is the deadkey() context, position 2 is any(dk_bases).\n" +
+    "c Output is precomposed NFC (no combining sequences).\n" +
+    "deadkey(accent) + any(dk_bases) > index(dk_output, 2)\n\n" +
+    "c ---- Double-press: trigger key pressed twice --------------------------------\n" +
+    "c Pressing the trigger key twice produces the bare combining accent.\n" +
+    "c This rule must appear BEFORE the generic notany() fallback so it fires first.\n" +
+    "deadkey(accent) + [{{triggerKey}}] > '{{accentChar}}'\n\n" +
+    "c ---- Fallback: unrecognized key after the trigger ----------------------------\n" +
+    "c notany() matches any key NOT in dk_bases. context(2) restores the unmatched key\n" +
+    "c after the trigger character, implementing the \"restore on miss\" pattern.\n" +
+    "c This allows the trigger character to fall through to normal output when followed\n" +
+    "c by any non-base letter.\n" +
+    "deadkey(accent) + notany(dk_bases) > '{{accentChar}}' context(2)\n",
   touchLayoutFragment:
-    '{\n  "sk": [\n    { "id": "{{accentChar}}", "text": "{{accentChar}}" }\n  ]\n}\n',
+    '{\n  "id": "{{triggerKey}}",\n  "sk": [\n    { "id": "{{accentChar}}", "text": "{{accentChar}}" }\n  ]\n}\n',
   tests: [
     {
       input: ["K_QUOTE", "K_A"],
-      expectedOutput: "á", // a-acute
+      expectedOutput: "á",
       description: "apostrophe + a produces a-acute (U+00E1)",
     },
     {
       input: ["K_QUOTE", "K_E"],
-      expectedOutput: "é", // e-acute
+      expectedOutput: "é",
       description: "apostrophe + e produces e-acute (U+00E9)",
     },
     {
+      input: ["K_QUOTE", "K_I"],
+      expectedOutput: "í",
+      description: "apostrophe + i produces i-acute (U+00ED)",
+    },
+    {
+      input: ["K_QUOTE", "K_O"],
+      expectedOutput: "ó",
+      description: "apostrophe + o produces o-acute (U+00F3)",
+    },
+    {
+      input: ["K_QUOTE", "K_U"],
+      expectedOutput: "ú",
+      description: "apostrophe + u produces u-acute (U+00FA)",
+    },
+    {
       input: ["K_QUOTE", "K_QUOTE"],
-      expectedOutput: "́", // bare combining acute on double-tap
-      description: "double-tap trigger emits the bare combining accent",
+      expectedOutput: "́",
+      description: "double-tap trigger emits the bare combining acute (U+0301)",
+    },
+    {
+      input: ["K_QUOTE", "K_SPACE"],
+      expectedOutput: "́ ",
+      description: "apostrophe + space: space is not in baseLetters, so fallback rule fires producing combining accent + space",
+    },
+    {
+      input: ["K_QUOTE", "K_B"],
+      expectedOutput: "́b",
+      description: "apostrophe + b (not in baseLetters): fallback rule outputs combining accent + literal b",
     },
   ],
   validatedForFamilies: ["Latn"],
@@ -72,7 +128,7 @@ export const latinDeadkeyAcuteSingle: Pattern = makePattern({
     "release/sil/sil_euro_latin",
   ],
   reviewedBy: "keyboard-studio-content-team",
-  reviewDate: "2026-06-02",
+  reviewDate: "2026-06-04",
 });
 
 /**
@@ -144,6 +200,9 @@ export const nfdNormalization: Pattern = makePattern({
     "// NFD reorder group — canonical combining-mark sort\n" +
     "// Generated by the scaffolder for QWERTY/QWERTZ targets; adjust\n" +
     "// the class list below for your script's combining mark set.\n",
+  // NOTE: this reorderRules value is a contract-shape stub, NOT valid KMN —
+  // kmc-kmn has no reorder() function. See content/patterns/reorder/nfd-latin.yaml
+  // for the authoritative, compile-verified KMN implementation (group + match).
   reorderRules:
     "reorder(from({{combiningMarks}}) before(\\uFFFD) order(0))\n",
   tests: [

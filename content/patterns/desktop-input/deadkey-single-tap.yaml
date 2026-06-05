@@ -1,0 +1,196 @@
+# deadkey-single-tap.yaml
+# Spec §5/§6 worked example — highest-priority desktop pattern (issue #23)
+# Strategy: S-02 deadkey composition (+ S-04 parallel-store lookup)
+
+id: deadkey_single_tap
+title: "Tap-and-add accent"
+description: >
+  Press an accent key (e.g. apostrophe), then a base letter — the accent key
+  disappears and an accented character appears in its place. Pressing the
+  accent key twice in a row produces the bare combining accent mark itself.
+category: desktop
+appliesTo: []
+priority: 1
+group_visibility: any
+strategyId: "S-02"
+combinesWith: ["S-04"]
+
+questions:
+  - id: triggerKey
+    prompt: "Which key starts the accent? (e.g. apostrophe, backtick, caret)"
+    answerType: key-name
+    default: "K_QUOTE"
+
+  - id: deadkeyName
+    prompt: >
+      Internal name for this deadkey state (e.g. "acute", "grave", "circum").
+      Use letters and underscores only — it becomes a KMN identifier.
+    answerType: text
+    default: "acute"
+
+  - id: baseLetters
+    prompt: >
+      Which base letters take this accent? Type them without spaces.
+      Example: aeiouAEIOU
+    answerType: char-list
+
+  - id: accentedForms
+    prompt: >
+      The accented forms in the same order as the base letters above.
+      Example: áéíóúÁÉÍÓÚ
+    answerType: char-list
+
+  - id: accentChar
+    prompt: >
+      The bare accent mark emitted when the trigger key is pressed twice
+      (e.g. U+0301 for combining acute, U+0300 for combining grave).
+    answerType: char-single
+    default: "́"
+
+kmnFragment: |
+  store(dk_{{deadkeyName}}_bases)  '{{baseLetters}}'
+  store(dk_{{deadkeyName}}_output) '{{accentedForms}}'
+
+  + [{{triggerKey}}] > deadkey({{deadkeyName}})
+  deadkey({{deadkeyName}}) + any(dk_{{deadkeyName}}_bases) > index(dk_{{deadkeyName}}_output, 2)
+  deadkey({{deadkeyName}}) + [{{triggerKey}}] > '{{accentChar}}'
+
+touchLayoutFragment: |
+  {
+    "sk": [
+      { "id": "{{accentChar}}", "text": "{{accentChar}}" }
+    ]
+  }
+
+reorderRules: null
+
+tests:
+  - input: ["K_QUOTE", "K_A"]
+    expectedOutput: "á"
+    description: "apostrophe + a produces a-acute (U+00E1)"
+  - input: ["K_QUOTE", "K_E"]
+    expectedOutput: "é"
+    description: "apostrophe + e produces e-acute (U+00E9)"
+  - input: ["K_QUOTE", "K_O"]
+    expectedOutput: "ó"
+    description: "apostrophe + o produces o-acute (U+00F3)"
+  - input: ["K_QUOTE", "K_QUOTE"]
+    expectedOutput: "́"
+    description: "double-tap trigger emits the bare combining acute (U+0301)"
+  - input: ["K_A"]
+    expectedOutput: "a"
+    description: "plain a without deadkey produces a unchanged"
+
+validatedForFamilies: ["Latn"]
+sourceKeyboards:
+  - "release/sil/sil_euro_latin"
+  - "release/basic/basic_kbdfr"
+  - "release/sil/sil_cameroon_qwerty"
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-06-04"
+
+# ---------------------------------------------------------------------------
+# Extended metadata — YAML-only; not part of the TypeScript Pattern interface
+# ---------------------------------------------------------------------------
+
+frequency_in_corpus: "12/20 scanned keyboards use S-02 (6 as primary strategy, 6 as secondary)"
+
+provenance:
+  - keyboard: "release/sil/sil_euro_latin/source/sil_euro_latin.kmn"
+    line: 130
+    rule: '"'"'"' dk(1) + any(acuteK) > index(acuteO, 3)'
+    note: >
+      Apostrophe as acute deadkey trigger; parallel-list lookup over all accented vowels
+      and consonants. 92 dk() rules total. Primary S-02 example in the spec §6 writeup.
+  - keyboard: "release/basic/basic_kbdfr/source/basic_kbdfr.kmn"
+    lines: [171, 201]
+    rules:
+      - "+ [K_LBRKT] > dk(005e)   c circumflex trigger"
+      - "dk(005e) any(dkf005e) > index(dkt005e, 2)   c circumflex output"
+    note: >
+      French keyboard — bracket key as circumflex prefix; output via parallel stores.
+      Shows virtual-key trigger form vs. string-literal trigger in sil_euro_latin.
+  - keyboard: "release/sil/sil_cameroon_qwerty/source/sil_cameroon_qwerty.kmn"
+    lines: [226, 353]
+    rules:
+      - "+ [K_COLON] > dk(003b)   c tone/diacritic trigger"
+      - "dk(003b) any(dkf003b) > index(dkt003b, 2)   c output"
+    note: >
+      Cameroon QWERTY — colon as diacritic prefix for Cameroonian General Alphabet
+      characters (open vowels, hooked letters). Secondary S-02 in an S-08-primary keyboard.
+
+demo:
+  filled_kmn: |
+    c Demo: Single-tap deadkey acute accent
+    c Press ' then a base letter to add an acute accent.
+    c Press '' (apostrophe twice) to emit a bare combining acute (U+0301).
+
+    store(&VERSION) '10.0'
+    store(&NAME) 'Deadkey Acute Demo'
+    store(&TARGETS) 'any'
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+
+    store(acuteK) 'aeiouAEIOU'
+    store(acuteO) 'áéíóúÁÉÍÓÚ'
+
+    + [K_QUOTE] > deadkey(acute)
+    deadkey(acute) + any(acuteK) > index(acuteO, 2)
+    deadkey(acute) + [K_QUOTE] > U+0301
+
+  sample_keys:
+    - keys: ["'", "a"]
+      output: "á"
+      note: "apostrophe then a — a-acute"
+    - keys: ["'", "e"]
+      output: "é"
+      note: "apostrophe then e — e-acute"
+    - keys: ["'", "o"]
+      output: "ó"
+      note: "apostrophe then o — o-acute"
+    - keys: ["'", "'"]
+      output: "́"
+      note: "apostrophe twice — bare combining acute"
+
+  sample_output: >
+    Type ' then a to get á.
+    Type ' then e to get é.
+    Type ' then o to get ó.
+    Type '' (apostrophe twice) to get the bare combining acute mark.
+
+skeleton:
+  kmn_template: |
+    store(dk_{{deadkeyName}}_bases)  '{{baseLetters}}'
+    store(dk_{{deadkeyName}}_output) '{{accentedForms}}'
+
+    + [{{triggerKey}}] > deadkey({{deadkeyName}})
+    deadkey({{deadkeyName}}) + any(dk_{{deadkeyName}}_bases) > index(dk_{{deadkeyName}}_output, 2)
+    deadkey({{deadkeyName}}) + [{{triggerKey}}] > '{{accentChar}}'
+
+  parameters:
+    - id: triggerKey
+      description: >
+        Virtual-key name for the accent trigger key (e.g. K_QUOTE for apostrophe,
+        K_BKQUOTE for backtick, K_6 for caret). The user presses this first; it
+        produces no visible output until the following key is pressed.
+    - id: deadkeyName
+      description: >
+        Internal identifier for this deadkey state (e.g. "acute", "grave", "circum").
+        Must be a valid KMN identifier — letters and underscores only. Each distinct
+        deadkey in the same keyboard must have a unique name to avoid rule conflicts.
+    - id: baseLetters
+      description: >
+        The base characters that accept this accent, as a plain string without spaces
+        (e.g. "aeiouAEIOU"). Order must exactly match accentedForms. Layer A enforces
+        equal store lengths between baseLetters and accentedForms.
+    - id: accentedForms
+      description: >
+        The accented output characters in the same order as baseLetters
+        (e.g. "áéíóúÁÉÍÓÚ"). One precomposed character per base letter, no spaces.
+    - id: accentChar
+      description: >
+        The bare combining accent emitted when the trigger key is pressed twice
+        (e.g. U+0301 for combining acute, U+0300 for combining grave). Ensures the
+        trigger punctuation mark can still be typed by pressing it twice in a row.

@@ -28,6 +28,10 @@ Language experts know their language's phonology, orthography, and character inv
 | [`strategy tree/`](strategy%20tree/) | The original standalone `.kmn` strategy reference — now **merged into [`spec.md` §7](spec.md#7-strategy-selection)** and retained only as a stub. |
 | [`CLAUDE.md`](CLAUDE.md) | Orientation for working in this repo with Claude Code. |
 
+## Local development
+
+**Local development:** Run `pnpm -r build` before `pnpm -r typecheck` or `pnpm -r test` — the engine and studio packages resolve types from `contracts/dist/` which only exists after building.
+
 ## Scope (v1)
 
 In scope: physical + touch keyboard layouts, package generation (`.kps`/`.kvks`/`.keyman-touch-layout`), the QWERTY/QWERTZ, AZERTY, and Non-Roman script groups. Out of scope for v1: CJK and Ethiopic reorder patterns, LDML output, predictive-text wordlists, and editing existing keyboards. See [`spec.md` §16](spec.md#16-out-of-scope) for the full list.

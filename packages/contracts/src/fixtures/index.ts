@@ -4,3 +4,4 @@ export * from "./baseKeyboards";
 export * from "./patterns";
 export * from "./lintFindings";
 export * from "./compileResults";
+export * from "./provenance";

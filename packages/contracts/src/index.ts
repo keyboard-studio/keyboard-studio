@@ -7,9 +7,11 @@ export * from "./axes";
 export * from "./baseKeyboard";
 export * from "./compileResult";
 export * from "./criteria";
+export * from "./linguistInventory";
 export * from "./lintFinding";
 export * from "./pattern";
 export * from "./patternMatch";
+export * from "./provenance";
 export * from "./strategy";
 export * from "./surveyPhaseResult";
 export * from "./virtualFS";
@@ -20,6 +22,7 @@ export * from "./virtualFS";
 // for fixture-driven UI work. Alphabetized.
 // ---------------------------------------------------------------------------
 export * from "./baseBrowser";
+export * from "./characterDiscovery";
 export * from "./compiler";
 export * from "./lintEngine";
 export * from "./outputService";

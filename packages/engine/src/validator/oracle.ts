@@ -32,16 +32,15 @@ import { runLexicalChecks } from "./index.js";
 
 function severityRank(s: LintFinding["severity"]): number {
   switch (s) {
-    case "fatal":
-      return 0;
-    case "error":
-      return 1;
-    case "warning":
-      return 2;
-    case "hint":
-      return 3;
-    case "info":
-      return 4;
+    case "fatal":   return 0;
+    case "error":   return 1;
+    case "warning": return 2;
+    case "hint":    return 3;
+    case "info":    return 4;
+    default: {
+      const _exhaustive: never = s;
+      throw new Error(`Unexpected severity: ${String(_exhaustive)}`);
+    }
   }
 }
 
@@ -224,9 +223,20 @@ export function _createOracle(
   if (handle === null) {
     return makeOracle(() =>
       Promise.reject(
-        new OracleLoadError("test seam: WASM disabled", "wasm-fetch-failed")
+        new OracleLoadError("test seam: WASM disabled", "wasm-load-failed")
       )
     );
   }
   return makeOracle(() => Promise.resolve(handle));
+}
+
+/**
+ * Test seam — construct an oracle backed by a caller-supplied LoadHandle.
+ * Bypasses the default `loadWasmOracle()` while still exercising the lazy
+ * init + catch-then-degrade path inside `makeOracle()`. Use this to test
+ * loader failure modes (e.g. a loader that rejects with a typed
+ * OracleLoadError vs. a generic Error).
+ */
+export function _createOracleWithLoader(load: LoadHandle): OracleInstance {
+  return makeOracle(load);
 }

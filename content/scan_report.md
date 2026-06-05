@@ -1,9 +1,9 @@
-# Corpus scan — 20 representative Keyman keyboards
+# Corpus scan — 22 representative Keyman keyboards
 
 ## Purpose
 
-This scan documents twenty real Keyman keyboards as the empirical groundwork for the keyboard
-studio. The goal is to show, in plain language, *which real-world keyboards solve which writing-system
+This scan documents twenty-two real Keyman keyboards as the empirical groundwork for the keyboard
+studio (plus a small set of deliberately rough keyboards, documented separately below). The goal is to show, in plain language, *which real-world keyboards solve which writing-system
 problems and how* — so the pattern library and the strategy catalog in [spec.md](../spec.md) (§5, §7)
 are built from observed practice rather than invented in the abstract. The notes are written for a
 **linguist audience**: each keyboard's day-to-day behaviour is described in ordinary words, and the
@@ -12,17 +12,19 @@ the top of each entry.
 
 ## Selection basis
 
-The keyboards were **handpicked by popularity** — ranked by monthly download counts on
-keyman.com — so the scan reflects the layouts people actually use. All twenty were nominated as
-"clean" examples to start from. Each was then read in full from the local source clone at
-`keymanapp/keyboards` (`release/<bucket>/<id>/source/<id>.kmn`) and classified against the spec.
+The core set was **handpicked by popularity** — ranked by monthly download counts on
+keyman.com — so the scan reflects the layouts people actually use. All twenty popularity picks were
+nominated as "clean" examples to start from; two further AZERTY keyboards (French Basic, Akebu) were
+added afterwards as targeted coverage, bringing the representative set to twenty-two. Each was then
+read in full from the local source clone at `keymanapp/keyboards`
+(`release/<bucket>/<id>/source/<id>.kmn`) and classified against the spec.
 
 ## Coverage summary
 
 | Group (spec §9) | Count | Keyboards |
 |---|---|---|
 | QWERTY/QWERTZ | 9 | EuroLatin, Cameroon QWERTY, Naija Type, Philippines, Tchad QWERTY, Uganda-Tanzania, Eastern Congo, Umatilla Sahaptin, Yorùbá with Dot |
-| AZERTY | 1 | Cameroon AZERTY |
+| AZERTY | 3 | Cameroon AZERTY, French Basic, Akebu |
 | Non-Roman | 10 | GFF Amharic, SIL Ethiopic Power-G (syllabary); Tamil99, Remington GAIL (Indic); Myanmar3, Khmer NIDA, Nulisa Aksara Jawa (SEA Brahmic); Pak Urdu, Saraiki (Arabic/RTL); Plains Cree (Canadian syllabics) |
 
 **Scripts represented:** Latin (Europe, Francophone & Anglophone Africa, the Philippines, Pacific
@@ -32,18 +34,43 @@ Syllabics. **Strategies observed:** S-01 through S-10 from the spec §7 catalog 
 (stateful orthography toggle) shows up only in passing as touch-layer state; S-12 (logographic IME
 callout) does not appear because no CJK keyboard is in the popular set.
 
+**Known-rough set (negative fixtures for `@keymanapp/keyboard-lint`):** 5 keyboards — 4 from
+`experimental/` and 1 from `release/` (clavbur9, showing that hygiene issues reach release too) —
+all Layer-A valid (they compile and run — rough, not broken). Criteria exercised:
+
+| Criterion | Description | Keyboards |
+|---|---|---|
+| 1.11 | committed `.kpj.user` developer-state file | clavbur9 |
+| 1.12 | compiled `build/` outputs committed in the source tree | clavbur9 |
+| 3.6 | HISTORY.md top version != .kmn version | elfdalian |
+| 4.5 | LICENSE.md copyright line malformed | elfdalian, gff_geez_emufi, wancho, alkelang, clavbur9 |
+| 5.2 | Version string embedded in user-facing doc | elfdalian, gff_geez_emufi, wancho, alkelang |
+| 6 | readme.htm missing from source/ | gff_geez_emufi, alkelang |
+| 7.2 | targets lists platforms alongside `any` | elfdalian |
+
+Groups covered: QWERTY/QWERTZ Latin (elfdalian), mobile-touch Latin (alkelang), AZERTY-mnemonic
+(clavbur9), Non-Roman syllabary/abugida (gff_geez_emufi: Ethiopic; wancho: Wancho script).
+
 ### Two intentional gaps relative to the issue's literal coverage targets
 
 The popularity-driven selection does not hit two of the originally suggested minimums. They are
 recorded openly here rather than papered over, so a follow-up pass can fill them:
 
-1. **AZERTY breadth.** Only one AZERTY keyboard (Cameroon AZERTY) made the popular cut. The Francophone
-   Africa AZERTY family is large (e.g. the Senegal, Mali and Tchad AZERTY keyboards) and additional
-   examples can be added if AZERTY-specific coverage is needed.
-2. **"Known-rough" examples.** All twenty were chosen as clean references, and on inspection none is
-   outright defective. Four carry small, honestly-noted caveats (flagged `clean (caveat: …)` below),
-   but a couple of deliberately *rough* keyboards should be scanned later to exercise the linter's
-   negative cases.
+1. **AZERTY breadth.** This gap is now closed. The popularity cut surfaced only one AZERTY keyboard
+   (Cameroon AZERTY), so two further AZERTY examples were added as targeted coverage beyond the
+   original popularity-ranked twenty: **French Basic** (basic_kbdfr — the plain machine-imported
+   French AZERTY base) and **Akebu** (sil_akebu — an AZERTY base extended for a Kwa language of Togo).
+   Both are documented below alongside Cameroon AZERTY, bringing AZERTY coverage to three. A mnemonic
+   Burkina Faso keyboard (clavbur9) is also documented, in the Known-rough section, as an AZERTY-region
+   rough example.
+2. **"Known-rough" examples.** All twenty-two clean keyboards were chosen as positive references; none
+   is outright defective. This gap is now closed: four deliberately rough keyboards from
+   `keymanapp/keyboards experimental/` — elfdalian, gff_geez_emufi, wancho, alkelang — have been
+   scanned with `scan_hygiene.py` and documented in the [Known-rough keyboards](#known-rough-keyboards)
+   section below. Together they exercise criteria {3.6, 4.5, 5.2, 6, 7.2} and serve as the
+   negative-fixture corpus for `@keymanapp/keyboard-lint`. A fifth keyboard, hong_kong (3.6:
+   HISTORY '2.1' != .kmn '2.2'), is reserved as a second version-skew example if additional
+   coverage is needed.
 
 ### How to read each entry
 
@@ -285,6 +312,78 @@ clean example with an authored copyright and a worked typing example in its pack
 
 # Non-Latin-script keyboards
 
+## sil_cameroon_azerty
+- **Display name / downloads:** Cameroon AZERTY — 2,233/mo
+- **Language(s) / script:** Latin script with the General Alphabet of Cameroonian Languages, on a French AZERTY base
+- **Group:** AZERTY
+- **Strategy:** S-08 RAlt modifier-layer (+ S-06 chained deadkeys, + S-02 deadkey composition, + S-04 parallel-store lookup, + S-10 constraints + beep)
+- **Axes:** A1=medium · A2=alphabetic · A3=strong · A4=multi-family · A6=loud (beep) · A7=fully-booked
+- **Quality:** clean (caveat: legacy NCAPS/CAPS rule pairs on the slash key, lines 264-267)
+- **Source:** release/sil/sil_cameroon_azerty/source/sil_cameroon_azerty.kmn
+
+This is the French-keyboard counterpart to Cameroon QWERTY, for the very large population of Cameroon
+that learned typing on a French AZERTY layout. The base follows AZERTY conventions — A and Q are
+swapped, Z and W are swapped, and the digit row produces French accented letters and symbols directly
+(sil_cameroon_azerty.kmn lines 40-99, 101, 182). As with its sibling, the right-hand Alt key opens a
+plane of African letters (lines 102-230), and special tone and accent marks sit on the bracket and
+quote keys. Its most distinctive feature is a richer two-step "dead key" system inherited from French
+typing: pressing a French accent key first, then a vowel, composes letters such as ã, ñ, ê or ä through
+several paired lookup tables (lines 366-400), and an exclamation-mark prefix opens a large general
+character menu. Invalid combinations beep (e.g. lines 43, 86, 233). It is well-built — proper cased
+keys (line 11), populated copyright, named author and website — though it still carries a pair of older
+explicit Caps-Lock-state rules on the slash key (lines 264-267) that modern keyboards usually handle
+automatically, hence the minor caveat.
+
+*(This keyboard is listed here, alongside its script peers, as the first of the scan's three AZERTY
+examples; it is Latin-script and shares the General Alphabet of its QWERTY sibling above. The two
+keyboards below — French Basic and Akebu — complete the AZERTY coverage.)*
+
+## basic_kbdfr
+- **Display name / downloads:** French Basic — release; download count not checked
+- **Language(s) / script:** French and other Western European languages; Latin script on a French AZERTY base
+- **Group:** AZERTY
+- **Strategy:** S-01 simple swap (machine-imported base) + S-02 deadkey composition
+- **Axes:** A1=small · A2=alphabetic · A3=weak · A4=stacking-combining (precomposed NFC via four dead keys) · A5=single · A6=none · A7=few
+- **Quality:** clean (caveat: machine import from Windows KBDFR.DLL — complete and correct, but carries no authored design comment and ships a generated rather than hand-designed touch layout)
+- **Source:** release/basic/basic_kbdfr/source/basic_kbdfr.kmn
+
+French Basic is Keyman's direct import of the French national keyboard (Windows KBDFR.DLL), giving
+French speakers a faithful AZERTY layout on any platform. It is one of the simplest keyboards in this
+set: each key maps to a fixed character and the only compositional mechanism is four dead keys. The
+defining AZERTY signature is present — the physical Q key types *a* and the physical A key types *q*
+(basic_kbdfr.kmn lines 65, 114) — and on the unshifted digit row the French accented vowels appear
+directly: à on [0], é on [2], è on [7], ç on [9] (lines 26, 33, 53, 61), with Shift recovering the
+numerals and Right-Alt carrying the programming symbols (braces, brackets, backslash) French coders
+need. The dead keys follow French convention exactly: the circumflex dead (K_LBRKT, line 171)
+composes â/ê/î/ô/û; the diaeresis dead (Shift+K_LBRKT, line 172) composes ä/ë/ï/ö/ü; the tilde
+(RALT+K_2, line 35) and grave (RALT+K_7, line 55) deads cover ã/ñ/õ and à/è/ì. All output is
+precomposed NFC. It is a clean, functionally complete baseline AZERTY example; its only limitation as
+a reference is that, being machine-generated, it contains no authored rationale and demonstrates only
+the simplest strategy.
+
+## sil_akebu
+- **Display name / downloads:** Akebu — release; download count not checked
+- **Language(s) / script:** Akebu (ISO 639-3 keu), a Kwa language of the Ghana–Togo border; Latin script with IPA-based extension letters, on a French AZERTY base
+- **Group:** AZERTY
+- **Strategy:** S-08 RAlt modifier-layer (+ S-01 base swap, + S-06 chained `!` deadkey prefix, + S-04 parallel-store lookup)
+- **Axes:** A1=small · A2=alphabetic · A3=weak · A4=stacking-combining (combining marks typed after the letter) · A5=single · A6=soft (selective beep on listed impossible combinations) · A7=fully-booked
+- **Quality:** clean (caveat: README copyright reads "SIL Cameroon" though the language is Akebu of Togo; one unresolved "??" comment at line 54; HISTORY.md is a single-entry stub)
+- **Source:** release/sil/sil_akebu/source/sil_akebu.kmn
+
+Akebu is a Kwa language of the Ghana–Togo border region whose SIL orthography needs a set of IPA-based
+vowels and consonants alongside the standard French AZERTY base. The keyboard keeps the full AZERTY
+layout intact — the A/Q swap (sil_akebu.kmn lines 101, 181), the French digit-row accents and the RALT
+programming symbols all behave as a French typist expects — so nothing familiar is lost. The
+language-specific letters live on the Right-Alt plane: RALT+Q gives ɛ (line 102), RALT+O gives ɔ (line
+173), RALT+N gives ŋ (line 168), RALT+I gives ɩ, RALT+D gives ɖ, RALT+U gives ʊ, with Shift+RALT
+supplying the capitals. For characters that do not fit that plane, the slash key becomes a "!" dead-key
+prefix (line 261) and the next keystroke is looked up in a large parallel store (lines 326-328),
+opening dozens more characters in two keystrokes — a mechanism the French welcome.htm explains for
+users. Tone and accent marks (grave, acute, caron, circumflex) are typed after the letter and stack as
+raw combining marks rather than precomposed forms, which suits the language's tone-marking but means
+downstream text must tolerate NFD sequences. It is a clean, well-built AZERTY example for a minority
+African language.
+
 ## gff_amharic
 - **Display name / downloads:** GFF Amharic — 5,362/mo
 - **Language(s) / script:** Amharic (አማርኛ) in the Ethiopic / Geʾez (Fidel) syllabary, plus Ethiopic numerals and punctuation
@@ -497,3 +596,160 @@ the Windows layout rather than a hand-crafted design, which is why it makes no a
 keying mistakes. The honest caveat is that, being a minimal machine import, its own package notes steer
 users toward the smarter Khmer Angkor keyboard, which auto-corrects errors. Technically it is still tidy
 — proper copyright, real version and a Khmer display map (lines 16-18).
+
+---
+
+# Known-rough keyboards
+
+These four keyboards are approved as negative-fixture references for the keyboard-lint validator
+(`@keymanapp/keyboard-lint`). Each is Layer-A valid — the keyboard compiles and runs correctly —
+but carries one or more hygiene flags that the linter's Layer-C checks should catch and FAIL.
+They come from `keymanapp/keyboards experimental/` and were detected with `content/tools/scan_hygiene.py`,
+which encodes the green-band (deterministic) checks of [criteria.md](../docs/criteria.md); flag
+strings below are quoted verbatim from `content/hygiene_report.csv`.
+
+The lint fixtures themselves are deferred until `@keymanapp/keyboard-lint` is scaffolded (the package
+does not yet exist). When it is, each fixture's `criterionId` must match the criteria catalog exactly
+(e.g. `3.6`, `4.5`, `5.2`, `6`/`6.1-readme-htm-exists`, `7.2`), one finding per tripped criterion.
+
+## elfdalian
+- **Display name / downloads:** Övdalsk — experimental; no keyman.com download count
+- **Language(s) / script:** Elfdalian (Övdalsk), a conservative North Germanic variety spoken in Älvdalen, Dalarna, Sweden; Latin script with a large inventory of ogonek and ring-ogonek letters (ą, ą̊, ę, į, ų and capitals) plus eth (Đ)
+- **Group:** QWERTY/QWERTZ
+- **Strategy:** S-08 Alt modifier-layer (+ S-01 simple swap on the remapped bracket key)
+- **Axes:** A1=small · A2=alphabetic · A3=weak (positional Alt-layer) · A4=none (precomposed output) · A6=none · A7=Alt layer only
+- **Quality:** rough
+- **Rough:** 3.6 — HISTORY.md top version '1.05' != .kmn version '1.0.5'
+- **Rough:** 4.5 — LICENSE.md has no well-formed copyright line
+- **Rough:** 5.2 — version string 'Version 1.05' embedded in README.md
+- **Rough:** 7.2 — targets lists `mobile` alongside `any`
+- **Scan flag:** green · `HISTORY.md top version '1.05' != .kmn version '1.0.5'`
+- **Scan flag:** green · `LICENSE.md has no well-formed 'Copyright © <year> <holder>' line`
+- **Scan flag:** green · `version number embedded in user-facing README.md ('Version 1.05')`
+- **Scan flag:** green · `targets lists platforms alongside 'any': 'any mobile'`
+- **Lint expectation:** FAIL `3.6`, `4.5`, `5.2`, `7.2`
+- **Source:** experimental/e/elfdalian/source/elfdalian.kmn
+
+Elfdalian is a highly archaic North Germanic variety spoken by a few thousand people in the Älvdalen
+municipality of Dalarna, Sweden. Its orthography preserves vowels and consonants lost from standard
+Swedish, including several ogonek letters, a ring-ogonek (ą̊) and the eth (Đ). The keyboard maps these
+special letters onto Alt-modified positions of an otherwise standard QWERTY layout (elfdalian.kmn
+lines 27-40), and reassigns the bracket key to produce å directly. Because each key emits a single
+precomposed character, the design is effectively a positional swap reached through an Alt plane — close
+to S-01 in spirit, layered via S-08. The header records that it began as a Google Input Tools
+conversion (line 1). It is a perfectly usable keyboard, but it shows four independent hygiene problems
+at once, which makes it the richest single negative fixture: the changelog version '1.05' is written
+differently from the source's '1.0.5'; the licence file lacks the exact `Copyright © <year> <holder>`
+line; the README repeats the version number; and the targets line says `any mobile`, where `any`
+already covers mobile.
+
+## gff_geez_emufi
+- **Display name / downloads:** Geʾez EMUFI — experimental; no keyman.com download count
+- **Language(s) / script:** Geʾez (Classical Ethiopic, ISO 639-2 gez) in the Ethiopic Fidel syllabary; companion to the EMUFI "Geʾez Manuscript Zemen" font, which carries manuscript letter-forms not yet in Unicode
+- **Group:** Non-Roman (syllabary / abugida)
+- **Strategy:** S-05 mnemonic transliteration (+ S-03 sequence replace for consonant+vowel reshaping)
+- **Axes:** A1=large · A2=syllabary · A2a=yes · A3=strong (phonetic Latin input) · A4=none · A5=single · A6=none · A7=fully-booked
+- **Quality:** rough
+- **Rough:** 4.5 — LICENSE.md has no well-formed copyright line
+- **Rough:** 5.2 — version 'Version 1.0' in README.md *and* 'v1.2' in source/welcome.htm (two-source inconsistency)
+- **Rough:** 6 — readme.htm missing from source/
+- **Scan flag:** green · `LICENSE.md has no well-formed 'Copyright © <year> <holder>' line`
+- **Scan flag:** green · `version number embedded in user-facing README.md ('Version 1.0')`
+- **Scan flag:** green · `version number embedded in user-facing source/welcome.htm ('v1.2')`
+- **Scan flag:** green · `readme.htm missing from source/ (shown on package install)`
+- **Lint expectation:** FAIL `4.5`, `5.2` (×2 — README and welcome.htm), `6`
+- **Source:** experimental/gff/gff_geez_emufi/source/gff_geez_emufi.kmn
+
+Geʾez is the classical liturgical language of the Ethiopian and Eritrean Orthodox Tewahedo churches,
+written in the Ethiopic Fidel syllabary shared with Amharic and Tigrinya. This keyboard accompanies the
+EMUFI manuscript-font project, which supplies punctuation, numeral forms and letter variants found in
+manuscripts but not yet standardised in Unicode. Input follows the standard Geʾez Frontier Foundation
+mnemonic convention: the typist enters a consonant's Latin sound followed by a vowel, and the keyboard
+replaces the pair with the correct Ethiopic syllable. Because the target font uses some Private Use Area
+codepoints for manuscript-only forms, the keyboard belongs in `experimental/`. Its roughness is mostly
+documentary: the licence file lacks the exact copyright line, and the version number is stated in two
+user-facing places that disagree — the README says 'Version 1.0' while welcome.htm says 'v1.2'. It is
+also missing `source/readme.htm`, so the package-install splash would be blank.
+
+## wancho
+- **Display name / downloads:** Wancho — experimental; no keyman.com download count
+- **Language(s) / script:** Wancho, a Tibeto-Burman language of Arunachal Pradesh and Nagaland, NE India; Wancho script (Unicode U+1E2C0–U+1E2FF, added in Unicode 12.0)
+- **Group:** Non-Roman (alphabetic, direct map)
+- **Strategy:** S-01 simple swap (one Wancho character per key, no context rules)
+- **Axes:** A1=small · A2=alphabetic · A3=weak (positional map) · A4=none · A6=none · A7=fully-booked
+- **Quality:** rough
+- **Rough:** 4.5 — LICENSE.md has no well-formed copyright line
+- **Rough:** 5.2 — version string 'Version 1.0' embedded in README.md
+- **Scan flag:** green · `LICENSE.md has no well-formed 'Copyright © <year> <holder>' line`
+- **Scan flag:** green · `version number embedded in user-facing README.md ('Version 1.0')`
+- **Lint expectation:** FAIL `4.5`, `5.2`
+- **Source:** experimental/w/wancho/source/wancho.kmn
+
+Wancho is spoken by roughly fifty thousand people in the hill districts of Arunachal Pradesh and
+Nagaland in northeast India. Its script was devised by community scholar Banwang Losu and added to
+Unicode in version 12.0 (2019). The keyboard is a straightforward direct mapping — each physical key
+produces a fixed Wancho letter, digit or punctuation mark, with Shift giving variant forms — so it is
+pure S-01 with no context rules or dead keys. That simplicity makes it a clean negative fixture for
+file-level hygiene without any engine-complexity noise. Two issues are present: the licence file lacks
+the required `Copyright © <year> <holder>` line, and the README embeds the version string 'Version
+1.0'. The `.kmn` copyright store reads `© 2020 Banwang Losu` — the symbol is there but the literal word
+"Copyright" is absent, exactly the pattern the 4.5 check targets.
+
+## alkelang
+- **Display name / downloads:** Àlkèláŋg — experimental; no keyman.com download count
+- **Language(s) / script:** Bafut (bfd) and related Cameroonian Grassfields languages; Latin script with IPA extensions (ɓ, ɗ, ɛ, ɔ, ŋ and others) for tone-language phonetics
+- **Group:** QWERTY/QWERTZ (mobile-first; the header calls it an AZERTY mobile/tablet layout, but the `.kmn` is a touch-layout keyboard with no hardware base rules)
+- **Strategy:** S-08 modifier/layer (touch layers: default, shift, numeric, IPA) with an S-10 layer-state PostKeystroke group
+- **Axes:** A1=small · A2=alphabetic · A3=strong (phonetic IPA layer) · A4=none · A5=multi (numeric + IPA layers) · A6=soft · A7=fully-booked (touch layers)
+- **Quality:** rough
+- **Rough:** 4.5 — LICENSE.md has no well-formed copyright line
+- **Rough:** 5.2 — version string 'Version : 1.0' embedded in README.md
+- **Rough:** 6 — readme.htm missing from source/
+- **Scan flag:** green · `LICENSE.md has no well-formed 'Copyright © <year> <holder>' line`
+- **Scan flag:** green · `version number embedded in user-facing README.md ('Version : 1.0')`
+- **Scan flag:** green · `readme.htm missing from source/ (shown on package install)`
+- **Lint expectation:** FAIL `4.5`, `5.2`, `6`
+- **Source:** experimental/a/alkelang/source/alkelang.kmn
+
+Àlkèláŋg is a touch-first keyboard for Bafut, a Grassfields Bantu language of the North West Region of
+Cameroon, and related languages of the same area. The `.kmn` header describes it as an "AZERTY mobile
+et tablet" layout with suggestions, authored by SOSA Developments under the MIT licence. In practice it
+is primarily a touch keyboard: it provides a full IPA extension layer reached by a dedicated layer key,
+giving typists the phonetic letters (ɓ, ɗ, ɛ, ɔ, ŋ and others) that the General Alphabet of Cameroonian
+Languages requires (alkelang.kmn stores `ipa_keys` / `ipa_shift_keys`), and a PostKeystroke group keeps
+the keyboard on the correct layer after each keypress. As the second Latin-script keyboard in the rough
+set it complements elfdalian. Three documentary issues are present: the licence holder is written
+`(C) NIBANN ENGINEERING` with no `©` and no year; the README embeds 'Version : 1.0'; and
+`source/readme.htm` is missing.
+
+## clavbur9
+- **Display name / downloads:** Clavier du Burkina — release; download count not checked
+- **Language(s) / script:** Languages of Burkina Faso (Mooré, Dioula, Fulfuldé, Gulmancema and others); Latin script with a large IPA extension inventory
+- **Group:** AZERTY (mnemonic / layout-agnostic — see note)
+- **Strategy:** S-02 deadkey composition (+ S-04 parallel-store prefix lookup, + S-11 schwa-choice toggle, + S-10 mark-ordering constraints + beep)
+- **Axes:** A1=large · A2=alphabetic · A3=weak (mnemonic) · A4=multi-family (stacking combining marks) · A5=multi (schwa-convention toggle) · A6=soft (beep) · A7=fully-booked
+- **Quality:** rough — and notably a `release/` keyboard, showing hygiene issues are not confined to `experimental/`
+- **Rough:** 1.11 — committed `.kpj.user` developer-state file
+- **Rough:** 1.12 — committed `build/` outputs in the source tree
+- **Rough:** 4.5 — LICENSE.md has no well-formed `Copyright © <year> <holder>` line
+- **Scan flag:** green · `committed user-state file: clavbur9.kpj.user`
+- **Scan flag:** green · `compiled/build output in source tree: build/clavbur9.js; build/clavbur9.kmx; build/clavbur9.kvk`
+- **Scan flag:** green · `LICENSE.md has no well-formed 'Copyright © <year> <holder>' line`
+- **Lint expectation:** FAIL `1.11`, `1.12`, `4.5`
+- **Source:** release/c/clavbur9/source/clavbur9.kmn
+
+Clavier du Burkina is a mature, much-revised keyboard (nine version generations) serving the many
+language communities of Burkina Faso, whose languages share a common extended-Latin alphabet from the
+Africanist phonetic tradition. Its defining design choice is the mnemonic-layout declaration
+(clavbur9.kmn line 8, `store(&mnemoniclayout) '1'`): rather than hard-coding AZERTY scancodes, it
+follows whatever character is printed on each physical key, so the one file works on French AZERTY and
+US QWERTY machines alike — its own README says "AZERTY or QWERTY," and it is bucketed here as AZERTY
+because its primary audience and French-language welcome page assume an AZERTY keyboard. Special
+letters are reached through two prefix systems: the semicolon prefix (lines 87-91) reaches IPA letters
+(ɓ, ɗ, ɛ, ɔ, ŋ, ʃ, ʋ, ʒ …) and the comma prefix (lines 92-93) reaches rarer ones; diacritics are typed
+after the base letter and a 13-mark system stacks under an ordering group (lines 120-126), including
+the mid-level tone marks Gulmancema needs. A schwa-choice toggle (line 41) lets a community pick
+between the reversed-E and open-E conventions. The keyboard logic is rich and well-commented, but the
+repository state is not clean: it commits binary build outputs (`build/clavbur9.js`, `.kmx`, `.kvk`)
+and a developer-local `clavbur9.kpj.user`, and its LICENSE.md lacks a well-formed copyright line — the
+kind of green-band issues the linter is meant to catch even on a long-published release keyboard.

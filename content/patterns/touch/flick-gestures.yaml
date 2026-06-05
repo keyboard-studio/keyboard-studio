@@ -1,0 +1,206 @@
+# flick-gestures.yaml
+# Touch pattern: swipe a key in a direction to produce a different character.
+# Strategy: S-08 (layer expansion — on touch, directional flicks are a layer variant).
+# Priority 3 — secondary touch gallery pattern.
+
+id: flick_gestures
+title: "Swipe a key in a direction for a different letter"
+description: >
+  Swipe up, down, left, or right on a key to produce a related character
+  without opening a popup. Common on tone-marking and accent keyboards where
+  direction maps naturally to meaning (e.g. swipe up for acute, down for grave).
+category: touch
+appliesTo: []
+priority: 3
+group_visibility: any
+strategyId: "S-08"
+
+questions:
+  - id: hostKey
+    prompt: "Which key carries the flick gestures? (virtual-key name, e.g. K_A)"
+    answerType: key-name
+    default: "K_A"
+
+  - id: flickUp
+    prompt: >
+      Character produced by swiping UP on this key.
+      Leave empty if no up-flick is needed.
+    answerType: char-single
+    required: false
+
+  - id: flickDown
+    prompt: >
+      Character produced by swiping DOWN on this key.
+      Leave empty if no down-flick is needed.
+    answerType: char-single
+    required: false
+
+  - id: flickLeft
+    prompt: >
+      Character produced by swiping LEFT on this key.
+      Leave empty if no left-flick is needed.
+    answerType: char-single
+    required: false
+
+  - id: flickRight
+    prompt: >
+      Character produced by swiping RIGHT on this key.
+      Leave empty if no right-flick is needed.
+    answerType: char-single
+    required: false
+
+kmnFragment: |
+  c Flick gestures are defined entirely in the touch-layout JSON (flick objects).
+  c No KMN rules are required for this pattern.
+
+touchLayoutFragment: |
+  {
+    "id": "{{hostKey}}",
+    "flick": {
+      "n": { "id": "U_{{flickUp_cp}}", "text": "{{flickUp}}" },
+      "s": { "id": "U_{{flickDown_cp}}", "text": "{{flickDown}}" }
+    }
+  }
+  c Note: include only the directions that are filled. The engine omits
+  c entries for empty optional slots. Add "e"/"w"/"ne"/"nw"/"se"/"sw"
+  c keys to the flick object for additional directions.
+
+reorderRules: null
+
+tests:
+  - input: ["K_A"]
+    expectedOutput: "a"
+    description: "plain tap on K_A still produces a (flick does not affect tap)"
+
+validatedForFamilies: ["Latn"]
+sourceKeyboards:
+  - "release/t/triqui_itunyoso"
+  - "release/k/komono_ci"
+  - "release/k/khmer_angkor"
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-06-05"
+
+# ---------------------------------------------------------------------------
+# Extended metadata — YAML-only; not part of the TypeScript Pattern interface
+# ---------------------------------------------------------------------------
+
+frequency_in_corpus: "19/~200 scanned touch keyboards use flick blocks; feature is newer and growing"
+
+provenance:
+  - keyboard: "release/t/triqui_itunyoso/source/triqui_itunyoso.keyman-touch-layout"
+    note: >
+      Phone layout (Triqui Itunyoso, Oaxaca, Mexico; BCP47 trq). Author: Kayla Shames.
+      Flicks used for tone accents: K_A flick-n → á (U+00E1), flick-s → à (U+00E0);
+      K_E flick-n → é (U+00E9), flick-s → è (U+00E8); K_I flick-n → í (U+00ED),
+      flick-s → ì (U+00EC). Clean two-direction (n/s) pattern mapping acute (up) and
+      grave (down) across all vowels — the canonical Latin flick example.
+    rule: '"flick": {"n": {"id": "U_00E1", "text": "á"}, "s": {"id": "U_00E0"}}'
+  - keyboard: "release/k/komono_ci/source/komono_ci.keyman-touch-layout"
+    note: >
+      Phone layout (Komono, Côte d'Ivoire; BCP47 kqg). Author: Kirk Rogers.
+      Uses single-direction north flicks to map uncommon Latin characters onto
+      more common keys: U_0269 (ɩ) flick-n → q; U_025B (ɛ) flick-n → k;
+      U_0254 (ɔ) flick-n → l. Shows flick as a fallback-access mechanism for
+      characters that don't fit the main layout.
+    rule: '"flick": {"n": {"text": "q", "id": "U_0071"}}'
+  - keyboard: "release/k/khmer_angkor/source/khmer_angkor.keyman-touch-layout"
+    note: >
+      Phone layout (Khmer Angkor). South flicks used pervasively to expose
+      subscript/coeng forms: K_Q (ឆ) flick-s → ្ឆ (coeng-cha, T_17D2_1786);
+      K_W (ឹ) flick-s → ឺ via shift layer. Demonstrates that flick directions
+      can target a key in another layer (using the "layer" field) rather than
+      emitting a character directly.
+    rule: '"flick": {"s": {"text": "្ឆ", "id": "T_17D2_1786"}}'
+
+demo:
+  filled_kmn: |
+    c Demo: Flick gestures on K_E (acute up, grave down)
+    c Swipe E upward for é, downward for è. Plain tap still produces e.
+    c No KMN rules needed — flick behaviour is in the touch layout JSON.
+
+    store(&VERSION) '10.0'
+    store(&NAME) 'Flick Gestures Demo'
+    store(&TARGETS) 'phone tablet'
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+
+    c (no rules — flick behaviour defined in touch layout JSON below)
+
+  touch_layout_fragment: |
+    {
+      "phone": {
+        "font": "Tahoma",
+        "layer": [
+          {
+            "id": "default",
+            "row": [
+              {
+                "id": 1,
+                "key": [
+                  {
+                    "id": "K_E",
+                    "text": "e",
+                    "flick": {
+                      "n": { "id": "U_00E9", "text": "é" },
+                      "s": { "id": "U_00E8", "text": "è" }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+
+  sample_keys:
+    - keys: ["(swipe E up)"]
+      output: "é"
+      note: "north flick on K_E produces e-acute (U+00E9)"
+    - keys: ["(swipe E down)"]
+      output: "è"
+      note: "south flick on K_E produces e-grave (U+00E8)"
+    - keys: ["K_E"]
+      output: "e"
+      note: "plain tap still produces plain e"
+
+  sample_output: >
+    Swipe E upward to get é (e-acute). Swipe E downward to get è (e-grave).
+    A plain tap on E still produces e.
+
+skeleton:
+  touch_layout_template: |
+    {
+      "id": "{{hostKey}}",
+      "flick": {
+        "n": { "id": "U_{{flickUp_cp}}", "text": "{{flickUp}}" },
+        "s": { "id": "U_{{flickDown_cp}}", "text": "{{flickDown}}" }
+      }
+    }
+
+  direction_keys:
+    - "n"   # north  (swipe up)
+    - "s"   # south  (swipe down)
+    - "e"   # east   (swipe right)
+    - "w"   # west   (swipe left)
+    - "ne"  # northeast
+    - "nw"  # northwest
+    - "se"  # southeast
+    - "sw"  # southwest
+
+  parameters:
+    - id: hostKey
+      description: >
+        Virtual-key name for the key that carries flick gestures
+        (e.g. K_E, K_A, K_N). One skeleton block per key.
+    - id: flickUp
+      description: >
+        Character emitted by a north (upward) swipe. Paired with flickUp_cp
+        (the U_XXXX codepoint form). Omit the "n" entry entirely if unused.
+    - id: flickDown
+      description: >
+        Character emitted by a south (downward) swipe. Omit the "s" entry
+        if unused. Add "e", "w", "ne", "nw", "se", "sw" entries for additional
+        directions following the same {"id": "U_XXXX", "text": "x"} shape.

@@ -2,15 +2,15 @@
 // Thrown by wasmLoader.loadWasmOracle(); caught exactly once inside
 // validateWithOracle() at lazy init. Never re-thrown from validateWithOracle.
 //
-// The `.reason` discriminator lets the SPA distinguish a network failure
-// ("check your connection") from an ABI mismatch ("update your browser")
-// without string-matching the message.
+// The `.reason` discriminator lets the SPA distinguish a module-load
+// failure ("kmc-kmn could not be initialised") from an ABI mismatch
+// ("update your browser") without string-matching the message.
 //
 // See packages/engine/src/validator/oracle.ts for the catch site and
 // degraded-mode policy (KM_WARN_ORACLE_UNAVAILABLE appended once per call).
 
 export type OracleLoadReason =
-  | "wasm-fetch-failed"
+  | "wasm-load-failed"
   | "wasm-instantiate-failed"
   | "abi-mismatch";
 

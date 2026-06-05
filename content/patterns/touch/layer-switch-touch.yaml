@@ -1,0 +1,366 @@
+# layer-switch-touch.yaml
+# Strategy: S-13 Touch layer switch
+# Real exemplars: release/sil/sil_ipa, release/sil/sil_khmer, release/sil/sil_hebrew
+
+id: touch_layer_switch
+title: "Touch Layer Switch"
+description: >
+  A dedicated key that swaps the entire keyboard to a different layer —
+  numbers, symbols, punctuation, or an alternate script — so language experts
+  can offer distinct character sets without crowding the main layout.
+category: touch
+appliesTo: []
+priority: 1
+group_visibility: any
+strategyId: "S-13"
+combinesWith: []
+
+questions:
+  - id: default_layer
+    prompt: >
+      What is the ID of your main (opening) layer? This is the layer users
+      see when the keyboard first appears. Use letters and hyphens only
+      (e.g. "default", "main", "letters").
+    answerType: text
+    default: "default"
+
+  - id: switch_layer
+    prompt: >
+      What is the ID of the secondary layer the switch key leads to?
+      Common choices: "numbers", "symbols", "alt-script".
+    answerType: text
+    default: "numbers"
+
+  - id: switch_key_label
+    prompt: >
+      What text should appear on the key that switches from the main layer
+      to the secondary layer? This is what the user sees and taps (e.g. "123",
+      "?123", "!@#").
+    answerType: text
+    default: "123"
+
+  - id: return_key_label
+    prompt: >
+      What text should appear on the key that returns from the secondary
+      layer to the main layer? (e.g. "ABC", "abc", "Letters").
+    answerType: text
+    default: "ABC"
+
+kmnFragment: |
+  begin Unicode > use(main)
+
+  group(main) using keys
+
+  c Character output rules go here — one rule per custom touch key.
+  c Layer-switch keys need no rules; "nextlayer": in the JSON handles them.
+
+touchLayoutFragment: |
+  {
+    "phone": {
+      "displayUnderlying": false,
+      "layer": [
+        {
+          "id": "{{default_layer}}",
+          "row": [
+            {
+              "id": 1,
+              "key": [
+                { "id": "K_A", "text": "a" }
+              ]
+            },
+            {
+              "id": 2,
+              "key": [
+                {
+                  "id": "T_switch",
+                  "text": "{{switch_key_label}}",
+                  "sp": 1,
+                  "nextlayer": "{{switch_layer}}"
+                },
+                { "id": "K_SPACE", "text": " ", "width": 460 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "{{switch_layer}}",
+          "row": [
+            {
+              "id": 1,
+              "key": [
+                { "id": "T_1", "text": "1" }
+              ]
+            },
+            {
+              "id": 2,
+              "key": [
+                {
+                  "id": "T_return",
+                  "text": "{{return_key_label}}",
+                  "sp": 1,
+                  "nextlayer": "{{default_layer}}"
+                },
+                { "id": "K_SPACE", "text": " ", "width": 460 }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+
+reorderRules: null
+
+tests:
+  - input: ["K_A"]
+    expectedOutput: "a"
+    description: "Letter key on default layer outputs the letter"
+  - input: ["K_1"]
+    expectedOutput: "1"
+    description: "Standard digit key produces its digit regardless of layer"
+  - input: ["K_SPACE"]
+    expectedOutput: " "
+    description: "Space key outputs a space on any layer"
+
+validatedForFamilies: []
+sourceKeyboards:
+  - "release/sil/sil_ipa"
+  - "release/sil/sil_khmer"
+  - "release/sil/sil_hebrew"
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-06-05"
+
+# ---------------------------------------------------------------------------
+# Extended metadata — YAML-only; not part of the TypeScript Pattern interface
+# ---------------------------------------------------------------------------
+
+frequency_in_corpus: >
+  The "nextlayer": property is used in nearly every multi-layer Keyman touch
+  keyboard. All three provenance keyboards define 4–5 layers with dedicated
+  switch keys. Any touch keyboard offering numeric, symbol, or script-alternate
+  characters uses this pattern — it is the structural baseline for touch
+  keyboard design, equivalent in prevalence to what S-02 is for desktop.
+
+provenance:
+  - keyboard: "release/sil/sil_ipa/source/sil_ipa.keyman-touch-layout"
+    lines: [472, 1185, 1198]
+    rules:
+      - '{ "id": "K_A", "text": "a", "nextlayer": "default", "hint": "ae" }'
+      - '{ "id": "T_new_2196", "text": "SupSub", "sp": 1, "nextlayer": "supersub" }'
+      - '{ "id": "T_Diacritic", "text": "diac", "width": 120, "sp": 1, "nextlayer": "diacritic", "hint": "\"" }'
+    note: >
+      IPA (SIL) keyboard — five layers (default, shift, numeric, diacritic, supersub).
+      The key at line 472 shows the auto-return pattern: a regular character key on
+      the shift layer carries "nextlayer": "default" so the keyboard drops back to
+      the default layer after each character is typed. Lines 1185 and 1198 show
+      dedicated switch keys navigating from shift to supersub and diacritic layers
+      respectively. This keyboard is also the canonical S-03 desktop exemplar from
+      spec §7.3 — its touch layout demonstrates S-13 alongside a desktop S-03 strategy.
+
+  - keyboard: "release/sil/sil_khmer/source/sil_khmer.keyman-touch-layout"
+    lines: [187, 270]
+    rules:
+      - '{ "width": 160, "sp": 1, "nextlayer": "shift" }'
+      - '{ "width": 130, "sp": 1, "nextlayer": "ctrl-alt", "sk": [{ "text": "*AltShift*", "id": "K_LCONTROL", "sp": 1, "nextlayer": "shift-ctrl-alt" }] }'
+    note: >
+      Khmer (SIL) keyboard — four layers (default, shift, ctrl-alt, shift-ctrl-alt).
+      Demonstrates that "nextlayer": can appear on both the primary key and on
+      longpress (sk) keys: the ctrl-alt key switches to ctrl-alt on tap but to
+      shift-ctrl-alt on longpress. This allows a single physical key position to
+      reach multiple layers. Covers multi-layer navigation in a non-Latin Brahmic
+      script (km) and several related Khmer-script languages.
+
+  - keyboard: "release/sil/sil_hebrew/source/sil_hebrew.keyman-touch-layout"
+    lines: [242, 323]
+    rules:
+      - '{ "width": "170", "sp": "1", "nextlayer": "rightalt", "sk": [{ "text": "S Alt", "id": "K_RALT", "sp": "1", "nextlayer": "rightalt-shift" }] }'
+      - '{ "width": "190", "sp": "1", "nextlayer": "shift" }'
+    note: >
+      Hebrew (SIL) keyboard — four layers (default, shift, rightalt, rightalt-shift).
+      A Semitic abjad keyboard demonstrating layer switch in a right-to-left script
+      context. The switch key at line 242 navigates to the rightalt layer on tap and
+      to rightalt-shift on longpress; the key at line 323 returns from rightalt to
+      the shift layer. Confirms that "nextlayer": is script-agnostic: it operates
+      identically regardless of text direction (RTL) or script family (abjad).
+
+demo:
+  filled_kmn: |
+    c Demo: Touch Layer Switch — two-layer keyboard (letters + numbers)
+    c Default layer: letter keys. Numbers layer: digit keys.
+    c The switch keys use "nextlayer": in the touch layout JSON.
+    c No KMN rules are needed for the layer switch itself.
+
+    store(&VERSION) '10.0'
+    store(&NAME) 'Touch Layer Switch Demo'
+    store(&TARGETS) 'mobile web'
+    store(&LAYOUTFILE) 'layer_switch_demo.keyman-touch-layout'
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+
+    c Custom touch keys need explicit output rules.
+    + [T_1] > '1'
+    + [T_2] > '2'
+    + [T_3] > '3'
+
+  touch_layout: |
+    {
+      "phone": {
+        "displayUnderlying": false,
+        "layer": [
+          {
+            "id": "default",
+            "row": [
+              {
+                "id": 1,
+                "key": [
+                  { "id": "K_A", "text": "a" },
+                  { "id": "K_B", "text": "b" },
+                  { "id": "K_C", "text": "c" }
+                ]
+              },
+              {
+                "id": 2,
+                "key": [
+                  { "id": "K_LOPT",       "sp": 1, "width": 100 },
+                  { "id": "T_switch_num", "text": "123", "sp": 1, "nextlayer": "numbers" },
+                  { "id": "K_SPACE",      "text": " ",   "width": 300 },
+                  { "id": "K_BKSP",       "sp": 1, "width": 100 },
+                  { "id": "K_ENTER",      "sp": 1, "width": 100 }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "numbers",
+            "row": [
+              {
+                "id": 1,
+                "key": [
+                  { "id": "T_1", "text": "1" },
+                  { "id": "T_2", "text": "2" },
+                  { "id": "T_3", "text": "3" }
+                ]
+              },
+              {
+                "id": 2,
+                "key": [
+                  { "id": "K_LOPT",       "sp": 1, "width": 100 },
+                  { "id": "T_switch_def", "text": "ABC", "sp": 1, "nextlayer": "default" },
+                  { "id": "K_SPACE",      "text": " ",   "width": 300 },
+                  { "id": "K_BKSP",       "sp": 1, "width": 100 },
+                  { "id": "K_ENTER",      "sp": 1, "width": 100 }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+
+  sample_keys:
+    - keys: ["a (default layer)"]
+      output: "a"
+      note: "Tap a on the default layer — letter a"
+    - keys: ["123 (switch)", "1 (numbers layer)"]
+      output: "1"
+      note: "Tap 123 to switch to the numbers layer; tap 1 for digit 1"
+    - keys: ["ABC (switch)"]
+      output: "(layer switch — no character)"
+      note: "Tap ABC to return to the default layer; no character is emitted"
+
+  sample_output: >
+    On the default layer, tap a to type the letter a.
+    Tap 123 to switch to the numbers layer.
+    On the numbers layer, tap 1, 2, or 3 for the digit.
+    Tap ABC to return to the default layer.
+    The layer-switch keys (123 and ABC) produce no character output —
+    they only swap the visible keyboard layout.
+
+skeleton:
+  kmn_template: |
+    begin Unicode > use(main)
+
+    group(main) using keys
+
+    c Add one rule per custom T_ key that should produce a character:
+    c + [T_KEY_ID] > 'character'
+    c
+    c Layer-switch keys need no rules. Their behavior is defined by
+    c "nextlayer": in the touch layout JSON below.
+
+  touch_layout_template: |
+    {
+      "phone": {
+        "displayUnderlying": false,
+        "layer": [
+          {
+            "id": "{{default_layer}}",
+            "row": [
+              { "id": 1, "key": [ ...character keys... ] },
+              {
+                "id": 2,
+                "key": [
+                  {
+                    "id": "T_switch",
+                    "text": "{{switch_key_label}}",
+                    "sp": 1,
+                    "nextlayer": "{{switch_layer}}"
+                  },
+                  { "id": "K_SPACE", "text": " ", "width": 460 }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "{{switch_layer}}",
+            "row": [
+              { "id": 1, "key": [ ...character keys... ] },
+              {
+                "id": 2,
+                "key": [
+                  {
+                    "id": "T_return",
+                    "text": "{{return_key_label}}",
+                    "sp": 1,
+                    "nextlayer": "{{default_layer}}"
+                  },
+                  { "id": "K_SPACE", "text": " ", "width": 460 }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+
+  parameters:
+    - id: default_layer
+      description: >
+        The ID of the opening layer — what the keyboard shows when it first
+        appears. Must match the "id": value of the first "layer": entry in
+        the touch layout JSON. Layer IDs are case-sensitive. Common value: "default".
+
+    - id: switch_layer
+      description: >
+        The ID of the secondary layer the switch key navigates to. Must match
+        the "id": of the target layer entry in the touch layout JSON. The switch
+        key on the default layer sets "nextlayer": to this value. Common values:
+        "numbers", "symbols", "alt-script".
+
+    - id: switch_key_label
+      description: >
+        The text displayed on the forward-switch key (the key that takes the user
+        from the default layer to the secondary layer). Should be short and descriptive
+        so users know what they will find on the next layer (e.g. "123" for digits,
+        "?!#" for punctuation). The switch key should use "sp": 1 to apply special
+        key styling that distinguishes it visually from character keys.
+
+    - id: return_key_label
+      description: >
+        The text displayed on the return key (the key on the secondary layer that
+        takes the user back to the default layer). Should indicate a return to
+        letters or the main layout (e.g. "ABC", "abc", "Letters"). Typically
+        placed in the same bottom-row position as the forward switch key on the
+        default layer for spatial consistency.

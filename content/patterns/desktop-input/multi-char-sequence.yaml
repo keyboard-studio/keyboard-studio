@@ -1,0 +1,195 @@
+# multi-char-sequence.yaml
+# Spec §7.3 S-03 "Sequence Replace" — visible-output digraph collapse.
+# Distinct from the deadkey pattern (S-02): each keystroke is visible,
+# and the run is replaced on the SECOND keystroke via context-match.
+
+id: multi_char_sequence
+title: "Two letters in a row become one character"
+description: >
+  Each key you press shows its normal letter; when you type the second key, the
+  pair already in the buffer is swapped for a single character (type n, then g,
+  and the n becomes ŋ). The visible-output cousin of a deadkey. Use this only
+  when your orthography treats the sequence as a single letter — if the same
+  letters can also be two separate sounds, this would mis-collapse those words.
+category: desktop
+appliesTo: []
+priority: 1
+group_visibility: any
+strategyId: "S-03"
+combinesWith: ["S-04", "S-05"]
+
+questions:
+  - id: firstLetterOut
+    prompt: >
+      What character does the FIRST key produce on its own? (e.g. n) This is
+      matched as the already-typed context, not the key — so use the letter
+      that appears on screen, not a key name.
+    answerType: char-single
+    default: "n"
+
+  - id: secondLetter
+    prompt: >
+      What character does the SECOND key produce on its own? (e.g. g) Typing
+      this letter after the first one fires the collapse.
+    answerType: char-single
+    default: "g"
+
+  - id: collapsedChar
+    prompt: >
+      Which single character should the pair collapse to? (e.g. ŋ — U+014B,
+      LATIN SMALL LETTER ENG)
+    answerType: char-single
+    default: "ŋ"
+
+kmnFragment: |
+  c S-03 visible-output collapse — fires on the 2nd keystroke; the left side
+  c matches the previously-output glyph, so there is no separate trigger key.
+  c Assumes a `group(main) using keys` host group (the standard scaffold), where
+  c each unmatched key prints its own letter first.
+  '{{firstLetterOut}}' + '{{secondLetter}}' > '{{collapsedChar}}'
+
+touchLayoutFragment: |
+  {
+    "sk": [
+      { "id": "{{collapsedChar}}", "text": "{{collapsedChar}}" }
+    ]
+  }
+
+reorderRules: null
+
+tests:
+  - input: ["K_N", "K_G"]
+    expectedOutput: "ŋ"
+    description: "n then g collapses to eng (U+014B)"
+  - input: ["K_N", "K_Y"]
+    expectedOutput: "ɲ"
+    description: "second demo sequence: n then y collapses to n-with-left-hook (U+0272)"
+  - input: ["K_N"]
+    expectedOutput: "n"
+    description: "first keystroke alone stays the plain letter — the visible partial state"
+  - input: ["K_N", "K_O"]
+    expectedOutput: "no"
+    description: "a non-matching second key leaves the run uncollapsed"
+  - input: ["K_G"]
+    expectedOutput: "g"
+    description: "the second letter alone, with no preceding n, does not collapse"
+
+validatedForFamilies: ["Latn"]
+sourceKeyboards:
+  - "release/athinkra/athinkra_vai"
+  - "release/sil/sil_ipa"
+  - "release/sil/sil_yoruba_dot"
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-06-04"
+
+# ---------------------------------------------------------------------------
+# Extended metadata — YAML-only; not part of the TypeScript Pattern interface
+# ---------------------------------------------------------------------------
+
+frequency_in_corpus: >
+  Bare-digraph collapse is attested directly in athinkra_vai (Vai Latin) and is
+  idiomatic across African Latin orthographies. The wider S-03 family —
+  context-match against previously-output characters — uses the `context`
+  primitive found in 235 / 1026 scanned keyboards (content/scan_summary.md).
+
+provenance:
+  - keyboard: "release/athinkra/athinkra_vai/source/athinkra_vai.kmn"
+    lines: [42, 331]
+    rules:
+      - '"n" + "g" > U+014B   c the literal ng -> ŋ collapse'
+      - '"n" + "y" > U+0272   c ny -> ɲ, the same mechanic'
+    note: >
+      The canonical bare-digraph collapse. Both sides are character literals: the
+      left matches the previously-output glyph, the right is the second keystroke.
+      In its `group(Umain) using keys` group each letter prints first, then the
+      pair is replaced on the second key — exactly the visible-output behavior.
+  - keyboard: "release/sil/sil_ipa/source/sil_ipa.kmn"
+    lines: [104, 363, 404]
+    rules:
+      - "store(greatU) ... U+014B ...   c ŋ lives in the suffix output table"
+      - 'any(greatD) + ">"  > index(greatU, 1)   c suffix-triggered sequence replace'
+    note: >
+      The spec's named S-03 exemplar (spec §7.3). Same context-match-on-prior-output
+      mechanic, but with an ASCII suffix (`>`) as the second key instead of a bare
+      letter. Anchors this pattern in the S-03 strategy family.
+  - keyboard: "release/sil/sil_yoruba_dot/source/sil_yoruba_dot.kmn"
+    lines: [105, 166, 216]
+    rules:
+      - "'gb' + [K_BKSP] > nul   c delete a multi-codepoint cluster as one unit"
+    note: >
+      Optional companion building block. When a collapse produces MORE than one
+      codepoint, add a rule like this so backspace removes the whole cluster in one
+      press. Not needed for single-codepoint outputs such as ŋ / ɲ, where the
+      default backspace already deletes the character.
+
+demo:
+  filled_kmn: |
+    c Demo: multi-character sequence collapse (visible output, fires on 2nd key)
+    c In a "using keys" group each key prints its own letter; the context rule
+    c then swaps the pair for a single character on the second keystroke.
+
+    store(&VERSION) '10.0'
+    store(&NAME) 'Multi-char Sequence Demo'
+    store(&KEYBOARDVERSION) '1.0'
+    store(&TARGETS) 'any'
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+
+    c n + g collapses to U+014B (LATIN SMALL LETTER ENG)
+    'n' + 'g' > U+014B
+    c n + y collapses to U+0272 (LATIN SMALL LETTER N WITH LEFT HOOK)
+    'n' + 'y' > U+0272
+
+  sample_keys:
+    - keys: ["n"]
+      output: "n"
+      note: "first key — the plain letter is visible while you decide"
+    - keys: ["n", "g"]
+      output: "ŋ"
+      note: "second key g — the n is replaced by ŋ"
+    - keys: ["n", "y"]
+      output: "ɲ"
+      note: "second key y — the n is replaced by ɲ"
+    - keys: ["n", "o"]
+      output: "no"
+      note: "o does not collapse — the n stays as a plain letter"
+
+  sample_output: >
+    Type n to see n. Type n then g to get ŋ. Type n then y to get ɲ.
+    Type n then any other letter (e.g. o) and nothing collapses — you get "no".
+    On a touch keyboard, the preferred path is to long-press the n key and pick ŋ
+    directly (see touchLayoutFragment), rather than typing the digraph.
+
+  # Built clean with kmc build (zero errors, zero warnings) — Keyman Developer 17.
+
+skeleton:
+  kmn_template: |
+    c Fires on the 2nd keystroke; left side matches the previously-output glyph.
+    c Requires a `group(main) using keys` host group.
+    '{{firstLetterOut}}' + '{{secondLetter}}' > '{{collapsedChar}}'
+
+  parameters:
+    - id: firstLetterOut
+      description: >
+        The character the first key already produced (e.g. "n"). Matched as
+        already-typed context on the left of the rule — it must be the output
+        glyph, NOT a virtual-key name, so the collapse is layout-independent.
+    - id: secondLetter
+      description: >
+        The character the second key produces (e.g. "g"). Typing it after
+        firstLetterOut fires the collapse. Also a glyph literal, not a key name —
+        this mirrors the reference keyboard (athinkra_vai) and keeps the rule
+        correct even when a host keyboard remaps physical keys.
+    - id: collapsedChar
+      description: >
+        The single character the pair becomes (e.g. ŋ, U+014B). Usually one
+        precomposed codepoint. If a collapse instead yields multiple codepoints,
+        add a smart-backspace rule (see the sil_yoruba_dot provenance) so a single
+        backspace removes the whole cluster.
+
+  notes: >
+    Add one rule per sequence you want to collapse. For a large table of
+    sequences, combine with S-04 (parallel-store lookup) so the rules read from
+    paired stores instead of one rule per pair (see spec §7.3).

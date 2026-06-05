@@ -7,6 +7,28 @@ export type CriteriaBand =
   | "red-checklist"; // band 4: manual pre-submit checklist
 
 /**
+ * The six DISCUS keyboard-design principles (Durdin, EMDC Online 2023) —
+ * Discoverability, Intuition, Simplicity, Consistency, Usability, Standards.
+ * The two distinct "S" principles disambiguate to `"simplicity"` and
+ * `"standards"`.
+ *
+ * Carried as the optional `principle` tag on a {@link Criterion} so the
+ * section-18 ("Design heuristics (DISCUS)") rows can record which design
+ * principle they operationalize. Pre-existing repo-hygiene criteria leave it
+ * unset.
+ *
+ * @see docs/discus-principles-integration.md
+ * @see docs/keyboard-design-principles.md
+ */
+export type DiscusPrinciple =
+  | "discoverability"
+  | "intuition"
+  | "simplicity"
+  | "consistency"
+  | "usability"
+  | "standards";
+
+/**
  * Fields every band shares.
  */
 interface BaseCriterion {
@@ -15,6 +37,14 @@ interface BaseCriterion {
   /** criteria.md section heading the rule lives under. */
   section: string;
   description: string;
+  /**
+   * The DISCUS design principle this criterion operationalizes, if any.
+   * Populated for the section-18 design-heuristics rows; absent on the
+   * mechanical repo-hygiene criteria that predate the framework.
+   *
+   * @see docs/discus-principles-integration.md
+   */
+  principle?: DiscusPrinciple;
 }
 
 /**

@@ -50,7 +50,7 @@ Options:
 - `content/scan_summary.md` — scan stats, the mobile-verdict tally, and the top-N
   `.kmn` primitives.
 
-> `content/scan_report.md` is a **separate** generated catalog of 20 keyboards.
+> `content/scan_report.md` is a **separate** hand-written catalog of 22 keyboards.
 > It is **not** produced by this script and is never overwritten by it (note `.md`
 > vs this script's `scan_report.csv`).
 

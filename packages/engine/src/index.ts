@@ -41,3 +41,6 @@ export type {
   FetchKeyboardSourceOptions,
   FetchKeyboardSourceResult,
 } from "./loader/fetchKeyboardSourceToVfs.js";
+
+// Issues #46/#47 — output service (zip download + GitHub OAuth fork+PR).
+export { createOutputService, toZip, serializeToZip } from "./output/index.js";

@@ -1,0 +1,38 @@
+c NFD Latin canonical mark-reorder — demo (issue #40)
+c Scenario: a tonal Latin language where the user may type a tone mark
+c (above, CCC 230) BEFORE a dot-below (CCC 220). Canonical order needs the
+c below-mark first; the reorder group corrects it after each keystroke.
+c   'a' + acute(/) + dot-below(.)  ->  a + U+0323 + U+0301
+
+store(&NAME) 'NFD Latin Reorder Demo'
+store(&VERSION) '17.0'
+store(&KEYBOARDVERSION) '1.0'
+store(&TARGETS) 'any'
+
+store(vowels) 'aeiouAEIOU'
+store(nfd_above) U+0301 U+0300 U+0302 U+030C U+0303 U+0304
+store(nfd_below) U+0323 U+0330 U+0331
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [K_A] > 'a'
++ [K_E] > 'e'
++ [K_I] > 'i'
++ [K_O] > 'o'
++ [K_U] > 'u'
+
+c Tone above (slash key): append combining acute
+any(vowels) + [K_SLASH]  > index(vowels, 1) U+0301
+c Dot below (period key): append combining dot-below
+any(vowels) + [K_PERIOD] > index(vowels, 1) U+0323
+c Dot-below typed after a tone-above (non-canonical; fixed by the reorder group)
+U+0301 + [K_PERIOD] > context U+0323
+
+c After each successful key, run the canonical reorder pass
+match > use(nfd_reorder)
+
+group(nfd_reorder)
+c Swap above-mark (pos 1) + below-mark (pos 2) into canonical order
+any(nfd_above) any(nfd_below) > index(nfd_below, 2) index(nfd_above, 1)

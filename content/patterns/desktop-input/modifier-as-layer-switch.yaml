@@ -1,0 +1,175 @@
+# modifier-as-layer-switch.yaml
+# Strategy: S-08 RAlt modifier-layer (spec §7.3) — always a secondary add-on (rule 10)
+# Issue #27 — exposes a held alternate plane of characters (symbols, currency, rare letters).
+
+id: modifier_as_layer_switch
+title: "Hold a key for a hidden layer"
+description: >
+  Adds a second, hidden layer of characters that you reach by holding one extra
+  key while pressing a normal key — like holding it to get currency symbols,
+  punctuation, or rarely-used letters that don't fit on the main keyboard. This
+  is the backbone of European-extended layouts: it is especially central to
+  French-style (AZERTY) keyboards, where the held layer is how you reach
+  €, #, and the { [ ] } brackets.
+category: desktop
+appliesTo: []
+priority: 2
+group_visibility: any
+strategyId: "S-08"
+combinesWith: ["S-02", "S-05", "S-06"]
+
+questions:
+  - id: altgrKeyList
+    prompt: >
+      Which keys should gain a hidden-layer character, and in what order? For
+      each one, pick the base key (such as E, 4, or 5) that you reach by holding
+      the extra-layer key. The order you choose here must match the order of the
+      characters below.
+    answerType: text
+    default: "[RALT K_E][RALT K_4][RALT K_5]"
+
+  - id: altgrOutputList
+    prompt: >
+      The hidden-layer characters, in the same order as the keys above — one
+      character per key, typed without spaces. Example: é€£
+    answerType: char-list
+    default: "é€£"
+
+kmnFragment: |
+  store(altgrKeys)   {{altgrKeyList}}
+  store(altgrOutput) '{{altgrOutputList}}'
+
+  + any(altgrKeys) > index(altgrOutput, 1)
+
+touchLayoutFragment: null
+
+reorderRules: null
+
+tests:
+  - input: ["RALT K_E"]
+    expectedOutput: "é"
+    description: "held layer + e produces e-acute (U+00E9)"
+  - input: ["RALT K_4"]
+    expectedOutput: "€"
+    description: "held layer + 4 produces the euro sign (U+20AC)"
+  - input: ["RALT K_5"]
+    expectedOutput: "£"
+    description: "held layer + 5 produces the pound sign (U+00A3)"
+  - input: ["K_E"]
+    expectedOutput: "e"
+    description: "the same key without the held layer is unchanged"
+
+validatedForFamilies: ["Latn"]
+sourceKeyboards:
+  - "release/sil/sil_cameroon_azerty"
+  - "release/sil/sil_euro_latin"
+  - "release/r/russian_mnemonic_r"
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-06-04"
+
+# ---------------------------------------------------------------------------
+# Extended metadata — YAML-only; not part of the TypeScript Pattern interface
+# ---------------------------------------------------------------------------
+
+frequency_in_corpus: >
+  Recurs as a secondary plane across the AZERTY family (sil_cameroon_azerty,
+  sil_mali_azerty, sil_senegal_bsc_azerty), Euro-Latin, and Cyrillic mnemonic
+  keyboards. Per spec §7.3 it is offered only as a secondary strategy
+  (decision-tree rule 10: A7=fully booked), never as a keyboard's primary.
+
+provenance:
+  - keyboard: "release/sil/sil_cameroon_azerty/source/sil_cameroon_azerty.kmn"
+    lines: [41, 65]
+    rules:
+      - "+ [RALT K_0] > U+0040   c held layer over digit row -> @"
+      - "+ [RALT K_4] > U+007B   c held layer over digit row -> {"
+    note: >
+      AZERTY exemplar. ~150 explicit per-key RALT (and SHIFT RALT) rules build a
+      full second plane over the AZERTY base — digits, brackets, currency, and the
+      Cameroonian extended letters. Per-key form; this pattern collapses the same
+      idea into a parallel store.
+  - keyboard: "release/sil/sil_euro_latin/source/sil_euro_latin.kmn"
+    lines: [35, 265]
+    rules:
+      - 'store(controls-ralt) [RALT "`"][RALT SHIFT "#"] [RALT "."] [RALT ","] ...   c the held-layer key set'
+      - "+ any(controls-ralt) > index(controls, 2) dk(1)   c parallel-store layer mapping"
+    note: >
+      Euro-Latin exemplar, and the direct model for this pattern's KMN: a store of
+      held-key combinations mapped to a parallel output store via any()/index(),
+      rather than one rule per key. (Euro-Latin uses index(...,2) because a context
+      character precedes the match; this pattern's bare form uses index(...,1).)
+  - keyboard: "release/r/russian_mnemonic_r/source/russian_mnemonic_r.kmn"
+    lines: [17, 29]
+    rules:
+      - "+ [SHIFT RALT K_PERIOD] > '»'   c held layer -> guillemet"
+      - "+ [SHIFT RALT K_RBRKT] > '“'    c held layer -> curly quote"
+    note: >
+      The spec §7.3 named S-08 real exemplar. A Cyrillic mnemonic keyboard that uses
+      the held layer for typographic punctuation and superscripts — showing the
+      pattern is script-agnostic, not an AZERTY/Euro-Latin peculiarity.
+
+demo:
+  filled_kmn: |
+    c Demo: hold-layer (AltGr) alternate plane.
+    c Hold the right-hand extra-layer key with a base key to reach a hidden character.
+    c Shows the base layer and the held layer for a small set of keys.
+
+    store(&VERSION) '10.0'
+    store(&NAME) 'AltGr Layer Demo'
+    store(&TARGETS) 'any'
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+
+    c base layer
+    + [K_E] > 'e'
+    + [K_4] > '4'
+    + [K_5] > '5'
+
+    c held layer — the same keys reach the hidden plane
+    store(altgrKeys)   [RALT K_E][RALT K_4][RALT K_5]
+    store(altgrOutput) 'é€£'
+
+    + any(altgrKeys) > index(altgrOutput, 1)
+
+  sample_keys:
+    - keys: ["e"]
+      output: "e"
+      note: "plain e on the base layer"
+    - keys: ["hold + e"]
+      output: "é"
+      note: "held layer + e — e-acute"
+    - keys: ["hold + 4"]
+      output: "€"
+      note: "held layer + 4 — euro sign"
+    - keys: ["hold + 5"]
+      output: "£"
+      note: "held layer + 5 — pound sign"
+
+  sample_output: >
+    Press e to type e. Hold the extra-layer key and press e to get é, 4 to get €,
+    or 5 to get £. The same keys do double duty — one plane plain, one plane held.
+
+skeleton:
+  kmn_template: |
+    store(altgrKeys)   {{altgrKeyList}}
+    store(altgrOutput) '{{altgrOutputList}}'
+
+    + any(altgrKeys) > index(altgrOutput, 1)
+
+  parameters:
+    - id: altgrKeyList
+      description: >
+        The store body listing each held-layer keystroke, written as KMN key
+        combinations back-to-back with no separators, e.g.
+        [RALT K_E][RALT K_4][RALT K_5] (add SHIFT for the shifted plane, e.g.
+        [SHIFT RALT K_4]). RALT is the right-hand "extra layer" key. The order of
+        entries must match altgrOutputList one-for-one; the Nth keystroke here maps
+        to the Nth character there. Inserted verbatim, so it must be valid KMN.
+    - id: altgrOutputList
+      description: >
+        The held-layer output characters as a plain string with no spaces, in the
+        same order as altgrKeyList (e.g. "é€£"). Exactly one character per keystroke
+        above. Layer A enforces equal store lengths between altgrKeys and
+        altgrOutput, so a mismatch is reported at validation time.

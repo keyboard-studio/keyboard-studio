@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { _createOracle, validateWithOracle } from "./oracle.js";
+import {
+  _createOracle,
+  _createOracleWithLoader,
+  validateWithOracle,
+} from "./oracle.js";
+import { OracleLoadError } from "./OracleLoadError.js";
 import type { WasmOracleHandle, RawWasmFinding } from "./wasmLoader.js";
 import type { GroupName } from "./types.js";
 
@@ -44,7 +49,8 @@ describe("validateWithOracle (default oracle, WASM stubbed out)", () => {
   });
 
   it("appends KM_WARN_ORACLE_UNAVAILABLE once when WASM load fails", async () => {
-    const findings = await validateWithOracle(knownBadSource);
+    const downOracle = _createOracle(null);
+    const findings = await downOracle.lint(knownBadSource);
     const unavailable = findings.filter(
       (f) => f.code === "KM_WARN_ORACLE_UNAVAILABLE"
     );
@@ -169,6 +175,35 @@ describe("_createOracle(null) — simulating WASM-down", () => {
     const codes = findings.map((f) => f.code);
     expect(codes).toContain("KM_ERROR_DUPLICATE_STORE");
     expect(codes).toContain("KM_WARN_ORACLE_UNAVAILABLE");
+    expect(
+      findings.filter((f) => f.code === "KM_WARN_ORACLE_UNAVAILABLE")
+    ).toHaveLength(1);
+  });
+});
+
+describe("_createOracleWithLoader — loader rejection path", () => {
+  // Exercises the `.catch` in makeOracle()'s lazy init: a LoadHandle that
+  // rejects with a typed OracleLoadError must be absorbed (no throw to
+  // caller) and must flip the oracle into degraded mode (TS-only findings
+  // + KM_WARN_ORACLE_UNAVAILABLE).
+  it("absorbs OracleLoadError from a failing loader and degrades to TS-only + KM_WARN_ORACLE_UNAVAILABLE", async () => {
+    const failingLoader = () =>
+      Promise.reject<WasmOracleHandle>(
+        new OracleLoadError(
+          "synthetic: kmcmplib module unavailable",
+          "wasm-load-failed"
+        )
+      );
+    const oracle = _createOracleWithLoader(failingLoader);
+
+    // Should not throw — degraded mode swallows OracleLoadError.
+    const findings = await oracle.lint(knownBadSource);
+
+    const codes = findings.map((f) => f.code);
+    expect(codes).toContain("KM_WARN_ORACLE_UNAVAILABLE");
+    // TS-portable findings still flow through.
+    expect(codes).toContain("KM_ERROR_DUPLICATE_STORE");
+    // Exactly one degraded-mode warning per call.
     expect(
       findings.filter((f) => f.code === "KM_WARN_ORACLE_UNAVAILABLE")
     ).toHaveLength(1);

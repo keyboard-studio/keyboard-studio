@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Keyboard Studio — OSK frame</title>
+    <!--
+      [SCAFFOLD] Inline OSK pattern using KMW's InlinedOSKView. Adapted from
+      Keyman Developer's debug-host
+      (keyman/developer/src/server/src/site/{index.html,test.js}).
+
+      [TEMP] KMW resources loaded from hardcoded CDN URL:
+        https://s.keyman.com/kmw/engine/18.0.245/
+      Replace with a versioned, CSP-safe asset path once the production
+      delivery model is decided.
+
+      postMessage contract:
+        host -> frame: { type: "SET_KEYBOARD",  jsUrl, keyboardId }
+        host -> frame: { type: "SET_OSK_MODE",  mode: "desktop" | "touch" }
+        frame -> host: { type: "ENGINE_READY" }
+        frame -> host: { type: "ENGINE_ERROR", message }
+        frame -> host: { type: "TEXT_UPDATED", value }
+    -->
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; height: 100%; }
+      body {
+        background: #14191f;
+        color: #e6edf3;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      #osk-target {
+        width: 100%;
+        min-height: 80px;
+        font-size: 20px;
+        padding: 10px;
+        border: 1px solid #283040;
+        background: #0d1117;
+        color: #e6edf3;
+        border-radius: 8px;
+        resize: vertical;
+        outline: none;
+      }
+      #osk-target:focus { border-color: #6ea8fe; box-shadow: 0 0 0 2px rgba(110,168,254,0.25); }
+      #status {
+        font-size: 12px;
+        color: #9aa7b8;
+        font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      }
+      /* The inline OSK host — derived from Keyman Developer's test.css. */
+      #osk-host-frame {
+        width: 100%;
+        background: #1c2230;
+        border: 1px solid #283040;
+        border-radius: 8px;
+        padding: 8px;
+        display: flex;
+        justify-content: center;
+        overflow: hidden;
+      }
+      #osk-host {
+        width: 100%;
+        min-height: 280px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      /* Mobile/Pixel5 frame styling. */
+      #osk-host-frame.Pixel5 {
+        background: #0a0a0a;
+        border-radius: 24px;
+        padding: 24px 16px;
+      }
+      #osk-host-frame.Pixel5 #osk-host {
+        background: #fff;
+        border-radius: 4px;
+        min-height: 320px;
+      }
+      .kmw-osk-frame { box-shadow: none !important; }
+    </style>
+  </head>
+  <body class="osk-always-visible">
+    <textarea id="osk-target" autofocus placeholder="Pick a keyboard, then type here..."></textarea>
+    <div id="status">booting KeymanWeb...</div>
+    <div id="osk-host-frame" class="Windows">
+      <div id="osk-host">
+        <!-- InlinedOSKView lives here. -->
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        var statusEl = document.getElementById("status");
+        var oskTarget = document.getElementById("osk-target");
+        var oskHost = document.getElementById("osk-host");
+        var oskHostFrame = document.getElementById("osk-host-frame");
+        var engineReady = false;
+        var pendingKeyboard = null;
+        var currentOsk = null;
+        var currentMode = "desktop";
+
+        // [SCAFFOLD] Device profiles cribbed from Keyman Developer test.js.
+        // Two entries (desktop + phone) cover the toggle; dimensions drive
+        // InlinedOSKView.setSize().
+        var devices = {
+          desktop: {
+            name: "Windows",
+            browser: "chrome",
+            formFactor: "desktop",
+            OS: "windows",
+            touchable: false,
+            dimensions: [640, 300],
+          },
+          touch: {
+            name: "Google Pixel 5",
+            browser: "chrome",
+            formFactor: "phone",
+            OS: "android",
+            touchable: true,
+            dimensions: [320, 290],
+          },
+        };
+
+        function setStatus(s) { statusEl.textContent = s; }
+        function post(msg) { try { window.parent.postMessage(msg, "*"); } catch (_) {} }
+        function postError(message) {
+          setStatus("ERROR: " + message);
+          post({ type: "ENGINE_ERROR", message: message });
+        }
+
+        function checkMinVersion(jsText) {
+          var m = /MinimumKeymanVersion\s*[:=]\s*["']?(\d+)\.(\d+)/.exec(jsText);
+          if (!m) return true;
+          return parseInt(m[1], 10) <= 18;
+        }
+
+        // Friendly fallback for keyboards with a custom KH help panel (e.g.
+        // sil_euro_latin's KMW_EMBEDJS). The panel doesn't fit flat inline
+        // preview; render an explainer so the user knows the keyboard IS loaded.
+        function renderCustomHelpStub(profile, keyboardId) {
+          var name = keyboardId || "this keyboard";
+          var note = document.createElement("div");
+          note.setAttribute(
+            "style",
+            "padding:24px;color:#9aa7b8;font-size:13px;line-height:1.6;" +
+              "text-align:center;display:flex;flex-direction:column;gap:12px;" +
+              "align-items:center;justify-content:center;height:100%;",
+          );
+          note.innerHTML =
+            "<div style=\"font-size:18px;color:#d2a8ff;\">[!] Custom keyboard layout</div>" +
+            "<div><strong>" +
+            name +
+            "</strong> ships a custom help-panel-style OSK that doesn't fit this preview frame.</div>" +
+            "<div>The keyboard is loaded and typing in the textbox above works normally.</div>" +
+            "<div style=\"font-size:11px;color:#6c7891;font-family:ui-monospace,monospace;\">(" +
+            profile.name +
+            ")</div>";
+          oskHost.appendChild(note);
+        }
+
+        // Build / rebuild the inline OSK for the current device.
+        // Mirror of Keyman Developer test.js setOSK().
+        function setOsk() {
+          if (!window.keyman || !window.keyman.views || !window.keyman.views.InlinedOSKView) {
+            return;
+          }
+          var profile = devices[currentMode] || devices.desktop;
+
+          oskHostFrame.className = profile.name === "Google Pixel 5" ? "Pixel5" : "Windows";
+
+          if (currentOsk) {
+            try {
+              if (currentOsk.element && currentOsk.element.parentNode === oskHost) {
+                oskHost.removeChild(currentOsk.element);
+              }
+            } catch (_) {}
+            window.keyman.osk = null;
+            currentOsk = null;
+          }
+          while (oskHost.firstChild) oskHost.removeChild(oskHost.firstChild);
+
+          // Surgical DOM cleanup. KMW's per-keyboard teardown is partial:
+          // keyboards with KMW_EMBEDJS inject help-panel HTML directly as
+          // direct children of <body>. Sweep only direct body children;
+          // never remove <script>/<style>/<link> or our scaffold nodes.
+          var keep = new Set([
+            "osk-target",
+            "status",
+            "osk-host-frame",
+            "KeymanWeb_HelpFrame",
+          ]);
+          try {
+            Array.from(document.body.children).forEach(function (el) {
+              if (el.tagName === "SCRIPT" || el.tagName === "STYLE" || el.tagName === "LINK") return;
+              if (el.id && keep.has(el.id)) return;
+              var isStrayKbd =
+                (el.id && /^keyboard_/i.test(el.id)) ||
+                (el.classList && el.classList.contains("kmw-osk-frame"));
+              if (isStrayKbd) {
+                el.parentNode.removeChild(el);
+              }
+            });
+            document.querySelectorAll(".kmw-osk-frame").forEach(function (n) {
+              if (n.closest("#osk-host")) return;
+              n.parentNode && n.parentNode.removeChild(n);
+            });
+          } catch (_) {}
+
+          // Ensure the KMW help-frame root exists (kept always-hidden).
+          var helpRoot = document.getElementById("KeymanWeb_HelpFrame");
+          if (!helpRoot) {
+            helpRoot = document.createElement("div");
+            helpRoot.id = "KeymanWeb_HelpFrame";
+            helpRoot.setAttribute(
+              "style",
+              "display:none !important;visibility:hidden !important;position:absolute !important;left:-9999px !important;top:-9999px !important;width:0 !important;height:0 !important;overflow:hidden !important;",
+            );
+            document.body.appendChild(helpRoot);
+          }
+          helpRoot.innerHTML = "";
+
+          // [SCAFFOLD] Hard list of keyboards whose DESKTOP OSK is a custom
+          // KMW_EMBEDJS help panel that doesn't fit inline preview. Touch
+          // layout renders normally for these. Replace with a dynamic check
+          // once the engine can introspect keyboard capabilities.
+          var CUSTOM_HELP_KEYBOARDS_DESKTOP = ["sil_euro_latin"];
+          var activeKbId = "";
+          try {
+            activeKbId = String(window.keyman.getActiveKeyboard() || "").replace(
+              /^Keyboard_/,
+              "",
+            );
+          } catch (_) {}
+          if (
+            currentMode === "desktop" &&
+            CUSTOM_HELP_KEYBOARDS_DESKTOP.indexOf(activeKbId) >= 0
+          ) {
+            renderCustomHelpStub(profile, activeKbId);
+            return;
+          }
+          try {
+            currentOsk = new window.keyman.views.InlinedOSKView(window.keyman, { device: profile });
+            if (window.keyman.core) {
+              window.keyman.core.contextDevice = profile;
+            }
+            window.keyman.osk = currentOsk;
+            var hostW = oskHost.clientWidth || profile.dimensions[0];
+            currentOsk.setSize(hostW + "px", profile.dimensions[1] + "px");
+            oskHost.appendChild(currentOsk.element);
+            try {
+              var active = window.keyman.contextManager && window.keyman.contextManager.activeKeyboard;
+              if (active) currentOsk.activeKeyboard = active;
+            } catch (_) {}
+          } catch (err) {
+            postError("InlinedOSKView creation failed: " + (err && err.message || err));
+            currentOsk = null;
+          }
+        }
+
+        function loadKeyboard(jsUrl, keyboardId) {
+          if (!window.keyman || typeof window.keyman.addKeyboards !== "function") {
+            postError("KMW engine missing addKeyboards()");
+            return;
+          }
+          setStatus("registering keyboard: " + keyboardId);
+          var kmwId = "Keyboard_" + keyboardId;
+          var stub = {
+            id: keyboardId,
+            name: keyboardId,
+            languages: { id: "en", name: "English" },
+            filename: jsUrl,
+          };
+          try {
+            window.keyman.addKeyboards(stub);
+          } catch (err) {
+            postError("addKeyboards threw: " + (err && err.message || err));
+            return;
+          }
+          setTimeout(function () {
+            try {
+              window.keyman.setActiveKeyboard(kmwId, "en").then(function () {
+                setStatus("active: " + keyboardId);
+                setOsk();
+                try { oskTarget.focus(); } catch (_) {}
+              }).catch(function (err) {
+                postError("setActiveKeyboard('" + kmwId + "') failed: " + (err && err.message || err));
+              });
+            } catch (err) {
+              postError("setActiveKeyboard threw: " + (err && err.message || err));
+            }
+          }, 50);
+        }
+
+        function initEngine() {
+          if (!window.keyman) {
+            postError("window.keyman missing after KMW script load.");
+            return;
+          }
+          window.keyman
+            .init({
+              // [TEMP] Hardcoded CDN resource path for KMW 18.0.245.
+              // Replace with a versioned, self-hosted path once the production
+              // delivery model for KMW assets is decided.
+              resources: "https://s.keyman.com/kmw/engine/18.0.245/",
+              root: "https://s.keyman.com/kmw/engine/18.0.245/",
+              attachType: "manual",
+              setActiveOnRegister: false,
+              useAlerts: false,
+            })
+            .then(function () {
+              try { window.keyman.attachToControl(oskTarget); } catch (_) {}
+              engineReady = true;
+              setStatus("KMW ready — pick a keyboard");
+              post({ type: "ENGINE_READY" });
+              if (pendingKeyboard) {
+                var k = pendingKeyboard;
+                pendingKeyboard = null;
+                loadKeyboard(k.jsUrl, k.keyboardId);
+              }
+            })
+            .catch(function (err) {
+              postError("keyman.init failed: " + (err && err.message || err));
+            });
+        }
+
+        // [SCAFFOLD] Load KMW from vendored local copy. The vendored
+        // keymanweb.js lives at public/kmw/18.0/ and is served by Vite
+        // as a static asset.
+        var s = document.createElement("script");
+        s.src = "/kmw/18.0/keymanweb.js";
+        s.onload = initEngine;
+        s.onerror = function () {
+          postError("could not load /kmw/18.0/keymanweb.js — was KMW vendored?");
+        };
+        document.head.appendChild(s);
+
+        oskTarget.addEventListener("input", function () {
+          post({ type: "TEXT_UPDATED", value: oskTarget.value });
+        });
+
+        window.addEventListener("message", function (event) {
+          var msg = event.data;
+          if (!msg || typeof msg !== "object" || typeof msg.type !== "string") return;
+
+          if (msg.type === "SET_KEYBOARD") {
+            if (!engineReady) {
+              pendingKeyboard = { jsUrl: msg.jsUrl, keyboardId: msg.keyboardId };
+            } else {
+              loadKeyboard(msg.jsUrl, msg.keyboardId);
+            }
+            return;
+          }
+
+          if (msg.type === "SET_OSK_MODE") {
+            var nextMode = msg.mode === "touch" ? "touch" : "desktop";
+            if (nextMode === currentMode) return;
+            currentMode = nextMode;
+            if (engineReady && window.keyman.getActiveKeyboard()) {
+              setOsk();
+            }
+            return;
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

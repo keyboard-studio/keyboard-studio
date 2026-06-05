@@ -1,0 +1,59 @@
+keyboard_id,path,criterion,severity,detail
+adinkra,experimental/a/adinkra/source/adinkra.kmn,13.1,info,uses PUA codepoints (allowed in experimental/; must carry PUA notices)
+alkelang,experimental/a/alkelang/source/alkelang.kmn,4.5,green,LICENSE.md has no well-formed 'Copyright © <year> <holder>' line
+alkelang,experimental/a/alkelang/source/alkelang.kmn,5.2,green,version number embedded in user-facing README.md ('Version : 1.0')
+alkelang,experimental/a/alkelang/source/alkelang.kmn,6,green,readme.htm missing from source/ (shown on package install)
+athinkra_mwangwego,experimental/athinkra/athinkra_mwangwego/source/athinkra_mwangwego.kmn,4.5,green,LICENSE.md has no well-formed 'Copyright © <year> <holder>' line
+athinkra_mwangwego,experimental/athinkra/athinkra_mwangwego/source/athinkra_mwangwego.kmn,13.1,info,uses PUA codepoints (allowed in experimental/; must carry PUA notices)
+chorasmian,experimental/c/chorasmian/source/chorasmian.kmn,5.2,green,version number embedded in user-facing README.md ('Version 1.0')
+dubeolsik_phonetic,experimental/d/dubeolsik_phonetic/source/dubeolsik_phonetic.kmn,4.5,green,LICENSE.md has no well-formed 'Copyright © <year> <holder>' line
+elfdalian,experimental/e/elfdalian/source/elfdalian.kmn,3.6,green,HISTORY.md top version '1.05' != .kmn version '1.0.5'
+elfdalian,experimental/e/elfdalian/source/elfdalian.kmn,4.5,green,LICENSE.md has no well-formed 'Copyright © <year> <holder>' line
+elfdalian,experimental/e/elfdalian/source/elfdalian.kmn,5.2,green,version number embedded in user-facing README.md ('Version 1.05')
+elfdalian,experimental/e/elfdalian/source/elfdalian.kmn,7.2,green,targets lists platforms alongside 'any': 'any mobile'
+finongan,experimental/f/finongan/source/finongan.kmn,5.2,green,version number embedded in user-facing README.md ('Version 1.0')
+gff_geez_emufi-pua,experimental/gff/gff_geez_emufi/extras/gff_geez_emufi-pua.kmn,4.5,green,LICENSE.md has no well-formed 'Copyright © <year> <holder>' line
+gff_geez_emufi-pua,experimental/gff/gff_geez_emufi/extras/gff_geez_emufi-pua.kmn,5.2,green,version number embedded in user-facing README.md ('Version 1.0')
+gff_geez_emufi-pua,experimental/gff/gff_geez_emufi/extras/gff_geez_emufi-pua.kmn,5.2,green,version number embedded in user-facing source/welcome.htm ('v1.2')
+gff_geez_emufi-pua,experimental/gff/gff_geez_emufi/extras/gff_geez_emufi-pua.kmn,6,green,readme.htm missing from source/ (shown on package install)
+gff_geez_emufi-pua,experimental/gff/gff_geez_emufi/extras/gff_geez_emufi-pua.kmn,13.1,info,uses PUA codepoints (allowed in experimental/; must carry PUA notices)
+gff_geez_emufi,experimental/gff/gff_geez_emufi/source/gff_geez_emufi.kmn,4.5,green,LICENSE.md has no well-formed 'Copyright © <year> <holder>' line
+gff_geez_emufi,experimental/gff/gff_geez_emufi/source/gff_geez_emufi.kmn,5.2,green,version number embedded in user-facing README.md ('Version 1.0')
+gff_geez_emufi,experimental/gff/gff_geez_emufi/source/gff_geez_emufi.kmn,5.2,green,version number embedded in user-facing source/welcome.htm ('v1.2')
+gff_geez_emufi,experimental/gff/gff_geez_emufi/source/gff_geez_emufi.kmn,6,green,readme.htm missing from source/ (shown on package install)
+gff_geez_emufi,experimental/gff/gff_geez_emufi/source/gff_geez_emufi.kmn,13.1,info,uses PUA codepoints (allowed in experimental/; must carry PUA notices)
+gff_sbs,experimental/gff/gff_sbs/source/gff_sbs.kmn,4.5,green,LICENSE.md has no well-formed 'Copyright © <year> <holder>' line
+gff_sbs,experimental/gff/gff_sbs/source/gff_sbs.kmn,6,green,readme.htm missing from source/ (shown on package install)
+gff_sbs,experimental/gff/gff_sbs/source/gff_sbs.kmn,13.1,info,uses PUA codepoints (allowed in experimental/; must carry PUA notices)
+hindi_flick,experimental/h/hindi_flick/source/hindi_flick.kmn,4.5,green,LICENSE.md has no well-formed 'Copyright © <year> <holder>' line
+hong_kong,experimental/h/hong_kong/source/hong_kong.kmn,3.6,green,HISTORY.md top version '2.1' != .kmn version '2.2'
+irula_tamil_winscript,experimental/i/irula_tamil_winscript/source/irula_tamil_winscript.kmn,4.5,green,LICENSE.md has no well-formed 'Copyright © <year> <holder>' line
+ishkashimi_cyrillic,experimental/i/ishkashimi_cyrillic/source/ishkashimi_cyrillic.kmn,5.2,green,version number embedded in user-facing README.md ('Version 1.0')
+kadu_kadu,experimental/k/kadu_kadu/source/kadu_kadu.kmn,13.1,info,uses PUA codepoints (allowed in experimental/; must carry PUA notices)
+koreguaje,experimental/k/koreguaje/source/koreguaje.kmn,5.2,green,version number embedded in user-facing README.md ('Version 0.2')
+kreative_sitelenpona_ucsur,experimental/kreative/kreative_sitelenpona_ucsur/source/kreative_sitelenpona_ucsur.kmn,5.2,green,version number embedded in user-facing README.md ('Version 1.1')
+kreative_sitelenpona_ucsur,experimental/kreative/kreative_sitelenpona_ucsur/source/kreative_sitelenpona_ucsur.kmn,13.1,info,uses PUA codepoints (allowed in experimental/; must carry PUA notices)
+lao_pali_extended,experimental/l/lao_pali_extended/source/lao_pali_extended.kmn,13.1,info,uses PUA codepoints (allowed in experimental/; must carry PUA notices)
+luo_lakeside,experimental/l/luo_lakeside/source/luo_lakeside.kmn,13.1,info,uses PUA codepoints (allowed in experimental/; must carry PUA notices)
+masaba,experimental/m/masaba/source/masaba.kmn,13.1,info,uses PUA codepoints (allowed in experimental/; must carry PUA notices)
+meitei_legacy,experimental/m/meitei_legacy/source/meitei_legacy.kmn,5.2,green,version number embedded in user-facing README.md ('Version 0.1')
+paleohispanic,experimental/p/paleohispanic/source/paleohispanic.kmn,5.2,green,version number embedded in user-facing README.md ('Version 1.0')
+pingelap,experimental/p/pingelap/source/pingelap.kmn,4.5,green,LICENSE.md has no well-formed 'Copyright © <year> <holder>' line
+pingelap,experimental/p/pingelap/source/pingelap.kmn,5.2,green,version number embedded in user-facing README.md ('Version 1.0')
+runeboard,experimental/r/runeboard/source/runeboard.kmn,4.5,green,LICENSE.md has no well-formed 'Copyright © <year> <holder>' line
+santali_latin,experimental/s/santali_latin/source/santali_latin.kmn,5.2,green,version number embedded in user-facing source/welcome.htm ('version 1.0')
+soninke_n_ti,experimental/s/soninke_n_ti/source/soninke_n_ti.kmn,13.1,info,uses PUA codepoints (allowed in experimental/; must carry PUA notices)
+sp_lentan_ucsur,experimental/s/sp_lentan_ucsur/source/sp_lentan_ucsur.kmn,5.2,green,version number embedded in user-facing README.md ('Version 1.0')
+sp_lentan_ucsur,experimental/s/sp_lentan_ucsur/source/sp_lentan_ucsur.kmn,13.1,info,uses PUA codepoints (allowed in experimental/; must carry PUA notices)
+sp_pochin_ucsur,experimental/s/sp_pochin_ucsur/source/sp_pochin_ucsur.kmn,5.2,green,version number embedded in user-facing README.md ('Version 1.0')
+sp_pochin_ucsur,experimental/s/sp_pochin_ucsur/source/sp_pochin_ucsur.kmn,13.1,info,uses PUA codepoints (allowed in experimental/; must carry PUA notices)
+sp_wakalito_ucsur,experimental/s/sp_wakalito_ucsur/source/sp_wakalito_ucsur.kmn,5.2,green,version number embedded in user-facing README.md ('Version 1.0')
+sp_wakalito_ucsur,experimental/s/sp_wakalito_ucsur/source/sp_wakalito_ucsur.kmn,13.1,info,uses PUA codepoints (allowed in experimental/; must carry PUA notices)
+teggargrent_lat,experimental/t/teggargrent_lat/source/teggargrent_lat.kmn,5.2,green,version number embedded in user-facing README.md ('Version 1.0')
+tengwar_quenya,experimental/t/tengwar_quenya/source/tengwar_quenya.kmn,13.1,info,uses PUA codepoints (allowed in experimental/; must carry PUA notices)
+wakhi_cyrillic,experimental/w/wakhi_cyrillic/source/wakhi_cyrillic.kmn,5.2,green,version number embedded in user-facing README.md ('Version 1.0')
+wakhi_standard,experimental/w/wakhi_standard/source/wakhi_standard.kmn,5.2,green,version number embedded in user-facing README.md ('Version 1.0')
+wancho,experimental/w/wancho/source/wancho.kmn,4.5,green,LICENSE.md has no well-formed 'Copyright © <year> <holder>' line
+wancho,experimental/w/wancho/source/wancho.kmn,5.2,green,version number embedded in user-facing README.md ('Version 1.0')
+zanan,experimental/z/zanan/source/zanan.kmn,13.1,info,uses PUA codepoints (allowed in experimental/; must carry PUA notices)
+zou_script_and_numerals,experimental/z/zou_script_and_numerals/source/zou_script_and_numerals.kmn,13.1,info,uses PUA codepoints (allowed in experimental/; must carry PUA notices)

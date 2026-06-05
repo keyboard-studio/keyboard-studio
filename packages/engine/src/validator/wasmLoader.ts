@@ -1,20 +1,27 @@
 // Acquisition seam for the kmcmplib WASM oracle.
 //
-// Option-A primary path (default factory): load the WASM artifact bundled
-// inside `@keymanapp/kmc-kmn` from npm. Option-B escape hatch: a consumer
-// passes their own loader to validateWithOracle() — they receive the same
-// WasmOracleHandle interface and never see the raw kmcmplib ABI.
+// Option-A primary path (default factory): reuse the kmc-kmn KmnCompiler
+// constructor exposed by the compiler service (packages/engine/src/compiler).
+// kmc-kmn caches the underlying WASM Module at module scope, so the
+// compiler and the oracle share a single instantiation. Option-B escape
+// hatch: a consumer passes their own loader to validateWithOracle() — they
+// receive the same WasmOracleHandle interface and never see the raw
+// kmcmplib ABI.
 //
-// The factory below is a stub: it throws OracleLoadError with reason
-// "wasm-fetch-failed" until the kmc-kmn integration lands in a follow-up
-// issue. Until then, validateWithOracle() reliably degrades to TS-only
-// findings and attaches one KM_WARN_ORACLE_UNAVAILABLE supplementary
-// finding per call.
+// On any failure during init/run, lintWasmGroups returns whatever
+// diagnostics were collected before the failure (often empty). The
+// validator oracle layer (oracle.ts) treats a thrown OracleLoadError as a
+// permanent degrade-to-TS-only signal; mid-call run failures simply
+// surface fewer findings without bringing the oracle down.
 //
-// See spec.md §10 + the Issue #16 design (cycles 1-5).
+// See spec.md §10 + the Issue #16 design (cycles 1-5) + Issue #17 tail
+// (shared WASM instance).
 
 import type { GroupName } from "./types.js";
 import { OracleLoadError } from "./OracleLoadError.js";
+import { getKmnCompilerCtor, type KmnCompilerLike } from "../compiler/index.js";
+import { pathUtils } from "../compiler/pathUtils.js";
+import { CompilerLoadError } from "@keyboard-studio/contracts";
 
 /**
  * Minimal structured diagnostic returned by the WASM compiler. The oracle
@@ -55,21 +62,100 @@ export interface WasmOracleHandle {
   dispose(): void;
 }
 
+const ORACLE_SOURCE_FILE = "__oracle_source__.kmn";
+const ORACLE_OUTPUT_FILE = "__oracle_out__.kmx";
+
+class KmnCompilerOracleHandle implements WasmOracleHandle {
+  constructor(private readonly Ctor: new () => KmnCompilerLike) {}
+
+  async lintWasmGroups(
+    source: string,
+    _groups: readonly GroupName[]
+  ): Promise<RawWasmFinding[]> {
+    const findings: RawWasmFinding[] = [];
+    const sourceBytes = new TextEncoder().encode(source);
+
+    const callbacks = {
+      reportMessage(message: Record<string, unknown>): void {
+        const text =
+          (typeof message.message === "string" && message.message) ||
+          (typeof message.text === "string" && message.text) ||
+          (typeof message.description === "string" && message.description) ||
+          "";
+        const codeSym = String(
+          message.code ?? message.errorCode ?? "UNKNOWN"
+        );
+        const line =
+          typeof message.lineNumber === "number" ? message.lineNumber : 0;
+        findings.push({
+          kmcmpCode: codeSym,
+          line,
+          column: 0,
+          text,
+        });
+      },
+      loadFile(filename: string): Uint8Array | null {
+        const basename = filename.split(/[\\/]/).pop() ?? filename;
+        if (basename === ORACLE_SOURCE_FILE) return sourceBytes;
+        return null;
+      },
+      resolveFilename(baseFilename: string, filename: string): string {
+        if (/^[/\\]/.test(filename) || /[/\\]/.test(filename)) return filename;
+        const base = pathUtils.dirname(baseFilename ?? "");
+        return base === "" ? filename : `${base}/${filename}`;
+      },
+      fs: {
+        existsSync(filename: string): boolean {
+          const basename = filename.split(/[\\/]/).pop() ?? filename;
+          return basename === ORACLE_SOURCE_FILE;
+        },
+        writeFileSync(_filename: string, _data: Uint8Array): void {
+          /* artifacts unused — oracle only consumes reportMessage */
+        },
+      },
+      path: pathUtils,
+    };
+
+    const compiler = new this.Ctor();
+    const ok = await compiler.init(callbacks, {});
+    if (!ok) return findings;
+    try {
+      await compiler.run(ORACLE_SOURCE_FILE, ORACLE_OUTPUT_FILE);
+    } catch {
+      // Mid-run failures still surface whatever diagnostics arrived via
+      // reportMessage before the throw.
+    }
+    return findings;
+  }
+
+  dispose(): void {
+    // No per-instance state to release; the kmc-kmn module-scope cache
+    // outlives any single handle.
+  }
+}
+
 /**
- * Async factory. Production builds load kmcmplib here.
+ * Async factory. Returns a WasmOracleHandle backed by the kmc-kmn
+ * KmnCompiler constructor (shared with the compiler service).
  *
- * Currently a stub — throws OracleLoadError with reason "wasm-fetch-failed".
- * validateWithOracle() catches that at lazy init and degrades gracefully.
- *
- * @throws OracleLoadError on fetch failure, instantiation failure, or ABI
- *   mismatch. Always thrown via the typed class so callers can branch on
- *   `.reason`.
+ * @throws OracleLoadError when kmc-kmn cannot be loaded. The validator
+ *   oracle catches this at lazy init and degrades to TS-only findings.
  */
 export async function loadWasmOracle(_options?: {
   wasmUrl?: string;
 }): Promise<WasmOracleHandle> {
-  throw new OracleLoadError(
-    "kmcmplib WASM oracle is not yet wired. Returning TS-only findings.",
-    "wasm-fetch-failed"
-  );
+  let Ctor: new () => KmnCompilerLike;
+  try {
+    Ctor = await getKmnCompilerCtor();
+  } catch (err) {
+    if (err instanceof CompilerLoadError) {
+      throw new OracleLoadError(
+        `kmcmplib WASM unavailable: ${err.message}`,
+        "wasm-load-failed",
+        { cause: err }
+      );
+    }
+    throw err;
+  }
+  return new KmnCompilerOracleHandle(Ctor);
 }
