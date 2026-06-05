@@ -121,18 +121,18 @@ notes: >
 
 tests:
   - input: ["p", "i", "n", "y", "i", "n"]
-    expectedOutput: "汉字" (or selection menu)
+    expectedOutput: "汉字 (or selection menu)"
     description: >
       Simplified Chinese (Pinyin): typing "pinyin" passes the sequence to the
       DLL, which returns matching Han characters (汉字 for "hanzi"). User sees
       a menu of options and selects the intended character(s).
   - input: ["j", "y", "u", "t", "p", "i", "n", "g"]
-    expectedOutput: "香港" (or selection menu)
+    expectedOutput: "香港 (or selection menu)"
     description: >
       Traditional Chinese (Jyutping): typing "jyutping" looks up matching
       Traditional Han characters. DLL returns candidates; user picks.
   - input: ["r", "o", "m", "a", "j", "i"]
-    expectedOutput: "ローマ字" (or selection menu)
+    expectedOutput: "ローマ字 (or selection menu)"
     description: >
       Japanese (Romaji): typing "romaji" returns kana/kanji matches. DLL
       handles the conversion; user selection completes input.
