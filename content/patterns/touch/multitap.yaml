@@ -1,0 +1,186 @@
+# multitap.yaml
+# Touch pattern: rapid repeated taps on a key cycle through a set of characters.
+# Strategy: S-08 (layer expansion — on touch, multitap is a tap-count-driven
+# access mechanism analogous to the desktop RAlt/modifier layer).
+# Priority 3 — secondary touch gallery pattern.
+
+id: multitap
+title: "Tap a key several times to cycle through letters"
+description: >
+  Tap the same key rapidly more than once to get a different letter each time.
+  The first tap produces the key's main character; the second tap replaces it
+  with the next character in the cycle; the third tap gives the next; and so on.
+  This is the touch equivalent of T9-style cycling on feature phones and works
+  well for syllabic scripts where a handful of related glyphs share one key.
+category: touch
+appliesTo: []
+priority: 3
+group_visibility: any
+strategyId: "S-08"
+
+questions:
+  - id: hostKey
+    prompt: "Which key should cycle on repeated taps? (virtual-key name, e.g. K_A)"
+    answerType: key-name
+    default: "K_A"
+
+  - id: multitapList
+    prompt: >
+      The characters to cycle through on the 2nd, 3rd, 4th … tap (in order).
+      The first tap still produces the key's primary text; these entries take
+      over on subsequent rapid taps. Type them without spaces, e.g. áàâ.
+    answerType: char-list
+
+kmnFragment: |
+  c Multitap cycling is defined entirely in the touch-layout JSON (multitap array).
+  c No KMN rules are required for this pattern.
+
+touchLayoutFragment: |
+  {
+    "id": "{{hostKey}}",
+    "multitap": {{multitapList}}
+  }
+  c Note: {{multitapList}} is a char-list slot. The engine serializes it as a
+  c JSON array of {"id":"U_XXXX","text":"x"} objects, one per character.
+
+reorderRules: null
+
+tests:
+  - input: ["K_A"]
+    expectedOutput: "a"
+    description: "single tap on K_A still produces a (multitap only triggers on rapid repeated taps)"
+
+validatedForFamilies: ["Latn", "Ethi"]
+sourceKeyboards:
+  - "release/gff/gff_amharic"
+  - "release/sil/sil_yi"
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-06-05"
+
+# ---------------------------------------------------------------------------
+# Extended metadata — YAML-only; not part of the TypeScript Pattern interface
+# ---------------------------------------------------------------------------
+
+frequency_in_corpus: "~12/~200 scanned touch keyboards use multitap blocks; heaviest use is in Ethiopic-script keyboards (GFF family)"
+
+notes: >
+  The multitap array is the touch counterpart of the desktop rota pattern (C-8,
+  strategy S-07 diacritic cycle). On desktop, the S-07 pattern uses KMN
+  any()/index() stores so that pressing the same key again replaces the previous
+  output with the next character in a pre-defined cycle. On touch, the
+  multitap JSON array achieves the same outcome with no KMN rules: the
+  runtime counts rapid taps and selects the corresponding array entry.
+  Authors most often use multitap when the cycling set is small (2–4
+  characters) and the characters are closely related — phonetic variants,
+  consonant-family alternates, or punctuation-width variants. For larger
+  sets, longpress_alternates (sk popup) is usually a better fit because the
+  user can see all options at once.
+
+provenance:
+  - keyboard: "release/gff/gff_amharic/source/gff_amharic.keyman-touch-layout"
+    note: >
+      Phone/tablet layout (GFF Amharic, Ethiopic script, BCP47 am).
+      Author: The Geʾez Frontier Foundation. Multitap is used pervasively
+      to expose related Ge'ez consonant families that share a phonetic base.
+      K_S text='ስ' (si), multitap: [ሰ (U+1230, opens ሰ-layer), ሠ (U+1220,
+      opens ሠ-layer)]. K_K text='ክ', multitap: [ከ (U+12A8), ኸ (U+12B8)].
+      K_H text='ህ', multitap: [ሀ (U+1200), ኀ (U+1280)]. Shows the pattern
+      used at scale — nearly every consonant key has 1–2 multitap entries
+      reaching related consonant-family root forms.
+    rule: '"multitap": [{"text": "ሰ", "id": "U_1230", "nextlayer": "ሰ-layer"}, {"text": "ሠ", "id": "U_1220", "nextlayer": "ሠ-layer"}]'
+  - keyboard: "release/sil/sil_yi/source/sil_yi.keyman-touch-layout"
+    note: >
+      Phone layout (SIL Yi, Sichuan Yi / Nuosu script, BCP47 ii).
+      Authors: Andy Eatough, Dennis Walters, David Rowe (© SIL Global).
+      Uses multitap for punctuation-width cycling: the dash key (U_2013,
+      text='-') cycles through － (U+FF0D fullwidth hyphen), – (U+2013
+      en dash), — (U+2014 em dash) on repeated taps. Similarly the bracket
+      key ［ (U+FF3B) cycles through 〔 (U+3014), 【 (U+3010), ［ (U+FF3B).
+      Clean three-entry cycling example; no nextlayer — pure character output.
+    rule: '"multitap": [{"text": "－", "id": "U_FF0D"}, {"text": "–", "id": "U_2013"}, {"text": "—", "id": "U_2014"}]'
+
+demo:
+  filled_kmn: |
+    c Demo: Multitap on K_A cycling through á, à, â
+    c First tap → a (key's primary text); second tap → á; third → à; fourth → â.
+    c No KMN rules needed — multitap behaviour is in the touch layout JSON.
+
+    store(&VERSION) '10.0'
+    store(&NAME) 'Multitap Demo'
+    store(&TARGETS) 'any'
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+
+    c (no rules — multitap behaviour defined in touch layout JSON below)
+
+  touch_layout_fragment: |
+    {
+      "phone": {
+        "font": "Tahoma",
+        "layer": [
+          {
+            "id": "default",
+            "row": [
+              {
+                "id": 1,
+                "key": [
+                  {
+                    "id": "K_A",
+                    "text": "a",
+                    "multitap": [
+                      { "id": "U_00E1", "text": "á" },
+                      { "id": "U_00E0", "text": "à" },
+                      { "id": "U_00E2", "text": "â" }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+
+  sample_keys:
+    - keys: ["K_A"]
+      output: "a"
+      note: "single tap produces plain a"
+    - keys: ["K_A", "K_A"]
+      output: "á"
+      note: "double-tap (rapid) produces a-acute (U+00E1)"
+    - keys: ["K_A", "K_A", "K_A"]
+      output: "à"
+      note: "triple-tap produces a-grave (U+00E0)"
+    - keys: ["K_A", "K_A", "K_A", "K_A"]
+      output: "â"
+      note: "quadruple-tap produces a-circumflex (U+00E2)"
+
+  sample_output: >
+    Tap A once for a. Tap A twice quickly for á. Tap three times for à.
+    Tap four times for â. Each rapid re-tap replaces the previous character.
+
+skeleton:
+  touch_layout_template: |
+    {
+      "id": "{{hostKey}}",
+      "multitap": {{multitapList}}
+    }
+  note: >
+    The multitap array contains only the characters reached on the 2nd, 3rd,
+    4th… tap. The 1st tap output is the key's main text field — do not repeat
+    it here. For layer-switching multitap entries (used in Ethiopic keyboards),
+    add a "nextlayer" field alongside "id" and "text".
+
+  parameters:
+    - id: hostKey
+      description: >
+        Virtual-key name for the key that cycles on repeated taps (e.g. K_A).
+        One skeleton block per key.
+    - id: multitapList
+      description: >
+        Ordered list of characters reached on the 2nd, 3rd, 4th… rapid tap.
+        Serialized by the engine as a JSON array of {"id":"U_XXXX","text":"x"}
+        objects. Keep the list short — 2–4 entries is ideal; larger sets are
+        better served by the longpress_alternates (sk) pattern.
