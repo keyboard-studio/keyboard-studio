@@ -1,0 +1,193 @@
+id: latin_if_set_option_flags
+title: "User toggles a setting in the menu that changes keyboard behavior"
+description: >
+  A setting stored on the keyboard that the user can flip using a hotkey or menu
+  option, changing how the keyboard interprets input. Each mode (option value) can
+  have different output rules. Example: press Ctrl+. to switch between dotted-below
+  and bar-below accents in Yoruba, or to switch between US and British spelling
+  conventions. The initial mode is set at keyboard startup; toggle hotkeys change it
+  at runtime. This pattern wraps an inner strategy (deadkey, mnemonic, etc.) with
+  `if()` guards to apply different rules per mode.
+category: desktop
+appliesTo:
+  - "Latn"
+strategyId: "S-11"
+combinesWith:
+  - "S-02"
+  - "S-05"
+  - "S-06"
+
+questions:
+  - id: optionStoreName
+    prompt: >
+      Give an internal name for this setting (ASCII, no spaces, no hyphens).
+      This becomes a KMN store that holds the current value.
+      Example: "spelling_mode" or "diacritic_style"
+    answerType: text
+    default: "spelling_mode"
+
+  - id: defaultValue
+    prompt: >
+      What is the initial value of this setting when the keyboard starts?
+      This is a quoted store-content string (single characters or short ASCII names).
+      Example: "us" or "dot"
+    answerType: store-content
+    default: "us"
+
+  - id: valueA
+    prompt: >
+      What is the first toggle value (the alternative to the default)?
+      Example: if defaultValue is "us", valueA might be "british"
+    answerType: store-content
+    default: "british"
+
+  - id: valueB
+    prompt: >
+      What is the second toggle value (returned to when toggling again)?
+      This should match the defaultValue so toggling cycles between two states.
+      Example: "us" (matches defaultValue)
+    answerType: store-content
+    default: "us"
+
+  - id: toggleKey
+    prompt: >
+      Which key is pressed (with modifiers) to toggle between the two modes?
+      Example: "K_PERIOD" (for Ctrl+. shortcut) or "K_SLASH" (for Ctrl+/ shortcut)
+    answerType: key-name
+    default: "K_PERIOD"
+
+  - id: modifiers
+    prompt: >
+      Which modifier keys must be held for the toggle to fire?
+      Example: "Ctrl" alone, or "Ctrl+Shift", or leave empty for no modifiers.
+    answerType: select
+    options:
+      - value: "CTRL"
+        label: "Ctrl"
+      - value: "SHIFT"
+        label: "Shift"
+      - value: "CTRL SHIFT"
+        label: "Ctrl+Shift"
+      - value: "ALT"
+        label: "Alt"
+      - value: "RALT"
+        label: "RAlt"
+      - value: ""
+        label: "No modifier (any mode)"
+    default: "CTRL"
+
+  - id: descriptionA
+    prompt: >
+      Human-readable label for the first toggle value (shown in menus).
+      Example: "British spelling" or "Bar-below accents"
+    answerType: text
+    default: "British"
+    required: false
+
+  - id: descriptionB
+    prompt: >
+      Human-readable label for the default/second toggle value (shown in menus).
+      Example: "US spelling" or "Dot-below accents"
+    answerType: text
+    default: "US"
+    required: false
+
+kmnFragment: |
+  c ---- S-11 Stateful option store -----------------------------------------------
+  c {{optionStoreName}} holds the current mode; initialized to the default value
+  c at keyboard startup.
+  store({{optionStoreName}}) '{{defaultValue}}'
+
+  c ---- Toggle rules to switch between the two modes ----
+  c When {{optionStoreName}}='{{valueB}}' (default), pressing the toggle hotkey
+  c (with the specified modifiers) changes the mode to {{valueA}}.
+  if({{optionStoreName}}='{{valueB}}') + [{{modifiers}} {{toggleKey}}] > set({{optionStoreName}}='{{valueA}}')
+
+  c When {{optionStoreName}}='{{valueA}}', pressing the same toggle hotkey
+  c switches the mode back to {{valueB}} (the default).
+  if({{optionStoreName}}='{{valueA}}') + [{{modifiers}} {{toggleKey}}] > set({{optionStoreName}}='{{valueB}}')
+
+  c ---- Example output rules (user customizes these for their strategy) ----
+  c These are demonstration rules for keys that behave differently in each mode.
+  c In a real pattern, the user would fill in their actual orthography rules here.
+  c
+  c if({{optionStoreName}}='{{valueB}}') + [K_Z] > 'z'
+  c if({{optionStoreName}}='{{valueB}}') + SHIFT [K_Z] > 'Z'
+  c if({{optionStoreName}}='{{valueA}}') + [K_Z] > 'Z'
+  c if({{optionStoreName}}='{{valueA}}') + SHIFT [K_Z] > 'z'
+
+tests:
+  - input: ["CTRL K_PERIOD"]
+    expectedOutput: ""
+    description: >
+      At startup (default mode {{valueB}}), pressing Ctrl+. triggers the first
+      if({{optionStoreName}}='{{valueB}}') rule, calling set({{optionStoreName}}='{{valueA}}').
+      The set() action changes the mode but produces no visible output character.
+
+  - input: ["CTRL K_PERIOD", "CTRL K_PERIOD"]
+    expectedOutput: ""
+    description: >
+      After the first toggle to {{valueA}}, pressing Ctrl+. again triggers
+      if({{optionStoreName}}='{{valueA}}') rule, changing the mode back to {{valueB}}.
+      Again, no visible output (set() produces no output). Mode cycles between the two states.
+
+  - input: ["CTRL K_PERIOD", "CTRL K_PERIOD", "CTRL K_PERIOD"]
+    expectedOutput: ""
+    description: >
+      Multiple toggles in sequence. Each set() call is silent. The mode oscillates
+      between {{valueB}} and {{valueA}} with each hotkey press. Verifies that mode
+      state is properly maintained across multiple cycles.
+
+  - input: ["K_A"]
+    expectedOutput: "a"
+    description: >
+      Plain A keystroke at startup (default mode {{valueB}}). No if() guard binds
+      this key, so it passes through unchanged to the base layer. The toggle does not
+      interfere with unrelated keys.
+
+  - input: ["K_A", "CTRL K_PERIOD", "K_A"]
+    expectedOutput: "aa"
+    description: >
+      A key before and after toggling. Both produce 'a' because A is not part of the
+      mode-specific rules; only keys with if() guards are affected by the toggle.
+      Verifies mode changes do not corrupt unbound keys.
+
+  - input: ["K_SPACE"]
+    expectedOutput: " "
+    description: >
+      Space bar at startup. Not bound to the if() rules, passes through normally.
+      Confirms the pattern does not consume or interfere with unrelated modifier-free keys.
+
+  - input: ["CTRL K_PERIOD", "K_SPACE"]
+    expectedOutput: " "
+    description: >
+      Space after toggling to {{valueA}}. Still outputs a space; the toggle rules
+      do not affect unbound keys even in the alternate mode.
+
+  - input: ["SHIFT CTRL K_PERIOD"]
+    expectedOutput: "."
+    description: >
+      If modifiers='CTRL' is specified, then SHIFT+CTRL+. does NOT match the toggle rule
+      (the Keyman rule requires exactly CTRL, not SHIFT+CTRL). Instead, K_PERIOD is passed
+      to the main group as an unmatched keystroke, outputting its literal character.
+      Verifies that modifier sensitivity prevents accidental toggles.
+
+  - input: ["CTRL K_A"]
+    expectedOutput: "a"
+    description: >
+      Ctrl+A does not match any toggle rule (toggle is bound to K_PERIOD only).
+      The keystroke is passed through; A outputs 'a' and Ctrl is released without
+      triggering a mode change. Verifies toggle hotkey specificity.
+
+validatedForFamilies:
+  - "Latn"
+
+sourceKeyboards:
+  - "release/sil/sil_yoruba8/source/sil_yoruba8.kmn#L23-L25,L142-L154"
+  - "release/sil/sil_ipa/source/sil_ipa.kmn#L368-L373"
+  - "release/sil/sil_euro_latin/source/sil_euro_latin.kmn#L32-L37"
+
+frequencyInCorpus: 2
+
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-06-04"

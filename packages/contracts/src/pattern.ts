@@ -118,6 +118,8 @@ export interface Pattern {
   reviewedBy: string;
   /** ISO date of review. Format: YYYY-MM-DD. */
   reviewDate: string;
+  /** Frequency of this pattern in corpus data (optional numeric indicator). */
+  frequencyInCorpus?: number;
 }
 
 /**
@@ -141,6 +143,7 @@ export type PatternInit = {
   sourceKeyboards: string[];
   reviewedBy: string;
   reviewDate: string;
+  frequencyInCorpus?: number;
 };
 
 /**
@@ -167,5 +170,6 @@ export function makePattern(init: PatternInit): Pattern {
       ? { touchLayoutFragment: init.touchLayoutFragment }
       : {}),
     ...(init.reorderRules !== undefined ? { reorderRules: init.reorderRules } : {}),
+    ...(init.frequencyInCorpus !== undefined ? { frequencyInCorpus: init.frequencyInCorpus } : {}),
   };
 }

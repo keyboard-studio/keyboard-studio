@@ -1,0 +1,270 @@
+id: latin_multi_char_sequence
+title: "Type a letter sequence to get a special character"
+description: >
+  The user types two (or more) ordinary letters in quick succession; the sequence
+  is recognized by context and replaced with a single special character.
+  For example, typing 'n' then 'g' produces 'ŋ' (eng). Unlike deadkeys, the first
+  letter appears visible on screen before the second letter triggers the collapse.
+  This strategy is common in IPA-style alphabets, syllabic scripts (Vai), and
+  Indic vowel-lengthening rules where the input sequence forms a meaningful intermediate
+  stage before resolution. The user sees the progression: n → ng → ŋ.
+category: desktop
+appliesTo:
+  - "Latn"
+strategyId: "S-03"
+combinesWith:
+  - "S-04"
+  - "S-05"
+
+questions:
+  - id: seqFirst
+    prompt: >
+      Which character starts the sequence? This is the first key the user presses
+      (e.g., 'n' for the ng→ŋ pattern). The character is displayed immediately
+      and remains visible until the second key is pressed.
+    answerType: char-single
+    default: "n"
+
+  - id: seqSecond
+    prompt: >
+      Which character completes the sequence? Pressing this key after the first
+      triggers the context rule and collapses the pair into the output character
+      (e.g., 'g' for ng→ŋ).
+    answerType: char-single
+    default: "g"
+
+  - id: outputChar
+    prompt: >
+      What single character should the sequence produce? Use a precomposed Unicode
+      character (NFC), not a combining sequence. For example, 'ŋ' (U+014B LATIN SMALL
+      LETTER ENG) for the ng→ŋ pattern.
+    answerType: char-single
+    default: "ŋ"
+
+  - id: seqFirstUpper
+    prompt: >
+      Optional: If the first character has an uppercase form, what is it?
+      Leave blank if the character has no case distinction (e.g. digits, symbols).
+      Example: 'N' for 'n'.
+    answerType: char-single
+    default: "N"
+
+  - id: seqSecondUpper
+    prompt: >
+      Optional: If the second character has an uppercase form, what is it?
+      Leave blank if there is no uppercase variant.
+      Example: 'G' for 'g'.
+    answerType: char-single
+    default: "G"
+
+  - id: outputCharUpper
+    prompt: >
+      Optional: If the output character has an uppercase form, what is it?
+      For 'ŋ', the uppercase is 'Ŋ' (U+014A). Leave blank if no uppercase exists.
+    answerType: char-single
+    default: "Ŋ"
+
+  - id: fallbackChar
+    prompt: >
+      What should appear if the user presses the first character but then
+      a key that is NOT the second character (escape/fallback)? Typically,
+      just let the first character remain visible and process the second key
+      normally. If you want explicit control, specify the fallback character.
+      Example: leave blank (no fallback rule needed).
+    answerType: char-single
+    default: ""
+
+  - id: additionalSequences
+    prompt: >
+      Optional: List additional sequences using the same pattern. Format as
+      "first1:second1→output1 first2:second2→output2" (space-separated pairs,
+      colon between chars, arrow before output, no spaces around punctuation).
+      Example: "m:b→ṃ o:o→ȭ". Leave blank if only the primary sequence is needed.
+    answerType: text
+    default: ""
+
+  - id: linguisticNote
+    prompt: >
+      Optional: Brief linguistic note for the pattern. For example, for ng→ŋ,
+      you might note: "Vai consonant-onset encoding; ng is a phonetically coherent
+      intermediate step that resolves to the velar nasal syllable ŋa, ŋe, etc."
+      This helps future pattern users understand the linguistic motivation.
+    answerType: text
+    default: ""
+
+kmnFragment: |
+  c ---- S-03 Sequence replace: letter1 + letter2 → combined character -------
+  c The first character is typed normally and appears on screen (visible output).
+  c The second character triggers a context rule that replaces the pair with the
+  c single output character. The user sees the progression: first → first+second → output.
+  c
+  c This differs from S-02 (deadkey) where the trigger key emits no visible output
+  c until the base letter is pressed. Here, the first character IS the visible intermediate.
+
+  c ---- Lowercase sequence ----
+  + '{{seqFirst}}' > '{{seqFirst}}'
+  '{{seqFirst}}' + '{{seqSecond}}' > '{{outputChar}}'
+
+  c ---- Uppercase sequence (if both uppercase variants exist) ----
+  + '{{seqFirstUpper}}' > '{{seqFirstUpper}}'
+  '{{seqFirstUpper}}' + '{{seqSecondUpper}}' > '{{outputCharUpper}}'
+
+  c ---- Mixed case: uppercase first + lowercase second ----
+  '{{seqFirstUpper}}' + '{{seqSecond}}' > '{{outputCharUpper}}'
+
+  c ---- Mixed case: lowercase first + uppercase second ----
+  '{{seqFirst}}' + '{{seqSecondUpper}}' > '{{outputChar}}'
+
+  c ---- Fallback: first character followed by a key other than second ----
+  c No explicit fallback rule is needed; the first character is already committed
+  c to the buffer. The second key is processed normally by the main group rules.
+
+  c ---- SCAFFOLDER INSTRUCTION for additionalSequences ----
+  c The {{additionalSequences}} question (optional) collects multiple sequence pairs
+  c in the form: "first1:second1→output1 first2:second2→output2" (space-separated).
+  c The scaffolder should parse this string and emit a duplicate rule block for each
+  c pair using the same case-handling logic as above. Do not emit a placeholder;
+  c the scaffolder expands {{additionalSequences}} into N rule blocks (one per pair).
+
+touchLayoutFragment: |
+  {
+    "id": "{{seqFirst}}",
+    "sk": [
+      {
+        "id": "{{seqSecond}}",
+        "text": "{{outputChar}}"
+      }
+    ]
+  }
+
+frequencyInCorpus: 5
+
+tests:
+  - input: ["K_N"]
+    expectedOutput: "n"
+    description: >
+      Bare 'n' without the second character. The key is a placeholder; in a
+      real keyboard this would be the physical key that produces 'n' (e.g., K_N
+      on a QWERTY layout). The output is 'n' unchanged.
+
+  - input: ["K_N", "K_G"]
+    expectedOutput: "ŋ"
+    description: >
+      The two-character sequence: 'n' followed by 'g' produces 'ŋ' (U+014B).
+      This is the core S-03 rule firing. The intermediate 'n' is consumed and
+      replaced by 'ŋ'.
+
+  - input: ["SHIFT K_N"]
+    expectedOutput: "N"
+    description: >
+      Uppercase 'N' (shift-pressed). Without the second character, 'N' outputs
+      unchanged.
+
+  - input: ["SHIFT K_N", "K_G"]
+    expectedOutput: "Ŋ"
+    description: >
+      Uppercase first + lowercase second: 'N' + 'g' produces 'Ŋ' (U+0220).
+      Demonstrates that the rule matches the exact case of the first character
+      and applies the corresponding output case.
+
+  - input: ["K_N", "SHIFT K_G"]
+    expectedOutput: "ŋ"
+    description: >
+      Lowercase first + uppercase second: 'n' + 'G' produces 'ŋ' (lowercase output).
+      The context rule is case-sensitive on the FIRST character; a shift on the
+      SECOND character does not prevent the rule from firing, but the output
+      case is determined by the first-character case.
+
+  - input: ["SHIFT K_N", "SHIFT K_G"]
+    expectedOutput: "Ŋ"
+    description: >
+      Both uppercase: 'N' + 'G' produces 'Ŋ'. Both case variants present.
+
+  - input: ["K_N", "K_A"]
+    expectedOutput: "na"
+    description: >
+      Partial sequence mismatch: 'n' followed by 'a' (not 'g'). The 'n' is already
+      in the buffer; the 'a' key is processed normally, resulting in 'na' (two
+      characters). No rule fires because the second character is not 'g'.
+
+  - input: ["K_N", "K_SPACE"]
+    expectedOutput: "n "
+    description: >
+      Fallback with space: 'n' followed by space. The space is processed normally,
+      yielding 'n ' (n plus space). The context rule does not fire.
+
+  - input: ["K_N", "K_G", "K_A"]
+    expectedOutput: "ŋa"
+    description: >
+      Sequence followed by a continuation character. After 'n' + 'g' → 'ŋ', the
+      'a' key is pressed and outputs 'a' normally, resulting in 'ŋa' (two characters).
+      The 'ŋ' does not interact further with 'a'; each keystroke is independent
+      once the sequence rule has fired.
+
+  - input: ["K_N", "K_G", "K_G"]
+    expectedOutput: "ŋg"
+    description: >
+      After the sequence collapses to 'ŋ', pressing 'g' again outputs 'g' normally
+      (there is no 'ŋ' + 'g' rule). Result: 'ŋg'. This verifies the sequence rule
+      consumes the 'n' and does not leave residual state.
+
+  - input: ["K_N", "K_N"]
+    expectedOutput: "nn"
+    description: >
+      Double 'n': the first 'n' outputs as normal; the second 'n' is processed
+      by the main group (no rule for 'n' + 'n'), so it outputs 'n' as well.
+      Result: 'nn'. This verifies the rule does not over-match on repeated first chars.
+
+  - input: ["K_G"]
+    expectedOutput: "g"
+    description: >
+      Bare 'g' without a preceding 'n'. The key outputs 'g' normally; there is
+      no context rule (since 'g' requires 'n' in the preceding context).
+
+  - input: ["K_G", "K_N"]
+    expectedOutput: "gn"
+    description: >
+      'g' followed by 'n': the sequence is reversed, so no rule fires. Output is
+      'gn' (two separate characters). This verifies the rule is order-sensitive.
+
+  - input: ["K_A", "K_N", "K_G"]
+    expectedOutput: "aŋ"
+    description: >
+      A character before the sequence: 'a' outputs normally, then 'n' outputs,
+      then 'g' triggers the collapse of the 'n' + 'g' pair into 'ŋ'.
+      Result: 'aŋ' (a unchanged, ng collapsed). Verifies the context rule
+      looks only at the immediately preceding character in the output buffer.
+
+  - input: ["K_N", "K_G", "K_N", "K_G"]
+    expectedOutput: "ŋŋ"
+    description: >
+      Two sequences in succession: 'n' + 'g' → 'ŋ', then 'n' + 'g' → 'ŋ' again.
+      Result: 'ŋŋ'. Verifies the rule can fire multiple times and does not lock
+      the output after the first collapse.
+
+  - input: ["K_N", "K_BKSP"]
+    expectedOutput: ""
+    description: >
+      'n' followed by backspace. After 'n' outputs, backspace deletes it.
+      Result: empty. This verifies 'n' is a real character in the buffer,
+      not a held deadkey state that would block backspace.
+
+  - input: ["K_N", "K_G", "K_BKSP"]
+    expectedOutput: ""
+    description: >
+      'n' + 'g' → 'ŋ' (sequence collapses), then backspace. Backspace deletes
+      the 'ŋ'. Result: empty. Verifies the output character 'ŋ' is a normal
+      character that can be deleted and is not locked by the rule.
+
+validatedForFamilies:
+  - "Latn"
+
+sourceKeyboards:
+  - "release/athinkra/athinkra_vai/source/athinkra_vai.kmn#L42"
+  - "release/athinkra/athinkra_vai_typewriter/source/athinkra_vai_typewriter.kmn#L42"
+  - "release/c/common_devanagari/source/common_devanagari.kmn#L162-L169"
+  - "release/nlci/nlci_telugu_winscript/source/nlci_telugu_winscript.kmn#L35,L41,L45,L49"
+  - "release/sil/sil_ipa/source/sil_ipa.kmn#L301-L313"
+
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-06-04"

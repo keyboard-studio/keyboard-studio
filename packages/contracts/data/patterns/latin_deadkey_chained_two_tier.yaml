@@ -1,0 +1,305 @@
+id: latin_deadkey_chained_two_tier
+title: "Two trigger keys, then a base letter, gives a double-accented or multi-family accented form"
+description: >
+  The user presses a first trigger key (selects the accent family, e.g. grave),
+  then a second trigger key (selects a sub-family or variant, e.g. acute within
+  grave family), then a base letter to produce a combined or accented form.
+  This is the reference implementation for positional (non-mnemonic) two-tier
+  deadkey chaining. See thamizha_bamini (Tamil) for the same pattern applied
+  to an abugida script. Designed for keyboards needing multi-family diacritics
+  while keeping individual deadkey tables manageable. Most single-language
+  keyboards will use simpler strategies (S-01 simple swap or S-02 single deadkey).
+category: desktop
+appliesTo:
+  - "Latn"
+strategyId: "S-06"
+combinesWith:
+  - "S-04"
+  - "S-08"
+
+questions:
+  - id: firstTriggerKey
+    prompt: >
+      Which key starts the two-key accent sequence — the "family selector"?
+      This key has no visible output on its own; it just arms the first stage.
+      Example: the grave/backtick key (K_GRAVE) or the left-bracket key (K_LBRKT).
+    answerType: key-name
+    default: "K_GRAVE"
+
+  - id: secondTriggerKey
+    prompt: >
+      Which key is pressed after the family selector to choose the specific accent?
+      This is the second stage of the chain before the base letter.
+      Example: the apostrophe/quote key (K_QUOTE) or the semicolon key (K_SEMICOLON).
+    answerType: key-name
+    default: "K_QUOTE"
+
+  - id: tier1FamilyName
+    prompt: >
+      Give a short internal name for the accent family selected by the first trigger.
+      This becomes the deadkey name in the compiled KMN (no spaces, ASCII only).
+      Example: "grave_family" or "low_tone"
+    answerType: text
+    default: "grave_family"
+
+  - id: tier2AccentName
+    prompt: >
+      Give a short internal name for the specific accent selected by the second trigger.
+      This becomes the second-tier deadkey name in the compiled KMN.
+      Example: "grave_acute_chain" or "low_rising"
+    answerType: text
+    default: "grave_acute_chain"
+
+  - id: baseLetters
+    prompt: >
+      Which base letters can follow the two-key trigger sequence to produce an
+      accented character? List them without spaces, lowercase then uppercase.
+      The output store must have the same number of characters.
+      Example: aeiouAEIOU
+    answerType: char-list
+    default: "aeiouAEIOU"
+
+  - id: chainedOutputs
+    prompt: >
+      List the output characters for the chained (first + second + base) path, in
+      exactly the same order as the base letters above. Use precomposed NFC forms,
+      not combining sequences.
+      Example: àèìòùÀÈÌÒÙ
+    answerType: char-list
+    default: "àèìòùÀÈÌÒÙ"
+
+  - id: tier1OnlyOutputs
+    prompt: >
+      Optional: what should be output when the user presses the FIRST trigger key
+      followed directly by a base letter (bypassing the second trigger)?
+      If you want a full S-02-style single-tier fallback, fill this in.
+      If you do not want a first-tier-only path, leave blank.
+      Example: for a grave-only first tier: àèìòùÁÉÍÓÚ
+    answerType: char-list
+    default: ""
+
+  - id: tier1FallbackChar
+    prompt: >
+      What single character should appear if the FIRST trigger is pressed and then
+      a key that is NOT in the base-letter list is pressed (the fallback / escape
+      output)? Typically the trigger key's own character, so the user gets it back.
+      Example: "`" (backtick / grave)
+    answerType: char-single
+    default: "`"
+
+  - id: tier2FallbackChar
+    prompt: >
+      What single character should appear if the SECOND trigger is pressed (after
+      the first) and then a key that is NOT in the base-letter list is pressed?
+      Typically the second trigger's own character.
+      Example: "'" (apostrophe)
+    answerType: char-single
+    default: "'"
+
+kmnFragment: |
+  c ---- S-06 Chained-deadkey stores ----------------------------------------
+  c Both output stores MUST have the same element count as dk_chain_bases.
+  c The scaffolder enforces this at slot-fill time (Layer A store-parity check).
+  store(dk_chain_bases) '{{baseLetters}}'
+  store(dk_chain_out)   '{{chainedOutputs}}'
+
+  c ---- Tier-1: first trigger key arms the family deadkey -------------------
+  c Pressing {{firstTriggerKey}} alone commits nothing visible.
+  + [{{firstTriggerKey}}] > dk({{tier1FamilyName}})
+
+  c ---- Tier-1 → tier-2: second trigger fires the chained accent deadkey ----
+  c The family deadkey followed by the second trigger arms the resolution deadkey.
+  dk({{tier1FamilyName}}) + [{{secondTriggerKey}}] > dk({{tier2AccentName}})
+
+  c ---- Tier-2 resolution: chained deadkey + base letter → NFC output -------
+  c index() offset N=2: position 1 is the dk() context, position 2 is any(dk_chain_bases).
+  c Output is precomposed NFC (no combining sequences).
+  dk({{tier2AccentName}}) + any(dk_chain_bases) > index(dk_chain_out, 2)
+
+  c ---- Tier-2 fallback: unrecognised base after second trigger --------------
+  c notany() matches any key NOT in dk_chain_bases; context(2) restores it.
+  c This mirrors the S-02 "restore on miss" pattern (spec.md §7.3 S-02 card).
+  dk({{tier2AccentName}}) + notany(dk_chain_bases) > '{{tier2FallbackChar}}' context(2)
+
+  c ---- Tier-1 direct-resolution path (optional; omitted if slot is empty) --
+  c If the user fills {{tier1OnlyOutputs}}, a single-tier shortcut is also active:
+  c [firstTrigger] + base → tier-1 output (without pressing the second trigger).
+  c Store dk_tier1_out MUST have the same element count as dk_chain_bases.
+  c The scaffolder strips this block when {{tier1OnlyOutputs}} is empty.
+  c
+  c store(dk_tier1_out) '{{tier1OnlyOutputs}}'
+  c dk({{tier1FamilyName}}) + any(dk_chain_bases) > index(dk_tier1_out, 2)
+
+  c ---- Tier-1 fallback: unrecognised key after first trigger ----------------
+  c Fires when first trigger is followed by anything other than:
+  c   (a) the second trigger key, or (b) a base letter (if tier-1-only path active).
+  c context(2) restores the unmatched character after the family-selector literal.
+  dk({{tier1FamilyName}}) + notany(dk_chain_bases) > '{{tier1FallbackChar}}' context(2)
+
+  c ---- Double-press of first trigger key -----------------------------------
+  c Pressing the first trigger twice produces its literal character.
+  c This rule must appear BEFORE the generic tier-1 fallback so it fires first.
+  c (Rule ordering in KMN: more specific LHS context beats less specific.)
+  dk({{tier1FamilyName}}) + [{{firstTriggerKey}}] > '{{tier1FallbackChar}}'
+
+  c ---- Double-press of second trigger key (after first trigger) ------------
+  c Pressing first + second + second produces the second trigger's literal char.
+  dk({{tier2AccentName}}) + [{{secondTriggerKey}}] > '{{tier2FallbackChar}}'
+
+touchLayoutFragment: |
+  {
+    "id": "{{firstTriggerKey}}",
+    "sk": [
+      {
+        "id": "{{secondTriggerKey}}",
+        "text": "{{tier2FallbackChar}}",
+        "nextlayer": "{{tier2AccentName}}_layer"
+      }
+    ]
+  }
+
+tests:
+  - input: ["K_GRAVE", "K_QUOTE", "K_A"]
+    expectedOutput: "à"
+    description: >
+      grave-family trigger + quote trigger + a → à (U+00E0 LATIN SMALL LETTER A WITH GRAVE).
+      Full two-tier chain: tier-1 arms dk(grave_family), tier-2 arms dk(grave_acute_chain),
+      then any(dk_chain_bases) resolves via index(dk_chain_out, 2).
+
+  - input: ["K_GRAVE", "K_QUOTE", "K_E"]
+    expectedOutput: "è"
+    description: >
+      Full chain with e → è (U+00E8). Confirms index offset 2 is correct for the
+      second vowel position in the store.
+
+  - input: ["K_GRAVE", "K_QUOTE", "K_I"]
+    expectedOutput: "ì"
+    description: >
+      Full chain with i → ì (U+00EC). Third store position.
+
+  - input: ["K_GRAVE", "K_QUOTE", "K_O"]
+    expectedOutput: "ò"
+    description: >
+      Full chain with o → ò (U+00F2). Fourth store position.
+
+  - input: ["K_GRAVE", "K_QUOTE", "K_U"]
+    expectedOutput: "ù"
+    description: >
+      Full chain with u → ù (U+00F9). Fifth store position.
+
+  - input: ["K_GRAVE", "K_QUOTE", "SHIFT K_A"]
+    expectedOutput: "À"
+    description: >
+      Full chain with shift-A → À (U+00C0 LATIN CAPITAL LETTER A WITH GRAVE).
+      Confirms uppercase members of dk_chain_bases map to correct index positions
+      in dk_chain_out. Store position 6 (after aeiou).
+
+  - input: ["K_GRAVE", "K_QUOTE", "SHIFT K_E"]
+    expectedOutput: "È"
+    description: >
+      Full chain with shift-E → È (U+00C8). Store position 7.
+
+  - input: ["K_GRAVE", "K_QUOTE", "SHIFT K_I"]
+    expectedOutput: "Ì"
+    description: >
+      Full chain with shift-I → Ì (U+00CC). Store position 8.
+
+  - input: ["K_GRAVE", "K_QUOTE", "SHIFT K_O"]
+    expectedOutput: "Ò"
+    description: >
+      Full chain with shift-O → Ò (U+00D2). Store position 9.
+
+  - input: ["K_GRAVE", "K_QUOTE", "SHIFT K_U"]
+    expectedOutput: "Ù"
+    description: >
+      Full chain with shift-U → Ù (U+00D9). Store position 10. Final entry in the
+      default store; confirms the store has no off-by-one error.
+
+  - input: ["K_GRAVE", "K_A"]
+    expectedOutput: "`a"
+    description: >
+      First trigger + a without the second trigger: when {{tier1OnlyOutputs}} is empty,
+      no tier-1 direct-resolution rule is active. The dk(grave_family) + any(dk_chain_bases)
+      path is not defined, so the key is consumed by the dk() state. The character passes
+      through via context(2) in the tier-1 fallback rule.
+      NOTE: when {{tier1OnlyOutputs}} is populated, this vector must be updated to
+      match the tier-1 output character (e.g. "à" for a grave-first-tier path).
+
+  - input: ["K_GRAVE", "K_SPACE"]
+    expectedOutput: "` "
+    description: >
+      First trigger followed by space — space is not in dk_chain_bases, so
+      dk(grave_family) + notany(dk_chain_bases) fires: output is '`' + context(2) = '` '.
+      Verifies the tier-1 fallback restore rule.
+
+  - input: ["K_GRAVE", "K_QUOTE", "K_SPACE"]
+    expectedOutput: "' "
+    description: >
+      Full chain fires through tier-2, then space is not in dk_chain_bases, so
+      dk(grave_acute_chain) + notany(dk_chain_bases) fires: output is "'" + context(2) = "' ".
+      Verifies the tier-2 fallback restore rule.
+
+  - input: ["K_GRAVE", "K_GRAVE"]
+    expectedOutput: "`"
+    description: >
+      Two presses of the first trigger key: the first press arms dk(grave_family),
+      the second press matches dk(grave_family) + [K_GRAVE] → '`' (tier1FallbackChar).
+      The user gets the backtick/grave literal. Verifies the double-press handler
+      fires before the generic notany() fallback.
+
+  - input: ["K_GRAVE", "K_QUOTE", "K_QUOTE"]
+    expectedOutput: "'"
+    description: >
+      First trigger arms tier-1, second trigger arms tier-2 (dk(grave_acute_chain)),
+      then second trigger again matches dk(grave_acute_chain) + [K_QUOTE] → "'".
+      The user gets the apostrophe literal. Verifies the tier-2 double-press handler.
+
+  - input: ["K_GRAVE", "K_QUOTE", "K_SEMICOLON"]
+    expectedOutput: "';"
+    description: >
+      Chain reaches tier-2, then semicolon (not in dk_chain_bases) triggers
+      dk(grave_acute_chain) + notany(dk_chain_bases): output is "'" + context(2) = "';"
+      followed by the literal semicolon from context(2).
+
+  - input: ["K_A"]
+    expectedOutput: "a"
+    description: >
+      Plain a without any trigger. No deadkey is armed; the main group
+      passes the character through unchanged. Confirms no unintended interaction
+      with the chain rules.
+
+  - input: ["K_E"]
+    expectedOutput: "e"
+    description: >
+      Plain e passthrough.
+
+  - input: ["SHIFT K_A"]
+    expectedOutput: "A"
+    description: >
+      Plain uppercase A passthrough. Confirms shift handling is not accidentally
+      consumed by the chain rules.
+
+  - input: ["K_GRAVE", "K_QUOTE", "K_A", "K_B"]
+    expectedOutput: "àb"
+    description: >
+      After the full chain resolves to à, the subsequent b is a plain passthrough.
+      Verifies the deadkey state is fully consumed after resolution and does not
+      persist into the next keystroke.
+
+  - input: ["K_GRAVE", "K_SPACE", "K_A"]
+    expectedOutput: "` a"
+    description: >
+      Tier-1 fallback fires on space (outputting '`' + ' '), then a is a plain
+      passthrough. Verifies the tier-1 fallback does not leave residual deadkey
+      state that could corrupt subsequent input.
+
+validatedForFamilies:
+  - "Latn"
+
+sourceKeyboards:
+  - "release/t/thamizha_bamini/source/thamizha_bamini.kmn#L168-L172"
+
+frequencyInCorpus: 1
+
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-06-04"
