@@ -6,6 +6,7 @@
   "description": "The spec'd authoring SPA. Two-pane survey + live preview per spec.md §4 (issue #22 et al). For the working compile/preview pipeline reference, see @keyboard-studio/studio-poc.",
   "scripts": {
     "dev": "vite",
+    "prebuild": "pnpm --filter @keyboard-studio/contracts --filter @keyboard-studio/engine run build",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
