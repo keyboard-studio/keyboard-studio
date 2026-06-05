@@ -87,7 +87,8 @@ kmnFragment: |
   group(main) using keys
   c Context-sensitive sequence rules
   c Pattern: ascii_sequence + next_char > expanded_output / context
-  # TODO(km-keyman): add context rule for RR → ṛ collapse; single-R rule alone will produce ṛṛ
+  c RR collapse: if R has already emitted U+0943, a second R replaces it with a single U+0943
+  U+0943 + 'R' > U+0943      c R + R → ṛ (retroflex vowel, collapsed to one)
   {{kmnRules}}
 
 touchLayoutFragment: null
@@ -239,8 +240,8 @@ demo:
       output: "आ"
       note: "Length vowel: 'aa' → long ā (U+0906)"
     - keys: ["R", "R"]
-      output: "ṛṛ"
-      note: "Retroflex: 'RR' → retroflex vowel (U+0943)"
+      output: "ṛ"
+      note: "Retroflex: 'RR' → single retroflex vowel (U+0943); context rule collapses double emission"
 
   sample_output: >
     Type ITRANS sequences: 'a' → अ, 'aa' → आ, 'ka' → क, 'kaa' → का, etc.
