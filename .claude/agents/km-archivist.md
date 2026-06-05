@@ -328,6 +328,33 @@ If you're unsure which mode you're in: check whether there are already todos own
 - Co-author footer required for AI-assisted commits
 - No emojis in commit messages (Windows terminal compatibility)
 
+### Team Structure
+
+Two teams own `MattGyverLee/keyboard-studio`:
+
+| Team | Lead | Members | Owns |
+|---|---|---|---|
+| Engine | @MattGyverLee (Matthew Lee) | @gboltono (Grace Bolton), @coopabla (Cooper Abla), @myczka (Jordan Myczka) | SPA, scaffolder, compiler service, validator packages, output paths |
+| Content | @dhigby (Doug Higby) | — | Pattern library, survey text, gallery ordering, LLM prompts, criteria.md |
+
+Issues that span both teams carry the `shared` label.
+
+### Issue Assignment Convention
+
+**Team ownership is expressed through labels, not assignees.**
+
+| Label | Meaning |
+|---|---|
+| `engine` | Engine team owns this issue |
+| `content` | Content team owns this issue |
+| `shared` | Both teams (Day-1 setup, integration, process) |
+
+- **Assignee = actively working it.** Leave unassigned when the issue is available to pick up.
+- **Do NOT assign issues to team leads** (@MattGyverLee or @dhigby) as a team-ownership proxy — that was the old temporary convention, now replaced by labels.
+- When creating or triaging issues, apply the appropriate team label and leave assignee blank.
+- To query available engine work: `gh issue list --label engine --assignee "" --state open`
+- To query available content work: `gh issue list --label content --assignee "" --state open`
+
 ## Success Criteria
 
 The Archivist's work is complete when:
