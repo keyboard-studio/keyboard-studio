@@ -32,16 +32,15 @@ import { runLexicalChecks } from "./index.js";
 
 function severityRank(s: LintFinding["severity"]): number {
   switch (s) {
-    case "fatal":
-      return 0;
-    case "error":
-      return 1;
-    case "warning":
-      return 2;
-    case "hint":
-      return 3;
-    case "info":
-      return 4;
+    case "fatal":   return 0;
+    case "error":   return 1;
+    case "warning": return 2;
+    case "hint":    return 3;
+    case "info":    return 4;
+    default: {
+      const _exhaustive: never = s;
+      throw new Error(`Unexpected severity: ${String(_exhaustive)}`);
+    }
   }
 }
 
