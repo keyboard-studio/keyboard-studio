@@ -1,0 +1,298 @@
+# dll-ime-callout.yaml
+# DLL IME callout pattern for logographic scripts
+# Strategy: S-12 (DLL IME callout)
+# Priority 3 — specialized; logographic-only, Windows-only.
+
+id: dll_ime_callout
+title: "DLL IME callout: delegate to Windows IME for massive inventories"
+description: >
+  For logographic scripts with tens of thousands of characters (Han, Kanji,
+  Hanja), the keyboard delegates character lookup to a native Windows IME via
+  a DLL function call. Instead of embedding thousands of rules, the keyboard
+  acts as a thin shim: user types a phonetic key sequence (Pinyin, Jyutping,
+  Romaja), and the DLL (usually installed by the OS or IME vendor) returns the
+  matching characters. Keyman rules simply call the DLL and pass through the
+  result.
+category: ime
+appliesTo: ["Hans", "Hant", "Jpan", "Kore"]
+priority: 3
+group_visibility: all
+strategyId: "S-12"
+combinesWith: []
+
+questions:
+  - id: dllFunctionReference
+    prompt: >
+      What DLL function will you call to look up characters?
+      Format: DLL_NAME.DLL:FunctionName
+
+      Common examples:
+        KeymanIMX.DLL:FindGlyph           (for Pinyin → Han, CS Pinyin keyboard)
+        MSIMECallback.DLL:GetCharacters   (Microsoft IME callback)
+        Custom.DLL:CustomLookup           (custom vendor DLL)
+
+      The DLL must be:
+      - Installed on the user's Windows system (or shipped with the keyboard)
+      - Accessible to Keyman at runtime
+      - Callable with the signature the keyboard expects
+
+      Consult the IME vendor or DLL documentation for the exact function name
+      and calling convention (what arguments it accepts, what it returns).
+    answerType: text
+
+  - id: inputMappingScheme
+    prompt: >
+      How does the user input the lookup key? (Pinyin, Jyutping, Romaja, etc.)
+      Format: brief description + examples
+
+      Example for Simplified Chinese (Pinyin):
+        - User types Pinyin romanization: "han" for 汉, "zi" for 字
+        - The keyboard reads the keystroke sequence and passes it to the DLL
+        - DLL returns matching Han characters; user selects from list
+
+      Example for Japanese (Romaji):
+        - User types Romaji: "ka" for か, "sa" for さ
+        - DLL returns kana or kanji matches
+        - User selection appears in text
+
+      Describe your input scheme so future authors understand the flow.
+    answerType: text
+
+  - id: platformLimitations
+    prompt: >
+      Are you aware of the platform limitations? (Read carefully!)
+
+      S-12 is WINDOWS-ONLY. It does NOT work on:
+      - macOS (no Windows.Media.Sounds equivalent for IME DLLs)
+      - Linux (no native Windows DLL support)
+      - Mobile (no Keyman DLL mechanism)
+      - Web (no DLL access in browsers)
+
+      If you need cross-platform support, S-12 is NOT the right strategy.
+      Consider:
+      - S-05 (transliteration) if the inventory is <10k characters
+      - Cloud-based lookup (not yet in Keyboard Studio v1)
+      - Ship multiple platform-specific keyboards
+
+      Do you accept the Windows-only limitation and want to proceed with S-12?
+    answerType: text
+    required: false
+
+kmnFragment: |
+  c DLL IME callout (S-12)
+  c User types phonetic input; keyboard calls DLL to look up characters.
+  c This is a thin shim around a Windows DLL function.
+
+  store(DLLFunction) "{{dllFunctionReference}}"
+
+  begin Unicode > use(main)
+
+  group(main) using keys
+  c For any keystroke, call the DLL to get matching characters
+  {{kmnRules}}
+
+  nomatch > use(main)
+
+touchLayoutFragment: null
+
+notes: >
+  **When the decision tree picks S-12:**
+  The decision tree (spec.md §7.2, rule 1) selects S-12 when:
+  - A1 = massive (1000+ new characters) AND
+  - A2 = logographic (Han, Kanji, Hanja, etc.)
+
+  This is rare because:
+  1. Massive inventories (1000+) are almost always logographic
+  2. Logographic scripts almost always need S-12 (no other strategy scales)
+  3. S-12 is WINDOWS-ONLY, which is a hard constraint
+
+  **Use S-12 when:**
+  - Character inventory is 1000+ (too large for rule-based approaches)
+  - Script is logographic (Han, Kanji, Hanja, or similar)
+  - A DLL function is available and callable
+  - Target platform is Windows
+  - User input is phonetic (Pinyin, Jyutping, Romaja, etc.)
+
+  **When to NOT use S-12:**
+  - Inventory < 1000 characters → use S-05 (transliteration) instead
+  - Cross-platform support needed → S-12 won't work; design differently
+  - No DLL available → S-05 is the fallback (slower but portable)
+  - Logographic but user input is not phonetic → design a custom strategy
+
+tests:
+  - input: ["p", "i", "n", "y", "i", "n"]
+    expectedOutput: "汉字" (or selection menu)
+    description: >
+      Simplified Chinese (Pinyin): typing "pinyin" passes the sequence to the
+      DLL, which returns matching Han characters (汉字 for "hanzi"). User sees
+      a menu of options and selects the intended character(s).
+  - input: ["j", "y", "u", "t", "p", "i", "n", "g"]
+    expectedOutput: "香港" (or selection menu)
+    description: >
+      Traditional Chinese (Jyutping): typing "jyutping" looks up matching
+      Traditional Han characters. DLL returns candidates; user picks.
+  - input: ["r", "o", "m", "a", "j", "i"]
+    expectedOutput: "ローマ字" (or selection menu)
+    description: >
+      Japanese (Romaji): typing "romaji" returns kana/kanji matches. DLL
+      handles the conversion; user selection completes input.
+
+validatedForFamilies: ["Hans"]
+sourceKeyboards:
+  - "release/c/cs_pinyin/source/cs_pinyin.kmn"
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-06-05"
+
+# ---------------------------------------------------------------------------
+# Extended metadata — YAML-only; not part of the TypeScript Pattern interface
+# ---------------------------------------------------------------------------
+
+frequency_in_corpus: "Rare; only for massive logographic inventories on Windows"
+
+notes_extended: >
+  S-12 is a pragmatic choice for logographic keyboards: shipping 100k+ rules
+  in a `.kmn` file is infeasible (file size, compilation time, memory). Instead,
+  the keyboard is a thin client that calls a DLL installed by the OS or IME vendor.
+
+  **Why S-12 exists:**
+  Windows IMEs (Input Method Editors) for Chinese, Japanese, Korean have been
+  built for decades. They're optimized, language-aware, and already on most
+  Windows systems. Keyman S-12 doesn't reinvent the wheel — it bridges to
+  existing IME infrastructure.
+
+  **The tradeoff:**
+  - **Pro:** Massive inventories (100k+ characters) become feasible
+  - **Pro:** Leverages existing, battle-tested IME code
+  - **Con:** Windows-only (no macOS, Linux, mobile, web)
+  - **Con:** Requires the DLL to be installed and accessible
+  - **Con:** No fallback if the DLL is missing or incompatible
+  - **Con:** Harder to debug (DLL behavior is opaque)
+
+  **Common mistakes to avoid:**
+
+  1. **Assuming cross-platform compatibility**
+     S-12 only works on Windows. If you need macOS or Linux support, use S-05
+     (transliteration with fewer characters) or design a custom cloud-based
+     approach (not yet in Keyboard Studio v1).
+
+  2. **Forgetting to ship the DLL**
+     If you write a custom DLL, you MUST ship it with the keyboard package
+     and document installation steps. If the DLL is missing, the keyboard is
+     non-functional.
+
+  3. **Hard-coding absolute DLL paths**
+     WRONG: store(DLLFunction) "C:\Program Files\Custom\MyDLL.dll:MyFunc"
+     RIGHT: store(DLLFunction) "MyDLL.dll:MyFunc" (Windows searches PATH)
+
+     Use relative paths or Windows PATH so the DLL can move.
+
+  4. **Not testing on a clean Windows system**
+     Test your keyboard on a Windows system where the DLL is NOT installed.
+     If it fails silently, users will blame Keyman, not your DLL.
+
+  5. **Not providing fallback input method**
+     If your DLL is missing, users are stuck. Consider:
+     - Documenting DLL installation clearly
+     - Providing an S-05 transliteration fallback
+     - Shipping the DLL in the keyboard package
+     - Clear error messages when the DLL is missing
+
+  **Testing checklist:**
+  Before submitting, verify:
+  - [ ] DLL function name is correct (from vendor documentation)
+  - [ ] KMN compiles with zero errors
+  - [ ] DLL is callable and returns expected output
+  - [ ] Tested on a Windows system WITHOUT the DLL installed
+  - [ ] Graceful degradation if DLL is missing (error message, not crash)
+  - [ ] Platform limitations clearly documented
+  - [ ] Installation instructions for any custom DLL included
+
+provenance:
+  - keyboard: "release/c/cs_pinyin/source/cs_pinyin.kmn"
+    note: >
+      Simplified Chinese Pinyin (SIL International). The canonical S-12 exemplar.
+      Uses KeymanIMX.DLL:FindGlyph to delegate lookup to a Windows DLL.
+
+      Key insight: the `.kmn` file is minimal (~50 lines of actual rules).
+      All intelligence lives in the DLL. The keyboard simply:
+      1. Reads user keystrokes (Pinyin romanization)
+      2. Calls the DLL with the keystroke sequence
+      3. Renders the result (character or selection menu)
+      4. User selects the intended character
+
+      This pattern scales to 100k+ Han characters without bloating the KMN file.
+      It is the ONLY S-12 implementation in keymanapp/keyboards; treat it as
+      the reference.
+
+demo:
+  filled_kmn: |
+    c DLL IME callout demo: Simplified Chinese Pinyin
+    c Minimal implementation; real work happens in the DLL
+
+    store(&VERSION) '10.0'
+    store(&NAME) 'Pinyin DLL Demo'
+    store(&TARGETS) 'any'
+
+    store(DLLFunction) "KeymanIMX.DLL:FindGlyph"
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+    c Call the DLL for any keystroke
+    + any(keys) > call(DLLFunction)
+    nomatch > call(DLLFunction)
+
+  sample_keys:
+    - keys: ["p", "i", "n", "y", "i", "n"]
+      output: "[DLL returns matching characters for 'pinyin']"
+      note: "User types Pinyin; DLL returns Han characters"
+    - keys: ["h", "a", "n", "z", "i"]
+      output: "[DLL returns matches for 'hanzi']"
+      note: "Another example: Pinyin input → Han output"
+
+  sample_output: >
+    Type Pinyin (romanized) keystrokes. The keyboard calls the DLL to look up
+    matching Han characters. The DLL returns a selection menu (usually a dropdown
+    or candidate list). User selects the intended character, which appears in text.
+    The keyboard is a thin bridge; all character lookup is delegated to the DLL.
+
+skeleton:
+  kmn_template: |
+    c DLL IME callout ({{language}})
+    c Minimal shim around {{dllFunctionReference}}
+
+    store(&VERSION) '10.0'
+    store(&NAME) '{{keyboardName}}'
+    store(&TARGETS) 'any'
+
+    store(DLLFunction) "{{dllFunctionReference}}"
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+    c Delegate all input to the DLL
+    + any(keys) > call(DLLFunction)
+    nomatch > call(DLLFunction)
+
+  note: >
+    S-12 is intentionally minimal. The entire keyboard is a client that calls
+    a DLL function for every keystroke. The DLL handles all the logic:
+    - Phonetic-to-character mapping
+    - Character selection UI
+    - Candidate ranking
+    - User preferences (simplified vs. traditional, etc.)
+
+    You do NOT define character mappings in KMN for S-12. The DLL owns that.
+
+  parameters:
+    - id: language
+      description: >
+        Language name (e.g., "Simplified Chinese", "Japanese").
+    - id: dllFunctionReference
+      description: >
+        DLL function to call. Format: DLL_NAME.DLL:FunctionName
+        Example: KeymanIMX.DLL:FindGlyph
+    - id: keyboardName
+      description: >
+        Display name for the keyboard being authored.
+        Example: "Pinyin"
