@@ -443,7 +443,9 @@ flowchart TD
 
 **Encoding.** The tree may be encoded as JSON/TS rules in `packages/contracts` or reasoned over by the LLM directly against this table; both are valid (pick per studio architecture). The strategy selector returns `{ primary: strategyId, secondaries: strategyId[] }`, which the gallery resolves to patterns via the `strategyId` / `combinesWith` fields (Sec 5).
 
-### 7.3 Strategy catalog (S-01..S-12)
+**Touch keyboards and S-13.** The rules above are desktop-oriented — they model character-entry strategies driven by the A1–A7 axis vector. Touch keyboards need an additional structural choice: a dedicated layer-switch key that swaps the entire visible keyboard layout (default, shift, numeric, symbol, alt-script). This is not an A1–A7 character-entry strategy; it is a touch layout feature. Any touch keyboard with more than one named layer uses **S-13 Touch layer switch** as a structural wrapper alongside whichever character-entry strategy (S-01–S-09) governs the content of each layer. S-13 is chosen outside this decision tree, triggered by the presence of multiple entries in the touch layout's `"layer":` array.
+
+### 7.3 Strategy catalog (S-01..S-13)
 
 Each card is self-contained and citable by ID. Snippets are verbatim from `keymanapp/keyboards` (paths shown). The **Pattern mapping** line ties the card to the library: a pattern with that `strategyId` is what the gallery surfaces when the tree selects this strategy.
 
@@ -651,6 +653,38 @@ nomatch       > call(DLLFunction)
 
 **Real exemplar:** `release/c/cs_pinyin/source/cs_pinyin.kmn` — 100k+ Han characters via Pinyin lookup, delegated to a Windows DLL.
 
+#### S-13 Touch layer switch
+
+**When to use:** Any touch keyboard with more than one named layer (numeric, symbol, alt-script, shift-alternate). The switch key uses `"nextlayer":` in the Keyman touch layout JSON to swap the visible layer — no KMN rules are required for the layer switch itself.
+**When to avoid:** Desktop-only keyboards; single-layer touch keyboards.
+**Combines well with:** S-01, S-02, S-03, S-05, S-06, S-07, S-08, S-09 — whichever character-entry strategy governs the content within each layer. S-13 is structural: it wraps the content strategy rather than replacing it.
+**Pattern mapping:** `strategyId: "S-13"`; `combinesWith: []` (the pattern document leaves the choice of content strategy to the author — any S-01–S-09 combination is valid).
+
+```json
+{
+  "layer": [
+    { "id": "default", "row": [
+        { "id": 1, "key": [
+            { "id": "K_A", "text": "a" },
+            { "id": "T_switch_num", "text": "123", "sp": 1, "nextlayer": "numbers" }
+          ]
+        }
+      ]
+    },
+    { "id": "numbers", "row": [
+        { "id": 1, "key": [
+            { "id": "T_1", "text": "1" },
+            { "id": "T_switch_def", "text": "ABC", "sp": 1, "nextlayer": "default" }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Real exemplar:** `release/sil/sil_ipa/source/sil_ipa.keyman-touch-layout` — five named layers (`default`, `shift`, `numeric`, `diacritic`, `supersub`); dedicated switch keys on each layer use `"nextlayer":` to navigate the full layer set.
+
 ### 7.4 Building blocks
 
 Applied **inside** the strategies above, never chosen independently. The studio invokes them as a keyboard grows.
@@ -712,6 +746,14 @@ Note: S-04 (`any`/`index` table mechanism) is structurally embedded in every S-0
 - **IPA**: A3=strong but the user prefers *sequence modifiers* (`<`, `=`, `>`) to mnemonic spelling. Add a sub-axis distinguishing "spell the sound" from "decorate with suffix keys."
 
 These two remaining mismatches are **the value of the validation pass** — they pinpoint where v1 needs work before release. They are not v1 blockers: EuroLatin and IPA are expert-authored, well outside the target user's profile, and the strategies the tree picks (S-06 for EuroLatin, S-05 for IPA) produce working keyboards even if they differ from what SIL chose.
+
+**Touch strategy validation (S-13).** S-13 is not reached by the desktop decision tree above — it is selected whenever a touch keyboard's layout JSON defines more than one named layer. The A1–A7 axes do not apply; the confirmation criterion is simply the presence of `"nextlayer":` on one or more keys.
+
+| Exemplar | Touch layers | S-13 confirmed |
+|----------|--------------|----------------|
+| `release/sil/sil_ipa/` | 5 layers: `default`, `shift`, `numeric`, `diacritic`, `supersub` | ✓ |
+| `release/sil/sil_khmer/` | 4 layers: `default`, `shift`, `ctrl-alt`, `shift-ctrl-alt` | ✓ |
+| `release/sil/sil_hebrew/` | 4 layers: `default`, `shift`, `rightalt`, `rightalt-shift` | ✓ |
 
 ---
 

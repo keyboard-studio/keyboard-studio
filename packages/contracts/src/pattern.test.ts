@@ -72,13 +72,13 @@ describe("Pattern", () => {
     expect(pattern.tests[0]?.expectedOutput).toBe("á");
   });
 
-  it("ALL_STRATEGY_IDS exposes every S-01..S-12 id exactly once", () => {
-    expect(ALL_STRATEGY_IDS).toHaveLength(12);
-    expect(new Set(ALL_STRATEGY_IDS).size).toBe(12);
+  it("ALL_STRATEGY_IDS exposes every S-01..S-13 id exactly once", () => {
+    expect(ALL_STRATEGY_IDS).toHaveLength(13);
+    expect(new Set(ALL_STRATEGY_IDS).size).toBe(13);
     const first = ALL_STRATEGY_IDS[0]!;
     expect(first).toBe("S-01");
-    const last = ALL_STRATEGY_IDS[11]!;
-    expect(last).toBe("S-12");
+    const last = ALL_STRATEGY_IDS[12]!;
+    expect(last).toBe("S-13");
   });
 
   // (a) non-empty appliesTo array on a constructed Pattern
@@ -163,7 +163,7 @@ describe("Pattern", () => {
     const first = ALL_STRATEGY_IDS[0]!;
     const last = ALL_STRATEGY_IDS[ALL_STRATEGY_IDS.length - 1]!;
     expect(first).toBe("S-01");
-    expect(last).toBe("S-12");
+    expect(last).toBe("S-13");
   });
 });
 

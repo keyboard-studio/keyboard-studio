@@ -1,4 +1,4 @@
-// see spec.md section 7.3 - strategy catalog S-01..S-12
+// see spec.md section 7.3 - strategy catalog S-01..S-13
 
 export type StrategyId =
   | "S-01"
@@ -12,7 +12,8 @@ export type StrategyId =
   | "S-09"
   | "S-10"
   | "S-11"
-  | "S-12";
+  | "S-12"
+  | "S-13";
 
 export const ALL_STRATEGY_IDS: readonly StrategyId[] = [
   "S-01",
@@ -27,6 +28,7 @@ export const ALL_STRATEGY_IDS: readonly StrategyId[] = [
   "S-10",
   "S-11",
   "S-12",
+  "S-13",
 ] as const;
 
 /**
