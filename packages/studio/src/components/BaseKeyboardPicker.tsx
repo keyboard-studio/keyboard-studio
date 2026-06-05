@@ -20,14 +20,26 @@ export interface BaseKeyboardPickerProps {
 export function BaseKeyboardPicker({ value, onChange }: BaseKeyboardPickerProps) {
   const [keyboards, setKeyboards] = useState<BaseKeyboard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void baseBrowser.listAll().then((list) => {
-      if (cancelled) return;
-      setKeyboards(list);
-      setLoading(false);
-    });
+    setLoading(true);
+    setError(null);
+    baseBrowser.listAll().then(
+      (list) => {
+        if (cancelled) return;
+        setKeyboards(list);
+        setLoading(false);
+      },
+      (err: unknown) => {
+        if (cancelled) return;
+        const message = err instanceof Error ? err.message : String(err);
+        console.error("[BaseKeyboardPicker] listAll() failed:", err);
+        setError(message);
+        setLoading(false);
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -52,7 +64,7 @@ export function BaseKeyboardPicker({ value, onChange }: BaseKeyboardPickerProps)
       <select
         id="kbd-picker"
         value={selectedId}
-        disabled={loading}
+        disabled={loading || error !== null}
         onChange={(e) => {
           const id = e.currentTarget.value;
           const kb = keyboards.find((k) => k.id === id) ?? null;
@@ -61,7 +73,7 @@ export function BaseKeyboardPicker({ value, onChange }: BaseKeyboardPickerProps)
         style={{
           background: "#161b22",
           color: "#e6edf3",
-          border: "1px solid #283040",
+          border: `1px solid ${error ? "#7a2a2a" : "#283040"}`,
           borderRadius: 8,
           padding: "10px 12px",
           fontSize: 14,
@@ -70,7 +82,11 @@ export function BaseKeyboardPicker({ value, onChange }: BaseKeyboardPickerProps)
         }}
       >
         <option value="" disabled>
-          {loading ? "loading..." : "-- choose a base keyboard --"}
+          {loading
+            ? "loading..."
+            : error
+              ? "failed to load keyboards"
+              : "-- choose a base keyboard --"}
         </option>
         {keyboards.map((k) => (
           <option key={k.id} value={k.id}>
@@ -78,6 +94,18 @@ export function BaseKeyboardPicker({ value, onChange }: BaseKeyboardPickerProps)
           </option>
         ))}
       </select>
+      {error !== null && (
+        <div
+          role="alert"
+          style={{
+            fontSize: 12,
+            color: "#f0a0a0",
+            lineHeight: 1.4,
+          }}
+        >
+          {error}
+        </div>
+      )}
     </div>
   );
 }
