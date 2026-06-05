@@ -121,9 +121,9 @@ describe("mockPatternLibrary", () => {
     const result = await mockPatternLibrary.getById("latin_deadkey_acute_single");
     expect(result).toBeDefined();
     expect(result!.strategyId).toBe("S-02");
-    expect(result!.combinesWith).toEqual(["S-04"]);
+    expect(result!.combinesWith).toEqual(["S-04", "S-08", "S-11"]);
     expect(result!.category).toBe("desktop");
-    expect(result!.questions).toHaveLength(4);
+    expect(result!.questions).toHaveLength(5);
   });
 
   it("getById('nfd_normalization') returns the reorder pattern", async () => {
@@ -496,7 +496,7 @@ describe("fixture cross-checks", () => {
   it("latinDeadkeyAcuteSingle matches spec §6 fields", () => {
     expect(latinDeadkeyAcuteSingle.id).toBe("latin_deadkey_acute_single");
     expect(latinDeadkeyAcuteSingle.strategyId).toBe("S-02");
-    expect(latinDeadkeyAcuteSingle.combinesWith).toEqual(["S-04"]);
+    expect(latinDeadkeyAcuteSingle.combinesWith).toEqual(["S-04", "S-08", "S-11"]);
     expect(latinDeadkeyAcuteSingle.category).toBe("desktop");
     expect(latinDeadkeyAcuteSingle.tests[0]?.expectedOutput).toBe("á");
   });
