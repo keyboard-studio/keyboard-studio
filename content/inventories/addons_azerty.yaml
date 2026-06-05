@@ -1,0 +1,258 @@
+# addons_azerty.yaml
+# Common add-on letters for AZERTY-based African Latin keyboards.
+# Francophone Africa builds on the French AZERTY base (basic_kbdfr) and adds
+# characters for tonal, implosive, and nasal features of regional languages.
+#
+# Anchored from: sil_cameroon_azerty, sil_cameroon_qwerty, sil_pan_africa_mnemonic,
+#                clavbur9 (Burkina Faso), sil_akebu (scan corpus)
+#
+# AZERTY position notes:
+#   - Digits require Shift on standard French AZERTY (e.g. Shift+1 = 1, unshifted = &)
+#   - Q and A are swapped vs QWERTY
+#   - W and Z are swapped vs QWERTY
+#   - AltGr (RAlt) is heavily used for Latin Extended characters
+#
+# Each entry: codepoint, plain_name, category, example_languages,
+#             group_visibility, typical_key, azerty_notes, strategy_hint
+
+schema_version: "1.0"
+category: addons_azerty
+
+entries:
+
+  # ── Open vowels (most common West/Central African add-ons) ────────────────
+  - codepoint: U+025B
+    plain_name: "Open e (ɛ) — like the 'e' in 'bed'"
+    category: open_vowel
+    example_languages:
+      - "Bambara / Dioula (ɛ)"
+      - "Fula / Fulfulde (ɛ)"
+      - "Ewe, Fon (ɛ)"
+      - "Bassa (ɛ)"
+      - "All Cameroonian-language AZERTY keyboards"
+    group_visibility: all
+    typical_key: "AltGr+E on Cameroon AZERTY"
+    azerty_notes: "Shares AltGr layer with E; Cameroon AZERTY dedicates a key"
+    strategy_hint: "S-02 (deadkey from E) or S-08 (AltGr+E)"
+    uppercase: U+0190
+
+  - codepoint: U+0254
+    plain_name: "Open o (ɔ) — like the 'o' in 'caught'"
+    category: open_vowel
+    example_languages:
+      - "Bambara / Dioula (ɔ)"
+      - "Fula / Fulfulde (ɔ)"
+      - "Ewe, Fon (ɔ)"
+      - "All Cameroonian-language AZERTY keyboards"
+    group_visibility: all
+    typical_key: "AltGr+O on Cameroon AZERTY"
+    azerty_notes: "Shares AltGr layer with O"
+    strategy_hint: "S-02 (deadkey from O) or S-08 (AltGr+O)"
+    uppercase: U+0186
+
+  - codepoint: U+0259
+    plain_name: "Schwa (ə) — neutral unstressed vowel"
+    category: open_vowel
+    example_languages:
+      - "Fula (ə in some orthographies)"
+      - "Some Cameroonian languages"
+    group_visibility: all
+    typical_key: "AltGr+Shift+E or dedicated key"
+    azerty_notes: "Less common than ɛ; included in wider Cameroon keyboards"
+    strategy_hint: "S-08 (AltGr plane)"
+    uppercase: U+018F
+
+  - codepoint: U+028A
+    plain_name: "Near-close back rounded vowel (ʊ) — like 'oo' in 'foot'"
+    category: open_vowel
+    example_languages:
+      - "Ewe, Twi (ʊ)"
+      - "Some Cameroonian languages"
+    group_visibility: all
+    typical_key: "AltGr+U"
+    azerty_notes: "Present in pan-African keyboards; rare in single-language AZERTY"
+    strategy_hint: "S-08 (AltGr plane)"
+    uppercase: U+01B1
+
+  # ── Nasals ────────────────────────────────────────────────────────────────
+  - codepoint: U+014B
+    plain_name: "Eng (ŋ) — 'ng' sound as in 'sing'"
+    category: nasal_consonant
+    example_languages:
+      - "Bambara, Fula, Hausa (ŋ)"
+      - "Most West African language keyboards"
+    group_visibility: all
+    typical_key: "AltGr+N on Cameroon AZERTY"
+    azerty_notes: >
+      On French AZERTY, N is unshifted. The Cameroon AZERTY keyboard places ŋ
+      on AltGr+N (similar to QWERTY convention).
+    strategy_hint: "S-08 (AltGr plane) or S-01 if dedicated key available"
+    uppercase: U+014A
+
+  - codepoint: U+0272
+    plain_name: "Palatal n (ɲ) — 'ny' sound as in 'gn' (French) or 'ñ' (Spanish)"
+    category: nasal_consonant
+    example_languages:
+      - "Bambara (ɲ — very common)"
+      - "Fula / Fulfulde (ɲ)"
+      - "Wolof (ɲ)"
+    group_visibility: all
+    typical_key: "AltGr+Shift+N or dedicated key near N"
+    azerty_notes: "Critical for Bambara; should be prominent, not buried in AltGr+Shift"
+    strategy_hint: "S-01 if unused key available; S-08 (AltGr) otherwise"
+    uppercase: U+019D
+
+  # ── Implosives ────────────────────────────────────────────────────────────
+  - codepoint: U+0253
+    plain_name: "Implosive b (ɓ) — 'b' drawn inward, air pulled in"
+    category: implosive
+    example_languages:
+      - "Fula / Fulfulde (ɓ — very common)"
+      - "Hausa (ɓ)"
+      - "Many Cameroonian and West African languages"
+    group_visibility: all
+    typical_key: "AltGr+B on Cameroon AZERTY"
+    azerty_notes: "B position same as QWERTY on AZERTY; AltGr+B is natural"
+    strategy_hint: "S-08 (AltGr plane)"
+    uppercase: U+0181
+
+  - codepoint: U+0257
+    plain_name: "Implosive d (ɗ) — 'd' drawn inward"
+    category: implosive
+    example_languages:
+      - "Fula / Fulfulde (ɗ — very common)"
+      - "Hausa (ɗ)"
+      - "Many Cameroonian and West African languages"
+    group_visibility: all
+    typical_key: "AltGr+D on Cameroon AZERTY"
+    azerty_notes: "D is in the same position on AZERTY as QWERTY"
+    strategy_hint: "S-08 (AltGr plane)"
+    uppercase: U+018A
+
+  - codepoint: U+0260
+    plain_name: "G with hook (ɠ) — implosive g"
+    category: implosive
+    example_languages:
+      - "Some Cameroonian languages"
+      - "IPA transcription"
+    group_visibility: all
+    typical_key: "AltGr+G"
+    azerty_notes: "Less common than ɓ/ɗ; present in broad Cameroonian keyboards"
+    strategy_hint: "S-08 (AltGr plane)"
+    uppercase: U+029B
+
+  # ── Velar / pharyngeal fricatives ─────────────────────────────────────────
+  - codepoint: U+0263
+    plain_name: "Voiced velar fricative (ɣ) — back-of-throat 'g'"
+    category: fricative
+    example_languages:
+      - "Ewe (ɣ)"
+      - "Some Cameroonian languages"
+      - "Arabic transcription (for غ)"
+    group_visibility: all
+    typical_key: "AltGr+G or AltGr+H"
+    azerty_notes: "Present in pan-African and some Cameroonian keyboards"
+    strategy_hint: "S-08 (AltGr plane)"
+    uppercase: U+0194
+
+  # ── Hook letters (Fula / pan-African) ─────────────────────────────────────
+  - codepoint: U+01A5
+    plain_name: "P with hook (ƥ) — p drawn inward"
+    category: implosive
+    example_languages:
+      - "Some West African languages"
+      - "IPA transcription"
+    group_visibility: all
+    typical_key: "AltGr+P"
+    azerty_notes: "Rare; present in comprehensive pan-African keyboards"
+    strategy_hint: "S-08 (AltGr plane)"
+    uppercase: U+01A4
+
+  - codepoint: U+025F
+    plain_name: "Dotless j with stroke (ɟ) — palatal stop"
+    category: ipa_consonant
+    example_languages:
+      - "IPA transcription"
+      - "Some West African language phonetic orthographies"
+    group_visibility: all
+    typical_key: "AltGr+J"
+    azerty_notes: "Specialist; mainly phonetic transcription"
+    strategy_hint: "S-08 (AltGr plane)"
+
+  # ── Tonal punctuation / special marks ─────────────────────────────────────
+  - codepoint: U+0300
+    plain_name: "Grave accent combining (◌̀) — low tone mark in text"
+    category: tone_mark
+    example_languages:
+      - "Bassa, Dendi, and other tonal African languages"
+      - "Used as combining mark after vowels on AZERTY"
+    group_visibility: all
+    typical_key: "Deadkey on backtick / AltGr key"
+    azerty_notes: >
+      French AZERTY already has grave deadkey for grave accented vowels.
+      Extending it to more bases (like tonal vowels) is natural.
+    strategy_hint: "S-02 (deadkey) — reuse French AZERTY grave deadkey"
+
+  - codepoint: U+0301
+    plain_name: "Acute accent combining (◌́) — high tone mark in text"
+    category: tone_mark
+    example_languages:
+      - "Bassa, many West African tonal languages"
+    group_visibility: all
+    typical_key: "Deadkey on 2-key / AltGr+´"
+    azerty_notes: >
+      French AZERTY has acute on AltGr+². Extending to more bases handles
+      tonal languages on the same deadkey.
+    strategy_hint: "S-02 (deadkey) — reuse French AZERTY acute deadkey"
+
+  # ── AZERTY-specific position remaps ───────────────────────────────────────
+  - codepoint: U+00E0
+    plain_name: "A with grave (à) — standard French"
+    category: french_base
+    example_languages:
+      - "French (à — already on standard AZERTY)"
+    group_visibility: all
+    typical_key: "Own key on standard French AZERTY (À key)"
+    azerty_notes: "Already present on base; reminder that African AZERTY inherits this"
+    strategy_hint: "Present in base; no authoring needed"
+
+  - codepoint: U+00E9
+    plain_name: "E with acute (é) — standard French"
+    category: french_base
+    example_languages:
+      - "French (é — already on standard AZERTY)"
+    group_visibility: all
+    typical_key: "Own key on standard French AZERTY"
+    azerty_notes: "Already present on base; inherited by all AZERTY keyboards"
+    strategy_hint: "Present in base; no authoring needed"
+
+  - codepoint: U+00E8
+    plain_name: "E with grave (è) — standard French"
+    category: french_base
+    example_languages:
+      - "French (è)"
+    group_visibility: all
+    typical_key: "Own key on standard French AZERTY"
+    azerty_notes: "Already present on base"
+    strategy_hint: "Present in base; no authoring needed"
+
+  - codepoint: U+00EA
+    plain_name: "E with circumflex (ê) — standard French"
+    category: french_base
+    example_languages:
+      - "French (ê)"
+    group_visibility: all
+    typical_key: "Deadkey ^ + e on standard French AZERTY"
+    azerty_notes: "Already present via circumflex deadkey on base"
+    strategy_hint: "Present in base; no authoring needed"
+
+  # ── Currency / symbols (African) ──────────────────────────────────────────
+  - codepoint: U+20A3
+    plain_name: "French franc sign (₣) — historical"
+    category: currency
+    example_languages:
+      - "CFA franc zone (Francophone Africa)"
+    group_visibility: all
+    typical_key: "AltGr+F"
+    azerty_notes: "Historical; present in some legacy Francophone keyboards"
+    strategy_hint: "S-08 (AltGr plane)"

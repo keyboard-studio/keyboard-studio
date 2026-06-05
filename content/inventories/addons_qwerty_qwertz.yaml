@@ -1,0 +1,262 @@
+# addons_qwerty_qwertz.yaml
+# Common add-on letters for QWERTY/QWERTZ-based Latin keyboards.
+# These are standalone characters (not diacritic+base combos) that keyboards
+# add to a base US/UK/German layout — typically on unused keys or RAlt plane.
+#
+# Anchored from: akan, sil_euro_latin, sil_pan_africa_mnemonic,
+#                sil_cameroon_qwerty, sil_ipa, armenian_mnemonic_r (scan corpus)
+#
+# Each entry: codepoint, plain_name, category, example_languages,
+#             group_visibility, typical_key, strategy_hint
+
+schema_version: "1.0"
+category: addons_qwerty_qwertz
+
+entries:
+
+  # ── Open vowels (IPA / African) ───────────────────────────────────────────
+  - codepoint: U+025B
+    plain_name: "Open e (ɛ) — like the 'e' in 'bed'"
+    category: open_vowel
+    example_languages:
+      - "Akan / Twi / Fante (ɛ — canonical S-01 exemplar)"
+      - "Ewe, Fon, Yorùbá, Igbo"
+      - "French IPA transcription"
+      - "Many West and Central African languages"
+    group_visibility: all
+    typical_key: "Q or unused key near E"
+    strategy_hint: "S-01 (simple swap) if only ɛ/Ɛ added; S-02 otherwise"
+    uppercase: U+0190
+
+  - codepoint: U+0254
+    plain_name: "Open o (ɔ) — like the 'o' in 'caught'"
+    category: open_vowel
+    example_languages:
+      - "Akan / Twi / Fante (ɔ — canonical S-01 exemplar)"
+      - "Ewe, Fon, Yorùbá, Igbo"
+      - "Many West and Central African languages"
+    group_visibility: all
+    typical_key: "C or unused key near O"
+    strategy_hint: "S-01 (simple swap) if only ɔ/Ɔ added; S-02 otherwise"
+    uppercase: U+0186
+
+  - codepoint: U+0259
+    plain_name: "Schwa (ə) — unstressed neutral vowel"
+    category: open_vowel
+    example_languages:
+      - "Azerbaijani (ə — front open vowel)"
+      - "IPA transcription (English unstressed vowels)"
+      - "Some Canadian Indigenous languages"
+    group_visibility: all
+    typical_key: "RAlt+E or unused key"
+    strategy_hint: "S-01 or S-08 (RAlt plane)"
+    uppercase: U+018F
+
+  - codepoint: U+028A
+    plain_name: "Near-close back rounded vowel (ʊ) — like 'oo' in 'foot'"
+    category: open_vowel
+    example_languages:
+      - "Ewe, Twi, Hausa, many West African languages"
+      - "IPA transcription"
+    group_visibility: all
+    typical_key: "RAlt+U or unused key"
+    strategy_hint: "S-01 or S-08 (RAlt plane)"
+    uppercase: U+01B1
+
+  # ── Nasal / sonorant consonants ───────────────────────────────────────────
+  - codepoint: U+014B
+    plain_name: "Eng (ŋ) — 'ng' sound as in 'sing'"
+    category: nasal_consonant
+    example_languages:
+      - "Many African languages (Yorùbá, Hausa, Bambara)"
+      - "Vietnamese (ng)"
+      - "IPA for any ng sound"
+      - "Some European minority languages"
+    group_visibility: all
+    typical_key: "RAlt+N or unused key"
+    strategy_hint: "S-01 or S-08 (RAlt plane)"
+    uppercase: U+014A
+
+  - codepoint: U+0272
+    plain_name: "Palatal n (ɲ) — 'ny' sound as in Spanish 'ñ' or French 'gn'"
+    category: nasal_consonant
+    example_languages:
+      - "Bambara, Fula (West African)"
+      - "Hausa (palatal nasal)"
+      - "Catalan, Spanish (ñ is more common but ɲ used in IPA)"
+    group_visibility: all
+    typical_key: "RAlt+Shift+N or unused key"
+    strategy_hint: "S-01 or S-08 (RAlt plane)"
+    uppercase: U+019D
+
+  # ── Implosives ────────────────────────────────────────────────────────────
+  - codepoint: U+0253
+    plain_name: "Implosive b (ɓ) — 'b' drawn inward"
+    category: implosive
+    example_languages:
+      - "Hausa (ɓ)"
+      - "Fula / Fulfulde (ɓ)"
+      - "Many West and Central African languages"
+    group_visibility: all
+    typical_key: "RAlt+B or unused key"
+    strategy_hint: "S-01 or S-08 (RAlt plane)"
+    uppercase: U+0181
+
+  - codepoint: U+0257
+    plain_name: "Implosive d (ɗ) — 'd' drawn inward"
+    category: implosive
+    example_languages:
+      - "Hausa (ɗ)"
+      - "Fula / Fulfulde (ɗ)"
+      - "Many West and Central African languages"
+    group_visibility: all
+    typical_key: "RAlt+D or unused key"
+    strategy_hint: "S-01 or S-08 (RAlt plane)"
+    uppercase: U+018A
+
+  # ── Old English / Norse / Germanic ────────────────────────────────────────
+  - codepoint: U+00F0
+    plain_name: "Eth (ð) — voiced 'th' as in 'the'"
+    category: historic_germanic
+    example_languages:
+      - "Icelandic (ð)"
+      - "Faroese"
+      - "Old English / Medieval English"
+    group_visibility: all
+    typical_key: "RAlt+D or unused key"
+    strategy_hint: "S-01 or S-08 (RAlt plane)"
+    uppercase: U+00D0
+
+  - codepoint: U+00FE
+    plain_name: "Thorn (þ) — unvoiced 'th' as in 'thin'"
+    category: historic_germanic
+    example_languages:
+      - "Icelandic (þ)"
+      - "Faroese"
+      - "Old English / Medieval English"
+    group_visibility: all
+    typical_key: "RAlt+T or unused key"
+    strategy_hint: "S-01 or S-08 (RAlt plane)"
+    uppercase: U+00DE
+
+  - codepoint: U+00DF
+    plain_name: "Sharp s / Eszett (ß) — German double-s"
+    category: germanic
+    example_languages:
+      - "German (ß — sharp s after long vowels)"
+    group_visibility: all
+    typical_key: "Varies by keyboard; on QWERTY often RAlt+S"
+    strategy_hint: "S-01"
+    uppercase: U+1E9E
+
+  # ── Ligatures ─────────────────────────────────────────────────────────────
+  - codepoint: U+00E6
+    plain_name: "Ae ligature (æ) — combined a and e"
+    category: ligature
+    example_languages:
+      - "Danish, Norwegian (æ)"
+      - "Old English (æ)"
+      - "IPA (open front unrounded vowel)"
+    group_visibility: all
+    typical_key: "Own key in Nordic layouts; RAlt+A on QWERTY"
+    strategy_hint: "S-01 or S-08 (RAlt plane)"
+    uppercase: U+00C6
+
+  - codepoint: U+00F8
+    plain_name: "O with stroke (ø) — Danish/Norwegian o"
+    category: scandinavian
+    example_languages:
+      - "Danish, Norwegian (ø)"
+      - "Faroese"
+      - "IPA (close-mid front rounded vowel)"
+    group_visibility: all
+    typical_key: "Own key in Nordic layouts; RAlt+O on QWERTY"
+    strategy_hint: "S-01 or S-08 (RAlt plane)"
+    uppercase: U+00D8
+
+  - codepoint: U+00E5
+    plain_name: "A with ring (å) — Scandinavian a"
+    category: scandinavian
+    example_languages:
+      - "Swedish, Norwegian, Danish (å)"
+    group_visibility: all
+    typical_key: "Own key in Nordic layouts; RAlt+A on QWERTY"
+    strategy_hint: "S-01 or S-08 (RAlt plane)"
+    uppercase: U+00C5
+
+  - codepoint: U+0153
+    plain_name: "Oe ligature (œ) — French oe"
+    category: ligature
+    example_languages:
+      - "French (œ — as in cœur, sœur)"
+      - "Romanian (historical, now replaced by oe)"
+    group_visibility: all
+    typical_key: "RAlt+O on QWERTY / AZERTY"
+    strategy_hint: "S-01 or S-08 (RAlt plane)"
+    uppercase: U+0152
+
+  # ── IPA / phonetic ────────────────────────────────────────────────────────
+  - codepoint: U+0263
+    plain_name: "Voiced velar fricative (ɣ) — like Arabic غ"
+    category: ipa_consonant
+    example_languages:
+      - "Some African language romanizations"
+      - "Greek gamma in IPA"
+      - "Arabic transcription (for غ)"
+    group_visibility: all
+    typical_key: "RAlt+G"
+    strategy_hint: "S-01 or S-08 (RAlt plane)"
+    uppercase: U+0194
+
+  - codepoint: U+0294
+    plain_name: "Glottal stop (ʔ) — catch in throat"
+    category: ipa_consonant
+    example_languages:
+      - "Arabic romanization"
+      - "Hawaiian (ʻokina — though ʻ U+02BB is preferred)"
+      - "Many languages in IPA transcription"
+    group_visibility: all
+    typical_key: "Varies; often punctuation key with modifier"
+    strategy_hint: "S-01 or S-08 (RAlt plane)"
+
+  - codepoint: U+0192
+    plain_name: "F with hook (ƒ) — Ewe labio-dental flap"
+    category: ipa_consonant
+    example_languages:
+      - "Ewe (ƒ)"
+      - "Some West African languages"
+    group_visibility: all
+    typical_key: "RAlt+F"
+    strategy_hint: "S-01 or S-08 (RAlt plane)"
+
+  # ── Modifier letters / apostrophe variants ────────────────────────────────
+  - codepoint: U+02BC
+    plain_name: "Modifier letter apostrophe (ʼ) — ejective or glottalization marker"
+    category: modifier_letter
+    example_languages:
+      - "Georgian romanization"
+      - "Caucasian languages (ejectives: kʼ, tʼ, pʼ)"
+      - "Some First Nations languages"
+    group_visibility: all
+    typical_key: "Apostrophe key or RAlt+'"
+    strategy_hint: "S-01; ensure it is U+02BC not U+0027 (ASCII apostrophe)"
+
+  - codepoint: U+02BB
+    plain_name: "Modifier letter turned comma (ʻ) — Hawaiian ʻokina"
+    category: modifier_letter
+    example_languages:
+      - "Hawaiian (ʻokina — glottal stop)"
+      - "Some Pacific language romanizations"
+    group_visibility: all
+    typical_key: "Often mapped to backtick or apostrophe"
+    strategy_hint: "S-01; ensure correct codepoint (not U+2018 left single quote)"
+
+  # ── Currency / typographic (common on European RAlt planes) ───────────────
+  - codepoint: U+20AC
+    plain_name: "Euro sign (€)"
+    category: currency
+    example_languages:
+      - "European keyboards (standard RAlt+E on most EU layouts)"
+    group_visibility: all
+    typical_key: "RAlt+E (standard European)"
+    strategy_hint: "S-08 (RAlt plane)"

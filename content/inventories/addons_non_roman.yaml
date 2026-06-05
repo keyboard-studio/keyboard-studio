@@ -1,0 +1,297 @@
+# addons_non_roman.yaml
+# Common add-on characters by script family for Non-Roman keyboards.
+# Organized by the script families in spec §9 (Indic, SEA Brahmic, RTL, Syllabic).
+# These are characters a language expert might add beyond the base script.
+#
+# Anchored from: sil_devanagari_phonetic, itrans_devanagari_hindi, basic_kbdkni,
+#                khmer_angkor, pak_urdu_phonetic, fv_plains_cree (scan corpus)
+#
+# Each entry: codepoint, plain_name, script_family, category,
+#             example_languages, group_visibility, strategy_hint
+
+schema_version: "1.0"
+category: addons_non_roman
+
+# ════════════════════════════════════════════════════════════════════════════
+# INDIC ABUGIDA (Devanagari, Tamil, Bengali, Gujarati, Gurmukhi, etc.)
+# ════════════════════════════════════════════════════════════════════════════
+
+entries:
+
+  # ── Devanagari structural marks ───────────────────────────────────────────
+  - codepoint: U+094D
+    plain_name: "Halant / virama (◌्) — joins two consonants (no vowel between them)"
+    script_family: Indic
+    category: structural_mark
+    example_languages:
+      - "Hindi, Sanskrit, Marathi, Nepali (Devanagari)"
+      - "Bengali (U+09CD), Tamil (U+0BCD), Gujarati (U+0ACD) — each script has its own virama"
+    group_visibility: non-roman
+    strategy_hint: "S-09 (cluster formation); virama triggers halant+consonant → subscript"
+    note: "Each Indic script has its own virama codepoint — use the one for your script."
+
+  - codepoint: U+0902
+    plain_name: "Anusvara (◌ं) — nasal sound above the line"
+    script_family: Indic
+    category: diacritic_mark
+    example_languages:
+      - "Hindi (ं — nasal in words like संस्कृत)"
+      - "Sanskrit, Marathi, Nepali"
+    group_visibility: non-roman
+    strategy_hint: "S-09; typed after the vowel it nasalizes"
+
+  - codepoint: U+0903
+    plain_name: "Visarga (◌ः) — breathy h-sound at end of syllable"
+    script_family: Indic
+    category: diacritic_mark
+    example_languages:
+      - "Sanskrit (ः)"
+      - "Hindi (in Sanskrit loanwords)"
+    group_visibility: non-roman
+    strategy_hint: "S-09; typed after the vowel"
+
+  - codepoint: U+0901
+    plain_name: "Chandrabindu (◌ँ) — moon-dot, nasalizes vowel"
+    script_family: Indic
+    category: diacritic_mark
+    example_languages:
+      - "Hindi (ँ — lighter nasalization than anusvara)"
+      - "Nepali"
+    group_visibility: non-roman
+    strategy_hint: "S-09; typed after the vowel"
+
+  # ── Devanagari special vowels ──────────────────────────────────────────────
+  - codepoint: U+0943
+    plain_name: "Vowel sign vocalic r (◌ृ) — retroflex r vowel"
+    script_family: Indic
+    category: vowel_sign
+    example_languages:
+      - "Sanskrit (ṛ — as in kṛṣṇa)"
+      - "Hindi (in Sanskrit loanwords)"
+    group_visibility: non-roman
+    strategy_hint: "S-05 (ITRANS: RR → ṛ) or S-09"
+
+  # ── Tamil structural marks ────────────────────────────────────────────────
+  - codepoint: U+0BCD
+    plain_name: "Tamil virama (◌்) — removes inherent vowel from consonant"
+    script_family: Indic
+    category: structural_mark
+    example_languages:
+      - "Tamil (pulli — marks bare consonant with no vowel)"
+    group_visibility: non-roman
+    strategy_hint: "S-09; Tamil pulli behaves differently from Devanagari halant"
+
+  - codepoint: U+0BBE
+    plain_name: "Tamil vowel sign aa (◌ா) — long a attached to right of consonant"
+    script_family: Indic
+    category: vowel_sign
+    example_languages:
+      - "Tamil (ா — most common vowel sign)"
+    group_visibility: non-roman
+    strategy_hint: "S-09; post-base vowel, no reordering needed"
+
+  - codepoint: U+0BBF
+    plain_name: "Tamil vowel sign i (◌ி) — pre-base vowel, appears LEFT of consonant"
+    script_family: Indic
+    category: pre_base_vowel
+    example_languages:
+      - "Tamil (ி — moves to left of consonant in rendering)"
+    group_visibility: non-roman
+    strategy_hint: "S-09 with indic-pre-base-vowel reorder pattern"
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # SOUTHEAST ASIAN BRAHMIC (Khmer, Myanmar, Lao, Thai, Javanese, Sinhala)
+  # ════════════════════════════════════════════════════════════════════════════
+
+  # ── Khmer structural marks ────────────────────────────────────────────────
+  - codepoint: U+17D2
+    plain_name: "Khmer coeng (◌្) — subscript marker, stacks consonants below base"
+    script_family: SEA_Brahmic
+    category: structural_mark
+    example_languages:
+      - "Khmer (coeng — makes the following consonant subscript)"
+    group_visibility: non-roman
+    strategy_hint: "S-09 with sea-stack-reorder pattern"
+    note: "Coeng always precedes the subscript consonant in stored order."
+
+  # ── Myanmar structural marks ──────────────────────────────────────────────
+  - codepoint: U+1039
+    plain_name: "Myanmar asat / virama (◌်) — subscript marker"
+    script_family: SEA_Brahmic
+    category: structural_mark
+    example_languages:
+      - "Myanmar / Burmese (asat — marks subscript consonants)"
+    group_visibility: non-roman
+    strategy_hint: "S-09 with sea-stack-reorder pattern"
+
+  - codepoint: U+103A
+    plain_name: "Myanmar asat (◌်) — kills inherent vowel (different from subscript marker)"
+    script_family: SEA_Brahmic
+    category: structural_mark
+    example_languages:
+      - "Myanmar / Burmese (asat — closes syllable)"
+    group_visibility: non-roman
+    strategy_hint: "S-09; typed after the base consonant"
+
+  # ── Thai / Lao tone marks ─────────────────────────────────────────────────
+  - codepoint: U+0E48
+    plain_name: "Thai mai tho (◌่) — tone mark 2 (low)"
+    script_family: SEA_Brahmic
+    category: tone_mark
+    example_languages:
+      - "Thai (ไม้โท — second tone, low)"
+    group_visibility: non-roman
+    strategy_hint: "S-09 with tone-mark-canonicalization pattern"
+
+  - codepoint: U+0EC8
+    plain_name: "Lao mai kho (◌່) — tone mark 2"
+    script_family: SEA_Brahmic
+    category: tone_mark
+    example_languages:
+      - "Lao (ໄມ້ຂ — second tone)"
+    group_visibility: non-roman
+    strategy_hint: "S-09 with tone-mark-canonicalization pattern"
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # RTL SCRIPTS (Arabic, Hebrew, Urdu, Syriac)
+  # ════════════════════════════════════════════════════════════════════════════
+
+  # ── Arabic diacritics (tashkeel) ──────────────────────────────────────────
+  - codepoint: U+064E
+    plain_name: "Arabic fatha (◌َ) — short 'a' vowel above"
+    script_family: RTL_Arabic
+    category: tashkeel
+    example_languages:
+      - "Arabic (فتحة — marks short /a/ in fully vocalized text)"
+      - "Urdu, Pashto (in Quranic / educational text)"
+    group_visibility: non-roman
+    strategy_hint: "S-09; tashkeel typed after the consonant they mark"
+
+  - codepoint: U+064F
+    plain_name: "Arabic damma (◌ُ) — short 'u' vowel above"
+    script_family: RTL_Arabic
+    category: tashkeel
+    example_languages:
+      - "Arabic (ضمة — marks short /u/)"
+    group_visibility: non-roman
+    strategy_hint: "S-09"
+
+  - codepoint: U+0650
+    plain_name: "Arabic kasra (◌ِ) — short 'i' vowel below"
+    script_family: RTL_Arabic
+    category: tashkeel
+    example_languages:
+      - "Arabic (كسرة — marks short /i/)"
+    group_visibility: non-roman
+    strategy_hint: "S-09"
+
+  - codepoint: U+0651
+    plain_name: "Arabic shadda (◌ّ) — consonant doubling mark"
+    script_family: RTL_Arabic
+    category: tashkeel
+    example_languages:
+      - "Arabic (شدة — marks geminate consonant)"
+      - "Urdu, Pashto"
+    group_visibility: non-roman
+    strategy_hint: "S-09; can combine with fatha/damma/kasra"
+
+  - codepoint: U+0652
+    plain_name: "Arabic sukun (◌ْ) — zero-vowel mark (consonant with no following vowel)"
+    script_family: RTL_Arabic
+    category: tashkeel
+    example_languages:
+      - "Arabic (سكون — marks absence of vowel)"
+    group_visibility: non-roman
+    strategy_hint: "S-09"
+
+  # ── Arabic hamza forms ────────────────────────────────────────────────────
+  - codepoint: U+0621
+    plain_name: "Arabic hamza (ء) — glottal stop, standalone"
+    script_family: RTL_Arabic
+    category: consonant_variant
+    example_languages:
+      - "Arabic (همزة — glottal stop)"
+      - "Urdu"
+    group_visibility: non-roman
+    strategy_hint: "S-09; context-sensitive — position (above alef, below alef, on waw, on ya) depends on surrounding vowels"
+
+  - codepoint: U+0623
+    plain_name: "Alef with hamza above (أ)"
+    script_family: RTL_Arabic
+    category: consonant_variant
+    example_languages:
+      - "Arabic (ألف مع همزة فوق)"
+    group_visibility: non-roman
+    strategy_hint: "S-09 context rule or direct key assignment"
+
+  # ── Urdu-specific ─────────────────────────────────────────────────────────
+  - codepoint: U+06BE
+    plain_name: "Urdu heh goal (ھ) — aspirated h, distinct from Arabic heh"
+    script_family: RTL_Arabic
+    category: consonant_variant
+    example_languages:
+      - "Urdu (ھ — forms aspirated consonant clusters: بھ، پھ، تھ)"
+    group_visibility: non-roman
+    strategy_hint: "S-09; pairs with other consonants for aspiration"
+
+  - codepoint: U+06C1
+    plain_name: "Urdu heh (ہ) — word-final heh form"
+    script_family: RTL_Arabic
+    category: consonant_variant
+    example_languages:
+      - "Urdu (ہ — final position h)"
+    group_visibility: non-roman
+    strategy_hint: "S-09"
+
+  # ════════════════════════════════════════════════════════════════════════════
+  # SYLLABIC SCRIPTS (Canadian Aboriginal Syllabics, Ethiopic, Cherokee)
+  # ════════════════════════════════════════════════════════════════════════════
+
+  # ── Canadian Aboriginal Syllabics ─────────────────────────────────────────
+  - codepoint: U+1427
+    plain_name: "Canadian syllabics final middle dot (᐀) — marks a final consonant"
+    script_family: Syllabic_Canadian
+    category: structural_mark
+    example_languages:
+      - "Plains Cree (◌ᐧ — w-dot, modifies preceding character)"
+      - "Other Algonquian languages"
+    group_visibility: non-roman
+    strategy_hint: "S-09; w-dot follows the syllable it modifies"
+
+  - codepoint: U+1430
+    plain_name: "Canadian syllabics carrier (ᐰ) — Dene Carrier syllabic"
+    script_family: Syllabic_Canadian
+    category: base_character
+    example_languages:
+      - "Dene Carrier (Dakelh)"
+      - "Some Athapaskan languages"
+    group_visibility: non-roman
+    strategy_hint: "S-01 or S-09 depending on keyboard complexity"
+
+  # ── Ethiopic ──────────────────────────────────────────────────────────────
+  - codepoint: U+1361
+    plain_name: "Ethiopic word separator (፡) — marks word boundary"
+    script_family: Syllabic_Ethiopic
+    category: punctuation
+    example_languages:
+      - "Amharic, Tigrinya, Ge'ez (፡ — word separator, not a space)"
+    group_visibility: non-roman
+    strategy_hint: "S-01; usually on spacebar or punctuation key"
+
+  - codepoint: U+1362
+    plain_name: "Ethiopic full stop (።) — sentence-ending punctuation"
+    script_family: Syllabic_Ethiopic
+    category: punctuation
+    example_languages:
+      - "Amharic, Tigrinya (። — period equivalent)"
+    group_visibility: non-roman
+    strategy_hint: "S-01; usually on period key"
+
+  - codepoint: U+135D
+    plain_name: "Ethiopic combining gemination mark (◌᳝) — doubles the consonant"
+    script_family: Syllabic_Ethiopic
+    category: diacritic_mark
+    example_languages:
+      - "Amharic (rare in modern text but present in some keyboards)"
+    group_visibility: non-roman
+    strategy_hint: "S-09"

@@ -1,0 +1,261 @@
+# diacritics_latin.yaml
+# Reference catalog of Latin-script diacritic marks for Phase B character discovery.
+# Each entry is a combining diacritic (the mark itself) that a keyboard author
+# may need to assign to a deadkey, modifier, or sequence.
+#
+# Anchored from: sil_euro_latin, sil_cameroon_qwerty, sil_pan_africa_mnemonic,
+#                vietnamese_telex, el_pasifika, sil_yoruba8 (scan corpus)
+#
+# Each entry: codepoint, plain_name, combining_form, example_languages,
+#             group_visibility, common_base_letters, strategy_hint
+
+schema_version: "1.0"
+category: diacritics_latin
+
+entries:
+
+  # ── Acute ─────────────────────────────────────────────────────────────────
+  - codepoint: U+0301
+    plain_name: "Acute accent (slant up-right: á é í ó ú)"
+    spacing_form: U+00B4
+    example_languages:
+      - "Spanish (á, é, í, ó, ú)"
+      - "French (é)"
+      - "Irish (á, é, í, ó, ú — called fada)"
+      - "Yorùbá (high tone mark on vowels)"
+      - "Vietnamese (sắc — high-rising tone)"
+      - "Polish (ć, ń, ó, ś, ź)"
+    group_visibility: all
+    common_base_letters: "aeiouAEIOUcnszyCNSZY"
+    strategy_hint: "S-02 (deadkey) or S-07 (cycling)"
+
+  # ── Grave ─────────────────────────────────────────────────────────────────
+  - codepoint: U+0300
+    plain_name: "Grave accent (slant up-left: à è ì ò ù)"
+    spacing_form: U+0060
+    example_languages:
+      - "French (à, è, ù)"
+      - "Italian (à, è, ì, ò, ù)"
+      - "Yorùbá (low tone mark)"
+      - "Vietnamese (huyền — low-falling tone)"
+      - "Hausa (low tone on vowels)"
+    group_visibility: all
+    common_base_letters: "aeiouAEIOU"
+    strategy_hint: "S-02 (deadkey) or S-07 (cycling)"
+
+  # ── Circumflex ────────────────────────────────────────────────────────────
+  - codepoint: U+0302
+    plain_name: "Circumflex (hat: â ê î ô û)"
+    spacing_form: U+005E
+    example_languages:
+      - "French (â, ê, î, ô, û)"
+      - "Romanian (â, î)"
+      - "Welsh (â, ê, î, ô, û, ŵ, ŷ)"
+      - "Vietnamese (circumflex on a, e, o for vowel quality)"
+      - "Esperanto (ĉ, ĝ, ĥ, ĵ, ŝ, ŭ)"
+    group_visibility: all
+    common_base_letters: "aeiouAEIOUcghjswyCGHJSWY"
+    strategy_hint: "S-02 (deadkey)"
+
+  # ── Tilde ─────────────────────────────────────────────────────────────────
+  - codepoint: U+0303
+    plain_name: "Tilde (squiggle: ã ñ õ)"
+    spacing_form: U+007E
+    example_languages:
+      - "Portuguese (ã, õ, ẽ)"
+      - "Spanish (ñ)"
+      - "Vietnamese (ngã — broken rising tone)"
+      - "Guaraní (nasal vowels: ã, ẽ, ĩ, õ, ũ)"
+    group_visibility: all
+    common_base_letters: "aeiounAEIOUN"
+    strategy_hint: "S-02 (deadkey)"
+
+  # ── Macron ────────────────────────────────────────────────────────────────
+  - codepoint: U+0304
+    plain_name: "Macron (long bar above: ā ē ī ō ū)"
+    example_languages:
+      - "Māori (ā, ē, ī, ō, ū — vowel length)"
+      - "Latvian (ā, ē, ī, ū)"
+      - "Lithuanian (ā, ē, ī, ū)"
+      - "Polynesian languages (macron = long vowel)"
+      - "ITRANS/Sanskrit romanization (ā, ī, ū)"
+      - "Japanese romanization (Hepburn: ā, ī, ū, ē, ō)"
+    group_visibility: all
+    common_base_letters: "aeiouAEIOU"
+    strategy_hint: "S-02 (deadkey)"
+
+  # ── Breve ─────────────────────────────────────────────────────────────────
+  - codepoint: U+0306
+    plain_name: "Breve (short curve above: ă ŭ)"
+    example_languages:
+      - "Romanian (ă — schwa-like vowel)"
+      - "Turkish (ğ — soft g)"
+      - "Azerbaijani (ə with breve variants)"
+      - "Vietnamese romanization (â with breve in some systems)"
+    group_visibility: all
+    common_base_letters: "aeguAEGU"
+    strategy_hint: "S-02 (deadkey)"
+
+  # ── Dot above ─────────────────────────────────────────────────────────────
+  - codepoint: U+0307
+    plain_name: "Dot above (ċ ė ġ ż)"
+    example_languages:
+      - "Irish (ṁ, ṅ, ṡ, ṫ — lenition dot)"
+      - "Maltese (ġ, ż)"
+      - "Yorùbá with dot style (ẹ̣, ọ̣ — dot below)"
+      - "Lithuanian (ė)"
+      - "Old English paleography"
+    group_visibility: all
+    common_base_letters: "bcdefgmnoprstzBCDEFGMNOPRSTZ"
+    strategy_hint: "S-02 (deadkey)"
+
+  # ── Diaeresis / Umlaut ────────────────────────────────────────────────────
+  - codepoint: U+0308
+    plain_name: "Diaeresis / Umlaut (two dots above: ä ë ï ö ü ÿ)"
+    spacing_form: U+00A8
+    example_languages:
+      - "German (ä, ö, ü)"
+      - "French (ë, ï, ü, ÿ — marks separate syllables)"
+      - "Spanish (ü in güe, güi)"
+      - "Catalan (l·l, ü)"
+      - "Swedish/Finnish (ä, ö)"
+      - "Albanian (ë)"
+    group_visibility: all
+    common_base_letters: "aeiouwyAEIOUWY"
+    strategy_hint: "S-02 (deadkey)"
+
+  # ── Ring above ────────────────────────────────────────────────────────────
+  - codepoint: U+030A
+    plain_name: "Ring above (small circle: å ů)"
+    example_languages:
+      - "Swedish/Norwegian/Danish (å)"
+      - "Czech (ů)"
+      - "Walloon (å)"
+    group_visibility: all
+    common_base_letters: "auAU"
+    strategy_hint: "S-02 (deadkey)"
+
+  # ── Double acute ──────────────────────────────────────────────────────────
+  - codepoint: U+030B
+    plain_name: "Double acute (two slants: ő ű)"
+    example_languages:
+      - "Hungarian (ő, ű — long front rounded vowels)"
+    group_visibility: all
+    common_base_letters: "ouOU"
+    strategy_hint: "S-02 (deadkey)"
+
+  # ── Caron / Háček ─────────────────────────────────────────────────────────
+  - codepoint: U+030C
+    plain_name: "Caron / háček (inverted hat: č š ž ř)"
+    example_languages:
+      - "Czech (č, ď, ě, ň, ř, š, ť, ž)"
+      - "Slovak (č, ď, ľ, ň, š, ť, ž)"
+      - "Slovenian (č, š, ž)"
+      - "Baltic languages (š, ž, č)"
+      - "Lakota (č, š, ž, ǧ, ǰ)"
+    group_visibility: all
+    common_base_letters: "cdeghijlnrstzCDEGHIJLNRSTZ"
+    strategy_hint: "S-02 (deadkey)"
+
+  # ── Horn ──────────────────────────────────────────────────────────────────
+  - codepoint: U+031B
+    plain_name: "Horn (small hook at top-right: ơ ư)"
+    example_languages:
+      - "Vietnamese (ơ, ư — distinct vowels, not tone marks)"
+    group_visibility: all
+    common_base_letters: "ouOU"
+    strategy_hint: "S-02 (deadkey); pairs with tone marks in Vietnamese"
+    common_diacritic_combos:
+      - "ơ + grave → ờ (U+1EDD)"
+      - "ơ + acute → ớ (U+1EDB)"
+      - "ơ + tilde → ỡ (U+1EE1)"
+      - "ư + grave → ừ (U+1EEB)"
+      - "ư + acute → ứ (U+1EE9)"
+
+  # ── Dot below ─────────────────────────────────────────────────────────────
+  - codepoint: U+0323
+    plain_name: "Dot below (ạ ẹ ọ ṣ ṭ)"
+    example_languages:
+      - "Yorùbá (ẹ, ọ, ṣ — dotted style; alternative to bar-under)"
+      - "Igbo (ị, ọ, ụ)"
+      - "ITRANS/Sanskrit (ṭ, ḍ, ṇ, ṣ — retroflex)"
+      - "IPA transcription of many African languages"
+      - "Hausa (ḍ, ẓ in some romanizations)"
+    group_visibility: all
+    common_base_letters: "aehilmnorstuAEHILMNORSTU"
+    strategy_hint: "S-02 (deadkey); common secondary in S-06 (chained deadkeys)"
+
+  # ── Cedilla ───────────────────────────────────────────────────────────────
+  - codepoint: U+0327
+    plain_name: "Cedilla (hook below: ç ş ţ)"
+    example_languages:
+      - "French (ç)"
+      - "Turkish (ç, ş)"
+      - "Romanian (ș, ț — NB: comma-below preferred over cedilla in Unicode)"
+      - "Catalan (ç)"
+      - "Kurdish (ç, ş)"
+    group_visibility: all
+    common_base_letters: "cdeghklnrstCDEGHKLNRST"
+    strategy_hint: "S-02 (deadkey)"
+
+  # ── Ogonek ────────────────────────────────────────────────────────────────
+  - codepoint: U+0328
+    plain_name: "Ogonek (tail below: ą ę į ų)"
+    example_languages:
+      - "Polish (ą, ę)"
+      - "Lithuanian (ą, ę, į, ų)"
+      - "Navajo (ą, ę, į, ǫ)"
+      - "Old Norse romanization"
+    group_visibility: all
+    common_base_letters: "aeioAEIO"
+    strategy_hint: "S-02 (deadkey)"
+
+  # ── Comma below (≠ cedilla) ───────────────────────────────────────────────
+  - codepoint: U+0326
+    plain_name: "Comma below (preferred for ș ț in Romanian)"
+    example_languages:
+      - "Romanian (ș U+0219, ț U+021B — Unicode prefers comma-below over cedilla)"
+    group_visibility: all
+    common_base_letters: "stST"
+    strategy_hint: "S-02 (deadkey); use U+0219/U+021B precomposed, not cedilla forms"
+
+  # ── Stroke / bar through ──────────────────────────────────────────────────
+  - codepoint: U+0338
+    plain_name: "Stroke through (ø ɨ — diagonal bar)"
+    example_languages:
+      - "Danish/Norwegian (ø)"
+      - "IPA (ɨ, ʉ — close central vowels)"
+    group_visibility: all
+    common_base_letters: "oOiIuU"
+    strategy_hint: "Often precomposed (ø = U+00F8); use precomposed form when available"
+
+  # ── Bar below ─────────────────────────────────────────────────────────────
+  - codepoint: U+0332
+    plain_name: "Macron below / bar under (ḇ ḏ ḵ ḻ ṟ)"
+    example_languages:
+      - "Some Semitic language romanizations"
+      - "Umatilla Sahaptin (q̱ — velar with underbar)"
+      - "Some First Nations languages (x̱)"
+    group_visibility: all
+    common_base_letters: "bdklnrtzBDKLNRTZ"
+    strategy_hint: "S-02 (deadkey)"
+
+  # ── Tilde below ───────────────────────────────────────────────────────────
+  - codepoint: U+0330
+    plain_name: "Tilde below (subscript tilde: ḛ ḭ ṵ)"
+    example_languages:
+      - "Navajo (ą̃ — nasal + creaky voice combinations)"
+      - "Some phonetic transcription systems"
+    group_visibility: all
+    common_base_letters: "aeiouAEIOU"
+    strategy_hint: "S-02 (deadkey); rare outside specialist transcription"
+
+  # ── Subscript dot (IPA voice quality) ────────────────────────────────────
+  - codepoint: U+0329
+    plain_name: "Vertical line below (syllabic consonants: n̩ l̩)"
+    example_languages:
+      - "IPA (syllabic consonants: n̩, l̩, r̩, m̩)"
+      - "Yorùbá bar-under style (alternative to dot-below)"
+    group_visibility: all
+    common_base_letters: "lmnrLMNR"
+    strategy_hint: "S-02 (deadkey); specialist IPA transcription"
