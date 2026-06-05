@@ -108,7 +108,9 @@
       "Bash(curl -sI http://localhost:5184/local-kbd-api/list)",
       "Bash(curl -s http://localhost:5184/local-kbd-api/list)",
       "Bash(python -c \"import sys, json; d = json.load\\(sys.stdin\\); print\\('count:', len\\(d\\)\\); print\\('first 3:'\\); [print\\(' ', k['id'], '|', k['displayName'], '|', k['path']\\) for k in d[:3]]; print\\('basic_kbdus:', next\\(\\(k for k in d if k['id']=='basic_kbdus'\\), None\\)\\)\")",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(npx -y vercel@latest inspect --logs https://vercel.com/matthew-lees-projects-c1ffbcf8/keyboard-studio-studio/8ZWe4PrwZ7bTNieB8ZcSCmVCA8Sj)",
+      "Bash(npx -y vercel@latest inspect --logs https://keyboard-studio-studio-7y49t0xzb-matthew-lees-projects-c1ffbcf8.vercel.app)"
     ]
   }
 }

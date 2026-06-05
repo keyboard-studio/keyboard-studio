@@ -1,0 +1,231 @@
+id: latin_deadkey_acute_single
+title: "Tap, then a base letter, gives an accented version"
+description: >
+  A single trigger key (typically apostrophe or backtick) followed by a base letter
+  produces the precomposed accented form. This is the most common desktop diacritic
+  pattern: press the accent key, then the letter you want to accent. No intermediate
+  state is visible; only when the base letter is pressed does the accented character
+  appear. This pattern is the foundation of European keyboard layouts and a primary
+  in the S-02 strategy card.
+category: desktop
+appliesTo:
+  - "Latn"
+strategyId: "S-02"
+combinesWith:
+  - "S-04"
+  - "S-08"
+  - "S-11"
+
+questions:
+  - id: triggerKey
+    prompt: >
+      Which key acts as the accent trigger (the deadkey)?
+      This is typically an apostrophe (K_QUOTE), backtick/grave (K_GRAVE),
+      or circumflex (K_CARET). The key must be distinct from the base letters
+      so it does not produce a character on its own when followed by an unrecognized key.
+    answerType: key-name
+    default: "K_QUOTE"
+
+  - id: accentChar
+    prompt: >
+      Which combining accent character (or precomposed combining sequence) do you want?
+      This is typically a Unicode combining diacritic mark (e.g., U+0301 COMBINING ACUTE ACCENT).
+      When the trigger key is pressed twice in a row, this character is emitted.
+      Examples: combining acute (́), combining grave (`̀), combining circumflex (̂).
+    answerType: char-single
+    default: "́"
+
+  - id: baseLetters
+    prompt: >
+      Which base letters (or sequences) take this accent?
+      List them without spaces, lowercase before uppercase.
+      Example: aeiouAEIOU (five lowercase vowels followed by five uppercase vowels).
+      The output store must have the same number of characters as this list.
+    answerType: char-list
+    default: "aeiouAEIOU"
+
+  - id: accentedForms
+    prompt: >
+      List the accented forms in the same order as the base letters.
+      Use precomposed NFC characters, not combining sequences.
+      Example: áéíóúÁÉÍÓÚ (five lowercase accented vowels, then five uppercase).
+      This store must have exactly the same number of characters as baseLetters.
+    answerType: char-list
+    default: "áéíóúÁÉÍÓÚ"
+
+  - id: descriptionOfAccent
+    prompt: >
+      Optional: short human-readable name for this accent (shown in documentation and UI).
+      Example: "acute" or "grave" or "circumflex". Leave blank if not needed.
+    answerType: text
+    default: "acute"
+    required: false
+
+kmnFragment: |
+  c ---- S-02 Single deadkey stores -----------------------------------------------
+  c Both stores MUST have the same element count; the scaffolder enforces this at
+  c Layer A slot-fill validation (spec §10 Check #1).
+  store(dk_bases)  '{{baseLetters}}'
+  store(dk_output) '{{accentedForms}}'
+
+  group(main) using keys
+
+  c ---- Trigger key arms the deadkey -------------------------------------------
+  c Pressing {{triggerKey}} alone commits nothing; it arms a deadkey state.
+  + [{{triggerKey}}] > deadkey(accent)
+
+  match > use(deadkeys)
+
+  group(deadkeys) using keys
+
+  c ---- Resolution: deadkey + base letter → accented form -----------------------
+  c The deadkey followed by a character in dk_bases produces the precomposed output.
+  c index() offset N=2: position 1 is the deadkey() context, position 2 is any(dk_bases).
+  c Output is precomposed NFC (no combining sequences).
+  deadkey(accent) + any(dk_bases) > index(dk_output, 2)
+
+  c ---- Double-press: trigger key pressed twice --------------------------------
+  c Pressing the trigger key twice produces the bare combining accent.
+  c This rule must appear BEFORE the generic notany() fallback so it fires first.
+  deadkey(accent) + [{{triggerKey}}] > '{{accentChar}}'
+
+  c ---- Fallback: unrecognized key after the trigger ----------------------------
+  c notany() matches any key NOT in dk_bases. context(2) restores the unmatched key
+  c after the trigger character, implementing the "restore on miss" pattern.
+  c This allows the trigger character to fall through to normal output when followed
+  c by any non-base letter.
+  deadkey(accent) + notany(dk_bases) > '{{accentChar}}' context(2)
+
+touchLayoutFragment: |
+  {
+    "id": "{{triggerKey}}",
+    "sk": [
+      {
+        "id": "{{accentChar}}",
+        "text": "{{accentChar}}"
+      }
+    ]
+  }
+
+tests:
+  - input: ["K_QUOTE", "K_A"]
+    expectedOutput: "á"
+    description: >
+      Apostrophe + a produces a-acute (U+00E1 LATIN SMALL LETTER A WITH ACUTE).
+      The deadkey(accent) is armed by the first press; any(dk_bases) matches K_A
+      (position 1 in baseLetters), and index(dk_output, 2) returns the first output
+      character 'á'. This is the core use case of the S-02 pattern.
+
+  - input: ["K_QUOTE", "K_E"]
+    expectedOutput: "é"
+    description: >
+      Apostrophe + e produces e-acute (U+00E9). Second position in the base and
+      output stores. Confirms the index offset is correct for multi-character stores.
+
+  - input: ["K_QUOTE", "K_I"]
+    expectedOutput: "í"
+    description: >
+      Apostrophe + i produces i-acute (U+00ED). Third position. Verifies the
+      store positional mapping works for the middle vowel.
+
+  - input: ["K_QUOTE", "K_O"]
+    expectedOutput: "ó"
+    description: >
+      Apostrophe + o produces o-acute (U+00F3). Fourth position.
+
+  - input: ["K_QUOTE", "K_U"]
+    expectedOutput: "ú"
+    description: >
+      Apostrophe + u produces u-acute (U+00FA). Fifth position.
+
+  - input: ["K_QUOTE", "SHIFT K_A"]
+    expectedOutput: "Á"
+    description: >
+      Apostrophe + shift-A produces capital A-acute (U+00C1). Uppercase A is at
+      position 6 in the baseLetters store (after the five lowercase vowels),
+      so index(dk_output, 2) returns the sixth output character 'Á'.
+
+  - input: ["K_QUOTE", "SHIFT K_E"]
+    expectedOutput: "É"
+    description: >
+      Apostrophe + shift-E produces capital E-acute (U+00C9). Seventh position
+      in the stores. Verifies uppercase mapping works across the shift boundary.
+
+  - input: ["K_QUOTE", "SHIFT K_I"]
+    expectedOutput: "Í"
+    description: >
+      Apostrophe + shift-I produces capital I-acute (U+00CD). Eighth position.
+
+  - input: ["K_QUOTE", "SHIFT K_O"]
+    expectedOutput: "Ó"
+    description: >
+      Apostrophe + shift-O produces capital O-acute (U+00D3). Ninth position.
+
+  - input: ["K_QUOTE", "SHIFT K_U"]
+    expectedOutput: "Ú"
+    description: >
+      Apostrophe + shift-U produces capital U-acute (U+00DA). Tenth and final
+      position. Confirms the store has no off-by-one error at the boundary.
+
+  - input: ["K_QUOTE", "K_QUOTE"]
+    expectedOutput: "́"
+    description: >
+      Double-tap trigger emits the bare combining accent (U+0301 COMBINING ACUTE).
+      Pressing {{triggerKey}} arms deadkey(accent); pressing it again matches
+      deadkey(accent) + [{{triggerKey}}], which outputs the accentChar directly.
+      This allows the user to insert the combining mark without a base letter if needed.
+
+  - input: ["K_QUOTE", "K_SPACE"]
+    expectedOutput: "́ "
+    description: >
+      Apostrophe + space: space is not in dk_bases, so the fallback rule fires.
+      deadkey(accent) + notany(dk_bases) outputs '{{accentChar}}' + context(2).
+      The space (which was consumed by notany()) is restored, producing "́ " (accent + space).
+      This verifies the "restore on miss" behavior for passthrough of unrecognized keys.
+
+  - input: ["K_QUOTE", "K_B"]
+    expectedOutput: "́b"
+    description: >
+      Apostrophe + b: b is not in dk_bases (only aeiouAEIOU are), so the fallback
+      rule fires again. Output is the combining accent + the literal 'b' from context(2).
+      Verifies that non-base consonants fall through correctly.
+
+  - input: ["K_QUOTE", "K_1"]
+    expectedOutput: "́1"
+    description: >
+      Apostrophe + digit: digits are not in dk_bases. The fallback rule outputs
+      the combining accent + the digit via context(2). Confirms the pattern does not
+      consume digits or other non-alphabetic characters unexpectedly.
+
+  - input: ["K_QUOTE", "K_A", "K_B"]
+    expectedOutput: "áb"
+    description: >
+      After the first two keys resolve to 'á', the deadkey state is fully consumed.
+      The next keystroke (b) is a plain passthrough, outputting 'b' normally.
+      Verifies the deadkey does not persist into the next input and does not corrupt
+      subsequent keys.
+
+  - input: ["K_A"]
+    expectedOutput: "a"
+    description: >
+      Plain 'a' without any trigger. No deadkey is armed; the base layer passes
+      'a' through unchanged. Confirms that the trigger key is necessary and the
+      pattern does not interfere with normal character input.
+
+  - input: ["K_SPACE"]
+    expectedOutput: " "
+    description: >
+      Plain space without any deadkey. Not affected by the pattern. Confirms the
+      deadkey rules do not corrupt unrelated keys.
+
+validatedForFamilies:
+  - "Latn"
+
+sourceKeyboards:
+  - "release/basic/basic_kbdfr/source/basic_kbdfr.kmn#L65,L114"
+  - "release/sil/sil_euro_latin/source/sil_euro_latin.kmn#L32-L37,L92-L95"
+
+frequencyInCorpus: 1
+
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-06-04"

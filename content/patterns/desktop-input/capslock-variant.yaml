@@ -1,0 +1,204 @@
+# capslock-variant.yaml
+# Issue #30 — CapsLock state alters output beyond case: caps-on selects a
+# DIFFERENT character (not the uppercase of the same letter). Rare, easy to
+# misuse; offered in the more-options bucket (priority 5).
+# No strategyId: no S-01..S-12 card matches this mechanism (see spec §7.5 gaps).
+
+id: capslock_variant
+title: "CapsLock switches to a different letter"
+description: >
+  When CapsLock is on, each affected key produces a different character than it
+  does when CapsLock is off — not the uppercase of the same letter, but a
+  distinct character from elsewhere in the script. This is used for scripts that
+  have no upper/lower case and need more character slots than Shift alone
+  provides, so CapsLock becomes a stable "alternate letter" layer. Use sparingly:
+  CapsLock gives users no reliable on-screen cue that the mode is active, so
+  anyone unfamiliar with the design can be surprised by the output.
+category: desktop
+appliesTo: []
+priority: 5
+group_visibility: any
+
+questions:
+  - id: capsVariantKeyList
+    prompt: >
+      Which keys produce a different character under CapsLock, in the CapsLock-OFF
+      (normal) state? Write each key with the NCAPS modifier so it matches only when
+      CapsLock is off, back-to-back with no separators, e.g. [NCAPS K_C][NCAPS K_H].
+      The order here must match the caps-off output list below one-for-one.
+    answerType: text
+    default: "[NCAPS K_C]"
+
+  - id: capsOffOutputList
+    prompt: >
+      The normal (CapsLock-OFF) output characters, in the same order as the keys
+      above — one character per key, typed without spaces. This list must be the
+      same length as the caps-on output list.
+    answerType: char-list
+    default: "ခ"
+
+  - id: capsVariantKeyList_caps
+    prompt: >
+      The same keys as above, but written with the CAPS modifier so they match when
+      CapsLock is on, e.g. [CAPS K_C][CAPS K_H]. Keep the same order as the caps-off
+      key list.
+    answerType: text
+    default: "[CAPS K_C]"
+
+  - id: capsOnOutputList
+    prompt: >
+      The CapsLock-ON output characters, in the same order as the keys above — one
+      character per key, typed without spaces. Must be the same length as the
+      caps-off output list.
+    answerType: char-list
+    default: "ဃ"
+
+kmnFragment: |
+  store(capsOffKeys)   {{capsVariantKeyList}}
+  store(capsOffOutput) '{{capsOffOutputList}}'
+  store(capsOnKeys)    {{capsVariantKeyList_caps}}
+  store(capsOnOutput)  '{{capsOnOutputList}}'
+
+  + any(capsOffKeys) > index(capsOffOutput, 1)
+  + any(capsOnKeys)  > index(capsOnOutput, 1)
+
+touchLayoutFragment: null
+
+reorderRules: null
+
+tests:
+  - input: ["NCAPS K_C"]
+    expectedOutput: "ခ"
+    description: "caps off -> Myanmar Kha (U+1001)"
+  - input: ["CAPS K_C"]
+    expectedOutput: "ဃ"
+    description: "caps on -> Myanmar Gha (U+1003), a different letter not a case"
+  - input: ["NCAPS SHIFT K_C"]
+    expectedOutput: "ဃ"
+    description: "in this keyboard Shift (caps off) also reaches Gha — a per-keyboard choice, not inherent to the pattern"
+
+validatedForFamilies: ["Mymr", "Arab"]
+sourceKeyboards:
+  - "release/s/sorani_behdini_arab_qwerty"
+  - "release/g/geba_karen_mymr"
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-06-05"
+
+# ---------------------------------------------------------------------------
+# Extended metadata — YAML-only; not part of the TypeScript Pattern interface
+# ---------------------------------------------------------------------------
+
+frequency_in_corpus: >
+  Rare. One fully systematic example exists (sorani_behdini_arab_qwerty, where
+  every alphabetic key's CAPS layer produces a different Arabic/Kurdish letter),
+  plus one minimal single-key case (geba_karen_mymr). Note that the FAR more
+  common CapsLock idiom across the corpus is CapsAlwaysOff — disabling CapsLock
+  entirely so it cannot interfere with typing — which is a DIFFERENT technique,
+  not this one. Caps-as-alternate-layer is genuinely uncommon and is offered here
+  only as a more-options choice (priority 5), never as a recommended primary.
+
+provenance:
+  - keyboard: "release/g/geba_karen_mymr/source/geba_karen_mymr.kmn"
+    lines: [61, 64]
+    rules:
+      - "+ [NCAPS K_C] > U+1001        c caps off -> Myanmar Kha"
+      - "+ [CAPS K_C] > U+1003         c caps on  -> Myanmar Gha (a different letter)"
+      - "+ [NCAPS SHIFT K_C] > U+1003  c shift inverts to the caps-on letter"
+      - "+ [CAPS SHIFT K_C] > U+1001   c caps+shift rounds back to the caps-off letter"
+    note: >
+      Minimal single-key case — CapsLock selects Myanmar Gha (U+1003) in place of
+      Kha (U+1001), a different consonant rather than a case. All four CAPS/NCAPS ×
+      SHIFT quadrants are covered for K_C, which is what the WASM CAPS/NCAPS
+      consistency check (spec §10 check #10) requires for a clean compile.
+  - keyboard: "release/s/sorani_behdini_arab_qwerty/source/sorani_behdini_arab_qwerty.kmn"
+    lines: [67, 121]
+    rules:
+      - "+ [NCAPS K_A] > U+0627   c Alef"
+      - "+ [CAPS K_A] > U+0622    c Alef with Madda Above (a different letter)"
+      - "+ [NCAPS K_L] > U+0644   c Lam"
+      - "+ [CAPS K_L] > U+06b5    c Lam with Small V (Kurdish-specific)"
+    note: >
+      The systematic exemplar — Arabic has no case, so every alphabetic key's CAPS
+      variant produces a DIFFERENT Arabic/Kurdish letter, turning CapsLock into a
+      full second alphabet layer that frees the base and Shift planes for the most
+      common Sorani/Behdini characters.
+
+demo:
+  filled_kmn: |
+    c Demo: CapsLock as an alternate-letter layer (caps-on -> a different letter).
+    c Grounded in geba_karen_mymr: caps-off K_C is Kha; caps-on K_C is Gha.
+    c All four CAPS/NCAPS x SHIFT quadrants are written so the compile is clean.
+
+    store(&VERSION) '10.0'
+    store(&NAME) 'CapsLock Variant Demo'
+    store(&TARGETS) 'any'
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+
+    c CapsLock OFF -> Kha; CapsLock ON -> Gha (a different letter, not a case)
+    + [NCAPS K_C]       > U+1001
+    + [CAPS  K_C]       > U+1003
+    + [NCAPS SHIFT K_C] > U+1003
+    + [CAPS  SHIFT K_C] > U+1001
+
+  sample_keys:
+    - keys: ["c (CapsLock off)"]
+      output: "ခ"
+      note: "CapsLock off — Myanmar Kha (U+1001)"
+    - keys: ["CapsLock on, then c"]
+      output: "ဃ"
+      note: "CapsLock on — Myanmar Gha (U+1003), a different letter"
+    - keys: ["CapsLock off, Shift+c"]
+      output: "ဃ"
+      note: "Shift (caps off) reaches the same letter the caps layer produces"
+
+  sample_output: >
+    With CapsLock off, c types Kha (ခ). Turn CapsLock on and the same c types Gha
+    (ဃ) — a different letter, not a capitalised Kha. The CapsLock state is acting
+    as a switch between two letters, not as upper/lower case.
+
+skeleton:
+  kmn_template: |
+    store(capsOffKeys)   {{capsVariantKeyList}}
+    store(capsOffOutput) '{{capsOffOutputList}}'
+    store(capsOnKeys)    {{capsVariantKeyList_caps}}
+    store(capsOnOutput)  '{{capsOnOutputList}}'
+
+    + any(capsOffKeys) > index(capsOffOutput, 1)
+    + any(capsOnKeys)  > index(capsOnOutput, 1)
+
+  parameters:
+    - id: capsVariantKeyList
+      description: >
+        The store body listing each affected key in its CapsLock-OFF form, each
+        written with the NCAPS modifier so it matches only when CapsLock is off,
+        back-to-back with no separators, e.g. [NCAPS K_C][NCAPS K_H]. The NCAPS form
+        pairs with the CAPS rule below so the CAPS/NCAPS-consistency check (spec §10
+        check #10) is satisfied. The order must match capsOffOutputList one-for-one.
+        Inserted verbatim, so it must be valid KMN.
+    - id: capsOffOutputList
+      description: >
+        The normal (CapsLock-OFF) output characters as a plain string with no
+        spaces, in the same order as capsVariantKeyList. Exactly one character per
+        key.
+    - id: capsVariantKeyList_caps
+      description: >
+        The same keys as capsVariantKeyList but written with the CAPS modifier, e.g.
+        [CAPS K_C][CAPS K_H], so they match while CapsLock is on. Same order as the
+        caps-off key list.
+    - id: capsOnOutputList
+      description: >
+        The CapsLock-ON output characters as a plain string with no spaces, in the
+        same order as the keys. Must be the SAME length as capsOffOutputList — Layer
+        A check #9 (index() offset validity) enforces equal store lengths, so a
+        mismatch is reported at validation time.
+
+  notes: >
+    This fragment covers only the no-SHIFT quadrants (CapsLock off and CapsLock on).
+    If a key listed here also appears in a SHIFT rule elsewhere in the target
+    keyboard, add the matching [NCAPS SHIFT key] and [CAPS SHIFT key] rules (see the
+    demo's full four-quadrant block) so the CAPS/NCAPS-consistency check (spec §10
+    check #10) stays satisfied. demo.filled_kmn is validated with
+    `npx @keymanapp/kmc build` (zero errors, zero warnings — kmc 18.0.249).
