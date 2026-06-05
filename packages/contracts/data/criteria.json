@@ -796,5 +796,101 @@
     "section": "17. Build trigger",
     "band": "yellow-survey",
     "description": "After the build runs, any issues it catches that local review missed were fed back to the author"
+  },
+  {
+    "id": "18.1-longpress-within-limit",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "layer-c-enforce",
+    "principle": "simplicity",
+    "lintRuleId": "KM_WARN_LONGPRESS_OVERSIZE",
+    "description": "No touch long-press menu offers more than 8 options (warning), and none exceeds the hard cap of 10"
+  },
+  {
+    "id": "18.2-touch-rows-within-range",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "layer-c-enforce",
+    "principle": "usability",
+    "lintRuleId": "KM_WARN_TOUCH_ROW_COUNT",
+    "description": "Touch layout uses 4-5 rows on phone and 5 rows on tablet"
+  },
+  {
+    "id": "18.3-keys-per-row-within-range",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "layer-c-enforce",
+    "principle": "usability",
+    "lintRuleId": "KM_WARN_TOUCH_KEYS_PER_ROW",
+    "description": "Touch layout uses at most 10 keys per row on phone and 13 on tablet"
+  },
+  {
+    "id": "18.4-control-keys-stable-across-layers",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "layer-c-enforce",
+    "principle": "usability",
+    "lintRuleId": "KM_WARN_CONTROL_KEY_DRIFT",
+    "description": "Backspace, Enter, and other control keys do not move or resize across touch layers"
+  },
+  {
+    "id": "18.5-layer-switch-toggles-back",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "layer-c-enforce",
+    "principle": "usability",
+    "lintRuleId": "KM_WARN_LAYER_SWITCH_NO_RETURN",
+    "description": "Every layer-switch key has a corresponding key that toggles back to the previous layer"
+  },
+  {
+    "id": "18.6-inventory-fully-covered",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "layer-c-enforce",
+    "principle": "discoverability",
+    "lintRuleId": "KM_LINT_INVENTORY_UNCOVERED",
+    "description": "Every character in the confirmed linguist inventory is produced by some reachable input sequence in the draft keyboard"
+  },
+  {
+    "id": "18.7-mandated-currency-present",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "layer-c-enforce",
+    "principle": "standards",
+    "lintRuleId": "KM_LINT_MANDATED_CHAR_MISSING",
+    "description": "The locale's mandated currency symbol (from CLDR) is reachable on the keyboard"
+  },
+  {
+    "id": "18.8-character-set-is-minimal",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "yellow-survey",
+    "principle": "simplicity",
+    "surveyQuestionId": "discus-minimal-charset",
+    "description": "The character set was kept focused - extra characters were resisted and each addition was deliberate"
+  },
+  {
+    "id": "18.9-rare-chars-discoverable",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "yellow-survey",
+    "principle": "discoverability",
+    "surveyQuestionId": "discus-rare-chars-discoverable",
+    "description": "Rare characters are findable without experimentation, not buried on deep long-press menus alone"
+  },
+  {
+    "id": "18.10-frequent-chars-reachable",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "yellow-survey",
+    "principle": "consistency",
+    "surveyQuestionId": "discus-frequent-chars-reachable",
+    "description": "Frequently used characters sit on easy-to-reach positions consistent with the script's structure"
+  },
+  {
+    "id": "18.11-tested-with-real-users",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "red-checklist",
+    "principle": "usability",
+    "preSubmitChecklistText": "This layout has been tested with target users - good on paper does not equal good in practice",
+    "description": "The layout has been tested with real target users before submission"
+  },
+  {
+    "id": "18.12-meets-legal-accessibility-requirements",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "red-checklist",
+    "principle": "standards",
+    "preSubmitChecklistText": "The keyboard meets any applicable legislated, societal, and accessibility requirements for its locale",
+    "description": "The keyboard meets any applicable legislated, societal, and accessibility requirements for its locale"
   }
 ]

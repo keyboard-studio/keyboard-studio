@@ -6,13 +6,13 @@ This document records the triage outcome for all criteria drawn from `docs/crite
 
 | Band | Count | % of total |
 |------|-------|-----------|
-| scaffolder-bake | 38 | 29% |
-| layer-c-enforce | 58 | 44% |
-| yellow-survey | 33 | 25% |
-| red-checklist | 4 | 3% |
-| **Total** | **133** | **100%** |
+| scaffolder-bake | 38 | 26% |
+| layer-c-enforce | 65 | 45% |
+| yellow-survey | 36 | 25% |
+| red-checklist | 6 | 4% |
+| **Total** | **145** | **100%** |
 
-Counts recomputed directly from `criteria.json` array length and per-band occurrence counts. The 133 total accounts for all 133 colored criterion spans in `docs/criteria.md` (the 136-span count cited in earlier passes included the 3 legend-definition spans at lines 6-8, which are not criteria; see "Omitted rows" below).
+Counts recomputed directly from `criteria.json` array length and per-band occurrence counts. 133 of the 145 are the original repo-hygiene criteria, accounting for all 133 colored criterion spans in `docs/criteria.md` (the 136-span count cited in earlier passes included the 3 legend-definition spans at lines 6-8, which are not criteria; see "Omitted rows" below). The remaining 12 are the **section-18 "Design heuristics (DISCUS)"** rows added to operationalize the keyboard-design principles in [docs/keyboard-design-principles.md](../../../docs/keyboard-design-principles.md) — 7 `layer-c-enforce` (auto-checkable on the first-draft touch layout / output coverage), 3 `yellow-survey` (judgement-dependent), and 2 `red-checklist` (inherently human). See [docs/discus-principles-integration.md](../../../docs/discus-principles-integration.md) for the full DISCUS → programmability mapping.
 
 ## Flagged for re-review
 

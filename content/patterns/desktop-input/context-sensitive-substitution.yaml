@@ -1,0 +1,214 @@
+# context-sensitive-substitution.yaml
+# Strategy: S-03 sequence replace (+ S-04 parallel-store lookup)
+# Real exemplar: release/sil/sil_ipa — the canonical S-03 keyboard cited in spec §7.3
+
+id: context_sensitive_substitution
+title: "Context-sensitive key output"
+description: >
+  What a key types out depends on the character you typed just before it.
+  Type a modifier character first, then press a trigger key — the result is
+  determined by what you typed before, not just the key you pressed.
+category: desktop
+appliesTo: []
+priority: 2
+group_visibility: any
+strategyId: "S-03"
+combinesWith: ["S-04"]
+
+questions:
+  - id: contextStoreName
+    prompt: >
+      Internal name for this rule set (e.g. ipa_seq, tone_mod).
+      Use letters and underscores only — it becomes a KMN identifier.
+    answerType: text
+    default: "seq"
+
+  - id: contextChars
+    prompt: >
+      Which characters trigger a special output when followed by the trigger key?
+      Type them without spaces. Each character here, when typed just before the
+      trigger key, produces a different result than pressing the trigger key alone.
+    answerType: char-list
+
+  - id: triggerKey
+    prompt: >
+      Which key (pressed after the context character) produces a different output
+      depending on what came before it? Example: K_EQUAL for the = key.
+    answerType: key-name
+
+  - id: contextOutputs
+    prompt: >
+      What does the trigger key produce for each context character above, in the
+      same order? One output character per context, no spaces.
+    answerType: char-list
+
+  - id: defaultOutput
+    prompt: >
+      What does the trigger key produce when no special context character came
+      immediately before it? This keeps the key working normally in all other cases.
+    answerType: char-single
+
+kmnFragment: |
+  store(css_{{contextStoreName}}_ctx) '{{contextChars}}'
+  store(css_{{contextStoreName}}_out) '{{contextOutputs}}'
+
+  any(css_{{contextStoreName}}_ctx) + [{{triggerKey}}] > index(css_{{contextStoreName}}_out, 1)
+  + [{{triggerKey}}] > '{{defaultOutput}}'
+
+touchLayoutFragment: null
+
+reorderRules: null
+
+tests:
+  - input: ["K_A", "K_EQUAL"]
+    expectedOutput: "ᵃ"
+    description: "a then = produces superscript-a (U+1D43)"
+  - input: ["K_E", "K_EQUAL"]
+    expectedOutput: "ᵉ"
+    description: "e then = produces superscript-e (U+1D49); different output than a= shows context-sensitivity"
+  - input: ["K_EQUAL"]
+    expectedOutput: "="
+    description: "= without context produces literal = (default output)"
+  - input: ["K_B", "K_EQUAL"]
+    expectedOutput: "b="
+    description: "b (not in context store) followed by = produces b then = unchanged"
+  - input: ["K_A"]
+    expectedOutput: "a"
+    description: "a without following = produces a unchanged"
+
+validatedForFamilies: ["Latn"]
+sourceKeyboards:
+  - "release/sil/sil_ipa"
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-06-04"
+
+# Extended metadata — YAML-only; not part of the TypeScript Pattern interface
+frequency_in_corpus: >
+  The any(store) + trigger > index(out, 1) sequence-replace form appears in
+  approximately 6 of 20 scanned SIL keyboards, concentrated in full-coverage
+  IPA/phonetic keyboards (sil_ipa, sil_phonetic). Deadkey keyboards (S-02)
+  vastly outnumber it in the general catalog, but S-03 is the dominant pattern
+  for keyboards that require extensive modifier-suffix coverage without
+  intermediate visible state.
+
+provenance:
+  - keyboard: "release/sil/sil_ipa/source/sil_ipa.kmn"
+    line: 403
+    rule: "if(option_key = '') any(equalD) + \"=\" > index(equalU,2)"
+    note: >
+      Canonical S-03 example from the keyboard cited in spec §7.3. Any character
+      from the equalD store (capital letters, Greek letters, and IPA symbols)
+      followed by = produces the corresponding IPA phonetic character from equalU.
+      The preceding character and the = are both consumed; the output is a single
+      IPA character determined entirely by the context. The same keyboard supports
+      the reverse word order (= then base letter) via line 378:
+      if(option_key = 'before') "=" + any(equalD) > index(equalU,3).
+      Position numbering: if() occupies position 1 in both rules, shifting the
+      any(equalD) to position 2 or 3 accordingly.
+  - keyboard: "release/sil/sil_ipa/source/sil_ipa.kmn"
+    lines: [301, 302]
+    rules:
+      - "\"[\" + \"[\" > U+02BD    c light aspiration"
+      - "U+02BD + \"[\" > U+02DE   c rhoticity"
+    note: >
+      String-literal context chaining from sil_ipa. Each [ keypress transforms the
+      preceding character: [ + [ produces U+02BD (modifier letter reversed comma,
+      used for light aspiration); U+02BD + [ produces U+02DE (modifier letter rhotic
+      hook). Shows the same consumed-context principle using literal character chains
+      rather than stores — the prior character uniquely determines the output of the
+      next [ press.
+  - keyboard: "release/b/balochi_scientific/source/balochi_scientific.kmn"
+    lines: [57, 59]
+    rules:
+      - "store(dkf003b) U+0020 U+0061 U+0063 U+0064 U+0065 ..."
+      - "dk(003b) any(dkf003b) > index(dkt003b, 2)"
+    note: >
+      Balochi Scientific keyboard (Uppsala University transcription standard for
+      Balochi languages). Uses the same any(store) + trigger > index(out, N)
+      mechanism in a post-deadkey context: after pressing the semicolon deadkey,
+      any character from dkf003b produces its Balochi counterpart from dkt003b
+      (e.g. a → ā, c → č, d → ḍ, n → ñ). Demonstrates S-04 parallel-store
+      lookup as the implementation mechanism for context-sensitive output in a
+      real language keyboard outside the IPA/phonetic domain.
+
+demo:
+  filled_kmn: |
+    c Demo: Context-sensitive key output
+    c Press a base vowel (a or e), then = to get its IPA superscript modifier letter.
+    c Press = without a vowel context to get a literal =.
+
+    store(&VERSION) '10.0'
+    store(&NAME) 'Context-Sensitive Substitution Demo'
+    store(&TARGETS) 'any'
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+
+    store(css_ipa_ctx) 'ae'
+    store(css_ipa_out) U+1D43 U+1D49
+
+    c Context-consumed: preceding vowel + = → IPA superscript modifier letter
+    any(css_ipa_ctx) + [K_EQUAL] > index(css_ipa_out, 1)
+    c Default: = without context → literal =
+    + [K_EQUAL] > '='
+
+  sample_keys:
+    - keys: ["a", "="]
+      output: "ᵃ"
+      note: "a then = — superscript-a (U+1D43 MODIFIER LETTER SMALL A)"
+    - keys: ["e", "="]
+      output: "ᵉ"
+      note: "e then = — superscript-e (U+1D49 MODIFIER LETTER SMALL E)"
+    - keys: ["="]
+      output: "="
+      note: "= alone — literal equals sign"
+    - keys: ["b", "="]
+      output: "b="
+      note: "b (not in context store) then = — both characters output unchanged"
+
+  sample_output: >
+    Type a then = to get ᵃ.
+    Type e then = to get ᵉ.
+    Type = alone to get =.
+    Type b then = to get b= (b is not in the context store).
+
+skeleton:
+  kmn_template: |
+    store(css_{{contextStoreName}}_ctx) '{{contextChars}}'
+    store(css_{{contextStoreName}}_out) '{{contextOutputs}}'
+
+    any(css_{{contextStoreName}}_ctx) + [{{triggerKey}}] > index(css_{{contextStoreName}}_out, 1)
+    + [{{triggerKey}}] > '{{defaultOutput}}'
+
+  parameters:
+    - id: contextStoreName
+      description: >
+        Internal identifier for this context rule set (e.g. "ipa_seq", "tone_mod").
+        Must be a valid KMN identifier — letters and underscores only. Each distinct
+        context rule set in the same keyboard must have a unique name to avoid store
+        name collisions.
+    - id: contextChars
+      description: >
+        The characters that act as context triggers — what the user types first to
+        set up the context. Supplied as a plain string without spaces (e.g. "aeiou").
+        Position in this string must exactly match position in contextOutputs. Layer A
+        enforces equal store lengths between contextChars and contextOutputs.
+    - id: triggerKey
+      description: >
+        Virtual-key name for the trigger key — the key that produces different output
+        depending on what was typed immediately before it (e.g. K_EQUAL for the = key,
+        K_LBRKT for [). Both the preceding context character and the trigger key are
+        consumed; the output is a single character looked up from contextOutputs.
+    - id: contextOutputs
+      description: >
+        The output characters in the same order as contextChars, no spaces (e.g.
+        "ᵃᵉ"). One character per context entry. When the trigger key is pressed
+        immediately after the i-th character in contextChars, the i-th character in
+        contextOutputs is emitted. The context character itself is consumed — it does
+        not appear in the output.
+    - id: defaultOutput
+      description: >
+        The character emitted when the trigger key is pressed and no context character
+        from contextChars immediately preceded it. Allows the trigger key to retain its
+        normal meaning (e.g. "=" for K_EQUAL) in all non-context situations.
