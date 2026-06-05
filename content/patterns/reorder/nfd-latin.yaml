@@ -1,0 +1,281 @@
+# nfd-latin.yaml
+# Spec §8 Phase C' (Reordering) / §9 reorder-priority — the canonical
+# combining-mark ordering skeleton for Latin-script keyboards (issue #40).
+#
+# *** AUTO-APPLIED BY THE SCAFFOLDER ***  (Engine team — see scaffolder_note
+# at the bottom of this file). For QWERTY/QWERTZ and AZERTY groups this
+# pattern is applied silently, NOT surfaced as a gallery choice, unless the
+# base keyboard already carries its own reorder scheme.
+#
+# Strategy framework: this is a Phase C' pipeline stage, not an S-01..S-12
+# output strategy, so strategyId / combinesWith are intentionally omitted
+# (km-strategy review, 2026-06-05).
+
+id: nfd_latin
+title: "Stack accents in the right order"
+description: >
+  When a letter carries more than one mark — for example a vowel that is both
+  nasalised and toned (such as an e with a mark below and an accent above) —
+  the marks have to be stored in a precise sequence so that every program
+  shows and searches the text correctly. This makes the keyboard put those
+  marks in the right order behind the scenes, even when the author types them
+  in a different order. You also choose whether the keyboard produces a single
+  ready-made character when one exists, or always keeps the base letter and
+  its marks as separate pieces — the safest choice when your language has
+  combinations that have no ready-made form.
+category: reorder
+appliesTo: ["Latn"]
+priority: 1
+group_visibility: qwerty-qwertz | azerty
+
+questions:
+  - id: outputForm
+    prompt: >
+      When the keyboard produces an accented letter that also exists as a
+      single ready-made character, which form should it output?
+    answerType: select
+    options:
+      - value: "single-char"
+        label: "Single ready-made character where one exists"
+      - value: "separate"
+        label: "Always keep base letter + marks as separate pieces"
+      - value: "auto"
+        label: "Let the keyboard decide per character"
+    default: "separate"
+    # Default rationale: many Cameroonian / pan-African and IPA letters (e.g.
+    # ə + tone, ɛ + dot-below + tone) have no single ready-made form, so the
+    # "separate pieces" form is the only one that works for every character
+    # without author intervention (langtechcameroon.info/composed-characters).
+    # European-Latin authors who want ready-made output set this to single-char.
+    required: false
+
+  - id: combiningMarks
+    prompt: >
+      List the accent marks your language uses (the marks alone, not the
+      finished accented letters). If you are not sure, leave this blank and the
+      keyboard covers the common Latin marks automatically.
+    answerType: char-list
+    # Default covers the common Latin combining set, classified by Unicode
+    # combining class in skeleton.parameters below:
+    #   above (CCC 230): U+0300-0304 U+0306-0308 U+030A-030C U+030F U+0311
+    #   below (CCC 220): U+0323-0328 U+0330-0331
+    default: "̧̨̣̤̥̦̰̱̀́̂̃̄̆̇̈̊̋̌̏̑"
+    required: false
+
+# kmnFragment — the hook spliced into the caller's group(main). The reorder
+# group itself lives in reorderRules. Placeholders use the {{slotId}} convention.
+kmnFragment: |
+  c --- canonical mark-order hook: place as the last line of group(main) ---
+  match > use(nfd_reorder)
+
+# reorderRules — the reorder group. NOTE (km-keyman, 2026-06-05): kmc-kmn has
+# no reorder() function; canonical ordering is done with a readonly group of
+# context-swap rules reached via `match > use(...)`.
+reorderRules: |
+  store(nfd_below_marks) {{combiningMarksBelow}}
+  store(nfd_above_marks) {{combiningMarksAbove}}
+
+  group(nfd_reorder)
+  c Swap an above-mark (CCC 230) immediately followed by a below-mark (CCC 220)
+  c into canonical order (below before above).
+  c Offset: context position 1 = any(nfd_above_marks); position 2 = any(nfd_below_marks).
+  c index(store, n) re-emits the character matched by the any(store) at position n.
+  any(nfd_above_marks) any(nfd_below_marks) > index(nfd_below_marks, 2) index(nfd_above_marks, 1)
+
+tests:
+  - input: ["U_0065", "U_0301", "U_0330"]
+    expectedOutput: "ḛ́"
+    description: >
+      e typed with acute (above, CCC 230) then tilde-below (CCC 220): the marks
+      are re-ordered so the below-mark comes first (canonical order).
+  - input: ["U_025B", "U_0300", "U_0323"]
+    expectedOutput: "ɛ̣̀"
+    description: >
+      Open-e (U+025B, used across 200+ Cameroon languages) with grave (above)
+      then dot-below: re-ordered to dot-below first. Covers IPA-extended Latin
+      base letters, not just a-z.
+  - input: ["U_0065", "U_0330", "U_0301"]
+    expectedOutput: "ḛ́"
+    description: >
+      Same marks already typed in canonical order (below before above): the
+      swap rule matches only above-then-below, so a correctly-ordered sequence
+      is never matched and passes through unchanged.
+  - input: ["U_0259", "U_0301", "U_0324"]
+    expectedOutput: "ə̤́"
+    description: >
+      IPA schwa (U+0259) with acute (above) then diaeresis-below: re-ordered to
+      diaeresis-below first. Exercises stacked IPA notation.
+  - input: ["U_0065", "U_0301"]
+    expectedOutput: "é"
+    description: >
+      A single mark needs no re-ordering: base + mark passes through unchanged.
+
+validatedForFamilies: ["Latn"]
+sourceKeyboards:
+  - "release/sil/sil_euro_latin"
+  - "release/sil/sil_ipa"
+  - "release/sil/sil_cameroon_qwerty"
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-06-05"
+
+# ---------------------------------------------------------------------------
+# Extended metadata — YAML-only; not part of the TypeScript Pattern interface
+# ---------------------------------------------------------------------------
+
+frequency_in_corpus: >
+  Decomposed (separate base+mark) output is the deliberate convention for
+  Cameroonian/pan-African tonal Latin keyboards (sil_cameroon_qwerty,
+  el_naija) and for IPA (sil_ipa); precomposed Latin keyboards
+  (sil_euro_latin) only fall back to separate base+mark where no ready-made
+  form exists (e.g. line 131, Dutch j-acute).
+
+# Known v1 scope (km-keyman behavioural review, 2026-06-05).
+limitations: >
+  The reorder rule corrects a single above-mark (CCC 230) immediately followed
+  by a below-mark (CCC 220) — the common tone-over-nasal case the test vectors
+  cover. It does NOT fully canonical-sort stacks of three or more marks, and it
+  does not order two marks of the same combining class (e.g. two above-marks),
+  which are left in typed order. Broader CCC sorting is future work.
+
+# Engine hand-off (issue #40 note: "coordinate with the scaffolder").
+auto_applied: true
+scaffolder_note: >
+  The scaffolder auto-includes this skeleton's reorder group for Latin
+  keyboards (spec §8 Phase C' / §9 reorder-priority): adopt the base
+  keyboard's existing reorder scheme if present, otherwise splice this
+  pattern's reorderRules into source/<id>.kmn and add the kmnFragment hook as
+  the last line of group(main). The only fields the scaffolder must read are
+  id, category ("reorder"), reorderRules, and the questions' defaults (so it
+  can run unattended). auto_applied / group_visibility / priority are advisory
+  metadata with no reader in code today — the Engine team must build the
+  reader. The precise auto-apply trigger is "Latin script with
+  stacking-combining marks" (axis A4), for which group_visibility
+  (qwerty-qwertz | azerty) is a coarse proxy. Every below-base mark the keyboard
+  uses (e.g. U+0324 diaeresis-below) must be placed in the combiningMarksBelow
+  slot and every above-base mark in combiningMarksAbove, or the swap rule will
+  not fire for that mark.
+
+provenance:
+  - keyboard: "release/sil/sil_euro_latin/source/sil_euro_latin.kmn"
+    lines: [49, 130, 131]
+    rules:
+      - "store(acuteO) 'áćéǵíḱĺḿńóṕŕśúẃýźÁĆÉǴÍḰĹḾŃÓṔŔŚÚẂÝŹ'   c line 49"
+      - "\"'\" dk(1) + any(acuteK) > index(acuteO, 3)            c line 130"
+      - "\"'\" dk(1) + \"j\" > U+006A U+0301 c Dutch addition     c line 131"
+    note: >
+      EuroLatin is the precomposed baseline: lines 49/130 emit a single
+      ready-made character (NFC) and need no re-ordering. Line 131 is the
+      tell — Dutch j-acute has no ready-made form, so the keyboard emits a
+      base letter plus a separate combining mark (U+006A U+0301). That
+      separate-pieces output is exactly what this re-order pattern keeps in
+      canonical order. (EuroLatin has no reorder group of its own.)
+  - keyboard: "release/sil/sil_ipa/source/sil_ipa.kmn"
+    lines: [193, 194, 197, 198, 200, 201, 412, 416]
+    rules:
+      - "store(ldiaK) \"+_%${\"                                  c below-mark keys, line 193"
+      - "store(ldiaU) U+031F U+0320 U+0325 U+0329 U+032A          c below marks, line 194"
+      - "store(udiaK) '~*@'                                       c above-mark keys, line 197"
+      - "store(udiaU) U+0303 U+0308 U+030A                        c above marks, line 198"
+      - "store(toneU) U+030F U+030C U+0300 U+0304 U+0301 ...       c tone marks, line 200-201"
+      - "any(segmentU) + any(ldiaK) > context beep                c line 412"
+      - "        + any(ldiaK) > index(ldiaU,1)                    c line 416"
+    note: >
+      SIL IPA separates combining marks into stores by vertical position —
+      below (ldiaU), above (udiaU) and tone (toneU). That below/above split is
+      the model for this pattern's nfd_below_marks / nfd_above_marks stores and
+      the CCC-220-before-CCC-230 ordering rule. Lines 412-416 show IPA's guard
+      that forces the author to handle ordering rather than silently emit a
+      non-canonical sequence.
+
+demo:
+  filled_kmn: |
+    c NFD Latin canonical mark-reorder — demo
+    c Scenario: a tonal Latin language where the user may type a tone mark
+    c (above, CCC 230) BEFORE a dot-below (CCC 220). Canonical order needs the
+    c below-mark first; the reorder group corrects it after each keystroke.
+    c   'a' + acute(/) + dot-below(.)  ->  a + U+0323 + U+0301
+
+    store(&NAME) 'NFD Latin Reorder Demo'
+    store(&VERSION) '17.0'
+    store(&KEYBOARDVERSION) '1.0'
+    store(&TARGETS) 'any'
+
+    store(vowels) 'aeiouAEIOU'
+    store(nfd_above) U+0301 U+0300 U+0302 U+030C U+0303 U+0304
+    store(nfd_below) U+0323 U+0330 U+0331
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+
+    + [K_A] > 'a'
+    + [K_E] > 'e'
+    + [K_I] > 'i'
+    + [K_O] > 'o'
+    + [K_U] > 'u'
+
+    c Tone above (slash key): append combining acute
+    any(vowels) + [K_SLASH]  > index(vowels, 1) U+0301
+    c Dot below (period key): append combining dot-below
+    any(vowels) + [K_PERIOD] > index(vowels, 1) U+0323
+    c Dot-below typed after a tone-above (non-canonical; fixed by the reorder group)
+    U+0301 + [K_PERIOD] > context U+0323
+
+    c After each successful key, run the canonical reorder pass
+    match > use(nfd_reorder)
+
+    group(nfd_reorder)
+    c Swap above-mark (pos 1) + below-mark (pos 2) into canonical order
+    any(nfd_above) any(nfd_below) > index(nfd_below, 2) index(nfd_above, 1)
+
+  sample_keys:
+    - keys: ["o", "/", "."]
+      output: "ọ́"
+      note: "o, then acute (/), then dot-below (.) — comes out dot-below first"
+    - keys: ["o", ".", "/"]
+      output: "ọ́"
+      note: "same letter typed in the correct order — unchanged"
+    - keys: ["e", "/"]
+      output: "é"
+      note: "single mark — passes through"
+
+  sample_output: >
+    Type o then / then . to get o with a dot-below and an acute, in the right
+    order. Typing the marks the other way round gives the same result.
+
+skeleton:
+  kmn_template: |
+    c Store declarations (emit before begin Unicode):
+    store(nfd_below_marks) {{combiningMarksBelow}}
+    store(nfd_above_marks) {{combiningMarksAbove}}
+
+    c Hook — emit as the LAST line of group(main) using keys, so the reorder
+    c pass runs after every successful keystroke:
+    match > use(nfd_reorder)
+
+    c Reorder group — emit after group(main):
+    group(nfd_reorder)
+    c OFFSET RULE: context has 2 positions, counted left-to-right from 1.
+    c   pos 1 = any(nfd_above_marks); pos 2 = any(nfd_below_marks).
+    c   index(store, n) re-emits the character the any(store) matched at pos n.
+    c NEVER MIX precomposed (ready-made) and separate base+mark codepoints in a
+    c   store — each store holds ONLY combining marks, never finished letters.
+    any(nfd_above_marks) any(nfd_below_marks) > index(nfd_below_marks, 2) index(nfd_above_marks, 1)
+
+  parameters:
+    - id: combiningMarksBelow
+      description: >
+        KMN store body listing the below-base combining marks (Unicode
+        combining class 220 family), e.g. 'U+0323 U+0330 U+0331' (dot-below,
+        tilde-below, macron-below). Combining marks only — never precomposed
+        letters. Default: the below-marks subset of the combiningMarks question.
+    - id: combiningMarksAbove
+      description: >
+        KMN store body listing the above-base combining marks (Unicode
+        combining class 230 family), e.g. 'U+0301 U+0300 U+0302 U+030C'
+        (acute, grave, circumflex, caron). Combining marks only.
+        Default: the above-marks subset of the combiningMarks question.
+  # Bridge note: the author-facing `combiningMarks` question takes one flat
+  # list; the marks are classified into combiningMarksBelow / combiningMarksAbove
+  # by their Unicode combining class. Until a loader/scaffolder performs that
+  # split, the canonical defaults above are used (they cover the common Latin set).
