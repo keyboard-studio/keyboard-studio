@@ -1,0 +1,191 @@
+{
+  "main": {
+    "id": "bbdcafba034735b2",
+    "type": "split",
+    "children": [
+      {
+        "id": "be01b76052fd6465",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "1136242dbdf254dd",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Graph view"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "9d3c9e34ae75102f",
+    "type": "split",
+    "children": [
+      {
+        "id": "2cf372e8181cccc2",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "75c5da738d085954",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": true
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "fd6227a23efd5bb2",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "31fddf2b11b42dd0",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "d9fcd76d2021ef0e",
+    "type": "split",
+    "children": [
+      {
+        "id": "2ed3eb46dae05787",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "79a4dd6e19681b57",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "c0d636066963e0a5",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "39733327373d4723",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "f5f5edb87a0e77b0",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "affe78b2519f9cfb",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "1136242dbdf254dd",
+  "lastOpenFiles": [
+    "keyman/developer/docs/help/reference/api/index.md",
+    "keyman/developer/docs/help/reference/messages/kmc.infrastructuremessages.md",
+    "keyman/developer/docs/help/reference/messages/kmc-kmn.kmncompilermessages.md",
+    "keyboards/release/fv/fv_uummarmiutun/README.md",
+    "keyboard-studio/docs/criteria.md",
+    "2026-06-04.md",
+    "keyman/android/docs/engine/KMManager/index.md",
+    "keyboard-studio/docs/architecture.svg",
+    "keyboards/experimental/a/adinkra/source/help/AdinkraKeyboardLayout.png"
+  ]
+}
