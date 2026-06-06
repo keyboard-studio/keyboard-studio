@@ -100,7 +100,7 @@ For each PR, **skip** (with audit-log entry `action_taken: skipped, reason: <X>`
   ```
   Dedup the two mentions if `directed_by` resolves to the lead's own login. Audit-log entry uses `action_taken: skipped, reason: merge_conflict`. No labels added.
 - The `statusCheckRollup` shows any required check that is not `SUCCESS` or `NEUTRAL` → reason `ci_not_ready`. Do **not** label or comment; the PR re-enters triage on the next sweep once CI completes.
-- The last commit SHA on the PR (`commits[-1].oid`) equals the SHA recorded in the most recent audit-log entry for this PR AND that entry's action was one of `mention_only`, `fix_and_mention`, `escalate`, or `auto_fix_attempt_failed` → reason `no_new_commits_since_last_review`. This is the idempotency gate; it keeps the inbox quiet when the author or lead hasn't yet pushed a response. Note: `auto_fix_only` is **not** in this list because the auto-fix push changes the head SHA, so the next sweep naturally sees a new HEAD and re-runs the crew on the now-fixed code.
+- The last commit SHA on the PR (`commits[-1].oid`) equals the SHA recorded in the most recent audit-log entry for this PR AND that entry's action was one of `approve_park`, `mention_only`, `fix_and_mention`, `escalate`, or `auto_fix_attempt_failed` → reason `no_new_commits_since_last_review`. This is the idempotency gate; it keeps the inbox quiet when the lead hasn't merged (approve_park), the author hasn't pushed a fix (request-changes paths), or the lead hasn't answered (escalate). Note: `auto_fix_only` is **not** in this list because the auto-fix push changes the head SHA, so the next sweep naturally sees a new HEAD and re-runs the crew on the now-fixed code.
 
 If `$ARGUMENTS` is a single PR number, fetch just that PR with the same fields and proceed.
 
@@ -236,12 +236,28 @@ Review range: <RANGE_DESCRIPTION>
 To list files at current head:
   gh pr view <NUM> --json files
 
+<PREVIOUS_REVIEW_CONTEXT_BLOCK>
+
 Your output will be machine-parsed by the triage agent. Do NOT comment
 on the PR yourself, do NOT push, do NOT merge, do NOT modify files.
 Your job is to produce a verdict ONLY.
 
 Read the diff. Read what you need from the cited files. Apply your
 normal review process per .claude/agents/<your-role>.md.
+
+When the Previous review context block above is non-empty, your job is
+narrower: assess the incremental diff in light of what you already
+flagged. Specifically:
+  - If the new commits address an issue you previously flagged, note
+    it as resolved in your prose and do NOT re-list that finding in
+    `comments`.
+  - If the new commits do NOT address an issue you previously flagged
+    and the issue is still present at the current head, re-list it in
+    `comments` with "(carried from prior review)" appended to `body`.
+  - If the new commits introduce a NEW issue, flag it as you normally
+    would.
+  - If the new commits resolve all prior issues and introduce no new
+    ones, return APPROVE.
 
 Output: your usual prose report (≤500 words), then a fenced verdict
 block on the final lines, in EXACTLY this format:
@@ -293,6 +309,49 @@ Length cap: 500 words of prose + the verdict block. Do not exceed.
 ```
 
 Substitute `<NUM>`, `<TITLE>`, `<LOGIN>`, `<BASE>`, `<HEAD>`, the team-label, and the area-hints from the Phase 2 JSON.
+
+### Populating `<PREVIOUS_REVIEW_CONTEXT_BLOCK>`
+
+For each specialist being dispatched, look up the most recent **substantive-review** audit-log entry for this PR (same definition as Pre-filter A: action_taken ∈ {approve_park, auto_fix_only, mention_only, fix_and_mention, escalate, auto_fix_attempt_failed}). In that entry's `verdicts` array, find the object whose `specialist` field matches the agent you're briefing.
+
+If no prior verdict exists for this specialist (first-sweep PRs, or specialist that didn't run last time), replace `<PREVIOUS_REVIEW_CONTEXT_BLOCK>` with the literal string:
+
+```
+(No prior review context — this is your first review of PR #<NUM>.)
+```
+
+Otherwise, build a block in this shape:
+
+```
+=== Previous review context ===
+
+Your last review of PR #<NUM>:
+  When:       <last audit ts>
+  At HEAD:    <last_audited_sha>
+  Status:     <APPROVE | REQUEST_CHANGES | ESCALATE>
+  Summary:    <your previous verdict.summary>
+
+<if your previous verdict had comments:>
+Findings you raised last time (re-listed for your reference):
+  - <file>:<line> — <body>
+  - ...
+
+<if any auto-fix landed since the last review:>
+Auto-fixes pushed since your last review:
+  - commit <sha>: <auto_fix.applied summaries from the intervening audit entry>
+
+<if the action between then and now @-mentioned the lead:>
+Mention sent to the tech lead at:
+  <mention_comment_url>
+  (The lead may have answered on the PR. The triage will route any
+  resulting decisions on the next cycle; you can ignore the @-mention
+  thread for this review — focus only on whether the new commits
+  introduce, resolve, or fail to address the findings above.)
+
+=== End previous review context ===
+```
+
+Omit any sub-section whose source data is empty. Always keep the surrounding `===` markers so the agent can recognize the block boundaries.
 
 ## Phase 5 — Synthesize verdicts
 
