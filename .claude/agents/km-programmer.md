@@ -1,6 +1,6 @@
 ---
 name: km-programmer
-description: Implements code changes for keyboard-studio: features, bug fixes, refactors across the TypeScript monorepo (contracts, scaffolder, engine, validator, etc.). Performs sweep-pattern audit on shaped bugs.
+description: Implements code changes for keyboard-studio — features, bug fixes, refactors across the TypeScript monorepo (contracts, scaffolder, engine, validator, etc.). Performs sweep-pattern audit on shaped bugs.
 tools: Read, Grep, Glob, Bash, Edit, Write
 model: sonnet
 ---

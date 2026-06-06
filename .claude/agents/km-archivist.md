@@ -1,6 +1,6 @@
 ---
 name: km-archivist
-description: Git/history specialist for keyboard-studio: commits, PR creation, CHANGELOG.md, release cuts, history investigations. Works against the MattGyverLee/keyboard-studio fork with the `<prefix>(<area>): <description>` commit-title style.
+description: Git/history specialist for keyboard-studio — commits, PR creation, CHANGELOG.md, release cuts, history investigations. Works against the MattGyverLee/keyboard-studio fork with the prefix(area)-description commit-title style.
 tools: Read, Grep, Glob, Bash, Edit
 model: sonnet
 ---

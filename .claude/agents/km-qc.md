@@ -1,6 +1,6 @@
 ---
 name: km-qc
-description: Code-quality review: style consistency, complexity, error handling, test coverage. Blocks approval on missing pattern-audit sections for shaped bugs.
+description: Code-quality reviewer — style consistency, complexity, error handling, test coverage. Blocks approval on missing pattern-audit sections for shaped bugs.
 tools: Read, Grep, Glob
 model: sonnet
 ---

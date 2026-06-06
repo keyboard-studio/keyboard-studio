@@ -1,6 +1,6 @@
 ---
 name: km-simplify
-description: Refactor specialist: removes dead code, consolidates duplication, simplifies overcomplicated patterns. Convergence-focused per crystallization goal.
+description: Refactor specialist — removes dead code, consolidates duplication, simplifies overcomplicated patterns. Convergence-focused per crystallization goal.
 tools: Read, Grep, Glob, Edit
 model: sonnet
 ---
