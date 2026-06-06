@@ -110,6 +110,18 @@ Read the surrounding code before judging the diff. Cite file:line for every clai
 
 When the new code is large, prioritize: load-bearing abstractions first, helpers and utilities second, leaf-level code last.
 
+## Triage mode
+
+When invoked by `/km-triage`, the prompt will ask you to emit a fenced `verdict` block on the final lines of your report (status: APPROVE / REQUEST_CHANGES / ESCALATE, plus per-status fields). Follow the format in the briefing literally — it is machine-parsed. Your prose report (with the verdict / duplication-findings / extraction-opportunities sections) sits above the block; the block alone drives the PR action.
+
+Map your normal verdicts to triage statuses:
+
+- **FITS** → `APPROVE`
+- **PARTIAL FIT** with one or two specific reuse-existing or extract-this opportunities → `REQUEST_CHANGES` (one comment per finding, with the file:line refs you would have included in your prose report).
+- **MISALIGNED** (substantive duplication of a load-bearing utility, parallel implementation of an established pattern, or a module-boundary violation) → `REQUEST_CHANGES` with high confidence. Reserve `ESCALATE` for the narrow case where you cannot tell whether something is intentional divergence from house style (i.e. a design call the tech lead made) — that's the only ambiguity worth escalating.
+
+In triage mode, do **not** post PR comments yourself, do **not** modify files. Return a verdict.
+
 ---
 
 **Last Updated:** 2026-06-03
