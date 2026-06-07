@@ -18,33 +18,49 @@ strategyId: "S-09"
 combinesWith: []
 
 questions:
-  - id: preBaseVowelMap
+  # Hunk 1: keep ours — char-list answerType is the right type for collecting
+  # a character set; theirs' text/keystroke-map conflates vowel identity with
+  # key assignment (which belongs in the KMN rules layer, not the survey).
+  - id: preBaseVowels
     prompt: >
-      For each pre-base vowel sign, what is the key/character that types it?
-      Format: one line per vowel, comma-separated: keystroke,unicode_codepoint
-      Example for Devanagari i-matra: i,U+093F
-      Example for Tamil: (i,U+0BBF e,U+0BC6 E,U+0BC7 ai,U+0BC8)
-    answerType: text
+      Which vowel signs appear to the LEFT of the consonant on screen?
+      Type them one after another without spaces.
+      Example for Devanagari: ि (U+093F, i-matra)
+      Example for Tamil: ி (U+0BBF) ெ (U+0BC6) ே (U+0BC7) ை (U+0BC8)
+    answerType: char-list
 
+  # Hunk 2: keep ours — adds the halant/virama question (required for
+  # cluster-boundary reorder rules). Theirs omitted halant coverage entirely.
   - id: baseConsonants
     prompt: >
       Which consonants do these vowel signs attach to?
-      Type the full range without spaces, or provide a store name.
+      Type the full range without spaces.
       Example for Devanagari: कखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसह
     answerType: char-list
 
-questions_deprecated:
-  - note: >
-      The single-keystroke assumption allows the pattern to work generically
-      across all Indic scripts. Some keyboards may parameterize differently
-      (e.g., Tamil99 uses 'e' → U+0BC6, while another may use two keystrokes).
-      For multi-keystroke pre-base vowels, define them in the question text.
+  - id: halant
+    prompt: >
+      What is the halant or virama character for this script — the mark that
+      ends a consonant cluster?
+      Example for Devanagari: ् (U+094D)
+      Example for Tamil: ் (U+0BCD)
+      Leave blank if your script does not use a virama.
+    answerType: char-single
+    required: false
+    default: ""
 
+# Hunk 3: keep theirs — canonical Unicode Indic encoding is C+V (consonant
+# then vowel sign in the backing store). Theirs' context-rule approach
+# produces that order. Ours' reorder(from(preBaseVowels) before(baseConsonants))
+# inverts storage to V+C, which is non-canonical for Unicode-mode keyboards
+# and contradicts how Unicode-mode Keyman Indic keyboards (common_devanagari,
+# SIL Devanagari Phonetic) actually work.
 kmnFragment: |
   c Pre-base vowel reordering: type consonant, then vowel key
   c The 'context' rule keeps the consonant and adds the vowel after it.
   c Indic script rendering engines automatically display the vowel to the left.
 
+  store(preBaseVowels) '{{preBaseVowels}}'
   store(baseConsonants) '{{baseConsonants}}'
 
   begin Unicode > use(main)
@@ -76,22 +92,27 @@ notes: >
   the same KMN group. There is no explicit reordering rule in the KMN source;
   the reordering is inherent to how the Unicode text is rendered.
 
+# Post-resolution audit fix: the tests block was outside the conflict markers
+# but still asserted V+C storage order, which would contradict the C+V kmnFragment
+# now in place. Corrected to canonical C+V order so the descriptions match what
+# the rule actually emits.
 tests:
   - input: ["K_K", "U+093F"]
-    expectedOutput: "िक"
+    expectedOutput: "कि"
     description: >
       Devanagari: type ka (क U+0915) then i-matra (ि U+093F) — stored as
-      i-matra BEFORE consonant (U+093F U+0915) for correct visual rendering
+      consonant THEN i-matra (U+0915 U+093F, canonical Unicode order); the
+      rendering engine positions the i-matra visually to the left.
   - input: ["K_K", "U+0BBF"]
-    expectedOutput: "ிக"
+    expectedOutput: "கி"
     description: >
       Tamil: type ka (க U+0B95) then i-matra (ி U+0BBF) — stored as
-      i-matra BEFORE consonant (U+0BBF U+0B95)
+      consonant THEN i-matra (U+0B95 U+0BBF, canonical Unicode order).
   - input: ["K_K", "U+09BF"]
-    expectedOutput: "িক"
+    expectedOutput: "কি"
     description: >
       Bengali: type ka (ক U+0995) then i-matra (ি U+09BF) — stored as
-      i-matra BEFORE consonant (U+09BF U+0995)
+      consonant THEN i-matra (U+0995 U+09BF, canonical Unicode order).
 
 validatedForFamilies: ["Deva", "Taml", "Beng"]
 sourceKeyboards:
@@ -108,6 +129,8 @@ reviewDate: "2026-06-05"
 frequency_in_corpus: "3/3 scanned Indic abugida keyboards require pre-base vowel reorder"
 
 provenance:
+  # Hunk 4: keep theirs — explicitly and correctly states the i-matra is
+  # stored AFTER the consonant and rendered visually to the left.
   - keyboard: "release/c/common_devanagari/source/common_devanagari.kmn"
     note: >
       Common Devanagari keyboard for Hindi. Uses context rules to handle pre-base
@@ -115,6 +138,8 @@ provenance:
       (U+093F) is the canonical pre-base vowel: typed after the consonant via
       the 'i' key, it's stored after the consonant but rendered visually to the
       left. This is the primary S-09 exemplar cited in spec §7.3.
+  # Hunk 5: keep theirs — context rules append the vowel after the consonant
+  # (C+V correct); ours' V+C claim was incorrect for Unicode canonical Tamil.
   - keyboard: "release/tamil/tamil99/source/tamil99.kmn"
     note: >
       Tamil99 standard layout. Tamil has four pre-base vowels: ி (U+0BBF),
@@ -123,6 +148,7 @@ provenance:
       append the vowel sign. The rendering engine automatically positions each
       pre-base vowel visually to the left, matching the Unicode canonical order
       for Tamil syllables.
+  # Hunk 6: keep theirs — same storage-order correction as hunk 5.
   - keyboard: "release/sil/sil_bengali_national_jatiya/source/sil_bengali_national_jatiya.kmn"
     note: >
       SIL Bengali National/Jatiya keyboard. Bengali i-matra (ি U+09BF) is a
@@ -132,6 +158,7 @@ provenance:
       abugida family.
 
 demo:
+  # Hunk 7a: keep theirs for filled_kmn — context rule (C+V correct).
   filled_kmn: |
     c Demo: Devanagari pre-base i-matra reorder using context rules
     c Type any consonant, then 'i' to produce consonant + i-matra (U+093F)
@@ -150,26 +177,38 @@ demo:
     c Context rule preserves the consonant and appends the vowel sign
     any(baseConsonants) + 'i' > context U+093F
 
+  # Post-resolution audit fix: sample_keys output was V+C ("ि​क" with ZWJ),
+  # corrected to canonical C+V ("कि"). Keystrokes also normalised — type the
+  # consonant key then the 'i' keystroke (matching the demo rule), not the
+  # i-matra character directly.
   sample_keys:
-    - keys: ["क", "ि"]
-      output: "ि​क"
-      note: "ka + i-matra — stored as i-matra then ka (किperceived as कि)"
-    - keys: ["ग", "ि"]
-      output: "ि​ग"
-      note: "ga + i-matra — pre-base reorder applied"
-    - keys: ["स", "ि"]
-      output: "ि​स"
-      note: "sa + i-matra — pre-base reorder applied"
+    - keys: ["क", "i"]
+      output: "कि"
+      note: "ka + 'i' — stored as ka THEN i-matra (canonical C+V); i-matra renders visually to the left"
+    - keys: ["ग", "i"]
+      output: "गि"
+      note: "ga + 'i' — stored as ga THEN i-matra (canonical C+V)"
+    - keys: ["स", "i"]
+      output: "सि"
+      note: "sa + 'i' — stored as sa THEN i-matra (canonical C+V)"
 
+  # Post-resolution audit fix: prose was "stored before the consonant", corrected
+  # to "stored after the consonant" so it matches the canonical Unicode order
+  # that the kmnFragment's context rule actually produces.
   sample_output: >
-    Type any Devanagari consonant key followed by the i-matra (ि).
-    The vowel sign will be stored before the consonant in the text buffer,
-    which causes the rendering engine to display it visually to the left
-    of the consonant — the correct appearance for Devanagari syllables
-    such as कि (ka+i), गि (ga+i), सि (sa+i).
+    Type any Devanagari consonant key followed by 'i' to produce the i-matra (ि).
+    The vowel sign is stored AFTER the consonant in the text buffer (canonical
+    Unicode order); the Indic shaping engine positions it visually to the left
+    of the consonant — the correct appearance for Devanagari syllables such as
+    कि (ka+i), गि (ga+i), सि (sa+i).
 
 skeleton:
+  # Hunk 7b: merge — theirs' context-rule template + ours' store(preBaseVowels)
+  # declaration (the skeleton parameters reference preBaseVowels even though
+  # theirs' rule body uses literal codepoints; the store is available for
+  # alternative rule shapes during pattern instantiation).
   kmn_template: |
+    store(preBaseVowels) '{{preBaseVowels}}'
     store(baseConsonants) '{{baseConsonants}}'
 
     begin Unicode > use(main)
@@ -186,23 +225,25 @@ skeleton:
     rendering engine automatically positions pre-base vowels visually to the left
     of the consonant.
 
+  # Hunk 7c: keep ours' parameters — documents preBaseVowels, baseConsonants,
+  # and halant. Halant is genuinely needed for cluster-aware extensions; theirs
+  # documented kmnRules as a parameter but kmnRules is the rule-body output
+  # produced from the other answers, not a survey input.
   parameters:
+    - id: preBaseVowels
+      description: >
+        The vowel signs that must be stored before the consonant even though
+        they are typed after it. In Devanagari this is ि (U+093F); in Tamil
+        ி ெ ே ை (U+0BBF, U+0BC6, U+0BC7, U+0BC8); in Bengali ি (U+09BF).
+        Provide all pre-base vowels for the target script as a plain string.
     - id: baseConsonants
       description: >
         The consonant characters that pre-base vowels attach to. Provide the
-        full consonant inventory of the target script as a plain string so each
-        rule fires for every consonant+vowel pair.
-        Example for Devanagari: कखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसह
-    - id: kmnRules
+        full consonant inventory of the target script as a plain string so the
+        reorder rule fires for every consonant+vowel pair.
+    - id: halant
       description: >
-        One context rule per pre-base vowel. Format:
-        any(baseConsonants) + 'keystroke' > context U+XXXX
-
-        Example for Devanagari i-matra:
-        any(baseConsonants) + 'i' > context U+093F
-
-        Example for Tamil (four pre-base vowels):
-        any(baseConsonants) + 'i' > context U+0BBF
-        any(baseConsonants) + 'e' > context U+0BC6
-        any(baseConsonants) + 'E' > context U+0BC7
-        any(baseConsonants) + 'ai' > context U+0BC8
+        The virama or halant character that ends a consonant cluster
+        (Devanagari ् U+094D, Tamil ் U+0BCD, Bengali ্ U+09CD). Used in
+        extended reorder rules that handle consonant-cluster+vowel sequences.
+        Optional — leave blank if your script does not use a virama.
