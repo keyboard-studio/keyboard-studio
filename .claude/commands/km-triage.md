@@ -65,43 +65,54 @@ Every action that writes to GitHub (reviews, comments, label adds, auto-fix push
 
 The App's credentials live outside the repo at `~/.config/km-triage/` (Linux/macOS) or `%LOCALAPPDATA%\km-triage\` (Windows). They are created once via [utilities/km-triage-app/setup.js](utilities/km-triage-app/setup.js); see the "Setup (one-time)" sub-section below.
 
-### Per-sweep token mint
+### The bot-gh wrapper
 
-At the start of Phase 1 (after the inbox bootstrap), mint a fresh 1-hour installation token:
+All bot-attributed `gh` calls go through a thin wrapper: [utilities/km-triage-app/bot-gh.js](utilities/km-triage-app/bot-gh.js). It mints a fresh installation token and exec's `gh` with `GH_TOKEN` set. Each invocation is self-contained — no shell-state assumptions, no `$BOT_TOKEN` to thread across separate Bash tool calls (which would silently fail because the Bash tool gives each invocation a fresh shell).
+
+The pattern is a drop-in replacement: anywhere the doc would say `gh <args>`, the bot-attributed equivalent is `node utilities/km-triage-app/bot-gh.js <args>`. The wrapper's stdout/stderr/exit-code mirror `gh` exactly.
+
+### Phase 1 reachability check
+
+At the start of Phase 1 (after the inbox bootstrap), confirm the App is reachable. This is a fail-fast: a sweep with no bot identity is a sweep that cannot APPROVE-AND-PARK anything.
 
 ```bash
-BOT_TOKEN=$(node utilities/km-triage-app/mint-token.js)
+node utilities/km-triage-app/mint-token.js > /dev/null || {
+  ts=$(date -u +%FT%TZ)
+  echo "[$ts] km-triage bot-token mint failed; run \`node utilities/km-triage-app/setup.js\` to (re)install the GitHub App, then retry." >> .tech-lead-inbox/INBOX.md
+  printf '{"ts":"%s","action_taken":"auth_failed","reason":"bot_token_unavailable"}\n' "$ts" >> .tech-lead-inbox/audit-log.jsonl
+  exit 1
+}
 ```
 
-`$BOT_TOKEN` is in scope for the rest of the sweep. If the mint exits non-zero (no credentials, App not installed on the repo, network failure), the sweep MUST NOT proceed: append a one-line note to `INBOX.md`, append an audit-log entry with `action_taken: auth_failed, reason: bot_token_unavailable`, and exit non-zero. Do not silently fall back to the human's PAT — bot identity is the whole point.
+The discarded mint is just the reachability check — every subsequent action mints its own fresh token via the wrapper.
 
 ### Which calls use which token
 
-| Action | Token | Reason |
+| Action | Wrapper / token | Reason |
 |---|---|---|
-| `gh pr list` / `view` / `diff` / `checks`; `gh api .../pulls/<NUM>` re-checks | human PAT (default `gh auth`) | Read-only; no need to switch. |
-| `git fetch`, `git diff`, `git worktree add`, `git commit` (local) | human PAT / git default | Local or read-only. |
-| `gh label create` (Phase 1 sentinel-guarded) | human PAT | Runs once per repo lifetime; not per-PR. |
-| `gh pr review --approve` (APPROVE-AND-PARK) | **`$BOT_TOKEN`** | Must be attributable to a non-author identity to satisfy the ruleset's required-approving-review count. |
-| `gh pr comment` (any comment posted by triage) | **`$BOT_TOKEN`** | PR UI shows "km-triage[bot] commented" — clear it's the agent. |
-| `gh api .../labels` (label adds on PRs) | **`$BOT_TOKEN`** | Consistent attribution; the App has `issues: write` for this. |
-| `git push` (auto-fix commits, Phase 6) | **`$BOT_TOKEN`** via authenticated remote URL | Pushed commit is attributed to km-triage[bot]; push must use bot credentials. |
+| `gh pr list` / `view` / `diff` / `checks`; `gh api .../pulls/<NUM>` re-checks | direct `gh` (human PAT) | Read-only; no need to switch. |
+| `git fetch`, `git diff`, `git worktree add`, `git commit` (local) | direct git (human PAT / local) | Local or read-only. |
+| `gh label create` (Phase 1 sentinel-guarded) | direct `gh` (human PAT) | Runs once per repo lifetime; not per-PR. |
+| `gh pr review --approve` (APPROVE-AND-PARK) | **`bot-gh.js`** | Must be attributable to a non-author identity to satisfy the ruleset's required-approving-review count. |
+| `gh pr comment` (any comment posted by triage) | **`bot-gh.js`** | PR UI shows "km-triage[bot] commented" — clear it's the agent. |
+| `gh api .../labels` (label adds on PRs) | **`bot-gh.js`** | Consistent attribution; the App has `issues: write` for this. |
+| `git push` (auto-fix commits, Phase 6) | **mint inline** via authenticated remote URL | Pushed commit is attributed to km-triage[bot]; push must use bot credentials. |
 
-The pattern for bot-attributed gh calls — inline env-var, scoped to one command (never `export` globally; the App token's scopes are narrower than the human PAT's, and read-only calls like `gh pr list` may rely on the human PAT's `read:org`):
-
-```bash
-GH_TOKEN=$BOT_TOKEN gh pr review <NUM> --approve --body-file <path>
-GH_TOKEN=$BOT_TOKEN gh pr comment <NUM> --body-file <path>
-GH_TOKEN=$BOT_TOKEN gh api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=<label>"
-```
-
-For git pushes, use a bot-authenticated remote URL (no remote rename, no credential helper change — the URL is one-shot):
+The pattern for bot-attributed gh calls:
 
 ```bash
-git -C "$WORKTREE" push "https://x-access-token:$BOT_TOKEN@github.com/MattGyverLee/keyboard-studio.git" "HEAD:$HEAD_BRANCH"
+node utilities/km-triage-app/bot-gh.js pr review <NUM> --approve --body-file <path>
+node utilities/km-triage-app/bot-gh.js pr comment <NUM> --body-file <path>
+node utilities/km-triage-app/bot-gh.js api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=<label>"
 ```
 
-The code blocks in Phases 2–6 below show the `GH_TOKEN=$BOT_TOKEN` prefix on every PR-mutating call. Follow it exactly — silent omission means the action gets attributed to the human and (for APPROVE) gets rejected by GitHub as author-self-approval.
+For git pushes, mint inline and put the token in the remote URL (one-shot URL; no remote rename, no credential helper change):
+
+```bash
+git -C "$WORKTREE" push "https://x-access-token:$(node utilities/km-triage-app/mint-token.js)@github.com/MattGyverLee/keyboard-studio.git" "HEAD:$HEAD_BRANCH"
+```
+
+The code blocks in Phases 2–6 below show `bot-gh.js` on every PR-mutating call. Follow them exactly — silently falling back to direct `gh` attributes the action to the human PAT and (for APPROVE) gets rejected by GitHub as author-self-approval.
 
 ### Setup (one-time)
 
@@ -138,18 +149,7 @@ fi
 
 `.tech-lead-inbox/` is in `.gitignore` already; the bootstrap is paranoia. The label-creation sentinel means three `gh label create` API calls happen on the first ever sweep and zero on every subsequent sweep.
 
-After the bootstrap, mint the bot installation token (see "Bot identity" above):
-
-```bash
-BOT_TOKEN=$(node utilities/km-triage-app/mint-token.js) || {
-  ts=$(date -u +%FT%TZ)
-  echo "[$ts] km-triage bot-token mint failed; run \`node utilities/km-triage-app/setup.js\` to (re)install the GitHub App, then retry." >> .tech-lead-inbox/INBOX.md
-  printf '{"ts":"%s","action_taken":"auth_failed","reason":"bot_token_unavailable"}\n' "$ts" >> .tech-lead-inbox/audit-log.jsonl
-  exit 1
-}
-```
-
-`$BOT_TOKEN` is required for every Phase-6 PR-mutating call (reviews, comments, label adds, auto-fix pushes). It is the *only* way the triage agent's APPROVE review can satisfy the `main` ruleset on PRs the repo owner authored.
+After the bootstrap, run the bot-identity reachability check (see "Phase 1 reachability check" in the Bot identity section above). It mints a throwaway token to confirm the App is installed and reachable, and fast-fails the sweep with `auth_failed` if not. Every subsequent PR-mutating action mints its own fresh token via [utilities/km-triage-app/bot-gh.js](utilities/km-triage-app/bot-gh.js) — no shell-state assumptions.
 
 ## Phase 2 — Discover PRs
 
@@ -176,7 +176,7 @@ For each PR, **skip** (with audit-log entry `action_taken: skipped, reason: <X>`
 
   Any other shape — Claude (`noreply@anthropic.com`), a teammate's email (`*@taylor.edu`, `*@sil.org` that isn't the lead's), or a Co-Authored-By trailer pointing elsewhere — means **triage the PR**. Do **not** key off `author.login` (who opened the PR) — that field is set to the tech lead's identity whenever a headless CLI run or a "push for me" workflow lands a PR under their credentials, and skipping on that signal would defeat the entire purpose of the triage.
 - Labels include `tech-lead-ready-to-merge`, `tech-lead-review-needed`, or `triage-skip` → reason `already_in_lead_queue`.
-- `mergeable` is `CONFLICTING` → reason `merge_conflict`. The triage will not run the review crew on this PR (the user's directive: "don't try to fix a conflicting branch"). Instead, post **one** @-mention comment (via `GH_TOKEN=$BOT_TOKEN gh pr comment <NUM> --body-file <conflict-body.md>`) tagging both the tech lead and the PR's directing human (computed per the same Phase-3.5 logic the normal path uses — desktop case via commit author email → GitHub login; web case via `pr.author.login`). Body:
+- `mergeable` is `CONFLICTING` → reason `merge_conflict`. The triage will not run the review crew on this PR (the user's directive: "don't try to fix a conflicting branch"). Instead, post **one** @-mention comment (via `node utilities/km-triage-app/bot-gh.js pr comment <NUM> --body-file <conflict-body.md>`) tagging both the tech lead and the PR's directing human (computed per the same Phase-3.5 logic the normal path uses — desktop case via commit author email → GitHub login; web case via `pr.author.login`). Body:
   ```
   @MattGyverLee @<directed_by-login> — km-triage skipped this PR.
 
@@ -499,12 +499,12 @@ CONFLICTING PRs never reach this phase — Phase 2 catches them and posts a sepa
 
 The triage labels (`tech-lead-ready-to-merge`, `tech-lead-review-needed`, `triage-skip`) are created once in Phase 1 (guarded by the `.tech-lead-inbox/.labels-created` sentinel) — no further label-create calls run here.
 
-**Every PR-mutating gh call in this Phase MUST use `$BOT_TOKEN`** per the Bot identity contract above. The code blocks below show the `GH_TOKEN=$BOT_TOKEN` prefix explicitly. Omitting it attributes the action to the human PAT, which (a) breaks the identity-separation contract and (b) causes `gh pr review --approve` to be rejected by GitHub as author-self-approval on owner-authored PRs.
+**Every PR-mutating gh call in this Phase MUST go through `node utilities/km-triage-app/bot-gh.js`** per the Bot identity contract above. The code blocks below show the wrapper invocation explicitly. Falling back to direct `gh` attributes the action to the human PAT, which (a) breaks the identity-separation contract and (b) causes `gh pr review --approve` to be rejected by GitHub as author-self-approval on owner-authored PRs.
 
-Label additions use the REST API (because `gh pr edit --add-label` requires a `read:org` token scope the App's installation token does not have either — the issue isn't scope, it's that the REST endpoint accepts the App token cleanly):
+Label additions use the REST API (the wrapper passes through to `gh api` cleanly with the App's installation token):
 
 ```bash
-GH_TOKEN=$BOT_TOKEN gh api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=<label>"
+node utilities/km-triage-app/bot-gh.js api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=<label>"
 ```
 
 ### Action: APPROVE-AND-PARK (Phase 5 outcome)
@@ -525,8 +525,8 @@ If `mergeable_state` is `dirty` (CONFLICTING) or any required check is not `SUCC
 If both gates pass, label and submit a formal **APPROVE review** (not a plain comment — the review is what satisfies `main`'s required-approving-review-count rule):
 
 ```bash
-GH_TOKEN=$BOT_TOKEN gh api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=tech-lead-ready-to-merge"
-GH_TOKEN=$BOT_TOKEN gh pr review <NUM> --approve --body-file <approval-body.md>
+node utilities/km-triage-app/bot-gh.js api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=tech-lead-ready-to-merge"
+node utilities/km-triage-app/bot-gh.js pr review <NUM> --approve --body-file <approval-body.md>
 ```
 
 Approval body:
@@ -590,8 +590,8 @@ Procedure (worktree-isolated — NEVER mutates the triage's own working tree):
                         commit -m "triage(auto-fix): apply <N> mechanical fix(es) from review (refs #<NUM>)"
    (Substitute <APP_ID> with the `id` from ~/.config/km-triage/config.json or %LOCALAPPDATA%\km-triage\config.json — that's the GitHub-recognized email format for App-authored commits.)
    Body lists each fix with the originating specialist. Include "Co-Authored-By: Claude <noreply@anthropic.com>".
-9. Push from "$WORKTREE" using a bot-authenticated remote URL (one-shot; do not rename the existing origin):
-     git -C "$WORKTREE" push "https://x-access-token:$BOT_TOKEN@github.com/MattGyverLee/keyboard-studio.git" "HEAD:<HEAD>"
+9. Push from "$WORKTREE" using a bot-authenticated remote URL (mint inline, one-shot; do not rename the existing origin or persist the token):
+     git -C "$WORKTREE" push "https://x-access-token:$(node utilities/km-triage-app/mint-token.js)@github.com/MattGyverLee/keyboard-studio.git" "HEAD:<HEAD>"
 10. Clean up the worktree:
      git worktree remove "$WORKTREE"
 11. Post-condition (the triage runs this after km-programmer returns): verify the triage's main working-tree HEAD equals the SHA recorded at sweep start. If it changed, log a critical error to INBOX.md ("PR #<NUM> auto-fix appears to have bypassed worktree isolation — sweep aborted") and stop the entire sweep until investigated.
@@ -611,7 +611,7 @@ problem: <only if ESCALATE — what went wrong>
 When `km-programmer` returns APPLIED, post a single comment on the PR (no @mention — nothing requires the lead's input):
 
 ```bash
-GH_TOKEN=$BOT_TOKEN gh pr comment <NUM> --body-file <auto-fix-body.md>
+node utilities/km-triage-app/bot-gh.js pr comment <NUM> --body-file <auto-fix-body.md>
 ```
 
 Body:
@@ -624,14 +624,14 @@ Body:
 The next triage sweep will re-review the updated PR.
 ```
 
-When `km-programmer` returns ESCALATE (a fix failed to apply, or a check broke), treat the PR as if the action were MENTION_ONLY: post an @-mention comment listing the failed-to-apply fixes alongside their original specialist findings (use the same `GH_TOKEN=$BOT_TOKEN gh pr comment` pattern as MENTION_ONLY below), and add a follow-up audit-log entry with `action_taken: auto_fix_attempt_failed`.
+When `km-programmer` returns ESCALATE (a fix failed to apply, or a check broke), treat the PR as if the action were MENTION_ONLY: post an @-mention comment listing the failed-to-apply fixes alongside their original specialist findings (use the same `node utilities/km-triage-app/bot-gh.js pr comment` pattern as MENTION_ONLY below), and add a follow-up audit-log entry with `action_taken: auto_fix_attempt_failed`.
 
 ### Action: MENTION_ONLY (Phase 5.5 outcome)
 
 No fixes to push. Post one consolidated comment on the PR that @-mentions both the tech lead and the directing human:
 
 ```bash
-GH_TOKEN=$BOT_TOKEN gh pr comment <NUM> --body-file <mention-body.md>
+node utilities/km-triage-app/bot-gh.js pr comment <NUM> --body-file <mention-body.md>
 ```
 
 Body:
@@ -656,12 +656,12 @@ If `directed_by` is an email (desktop-Claude case), look up the GitHub username 
 Then label:
 
 ```bash
-GH_TOKEN=$BOT_TOKEN gh api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=tech-lead-review-needed"
+node utilities/km-triage-app/bot-gh.js api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=tech-lead-review-needed"
 ```
 
 ### Action: FIX_AND_MENTION (Phase 5.5 outcome)
 
-Both paths run. First dispatch km-programmer per AUTO_FIX_ONLY above and wait for the result. Then post a single combined comment (same `GH_TOKEN=$BOT_TOKEN gh pr comment <NUM> --body-file <combined-body.md>` pattern as MENTION_ONLY):
+Both paths run. First dispatch km-programmer per AUTO_FIX_ONLY above and wait for the result. Then post a single combined comment (same `node utilities/km-triage-app/bot-gh.js pr comment <NUM> --body-file <combined-body.md>` pattern as MENTION_ONLY):
 
 ```
 @MattGyverLee @<directed_by-login> — km-triage applied auto-fixes and needs your input on the remaining items.
@@ -714,7 +714,7 @@ Do **not** comment on the PR. Append to `.tech-lead-inbox/INBOX.md`:
 Then label:
 
 ```bash
-GH_TOKEN=$BOT_TOKEN gh api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=tech-lead-review-needed"
+node utilities/km-triage-app/bot-gh.js api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=tech-lead-review-needed"
 ```
 
 ## Phase 7 — Audit log

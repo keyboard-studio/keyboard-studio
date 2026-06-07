@@ -1,0 +1,7 @@
+# Defensive: credentials should live at %LOCALAPPDATA%\km-triage\ (Windows) or
+# ~/.config/km-triage/ (POSIX) — NOT in the repo. If misconfiguration ever drops
+# them here, git refuses to stage.
+*.pem
+config.json
+installation.json
+.bot-token*

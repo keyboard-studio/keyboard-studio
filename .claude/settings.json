@@ -28,6 +28,7 @@
       "Bash(git status)",
       "Bash(git status *)",
       "Bash(git log *)",
+      "Bash(git pull *)",
       "Bash(git diff *)",
       "Bash(git show *)",
       "Bash(git branch *)",
@@ -120,7 +121,9 @@
       "Bash(git rebase *)",
       "Bash(node utilities/km-triage-app/setup.js)",
       "Bash(node utilities/km-triage-app/mint-token.js)",
-      "Bash(git pull *)"
+      "Bash(node utilities/km-triage-app/bot-gh.js *)",
+      "Bash(git pull *)",
+      "PowerShell(Get-ChildItem \"$env:LOCALAPPDATA\\\\km-triage\" -ErrorAction SilentlyContinue | Select-Object Name, Length)"
     ]
   }
 }
