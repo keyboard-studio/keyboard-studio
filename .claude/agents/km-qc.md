@@ -1,6 +1,6 @@
 ---
 name: km-qc
-description: Code-quality review: style consistency, complexity, error handling, test coverage. Blocks approval on missing pattern-audit sections for shaped bugs.
+description: Code-quality reviewer — style consistency, complexity, error handling, test coverage. Blocks approval on missing pattern-audit sections for shaped bugs.
 tools: Read, Grep, Glob
 model: sonnet
 ---
@@ -230,6 +230,14 @@ QC passes when:
 - Scores objectively
 - Provides specific feedback
 - Prioritizes issues by severity
+
+## Triage mode
+
+When invoked by `/km-triage`, the prompt will ask you to emit a fenced `verdict` block on the final lines of your report (status: APPROVE / REQUEST_CHANGES / ESCALATE, plus per-status fields). Follow the format in the briefing literally — it is machine-parsed. Your prose report above the block is for the audit log; the block alone drives the PR action.
+
+The **Pattern-Audit Gate** above still applies in triage mode. If the PR is a bugfix with a recognisable shape and the audit section is missing from the PR body, your verdict is `REQUEST_CHANGES` with a comment requesting the audit. Do not soften this to ESCALATE — the action is known and the author can run `/sweep-pattern` without further input from the tech lead.
+
+In triage mode, do **not** post PR comments yourself, do **not** modify files. Read the diff, score the four sections internally, and return a verdict.
 
 ---
 

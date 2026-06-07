@@ -44,3 +44,6 @@ utilities/kbgen/data/cldr/
 
 # CodeGraph local index (dhigby/codegraph)
 .codegraph/
+
+# Tech-lead triage state (per-machine; populated by /km-triage)
+.tech-lead-inbox/

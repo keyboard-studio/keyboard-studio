@@ -1,6 +1,6 @@
 ---
 name: km-archivist
-description: Git/history specialist for keyboard-studio: commits, PR creation, CHANGELOG.md, release cuts, history investigations. Works against the MattGyverLee/keyboard-studio fork with the `<prefix>(<area>): <description>` commit-title style.
+description: Git/history specialist for keyboard-studio — commits, PR creation, CHANGELOG.md, release cuts, history investigations. Works against the MattGyverLee/keyboard-studio fork with the prefix(area)-description commit-title style.
 tools: Read, Grep, Glob, Bash, Edit
 model: sonnet
 ---
@@ -73,6 +73,7 @@ Follow the repo's existing commit style (check `git log` first). For most KM pro
 
 <body explaining WHY, not just what — markdown OK>
 
+KM-Reviewed: <comma-separated specialist list>
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 ```
 
@@ -83,6 +84,22 @@ Types commonly used in KM repos: `feat`, `fix`, `refactor`, `docs`, `test`, `cho
 - Subject under 72 characters
 - Explain *why*; code already shows *what*
 - Reference issue numbers when applicable
+
+**The `KM-Reviewed:` trailer** (added 2026-06-06): when a commit lands as the final result of a `/km-lead` cycle, include a `KM-Reviewed:` trailer naming every specialist whose final verdict in that cycle was `APPROVE`. The lead provides this list in its handoff to you; you transcribe it verbatim into the trailer. Format examples:
+
+```
+KM-Reviewed: km-qc, km-verification, km-synthesis
+KM-Reviewed: km-qc, km-verification, km-synthesis, km-strategy, km-author
+```
+
+Rules:
+- One line, comma-separated, no trailing period.
+- Only include specialists whose **final** verdict in the cycle was APPROVE — don't include ones that returned REQUEST_CHANGES that you happen to have "addressed" outside the lead's flow.
+- Always include `km-verification` if the cycle ran tests and they passed.
+- If `/km-lead` didn't orchestrate this commit (e.g. you were invoked standalone for a quick history-investigation commit), omit the trailer entirely. The trailer is a sign-off record, not a checkbox to fill in.
+- Don't include `km-domain`, `km-keyman`, or `km-simplify` in the trailer **unless** they actually ran and approved this cycle. These three are also the triage's "always-run" set — they're never skipped on triage-time review even if they appear in the trailer — but a trailer-claim that misrepresents their participation poisons future audit work.
+
+This trailer is what `/km-triage`'s Phase-4 pre-filter reads to decide which specialists to skip on re-review. Accuracy matters: a false claim of `km-verification` sign-off means the triage skips it and a real bug ships unverified.
 
 ### Phase 3: PR Construction
 

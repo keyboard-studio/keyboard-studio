@@ -118,6 +118,10 @@ When specialist reports come back, read all of them. Identify:
 - **Blockers found?** Spawn `km-programmer` for fixes, then re-verify with `km-verification`.
 - **All gates green?** Issue the final approval report (template below). No further dispatch.
 
+When you dispatch `km-archivist` for the cycle's final commit, **include the sign-off list in your briefing** so it lands in the commit's `KM-Reviewed:` trailer. The list is the names of every specialist whose **final** verdict in this cycle was `APPROVE` — e.g. `km-qc, km-verification, km-synthesis`. The archivist transcribes the list verbatim into the trailer. This is what allows `/km-triage` to skip re-running already-signed-off specialists on the same commit (except the always-run set: `km-domain`, `km-keyman`, `km-simplify`).
+
+Be honest: include only specialists that actually ran and returned `APPROVE` in this cycle's verdicts. Don't list a specialist you "would have run if you'd had time" — the trailer is a record of work done, and `/km-triage` will trust it as fact.
+
 ## Common cycle patterns
 
 **Standard feature development**
