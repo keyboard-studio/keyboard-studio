@@ -744,7 +744,7 @@
     "section": "15. Deprecating a keyboard",
     "band": "red-checklist",
     "description": "Original author has granted permission to relicense under MIT",
-    "preSubmitChecklistText": "The original author has confirmed permission to relicense this keyboard under MIT — written confirmation is referenced in this PR or on file"
+    "preSubmitChecklistText": "The original author has confirmed permission to relicense this keyboard under MIT"
   },
   {
     "id": "15.2-new-keyboard-created-in-release",
@@ -894,7 +894,7 @@
     "section": "18. Design heuristics (DISCUS)",
     "band": "red-checklist",
     "principle": "standards",
-    "preSubmitChecklistText": "The keyboard meets any applicable legislated, societal, and accessibility requirements for its locale",
+    "preSubmitChecklistText": "This keyboard complies with any legislated or accessibility requirements for its target locale — if you are unsure whether requirements apply, check before submitting.",
     "description": "The keyboard meets any applicable legislated, societal, and accessibility requirements for its locale"
   }
 ]
