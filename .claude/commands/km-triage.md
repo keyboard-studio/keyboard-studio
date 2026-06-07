@@ -64,7 +64,7 @@ If `$KM_TRIAGE_DRY_RUN` is set to `1` in the environment, do everything **except
 Before touching any PR:
 
 ```bash
-mkdir -p .tech-lead-inbox/runs
+mkdir -p .tech-lead-inbox/runs .tech-lead-inbox/diffs .tech-lead-inbox/worktrees
 test -f .tech-lead-inbox/INBOX.md || cat > .tech-lead-inbox/INBOX.md <<'EOF'
 # Tech Lead Inbox
 
@@ -72,18 +72,28 @@ PRs and questions that need your attention. Append-only; the triage loop adds en
 
 EOF
 test -f .tech-lead-inbox/audit-log.jsonl || : > .tech-lead-inbox/audit-log.jsonl
+
+# Triage labels: create once per repo lifetime, guarded by a sentinel file.
+if [ ! -f .tech-lead-inbox/.labels-created ]; then
+  gh label create tech-lead-ready-to-merge --color 0e8a16 --description "Triage approved - awaiting tech lead merge" 2>/dev/null || true
+  gh label create tech-lead-review-needed  --color d93f0b --description "Triage escalated - tech lead must answer a question" 2>/dev/null || true
+  gh label create triage-skip              --color cfd3d7 --description "Do not run triage on this PR" 2>/dev/null || true
+  touch .tech-lead-inbox/.labels-created
+fi
 ```
 
-`.tech-lead-inbox/` is in `.gitignore` already; the bootstrap is paranoia.
+`.tech-lead-inbox/` is in `.gitignore` already; the bootstrap is paranoia. The label-creation sentinel means three `gh label create` API calls happen on the first ever sweep and zero on every subsequent sweep.
 
 ## Phase 2 — Discover PRs
 
 ```bash
 gh pr list \
   --state open \
-  --json number,title,author,headRefName,baseRefName,labels,files,isDraft,mergeable,mergeStateStatus,statusCheckRollup,reviewDecision,commits,isCrossRepository,headRepositoryOwner \
+  --json number,title,author,headRefName,baseRefName,labels,isDraft,mergeable,mergeStateStatus,statusCheckRollup,reviewDecision,commits,isCrossRepository,headRepositoryOwner \
   --limit 50
 ```
+
+(`files` is intentionally omitted from this list call — it's expensive and only needed for path-based classification fallback. Phase 3 fetches it per-PR via `gh pr view <NUM> --json files` only for the subset that hits the no-team-label fallback. Once the team adopts team labels universally, no `files` fetch ever runs.)
 
 For each PR, **skip** (with audit-log entry `action_taken: skipped, reason: <X>`) when any of these hold:
 
@@ -132,6 +142,14 @@ Decision precedence (first match wins):
 | No team label, mixed paths (e.g. `packages/contracts/src/fixtures/patterns.ts` alongside `content/**`) | BOTH (fallback) |
 | No team label, no clear path signal | BOTH (defensive) |
 
+**Lazy `files` fetch.** `files` was dropped from the Phase-2 list call (it's expensive and only relevant to the fallback rows above). When this phase needs to inspect `files[].path` — i.e. the PR has no team label AND the routing falls through to a path-based rule — fetch the file list per-PR now:
+
+```bash
+gh pr view <NUM> --json files --jq '.files[].path'
+```
+
+PRs with team labels (the common case once the team adopts labels universally) never trigger this fetch. Cache the result for later phases that might also want it (Phase 7 audit reporting).
+
 **Always**: if the PR has no team label (none of `engine` / `content` / `shared`), record `missing_team_label: true` in the audit log AND add a one-line entry to INBOX.md asking the tech lead to fix it. Continue the review with the inferred crew — don't block on the missing label.
 
 **Area labels** (`validator`, `compiler`, `scaffolder`, `patterns`, `lint`, `tooling`, `ui`, `flows`, `inventories`, `output`, `contracts`, `base-browser`, `process`, `simulator`, `integration`, `scan-report`, `criteria`, `gap`, `spec`, `housekeeping`) refine the briefing each specialist receives but do **not** change which crew fires. Pass them into the prompt under "PR area hints" so e.g. km-keyman knows the PR is `patterns`-flavored.
@@ -172,7 +190,7 @@ The triage is scheduled, not PR-triggered. To avoid re-reviewing the same code o
 
 Procedure:
 
-1. Look up the **most recent** audit-log entry in `.tech-lead-inbox/audit-log.jsonl` whose `pr` field matches this PR number AND whose `action_taken` is a *substantive review action*: one of `approve_park`, `auto_fix_only`, `mention_only`, `fix_and_mention`, `escalate`, or `auto_fix_attempt_failed`. Take its `head_sha` value as `last_audited_sha`. Non-review entries (`skipped`, `auth_failed`) do **not** define a review boundary — the crew never actually saw the code on those runs, so they're ignored when computing the incremental range.
+1. Look up the **most recent** audit-log entry in `.tech-lead-inbox/audit-log.jsonl` whose `pr` field matches this PR number AND whose `action_taken` is a *substantive review action*: one of `approve_park`, `auto_fix_only`, `mention_only`, `fix_and_mention`, `escalate`, or `auto_fix_attempt_failed`. Take its `head_sha` value as `last_audited_sha`. Non-review entries (`skipped`, `auth_failed`) do **not** define a review boundary — the crew never actually saw the code on those runs, so they're ignored when computing the incremental range. **Cache this entry as `last_audit_entry` for reuse later in Phase 4** — the same lookup powers Pre-filter B's diff range, the PREVIOUS_REVIEW_CONTEXT_BLOCK populator (which reads each specialist's prior verdict from `last_audit_entry.verdicts`), and any audit-driven Phase-6 decisions. Scan the audit log once per PR per sweep; do not re-read.
 2. If no prior substantive-review entry exists, set `last_audited_sha = null` — this is the first real review of this PR (even if earlier sweeps skipped it).
 3. If `last_audited_sha` is set, verify it still exists in git history:
    ```bash
@@ -184,8 +202,23 @@ Procedure:
    - `last_audited_sha == null` → `review_range = "full"`. The crew reviews the entire PR diff (`gh pr diff <NUM>`).
    - otherwise → `review_range = "incremental"` from `last_audited_sha` to the current head. The crew reviews only `git diff <last_audited_sha>..<current_head>` (or equivalently `gh api repos/MattGyverLee/keyboard-studio/compare/<last_audited_sha>...<current_head>`).
 5. If `review_range == "incremental"` AND the incremental diff is empty (no actual file changes, e.g. only merge commits with no content), skip this PR with reason `no_content_changes_since_last_review`. This is a secondary idempotency gate beyond Phase 2's head-sha check, catching cases where new commits don't actually change reviewable content.
+6. **Cache the diff to disk once for the whole crew.** Each specialist would otherwise re-run `gh pr diff` or `git diff` independently — for a BOTH-crew PR with no sign-offs, that's 6 redundant fetches of the same data. Fetch once now and write to a sweep-scoped path under `.tech-lead-inbox/diffs/`:
 
-The crew's briefing in the next sub-section uses `review_range` and `last_audited_sha` to tell each specialist exactly what to read.
+   ```bash
+   DIFF_PATH=.tech-lead-inbox/diffs/<NUM>-<CURRENT_HEAD_SHORT_SHA>.diff
+   FILES_PATH=.tech-lead-inbox/diffs/<NUM>-<CURRENT_HEAD_SHORT_SHA>.files.json
+   if [ "<RANGE>" = "full" ]; then
+     gh pr diff <NUM> > "$DIFF_PATH"
+     gh pr view <NUM> --json files > "$FILES_PATH"
+   else
+     git diff <LAST_AUDITED_SHA>..<CURRENT_HEAD_SHA> > "$DIFF_PATH"
+     git diff --name-status <LAST_AUDITED_SHA>..<CURRENT_HEAD_SHA> > "$FILES_PATH"
+   fi
+   ```
+
+   The briefing template passes `<DIFF_PATH>` and `<FILES_PATH>` to each specialist (replacing the per-specialist `gh pr diff` / `git diff` instructions). Specialists read the cached files; if they need the current state of an individual file at HEAD, they still use `git show <CURRENT_HEAD_SHA>:<path>` (the cached diff doesn't snapshot file contents). Cached diffs are sweep-scoped and get garbage-collected by `.tech-lead-inbox/` cleanup; never relied on across sweeps.
+
+The crew's briefing in the next sub-section uses `review_range`, `last_audited_sha`, and the cached `<DIFF_PATH>` / `<FILES_PATH>` to tell each specialist exactly what to read.
 
 ### Pre-filter B: skip already-signed-off specialists
 
@@ -234,22 +267,23 @@ Area hints: <comma-separated area labels, or "none">
 
 Review range: <RANGE_DESCRIPTION>
   - If FULL ("first sweep on this PR" or "branch was force-pushed since last sweep"):
-    review the entire PR diff. Read it with:
-      gh pr diff <NUM>
+    review the entire PR diff.
   - If INCREMENTAL from <LAST_AUDITED_SHA>:
-    you are reviewing ONLY the new code since the last triage sweep. Read it with:
-      git fetch origin <HEAD>
-      git diff <LAST_AUDITED_SHA>..<CURRENT_HEAD_SHA>
-    Or via GitHub:
-      gh api repos/MattGyverLee/keyboard-studio/compare/<LAST_AUDITED_SHA>...<CURRENT_HEAD_SHA> --jq .files
+    you are reviewing ONLY the new code since the last triage sweep.
     Do NOT re-review code outside this range — earlier sweeps already
-    reviewed it. Focus your findings on what changed between these
-    two SHAs. If a file in the incremental diff references context from
-    outside the range that you need to read in full, fetch it with
-    `git show <CURRENT_HEAD_SHA>:<path>`.
+    reviewed it. Focus your findings on what changed between
+    <LAST_AUDITED_SHA> and <CURRENT_HEAD_SHA>.
 
-To list files at current head:
-  gh pr view <NUM> --json files
+The diff has been fetched once for the whole crew and cached on disk.
+Read it from:
+  <DIFF_PATH>
+File list (paths only) for this review range:
+  <FILES_PATH>
+
+Do NOT re-run `gh pr diff` or `git diff` yourself — the cached files
+above contain the same data. If a file in the cached diff references
+context from outside the range that you need to read in full, fetch
+it with `git show <CURRENT_HEAD_SHA>:<path>`.
 
 <PREVIOUS_REVIEW_CONTEXT_BLOCK>
 
@@ -396,15 +430,9 @@ CONFLICTING PRs never reach this phase — Phase 2 catches them and posts a sepa
 
 ## Phase 6 — Execute the action
 
-Ensure the triage labels exist (idempotent — only needed on the first ever run; use the REST API path because `gh pr edit --add-label` requires a `read:org` token scope that the typical PAT does not have):
+The triage labels (`tech-lead-ready-to-merge`, `tech-lead-review-needed`, `triage-skip`) are created once in Phase 1 (guarded by the `.tech-lead-inbox/.labels-created` sentinel) — no further label-create calls run here.
 
-```bash
-gh label create tech-lead-ready-to-merge --color 0e8a16 --description "Triage approved - awaiting tech lead merge" 2>/dev/null || true
-gh label create tech-lead-review-needed  --color d93f0b --description "Triage escalated - tech lead must answer a question" 2>/dev/null || true
-gh label create triage-skip              --color cfd3d7 --description "Do not run triage on this PR" 2>/dev/null || true
-```
-
-Label additions use the REST API:
+Label additions use the REST API (because `gh pr edit --add-label` requires a `read:org` token scope that the typical PAT does not have):
 
 ```bash
 gh api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=<label>"
