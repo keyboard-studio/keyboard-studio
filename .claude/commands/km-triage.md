@@ -187,7 +187,11 @@ For each PR, **skip** (with audit-log entry `action_taken: skipped, reason: <X>`
   Dedup the two mentions if `directed_by` resolves to the lead's own login. Audit-log entry uses `action_taken: skipped, reason: merge_conflict`. No labels added.
 - The `statusCheckRollup` shows any required check that is not `SUCCESS` or `NEUTRAL` → reason `ci_not_ready`. Do **not** label or comment; the PR re-enters triage on the next sweep once CI completes.
 - `mergeable` is `UNKNOWN` → reason `mergeability_unknown`. GitHub computes mergeability asynchronously and the value is often `UNKNOWN` for a few seconds after a push. Skip and retry on the next sweep — by then GitHub will have resolved to `MERGEABLE` or `CONFLICTING` and the normal Phase-2 routing applies. Do not treat UNKNOWN as MERGEABLE; running the crew and pushing fixes against a PR whose merge state isn't yet computed risks the same race the `became_conflicting_during_review` gate guards against, just earlier.
-- The last commit SHA on the PR (`commits[-1].oid`) equals the SHA recorded in the most recent audit-log entry for this PR AND that entry's action was one of `approve_park`, `mention_only`, `fix_and_mention`, `escalate`, or `auto_fix_attempt_failed` → reason `no_new_commits_since_last_review`. This is the idempotency gate; it keeps the inbox quiet when the lead hasn't merged (approve_park), the author hasn't pushed a fix (request-changes paths), or the lead hasn't answered (escalate). Note: `auto_fix_only` is **not** in this list because the auto-fix push changes the head SHA, so the next sweep naturally sees a new HEAD and re-runs the crew on the now-fixed code.
+- The last commit SHA on the PR (`commits[-1].oid`) equals the SHA recorded in the most recent audit-log entry for this PR AND that entry's action was one of `approve_park`, `mention_only`, `fix_and_mention`, `escalate`, or `auto_fix_attempt_failed` AND **no new lead-trigger comment has been posted since that audit entry's `ts`** (see below) → reason `no_new_commits_since_last_review`. This is the idempotency gate; it keeps the inbox quiet when the lead hasn't merged (approve_park), the author hasn't pushed a fix (request-changes paths), or the lead hasn't answered (escalate). Note: `auto_fix_only` is **not** in this list because the auto-fix push changes the head SHA, so the next sweep naturally sees a new HEAD and re-runs the crew on the now-fixed code.
+
+  **Lead-trigger comment override.** When the bot posts a MENTION_ONLY / FIX_AND_MENTION / ESCALATE action it asks the lead a question. The lead replying in a comment is the natural signal that re-review is wanted — but a head-SHA-only idempotency gate would skip that PR on the next sweep because no commit moved. To close that gap: a **lead-trigger comment** is any PR comment whose author login matches the tech-lead's login (read from `git config user.name` falling back to `MattGyverLee`; future: accept any GitHub username configured as a triage owner) AND whose body contains `@km-triage` (case-insensitive) AND whose `created_at` is after the most recent audit entry's `ts` for this PR. When such a comment exists, the idempotency gate above does **not** fire — the PR proceeds into Phase 3 even with HEAD unchanged. The audit entry then records `trigger: comment` and `triggering_comment_id: <id>` so the run is distinguishable from a commit-driven one.
+
+  Fetch comments via `gh api repos/MattGyverLee/keyboard-studio/issues/<NUM>/comments --jq '[.[] | {id, user: .user.login, body, created_at}]'`. Filter to lead-trigger comments matching the rules above. If any exist, store the most recent one's id as `triggering_comment_id` for the audit log. Pass all such comments (newest last) into Phase 4's briefing as `LEAD_REPLY_CONTEXT_BLOCK` — see Phase 4 below.
 
   **Defensive check for the auto_fix_only asymmetry**: if the most recent audit entry's `action_taken` is `auto_fix_only` AND its `head_sha` equals the current head (which would normally be impossible because auto-fix pushes a new commit), the auto-fix push didn't actually land. Re-run the review with reason `auto_fix_push_unverified` and append a one-line note to INBOX.md. Likely causes: km-programmer claimed success but the `git push` silently failed; a force-push reverted the auto-fix; a network hiccup. Belt-and-suspenders for what should be a never-event.
 
@@ -354,6 +358,8 @@ it with `git show <CURRENT_HEAD_SHA>:<path>`.
 
 <PREVIOUS_REVIEW_CONTEXT_BLOCK>
 
+<LEAD_REPLY_CONTEXT_BLOCK>
+
 Your output will be machine-parsed by the triage agent. Do NOT comment
 on the PR yourself, do NOT push, do NOT merge, do NOT modify files.
 Your job is to produce a verdict ONLY.
@@ -374,6 +380,29 @@ flagged. Specifically:
     would.
   - If the new commits resolve all prior issues and introduce no new
     ones, return APPROVE.
+
+When the **Lead reply context block** above is non-empty, the lead has
+posted one or more comments since the bot's last mention action. Use
+those comments as new context — they often answer questions the bot
+previously @-mentioned the lead about. Specifically:
+  - If a lead comment chooses between options the bot offered (e.g.
+    "Option A sounds good"), treat the corresponding option as the
+    chosen resolution. Note the choice in your prose. If the chosen
+    option implies a code change that you can specify mechanically
+    (the option's fix is concrete in the bot's prior @-mention),
+    flag it as REQUEST_CHANGES with `fixability: auto` and an exact
+    `fix_proposal` so km-programmer can apply it.
+  - If a lead comment provides a freeform answer that requires
+    judgment to translate into code (e.g. "I'll think about it"),
+    keep the prior finding open — REQUEST_CHANGES with
+    `fixability: needs_human_input`, body referencing the lead's
+    reply.
+  - If a lead comment confirms the existing state is acceptable
+    (e.g. "leave it as-is, it's fine"), mark the prior finding as
+    resolved and return APPROVE for that area.
+  - If a lead comment is conversational with no operational content
+    (e.g. "thanks!"), ignore it for verdict purposes but note it in
+    prose.
 
 Output: your usual prose report (≤500 words), then a fenced verdict
 block on the final lines, in EXACTLY this format:
@@ -757,7 +786,7 @@ Record the published check's `id` and `conclusion` in the Phase-7 audit log for 
 After every PR action (including skips), append exactly one JSON line to `.tech-lead-inbox/audit-log.jsonl`:
 
 ```json
-{"ts":"<ISO timestamp>","pr":<NUM>,"author":"<LOGIN>","directed_by":"<email|login|\"unknown\">","channel":"desktop|web|unknown","team":"<engine|content|shared|null>","crew":"engine|content|both|none","head_sha":"<NUM's last commit SHA before triage>","last_audited_sha":"<previous audit's head_sha or null>","review_range":"full|incremental","signed_off_skipped":["km-qc","..."],"verdicts":[{"specialist":"<name>","status":"APPROVE|REQUEST_CHANGES|ESCALATE","confidence":"<X>","summary":"<...>"}],"action_taken":"approve_park|auto_fix_only|mention_only|fix_and_mention|escalate|auto_fix_attempt_failed|skipped|auth_failed","ci_status":"<rollup>","missing_team_label":<bool>,"reason":"<skip reason or null>","auto_fix":{"applied":<int>,"escalated":<int>,"commit_sha":"<sha or null>"},"mention_comment_url":"<url or null>","mention_resolution":"ok|self_dedup|lookup_failed|n_a","check_run":{"id":<check_run_id_or_null>,"conclusion":"success|action_required|null"}}
+{"ts":"<ISO timestamp>","pr":<NUM>,"author":"<LOGIN>","directed_by":"<email|login|\"unknown\">","channel":"desktop|web|unknown","team":"<engine|content|shared|null>","crew":"engine|content|both|none","head_sha":"<NUM's last commit SHA before triage>","last_audited_sha":"<previous audit's head_sha or null>","review_range":"full|incremental","signed_off_skipped":["km-qc","..."],"trigger":"schedule|comment|manual_arg","triggering_comment_id":<comment_id_or_null>,"verdicts":[{"specialist":"<name>","status":"APPROVE|REQUEST_CHANGES|ESCALATE","confidence":"<X>","summary":"<...>"}],"action_taken":"approve_park|auto_fix_only|mention_only|fix_and_mention|escalate|auto_fix_attempt_failed|skipped|auth_failed","ci_status":"<rollup>","missing_team_label":<bool>,"reason":"<skip reason or null>","auto_fix":{"applied":<int>,"escalated":<int>,"commit_sha":"<sha or null>"},"mention_comment_url":"<url or null>","mention_resolution":"ok|self_dedup|lookup_failed|n_a","check_run":{"id":<check_run_id_or_null>,"conclusion":"success|action_required|null"}}
 ```
 
 Field notes:
@@ -780,6 +809,11 @@ Field notes:
 - `auto_fix.applied` counts findings that landed mechanically. `auto_fix.escalated` counts findings that were `fixability=auto` in the verdict but couldn't be applied (e.g. km-programmer hit a failing check and rolled back).
 - `mention_comment_url` is the comment URL when the triage @-mentioned the lead (MENTION_ONLY or FIX_AND_MENTION action). `null` otherwise.
 - `check_run.id` is the `id` returned by the `POST /check-runs` call that published `km-triage/review` for this sweep's head SHA. `check_run.conclusion` is the conclusion the bot set on that check (`success` for APPROVE-AND-PARK, `action_required` for every other substantive-review action). Both are `null` for skip-action entries since skip paths do not publish a check.
+- `trigger` records what caused this sweep to run on this PR. Values:
+  - `schedule` — scheduled sweep (cron / systemd timer / Task Scheduler) found new commits since the last audit and processed the PR.
+  - `comment` — a lead-trigger comment overrode the head-SHA idempotency gate (see Phase 2). Used when the lead replied to a bot mention by posting a comment containing `@km-triage`, even with HEAD unchanged.
+  - `manual_arg` — `$ARGUMENTS` was a single PR number; the operator triggered triage on this PR explicitly.
+- `triggering_comment_id` is populated when `trigger == "comment"` with the GitHub comment id (numeric) of the most recent lead-trigger comment that overrode the gate. `null` for the other trigger types. This lets the audit log reconstruct which lead reply caused the re-review.
 
 One line per PR per run, no exceptions. This is the source of truth when we later decide to graduate selected lanes to auto-merge.
 
