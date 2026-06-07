@@ -71,18 +71,18 @@ The table below maps each strategy in the spec §7.3 catalog (S-01..S-12) to two
 
 | Strategy (S-code + name) | Observed in the 27 (count + notes) | Corpus-wide signal | Pattern YAML |
 |---|---|---|---|
-| S-01 Simple swap | 7 (primary in 5: sahaptin_umatilla, basic_kbdfr, pak_urdu_phonetic, saraiki, wancho; secondary in sil_akebu, elfdalian) | No distinctive primitive: store()/use() are present in 1,021 kbds regardless; simple swap uses none of the rarer markers | [modifier-as-layer-switch.yaml](patterns/desktop-input/modifier-as-layer-switch.yaml) covers the closest desktop-swap idiom; no dedicated S-01 file — pending |
+| S-01 Simple swap | 7 (primary in 5: sahaptin_umatilla, basic_kbdfr, pak_urdu_phonetic, saraiki, wancho; secondary in sil_akebu, elfdalian) | No distinctive primitive: store()/use() are present in 1,021 kbds regardless; simple swap uses none of the rarer markers | [simple-swap.yaml](patterns/substitute/simple-swap.yaml) |
 | S-02 Deadkey composition | 13 (primary in 6: sil_euro_latin, sil_philippines, sil_tchad_qwerty, sil_uganda_tanzania, sil_eastern_congo, clavbur9; secondary in 7 others) | `dk(` in 255 keyboards / 14,653 occurrences — the strongest single-primitive signal in the corpus | [deadkey-single-tap.yaml](patterns/desktop-input/deadkey-single-tap.yaml) |
 | S-03 Sequence replace | 11 (primary in 3: remington_gail, basic_kbdkni, gff_geez_emufi; secondary in 8 others as a finishing/reorder group) | `context` in 235 keyboards / 7,562 occurrences — the direct implementation primitive | [multi-char-sequence.yaml](patterns/desktop-input/multi-char-sequence.yaml), [context-sensitive-substitution.yaml](patterns/desktop-input/context-sensitive-substitution.yaml) |
 | S-04 Parallel-store lookup | 17 (secondary in 17 keyboards; never observed as primary — per spec §7.3, a building block) | `any(` in 576 keyboards / 57,019 occurrences; `index(` in 489 keyboards / 32,305 occurrences — by far the largest raw counts in the corpus | — pending (building-block; not a standalone pattern) |
-| S-05 Mnemonic spelling / transliteration | 5 (primary in 3: gff_amharic, sil_ethiopic_power_g, gff_geez_emufi; secondary in 2: fv_plains_cree, jawa) | No isolated primitive signal; relies on the same store/any/index infrastructure as S-04 | — pending |
+| S-05 Mnemonic spelling / transliteration | 5 (primary in 3: gff_amharic, sil_ethiopic_power_g, gff_geez_emufi; secondary in 2: fv_plains_cree, jawa) | No isolated primitive signal; relies on the same store/any/index infrastructure as S-04 | [mnemonic-spelling.yaml](patterns/transliteration/mnemonic-spelling.yaml) |
 | S-06 Chained deadkeys (two-tier) | 3 (secondary only: sil_cameroon_azerty, sil_philippines, sil_akebu; no primary in the 27) | `deadkey(` in 63 keyboards / 1,777 occurrences (distinct from `dk(`; this is the explicit named-deadkey form used in multi-tier chains) | — pending |
 | S-07 Diacritic cycle | 2 (primary in 1: sil_yoruba_dot; secondary in 1: sil_tchad_qwerty for gliding/contour tones) | `match` in 144 keyboards / 169 occurrences + `nul` in 277 keyboards / 1,686 occurrences — the cycle-advance idiom uses both | — pending |
 | S-08 RAlt modifier-layer | 12 (primary in 5: sil_cameroon_qwerty, sil_cameroon_azerty, sil_akebu, elfdalian, alkelang; secondary in 7 others) | No single primitive is exclusive, but the pattern occurs wherever A7=fully-booked; indirect evidence from RALT key combinations throughout the corpus | [modifier-as-layer-switch.yaml](patterns/desktop-input/modifier-as-layer-switch.yaml), [flick-gestures.yaml](patterns/touch/flick-gestures.yaml), [hint-characters.yaml](patterns/touch/hint-characters.yaml), [multitap.yaml](patterns/touch/multitap.yaml) |
-| S-09 Context-sensitive cluster formation | 4 (primary in 4: sil_myanmar_my3, thamizha_tamil99_ext, fv_plains_cree, jawa; no secondary appearances) | `context` in 235 keyboards (shared with S-03); `if(` in 89 keyboards / 40,993 occurrences — the conditional-state guards common in cluster keyboards | [indic-pre-base-vowel.yaml](patterns/reorder/indic-pre-base-vowel.yaml), [sea-stack-reorder.yaml](patterns/reorder/sea-stack-reorder.yaml) |
-| S-10 Constraints + beep | 6 (primary in 1: el_naija; secondary in 5: sil_cameroon_qwerty, sil_cameroon_azerty, jawa, alkelang, clavbur9) | `beep` in 149 keyboards / 1,494 occurrences — a reliable direct signal | — pending |
+| S-09 Context-sensitive cluster formation | 4 (primary in 4: sil_myanmar_my3, thamizha_tamil99_ext, fv_plains_cree, jawa; no secondary appearances) | `context` in 235 keyboards (shared with S-03); `if(` in 89 keyboards / 40,993 occurrences — the conditional-state guards common in cluster keyboards | [indic-pre-base-vowel.yaml](patterns/reorder/indic-pre-base-vowel.yaml), [sea-stack-reorder.yaml](patterns/reorder/sea-stack-reorder.yaml), [tone-mark-canonicalization.yaml](patterns/reorder/tone-mark-canonicalization.yaml) |
+| S-10 Constraints + beep | 6 (primary in 1: el_naija; secondary in 5: sil_cameroon_qwerty, sil_cameroon_azerty, jawa, alkelang, clavbur9) | `beep` in 149 keyboards / 1,494 occurrences — a reliable direct signal | [constraints-beep.yaml](patterns/validation/constraints-beep.yaml) |
 | S-11 Stateful option toggle | 1 (secondary only: clavbur9, for its schwa-convention toggle) | `set(` in 23 keyboards / 447 occurrences; `if(` in 89 keyboards / 40,993 occurrences — the runtime variable infrastructure | — pending |
-| S-12 DLL IME callout | 0 (no appearances; no CJK keyboard in the popular set) | No corpus signal in the 27; at corpus scale, `platform(` in 40 keyboards hints at CJK IME-adjacent patterns, but this is indirect | — pending |
+| S-12 DLL IME callout | 0 (no appearances; no CJK keyboard in the popular set) | No corpus signal in the 27; at corpus scale, `platform(` in 40 keyboards hints at CJK IME-adjacent patterns, but this is indirect | [dll-ime-callout.yaml](patterns/ime/dll-ime-callout.yaml) |
 
 ### Commentary
 
@@ -128,7 +128,7 @@ The five keyboards below are documented as negative fixtures for `@keymanapp/key
 
 ## Pattern catalog
 
-The table below lists the 12 pattern YAML files currently in `content/patterns/`, grouped by category, with their associated strategy from the spec §7.3 catalog. This is 12 of a planned larger set; further pattern files (e.g. tone-mark-canonicalization, S-07 diacritic cycle, S-05 mnemonic transliteration) are still pending.
+The table below lists the 17 pattern YAML files currently in `content/patterns/`, grouped by category, with their associated strategy from the spec §7.3 catalog. This is 17 of a planned larger set; further pattern files (S-06 chained deadkeys, S-07 diacritic cycle, S-11 stateful toggle) are still pending.
 
 | Pattern | Category | Strategy |
 |---|---|---|
@@ -137,19 +137,24 @@ The table below lists the 12 pattern YAML files currently in `content/patterns/`
 | [deadkey-single-tap.yaml](patterns/desktop-input/deadkey-single-tap.yaml) | desktop-input | S-02 |
 | [modifier-as-layer-switch.yaml](patterns/desktop-input/modifier-as-layer-switch.yaml) | desktop-input | S-08 |
 | [multi-char-sequence.yaml](patterns/desktop-input/multi-char-sequence.yaml) | desktop-input | S-03 |
+| [dll-ime-callout.yaml](patterns/ime/dll-ime-callout.yaml) | ime | S-12 |
 | [indic-pre-base-vowel.yaml](patterns/reorder/indic-pre-base-vowel.yaml) | reorder | S-09 |
 | [nfd-latin.yaml](patterns/reorder/nfd-latin.yaml) | reorder | (scaffolder pipeline stage — no strategyId) |
 | [sea-stack-reorder.yaml](patterns/reorder/sea-stack-reorder.yaml) | reorder | S-09 |
+| [tone-mark-canonicalization.yaml](patterns/reorder/tone-mark-canonicalization.yaml) | reorder | S-09 |
+| [simple-swap.yaml](patterns/substitute/simple-swap.yaml) | substitute | S-01 |
 | [flick-gestures.yaml](patterns/touch/flick-gestures.yaml) | touch | S-08 |
 | [hint-characters.yaml](patterns/touch/hint-characters.yaml) | touch | S-08 |
 | [layer-switch-touch.yaml](patterns/touch/layer-switch-touch.yaml) | touch | S-13 (see open questions) |
 | [multitap.yaml](patterns/touch/multitap.yaml) | touch | S-08 |
+| [mnemonic-spelling.yaml](patterns/transliteration/mnemonic-spelling.yaml) | transliteration | S-05 |
+| [constraints-beep.yaml](patterns/validation/constraints-beep.yaml) | validation | S-10 |
 
 ---
 
 ## Open questions for future work
 
-- **Pattern-library completeness.** Only 12 pattern YAMLs exist so far. Files for S-07 (diacritic cycle), S-05 (mnemonic transliteration), S-10 (constraints + beep), S-11 (stateful toggle), and S-06 (chained deadkeys) are still pending. The S-04 building block is intentionally omitted as a standalone pattern per spec §7.3.
+- **Pattern-library completeness.** 17 pattern YAMLs exist. Files for S-06 (chained deadkeys), S-07 (diacritic cycle), and S-11 (stateful toggle) are still pending. The S-04 building block is intentionally omitted as a standalone pattern per spec §7.3.
 
 - **Intentional §7.5 self-check gaps.** The EuroLatin and IPA strategy self-check entries in the §7.5 validation table are documented as intentional v1.1 gaps. They were not introduced by this scan and are not actionable until v1.1 planning.
 
