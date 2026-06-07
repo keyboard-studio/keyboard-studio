@@ -23,7 +23,19 @@ Both hosts run the same command; only the scheduler differs.
 1. **Claude Code installed** and logged in under the tech-lead account (the user whose subscription pays for the runs).
 2. **`gh` CLI installed and authenticated** as the tech-lead's GitHub user. `gh auth status` must report `Logged in to github.com`. The command escalates to the inbox and exits non-zero if `gh auth status` fails.
 3. **A clone of `keyboard-studio` on the host**, kept up-to-date. The schedule should fetch latest `main` before invoking the command — see the wrapper scripts below.
-4. **`.claude/settings.json` allowlist** covers the `gh pr *`, `gh label *`, `git *`, `pnpm *` calls the command makes. This repo's allowlist already does so (verified 2026-06-06). On the Ubuntu host, copy `.claude/settings.json` from the dev box, or commit shared host-agnostic entries to the repo.
+4. **Scheduled runs use `--dangerously-skip-permissions`** because no human is at the terminal to answer permission prompts and the triage now calls a wide set of patterns (`bot-gh.js *`, `node utilities/km-triage-app/*`, `git worktree *`, `gh api check-runs`, ad-hoc `gh api repos/...`) that no static allowlist would cover comprehensively. The safety boundary is therefore **not** the local permission system — see the "Safety boundary" section below for what actually contains the bot's blast radius.
+
+## Safety boundary
+
+`--dangerously-skip-permissions` removes the local permission prompts entirely — every tool the triage's session reaches for runs without asking. The triage is not "unsafe" because of three layers that sit *outside* the local permission system:
+
+1. **GitHub App permissions (enforced by GitHub).** The `km-triage` App has `pull_requests: write`, `issues: write`, and `checks: write` — and nothing else. Specifically: it does **not** have `contents: write`. Any attempt by the bot to write a file via the GitHub Contents API returns `403 Resource not accessible by integration`. The App is also **not** in the `main: PR + review` ruleset's `bypass_actors` list, so `PUT /repos/.../pulls/<n>/merge` from the bot token returns the same 403 — the merge endpoint is just as unreachable as the contents-write endpoint.
+2. **Hard safety rules in the spec (enforced by prose + by the agent following them).** [`.claude/commands/km-triage.md`](../.claude/commands/km-triage.md) lists explicit forbidden commands: `gh pr merge` and every variant (`--admin`, the bot wrapper, direct REST), force-push, rebase, `--amend`, `--reset --hard`, issue close, direct `main` mutation. The spec is what the triage agent reads at runtime and follows; auditing the spec audits the behavior.
+3. **Git push auth context (enforced by git).** When the triage's auto-fix path pushes a commit, the push uses the host's local git auth — not the bot token. On the Ubuntu prod host, configure that auth to a credential that has write access only to feature branches (e.g. a PAT scoped to "selected repositories: keyboard-studio" without admin or branch-protection-bypass rights). Then auto-fix pushes can only land on PR branches, never on `main` directly.
+
+The local permission system was originally a stand-in for "trust the human at the terminal." With no human and three external boundaries doing the actual constraint enforcement, skipping the prompts is the right call. Audit-log JSONL captures every action the triage takes, so post-hoc verification is always possible.
+
+If any of those three layers ever changes (App perms widened, spec rules relaxed, git auth promoted), revisit this decision.
 
 ## Dev — Windows Task Scheduler
 
@@ -62,7 +74,7 @@ $log = ".tech-lead-inbox\runs\$stamp.log"
 New-Item -ItemType Directory -Force -Path ".tech-lead-inbox\runs" | Out-Null
 
 # claude.exe is on PATH after install; verify with `where.exe claude` if needed
-claude -p "/km-triage" --output-format text *> $log
+claude -p "/km-triage" --dangerously-skip-permissions --output-format text *> $log
 ```
 
 Then register it (PowerShell, as the tech lead's user — **not** elevated):
@@ -119,7 +131,7 @@ WorkingDirectory=/srv/keyboard-studio
 ExecStartPre=/usr/bin/git fetch origin main --quiet
 ExecStartPre=/usr/bin/git checkout main --quiet
 ExecStartPre=/usr/bin/git pull --ff-only --quiet
-ExecStart=/usr/local/bin/claude -p "/km-triage" --output-format text
+ExecStart=/usr/local/bin/claude -p "/km-triage" --dangerously-skip-permissions --output-format text
 # Soft cap: never let a stuck run sit forever
 TimeoutStartSec=20min
 # We log to journalctl, no need for stdout/stderr redirection
