@@ -1,4 +1,5 @@
 import type { LintFinding } from "@keyboard-studio/contracts";
+import { collectDeclaredStores, type StoreInfo } from "./_shared.js";
 
 // index(store, N) bounds — lint.md check #13 (warn-only).
 // Validates that:
@@ -8,49 +9,15 @@ import type { LintFinding } from "@keyboard-studio/contracts";
 //      store must have length >= the number of any() tokens (warn, not error).
 // All findings are warnings (KM_WARN_*).
 
-// Matches a store declaration and captures its name.
-const STORE_DECL_RE = /^\s*store\s*\(\s*([^)]+?)\s*\)/i;
-
-// Matches a store declaration body (the quoted string that follows).
-// e.g. store(s) "abc" — captures "abc" (3 chars = length 3).
-// Also handles single-quoted bodies: store(s) 'abc'
-const STORE_BODY_RE = /^\s*store\s*\([^)]+\)\s*(?:"([^"]*)"|'([^']*)')/i;
-
 // Matches index(storeName, offset) — captures store name and offset.
 const INDEX_RE = /\bindex\s*\(\s*([^,)]+?)\s*,\s*(\d+)\s*\)/;
 
 // Matches any() in a line.
 const ANY_RE = /\bany\s*\([^)]*\)/g;
 
-interface StoreInfo {
-  line: number; // 1-based declaration line
-  length: number | null; // character length if determinable, else null
-}
-
-function collectStores(source: string): Map<string, StoreInfo> {
-  const stores = new Map<string, StoreInfo>();
-  const lines = source.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? "";
-    const declMatch = STORE_DECL_RE.exec(line);
-    if (!declMatch) continue;
-    const name = (declMatch[1] ?? "").trim();
-    if (name.startsWith("&")) continue;
-    const key = name.toLowerCase();
-    if (stores.has(key)) continue; // first declaration wins
-
-    const bodyMatch = STORE_BODY_RE.exec(line);
-    // Group 1 = double-quoted body, group 2 = single-quoted body.
-    const bodyStr = bodyMatch ? (bodyMatch[1] ?? bodyMatch[2] ?? null) : null;
-    const length = bodyStr !== null ? bodyStr.length : null;
-    stores.set(key, { line: i + 1, length });
-  }
-  return stores;
-}
-
 export function checkIndexBounds(source: string): LintFinding[] {
   const findings: LintFinding[] = [];
-  const declared = collectStores(source);
+  const declared = collectDeclaredStores(source);
   const lines = source.split("\n");
 
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {

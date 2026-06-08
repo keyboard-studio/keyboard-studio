@@ -16,7 +16,7 @@ Day-1 fix. Unblocks CI — `contracts/dist` missing output + `oracle.ts` missing
 **#106** `chore(scaffolder): scaffold() Layer-C-clean promise vs VirtualFS-only return` — *unassigned*
 Design decision required before writing the scaffolder: does `scaffold()` return `VirtualFS` only or `VirtualFS + LintFindings[]`? Short session, not a full implementation.
 
-**#129** `maint(engine): extract shared validator helpers (_shared.ts)` — *unassigned*
+**#129** `maint(engine): extract shared validator helpers (_shared.ts)` — *PR #208 by @gboltono*
 Small cleanup while in the validator area. Once #106 is resolved and #137 is fixed, both people can begin their Sprint 2 tracks early.
 
 ---

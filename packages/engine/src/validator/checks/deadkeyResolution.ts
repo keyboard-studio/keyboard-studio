@@ -1,4 +1,5 @@
 import type { LintFinding } from "@keyboard-studio/contracts";
+import { INVALID_CHAR_RE } from "./_shared.js";
 
 // Deadkey resolution — lint.md check #7 (Compiler.cpp:2188-2205).
 // Validates that deadkey identifiers obey identifier rules (1–255 chars, no
@@ -7,11 +8,6 @@ import type { LintFinding } from "@keyboard-studio/contracts";
 
 // Matches dk(...) or deadkey(...) — captures the argument.
 const DK_RE = /\b(?:dk|deadkey)\s*\(\s*([^)]*?)\s*\)/;
-
-// Forbidden characters per validation.cpp:79-127.
-const INVALID_CHAR_RE = new RegExp(
-  "[ ,()\\[\\]\\x00-\\x1F\\x7F\\uFDD0-\\uFDEF\\uFFFE\\uFFFF]"
-);
 
 export function checkDeadkeyResolution(source: string): LintFinding[] {
   const findings: LintFinding[] = [];

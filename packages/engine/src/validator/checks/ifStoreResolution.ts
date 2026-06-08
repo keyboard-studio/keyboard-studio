@@ -1,4 +1,5 @@
 import type { LintFinding } from "@keyboard-studio/contracts";
+import { collectDeclaredStores } from "./_shared.js";
 
 // if() store resolution — lint.md check #9 (Compiler.cpp:2833-2906).
 // Every store name referenced in an if() condition must be declared somewhere
@@ -19,21 +20,6 @@ const SYSTEM_STORES = new Set([
 // Handles: if(storeName = 'val') and if(storeName, 'val').
 // Quantifier is capped at 255 chars (the KMN identifier limit) to prevent ReDoS.
 const IF_COND_RE = /\bif\s*\(\s*([^=,)]{1,255})/;
-
-// Matches a store declaration: store(name)
-const STORE_DECL_RE = /^\s*store\s*\(\s*([^)]+?)\s*\)/i;
-
-function collectDeclaredStores(source: string): Set<string> {
-  const stores = new Set<string>();
-  for (const line of source.split("\n")) {
-    const m = STORE_DECL_RE.exec(line);
-    if (m) {
-      const name = (m[1] ?? "").trim();
-      stores.add(name.toLowerCase());
-    }
-  }
-  return stores;
-}
 
 export function checkIfStoreResolution(source: string): LintFinding[] {
   const findings: LintFinding[] = [];

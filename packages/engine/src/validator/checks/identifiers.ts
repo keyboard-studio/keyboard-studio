@@ -1,17 +1,11 @@
 import type { LintFinding } from "@keyboard-studio/contracts";
+import { INVALID_CHAR_RE } from "./_shared.js";
 
 // Single-arg keywords: full paren content is the identifier (stop at closing paren).
 const SINGLE_ARG_RE = /\b(group|store|dk|use|call|deadkey)\s*\(\s*([^)]*?)\s*\)/;
 // Multi-arg keywords (index, if): only the first argument before the comma is an identifier.
 // Stop at '=' too so that if(userStore = 'val') captures only the name, not the full condition.
 const FIRST_ARG_RE = /\b(index|if)\s*\(\s*([^=,)]*)/;
-
-// Forbidden characters per validation.cpp:79-127:
-// space, comma, parens, square brackets, C0 controls (U+0000-U+001F), DEL (U+007F),
-// Unicode non-characters (U+FDD0-U+FDEF, U+FFFE, U+FFFF)
-const INVALID_CHAR_RE = new RegExp(
-  "[ ,()\\[\\]\\x00-\\x1F\\x7F\\uFDD0-\\uFDEF\\uFFFE\\uFFFF]"
-);
 
 export function checkIdentifiers(source: string): LintFinding[] {
   const findings: LintFinding[] = [];

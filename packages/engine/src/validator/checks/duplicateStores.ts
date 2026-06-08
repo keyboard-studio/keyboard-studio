@@ -1,8 +1,5 @@
 import type { LintFinding } from "@keyboard-studio/contracts";
-
-// Matches a store declaration line: store(name) ...
-// Case-insensitive, system stores exempt per CheckForDuplicates.cpp:31-52
-const STORE_DECL_RE = /^\s*store\s*\(\s*([^)]+?)\s*\)/i;
+import { STORE_DECL_RE } from "./_shared.js";
 
 export function checkDuplicateStores(source: string): LintFinding[] {
   const findings: LintFinding[] = [];
