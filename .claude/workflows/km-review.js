@@ -1,7 +1,7 @@
 export const meta = {
   name: "km-review",
   description:
-    "Six-specialist PR review pipeline for keyboard-studio. Returns per-reviewer findings, km-verification verdicts on each finding, and a synthesis verdict. Does NOT merge, push, or post GitHub comments — those stay in the main session.",
+    "Four-primary-reviewer PR review pipeline (km-keyman, km-strategy, km-qc, km-domain); km-verification acts as universal skeptic and km-synthesis as final aggregator. Returns per-reviewer findings, km-verification verdicts on each finding, and a synthesis verdict. Does NOT merge, push, or post GitHub comments — those stay in the main session.",
   whenToUse:
     "Invoke for any keyboard-studio PR that passes the km-triage Phase-2/3 gates and needs substantive crew review. Pass prNumber (required) and depth ('thorough' or 'quick', default 'thorough').",
   phases: [
@@ -63,6 +63,7 @@ const FINDINGS_SCHEMA = {
           autoFixable: { type: "boolean" },
           // km-synthesis output types (P0-2)
           findingKind: {
+            type: "string",
             enum: ["integration", "duplication", "extraction", "general"],
           },
           existingFile: { type: "string" },   // duplication: path already doing this
@@ -81,7 +82,7 @@ const FINDINGS_SCHEMA = {
               "none",
             ],
           },
-          gateId: { enum: ["pattern-audit", "none"] },
+          gateId: { type: "string", enum: ["pattern-audit", "none"] },
           evidence: { type: "string" },       // verification run-command and outcome
           testCommand: { type: "string" },    // verification repro command
         },
@@ -155,7 +156,7 @@ const REVIEWERS = [
     key: "strategy",
     agentType: "km-strategy",
     lens:
-      "Spec §7 strategy framework: A1-A7 axes, decision tree, S-01..S-13 catalog, §7.5 self-check. Validate Pattern.strategyId / combinesWith linkage.",
+      "Spec §7 strategy framework: A1-A7 axes, decision tree, S-01..S-12 catalog, §7.5 self-check. Validate Pattern.strategyId / combinesWith linkage.",
   },
   {
     key: "qc",
@@ -281,7 +282,7 @@ Do NOT post GitHub comments, push, or merge.`;
 
 async function reviewStage(_, reviewer, _index) {
   // NOTE: opts.phase used here instead of phase() to avoid race across
-  // the six concurrent reviewer items (contract rule 7).
+  // the four concurrent reviewer items (contract rule 7).
   // P0-4: wrap in try/catch so a thrown reviewer returns an error envelope
   // rather than null — synthesis can see WHY a slot is empty.
   try {
@@ -333,7 +334,7 @@ async function verifyStage(reviewerEnvelope, reviewer, _index) {
   }
 
   // NOTE: opts.phase used here too — these run concurrently per reviewer
-  // across all six lanes (contract rule 7).
+  // across all four primary reviewer lanes (contract rule 7).
   // Rule 6: parallel() thunk failure resolves to null; filter before use.
   // P0-4: wrap each thunk in try/catch so a thrown verifier returns an error
   // envelope rather than null — distinct from a user-skipped null.
@@ -402,7 +403,7 @@ if (!prNumber) {
   );
 }
 
-// Run the review + verify pipeline across all six reviewers.
+// Run the review + verify pipeline across all four primary reviewers.
 // pipeline(items, stage1, stage2) — no barrier between stages per item;
 // stage2 signature is (prevResult, originalItem, index) (contract rule 5).
 const perReviewerResults = await pipeline(REVIEWERS, reviewStage, verifyStage);
