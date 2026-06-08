@@ -11,7 +11,7 @@ export interface ScaffolderServiceOptions {
   fetchImpl?: typeof fetch;
 }
 
-const INVALID_ID_CHARS = /[\s(),[\] -]/;
+const INVALID_ID_CHARS = /[-\s(),[\]]/;
 
 function makeVirtualFS(): VirtualFS {
   const store = new Map<string, VirtualFSEntry>();
@@ -66,15 +66,15 @@ function applyKmnTransforms(
   const year = new Date().getFullYear();
 
   const hasCaps = content.split("\n").some((line) => line.includes("[CAPS"));
-
-  let result = content.replace(/NCAPS /g, "");
-
-  result = result
-    .split("\n")
-    .filter((line) => !line.includes("[CAPS"))
-    .join("\n");
+  let result = content;
 
   if (hasCaps) {
+    result = result.replace(/NCAPS /g, "");
+    result = result
+      .split("\n")
+      .filter((line) => !line.includes("[CAPS"))
+      .join("\n");
+
     const lines = result.split("\n");
     const noExistingCasedKeys = !lines.some((l) => l.includes("store(&CasedKeys)"));
     if (noExistingCasedKeys && group !== "non-roman") {
@@ -86,6 +86,8 @@ function applyKmnTransforms(
       if (versionIdx !== -1) {
         lines.splice(versionIdx + 1, 0, `store(&CasedKeys) ${casedKeysValue}`);
       }
+      result = lines.join("\n");
+    } else {
       result = lines.join("\n");
     }
   }

@@ -236,3 +236,87 @@ describe("createScaffolderService", () => {
     });
   });
 });
+
+describe("scaffold — additional coverage", () => {
+  it("accepts id of exactly 255 characters", () => {
+    const service = createScaffolderService();
+    expect(service.validateKeyboardId("a".repeat(255))).toBeNull();
+  });
+
+  it("removes the base id path after renaming to keyboardId", async () => {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(BASE_KMN));
+      return Promise.resolve(makeNotFoundResponse());
+    });
+    const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+    const vfs = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
+    expect(vfs.get("source/base_keyboard.kmn")).toBeUndefined();
+    expect(vfs.get("source/my_keyboard.kmn")).toBeDefined();
+  });
+
+  it("does not insert a second store(&CasedKeys) when base already has one", async () => {
+    const kmnWithExisting = BASE_KMN + "store(&CasedKeys) [K_A]..[K_Z]\n";
+    const mockFetch = vi.fn().mockResolvedValue(makeTextResponse(kmnWithExisting));
+    const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+    const vfs = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
+    const content = vfs.get("source/my_keyboard.kmn")!.content as string;
+    const count = (content.match(/store\(&CasedKeys\)/g) ?? []).length;
+    expect(count).toBe(1);
+  });
+
+  it("auto-detects non-roman for non-Latn script", async () => {
+    const nonLatnBase = { ...baseKeyboard, script: "Deva" };
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(BASE_KMN));
+      return Promise.resolve(makeNotFoundResponse());
+    });
+    const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+    const vfs = await service.scaffold(nonLatnBase, "my_keyboard", "My Keyboard");
+    const content = vfs.get("source/my_keyboard.kmn")!.content as string;
+    expect(content).not.toContain("store(&CasedKeys)");
+  });
+
+  it("removes phone layer, duplicates shift as caps, defaults nextlayer on regular keys", async () => {
+    const touchLayout = JSON.stringify({
+      phone: { layer: [{ id: "default", row: [] }] },
+      tablet: {
+        layer: [
+          { id: "default", row: [{ key: [{ id: "K_A", text: "a" }] }] },
+          { id: "shift", row: [{ key: [{ id: "K_A", text: "A" }] }] },
+        ],
+      },
+    });
+    const kmnWithLayout = `store(&NAME) 'Base Keyboard'
+store(&KEYBOARDVERSION) '1.0'
+store(&LAYOUTFILE) 'base_keyboard.keyman-touch-layout'
+NCAPS + [CAPS K_A] > 'a'
++ [K_A] > 'A'
+begin Unicode > use(main)
+group(main) using keys
++ [K_B] > 'b'
+`;
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes(".keyman-touch-layout")) return Promise.resolve(makeTextResponse(touchLayout));
+      if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(kmnWithLayout));
+      return Promise.resolve(makeNotFoundResponse());
+    });
+    const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+    const vfs = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
+
+    const entry = vfs.get("source/my_keyboard.keyman-touch-layout");
+    expect(entry).toBeDefined();
+    const data = JSON.parse(entry!.content as string) as {
+      phone?: unknown;
+      tablet: { layer: Array<{ id: string; row: Array<{ key: Array<{ id?: string; nextlayer?: string }> }> }> };
+    };
+
+    expect(data.phone).toBeUndefined();
+
+    const capsLayer = data.tablet.layer.find((l) => l.id === "caps");
+    expect(capsLayer).toBeDefined();
+
+    const shiftLayer = data.tablet.layer.find((l) => l.id === "shift");
+    const shiftKey = shiftLayer!.row[0].key[0];
+    expect(shiftKey.nextlayer).toBe("default");
+  });
+});
