@@ -19,7 +19,8 @@ export const STORE_DECL_RE = /^\s*store\s*\(\s*([^)]+?)\s*\)/i;
 // Matches a store declaration body (the quoted string that follows).
 // e.g. store(s) "abc" — captures "abc" (3 chars = length 3).
 // Also handles single-quoted bodies: store(s) 'abc'
-const STORE_BODY_RE = /^\s*store\s*\([^)]+\)\s*(?:"([^"]*)"|'([^']*)')/i; // Note: does not handle escaped quotes in body strings (e.g. "ab\"cd")
+// Note: does not handle escaped quotes in body strings (e.g. "ab\"cd")
+const STORE_BODY_RE = /^\s*store\s*\([^)]+\)\s*(?:"([^"]*)"|'([^']*)')/i;
 
 export function collectDeclaredStores(source: string): Map<string, StoreInfo> {
   const stores = new Map<string, StoreInfo>();
