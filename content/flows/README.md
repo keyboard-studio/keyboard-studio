@@ -36,7 +36,7 @@ questions:
 |---|---|---|
 | `id` | yes | Stable snake_case key. Used as `questionId` in completed instances. |
 | `prompt` | yes (unless `engine_resolved`) | The question shown to the user. Plain language; no technical jargon. |
-| `help_text` | yes (unless `engine_resolved`) | One or two friendly sentences expanding on the prompt. |
+| `help_text` | yes (unless `engine_resolved`) | One or two friendly sentences expanding on the prompt. Rendered as always-visible secondary text directly below the prompt — not a tooltip or collapsible. Write it assuming it is always seen alongside the prompt. |
 | `type` | yes (unless `engine_resolved`) | Input type — see Types below. |
 | `options` | when type is `select`, `radio`, or `multi_select` (and not seeded via `options_source`) | List of `{value, label}` pairs. |
 | `options_source` | when type is `autocomplete`, or a runtime-seeded `multi_select` | Data-source token (e.g. `@langtags_iso639`, `@picker_candidates_seeded`). |
