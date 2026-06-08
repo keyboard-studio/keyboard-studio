@@ -1150,6 +1150,15 @@ Field notes:
 
 One line per PR per run, no exceptions. This is the source of truth when we later decide to graduate selected lanes to auto-merge.
 
+After writing the audit-log line, emit a `pr-end` progress event so the dashboard closes out this PR's row with the final action and head SHA:
+
+```bash
+node utilities/km-triage-app/progress-emit.js \
+  phase=pr-end pr=<NUM> action_taken=<approve_park|auto_fix_only|mention_only|fix_and_mention|escalate|auto_fix_attempt_failed|bypass|skipped> head_sha=<head_sha> || true
+```
+
+For Phase-2 skipped PRs, `pr-skip` already covered the "skipped" signal — emit `pr-end action_taken=skipped` here as well so the per-PR lifecycle has a consistent close (skip → pr-skip → audit → pr-end). The dashboard treats `pr-end` as the canonical "this PR is finished this sweep" event.
+
 ## Phase 8 — Run summary
 
 At the end of the sweep, print a short summary to stdout (it lands in the scheduler's log file):
@@ -1168,6 +1177,17 @@ At the end of the sweep, print a short summary to stdout (it lands in the schedu
 ```
 
 If anything @-mentioned the lead or escalated, the line is preceded by `[km-triage] <N> PRs need your eyes: #X, #Y, #Z` so the scheduler's log highlights it.
+
+Then emit the final `sweep-end` progress event with the same counts (so the dashboard shows the sweep is done and the count breakdown matches the stdout summary):
+
+```bash
+node utilities/km-triage-app/progress-emit.js \
+  phase=sweep-end \
+  approve_park=<N> auto_fix_only=<N> mention_only=<N> fix_and_mention=<N> \
+  escalate=<N> skipped=<N> auto_fix_failed=<N> bypass=<N> duration_s=<seconds> || true
+```
+
+`triage-watch.mjs` treats the first `sweep-end` event with a given `sweep_id` as the sweep's terminal marker — the status badge flips from `RUNNING` to `DONE` once it appears, and the count row below the PR table populates from these fields.
 
 ## When to call which specialist (recap)
 
