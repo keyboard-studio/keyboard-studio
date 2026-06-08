@@ -6,3 +6,4 @@ export * from "./lintFindings";
 export * from "./compileResults";
 export * from "./provenance";
 export * from "./keyboard-ir";
+export * from "./linguistInventories";

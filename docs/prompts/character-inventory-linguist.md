@@ -67,26 +67,50 @@ not include any conversational intro or outro text.
   },
   "mandatory_diacritics_and_ligatures": ["œ", "æ", "ß"],
   "language_specific_punctuation": ["«", "»", "¿", "¡"],
-  "numerals": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+  "numerals": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+
+  // OPTIONAL FIELDS -- include only the fields relevant to the script.
+  // Omit fields that are not applicable to this language.
+  "digraphs_as_phoneme_units": ["sh", "ts", "ny"],
+  "nukta_and_borrowed_sound_markers": ["क़", "ख़", "ग़"],
+  "independent_vowels": ["अ", "आ", "इ"],
+  "direction_control_chars": ["U+200F", "U+200E"],
+  "syllabic_final_markers": ["U+1427", "U+1428"]
 }
 ```
 
 ## Output → contract mapping
 
-| Prompt JSON key | `LinguistInventory` field |
-|---|---|
-| `language` | `language` |
-| `script` | `script` |
-| `alphabet_core` | `alphabetCore` (`{ lowercase, uppercase }`) |
-| `alphabet_auxiliary` | `alphabetAuxiliary` (`{ lowercase, uppercase, note? }`) |
-| `mandatory_diacritics_and_ligatures` | `mandatoryDiacriticsAndLigatures` |
-| `language_specific_punctuation` | `languageSpecificPunctuation` |
-| `numerals` | `numerals` |
-| *(added by the CLDR cross-check)* | `flags[]` (`{ char, issue, note? }`) |
-| *(recorded from Step 1)* | `sources[]` (`{ title, url?, kind? }`) |
+| Prompt JSON key | `LinguistInventory` field | Notes |
+|---|---|---|
+| `language` | `language` | |
+| `script` | `script` | |
+| `alphabet_core` | `alphabetCore` (`{ lowercase, uppercase }`) | |
+| `alphabet_auxiliary` | `alphabetAuxiliary` (`{ lowercase, uppercase, note? }`) | |
+| `mandatory_diacritics_and_ligatures` | `mandatoryDiacriticsAndLigatures` | |
+| `language_specific_punctuation` | `languageSpecificPunctuation` | |
+| `numerals` | `numerals` | |
+| `digraphs_as_phoneme_units` | `digraphsAsPhonemeUnits` | Optional; Latin scripts only |
+| `nukta_and_borrowed_sound_markers` | `nuktaAndBorrowedSoundMarkers` | Optional; Indic scripts only; NFC |
+| `independent_vowels` | `independentVowels` | Optional; Indic scripts only; NFC |
+| `direction_control_chars` | `directionControlChars` | Optional; RTL scripts only; advisory -- Phase C |
+| `syllabic_final_markers` | `syllabicFinalMarkers` | Optional; Syllabic scripts only; NFC |
+| *(added by the CLDR cross-check)* | `flags[]` (`{ char, issue, note? }`) | |
+| *(recorded from Step 1)* | `sources[]` (`{ title, url?, kind? }`) | |
 
 ## Notes for implementers
 
+- **Optional script-specific fields.** The five fields added under the
+  `// OPTIONAL FIELDS` comment in the JSON spec are script-scoped: emit
+  `digraphs_as_phoneme_units` only for Latin-family scripts;
+  `nukta_and_borrowed_sound_markers` and `independent_vowels` only for
+  Indic scripts; `direction_control_chars` only for RTL scripts (mark as
+  advisory -- Phase C; the engine defers key placement to Phase C for these);
+  `syllabic_final_markers` only for Syllabic scripts. The engine adapter
+  treats all five as optional: a missing key is equivalent to an empty list.
+  All character values in these fields must be NFC-normalized, except
+  `digraphs_as_phoneme_units` (plain ASCII digraph strings) and
+  `direction_control_chars` (Unicode code-point strings, e.g. `"U+200F"`).
 - **Normalization layering.** The inventory is NFC for character *identification*
   and display. How the keyboard normalizes its *output* (e.g. the NFD reorder
   auto-emitted for Latin groups in Phase C', [spec §8](../../spec.md)) is a

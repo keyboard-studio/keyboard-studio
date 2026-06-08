@@ -15,6 +15,11 @@ import {
   makeLinguistInventory,
   linguistInventoryChars,
 } from "./linguistInventory";
+import {
+  hausaWithDigraphs,
+  hindiWithNukta,
+  hebrewWithDirectionMarks,
+} from "./fixtures/linguistInventories";
 
 // A compact French-ish exemplar reused across cases.
 const baseInit = {
@@ -136,5 +141,72 @@ describe("linguistInventoryChars flatten", () => {
     expect(linguistInventoryChars(inv)).toEqual([
       "a", "b", "c", "A", "B", "C", "œ", "æ", "ç", "«", "»", "0", "1", "2",
     ]);
+  });
+});
+
+describe("optional fields — issue #191 coverage", () => {
+  it("linguistInventoryChars includes digraphsAsPhonemeUnits after numerals", () => {
+    const chars = linguistInventoryChars(hausaWithDigraphs);
+    const lastNumeralIdx = chars.lastIndexOf("2");
+    expect(chars).toContain("sh");
+    expect(chars).toContain("ng");
+    expect(chars.indexOf("sh")).toBeGreaterThan(lastNumeralIdx);
+    expect(chars.indexOf("ng")).toBeGreaterThan(lastNumeralIdx);
+  });
+
+  it("linguistInventoryChars includes nukta markers and independent vowels", () => {
+    const chars = linguistInventoryChars(hindiWithNukta);
+    expect(chars).toContain("क़");
+    expect(chars).toContain("ख़");
+    expect(chars).toContain("अ");
+    expect(chars).toContain("आ");
+    expect(chars).toContain("इ");
+    expect(chars).toContain("ई");
+  });
+
+  it("linguistInventoryChars handles inventory with no new optional fields", () => {
+    const inv = makeLinguistInventory({
+      language: "en",
+      script: "Latin",
+      alphabetCore: { lowercase: ["a", "b"], uppercase: ["A", "B"] },
+      mandatoryDiacriticsAndLigatures: [],
+      languageSpecificPunctuation: [],
+      numerals: ["0"],
+    });
+    const chars = linguistInventoryChars(inv);
+    // ?? [] guards fire cleanly — no error, only core chars present
+    expect(chars).toEqual(["a", "b", "A", "B", "0"]);
+  });
+
+  it("makeLinguistInventory roundtrips digraphsAsPhonemeUnits", () => {
+    const inv = makeLinguistInventory({
+      ...baseInit,
+      digraphsAsPhonemeUnits: ["sh", "ts", "ny", "ng"],
+    });
+    expect(inv.digraphsAsPhonemeUnits).toEqual(["sh", "ts", "ny", "ng"]);
+  });
+
+  it("makeLinguistInventory omits undefined optional fields", () => {
+    const inv = makeLinguistInventory(baseInit);
+    expect("digraphsAsPhonemeUnits" in inv).toBe(false);
+    expect("nuktaAndBorrowedSoundMarkers" in inv).toBe(false);
+    expect("independentVowels" in inv).toBe(false);
+    expect("directionControlChars" in inv).toBe(false);
+    expect("syllabicFinalMarkers" in inv).toBe(false);
+  });
+
+  it("linguistInventoryChars includes directionControlChars after numerals", () => {
+    const chars = linguistInventoryChars(hebrewWithDirectionMarks);
+    expect(chars).toContain("‏"); // U+200F RIGHT-TO-LEFT MARK
+    expect(chars).toContain("‎"); // U+200E LEFT-TO-RIGHT MARK
+    const lastNumeralIdx = chars.lastIndexOf("1");
+    expect(chars.indexOf("‏")).toBeGreaterThan(lastNumeralIdx);
+  });
+
+  it("linguistInventoryChars includes syllabicFinalMarkers after numerals", () => {
+    const chars = linguistInventoryChars(hebrewWithDirectionMarks);
+    expect(chars).toContain("ᐧ"); // U+1427 CANADIAN SYLLABICS FINAL MIDDLE DOT
+    const lastNumeralIdx = chars.lastIndexOf("1");
+    expect(chars.indexOf("ᐧ")).toBeGreaterThan(lastNumeralIdx);
   });
 });
