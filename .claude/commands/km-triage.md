@@ -124,6 +124,84 @@ node utilities/km-triage-app/setup.js
 
 The script opens a browser, you click "Create GitHub App", then install the App on `MattGyverLee/keyboard-studio`. About 90 seconds total. After that, every subsequent sweep mints its own token automatically. See [utilities/km-triage-app/setup.js](utilities/km-triage-app/setup.js) for the full flow.
 
+## Observability — progress emission and check-run updates
+
+The triage runs unattended, so it must leave breadcrumbs. Two parallel channels:
+
+1. **Local JSONL** at `.tech-lead-inbox/progress.jsonl` — one event per phase boundary. Consumed by [tools/triage-watch.mjs](tools/triage-watch.mjs) (live terminal dashboard) and by ad-hoc `tail -f` / `Get-Content -Wait`. Gitignored; never committed.
+2. **GitHub `km-triage/review` check_run** — per-PR, created as `status: in_progress` at Phase 4 start, PATCHed with a fresh markdown summary at every subsequent phase boundary, completed in Phase 6/7 with the final conclusion. Visible to anyone looking at the PR page.
+
+Both are written via small Node helpers; the triage agent invokes them at the points listed below. **A failed observability write must never abort the sweep** — both helpers exit non-zero on error, but the doc's surrounding bash blocks should treat their failures as best-effort (`|| true` where it matters).
+
+### Sweep identity
+
+Every event carries a `sweep_id`. It comes from the `KM_TRIAGE_SWEEP_ID` env var, set by the scheduler wrapper ([scripts/triage-windows.ps1](scripts/triage-windows.ps1) on Windows; the eventual Linux equivalent sets the same name). If the env var is absent (manual `claude -p "/km-triage"` invocation without the wrapper), the helpers fall back to a fresh per-process timestamp — workable for one-off runs but means iteration boundaries collapse together. Always run the triage via the wrapper for production sweeps.
+
+### Helper #1: `progress-emit.js`
+
+Appends one JSON line to `.tech-lead-inbox/progress.jsonl`. Auto-injects `ts` and `sweep_id`. Use at every phase boundary listed in the per-phase sections below.
+
+```bash
+node utilities/km-triage-app/progress-emit.js phase=<name> [key=value ...]
+```
+
+Value type inference: `true`/`false` → boolean, integer-looking string → number, `[a,b,c]` → array of strings, anything else → string. Quote strings with spaces from the shell as usual.
+
+The canonical event vocabulary (consumed by triage-watch.mjs; new event types are welcome but unknown phases render under the generic event-tail):
+
+| `phase` value         | Required fields                          | Emitted at                                                        |
+|-----------------------|------------------------------------------|-------------------------------------------------------------------|
+| `sweep-start`         | `total_prs`, `prs` (array)               | Right after Phase 2's `gh pr list`                                |
+| `pr-skip`             | `pr`, `reason`                           | For each Phase-2 skip                                             |
+| `pr-start`            | `pr`, `title`, `crew`                    | Start of Phase 3/4 for a non-skipped PR                           |
+| `dispatch`            | `pr`, `specialists` (array)              | Phase 4 right before the parallel Agent calls                     |
+| `verdict`             | `pr`, `specialist`, `status`, `summary`  | Phase 5 once per specialist whose verdict block parsed            |
+| `action`              | `pr`, `action`                           | End of Phase 5 / 5.5 after the per-PR action is determined        |
+| `auto-fix`            | `pr`, `applied`, `commit_sha`            | Phase 6 after km-programmer returns APPLIED                       |
+| `mention`             | `pr`, `comment_url`                      | Phase 6 after the @-mention comment posts (MENTION_ONLY / FIX_AND_MENTION) |
+| `escalate`            | `pr`, `comment_url`, `directed_by`, `channel` | Phase 6 after ESCALATE action posts question to PR and adds tech-lead-review-needed label; awaiting lead reply |
+| `check-published`     | `pr`, `conclusion`, `check_id`           | After `check-progress.js` completes the check                     |
+| `pr-end`              | `pr`, `action_taken`, `head_sha`         | End of Phase 7 (after audit-log entry written)                    |
+| `sweep-end`           | `approve_park`, `auto_fix_only`, `mention_only`, `fix_and_mention`, `escalate`, `skipped`, `auto_fix_failed`, `duration_s` | End of Phase 8 |
+
+### Helper #2: `check-progress.js`
+
+Manages the `km-triage/review` check_run lifecycle on GitHub. First call for a (sweep, pr) pair POSTs a fresh check_run; subsequent calls PATCH the same one, so the check's summary refreshes in place on the PR page.
+
+```bash
+node utilities/km-triage-app/check-progress.js \
+  --pr <NUM> --head <CURRENT_HEAD_SHA> \
+  --status in_progress|completed \
+  [--conclusion success|action_required] \
+  [--title "one-line title shown in the check rollup"] \
+  [--summary-file <path-to-markdown-body>]
+```
+
+The check_run id is stored in a per-sweep sidecar at `.tech-lead-inbox/runs/<sweep_id>-checks.json`, so subsequent invocations within the same sweep find and patch the same check. The helper goes through [utilities/km-triage-app/bot-gh.js](utilities/km-triage-app/bot-gh.js) so the check is attributed to `km-triage[bot]`.
+
+Lifecycle per PR (non-skip path):
+
+| Phase           | Call                                              | Status / conclusion                |
+|-----------------|---------------------------------------------------|------------------------------------|
+| Phase 4 start   | `--status in_progress --title "Reviewing — dispatching crew"` | creates the check          |
+| Phase 5 done    | `--status in_progress --title "Reviewing — synthesizing verdicts"` | PATCH                  |
+| Phase 6 final   | `--status completed --conclusion <see Phase 6 table> --title "<final title>"` | PATCH, locks the check |
+
+Phase-2 skip paths do **not** create a check_run, matching the previous behavior — a skipped PR's gate stays at the GitHub default "Expected — waiting for status to be reported."
+
+### Consumer
+
+The terminal viewer:
+
+```bash
+node tools/triage-watch.mjs              # tail the latest sweep, live refresh
+node tools/triage-watch.mjs --list       # enumerate recent sweeps
+node tools/triage-watch.mjs --sweep <id> # replay one sweep
+node tools/triage-watch.mjs --once       # render once and exit (good for screenshots / CI)
+```
+
+Works identically on Windows (Terminal, PowerShell 7, Win 10+ cmd with VT mode) and Linux/macOS. No node_modules.
+
 ## Phase 1 — Bootstrap the inbox
 
 Before touching any PR:
@@ -161,6 +239,12 @@ gh pr list \
 ```
 
 (`files` is intentionally omitted from this list call — it's expensive and only needed for path-based classification fallback. Phase 3 fetches it per-PR via `gh pr view <NUM> --json files` only for the subset that hits the no-team-label fallback. Once the team adopts team labels universally, no `files` fetch ever runs.)
+
+**Emit `sweep-start`** as soon as you have the list, before any skip decisions:
+
+```bash
+node utilities/km-triage-app/progress-emit.js phase=sweep-start total_prs=<N> "prs=[<comma-separated PR numbers>]" || true
+```
 
 For each PR, **skip** (with audit-log entry `action_taken: skipped, reason: <X>`) when any of these hold:
 
@@ -789,7 +873,7 @@ Apply the same @-mention dedup and email-to-handle conversion rules as MENTION_O
 
 Pure ESCALATE means at least one specialist could not grade the PR without lead input. The lead's answer may invalidate every other comment, so REQUEST_CHANGES findings (if any) are held without acting on them.
 
-Do **not** comment on the PR. Append to `.tech-lead-inbox/INBOX.md`:
+ESCALATE now posts **both** an INBOX entry (local audit trail) and a PR comment (question only — held REQUEST_CHANGES findings remain INBOX-only, per issue #216). Append to `.tech-lead-inbox/INBOX.md`:
 
 ```
 ## [<ISO timestamp>] PR #<NUM> — <TITLE>
@@ -814,10 +898,56 @@ Do **not** comment on the PR. Append to `.tech-lead-inbox/INBOX.md`:
 ---
 ```
 
+Then post a PR comment with the question (question only — held REQUEST_CHANGES findings stay INBOX-only, see issue #216 rationale):
+
+Generate `.tech-lead-inbox/escalate-body-<NUM>.md` from the template below, then call:
+
+```bash
+node utilities/km-triage-app/bot-gh.js pr comment <NUM> --body-file .tech-lead-inbox/escalate-body-<NUM>.md
+```
+
+Capture the URL returned by that call (or extract it from `gh pr view <NUM> --json comments`) and stash it as `mention_comment_url` for the Phase-7 audit log.
+
+**escalate-body template** (substitute `{…}` placeholders before writing the file):
+
+```
+@{lead_login} - km-triage needs your input on PR #{N}.
+
+@{author_login}: no action needed from you yet; the lead will reply here.
+You're welcome to add context if it helps.
+
+Question for the tech lead:
+- **{specialist_name}** (confidence: {confidence}): {question}
+
+Reply on this PR with `@km-triage <your answer>` and the next sweep will
+route accordingly (auto-fix, request-changes, or approve-park).
+```
+
+<!-- Held REQUEST_CHANGES findings stay INBOX-only — see issue #216 rationale. -->
+
+**@-mention dedup rule** (mirrors MENTION_ONLY's rule at lines ~758-760 above):
+Apply this before rendering the template.
+- If `{directed_by}` (from Phase 3.5) resolves to `{lead_login}`, the lead is the directing human. Do **not** @-mention them a second time on the `@{author_login}` context line. Collapse the first line to just: `km-triage needs your input on PR #{N}.` (no @-mention), and set `mention_resolution = self_dedup`.
+- If `{directed_by}` is an email (desktop channel), convert it to a GitHub @-handle via `pr.commits[].authors[].login` matching the email. If the lookup fails, include only `@{lead_login}` in the comment and note "directing human was <email> (couldn't resolve GitHub handle)" in the body; set `mention_resolution = lookup_failed`.
+- If the handle resolved normally, set `mention_resolution = ok`.
+
+Note: `{directed_by}` is computed by Phase 3.5 — do not re-derive it here.
+
 Then label:
 
 ```bash
 node utilities/km-triage-app/bot-gh.js api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=tech-lead-review-needed"
+```
+
+Then emit an `escalate` progress event (using `directed_by` and `channel` computed by Phase 3.5 — do not re-derive them here):
+
+```bash
+node utilities/km-triage-app/progress-emit.js \
+  phase=escalate \
+  pr=<NUM> \
+  comment_url=<mention_comment_url> \
+  directed_by=<directed_by> \
+  channel=<channel>
 ```
 
 ### Publish `km-triage/review` check run (always, after the per-action steps)
@@ -871,7 +1001,7 @@ Field notes:
 - `last_audited_sha` is the `head_sha` of the previous audit-log entry for this PR (the SHA the last sweep saw), or `null` for first-sweep PRs and PRs that were force-pushed since the last sweep. Paired with `head_sha`, this defines the range `last_audited_sha..head_sha` — the diff this sweep actually reviewed.
 - `review_range` is `"full"` (full PR diff was reviewed: first sweep, or post-force-push) or `"incremental"` (only the `last_audited_sha..head_sha` range was reviewed).
 - `signed_off_skipped` lists the specialists the Pre-filter-B step skipped because they appeared in the last commit's `KM-Reviewed:` trailer.
-- `mention_resolution` records what happened when the triage tried to resolve the directing-human's GitHub @-handle for a MENTION_ONLY or FIX_AND_MENTION comment. Values:
+- `mention_resolution` records what happened when the triage tried to resolve the directing-human's GitHub @-handle for a MENTION_ONLY, FIX_AND_MENTION, or ESCALATE comment. Values:
   - `ok` — handle resolved (commit-author email → login lookup or `pr.author.login` worked), mention posted with both lead + directing-human tagged.
   - `self_dedup` — directing human resolved to the tech lead's own login; comment tags the lead once.
   - `lookup_failed` — desktop-channel case where commit-author email didn't map to a known GitHub login; comment tagged only the lead and the body noted the directing-human's email verbatim.
@@ -884,7 +1014,7 @@ Field notes:
   - Approve-park abort → MENTION_ONLY reroute (Phase 6 APPROVE-AND-PARK re-check): `became_conflicting_during_review`, `ci_red_during_review`.
   - Other: `auth_failed`, `missing_team_label` (informational; doesn't gate). Empty array `[]` means either no trailer was present or the trailer named only specialists in the always-run set (which never get skipped). This list is *informational* — it does not appear in `verdicts` since those specialists didn't run this sweep, but it lets a later audit reconstruct why the crew was smaller than the classification suggests.
 - `auto_fix.applied` counts findings that landed mechanically. `auto_fix.escalated` counts findings that were `fixability=auto` in the verdict but couldn't be applied (e.g. km-programmer hit a failing check and rolled back).
-- `mention_comment_url` is the comment URL when the triage @-mentioned the lead (MENTION_ONLY or FIX_AND_MENTION action). `null` otherwise.
+- `mention_comment_url` is the comment URL when the triage @-mentioned the lead (MENTION_ONLY, FIX_AND_MENTION, or ESCALATE action). For ESCALATE entries this is always populated (not null) — capture it from the `bot-gh.js pr comment` call in Phase 6. `null` for all other actions.
 - `check_run.id` is the `id` returned by the `POST /check-runs` call that published `km-triage/review` for this sweep's head SHA. `check_run.conclusion` is the conclusion the bot set on that check (`success` for APPROVE-AND-PARK and `bypass`, `action_required` for every other substantive-review action). Both are `null` for skip-action entries since skip paths do not publish a check.
 - `trigger` records what caused this sweep to run on this PR. Values:
   - `schedule` — scheduled sweep (cron / systemd timer / Task Scheduler) found new commits since the last audit and processed the PR.

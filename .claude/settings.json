@@ -123,7 +123,43 @@
       "Bash(node utilities/km-triage-app/mint-token.js)",
       "Bash(node utilities/km-triage-app/bot-gh.js *)",
       "Bash(git pull *)",
-      "PowerShell(Get-ChildItem \"$env:LOCALAPPDATA\\\\km-triage\" -ErrorAction SilentlyContinue | Select-Object Name, Length)"
+      "PowerShell(Get-ChildItem \"$env:LOCALAPPDATA\\\\km-triage\" -ErrorAction SilentlyContinue | Select-Object Name, Length)",
+      "WebFetch(domain:docs.claude.com)",
+      "Bash(node -e \"const s = require\\('fs'\\).readFileSync\\('.claude/settings.json','utf8'\\); const o = JSON.parse\\(s\\); console.log\\('parse: ok'\\); console.log\\('enableWorkflows:', o.enableWorkflows\\); console.log\\('skipWorkflowUsageWarning:', o.skipWorkflowUsageWarning\\); console.log\\('permissions.allow length:', o.permissions.allow.length\\);\")",
+      "Workflow(km-review)",
+      "WebFetch(domain:patch-diff.githubusercontent.com)",
+      "WebFetch(domain:www.unicode.org)",
+      "WebFetch(domain:unicode.org)",
+      "Bash(git -C \"d:\\\\Github\\\\_Projects\\\\_KM\\\\keyboard-studio\" log main..HEAD --oneline)",
+      "Bash(git -C \"d:\\\\Github\\\\_Projects\\\\_KM\\\\keyboard-studio\" diff main...HEAD -- packages/contracts/src/strategy.ts)",
+      "Bash(git -C \"d:\\\\Github\\\\_Projects\\\\_KM\\\\keyboard-studio\" log --oneline --all -- packages/contracts/src/strategy.ts)",
+      "Bash(git -C \"d:\\\\Github\\\\_Projects\\\\_KM\\\\keyboard-studio\" log --oneline --diff-filter=M main -- packages/contracts/src/strategy.ts)",
+      "Bash(git -C \"d:\\\\Github\\\\_Projects\\\\_KM\\\\keyboard-studio\" show 8e9d8c9 --stat)",
+      "Bash(npx pnpm *)",
+      "Bash(python3 -c ' *)",
+      "Bash(python -c \"import sys, base64; data = sys.stdin.read\\(\\).replace\\('\\\\n',''\\); print\\(base64.b64decode\\(data\\).decode\\('utf-8'\\)\\)\")",
+      "Bash(node -e ' *)",
+      "Bash(npx vitest *)",
+      "Bash(node -e \"const fs = require\\('fs'\\); const content = fs.readFileSync\\('d:/Github/_Projects/_KM/keyboard-studio/content/patterns/transliteration/mnemonic-spelling.yaml', 'utf8'\\); const lines = content.split\\('\\\\n'\\); const line197 = lines[196]; console.log\\('Line 197:', line197\\); const match = line197.match\\(/[ऀ-ॿ]/g\\); if \\(match\\) { match.forEach\\(c => console.log\\('  char:', c, 'U+' + c.codePointAt\\(0\\).toString\\(16\\).toUpperCase\\(\\).padStart\\(4,'0'\\)\\)\\); }\")",
+      "Bash(git -C \"d:/Github/_Projects/_KM/keyboard-studio\" log --oneline --all -- content/patterns/substitute/simple-swap.yaml content/patterns/transliteration/mnemonic-spelling.yaml content/patterns/validation/constraints-beep.yaml content/patterns/ime/dll-ime-callout.yaml)",
+      "Bash(python -c \"import sys, base64; data = sys.stdin.read\\(\\).replace\\('\\\\n',''\\); content = base64.b64decode\\(data\\).decode\\('utf-8'\\); lines = content.split\\('\\\\n'\\); [print\\(f'{i+1}: {l}'\\) for i,l in enumerate\\(lines[80:130], start=81\\)]\")",
+      "Bash(git -C \"d:/Github/_Projects/_KM/keyboard-studio\" show 8973a4f --stat)",
+      "Bash(git -C \"d:\\\\Github\\\\_Projects\\\\_KM\\\\keyboard-studio\" log --oneline main..HEAD)",
+      "Bash(gh api *)",
+      "Bash(git -C \"d:/Github/_Projects/_KM/keyboard-studio\" show b3cd41c --stat)",
+      "Bash(git -C \"d:/Github/_Projects/_KM/keyboard-studio\" log --oneline --all -- packages/contracts/src/pattern.ts)",
+      "Bash(git -C \"d:/Github/_Projects/_KM/keyboard-studio\" show b3cd41c -- packages/contracts/src/pattern.ts)",
+      "Bash(git -C \"d:/Github/_Projects/_KM/keyboard-studio\" show 9c981b9 -- content/patterns/substitute/simple-swap.yaml)",
+      "Bash(node -e \"const fs=require\\('fs'\\);const s=fs.readFileSync\\('C:/Users/thoua/AppData/Local/Temp/claude/d--Github--Projects--KM-keyboard-studio/2768d6f3-9012-449d-8b78-eca3fc69998a/tasks/wcw39xzs0.output','utf8'\\);console.log\\('first 200 chars:'\\);console.log\\(s.slice\\(0,200\\)\\);console.log\\('---'\\);console.log\\('last 200 chars:'\\);console.log\\(s.slice\\(-200\\)\\);\")",
+      "Bash(node -e \"const fs=require\\('fs'\\);const s=fs.readFileSync\\('C:/Users/thoua/AppData/Local/Temp/claude/d--Github--Projects--KM-keyboard-studio/2768d6f3-9012-449d-8b78-eca3fc69998a/tasks/wcw39xzs0.output','utf8'\\);const obj=JSON.parse\\(s\\);console.log\\('top keys:',Object.keys\\(obj\\)\\);console.log\\('result keys:',Object.keys\\(obj.result||{}\\)\\);console.log\\('synth keys:',Object.keys\\(obj.result?.synthesis||{}\\)\\);console.log\\(''\\);const r=obj.result;console.log\\('prNumber:',r.prNumber\\);console.log\\('reviewers:',r.reviewers\\);console.log\\('confirmed:',r.confirmed\\);console.log\\('refuted:',r.refuted\\);console.log\\(''\\);console.log\\('verifyEnvelopes per-reviewer:'\\);for\\(const e of r.verifyEnvelopes||[]\\){console.log\\(' '+\\(e.reviewerKey||''\\).padEnd\\(14\\)+' '+\\(e.reviewerVerdict||''\\).padEnd\\(22\\)+' findings='+\\(e.verifiedFindings?.length||0\\)\\);}console.log\\(''\\);console.log\\('synth.verdict:',r.synthesis?.verdict\\);console.log\\('autoFixable count:',r.synthesis?.autoFixable?.length\\);console.log\\('humanDecisionNeeded count:',r.synthesis?.humanDecisionNeeded?.length\\);console.log\\(''\\);console.log\\('=== synth.summary ==='\\);console.log\\(r.synthesis?.summary||'\\(empty\\)'\\);\")",
+      "Bash(node -c utilities/km-triage-app/progress-emit.js)",
+      "Bash(node -c utilities/km-triage-app/check-progress.js)",
+      "Bash(node --check tools/triage-watch.mjs)"
+    ],
+    "additionalDirectories": [
+      "C:\\Temp"
     ]
-  }
+  },
+  "enableWorkflows": true,
+  "skipWorkflowUsageWarning": true
 }
