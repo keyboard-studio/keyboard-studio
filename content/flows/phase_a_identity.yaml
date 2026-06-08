@@ -153,8 +153,8 @@ questions:
     help_text: >
       Most keyboards in the world follow one of a small number of standard
       layouts. Pick the one that best matches the physical keyboard your
-      community uses. If you are creating a keyboard from scratch with no
-      existing layout in mind, choose "Start from a blank layout."
+      community uses. If you are not sure or skip this question, the studio
+      will use the US QWERTY layout as your starting point.
     type: radio
     options:
       - value: qwerty
@@ -165,9 +165,7 @@ questions:
         label: "AZERTY (used in France, Belgium, and parts of Africa)"
       - value: non-roman
         label: "A layout designed for a non-Roman script (e.g. Devanagari, Arabic, Thai)"
-      - value: blank
-        label: "Start from a blank layout -- I will define all key positions myself"
-    required: true
+    required: false
     next:
       - condition: "value == 'non-roman'"
         goto: script_family
