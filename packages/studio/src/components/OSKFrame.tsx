@@ -9,7 +9,7 @@
 import { useEffect, useRef } from "react";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { isExcludedScript } from "../lib/excludedScriptFamilies.ts";
-import { useKeyboardArtifact } from "../hooks/useKeyboardArtifact.ts";
+import type { Stage } from "../hooks/useKeyboardArtifact.ts";
 import { useOskChannel } from "../hooks/useOskChannel.ts";
 import type { OskMode } from "./OskModeToggle.tsx";
 import { PreviewPaneOverlay } from "./PreviewPaneOverlay.tsx";
@@ -18,16 +18,21 @@ import { UnsupportedScriptStub } from "./UnsupportedScriptStub.tsx";
 export interface OSKFrameProps {
   baseKeyboard: BaseKeyboard | null;
   oskMode: OskMode;
+  /** Lifted from useKeyboardArtifact in the parent (PreviewShell). */
+  stage: Stage;
+  /** Retry callback from useKeyboardArtifact in the parent. */
+  retry: () => void;
   onTextChange?: (text: string) => void;
 }
 
 export function OSKFrame({
   baseKeyboard,
   oskMode,
+  stage,
+  retry,
   onTextChange,
 }: OSKFrameProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const { stage, retry } = useKeyboardArtifact(baseKeyboard);
   const channel = useOskChannel(iframeRef);
 
   // Pull stable references out of the channel — the returned object's
