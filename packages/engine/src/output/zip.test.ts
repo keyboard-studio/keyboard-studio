@@ -1,30 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { unzipSync } from "fflate";
 import { toZip, serializeToZip } from "./zip.js";
-import type { VirtualFS, VirtualFSEntry } from "@keyboard-studio/contracts";
-
-// ---------------------------------------------------------------------------
-// Minimal in-memory VirtualFS for tests — no external dependency needed
-// ---------------------------------------------------------------------------
-
-function makeVirtualFS(entries: VirtualFSEntry[]): VirtualFS {
-  const store = new Map<string, VirtualFSEntry>(entries.map((e) => [e.path, e]));
-  return {
-    get: (path) => store.get(path),
-    set: (path, content, isBinary = false) => {
-      const prev = store.get(path);
-      store.set(path, { path, content, isBinary });
-      return prev;
-    },
-    delete: (path) => store.delete(path),
-    list: (prefix) =>
-      [...store.keys()].filter((p) => prefix === undefined || p.startsWith(prefix)),
-    entries: (prefix) =>
-      [...store.values()].filter(
-        (e) => prefix === undefined || e.path.startsWith(prefix)
-      ),
-  };
-}
+import type { VirtualFSEntry } from "@keyboard-studio/contracts";
+import { createVirtualFS } from "@keyboard-studio/contracts";
 
 const dec = new TextDecoder();
 
@@ -38,7 +16,7 @@ const FIXTURE_KMX = new Uint8Array([0x4b, 0x4d, 0x58, 0x00, 0x01, 0x00]); // moc
 const FIXTURE_README = `# Test Keyboard\n\nA test keyboard.\n`;
 
 function makeFixtureFS(): VirtualFS {
-  return makeVirtualFS([
+  return createVirtualFS([
     { path: "source/test.kmn", content: FIXTURE_KMN, isBinary: false },
     { path: "source/test.kps", content: FIXTURE_KPS, isBinary: false },
     { path: "build/test.kmx", content: FIXTURE_KMX, isBinary: true },
@@ -102,7 +80,7 @@ describe("toZip", () => {
   });
 
   it("includes compiled artifacts (.kmx) in the zip (spec §12)", async () => {
-    const fsWithKmx = makeVirtualFS([
+    const fsWithKmx = createVirtualFS([
       { path: "source/x.kmn", content: "c version(10.0)", isBinary: false },
       { path: "build/x.kmx", content: new Uint8Array([1, 2, 3]), isBinary: true },
       { path: "build/x.js", content: "// compiled", isBinary: false },
@@ -114,14 +92,14 @@ describe("toZip", () => {
   });
 
   it("handles an empty VirtualFS (only NEXT_STEPS.md in output)", async () => {
-    const emptyFs = makeVirtualFS([]);
+    const emptyFs = createVirtualFS([]);
     const bytes = await toZip(emptyFs);
     const entries = unzipSync(bytes);
     expect(Object.keys(entries)).toEqual(["NEXT_STEPS.md"]);
   });
 
   it("overrides any existing NEXT_STEPS.md in the VirtualFS", async () => {
-    const fs = makeVirtualFS([
+    const fs = createVirtualFS([
       { path: "NEXT_STEPS.md", content: "old content", isBinary: false },
     ]);
     const bytes = await toZip(fs);

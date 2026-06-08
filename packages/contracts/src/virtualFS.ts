@@ -44,3 +44,30 @@ export interface VirtualFS {
    */
   entries(prefix?: string): VirtualFSEntry[];
 }
+
+/**
+ * Create a minimal in-memory {@link VirtualFS} pre-populated with the given
+ * entries. Shared by the real engine and mock services so they stay in sync.
+ */
+export function createVirtualFS(entries?: VirtualFSEntry[]): VirtualFS {
+  const store = new Map<string, VirtualFSEntry>(
+    (entries ?? []).map((e) => [e.path, e])
+  );
+  return {
+    get(path: string): VirtualFSEntry | undefined { return store.get(path); },
+    set(path: string, content: Uint8Array | string, isBinary = false): VirtualFSEntry | undefined {
+      const prev = store.get(path);
+      store.set(path, { path, content, isBinary });
+      return prev;
+    },
+    delete(path: string): boolean { return store.delete(path); },
+    list(prefix?: string): string[] {
+      const keys = [...store.keys()];
+      return prefix === undefined ? keys : keys.filter((k) => k.startsWith(prefix));
+    },
+    entries(prefix?: string): VirtualFSEntry[] {
+      const all = [...store.values()];
+      return prefix === undefined ? all : all.filter((e) => e.path.startsWith(prefix));
+    },
+  };
+}

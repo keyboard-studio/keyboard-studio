@@ -3,50 +3,16 @@ import type {
   ScaffoldOptions,
   RoutingGroup,
 } from "@keyboard-studio/contracts";
-import type { BaseKeyboard, VirtualFS, VirtualFSEntry } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, VirtualFS } from "@keyboard-studio/contracts";
+import {
+  createVirtualFS,
+  validateKeyboardId as contractsValidateKeyboardId,
+} from "@keyboard-studio/contracts";
 import { fetchKeyboardSourceToVfs } from "../loader/fetchKeyboardSourceToVfs.js";
 
 export interface ScaffolderServiceOptions {
   proxyBase?: string;
   fetchImpl?: typeof fetch;
-}
-
-const INVALID_ID_CHARS = /[-\s(),[\]]/;
-
-function makeVirtualFS(): VirtualFS {
-  const store = new Map<string, VirtualFSEntry>();
-  return {
-    get(path: string): VirtualFSEntry | undefined {
-      return store.get(path);
-    },
-    set(path: string, content: Uint8Array | string, isBinary = false): VirtualFSEntry | undefined {
-      const prev = store.get(path);
-      store.set(path, { path, content, isBinary });
-      return prev;
-    },
-    delete(path: string): boolean {
-      return store.delete(path);
-    },
-    list(prefix?: string): string[] {
-      const keys = [...store.keys()];
-      if (prefix === undefined) return keys;
-      return keys.filter((k) => k.startsWith(prefix));
-    },
-    entries(prefix?: string): VirtualFSEntry[] {
-      const all = [...store.values()];
-      if (prefix === undefined) return all;
-      return all.filter((e) => e.path.startsWith(prefix));
-    },
-  };
-}
-
-function validateKeyboardId(id: string): string | null {
-  if (id.length === 0) return "keyboard id cannot be empty";
-  if (id.length > 255) return "keyboard id is longer than 255 characters";
-  if (INVALID_ID_CHARS.test(id)) {
-    return "keyboard id contains a disallowed character (spaces, parens, brackets, commas, control chars are not allowed)";
-  }
-  return null;
 }
 
 function detectGroup(base: BaseKeyboard): RoutingGroup {
@@ -267,7 +233,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
 
   return {
     validateKeyboardId(id: string): string | null {
-      return validateKeyboardId(id);
+      return contractsValidateKeyboardId(id);
     },
 
     async scaffold(
@@ -276,13 +242,13 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       displayName: string,
       scaffoldOpts?: ScaffoldOptions
     ): Promise<VirtualFS> {
-      const idError = validateKeyboardId(keyboardId);
+      const idError = contractsValidateKeyboardId(keyboardId);
       if (idError !== null) {
         return Promise.reject(new Error(`invalid keyboardId: ${idError}`));
       }
 
       const group: RoutingGroup = scaffoldOpts?.group ?? detectGroup(base);
-      const vfs = makeVirtualFS();
+      const vfs = createVirtualFS();
 
       try {
         const loaderOpts = {
@@ -291,7 +257,10 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         };
         await fetchKeyboardSourceToVfs(base, vfs, loaderOpts);
       } catch {
-        // Fall through with empty VFS; stubs will be generated below
+        // fetchKeyboardSourceToVfs handles network errors and 404s internally;
+        // this catch covers offline environments and proxy misconfigurations.
+        // generateStubs() below fills all required §12 paths so the returned
+        // VirtualFS is always usable.
       }
 
       const kmnVfsPath = vfs.list("source/").find((p) => p.endsWith(".kmn"));

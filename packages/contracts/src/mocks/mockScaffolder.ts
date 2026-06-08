@@ -1,6 +1,7 @@
 // see spec.md section 11 — ScaffolderService mock
 
 import type { ScaffolderService, ScaffoldOptions } from "../scaffolder";
+import { validateKeyboardId as contractsValidateKeyboardId } from "../scaffolder";
 import type { BaseKeyboard } from "../baseKeyboard";
 import type { VirtualFS } from "../virtualFS";
 import { scaffoldedFS } from "./mockVirtualFS";
@@ -12,11 +13,6 @@ import { scaffoldedFS } from "./mockVirtualFS";
 // RoutingGroup type in scaffolder.ts.)
 const AVAILABLE_TEMPLATES = ["qwerty-qwertz", "azerty", "non-roman"] as const;
 
-// §10 Layer A check #1 — identifier rules: 1-255 chars, no spaces / parens /
-// brackets / commas / control chars. The lint engine uses the same regex when
-// validating `.kmn` source; the mock validates the same characters.
-const INVALID_ID_CHARS = /[-\s(),[\]]/;
-
 /**
  * In-memory mock of {@link ScaffolderService}.
  * Returns fixture data without invoking the real implementation.
@@ -24,12 +20,7 @@ const INVALID_ID_CHARS = /[-\s(),[\]]/;
  */
 export const mockScaffolder: ScaffolderService = {
   validateKeyboardId(id: string): string | null {
-    if (id.length === 0) return "keyboard id cannot be empty";
-    if (id.length > 255) return "keyboard id is longer than 255 characters";
-    if (INVALID_ID_CHARS.test(id)) {
-      return "keyboard id contains a disallowed character (spaces, parens, brackets, commas, control chars are not allowed)";
-    }
-    return null;
+    return contractsValidateKeyboardId(id);
   },
 
   scaffold(

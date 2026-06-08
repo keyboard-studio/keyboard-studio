@@ -28,6 +28,31 @@ export interface ScaffoldOptions {
 }
 
 /**
+ * Characters disallowed in a keyboard identifier (§10 Layer A check #1).
+ * Shared between the real engine and the mock scaffolder so both validate
+ * identically.
+ */
+export const KEYBOARD_ID_INVALID_CHARS = /[-\s(),[\]]/;
+
+/**
+ * Validate that `id` satisfies §10 Layer A check #1 (identifier rules:
+ * 1-255 chars, no spaces / parens / brackets / commas / control chars).
+ *
+ * Returns `null` if `id` is valid; otherwise a short human-readable error
+ * message describing the first failure.
+ *
+ * @see spec.md §10 Layer A check #1
+ */
+export function validateKeyboardId(id: string): string | null {
+  if (id.length === 0) return "keyboard id cannot be empty";
+  if (id.length > 255) return "keyboard id is longer than 255 characters";
+  if (KEYBOARD_ID_INVALID_CHARS.test(id)) {
+    return "keyboard id contains a disallowed character (spaces, parens, brackets, commas, control chars are not allowed)";
+  }
+  return null;
+}
+
+/**
  * Service contract for the project scaffolder.
  *
  * The scaffolder duplicates a chosen base keyboard into a fresh in-memory

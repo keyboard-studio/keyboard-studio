@@ -1,29 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { verifyToken, publishPR, type GitHubFetchFn, type GitHubFetchResponse } from "./github.js";
-import type { PublishPROptions, VirtualFS, VirtualFSEntry } from "@keyboard-studio/contracts";
-
-// ---------------------------------------------------------------------------
-// Minimal VirtualFS (same helper as zip.test.ts, inline for isolation)
-// ---------------------------------------------------------------------------
-
-function makeVirtualFS(entries: VirtualFSEntry[]): VirtualFS {
-  const store = new Map<string, VirtualFSEntry>(entries.map((e) => [e.path, e]));
-  return {
-    get: (path) => store.get(path),
-    set: (path, content, isBinary = false) => {
-      const prev = store.get(path);
-      store.set(path, { path, content, isBinary });
-      return prev;
-    },
-    delete: (path) => store.delete(path),
-    list: (prefix) =>
-      [...store.keys()].filter((p) => prefix === undefined || p.startsWith(prefix)),
-    entries: (prefix) =>
-      [...store.values()].filter(
-        (e) => prefix === undefined || e.path.startsWith(prefix)
-      ),
-  };
-}
+import type { PublishPROptions, VirtualFSEntry } from "@keyboard-studio/contracts";
+import { createVirtualFS } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
 // Mock fetch builder
@@ -109,7 +87,7 @@ function makeOpts(overrides: Partial<PublishPROptions> = {}): PublishPROptions {
 }
 
 function makeSourceFS(): VirtualFS {
-  return makeVirtualFS([
+  return createVirtualFS([
     { path: "source/test.kmn", content: "c version(10.0)\n", isBinary: false },
     { path: "source/test.kps", content: "<Package/>", isBinary: false },
     // compiled artifacts — must be excluded from the PR
