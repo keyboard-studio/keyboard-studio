@@ -283,6 +283,14 @@ For each PR, **skip** (with audit-log entry `action_taken: skipped, reason: <X>`
 
 If `$ARGUMENTS` is a single valid PR number, fetch just that PR with the same fields and proceed.
 
+**For every PR that hits a Phase-2 skip** above, emit a `pr-skip` progress event before writing its audit-log line:
+
+```bash
+node utilities/km-triage-app/progress-emit.js phase=pr-skip pr=<NUM> reason=<skip_reason> || true
+```
+
+The `reason` value is the same one that goes into the audit log — `external_pr_not_in_scope`, `draft`, `solo_tech_lead_author`, `already_in_lead_queue`, `merge_conflict`, `ci_not_ready`, `mergeability_unknown`, or `no_new_commits_since_last_review`. Skip-action paths do not create a check_run (see Observability lifecycle table), so the GitHub merge gate stays at "Expected — waiting" for skipped PRs.
+
 ## Phase 3 — Classify each surviving PR
 
 Decision precedence (first match wins):
@@ -477,6 +485,42 @@ Procedure:
 - **BOTH**: all six in parallel.
 
 `km-author` (upstream parity) and `security-review` are deliberately not in scope here — they fire only when the tech lead manually invokes them. Triage is fast-path review.
+
+### Observability — Phase 4 emissions and check-run create
+
+Before composing the Agent calls, emit two progress events and create the `km-triage/review` check_run as `in_progress`. These three calls together signal "the crew is starting work on this PR" to both the local viewer and the GitHub PR page.
+
+```bash
+# 1. Mark the PR as entered (title + crew + team-label context).
+node utilities/km-triage-app/progress-emit.js \
+  phase=pr-start pr=<NUM> title="<TITLE>" crew=<engine|content|both> team=<engine|content|shared|MISSING> || true
+
+# 2. Announce the specialist roster about to fire (post-Pre-filter-B filtering).
+node utilities/km-triage-app/progress-emit.js \
+  phase=dispatch pr=<NUM> "specialists=[<comma-separated names>]" || true
+
+# 3. Create the in_progress check_run on the PR's current head SHA. Use a
+#    short markdown body in a temp file so the GitHub PR page shows what's
+#    being reviewed (the same body is PATCHed later, in Phase 5 and Phase 6).
+DISPATCH_BODY=.tech-lead-inbox/runs/$KM_TRIAGE_SWEEP_ID-pr<NUM>-dispatch.md
+mkdir -p "$(dirname "$DISPATCH_BODY")"
+cat > "$DISPATCH_BODY" <<EOF
+**km-triage is reviewing this PR.**
+
+- Crew: <engine|content|both>
+- Specialists dispatched: <comma-separated names>
+- Sweep id: \`$KM_TRIAGE_SWEEP_ID\`
+
+This check will refresh as the crew progresses through verdicts and the final action.
+EOF
+node utilities/km-triage-app/check-progress.js \
+  --pr <NUM> --head <CURRENT_HEAD_SHA> \
+  --status in_progress \
+  --title "Reviewing - dispatching crew" \
+  --summary-file "$DISPATCH_BODY"
+```
+
+The check_run id is now stored in `.tech-lead-inbox/runs/<sweep_id>-checks.json`; subsequent `check-progress.js` calls within the same sweep PATCH the same check rather than creating a new one.
 
 ### Self-contained briefing template
 
