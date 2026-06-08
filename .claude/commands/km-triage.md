@@ -1055,21 +1055,33 @@ node utilities/km-triage-app/progress-emit.js \
   channel=<channel>
 ```
 
-### Publish `km-triage/review` check run (always, after the per-action steps)
+### Complete the `km-triage/review` check run (after the per-action steps)
 
 This is the gating step. The repo's `main: CI + integrity` ruleset (id 17331134) lists `km-triage/review` (integration_id 3984948 = the km-triage App) in `required_status_checks`. The ruleset's `main: PR + review` rule (id 17331095) has `required_approving_review_count: 0`. Net effect: a PR's merge button is grey until a `km-triage/review` check_run with `conclusion: success` is published against the current head SHA. The bot's review activity (APPROVE comments, REQUEST_CHANGES posts, ESCALATE inbox writes) is visible record-of-decision; the **check run** is what actually unblocks the merge.
 
-After any substantive-review action (APPROVE-AND-PARK, AUTO_FIX_ONLY, MENTION_ONLY, FIX_AND_MENTION, ESCALATE), publish one check run on the current head:
+After any substantive-review action (APPROVE-AND-PARK, AUTO_FIX_ONLY, MENTION_ONLY, FIX_AND_MENTION, ESCALATE), **PATCH the in-progress check_run created in Phase 4** to `completed` with the appropriate conclusion and a final summary body. Use `check-progress.js`, which looks up the existing check_id from the per-sweep sidecar and PATCHes it (rather than POSTing a fresh check):
 
 ```bash
-node utilities/km-triage-app/bot-gh.js api -X POST \
-  repos/MattGyverLee/keyboard-studio/check-runs \
-  -f name='km-triage/review' \
-  -f head_sha='<CURRENT_HEAD_SHA>' \
-  -f status='completed' \
-  -f conclusion='<CONCLUSION_FROM_TABLE_BELOW>' \
-  -f 'output[title]=<one-line summary>' \
-  -f 'output[summary]=<markdown body — typically the same content posted as the FYI / @-mention / inbox-entry text>'
+FINAL_BODY=.tech-lead-inbox/runs/$KM_TRIAGE_SWEEP_ID-pr<NUM>-final.md
+cat > "$FINAL_BODY" <<EOF
+**km-triage completed.**
+
+Action: <APPROVE-AND-PARK|AUTO_FIX_ONLY|MENTION_ONLY|FIX_AND_MENTION|ESCALATE>
+
+<bulleted verdict list, same shape as Phase 5's summary>
+
+<one-paragraph human-facing description of what landed — auto-fix commit
+sha, comment URL, inbox-entry reference, etc. — same content as posted
+in the per-action comment or INBOX entry>
+
+Sweep id: \`$KM_TRIAGE_SWEEP_ID\`
+EOF
+node utilities/km-triage-app/check-progress.js \
+  --pr <NUM> --head <CURRENT_HEAD_SHA> \
+  --status completed \
+  --conclusion <CONCLUSION_FROM_TABLE_BELOW> \
+  --title "<one-line summary>" \
+  --summary-file "$FINAL_BODY"
 ```
 
 Conclusion mapping by action:
@@ -1083,13 +1095,22 @@ Conclusion mapping by action:
 | `FIX_AND_MENTION` | `action_required` | Both: auto-fixes landed AND lead has questions; gate stays blocked. |
 | `ESCALATE` | `action_required` | Specialist couldn't grade; lead must respond before merge can proceed. |
 
-Skip-action paths (Phase 2 skips like `draft`, `external_pr_not_in_scope`, `merge_conflict`, `ci_not_ready`, `no_new_commits_since_last_review`) do **not** publish a check. A skipped PR keeps whatever check (if any) was previously published on its current head; if none was ever published, the gate stays blocked, which is correct — skipped PRs were never reviewed.
+Then emit a `check-published` progress event so the dashboard records the conclusion (read the check_id back from the sidecar — `check-progress.js` writes it to `.tech-lead-inbox/runs/<sweep_id>-checks.json`):
 
-Record the published check's `id` and `conclusion` in the Phase-7 audit log for traceability.
+```bash
+node utilities/km-triage-app/progress-emit.js \
+  phase=check-published pr=<NUM> conclusion=<success|action_required> check_id=<id-from-sidecar> || true
+```
 
-**A note on stale checks**: a check_run is bound to a single SHA. When new commits land on a PR branch, GitHub treats the old check as orphaned (it shows in the rollup but doesn't satisfy the gate for the new head). The triage's incremental review (Pre-filter A) sees the new head and publishes a fresh check_run on the next sweep. This is the same lifecycle as any CI check.
+Skip-action paths (Phase 2 skips like `draft`, `external_pr_not_in_scope`, `merge_conflict`, `ci_not_ready`, `no_new_commits_since_last_review`) do **not** create or complete a check. A skipped PR keeps whatever check (if any) was previously published on its current head; if none was ever published, the gate stays blocked, which is correct — skipped PRs were never reviewed.
 
-**A note on auth**: every `bot-gh.js api -X POST ... /check-runs` call uses the bot token minted in Phase 1 — the App's `checks: write` permission scopes the call. The `integration_id` on the published check is implicitly the App's ID (3984948), which pins the check identity in the ruleset's required_status_checks list (no other App can spoof a `km-triage/review` check).
+Record the completed check's `id` and `conclusion` in the Phase-7 audit log for traceability.
+
+**A note on stale checks**: a check_run is bound to a single SHA. When new commits land on a PR branch (e.g. via auto-fix push in AUTO_FIX_ONLY / FIX_AND_MENTION), GitHub treats the old check as orphaned (it shows in the rollup but doesn't satisfy the gate for the new head). The triage's incremental review (Pre-filter A) sees the new head and the next sweep creates a fresh in-progress check via Phase 4's `check-progress.js` call. This is the same lifecycle as any CI check.
+
+**A note on Phase-4 / Phase-6 symmetry**: `check-progress.js` is idempotent within a sweep — Phase 4 creates the check (sidecar entry written), Phase 5 PATCHes it (sidecar entry reused), Phase 6 PATCHes it again with `--status completed --conclusion <X>`. If Phase 4's create call failed silently and the sidecar entry is missing, Phase 6 will fall back to a fresh POST (no patching to do), so the gate still gets unblocked — but the check will lack the in-progress history. Treat that as a soft warning condition; an `INBOX.md` note is appropriate but the sweep should not abort.
+
+**A note on auth**: every `check-progress.js` call goes through [utilities/km-triage-app/bot-gh.js](utilities/km-triage-app/bot-gh.js), which mints the bot token in-process. The App's `checks: write` permission scopes the call. The `integration_id` on the published check is implicitly the App's ID (3984948), which pins the check identity in the ruleset's required_status_checks list (no other App can spoof a `km-triage/review` check).
 
 ## Phase 7 — Audit log
 
