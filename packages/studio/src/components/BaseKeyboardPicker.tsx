@@ -1,16 +1,12 @@
 // Metadata-only picker — dropdown over BaseBrowserService.listAll().
 // No filter; CJK/Ethiopic guard lives in OSKFrame, not here.
-//
-// [SCAFFOLD] Uses localBaseBrowser (Vite dev plugin backed) as the
-// BaseBrowserService. Swap the import below to switch backends:
-//   import { mockBaseBrowser } from "@keyboard-studio/contracts/mocks";
-// or replace with the real engine service once it lands.
 
 import { useEffect, useState } from "react";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import { mockBaseBrowser } from "@keyboard-studio/contracts/mocks";
+// mockPatternLibrary (also from @keyboard-studio/contracts/mocks) serves the
+// gallery and survey routes once those land.
 import { localBaseBrowser } from "../lib/localBaseBrowser.ts";
-
-const baseBrowser = localBaseBrowser;
 
 export interface BaseKeyboardPickerProps {
   value: BaseKeyboard | null;
@@ -26,18 +22,30 @@ export function BaseKeyboardPicker({ value, onChange }: BaseKeyboardPickerProps)
     let cancelled = false;
     setLoading(true);
     setError(null);
-    baseBrowser.listAll().then(
+    // Try the Vite dev-plugin backed browser first; fall back to mock fixtures
+    // when the local API endpoint is unavailable (air-gapped runs, tests, CI).
+    localBaseBrowser.listAll().then(
       (list) => {
         if (cancelled) return;
         setKeyboards(list);
         setLoading(false);
       },
-      (err: unknown) => {
+      () => {
         if (cancelled) return;
-        const message = err instanceof Error ? err.message : String(err);
-        console.error("[BaseKeyboardPicker] listAll() failed:", err);
-        setError(message);
-        setLoading(false);
+        mockBaseBrowser.listAll().then(
+          (list) => {
+            if (cancelled) return;
+            setKeyboards(list);
+            setLoading(false);
+          },
+          (err: unknown) => {
+            if (cancelled) return;
+            const message = err instanceof Error ? err.message : String(err);
+            console.error("[BaseKeyboardPicker] listAll() failed:", err);
+            setError(message);
+            setLoading(false);
+          },
+        );
       },
     );
     return () => {

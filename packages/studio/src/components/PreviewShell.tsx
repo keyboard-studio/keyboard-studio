@@ -1,11 +1,11 @@
 // Two-pane preview shell — picker left, live OSK right.
 //
 // [SCAFFOLD] Left pane: currently a base-keyboard picker only. The full
-// survey UI (spec §4 / §8 Phase B) lands in issues #48–#49 and replaces
+// survey UI (spec §4 / §8 Phase B) is not yet implemented and will replace
 // this pane. The right pane (compile + KMW iframe preview) is the working
 // deliverable ported from studio-poc.
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
 import { OskModeToggle, type OskMode } from "./OskModeToggle.tsx";
@@ -129,34 +129,87 @@ function MetadataCard({ kb }: { kb: BaseKeyboard }) {
   );
 }
 
+const DIVIDER_WIDTH = 6;
+const LEFT_MIN_PCT = 20;
+const LEFT_MAX_PCT = 70;
+const LEFT_INIT_PCT = 40;
+
 export function PreviewShell() {
   const [baseKeyboard, setBaseKeyboard] = useState<BaseKeyboard | null>(null);
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
+  const [leftPct, setLeftPct] = useState(LEFT_INIT_PCT);
+  const [handleHovered, setHandleHovered] = useState(false);
+
+  // Track drag state in a ref so pointer-move handlers always see current values
+  // without triggering re-renders on every pixel.
+  const dragRef = useRef<{ startX: number; startPct: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    dragRef.current = { startX: e.clientX, startPct: leftPct };
+    document.addEventListener("pointermove", onPointerMove);
+    document.addEventListener("pointerup", onPointerUp);
+  // leftPct captured via dragRef; no lint dep needed for the document listeners
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leftPct]);
+
+  const onPointerMove = useCallback((e: PointerEvent) => {
+    if (dragRef.current === null || containerRef.current === null) return;
+    const containerW = containerRef.current.getBoundingClientRect().width;
+    if (containerW === 0) return;
+    const deltaPct = ((e.clientX - dragRef.current.startX) / containerW) * 100;
+    const next = Math.min(
+      LEFT_MAX_PCT,
+      Math.max(LEFT_MIN_PCT, dragRef.current.startPct + deltaPct),
+    );
+    setLeftPct(next);
+  }, []);
+
+  const onPointerUp = useCallback(() => {
+    dragRef.current = null;
+    document.removeEventListener("pointermove", onPointerMove);
+    document.removeEventListener("pointerup", onPointerUp);
+  }, [onPointerMove]);
+
+  // Clean up listeners if the component unmounts mid-drag.
+  useEffect(() => {
+    return () => {
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", onPointerUp);
+    };
+  }, [onPointerMove, onPointerUp]);
+
+  const rightPct = 100 - leftPct;
 
   return (
     <div
+      ref={containerRef}
       style={{
-        display: "grid",
-        gridTemplateColumns: "minmax(320px, 1fr) minmax(520px, 1.4fr)",
-        gap: 24,
-        height: "100vh",
-        width: "100vw",
-        padding: 24,
+        display: "flex",
+        flexDirection: "row",
+        height: "100%",
+        width: "100%",
         background: "#0d1117",
         color: "#e6edf3",
         fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-        boxSizing: "border-box",
+        overflow: "hidden",
       }}
     >
-      {/* [SCAFFOLD] Left pane: picker-only until survey UI (#48-#49) */}
+      {/* Left pane: picker-only until survey UI lands */}
       <section
         aria-label="Picker pane"
         style={{
+          flexBasis: `calc(${leftPct}% - ${DIVIDER_WIDTH / 2}px)`,
+          flexShrink: 0,
+          flexGrow: 0,
           display: "flex",
           flexDirection: "column",
           gap: 12,
           minHeight: 0,
           overflow: "auto",
+          padding: 24,
+          boxSizing: "border-box",
         }}
       >
         <h1 style={{ margin: 0, fontSize: "1.4rem", letterSpacing: "-0.01em" }}>
@@ -172,14 +225,38 @@ export function PreviewShell() {
         {baseKeyboard !== null ? <MetadataCard kb={baseKeyboard} /> : null}
       </section>
 
+      {/* Drag handle */}
+      <div
+        role="separator"
+        aria-label="Resize panes"
+        aria-orientation="vertical"
+        onPointerDown={onPointerDown}
+        onMouseEnter={() => setHandleHovered(true)}
+        onMouseLeave={() => setHandleHovered(false)}
+        style={{
+          width: DIVIDER_WIDTH,
+          flexShrink: 0,
+          background: handleHovered ? "#3d5070" : "#283040",
+          cursor: "col-resize",
+          userSelect: "none",
+          transition: "background 120ms ease",
+        }}
+      />
+
+      {/* Right pane: live OSK preview */}
       <section
         aria-label="Preview pane"
         style={{
+          flexBasis: `calc(${rightPct}% - ${DIVIDER_WIDTH / 2}px)`,
+          flexGrow: 1,
+          flexShrink: 0,
           display: "flex",
           flexDirection: "column",
           gap: 12,
           minHeight: 0,
           overflow: "auto",
+          padding: 24,
+          boxSizing: "border-box",
         }}
       >
         <div
