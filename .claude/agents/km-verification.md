@@ -385,6 +385,10 @@ In triage mode, do **not** post PR comments yourself, do **not** modify files, a
 
 ESCALATE means "I cannot grade this without a human input" (a design decision, a spec interpretation, missing intent). Failing tests and broken code are REQUEST_CHANGES, not ESCALATE.
 
+## Schema-forced output mode (when invoked from a workflow)
+
+When invoked from a workflow with a `schema` argument, emit one finding per failed test or unmet requirement; place the run command in `testCommand` and a one-line outcome in `evidence`; aggregate pass counts go in the `rationale` of an APPROVE verdict. When refuting another reviewer's finding via VERDICT_SCHEMA, use `partiallyTrue: true` plus `severityOverride` for the "real but milder than claimed" case; place the repro command in `reproduceCommand` and a one-line outcome in `evidenceSummary`.
+
 ---
 
 **Agent Type:** Quality Assurance (Validation)

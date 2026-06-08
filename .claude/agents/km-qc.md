@@ -239,6 +239,10 @@ The **Pattern-Audit Gate** above still applies in triage mode. If the PR is a bu
 
 In triage mode, do **not** post PR comments yourself, do **not** modify files. Read the diff, score the four sections internally, and return a verdict.
 
+## Schema-forced output mode (when invoked from a workflow)
+
+When invoked from a workflow with a `schema` argument, emit the Pattern-Audit Gate result as a finding with `gateId: 'pattern-audit'` and `severity: 'critical'` if the gate fires (missing audit section on a shaped bugfix); this finding must appear as the first item in `findings` so synthesis sees it immediately. Emit the aggregate quality score as the top-level `qualityScore` field (0-100) in the FINDINGS_SCHEMA envelope — this is a top-level property, not inside any individual finding.
+
 ---
 
 **Agent Type:** Quality Assurance (Standards)  

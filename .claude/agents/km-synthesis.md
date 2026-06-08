@@ -122,6 +122,10 @@ Map your normal verdicts to triage statuses:
 
 In triage mode, do **not** post PR comments yourself, do **not** modify files. Return a verdict.
 
+## Schema-forced output mode (when invoked from a workflow)
+
+When invoked from a workflow with a `schema` argument, set `findingKind` on every finding: use `'integration'` for fit/coherence findings (the new code does not align with existing patterns or module boundaries), `'duplication'` for redundant code (also set `existingFile` to the path that already implements this), `'extraction'` for opportunities to factor out a shared helper (also set `proposedTarget` to where that helper should land). `'general'` is the catch-all for findings that don't fall into the above three categories.
+
 ---
 
 **Last Updated:** 2026-06-03
