@@ -1,10 +1,4 @@
-// km-review.js — Workflow v2
-// Runs the six-specialist review pipeline for a keyboard-studio PR.
-// The main session retains: auto-fix decision, check_run publish, @-mention.
-
-// Rule 1: meta MUST be a pure literal — no variables, calls, spreads, or
-// template expressions. Required fields: name, description.
-const meta = {
+export const meta = {
   name: "km-review",
   description:
     "Six-specialist PR review pipeline for keyboard-studio. Returns per-reviewer findings, km-verification verdicts on each finding, and a synthesis verdict. Does NOT merge, push, or post GitHub comments — those stay in the main session.",
@@ -143,9 +137,13 @@ const SYNTHESIS_SCHEMA = {
 // Reviewer roster
 // ---------------------------------------------------------------------------
 
-// Six specialists. agentType values match the `name:` field in each
-// .claude/agents/km-*.md file — that's the registry the Agent tool uses
-// (contract rule 4: "Resolved from the same registry as the Agent tool").
+// Four primary reviewers. km-verification and km-synthesis are intentionally
+// omitted from this roster — they each have downstream roles (universal
+// skeptic on every finding; final aggregator) and reviewing as primaries
+// would let them self-review their own findings. Self-review was flagged as
+// a structural role-conflict in the v2 smoke-test self-audit on PR #197.
+// agentType values match the `name:` field in each .claude/agents/km-*.md
+// file — the registry the Agent tool uses (contract rule 4).
 const REVIEWERS = [
   {
     key: "keyman",
@@ -154,22 +152,10 @@ const REVIEWERS = [
       "Keyman / .kmn / kmcmplib semantics. Validate Pattern schema fields, Layer-A compiler checks, kmnFragment correctness, and keyboards/<id>/ output layout.",
   },
   {
-    key: "verification",
-    agentType: "km-verification",
-    lens:
-      "Test-run and evidence production. Run vitest / Playwright where applicable; confirm the change does what it claims.",
-  },
-  {
-    key: "synthesis",
-    agentType: "km-synthesis",
-    lens:
-      "Integration fit. Flag duplication of existing utilities/types, extraction opportunities, and deviation from established codebase patterns.",
-  },
-  {
     key: "strategy",
     agentType: "km-strategy",
     lens:
-      "Spec §7 strategy framework: A1-A7 axes, decision tree, S-01..S-12 catalog, §7.5 self-check. Validate Pattern.strategyId / combinesWith linkage.",
+      "Spec §7 strategy framework: A1-A7 axes, decision tree, S-01..S-13 catalog, §7.5 self-check. Validate Pattern.strategyId / combinesWith linkage.",
   },
   {
     key: "qc",
@@ -202,6 +188,12 @@ Steps:
 2. Read any files in the diff that fall within your domain.
 3. Apply your normal review process per .claude/agents/${reviewer.agentType}.md.
 4. Return a structured findings object matching the schema you will be given.
+
+SCOPE DISCIPLINE — only review what THIS PR changes:
+- Review only files modified in the PR diff (\`gh pr diff ${prNumber}\` output).
+- Do NOT follow links, references, or imports out of the diff into other files unless that other file is ALSO in the diff. If a docs change adds a link to file X and X is not in the diff, do not review X — flag it as out-of-scope context only.
+- Pre-existing defects in unchanged files are NOT this PR's responsibility. Mention them only as a single advisory finding ("pre-existing: ...", severity: nit) at most, and only if directly relevant to the diff.
+- Your job is to gate THIS PR, not to audit the codebase.
    - verdict: APPROVE if no actionable findings; REQUEST_CHANGES if specific issues exist; NEEDS_HUMAN_INPUT if a design call or spec ambiguity blocks you.
    - Every finding MUST include title, severity, and rationale. Include file/line when locatable. The 'file' field is OPTIONAL — omit it when a finding implicates a cross-section coherence issue, a linguistic premise, or a spec-level concern with no single source file.
    - Set autoFixable: true only when the fix is mechanical and unambiguous (rename, remove line, single codepoint swap).
@@ -293,7 +285,7 @@ async function reviewStage(_, reviewer, _index) {
   // P0-4: wrap in try/catch so a thrown reviewer returns an error envelope
   // rather than null — synthesis can see WHY a slot is empty.
   try {
-    const result = await agent(reviewPrompt(reviewer, args.prNumber, args.depth), {
+    const result = await agent(reviewPrompt(reviewer, prNumber, depth), {
       agentType: reviewer.agentType,
       label: `Review: ${reviewer.key}`,
       phase: "Review",
@@ -349,7 +341,7 @@ async function verifyStage(reviewerEnvelope, reviewer, _index) {
     reviewerEnvelope.result.findings.map((finding, fi) => async () => {
       try {
         const verdict = await agent(
-          verifyPrompt(finding, args.prNumber, reviewer.key),
+          verifyPrompt(finding, prNumber, reviewer.key),
           {
             agentType: "km-verification",
             // NOTE: vary label by index rather than Math.random() (rule 2 bans
@@ -388,9 +380,26 @@ async function verifyStage(reviewerEnvelope, reviewer, _index) {
 // ---------------------------------------------------------------------------
 
 // Required-arg guard — prNumber must be supplied.
-const { prNumber, depth = "thorough" } = args ?? {};
+// Workflow runtime may pass args as a parsed object, a JSON string, or even
+// a double-JSON-encoded string. Decode repeatedly until we hit a non-string.
+let parsedArgs = args;
+let decodeRounds = 0;
+while (typeof parsedArgs === "string" && decodeRounds < 3) {
+  try {
+    parsedArgs = JSON.parse(parsedArgs);
+  } catch {
+    break;
+  }
+  decodeRounds++;
+}
+parsedArgs = parsedArgs ?? {};
+const { prNumber, depth = "thorough" } = parsedArgs;
 if (!prNumber) {
-  throw new Error("km-review requires args.prNumber (PR number to review).");
+  throw new Error(
+    `km-review requires args.prNumber. typeof args=${typeof args}, ` +
+    `args=${JSON.stringify(args)}, decodeRounds=${decodeRounds}, ` +
+    `parsedArgs=${JSON.stringify(parsedArgs)}`
+  );
 }
 
 // Run the review + verify pipeline across all six reviewers.
