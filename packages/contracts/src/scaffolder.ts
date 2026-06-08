@@ -41,8 +41,11 @@ export interface ScaffoldOptions {
  *   - Touch-layout cleanup: blank or base-only touch-layout entries cleared.
  *
  * The output virtual FS is clean-by-construction before the user touches
- * anything; Layer C hygiene (§10) runs immediately after scaffolding to
- * confirm all band-1 criteria are satisfied (§14, Decision 4).
+ * anything: band-1 (scaffolder-bake) criteria from §14 Decision 4 are made
+ * structurally impossible by the template-cleanup pipeline, so they cannot
+ * exist in the returned VirtualFS. Band-2 (layer-c-enforce) criteria are the
+ * lint engine's concern and run on the 300 ms debounce cycle after scaffold
+ * returns.
  *
  * @see spec.md §11
  * @see spec.md §8 step 2 (scaffolding is pipeline step 2)
@@ -87,11 +90,14 @@ export interface ScaffolderService {
    *   user-confirmation step explicitly chose a routing different from the
    *   auto-detected one (e.g. user picks AZERTY when base.script suggests
    *   QWERTY/QWERTZ — spec §9).
-   * @returns A fully scaffolded, Layer-C-clean virtual FS ready for
-   *   Phase B of the survey.
+   * @returns A fully scaffolded virtual FS with all band-1 (scaffolder-bake,
+   *   §14 Decision 4) criteria satisfied by construction. Band-2
+   *   (layer-c-enforce) criteria are validated separately by the lint engine
+   *   on the first debounce cycle after scaffold returns.
    * @see spec.md §11
    * @see spec.md §8 step 2
    * @see spec.md §9 (Three-group routing)
+   * @see spec.md §14 Decision 4 (band-1 vs band-2 enforcement split)
    */
   scaffold(
     base: BaseKeyboard,
