@@ -30,7 +30,8 @@ export function BaseKeyboardPicker({ value, onChange }: BaseKeyboardPickerProps)
         setKeyboards(list);
         setLoading(false);
       },
-      () => {
+      (err: unknown) => {
+        console.warn('[BaseKeyboardPicker] localBaseBrowser unavailable, falling back to mock:', err);
         if (cancelled) return;
         mockBaseBrowser.listAll().then(
           (list) => {

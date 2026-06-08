@@ -7,7 +7,7 @@
 //   #preview              — compiled preview (stub; not yet implemented)
 //   #output               — output / delivery (stub; not yet implemented)
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { PreviewShell } from "./components/PreviewShell.tsx";
 
 // ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ function NavBar({ active }: NavBarProps) {
 export function StudioShell() {
   const route = useRoute();
 
-  let content: React.ReactNode;
+  let content: ReactNode;
   switch (route) {
     case "pick-base":
       content = <PreviewShell />;
