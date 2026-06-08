@@ -893,6 +893,13 @@ Body:
 The next triage sweep will re-review the updated PR.
 ```
 
+Then emit an `auto-fix` progress event so the dashboard records the push:
+
+```bash
+node utilities/km-triage-app/progress-emit.js \
+  phase=auto-fix pr=<NUM> applied=<N> commit_sha=<new-head-sha> || true
+```
+
 When `km-programmer` returns ESCALATE (a fix failed to apply, or a check broke), treat the PR as if the action were MENTION_ONLY: post an @-mention comment listing the failed-to-apply fixes alongside their original specialist findings (use the same `node utilities/km-triage-app/bot-gh.js pr comment` pattern as MENTION_ONLY below), and add a follow-up audit-log entry with `action_taken: auto_fix_attempt_failed`.
 
 ### Action: MENTION_ONLY (Phase 5.5 outcome)
@@ -928,6 +935,13 @@ Then label:
 node utilities/km-triage-app/bot-gh.js api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=tech-lead-review-needed"
 ```
 
+Then emit a `mention` progress event so the dashboard records the @-mention (use the same `directed_by` / `channel` values computed in Phase 3.5):
+
+```bash
+node utilities/km-triage-app/progress-emit.js \
+  phase=mention pr=<NUM> comment_url=<comment_url> directed_by=<directed_by> channel=<desktop|web|unknown> || true
+```
+
 ### Action: FIX_AND_MENTION (Phase 5.5 outcome)
 
 Both paths run. First dispatch km-programmer per AUTO_FIX_ONLY above and wait for the result. Then post a single combined comment (same `node utilities/km-triage-app/bot-gh.js pr comment <NUM> --body-file <combined-body.md>` pattern as MENTION_ONLY):
@@ -950,6 +964,15 @@ Reply on this PR with your decision and the next sweep will continue from there.
 ```
 
 Apply the same @-mention dedup and email-to-handle conversion rules as MENTION_ONLY. Label `tech-lead-review-needed`.
+
+Then emit both an `auto-fix` event (for the commit km-programmer landed) and a `mention` event (for the @-mention comment), in that order:
+
+```bash
+node utilities/km-triage-app/progress-emit.js \
+  phase=auto-fix pr=<NUM> applied=<N> commit_sha=<new-head-sha> || true
+node utilities/km-triage-app/progress-emit.js \
+  phase=mention pr=<NUM> comment_url=<comment_url> directed_by=<directed_by> channel=<desktop|web|unknown> || true
+```
 
 ### Action: ESCALATE (Phase 5 outcome — pure escalation, no REQUEST_CHANGES partition)
 
