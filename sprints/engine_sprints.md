@@ -4,7 +4,7 @@
 **Cadence:** Biweekly sprints
 **Milestone IDs:** KS-S1 through KS-S7
 
-**Status key:** *unassigned* · *started by @username* · *done*
+**Status key:** *unassigned* · *in progress by @username* · *in PR #NNN by @username* · *done*
 
 ---
 

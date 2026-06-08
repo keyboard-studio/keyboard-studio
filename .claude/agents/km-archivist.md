@@ -147,15 +147,17 @@ When asked "when did X change?" or "why does Y exist?":
 
 ### Phase 5: Sprint Status Tracking
 
-When an issue is picked up or completed, update the relevant sprint file (`sprints/engine_sprints.md` or `sprints/content_sprints.md`) to reflect its current status. Every issue line carries one of three markers:
+When an issue is picked up or completed, update the relevant sprint file (`sprints/engine_sprints.md` or `sprints/content_sprints.md`) to reflect its current status. Every issue line carries one of four markers:
 
 - `— *unassigned*` — no one has started it yet
-- `— *started by @username*` — someone has self-assigned it (update when a GitHub assignee appears)
+- `— *in progress by @username*` — someone is actively working it (update when a GitHub assignee appears)
+- `— *in PR #NNN by @username*` — code done, PR open and awaiting review
 - `— *done*` — the issue is closed or all acceptance criteria are checked
 
 **When to update:**
 - When a PR is merged that closes an issue → change to `*done*`
-- When someone assigns an issue to themselves on GitHub → change to `*started by @username*`
+- When a PR is opened for an issue → change to `*in PR #NNN by @username*`
+- When someone assigns an issue to themselves on GitHub → change to `*in progress by @username*`
 - When an issue is unassigned again → revert to `*unassigned*`
 
 Always commit sprint file updates alongside the relevant code commit or PR merge — not in a separate unrelated commit. Use `docs(process): update sprint status for #N` as the commit prefix when the only change is a status update.
@@ -368,8 +370,8 @@ Two teams own `MattGyverLee/keyboard-studio`:
 
 | Team | Lead | Members | Owns |
 |---|---|---|---|
-| Engine | @MattGyverLee (Matthew Lee) | @gboltono (Grace Bolton), @coopabla (Cooper Abla), @myczka (Jordan Myczka) | SPA, scaffolder, compiler service, validator packages, output paths |
-| Content | @dhigby (Doug Higby) | — | Pattern library, survey text, gallery ordering, LLM prompts, criteria.md |
+| Engine | @MattGyverLee (Matthew Lee) | @gboltono (Grace Bolton) | SPA, scaffolder, compiler service, validator packages, output paths |
+| Content | @dhigby (Doug Higby) | @KevinPNG, @coopabla (Cooper Abla), @myczka (Jordan Myczka) | Pattern library, survey text, gallery ordering, LLM prompts, criteria.md |
 
 Issues that span both teams carry the `shared` label.
 

@@ -4,14 +4,14 @@
 **Cadence:** Biweekly sprints
 **Milestone IDs:** KS-S1 through KS-S6
 
-**Status key:** *unassigned* · *started by @username* · *done*
+**Status key:** *unassigned* · *in progress by @username* · *in PR #NNN by @username* · *done*
 
 ---
 
 ## Sprint 1 — KS-S1: Foundation + first patterns
 
-**#56** `docs(keyboards): Finalize content/scan_report.md durable corpus writeup` — *narrative drafted in S1 (PR #181); final close moved to KS-S4*
-The narrative shipped early as the foundational reference. Two acceptance criteria can't close until the pattern catalog is complete (full C-5..C-21 links) and a human Content-team review lands, so the issue now sits in KS-S4 — see Sprint 4.
+**#56** `docs(keyboards): Finalize content/scan_report.md durable corpus writeup` — *done*
+Narrative shipped (PR #181 by @coopabla). Pattern-YAML links spun off to #212 (blocked on KS-S3 catalog completion).
 
 **#40** `feat(patterns): Reorder pattern: nfd-latin (auto-applied canonical skeleton)` — *started by @coopabla*
 Priority-1 reorder. Auto-applied to all Latin-script keyboards with diacritics; simplest entry, good warmup.
@@ -58,8 +58,8 @@ Priority-3. Tone marks in canonical position regardless of typed order (Thai, La
 
 ## Sprint 4 — KS-S4: Inventory atlas + criteria re-review
 
-**#56** `docs(keyboards): Finalize content/scan_report.md durable corpus writeup` — *narrative shipped (PR #181); awaiting final close*
-Moved from KS-S1. The narrative is written and merged-ready; closing it needs the two remaining ACs: complete the pattern-YAML links once all patterns land (the last, #43 tone-mark-canonicalization, finishes in KS-S3) and a human Content-team review. Revisit the final checkbox here, after the pattern catalog is complete.
+**#56** `docs(keyboards): Finalize content/scan_report.md durable corpus writeup` — *done*
+Narrative shipped (PR #181 by @coopabla). Pattern-YAML links tracked separately in #212 — revisit after KS-S3 closes.
 
 **#50** `feat(keyboards): Inventory atlas — diacritic sets and add-on letters per group` — *unassigned*
 Build the reference inventories Phase B draws from: per-group diacritic catalogs, special letters, punctuation with Unicode codepoints and example languages. Phase B flow (#51) is blocked on this.
