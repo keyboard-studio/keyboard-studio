@@ -56,26 +56,7 @@ claude -p "/km-triage"
 
 Inspect `.tech-lead-inbox/INBOX.md` and `.tech-lead-inbox/audit-log.jsonl` after each run.
 
-Once you're happy with the output, register a scheduled task. Save this as `scripts/triage-windows.ps1`:
-
-```powershell
-# scripts/triage-windows.ps1 — run /km-triage from Task Scheduler
-$ErrorActionPreference = "Stop"
-Set-Location "D:\Github\_Projects\_KM\keyboard-studio"
-
-# Refresh main so the command sees the latest crew and command defs
-git fetch origin main --quiet
-git checkout main --quiet
-git pull --ff-only --quiet
-
-# Run the triage; output goes to a timestamped log under .tech-lead-inbox/runs/
-$stamp = Get-Date -Format "yyyy-MM-dd-HHmm"
-$log = ".tech-lead-inbox\runs\$stamp.log"
-New-Item -ItemType Directory -Force -Path ".tech-lead-inbox\runs" | Out-Null
-
-# claude.exe is on PATH after install; verify with `where.exe claude` if needed
-claude -p "/km-triage" --dangerously-skip-permissions --output-format text *> $log
-```
+Once you're happy with the output, register a scheduled task. Point it at `scripts/triage-windows.ps1` (already in the repo). The script fetches latest `main`, runs `/km-triage`, and re-runs up to 3 times within the same tick when an auto-fix action is detected (bounded by `$maxIterations` and a `$sleepBetweenSec`-second sleep between iterations). See the file itself for the configurable constants.
 
 Then register it (PowerShell, as the tech lead's user — **not** elevated):
 
