@@ -13,6 +13,7 @@
 3. [Target user](#3-target-user)
 4. [System overview](#4-system-overview)
 5. [Pattern schema](#5-pattern-schema)
+5a. [KeyboardIR (keyboard intermediate representation)](#5a-keyboardir-keyboard-intermediate-representation)
 6. [Worked example](#6-worked-example)
 7. [Strategy selection](#7-strategy-selection)
 8. [Data flow](#8-data-flow)
@@ -32,15 +33,19 @@
 
 ## 1. Elevator pitch
 
+*Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
+
 **Problem.** Language experts who want to submit a keyboard to `keymanapp/keyboards` must either learn `.kmn` syntax themselves or find a Keyman Developer-fluent collaborator. Most language workers cannot ship without external help; keyboard repository reviewers spend significant time correcting the same mechanical hygiene mistakes across dozens of PRs.
 
-**Solution.** Keyboard-Studio is a browser-based authoring environment that lets language experts — people who know their language's phonology, orthography, and character inventory but have never written a Keyman keyboard — create production-ready Keyman keyboards without touching `.kmn` syntax. Users answer plain-language questions and choose from live-demoed interaction patterns. The system compiles in-browser in 100-300 ms per edit using the existing `kmcmplib` WebAssembly (WASM) binary, validates every emission against a real language-aware lint engine, scaffolds a touch layout automatically from desktop rules, and enforces all mechanical criteria by construction.
+**Solution.** Keyboard-Studio is a browser-based authoring environment that lets language experts — people who know their language's phonology, orthography, and character inventory but have never written a Keyman keyboard — produce production-ready Keyman keyboards without touching `.kmn` syntax. Every session adapts a **single** base keyboard: the US-English fallback (the default when the user has no existing layout to start from), any `release/basic/` layout, any other `keymanapp/keyboards/release/` keyboard (e.g. a country keyboard the user wants to subset for one language), or an uploaded `.kmn`. Users answer plain-language questions, carve away rules they do not want from the imported base, and choose from live-demoed interaction patterns to add new behaviour. The system compiles in-browser in 100-300 ms per edit using the existing `kmcmplib` WebAssembly (WASM) binary, validates every emission against a real language-aware lint engine, scaffolds a touch layout automatically from desktop rules, and enforces all mechanical criteria by construction.
 
 **Delivery.** A finished keyboard is delivered either as a downloadable `.zip` or via GitHub Open Authorization (OAuth) fork-and-draft-PR directly to `keymanapp/keyboards`.
 
 ---
 
 ## 2. Why this exists
+
+*Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
 
 Language experts who want to submit a keyboard to `keymanapp/keyboards` today face every one of these barriers:
 
@@ -49,12 +54,15 @@ Language experts who want to submit a keyboard to `keymanapp/keyboards` today fa
 - Generating a touch layout from desktop rules is a manual, error-prone step.
 - Satisfying the ~200 PR-review criteria in `criteria.md` requires both domain knowledge and Keyman-specific familiarity.
 - In practice, reviewers silently fix the same hygiene mistakes across dozens of PRs: missing `usealtgr` tag, wrong `Copyright ©` syntax, `NCAPS` leftovers, blank `.kvks`, `welcome.htm`/`.php` body drift.
+- Existing keyboards in `release/` cannot be adapted without re-authoring by hand: a maintainer who wants to take a multilingual country keyboard (e.g. `cm_qwerty`) and ship a monolingual subset for one language has no path short of hand-editing `.kmn`. Original authors updating their own keyboards face the same friction.
 
-Keyboard-Studio removes every mechanical barrier: the scaffolder enforces all green criteria by construction, the survey surfaces yellow criteria in plain language, and the validator blocks invalid output before it ever reaches the compiler.
+Keyboard-Studio removes every mechanical barrier: the scaffolder enforces all green criteria by construction, the survey surfaces yellow criteria in plain language, and the validator blocks invalid output before it ever reaches the compiler. The same machinery serves authors adapting an existing keyboard: the studio parses the chosen `.kmn` into a typed in-memory representation, lets the author carve unwanted rules away and add new ones through the same survey, and re-emits a functionally-equivalent `.kmn`.
 
 ---
 
 ## 3. Target user
+
+*Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
 
 A **language expert, not a keyboard developer.** They understand phonology, orthography, casing rules, diacritic stacking behavior, and the characters their language needs. They do not have a mental model of what a deadkey, longpress menu, rota, multitap, or flick is as a keyboard implementation — even if they intuitively recognize the behaviors when demonstrated.
 
@@ -70,22 +78,42 @@ What they do not have:
 
 The studio teaches keyboard interaction patterns through live mini-keyboards the user can tap and type into, translating their linguistic intent into validated KMN rules.
 
+A secondary user-mode the studio explicitly supports: an **adapting author** who is starting from an existing `release/` keyboard rather than from the US-English base. They may be a community member taking a country-wide keyboard down to a single language, or an original author returning to update their own keyboard. They have the same linguistic knowledge as the primary user; what they additionally have is an existing `.kmn` they want to keep most of. The studio's import path treats this case as the same authoring flow — only the source of the initial in-memory project differs.
+
 ---
 
 ## 4. System overview
 
+*Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
+
 ```
 keyboard-studio
 |
-+-- base-keyboard browser      [engine]   GitHub API client; filters keymanapp/keyboards/release/;
-|                                         offline fallback US-English bundle.
++-- source selection           [engine]   Picks ONE source: US-English fallback (default),
+|                                         release/basic/* layout, any release/ keyboard, or
+|                                         user-uploaded .kmn. No multi-keyboard merge.
 |
-+-- project scaffolder         [engine]   Duplicates base into virtual FS (see Glossary); applies
-|                                         template-cleanup pipeline (NCAPS strip, [CAPS] deletion,
-|                                         &CasedKeys insertion, touch-layout cleanup); enforces
-|                                         identity propagation (plain-language: resets keyboard
-|                                         name, BCP47 tag, copyright, and version to match the
-|                                         new keyboard being authored).
++-- KeyboardIR codec           [engine]   Parses the chosen .kmn (+ .kvks, .keyman-touch-layout)
+|                                         into the typed KeyboardIR (§5a). Emits IR back to
+|                                         .kmn at output time. Round-trip is functional-equivalence
+|                                         verified (D7, §14).
+|
++-- pattern recognizer         [engine/content]
+|                                         Walks the imported IR and lifts node clusters matching
+|                                         content-curated recognizer rules into Pattern instances
+|                                         (origin: 'recognized'). Lifted nodes become
+|                                         survey-editable; unlifted nodes stay opaque (D8).
+|
++-- carve gallery              [engine]   Renders the IR as a card view: every rule, store, group,
+|                                         touch key, and recognized Pattern is a card the author can
+|                                         keep, edit (if survey-editable), or delete. Carve operations
+|                                         mutate the IR in place.
+|
++-- project scaffolder         [engine]   Applies identity propagation (keyboard name, BCP47 tag,
+|                                         copyright, version) to the IR; runs template-cleanup over
+|                                         the IR (NCAPS strip, [CAPS] deletion, &CasedKeys insertion,
+|                                         touch-layout cleanup); enforces clean-by-construction
+|                                         before the authoring engine sees the project.
 |
 +-- authoring engine           [engine/content]
 |   +-- survey                            Eight-phase branching questionnaire (A, B, C, C-prime, D, E, F, G — see §8); LLM maps answers to
@@ -113,6 +141,8 @@ keyboard-studio
 +-- validator / lint engine    [engine]   Three layers: Layer A validity (TS + WASM oracle),
 |                                         Layer B style (TS AST rules), Layer C hygiene (criteria.md).
 |                                         Packaged as @keymanapp/kmn-validator + @keymanapp/keyboard-lint.
+|                                         Also includes the new Layer A' import-fidelity checks I1-I5
+|                                         (§10) that run on every codec parse and on output emission.
 |
 +-- compiler service (WASM)    [engine]   kmcmplib loaded once; warm recompile 100-300 ms; produces
 |                                         .kmx + .kvk + .js + .keyman-touch-layout blob URLs.
@@ -125,7 +155,11 @@ keyboard-studio
 
 ## 5. Pattern schema
 
+*Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
+
 This schema is the Day-1 contract. Any change to field names or types requires a joint session (issue #5). Breaking changes to the `Pattern` interface require a major version bump (see Sec 18). The optional `strategyId` and `combinesWith` fields are **proposed** additions that link each pattern to the strategy catalog (Sec 7); they are non-breaking (optional) but, per the same policy, are not locked until the Day-1 #5 session ratifies them.
+
+The optional `origin` and `ownedNodes` fields are non-breaking additions that link a Pattern instance back to the imported IR it was lifted from; see §5a. They are ratified in the same Day-1 #5 session that ratifies `strategyId` / `combinesWith`.
 
 ```ts
 /** Canonical Pattern schema — packages/contracts/src/pattern.ts */
@@ -201,6 +235,27 @@ export interface Pattern {
    * @see Sec 7.2 — `StrategyRecommendation.secondaries` (axis-conditional)
    */
   combinesWith?: StrategyId[];
+  /**
+   * Where this Pattern instance came from.
+   *   'survey'      — author selected it from the gallery (existing v1 behaviour).
+   *   'imported'    — round-tripped as opaque IR; not survey-editable in v1
+   *                   (rendered in the carve gallery as a deletable card).
+   *   'recognized'  — the pattern recognizer lifted node clusters from an
+   *                   imported IR into this Pattern instance; survey-editable
+   *                   via the standard {{slotId}} substitution flow.
+   * Default: 'survey' (omitted means survey-originated).
+   */
+  origin?: "survey" | "imported" | "recognized";
+  /**
+   * IR nodes this Pattern owns. Populated by the pattern recognizer for
+   * origin='recognized' patterns; back-references let the emitter know
+   * which IR nodes to overwrite when the survey edits a slot, and let the
+   * carve gallery know which IR cards to suppress (because they are
+   * already represented by their parent Pattern card).
+   * Empty/omitted for origin='survey'.
+   * @see §5a KeyboardIR — IRNodeRef
+   */
+  ownedNodes?: IRNodeRef[];
   /** Survey questions that fill the named slots in kmnFragment. */
   questions: PatternQuestion[];
   /**
@@ -258,6 +313,125 @@ export interface Pattern {
 `StrategyId` is the union `'S-01' | 'S-02' | ... | 'S-12'` exported from `@keyboard-studio/contracts`; see §7.3 for the strategy catalog.
 
 **`appliesTo` semantics.** An empty array (`[]`) means the pattern is unrestricted and will be offered to all script groups. A non-empty array lists BCP47 script subtags (e.g. `"Latn"`, `"Deva"`) or base-keyboard IDs; the pattern is then offered only to projects matching at least one listed value.
+
+---
+
+## 5a. KeyboardIR (keyboard intermediate representation)
+
+*Added 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
+
+KeyboardIR is the typed, in-memory representation of a single Keyman keyboard — a lossless model of a `.kmn` plus its sibling `.kvks` and `.keyman-touch-layout` files. **Once a project exists in the studio, the IR is the source of truth (decision D9):** the survey, carve gallery, validator, and scaffolder all read and mutate the IR; the emitter renders the final `.kmn` from the IR; no original-source text round-trips through the rest of the pipeline. The original `.kmn` (for imports beyond the US-English fallback) is preserved as a `<id>.kmn.imported` sidecar for reviewer diff — included in the `.zip` and OAuth working tree but **excluded from the PR commit** itself (§12).
+
+The IR's schema is locked alongside the Pattern schema at the Day-1 #5 joint session; field renames, type changes, and removals are major version bumps of `packages/contracts` per the policy in §18.
+
+```ts
+/** packages/contracts/src/keyboard-ir.ts — sketch; full types live in the contracts package */
+
+export type IROrigin = "scaffolded" | "imported" | "synthesized";
+
+export interface IRNodeRef {
+  kind: "rule" | "store" | "group" | "touchKey" | "kvksKey" | "comment" | "raw";
+  nodeId: string;
+}
+
+export interface IRHeader {
+  keyboardId: string;
+  name: string;
+  bcp47: string[];
+  copyright: string;
+  version: string;
+  targets: string[];
+  storeDirectives: StoreItem[];
+}
+
+export interface IRStore {
+  nodeId: string;
+  name: string;
+  items: StoreItem[];
+  isSystem: boolean;
+}
+
+export interface IRGroup {
+  nodeId: string;
+  name: string;
+  usingKeys: boolean;
+  rules: IRRule[];
+  readonly: boolean;
+}
+
+export interface IRRule {
+  nodeId: string;
+  context: ContextElement[];
+  output: OutputElement[];
+  trailingComment?: string;
+  ownedByPattern?: string;
+}
+
+export interface IRComment {
+  nodeId: string;
+  text: string;
+  anchor: "leading" | "trailing" | "freestanding";
+  anchorRef?: IRNodeRef;
+}
+
+export interface RawKmnFragment {
+  nodeId: string;
+  origin: "imported";
+  sourceText: string;
+  reason: string;
+}
+
+export interface TouchLayoutIR {
+  layers: Array<{ id: string; rows: Array<{ keys: TouchKeyIR[] }> }>;
+  nodeIds: Map<string, IRNodeRef>;
+}
+
+export interface KvksIR {
+  layers: Array<{ shift: string; keys: Array<{ vkey: string; output: string }> }>;
+  usealtgr: boolean;
+  nodeIds: Map<string, IRNodeRef>;
+}
+
+export interface KeyboardIR {
+  origin: IROrigin;
+  header: IRHeader;
+  stores: IRStore[];
+  groups: IRGroup[];
+  comments: IRComment[];
+  raw: RawKmnFragment[];
+  touchLayout?: TouchLayoutIR;
+  visualKeyboard?: KvksIR;
+  recognizedPatterns: Pattern[];
+}
+
+export enum ImportStatus {
+  Clean = "clean",
+  CleanWithOpaque = "clean-with-opaque",
+  ParseFailure = "parse-failure",
+  RoundTripDivergence = "round-trip-divergence",
+}
+
+export interface ImportReport {
+  keyboardId: string;
+  status: ImportStatus;
+  parseErrors: string[];
+  opaqueFeatureInventory: Array<{ feature: string; count: number }>;
+  recognizedRatio: number;
+  roundTripDiff?: RoundTripDiff;
+}
+```
+
+Detailed types — `ContextElement`, `OutputElement`, `KeyChord`, `StoreItem`, `TouchKeyIR`, `RoundTripDiff` — live in `packages/contracts/src/keyboard-ir.ts` alongside the sketch above.
+
+**Functional-equivalence round-trip (D7).** Two IRs are equivalent when, for every input in a bounded enumeration corpus (every virtual key x every modifier combination x deadkey paths up to depth 3), the WASM oracle produces the same output character sequence from both. Byte-identity of emitted `.kmn` is not required; the emitter is free to canonicalize whitespace, store ordering, comment placement, and codepoint formatting.
+
+**Sources of an IR.** A KeyboardIR is produced from exactly one of four sources, each routed through the same downstream pipeline:
+1. The bundled US-English fallback (default when the author has no preference).
+2. A `release/basic/*` layout chosen from the source-selection browser.
+3. Any other `keymanapp/keyboards/release/` keyboard chosen from the browser (e.g. adapting `cm_qwerty` for one Cameroonian language).
+4. A user-uploaded `.kmn` (plus optional sibling `.kvks` / `.keyman-touch-layout`).
+
+v1 ships single-source adaptation only — there is no path that combines IRs from two source keyboards. An author adapting Bafut from three overlapping country keyboards picks the closest single one and carves it down.
 
 ---
 
@@ -355,6 +529,8 @@ Substitution is deterministic and reproducible: given the same answer map, the s
 
 ## 7. Strategy selection
 
+*Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
+
 Character coverage is **not** "simple substitution." Choosing how a character is output — a bare key swap, a deadkey-then-base composition, an ASCII transliteration, a tone cycle, a context-sensitive cluster, an OS IME callout — is the core decision the studio makes for the user. This section is that recommendation engine.
 
 The survey does not emit output rules directly. It computes a seven-axis description of the keyboard's needs (Sec 7.1), runs a decision tree over those axes (Sec 7.2) to choose a **primary output strategy** (one of S-01..S-12) plus likely **secondaries**, and surfaces the matching gallery patterns for the user to confirm by example. The pattern library (Sec 5) is the implementation layer: each `Pattern` names the strategy it implements via `strategyId`, so a decision-tree result maps directly to the patterns the gallery shows first.
@@ -364,6 +540,8 @@ The survey does not emit output rules directly. It computes a seven-axis descrip
 ### 7.1 Discovery axes
 
 Seven dimensions describe a keyboard-design need well enough to pick a strategy. Each is a value the **survey** computes — there is no separate interview script. The last column gives the survey phase that elicits the axis and the plain-language question used.
+
+The axis vector is computed from the working IR (§5a), the patterns the recognizer has lifted from it, and the survey's confirmations. The survey augments the IR; it never substitutes for it. For a session starting from the US-English fallback the recognizer typically lifts no patterns and the axis vector comes almost entirely from survey answers; for a session adapting `sil_euro_latin` the recognizer lifts the deadkey families and the axis vector is largely pre-populated, with the survey confirming or correcting. The decision-tree firing order (§7.2) is unchanged.
 
 | # | Axis | Allowed values | Meaning & survey elicitation |
 |---|------|----------------|------------------------------|
@@ -763,6 +941,8 @@ Note: S-04 (`any`/`index` table mechanism) is structurally embedded in every S-0
 
 These two remaining mismatches are **the value of the validation pass** — they pinpoint where v1 needs work before release. They are not v1 blockers: EuroLatin and IPA are expert-authored, well outside the target user's profile, and the strategies the tree picks (S-06 for EuroLatin, S-05 for IPA) produce working keyboards even if they differ from what SIL chose.
 
+Once import lands, the validation pass also runs against each exemplar's *imported* IR — the round-trip emit must produce the same strategy attribution. A mismatch here surfaces as an `ImportStatus.RoundTripDivergence` for that exemplar in the supportability scanner output (§13).
+
 **Touch strategy validation (S-13).** S-13 is not reached by the desktop decision tree above — it is selected whenever a touch keyboard's layout JSON defines more than one named layer. The A1–A7 axes do not apply; the confirmation criterion is simply the presence of `"nextlayer":` on one or more keys.
 
 | Exemplar | Touch layers | S-13 confirmed |
@@ -775,13 +955,19 @@ These two remaining mismatches are **the value of the validation pass** — they
 
 ## 8. Data flow
 
-1. **Base selection.** User opens studio; base-keyboard browser fetches `keymanapp/keyboards` index via GitHub API, highlights `release/basic/` as the default pool. User picks a base (or accepts US-English fallback).
+*Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
 
-2. **Scaffolding.** Project scaffolder duplicates the chosen base into an in-memory virtual FS, applies the full template-cleanup pipeline (identity reset, NCAPS strip, `[CAPS]` deletion, `&CasedKeys` insertion, touch-layout cleanup), and runs Layer C hygiene. The scaffolded project is clean-by-construction before the user touches anything.
+1. **Source selection.** The source-selection browser offers the user one of four sources for the session: the bundled US-English fallback (preselected), any `release/basic/*` layout, any other `keymanapp/keyboards/release/` keyboard, or an uploaded `.kmn`. The user picks exactly one. There is no multi-source merge.
 
-3. **Survey — Phase A (Identity + routing).** User enters language name, localized language name (autonym), BCP47 tag (with langtags.json lookup), display name, copyright holder. System detects script group (QWERTY/QWERTZ, AZERTY, or non-Roman) from BCP47 + base choice and confirms with the user. This routes all subsequent phases. Phase A also surfaces v1's desktop-first authoring posture (Decision 6, Sec 14) — mobile-primary authors are notified that the survey is anchored to physical-keyboard mental-model answers before they invest survey time. The touch layout is still produced in Phase E. Phase A optionally collects **provenance metadata** (`KeyboardProvenance` in `@keyboard-studio/contracts`) — requester identity and contact, language-community representative, speaker count, language status, regions, existing tools, orthography link, casing notes, and free-form notes (the intake fields carried over from the legacy manual request form). Provenance is **non-gating**: it never blocks a phase exit or the submit button, and is serialized into the package / PR body for attribution and contact at output (Sec 12), never into the `.kmn`. The localized name is the one provenance field that may also feed a build artifact (the `.kps` / `welcome.htm` display). This is metadata capture only — it is distinct from the out-of-scope triage tool (Sec 16) and implies no request queue or assignment workflow.
+2. **Parse to IR.** The KeyboardIR codec (§5a) parses the chosen source's `.kmn`, `.kvks`, and `.keyman-touch-layout` into a `KeyboardIR`. Unrecognized features (save/set/reset/if option-store, call/return, indexed context(n), outs(), SMP 5-digit literals) become `RawKmnFragment` nodes with `origin: 'imported'` (D8). The pattern recognizer then walks the IR and lifts node clusters matching recognizer rules into `Pattern` instances with `origin: 'recognized'` and back-references via `ownedNodes`. Lifted nodes become survey-editable; unlifted nodes stay opaque. The Layer A' import-fidelity checks (I1-I5, §10) run at this point; a parse failure halts the session and surfaces the codec error to the user.
 
-4. **Survey — Phase B (Character coverage + strategy axes).** User pastes or lists target characters. Studio diffs against the base keyboard output set and, for each new character, the user states which key it lives on and under what modifier. Crucially, this phase also **computes the discovery axes** (Sec 7.1): the character count fixes A1 (scale), the diff and a few plain-language follow-ups fix A3 (phonetic intuition), A4 (diacritic behavior), and A7 (spare-key availability). The output method is **not** assumed to be simple substitution — Phase B feeds the axis vector to the strategy selector (Sec 7.2), which picks the right strategy. A simple one-key-per-character swap (S-01) is only the result when the inventory is tiny and phonetic; larger or diacritic-heavy inventories route to deadkey composition (S-02), mnemonic spelling (S-05), diacritic cycling (S-07), context-sensitive clusters (S-09), and so on.
+3. **Scaffold over the IR.** The scaffolder applies identity propagation (resets `header.keyboardId`, `header.bcp47`, `header.copyright`, `header.version`) and the template-cleanup pipeline (NCAPS strip, `[CAPS]` deletion, `&CasedKeys` insertion, touch-layout cleanup) **directly on the IR**. For a US-English-fallback session this is the same template cleanup v1 already performs; for an imported `release/` keyboard the scaffolder runs the same cleanups over the imported IR. Layer C hygiene runs after scaffolding. The author sees a clean-by-construction IR before they touch anything.
+
+4. **Carve gallery.** Before the Phase A identity survey runs, the carve gallery renders every rule, store, group, touch key, and recognized Pattern in the IR as a card. The author can keep, edit (survey-editable cards only — recognized Patterns and scaffolded slots), or delete each card. For a US-English-fallback session the carve gallery is mostly pass-through (the user typically keeps everything). For an imported `cm_qwerty` adapted to one Cameroonian language, carving away the other languages' rules is the bulk of the work. The mechanism is identical in both cases.
+
+5. **Survey — Phase A (Identity + routing).** User enters language name, localized language name (autonym), BCP47 tag (with langtags.json lookup), display name, copyright holder. System detects script group (QWERTY/QWERTZ, AZERTY, or non-Roman) from BCP47 + the IR's structural shape and confirms with the user. This routes all subsequent phases. Phase A also surfaces v1's desktop-first authoring posture (Decision 6, Sec 14) — mobile-primary authors are notified that the survey is anchored to physical-keyboard mental-model answers before they invest survey time. The touch layout is still produced in Phase E. Phase A optionally collects **provenance metadata** (`KeyboardProvenance` in `@keyboard-studio/contracts`) — requester identity and contact, language-community representative, speaker count, language status, regions, existing tools, orthography link, casing notes, and free-form notes (the intake fields carried over from the legacy manual request form). Provenance is **non-gating**: it never blocks a phase exit or the submit button, and is serialized into the package / PR body for attribution and contact at output (Sec 12), never into the `.kmn`. The localized name is the one provenance field that may also feed a build artifact (the `.kps` / `welcome.htm` display). This is metadata capture only — it is distinct from the out-of-scope triage tool (Sec 16) and implies no request queue or assignment workflow.
+
+6. **Survey — Phase B (Character coverage + strategy axes).** User pastes or lists target characters. Studio diffs against the IR's output set and, for each new character, the user states which key it lives on and under what modifier. Crucially, this phase also **computes the discovery axes** (Sec 7.1): the character count fixes A1 (scale), the diff and a few plain-language follow-ups fix A3 (phonetic intuition), A4 (diacritic behavior), and A7 (spare-key availability). The output method is **not** assumed to be simple substitution — Phase B feeds the axis vector to the strategy selector (Sec 7.2), which picks the right strategy. A simple one-key-per-character swap (S-01) is only the result when the inventory is tiny and phonetic; larger or diacritic-heavy inventories route to deadkey composition (S-02), mnemonic spelling (S-05), diacritic cycling (S-07), context-sensitive clusters (S-09), and so on.
 
 To seed this phase the studio offers several **character-discovery** methods (`CharacterDiscoveryService`). No single source is assumed available, so the methods are complementary and the inventory may be built from any combination:
 
@@ -792,27 +978,29 @@ To seed this phase the studio offers several **character-discovery** methods (`C
 
 Whatever the method, the result pre-fills the target-character inventory, which the user confirms or edits; the strategy selector (Sec 7.2) then runs over the confirmed set. Discovery is **character enumeration only** — no wordlist or prediction model is built (Sec 16); frequency, where a method provides it, is advisory and may hint key placement. (The picker and the linguist agent's cross-check reuse the same pinned Unicode/CLDR signal as the kbgen placement seeder.) **Normalization note:** the linguist inventory is NFC for character identification and display; how the keyboard normalizes its *output* (e.g. the NFD reorder auto-emitted for Latin groups in Phase C' below) is a separate, later concern and is not constrained by the inventory's NFC form.
 
-5. **Gallery — Phase C (Special inputs).** Driven by the strategy selector's result (primary + secondaries, Sec 7.2). The gallery surfaces the **recommended strategy's** patterns first as live mini-keyboards (e.g. a deadkey demo for S-02, a tone-cycle demo for S-07); secondary and less-common strategies sit behind "show me more." This phase also resolves the remaining axes that need a judgment call — A5 (multi-mode), A6 (constraint enforcement), and A2a (cluster sensitivity) — which can add S-11, S-10, or S-09 to the recommendation. User taps each demo, confirms the ones that match their language, and fills plain-language slot questions. Each selected pattern is inserted as a validated KMN skeleton tagged with its `strategyId`.
+7. **Gallery — Phase C (Special inputs).** Driven by the strategy selector's result (primary + secondaries, Sec 7.2). The gallery surfaces the **recommended strategy's** patterns first as live mini-keyboards (e.g. a deadkey demo for S-02, a tone-cycle demo for S-07); secondary and less-common strategies sit behind "show me more." This phase also resolves the remaining axes that need a judgment call — A5 (multi-mode), A6 (constraint enforcement), and A2a (cluster sensitivity) — which can add S-11, S-10, or S-09 to the recommendation. User taps each demo, confirms the ones that match their language, and fills plain-language slot questions. Each selected pattern is inserted as a validated KMN skeleton tagged with its `strategyId`.
 
-6. **Gallery/auto — Phase C' (Reordering).** (C-prime.) QWERTY/QWERTZ and AZERTY groups get NFD normalization auto-emitted unless the base already has a reorder scheme. Non-Roman groups see a curated reorder gallery (pre-base vowel, halant/conjunct, tone-mark, subscript stacking) and pick the pattern matching their script family.
+8. **Gallery/auto — Phase C' (Reordering).** (C-prime.) QWERTY/QWERTZ and AZERTY groups get NFD normalization auto-emitted unless the IR already has a reorder scheme. Non-Roman groups see a curated reorder gallery (pre-base vowel, halant/conjunct, tone-mark, subscript stacking) and pick the pattern matching their script family.
 
-7. **Auto + survey — Phase D (OSK desktop).** OSK `.kvks` is auto-populated from rule output; modifier-name consistency enforced across `.kmn`/`.kvks`/`.keyman-touch-layout`; `usealtgr` tag auto-inserted when `RALT` is present. Survey intervenes only when modifier-naming intent is ambiguous.
+9. **Auto + survey — Phase D (OSK desktop).** OSK `.kvks` is auto-populated from rule output; modifier-name consistency enforced across `.kmn`/`.kvks`/`.keyman-touch-layout`; `usealtgr` tag auto-inserted when `RALT` is present. Survey intervenes only when modifier-naming intent is ambiguous.
 
-8. **Gallery — Phase E (Touch layout).** Touch layout JSON scaffolded from desktop KVK via modifier-to-layer mapping. User sees touch-feature galleries (longpress menus, layer switching, flicks, multitap) as live tappable demos and enables those that fit their language. Output validated against the touch-layout JSON schema.
+10. **Gallery — Phase E (Touch layout).** Touch layout JSON scaffolded from desktop KVK via modifier-to-layer mapping. User sees touch-feature galleries (longpress menus, layer switching, flicks, multitap) as live tappable demos and enables those that fit their language. Output validated against the touch-layout JSON schema.
 
-9. **Survey — Phase F (Help docs).** `welcome.htm` generated from template (BCP47 lang attr from Phase A, no version, no copyright). User writes descriptive content; `help/<name>.php` regenerated deterministically from the same content, guaranteeing body+style parity.
+11. **Survey — Phase F (Help docs).** `welcome.htm` generated from template (BCP47 lang attr from Phase A, no version, no copyright). User writes descriptive content; `help/<name>.php` regenerated deterministically from the same content, guaranteeing body+style parity.
 
-10. **Auto — Phase G (Package).** `.kps` pre-populated: `LICENSE.md` as license file (avoids `KM0900A`), "Follow keyboard version" set, language tags from Phase A, Files block matches `targets`.
+12. **Auto — Phase G (Package).** `.kps` pre-populated: `LICENSE.md` as license file (avoids `KM0900A`), "Follow keyboard version" set, language tags from Phase A, Files block matches `targets`.
 
-11. **Live preview.** Every edit triggers a 300 ms debounce; kmcmplib compiles to blob URLs; KeymanWeb reloads with the new keyboard; lint chips appear for any diagnostics. Submit button is blocked until zero warnings.
+13. **Live preview.** Every edit triggers a 300 ms debounce; kmcmplib compiles to blob URLs; KeymanWeb reloads with the new keyboard; lint chips appear for any diagnostics. Submit button is blocked until zero warnings.
 
-12. **Lint and validate.** Layer A (validity) + Layer B (style) run on every edit; Layer C (hygiene) runs on each phase exit and at submit. Green checks pass silently; yellow checks surface as survey questions at the relevant phase; red checks appear as a final checklist before PR submission.
+14. **Lint and validate.** Layer A (validity) + Layer B (style) run on every edit; Layer C (hygiene) runs on each phase exit and at submit. Green checks pass silently; yellow checks surface as survey questions at the relevant phase; red checks appear as a final checklist before PR submission.
 
-13. **Output.** User chooses download `.zip` (virtual FS serialized, readme on next steps, no auth required) or GitHub OAuth fork+draft PR (fork `keymanapp/keyboards`, branch `add/<id>`, commit virtual FS, open draft PR with auto-generated body listing green checks passed, yellow items by criteria section, red items as a final checklist, plus copyright attestation).
+15. **Output.** User chooses download `.zip` (virtual FS serialized, readme on next steps, no auth required) or GitHub OAuth fork+draft PR (fork `keymanapp/keyboards`, branch `add/<id>`, commit the IR-emitted source tree (no compiled artifacts), open draft PR with auto-generated body listing green checks passed, yellow items by criteria section, red items as a final checklist, plus copyright attestation). The emitter renders the final `.kmn`, `.kvks`, and `.keyman-touch-layout` from the IR (D9). For sessions whose source was not the US-English fallback, the original `.kmn` is preserved as a `<id>.kmn.imported` sidecar in the `.zip` and OAuth working tree; the sidecar is excluded from the PR commit (§12).
 
 ---
 
 ## 9. Three-group routing
+
+*Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
 
 The survey branches at Phase A based on BCP47 tag, base-keyboard choice, and user confirmation. The three groups share the same phase structure but differ in authoring emphasis, reordering load, and `&CasedKeys` content.
 
@@ -822,7 +1010,7 @@ The survey branches at Phase A based on BCP47 tag, base-keyboard choice, and use
 | AZERTY | French/Francophone-Africa bases | Position remapping (Q<->A, W<->Z), shifted digits, heavy AltGr layer | `[K_A]..[K_Z] [K_0]..[K_9] [K_HYPHEN] [K_EQUAL] [K_LBRKT] [K_RBRKT] [K_BKSLASH] [K_QUOTE] [K_COMMA] [K_PERIOD] [K_SLASH] [K_COLON]` | NFD normalization; auto-emitted unless base has its own scheme |
 | Non-Roman | Curated bases per script family (Indic, Arabic, Hebrew, SEA, etc.) | Character mapping, heavy reordering, script-specific OSK conventions | Typically omitted; survey confirms per script (see decision in Sec 14) | Gallery-picked: pre-base vowel, halant/conjunct, tone-mark, subscript stacking |
 
-**Routing decision.** Group is detected automatically from the BCP47 script subtag and the chosen base keyboard, then confirmed with the user in a single plain-language step before the survey continues. Non-Roman group is further sub-routed to a script-family branch (Indic, Arabic, SEA, etc.) that controls which reorder patterns are shown in Phase C'.
+**Routing decision.** Group is detected automatically from the BCP47 script subtag (from Phase A) and the IR's structural shape (which scripts its rules already emit), then confirmed with the user in a single plain-language step before the survey continues. Non-Roman group is further sub-routed to a script-family branch (Indic, Arabic, SEA, etc.) that controls which reorder patterns are shown in Phase C'.
 
 The three groups are the coarse expression of discovery axis **A2 (script class, Sec 7.1)**: QWERTY/QWERTZ and AZERTY are both *alphabetic*; the Non-Roman group spans *abugida / abjad / syllabary / logographic*, which the strategy selector then refines (e.g. abugida + cluster sensitivity → S-09). Routing narrows the field; the decision tree (Sec 7.2) picks the specific output strategy within it.
 
@@ -833,6 +1021,8 @@ The three groups are the coarse expression of discovery axis **A2 (script class,
 ---
 
 ## 10. Validator and lint engine
+
+*Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
 
 The validator is the sole arbiter of what the survey and LLM are allowed to emit. Existing keyboards in `release/` are not treated as authoritative — the corpus contains both clean and defective patterns, and bad patterns must not survive by inertia.
 
@@ -878,6 +1068,20 @@ All 14 checks have corresponding message entries in `kmn-compiler-messages.ts`; 
 
 Note: checks #1-9 are portable to TypeScript and run per-keystroke. Checks #10-14 are WASM-only and share the 300 ms debounce cycle.
 
+#### Layer A' — import fidelity (5 checks)
+
+Layer A' runs on every codec parse (after import) and on every emit (before output). It is part of `@keymanapp/kmn-validator`. The checks are:
+
+| # | Check | Severity | When |
+|---|-------|----------|------|
+| I1 | **Parse cleanliness** — the codec parsed the source without falling back to `RawKmnFragment` for *known-supported* features. | `warning` (per fragment) | On import |
+| I2 | **Round-trip functional equivalence** — emit the IR, re-parse, compare against the bounded enumeration corpus (D7); the input->output map must be identical. | `error` | On import and on every emit during authoring |
+| I3 | **Comment preservation** — every `IRComment` with `anchor: 'leading' \| 'trailing'` is emitted attached to the same anchor node it imported with. | `warning` | On emit |
+| I4 | **Recognized ratio** — `ImportReport.recognizedRatio` is reported informationally; no threshold blocks submission. | `info` | On import |
+| I5 | **Unsupported feature inventory** — every `RawKmnFragment` produces one entry in `ImportReport.opaqueFeatureInventory`. | `info` | On import |
+
+A failing I2 halts the authoring session: the IR cannot be trusted as the source of truth (D9) if the emit does not round-trip. I1, I3, I4, I5 are informational/warning and do not block authoring. The supportability scanner CLI (§13) runs the same checks in batch over `release/` and aggregates the reports.
+
 ### Implementation phases
 
 - **Phase 1 — Oracle mode.** TypeScript wraps the WASM `kmcmplib` in a `validate(source) -> diagnostics` entry point. Maps compiler diagnostics through the message catalog. No new parser. Full coverage of all 14 checks.
@@ -911,12 +1115,17 @@ Source-of-truth for the band assignments is `packages/contracts/data/criteria.js
 
 ## 12. Output artifacts
 
+*Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
+
 ### Virtual filesystem (in-memory, emitted at output time)
 
 ```text
 release/<letter-or-org>/<id>/
   source/
     <id>.kmn                  -- KMN source with all rules, stores, groups
+    <id>.kmn.imported         -- original .kmn from the import source (D9);
+                                 present only when source != US-English fallback.
+                                 INCLUDED in the .zip; EXCLUDED from the PR commit.
     <id>.kps                  -- package descriptor (XML)
     <id>.kvks                 -- on-screen keyboard source (XML)
     <id>.keyman-touch-layout  -- touch layout JSON
@@ -945,10 +1154,13 @@ Compiled artifacts (`.kmx`, `.kvk`, `.js`) are produced by the in-browser compil
 - Red items: listed as a manual checklist for the author to complete.
 - Copyright attestation: "I confirm I am the copyright holder or am authorized to submit on behalf of `<holder>`."
 - Provenance metadata (when supplied): requester and language-community contact, speaker count, language status, regions, orthography link, and notes — rendered for reviewer context. Non-gating; never written into the `.kmn` source.
+- Import attribution (when supplied): the source keyboard the session adapted (e.g. `release/c/cm_qwerty`), the round-trip status, and the `ImportReport.opaqueFeatureInventory` for reviewer context. Non-gating.
 
 ---
 
 ## 13. Team boundaries
+
+*Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
 
 ### Engine team owns
 
@@ -961,6 +1173,10 @@ Compiled artifacts (`.kmx`, `.kvk`, `.js`) are produced by the in-browser compil
 - Layer C hygiene lint (`@keymanapp/keyboard-lint`)
 - Output paths (zip serialization, GitHub OAuth fork+PR)
 - Service interfaces in `packages/contracts` (types for Pattern, LintFinding, SurveyAnswer, VirtualFS)
+- KeyboardIR codec (parse `.kmn` + sibling files into IR; emit IR back to `.kmn`)
+- Carve gallery UI
+- Layer A' import-fidelity checks I1-I5
+- Supportability scanner CLI (`utilities/import-scanner/`), the `docs/import-corpus.md` generator, and the CI job that runs the scanner on codec changes
 
 ### Content team owns
 
@@ -969,12 +1185,14 @@ Compiled artifacts (`.kmx`, `.kvk`, `.js`) are produced by the in-browser compil
 - Gallery ordering and "show me more" threshold decisions
 - LLM prompt templates and grounding context (Keyman reference index build); prompt templates live in `docs/prompts/` (e.g. the Phase B character-inventory linguist agent, `docs/prompts/character-inventory-linguist.md`)
 - criteria.md triage: assigning final green/yellow/red classification to each checkpoint
+- Pattern recognizer rules (which node-cluster shapes lift to which Pattern; curated per script family, the same rigour as new pattern mining)
 
 ### Day-1 joint session (blocking — parallel work cannot start until resolved)
 
 Three contract-lock issues must be resolved in a single joint session before either team begins implementation work:
 
 - **#5** — Lock the Pattern schema (field names, types, placeholder syntax). This spec's TypeScript interface is the proposed starting point, **including the proposed `strategyId` and `combinesWith` fields (Sec 5)** that link each pattern to the strategy catalog (Sec 7); the session ratifies or drops them.
+- **#5b** — Lock the KeyboardIR schema (header / store / group / rule / comment / raw fragment / touch / kvks; `IROrigin`, `IRNodeRef`, `ImportStatus`, `ImportReport`). Held jointly with #5; depends on no other issue.
 - **#6** — Triage criteria.md into auto-fix (scaffolder/Layer C), template-bake (always-clean output), yellow-survey, and red-checklist. Final counts are inputs to the scaffolder spec and the Layer C implementation.
 - **#8** — Define service interfaces in `packages/contracts` (VirtualFS shape, LintFinding type, SurveyPhaseResult, PatternMatch). Both teams build to these interfaces.
 
@@ -983,6 +1201,8 @@ After Day 1, engine and content teams work in parallel. The Day-4 integration mi
 ---
 
 ## 14. Open questions — resolved decisions
+
+*Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
 
 The following items were open at the time of the initial draft. Each is now a binding decision for v1. Revisiting any decision requires an explicit revision request following the process in Sec 18.
 
@@ -1014,14 +1234,28 @@ Rationale: Reorder patterns for CJK and Ethiopic require specialist curation tha
 Decision: v1 supports desktop-first authoring only. The survey, strategy selector, and gallery are anchored to physical-keyboard KMN rules; the touch layout is scaffolded from the desktop OSK in Phase E (no reverse touch-to-desktop derivation in v1). Authors whose primary deployment is mobile are surfaced this posture at Phase A before they invest survey time and may continue with the desktop-first flow (still receiving a derived touch layout). Touch-first authoring is a v1.1 candidate.
 Rationale: The strategy framework (Sec 7) and the seven discovery axes (Sec 7.1) elicit physical-keyboard mental-model answers — key names like `K_QUOTE`, modifier-plane availability, base-layout collisions. Inverting the data flow to touch-first requires touch-first strategy variants that are not yet curated and would expand v1 scope materially. Mobile-first authoring is a known v1.1 work-item, not a silent gap.
 
+**Decision 7 — Functional equivalence, not byte-identity.**
+Decision: Round-trip is verified by *functional equivalence under `kmcmplib`*, not by byte-identity of the emitted `.kmn`. Two IRs are equivalent when every input in the bounded enumeration corpus (every virtual key x every modifier combination x deadkey paths up to depth 3) produces the same output character sequence under the WASM oracle. Order, whitespace, comment placement, and codepoint formatting differences are not defects.
+Rationale: Byte-identity is unachievable across the corpus (mined `.kmn` files mix `dk()` and `deadkey()`, varying U+XXXX vs. literal forms, and free-form comment placement). Functional equivalence is the property authors and reviewers actually care about; it is mechanically checkable via the existing WASM oracle.
+
+**Decision 8 — Opaque imports for unrecognized features.**
+Decision: KMN features outside the typed IR — `save()`/`set()`/`reset()` option stores, `if()` over option stores, `call()`/`return()`, indexed `context(N)`, `outs()` store composition, SMP 5-digit `U+XXXXX` literals — are imported as `RawKmnFragment` IR nodes with `origin: 'imported'`. They render in the carve gallery as deletable cards; they are not survey-editable in v1. A lower-level raw-KMN editor is a v1.1 candidate.
+Rationale: These features appear in a small fraction of `release/` keyboards and require substantial typed-IR work each. Treating them as opaque preserves round-trip fidelity (the emitter writes the original text back verbatim) and lets v1 import the long tail of `release/` keyboards without blocking on a complete typed model.
+
+**Decision 9 — IR is canonical; original `.kmn` is a sidecar.**
+Decision: Once a session exists, the KeyboardIR is the source of truth. The emitter always renders from the IR. The original `.kmn` (for imports beyond the US-English fallback) is preserved as a `<id>.kmn.imported` sidecar — included in the `.zip` and in the OAuth working tree for reviewer diff — but is **excluded from the PR commit**. This holds even when no edits are made: a no-edit import still emits a freshly-rendered `.kmn`.
+Rationale: A two-source-of-truth model (IR + original text) drifts the moment any edit lands. Picking one canonical representation (the IR) makes the emitter, validator, and round-trip story all deterministic. The sidecar exists strictly for reviewer convenience during the v1 stabilization window and can be removed entirely in v1.1.
+
 ---
 
 ## 15. Acceptance scenarios
 
+*Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
+
 ### Scenario A: Latin QWERTY keyboard with a deadkey
 
-**Starting state:** Studio open, no authentication, US-English fallback base selected.
-**User actions:** Phase A — enters language name "Tuvan", tag `tyv`, copyright holder "Researcher Name". Phase B — adds characters `a e i o u` with acute accent variants. Phase C — selects the "tap then base letter" deadkey pattern; picks `K_QUOTE` as trigger key; lists base `aeiou` and accented `áéíóú`. Phase C' — NFD reorder auto-emitted. Phases D-G complete with defaults. Clicks "Download .zip".
+**Starting state:** Studio open, no authentication, US-English fallback selected as the source. The carve gallery renders a pass-through view (no recognized patterns to suppress).
+**User actions:** Phase A — enters language name "Tuvan", tag `tyv`, copyright holder "Researcher Name". Phase B — adapts the US-English base by adding characters `a e i o u` with acute accent variants. Phase C — selects the "tap then base letter" deadkey pattern; picks `K_QUOTE` as trigger key; lists base `aeiou` and accented `áéíóú`. Phase C' — NFD reorder auto-emitted. Phases D-G complete with defaults. Clicks "Download .zip".
 **Expected output:** `.zip` containing a virtual FS that builds with `kmc build` with zero errors and zero warnings. `HISTORY.md` has a single `1.0` entry. `LICENSE.md` reads `Copyright © 2026 Researcher Name`. `welcome.htm` has `<html lang="tyv">`. `&CasedKeys` store present with `[K_A]..[K_Z]`.
 **Pass criteria:** `kmc build` exit code 0, no diagnostics. Layer C green checks all pass. Typing `'a` in the live preview produces `a` with acute.
 
@@ -1053,9 +1287,18 @@ Rationale: The strategy framework (Sec 7) and the seven discovery axes (Sec 7.1)
 **Expected output:** Red checklist includes: "I confirm I am the copyright holder or am authorized to submit on behalf of [copyright holder]." Green checks listed as auto-verified. Yellow items listed with the values the studio emitted (e.g. BCP47 tag, display name) for the reviewer's reference.
 **Pass criteria:** No red item is pre-checked by the studio. User must check each red item manually before the "Confirm and submit" button becomes active.
 
+### Scenario F: Adapting a country keyboard down to a single language
+
+**Starting state:** Studio open; user selects `release/c/cm_qwerty` (a hypothetical multilingual Cameroonian QWERTY) from the source-selection browser. The codec parses it; the pattern recognizer lifts the Bafut deadkey family and the Fulfulde sequence-replace rules into recognized Patterns; remaining language families render in the carve gallery as deletable cards. The Layer A' I2 round-trip check passes; I5 reports two `RawKmnFragment` nodes (an `outs()` composition and a `save()` option store) as info-level entries.
+**User actions:** Carve gallery — the user deletes the Fulfulde, Ewondo, and Duala rule families, keeping the Bafut Pattern intact. Phase A — sets `id = bfd_keyboard`, BCP47 = `bfd-Latn`, copyright = the language community organization. Phase B — confirms the Bafut character inventory pre-populated from the surviving rules; adds two characters the import missed. Phases C-G complete with defaults. Clicks "Submit via GitHub OAuth".
+**Expected output:** Draft PR opened on the user's fork. PR body lists the import attribution (`adapted from release/c/cm_qwerty`, round-trip clean, two opaque features deleted as part of carving). The PR commit contains the emitted `<id>.kmn` but NOT `<id>.kmn.imported`. The `.zip` (if also downloaded) contains both.
+**Pass criteria:** WASM oracle produces no errors. Layer A' I2 passes on every emit during the session. The committed `.kmn` builds with `kmc build` exit code 0. Re-importing the emitted `.kmn` into the studio produces an IR functionally equivalent to the one at submit time.
+
 ---
 
 ## 16. Out of scope
+
+*Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
 
 - **Triage tool for traditional submissions** — a separate project that reuses `@keymanapp/kmn-validator` and `@keymanapp/keyboard-lint`; not part of keyboard-studio.
 - **LDML output** — deferred until the LDML-to-touch build path lands in the Keyman toolchain. Emission format is locked to KMN + `.keyman-touch-layout`.
@@ -1064,10 +1307,12 @@ Rationale: The strategy framework (Sec 7) and the seven discovery axes (Sec 7.1)
 - **Hosting and deployment** — infrastructure is left to the operator; this project ships a static SPA.
 - **CJK and Ethiopic reorder patterns in v1** — confirmed excluded; see Sec 14, decision 5. Target: sprint 2 pattern-library work.
 - **Multi-language `welcome.htm` variants** — LLM-generated variants for multiple languages; post-v1.
-- **Editing existing keyboards** — the studio creates new keyboards from a base; it does not support round-tripping or editing an uploaded `.kmn`.
 - **`.kpj.user` or build-folder management beyond what the scaffolder strips** — cleanup is one-time at scaffold time.
 - **Predictive text / wordlists (`.model.ts`)** — the strategy catalog (Sec 7) covers input rules only; lexical models are a separate artifact, post-v1. (A pasted text sample *is* used in Phase B for **character discovery** — enumerating which characters the keyboard must support — which is in scope, Sec 8. Only the wordlist / frequency *model* is deferred.)
 - **Migration of legacy binary keyboards** — the studio authors from KMN sources; it does not import compiled `.kmx`/`.kmn` binaries.
+- **Multi-source merge** — v1 adapts exactly one source keyboard per session (US-English fallback, a `release/` keyboard, or one upload). Combining rules from two sources (e.g. taking deadkeys from one keyboard and a touch layout from another) is not supported. Authors adapting a language covered by overlapping country keyboards pick the closest single source and carve it down.
+- **Survey-editing opaque IR fragments** — `RawKmnFragment` nodes (D8) appear in the carve gallery as deletable cards but cannot be edited through the survey in v1. A lower-level raw-KMN editor is a v1.1 candidate.
+- **Byte-identical round-trip** — round-trip is verified by functional equivalence under `kmcmplib` (D7), not by byte-for-byte preservation of the original `.kmn` text. Whitespace, store ordering, comment placement, and codepoint formatting may change between import and emit.
 
 Note: touch/mobile layouts and `.kmp`/`.kvks`/`.keyboard_info` generation are **in** scope (Phases E, D, G) — the strategy framework (Sec 7) was originally drafted physical-keyboard-only, but in the studio it is the desktop-rule layer of the full pipeline (see Sec 7 scope note).
 
@@ -1075,7 +1320,13 @@ Note: touch/mobile layouts and `.kmp`/`.kvks`/`.keyboard_info` generation are **
 
 ## 17. Glossary
 
+*Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
+
+**adapting author.** A user-mode the studio supports as a first-class case: an author starting from an existing `release/` keyboard rather than from the US-English fallback. The flow is the same as the primary user-mode; only the source of the IR differs. See §3.
+
 **BCP47.** Internet standard tag format for identifying human languages and scripts. Example: `tyv` (Tuvan), `hi-Deva` (Hindi in Devanagari script). Used throughout for language and script identification.
+
+**carve gallery.** The card-view UI that renders an imported IR's rules, stores, groups, touch keys, and recognized Patterns as keep/edit/delete cards. The author carves unwanted material away before the Phase A survey begins. See §4, §8.
 
 **CasedKeys (`&CasedKeys`).** A Keyman system store declaring the set of virtual keys that participate in `CAPS`/`NCAPS` modifier logic. Scaffold inserts the appropriate set per script group; non-Roman scripts default to omitting it.
 
@@ -1083,9 +1334,13 @@ Note: touch/mobile layouts and `.kmp`/`.kvks`/`.keyboard_info` generation are **
 
 **decision tree.** The ordered rule set (Sec 7.2) that maps a keyboard's discovery-axis values to a primary output strategy (S-01..S-12) plus secondaries. The strategy selector runs it; its output drives which gallery patterns are shown.
 
+**functional equivalence.** Round-trip criterion (Decision 7, §14): two IRs are equivalent when, for every input in the bounded enumeration corpus (every virtual key x every modifier x deadkey paths up to depth 3), the WASM oracle produces the same output character sequence from both.
+
 **discovery axis.** One of the seven dimensions (A1–A7, Sec 7.1) the survey computes to describe a keyboard's input-method needs (scale, script class, phonetic intuition, diacritic behavior, multi-mode, constraint enforcement, spare-key availability). The axis vector is the decision tree's input.
 
 **identity propagation.** The scaffolder step that resets the base keyboard's identifier fields — keyboard name, BCP47 language tag, copyright line, and version — to values for the new keyboard being authored. Prevents base-keyboard metadata from appearing in the submitted keyboard.
+
+**KeyboardIR (IR).** The typed in-memory representation of a keyboard. Once a session exists in the studio, the IR is the source of truth (Decision 9, §14); the emitter renders the final `.kmn` from the IR. See §5a.
 
 **kmnFragment.** The KMN rule text embedded in a Pattern record, containing `{{slotId}}` placeholders that the scaffolder replaces with user-supplied values.
 
@@ -1093,11 +1348,15 @@ Note: touch/mobile layouts and `.kmp`/`.kvks`/`.keyboard_info` generation are **
 
 **NCAPS.** A Keyman modifier keyword that suppresses `CAPS LOCK` behavior on a rule. A known scaffolding hygiene issue is leftover `NCAPS` modifiers in base keyboards that should be stripped.
 
+**pattern recognizer.** The engine + content component that walks an imported IR, lifts node clusters matching curated recognizer rules into `Pattern` instances with `origin: 'recognized'`, and back-references the lifted nodes via `Pattern.ownedNodes`. See §4, §8.
+
 **OAuth.** Open Authorization. The protocol used for GitHub authentication in the studio's fork+PR delivery path. The studio requests `public_repo` scope only.
 
 **slot.** A named placeholder in a `kmnFragment` (written `{{slotId}}`). Each slot corresponds to a `PatternQuestion` whose answer is substituted at scaffolding time.
 
 **store.** A KMN named sequence of characters or virtual keys, declared with `store(name) '...'`. Stores are referenced in rules via `any(name)` and `index(name, N)`.
+
+**RawKmnFragment.** An IR node holding KMN syntax that the codec could not map to a typed IR node (e.g. `save()`/`set()`, `call()`, `outs()`, SMP 5-digit literals). Round-trips verbatim; rendered as a deletable card in the carve gallery; not survey-editable in v1. See Decision 8, §14.
 
 **strategy card / strategy ID.** A strategy card (Sec 7.3) is a self-contained, citable description of one `.kmn` output method, identified by a strategy ID (`S-01`..`S-12`). A `Pattern` (Sec 5) names the card it implements via its `strategyId` field.
 
@@ -1109,11 +1368,17 @@ Note: touch/mobile layouts and `.kmp`/`.kvks`/`.keyboard_info` generation are **
 
 ## 18. Revision policy
 
+*Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
+
 This spec evolves via explicit revision requests tracked in the keyboard-studio issue tracker. Changes to prose sections (data flow, scenarios, out-of-scope list) may be made by the spec maintainer following a single-reviewer approval. Changes to the Pattern schema (Sec 5) require a joint engine+content session (the same threshold as the Day-1 contract lock); breaking field changes — renames, type changes, removals — require a major version bump of the `Pattern` interface and a corresponding update to `packages/contracts`. Changes to resolved decisions in Sec 14 require an explicit revision request citing the original decision and the new evidence; they may not be re-opened informally. The following items are tracked for a v1.1 revision cycle and are not in scope for v1: risk and dependencies section, performance targets table, and accessibility section.
+
+Changes to the KeyboardIR schema (§5a) — field renames, type changes, removals — follow the same policy as the Pattern schema: joint engine+content session required; breaking changes require a major version bump of `packages/contracts`. Adding new typed nodes for features currently held as `RawKmnFragment` (Decision 8, §14) is a minor revision, not a breaking change.
 
 ---
 
 ## 19. Reference
+
+*Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
 
 | Document | Location |
 |---|---|
@@ -1124,6 +1389,9 @@ This spec evolves via explicit revision requests tracked in the keyboard-studio 
 | `.kmn` strategy framework (discovery axes, decision tree, strategy cards S-01..S-12) | Merged into Sec 7 of this spec. `strategy tree/strategies.md` is retained only as a stub pointer — do not treat it as a separate source. |
 | GitHub repository | https://github.com/MattGyverLee/keyboard-studio |
 | Issue tracker | https://github.com/MattGyverLee/keyboard-studio/issues |
+| KeyboardIR schema (full TypeScript) | `packages/contracts/src/keyboard-ir.ts` |
+| Import corpus / supportability matrix | `docs/import-corpus.md` (generated by the supportability scanner) |
+| ParseKB prior art (Python, separate repo) | `D:\Github\_Projects\_KM\ParseKB` — informs codec design; not a dependency |
 
 Issues #5, #6, #8, and #31 are the critical-path items. Do not reference individual issues in shipped code comments; cross-link via commit messages and PR bodies.
 
