@@ -79,6 +79,12 @@ tests:
 validatedForFamilies: ["Latn"]
 sourceKeyboards:
   - "release/sil/sil_ipa"
+  - "release/b/balochi_scientific"
+  - "release/itrans/itrans_odia"
+  - "release/gautami/gautami_inditran"
+  - "release/gautami/gautami_thamizh_tamil"
+  - "release/gautami/gautami_devanagari"
+  - "release/gautami/gautami_bangla_bengali"
 reviewedBy: "keyboard-studio-content-team"
 reviewDate: "2026-06-04"
 
@@ -130,6 +136,50 @@ provenance:
       (e.g. a → ā, c → č, d → ḍ, n → ñ). Demonstrates S-04 parallel-store
       lookup as the implementation mechanism for context-sensitive output in a
       real language keyboard outside the IPA/phonetic domain.
+  - keyboard: "release/itrans/itrans_odia/source/itrans_odia.kmn"
+    line: 241
+    rule: "any(NuktaVyanjana) \"଼\" \"୍\" + any(ViramaMaatraa) > index(NuktaVyanjana,1) \"଼\" index(ViramaMaatraaU,4)"
+    note: >
+      B-variant: deferred collapse on following context. The preceding context is a
+      multi-character cluster (nukta consonant plus diacritic marks); the trigger is
+      not a single fixed key but any member of the ViramaMaatraa store. When a vowel
+      sign from that store arrives, the entire cluster is rewritten with the incoming
+      vowel factored in — contrast with the basic S-03 template where the trigger is
+      always one specific key. The same any(ctx) + any(followingStore) > index(...)
+      shape appears in itrans_devanagari_hindi, itrans_bengali, itrans_gujarati,
+      itrans_devanagari_sanskrit_vedic, and masaram_gondi; it is the standard ITRANS
+      family mechanism for Indic consonant-cluster + vowel composition.
+  - keyboard: "release/gautami/gautami_inditran/source/gautami_inditran.kmn"
+    line: 114
+    rule: "'k' 'h' +[K_HYPHEN] > context(1) U+035f context(2)"
+    note: >
+      C-variant: collapse on a dedicated trigger key. The user types 'k' then 'h' —
+      both appear in the output buffer as separate characters. Pressing K_HYPHEN fires
+      a rewrite: both characters are retained but U+035F (COMBINING DOUBLE MACRON
+      BELOW) is inserted between them, forming the phonetic digraph k͟h. The trigger
+      key emits no character of its own — it only transforms the preceding sequence.
+      Latin-script analogue of trigger-key digraph formation for phonetic transcription.
+  - keyboard: "release/gautami/gautami_thamizh_tamil/source/gautami_thamizh_tamil.kmn"
+    line: 81
+    rule: "'க' 'ஷ' +[K_SLASH]> 'க்ஷ'"
+    note: >
+      C-variant in Tamil script: the two Tamil letters க (ka) and ஷ (sha) are typed
+      separately; pressing K_SLASH collapses them into the conjunct க்ஷ
+      (ka-virama-sha). Demonstrates the trigger-key collapse pattern operating in a
+      non-Latin script where the combined output is a proper script conjunct rather
+      than a diacritic-marked pair.
+  - keyboard: "release/gautami/gautami_devanagari/source/gautami_devanagari.kmn"
+    lines: [120, 125]
+    rules:
+      - "U+094d any(m_bearer) '़' + [K_SLASH] > context(2) context(3)"
+      - "any(m_bearer) '़' + [K_SLASH] > U+094d context(1) context(2)"
+    note: >
+      C-variant for Devanagari consonant cluster toggle. Pressing K_SLASH either
+      strips a preceding virama (U+094D, the consonant-joiner mark) to split a
+      cluster, or inserts one to join a consonant pair. Both directions are triggered
+      by the same slash key, making it a toggle: one press joins, a second press
+      splits. Identical rule structure appears in gautami_bangla_bengali (lines
+      96-101) with the Bengali virama codepoint (U+09CD) in place of Devanagari's.
 
 demo:
   filled_kmn: |

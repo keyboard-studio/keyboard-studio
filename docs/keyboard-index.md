@@ -26,6 +26,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Armenian Mnemonic R | `armenian_mnemonic_r` | `hy` | Tigran Sarukhanyan | `../keyboards/release/a/armenian_mnemonic_r` |
 | Vai (Athinkra) | `athinkra_vai` | `vai` | Jason Glavy | `../keyboards/release/athinkra/athinkra_vai` |
 | Vai Typewriter (Athinkra) | `athinkra_vai_typewriter` | `vai` | Jason Glavy | `../keyboards/release/athinkra/athinkra_vai_typewriter` |
+| Balochi Scientific | `balochi_scientific` | `bal-Latn` | © 2017-2023 SIL International | `../keyboards/release/b/balochi_scientific` |
 | Balochi Urdu | `balochi_urdu` | `bal` | © SIL Global | `../keyboards/release/b/balochi_urdu` |
 | French Basic | `basic_kbdfr` | `fr` | (c) 2009-2019 SIL International | `../keyboards/release/basic/basic_kbdfr` |
 | Khmer (NIDA) Basic | `basic_kbdkni` | `km` | © SIL Global | `../keyboards/release/basic/basic_kbdkni` |
@@ -34,16 +35,26 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Simplified Chinese | `cs_pinyin` | `zh` | SIL International | `../keyboards/release/c/cs_pinyin` |
 | Common Devanagari | `common_devanagari` | `hi` | © 2021 WIn Publishing Trust | `../keyboards/release/c/common_devanagari` |
 | Naija NFD | `el_naija` | `abn-Latn`, `bky-Latn`, `bwr-Latn`, `deg-Latn`, `igb-Latn`, `bin-Latn`, `efi-Latn`, `eka-Latn`, `ekp-Latn`, `elm-Latn`, `enn-Latn`, `ish-Latn`, `gbr-Latn`, `aaa-Latn`, `gkn-Latn` … (+37 more) | Andrew Cunningham and Chinedu Uchechukwu | `../keyboards/release/el/el_naija` |
+| Osmanya | `el_osmanya` | `so-Osma` | Andrew Cunningham | `../keyboards/release/el/el_osmanya` |
 | Pasifika | `el_pasifika` | `mi-Latn`, `rar-Latn`, `fj`, `haw-Latn`, `niu`, `sm`, `ty-Latn`, `to` | © 2018 Enabling Languages | `../keyboards/release/el/el_pasifika` |
 | ᓀᐦᐃᔭᐍᐏᐣ (Plains Cree) | `fv_plains_cree` | `crk` | (c) 2015-2025 FirstVoices, SIL Global, 2015 First Peoples' Cultural Foundation | `../keyboards/release/fv/fv_plains_cree` |
+| Gautami Bangla/Bengali | `gautami_bangla_bengali` | `bn-IN` | Gautam Sengupta | `../keyboards/release/gautami/gautami_bangla_bengali` |
+| Gautami Devanagari | `gautami_devanagari` | `hi`, `sa` | Gautam Sengupta | `../keyboards/release/gautami/gautami_devanagari` |
+| Gautami IndiTran | `gautami_inditran` | `la` | Gautam Sengupta | `../keyboards/release/gautami/gautami_inditran` |
+| Gautami Thamizh/Tamil | `gautami_thamizh_tamil` | `ta` | Gautam Sengupta | `../keyboards/release/gautami/gautami_thamizh_tamil` |
 | Geba Karen (Myanmar) | `geba_karen_mymr` | `kvq` | Copyright © SIL Global | `../keyboards/release/g/geba_karen_mymr` |
 | GFF Amharic | `gff_amharic` | `am` | The Geʾez Frontier Foundation | `../keyboards/release/gff/gff_amharic` |
 | Hausa Kano | `hausa_kano` | `ha-Latn` | Hamza Sulayman | `../keyboards/release/h/hausa_kano` |
+| Bengali Phonetic (ITRANS) | `itrans_bengali` | `bn`, `as` | Shree Devi Kumar | `../keyboards/release/itrans/itrans_bengali` |
 | Hindi Devanagari Phonetic (ITRANS) | `itrans_devanagari_hindi` | `hi`, `mr`, `sa`, `bho`, `mai`, `awa`, `bra`, `mag`, `raj`, `kok`, `gom`, `knn-Deva`, `hne`, `bgc`, `sck` … (+2 more) | Shree Devi Kumar | `../keyboards/release/itrans/itrans_devanagari_hindi` |
+| Vedic Sanskrit Devanagari Phonetic (ITRANS) | `itrans_devanagari_sanskrit_vedic` | `sa`, `hi`, `mr` | Shree Devi Kumar | `../keyboards/release/itrans/itrans_devanagari_sanskrit_vedic` |
+| Gujarati Phonetic (ITRANS) | `itrans_gujarati` | `gu`, `ae-Gujr` | Shree Devi Kumar | `../keyboards/release/itrans/itrans_gujarati` |
+| Odia/Oriya Phonetic (ITRANS) | `itrans_odia` | `bdv`, `bfw`, `dso`, `gbj`, `gdb`, `hoc-Orya`, `jun`, `kff-Orya`, `kxv-Orya`, `kyw-Orya`, `pci-Orya`, `peg`, `sat-Orya`, `spv`, `srb-Orya` | Shree Devi Kumar | `../keyboards/release/itrans/itrans_odia` |
 | Ibọnọ Chwerty | `ibono_chwerty` | `ibn` | Rogers Katelem Edeh | `../keyboards/release/i/ibono_chwerty` |
 | Khmer Angkor | `khmer_angkor` | `km` | Makara Sok | `../keyboards/release/k/khmer_angkor` |
 | Komono (Côte d'Ivoire) | `komono_ci` | `kqg` | Kirk Rogers | `../keyboards/release/k/komono_ci` |
 | Nulisa Aksara Jawa | `jawa` | `id-Java`, `jv-Java`, `kaw-Java`, `mad-Java`, `sas-Java`, `su-Java`, `osi`, `tes` | Benny Lin | `../keyboards/release/j/jawa` |
+| Masaram Gondi (ITRANS) | `masaram_gondi` | `gon-Gonm` | Rajesh Kumar Dhuriya | `../keyboards/release/m/masaram_gondi` |
 | Pak Urdu Phonetic | `pak_urdu_phonetic` | `ur` | Nashit Ahmed Barq | `../keyboards/release/p/pak_urdu_phonetic` |
 | Remington GAIL (SIL) | `remington_gail` | `hi` | © SIL Global | `../keyboards/release/r/remington_gail` |
 | Russian Mnemonic R | `russian_mnemonic_r` | `ru` | Tigran Sarukhanyan | `../keyboards/release/r/russian_mnemonic_r` |
