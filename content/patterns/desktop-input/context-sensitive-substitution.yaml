@@ -169,7 +169,7 @@ provenance:
       non-Latin script where the combined output is a proper script conjunct rather
       than a diacritic-marked pair.
   - keyboard: "release/gautami/gautami_devanagari/source/gautami_devanagari.kmn"
-    lines: [120, 125]
+    lines: [119, 124]
     rules:
       - "U+094d any(m_bearer) '़' + [K_SLASH] > context(2) context(3)"
       - "any(m_bearer) '़' + [K_SLASH] > U+094d context(1) context(2)"
@@ -179,7 +179,7 @@ provenance:
       cluster, or inserts one to join a consonant pair. Both directions are triggered
       by the same slash key, making it a toggle: one press joins, a second press
       splits. Identical rule structure appears in gautami_bangla_bengali (lines
-      96-101) with the Bengali virama codepoint (U+09CD) in place of Devanagari's.
+      93-101) with the Bengali virama codepoint (U+09CD) in place of Devanagari's.
 
 demo:
   filled_kmn: |
