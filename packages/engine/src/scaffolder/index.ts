@@ -120,7 +120,7 @@ function applyTouchLayoutCleanup(vfs: VirtualFS, keyboardId: string): void {
 
   delete (data as Record<string, unknown>)["phone"];
 
-  for (const device of ["tablet", "phone"] as const) {
+  for (const device of ["tablet"] as const) {
     const deviceData = data[device] as { layer?: Array<Record<string, unknown>> } | undefined;
     if (deviceData?.layer == null) continue;
     const layers = deviceData.layer;
@@ -162,7 +162,6 @@ function applyTouchLayoutCleanup(vfs: VirtualFS, keyboardId: string): void {
 }
 
 function generateStubs(vfs: VirtualFS, keyboardId: string, displayName: string): void {
-  const year = new Date().getFullYear();
   const now = new Date();
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, "0");
@@ -204,7 +203,7 @@ function generateStubs(vfs: VirtualFS, keyboardId: string, displayName: string):
     },
     {
       path: `LICENSE.md`,
-      content: `Copyright © ${year} ${displayName}\n\nMIT License\n`,
+      content: `Copyright © ${yyyy} ${displayName}\n\nMIT License\n`,
     },
     {
       path: `HISTORY.md`,
@@ -257,10 +256,10 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         };
         await fetchKeyboardSourceToVfs(base, vfs, loaderOpts);
       } catch {
-        // fetchKeyboardSourceToVfs handles network errors and 404s internally;
-        // this catch covers offline environments and proxy misconfigurations.
-        // generateStubs() below fills all required §12 paths so the returned
-        // VirtualFS is always usable.
+        // fetchKeyboardSourceToVfs throws when the required .kmn is unreachable
+        // (network error, 404, or offline). Treat any such failure as a
+        // base-absent session; generateStubs() below fills all required §12
+        // paths so the returned VirtualFS is always usable.
       }
 
       const kmnVfsPath = vfs.list("source/").find((p) => p.endsWith(".kmn"));
