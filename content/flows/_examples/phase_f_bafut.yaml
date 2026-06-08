@@ -51,9 +51,6 @@ answers:
       Bafut Language Committee, Northwest Region, Cameroon. Keyboard layout by
       the Bafut Literacy Project, 2024.
 
-  - questionId: pf_license_selection
-    value: "MIT"
-
   - questionId: pf_contact_info
     value: "bafut.keyboard@example.org"
 
@@ -77,7 +74,7 @@ answers:
 #     (spec §8 step 9 parity guarantee)
 #
 #   LICENSE.md
-#     MIT license text (from pf_license_selection "MIT")
+#     MIT license text (populated automatically by the scaffolder)
 #
 #   keyboard package metadata (.kps)
-#     license field set to "MIT" (from pf_license_selection)
+#     license field set to "MIT" (populated automatically by the scaffolder)

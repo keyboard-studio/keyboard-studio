@@ -12,8 +12,9 @@
 #   - version numbers (managed by the scaffolder)
 #   - copyright notices (managed by the scaffolder)
 #
-# pf_license_selection feeds LICENSE.md and the keyboard package metadata only;
-# it is NOT rendered in either help output.
+# The scaffolder always uses the MIT license for keyboard packages submitted to
+# keymanapp/keyboards. LICENSE.md and the keyboard package metadata are populated
+# automatically — no license question is asked here.
 
 flow_id: phase_f_helpdocs
 phase: "F"
@@ -80,7 +81,7 @@ questions:
     required: false
     next: pf_credits
 
-  # -- Credits and licensing ---------------------------------------------------
+  # -- Credits -----------------------------------------------------------------
 
   - id: pf_credits
     prompt: "Who should be acknowledged for creating this keyboard?"
@@ -92,29 +93,7 @@ questions:
       the help page.
     type: text
     required: true
-    next: pf_license_selection
-
-  - id: pf_license_selection
-    prompt: "Which license should this keyboard package use?"
-    help_text: >
-      The license sets the rules for how others can share, use, and modify your
-      keyboard. MIT is a good default for most keyboards — it is short, simple,
-      and widely recognized. Choose the open font license if your package
-      includes custom fonts. The keyboard repository requires an open license.
-    type: radio
-    required: true
     next: pf_contact_info
-    options:
-      - value: MIT
-        label: "MIT (simple, permissive — recommended for most keyboards)"
-      - value: Apache-2.0
-        label: "Apache 2.0 (permissive, includes patent clause)"
-      - value: GPL-2.0-or-later
-        label: "GPL 2.0 or later (copyleft — derivatives must also be GPL)"
-      - value: OFL-1.1
-        label: "SIL Open Font License 1.1 (use when the package includes custom fonts)"
-      - value: CC-BY-4.0
-        label: "Creative Commons Attribution 4.0"
 
   # -- Contact information -----------------------------------------------------
 
@@ -168,6 +147,6 @@ welcome_htm_template:
     </html>
   notes:
     - "pf_usage_tips is the ordered array [pf_usage_tip_1..pf_usage_tip_5] with blank entries removed"
-    - "pf_license_selection feeds LICENSE.md and .kps metadata — NOT rendered in welcome.htm (spec §8 step 9 excludes copyright)"
+    - "LICENSE.md (MIT) and .kps license metadata are populated by the scaffolder automatically — not asked in this flow"
     - "help/<keyboardId>.php is auto-generated from the same content with identical body (spec §8 step 9 parity guarantee)"
     - "BCP47 lang attr ({{phase_a.bcp47Tag}}) is derived from Phase A KeyboardIdentity, never asked again"
