@@ -1,15 +1,12 @@
 // Metadata-only picker — dropdown over BaseBrowserService.listAll().
 // No filter; CJK/Ethiopic guard lives in OSKFrame, not here.
-//
-// [SCAFFOLD] Uses localBaseBrowser (Vite dev plugin backed) as the
-// BaseBrowserService.
 
 import { useEffect, useState } from "react";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
-import { mockBaseBrowser } from "@keyboard-studio/contracts/mocks";
-// mockPatternLibrary (also from @keyboard-studio/contracts/mocks) serves the
-// gallery and survey routes once those land.
-import { localBaseBrowser } from "../lib/localBaseBrowser.ts";
+import { getBaseBrowserService } from "../lib/services.ts";
+
+const baseBrowser = getBaseBrowserService();
+
 
 export interface BaseKeyboardPickerProps {
   value: BaseKeyboard | null;

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { BaseKeyboard, VirtualFS } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { LOCAL_PROXY_BASE } from "../lib/localBaseBrowser.ts";
+import { LOCAL_PROXY_BASE } from "../lib/services.ts";
 
 interface EngineModule {
   compile: (fs: VirtualFS, keyboardId: string) => Promise<CompileResult>;
