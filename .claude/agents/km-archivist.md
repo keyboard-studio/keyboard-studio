@@ -147,20 +147,50 @@ When asked "when did X change?" or "why does Y exist?":
 
 ### Phase 5: Sprint Status Tracking
 
-When an issue is picked up or completed, update the relevant sprint file (`sprints/engine_sprints.md` or `sprints/content_sprints.md`) to reflect its current status. Every issue line carries one of four markers:
+**This phase is mandatory, not optional.** Whenever you complete any PR or issue action, sync the sprint files to the board before the task is done.
 
-- `— *unassigned*` — no one has started it yet
-- `— *in progress by @username*` — someone is actively working it (update when a GitHub assignee appears)
-- `— *in PR #NNN by @username*` — code done, PR open and awaiting review
-- `— *done*` — the issue is closed or all acceptance criteria are checked
+The authoritative source is **MattGyverLee's "Keyman Summer" project board** (project number 1). Sprint files mirror it; the board wins on conflict.
 
-**When to update:**
-- When a PR is merged that closes an issue → change to `*done*`
-- When a PR is opened for an issue → change to `*in PR #NNN by @username*`
-- When someone assigns an issue to themselves on GitHub → change to `*in progress by @username*`
-- When an issue is unassigned again → revert to `*unassigned*`
+Every issue line in `sprints/engine_sprints.md` and `sprints/content_sprints.md` carries one of four markers — the exact column names from the board:
 
-Always commit sprint file updates alongside the relevant code commit or PR merge — not in a separate unrelated commit. Use `docs(process): update sprint status for #N` as the commit prefix when the only change is a status update.
+- `— *todo*` — not yet picked up
+- `— *in progress by @username*` — actively being worked; use the GitHub assignee(s) from the board (comma-separate multiple: `*in progress by @alice, @bob*`)
+- `— *in PR*` — has an open PR under review
+- `— *done*` — issue is closed / all acceptance criteria checked
+
+**Procedure — run this after every PR open, merge, or issue status change:**
+
+```bash
+# 1. Fetch current board state for all issues in both sprint files
+gh project item-list 1 --owner MattGyverLee --format json --limit 200 \
+  | python3 -c "
+import json,sys
+data=json.load(sys.stdin)
+for item in data['items']:
+    n=item.get('content',{}).get('number')
+    if n: print(f'#{n}: {item.get(\"status\",\"\")} | {item.get(\"assignees\",[])}')
+"
+
+# 2. For any issue whose board status differs from the sprint file, edit the sprint line.
+# 3. Commit with: docs(process): sync sprint status with Keyman Summer board
+```
+
+**Status → marker mapping:**
+
+| Board column | Sprint marker |
+|---|---|
+| Todo | `*todo*` |
+| In progress | `*in progress by @username*` |
+| In PR | `*in PR*` |
+| Done | `*done*` |
+
+**When to run the sync:**
+- After merging a PR that closes an issue → verify board moved to Done, update sprint file
+- After opening a PR for an issue → verify board moved to In PR, update sprint file
+- After someone self-assigns an issue → verify board moved to In progress, update sprint file
+- Any time you touch a sprint file for any other reason → spot-check surrounding issues
+
+Always commit sprint file updates alongside the relevant code commit or PR merge — not in a separate unrelated commit. Use `docs(process): sync sprint status with Keyman Summer board` as the commit prefix when the only change is a status update.
 
 The milestone on each issue should match the sprint it belongs to (`KS-S1` through `KS-S7`). If an issue slips to a later sprint, update both the GitHub milestone and the sprint file.
 
