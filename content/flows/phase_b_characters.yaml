@@ -821,6 +821,9 @@ questions:
 #     pb_char_count == "small"  -> A1: small
 #     pb_char_count == "medium" -> A1: medium
 #     pb_char_count == "large"  -> A1: large
+#     # NOTE: A1=massive is not emitted by Phase B (v1). Massive-scale inventories map to
+#     # logographic scripts (CJK) excluded from v1 scope per spec §9/§16.
+#     # Rule 1 (A1=massive AND A2=logographic → S-12) is unreachable from Phase B output in v1.
 #
 #   A3 (phonetic intuition):  (§7.1 defines only "strong" | "weak")
 #     pb_typing_approach == "phonetic"      -> A3: strong  (type the Latin spelling)
@@ -841,6 +844,11 @@ questions:
 #     S-07) is NOT elicited by Phase B here; it is set later (Phase C / pattern
 #     selection). pb_mark_style (precomposed vs combining) informs OUTPUT
 #     normalisation and the S-02-vs-direct-key choice, not the A4 axis value.
+#     # TIMING NOTE (A4=replacing-cycling): Phase B emits A4 as one of {none, stacking-combining, multi-family}.
+#     # The value 'replacing-cycling' is resolved only during Phase C pattern selection.
+#     # Consequence: the strategy selector must be invoked a SECOND TIME after Phase C confirms A4,
+#     # or rule 3 (A4=replacing-cycling → S-07) must be treated as a Phase C post-selection step.
+#     # See spec §7.2 rule 3 and §8.7.
 #
 #   A7 (spare keys):  (§7.1: "many" | "RAlt-only" | "fully-booked")
 #     A7 is authoritatively computed by the engine from the base-keyboard diff
@@ -888,6 +896,13 @@ questions:
 # Known §7.5 gaps (do not hard-assert these until resolved):
 #   EuroLatin profile (S-06 vs S-02) -- intentional v1.1 gap
 #   IPA profile (S-05 vs S-03)       -- intentional v1.1 gap
+#
+# AXES NOT COMPUTED BY PHASE B:
+#   - A2 (script class): set in Phase A from BCP47 + three-group routing (spec §7.1, §9)
+#   - A5 (multi-mode): resolved in Phase C gallery pattern selection (spec §8.7)
+#   - A6 (constraint enforcement): resolved in Phase C gallery pattern selection (spec §8.7)
+#   - A2a (cluster sensitivity): resolved in Phase C gallery pattern selection (spec §8.7)
+#   Phase B contributes A1, A3, A4 (partial -- see TIMING NOTE), A7 to the axis vector.
 #
 # eligible_inventory_entries:
 #   Union of all InventoryChar[] from methods used (manual answers converted,
