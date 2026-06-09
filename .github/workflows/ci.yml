@@ -62,4 +62,4 @@ jobs:
         run: node utilities/spec-trace/index.js check
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SPEC_TRACE_REPO: MattGyverLee/keyboard-studio
+          SPEC_TRACE_REPO: ${{ github.repository }}

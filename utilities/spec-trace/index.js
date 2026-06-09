@@ -56,7 +56,12 @@ function hashSection(content) {
 
 function loadTrace() {
   if (!fs.existsSync(TRACE_FILE)) return null;
-  return JSON.parse(fs.readFileSync(TRACE_FILE, 'utf8'));
+  try {
+    return JSON.parse(fs.readFileSync(TRACE_FILE, 'utf8'));
+  } catch (e) {
+    console.log('[ERROR] Failed to parse ' + TRACE_FILE + ': ' + e.message);
+    return null;
+  }
 }
 
 function saveTrace(trace) {
@@ -94,7 +99,10 @@ function seed() {
       };
       added++;
     } else {
-      trace.sections[s.id].hash = currentHash;
+      if (trace.sections[s.id].hash !== currentHash) {
+        console.log('[WARN] Hash updated for ' + s.id + ' (spec content changed since last seed)');
+        trace.sections[s.id].hash = currentHash;
+      }
       trace.sections[s.id].title = s.title;
     }
   }
@@ -297,12 +305,17 @@ async function listOpenDriftIssues(owner, repo, token) {
 }
 
 async function createIssues(drifted, token) {
-  const [owner, repo] = REPO.split('/');
+  const parts = REPO.split('/');
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    console.log('[ERROR] SPEC_TRACE_REPO must be in "owner/repo" format, got: ' + REPO);
+    return;
+  }
+  const [owner, repo] = parts;
   await ensureLabel(owner, repo, token);
   const existing = await listOpenDriftIssues(owner, repo, token);
 
   for (const d of drifted) {
-    const dup = existing.find(i => i.title.includes(d.id));
+    const dup = existing.find(i => i.title.startsWith('spec drift: ' + d.id + ' --'));
     if (dup) {
       console.log('[INFO] Issue already open for ' + d.id + ': #' + dup.number);
       continue;
