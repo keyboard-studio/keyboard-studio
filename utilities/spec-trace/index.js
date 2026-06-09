@@ -11,7 +11,7 @@
  *   report                    print coverage + unacknowledged drift summary
  *   acknowledge <section-id>  accept a reviewed section, update its hash
  *
- * Never exits non-zero — drift is a warning, not a build failure.
+ * The check subcommand never exits non-zero — drift is a warning, not a build failure.
  */
 
 const fs = require('fs');
@@ -22,7 +22,7 @@ const https = require('https');
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const SPEC_FILE = path.join(REPO_ROOT, 'spec.md');
 const TRACE_FILE = path.join(REPO_ROOT, 'docs', 'spec-trace.json');
-const REPO = process.env.SPEC_TRACE_REPO || 'MattGyverLee/keyboard-studio';
+const REPO = process.env.SPEC_TRACE_REPO || '';
 
 // ---------------------------------------------------------------------------
 // Spec parsing
@@ -74,6 +74,7 @@ function saveTrace(trace) {
 // ---------------------------------------------------------------------------
 
 function seed() {
+  if (!fs.existsSync(SPEC_FILE)) { console.log('[ERROR] spec.md not found at ' + SPEC_FILE); return; }
   const content = fs.readFileSync(SPEC_FILE, 'utf8');
   const sections = parseSpecSections(content);
   const existing = loadTrace() || {};
@@ -123,6 +124,7 @@ async function check() {
     return;
   }
 
+  if (!fs.existsSync(SPEC_FILE)) { console.log('[ERROR] spec.md not found at ' + SPEC_FILE); return; }
   const content = fs.readFileSync(SPEC_FILE, 'utf8');
   const sections = parseSpecSections(content);
   const drifted = [];
@@ -173,6 +175,7 @@ function acknowledge(sectionId) {
   const trace = loadTrace();
   if (!trace) { console.log('[ERROR] docs/spec-trace.json not found'); process.exit(1); }
 
+  if (!fs.existsSync(SPEC_FILE)) { console.log('[ERROR] spec.md not found at ' + SPEC_FILE); process.exit(1); }
   const content = fs.readFileSync(SPEC_FILE, 'utf8');
   const sections = parseSpecSections(content);
   const section = sections.find(s => s.id === sectionId);
@@ -208,6 +211,7 @@ function report() {
   const trace = loadTrace();
   if (!trace) { console.log('[WARN] docs/spec-trace.json not found'); return; }
 
+  if (!fs.existsSync(SPEC_FILE)) { console.log('[ERROR] spec.md not found at ' + SPEC_FILE); return; }
   const content = fs.readFileSync(SPEC_FILE, 'utf8');
   const sections = parseSpecSections(content);
   const drifted = [];
@@ -257,7 +261,7 @@ function apiRequest(options, body) {
       res.on('data', c => { data += c; });
       res.on('end', () => {
         try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
-        catch { resolve({ status: res.statusCode, body: data }); }
+        catch (e) { resolve({ status: res.statusCode, body: data, parseError: e.message }); }
       });
     });
     req.on('error', reject);
@@ -284,13 +288,17 @@ async function ensureLabel(owner, repo, token) {
     headers: ghHeaders(token)
   });
   if (res.status === 404) {
-    await apiRequest({
+    const createRes = await apiRequest({
       hostname: 'api.github.com',
       path: '/repos/' + owner + '/' + repo + '/labels',
       method: 'POST',
       headers: { ...ghHeaders(token), 'Content-Type': 'application/json' }
     }, { name, description: 'spec.md section changed -- code review needed', color: 'd4c5ff' });
-    console.log('[OK] Created label: spec-drift');
+    if (createRes.status >= 300) {
+      console.log('[WARN] Failed to create label: ' + JSON.stringify(createRes.body).slice(0, 80));
+    } else {
+      console.log('[OK] Created label: spec-drift');
+    }
   }
 }
 
@@ -305,6 +313,7 @@ async function listOpenDriftIssues(owner, repo, token) {
 }
 
 async function createIssues(drifted, token) {
+  if (!REPO) { console.log('[INFO] SPEC_TRACE_REPO not set -- skipping issue creation'); return; }
   const parts = REPO.split('/');
   if (parts.length !== 2 || !parts[0] || !parts[1]) {
     console.log('[ERROR] SPEC_TRACE_REPO must be in "owner/repo" format, got: ' + REPO);

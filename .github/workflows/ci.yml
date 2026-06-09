@@ -59,6 +59,7 @@ jobs:
       # sections whose content changed since the last acknowledgement.
       # Never fails the build — drift is a backlog item, not a blocker.
       - name: Spec drift check
+        continue-on-error: true
         run: node utilities/spec-trace/index.js check
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
