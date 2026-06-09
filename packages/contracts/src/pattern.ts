@@ -3,7 +3,21 @@
 import type { StrategyId } from "./strategy";
 import type { IRNodeRef } from "./keyboard-ir";
 
-export type PatternCategory = "desktop" | "touch" | "reorder";
+/**
+ * Gallery categories a pattern can belong to.
+ * The three spec §5 values (desktop, touch, reorder) are the engine-canonical
+ * routing categories. The remaining values (substitute, transliteration, ime,
+ * validation) are the actual directory names used in the content/patterns YAML
+ * tree and must be accepted by the loader and the gallery.
+ */
+export type PatternCategory =
+  | "desktop"
+  | "touch"
+  | "reorder"
+  | "substitute"
+  | "transliteration"
+  | "ime"
+  | "validation";
 
 export type AnswerType =
   | "char-list" // user pastes or types a list of Unicode characters
@@ -166,6 +180,21 @@ export interface Pattern {
    * content-layer only; loader may omit when constructing engine Pattern objects.
    */
   demo?: string | null;
+
+  /**
+   * Gallery visibility scope for this pattern.
+   * "all" means the pattern is shown to all user groups; other values restrict
+   * the pattern to the named group (e.g. a language-family group ID).
+   * Present in YAML source files; used by the pattern-library loader filter.
+   */
+  group_visibility?: string;
+
+  /**
+   * Ordering priority within the gallery (lower number = higher priority).
+   * Used by the pattern-library loader's PatternFilter to select patterns
+   * at a specific priority tier.
+   */
+  priority?: number;
 }
 
 /**
@@ -198,6 +227,10 @@ export type PatternInit = {
     notes?: string;
   }>;
   demo?: string | null;
+  /** @see Pattern.group_visibility */
+  group_visibility?: string;
+  /** @see Pattern.priority */
+  priority?: number;
 };
 
 /**
@@ -229,5 +262,7 @@ export function makePattern(init: PatternInit): Pattern {
     ...(init.frequencyInCorpus !== undefined ? { frequencyInCorpus: init.frequencyInCorpus } : {}),
     ...(init.provenance !== undefined ? { provenance: init.provenance } : {}),
     ...(init.demo !== undefined ? { demo: init.demo } : {}),
+    ...(init.group_visibility !== undefined ? { group_visibility: init.group_visibility } : {}),
+    ...(init.priority !== undefined ? { priority: init.priority } : {}),
   };
 }

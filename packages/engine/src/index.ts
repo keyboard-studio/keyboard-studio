@@ -60,3 +60,7 @@ export type { RecognizerRule, MatchResult, RecognizeResult } from "./recognizer/
 // Issue #19 — scaffolder (template-cleanup pipeline).
 export { createScaffolderService } from "./scaffolder/index.js";
 export type { ScaffolderServiceOptions } from "./scaffolder/index.js";
+
+// Issue #21 — Pattern-library loader.
+export { loadPatterns, getPatterns, getById } from "./pattern-library/index.js";
+export type { PatternFilter, LoadReport } from "./pattern-library/index.js";

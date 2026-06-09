@@ -1,0 +1,6 @@
+id: test_invalid_pattern
+title: "Test Invalid"
+description: "Missing required fields — should be skipped by loader."
+category: substitute
+appliesTo: []
+questions: []
