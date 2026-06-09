@@ -31,6 +31,7 @@ type AnswerValueMap = {
   "text": string;
 };
 
+/** Discriminated union of all survey answer shapes keyed by {@link AnswerType}. Narrow on `answerType` to access the correctly-typed `value`. @see spec.md §8 */
 export type SurveyAnswer = {
   [K in AnswerType]: {
     questionId: string;

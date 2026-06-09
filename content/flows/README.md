@@ -157,7 +157,7 @@ routing_group: qwerty-qwertz   # RoutingGroup value derived from layout_family a
 ```
 
 The `answers` array is compatible with `SurveyAnswer[]` from `packages/contracts`:
-each entry has exactly `questionId` (string) and `value` (string). No extra fields.
+each entry has `questionId` (string), `answerType` (one of the seven `AnswerType` literals from `packages/contracts`), and `value` (typed per `answerType` — `string[]` for `char-list`, `boolean` for `boolean`, `string` for all others).
 
 Questions that were not shown (because a branch skipped them) are omitted from
 the array entirely.
