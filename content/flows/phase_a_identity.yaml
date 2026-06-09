@@ -149,12 +149,14 @@ questions:
   # -- Keyboard layout family (routing group) ----------------------------------
 
   - id: layout_family
-    prompt: "Which keyboard layout is this based on?"
+    prompt: "Which physical keyboard layout does your community use?"
     help_text: >
-      Most keyboards in the world follow one of a small number of standard
-      layouts. Pick the one that best matches the physical keyboard your
-      community uses. If you are not sure or skip this question, the studio
-      will use the US QWERTY layout as your starting point.
+      This tells the studio which keyboard patterns to offer you in the next
+      step. Most of the world uses QWERTY; choose QWERTZ or AZERTY only if
+      your community actually uses one of those regional variants. For
+      non-Roman scripts such as Devanagari or Arabic, choose the last option.
+      If you are not sure, leave this blank and the studio will show QWERTY
+      patterns.
     type: radio
     options:
       - value: qwerty
