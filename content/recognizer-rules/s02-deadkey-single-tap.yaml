@@ -1,0 +1,222 @@
+# s02-deadkey-single-tap.yaml
+# Recognizer rule: lift a single-tap deadkey family from an imported KeyboardIR
+# into a Pattern instance with origin='recognized'.
+#
+# Strategy: S-02 (deadkey composition). This is the most common pattern in the
+# Latin release/ corpus (12/20 scanned keyboards; spec §7.5 El Pasifika row).
+# The spec §6 worked example is this exact cluster shape.
+#
+# Format: provisional — see README.md. Pending ratification at issue #232.
+
+id: deadkey_single_tap
+strategyId: S-02
+patternRef: content/patterns/desktop-input/deadkey-single-tap.yaml   # repo-root-relative
+format_status: provisional
+
+description: >
+  Detect a three-rule deadkey composition cluster in a KeyboardIR and lift it
+  into the deadkey-single-tap Pattern. The cluster consists of:
+    (1) a trigger rule: one vkey key press sets a named deadkey state,
+    (2) a fan-out rule: the deadkey state plus any() base from a store maps to
+        index() output from a parallel store,
+    (3) an escape rule: the deadkey state plus the same trigger key emits the
+        bare combining accent character.
+  All three rules share the same deadkey id (DK) and live in the same IRGroup.
+
+# ---------------------------------------------------------------------------
+# IR predicate
+# ---------------------------------------------------------------------------
+predicate:
+  cluster_type: three-rule-deadkey
+  shared_key: deadkey.id   # All three rules share the same numeric deadkey id
+
+  rules:
+    # Rule 1 — trigger rule: arm the deadkey state
+    - role: trigger
+      description: >
+        Pressing a single vkey (no prior state) outputs a deadkey marker.
+        This is the "arm" rule — it does not emit a visible character.
+      context_pattern:
+        # IRRule.context is ContextElement[]. The bare rule form (+ [K_X] > deadkey(...))
+        # has context: [] (empty array) — the engine must match this as well as the
+        # single-vkey form. Both are valid and common trigger shapes.
+        - kind: vkey
+          count: zero_or_one   # zero = bare rule (context: []); one = single vkey
+          constraints:
+            no_modifiers_required: false   # modifiers like SHIFT are allowed
+            no_prior_deadkey: true         # context must NOT already contain a deadkey
+      output_pattern:
+        - kind: deadkey
+          count: exactly_one
+          constraints:
+            id: DK   # This id becomes the shared_key for the other two rules
+
+    # Rule 2 — fan-out rule: deadkey + any base -> index output
+    - role: fan-out
+      description: >
+        The deadkey state followed by any base letter (from a parallel store)
+        produces the corresponding accented letter (via index into the output store).
+      context_pattern:
+        - kind: deadkey
+          count: exactly_one
+          constraints:
+            id: DK   # Must match the trigger rule's deadkey id
+        - kind: any
+          count: exactly_one
+          constraints:
+            storeRef: S_bases   # Names the bases store (see store_constraints)
+      output_pattern:
+        - kind: index
+          count: exactly_one
+          constraints:
+            storeRef: S_output   # Names the output store (see store_constraints)
+            # offset must equal the 1-indexed position of the any() element in context.
+            # For this cluster shape (context = [deadkey, any]), any() is at position 2.
+            # The engine must verify: index.offset == (1-indexed position of any() in context)
+            # rather than hardcoding 2 — a cluster with context = [any] would require offset 1.
+            offset_equals_any_position: true
+
+    # Rule 3 — escape rule: deadkey + trigger key -> bare combining accent
+    - role: escape
+      description: >
+        The deadkey state followed by the same trigger key (pressed twice) emits
+        the bare combining accent mark, allowing the trigger character itself to
+        be typed.
+      context_pattern:
+        - kind: deadkey
+          count: exactly_one
+          constraints:
+            id: DK   # Must match the trigger rule's deadkey id
+        - kind: vkey
+          count: exactly_one
+          constraints:
+            same_as_trigger_rule_vkey: true   # Same K_X / modifier combo as rule 1
+      output_pattern:
+        - kind: char
+          count: exactly_one
+          constraints:
+            single_codepoint: true   # The bare combining accent, e.g. U+0301
+
+  store_constraints:
+    - store: S_bases
+      isSystem: false
+      items_kind: char   # All items must be char; no vkey, deadkey, or raw items
+    - store: S_output
+      isSystem: false
+      items_kind: char
+      same_length_as: S_bases   # Layer A parallel-store invariant — enforced by validator
+
+  group_constraints:
+    usingKeys: true             # Must be a 'using keys' group, not nomatch/match
+    all_rules_same_group: true  # All three rules must share the same IRGroup.nodeId
+
+  disqualifiers:
+    - Any rule in the cluster has output element kind=raw (unparsed fragment — cannot safely lift)
+    - S_bases or S_output items contain kind=vkey or kind=deadkey (complex stores, not plain char lists)
+    - The two stores have different item counts (parallel-store invariant violated — Layer A bug)
+    - IRRule.ownedByPattern is already set on any rule in the cluster (already claimed)
+
+  combinedWith_if:
+    # El Pasifika §7.5 regression row: the S-02 + S-10 combination is driven by
+    # A6=loud (a survey axis), NOT by mechanical presence of a beep in the IR.
+    # A defensive or stale beep in an escape rule does NOT imply the keyboard
+    # author intended constraint-feedback behavior. The recognizer must NOT
+    # silently add S-10 — instead it should set a flag for human review.
+    - condition:
+        any_rule_in_group:
+          output_has_element: { kind: beep }
+      action: flag_for_human_review   # Human confirms A6=loud before S-10 is added
+      note: >
+        Do not automatically assign combinesWith: ["S-10"]. Surface a review
+        annotation on the lifted Pattern so the author can confirm whether the
+        beep is intentional constraint feedback (A6=loud → S-10) or incidental.
+
+# ---------------------------------------------------------------------------
+# What gets lifted
+# ---------------------------------------------------------------------------
+lifts_to:
+  origin: recognized
+  patternId: deadkey_single_tap
+
+  # How to populate Pattern slot values from the matched IR cluster.
+  # After lifting, the user can refine these values in the survey.
+  slot_mapping:
+    triggerKey:
+      source: rules[trigger].context_pattern[0].name   # The vkey name, e.g. "K_QUOTE"
+      transform: none
+
+    deadkeyName:
+      source: rules[trigger].output_pattern[0].id   # The deadkey numeric id, DK
+      transform: numeric_id_to_label   # e.g. 1 -> "dk1"; content team may rename
+
+    baseLetters:
+      source: stores[S_bases].items
+      transform: store_items_to_char_string   # Concatenate all char items into a string
+
+    accentedForms:
+      source: stores[S_output].items
+      transform: store_items_to_char_string
+
+    accentChar:
+      source: rules[escape].output_pattern[0].value   # The bare combining char
+
+# ---------------------------------------------------------------------------
+# Corpus evidence
+# ---------------------------------------------------------------------------
+# Required by issue #240 AC: each rule must be validated against at least two
+# release/basic/ or SIL Latin keyboards before this rule is considered complete.
+# 'recognizedRatio_delta' values are TARGET estimates pending engine (#234).
+
+corpus_evidence:
+  keyboards:
+    - id: sil_euro_latin
+      path: release/sil/sil_euro_latin/source/sil_euro_latin.kmn
+      notes: >
+        Primary spec §6 exemplar. 92 deadkey rules across multiple accent families
+        (acute, grave, circumflex, tilde, diaeresis, macron). Each family is a
+        canonical three-rule cluster. Confirming this keyboard gets recognizedRatio > 0
+        is the first AC validation target.
+    - id: basic_kbdfr
+      path: release/basic/basic_kbdfr/source/basic_kbdfr.kmn
+      notes: >
+        French keyboard. Bracket key as circumflex prefix. Uses virtual-key trigger
+        (K_LBRKT) rather than string-literal trigger, which tests that the trigger
+        rule's context_pattern handles both forms.
+    - id: sil_cameroon_qwerty
+      path: release/sil/sil_cameroon_qwerty/source/sil_cameroon_qwerty.kmn
+      notes: >
+        Cameroon QWERTY. Colon as diacritic prefix for Cameroonian General Alphabet
+        characters. Secondary S-02 in an S-08-primary keyboard — tests that the
+        recognizer correctly lifts S-02 clusters even when S-08 is the primary strategy.
+
+  expected_recognizedRatio_min: 0.6   # Target after S-02 rules land (pending #234)
+
+# ---------------------------------------------------------------------------
+# Notes for km-domain review
+# ---------------------------------------------------------------------------
+notes:
+  linguistic: >
+    The escape rule (trigger-key double-tap) is critical for correct linguistic
+    behavior — without it the trigger character itself cannot be typed. The
+    escape rule's output is the trigger character's own Unicode identity, which
+    may be a combining diacritic (e.g. U+0301 COMBINING ACUTE ACCENT), a spacing
+    modifier letter (e.g. U+02BC MODIFIER LETTER APOSTROPHE), or ordinary
+    punctuation (e.g. U+0027 APOSTROPHE) depending on the keyboard's design. It
+    is NOT always a combining mark. Keyboards that use apostrophe as a deadkey
+    trigger (common for glottal stops and modifier letters in African and Pacific
+    orthographies) emit plain U+0027 from the escape rule, not a combining
+    character. The escape rule must always be present for linguistically complete
+    S-02 behavior.
+
+  edge_cases:
+    - >
+      Some keyboards use string-literal context (e.g. "'" > deadkey(acute)) rather
+      than a virtual-key context (+ [K_QUOTE] > deadkey(acute)). The predicate must
+      handle both ContextElement shapes.
+    - >
+      A keyboard may define multiple S-02 families (e.g. acute + grave + circumflex).
+      Each family has its own distinct deadkey id (DK) and its own trigger key. The
+      recognizer should lift each family as a separate Pattern instance.
+    - >
+      If the fan-out rule uses index() with offset != 2, this is an unusual pattern
+      that should not be silently lifted — surface as an unrecognized cluster.

@@ -1,0 +1,161 @@
+# s01-direct-substitution.yaml
+# Recognizer rule: lift a set of single-key direct substitution rules from an
+# imported KeyboardIR into a Pattern instance with origin='recognized'.
+#
+# Strategy: S-01 (simple swap). Applies when a keyboard maps a small set of
+# keys (≤5 base characters) directly to individual Unicode characters, with no
+# deadkeys, no stores, and no context dependency.
+#
+# The canonical exemplar is the Akan keyboard (spec §7.5 regression row; see
+# also content/patterns/substitute/simple-swap.yaml).
+#
+# Format: provisional — see README.md. Pending ratification at issue #232.
+
+id: simple_swap
+strategyId: S-01
+patternRef: content/patterns/substitute/simple-swap.yaml   # repo-root-relative
+format_status: provisional
+
+description: >
+  Detect a cluster of one to five independent single-key substitution rules in
+  a KeyboardIR and lift them into the simple-swap Pattern. Each qualifying rule
+  maps exactly one vkey keystroke (with optional modifiers) to exactly one
+  Unicode character, with no store references, no deadkey involvement, and no
+  context dependency.
+  Shift variants of the same base character (e.g. K_Q -> ɛ and SHIFT K_Q -> Ɛ)
+  count as one logical character and are grouped into the same lifted Pattern.
+
+# ---------------------------------------------------------------------------
+# IR predicate
+# ---------------------------------------------------------------------------
+predicate:
+  cluster_type: single-rule-direct
+  # S-01 has no shared linking key — each IRRule in the cluster is structurally
+  # independent. Clustering is done by grouping qualifying rules in the same
+  # IRGroup up to the max_cluster_size limit.
+  shared_key: none
+
+  rules:
+    - role: single
+      description: >
+        A direct substitution rule: one vkey (with optional modifier) in context,
+        one char in output. No state, no store references, no prior context.
+      context_pattern:
+        - kind: vkey
+          count: exactly_one
+          constraints:
+            # Modifiers (SHIFT, RALT, CTRL) are allowed — they identify case
+            # variants and alternate-layer characters.
+            no_prior_deadkey: true    # context must NOT start with a deadkey element
+            no_any: true             # no any() element — no store-driven fan-out
+            # no_char is redundant here — requiring kind=vkey already excludes
+            # kind=char; the disqualifier "context has more than one element" covers
+            # mixed-kind contexts. Do not add no_char to avoid ambiguity.
+      output_pattern:
+        - kind: char
+          count: exactly_one
+          constraints:
+            single_codepoint: true   # exactly one Unicode codepoint; no surrogate pairs
+
+  store_constraints: []   # S-01 rules reference no IRStore nodes
+
+  group_constraints:
+    usingKeys: true   # Must be a 'using keys' group
+
+  disqualifiers:
+    - IRRule.ownedByPattern is already set (rule already claimed by another recognizer)
+    - context contains a kind=deadkey element (belongs to an S-02 cluster)
+    - output contains kind=deadkey, kind=index, kind=outs, kind=beep, or kind=raw
+    - context or output references a storeRef (store involvement indicates S-02/S-04/S-05)
+    - context has more than one element (context dependency — not a simple swap)
+    - output has more than one element (multi-char output — not a simple swap)
+    - IRGroup.usingKeys is false (nomatch/match group — system rules, not substitutions)
+
+  cluster_constraints:
+    # Group rules by ContextElement.name (the vkey name, e.g. "K_Q"). All modifier
+    # combinations of the same name (K_Q, SHIFT K_Q, RALT K_Q) count as ONE distinct
+    # base character. This is the correct grouping algorithm per ContextElement { kind:
+    # "vkey", name: string, modifiers: string[] } in keyboard-ir.ts.
+    max_distinct_base_chars: 5
+    # Spec note: §7.1 defines A1=tiny as "< 5" (strictly less than 5) while §7.3
+    # S-01 card says "1–5 extra characters" (≤5). These are inconsistent. This rule
+    # follows §7.3 (≤5) as the tie-breaker for the recognizer. A reconciliation
+    # request should be filed against spec §7.1 (flag to km-strategy).
+    # If the cluster exceeds 5 distinct base characters in the same group,
+    # do NOT lift as S-01. Surface as unrecognized (possibly S-02 or S-05 territory).
+
+  combinedWith_if: []   # S-01 does not combine with other strategies
+
+# ---------------------------------------------------------------------------
+# What gets lifted
+# ---------------------------------------------------------------------------
+lifts_to:
+  origin: recognized
+  patternId: simple_swap
+
+  slot_mapping:
+    keystrokeCharacterMap:
+      source: cluster_rules[*]
+      transform: rules_to_keystroke_char_map
+      # Produces a list of { keystroke: "[K_X]" | "[SHIFT K_X]" | ..., codepoint: "U+XXXX" }
+      # entries, one per qualifying rule in the cluster.
+
+    swapCharDescriptions:
+      source: null   # Cannot be inferred from IR — user fills this in the survey
+      transform: none
+
+# ---------------------------------------------------------------------------
+# Corpus evidence
+# ---------------------------------------------------------------------------
+# Required by issue #240 AC: validate against at least two keyboards.
+
+corpus_evidence:
+  keyboards:
+    - id: akan
+      path: release/a/akan/source/akan.kmn
+      notes: >
+        The canonical S-01 exemplar. Adds ɛ (K_Q) and ɔ (K_C) with case variants
+        (Ɛ on SHIFT K_Q, Ɔ on SHIFT K_C). Exactly 4 rules, 2 distinct base chars.
+        spec §7.5 Akan regression row confirms the tree routes to S-01 for this
+        keyboard (A1=tiny, A3=strong, A4=none).
+    - id: hausa_kano
+      path: release/h/hausa_kano/source/hausa_kano.kmn
+      notes: >
+        Secondary corpus witness (phonebook-indexed, BCP47: ha-Latn). Hausa uses
+        implosive consonants (ɓ, ɗ) and the voiced pharyngeal fricative ɦ that
+        may appear as simple key swaps on unused keys in a Latin-QWERTY layout.
+        Verify S-01 cluster presence against actual source before marking AC
+        checkbox 2 — Hausa keyboards sometimes use S-05 mnemonic sequences
+        instead of direct key swaps for these characters.
+
+  expected_recognizedRatio_min: 0.3   # Target after S-01 rules land (pending #234)
+  # Lower than S-02 because S-01 applies only to the small subset of keyboards
+  # with tiny inventories; most keyboards will produce 0 S-01 matches.
+
+# ---------------------------------------------------------------------------
+# Notes for km-domain review
+# ---------------------------------------------------------------------------
+notes:
+  linguistic: >
+    S-01 is the simplest strategy, but the 5-character cluster limit is a
+    linguistic judgment call, not an arbitrary number. The spec §7.2 decision
+    tree routes to S-01 only when A1=tiny (fewer than 5 new characters). Above
+    this threshold, keyboards typically have enough characters to benefit from a
+    deadkey or mnemonic organization. The recognizer should NOT silently lift
+    larger clusters as S-01.
+
+  edge_cases:
+    - >
+      A keyboard may have both S-01 (a couple of standalone character swaps) and
+      S-02 (a deadkey family) in the same group. The S-02 recognizer runs first
+      and claims its rules (sets IRRule.ownedByPattern). The S-01 recognizer then
+      runs on the unclaimed rules. Correct ordering is the engine's responsibility,
+      not this rule's.
+    - >
+      RAlt (RALT K_X) variants are valid S-01 context elements. A keyboard that
+      puts ɛ on RAlt+Q counts as S-01 if the total is still ≤5 distinct base chars.
+    - >
+      Some keyboards use context= "" (empty string literal) instead of a vkey
+      context. These look like "output only" rules. Whether to treat them as S-01
+      or noise depends on the IR parser's handling of string-context rules.
+      For now, require kind=vkey in context; string-context rules are disqualified.
