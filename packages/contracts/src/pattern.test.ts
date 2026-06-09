@@ -208,6 +208,40 @@ describe("makePattern optional-field handling (#78)", () => {
   });
 });
 
+describe("makePattern — origin and ownedNodes", () => {
+  const base = {
+    id: "x",
+    title: "x",
+    description: "x",
+    category: "desktop" as const,
+    appliesTo: [] as string[],
+    questions: [],
+    kmnFragment: "",
+    tests: [],
+    validatedForFamilies: [],
+    sourceKeyboards: [],
+    reviewedBy: "test",
+    reviewDate: "2026-06-02",
+  };
+
+  it("preserves origin and ownedNodes when provided", () => {
+    const p = makePattern({
+      ...base,
+      origin: "recognized",
+      ownedNodes: [{ kind: "rule", nodeId: "r1" }],
+    });
+    expect(p.origin).toBe("recognized");
+    expect(p.ownedNodes).toEqual([{ kind: "rule", nodeId: "r1" }]);
+    expect(JSON.parse(JSON.stringify(p))).toEqual(p);
+  });
+
+  it("omits origin and ownedNodes when not provided", () => {
+    const p = makePattern(base);
+    expect(p).not.toHaveProperty("origin");
+    expect(p).not.toHaveProperty("ownedNodes");
+  });
+});
+
 describe("makeCompileResult", () => {
   it("returns a shape-conforming CompileResult", () => {
     const r = makeCompileResult({

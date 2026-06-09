@@ -7,6 +7,7 @@ export * from "./axes";
 export * from "./baseKeyboard";
 export * from "./compileResult";
 export * from "./criteria";
+export * from "./keyboard-ir";
 export * from "./keyboardIdentity";
 export * from "./linguistInventory";
 export * from "./lintFinding";

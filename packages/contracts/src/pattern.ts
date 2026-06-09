@@ -1,6 +1,7 @@
 // see spec.md section 5 - Pattern schema (Day-1 contract)
 
 import type { StrategyId } from "./strategy";
+import type { IRNodeRef } from "./keyboard-ir";
 
 export type PatternCategory = "desktop" | "touch" | "reorder";
 
@@ -83,6 +84,26 @@ export interface Pattern {
    * @see spec.md §5, §7.3
    */
   combinesWith?: StrategyId[];
+  /**
+   * Where this Pattern instance came from.
+   *   'survey'      — author selected it from the gallery (existing v1 behaviour).
+   *   'imported'    — round-tripped as opaque IR; not survey-editable in v1
+   *                   (rendered in the carve gallery as a deletable card).
+   *   'recognized'  — the pattern recognizer lifted node clusters from an
+   *                   imported IR into this Pattern; survey-editable via {{slotId}} flow.
+   * Default: 'survey' (omitted means survey-originated).
+   * @see spec.md §5a — KeyboardIR; pending ratification at #232 joint session.
+   */
+  origin?: "survey" | "imported" | "recognized";
+  /**
+   * IR nodes this Pattern owns. Populated by the pattern recognizer for
+   * origin='recognized' patterns. Back-references let the emitter know which IR
+   * nodes to overwrite when a slot is edited, and let the carve gallery know
+   * which IR cards to suppress (already represented by the parent Pattern card).
+   * Empty/omitted for origin='survey'.
+   * @see spec.md §5a — IRNodeRef; pending ratification at #232 joint session.
+   */
+  ownedNodes?: IRNodeRef[];
   /** Survey questions that fill the named slots in kmnFragment. */
   questions: PatternQuestion[];
   /**
@@ -154,6 +175,8 @@ export type PatternInit = {
   appliesTo: string[];
   strategyId?: StrategyId;
   combinesWith?: StrategyId[];
+  origin?: "survey" | "imported" | "recognized";
+  ownedNodes?: IRNodeRef[];
   questions: PatternQuestion[];
   kmnFragment: string;
   touchLayoutFragment?: string;
@@ -192,6 +215,8 @@ export function makePattern(init: PatternInit): Pattern {
     reviewDate: init.reviewDate,
     ...(init.strategyId !== undefined ? { strategyId: init.strategyId } : {}),
     ...(init.combinesWith !== undefined ? { combinesWith: init.combinesWith } : {}),
+    ...(init.origin !== undefined ? { origin: init.origin } : {}),
+    ...(init.ownedNodes !== undefined ? { ownedNodes: init.ownedNodes } : {}),
     ...(init.touchLayoutFragment !== undefined
       ? { touchLayoutFragment: init.touchLayoutFragment }
       : {}),

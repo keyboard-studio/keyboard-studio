@@ -14,8 +14,8 @@ Update this file as new package skeletons land. Keep build/test/lint commands an
 
 ## Source of truth
 
-- **`spec.md`** — the v1.0 spec (signed off; 19 sections). Treat as authoritative for scope, schema, validator layering, team boundaries, and resolved decisions.
-- **`docs/spec-signoff.md`** — review-cycle log and decision summary (D1–D6). Use this to see *why* a spec section reads the way it does before proposing changes.
+- **`spec.md`** — the v1.1.0 spec (v1.0 signed off; v1.1.0 KeyboardIR import amendment applied 2026-06-08). Treat as authoritative for scope, schema, validator layering, team boundaries, and resolved decisions.
+- **`docs/spec-signoff.md`** — review-cycle log and decision summary (D1–D9). Use this to see *why* a spec section reads the way it does before proposing changes.
 - **`README.md`** — one-line external description; do not expand without reason.
 - **`strategy tree/strategies.md`** — **superseded.** Merged into `spec.md §7`; now a stub pointer only. Do not edit it or treat it as a source.
 
@@ -41,13 +41,13 @@ The `Pattern` TS interface in spec Sec 5 is the Day-1 contract (issue #5). Treat
 
 - Prose section edits — single-reviewer approval.
 - `Pattern` schema field renames/type changes/removals — major version bump of `packages/contracts` + joint engine+content session.
-- Reopening a resolved decision (D1–D6, Sec 14) — explicit revision request citing original decision and new evidence; **not** informal.
+- Reopening a resolved decision (D1–D9, Sec 14) — explicit revision request citing original decision and new evidence; **not** informal.
 
 If a task seems to require schema-breaking changes, surface this to the user before editing — don't change the schema silently.
 
 ## Out of scope for v1 (do not implement)
 
-Spec Sec 16. CJK and Ethiopic reorder patterns, LDML output, mobile-app integration, hosting, multi-language `welcome.htm` variants, editing existing keyboards, `.kpj.user` management, touch-first authoring (Decision 6). The Three-group routing (Sec 9) explicitly renders a "not yet supported" stub for CJK/Ethiopic — do not silently empty the gallery.
+Spec Sec 16. CJK and Ethiopic reorder patterns, LDML output, mobile-app integration, hosting, multi-language `welcome.htm` variants, `.kpj.user` management, touch-first authoring (Decision 6). The v1.1.0 amendment removed "editing existing keyboards" — single-source adaptation is now in scope. Still out of scope: multi-source merge, survey-editing opaque IR fragments (`RawKmnFragment`), and byte-identical round-trip. The Three-group routing (Sec 9) explicitly renders a "not yet supported" stub for CJK/Ethiopic — do not silently empty the gallery.
 
 ## KM crew
 
