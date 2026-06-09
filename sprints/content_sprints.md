@@ -2,127 +2,105 @@
 
 **Team:** @dhigby (Doug Higby), @coopabla (Cooper Abla), @myczka (Jordan Myczka)
 **Cadence:** Biweekly sprints
-**Milestone IDs:** KS-S1 through KS-S6
+**Milestone IDs:** KS-S1 through KS-S4 (v1.1 import-pipeline era)
 
-**Status key:** *unassigned* · *in progress by @username* · *in PR #NNN by @username* · *done*
+**Status key:** *unassigned* · *started by @username* · *done*
 
----
-
-## Sprint 1 — KS-S1: Foundation + first patterns
-
-**#56** `docs(keyboards): Finalize content/scan_report.md durable corpus writeup` — *done*
-Narrative shipped (PR #181 by @coopabla). Pattern-YAML links spun off to #212 (blocked on KS-S3 catalog completion).
-
-**#40** `feat(patterns): Reorder pattern: nfd-latin (auto-applied canonical skeleton)` — *started by @coopabla*
-Priority-1 reorder. Auto-applied to all Latin-script keyboards with diacritics; simplest entry, good warmup.
-
-**#34** `feat(patterns): Touch pattern: layer-switch-touch (numeric / symbol / alt-script)` — *started by @myczka*
-Priority-1 touch pattern. Layer switching is the most universal touch feature; leads the touch gallery.
-
-**#30** `feat(patterns): capslock-variant` — *done*
-All checkboxes confirmed checked.
+> **Plan revision: 2026-06-09.** Supersedes the v1.0 plan. The v1.1.0 KeyboardIR amendment (epic #231, contracts session #232) introduces a pattern recognizer that the content team curates rules for — #240 is the new spine of content's contribution. Phase A YAML (#49), Inventory atlas (#50), and Phase B characters (#51) all shipped in the v1.0 plan; this revision picks up from there.
 
 ---
 
-## Sprint 2 — KS-S2: Touch patterns + Phase A flow + validation scaffold
+## Sprint 1 — KS-S1: Recognizer rules first-pass + scan_report polish
 
-**#37** `feat(patterns): Touch pattern: hint-characters (small glyphs on touch keys)` — *unassigned*
-Priority-2. High discoverability value; straightforward demo.
+Paired with engine KS-S1 (identity-mutation working slice). The engine slice does not need new YAML — Phase A is already authored. Content's S1 starts the recognizer curation that engine consumes in their S3.
 
-**#35** `feat(patterns): Touch pattern: flick-gestures` — *unassigned*
-Priority-3. Swipe-direction variants.
+**#240** `feat(content): Pattern recognizer rule curation — first-pass S-01..S-09` — *unassigned*
+First-pass rules covering S-01 (NFD canonical reorder, Latin) and S-02 (deadkey-based diacritic) — these are the recognizer rules that lift IR node clusters into typed `Pattern[]` with `origin: "recognized"`. Engine cannot start #234 (the recognizer engine itself) until the first two rules exist as concrete YAML/predicates to feed it. Land S-01 minimum; S-02 if time permits.
 
-**#36** `feat(patterns): Touch pattern: multitap (tap to cycle)` — *unassigned*
-Priority-3. T9-style cycling; common in syllabic-script touch keyboards.
+**#56** `docs(keyboards): Finalize content/scan_report.md durable corpus writeup` — *narrative shipped (PR #181); final close pending*
+Carries over from v1.0 S4. Two ACs still open: complete pattern-YAML links and human Content-team review. Close out in this sprint now that the pattern catalog is stable enough.
 
-**#49** `feat(flows): Phase A identity (language, region, base keyboard)` — *unassigned*
-Draft the Phase A survey YAML — language name, ISO 639-3, script, writing direction, layout family. **Engine team needs this before they build the Phase A studio UI (engine Sprint 4).**
-
-**#55** `feat(patterns): Validation safety net — kmc CLI green-light for every filled_kmn` — *unassigned*
-Set up `content/tools/validate_demos.sh` to walk every pattern YAML and run `kmc build` against each `demo.filled_kmn`. Run it against Sprint 1 patterns; treat it as a gate for all subsequent pattern issues.
+**#212** `docs(keyboards): Add pattern-YAML links to scan_report.md` — *unassigned*
+Mechanical link-up of every scan_report.md row to its corresponding pattern YAML file. Pairs naturally with #56 final close.
 
 ---
 
-## Sprint 3 — KS-S3: Reorder patterns (complex)
+## Sprint 2 — KS-S2: Recognizer expansion + import-attribution criteria + indic resolution
+
+**#240** `feat(content): Pattern recognizer rule curation — S-03..S-09 completion` — *continuation*
+Finish the first-pass rules so the engine recognizer (KS-S3) has full S-01..S-09 coverage. Test each rule against the `release/basic/` corpus.
+
+**#241** `chore(criteria): Add criteria.md rows for import-attribution PR body and sidecar exclusion` — *unassigned*
+Two new criteria.json entries for D9 import requirements (provenance attribution + `.kmn.imported` sidecar exclusion from PR commit). Blocks engine KS-S3 sidecar work (#239).
+
+**#204** `bug(patterns): indic-pre-base-vowel test-vector contract violation + appliesTo overreach` — *unassigned*
+Existing indic pattern has test vectors that violate the contract and an `appliesTo` field that overreaches into scripts it doesn't apply to. Fix before #41 can re-land cleanly.
 
 **#41** `feat(patterns): Reorder pattern: indic-pre-base-vowel` — *unassigned*
-Priority-2. Critical for Devanagari, Bengali, Tamil — vowels visually precede the consonant but are typed after.
-
-**#42** `feat(patterns): Reorder pattern: SEA stack reorder (Khmer Angkor case)` — *unassigned*
-Priority-3. Complex stacking/reorder for Burmese/Khmer; use Khmer Angkor as the canonical case.
-
-**#43** `feat(patterns): Reorder pattern: tone-mark-canonicalization (SEA)` — *unassigned*
-Priority-3. Tone marks in canonical position regardless of typed order (Thai, Lao, Vietnamese).
+Re-land the indic reorder pattern with the #204 corrections applied. Devanagari, Bengali, Tamil need this.
 
 ---
 
-## Sprint 4 — KS-S4: Inventory atlas + criteria re-review
+## Sprint 3 — KS-S3: Phase B coverage gaps + Phase F docs + validation safety net
 
-**#56** `docs(keyboards): Finalize content/scan_report.md durable corpus writeup` — *done*
-Narrative shipped (PR #181 by @coopabla). Pattern-YAML links tracked separately in #212 — revisit after KS-S3 closes.
+**#191** `feat(flows): Phase B character-inventory coverage gaps` — *unassigned*
+The shipped Phase B YAML (#51 PR #190) misses digraphs, nukta, independent vowels, direction marks, and syllabic finals. Fill the gaps so Phase B inventory is comprehensive before engine renders Phase B in KS-S4.
 
-**#50** `feat(keyboards): Inventory atlas — diacritic sets and add-on letters per group` — *unassigned*
-Build the reference inventories Phase B draws from: per-group diacritic catalogs, special letters, punctuation with Unicode codepoints and example languages. Phase B flow (#51) is blocked on this.
+**#52** `feat(flows): Phase F help docs (welcome, tips, credits)` — *unassigned*
+Phase F survey YAML: prose-collection questions for welcome HTML, usage tips, credits, license note.
+
+**#55** `feat(patterns): Validation safety net — kmc CLI green-light for every filled_kmn` — *unassigned*
+`content/tools/validate_demos.sh` walks every pattern YAML and runs `kmc build` against each `demo.filled_kmn`. Treat as the regression gate for all pattern issues from here on.
+
+---
+
+## Sprint 4 — KS-S4: Criteria automation hooks + re-review
+
+Lands after engine #44 (lint engine) and #238 (scaffold-over-IR) so the automation-hook fields point at real machinery.
+
+**#70** `chore(criteria): populate optional automation-hook fields (lintRuleId, scaffolderRule, etc.)` — *unassigned*
+All 133 `criteria.json` entries currently omit `lintRuleId`, `scaffolderRule`, `surveyQuestionId`, `preSubmitChecklistText`. Populate once the engine lint rules (#44) and scaffold-over-IR (#238) exist so the references are real.
 
 **#120** `chore(criteria): 13 criteria flagged for re-review — file individual decisions` — *unassigned*
 13 band-assignment decisions pending from Day-1 review. File individual decisions or a tracking checklist before they drift further.
 
 ---
 
-## Sprint 5 — KS-S5: Phase B + F flows
-
-**#51** `feat(flows): Phase B characters (inventory, diacritics, special letters)` — *unassigned*
-Needs #50. Walk the language expert through their character inventory. Output is YAML the studio renders as a multi-step form feeding the gallery filter.
-
-**#52** `feat(flows): Phase F help docs (welcome, tips, credits)` — *unassigned*
-Phase F survey YAML: prose-collection questions for welcome HTML, usage tips, credits, license note.
-
----
-
-## Sprint 6 — KS-S6: Automation hooks (after engine lint + scaffolder land)
-
-**#70** `feat(criteria): populate optional automation-hook fields (lintRuleId, scaffolderRule, etc.)` — *unassigned*
-All 133 `criteria.json` entries omit `lintRuleId`, `scaffolderRule`, `surveyQuestionId`, `preSubmitChecklistText`. Populate once the engine lint rules (#44) and scaffolder (#19) exist so there's something real to link to. Waits on engine Sprint 4.
-
----
-
 ## Deferred / polish
 
-**#58** `feat(process): Add Risk and dependencies section to spec.md` — v1.1 spec work
-**#59** `feat(process): Add Performance targets table to spec.md` — v1.1 spec work
-**#60** `feat(process): Add Accessibility section to spec.md` — v1.1 spec work
+**#84** `chore(flows): No merged running axis-vector across phases` — design Q; settle before Phase C strategy work
+**#85** `chore(flows): SurveyAnswer.value is opaque string — boolean/select encoding unclear` — design Q; settle before engine widens survey UI past identity questions
 **#65** `bug(tools): Hygiene backlog P2 follow-ups from Day-1 contract lock` — address opportunistically
+**#58, #59, #60** `feat(process): spec.md Risk / Performance / Accessibility sections` — v1.2 spec work
 
 ---
 
 ## Dependency map
 
 ```
-#30 → done
+KS-S1: #240 (S-01..S-02) ───→ engine #234 (recognizer) needs this before KS-S3
+       #56, #212
 
-#40, #34 ───────────────────────────────────────────┐
-#37, #35, #36 ──────────────────────────────────────┤
-#41, #42, #43 ──────────────────────────────────────┴→ #55 (validation gate)
-                                                     └→ #56 final close (full pattern-YAML links + human review)
+KS-S2: #240 (S-03..S-09) ───→ engine #234 completion
+       #241                  ───→ engine #239 sidecar (KS-S3)
+       #204 → #41
 
-#49 (Phase A YAML — unblocks engine #48 survey UI)
+KS-S3: #191                  ───→ engine Phase B render (KS-S4)
+       #52                   ───→ engine Phase F render (KS-S5)
+       #55  (regression gate, ongoing)
 
-#50 → #51 (inventory atlas must precede Phase B flow)
-#52   (Phase F — independent)
-
-#120  (criteria re-review — independent)
-
-engine #44 + engine #19 → #70 (automation hooks)
+KS-S4: #70   (needs engine #44 + #238 to point at)
+       #120  (independent)
 ```
 
 ---
 
 ## Cross-team dependencies
 
-| Content delivers | Engine consumes | Notes |
+| Content delivers | Engine consumes | Sprint gate |
 |---|---|---|
-| #49 Phase A YAML | #61, #48 (survey UI) | Needed before engine Sprint 4 |
-| #50 Inventory atlas | #51 (content), eventually Phase B UI | Needed before content Sprint 5 |
-| #51 Phase B YAML | Phase B survey UI (engine) | Needed before engine Sprint 5+ |
-| #52 Phase F YAML | Phase F survey UI (engine) | Needed before engine Sprint 5+ |
-| Pattern YAMLs (#34–#43) | #21 pattern library loader, gallery cards | Needed before engine Sprint 3 |
+| #240 S-01..S-02 rules | #234 pattern recognizer engine | content KS-S1 → engine KS-S3 |
+| #240 S-03..S-09 rules | #234 full recognizer coverage | content KS-S2 → engine KS-S3 |
+| #241 attribution criteria | #239 .kmn.imported sidecar | content KS-S2 → engine KS-S3 |
+| #191 Phase B gap-fill | Phase B survey UI extension | content KS-S3 → engine KS-S4 |
+| #52 Phase F YAML | Phase F survey UI | content KS-S3 → engine KS-S5 |
