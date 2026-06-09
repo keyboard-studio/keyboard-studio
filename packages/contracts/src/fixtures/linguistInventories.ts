@@ -33,11 +33,10 @@ export const hindiWithNukta: LinguistInventory = {
 };
 
 /**
- * Fixture C — Hebrew RTL with directionControlChars and syllabicFinalMarkers.
- * Named hebrewRtlCoverageOnly to make explicit that this fixture exists for
- * type-coverage of the remaining two optional fields; the syllabicFinalMarkers
- * value (U+1427) is atypical for Hebrew and is present only to exercise the
- * field type, not to model a real Hebrew inventory.
+ * Fixture C — Hebrew RTL with directionControlChars.
+ * Exercises the RTL optional field; directionControlChars stores code-point
+ * notation strings ("U+200F", "U+200E") not raw invisible char bytes — this
+ * matches the prompt template format and the YAML survey option values.
  */
 export const hebrewRtlCoverageOnly: LinguistInventory = {
   language: "he",
@@ -46,6 +45,21 @@ export const hebrewRtlCoverageOnly: LinguistInventory = {
   mandatoryDiacriticsAndLigatures: [],
   languageSpecificPunctuation: [],
   numerals: ["0", "1"],
-  directionControlChars: ["‏", "‎"],
+  directionControlChars: ["U+200F", "U+200E"],
+};
+
+/**
+ * Fixture D — Cree (Canadian Syllabics) with syllabicFinalMarkers.
+ * Exercises the syllabic-script optional field with a linguistically realistic
+ * inventory: U+1427 CANADIAN SYLLABICS FINAL MIDDLE DOT is the period-like
+ * dot that marks a syllable-final w- in the Cree/Ojibwe traditions.
+ */
+export const creeWithSyllabicFinals: LinguistInventory = {
+  language: "cr-Cans",
+  script: "Canadian Syllabics",
+  alphabetCore: { lowercase: ["ᐁ", "ᐃ", "ᐅ"], uppercase: [] },
+  mandatoryDiacriticsAndLigatures: [],
+  languageSpecificPunctuation: [],
+  numerals: ["0", "1"],
   syllabicFinalMarkers: ["ᐧ"],
 };

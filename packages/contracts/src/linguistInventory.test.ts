@@ -19,6 +19,7 @@ import {
   hausaWithDigraphs,
   hindiWithNukta,
   hebrewRtlCoverageOnly,
+  creeWithSyllabicFinals,
 } from "./fixtures/linguistInventories";
 
 // A compact French-ish exemplar reused across cases.
@@ -197,12 +198,17 @@ describe("optional fields — issue #191 coverage", () => {
 
   it("linguistInventoryChars excludes directionControlChars (Phase C advisory)", () => {
     const chars = linguistInventoryChars(hebrewRtlCoverageOnly);
-    expect(chars).not.toContain("\u200F"); // U+200F RIGHT-TO-LEFT MARK
-    expect(chars).not.toContain("\u200E"); // U+200E LEFT-TO-RIGHT MARK
+    // canonical format is code-point notation strings, not raw invisible char bytes
+    expect(hebrewRtlCoverageOnly.directionControlChars).toEqual(["U+200F", "U+200E"]);
+    // neither raw chars nor code-point strings appear in the flat output
+    expect(chars).not.toContain("‏"); // raw U+200F RIGHT-TO-LEFT MARK
+    expect(chars).not.toContain("‎"); // raw U+200E LEFT-TO-RIGHT MARK
+    expect(chars).not.toContain("U+200F"); // code-point string form
+    expect(chars).not.toContain("U+200E");
   });
 
   it("linguistInventoryChars includes syllabicFinalMarkers after numerals", () => {
-    const chars = linguistInventoryChars(hebrewRtlCoverageOnly);
+    const chars = linguistInventoryChars(creeWithSyllabicFinals);
     expect(chars).toContain("ᐧ"); // U+1427 CANADIAN SYLLABICS FINAL MIDDLE DOT
     const lastNumeralIdx = chars.lastIndexOf("1");
     expect(chars.indexOf("ᐧ")).toBeGreaterThan(lastNumeralIdx);

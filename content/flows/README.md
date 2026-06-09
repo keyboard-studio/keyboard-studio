@@ -43,6 +43,7 @@ questions:
 | `required` | yes (unless `engine_resolved`) | `true` or `false`. |
 | `next` | yes | Routing rule — see Branching below. |
 | `engine_resolved` | no | Optional boolean. When `true`, the question is never shown to the user; the engine evaluates its `next` rules from context and prior answers (never `value`) and jumps directly. `prompt`, `help_text`, `type`, `options`, and `required` are ignored and should be omitted. Used for routing nodes that branch on Phase A state. |
+| `advisory` | no | Optional boolean. When `true`, the question records intent for a later phase (e.g. Phase C key placement) and is never gating. The question must also be `required: false`. Engine runners that do not recognize this field must not error — they may treat the question as `required: false` and pass the answer through. When the engine adapter is built, `advisory?: boolean` can be added to the question type as a backwards-compatible addition. |
 
 ### Types
 
