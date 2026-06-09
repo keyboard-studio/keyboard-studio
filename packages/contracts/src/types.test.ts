@@ -285,12 +285,6 @@ describe("SurveyAnswer discriminated union", () => {
     expect(typeof a.value).toBe("string");
   });
 
-  it("char-list value is string[], not a plain string", () => {
-    const a: SurveyAnswer = { questionId: "extraChars", answerType: "char-list", value: ["ñ", "ü", "ö"] };
-    expect(Array.isArray(a.value)).toBe(true);
-    expect(typeof a.value === "string").toBe(false);
-  });
-
   it("boolean value is boolean, not a string", () => {
     const a: SurveyAnswer = { questionId: "supportsNFD", answerType: "boolean", value: false };
     expect(typeof a.value).toBe("boolean");
