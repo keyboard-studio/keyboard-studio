@@ -76,7 +76,7 @@ questions:
   - id: pf_usage_tip_5
     prompt: "Add a fifth usage tip (optional)"
     help_text: >
-      Leave blank when done.
+      Another short tip. Leave blank when done.
     type: text
     required: false
     next: pf_credits
@@ -126,7 +126,12 @@ welcome_htm_template:
     <html lang="{{phase_a.bcp47Tag}}">
     <head>
       <meta charset="utf-8">
-      <title>{{phase_a.language_name_english}} Keyboard</title>
+      <style type="text/css">
+        p { font: 10pt Tahoma; }
+        h1 { font: bold 16pt Tahoma; color: #4444cc; margin-bottom: 2px }
+        h2 { font: bold 12pt Tahoma; color: #4444cc; }
+      </style>
+      <title>Start Using {{phase_a.languageName}}</title>
     </head>
     <body>
       <h1>{{phase_a.language_name_autonym}} ({{phase_a.language_name_english}}) Keyboard</h1>

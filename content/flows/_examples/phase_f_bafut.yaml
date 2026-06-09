@@ -77,4 +77,4 @@ answers:
 #     MIT license text (populated automatically by the scaffolder)
 #
 #   keyboard package metadata (.kps)
-#     license field set to "MIT" (populated automatically by the scaffolder)
+#     <LicenseFile> element in .kps points to LICENSE.md (MIT license text populated by the scaffolder)
