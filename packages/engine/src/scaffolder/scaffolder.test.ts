@@ -237,6 +237,82 @@ describe("createScaffolderService", () => {
   });
 });
 
+describe("scaffold — displayName sanitization", () => {
+  function makeFetch(kmnContent: string) {
+    return vi.fn().mockImplementation((url: string) => {
+      if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(kmnContent));
+      return Promise.resolve(makeNotFoundResponse());
+    });
+  }
+
+  it("escapes single quote in KMN store(&NAME) with typographic apostrophe", async () => {
+    const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
+    const vfs = await service.scaffold(baseKeyboard, "my_keyboard", "O'Brien's Keyboard");
+    const content = vfs.get("source/my_keyboard.kmn")!.content as string;
+    expect(content).toContain("store(&NAME) 'O’Brien’s Keyboard'");
+    expect(content).not.toContain("store(&NAME) 'O'Brien");
+  });
+
+  it("escapes single quote in store(&COPYRIGHT)", async () => {
+    const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
+    const vfs = await service.scaffold(baseKeyboard, "my_keyboard", "O'Brien's Keyboard");
+    const content = vfs.get("source/my_keyboard.kmn")!.content as string;
+    expect(content).toMatch(/store\(&COPYRIGHT\) 'Copyright © \d{4} O’Brien’s Keyboard'/);
+  });
+
+  it("escapes single quote in stub .kmn store(&NAME)", async () => {
+    // All fetches return 404 → stub generation path is exercised.
+    const notFoundFetch = vi.fn().mockResolvedValue(makeNotFoundResponse());
+    const service = createScaffolderService({ fetchImpl: notFoundFetch as typeof fetch });
+    // U+0027 straight apostrophe in input; expect U+2019 right single quotation mark in output.
+    const vfs = await service.scaffold(baseKeyboard, "my_keyboard", "O'Brien's Keyboard");
+    const content = vfs.get("source/my_keyboard.kmn")!.content as string;
+    expect(content).toContain("store(&NAME) 'O’Brien’s Keyboard'");
+  });
+
+  it("HTML-escapes < > & in welcome.htm", async () => {
+    const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
+    const vfs = await service.scaffold(baseKeyboard, "my_keyboard", "<script>alert('xss')</script>");
+    const content = vfs.get("source/welcome.htm")!.content as string;
+    expect(content).not.toContain("<script>");
+    expect(content).toContain("&lt;script&gt;");
+  });
+
+  it("HTML-escapes & in readme.htm", async () => {
+    const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
+    const vfs = await service.scaffold(baseKeyboard, "my_keyboard", "Foo & Bar");
+    const content = vfs.get("source/readme.htm")!.content as string;
+    expect(content).toContain("Foo &amp; Bar keyboard");
+  });
+
+  it("defuses */ in PHP block comment", async () => {
+    const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
+    const vfs = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard */ eval('bad')");
+    const content = vfs.get("source/help/my_keyboard.php")!.content as string;
+    // The injected '*/' must be defused; the template's own closing '*/' is still present.
+    expect(content).toContain("My Keyboard * / eval");
+    expect(content).not.toContain("My Keyboard */");
+  });
+
+  it("strips newlines from displayName (prevents KMN line injection)", async () => {
+    const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
+    const vfs = await service.scaffold(baseKeyboard, "my_keyboard", "My\nKeyboard\nInjected");
+    const kmnContent = vfs.get("source/my_keyboard.kmn")!.content as string;
+    const nameLines = kmnContent.split("\n").filter((l) => l.startsWith("store(&NAME)"));
+    expect(nameLines).toHaveLength(1);
+    expect(nameLines[0]).toContain("My Keyboard Injected");
+  });
+
+  it("strips null bytes and control characters", async () => {
+    const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
+    const vfs = await service.scaffold(baseKeyboard, "my_keyboard", "My\x00Keyboard\x01Name");
+    const content = vfs.get("source/my_keyboard.kmn")!.content as string;
+    expect(content).not.toContain("\x00");
+    expect(content).not.toContain("\x01");
+    expect(content).toContain("My Keyboard Name");
+  });
+});
+
 describe("scaffold — additional coverage", () => {
   it("accepts id of exactly 255 characters", () => {
     const service = createScaffolderService();

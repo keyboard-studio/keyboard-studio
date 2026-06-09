@@ -15,6 +15,33 @@ export interface ScaffolderServiceOptions {
   fetchImpl?: typeof fetch;
 }
 
+// Replace C0/C1 control chars (incl. newlines, nulls) with spaces, then collapse and trim.
+function sanitizeDisplayName(raw: string): string {
+  return raw
+    .replace(/[\x00-\x1F\x7F-\x9F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// In KMN, single-quoted strings have no escape sequence; U+2019 is the typographic equivalent.
+function kmnStringEscape(s: string): string {
+  return s.replace(/'/g, "’");
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// '*/' ends a PHP block comment; insert a space to defuse it.
+function phpCommentEscape(s: string): string {
+  return s.replace(/\*\//g, "* /");
+}
+
 function detectGroup(base: BaseKeyboard): RoutingGroup {
   if (base.script !== "Latn") return "non-roman";
   const id = base.id.toLowerCase();
@@ -62,10 +89,10 @@ function applyKmnTransforms(
     .split("\n")
     .map((line) => {
       if (/^\s*store\s*\(\s*&NAME\s*\)/i.test(line)) {
-        return `store(&NAME) '${displayName}'`;
+        return `store(&NAME) '${kmnStringEscape(displayName)}'`;
       }
       if (/^\s*store\s*\(\s*&COPYRIGHT\s*\)/i.test(line)) {
-        return `store(&COPYRIGHT) 'Copyright © ${year} ${displayName}'`;
+        return `store(&COPYRIGHT) 'Copyright © ${year} ${kmnStringEscape(displayName)}'`;
       }
       if (/^\s*store\s*\(\s*&VERSION\s*\)/i.test(line)) {
         return `store(&VERSION) '1.0'`;
@@ -170,7 +197,7 @@ function generateStubs(vfs: VirtualFS, keyboardId: string, displayName: string):
   const stubs: Array<{ path: string; content: string | Uint8Array; isBinary?: boolean }> = [
     {
       path: `source/${keyboardId}.kmn`,
-      content: `store(&NAME) '${displayName}'\nstore(&VERSION) '1.0'\nstore(&KEYBOARDVERSION) '1.0'\nstore(&TARGETS) 'any'\nbegin Unicode > use(main)\ngroup(main) using keys\n`,
+      content: `store(&NAME) '${kmnStringEscape(displayName)}'\nstore(&VERSION) '1.0'\nstore(&KEYBOARDVERSION) '1.0'\nstore(&TARGETS) 'any'\nbegin Unicode > use(main)\ngroup(main) using keys\n`,
     },
     {
       path: `source/${keyboardId}.kps`,
@@ -191,15 +218,15 @@ function generateStubs(vfs: VirtualFS, keyboardId: string, displayName: string):
     },
     {
       path: `source/welcome.htm`,
-      content: `<html><body><p>Welcome to ${displayName}</p></body></html>`,
+      content: `<html><body><p>Welcome to ${escapeHtml(displayName)}</p></body></html>`,
     },
     {
       path: `source/readme.htm`,
-      content: `<html><body><p>${displayName} keyboard</p></body></html>`,
+      content: `<html><body><p>${escapeHtml(displayName)} keyboard</p></body></html>`,
     },
     {
       path: `source/help/${keyboardId}.php`,
-      content: `<?php /* ${displayName} help */ ?>`,
+      content: `<?php /* ${phpCommentEscape(displayName)} help */ ?>`,
     },
     {
       path: `LICENSE.md`,
@@ -246,6 +273,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         return Promise.reject(new Error(`invalid keyboardId: ${idError}`));
       }
 
+      displayName = sanitizeDisplayName(displayName);
       const group: RoutingGroup = scaffoldOpts?.group ?? detectGroup(base);
       const vfs = createVirtualFS();
 
