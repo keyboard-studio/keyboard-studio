@@ -122,7 +122,7 @@ tests:
     expectedOutput: " "
     description: "Space key outputs a space on any layer"
 
-validatedForFamilies: []
+validatedForFamilies: ["Latn", "Khmr", "Hebr"]
 sourceKeyboards:
   - "release/sil/sil_ipa"
   - "release/sil/sil_khmer"

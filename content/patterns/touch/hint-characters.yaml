@@ -1,7 +1,7 @@
 # hint-characters.yaml
 # Touch pattern: small glyph shown in the corner of a touch key revealing what
 # the longpress (or flick) will produce. Improves discoverability.
-# Strategy: S-08 (layer expansion — hint is the discoverability signal for sk/flick).
+# No strategyId: hint is a touch-layout discoverability property (hint JSON field); not an S-01..S-12 output strategy.
 # Priority 2 — secondary touch gallery pattern; pairs with longpress-alternates.
 
 id: hint_characters

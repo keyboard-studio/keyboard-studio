@@ -1,6 +1,6 @@
 # flick-gestures.yaml
 # Touch pattern: swipe a key in a direction to produce a different character.
-# Strategy: S-08 (layer expansion — on touch, directional flicks are a layer variant).
+# No strategyId: flick is a touch-layout gesture mechanism (flick JSON object); not an S-01..S-12 output strategy.
 # Priority 3 — secondary touch gallery pattern.
 
 id: flick_gestures

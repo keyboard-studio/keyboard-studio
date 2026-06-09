@@ -1,7 +1,6 @@
 # multitap.yaml
 # Touch pattern: rapid repeated taps on a key cycle through a set of characters.
-# Strategy: S-08 (layer expansion — on touch, multitap is a tap-count-driven
-# access mechanism analogous to the desktop RAlt/modifier layer).
+# No strategyId: multitap is a touch-runtime tap-count mechanism; see inline note — S-08 mapping is inexact.
 # Priority 3 — secondary touch gallery pattern.
 
 id: multitap
