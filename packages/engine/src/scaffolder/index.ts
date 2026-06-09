@@ -1,6 +1,7 @@
 import type {
   ScaffolderService,
   ScaffoldOptions,
+  ScaffoldResult,
   RoutingGroup,
 } from "@keyboard-studio/contracts";
 import type { BaseKeyboard, VirtualFS } from "@keyboard-studio/contracts";
@@ -177,7 +178,10 @@ function applyTouchLayoutCleanup(vfs: VirtualFS, keyboardId: string): void {
         if (row.key == null) continue;
         for (const key of row.key) {
           const sp = key.sp;
-          if (![1, 2, 8, 9, 10].includes(sp ?? -1) && key.nextlayer == null) {
+          // sp codes that must NOT get nextlayer defaulted:
+          // 1=special, 2=specialActive, 3=customSpecial, 4=customSpecialActive (frame/modifier keys),
+          // 8=deadkey, 9=blank, 10=spacer. Only sp=0/absent (normal char key) should default.
+          if (![1, 2, 3, 4, 8, 9, 10].includes(sp ?? -1) && key.nextlayer == null) {
             key.nextlayer = "default";
           }
         }
@@ -267,7 +271,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       keyboardId: string,
       displayName: string,
       scaffoldOpts?: ScaffoldOptions
-    ): Promise<VirtualFS> {
+    ): Promise<ScaffoldResult> {
       const idError = contractsValidateKeyboardId(keyboardId);
       if (idError !== null) {
         return Promise.reject(new Error(`invalid keyboardId: ${idError}`));
@@ -276,6 +280,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       displayName = sanitizeDisplayName(displayName);
       const group: RoutingGroup = scaffoldOpts?.group ?? detectGroup(base);
       const vfs = createVirtualFS();
+      const warnings: string[] = [];
 
       try {
         const loaderOpts = {
@@ -283,11 +288,13 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
           ...(fetchImpl !== undefined ? { fetchImpl } : {}),
         };
         await fetchKeyboardSourceToVfs(base, vfs, loaderOpts);
-      } catch {
+      } catch (err) {
         // fetchKeyboardSourceToVfs throws when the required .kmn is unreachable
-        // (network error, 404, or offline). Treat any such failure as a
-        // base-absent session; generateStubs() below fills all required §12
-        // paths so the returned VirtualFS is always usable.
+        // (network error, 404, or offline). Fall through to stub-only output and
+        // surface the failure so callers can inform the user.
+        warnings.push(
+          `base keyboard source unavailable — stub-only output (${err instanceof Error ? err.message : String(err)})`
+        );
       }
 
       const kmnVfsPath = vfs.list("source/").find((p) => p.endsWith(".kmn"));
@@ -305,7 +312,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       applyTouchLayoutCleanup(vfs, keyboardId);
       generateStubs(vfs, keyboardId, displayName);
 
-      return vfs;
+      return { vfs, warnings };
     },
 
     async listTemplates(): Promise<string[]> {

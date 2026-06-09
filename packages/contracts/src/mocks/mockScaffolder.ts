@@ -1,9 +1,8 @@
 // see spec.md section 11 — ScaffolderService mock
 
-import type { ScaffolderService, ScaffoldOptions } from "../scaffolder";
+import type { ScaffolderService, ScaffoldOptions, ScaffoldResult } from "../scaffolder";
 import { validateKeyboardId as contractsValidateKeyboardId } from "../scaffolder";
 import type { BaseKeyboard } from "../baseKeyboard";
-import type { VirtualFS } from "../virtualFS";
 import { scaffoldedFS } from "./mockVirtualFS";
 
 // Three templates matching spec §9's Three-group routing exactly.
@@ -28,7 +27,7 @@ export const mockScaffolder: ScaffolderService = {
     keyboardId: string,
     _displayName: string,
     _opts?: ScaffoldOptions
-  ): Promise<VirtualFS> {
+  ): Promise<ScaffoldResult> {
     const idError = this.validateKeyboardId(keyboardId);
     if (idError !== null) {
       return Promise.reject(new Error(`invalid keyboardId: ${idError}`));
@@ -36,7 +35,7 @@ export const mockScaffolder: ScaffolderService = {
     // Returns the pre-built scaffolded FS fixture.
     // A real implementation would clone base, run template-cleanup pipeline
     // with the routing decision in opts.group (or auto-detected from base).
-    return Promise.resolve(scaffoldedFS);
+    return Promise.resolve({ vfs: scaffoldedFS, warnings: [] });
   },
 
   listTemplates(): Promise<string[]> {

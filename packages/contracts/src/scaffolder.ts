@@ -28,6 +28,19 @@ export interface ScaffoldOptions {
 }
 
 /**
+ * Result returned by {@link ScaffolderService.scaffold}.
+ *
+ * `warnings` is non-empty when the scaffolder fell back to stub-only output
+ * (e.g. the base keyboard's source files were unreachable). The `vfs` is
+ * always a complete, Layer-C-clean virtual FS regardless.
+ */
+export interface ScaffoldResult {
+  vfs: VirtualFS;
+  /** Non-fatal issues encountered during scaffolding (e.g. fetch failure). */
+  warnings: string[];
+}
+
+/**
  * Characters disallowed in a keyboard identifier (§10 Layer A check #1).
  * Shared between the real engine and the mock scaffolder so both validate
  * identically.
@@ -115,10 +128,11 @@ export interface ScaffolderService {
    *   user-confirmation step explicitly chose a routing different from the
    *   auto-detected one (e.g. user picks AZERTY when base.script suggests
    *   QWERTY/QWERTZ — spec §9).
-   * @returns A fully scaffolded virtual FS with all band-1 (scaffolder-bake,
-   *   §14 Decision 4) criteria satisfied by construction. Band-2
-   *   (layer-c-enforce) criteria are enforced at phase exit or on explicit
-   *   submit — not on the 300 ms debounce cycle.
+   * @returns A {@link ScaffoldResult} containing the scaffolded VFS (with all
+   *   band-1 §14 Decision 4 criteria satisfied by construction) and any
+   *   non-fatal warnings (e.g. base source files unreachable — stub-only output).
+   *   Band-2 criteria are enforced at phase exit or on explicit submit — not on
+   *   the 300 ms debounce cycle.
    * @see spec.md §11
    * @see spec.md §8 step 2
    * @see spec.md §9 (Three-group routing)
@@ -129,7 +143,7 @@ export interface ScaffolderService {
     keyboardId: string,
     displayName: string,
     opts?: ScaffoldOptions
-  ): Promise<VirtualFS>;
+  ): Promise<ScaffoldResult>;
 
   /**
    * List the internal template names available to the scaffolder.
