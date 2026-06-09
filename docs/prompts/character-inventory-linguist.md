@@ -53,6 +53,8 @@ apply the following logical constraints:
 Provide the final character inventory strictly in the following JSON format. Do
 not include any conversational intro or outro text.
 
+The following five fields are optional; omit any that do not apply to the script.
+
 {
   "language": "{{bcp47}}",
   "script": "Name of the script (e.g., Latin, Arabic, Devanagari)",
@@ -68,9 +70,6 @@ not include any conversational intro or outro text.
   "mandatory_diacritics_and_ligatures": ["œ", "æ", "ß"],
   "language_specific_punctuation": ["«", "»", "¿", "¡"],
   "numerals": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
-
-  // OPTIONAL FIELDS -- include only the fields relevant to the script.
-  // Omit fields that are not applicable to this language.
   "digraphs_as_phoneme_units": ["sh", "ts", "ny"],
   "nukta_and_borrowed_sound_markers": ["क़", "ख़", "ग़"],
   "independent_vowels": ["अ", "आ", "इ"],
@@ -91,7 +90,7 @@ not include any conversational intro or outro text.
 | `language_specific_punctuation` | `languageSpecificPunctuation` | |
 | `numerals` | `numerals` | |
 | `digraphs_as_phoneme_units` | `digraphsAsPhonemeUnits` | Optional; Latin scripts only |
-| `nukta_and_borrowed_sound_markers` | `nuktaAndBorrowedSoundMarkers` | Optional; Indic scripts only; NFC-ordered multi-codepoint sequences (base consonant + nukta combining mark; does not precompose) |
+| `nukta_and_borrowed_sound_markers` | `nuktaAndBorrowedSoundMarkers` | Optional; Indic scripts only; NFC-normalized; most base+nukta sequences remain two codepoints under NFC, but a small set of standard exceptions (e.g. U+0958 DEVANAGARI LETTER QA) do precompose — always apply NFC before storing. |
 | `independent_vowels` | `independentVowels` | Optional; Indic scripts only; NFC |
 | `direction_control_chars` | `directionControlChars` | Optional; RTL scripts only; advisory -- Phase C |
 | `syllabic_final_markers` | `syllabicFinalMarkers` | Optional; Syllabic scripts only; NFC |

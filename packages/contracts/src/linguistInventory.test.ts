@@ -195,12 +195,10 @@ describe("optional fields — issue #191 coverage", () => {
     expect("syllabicFinalMarkers" in inv).toBe(false);
   });
 
-  it("linguistInventoryChars includes directionControlChars after numerals", () => {
+  it("linguistInventoryChars excludes directionControlChars (Phase C advisory)", () => {
     const chars = linguistInventoryChars(hebrewRtlCoverageOnly);
-    expect(chars).toContain("‏"); // U+200F RIGHT-TO-LEFT MARK
-    expect(chars).toContain("‎"); // U+200E LEFT-TO-RIGHT MARK
-    const lastNumeralIdx = chars.lastIndexOf("1");
-    expect(chars.indexOf("‏")).toBeGreaterThan(lastNumeralIdx);
+    expect(chars).not.toContain("\u200F"); // U+200F RIGHT-TO-LEFT MARK
+    expect(chars).not.toContain("\u200E"); // U+200E LEFT-TO-RIGHT MARK
   });
 
   it("linguistInventoryChars includes syllabicFinalMarkers after numerals", () => {

@@ -240,12 +240,15 @@ export function makeLinguistInventory(
  *
  * Order: core (lowercase then uppercase) → auxiliary (lowercase then uppercase)
  * → mandatory diacritics/ligatures → language-specific punctuation → numerals
- * → digraphs → nukta markers → independent vowels → direction control chars
- * → syllabic finals. Duplicates are removed, keeping the first occurrence, so
- * a character that appears in more than one group lands once in its earliest
- * position.
+ * → digraphs → nukta markers → independent vowels → syllabic finals.
+ * Duplicates are removed, keeping the first occurrence, so a character that
+ * appears in more than one group lands once in its earliest position.
  *
  * `flags` and `sources` are confirmation aids and do not contribute characters.
+ *
+ * `directionControlChars` is excluded from this flatten (Phase C advisory bidi
+ * markers; callers wanting those chars should read inv.directionControlChars
+ * directly).
  *
  * @param inv - The (typically user-confirmed) synthesized inventory.
  * @returns Ordered, de-duplicated character list.
@@ -263,7 +266,6 @@ export function linguistInventoryChars(inv: LinguistInventory): string[] {
     ...(inv.digraphsAsPhonemeUnits ?? []),
     ...(inv.nuktaAndBorrowedSoundMarkers ?? []),
     ...(inv.independentVowels ?? []),
-    ...(inv.directionControlChars ?? []),
     ...(inv.syllabicFinalMarkers ?? []),
   ];
   return [...new Set(ordered)];

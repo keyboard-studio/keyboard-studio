@@ -385,14 +385,14 @@ questions:
   # -- Gap 1: Latin digraphs ---------------------------------------------------
 
   - id: pb_latin_digraphs_gate
-    prompt: "Does your language treat any two-letter combination as a single sound -- one that you might want on its own dedicated key?"
+    prompt: "Does your language treat any combination of letters (two or more) as a single sound -- one that you might want on its own dedicated key?"
     help_text: >
-      Some languages use combinations of two letters to spell a single
+      Some languages use multi-letter combinations to spell a single
       sound, such as 'sh', 'ts', 'ny', or 'ng'. If your language treats
       a combination like this as its own unit -- the way English treats
-      'ch' or Hausa treats 'sh' -- it may deserve its own key rather
-      than being typed as two separate letters. Answer Yes if any
-      two-letter combinations work this way in your language.
+      'ch' or Hausa treats 'sh', or Welsh treats 'ngh' -- it may deserve
+      its own key rather than being typed as separate letters. Answer Yes
+      if any multi-letter combinations work this way in your language.
     type: bool
     required: true
     next:
@@ -401,12 +401,12 @@ questions:
       - default: pb_punctuation_gate
 
   - id: pb_latin_digraphs_list
-    prompt: "List the two-letter combinations (digraphs) your language treats as single sounds."
+    prompt: "List the letter combinations (digraphs and multigraphs) your language treats as single sounds."
     help_text: >
-      Type each combination separated by spaces, for example: sh ts ny
-      ng ch. Include both lowercase and uppercase forms if the uppercase
+      Type each letter combination separated by spaces, for example: sh ts ny
+      ng ch ngh. Include both lowercase and uppercase forms if the uppercase
       version differs from simply capitalizing each letter. The studio
-      uses this to decide whether to give each digraph its own key.
+      uses this to decide whether to give each digraph or multigraph its own key.
     type: text
     required: false
     next: pb_punctuation_gate
