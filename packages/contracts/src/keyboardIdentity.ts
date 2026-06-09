@@ -14,6 +14,19 @@ import type { RoutingGroup } from "./scaffolder";
  * `ScriptFamily` is a Phase A user-routing label; `ScriptClass` is an A2
  * discovery-axis value used by the §7.2 strategy selector. Do not unify them.
  *
+ * `"alpha-nonlatin"` is emitted by the Phase A flow for users who select the
+ * non-roman layout and identify their script as a non-Latin alphabet (Cyrillic,
+ * Greek, Georgian, or Armenian). It routes directly to the shared universal
+ * tail in Phase B (pb_special_letters), bypassing the Indic/SEA/RTL/syllabic
+ * sub-branches.
+ *
+ * `"logographic"` is RESERVED for CJK. In v1 it is never emitted as a Phase B
+ * routing value: Ethiopic (Ethi), Hangul (Hang), and Han (Hani) are detected
+ * at `primary_script` in Phase A and stub-gated there (script_not_supported_stub,
+ * §16 / §14 Decision 5). The member is kept in the union so downstream code
+ * can reference it without a type error; do not remove it until CJK support
+ * is fully built.
+ *
  * @see spec.md §9 (Three-group routing)
  * @see content/flows/phase_a_identity.yaml
  * @see ScriptClass (axes.ts) for the strategy-selector equivalent

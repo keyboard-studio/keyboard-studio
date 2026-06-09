@@ -125,7 +125,7 @@ sentence-casing logic (lines 290-329).
 - **Display name / downloads:** Cameroon QWERTY — 2,371/mo
 - **Language(s) / script:** Latin script with the extended General Alphabet of Cameroonian Languages (open vowels ɛ ɔ, hooked letters ɓ ɗ, eng ŋ, etc.)
 - **Group:** QWERTY/QWERTZ
-- **Strategy:** S-08 RAlt modifier-layer (+ S-02 deadkey composition, + S-04 parallel-store lookup, + S-10 constraints + beep)
+- **Strategy:** S-02 deadkey composition (+ S-04 parallel-store lookup, + S-08 RAlt modifier-layer, + S-10 constraints + beep)
 - **Axes:** A1=medium · A2=alphabetic · A3=strong · A4=stacking-combining · A6=loud (beep) · A7=fully-booked (RALT plane heavily used)
 - **Quality:** clean
 - **Source:** release/sil/sil_cameroon_qwerty/source/sil_cameroon_qwerty.kmn
@@ -147,7 +147,7 @@ reach the extra characters (line 4).
 - **Display name / downloads:** Cameroon AZERTY — 2,233/mo
 - **Language(s) / script:** Latin script with the General Alphabet of Cameroonian Languages, on a French AZERTY base
 - **Group:** AZERTY
-- **Strategy:** S-08 RAlt modifier-layer (+ S-06 chained deadkeys, + S-02 deadkey composition, + S-04 parallel-store lookup, + S-10 constraints + beep)
+- **Strategy:** S-02 deadkey composition (+ S-06 chained deadkeys, + S-04 parallel-store lookup, + S-08 RAlt modifier-layer, + S-10 constraints + beep)
 - **Axes:** A1=medium · A2=alphabetic · A3=strong · A4=multi-family · A6=loud (beep) · A7=fully-booked
 - **Quality:** clean (caveat: legacy NCAPS/CAPS rule pairs on the slash key, lines 264-267)
 - **Source:** release/sil/sil_cameroon_azerty/source/sil_cameroon_azerty.kmn
@@ -169,7 +169,7 @@ automatically, hence the minor caveat.
 - **Display name / downloads:** Naija Type (package name "Naija NFD") — 1,010/mo
 - **Language(s) / script:** Latin script for Nigerian languages (Igbo, Yoruba, Hausa, Efik, Tiv and many more), with tone marks and below-base dots
 - **Group:** QWERTY/QWERTZ
-- **Strategy:** S-10 constraints + beep (+ S-02 deadkey-style mark composition, + S-08 Ctrl-Alt modifier-layer, + S-04 parallel-store lookup, + a reorder group)
+- **Strategy:** S-02 deadkey-style mark composition (+ S-04 parallel-store lookup, + S-08 Ctrl-Alt modifier-layer, + S-10 constraints + beep, + reorder group)
 - **Axes:** A1=medium · A2=alphabetic · A3=weak · A4=stacking-combining · A5=single · A6=loud (beep) · A7=RAlt/Ctrl-Alt only
 - **Quality:** clean (caveat: desktop-only target, line 17; an apparent duplicate constraint at lines 113/119)
 - **Source:** release/el/el_naija/source/el_naija.kmn
@@ -321,32 +321,6 @@ clean example with an authored copyright and a worked typing example in its pack
 
 # Non-Latin-script keyboards
 
-## sil_cameroon_azerty
-- **Display name / downloads:** Cameroon AZERTY — 2,233/mo
-- **Language(s) / script:** Latin script with the General Alphabet of Cameroonian Languages, on a French AZERTY base
-- **Group:** AZERTY
-- **Strategy:** S-08 RAlt modifier-layer (+ S-06 chained deadkeys, + S-02 deadkey composition, + S-04 parallel-store lookup, + S-10 constraints + beep)
-- **Axes:** A1=medium · A2=alphabetic · A3=strong · A4=multi-family · A6=loud (beep) · A7=fully-booked
-- **Quality:** clean (caveat: legacy NCAPS/CAPS rule pairs on the slash key, lines 264-267)
-- **Source:** release/sil/sil_cameroon_azerty/source/sil_cameroon_azerty.kmn
-
-This is the French-keyboard counterpart to Cameroon QWERTY, for the very large population of Cameroon
-that learned typing on a French AZERTY layout. The base follows AZERTY conventions — A and Q are
-swapped, Z and W are swapped, and the digit row produces French accented letters and symbols directly
-(sil_cameroon_azerty.kmn lines 40-99, 101, 182). As with its sibling, the right-hand Alt key opens a
-plane of African letters (lines 102-230), and special tone and accent marks sit on the bracket and
-quote keys. Its most distinctive feature is a richer two-step "dead key" system inherited from French
-typing: pressing a French accent key first, then a vowel, composes letters such as ã, ñ, ê or ä through
-several paired lookup tables (lines 366-400), and an exclamation-mark prefix opens a large general
-character menu. Invalid combinations beep (e.g. lines 43, 86, 233). It is well-built — proper cased
-keys (line 11), populated copyright, named author and website — though it still carries a pair of older
-explicit Caps-Lock-state rules on the slash key (lines 264-267) that modern keyboards usually handle
-automatically, hence the minor caveat.
-
-*(This keyboard is listed here, alongside its script peers, as the first of the scan's three AZERTY
-examples; it is Latin-script and shares the General Alphabet of its QWERTY sibling above. The two
-keyboards below — French Basic and Akebu — complete the AZERTY coverage.)*
-
 ## basic_kbdfr
 - **Display name / downloads:** French Basic — release; download count not checked
 - **Language(s) / script:** French and other Western European languages; Latin script on a French AZERTY base
@@ -374,7 +348,7 @@ the simplest strategy.
 - **Display name / downloads:** Akebu — release; download count not checked
 - **Language(s) / script:** Akebu (ISO 639-3 keu), a Kwa language of the Ghana–Togo border; Latin script with IPA-based extension letters, on a French AZERTY base
 - **Group:** AZERTY
-- **Strategy:** S-08 RAlt modifier-layer (+ S-01 base swap, + S-06 chained `!` deadkey prefix, + S-04 parallel-store lookup)
+- **Strategy:** S-01 base swap (+ S-06 chained `!` deadkey prefix, + S-04 parallel-store lookup, + S-08 RAlt modifier-layer)
 - **Axes:** A1=small · A2=alphabetic · A3=weak · A4=stacking-combining (combining marks typed after the letter) · A5=single · A6=soft (selective beep on listed impossible combinations) · A7=fully-booked
 - **Quality:** clean (caveat: README copyright reads "SIL Cameroon" though the language is Akebu of Togo; one unresolved "??" comment at line 54; HISTORY.md is a single-entry stub)
 - **Source:** release/sil/sil_akebu/source/sil_akebu.kmn
@@ -442,6 +416,7 @@ v1.1 target, per spec §9) and appears here only as corpus documentation.
 - **Language(s) / script:** Urdu in the Arabic (Nastaʿliq/Naskh) script, right-to-left, as used in Pakistan
 - **Group:** Non-Roman (abjad)
 - **Strategy:** S-01 simple swap (+ S-08 RAlt modifier-layer for the extra diacritics, honorific phrases and Eastern Arabic digits)
+- **Decision-tree note:** A2=abjad nominally triggers rule 2 → S-09, but Arabic ligature/joining shaping is handled by the OS text stack; the KMN rules emit fixed characters with no joining logic, so S-01 is correct.
 - **Axes:** A1=medium (one full Urdu letter set plus marks and digits) · A2=abjad · A2a=no (no context rules; each keystroke emits its character independently) · A3=weak (fixed key positions) · A4=none at the engine level (marks placed as standalone characters) · A5=single · A6=none · A7=fully-booked (base, Shift, RAlt and Shift+RAlt layers all populated)
 - **Quality:** clean
 - **Source:** release/p/pak_urdu_phonetic/source/pak_urdu_phonetic.kmn
@@ -507,6 +482,7 @@ Tamil-symbol coverage.
 - **Language(s) / script:** Hindi (and other Devanagari-script languages), Devanagari abugida, emulating the legacy Remington-GAIL mechanical typewriter layout
 - **Group:** Non-Roman (abugida)
 - **Strategy:** S-03 sequence replace (+ S-04 parallel-store lookup, + S-08 RAlt modifier-layer)
+- **Decision-tree note:** A2=abugida + A2a=yes nominally triggers rule 2 → S-09, but this keyboard does syllable decomposition emulating a typewriter (sequence replace), not cluster formation — S-03 is the correct primary.
 - **Axes:** A1=large · A2=abugida · A2a=yes (output depends on prior character) · A3=weak (fixed typewriter layout) · A4=stacking-combining · A5=single · A6=none · A7=RAlt only
 - **Quality:** clean
 - **Source:** release/r/remington_gail/source/remington_gail.kmn
@@ -528,7 +504,7 @@ version, and organizes its many mappings into readable lookup tables (lines 3-6,
 - **Language(s) / script:** Plains Cree (nêhiyawêwin, Y-dialect), Canadian Aboriginal Syllabics
 - **Group:** Non-Roman (syllabary)
 - **Strategy:** S-09 context-sensitive cluster formation (+ S-05 mnemonic transliteration, + S-08 RAlt modifier-layer)
-- **Axes:** A1=large · A2=syllabary · A3=strong (type the romanized sound) · A4=replacing-cycling (vowel rotates the glyph) · A5=single · A6=none · A7=RAlt only
+- **Axes:** A1=large · A2=syllabary · A2a=yes (whole-syllable context replace, not diacritic cycling) · A3=strong (type the romanized sound) · A4=none · A5=single · A6=none · A7=RAlt only
 - **Quality:** clean
 - **Source:** release/fv/fv_plains_cree/source/fv_plains_cree.kmn
 
@@ -570,6 +546,7 @@ package metadata (lines 7-11).
 - **Language(s) / script:** Saraiki (Pakistan), Arabic script, right-to-left
 - **Group:** Non-Roman (abjad)
 - **Strategy:** S-01 simple swap (+ S-08 modifier-layer via Shift and Ctrl+Alt)
+- **Decision-tree note:** A2=abjad nominally triggers rule 2 → S-09, but Arabic ligature/joining shaping is handled by the OS text stack; the KMN rules emit fixed characters with no joining logic, so S-01 is correct.
 - **Axes:** A1=medium · A2=abjad · A2a=no (each key emits a fixed character; no prior-context rules) · A3=weak (fixed national/phonetic key layout) · A4=none (combining marks are themselves keyed, not auto-applied) · A5=single · A6=none · A7=fully-booked
 - **Quality:** clean
 - **Source:** release/s/saraiki/source/saraiki.kmn
@@ -625,7 +602,7 @@ does not yet exist). When it is, each fixture's `criterionId` must match the cri
 - **Display name / downloads:** Övdalsk — experimental; no keyman.com download count
 - **Language(s) / script:** Elfdalian (Övdalsk), a conservative North Germanic variety spoken in Älvdalen, Dalarna, Sweden; Latin script with a large inventory of ogonek and ring-ogonek letters (ą, ą̊, ę, į, ų and capitals) plus eth (Đ)
 - **Group:** QWERTY/QWERTZ
-- **Strategy:** S-08 Alt modifier-layer (+ S-01 simple swap on the remapped bracket key)
+- **Strategy:** S-01 simple swap (+ S-08 Alt modifier-layer on remapped bracket key)
 - **Axes:** A1=small · A2=alphabetic · A3=weak (positional Alt-layer) · A4=none (precomposed output) · A6=none · A7=Alt layer only
 - **Quality:** rough
 - **Rough:** 3.6 — HISTORY.md top version '1.05' != .kmn version '1.0.5'
@@ -708,7 +685,7 @@ the required `Copyright © <year> <holder>` line, and the README embeds the vers
 - **Display name / downloads:** Àlkèláŋg — experimental; no keyman.com download count
 - **Language(s) / script:** Bafut (bfd) and related Cameroonian Grassfields languages; Latin script with IPA extensions (ɓ, ɗ, ɛ, ɔ, ŋ and others) for tone-language phonetics
 - **Group:** QWERTY/QWERTZ (mobile-first; the header calls it an AZERTY mobile/tablet layout, but the `.kmn` is a touch-layout keyboard with no hardware base rules)
-- **Strategy:** S-08 modifier/layer (touch layers: default, shift, numeric, IPA) with an S-10 layer-state PostKeystroke group
+- **Strategy:** S-03 sequence replace (+ S-13 touch layer switch — four layers: default, shift, numeric, IPA; + S-08 modifier-layer secondary add-on)
 - **Axes:** A1=small · A2=alphabetic · A3=strong (phonetic IPA layer) · A4=none · A5=multi (numeric + IPA layers) · A6=soft · A7=fully-booked (touch layers)
 - **Quality:** rough
 - **Rough:** 4.5 — LICENSE.md has no well-formed copyright line

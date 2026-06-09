@@ -54,6 +54,7 @@ questions:
 | `radio` | Mutually-exclusive option buttons (short lists). |
 | `bool` | Yes / No toggle. |
 | `multi_select` | Checkbox grid; zero or more options may be selected. Answer `value` is a comma-and-space-delimited token string, e.g. `"U+0301, U+0300, U+0304"`. An empty selection is encoded as an empty string `""`. `options_source` may be used instead of a literal `options` list when the grid is seeded at runtime (e.g. `@picker_candidates_seeded`). |
+| `notice` | Informational terminal screen shown to the user with no input. Used to surface a message (e.g. the §16 "not yet supported" stub) and end the flow (`next: null`). Has `prompt` and `help_text`; no `options` or answer value. |
 
 Options are objects with `value` (the stored token) and `label` (the display string).
 
@@ -105,8 +106,8 @@ used.
 Valid `ctx` keys carried from Phase A into Phase B:
 
 - `ctx.routing_group` — `"qwerty-qwertz"` \| `"azerty"` \| `"non-roman"`.
-- `ctx.script_family` — `"indic"` \| `"sea"` \| `"rtl"` \| `"syllabic"` \| `"other"`
-  (only set when `ctx.routing_group == "non-roman"`).
+- `ctx.script_family` — `"indic"` \| `"sea"` \| `"rtl"` \| `"syllabic"` \| `"alpha-nonlatin"` \| `"other"`
+  (only set when `ctx.routing_group == "non-roman"`). Note: `logographic` (CJK) is NOT a valid `ctx.script_family` value — CJK (Han, Hangul) and Ethiopic are detected at the Phase A `primary_script` step and routed to the §16 `notice` stub before this context is ever set.
 
 ```yaml
 next:

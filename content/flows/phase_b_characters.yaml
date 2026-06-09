@@ -32,7 +32,7 @@
 #   `ctx.routing_group` namespace before Phase B runs; likewise `script_family`
 #   -> `ctx.script_family`. Conditions in this flow read `ctx.*`.
 #   {{detected_group}}   -- "qwerty-qwertz" | "azerty" | "non-roman" (= ctx.routing_group)
-#   {{script_family}}    -- "indic" | "sea" | "rtl" | "syllabic" | "other"
+#   {{script_family}}    -- "indic" | "sea" | "rtl" | "syllabic" | "alpha-nonlatin" | "other"
 #                          (non-roman only; engine passes "" for Latin groups)
 #   {{language_name}}    -- autonym from Phase A language_name_autonym answer
 #
@@ -575,6 +575,8 @@ questions:
         label: "Right-to-left (Arabic, Hebrew, and similar)"
       - value: syllabic
         label: "Syllabic (each character represents a syllable, e.g. Cherokee, Canadian Aboriginal Syllabics, Vai)"
+      - value: alpha-nonlatin
+        label: "Non-Latin alphabet (Cyrillic, Greek, Georgian, Armenian -- letters, not syllables or attached marks)"
       - value: other
         label: "Other or I am not sure"
     next:
@@ -586,6 +588,8 @@ questions:
         goto: pb_rtl_direction_confirm
       - condition: "value == 'syllabic'"
         goto: pb_syllabic_note
+      - condition: "value == 'alpha-nonlatin'"
+        goto: pb_special_letters
       - default: pb_other_free_entry
 
   # ---- Indic sub-branch ------------------------------------------------------
@@ -730,12 +734,10 @@ questions:
     prompt: "In your writing system, does each character represent a complete syllable, or do you combine parts (such as a consonant symbol and a vowel symbol) to form a syllable?"
     help_text: >
       Some writing systems give each possible syllable its own distinct
-      character that you type with a single keypress (for example, Cherokee,
-      Vai, and Ethiopic/Ge'ez). Others let you build a syllable by combining a
-      consonant symbol with a vowel symbol (for example, Canadian Aboriginal
-      Syllabics). Note: full support for Ethiopic and some large syllable-based
-      writing systems is still being added to this tool. This branch currently
-      works best for Vai, Cherokee, and Canadian Aboriginal Syllabics.
+      character that you type with a single keypress (for example, Cherokee
+      and Vai). Others let you build a syllable by combining a consonant symbol
+      with a vowel symbol (for example, Canadian Aboriginal Syllabics). This
+      branch covers Vai, Cherokee, and Canadian Aboriginal Syllabics.
     type: radio
     required: true
     options:

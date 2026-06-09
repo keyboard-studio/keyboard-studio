@@ -145,7 +145,7 @@ The table below lists the 17 pattern YAML files currently in `content/patterns/`
 | [simple-swap.yaml](patterns/substitute/simple-swap.yaml) | substitute | S-01 |
 | [flick-gestures.yaml](patterns/touch/flick-gestures.yaml) | touch | S-08 |
 | [hint-characters.yaml](patterns/touch/hint-characters.yaml) | touch | S-08 |
-| [layer-switch-touch.yaml](patterns/touch/layer-switch-touch.yaml) | touch | S-13 (see open questions) |
+| [layer-switch-touch.yaml](patterns/touch/layer-switch-touch.yaml) | touch | S-13 |
 | [multitap.yaml](patterns/touch/multitap.yaml) | touch | S-08 |
 | [mnemonic-spelling.yaml](patterns/transliteration/mnemonic-spelling.yaml) | transliteration | S-05 |
 | [constraints-beep.yaml](patterns/validation/constraints-beep.yaml) | validation | S-10 |
@@ -161,8 +161,6 @@ The table below lists the 17 pattern YAML files currently in `content/patterns/`
 - **Under-represented strategies.** S-11 (stateful orthography toggle) appears only once in the corpus (clavbur9's schwa-convention switch). S-12 (logographic IME callout) is absent because there is no CJK keyboard in the popular download tier; CJK is out of v1 scope per spec §16.
 
 - **Ethiopic scope.** The two Ethiopic keyboards (gff_amharic, sil_ethiopic_power_g) are documented here as corpus references only. Ethiopic is excluded from v1 and is a candidate for sprint-2 pattern-library work (spec §14 Decision 5, §16); the gallery renders a "not yet supported" stub for it in v1 (§9). No pattern files for Ethiopic strategies are planned for v1.
-
-- **DATA-INTEGRITY FLAG — S-13 in layer-switch-touch.yaml.** [layer-switch-touch.yaml](patterns/touch/layer-switch-touch.yaml) declares `strategyId: "S-13"`, which is outside the S-01..S-12 union defined in `packages/contracts/src/strategy.ts`. This needs resolution before the pattern can be used: either ratify S-13 in the union, add it to the §7.3 catalog, and add a §7.5 self-check row — or remove the `strategyId` field from the YAML.
 
 - **Lint negative-fixture wiring.** The rough keyboards documented above are ready as negative fixtures, but `@keymanapp/keyboard-lint` is not yet scaffolded. Wiring these fixtures into actual test cases is deferred until the package exists.
 

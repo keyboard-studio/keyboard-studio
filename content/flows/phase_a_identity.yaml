@@ -4,7 +4,9 @@
 #   routing_group : derived from the layout_family answer
 #                   ("qwerty-qwertz" | "azerty" | "non-roman")
 #   script_family : derived from the script_family answer (non-Roman only)
-#                   ("indic" | "sea" | "rtl" | "syllabic" | "other")
+#                   ("indic" | "sea" | "rtl" | "syllabic" | "alpha-nonlatin" | "other")
+#                   Note: "logographic" is reserved but never emitted here —
+#                   CJK (Hani) is stub-gated at primary_script in Phase A.
 #
 # These two values determine which template pipeline and which pattern set
 # the studio shows in Phase B. The base-keyboard picker is a separate UI
@@ -106,6 +108,8 @@ questions:
         label: "Ethiopic (Ge'ez, Amharic, Tigrinya, and others)"
       - value: Hang
         label: "Hangul (Korean)"
+      - value: Hani
+        label: "Chinese, Japanese, or other Han-character script (Chinese Hanzi, Japanese Kanji/kana, and similar)"
       - value: Geor
         label: "Georgian"
       - value: Armn
@@ -124,6 +128,8 @@ questions:
         label: "A different writing system not listed here"
     required: true
     next:
+      - condition: "value == 'Ethi' or value == 'Hang' or value == 'Hani'"
+        goto: script_not_supported_stub
       - condition: "value == 'Arab' or value == 'Hebr'"
         goto: writing_direction
       - condition: "value == 'Latn' or value == 'Cyrl' or value == 'Grek' or value == 'Geor' or value == 'Armn'"
@@ -145,6 +151,20 @@ questions:
         label: "Left to right"
     required: true
     next: layout_family
+
+  # §16 / §14 Decision 5: CJK and Ethiopic are excluded from v1. Detected here at
+  # Phase A and gated before the character survey, so the user gets an honest
+  # "coming soon" message instead of a broken survey path.
+  - id: script_not_supported_stub
+    prompt: "This writing system is not supported yet"
+    help_text: >
+      Support for Ethiopic (Ge'ez), Korean (Hangul), and Han-based scripts
+      (Chinese, Japanese) is still being built and is not available in this
+      version of the studio. We are adding it in a future release. You can close
+      this form for now -- nothing you entered will be submitted.
+    type: notice
+    required: false
+    next: null
 
   # -- Keyboard layout family (routing group) ----------------------------------
 
@@ -189,7 +209,9 @@ questions:
       - value: rtl
         label: "Right-to-left (Arabic, Hebrew, and similar scripts)"
       - value: syllabic
-        label: "Syllabic (each glyph represents a syllable or syllable unit, e.g. Cherokee, Canadian Aboriginal Syllabics, Ethiopic / Ge'ez)"
+        label: "Syllabic (each glyph represents a syllable or syllable unit, e.g. Cherokee, Canadian Aboriginal Syllabics, Vai)"
+      - value: alpha-nonlatin
+        label: "Non-Latin alphabet (Cyrillic, Greek, Georgian, Armenian -- letters, not syllables or attached marks)"
       - value: other
         label: "Other or I am not sure"
     required: true
