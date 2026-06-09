@@ -381,7 +381,7 @@
     "id": "7.6-compiles-no-errors-no-warnings",
     "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
     "band": "layer-c-enforce",
-    "description": "Keyboard compiles with no errors and no warnings",
+    "description": "Keyboard compiles with no errors and no warnings (source review pass; stricter than 7.21 which checks errors only)",
     "lintRuleId": "KM_LINT_COMPILE_HAS_WARNINGS"
   },
   {
@@ -423,7 +423,7 @@
     "id": "7.12-pua-in-experimental",
     "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
     "band": "layer-c-enforce",
-    "description": "If keyboard uses PUA codepoints, it is in `experimental/`",
+    "description": "If keyboard uses PUA codepoints, it is in `experimental/` (source review pass; see also 13.1 which checks the same condition from the encoding/script angle)",
     "lintRuleId": "KM_LINT_PUA_NOT_IN_EXPERIMENTAL"
   },
   {
@@ -486,7 +486,7 @@
     "id": "7.21-compiles-no-errors",
     "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
     "band": "layer-c-enforce",
-    "description": "Keyboard compiles with no errors (build-output context)",
+    "description": "Keyboard compiles with no errors (build-output context; errors only, not warnings — see 7.6 for the stricter source-review check)",
     "lintRuleId": "KM_LINT_COMPILE_ERRORS"
   },
   {
@@ -822,7 +822,7 @@
     "id": "13.1-pua-keyboard-in-experimental",
     "section": "13. Encoding / script issues",
     "band": "layer-c-enforce",
-    "description": "PUA codepoint use means keyboard is in `experimental/`",
+    "description": "PUA codepoint use means keyboard is in `experimental/` (encoding/script context; see also 7.12 which checks the same condition during source review)",
     "lintRuleId": "KM_LINT_PUA_KEYBOARD_PLACEMENT"
   },
   {
