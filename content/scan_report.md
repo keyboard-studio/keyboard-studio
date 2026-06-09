@@ -145,7 +145,7 @@ The table below lists the 17 pattern YAML files currently in `content/patterns/`
 | [simple-swap.yaml](patterns/substitute/simple-swap.yaml) | substitute | S-01 |
 | [flick-gestures.yaml](patterns/touch/flick-gestures.yaml) | touch | S-08 |
 | [hint-characters.yaml](patterns/touch/hint-characters.yaml) | touch | S-08 |
-| [layer-switch-touch.yaml](patterns/touch/layer-switch-touch.yaml) | touch | S-13 (see open questions) |
+| [layer-switch-touch.yaml](patterns/touch/layer-switch-touch.yaml) | touch | S-13 |
 | [multitap.yaml](patterns/touch/multitap.yaml) | touch | S-08 |
 | [mnemonic-spelling.yaml](patterns/transliteration/mnemonic-spelling.yaml) | transliteration | S-05 |
 | [constraints-beep.yaml](patterns/validation/constraints-beep.yaml) | validation | S-10 |

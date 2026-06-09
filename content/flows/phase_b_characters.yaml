@@ -576,7 +576,7 @@ questions:
       - value: syllabic
         label: "Syllabic (each character represents a syllable, e.g. Cherokee, Canadian Aboriginal Syllabics, Vai)"
       - value: alpha-nonlatin
-        label: "Non-Latin alphabet (Cyrillic, Greek, Georgian, Armenian)"
+        label: "Non-Latin alphabet (Cyrillic, Greek, Georgian, Armenian -- letters, not syllables or attached marks)"
       - value: other
         label: "Other or I am not sure"
     next:
