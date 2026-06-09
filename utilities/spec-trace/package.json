@@ -1,0 +1,15 @@
+{
+  "name": "spec-trace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Detects drift between spec.md sections and the implementation; creates GitHub Issues for the review backlog",
+  "type": "commonjs",
+  "bin": {
+    "spec-trace": "index.js"
+  },
+  "scripts": {
+    "check": "node index.js check",
+    "report": "node index.js report",
+    "seed": "node index.js seed"
+  }
+}

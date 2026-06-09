@@ -14,6 +14,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
 
     steps:
       - name: Checkout
@@ -51,3 +54,12 @@ jobs:
 
       - name: Test (all packages)
         run: pnpm -r test
+
+      # Non-blocking: warns in CI log and opens GitHub Issues for any spec
+      # sections whose content changed since the last acknowledgement.
+      # Never fails the build — drift is a backlog item, not a blocker.
+      - name: Spec drift check
+        run: node utilities/spec-trace/index.js check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SPEC_TRACE_REPO: MattGyverLee/keyboard-studio
