@@ -18,7 +18,7 @@ import {
 import {
   hausaWithDigraphs,
   hindiWithNukta,
-  hebrewWithDirectionMarks,
+  hebrewRtlCoverageOnly,
 } from "./fixtures/linguistInventories";
 
 // A compact French-ish exemplar reused across cases.
@@ -196,7 +196,7 @@ describe("optional fields — issue #191 coverage", () => {
   });
 
   it("linguistInventoryChars includes directionControlChars after numerals", () => {
-    const chars = linguistInventoryChars(hebrewWithDirectionMarks);
+    const chars = linguistInventoryChars(hebrewRtlCoverageOnly);
     expect(chars).toContain("‏"); // U+200F RIGHT-TO-LEFT MARK
     expect(chars).toContain("‎"); // U+200E LEFT-TO-RIGHT MARK
     const lastNumeralIdx = chars.lastIndexOf("1");
@@ -204,7 +204,7 @@ describe("optional fields — issue #191 coverage", () => {
   });
 
   it("linguistInventoryChars includes syllabicFinalMarkers after numerals", () => {
-    const chars = linguistInventoryChars(hebrewWithDirectionMarks);
+    const chars = linguistInventoryChars(hebrewRtlCoverageOnly);
     expect(chars).toContain("ᐧ"); // U+1427 CANADIAN SYLLABICS FINAL MIDDLE DOT
     const lastNumeralIdx = chars.lastIndexOf("1");
     expect(chars.indexOf("ᐧ")).toBeGreaterThan(lastNumeralIdx);

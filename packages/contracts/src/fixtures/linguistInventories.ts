@@ -34,11 +34,12 @@ export const hindiWithNukta: LinguistInventory = {
 
 /**
  * Fixture C — Hebrew RTL with directionControlChars and syllabicFinalMarkers.
- * Exercises the remaining two optional fields from issue #191.
- * syllabicFinalMarkers is included here for completeness even though Hebrew
- * is not a syllabic script — the type allows any script to carry the field.
+ * Named hebrewRtlCoverageOnly to make explicit that this fixture exists for
+ * type-coverage of the remaining two optional fields; the syllabicFinalMarkers
+ * value (U+1427) is atypical for Hebrew and is present only to exercise the
+ * field type, not to model a real Hebrew inventory.
  */
-export const hebrewWithDirectionMarks: LinguistInventory = {
+export const hebrewRtlCoverageOnly: LinguistInventory = {
   language: "he",
   script: "Hebrew",
   alphabetCore: { lowercase: ["א", "ב", "ג"], uppercase: [] },

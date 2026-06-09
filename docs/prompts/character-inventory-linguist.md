@@ -91,7 +91,7 @@ not include any conversational intro or outro text.
 | `language_specific_punctuation` | `languageSpecificPunctuation` | |
 | `numerals` | `numerals` | |
 | `digraphs_as_phoneme_units` | `digraphsAsPhonemeUnits` | Optional; Latin scripts only |
-| `nukta_and_borrowed_sound_markers` | `nuktaAndBorrowedSoundMarkers` | Optional; Indic scripts only; NFC |
+| `nukta_and_borrowed_sound_markers` | `nuktaAndBorrowedSoundMarkers` | Optional; Indic scripts only; NFC-ordered multi-codepoint sequences (base consonant + nukta combining mark; does not precompose) |
 | `independent_vowels` | `independentVowels` | Optional; Indic scripts only; NFC |
 | `direction_control_chars` | `directionControlChars` | Optional; RTL scripts only; advisory -- Phase C |
 | `syllabic_final_markers` | `syllabicFinalMarkers` | Optional; Syllabic scripts only; NFC |

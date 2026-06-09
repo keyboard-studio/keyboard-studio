@@ -136,7 +136,10 @@ export interface LinguistInventory {
   /** Numerals used by the language. */
   numerals: string[];
   /** Digraphs that function as single phoneme units (e.g. "sh", "ny");
-   *  surface as an S-01 signal. Latin scripts only. */
+   *  intended as an S-01 placement signal — engine adapter to implement
+   *  (see utilities/kbgen/INTEGRATION.md). Latin scripts only.
+   *  TODO: wire axis-accumulation in the engine adapter so this field
+   *  actually adjusts A1/S-01 before relying on it. */
   digraphsAsPhonemeUnits?: string[];
   /** Nukta and related borrowed-sound markers (e.g. U+093C in Devanagari);
    *  used in Indic scripts to extend the native consonant inventory. */
