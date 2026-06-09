@@ -412,6 +412,42 @@ describe("criteria.json schema conformance", () => {
         expect(validPrinciples, `${c.id}.principle`).toContain(c.principle)
       );
   });
+
+  it("every record carries its band-appropriate hook field (populated)", () => {
+    records.forEach((c) => {
+      switch (c.band) {
+        case "scaffolder-bake":
+          expect(typeof c.scaffolderRule, `${c.id}.scaffolderRule`).toBe("string");
+          expect(c.scaffolderRule.length, `${c.id}.scaffolderRule non-empty`).toBeGreaterThan(0);
+          break;
+        case "layer-c-enforce":
+          expect(typeof c.lintRuleId, `${c.id}.lintRuleId`).toBe("string");
+          expect(c.lintRuleId.length, `${c.id}.lintRuleId non-empty`).toBeGreaterThan(0);
+          break;
+        case "yellow-survey":
+          expect(typeof c.surveyQuestionId, `${c.id}.surveyQuestionId`).toBe("string");
+          expect(c.surveyQuestionId.length, `${c.id}.surveyQuestionId non-empty`).toBeGreaterThan(0);
+          break;
+        case "red-checklist":
+          expect(typeof c.preSubmitChecklistText, `${c.id}.preSubmitChecklistText`).toBe("string");
+          expect(c.preSubmitChecklistText.length, `${c.id}.preSubmitChecklistText non-empty`).toBeGreaterThan(0);
+          break;
+      }
+    });
+  });
+
+  it("no record carries a sibling-band hook field", () => {
+    records.forEach((c) => {
+      if (c.band !== "scaffolder-bake")
+        expect("scaffolderRule" in c, `${c.id} must not have scaffolderRule`).toBe(false);
+      if (c.band !== "layer-c-enforce")
+        expect("lintRuleId" in c, `${c.id} must not have lintRuleId`).toBe(false);
+      if (c.band !== "yellow-survey")
+        expect("surveyQuestionId" in c, `${c.id} must not have surveyQuestionId`).toBe(false);
+      if (c.band !== "red-checklist")
+        expect("preSubmitChecklistText" in c, `${c.id} must not have preSubmitChecklistText`).toBe(false);
+    });
+  });
 });
 
 // -----------------------------------------------------------------------------
