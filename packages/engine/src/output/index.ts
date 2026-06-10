@@ -12,6 +12,9 @@ import { toZip } from "./zip.js";
 export { toZip, serializeToZip } from "./zip.js";
 export { createGitHubOutputService } from "./github.js";
 export type { GitHubOutputConfig, GitHubFetchFn } from "./github.js";
+export { addSidecar, isSidecarPath } from "./sidecar.js";
+export { buildImportAttributionBlock } from "./import-attribution.js";
+export type { ImportAttributionInput } from "./import-attribution.js";
 
 /**
  * Create a partial {@link OutputService} with the zip-download path wired up.

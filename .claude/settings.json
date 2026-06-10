@@ -160,7 +160,10 @@
       "Skill(update-config)",
       "Skill(update-config:*)",
       "PowerShell(Get-Content \"$env:USERPROFILE\\\\.claude\\\\settings.json\" -Raw | ConvertFrom-Json | Select-Object -ExpandProperty permissions | Select-Object -ExpandProperty allow | Select-String '^\\(PowerShell|Bash\\)\\\\\\(gh ')",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(pnpm --filter @keyboard-studio/engine test --reporter=verbose)",
+      "Bash(pnpm --filter @keyboard-studio/engine test)",
+      "Bash(pnpm --filter @keyboard-studio/contracts test)"
     ],
     "additionalDirectories": [
       "C:\\Temp",

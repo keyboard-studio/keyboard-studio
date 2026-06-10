@@ -147,3 +147,43 @@ describe("serializeToZip", () => {
     void fs; // suppress unused variable
   });
 });
+
+// ---------------------------------------------------------------------------
+// Sidecar (.kmn.imported) inclusion — spec §12 lines 1126-1128
+// Sidecars must appear in the zip so the user's local working blob contains
+// the original for diff; publishPR excludes them from the commit tree separately.
+// ---------------------------------------------------------------------------
+
+describe("toZip — sidecar (.kmn.imported) files", () => {
+  it("includes a .kmn.imported entry in the zip archive", async () => {
+    const fs = makeVirtualFS([
+      { path: "source/cm_qwerty.kmn", content: "c emitted\n", isBinary: false },
+      { path: "source/cm_qwerty.kmn.imported", content: "c original\n", isBinary: false },
+    ]);
+    const bytes = await toZip(fs);
+    const entries = unzipSync(bytes);
+    expect(Object.keys(entries)).toContain("source/cm_qwerty.kmn.imported");
+  });
+
+  it("preserves the exact content of a .kmn.imported entry", async () => {
+    const originalContent = "c version(10.0)\nstore(&NAME) \"CM Qwerty\"\n";
+    const fs = makeVirtualFS([
+      { path: "source/cm_qwerty.kmn.imported", content: originalContent, isBinary: false },
+    ]);
+    const bytes = await toZip(fs);
+    const entries = unzipSync(bytes);
+    expect(dec.decode(entries["source/cm_qwerty.kmn.imported"])).toBe(originalContent);
+  });
+
+  it("includes both the emitted .kmn and the .kmn.imported sidecar", async () => {
+    const fs = makeVirtualFS([
+      { path: "source/test_kb.kmn", content: "c emitted\n", isBinary: false },
+      { path: "source/test_kb.kmn.imported", content: "c original\n", isBinary: false },
+    ]);
+    const bytes = await toZip(fs);
+    const entries = unzipSync(bytes);
+    const paths = Object.keys(entries);
+    expect(paths).toContain("source/test_kb.kmn");
+    expect(paths).toContain("source/test_kb.kmn.imported");
+  });
+});
