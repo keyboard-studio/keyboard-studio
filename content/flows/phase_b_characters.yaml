@@ -380,6 +380,35 @@ questions:
       in the inventory. Leave blank if there is nothing to add.
     type: text
     required: false
+    next: pb_latin_digraphs_gate
+
+  # -- Gap 1: Latin digraphs ---------------------------------------------------
+
+  - id: pb_latin_digraphs_gate
+    prompt: "Does your language treat any combination of letters (two or more) as a single sound -- one that you might want on its own dedicated key?"
+    help_text: >
+      Some languages use multi-letter combinations to spell a single
+      sound, such as 'sh', 'ts', 'ny', or 'ng'. If your language treats
+      a combination like this as its own unit -- the way English treats
+      'ch' or Hausa treats 'sh', or Welsh treats 'ngh' -- it may deserve
+      its own key rather than being typed as separate letters. Answer Yes
+      if any multi-letter combinations work this way in your language.
+    type: bool
+    required: true
+    next:
+      - condition: "value == 'true'"
+        goto: pb_latin_digraphs_list
+      - default: pb_punctuation_gate
+
+  - id: pb_latin_digraphs_list
+    prompt: "List the letter combinations (digraphs and multigraphs) your language treats as single sounds."
+    help_text: >
+      Type each letter combination separated by spaces, for example: sh ts ny
+      ng ch ngh. Include both lowercase and uppercase forms if the uppercase
+      version differs from simply capitalizing each letter. The studio
+      uses this to decide whether to give each digraph or multigraph its own key.
+    type: text
+    required: false
     next: pb_punctuation_gate
 
   # -- Q4: Punctuation ---------------------------------------------------------
@@ -652,6 +681,65 @@ questions:
       their consonant in the final display.
     type: bool
     required: true
+    next: pb_indic_nukta_gate
+
+  # -- Gap 2: Indic nukta / borrowed-sound markers -----------------------------
+
+  - id: pb_indic_nukta_gate
+    prompt: "Does your language use a small dot placed below a consonant letter to spell sounds borrowed from other languages?"
+    help_text: >
+      Many South Asian scripts include a small dot that can be placed
+      directly below a consonant to show that it represents a foreign
+      sound not native to the script. In Hindi written in Devanagari,
+      this dot is used for sounds borrowed from Arabic and Persian, for
+      example the letter for 'q' or sounds used in loanwords. If your
+      language uses a dot like this under any letter, answer Yes.
+    type: bool
+    required: true
+    next:
+      - condition: "value == 'true'"
+        goto: pb_indic_nukta_detail
+      - default: pb_indic_vowels_onset
+
+  - id: pb_indic_nukta_detail
+    prompt: "Which consonant letters in your script take the dot-below modifier?"
+    help_text: >
+      Type or paste the base letters that can have the dot placed beneath
+      them, for example the letters used for k, kh, g, j, ph, and f in
+      Devanagari Hindi. If you are not sure of the exact set, type the
+      ones you know and leave a note. The visual character picker is also
+      available.
+    type: text
+    required: false
+    next: pb_indic_vowels_onset
+
+  # -- Gap 3: Indic independent vowels -----------------------------------------
+
+  - id: pb_indic_vowels_onset
+    prompt: "When a vowel sound begins a word or syllable with no consonant before it, does your script write it as a full standing letter -- different from the small mark used when the vowel follows a consonant?"
+    help_text: >
+      In most South Asian scripts, the same vowel sound is written two
+      different ways: as a full standing letter when it starts a word,
+      but as a small attached mark when it follows a consonant. The
+      keyboard needs both forms. Answer Yes if your script works this
+      way.
+    type: bool
+    required: true
+    next:
+      - condition: "value == 'true'"
+        goto: pb_indic_vowels_onset_list
+      - default: pb_special_letters
+
+  - id: pb_indic_vowels_onset_list
+    prompt: "List the full standing vowel letters your script uses at the start of a word or syllable."
+    help_text: >
+      These are the forms your script uses when a vowel begins a word --
+      the independent shapes, not the small marks attached to consonants.
+      Type or paste them, or use the character picker. For example,
+      Devanagari has independent vowel letters for a, aa, i, ii, u, uu,
+      e, ai, o, au, and others.
+    type: text
+    required: false
     # enter the shared universal tail (special letters, punctuation, digits, count)
     next: pb_special_letters
 
@@ -713,6 +801,45 @@ questions:
         label: "Sometimes written (for example, in educational or religious text only)"
       - value: never
         label: "Never or almost never written"
+    next: pb_rtl_direction_marks
+
+  # -- Gap 4: RTL direction marks (advisory) -----------------------------------
+
+  - id: pb_rtl_direction_marks
+    prompt: "Does your keyboard need to produce special invisible characters to keep numbers or left-to-right words in the correct order inside right-to-left text?"
+    help_text: >
+      When right-to-left text contains a number, a web address, or a
+      word from a left-to-right language, an invisible direction-control
+      character sometimes helps the computer display it in the right
+      order. These characters are not part of your written language but
+      help with mixed-direction text. Most users do not need a dedicated
+      key for them. Answer Yes only if your community regularly types
+      mixed content where automatic direction handling fails. (Note: the
+      studio will configure this in a later step if you answer Yes.)
+    type: bool
+    required: false
+    advisory: true
+    next:
+      - condition: "value == 'true'"
+        goto: pb_rtl_direction_marks_detail
+      - default: pb_rtl_special_letters
+
+  - id: pb_rtl_direction_marks_detail
+    prompt: "Which direction-control characters do you need? (the studio will place these in a later step)"
+    help_text: >
+      Select whichever you need. The Right-to-Left Mark forces
+      right-to-left reading order on surrounding text; the Left-to-Right
+      Mark forces left-to-right reading order. Both are invisible when
+      typed. The studio will suggest a key position for these in a later
+      step.
+    type: multi_select
+    required: false
+    advisory: true
+    options:
+      - value: "U+200F"
+        label: "Right-to-Left Mark -- forces right-to-left direction on surrounding text"
+      - value: "U+200E"
+        label: "Left-to-Right Mark -- forces left-to-right direction on surrounding text"
     next: pb_rtl_special_letters
 
   - id: pb_rtl_special_letters
@@ -759,6 +886,38 @@ questions:
       writing system works differently, choose No.
     type: bool
     required: true
+    next: pb_syllabic_finals_gate
+
+  # -- Gap 5: Syllabic final markers -------------------------------------------
+
+  - id: pb_syllabic_finals_gate
+    prompt: "Does your writing system use a special mark or a smaller character to show that a syllable ends with a consonant sound?"
+    help_text: >
+      Some syllabic writing systems have a small raised dot, a raised
+      letter form, or another special mark that shows the final consonant
+      of a syllable when no vowel follows it. For example, Canadian
+      Aboriginal Syllabics uses small raised forms and a centered dot for
+      this purpose. If your writing system has any such mark or form,
+      answer Yes.
+    type: bool
+    required: true
+    next:
+      - condition: "value == 'true'"
+        goto: pb_syllabic_finals_detail
+      - default: pb_special_letters
+
+  - id: pb_syllabic_finals_detail
+    prompt: "Describe or paste the final-consonant marks or small raised forms your writing system uses."
+    help_text: >
+      Type or paste the marks if you can, or describe them in words (for
+      example, 'a small raised dot in the center' or 'a small raised
+      version of the plain consonant character'). If there are several --
+      one per consonant -- list as many as you can. The visual character
+      picker is also available. The studio will use this to decide whether
+      these marks need their own key or can be typed through a modifier
+      key.
+    type: text
+    required: false
     # enter the shared universal tail (special letters, punctuation, digits, count)
     next: pb_special_letters
 

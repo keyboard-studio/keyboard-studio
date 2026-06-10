@@ -19,6 +19,11 @@
 //   mandatory_diacritics_and_ligatures-> mandatoryDiacriticsAndLigatures
 //   language_specific_punctuation     -> languageSpecificPunctuation
 //   numerals                          -> numerals
+//   digraphs_as_phoneme_units         -> digraphsAsPhonemeUnits
+//   nukta_and_borrowed_sound_markers  -> nuktaAndBorrowedSoundMarkers
+//   independent_vowels                -> independentVowels
+//   direction_control_chars           -> directionControlChars
+//   syllabic_final_markers            -> syllabicFinalMarkers
 //
 // Normalization: every character is NFC (precomposed — 'á', not 'a' + combining
 // acute), and a diacritic-letter combination that is its own letter or mandatory
@@ -130,6 +135,25 @@ export interface LinguistInventory {
   languageSpecificPunctuation: string[];
   /** Numerals used by the language. */
   numerals: string[];
+  /** Digraphs that function as single phoneme units (e.g. "sh", "ny");
+   *  intended as an S-01 placement signal — engine adapter to implement
+   *  (see utilities/kbgen/INTEGRATION.md). Latin scripts only.
+   *  TODO: wire axis-accumulation in the engine adapter so this field
+   *  actually adjusts A1/S-01 before relying on it. */
+  digraphsAsPhonemeUnits?: string[];
+  /** Nukta and related borrowed-sound markers (e.g. U+093C in Devanagari);
+   *  used in Indic scripts to extend the native consonant inventory. */
+  nuktaAndBorrowedSoundMarkers?: string[];
+  /** Independent (standing) vowel letters used at word/syllable onset,
+   *  as distinct from attached vowel signs (matras). Indic scripts. */
+  independentVowels?: string[];
+  /** Unicode directional control characters required for mixed-direction
+   *  text (e.g. U+200F RIGHT-TO-LEFT MARK, U+200E LEFT-TO-RIGHT MARK).
+   *  RTL scripts; marked Phase C advisory in Phase B. */
+  directionControlChars?: string[];
+  /** Syllabic final/coda markers that may need dedicated keys or a
+   *  modifier key (e.g. Canadian Aboriginal Syllabics raised finals). */
+  syllabicFinalMarkers?: string[];
   /** Deterministic CLDR cross-check divergences, when any were found. */
   flags?: InventoryFlag[];
   /** Sources the agent consulted, for user vetting. */
@@ -149,6 +173,11 @@ export type LinguistInventoryInit = {
   mandatoryDiacriticsAndLigatures: string[];
   languageSpecificPunctuation: string[];
   numerals: string[];
+  digraphsAsPhonemeUnits?: string[];
+  nuktaAndBorrowedSoundMarkers?: string[];
+  independentVowels?: string[];
+  directionControlChars?: string[];
+  syllabicFinalMarkers?: string[];
   flags?: InventoryFlag[];
   sources?: InventorySource[];
 };
@@ -184,6 +213,21 @@ export function makeLinguistInventory(
     ...(init.alphabetAuxiliary !== undefined
       ? { alphabetAuxiliary: stripUndefined(init.alphabetAuxiliary) }
       : {}),
+    ...(init.digraphsAsPhonemeUnits !== undefined
+      ? { digraphsAsPhonemeUnits: init.digraphsAsPhonemeUnits }
+      : {}),
+    ...(init.nuktaAndBorrowedSoundMarkers !== undefined
+      ? { nuktaAndBorrowedSoundMarkers: init.nuktaAndBorrowedSoundMarkers }
+      : {}),
+    ...(init.independentVowels !== undefined
+      ? { independentVowels: init.independentVowels }
+      : {}),
+    ...(init.directionControlChars !== undefined
+      ? { directionControlChars: init.directionControlChars }
+      : {}),
+    ...(init.syllabicFinalMarkers !== undefined
+      ? { syllabicFinalMarkers: init.syllabicFinalMarkers }
+      : {}),
     ...(init.flags !== undefined ? { flags: init.flags } : {}),
     ...(init.sources !== undefined ? { sources: init.sources } : {}),
   });
@@ -195,11 +239,16 @@ export function makeLinguistInventory(
  * against the base output set like any other discovery method's result).
  *
  * Order: core (lowercase then uppercase) → auxiliary (lowercase then uppercase)
- * → mandatory diacritics/ligatures → language-specific punctuation → numerals.
+ * → mandatory diacritics/ligatures → language-specific punctuation → numerals
+ * → digraphs → nukta markers → independent vowels → syllabic finals.
  * Duplicates are removed, keeping the first occurrence, so a character that
  * appears in more than one group lands once in its earliest position.
  *
  * `flags` and `sources` are confirmation aids and do not contribute characters.
+ *
+ * `directionControlChars` is excluded from this flatten (Phase C advisory bidi
+ * markers; callers wanting those chars should read inv.directionControlChars
+ * directly).
  *
  * @param inv - The (typically user-confirmed) synthesized inventory.
  * @returns Ordered, de-duplicated character list.
@@ -214,6 +263,10 @@ export function linguistInventoryChars(inv: LinguistInventory): string[] {
     ...inv.mandatoryDiacriticsAndLigatures,
     ...inv.languageSpecificPunctuation,
     ...inv.numerals,
+    ...(inv.digraphsAsPhonemeUnits ?? []),
+    ...(inv.nuktaAndBorrowedSoundMarkers ?? []),
+    ...(inv.independentVowels ?? []),
+    ...(inv.syllabicFinalMarkers ?? []),
   ];
   return [...new Set(ordered)];
 }
