@@ -385,8 +385,6 @@ The crew's briefing in the next sub-section uses `review_range`, `last_audited_s
 
 ### Pre-filter D: process-only bypass (title prefix OR triage-bypass label)
 
-(Letter D, not C, because C is reserved for a future filter.)
-
 Before composing and dispatching the crew, check whether this PR qualifies for an immediate lead-approved bypass. Two independent trigger conditions are tested; either is sufficient.
 
 **Trigger 1 — process title prefix.** The PR title matches the regex `^(feat|fix|docs|chore|maint|refactor|auto)\(process\):`. The prefix vocabulary mirrors the commit style in CLAUDE.md (§ "Commit and issue title style") exactly — do not add or remove prefix tokens.
@@ -455,7 +453,40 @@ If the timeline API returns a result, record the actor login as `label_applied_b
 
 **Action when neither trigger fires:** fall through to Pre-filter B and crew dispatch — compose the crew, apply Pre-filter B filtering, and run the normal substantive review path.
 
-**Ordering note.** Pre-filter D runs second, after A and before B's signed-off filtering and empty-crew guard. If a PR matches a D trigger, Pre-filter B and the empty-crew guard are never evaluated for it. If the PR does not match, Pre-filter B and the empty-crew guard apply as normal. Section is lettered D (not C) because C is reserved for a future filter; section letters reflect insertion order, not firing order, which is documented inline at each section.
+**Ordering note.** Pre-filter D runs second, after A and before C's scope filtering, B's signed-off filtering, and the empty-crew guard. If a PR matches a D trigger, none of those downstream filters are evaluated for it. If the PR does not match, C → B → empty-crew apply in that order. Section letters reflect insertion order, not firing order, which is documented inline at each section.
+
+### Pre-filter C: skip specialists whose scope the diff does not touch
+
+After D clears (no whole-PR bypass) and before B (signed-off skipping), drop any specialist whose review scope is structurally irrelevant to the changed files. Empirically (see `.tech-lead-inbox/audit-log.jsonl`), some specialists are routinely dispatched on PRs that never touch their domain — the verdict comes back "no §7 framework artifacts" or equivalent — and that dispatch is pure token waste.
+
+This filter is a path-based gate, not a content-aware one. It is intentionally conservative: when in doubt, dispatch. False negatives (filtering a specialist the diff actually needs) are worse than false positives (dispatching one that returns APPROVE quickly), because a missed finding is a defect that ships.
+
+**Specialists currently filterable:**
+
+| Specialist | Skip when NONE of the changed file paths match any of: |
+|---|---|
+| `km-strategy` | `**/*pattern*.{json,ts}`, `**/strategy/**`, `strategy tree/**`, `packages/contracts/src/fixtures/patterns.ts`, `packages/engine/**/strategy*`, `spec.md` |
+
+The path globs are matched against the cached `<FILES_PATH>` from Pre-filter A (`git diff --name-status` for incremental, `gh pr view --json files` for full). Paths come pre-normalized; no need to handle Windows-vs-POSIX separators.
+
+Other specialists (`km-domain`, `km-keyman`, `km-qc`, `km-verification`, `km-synthesis`) are **not** filterable here:
+
+- `km-domain` is the linguistic error-catcher — script names, BCP47 tags, and Unicode pitfalls can hide in any file (commit messages, doc strings, comments), so a path-based gate would miss them. Keep it in the loop.
+- `km-keyman` likewise — `.kmn` semantics and Pattern-schema invariants leak into adjacent docs, tests, and fixtures.
+- `km-qc`, `km-verification`, `km-synthesis` apply to any code change in the engine crew.
+
+**Procedure:**
+
+1. For each filterable specialist in the dispatched crew, check whether any path in `<FILES_PATH>` matches the specialist's glob set. Use minimatch semantics (`*` does not cross `/`, `**` does).
+2. If no path matches, remove the specialist from the dispatch list and record it under `scope_skipped` in the audit-log entry (parallel to `signed_off_skipped`). The recorded shape is the bare specialist name, e.g. `"scope_skipped": ["km-strategy"]`.
+3. If at least one path matches, dispatch the specialist normally.
+4. The crew composition rule from Phase 3 ("ENGINE = …, CONTENT = …, BOTH = …") still defines which specialists are eligible; C only removes already-classified ones. C does not add specialists.
+
+**Empty-crew interaction.** Pre-filter B's empty-crew guard runs after C. If C strips a specialist and B then strips the rest, the same ESCALATE-with-question fallback fires — the guard does not distinguish between scope-skipped and signed-off-skipped reasons. (For the current filter set this is unreachable, since `km-domain` and `km-keyman` are unfilterable and always populate CONTENT-flavored crews.)
+
+**Audit-log fields.** Add `scope_skipped: [<names>]` next to `signed_off_skipped`. When neither filter strips anyone, both fields are `[]`. Auditors comparing weight-pulling across specialists can read these fields directly to see who was dropped and why.
+
+**Adjusting the filter.** When a specialist's empirical signal/noise shifts (more APPROVEs for "didn't touch my domain"), add it to the table above with a tight glob set. Re-check the audit log after a few sweep cycles to confirm the filter didn't suppress real findings. The path globs are deliberately verbose-but-readable so future edits are obvious.
 
 ### Pre-filter B: skip already-signed-off specialists
 
