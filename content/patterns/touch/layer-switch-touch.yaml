@@ -124,7 +124,7 @@ tests:
     expectedOutput: " "
     description: "Space key outputs a space on any layer"
 
-validatedForFamilies: []
+validatedForFamilies: ["Latn", "Khmr", "Hebr"]
 sourceKeyboards:
   - "release/sil/sil_ipa"
   - "release/sil/sil_khmer"
@@ -227,7 +227,7 @@ demo:
                 "key": [
                   { "id": "K_LOPT",       "sp": 1, "width": 100 },
                   { "id": "T_switch_num", "text": "123", "sp": 1, "nextlayer": "numbers" },
-                  { "id": "K_SPACE",      "text": " ",   "width": 300 },
+                  { "id": "K_SPACE",      "text": " ",   "width": 600 },
                   { "id": "K_BKSP",       "sp": 1, "width": 100 },
                   { "id": "K_ENTER",      "sp": 1, "width": 100 }
                 ]
@@ -250,7 +250,7 @@ demo:
                 "key": [
                   { "id": "K_LOPT",       "sp": 1, "width": 100 },
                   { "id": "T_switch_def", "text": "ABC", "sp": 1, "nextlayer": "default" },
-                  { "id": "K_SPACE",      "text": " ",   "width": 300 },
+                  { "id": "K_SPACE",      "text": " ",   "width": 600 },
                   { "id": "K_BKSP",       "sp": 1, "width": 100 },
                   { "id": "K_ENTER",      "sp": 1, "width": 100 }
                 ]

@@ -1,7 +1,6 @@
 # multitap.yaml
 # Touch pattern: rapid repeated taps on a key cycle through a set of characters.
-# Strategy: S-08 (layer expansion — on touch, multitap is a tap-count-driven
-# access mechanism analogous to the desktop RAlt/modifier layer).
+# No strategyId: multitap is a touch-runtime tap-count mechanism; see inline note — S-08 mapping is inexact.
 # Priority 3 — secondary touch gallery pattern.
 
 id: multitap
@@ -54,7 +53,7 @@ tests:
     expectedOutput: "a"
     description: "single tap on K_A still produces a (multitap only triggers on rapid repeated taps)"
 
-validatedForFamilies: ["Latn", "Ethi"]
+validatedForFamilies: ["Latn", "Ethi", "Yiii"]
 sourceKeyboards:
   - "release/gff/gff_amharic"
   - "release/sil/sil_yi"
@@ -139,6 +138,15 @@ demo:
                       { "id": "U_00E2", "text": "â" }
                     ]
                   }
+                ]
+              },
+              {
+                "id": 2,
+                "key": [
+                  { "id": "K_LOPT",  "sp": 1, "width": 100 },
+                  { "id": "K_SPACE", "text": " ", "width": 700 },
+                  { "id": "K_BKSP",  "sp": 1, "width": 100 },
+                  { "id": "K_ENTER", "sp": 1, "width": 100 }
                 ]
               }
             ]

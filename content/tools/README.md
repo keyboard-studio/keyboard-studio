@@ -91,3 +91,57 @@ repo-relative paths so you can diff it against `keyboards/tools/mobile-layout-re
 
 Single pass; each file is read once. The full corpus (~1k keyboards) scans in well
 under the 60s budget. The script prints elapsed time and warns if it exceeds 60s.
+
+## validate_demos.py — pattern demo validator
+
+Validates every `demo.filled_kmn` (and paired touch layout, where present) across
+all pattern YAMLs by compiling each through `kmc build`. Extracts block scalars with
+stdlib regex — no PyYAML required.
+
+### Prerequisites
+
+- Python 3.8+ (standard library only — no `pip install` needed).
+- `kmc` 18+ on PATH.
+
+```sh
+npm install -g @keymanapp/kmc
+```
+
+### Re-run it
+
+```sh
+# bash / CI
+bash content/tools/validate_demos.sh
+bash content/tools/validate_demos.sh --report
+
+# PowerShell
+content/tools/validate_demos.ps1
+content/tools/validate_demos.ps1 --report
+```
+
+Or invoke the script directly:
+
+```sh
+python content/tools/validate_demos.py [--report]
+```
+
+### Options
+
+- `--report` — write results to `content/validation_report.md` in addition to stdout.
+
+### What it checks
+
+Discovers all `*.yaml` under `content/patterns/` recursively (12 patterns today).
+For each pattern:
+
+1. Writes `demo.filled_kmn` to a temp `.kmn` and runs
+   `kmc build file <path> --compiler-warnings-as-errors`.
+2. If the pattern also declares `demo.touch_layout_fragment` or `demo.touch_layout`,
+   runs a second paired compile (KMN + touch-layout JSON in a shared temp dir).
+
+Prints `[PASS]` / `[FAIL]` per pattern; on failure the `kmc` output is shown inline.
+
+### CI usage
+
+Exits with code `1` if any pattern fails, `0` if all pass — drop either wrapper
+directly into a status-check step.
