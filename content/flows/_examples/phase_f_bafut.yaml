@@ -1,0 +1,80 @@
+# Completed Phase F instance -- Bafut keyboard (hypothetical)
+#
+# This file shows what a finished phase_f_helpdocs flow looks like after a
+# language expert fills it in. The questionId values map 1:1 to the id fields
+# in content/flows/phase_f_helpdocs.yaml.
+#
+# Language: Bafut (Fa'), ISO 639-3: bfd, Cameroon
+# Author: Bafut Language Committee, bafut.keyboard@example.org
+# Companion files:
+#   content/flows/_examples/phase_a_bafut.yaml  (identity + routing)
+#   content/flows/_examples/phase_b_bafut.yaml  (character inventory)
+#
+# pf_usage_tip_4 and pf_usage_tip_5 are empty strings, showing that optional
+# fields are gracefully omitted from the help page output.
+
+flow_id: phase_f_helpdocs
+phase: "F"
+
+answers:
+  - questionId: pf_welcome_paragraph
+    value: >-
+      This keyboard lets you type Bafut (Fa') on any computer, including all
+      the tone marks and special letters used in the Bafut alphabet. It is
+      designed for speakers and literacy workers in the Northwest Region of
+      Cameroon.
+
+  - questionId: pf_usage_tip_1
+    value: >-
+      To type a vowel with a tone mark, press the vowel key first and then the
+      tone key: press the backtick key (`) for a low tone, or the apostrophe
+      key (') for a high tone. For example, press A then ` to get à (low-tone a).
+
+  - questionId: pf_usage_tip_2
+    value: >-
+      The velar nasal letter ŋ (the "ng" sound at the end of "sing") is typed
+      with Shift+N.
+
+  - questionId: pf_usage_tip_3
+    value: >-
+      The open back vowel ɑ is on AltGr+A, and the central close vowel ɨ is on
+      AltGr+I.
+
+  - questionId: pf_usage_tip_4
+    value: ""
+
+  - questionId: pf_usage_tip_5
+    value: ""
+
+  - questionId: pf_credits
+    value: >-
+      Bafut Language Committee, Northwest Region, Cameroon. Keyboard layout by
+      the Bafut Literacy Project, 2024.
+
+  - questionId: pf_contact_info
+    value: "bafut.keyboard@example.org"
+
+# Computed outputs (informational -- not part of SurveyAnswer[]):
+#
+# The scaffolder produces the following files from these Phase F answers,
+# combined with Phase A identity data (phase_a_bafut.yaml):
+#
+#   welcome.htm
+#     <html lang="en">
+#     heading: "Start Using Bafut"  (matches <title>; mirrors keymanapp/keyboards convention)
+#     body paragraph: pf_welcome_paragraph value above
+#     usage tips list: pf_usage_tip_1, pf_usage_tip_2, pf_usage_tip_3
+#       (pf_usage_tip_4 and pf_usage_tip_5 are blank -> omitted from list)
+#     credits section: pf_credits value above
+#     contact section: pf_contact_info value above
+#     version and copyright: NOT included (managed by the scaffolder separately)
+#
+#   help/bafut.php
+#     identical body content to welcome.htm
+#     (spec §8 step 9 parity guarantee)
+#
+#   LICENSE.md
+#     MIT license text (populated automatically by the scaffolder)
+#
+#   keyboard package metadata (.kps)
+#     <LicenseFile> element in .kps points to LICENSE.md (MIT license text populated by the scaffolder)
