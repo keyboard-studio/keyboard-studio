@@ -57,7 +57,7 @@ function buildPattern(matchResult: MatchResult): Pattern {
     questions: [
       {
         id: "keystrokeCharacterMap",
-        prompt: "Keystroke-to-character map (one entry per line: [MODS KEY],U+XXXX)",
+        prompt: "Keystroke-to-character map (one entry per line: + [MODS KEY] > U+XXXX)",
         answerType: "text",
         default: matchResult.slotValues["keystrokeCharacterMap"] ?? "",
       },
@@ -82,8 +82,7 @@ export const s01Recognizer: RecognizerRule = {
       const matchingRules = group.rules.filter((r) => isS01(r, group.name));
       if (matchingRules.length === 0) continue;
 
-      // Guard: spec §7.3 S-01 card says "1-5 extra characters" (≤5 inclusive).
-      // §7.1 says "<5 strict" but §7.3 card is the strategy contract — follow §7.3.
+      // Guard: spec §7.3 S-01 card says "1–5 extra characters" (≤5 inclusive); skip groups with more than 5 distinct base keys.
       const distinctBaseNames = new Set(
         matchingRules
           .map((r) => r.context[0])

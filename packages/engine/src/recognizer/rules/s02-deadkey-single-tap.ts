@@ -126,7 +126,7 @@ function buildPattern(match: MatchResult): Pattern {
     ],
     kmnFragment:
       "+ {{triggerKey}} > dk({{deadkeyName}})\n" +
-      "dk({{deadkeyName}}) any({{baseLetters}}) > index({{accentedForms}}, 2)",
+      "dk({{deadkeyName}}) + any({{baseLetters}}) > index({{accentedForms}}, 2)",
     tests: [],
     validatedForFamilies: [],
     sourceKeyboards: [],
