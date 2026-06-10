@@ -4,7 +4,7 @@
 **Cadence:** Biweekly sprints
 **Milestone IDs:** KS-S1 through KS-S6 (v1.1 import-pipeline era)
 
-**Status key:** *todo* · *in progress by @username* · *in PR* · *done*
+**Status key:** *todo* · *in progress by @username* · *in PR #NNN by @username* · *done*
 
 > **Plan revision: 2026-06-09.** Supersedes the v1.0 plan. The v1.1.0 KeyboardIR amendment (epic #231) reshapes the engine spine — text-based scaffolder #19 is being absorbed into scaffold-over-IR #238. Sprint 1 is built around a deliberately narrow working slice: import a keyboard, render Phase A's first 2-3 identity questions, mutate the imported `.kmn` in place. This proves the end-to-end pipeline with a throw-away regex stub for the mutation; the real IR codec lands in S2.
 
@@ -14,7 +14,7 @@
 
 The deliberately scoped MVP. Three header-only mutations (`&NAME`, `&COPYRIGHT`, optional `&KEYBOARDVERSION`), round-trip-safe by construction, demonstrably wired end-to-end. After this sprint, a user can: open the studio, pick a base keyboard from the browser, answer "what is your keyboard called?" and "who holds the copyright?", and see the `.kmn` file in the VirtualFS change to match.
 
-**#232** `feat(contracts): KeyboardIR schema + IR node types + ImportStatus / ImportReport (#5b)` — *todo*
+**#232** `feat(contracts): KeyboardIR schema + IR node types + ImportStatus / ImportReport (#5b)` — *done*
 Joint engine+content contracts session. The Day-1-style lock for the v1.1 IR types. Gates every other v1.1 import-epic issue (#233 codec, #234 recognizer, #235 carve gallery, #236 Layer A', #238 scaffold-over-IR, #239 sidecar). Schedule this within the first three days of the sprint; everything else in the sprint can proceed in parallel because the stub-mutation path does not require the codec. Five open questions to close in-session (recognizer rule format, sidecar v1.1 disposition, depth-3 enumeration justification, RawKmnFragment boundary completeness, provenance attribution) — see epic #231 body for the full list.
 
 **#248** `feat(engine): identity-stub mutation applyIdentityStubMutation()` — *todo*

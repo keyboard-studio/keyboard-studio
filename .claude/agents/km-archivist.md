@@ -155,7 +155,7 @@ Every issue line in `sprints/engine_sprints.md` and `sprints/content_sprints.md`
 
 - `— *todo*` — not yet picked up
 - `— *in progress by @username*` — actively being worked; use the GitHub assignee(s) from the board (comma-separate multiple: `*in progress by @alice, @bob*`)
-- `— *in PR*` — has an open PR under review
+- `— *in PR #NNN by @username*` — has an open PR under review (NNN = PR number, username = PR author)
 - `— *done*` — issue is closed / all acceptance criteria checked
 
 **Procedure — run this after every PR open, merge, or issue status change:**
@@ -181,7 +181,7 @@ for item in data['items']:
 |---|---|
 | Todo | `*todo*` |
 | In progress | `*in progress by @username*` |
-| In PR | `*in PR*` |
+| In PR | `*in PR #NNN by @username*` |
 | Done | `*done*` |
 
 **When to run the sync:**

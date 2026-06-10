@@ -4,7 +4,7 @@
 **Cadence:** Biweekly sprints
 **Milestone IDs:** KS-S1 through KS-S4 (v1.1 import-pipeline era)
 
-**Status key:** *todo* · *in progress by @username* · *in PR* · *done*
+**Status key:** *todo* · *in progress by @username* · *in PR #NNN by @username* · *done*
 
 > **Plan revision: 2026-06-09.** Supersedes the v1.0 plan. The v1.1.0 KeyboardIR amendment (epic #231, contracts session #232) introduces a pattern recognizer that the content team curates rules for — #240 is the new spine of content's contribution. Phase A YAML (#49), Inventory atlas (#50), and Phase B characters (#51) all shipped in the v1.0 plan; this revision picks up from there.
 
@@ -17,7 +17,7 @@ Paired with engine KS-S1 (identity-mutation working slice). The engine slice doe
 **#240** `feat(content): Pattern recognizer rule curation — first-pass S-01..S-09` — *todo*
 First-pass rules covering S-01 (NFD canonical reorder, Latin) and S-02 (deadkey-based diacritic) — these are the recognizer rules that lift IR node clusters into typed `Pattern[]` with `origin: "recognized"`. Engine cannot start #234 (the recognizer engine itself) until the first two rules exist as concrete YAML/predicates to feed it. Land S-01 minimum; S-02 if time permits.
 
-**#56** `docs(keyboards): Finalize content/scan_report.md durable corpus writeup` — *narrative shipped (PR #181); final close pending*
+**#56** `docs(keyboards): Finalize content/scan_report.md durable corpus writeup` — *done*
 Carries over from v1.0 S4. Two ACs still open: complete pattern-YAML links and human Content-team review. Close out in this sprint now that the pattern catalog is stable enough.
 
 **#212** `docs(keyboards): Add pattern-YAML links to scan_report.md` — *todo*
