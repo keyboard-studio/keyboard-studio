@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { LLMClient, LLMClientConfig, Message, CompleteOptions } from "../types.js";
 
-export const DEFAULT_MODEL = "claude-opus-4-8";
+export const DEFAULT_MODEL = "claude-opus-4-5";
 export const DEFAULT_MAX_TOKENS = 4096;
 
 /**
