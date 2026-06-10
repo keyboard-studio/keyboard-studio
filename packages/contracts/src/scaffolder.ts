@@ -44,8 +44,8 @@ export interface ScaffoldOptions {
  * anything: band-1 (scaffolder-bake) criteria from §14 Decision 4 are made
  * structurally impossible by the template-cleanup pipeline, so they cannot
  * exist in the returned VirtualFS. Band-2 (layer-c-enforce) criteria are the
- * lint engine's concern and run on the 300 ms debounce cycle after scaffold
- * returns.
+ * lint engine's concern and enforced at phase exit or on explicit submit
+ * (spec §14 Decision 4).
  *
  * @see spec.md §11
  * @see spec.md §8 step 2 (scaffolding is pipeline step 2)
@@ -92,8 +92,8 @@ export interface ScaffolderService {
    *   QWERTY/QWERTZ — spec §9).
    * @returns A fully scaffolded virtual FS with all band-1 (scaffolder-bake,
    *   §14 Decision 4) criteria satisfied by construction. Band-2
-   *   (layer-c-enforce) criteria are validated separately by the lint engine
-   *   on the first debounce cycle after scaffold returns.
+   *   (layer-c-enforce) criteria are enforced at phase exit or on explicit
+   *   submit — not on the 300 ms debounce cycle.
    * @see spec.md §11
    * @see spec.md §8 step 2
    * @see spec.md §9 (Three-group routing)
