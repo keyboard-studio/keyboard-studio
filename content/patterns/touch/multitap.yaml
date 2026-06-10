@@ -49,7 +49,7 @@ tests:
     expectedOutput: "a"
     description: "single tap on K_A still produces a (multitap only triggers on rapid repeated taps)"
 
-validatedForFamilies: ["Latn", "Ethi"]
+validatedForFamilies: ["Latn", "Ethi", "Yiii"]
 sourceKeyboards:
   - "release/gff/gff_amharic"
   - "release/sil/sil_yi"
