@@ -134,7 +134,7 @@ describe("serializeToZip", () => {
 
 describe("toZip — sidecar (.kmn.imported) files", () => {
   it("includes a .kmn.imported entry in the zip archive", async () => {
-    const fs = makeVirtualFS([
+    const fs = createVirtualFS([
       { path: "source/cm_qwerty.kmn", content: "c emitted\n", isBinary: false },
       { path: "source/cm_qwerty.kmn.imported", content: "c original\n", isBinary: false },
     ]);
@@ -145,7 +145,7 @@ describe("toZip — sidecar (.kmn.imported) files", () => {
 
   it("preserves the exact content of a .kmn.imported entry", async () => {
     const originalContent = "c version(10.0)\nstore(&NAME) \"CM Qwerty\"\n";
-    const fs = makeVirtualFS([
+    const fs = createVirtualFS([
       { path: "source/cm_qwerty.kmn.imported", content: originalContent, isBinary: false },
     ]);
     const bytes = await toZip(fs);
@@ -154,7 +154,7 @@ describe("toZip — sidecar (.kmn.imported) files", () => {
   });
 
   it("includes both the emitted .kmn and the .kmn.imported sidecar", async () => {
-    const fs = makeVirtualFS([
+    const fs = createVirtualFS([
       { path: "source/test_kb.kmn", content: "c emitted\n", isBinary: false },
       { path: "source/test_kb.kmn.imported", content: "c original\n", isBinary: false },
     ]);

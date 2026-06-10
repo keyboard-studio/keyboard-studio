@@ -240,7 +240,7 @@ describe("publishPR", () => {
       return base(url, init);
     };
 
-    const fsWithSidecar = makeVirtualFS([
+    const fsWithSidecar = createVirtualFS([
       { path: "source/cm_qwerty.kmn", content: "c emitted\n", isBinary: false },
       { path: "source/cm_qwerty.kps", content: "<Package/>", isBinary: false },
       // sidecar — must NOT appear in the PR commit tree
@@ -263,7 +263,7 @@ describe("publishPR", () => {
       return base(url, init);
     };
 
-    const fsWithSidecar = makeVirtualFS([
+    const fsWithSidecar = createVirtualFS([
       { path: "source/cm_qwerty.kmn", content: "c emitted\n", isBinary: false },
       { path: "source/cm_qwerty.kmn.imported", content: "c original\n", isBinary: false },
     ]);
