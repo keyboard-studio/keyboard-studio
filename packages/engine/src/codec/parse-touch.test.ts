@@ -73,24 +73,33 @@ const SUBKEY_TOUCH = JSON.stringify({
 });
 
 describe("parseTouchLayout", () => {
-  it("returns TouchLayoutIR with correct layer count", () => {
+  it("returns TouchLayoutIR with correct platform count", () => {
     const ir = parseTouchLayout(MINIMAL_TOUCH);
-    expect(ir.layers.length).toBe(2);
+    expect(ir.platforms.length).toBe(1);
   });
 
-  it("first layer has id 'default'", () => {
+  it("tablet platform has two layers", () => {
     const ir = parseTouchLayout(MINIMAL_TOUCH);
-    expect(ir.layers[0]?.id).toBe("default");
+    const tablet = ir.platforms.find(p => p.id === "tablet");
+    expect(tablet?.layers.length).toBe(2);
   });
 
-  it("second layer has id 'shift'", () => {
+  it("first layer of tablet platform has id 'default'", () => {
     const ir = parseTouchLayout(MINIMAL_TOUCH);
-    expect(ir.layers[1]?.id).toBe("shift");
+    const tablet = ir.platforms.find(p => p.id === "tablet");
+    expect(tablet?.layers[0]?.id).toBe("default");
+  });
+
+  it("second layer of tablet platform has id 'shift'", () => {
+    const ir = parseTouchLayout(MINIMAL_TOUCH);
+    const tablet = ir.platforms.find(p => p.id === "tablet");
+    expect(tablet?.layers[1]?.id).toBe("shift");
   });
 
   it("keys in first layer have correct id and text", () => {
     const ir = parseTouchLayout(MINIMAL_TOUCH);
-    const row0 = ir.layers[0]?.rows[0];
+    const tablet = ir.platforms.find(p => p.id === "tablet");
+    const row0 = tablet?.layers[0]?.rows[0];
     expect(row0?.keys[0]?.id).toBe("K_A");
     expect(row0?.keys[0]?.text).toBe("a");
     expect(row0?.keys[1]?.id).toBe("K_B");
@@ -98,13 +107,15 @@ describe("parseTouchLayout", () => {
 
   it("nextlayer is preserved on key", () => {
     const ir = parseTouchLayout(MINIMAL_TOUCH);
-    const shiftLayer = ir.layers.find(l => l.id === "shift");
+    const tablet = ir.platforms.find(p => p.id === "tablet");
+    const shiftLayer = tablet?.layers.find(l => l.id === "shift");
     expect(shiftLayer?.rows[0]?.keys[0]?.nextlayer).toBe("default");
   });
 
   it("each key has a unique nodeId", () => {
     const ir = parseTouchLayout(MINIMAL_TOUCH);
-    const allIds = ir.layers
+    const allIds = ir.platforms
+      .flatMap(p => p.layers)
       .flatMap(l => l.rows)
       .flatMap(r => r.keys)
       .map(k => k.nodeId);
@@ -120,30 +131,37 @@ describe("parseTouchLayout", () => {
     expect(ref?.kind).toBe("touchKey");
   });
 
-  it("multi-platform: desktop default takes priority over tablet default", () => {
+  it("multi-platform: desktop platform is present with its default layer", () => {
     const ir = parseTouchLayout(MULTI_PLATFORM_TOUCH);
-    const def = ir.layers.find(l => l.id === "default");
-    expect(def).toBeDefined();
-    // Should use desktop's default layer (K_D), not tablet's (K_T)
-    expect(def?.rows[0]?.keys[0]?.id).toBe("K_D");
+    const desktop = ir.platforms.find(p => p.id === "desktop");
+    expect(desktop).toBeDefined();
+    expect(desktop?.layers[0]?.rows[0]?.keys[0]?.id).toBe("K_D");
   });
 
-  it("multi-platform: tablet-only layer 'extra' is included", () => {
+  it("multi-platform: tablet-only layer 'extra' is included in tablet platform", () => {
     const ir = parseTouchLayout(MULTI_PLATFORM_TOUCH);
-    const extra = ir.layers.find(l => l.id === "extra");
+    const tablet = ir.platforms.find(p => p.id === "tablet");
+    const extra = tablet?.layers.find(l => l.id === "extra");
     expect(extra).toBeDefined();
     expect(extra?.rows[0]?.keys[0]?.id).toBe("K_E");
   });
 
-  it("multi-platform: phone default is excluded when desktop already provided it", () => {
+  it("multi-platform: each platform has its own default layer (no merging)", () => {
     const ir = parseTouchLayout(MULTI_PLATFORM_TOUCH);
-    const defaultLayers = ir.layers.filter(l => l.id === "default");
-    expect(defaultLayers.length).toBe(1);
+    // All three platforms should be present, each with their own default layer
+    expect(ir.platforms.length).toBe(3);
+    const desktopDefault = ir.platforms.find(p => p.id === "desktop")?.layers.find(l => l.id === "default");
+    const tabletDefault = ir.platforms.find(p => p.id === "tablet")?.layers.find(l => l.id === "default");
+    const phoneDefault = ir.platforms.find(p => p.id === "phone")?.layers.find(l => l.id === "default");
+    expect(desktopDefault?.rows[0]?.keys[0]?.id).toBe("K_D");
+    expect(tabletDefault?.rows[0]?.keys[0]?.id).toBe("K_T");
+    expect(phoneDefault?.rows[0]?.keys[0]?.id).toBe("K_P");
   });
 
   it("subkeys (sk) are recursively parsed with their own nodeIds", () => {
     const ir = parseTouchLayout(SUBKEY_TOUCH);
-    const symbolLayer = ir.layers.find(l => l.id === "symbol");
+    const tablet = ir.platforms.find(p => p.id === "tablet");
+    const symbolLayer = tablet?.layers.find(l => l.id === "symbol");
     const parentKey = symbolLayer?.rows[0]?.keys[0];
     expect(parentKey?.id).toBe("U_0028");
     expect(parentKey?.sk?.length).toBe(2);
