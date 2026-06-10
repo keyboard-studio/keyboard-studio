@@ -9,6 +9,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { PreviewShell } from "./components/PreviewShell.tsx";
+import { CarveGallery } from "./components/CarveGallery.tsx";
 
 // ---------------------------------------------------------------------------
 // Route types
@@ -151,7 +152,7 @@ export function StudioShell() {
       content = <RoutePlaceholder title="Survey" />;
       break;
     case "gallery":
-      content = <RoutePlaceholder title="Gallery" />;
+      content = <CarveGallery />;
       break;
     case "preview":
       content = <RoutePlaceholder title="Preview" />;
