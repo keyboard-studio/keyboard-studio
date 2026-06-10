@@ -50,6 +50,10 @@ All four automation-hook fields are now fully populated across every entry:
 
 `lintRuleId` values for sections 1–17 use the `KM_LINT_*` prefix (Layer C hygiene, no upstream kmcmplib equivalent). Section-18 DISCUS heuristics use `KM_WARN_*` to signal warning-grade rather than error-grade severity. `scaffolderRule` values use kebab-case action slugs. `surveyQuestionId` values use kebab-case descriptors. The rule identifiers are contracts — implementations in the lint engine, scaffolder, and survey surface must register against these IDs.
 
+**Compile-related criteria prefix note:** `7.6-compiles-no-errors-no-warnings` (`KM_LINT_COMPILE_HAS_WARNINGS`) and `7.21-compiles-no-errors` (`KM_LINT_COMPILE_ERRORS`) both use the `KM_LINT_*` prefix even though they overlap with what the WASM compiler checks. This is correct: these criteria enforce a Layer C *policy* (keyboards submitted to `keymanapp/keyboards` must compile clean) rather than implementing the compiler's own error reporting. The two rules are distinct records because 7.6 covers warnings-as-errors policy and 7.21 covers the narrower build-output-context check.
+
+**PUA cross-references (7.12 and 13.1) are not redundant:** `7.12-pua-not-in-experimental` (`KM_LINT_PUA_NOT_IN_EXPERIMENTAL`) fires during source review when PUA codepoints are detected in the `.kmn` file — a check on what the keyboard *encodes*. `13.1-pua-keyboard-placement` (`KM_LINT_PUA_KEYBOARD_PLACEMENT`) fires during the encoding/script survey to enforce keyboard placement policy — a check on *where* a PUA keyboard belongs in the repo layout. Different check sites, different artifacts, intentionally kept as separate records. The cross-references in each entry's `description` field document this relationship.
+
 ## Cross-references
 
 - [spec.md Section 11](../../../spec.md) — example triage table showing band definitions in context.
