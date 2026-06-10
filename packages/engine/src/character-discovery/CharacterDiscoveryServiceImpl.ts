@@ -73,6 +73,15 @@ export function buildLinguistPrompt(languageName: string, bcp47: string): string
     .replace(/\{\{bcp47\}\}/g, bcp47);
 }
 
+/**
+ * Parse a U+XXXX codepoint string into the corresponding character.
+ * Returns null if the string is not a valid U+ hex notation.
+ */
+function parseUPlusHex(s: string): string | null {
+  const cp = parseInt(s.replace(/^U\+/i, ""), 16);
+  return isNaN(cp) ? null : String.fromCodePoint(cp);
+}
+
 export function parseLinguistJson(text: string): LinguistInventory {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
@@ -173,7 +182,7 @@ export function parseLinguistJson(text: string): LinguistInventory {
     Array.isArray(raw["direction_control_chars"])
       ? (raw["direction_control_chars"] as unknown[])
           .filter((v): v is string => typeof v === "string")
-          .map((s) => { const cp = parseInt(s.replace(/^U\+/i, ''), 16); return isNaN(cp) ? null : String.fromCodePoint(cp); })
+          .map(parseUPlusHex)
           .filter((c): c is string => c !== null)
       : undefined;
 
