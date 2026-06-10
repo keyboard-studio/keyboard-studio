@@ -56,7 +56,7 @@ interface BaseCriterion {
 export interface ScaffolderBakeCriterion extends BaseCriterion {
   band: "scaffolder-bake";
   /** Rule identifier the scaffolder applies (e.g. "strip-ncaps", "set-version-1-0"). */
-  scaffolderRule?: string;
+  scaffolderRule: string;
 }
 
 /**
@@ -66,7 +66,7 @@ export interface ScaffolderBakeCriterion extends BaseCriterion {
 export interface LayerCEnforceCriterion extends BaseCriterion {
   band: "layer-c-enforce";
   /** Lint-rule identifier the Layer C engine checks (e.g. "KM_LINT_MISSING_LICENSE"). */
-  lintRuleId?: string;
+  lintRuleId: string;
 }
 
 /**
@@ -76,7 +76,7 @@ export interface LayerCEnforceCriterion extends BaseCriterion {
 export interface YellowSurveyCriterion extends BaseCriterion {
   band: "yellow-survey";
   /** PatternQuestion id (or survey-flow question id) the criterion maps to. */
-  surveyQuestionId?: string;
+  surveyQuestionId: string;
 }
 
 /**
@@ -86,7 +86,7 @@ export interface YellowSurveyCriterion extends BaseCriterion {
 export interface RedChecklistCriterion extends BaseCriterion {
   band: "red-checklist";
   /** Text rendered to the user on the pre-submit checklist. */
-  preSubmitChecklistText?: string;
+  preSubmitChecklistText: string;
 }
 
 /**
@@ -95,11 +95,9 @@ export interface RedChecklistCriterion extends BaseCriterion {
  * field for a band (e.g. `{ band: "scaffolder-bake", lintRuleId: "x" }`)
  * is now a TS type error.
  *
- * Hooks remain optional today so the existing `criteria.json` (no hooks
- * populated yet) still validates; the type-narrowed shape exists to
- * catch wrong-field assignments going forward and to force the per-band
- * hook to be the only legal field for that band when content team
- * populates them per #70.
+ * Each variant's hook field is required — all 145 entries in
+ * `criteria.json` are populated per #70. Omitting the hook field or
+ * assigning the wrong band's field is now a compile-time error.
  *
  * @see spec.md §11 / §14 D4
  * @see #103 (this type narrowing)

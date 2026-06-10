@@ -47,3 +47,6 @@ utilities/kbgen/data/cldr/
 
 # Tech-lead triage state (per-machine; populated by /km-triage)
 .tech-lead-inbox/
+
+# Local Claude Code settings (personal API keys, overrides)
+.claude/settings.local.json
