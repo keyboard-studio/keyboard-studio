@@ -5,6 +5,7 @@ import type {
   LinguistInventory,
 } from "@keyboard-studio/contracts";
 import type { CldrLoader } from "./cldr.js";
+import { loadExemplars, scriptBlockChars } from "./cldr.js";
 
 export class CharacterDiscoveryServiceImpl implements CharacterDiscoveryService {
   constructor(private readonly loader: CldrLoader) {}
@@ -44,11 +45,39 @@ export class CharacterDiscoveryServiceImpl implements CharacterDiscoveryService 
     });
   }
 
-  pickerCandidates(
-    _base: BaseKeyboard,
-    _bcp47?: string
+  async pickerCandidates(
+    base: BaseKeyboard,
+    bcp47?: string
   ): Promise<InventoryChar[]> {
-    throw new Error("not implemented");
+    let candidates: string[] | null = null;
+
+    // Step 1: try CLDR exemplars when bcp47 is provided
+    if (bcp47 !== undefined) {
+      const exemplars = await loadExemplars(bcp47, this.loader);
+      if (exemplars !== null) {
+        candidates = [...exemplars.used].filter((ch) => /\p{L}/u.test(ch));
+      }
+    }
+
+    // Step 2: fall back to script block chars
+    if (candidates === null) {
+      const block = scriptBlockChars(base.script);
+      if (block.length === 0) return [];
+      candidates = block;
+    }
+
+    // Step 3: deduplicate
+    const unique = [...new Set(candidates)];
+
+    // Step 4: sort ascending by codepoint
+    unique.sort((a, b) => (a.codePointAt(0) ?? 0) - (b.codePointAt(0) ?? 0));
+
+    // Step 5: map to InventoryChar (no count — exactOptionalPropertyTypes is on)
+    return unique.map((ch) => ({
+      char: ch,
+      method: "picker" as const,
+      inBaseOutput: (ch.codePointAt(0) ?? 0) <= 0x7e,
+    }));
   }
 
   synthesizeInventory(
