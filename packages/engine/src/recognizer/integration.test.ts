@@ -215,7 +215,7 @@ describe("integration: recognizePatterns against basic_kbdca multi-trigger IR sh
       expect(ruleNodes).toHaveLength(3); // 2 triggers + 1 body
 
       // unshifted trigger should be used
-      expect(pattern.questions.find((q) => q.id === "triggerKey")?.default).toBe("K_QUOTE");
+      expect(pattern.questions.find((q) => q.id === "triggerKey")?.default).toBe("[K_QUOTE]");
     },
   );
 });
