@@ -67,10 +67,17 @@ The following five fields are optional; omit any that do not apply to the script
   "syllabic_final_markers": ["U+1427", "U+1428"]
 }`;
 
-export function buildLinguistPrompt(languageName: string, bcp47: string): string {
-  return LINGUIST_PROMPT_TEMPLATE
+export function buildLinguistPrompt(languageName: string, bcp47: string, orthographyUrl?: string): string {
+  let prompt = LINGUIST_PROMPT_TEMPLATE
     .replace(/\{\{languageName\}\}/g, languageName)
     .replace(/\{\{bcp47\}\}/g, bcp47);
+
+  if (orthographyUrl !== undefined) {
+    // Anchor the LLM to a verified primary source rather than general knowledge alone
+    prompt += `\n\nGrounding source: A verified orthography reference for this language is available at: ${orthographyUrl}\nCross-reference this URL as a primary source, prioritizing it over general knowledge.`;
+  }
+
+  return prompt;
 }
 
 /**
@@ -401,8 +408,9 @@ export class CharacterDiscoveryServiceImpl implements CharacterDiscoveryService 
   async synthesizeInventory(
     languageName: string,
     bcp47: string,
+    orthographyUrl?: string,
   ): Promise<LinguistInventory> {
-    const prompt = buildLinguistPrompt(languageName, bcp47);
+    const prompt = buildLinguistPrompt(languageName, bcp47, orthographyUrl);
     const raw = await this.completer(prompt);
     const inv = parseLinguistJson(raw);
     return cldrCrossCheck(inv, bcp47, this.loader);

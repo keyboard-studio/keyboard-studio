@@ -142,7 +142,8 @@ export interface CharacterDiscoveryService {
    */
   synthesizeInventory(
     languageName: string,
-    bcp47: string
+    bcp47: string,
+    orthographyUrl?: string
   ): Promise<LinguistInventory>;
 
   /**

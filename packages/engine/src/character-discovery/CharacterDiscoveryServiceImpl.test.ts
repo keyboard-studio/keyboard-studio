@@ -508,4 +508,34 @@ describe("synthesizeInventory helpers + integration", () => {
     expect(inv.mandatoryDiacriticsAndLigatures).toEqual(["é"]);
     expect("flags" in inv).toBe(false);
   });
+
+  it("buildLinguistPrompt with orthographyUrl — URL appears in the prompt", () => {
+    const url = "https://example.org/bm-orthography";
+    const result = buildLinguistPrompt("Bambara", "bm", url);
+    expect(result).toContain(url);
+    expect(result).toContain("Grounding source:");
+    expect(result).toContain("primary source");
+  });
+
+  it("buildLinguistPrompt without orthographyUrl — no URL placeholder remains", () => {
+    const result = buildLinguistPrompt("French", "fr");
+    expect(result).not.toContain("orthographyUrl");
+    expect(result).not.toContain("Grounding source:");
+    expect(result).not.toContain("{{");
+  });
+
+  it("synthesizeInventory end-to-end with orthographyUrl — completer receives prompt containing the URL", async () => {
+    const url = "https://example.org/tyv-orthography";
+    let capturedPrompt = "";
+    const capturingCompleter = async (prompt: string): Promise<string> => {
+      capturedPrompt = prompt;
+      return MINIMAL_VALID_JSON;
+    };
+
+    const svc = createCharacterDiscoveryService(nullLoader, capturingCompleter);
+    await svc.synthesizeInventory("Tuvan", "tyv", url);
+
+    expect(capturedPrompt).toContain(url);
+    expect(capturedPrompt).toContain("Grounding source:");
+  });
 });
