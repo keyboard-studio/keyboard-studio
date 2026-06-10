@@ -38,12 +38,11 @@ function unescapeXml(s: string): string {
     .replace(/&apos;/g, "'");
 }
 
-/**
- * Extract the value of an XML attribute from a tag string.
- * Returns empty string if not found.
- */
-function attr(tag: string, name: string): string {
-  const re = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, "i");
+// Pre-compiled attribute extractors for the two attributes we care about.
+const RE_SHIFT = /\bshift\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
+const RE_VKEY  = /\bvkey\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
+
+function matchAttr(tag: string, re: RegExp): string {
   const m = re.exec(tag);
   if (!m) return "";
   return unescapeXml((m[1] ?? m[2]) ?? "");
@@ -71,7 +70,7 @@ export function parseKvks(xml: string): KvksIR {
   while ((layerMatch = layerRe.exec(xml)) !== null) {
     const layerAttrs = layerMatch[1] ?? "";
     const layerBody = layerMatch[2] ?? "";
-    const shift = attr(layerAttrs, "shift");
+    const shift = matchAttr(layerAttrs, RE_SHIFT);
 
     const keys: Array<{ vkey: string; label: string; chars?: string }> = [];
 
@@ -82,7 +81,7 @@ export function parseKvks(xml: string): KvksIR {
     while ((keyMatch = keyRe.exec(layerBody)) !== null) {
       const keyAttrs = keyMatch[1] ?? "";
       const keyText = unescapeXml((keyMatch[2] ?? "").trim());
-      const vkey = attr(keyAttrs, "vkey");
+      const vkey = matchAttr(keyAttrs, RE_VKEY);
       if (!vkey) continue;
 
       const nodeId = minter.mint("kvksKey");

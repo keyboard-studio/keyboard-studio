@@ -153,17 +153,17 @@ function parseVkeyBracket(tok: string): { name: string; modifiers: string[] } | 
   return { name: vkeyParts[0] ?? "", modifiers: modParts };
 }
 
-/** Parse any(storeName) → storeName, or null. */
-function parseAny(tok: string): string | null {
-  const m = /^any\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)$/i.exec(tok);
-  return m ? (m[1] ?? null) : null;
+/** Returns a parser for keyword(storeName) → storeName. */
+function makeStoreParser(keyword: string): (tok: string) => string | null {
+  const re = new RegExp(`^${keyword}\\s*\\(\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\)$`, "i");
+  return tok => { const m = re.exec(tok); return m ? (m[1] ?? null) : null; };
 }
 
+/** Parse any(storeName) → storeName, or null. */
+const parseAny = makeStoreParser("any");
+
 /** Parse notany(storeName) → storeName, or null. */
-function parseNotAny(tok: string): string | null {
-  const m = /^notany\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)$/i.exec(tok);
-  return m ? (m[1] ?? null) : null;
-}
+const parseNotAny = makeStoreParser("notany");
 
 /** Parse index(storeName, N) → {storeRef, offset}, or null. */
 function parseIndex(tok: string): { storeRef: string; offset: number } | null {
@@ -179,11 +179,15 @@ function parseContext(tok: string): number | null {
   return parseInt(m[1] ?? "0", 10);
 }
 
-/** Parse outs(storeName) → storeName, or null. */
-function parseOuts(tok: string): string | null {
-  const m = /^outs\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)$/i.exec(tok);
-  return m ? (m[1] ?? null) : null;
+/** Parse baselayout or baselayout('name') → layout name string (empty for bare form). */
+function parseBaselayout(tok: string): string | null {
+  if (!/^baselayout(\s*\(|$)/i.test(tok)) return null;
+  const m = /^baselayout\s*\(\s*'?([^')]*)'?\s*\)/i.exec(tok);
+  return m ? (m[1]?.trim() ?? "") : "";
 }
+
+/** Parse outs(storeName) → storeName, or null. */
+const parseOuts = makeStoreParser("outs");
 
 /** Parse use(groupName) → groupName, or null. */
 function parseUse(tok: string): string | null {
@@ -317,10 +321,9 @@ function parseContextElements(
       continue;
     }
     // baselayout keyword — bare or baselayout('en-US') / baselayout()
-    if (/^baselayout(\s*\(|$)/i.test(tok)) {
-      const m = /^baselayout\s*\(\s*'?([^')]*)'?\s*\)/i.exec(tok);
-      const value = m ? (m[1]?.trim() ?? "") : "";
-      elements.push({ kind: "baselayout", value });
+    const baselayoutValue = parseBaselayout(tok);
+    if (baselayoutValue !== null) {
+      elements.push({ kind: "baselayout", value: baselayoutValue });
       continue;
     }
     // if(...) — opaque

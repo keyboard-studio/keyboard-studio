@@ -5,9 +5,9 @@
  * (desktop, tablet, phone). Each platform has a `layer` array of layer
  * objects. Each layer has a `row` array of rows. Each row has a `key` array.
  *
- * For v1 we merge all platform layers (desktop first, then tablet, then phone)
- * taking each layer only once (by `id`). Keys within each layer row are
- * recursively shaped into TouchKeyIR nodes, including the `sk` (subkey) array.
+ * Each platform (desktop, tablet, phone) is a separate entry in the output IR.
+ * Keys within each layer row are recursively shaped into TouchKeyIR nodes,
+ * including the `sk` (subkey) array.
  */
 
 import type { TouchLayoutIR, TouchKeyIR, IRNodeRef } from "@keyboard-studio/contracts";
