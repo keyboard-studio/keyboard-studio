@@ -118,6 +118,12 @@ describe("applyIdentityStubMutation", () => {
       applyIdentityStubMutation(vfs, "nonexistent_kb", { name: "X" })
     ).toThrow("stub-mutator: keyboard file not found");
   });
+
+  it("replaces straight apostrophe with RIGHT SINGLE QUOTATION MARK (U+2019) in name", () => {
+    const vfs = makeVfs();
+    applyIdentityStubMutation(vfs, KEYBOARD_ID, { name: "O'Brien" });
+    expect(getText(vfs)).toContain("store(&NAME) 'O\u2019Brien'");
+  });
 });
 
 // ---------------------------------------------------------------------------
