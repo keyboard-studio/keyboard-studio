@@ -7,7 +7,6 @@ interface CarveActionsProps {
 
 export function CarveActions({ nodeId, onEdit }: CarveActionsProps) {
   const deleteNode = useIRStore((s) => s.deleteNode);
-  const undoDelete = useIRStore((s) => s.undoDelete);
   const restoreNode = useIRStore((s) => s.restoreNode);
   const isDeleted = useIRStore((s) => s.isDeleted(nodeId));
 
