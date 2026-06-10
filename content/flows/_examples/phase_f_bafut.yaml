@@ -61,7 +61,7 @@ answers:
 #
 #   welcome.htm
 #     <html lang="en">
-#     heading: "Fa' (Bafut) Keyboard"  (autonym from KeyboardProvenance.localizedName present)
+#     heading: "Start Using Bafut"  (matches <title>; mirrors keymanapp/keyboards convention)
 #     body paragraph: pf_welcome_paragraph value above
 #     usage tips list: pf_usage_tip_1, pf_usage_tip_2, pf_usage_tip_3
 #       (pf_usage_tip_4 and pf_usage_tip_5 are blank -> omitted from list)

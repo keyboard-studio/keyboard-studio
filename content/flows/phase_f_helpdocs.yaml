@@ -131,19 +131,15 @@ welcome_htm_template:
     <html lang="en">
     <head>
       <meta charset="utf-8">
+      <title>Start Using {{phase_a.languageName}}</title>
       <style type="text/css">
         p { font: 10pt Tahoma; }
         h1 { font: bold 16pt Tahoma; color: #4444cc; margin-bottom: 2px }
         h2 { font: bold 12pt Tahoma; color: #4444cc; }
       </style>
-      <title>Start Using {{phase_a.languageName}}</title>
     </head>
     <body>
-      {{#if phase_a.localizedName}}
-      <h1>{{phase_a.localizedName}} ({{phase_a.languageName}}) Keyboard</h1>
-      {{else}}
-      <h1>{{phase_a.languageName}} Keyboard</h1>
-      {{/if}}
+      <h1>Start Using {{phase_a.languageName}}</h1>
       <p>{{pf_welcome_paragraph}}</p>
 
       <h2>How to use this keyboard</h2>
