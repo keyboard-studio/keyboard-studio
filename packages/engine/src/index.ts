@@ -52,3 +52,7 @@ export type { ParseResult, OpaqueReason } from "./codec/index.js";
 // Issue #239 — .kmn.imported sidecar + import-attribution.
 export { addSidecar, isSidecarPath, buildImportAttributionBlock } from "./output/index.js";
 export type { ImportAttributionInput } from "./output/index.js";
+
+// Issue #234 — pattern recognizer public surface.
+export { recognizePatterns } from "./recognizer/index.js";
+export type { RecognizerRule, MatchResult, RecognizeResult } from "./recognizer/index.js";
