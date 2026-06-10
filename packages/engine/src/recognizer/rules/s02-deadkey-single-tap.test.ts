@@ -73,7 +73,7 @@ describe("s02Recognizer", () => {
     expect(nodeIds).toContain("store#dkf0060");
     expect(nodeIds).toContain("store#dkt0060");
 
-    expect(m.slotValues["triggerKey"]).toBe("K_7");
+    expect(m.slotValues["triggerKey"]).toBe("[RALT K_7]");
     expect(m.slotValues["deadkeyName"]).toBe("dk_0060");
     expect(m.slotValues["accentChar"]).toBe("U+0060");
   });
@@ -137,7 +137,7 @@ describe("s02Recognizer", () => {
     expect(ruleNodeIds).toContain(bodyNodeId);
 
     // Unshifted trigger is chosen as primary
-    expect(m.slotValues["triggerKey"]).toBe("K_QUOTE");
+    expect(m.slotValues["triggerKey"]).toBe("[K_QUOTE]");
   });
 
   it("body but no triggers: no match", () => {

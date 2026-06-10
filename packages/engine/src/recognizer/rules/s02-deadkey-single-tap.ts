@@ -72,9 +72,13 @@ function pickPrimaryTrigger(triggers: IRRule[]): IRRule {
 function triggerKeyName(rule: IRRule): string {
   const ctx = rule.context[0];
   if (ctx === undefined) return "";
-  if (ctx.kind === "vkey") return ctx.name;
-  // char trigger — return the char value
-  if (ctx.kind === "char") return ctx.value;
+  if (ctx.kind === "vkey") {
+    // Return the full KMN trigger expression including modifiers (e.g. [RALT K_7]).
+    const mods = ctx.modifiers.length > 0 ? ctx.modifiers.join(" ") + " " : "";
+    return `[${mods}${ctx.name}]`;
+  }
+  // char trigger — return a KMN char literal (e.g. 'à')
+  if (ctx.kind === "char") return `'${ctx.value}'`;
   return "";
 }
 
@@ -92,7 +96,7 @@ function buildPattern(match: MatchResult): Pattern {
       {
         id: "triggerKey",
         prompt: "Virtual key that triggers the deadkey state",
-        answerType: "key-name",
+        answerType: "text",
         default: match.slotValues["triggerKey"] ?? "",
       },
       {
@@ -121,7 +125,7 @@ function buildPattern(match: MatchResult): Pattern {
       },
     ],
     kmnFragment:
-      "+ [{{triggerKey}}] > dk({{deadkeyName}})\n" +
+      "+ {{triggerKey}} > dk({{deadkeyName}})\n" +
       "dk({{deadkeyName}}) any({{baseLetters}}) > index({{accentedForms}}, 2)",
     tests: [],
     validatedForFamilies: [],

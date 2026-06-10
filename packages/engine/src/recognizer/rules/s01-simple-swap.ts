@@ -29,7 +29,7 @@ function formatMapLine(rule: IRRule): string {
     return "";
   }
   const mods = ctx.modifiers.length > 0 ? ctx.modifiers.join(" ") + " " : "";
-  return `[${mods}${ctx.name}],${toUPlus(out.value)}`;
+  return `+ [${mods}${ctx.name}] > ${toUPlus(out.value)}`;
 }
 
 function isS01(rule: IRRule, groupName: string): boolean {
@@ -58,7 +58,7 @@ function buildPattern(matchResult: MatchResult): Pattern {
       {
         id: "keystrokeCharacterMap",
         prompt: "Keystroke-to-character map (one entry per line: [MODS KEY],U+XXXX)",
-        answerType: "store-content",
+        answerType: "text",
         default: matchResult.slotValues["keystrokeCharacterMap"] ?? "",
       },
     ],
@@ -81,6 +81,16 @@ export const s01Recognizer: RecognizerRule = {
     for (const group of ir.groups) {
       const matchingRules = group.rules.filter((r) => isS01(r, group.name));
       if (matchingRules.length === 0) continue;
+
+      // Guard: spec §7.3 S-01 card says "1-5 extra characters" (≤5 inclusive).
+      // §7.1 says "<5 strict" but §7.3 card is the strategy contract — follow §7.3.
+      const distinctBaseNames = new Set(
+        matchingRules
+          .map((r) => r.context[0])
+          .filter((ctx): ctx is NonNullable<typeof ctx> & { kind: "vkey" } => ctx?.kind === "vkey")
+          .map((ctx) => ctx.name),
+      );
+      if (distinctBaseNames.size > 5) continue;
 
       const lines = matchingRules
         .map(formatMapLine)

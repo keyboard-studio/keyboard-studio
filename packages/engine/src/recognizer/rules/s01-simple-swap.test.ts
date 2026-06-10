@@ -35,9 +35,9 @@ describe("s01Recognizer", () => {
 
     const lines = m.slotValues["keystrokeCharacterMap"]!.split("\n");
     expect(lines).toHaveLength(3);
-    expect(lines[0]).toBe("[K_Q],U+025B");
-    expect(lines[1]).toBe("[SHIFT K_Q],U+0190");
-    expect(lines[2]).toBe("[K_C],U+0254");
+    expect(lines[0]).toBe("+ [K_Q] > U+025B");
+    expect(lines[1]).toBe("+ [SHIFT K_Q] > U+0190");
+    expect(lines[2]).toBe("+ [K_C] > U+0254");
   });
 
   it("deadkey-output rule mixed in is left alone; only S-01 rules lift", () => {
@@ -84,13 +84,13 @@ describe("s01Recognizer", () => {
     const match = {
       patternId: "simple-swap#main",
       ownedNodes: [{ kind: "rule" as const, nodeId: "rule#0" }],
-      slotValues: { keystrokeCharacterMap: "[K_Q],U+025B" },
+      slotValues: { keystrokeCharacterMap: "+ [K_Q] > U+025B" },
     };
     const pattern = s01Recognizer.lift(match);
     expect(pattern.id).toBe("simple-swap#main");
     expect(pattern.origin).toBe("recognized");
     expect(pattern.strategyId).toBe("S-01");
-    expect(pattern.questions[0]!.default).toBe("[K_Q],U+025B");
+    expect(pattern.questions[0]!.default).toBe("+ [K_Q] > U+025B");
   });
 
   it("two non-deadkey groups produce two Patterns with distinct ids", () => {
