@@ -259,7 +259,13 @@ For each PR, **skip** (with audit-log entry `action_taken: skipped, reason: <X>`
   ```
 
   Any other shape — Claude (`noreply@anthropic.com`), a teammate's email (`*@taylor.edu`, `*@sil.org` that isn't the lead's), or a Co-Authored-By trailer pointing elsewhere — means **triage the PR**. Do **not** key off `author.login` (who opened the PR) — that field is set to the tech lead's identity whenever a headless CLI run or a "push for me" workflow lands a PR under their credentials, and skipping on that signal would defeat the entire purpose of the triage.
-- Labels include `tech-lead-ready-to-merge`, `review-needed`, or `triage-skip` → reason `already_in_lead_queue`.
+- Labels include `tech-lead-ready-to-merge` or `triage-skip` → reason `already_in_lead_queue`. These are unconditional hard skips: `tech-lead-ready-to-merge` means the crew already approved the PR and it awaits a human merge; `triage-skip` is an explicit opt-out. Neither is overridden by lead-trigger comments.
+- Label `review-needed` is present AND **no lead-trigger comment has been posted since the most recent audit entry's `ts`** → reason `already_in_lead_queue`. This is the "awaiting human response" state, so the same lead-trigger comment lookup defined under `no_new_commits_since_last_review` below applies here too. If a matching comment exists, do **not** skip: remove the `review-needed` label before proceeding into Phase 3 (Phase 6 will re-add it if the new outcome is still MENTION/ESCALATE, or replace it with `tech-lead-ready-to-merge` if the crew approves):
+  ```bash
+  node utilities/km-triage-app/bot-gh.js api \
+    repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels/review-needed -X DELETE || true
+  ```
+  Record `trigger: comment` and `triggering_comment_id: <id>` in the audit log.
 - `mergeable` is `CONFLICTING` → reason `merge_conflict`. The triage will not run the review crew on this PR (the user's directive: "don't try to fix a conflicting branch"). Instead, post **one** @-mention comment (via `node utilities/km-triage-app/bot-gh.js pr comment <NUM> --body-file <conflict-body.md>`) tagging both the tech lead and the PR's directing human (computed per the same Phase-3.5 logic the normal path uses — desktop case via commit author email → GitHub login; web case via `pr.author.login`). Body:
   ```
   @MattGyverLee @<directed_by-login> — km-triage skipped this PR.
