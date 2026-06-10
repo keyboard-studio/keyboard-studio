@@ -1226,9 +1226,9 @@ Decision: Four bands, not three:
 (4) Red checklist — criteria requiring out-of-band information appear as a manual checklist before PR submission.
 Rationale: The original three-band model collapsed the scaffolder-bake and Layer C enforcement into one "green" band. Separating them clarifies the implementation boundary: band 1 is scaffolder work; band 2 is lint-engine work.
 
-**Decision 5 — CJK and Ethiopic v1 status.**
-Decision: CJK and Ethiopic are confirmed excluded from v1. The Three-group routing section (Sec 9) renders a "not yet supported" stub for these scripts. The out-of-scope list (Sec 16) reflects this. These script families are candidates for sprint 2 pattern-library work.
-Rationale: Reorder patterns for CJK and Ethiopic require specialist curation that is not complete. Shipping a silent empty gallery would mislead users; a stub with an explanation is the correct v1 behavior.
+**Decision 5 — CJK, Ethiopic, and Hangul v1 status.**
+Decision: CJK, Ethiopic, and Hangul are confirmed excluded from v1. The Three-group routing section (Sec 9) renders a "not yet supported" stub for these scripts. The out-of-scope list (Sec 16) reflects this. These script families are candidates for sprint 2 pattern-library work.
+Rationale: Reorder patterns for CJK and Ethiopic require specialist curation that is not complete. Hangul is a third distinct complexity class — jamo cluster-assembly (Dubeolsik/Sebeolsik stateful composition) is different from CJK scale/IME and Ethiopic reorder complexity, but equally blocking in v1 because no jamo composition pattern exists in the library. Shipping a silent empty gallery would mislead users; a stub with an explanation is the correct v1 behavior.
 
 **Decision 6 — Desktop-first authoring scope.**
 Decision: v1 supports desktop-first authoring only. The survey, strategy selector, and gallery are anchored to physical-keyboard KMN rules; the touch layout is scaffolded from the desktop OSK in Phase E (no reverse touch-to-desktop derivation in v1). Authors whose primary deployment is mobile are surfaced this posture at Phase A before they invest survey time and may continue with the desktop-first flow (still receiving a derived touch layout). Touch-first authoring is a v1.1 candidate.
@@ -1305,7 +1305,7 @@ Rationale: A two-source-of-truth model (IR + original text) drifts the moment an
 - **Mobile-app integration** — `oem/` updates, partner CSV updates, partner-organization bundle workflows.
 - **Touch-first authoring path** — v1 supports desktop-first authoring only (Decision 6, Sec 14). The survey, strategy selector, and gallery are anchored to physical-keyboard mental-model answers; the touch layout is scaffolded from the desktop OSK in Phase E with no reverse derivation. Mobile-primary authors are surfaced this at Phase A and may continue with the desktop-first flow (still receiving a derived touch layout). Touch-first authoring is a v1.1 candidate.
 - **Hosting and deployment** — infrastructure is left to the operator; this project ships a static SPA.
-- **CJK and Ethiopic reorder patterns in v1** — confirmed excluded; see Sec 14, decision 5. Target: sprint 2 pattern-library work.
+- **CJK, Ethiopic, and Hangul/jamo cluster-assembly in v1** — confirmed excluded; see Sec 14, decision 5. CJK (Han-based scripts) and Ethiopic are excluded due to incomplete specialist curation; Hangul is excluded because jamo-to-syllable cluster composition (Dubeolsik/Sebeolsik stateful composition) is a distinct complexity class with no jamo composition pattern in the library. Target: sprint 2 pattern-library work.
 - **Multi-language `welcome.htm` variants** — LLM-generated variants for multiple languages; post-v1.
 - **`.kpj.user` or build-folder management beyond what the scaffolder strips** — cleanup is one-time at scaffold time.
 - **Predictive text / wordlists (`.model.ts`)** — the strategy catalog (Sec 7) covers input rules only; lexical models are a separate artifact, post-v1. (A pasted text sample *is* used in Phase B for **character discovery** — enumerating which characters the keyboard must support — which is in scope, Sec 8. Only the wordlist / frequency *model* is deferred.)

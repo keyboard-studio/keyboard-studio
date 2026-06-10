@@ -21,11 +21,12 @@ import type { RoutingGroup } from "./scaffolder";
  * sub-branches.
  *
  * `"logographic"` is RESERVED for CJK. In v1 it is never emitted as a Phase B
- * routing value: Ethiopic (Ethi), Hangul (Hang), and Han (Hani) are detected
- * at `primary_script` in Phase A and stub-gated there (script_not_supported_stub,
- * §16 / §14 Decision 5). The member is kept in the union so downstream code
- * can reference it without a type error; do not remove it until CJK support
- * is fully built.
+ * routing value: Hangul (Hang) and Han (Hani) are detected at `primary_script`
+ * in Phase A and stub-gated there (script_not_supported_stub, §16 / §14
+ * Decision 5). The member is kept in the union so downstream code can reference
+ * it without a type error; do not remove it until CJK support is fully built.
+ * Ethiopic (Ethi) is also stub-gated due to incomplete reorder pattern support,
+ * not because it is logographic.
  *
  * @see spec.md §9 (Three-group routing)
  * @see content/flows/phase_a_identity.yaml
