@@ -237,11 +237,6 @@ export function emit(ir: KeyboardIR): string {
   lines.push("");
   lines.push(`begin Unicode > use(${entryName})`);
 
-  // Pre-index user stores by name for O(1) lookup inside the group loop.
-  const userStoreByName = new Map(
-    ir.stores.filter(s => !s.isSystem).map(s => [s.name, s])
-  );
-
   // Groups.
   for (const group of ir.groups) {
     lines.push("");
@@ -251,8 +246,8 @@ export function emit(ir: KeyboardIR): string {
     lines.push(groupHeader);
 
     // User stores that belong to this group: heuristic — stores referenced in
-    // this group's rules. We emit all user stores scoped after the begin
-    // directive that are referenced in this group.
+    // this group's rules. Iterated in ir.stores declaration order to preserve
+    // round-trip comment anchoring (I3).
     const referencedStoreNames = new Set<string>();
     for (const rule of group.rules) {
       for (const el of rule.context) {
@@ -266,9 +261,8 @@ export function emit(ir: KeyboardIR): string {
         }
       }
     }
-    for (const name of referencedStoreNames) {
-      const store = userStoreByName.get(name);
-      if (store) {
+    for (const store of ir.stores) {
+      if (!store.isSystem && referencedStoreNames.has(store.name)) {
         pushLeadingComments(store.nodeId, commentMap, lines);
         lines.push(emitStore(store));
       }

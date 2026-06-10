@@ -126,7 +126,11 @@ export function parseTouchLayout(json: string): TouchLayoutIR {
       platformLayers.push({ id, rows });
     }
 
-    platforms.push({ id: platform as "phone" | "tablet" | "desktop", font: p.font, layers: platformLayers });
+    platforms.push({
+      id: platform,
+      ...(p.font !== undefined ? { font: p.font } : {}),
+      layers: platformLayers,
+    });
   }
 
   return { platforms, nodeIds };
