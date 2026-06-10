@@ -3,24 +3,47 @@ import { PatternSchema } from "./patternSchema.js";
 import type { RawPattern } from "./patternSchema.js";
 import { runAllChecks } from "../validator/index.js";
 import { makePattern } from "@keyboard-studio/contracts";
-import type { Pattern, PatternCategory, StrategyId } from "@keyboard-studio/contracts";
+import type { Pattern, PatternCategory, StrategyId, DemoObject } from "@keyboard-studio/contracts";
 import type { PatternFilter, LoadReport } from "./types.js";
 
 /** In-memory cache populated by the last successful {@link loadPatterns} call. */
 let _cache: Pattern[] = [];
 
 /**
+ * In-flight guard: holds the active `loadPatterns` promise while a load is in
+ * progress. A second concurrent call receives the same promise rather than
+ * racing to reset `_cache` mid-flight.
+ */
+let _loading: Promise<{ patterns: Pattern[]; report: LoadReport }> | null = null;
+
+/**
  * Discover and load all YAML pattern files under `contentDir`.
  *
  * Validation failures are collected into a {@link LoadReport} rather than
- * thrown. The cache is replaced atomically on each call.
+ * thrown. The cache is replaced atomically on each call. Concurrent calls
+ * receive the same in-flight promise so that `_cache` is never reset
+ * mid-load by a second caller.
  *
  * @param contentDir - Root of the pattern YAML tree. Defaults to
  *   `<cwd>/content/patterns` so it works in both dev and test contexts.
  * @returns Object with the loaded `patterns` array and a `report` summarising
  *   skipped and flagged files.
  */
-export async function loadPatterns(
+export function loadPatterns(
+  contentDir?: string,
+): Promise<{ patterns: Pattern[]; report: LoadReport }> {
+  if (_loading !== null) {
+    return _loading;
+  }
+
+  _loading = _doLoad(contentDir).finally(() => {
+    _loading = null;
+  });
+
+  return _loading;
+}
+
+async function _doLoad(
   contentDir?: string,
 ): Promise<{ patterns: Pattern[]; report: LoadReport }> {
   // Dynamic imports keep node:fs/promises and node:path out of the static
@@ -226,7 +249,7 @@ function toPattern(data: RawPattern): Pattern {
   const strategyId = data.strategyId as StrategyId | undefined;
   const combinesWith = data.combinesWith as StrategyId[] | undefined;
   const provenance = data.provenance as ProvenanceItem[] | undefined;
-  const demo = data.demo as string | null | undefined;
+  const demo = data.demo as string | DemoObject | null | undefined;
 
   return makePattern({
     ...base,
