@@ -44,3 +44,7 @@ export type {
 
 // Issues #46/#47 — output service (zip download + GitHub OAuth fork+PR).
 export { createOutputService, toZip, serializeToZip } from "./output/index.js";
+
+// Issue #233 — KeyboardIR codec public surface.
+export { parse as parseKmn, emit as emitKmn, parseKvks, parseTouchLayout, OPAQUE_REASONS } from "./codec/index.js";
+export type { ParseResult, OpaqueReason } from "./codec/index.js";
