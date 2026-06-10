@@ -249,4 +249,92 @@ describe("publishPR", () => {
     expect(prBody).toContain('"base":"master"');
     expect(prBody).toContain(`"head":"${FORK_OWNER}:${BRANCH}"`);
   });
+
+  // -------------------------------------------------------------------------
+  // Sidecar (.kmn.imported) exclusion — spec §12 lines 1126-1128
+  // -------------------------------------------------------------------------
+
+  it("excludes .kmn.imported sidecar files from the PR commit tree", async () => {
+    const capturedBodies: string[] = [];
+    const base = buildMockFetch(happyPathRoutes());
+    const captureFetch: GitHubFetchFn = async (url, init) => {
+      if (init?.body !== undefined) capturedBodies.push(init.body);
+      return base(url, init);
+    };
+
+    const fsWithSidecar = makeVirtualFS([
+      { path: "source/cm_qwerty.kmn", content: "c emitted\n", isBinary: false },
+      { path: "source/cm_qwerty.kps", content: "<Package/>", isBinary: false },
+      // sidecar — must NOT appear in the PR commit tree
+      { path: "source/cm_qwerty.kmn.imported", content: "c original\n", isBinary: false },
+    ]);
+
+    await publishPR(fsWithSidecar, makeOpts(), captureFetch);
+
+    const treeBody = capturedBodies.find((b) => b.includes("base_tree")) ?? "";
+    expect(treeBody).toContain("source/cm_qwerty.kmn");
+    expect(treeBody).toContain("source/cm_qwerty.kps");
+    expect(treeBody).not.toContain("source/cm_qwerty.kmn.imported");
+  });
+
+  it("includes the .kmn source file when a .kmn.imported sidecar also exists", async () => {
+    const capturedBodies: string[] = [];
+    const base = buildMockFetch(happyPathRoutes());
+    const captureFetch: GitHubFetchFn = async (url, init) => {
+      if (init?.body !== undefined) capturedBodies.push(init.body);
+      return base(url, init);
+    };
+
+    const fsWithSidecar = makeVirtualFS([
+      { path: "source/cm_qwerty.kmn", content: "c emitted\n", isBinary: false },
+      { path: "source/cm_qwerty.kmn.imported", content: "c original\n", isBinary: false },
+    ]);
+
+    const result = await publishPR(fsWithSidecar, makeOpts(), captureFetch);
+    // Happy path still completes successfully
+    expect(result.prUrl).toBe(PR_URL);
+
+    const treeBody = capturedBodies.find((b) => b.includes("base_tree")) ?? "";
+    expect(treeBody).toContain("source/cm_qwerty.kmn");
+  });
+
+  // -------------------------------------------------------------------------
+  // importAttribution field — spec §12 line 1157
+  // -------------------------------------------------------------------------
+
+  it("appends importAttribution to the PR body when provided", async () => {
+    const capturedBodies: string[] = [];
+    const base = buildMockFetch(happyPathRoutes());
+    const captureFetch: GitHubFetchFn = async (url, init) => {
+      if (init?.body !== undefined) capturedBodies.push(init.body);
+      return base(url, init);
+    };
+
+    const attributionBlock = "## Import attribution\nAdapted from: `release/c/cm_qwerty` (commit abc1234)";
+    await publishPR(
+      makeSourceFS(),
+      makeOpts({ importAttribution: attributionBlock }),
+      captureFetch,
+    );
+
+    const prBody = capturedBodies.find((b) => b.includes('"draft"')) ?? "";
+    expect(prBody).toContain("Import attribution");
+    expect(prBody).toContain("release/c/cm_qwerty");
+  });
+
+  it("uses the original prBody unchanged when importAttribution is absent", async () => {
+    const capturedBodies: string[] = [];
+    const base = buildMockFetch(happyPathRoutes());
+    const captureFetch: GitHubFetchFn = async (url, init) => {
+      if (init?.body !== undefined) capturedBodies.push(init.body);
+      return base(url, init);
+    };
+
+    const opts = makeOpts(); // no importAttribution
+    await publishPR(makeSourceFS(), opts, captureFetch);
+
+    const prBody = capturedBodies.find((b) => b.includes('"draft"')) ?? "";
+    expect(prBody).toContain("## Summary");
+    expect(prBody).not.toContain("Import attribution");
+  });
 });

@@ -37,6 +37,14 @@ export interface PublishPROptions {
    * @see spec.md §12 PR body composition
    */
   prBody: string;
+  /**
+   * Optional "Import attribution" markdown block to append to the PR body.
+   * Build this via buildImportAttributionBlock() from
+   * packages/engine/src/output/import-attribution.ts.
+   * Present only when the session was initialized from an imported release/ keyboard.
+   * @see spec.md §12 line 1157
+   */
+  importAttribution?: string;
 }
 
 /**

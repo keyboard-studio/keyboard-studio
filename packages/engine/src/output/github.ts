@@ -8,6 +8,7 @@ import type {
   PublishPRError,
   VerifyTokenResult,
 } from "@keyboard-studio/contracts";
+import { isSidecarPath } from "./sidecar.js";
 
 // ---------------------------------------------------------------------------
 // Fetch abstraction — extends the base-browser FetchFn with method + body
@@ -50,7 +51,18 @@ const COMPILED_EXT = new Set([".kmx", ".kvk", ".js"]);
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Return true when `path` should be included in the PR commit tree.
+ *
+ * Exclusions:
+ *   - Compiled artifacts (.kmx, .kvk, .js) — criteria SS1, spec §12.
+ *   - Import sidecar files (.kmn.imported) — spec §12 lines 1126-1128.
+ *     Sidecars stay in the VFS for zip and local working-tree presence but
+ *     must not land in the keymanapp/keyboards PR commit. The discriminator
+ *     is the .imported suffix; see sidecar.ts isSidecarPath().
+ */
 function isSourceFile(path: string): boolean {
+  if (isSidecarPath(path)) return false;
   const dot = path.lastIndexOf(".");
   return dot === -1 || !COMPILED_EXT.has(path.slice(dot));
 }
@@ -152,7 +164,14 @@ export async function publishPR(
   opts: PublishPROptions,
   fetchFn: GitHubFetchFn
 ): Promise<PublishPRResult> {
-  const { token, forkOwner, branchName, commitMessage, prTitle, prBody } = opts;
+  const { token, forkOwner, branchName, commitMessage, prTitle, prBody, importAttribution } = opts;
+  // Append the import-attribution block when supplied (spec §12 line 1157).
+  // The caller (studio UI) builds the block via buildImportAttributionBlock()
+  // and passes it through PublishPROptions.importAttribution.
+  const fullPrBody =
+    importAttribution !== undefined && importAttribution.length > 0
+      ? `${prBody}\n\n${importAttribution}`
+      : prBody;
   const forkBase = `${API_BASE}/repos/${forkOwner}/${UPSTREAM_REPO}`;
   const upstreamBase = `${API_BASE}/repos/${UPSTREAM_OWNER}/${UPSTREAM_REPO}`;
 
@@ -336,7 +355,7 @@ export async function publishPR(
   try {
     prRes = await ghFetch(`${upstreamBase}/pulls`, token, fetchFn, "POST", {
       title: prTitle,
-      body: prBody,
+      body: fullPrBody,
       head: `${forkOwner}:${branchName}`,
       base: "master",
       draft: true,

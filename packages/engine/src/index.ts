@@ -48,3 +48,7 @@ export { createOutputService, toZip, serializeToZip } from "./output/index.js";
 // Issue #233 — KeyboardIR codec public surface.
 export { parse as parseKmn, emit as emitKmn, parseKvks, parseTouchLayout, OPAQUE_REASONS } from "./codec/index.js";
 export type { ParseResult, OpaqueReason } from "./codec/index.js";
+
+// Issue #239 — .kmn.imported sidecar + import-attribution.
+export { addSidecar, isSidecarPath, buildImportAttributionBlock } from "./output/index.js";
+export type { ImportAttributionInput } from "./output/index.js";
