@@ -152,16 +152,20 @@ questions:
     required: true
     next: layout_family
 
-  # §16 / §14 Decision 5: CJK and Ethiopic are excluded from v1. Detected here at
-  # Phase A and gated before the character survey, so the user gets an honest
-  # "coming soon" message instead of a broken survey path.
+  # §16 / §14 Decision 5: CJK, Ethiopic, and Hangul are excluded from v1. Detected
+  # here at Phase A and gated before the character survey, so the user gets an
+  # honest "coming soon" message instead of a broken survey path.
   - id: script_not_supported_stub
     prompt: "This writing system is not supported yet"
     help_text: >
-      Support for Ethiopic (Ge'ez), Korean (Hangul), and Han-based scripts
-      (Chinese, Japanese) is still being built and is not available in this
-      version of the studio. We are adding it in a future release. You can close
-      this form for now -- nothing you entered will be submitted.
+      This version does not yet support Hangul keyboards — jamo-to-syllable
+      cluster composition rules will be added in a future release.
+      This version does not yet support Chinese, Japanese, or other Han-based
+      scripts — these require an input-method composition layer not yet built.
+      This version does not yet support Ethiopic scripts (Ge'ez, Amharic,
+      Tigrinya, and others) — reorder-pattern curation for Ethiopic is still
+      in progress and will be available in a future release.
+      You can close this form for now — nothing you entered will be submitted.
     type: notice
     required: false
     next: null
