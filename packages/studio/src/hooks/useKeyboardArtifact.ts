@@ -1,38 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, VirtualFS } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
-// [SCAFFOLD] Mock fallbacks — in use until @keyboard-studio/engine exports
-// compile + fetchKeyboardSourceToVfs + init (issues #17 / #39-loader).
-import { makeMockVirtualFS } from "@keyboard-studio/contracts/mocks";
-import { mockCompiler } from "@keyboard-studio/contracts/mocks";
-import { LOCAL_PROXY_BASE } from "../lib/localBaseBrowser.ts";
-
-// ---------------------------------------------------------------------------
-// Engine imports — these symbols land when km-keyman / km-output finish their
-// parallel work (issues #17 / #39-loader). Until then the dynamic import
-// below falls back to the mock implementations so the hook is exercisable
-// in dev and test without the real WASM pipeline.
-//
-// Import path: "@keyboard-studio/engine" (workspace package)
-// Exported symbols: compile, fetchKeyboardSourceToVfs, init
-// ---------------------------------------------------------------------------
+import { createVirtualFS } from "@keyboard-studio/contracts";
+import { LOCAL_PROXY_BASE } from "../lib/services.ts";
 
 interface EngineModule {
-  compile: (
-    fs: ReturnType<typeof makeMockVirtualFS>,
-    keyboardId: string
-  ) => Promise<CompileResult>;
+  compile: (fs: VirtualFS, keyboardId: string) => Promise<CompileResult>;
   fetchKeyboardSourceToVfs: (
     baseKeyboard: BaseKeyboard,
-    fs: ReturnType<typeof makeMockVirtualFS>,
+    fs: VirtualFS,
     opts?: { proxyBase?: string }
-  ) => Promise<{ options?: Record<string, unknown> }>;
+  ) => Promise<{ options?: Record<string, unknown>; filesLoaded?: string[]; warnings?: string[] }>;
   init: () => Promise<void>;
   isReady?: () => boolean;
 }
 
-// [SCAFFOLD] Dynamic import falls back gracefully when the engine package
-// doesn't yet export compile/fetchKeyboardSourceToVfs/init.
 async function loadEngine(): Promise<EngineModule | null> {
   try {
     const mod = await import(
@@ -107,13 +89,17 @@ export function useKeyboardArtifact(
       engineLoadAttempted.current = true;
       try {
         const mod = await loadEngine();
-        engineRef.current = mod;
-        if (mod) {
-          await mod.init();
-        } else {
-          // [SCAFFOLD] Fall back to mock compiler while engine is unbuilt.
-          await mockCompiler.init();
+        if (mod === null) {
+          setStage({
+            kind: "error",
+            step: "vfs",
+            message:
+              "Engine failed to load — check browser console for WASM errors.",
+          });
+          return;
         }
+        engineRef.current = mod;
+        await mod.init();
       } catch (err: unknown) {
         const message =
           err instanceof Error ? err.message : "WASM engine failed to load";
@@ -126,9 +112,7 @@ export function useKeyboardArtifact(
 
     setStage({ kind: "fetching" });
 
-    // [SCAFFOLD] makeMockVirtualFS — replace with real VirtualFS from
-    // @keyboard-studio/engine once spec §11 VirtualFS lands.
-    const vfs = makeMockVirtualFS([]);
+    const vfs = createVirtualFS();
 
     try {
       if (engineRef.current) {
@@ -136,8 +120,6 @@ export function useKeyboardArtifact(
           proxyBase: LOCAL_PROXY_BASE,
         });
       }
-      // If engine is absent, skip fetch — mockCompiler.compile() works without
-      // real source files (returns a fixture result).
     } catch (err: unknown) {
       if (runId.current !== thisRunId) return;
       const message =
@@ -148,20 +130,13 @@ export function useKeyboardArtifact(
 
     if (runId.current !== thisRunId) return;
 
-    const isWarmCompile = engineRef.current
-      ? engineRef.current.isReady?.() ?? false
-      : mockCompiler.isReady();
+    const isWarmCompile = engineRef.current?.isReady?.() ?? false;
 
     setStage({ kind: "compiling", isWarmCompile });
 
     let result: CompileResult;
     try {
-      if (engineRef.current) {
-        result = await engineRef.current.compile(vfs, kb.id);
-      } else {
-        // [SCAFFOLD] mockCompiler — remove when engine exports compile().
-        result = await mockCompiler.compile(vfs, kb.id);
-      }
+      result = await engineRef.current!.compile(vfs, kb.id);
     } catch (err: unknown) {
       if (runId.current !== thisRunId) return;
       const message =

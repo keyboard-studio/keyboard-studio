@@ -1,11 +1,6 @@
-// [SCAFFOLD] Dev-only BaseBrowserService backed by the localKeyboards Vite
-// plugin (see ../../vite-plugins/localKeyboards.ts). Hits /local-kbd-api/list
+// Dev-only BaseBrowserService backed by the localKeyboards Vite plugin
+// (see ../../vite-plugins/localKeyboards.ts). Hits /local-kbd-api/list
 // to enumerate every keyboard in the sibling keymanapp/keyboards clone.
-//
-// Replace with the real BaseBrowserService from @keyboard-studio/engine when
-// the engine package's browser-service layer lands. The mock backend at
-// @keyboard-studio/contracts/mocks#mockBaseBrowser is the alternative for
-// tests and air-gapped runs.
 
 import type {
   BaseBrowserService,

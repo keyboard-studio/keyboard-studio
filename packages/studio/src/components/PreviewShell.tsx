@@ -6,7 +6,8 @@
 // deliverable ported from studio-poc.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, CompilerDiagnostic } from "@keyboard-studio/contracts";
+import { useKeyboardArtifact } from "../hooks/useKeyboardArtifact.ts";
 import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
 import { OskModeToggle, type OskMode } from "./OskModeToggle.tsx";
 import { OSKFrame } from "./OSKFrame.tsx";
@@ -33,6 +34,109 @@ const TRY_HINTS: Record<string, { intro: string; examples: string[] }> = {
     examples: ["a -> base vowel", "k -> ka consonant", "i -> i vowel"],
   },
 };
+
+// ---------------------------------------------------------------------------
+// Severity label colours — Layer A: error (red), warning (yellow), hint/info
+// (blue). Matches the editor-gutter colour contract in the agent profile.
+// ---------------------------------------------------------------------------
+const SEVERITY_COLOR: Record<string, string> = {
+  fatal: "#f0a0a0",
+  error: "#f0a0a0",
+  warning: "#d29922",
+  hint: "#6ea8fe",
+  info: "#6ea8fe",
+};
+
+function DiagnosticsPanel({ diagnostics }: { diagnostics: CompilerDiagnostic[] }) {
+  if (diagnostics.length === 0) {
+    return (
+      <div
+        aria-live="polite"
+        style={{
+          marginTop: 12,
+          padding: "10px 14px",
+          background: "#161b22",
+          border: "1px solid #283040",
+          borderRadius: 8,
+          fontSize: 12,
+          color: "#7ee787",
+          fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
+        }}
+      >
+        No compiler diagnostics.
+      </div>
+    );
+  }
+  return (
+    <div
+      aria-label="Compiler diagnostics"
+      aria-live="polite"
+      style={{
+        marginTop: 12,
+        padding: "10px 14px",
+        background: "#161b22",
+        border: "1px solid #283040",
+        borderRadius: 8,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+          color: "#9aa7b8",
+          fontWeight: 700,
+          marginBottom: 8,
+        }}
+      >
+        Compiler diagnostics ({diagnostics.length})
+      </div>
+      <ul
+        style={{
+          margin: 0,
+          padding: 0,
+          listStyle: "none",
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
+        }}
+        role="list"
+      >
+        {diagnostics.map((d, i) => (
+          <li
+            key={`${d.severity}:${d.code ?? i}`}
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 8,
+              fontSize: 12,
+              fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
+              lineHeight: 1.5,
+            }}
+          >
+            <span
+              aria-label={`Severity: ${d.severity}`}
+              style={{
+                color: SEVERITY_COLOR[d.severity] ?? "#e6edf3",
+                minWidth: 50,
+                fontWeight: 700,
+                flexShrink: 0,
+              }}
+            >
+              [{d.severity.toUpperCase()}]
+            </span>
+            <span style={{ color: "#e6edf3" }}>
+              {d.location !== undefined
+                ? `${d.location.file}:${d.location.line} — `
+                : ""}
+              {d.message}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 function MetadataCard({ kb }: { kb: BaseKeyboard }) {
   const Row = ({ k, v }: { k: string; v: string }) => (
@@ -139,6 +243,7 @@ export function PreviewShell() {
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
   const [leftPct, setLeftPct] = useState(LEFT_INIT_PCT);
   const [handleHovered, setHandleHovered] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   // Track drag state in a ref so pointer-move handlers always see current values
   // without triggering re-renders on every pixel.
@@ -181,6 +286,52 @@ export function PreviewShell() {
   }, [onPointerMove, onPointerUp]);
 
   const rightPct = 100 - leftPct;
+
+  // Lifted from OSKFrame so DiagnosticsPanel and the download button can
+  // read stage (and the embedded VFS) without prop-drilling through the iframe.
+  const { stage, retry } = useKeyboardArtifact(baseKeyboard);
+
+  const diagnostics =
+    stage.kind === "ready"
+      ? stage.compileResult.diagnostics
+      : stage.kind === "error" && stage.compileResult !== undefined
+        ? stage.compileResult.diagnostics
+        : [];
+
+  const canDownload = stage.kind === "ready";
+
+  async function handleDownload() {
+    if (stage.kind !== "ready" || baseKeyboard === null) return;
+    setDownloading(true);
+    try {
+      // The VFS must be re-fetched from the hook; useKeyboardArtifact does not
+      // currently surface the VFS object in Stage.ready. As a day-4 interim,
+      // we download the compiled .js artifact blob directly via its existing
+      // blob URL. A full VFS-serializing zip lands when useKeyboardArtifact
+      // is extended to surface the VFS (tracked in the issue backlog).
+      // [LIMITATION] This downloads only the compiled JS artifact, not the
+      // full source + artifacts zip that toZip would produce.
+      const jsUrl = stage.jsBlobUrl;
+      if (jsUrl) {
+        const resp = await fetch(jsUrl);
+        const bytes = await resp.arrayBuffer();
+        const blob = new Blob([bytes], { type: "application/javascript" });
+        const url = URL.createObjectURL(blob);
+        try {
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${baseKeyboard.id}.js`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      }
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   return (
     <div
@@ -273,7 +424,42 @@ export function PreviewShell() {
           </h2>
           <OskModeToggle value={oskMode} onChange={setOskMode} />
         </div>
-        <OSKFrame baseKeyboard={baseKeyboard} oskMode={oskMode} />
+        <OSKFrame
+          baseKeyboard={baseKeyboard}
+          oskMode={oskMode}
+          stage={stage}
+          retry={retry}
+        />
+        {baseKeyboard !== null && (
+          <>
+            <button
+              type="button"
+              disabled={!canDownload || downloading}
+              onClick={() => { void handleDownload(); }}
+              aria-label={
+                canDownload
+                  ? `Download compiled keyboard ${baseKeyboard.id}`
+                  : "Download unavailable until compile completes"
+              }
+              style={{
+                alignSelf: "flex-start",
+                marginTop: 4,
+                padding: "7px 16px",
+                background: canDownload && !downloading ? "#1f6feb" : "#161b22",
+                color: canDownload && !downloading ? "#e6edf3" : "#484f58",
+                border: "1px solid #283040",
+                borderRadius: 6,
+                fontSize: 13,
+                cursor: canDownload && !downloading ? "pointer" : "not-allowed",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+                transition: "background 0.15s",
+              }}
+            >
+              {downloading ? "Downloading..." : "Download .js"}
+            </button>
+            <DiagnosticsPanel diagnostics={diagnostics} />
+          </>
+        )}
       </section>
     </div>
   );

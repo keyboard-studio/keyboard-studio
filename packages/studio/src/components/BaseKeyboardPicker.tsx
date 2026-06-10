@@ -3,10 +3,10 @@
 
 import { useEffect, useState } from "react";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
-import { mockBaseBrowser } from "@keyboard-studio/contracts/mocks";
-// mockPatternLibrary (also from @keyboard-studio/contracts/mocks) serves the
-// gallery and survey routes once those land.
-import { localBaseBrowser } from "../lib/localBaseBrowser.ts";
+import { getBaseBrowserService } from "../lib/services.ts";
+
+const baseBrowser = getBaseBrowserService();
+
 
 export interface BaseKeyboardPickerProps {
   value: BaseKeyboard | null;
@@ -22,31 +22,18 @@ export function BaseKeyboardPicker({ value, onChange }: BaseKeyboardPickerProps)
     let cancelled = false;
     setLoading(true);
     setError(null);
-    // Try the Vite dev-plugin backed browser first; fall back to mock fixtures
-    // when the local API endpoint is unavailable (air-gapped runs, tests, CI).
-    localBaseBrowser.listAll().then(
+    baseBrowser.listAll().then(
       (list) => {
         if (cancelled) return;
         setKeyboards(list);
         setLoading(false);
       },
       (err: unknown) => {
-        console.warn('[BaseKeyboardPicker] localBaseBrowser unavailable, falling back to mock:', err);
         if (cancelled) return;
-        mockBaseBrowser.listAll().then(
-          (list) => {
-            if (cancelled) return;
-            setKeyboards(list);
-            setLoading(false);
-          },
-          (err: unknown) => {
-            if (cancelled) return;
-            const message = err instanceof Error ? err.message : String(err);
-            console.error("[BaseKeyboardPicker] listAll() failed:", err);
-            setError(message);
-            setLoading(false);
-          },
-        );
+        const message = err instanceof Error ? err.message : String(err);
+        console.error("[BaseKeyboardPicker] listAll() failed:", err);
+        setError(message);
+        setLoading(false);
       },
     );
     return () => {

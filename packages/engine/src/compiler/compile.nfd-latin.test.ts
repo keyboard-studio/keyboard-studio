@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { makeMockVirtualFS } from "@keyboard-studio/contracts/mocks";
+import { createVirtualFS } from "@keyboard-studio/contracts";
 import { compile } from "./index.js";
 
 // Compile gate for the nfd-latin reorder pattern's demo skeleton (issue #40).
@@ -14,8 +14,8 @@ const demoKmn = readFileSync(demoKmnPath, "utf8");
 
 describe("compile() — nfd-latin reorder demo skeleton", () => {
   it("produces a non-empty .kmx artifact", async () => {
-    const vfs = makeMockVirtualFS([
-      { path: "source/nfd_latin_demo.kmn", content: demoKmn },
+    const vfs = createVirtualFS([
+      { path: "source/nfd_latin_demo.kmn", content: demoKmn, isBinary: false },
     ]);
     const result = await compile(vfs, "nfd_latin_demo");
 
@@ -25,8 +25,8 @@ describe("compile() — nfd-latin reorder demo skeleton", () => {
   }, 30_000);
 
   it("emits no error- or fatal-severity diagnostics", async () => {
-    const vfs = makeMockVirtualFS([
-      { path: "source/nfd_latin_demo.kmn", content: demoKmn },
+    const vfs = createVirtualFS([
+      { path: "source/nfd_latin_demo.kmn", content: demoKmn, isBinary: false },
     ]);
     const result = await compile(vfs, "nfd_latin_demo");
 

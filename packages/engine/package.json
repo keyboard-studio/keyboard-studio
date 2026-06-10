@@ -21,6 +21,7 @@
     "build": "tsc -b",
     "clean": "tsc -b --clean",
     "typecheck": "tsc --noEmit",
+    "pretest": "pnpm --filter @keyboard-studio/contracts build",
     "test": "vitest run",
     "test:watch": "vitest"
   },

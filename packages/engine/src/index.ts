@@ -1,7 +1,7 @@
 // Engine package — implementation in issues #14–#19, #64.
 // Issue #16 lands the kmcmplib WASM oracle wrapper.
 
-export { runLexicalChecks } from "./validator/index.js";
+export { runLexicalChecks, runSemanticChecks, runAllChecks } from "./validator/index.js";
 
 // Issue #20 — base-browser GitHub API client.
 export { createBaseBrowser } from "./base-browser/index.js";
