@@ -98,6 +98,7 @@ sourceKeyboards:
   - "release/sil/sil_devanagari_phonetic"
   - "release/tamil/tamil99"
   - "release/sil/sil_bengali_national_jatiya"
+  - "release/itrans/itrans_odia"
 reviewedBy: "keyboard-studio-content-team"
 reviewDate: "2026-06-05"
 
@@ -130,6 +131,23 @@ provenance:
       Devanagari. Uses a context rule to preserve the consonant and append the
       vowel sign. Confirms the pattern generalises across the Bengali–Devanagari
       abugida family.
+  - keyboard: "release/itrans/itrans_odia/source/itrans_odia.kmn"
+    line: 241
+    rule: "any(NuktaVyanjana) \"଼\" \"୍\" + any(ViramaMaatraa) > index(NuktaVyanjana,1) \"଼\" index(ViramaMaatraaU,4)"
+    note: >
+      This rule belongs under S-09 (not S-03): the trigger is a second any() over
+      a maatraa store, context depth is 3 slots, and index offset is 4 — structural
+      markers of abugida cluster formation.
+      B-variant: deferred collapse on following Odia vowel sign. The preceding
+      context is a multi-character cluster (nukta consonant + halanta + virama
+      diacritics); the trigger is any member of the ViramaMaatraa store. When a
+      vowel sign from that store arrives, the entire cluster is rewritten with the
+      incoming vowel factored in. The double-any() shape (any over a consonant
+      store, then any over a maatraa store) with a 3-slot context and index offset
+      4 is the structural signature of abugida cluster formation — the output form
+      depends on the script-position relationship between the consonant cluster and
+      the following vowel sign, which is an S-09 (context-sensitive cluster
+      formation) concern rather than an S-03 (sequence-replace) one.
 
 demo:
   filled_kmn: |

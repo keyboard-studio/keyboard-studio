@@ -80,7 +80,6 @@ validatedForFamilies: ["Latn"]
 sourceKeyboards:
   - "release/sil/sil_ipa"
   - "release/b/balochi_scientific"
-  - "release/itrans/itrans_odia"
   - "release/gautami/gautami_inditran"
   - "release/gautami/gautami_thamizh_tamil"
   - "release/gautami/gautami_devanagari"
@@ -136,25 +135,6 @@ provenance:
       (e.g. a → ā, c → č, d → ḍ, n → ñ). Demonstrates S-04 parallel-store
       lookup as the implementation mechanism for context-sensitive output in a
       real language keyboard outside the IPA/phonetic domain.
-  - keyboard: "release/itrans/itrans_odia/source/itrans_odia.kmn"
-    line: 241
-    rule: "any(NuktaVyanjana) \"଼\" \"୍\" + any(ViramaMaatraa) > index(NuktaVyanjana,1) \"଼\" index(ViramaMaatraaU,4)"
-    note: >
-      B-variant: deferred collapse on following context. The preceding context is a
-      multi-character cluster (nukta consonant plus diacritic marks); the trigger is
-      not a single fixed key but any member of the ViramaMaatraa store. When a vowel
-      sign from that store arrives, the entire cluster is rewritten with the incoming
-      vowel factored in — contrast with the basic S-03 template where the trigger is
-      always one specific key. The same any(ctx) + any(followingStore) > index(...)
-      shape appears in itrans_devanagari_hindi, itrans_bengali, itrans_gujarati,
-      itrans_devanagari_sanskrit_vedic, and masaram_gondi; it is the standard ITRANS
-      family mechanism for Indic consonant-cluster + vowel composition.
-      This remains S-03 rather than S-09 because the trigger store acts as a
-      set-based sequence terminator (the rule is phonetic-sequence-driven, mapping
-      a buffered Latin transliteration sequence to Indic output) rather than a
-      script-position dependency — S-09 applies when the output form depends on
-      rendering context such as Arabic positional variants or Indic conjunct
-      formation in a native-script IME.
   - keyboard: "release/gautami/gautami_inditran/source/gautami_inditran.kmn"
     line: 114
     rule: "'k' 'h' +[K_HYPHEN] > context(1) U+035f context(2)"
