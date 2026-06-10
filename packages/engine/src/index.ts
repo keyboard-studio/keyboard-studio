@@ -64,3 +64,6 @@ export type { ScaffolderServiceOptions } from "./scaffolder/index.js";
 // Issue #21 — Pattern-library loader.
 export { loadPatterns, getPatterns, getById } from "./pattern-library/index.js";
 export type { PatternFilter, LoadReport } from "./pattern-library/index.js";
+
+// Issue #248 — Sprint-1 identity stub mutator (deleted at Sprint-2 start per #238).
+export { applyIdentityStubMutation } from "./stub-mutator/index.js";
