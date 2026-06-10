@@ -98,7 +98,7 @@ describe("integration: recognizePatterns against real basic_kbdfr source", () =>
 
       // The real kbdfr trigger is: + [RALT K_7] > dk(0060)
       const triggerKey = gravePattern!.questions.find((q) => q.id === "triggerKey")?.default;
-      expect(triggerKey).toBe("[RALT K_7]");
+      expect(triggerKey).toBe("RALT K_7");
     },
   );
 });
@@ -149,7 +149,7 @@ describe("integration: recognizePatterns against real basic_kbdca source", () =>
       // primary trigger is unshifted K_QUOTE (no modifiers); SHIFT K_QUOTE is the
       // secondary trigger — both own the same dk(0060) family.
       const triggerKey = gravePattern!.questions.find((q) => q.id === "triggerKey")?.default;
-      expect(triggerKey).toBe("[K_QUOTE]");
+      expect(triggerKey).toBe("K_QUOTE");
     },
   );
 
@@ -193,7 +193,7 @@ describe("integration: recognizePatterns against real basic_kbdca source", () =>
 
       // unshifted K_LBRKT is the primary trigger
       const triggerKey = circumPattern!.questions.find((q) => q.id === "triggerKey")?.default;
-      expect(triggerKey).toBe("[K_LBRKT]");
+      expect(triggerKey).toBe("K_LBRKT");
     },
   );
 });
