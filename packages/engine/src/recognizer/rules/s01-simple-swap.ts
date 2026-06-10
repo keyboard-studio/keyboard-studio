@@ -16,7 +16,7 @@ function toUPlus(value: string): string {
 }
 
 // Format one rule line for the keystrokeCharacterMap slot.
-// e.g. [SHIFT K_Q],U+0190  or  [K_Q],U+025B
+// e.g. + [SHIFT K_Q] > U+0190  or  + [K_Q] > U+025B
 function formatMapLine(rule: IRRule): string {
   const ctx = rule.context[0];
   const out = rule.output[0];
@@ -58,6 +58,7 @@ function buildPattern(matchResult: MatchResult): Pattern {
       {
         id: "keystrokeCharacterMap",
         prompt: "Keystroke-to-character map (one entry per line: + [MODS KEY] > U+XXXX)",
+        // "text" not "store-content": slot contains KMN rule lines, not a store body.
         answerType: "text",
         default: matchResult.slotValues["keystrokeCharacterMap"] ?? "",
       },
