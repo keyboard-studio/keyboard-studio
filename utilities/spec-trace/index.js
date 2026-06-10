@@ -79,8 +79,9 @@ function seed() {
   const sections = parseSpecSections(content);
   const existing = loadTrace() || {};
 
+  const specVersion = (content.match(/v(\d+\.\d+(?:\.\d+)?)/) || [, 'unknown'])[1];
   const trace = {
-    specVersion: '1.0',
+    specVersion,
     lastUpdated: new Date().toISOString().slice(0, 10),
     specFile: 'spec.md',
     sections: existing.sections || {}
@@ -228,24 +229,24 @@ function report() {
     byStatus[data.status] = (byStatus[data.status] || 0) + 1;
   }
 
-  console.log('Spec trace report -- ' + new Date().toISOString().slice(0, 10));
-  console.log('');
-  console.log('Implementation coverage:');
+  console.log('[INFO] Spec trace report -- ' + new Date().toISOString().slice(0, 10));
+  console.log('[INFO] ');
+  console.log('[INFO] Implementation coverage:');
   const order = ['implemented', 'partial', 'unimplemented', 'unreviewed', 'reference', 'out-of-scope'];
   for (const status of order) {
-    if (byStatus[status]) console.log('  ' + status + ': ' + byStatus[status]);
+    if (byStatus[status]) console.log('[INFO]   ' + status + ': ' + byStatus[status]);
   }
 
   if (drifted.length > 0) {
-    console.log('');
-    console.log('Sections with unacknowledged changes (' + drifted.length + '):');
+    console.log('[INFO] ');
+    console.log('[WARN] Sections with unacknowledged changes (' + drifted.length + '):');
     for (const d of drifted) {
-      console.log('  ' + d.id + ' - ' + d.title + (d.stored ? '' : ' [NEW]'));
+      console.log('[WARN]   ' + d.id + ' - ' + d.title + (d.stored ? '' : ' [NEW]'));
     }
-    console.log('');
-    console.log('Acknowledge: node utilities/spec-trace acknowledge <section-id>');
+    console.log('[INFO] ');
+    console.log('[INFO] Acknowledge: node utilities/spec-trace acknowledge <section-id>');
   } else {
-    console.log('');
+    console.log('[INFO] ');
     console.log('[OK] All sections acknowledged');
   }
 }
