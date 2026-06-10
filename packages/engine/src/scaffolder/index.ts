@@ -9,11 +9,11 @@ import {
   createVirtualFS,
   validateKeyboardId as contractsValidateKeyboardId,
 } from "@keyboard-studio/contracts";
-import { fetchKeyboardSourceToVfs } from "../loader/fetchKeyboardSourceToVfs.js";
+import { fetchKeyboardSourceToVfs, type FetchFn } from "../loader/fetchKeyboardSourceToVfs.js";
 
 export interface ScaffolderServiceOptions {
   proxyBase?: string;
-  fetchImpl?: typeof fetch;
+  fetchImpl?: FetchFn;
 }
 
 // Replace C0/C1 control chars (incl. newlines, nulls) with spaces, then collapse and trim.
