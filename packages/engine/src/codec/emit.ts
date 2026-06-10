@@ -74,7 +74,7 @@ function fmtContextElement(el: ContextElement): string {
     case "notany":  return `notany(${el.storeRef})`;
     case "context": return `context(${el.offset})`;
     case "index":   return `index(${el.storeRef}, ${el.offset})`;
-    case "baselayout": return el.value ? `baselayout('${el.value}')` : "baselayout";
+    case "baselayout": { if (el.value.includes("'")) throw new Error(`baselayout value must not contain single-quote: ${el.value}`); return el.value ? `baselayout('${el.value}')` : "baselayout"; }
     case "raw":     return el.text;
   }
 }

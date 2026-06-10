@@ -41,6 +41,7 @@ interface RawLayer {
 interface RawPlatform {
   layer?: RawLayer[];
   displayUnderlying?: boolean;
+  font?: string;
 }
 
 type RawTouchLayout = Record<string, RawPlatform>;
@@ -125,7 +126,7 @@ export function parseTouchLayout(json: string): TouchLayoutIR {
       platformLayers.push({ id, rows });
     }
 
-    platforms.push({ id: platform, layers: platformLayers });
+    platforms.push({ id: platform as "phone" | "tablet" | "desktop", font: p.font, layers: platformLayers });
   }
 
   return { platforms, nodeIds };

@@ -383,13 +383,29 @@ export interface RawKmnFragment {
 }
 
 export interface TouchLayoutIR {
-  layers: Array<{ id: string; rows: Array<{ keys: TouchKeyIR[] }> }>;
+  platforms: Array<{
+    id: "phone" | "tablet" | "desktop";
+    font?: string;
+    layers: Array<{
+      id: string;
+      rows: Array<{ keys: TouchKeyIR[] }>;
+    }>;
+  }>;
   /** Entry-array form rather than `Map` because `Map` is not JSON-serializable; the VirtualFS round-trip (spec §11) requires entry-array form. */
   nodeIds: Array<[string, IRNodeRef]>;
 }
 
 export interface KvksIR {
-  layers: Array<{ shift: string; keys: Array<{ vkey: string; output: string }> }>;
+  kvksVersion?: string;
+  kbdname?: string;
+  layers: Array<{
+    shift: string;
+    keys: Array<{
+      vkey: string;
+      label: string;
+      chars?: string;
+    }>;
+  }>;
   usealtgr: boolean;
   /** Entry-array form rather than `Map` because `Map` is not JSON-serializable; the VirtualFS round-trip (spec §11) requires entry-array form. */
   nodeIds: Array<[string, IRNodeRef]>;
