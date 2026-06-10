@@ -5,3 +5,4 @@ export * from "./patterns";
 export * from "./lintFindings";
 export * from "./compileResults";
 export * from "./provenance";
+export * from "./keyboard-ir";

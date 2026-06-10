@@ -13,12 +13,12 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { recognizePatterns } from "./index.js";
 import type {
-  KeyboardIR,
   IRGroup,
   IRRule,
   IRStore,
   StoreItem,
 } from "@keyboard-studio/contracts";
+import { makeTestIR, charItems } from "@keyboard-studio/contracts/fixtures";
 
 const KEYBOARDS_ROOT = path.resolve(
   new URL(".", import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1"),
@@ -31,10 +31,6 @@ const kbdfrExists = fs.existsSync(
 const kbdcaExists = fs.existsSync(
   path.join(KEYBOARDS_ROOT, "basic_kbdca/source/basic_kbdca.kmn"),
 );
-
-function charItems(chars: string): StoreItem[] {
-  return [...chars].map((c) => ({ kind: "char" as const, value: c }));
-}
 
 function uItems(codepoints: string[]): StoreItem[] {
   return codepoints.map((cp) => ({
@@ -55,25 +51,7 @@ function makeRule(
   return { nodeId, context: ctx, output: out };
 }
 
-function makeIR(groups: IRGroup[], stores: IRStore[]): KeyboardIR {
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "test",
-      name: "Test",
-      bcp47: [],
-      copyright: "",
-      version: "1.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores,
-    groups,
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
-}
+const makeIR = (groups: IRGroup[], stores: IRStore[]) => makeTestIR(groups, stores);
 
 /**
  * Builds a KeyboardIR mirroring the structure of basic_kbdfr:

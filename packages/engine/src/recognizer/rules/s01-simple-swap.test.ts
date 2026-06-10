@@ -1,26 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { s01Recognizer } from "./s01-simple-swap.js";
-import type { KeyboardIR, IRGroup, IRRule } from "@keyboard-studio/contracts";
+import type { IRGroup, IRRule } from "@keyboard-studio/contracts";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
-function makeIR(groups: IRGroup[]): KeyboardIR {
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "test",
-      name: "Test",
-      bcp47: [],
-      copyright: "",
-      version: "1.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups,
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
-}
+const makeIR = (groups: IRGroup[]) => makeTestIR(groups);
 
 function s01Rule(nodeId: string, vkey: string, modifiers: string[], charOut: string): IRRule {
   return {

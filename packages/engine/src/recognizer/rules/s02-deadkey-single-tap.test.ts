@@ -1,36 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { s02Recognizer } from "./s02-deadkey-single-tap.js";
 import type {
-  KeyboardIR,
   IRGroup,
   IRRule,
   IRStore,
-  StoreItem,
 } from "@keyboard-studio/contracts";
+import { makeTestIR, charItems } from "@keyboard-studio/contracts/fixtures";
 
-function makeIR(groups: IRGroup[], stores: IRStore[]): KeyboardIR {
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "test",
-      name: "Test",
-      bcp47: [],
-      copyright: "",
-      version: "1.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores,
-    groups,
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
-}
-
-function charItems(chars: string): StoreItem[] {
-  return [...chars].map((c) => ({ kind: "char" as const, value: c }));
-}
+const makeIR = (groups: IRGroup[], stores: IRStore[]) => makeTestIR(groups, stores);
 
 function store(nodeId: string, name: string, chars: string): IRStore {
   return { nodeId, name, items: charItems(chars), isSystem: false };
