@@ -67,10 +67,10 @@ export class CharacterDiscoveryServiceImpl implements CharacterDiscoveryService 
     const unique = [...new Set(candidates)];
     unique.sort((a, b) => (a.codePointAt(0) ?? 0) - (b.codePointAt(0) ?? 0));
 
-    // count omitted — exactOptionalPropertyTypes, no corpus for picker candidates
+    // no count — no corpus for picker candidates
     return unique.map((ch) => ({
       char: ch,
-      method: "picker" as const,
+      method: "picker",
       inBaseOutput: (ch.codePointAt(0) ?? 0) <= 0x7e,
     }));
   }

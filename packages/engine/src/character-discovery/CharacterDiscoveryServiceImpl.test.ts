@@ -95,6 +95,11 @@ describe("CharacterDiscoveryServiceImpl.pickerCandidates", () => {
     const result = await nullService.pickerCandidates(unknownBase);
     expect(result).toEqual([]);
   });
+
+  it("bcp47 provided but CLDR null + unknown script → returns []", async () => {
+    const result = await nullService.pickerCandidates(unknownBase, "zzzz");
+    expect(result).toEqual([]);
+  });
 });
 
 describe("CharacterDiscoveryServiceImpl.harvestFromText", () => {
