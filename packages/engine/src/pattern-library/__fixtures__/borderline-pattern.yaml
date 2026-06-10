@@ -1,0 +1,29 @@
+id: test_borderline_pattern
+title: "Test Borderline Pattern"
+description: "Schema valid but demo filled_kmn has a Layer A error."
+category: substitute
+appliesTo: ["Latn"]
+group_visibility: all
+priority: 2
+questions:
+  - id: charMap
+    prompt: "Map keystrokes."
+    answerType: text
+kmnFragment: |
+  begin Unicode > use(main)
+  group(main) using keys
+tests:
+  - input: ["[K_Q]"]
+    expectedOutput: "x"
+    description: "placeholder test"
+validatedForFamilies: ["Latn"]
+sourceKeyboards: []
+reviewedBy: "test-suite"
+reviewDate: "2026-01-01"
+demo:
+  filled_kmn: |
+    begin Unicode > use(main)
+    group(main) using keys
+    + [K_Q] > U+025B
+    group(main) using keys
+    + [K_C] > U+0254
