@@ -3,7 +3,7 @@
 # Scope: the user authors the descriptive content for the keyboard's help page.
 #   welcome.htm   -- generated from the template below with the user's answers
 #                    substituted for {{pf_*}} placeholders; the <html> element
-#                    lang attr uses Phase A BCP47 tag per spec §8 template constraint
+#                    lang attr is "en" (document prose is in English, per keymanapp/keyboards convention)
 #   help/<id>.php -- auto-generated from the same body content as welcome.htm
 #                    (spec §8 step 9 parity guarantee)
 #
@@ -128,7 +128,7 @@ welcome_htm_template:
     array [pf_usage_tip_1..pf_usage_tip_5] with blank entries removed.
   template: |
     <!DOCTYPE html>
-    <html lang="{{phase_a.bcp47Tag}}">
+    <html lang="en">
     <head>
       <meta charset="utf-8">
       <style type="text/css">
@@ -166,4 +166,4 @@ welcome_htm_template:
     - "pf_usage_tips is the ordered array [pf_usage_tip_1..pf_usage_tip_5] with blank entries removed"
     - "LICENSE.md (MIT) and .kps license metadata are populated by the scaffolder automatically — not asked in this flow"
     - "help/<keyboardId>.php is auto-generated from the same content with identical body (spec §8 step 9 parity guarantee)"
-    - "lang attr on <html> uses {{phase_a.bcp47Tag}} per spec §8 template constraint"
+    - "lang attr on <html> is \"en\" — document prose is in English (keymanapp/keyboards convention; wrap autonym in span with BCP47 lang attr if needed)"
