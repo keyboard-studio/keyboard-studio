@@ -208,3 +208,10 @@ When the keyboard is part of a partner-organization bundle:
 - <span style="color:goldenrod">[ ] Author has resolved all PR comments before triggering a build on Team City.</span>
 - <span style="color:red">[ ] For a new author's first PR: PR was pulled locally and checked thoroughly (not only online review).</span>
 - <span style="color:goldenrod">[ ] After the build runs, any issues it catches that local review missed (e.g. `LICENSE.md` copyright format, `LICENSE.md` missing from `.kps`) were fed back to the author.</span>
+
+## 19. Import output
+
+Applies to keyboards adapted from an existing `release/` keyboard via the v1.1.0 import feature. Both checks are mechanical green-criteria — auto-enforced by the keyboard-studio output service at PR submission time.
+
+- <span style="color:green">[ ] PR body includes the attribution block: adapted-from path, commit SHA, round-trip status, and opaque feature inventory.</span>
+- <span style="color:green">[ ] `<id>.kmn.imported` sidecar is present in the OAuth working tree but absent from the PR commit tree (not staged for the PR diff).</span>

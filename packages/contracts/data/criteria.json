@@ -1025,5 +1025,19 @@
     "principle": "standards",
     "preSubmitChecklistText": "This keyboard complies with any legislated or accessibility requirements for its target locale — if you are unsure whether requirements apply, check before submitting.",
     "description": "The keyboard meets any applicable legislated, societal, and accessibility requirements for its locale"
+  },
+  {
+    "id": "19.1-import-attribution-in-pr-body",
+    "section": "19. Import output",
+    "band": "layer-c-enforce",
+    "lintRuleId": "KM_LINT_IMPORT_ATTRIBUTION_MISSING",
+    "description": "When a keyboard was adapted from a release/ keyboard, the PR body must include the attribution block (adapted-from path, commit SHA, round-trip status, opaque feature inventory). Enforced by the output service at PR submission time — not by the lint engine at edit time."
+  },
+  {
+    "id": "19.2-sidecar-excluded-from-pr-commit",
+    "section": "19. Import output",
+    "band": "layer-c-enforce",
+    "lintRuleId": "KM_LINT_SIDECAR_IN_PR_COMMIT",
+    "description": "<id>.kmn.imported must be present in the OAuth working tree but absent from the PR commit tree (not staged for the PR diff). Enforced by the output service at PR submission time — not by the lint engine at edit time."
   }
 ]
