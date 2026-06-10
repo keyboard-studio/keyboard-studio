@@ -355,16 +355,16 @@ describe("mockCompiler", () => {
 
 describe("mockScaffolder", () => {
   it("scaffold returns a VirtualFS with required keyboard source paths", async () => {
-    const fs = await mockScaffolder.scaffold(basicKbdus, "my_keyboard", "My Keyboard");
-    expect(fs.get("source/my_keyboard.kmn")).toBeDefined();
-    expect(fs.get("LICENSE.md")).toBeDefined();
-    expect(fs.get("HISTORY.md")).toBeDefined();
-    expect(fs.get("README.md")).toBeDefined();
+    const result = await mockScaffolder.scaffold(basicKbdus, "my_keyboard", "My Keyboard");
+    expect(result.vfs.get("source/my_keyboard.kmn")).toBeDefined();
+    expect(result.vfs.get("LICENSE.md")).toBeDefined();
+    expect(result.vfs.get("HISTORY.md")).toBeDefined();
+    expect(result.vfs.get("README.md")).toBeDefined();
   });
 
   it("scaffold list() returns a non-empty path list", async () => {
-    const fs = await mockScaffolder.scaffold(basicKbdus, "my_keyboard", "My Keyboard");
-    const paths = fs.list();
+    const result = await mockScaffolder.scaffold(basicKbdus, "my_keyboard", "My Keyboard");
+    const paths = result.vfs.list();
     expect(paths.length).toBeGreaterThanOrEqual(1);
   });
 
