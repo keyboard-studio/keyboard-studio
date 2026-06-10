@@ -67,3 +67,8 @@ export type { PatternFilter, LoadReport } from "./pattern-library/index.js";
 
 // Issue #248 — Sprint-1 identity stub mutator (deleted at Sprint-2 start per #238).
 export { applyIdentityStubMutation } from "./stub-mutator/index.js";
+
+// Issue #141 — character discovery service (Phase B).
+export { createCharacterDiscoveryService } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
+export type { CldrLoader, ExemplarResult, ParsedUnicodeSet } from "./character-discovery/cldr.js";
+export { createFetchCldrLoader, scriptBlockChars, SCRIPT_BLOCKS, parseUnicodeSet, loadExemplars } from "./character-discovery/cldr.js";

@@ -45,7 +45,6 @@ describe("CharacterDiscoveryServiceImpl.harvestFromText", () => {
   });
 
   it("tie broken by ascending codepoint", async () => {
-    // 'b' (U+0062) and 'a' (U+0061) both appear once; 'a' should come first
     const result = await service.harvestFromText("ba", baseKb);
     expect(result).toHaveLength(2);
     expect(result[0]?.char).toBe("a");
