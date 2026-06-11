@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@keyboard-studio/contracts": "workspace:*",
+    "@keyboard-studio/llm": "workspace:*",
     "@keymanapp/kmc-kmn": "19.0.240-alpha",
     "fflate": "^0.8.3",
     "yaml": "^2.9.0",

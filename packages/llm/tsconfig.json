@@ -6,10 +6,6 @@
     "composite": true,
     "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
-  "references": [
-    { "path": "../contracts" },
-    { "path": "../llm" }
-  ],
   "include": ["src/**/*"],
   "exclude": ["dist", "node_modules", "**/*.test.ts"]
 }

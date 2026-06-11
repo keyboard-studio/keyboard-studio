@@ -1,0 +1,30 @@
+{
+  "name": "@keyboard-studio/llm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "files": ["dist", "src", "README.md"],
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.54.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.6"
+  }
+}
