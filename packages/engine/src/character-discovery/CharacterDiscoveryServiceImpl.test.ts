@@ -5,7 +5,7 @@ import {
   parseLinguistJson,
   cldrCrossCheck,
 } from "./CharacterDiscoveryServiceImpl.js";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, InventoryFlag } from "@keyboard-studio/contracts";
 
 const noopCompleter = async () => { throw new Error("not called"); };
 
@@ -353,6 +353,36 @@ describe("synthesizeInventory helpers + integration", () => {
     const result = await cldrCrossCheck(inv, "fr", nullLoader);
     expect(result).toBe(inv);
     expect("flags" in result).toBe(false);
+  });
+
+  it("cldrCrossCheck — char in independentVowels attested by CLDR is NOT flagged cldr-omitted", async () => {
+    // Devanagari LETTER A (U+0905) is in independentVowels only (not alphabetCore).
+    // CLDR attests it. It must not appear as cldr-omitted.
+    const hiLoader = async (locale: string): Promise<string | null> =>
+      locale === "hi" ? "[अ आ इ ई]" : null;
+
+    const inv = parseLinguistJson(
+      JSON.stringify({
+        language: "hi",
+        script: "Devanagari",
+        alphabet_core: { lowercase: ["क", "ख"], uppercase: [] },
+        mandatory_diacritics_and_ligatures: [],
+        language_specific_punctuation: [],
+        numerals: [],
+        independent_vowels: ["अ", "आ", "इ", "ई"],
+      })
+    );
+
+    const result = await cldrCrossCheck(inv, "hi", hiLoader);
+    const flags = result.flags ?? [];
+    const cldrOmittedChars = flags
+      .filter((f: InventoryFlag) => f.issue === "cldr-omitted")
+      .map((f: InventoryFlag) => f.char);
+    // None of the independentVowels that CLDR attests should be flagged cldr-omitted
+    expect(cldrOmittedChars).not.toContain("अ");
+    expect(cldrOmittedChars).not.toContain("आ");
+    expect(cldrOmittedChars).not.toContain("इ");
+    expect(cldrOmittedChars).not.toContain("ई");
   });
 
   it("synthesizeInventory end-to-end — mock completer + null loader → correct inventory", async () => {

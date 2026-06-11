@@ -274,6 +274,12 @@ export async function cldrCrossCheck(
     }
   }
 
+  addLettersFrom(inv.nuktaAndBorrowedSoundMarkers ?? []);
+  addLettersFrom(inv.independentVowels ?? []);
+  addLettersFrom(inv.syllabicFinalMarkers ?? []);
+  // directionControlChars intentionally excluded: they are invisible controls,
+  // not letters, and are stored as U+XXXX notation strings (not raw chars).
+
   const cldrLetters = new Set(exemplarResult.specials);
 
   const newFlags: Array<{ char: string; issue: "not-attested" | "cldr-omitted" }> = [];
