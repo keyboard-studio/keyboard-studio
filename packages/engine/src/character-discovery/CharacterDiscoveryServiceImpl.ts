@@ -81,7 +81,12 @@ export function buildLinguistPrompt(languageName: string, bcp47: string, orthogr
 
   if (orthographyUrl !== undefined) {
     // Anchor the LLM to a verified primary source rather than general knowledge alone
-    const safeUrl = new URL(orthographyUrl).href.replace(/[\r\n]/g, "");
+    let safeUrl: string;
+    try {
+      safeUrl = new URL(orthographyUrl).href.replace(/[\r\n]/g, "");
+    } catch (e) {
+      throw new Error(`linguist: invalid orthographyUrl "${orthographyUrl}"`, { cause: e });
+    }
     prompt += `\n\nGrounding source: Use the following URL as the primary source for orthography data: ${safeUrl}`;
   }
 
@@ -171,8 +176,8 @@ export function parseLinguistJson(text: string): LinguistInventory {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text.slice(start, end + 1));
-  } catch {
-    throw new Error("linguist: invalid JSON response");
+  } catch (e) {
+    throw new Error("linguist: invalid JSON response", { cause: e });
   }
 
   if (typeof parsed !== "object" || parsed === null) {
@@ -198,13 +203,13 @@ export function parseLinguistJson(text: string): LinguistInventory {
     throw new Error("linguist: missing required field: alphabet_core");
   }
 
-  if (!Array.isArray(raw["mandatory_diacritics_and_ligatures"])) {
+  if (raw["mandatory_diacritics_and_ligatures"] !== undefined && !Array.isArray(raw["mandatory_diacritics_and_ligatures"])) {
     throw new Error("linguist: missing required field: mandatory_diacritics_and_ligatures");
   }
-  if (!Array.isArray(raw["language_specific_punctuation"])) {
+  if (raw["language_specific_punctuation"] !== undefined && !Array.isArray(raw["language_specific_punctuation"])) {
     throw new Error("linguist: missing required field: language_specific_punctuation");
   }
-  if (!Array.isArray(raw["numerals"])) {
+  if (raw["numerals"] !== undefined && !Array.isArray(raw["numerals"])) {
     throw new Error("linguist: missing required field: numerals");
   }
 
@@ -234,13 +239,15 @@ export function parseLinguistJson(text: string): LinguistInventory {
     };
   }
 
-  const mandatoryDiacriticsAndLigatures = nfcArr(
-    raw["mandatory_diacritics_and_ligatures"] as unknown[]
-  );
-  const languageSpecificPunctuation = nfcArr(
-    raw["language_specific_punctuation"] as unknown[]
-  );
-  const numerals = nfcArr(raw["numerals"] as unknown[]);
+  const mandatoryDiacriticsAndLigatures = Array.isArray(raw["mandatory_diacritics_and_ligatures"])
+    ? nfcArr(raw["mandatory_diacritics_and_ligatures"] as unknown[])
+    : [];
+  const languageSpecificPunctuation = Array.isArray(raw["language_specific_punctuation"])
+    ? nfcArr(raw["language_specific_punctuation"] as unknown[])
+    : [];
+  const numerals = Array.isArray(raw["numerals"])
+    ? nfcArr(raw["numerals"] as unknown[])
+    : [];
 
   const digraphsAsPhonemeUnits =
     Array.isArray(raw["digraphs_as_phoneme_units"])
