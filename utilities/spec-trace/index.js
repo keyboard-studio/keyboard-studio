@@ -29,7 +29,7 @@ const REPO = process.env.SPEC_TRACE_REPO || '';
 // ---------------------------------------------------------------------------
 
 function parseSpecSections(content) {
-  const lines = content.split('\n');
+  const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
   const sections = [];
   let current = null;
 
@@ -47,7 +47,8 @@ function parseSpecSections(content) {
 }
 
 function hashSection(content) {
-  return 'sha256:' + crypto.createHash('sha256').update(content, 'utf8').digest('hex').slice(0, 16);
+  const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  return 'sha256:' + crypto.createHash('sha256').update(normalized, 'utf8').digest('hex').slice(0, 16);
 }
 
 // ---------------------------------------------------------------------------

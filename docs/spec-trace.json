@@ -1,9 +1,9 @@
 {
   "specVersion": "1.1.0",
-  "lastUpdated": "2026-06-09",
+  "lastUpdated": "2026-06-11",
   "specFile": "spec.md",
   "sections": {
-    "\u00a71": {
+    "§1": {
       "title": "1. Elevator pitch",
       "hash": "sha256:eb79e27237c413b1",
       "status": "reference",
@@ -11,7 +11,7 @@
       "decisions": [],
       "notes": "Background narrative; no direct code implementation."
     },
-    "\u00a72": {
+    "§2": {
       "title": "2. Why this exists",
       "hash": "sha256:888302e2a8922968",
       "status": "reference",
@@ -19,7 +19,7 @@
       "decisions": [],
       "notes": "Background narrative; no direct code implementation."
     },
-    "\u00a73": {
+    "§3": {
       "title": "3. Target user",
       "hash": "sha256:df008443bd62c655",
       "status": "reference",
@@ -27,7 +27,7 @@
       "decisions": [],
       "notes": "User-persona definition; informs UX, not code contracts."
     },
-    "\u00a74": {
+    "§4": {
       "title": "4. System overview",
       "hash": "sha256:5d07d9c4c8d1b481",
       "status": "partial",
@@ -38,7 +38,7 @@
       "decisions": [],
       "notes": "High-level architecture. BaseBrowser interface exists; SPA shell not yet built."
     },
-    "\u00a75": {
+    "§5": {
       "title": "5. Pattern schema",
       "hash": "sha256:7c27c71a3e60f747",
       "status": "implemented",
@@ -55,9 +55,9 @@
       ],
       "notes": "Day-1 contract locked. Pattern + PatternMatch + PatternLibrary interfaces all present and tested."
     },
-    "\u00a75a": {
+    "§5a": {
       "title": "5a. KeyboardIR (keyboard intermediate representation)",
-      "hash": "sha256:827b9100e5a1305b",
+      "hash": "sha256:9ca9577cccfe0425",
       "status": "partial",
       "implements": [
         "packages/contracts/src/baseKeyboard.ts",
@@ -72,17 +72,17 @@
       ],
       "notes": "KeyboardIR types present (2026-06-08 amendment). Engine parse/emit not yet built."
     },
-    "\u00a76": {
+    "§6": {
       "title": "6. Worked example",
       "hash": "sha256:cd8447e0802fe336",
       "status": "reference",
       "implements": [],
       "decisions": [],
-      "notes": "Narrative walkthrough; validated by acceptance scenarios in \u00a715."
+      "notes": "Narrative walkthrough; validated by acceptance scenarios in §15."
     },
-    "\u00a77": {
+    "§7": {
       "title": "7. Strategy selection",
-      "hash": "sha256:b8db30cbbc9751a8",
+      "hash": "sha256:328c728951306c92",
       "status": "partial",
       "implements": [
         "packages/contracts/src/strategy.ts",
@@ -93,11 +93,11 @@
         "D1",
         "D2"
       ],
-      "notes": "A1-A7 axis types + strategy catalog types present. Decision tree engine (\u00a77.2) + S-01..S-12 selectors not yet built."
+      "notes": "A1-A7 axis types + strategy catalog types present. Decision tree engine (§7.2) + S-01..S-12 selectors not yet built."
     },
-    "\u00a78": {
+    "§8": {
       "title": "8. Data flow",
-      "hash": "sha256:dc072049cadd1a42",
+      "hash": "sha256:343b89581754ed73",
       "status": "partial",
       "implements": [
         "packages/contracts/src/characterDiscovery.ts",
@@ -106,9 +106,9 @@
       "decisions": [],
       "notes": "CharacterDiscovery + LinguistInventory types exist. Survey-to-pattern pipeline not yet wired."
     },
-    "\u00a79": {
+    "§9": {
       "title": "9. Three-group routing",
-      "hash": "sha256:091c379f2a23ef71",
+      "hash": "sha256:d19630dd9b9b0a71",
       "status": "unimplemented",
       "implements": [],
       "decisions": [
@@ -116,9 +116,9 @@
       ],
       "notes": "Gallery routing (supported / CJK+Ethiopic stub / legacy) not yet built. D5 governs CJK/Ethiopic out-of-scope stub."
     },
-    "\u00a710": {
+    "§10": {
       "title": "10. Validator and lint engine",
-      "hash": "sha256:f7a011e8fc612cb1",
+      "hash": "sha256:db644dd54c5ae5d7",
       "status": "partial",
       "implements": [
         "packages/contracts/src/validator.ts",
@@ -132,9 +132,9 @@
       ],
       "notes": "All three-layer interfaces typed. Layer A 9 TS-portable checks + 5 WASM-only not yet implemented. D3 governs 300ms debounce."
     },
-    "\u00a711": {
+    "§11": {
       "title": "11. Virtual FS",
-      "hash": "sha256:fc0f0bfc4a2e70f2",
+      "hash": "sha256:5acf160cf451fdbe",
       "status": "unimplemented",
       "implements": [
         "packages/engine/src/output/index.ts"
@@ -142,9 +142,9 @@
       "decisions": [],
       "notes": "In-memory FS mirroring keymanapp/keyboards layout. Serialized at output time to .zip or GitHub OAuth fork+PR. Not yet built beyond the output service stub."
     },
-    "\u00a712": {
+    "§12": {
       "title": "12. Output artifacts",
-      "hash": "sha256:5d94889ab8b4ba64",
+      "hash": "sha256:95c621efa8371a3e",
       "status": "partial",
       "implements": [
         "packages/contracts/src/virtualFS.ts",
@@ -157,7 +157,7 @@
       ],
       "notes": "VirtualFS + OutputService + Scaffolder interfaces typed. ZIP serialisation and GitHub OAuth fork+PR not yet built. D6 governs desktop-first scope."
     },
-    "\u00a713": {
+    "§13": {
       "title": "13. Team boundaries",
       "hash": "sha256:83900d7759b68db8",
       "status": "reference",
@@ -165,9 +165,9 @@
       "decisions": [],
       "notes": "Governance: engine vs content team split. Informs package ownership, not runtime code."
     },
-    "\u00a714": {
-      "title": "14. Open questions \u2014 resolved decisions",
-      "hash": "sha256:dd6215ceccf37cad",
+    "§14": {
+      "title": "14. Open questions — resolved decisions",
+      "hash": "sha256:5c6e0dca84a7c8b1",
       "status": "reference",
       "implements": [],
       "decisions": [
@@ -183,17 +183,17 @@
       ],
       "notes": "Decision ledger. Drift here means a decision was re-opened or a new one added."
     },
-    "\u00a715": {
+    "§15": {
       "title": "15. Acceptance scenarios",
-      "hash": "sha256:f832a312932dd3bb",
+      "hash": "sha256:8255410ef9943e1f",
       "status": "unimplemented",
       "implements": [],
       "decisions": [],
       "notes": "End-to-end scenarios not yet wired as test vectors. See km-testing backlog."
     },
-    "\u00a716": {
+    "§16": {
       "title": "16. Out of scope",
-      "hash": "sha256:bf5153cc09ede77d",
+      "hash": "sha256:56da5a20e944bd4b",
       "status": "reference",
       "implements": [],
       "decisions": [
@@ -202,7 +202,7 @@
       ],
       "notes": "Scope boundary definition. Drift here means v1 scope silently expanded."
     },
-    "\u00a717": {
+    "§17": {
       "title": "17. Glossary",
       "hash": "sha256:18fc42de7b78b116",
       "status": "reference",
@@ -210,7 +210,7 @@
       "decisions": [],
       "notes": "Terminology definitions; no code contract."
     },
-    "\u00a718": {
+    "§18": {
       "title": "18. Revision policy",
       "hash": "sha256:05c4a85c51be1de4",
       "status": "reference",
@@ -218,7 +218,7 @@
       "decisions": [],
       "notes": "Schema change governance; enforced by convention, not code."
     },
-    "\u00a719": {
+    "§19": {
       "title": "19. Reference",
       "hash": "sha256:8e9919d00e70c4e9",
       "status": "reference",
