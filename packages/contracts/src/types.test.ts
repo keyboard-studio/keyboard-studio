@@ -93,7 +93,7 @@ describe("LintFinding interface", () => {
   });
 
   it("accepts every LintLayer literal", () => {
-    const layers: LintLayer[] = ["A", "B", "C"];
+    const layers: LintLayer[] = ["A", "A-prime", "B", "C"];
     layers.forEach((l) => {
       const f: LintFinding = {
         code: "TEST",

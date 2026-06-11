@@ -9,7 +9,8 @@
  * exist upstream and is intended for Layer C hygiene messages that are
  * notable but never blocking. Layer A and Layer B validators MUST NOT emit
  * `"info"` — downgrade to `"hint"` if the finding has no compiler-level
- * severity.
+ * severity. Layer A' MAY emit `"info"` only for check I4
+ * (opaque-feature inventory), which is always non-blocking.
  */
 export type LintSeverity = "info" | "hint" | "warning" | "error" | "fatal";
 
@@ -27,7 +28,7 @@ export const LintSeverityNumeric: Record<LintSeverity, number> = {
   info: -1, // Layer C only; no upstream equivalent.
 };
 
-export type LintLayer = "A" | "B" | "C";
+export type LintLayer = "A" | "A-prime" | "B" | "C";
 
 export interface SourceLocation {
   file: string;
