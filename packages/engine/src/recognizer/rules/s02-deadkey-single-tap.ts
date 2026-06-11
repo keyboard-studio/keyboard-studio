@@ -101,7 +101,7 @@ function buildPattern(match: MatchResult): Pattern {
       {
         id: "deadkeyName",
         prompt: "Internal deadkey name",
-        answerType: "text",
+        answerType: "store-content",
         default: match.slotValues["deadkeyName"] ?? "",
       },
       {
@@ -115,12 +115,6 @@ function buildPattern(match: MatchResult): Pattern {
         prompt: "Resulting accented forms",
         answerType: "char-list",
         default: match.slotValues["accentedForms"] ?? "",
-      },
-      {
-        id: "accentChar",
-        prompt: "Accent character codepoint (U+XXXX form)",
-        answerType: "text",
-        default: match.slotValues["accentChar"] ?? "",
       },
     ],
     kmnFragment:
