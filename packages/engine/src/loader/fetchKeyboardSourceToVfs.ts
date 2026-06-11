@@ -11,11 +11,22 @@ import type { BaseKeyboard, VirtualFS } from "@keyboard-studio/contracts";
 import { parseKmnHeaderStores } from "../compiler/parseKmnHeaderStores.js";
 import { parseKpjFlags, type CompilerOptions } from "../compiler/parseKpjFlags.js";
 
+/** Structural fetch type — avoids pulling in the DOM lib for an isomorphic package. */
+export type FetchFn = (
+  url: string,
+  init?: { headers?: Record<string, string> }
+) => Promise<{
+  ok: boolean;
+  status: number;
+  text(): Promise<string>;
+  arrayBuffer(): Promise<ArrayBuffer>;
+}>;
+
 export interface FetchKeyboardSourceOptions {
   /** Default `/kbd-proxy` — Vite proxies it to raw.githubusercontent.com. */
   proxyBase?: string;
   /** Override `globalThis.fetch` (used in tests with a mock). */
-  fetchImpl?: typeof fetch;
+  fetchImpl?: FetchFn;
 }
 
 export interface FetchKeyboardSourceResult {
@@ -35,9 +46,9 @@ const DEFAULT_OPTIONS: Required<CompilerOptions> = {
 
 async function getText(
   url: string,
-  fetchImpl: typeof fetch,
+  fetchImpl: FetchFn,
 ): Promise<{ ok: boolean; status: number; text?: string; networkError?: string }> {
-  let r: Response;
+  let r: Awaited<ReturnType<FetchFn>>;
   try {
     r = await fetchImpl(url);
   } catch (err) {
@@ -49,9 +60,9 @@ async function getText(
 
 async function getBytes(
   url: string,
-  fetchImpl: typeof fetch,
+  fetchImpl: FetchFn,
 ): Promise<{ ok: boolean; status: number; bytes?: Uint8Array; networkError?: string }> {
-  let r: Response;
+  let r: Awaited<ReturnType<FetchFn>>;
   try {
     r = await fetchImpl(url);
   } catch (err) {

@@ -38,6 +38,7 @@ export type { CompilerOptions } from "./compiler/parseKpjFlags.js";
 // Issue #39 — release-tree source loader (proxy + VFS hydration).
 export { fetchKeyboardSourceToVfs } from "./loader/fetchKeyboardSourceToVfs.js";
 export type {
+  FetchFn,
   FetchKeyboardSourceOptions,
   FetchKeyboardSourceResult,
 } from "./loader/fetchKeyboardSourceToVfs.js";
