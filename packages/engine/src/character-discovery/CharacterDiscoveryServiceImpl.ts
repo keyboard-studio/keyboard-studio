@@ -83,6 +83,33 @@ function parseUPlusHex(s: string): string | null {
 }
 
 /**
+ * Normalise a single direction-control-char entry to U+XXXX notation.
+ *
+ * Accepts:
+ *   - U+XXXX / u+xxxx notation (normalises to uppercase hex, minimum 4 digits)
+ *   - Literal raw control characters (converts via codePointAt)
+ *
+ * Returns null for entries that are neither (e.g. empty string, multi-char
+ * literal that is not a control).
+ *
+ * NOTE: conversion from U+XXXX notation back to raw characters happens at
+ * .kmn emit time, not here.
+ */
+function toDirectionControlNotation(s: string): string | null {
+  // U+XXXX / u+xxxx notation path — normalise to uppercase
+  if (/^[Uu]\+[0-9a-fA-F]+$/.test(s)) {
+    const hex = s.slice(2).toUpperCase().padStart(4, "0");
+    return `U+${hex}`;
+  }
+  // Literal character path — convert via codePointAt
+  const cp = s.codePointAt(0);
+  if (cp === undefined) return null;
+  // Only accept if the whole string is exactly one code point
+  if (String.fromCodePoint(cp) !== s) return null;
+  return `U+${cp.toString(16).toUpperCase().padStart(4, "0")}`;
+}
+
+/**
  * Parse a U+XXXX codepoint string into the corresponding character.
  * If the string is not valid U+ notation, returns the NFC-normalized
  * input string (pass-through for syllabic final markers that may be
@@ -193,7 +220,7 @@ export function parseLinguistJson(text: string): LinguistInventory {
     Array.isArray(raw["direction_control_chars"])
       ? (raw["direction_control_chars"] as unknown[])
           .filter((v): v is string => typeof v === "string")
-          .map(parseUPlusHex)
+          .map(toDirectionControlNotation)
           .filter((c): c is string => c !== null)
       : undefined;
 

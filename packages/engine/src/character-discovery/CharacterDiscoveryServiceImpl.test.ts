@@ -225,7 +225,7 @@ describe("synthesizeInventory helpers + integration", () => {
     expect(inv.alphabetCore.lowercase[0]).toBe("á");
   });
 
-  it("parseLinguistJson direction_control_chars — U+200F converted to actual char", () => {
+  it("parseLinguistJson direction_control_chars — U+200F stored as notation string (not raw char)", () => {
     const json = JSON.stringify({
       language: "ar",
       script: "Arabic",
@@ -240,7 +240,37 @@ describe("synthesizeInventory helpers + integration", () => {
     });
     const inv = parseLinguistJson(json);
     expect(inv.directionControlChars).toBeDefined();
-    expect(inv.directionControlChars![0]).toBe("‏");
+    expect(inv.directionControlChars![0]).toBe("U+200F");
+  });
+
+  it("parseLinguistJson direction_control_chars — lowercase u+xxxx notation normalised to uppercase U+XXXX", () => {
+    const json = JSON.stringify({
+      language: "ar",
+      script: "Arabic",
+      alphabet_core: { lowercase: [], uppercase: [] },
+      mandatory_diacritics_and_ligatures: [],
+      language_specific_punctuation: [],
+      numerals: [],
+      direction_control_chars: ["u+200f"],
+    });
+    const inv = parseLinguistJson(json);
+    expect(inv.directionControlChars).toBeDefined();
+    expect(inv.directionControlChars![0]).toBe("U+200F");
+  });
+
+  it("parseLinguistJson direction_control_chars — literal raw RLM char converted to U+200F notation", () => {
+    const json = JSON.stringify({
+      language: "ar",
+      script: "Arabic",
+      alphabet_core: { lowercase: [], uppercase: [] },
+      mandatory_diacritics_and_ligatures: [],
+      language_specific_punctuation: [],
+      numerals: [],
+      direction_control_chars: ["‏"],
+    });
+    const inv = parseLinguistJson(json);
+    expect(inv.directionControlChars).toBeDefined();
+    expect(inv.directionControlChars![0]).toBe("U+200F");
   });
 
   it("parseLinguistJson throws on invalid JSON", () => {
