@@ -18,7 +18,8 @@
     "@keyboard-studio/contracts": "workspace:*",
     "@keyboard-studio/engine": "workspace:*",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@testing-library/react": "^16.0.0",

@@ -7,9 +7,10 @@
 //   #preview              — compiled preview (stub; not yet implemented)
 //   #output               — output / delivery (stub; not yet implemented)
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode, type CSSProperties } from "react";
 import { PreviewShell } from "./components/PreviewShell.tsx";
-
+import { PhaseA, PhaseB, PhaseF } from "./survey/index.ts";
+import type { SurveyContext } from "./survey/types.ts";
 // ---------------------------------------------------------------------------
 // Route types
 // ---------------------------------------------------------------------------
@@ -136,6 +137,125 @@ function NavBar({ active }: NavBarProps) {
 }
 
 // ---------------------------------------------------------------------------
+// SurveyView — orchestrates Phase A → B → F in sequence
+// ---------------------------------------------------------------------------
+
+type SurveyPhase = "A" | "B" | "F" | "done";
+
+function SurveyView() {
+  const [phase, setPhase] = useState<SurveyPhase>("A");
+  const [surveyContext, setSurveyContext] = useState<SurveyContext>({});
+
+  function handlePhaseAComplete(
+    _result: unknown,
+    identity: { languageName: string; routingGroup: string; scriptFamily?: string } | undefined,
+    _provenance: unknown,
+  ) {
+    const ctx: SurveyContext = {};
+    if (identity !== undefined) {
+      ctx["language_name"] = identity.languageName;
+      ctx["routing_group"] = identity.routingGroup;
+      if (identity.scriptFamily !== undefined) {
+        ctx["script_family"] = identity.scriptFamily;
+      }
+    }
+    setSurveyContext(ctx);
+    setPhase("B");
+  }
+
+  function handlePhaseBComplete(_result: unknown) {
+    setPhase("F");
+  }
+
+  function handlePhaseFComplete(_result: unknown) {
+    setPhase("done");
+  }
+
+  function handleStartOver() {
+    setSurveyContext({});
+    setPhase("A");
+  }
+
+  const containerStyle: CSSProperties = {
+    padding: 24,
+    maxWidth: 720,
+    margin: "0 auto",
+    overflowY: "auto",
+    height: "100%",
+    boxSizing: "border-box",
+    background: "#0d1117",
+    color: "#e6edf3",
+    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  };
+
+  if (phase === "done") {
+    return (
+      <div style={containerStyle}>
+        <div
+          style={{
+            padding: 24,
+            border: "1px solid #30363d",
+            borderRadius: 8,
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+            alignItems: "flex-start",
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: "1.1rem", color: "#6ea8fe", fontWeight: 600 }}>
+            Survey complete
+          </h2>
+          <p style={{ margin: 0, fontSize: 13, color: "#8b949e" }}>
+            All survey phases have been completed. You can proceed to the gallery.
+          </p>
+          <button
+            type="button"
+            onClick={handleStartOver}
+            style={{
+              padding: "8px 18px",
+              background: "transparent",
+              border: "1px solid #30363d",
+              borderRadius: 6,
+              color: "#8b949e",
+              fontSize: 13,
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            Start over
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={containerStyle}>
+      {phase === "A" && (
+        <PhaseA
+          context={surveyContext}
+          onComplete={handlePhaseAComplete}
+        />
+      )}
+      {phase === "B" && (
+        <PhaseB
+          context={surveyContext}
+          onComplete={handlePhaseBComplete}
+          onBack={() => setPhase("A")}
+        />
+      )}
+      {phase === "F" && (
+        <PhaseF
+          context={surveyContext}
+          onComplete={handlePhaseFComplete}
+          onBack={() => setPhase("B")}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // StudioShell — top-level layout: nav bar + route content
 // ---------------------------------------------------------------------------
 
@@ -148,7 +268,7 @@ export function StudioShell() {
       content = <PreviewShell />;
       break;
     case "survey":
-      content = <RoutePlaceholder title="Survey" />;
+      content = <SurveyView />;
       break;
     case "gallery":
       content = <RoutePlaceholder title="Gallery" />;
