@@ -6,9 +6,9 @@ import type { Criterion } from "./criteria";
 import data from "../data/criteria.json" with { type: "json" };
 
 /**
- * The full triaged Criterion catalog — 133 entries derived from the
+ * The full triaged Criterion catalog — 146 entries derived from the
  * `criteria.md` review-process source per the §11 four-band model
- * (Decision 4, §14).
+ * (Decision 4, §14); includes the 7.7a split row from the flagged-criteria re-review.
  *
  * Loaded statically from `packages/contracts/data/criteria.json`. The
  * `readonly Criterion[]` cast asserts conformance against the

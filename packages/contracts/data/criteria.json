@@ -66,7 +66,7 @@
     "id": "1.10-kpj-current-format",
     "section": "1. Repository hygiene",
     "band": "scaffolder-bake",
-    "description": "`.kpj` file uses the current/newest project-file format",
+    "description": "`.kpj` file uses the current/newest project-file format (the scaffolder template bakes the current `.kpj` schema version, literal `version=\"10.0\"` as of the Keyman Developer 17/18 era; bump this note when the format moves)",
     "scaffolderRule": "set-kpj-current-format"
   },
   {
@@ -240,9 +240,9 @@
   {
     "id": "4.8-year-range-starts-at-original",
     "section": "4. `LICENSE.md` (copyright)",
-    "band": "layer-c-enforce",
+    "band": "yellow-survey",
     "description": "If a year range is used, it starts at the original year and extends to the current year",
-    "lintRuleId": "KM_LINT_COPYRIGHT_YEAR_RANGE_INVALID"
+    "surveyQuestionId": "copyright-year-range-starts-at-original"
   },
   {
     "id": "5.1-readme-good-header",
@@ -388,8 +388,15 @@
     "id": "7.7-display-name-no-underscores",
     "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
     "band": "yellow-survey",
-    "description": "Keyboard display name is a readable phrase, not the underscore-separated ID",
+    "description": "Keyboard display name is a readable phrase that describes the keyboard (judgment half; the mechanical underscore check is 7.7a)",
     "surveyQuestionId": "display-name-readable"
+  },
+  {
+    "id": "7.7a-display-name-no-underscores-lint",
+    "section": "7. Keyboard source (`.kpj` → Keyboards tab → `.kmn`)",
+    "band": "layer-c-enforce",
+    "description": "Keyboard display name contains no literal underscore characters (mechanical half of 7.7; the readability judgment stays with 7.7)",
+    "lintRuleId": "KM_LINT_DISPLAY_NAME_UNDERSCORE"
   },
   {
     "id": "7.8-rtl-flag-matches-script",
@@ -535,7 +542,7 @@
     "id": "8.7-kps-includes-required-fonts",
     "section": "8. Package contents (`.kps` → Packaging tab → Files)",
     "band": "layer-c-enforce",
-    "description": "All required fonts with all typefaces listed in the `.kps`",
+    "description": "All required fonts referenced by the `.kmn` and touch layout are listed in the `.kps` (family-level presence check; full typeface — Bold/Italic — completeness is best-effort, not mechanically guaranteed)",
     "lintRuleId": "KM_LINT_KPS_FONT_MISSING"
   },
   {
@@ -611,9 +618,9 @@
   {
     "id": "9.5-shared-font-current-path",
     "section": "9. Font licensing",
-    "band": "yellow-survey",
+    "band": "red-checklist",
     "description": "Shared font path points to the current/newest shared-fonts location, not a deprecated duplicate",
-    "surveyQuestionId": "shared-font-path-current"
+    "preSubmitChecklistText": "I have verified the shared font path points to the current shared/fonts location in keymanapp/keyboards, not a deprecated duplicate."
   },
   {
     "id": "9.6-no-woff-fonts",
@@ -717,7 +724,7 @@
     "id": "11.2-php-osk-all-layers",
     "section": "11. Online help (`source/help/<name>.php`)",
     "band": "layer-c-enforce",
-    "description": "If using OSK syntax, all desktop and mobile layers are listed in `data-states`",
+    "description": "If using OSK syntax, all desktop and mobile layers are listed in `data-states` (complementary to 11.6 — see that entry for the direction split)",
     "lintRuleId": "KM_LINT_PHP_OSK_LAYERS_INCOMPLETE"
   },
   {
@@ -738,14 +745,14 @@
     "id": "11.5-php-htm-html-wellformed",
     "section": "11. Online help (`source/help/<name>.php`)",
     "band": "layer-c-enforce",
-    "description": "HTML in `welcome.htm` and `.php` is well-formed — balanced tags, proper headings, no unclosed elements",
+    "description": "HTML in `welcome.htm` and `.php` is well-formed — balanced tags, proper headings, no unclosed elements (in-browser check via DOMParser)",
     "lintRuleId": "KM_LINT_HTML_NOT_WELL_FORMED"
   },
   {
     "id": "11.6-php-osk-data-states-all-layers",
     "section": "11. Online help (`source/help/<name>.php`)",
     "band": "layer-c-enforce",
-    "description": "`.php` `data-states` attribute lists every layer defined in the `.kmn` and touch layout",
+    "description": "`.php` `data-states` attribute lists every layer defined in the `.kmn` and touch layout (complementary to 11.2: 11.2 catches layers missing from `data-states` — under-documentation; 11.6 catches `data-states` values naming layers that don't exist — phantom layers)",
     "lintRuleId": "KM_LINT_PHP_DATA_STATES_INCOMPLETE"
   },
   {
@@ -758,9 +765,9 @@
   {
     "id": "11.8-php-osk-image-constrained",
     "section": "11. Online help (`source/help/<name>.php`)",
-    "band": "yellow-survey",
+    "band": "layer-c-enforce",
     "description": "OSK graphics either use Keyman-generated form or custom images have width constraints",
-    "surveyQuestionId": "osk-image-constrained"
+    "lintRuleId": "KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED"
   },
   {
     "id": "11.9-php-htm-body-parity",
@@ -814,9 +821,9 @@
   {
     "id": "12.6-script-mismatch-submitted-to-langtags",
     "section": "12. Language tagging (BCP47)",
-    "band": "yellow-survey",
+    "band": "red-checklist",
     "description": "A flagged script mismatch has been submitted to langtags",
-    "surveyQuestionId": "script-mismatch-submitted-to-langtags"
+    "preSubmitChecklistText": "If a script mismatch was flagged, I have opened an issue at github.com/silnrsi/langtags documenting the mismatch."
   },
   {
     "id": "13.1-pua-keyboard-in-experimental",
@@ -912,9 +919,9 @@
   {
     "id": "17.1-build-trigger-pr-comments-resolved",
     "section": "17. Build trigger",
-    "band": "yellow-survey",
+    "band": "red-checklist",
     "description": "Author has resolved all PR comments before triggering a TeamCity build",
-    "surveyQuestionId": "pr-comments-resolved-before-build"
+    "preSubmitChecklistText": "I have resolved all PR comments before triggering a TeamCity build."
   },
   {
     "id": "17.2-new-author-local-pull",
@@ -926,9 +933,9 @@
   {
     "id": "17.3-build-issues-fed-back",
     "section": "17. Build trigger",
-    "band": "yellow-survey",
+    "band": "red-checklist",
     "description": "After the build runs, any issues it catches that local review missed were fed back to the author",
-    "surveyQuestionId": "build-issues-fed-back-to-author"
+    "preSubmitChecklistText": "Any issues the TeamCity build caught that local review missed have been fed back to the author."
   },
   {
     "id": "18.1-longpress-within-limit",

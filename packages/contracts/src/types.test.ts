@@ -447,7 +447,7 @@ describe("criteria.json schema conformance", () => {
     expect(unique.size).toBe(ids.length);
   });
 
-  it("matches the expected per-band counts (38/65/36/6 after section-18 DISCUS)", () => {
+  it("matches the expected per-band counts (38/66/32/10 after the flagged-criteria re-review)", () => {
     const counts = records.reduce<Record<string, number>>((acc, c) => {
       acc[c.band] = (acc[c.band] ?? 0) + 1;
       return acc;
@@ -457,12 +457,12 @@ describe("criteria.json schema conformance", () => {
       expect(validBands).toContain(k);
     });
     // 133 original repo-hygiene criteria + 12 section-18 DISCUS design
-    // heuristics (7 layer-c-enforce + 3 yellow-survey + 2 red-checklist).
-    expect(records.length).toBe(145);
+    // heuristics + 1 split row (7.7a) from the flagged-criteria re-review = 146 total.
+    expect(records.length).toBe(146);
     expect(counts["scaffolder-bake"]).toBe(38);
-    expect(counts["layer-c-enforce"]).toBe(65);
-    expect(counts["yellow-survey"]).toBe(36);
-    expect(counts["red-checklist"]).toBe(6);
+    expect(counts["layer-c-enforce"]).toBe(66);
+    expect(counts["yellow-survey"]).toBe(32);
+    expect(counts["red-checklist"]).toBe(10);
   });
 
   it("section-18 DISCUS rows are present, tagged with a valid principle, and banded correctly", () => {
@@ -547,7 +547,7 @@ describe("criteria.json schema conformance", () => {
 describe("criteriaData loader (#116)", () => {
   it("ALL_CRITERIA is a non-empty readonly Criterion[]", () => {
     expect(Array.isArray(ALL_CRITERIA)).toBe(true);
-    expect(ALL_CRITERIA.length).toBe(145);
+    expect(ALL_CRITERIA.length).toBe(146);
   });
 
   it("CRITERIA_BY_BAND partitions ALL_CRITERIA across the four bands", () => {
