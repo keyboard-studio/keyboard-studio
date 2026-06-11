@@ -18,6 +18,8 @@
 - `{{languageName}}` — the language name from Phase A.
 - `{{bcp47}}` — the BCP47 tag from Phase A (e.g. `bm`, `tyv`, `hi-Deva`).
 
+When the Phase A result includes a `orthographyUrl`, the engine appends a grounding line to the rendered prompt after the `Target Language` line. Do not add trailing prose to the template body — it will conflict with this engine-controlled append.
+
 ## Template
 
 ```text

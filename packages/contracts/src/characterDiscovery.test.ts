@@ -63,7 +63,7 @@ describe("CharacterDiscoveryService contract", () => {
         method: "text-sample" as const,
       }));
     },
-    async synthesizeInventory(languageName, bcp47) {
+    async synthesizeInventory(languageName, bcp47, _orthographyUrl?) {
       return makeLinguistInventory({
         language: bcp47,
         script: "Latin",
@@ -98,6 +98,13 @@ describe("CharacterDiscoveryService contract", () => {
     expect(inv.language).toBe("bm");
     expect(inv.alphabetCore.uppercase).toContain("Ɛ");
     expect(inv.flags?.[0]?.issue).toBe("cldr-omitted");
+    expect(inv.sources?.[0]?.kind).toBe("orthography");
+  });
+
+  it("synthesizeInventory accepts an orthographyUrl and returns a LinguistInventory", async () => {
+    const inv = await stub.synthesizeInventory("Bambara", "bm", "https://example.org/bm-ortho");
+    expect(inv.language).toBe("bm");
+    expect(inv.alphabetCore.uppercase).toContain("Ɛ");
     expect(inv.sources?.[0]?.kind).toBe("orthography");
   });
 

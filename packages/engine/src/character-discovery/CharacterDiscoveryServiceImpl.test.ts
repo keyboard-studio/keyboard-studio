@@ -508,4 +508,118 @@ describe("synthesizeInventory helpers + integration", () => {
     expect(inv.mandatoryDiacriticsAndLigatures).toEqual(["é"]);
     expect("flags" in inv).toBe(false);
   });
+
+  it("buildLinguistPrompt with orthographyUrl — URL appears in the prompt", () => {
+    const url = "https://example.org/bm-orthography";
+    const result = buildLinguistPrompt("Bambara", "bm", url);
+    expect(result).toContain(url);
+    expect(result).toContain("Grounding source:");
+    expect(result).toContain("primary source");
+  });
+
+  it("buildLinguistPrompt without orthographyUrl — no URL placeholder remains", () => {
+    const result = buildLinguistPrompt("French", "fr");
+    expect(result).not.toContain("orthographyUrl");
+    expect(result).not.toContain("Grounding source:");
+    expect(result).not.toContain("{{");
+  });
+
+  it("synthesizeInventory end-to-end with orthographyUrl — completer receives prompt containing the URL", async () => {
+    const url = "https://example.org/tyv-orthography";
+    let capturedPrompt = "";
+    const capturingCompleter = async (prompt: string): Promise<string> => {
+      capturedPrompt = prompt;
+      return MINIMAL_VALID_JSON;
+    };
+
+    const svc = createCharacterDiscoveryService(nullLoader, capturingCompleter);
+    await svc.synthesizeInventory("Tuvan", "tyv", url);
+
+    expect(capturedPrompt).toContain(url);
+    expect(capturedPrompt).toContain("Grounding source:");
+  });
+
+  // P1-A: omitting all three formerly-required list fields parses as empty arrays
+  it("parseLinguistJson — missing mandatory_diacritics_and_ligatures / language_specific_punctuation / numerals yields empty arrays", () => {
+    const json = JSON.stringify({
+      language: "fr",
+      script: "Latin",
+      alphabet_core: {
+        lowercase: ["a"],
+        uppercase: ["A"],
+      },
+      // all three optional-now fields are absent
+    });
+    const inv = parseLinguistJson(json);
+    expect(inv.mandatoryDiacriticsAndLigatures).toEqual([]);
+    expect(inv.languageSpecificPunctuation).toEqual([]);
+    expect(inv.numerals).toEqual([]);
+  });
+
+  // P1-B: malformed orthographyUrl throws a descriptive domain error
+  it("buildLinguistPrompt — malformed orthographyUrl throws linguist: domain error", () => {
+    expect(() => buildLinguistPrompt("French", "fr", "not a url")).toThrow(
+      /linguist: invalid orthographyUrl "not a url"/
+    );
+  });
+
+  // P2-B: cldrCrossCheck preserves pre-existing flags while appending new ones
+  it("cldrCrossCheck — pre-existing flags are preserved and new flags are appended", async () => {
+    const preExistingFlag = { char: "ø", issue: "not-attested" as const };
+    const mockLoader = async (locale: string): Promise<string | null> =>
+      locale === "fr" ? "[a b é ñ]" : null;
+
+    const baseInv = parseLinguistJson(
+      JSON.stringify({
+        language: "fr",
+        script: "Latin",
+        alphabet_core: {
+          lowercase: ["é"],
+          uppercase: [],
+        },
+        mandatory_diacritics_and_ligatures: [],
+        language_specific_punctuation: [],
+        numerals: [],
+      })
+    );
+
+    // Attach a pre-existing flag manually via spread (makeLinguistInventory accepts flags)
+    const { makeLinguistInventory } = await import("@keyboard-studio/contracts");
+    const invWithFlag = makeLinguistInventory({ ...baseInv, flags: [preExistingFlag] });
+
+    const result = await cldrCrossCheck(invWithFlag, "fr", mockLoader);
+    expect(result.flags).toBeDefined();
+    // Pre-existing flag must still be present
+    expect(result.flags!.some((f) => f.char === "ø" && f.issue === "not-attested")).toBe(true);
+    // New cldr-omitted flag for "ñ" (in CLDR but not in agent letters) must be appended
+    expect(result.flags!.some((f) => f.char === "ñ" && f.issue === "cldr-omitted")).toBe(true);
+  });
+
+  // P2-E: synthesizeInventory end-to-end with a non-null CLDR loader
+  it("synthesizeInventory end-to-end — non-null CLDR loader exercises completer→parse→cross-check and yields cldr-omitted flag", async () => {
+    // Loader returns "ñ" as a CLDR letter; LLM response only includes "é" in its core
+    const mockLoader = async (locale: string): Promise<string | null> =>
+      locale === "fr" ? "[a b é ñ]" : null;
+
+    const mockCompleter = async (_prompt: string): Promise<string> =>
+      JSON.stringify({
+        language: "fr",
+        script: "Latin",
+        alphabet_core: {
+          lowercase: ["é"],
+          uppercase: [],
+        },
+        mandatory_diacritics_and_ligatures: [],
+        language_specific_punctuation: [],
+        numerals: [],
+      });
+
+    const svc = createCharacterDiscoveryService(mockLoader, mockCompleter);
+    const inv = await svc.synthesizeInventory("French", "fr");
+
+    // cross-check must have run: ñ is in CLDR but not in agent letters → cldr-omitted
+    expect(inv.flags).toBeDefined();
+    const cldrOmitted = inv.flags!.find((f) => f.char === "ñ");
+    expect(cldrOmitted?.issue).toBe("cldr-omitted");
+  });
 });

@@ -8,7 +8,14 @@ import { makeLinguistInventory } from "@keyboard-studio/contracts";
 import type { CldrLoader } from "./cldr.js";
 import { loadExemplars, scriptBlockChars } from "./cldr.js";
 
-/** Injectable LLM backend — returns raw response text for a given prompt. */
+/**
+ * Injectable LLM backend — returns raw response text for a given prompt.
+ *
+ * Node-side composition: wrap the @keyboard-studio/llm client as
+ * `(p) => createLLMClient(config).complete(p)`. The engine package must NOT
+ * import @keyboard-studio/llm directly — that package is Node.js-only and
+ * would break browser bundling of the engine.
+ */
 export type LLMCompleter = (prompt: string) => Promise<string>;
 
 const LINGUIST_PROMPT_TEMPLATE = `You are an expert computational linguist specializing in typography, character
@@ -67,10 +74,23 @@ The following five fields are optional; omit any that do not apply to the script
   "syllabic_final_markers": ["U+1427", "U+1428"]
 }`;
 
-export function buildLinguistPrompt(languageName: string, bcp47: string): string {
-  return LINGUIST_PROMPT_TEMPLATE
+export function buildLinguistPrompt(languageName: string, bcp47: string, orthographyUrl?: string): string {
+  let prompt = LINGUIST_PROMPT_TEMPLATE
     .replace(/\{\{languageName\}\}/g, languageName)
     .replace(/\{\{bcp47\}\}/g, bcp47);
+
+  if (orthographyUrl !== undefined) {
+    // Anchor the LLM to a verified primary source rather than general knowledge alone
+    let safeUrl: string;
+    try {
+      safeUrl = new URL(orthographyUrl).href.replace(/[\r\n]/g, "");
+    } catch (e) {
+      throw new Error(`linguist: invalid orthographyUrl "${orthographyUrl}"`, { cause: e });
+    }
+    prompt += `\n\nGrounding source: Use the following URL as the primary source for orthography data: ${safeUrl}`;
+  }
+
+  return prompt;
 }
 
 /**
@@ -156,8 +176,8 @@ export function parseLinguistJson(text: string): LinguistInventory {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text.slice(start, end + 1));
-  } catch {
-    throw new Error("linguist: invalid JSON response");
+  } catch (e) {
+    throw new Error("linguist: invalid JSON response", { cause: e });
   }
 
   if (typeof parsed !== "object" || parsed === null) {
@@ -183,13 +203,13 @@ export function parseLinguistJson(text: string): LinguistInventory {
     throw new Error("linguist: missing required field: alphabet_core");
   }
 
-  if (!Array.isArray(raw["mandatory_diacritics_and_ligatures"])) {
+  if (raw["mandatory_diacritics_and_ligatures"] !== undefined && !Array.isArray(raw["mandatory_diacritics_and_ligatures"])) {
     throw new Error("linguist: missing required field: mandatory_diacritics_and_ligatures");
   }
-  if (!Array.isArray(raw["language_specific_punctuation"])) {
+  if (raw["language_specific_punctuation"] !== undefined && !Array.isArray(raw["language_specific_punctuation"])) {
     throw new Error("linguist: missing required field: language_specific_punctuation");
   }
-  if (!Array.isArray(raw["numerals"])) {
+  if (raw["numerals"] !== undefined && !Array.isArray(raw["numerals"])) {
     throw new Error("linguist: missing required field: numerals");
   }
 
@@ -219,13 +239,15 @@ export function parseLinguistJson(text: string): LinguistInventory {
     };
   }
 
-  const mandatoryDiacriticsAndLigatures = nfcArr(
-    raw["mandatory_diacritics_and_ligatures"] as unknown[]
-  );
-  const languageSpecificPunctuation = nfcArr(
-    raw["language_specific_punctuation"] as unknown[]
-  );
-  const numerals = nfcArr(raw["numerals"] as unknown[]);
+  const mandatoryDiacriticsAndLigatures = Array.isArray(raw["mandatory_diacritics_and_ligatures"])
+    ? nfcArr(raw["mandatory_diacritics_and_ligatures"] as unknown[])
+    : [];
+  const languageSpecificPunctuation = Array.isArray(raw["language_specific_punctuation"])
+    ? nfcArr(raw["language_specific_punctuation"] as unknown[])
+    : [];
+  const numerals = Array.isArray(raw["numerals"])
+    ? nfcArr(raw["numerals"] as unknown[])
+    : [];
 
   const digraphsAsPhonemeUnits =
     Array.isArray(raw["digraphs_as_phoneme_units"])
@@ -401,8 +423,9 @@ export class CharacterDiscoveryServiceImpl implements CharacterDiscoveryService 
   async synthesizeInventory(
     languageName: string,
     bcp47: string,
+    orthographyUrl?: string,
   ): Promise<LinguistInventory> {
-    const prompt = buildLinguistPrompt(languageName, bcp47);
+    const prompt = buildLinguistPrompt(languageName, bcp47, orthographyUrl);
     const raw = await this.completer(prompt);
     const inv = parseLinguistJson(raw);
     return cldrCrossCheck(inv, bcp47, this.loader);

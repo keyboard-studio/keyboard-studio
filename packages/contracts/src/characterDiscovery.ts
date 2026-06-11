@@ -136,13 +136,17 @@ export interface CharacterDiscoveryService {
    *
    * @param languageName - The language name from Phase A.
    * @param bcp47 - The BCP47 tag from Phase A (e.g. "tyv", "bm-Latn").
+   * @param orthographyUrl - Optional URL of a verified orthography reference (from Phase A).
+   *   When provided, the LLM prompt is anchored to this source as a primary grounding signal
+   *   rather than relying on general knowledge alone.
    * @returns The synthesized, cross-checked inventory for user confirmation.
    * @see spec.md §8 step 4
    * @see docs/prompts/character-inventory-linguist.md
    */
   synthesizeInventory(
     languageName: string,
-    bcp47: string
+    bcp47: string,
+    orthographyUrl?: string
   ): Promise<LinguistInventory>;
 
   /**
