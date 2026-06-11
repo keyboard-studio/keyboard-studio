@@ -69,10 +69,11 @@ export type { PatternFilter, LoadReport } from "./pattern-library/index.js";
 export { applyIdentityStubMutation } from "./stub-mutator/index.js";
 
 // Issue #141 — character discovery service (Phase B).
+// Public surface: factory + injectable types only.
+// Internal helpers (buildLinguistPrompt, parseLinguistJson, cldrCrossCheck,
+// parseUnicodeSet, loadExemplars, SCRIPT_BLOCKS) are NOT re-exported here;
+// tests import them directly from the module file.
 export { createCharacterDiscoveryService } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
 export type { LLMCompleter } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
-export { buildLinguistPrompt } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
-export { parseLinguistJson } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
-export { cldrCrossCheck } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
-export type { CldrLoader, ExemplarResult, ParsedUnicodeSet } from "./character-discovery/cldr.js";
-export { createFetchCldrLoader, scriptBlockChars, SCRIPT_BLOCKS, parseUnicodeSet, loadExemplars } from "./character-discovery/cldr.js";
+export type { CldrLoader, ExemplarResult } from "./character-discovery/cldr.js";
+export { createFetchCldrLoader } from "./character-discovery/cldr.js";
