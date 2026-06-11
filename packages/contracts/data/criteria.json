@@ -1031,6 +1031,6 @@
     "section": "19. Import output",
     "band": "layer-c-enforce",
     "lintRuleId": "KM_LINT_IMPORT_ATTRIBUTION_MISSING",
-    "description": "When a keyboard was adapted from a release/ keyboard, the PR body must include the attribution block: adapted-from path, commit SHA, round-trip status (one of: \"clean\", \"clean-with-opaque\", \"parse-failure\", \"round-trip-divergence\" — see ImportReport.opaqueFeatureInventory, check I5 (spec §5, v1.1.0 import amendment)), and opaque feature inventory. Enforced by the output service at PR submission time — not by the lint engine at edit time."
+    "description": "When a keyboard was adapted from a release/ keyboard, the PR body must include the attribution block: adapted-from path, commit SHA, round-trip status (one of: \"clean\", \"clean-with-opaque\", \"parse-failure\", \"round-trip-divergence\" — see ImportReport.opaqueFeatureInventory, check I5 (spec §5a, v1.1.0 import amendment)), and opaque feature inventory. Enforced by the output service at PR submission time — not by the lint engine at edit time."
   }
 ]
