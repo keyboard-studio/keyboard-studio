@@ -185,8 +185,7 @@ intake/provenance, not placement habits) and the Phase B inventory-gap work
    is universal, AltGr conventions must not collide. Feeds base-layout choice and
    the S-08 layer plan.
 3. **"Prefix or postfix mental model for marks?"** Whether the community thinks
-   "mark then letter" or "letter then mark" decides deadkey (S-02) vs. combining
-   postfix (S-03) more reliably than A3 alone — and matches the IPA mismatch
+   "mark then letter" or "letter then mark" decides deadkey (S-02) vs. sequence-replace (S-03): prefix = diacritic key first, postfix = base then mark key more reliably than A3 alone — and matches the IPA mismatch
    already documented in §7.5.
 4. **"Which contact-language words must remain typeable?"** Loanwords, names,
    URLs — constrains which base keys may be displaced (principle 4 above).
