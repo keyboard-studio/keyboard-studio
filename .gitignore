@@ -50,3 +50,5 @@ utilities/kbgen/data/cldr/
 
 # Local Claude Code settings (personal API keys, overrides)
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/worktrees/

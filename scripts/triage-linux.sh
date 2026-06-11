@@ -23,7 +23,7 @@ REPO="${KM_TRIAGE_REPO:-MattGyverLee/keyboard-studio}"
 TL_EMAIL="${KM_TRIAGE_TL_EMAIL:-matthew_lee@sil.org}"
 TL_LOGIN="${KM_TRIAGE_TL_LOGIN:-MattGyverLee}"
 TRIAGE_OWNERS_JSON='["MattGyverLee","gboltono","coopabla","KevinPNG","dhigby","myczka"]'
-CLAUDE="${CLAUDE_BIN:-claude}"
+CLAUDE="${CLAUDE_BIN:-/home/lee2mr/.local/bin/claude}"
 
 INBOX_DIR=".tech-lead-inbox"
 AUDIT_LOG="$INBOX_DIR/audit-log.jsonl"
@@ -104,9 +104,12 @@ if ! node utilities/km-triage-app/mint-token.js > /dev/null 2>&1; then
 fi
 
 # Refresh main so each claude call sees the latest crew/command definitions.
+# Stash any local changes so the pull can proceed; restore them after.
 git fetch origin main --quiet
 git checkout main --quiet
+STASH_OUTPUT=$(git stash --include-untracked 2>&1)
 git pull --ff-only --quiet
+[[ "$STASH_OUTPUT" != "No local changes to save" ]] && git stash pop --quiet || true
 
 # ── Iteration loop ────────────────────────────────────────────────────────────
 
@@ -273,7 +276,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     echo "  -> spawning claude for PR #$NUM" | tee -a "$LOG"
     n_review=$((n_review + 1))
     set +e
-    "$CLAUDE" -p "/km-triage $NUM" --dangerously-skip-permissions --output-format text \
+    CLAUDECODE="" "$CLAUDE" -p "/km-triage $NUM" --dangerously-skip-permissions --output-format text \
       >> "$LOG" 2>&1
     CLAUDE_EXIT=$?
     set -e
