@@ -59,15 +59,12 @@ export { recognizePatterns } from "./recognizer/index.js";
 export type { RecognizerRule, MatchResult, RecognizeResult } from "./recognizer/index.js";
 
 // Issue #19 — scaffolder (template-cleanup pipeline).
-export { createScaffolderService } from "./scaffolder/index.js";
+export { createScaffolderService, scaffoldIR } from "./scaffolder/index.js";
 export type { ScaffolderServiceOptions } from "./scaffolder/index.js";
 
 // Issue #21 — Pattern-library loader.
 export { loadPatterns, getPatterns, getById } from "./pattern-library/index.js";
 export type { PatternFilter, LoadReport } from "./pattern-library/index.js";
-
-// Issue #248 — Sprint-1 identity stub mutator (deleted at Sprint-2 start per #238).
-export { applyIdentityStubMutation } from "./stub-mutator/index.js";
 
 // Issue #141 — character discovery service (Phase B).
 // Public surface: factory + injectable types only.

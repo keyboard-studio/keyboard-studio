@@ -2,6 +2,7 @@
 
 import type { VirtualFS } from "./virtualFS";
 import type { BaseKeyboard } from "./baseKeyboard";
+import type { KeyboardIR } from "./keyboard-ir";
 
 /**
  * Three-group routing identifier per spec §9. The scaffolder picks a
@@ -25,6 +26,18 @@ export interface ScaffoldOptions {
    * @see spec.md §9
    */
   group?: RoutingGroup;
+
+  /**
+   * Pre-parsed KeyboardIR for the base keyboard. When supplied, the scaffolder
+   * uses this IR directly instead of re-parsing the .kmn text fetched into the
+   * VFS. Useful when the caller has already parsed the source (e.g. during an
+   * import flow) and wants to avoid a second parse.
+   *
+   * When omitted, the scaffolder parses the .kmn text it fetches.
+   *
+   * @see spec.md §5a (KeyboardIR)
+   */
+  ir?: KeyboardIR;
 }
 
 /**

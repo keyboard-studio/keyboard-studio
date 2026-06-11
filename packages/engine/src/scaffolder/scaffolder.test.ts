@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { createScaffolderService } from "./index.js";
+import { createScaffolderService, scaffoldIR } from "./index.js";
 import { runAllChecks } from "../validator/index.js";
+import { parse, emit } from "../codec/index.js";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 
 const BASE_KMN = `store(&NAME) 'Base Keyboard'
@@ -359,7 +360,10 @@ describe("scaffold — additional coverage", () => {
     const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
     const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
     const content = vfs.get("source/my_keyboard.kmn")!.content as string;
-    const count = (content.match(/store\(&CasedKeys\)/g) ?? []).length;
+    // emit() normalizes system-store names to uppercase (parseStoreLine uppercases them),
+    // so &CasedKeys from the base .kmn appears as &CASEDKEYS in canonical emit; use
+    // case-insensitive match to check idempotency (exactly one store, not two).
+    const count = (content.match(/store\(&casedkeys\)/gi) ?? []).length;
     expect(count).toBe(1);
   });
 
@@ -417,5 +421,141 @@ group(main) using keys
     const shiftLayer = data.tablet.layer.find((l) => l.id === "shift");
     const shiftKey = shiftLayer!.row[0].key[0];
     expect(shiftKey.nextlayer).toBe("default");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AC integration (scaffold-over-IR)
+// ---------------------------------------------------------------------------
+
+/** A mock base .kmn that includes NCAPS + [CAPS ...] rules so the hasCaps gate fires. */
+const INTEGRATION_BASE_KMN = `store(&NAME) 'Base Keyboard'
+store(&COPYRIGHT) 'Copyright © 2020 Base Author'
+store(&VERSION) '5.0'
+store(&KEYBOARDVERSION) '1.0'
+store(&TARGETS) 'any'
+begin Unicode > use(main)
+group(main) using keys
+NCAPS + [CAPS K_A] > 'A'
++ [K_A] > 'a'
+`;
+
+describe("scaffold — AC integration (scaffold-over-IR)", () => {
+  it("(a) emitted .kmn contains store(&NAME) with the display name", async () => {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(INTEGRATION_BASE_KMN));
+      return Promise.resolve(makeNotFoundResponse());
+    });
+    const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+    const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
+    const content = vfs.get("source/my_keyboard.kmn")!.content as string;
+    // Canonical emit form: store(&NAME) '<displayName>' where chars are emitted as char-run
+    expect(content).toContain("store(&NAME) 'My Keyboard'");
+  });
+
+  it("(b) no NCAPS substring remains in the emitted .kmn", async () => {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(INTEGRATION_BASE_KMN));
+      return Promise.resolve(makeNotFoundResponse());
+    });
+    const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+    const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
+    const content = vfs.get("source/my_keyboard.kmn")!.content as string;
+    expect(content).not.toContain("NCAPS");
+  });
+
+  it("(c) store(&CasedKeys) present with [K_A]..[K_Z] for qwerty group", async () => {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(INTEGRATION_BASE_KMN));
+      return Promise.resolve(makeNotFoundResponse());
+    });
+    const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+    const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
+    const content = vfs.get("source/my_keyboard.kmn")!.content as string;
+    expect(content).toContain("store(&CasedKeys) [K_A]..[K_Z]");
+  });
+
+  it("(d) header.keyboardId is reset on the output IR (via scaffoldIR directly)", () => {
+    const ir = parse(INTEGRATION_BASE_KMN, "base_keyboard").ir;
+    const outIr = scaffoldIR(ir, "new_id", "New Name", { group: "qwerty-qwertz" });
+    expect(outIr.header.keyboardId).toBe("new_id");
+  });
+
+  it("(e) scaffoldIR is a pure function — input IR is not mutated", () => {
+    const ir = parse(INTEGRATION_BASE_KMN, "base_keyboard").ir;
+    const originalRuleCount = ir.groups[0]?.rules.length ?? 0;
+    scaffoldIR(ir, "new_id", "New Name", { group: "qwerty-qwertz" });
+    expect(ir.groups[0]?.rules.length ?? 0).toBe(originalRuleCount);
+  });
+
+  it("(f) parse -> scaffoldIR -> emit round-trip produces valid KMN (no validator findings)", () => {
+    const ir = parse(INTEGRATION_BASE_KMN, "base_keyboard").ir;
+    const outIr = scaffoldIR(ir, "my_keyboard", "My Keyboard", { group: "qwerty-qwertz" });
+    const kmn = emit(outIr);
+    const findings = runAllChecks(kmn);
+    expect(findings).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// scaffoldIR — raw-fragment CAPS/NCAPS cleanup (focused unit)
+// ---------------------------------------------------------------------------
+
+describe("scaffoldIR — raw-fragment CAPS/NCAPS branch", () => {
+  /**
+   * Build a minimal KeyboardIR with empty groups but a `raw` array containing
+   * two RawKmnFragment entries: one with [CAPS (should be dropped) and one
+   * with NCAPS  (should have the modifier stripped, fragment kept).
+   */
+  function makeIrWithRawFragments(): ReturnType<typeof parse>["ir"] {
+    // Parse a minimal KMN so we get a well-formed IR to clone from.
+    const base = parse(
+      "store(&NAME) 'Test'\nstore(&KEYBOARDVERSION) '1.0'\nbegin Unicode > use(main)\ngroup(main) using keys\n",
+      "test_raw"
+    ).ir;
+
+    const capsFragment = {
+      nodeId: "raw-caps",
+      origin: "imported" as const,
+      sourceText: "NCAPS + [CAPS K_A] > 'x'",
+      reason: "indexed context(n)",
+    };
+    const ncapsFragment = {
+      nodeId: "raw-ncaps",
+      origin: "imported" as const,
+      sourceText: "NCAPS + [K_B] > 'y'",
+      reason: "indexed context(n)",
+    };
+
+    return { ...base, raw: [capsFragment, ncapsFragment] };
+  }
+
+  it("(a) removes raw fragments whose sourceText contains [CAPS", () => {
+    const ir = makeIrWithRawFragments();
+    const out = scaffoldIR(ir, "test_id", "Test Name", { group: "qwerty-qwertz" });
+    const hasCapsFragment = out.raw.some((f) => f.sourceText.includes("[CAPS"));
+    expect(hasCapsFragment).toBe(false);
+  });
+
+  it("(b) strips NCAPS  prefix from surviving raw fragments", () => {
+    const ir = makeIrWithRawFragments();
+    const out = scaffoldIR(ir, "test_id", "Test Name", { group: "qwerty-qwertz" });
+    // The [CAPS fragment is removed; the NCAPS-only fragment survives with the modifier stripped.
+    const survivingFragment = out.raw.find((f) => f.nodeId === "raw-ncaps");
+    expect(survivingFragment).toBeDefined();
+    expect(survivingFragment!.sourceText).not.toContain("NCAPS ");
+    expect(survivingFragment!.sourceText).toContain("[K_B] > 'y'");
+  });
+
+  it("(c) does not mutate the input IR in place (referential check on raw array)", () => {
+    const ir = makeIrWithRawFragments();
+    const originalRaw = ir.raw;
+    const originalFragment0 = ir.raw[0];
+    scaffoldIR(ir, "test_id", "Test Name", { group: "qwerty-qwertz" });
+    // Input raw array reference must be unchanged
+    expect(ir.raw).toBe(originalRaw);
+    expect(ir.raw[0]).toBe(originalFragment0);
+    // Original sourceText must not have been modified
+    expect(ir.raw[0]!.sourceText).toBe("NCAPS + [CAPS K_A] > 'x'");
   });
 });

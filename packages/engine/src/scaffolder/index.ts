@@ -3,6 +3,7 @@ import type {
   ScaffoldOptions,
   ScaffoldResult,
   RoutingGroup,
+  KeyboardIR,
 } from "@keyboard-studio/contracts";
 import type { BaseKeyboard, VirtualFS } from "@keyboard-studio/contracts";
 import {
@@ -10,6 +11,11 @@ import {
   validateKeyboardId as contractsValidateKeyboardId,
 } from "@keyboard-studio/contracts";
 import { fetchKeyboardSourceToVfs, type FetchFn } from "../loader/fetchKeyboardSourceToVfs.js";
+import { parse, emit } from "../codec/index.js";
+import { mutateStripNcaps } from "./mutations/ncaps.js";
+import { mutateDeleteCapsRules } from "./mutations/caps-rules.js";
+import { mutateInsertCasedKeys } from "./mutations/cased-keys.js";
+import { mutateIdentity } from "./mutations/identity.js";
 
 export interface ScaffolderServiceOptions {
   proxyBase?: string;
@@ -24,10 +30,7 @@ function sanitizeDisplayName(raw: string): string {
     .trim();
 }
 
-// In KMN, single-quoted strings have no escape sequence; U+2019 is the typographic equivalent.
-function kmnStringEscape(s: string): string {
-  return s.replace(/'/g, "’");
-}
+import { kmnStringEscape } from "./kmn-utils.js";
 
 function escapeHtml(s: string): string {
   return s
@@ -52,60 +55,60 @@ function detectGroup(base: BaseKeyboard): RoutingGroup {
   return "qwerty-qwertz";
 }
 
-function applyKmnTransforms(
-  content: string,
-  group: RoutingGroup,
-  displayName: string
-): string {
-  const year = new Date().getFullYear();
+/**
+ * Apply the four IR-level .kmn cleanup mutations and identity propagation to
+ * produce a scaffolded KeyboardIR.
+ *
+ * Composition order:
+ *   1. Detect whether the IR has any CAPS rules (the gate for caps-cleanup).
+ *   2. If hasCaps: strip NCAPS modifiers, delete CAPS rules, insert &CasedKeys.
+ *   3. Always: propagate identity (NAME, COPYRIGHT, VERSION, KEYBOARDVERSION, header).
+ *
+ * @param ir          Base keyboard IR (not mutated in-place — all mutations are pure).
+ * @param keyboardId  New keyboard identifier.
+ * @param displayName Sanitized display name (apostrophes will be escaped inside mutateIdentity).
+ * @param opts        { group } routing variant.
+ */
+export function scaffoldIR(
+  ir: KeyboardIR,
+  keyboardId: string,
+  displayName: string,
+  opts: { group: RoutingGroup }
+): KeyboardIR {
+  const { group } = opts;
 
-  const hasCaps = content.split("\n").some((line) => line.includes("[CAPS"));
-  let result = content;
+  const hasCaps =
+    // Check typed group rules
+    ir.groups.some((g) =>
+      g.rules.some((r) =>
+        r.context.some(
+          (e) =>
+            e.kind === "vkey" &&
+            (e.modifiers.includes("CAPS") || /^CAPS\b/.test(e.name))
+        )
+      )
+    ) ||
+    // Also check raw fragments (rules placed before `begin` in source end up
+    // as RawKmnFragments; we still need to detect CAPS there).
+    ir.raw.some((frag) => frag.sourceText.includes("[CAPS"));
 
+  let out = ir;
   if (hasCaps) {
-    result = result.replace(/NCAPS /g, "");
-    result = result
-      .split("\n")
-      .filter((line) => !line.includes("[CAPS"))
-      .join("\n");
-
-    const lines = result.split("\n");
-    const noExistingCasedKeys = !lines.some((l) => l.includes("store(&CasedKeys)"));
-    if (noExistingCasedKeys && group !== "non-roman") {
-      const casedKeysValue =
-        group === "azerty"
-          ? "[K_A]..[K_Z] [K_0]..[K_9] [K_HYPHEN] [K_EQUAL] [K_LBRKT] [K_RBRKT] [K_BKSLASH] [K_QUOTE] [K_COMMA] [K_PERIOD] [K_SLASH] [K_COLON]"
-          : "[K_A]..[K_Z]";
-      const versionIdx = lines.findIndex((l) => l.includes("&KEYBOARDVERSION"));
-      if (versionIdx !== -1) {
-        lines.splice(versionIdx + 1, 0, `store(&CasedKeys) ${casedKeysValue}`);
-      }
-      result = lines.join("\n");
-    } else {
-      result = lines.join("\n");
+    out = mutateStripNcaps(out);
+    out = mutateDeleteCapsRules(out);
+    // Rules placed before `begin` in the source end up as RawKmnFragments (the
+    // parser's unknown-pre-begin path). Apply the same CAPS cleanup to raw
+    // fragments so the emitted text is also clean.
+    const filteredRaw = out.raw
+      .filter((frag) => !frag.sourceText.includes("[CAPS"))
+      .map((frag) => ({ ...frag, sourceText: frag.sourceText.replace(/NCAPS /g, "") }));
+    if (filteredRaw.length !== out.raw.length || filteredRaw.some((f, i) => f.sourceText !== out.raw[i]?.sourceText)) {
+      out = { ...out, raw: filteredRaw };
     }
+    out = mutateInsertCasedKeys(out, group);
   }
-
-  result = result
-    .split("\n")
-    .map((line) => {
-      if (/^\s*store\s*\(\s*&NAME\s*\)/i.test(line)) {
-        return `store(&NAME) '${kmnStringEscape(displayName)}'`;
-      }
-      if (/^\s*store\s*\(\s*&COPYRIGHT\s*\)/i.test(line)) {
-        return `store(&COPYRIGHT) 'Copyright © ${year} ${kmnStringEscape(displayName)}'`;
-      }
-      if (/^\s*store\s*\(\s*&VERSION\s*\)/i.test(line)) {
-        return `store(&VERSION) '1.0'`;
-      }
-      if (/^\s*store\s*\(\s*&KEYBOARDVERSION\s*\)/i.test(line)) {
-        return `store(&KEYBOARDVERSION) '1.0'`;
-      }
-      return line;
-    })
-    .join("\n");
-
-  return result;
+  out = mutateIdentity(out, keyboardId, displayName);
+  return out;
 }
 
 function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: string): void {
@@ -134,6 +137,13 @@ function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: string): v
   }
 }
 
+/**
+ * Touch-layout cleanup remains a JSON/VFS op, not a KeyboardIR mutation,
+ * because the codec's parseTouchLayout is parse-only and lossy (drops `sp`,
+ * needed here) and there is no emitTouchLayout.
+ * TODO(touch-layout): convert to an IR-native mutation once the codec gains a lossless
+ * touch-layout emitter (parseTouchLayout currently drops sp and there is no emitTouchLayout).
+ */
 function applyTouchLayoutCleanup(vfs: VirtualFS, keyboardId: string): void {
   const path = `source/${keyboardId}.keyman-touch-layout`;
   const entry = vfs.get(path);
@@ -304,11 +314,24 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
 
       const kmnEntry = vfs.get(`source/${actualBaseId}.kmn`);
       if (kmnEntry !== undefined && typeof kmnEntry.content === "string") {
-        const transformed = applyKmnTransforms(kmnEntry.content, group, displayName);
-        vfs.set(`source/${actualBaseId}.kmn`, transformed);
+        try {
+          // Use a pre-parsed IR if the caller supplied one, otherwise parse
+          // the .kmn text fetched into the VFS.
+          const ir = scaffoldOpts?.ir ?? parse(kmnEntry.content, actualBaseId).ir;
+          const outIr = scaffoldIR(ir, keyboardId, displayName, { group });
+          const kmn = emit(outIr);
+          // renameFilesInVfs below handles the .kmn rename too; setting explicitly
+          // here is effectively redundant (rename will overwrite) but makes the
+          // post-emit state consistent immediately — left intentionally.
+          vfs.set(`source/${actualBaseId}.kmn`, kmn);
+        } catch {
+          // If parse/emit fails (malformed base .kmn), leave the raw text in the VFS
+          // so the rename + stub path can still produce a usable result.
+        }
       }
 
       renameFilesInVfs(vfs, actualBaseId, keyboardId);
+      // Touch-layout cleanup remains a JSON/VFS op (see applyTouchLayoutCleanup JSDoc).
       applyTouchLayoutCleanup(vfs, keyboardId);
       generateStubs(vfs, keyboardId, displayName);
 
