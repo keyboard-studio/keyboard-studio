@@ -823,7 +823,7 @@
     "section": "12. Language tagging (BCP47)",
     "band": "red-checklist",
     "description": "A flagged script mismatch has been submitted to langtags",
-    "preSubmitChecklistText": "If a script mismatch was flagged, I have submitted it to langtags."
+    "preSubmitChecklistText": "If a script mismatch was flagged, I have opened an issue at github.com/silnrsi/langtags documenting the mismatch."
   },
   {
     "id": "13.1-pua-keyboard-in-experimental",
