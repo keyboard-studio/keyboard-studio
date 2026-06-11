@@ -31,15 +31,6 @@ const baseKb: BaseKeyboard = {
 };
 
 describe("CharacterDiscoveryServiceImpl.pickerCandidates", () => {
-  const latnBase: BaseKeyboard = {
-    id: "basic_kbdus",
-    path: "release/b/basic_kbdus",
-    script: "Latn",
-    targets: ["windows"],
-    displayName: "US English",
-    version: "1.0",
-  };
-
   const unknownBase: BaseKeyboard = {
     id: "unknown_kb",
     path: "release/u/unknown_kb",
@@ -50,7 +41,7 @@ describe("CharacterDiscoveryServiceImpl.pickerCandidates", () => {
   };
 
   it("bcp47 provided + CLDR returns exemplars → non-ASCII chars present, method=picker, no count", async () => {
-    const result = await frService.pickerCandidates(latnBase, "fr");
+    const result = await frService.pickerCandidates(baseKb, "fr");
     // é (U+00E9) and ñ (U+00F1) should appear
     const chars = result.map((r) => r.char);
     expect(chars).toContain("é");
@@ -62,7 +53,7 @@ describe("CharacterDiscoveryServiceImpl.pickerCandidates", () => {
   });
 
   it("bcp47 provided but CLDR loader returns null → falls back to script block; non-empty for Latn", async () => {
-    const result = await nullService.pickerCandidates(latnBase, "fr");
+    const result = await nullService.pickerCandidates(baseKb, "fr");
     expect(result.length).toBeGreaterThan(0);
     for (const item of result) {
       expect(item.method).toBe("picker");
@@ -70,7 +61,7 @@ describe("CharacterDiscoveryServiceImpl.pickerCandidates", () => {
   });
 
   it("bcp47 absent → uses script block chars; non-empty for Latn", async () => {
-    const result = await nullService.pickerCandidates(latnBase);
+    const result = await nullService.pickerCandidates(baseKb);
     expect(result.length).toBeGreaterThan(0);
     for (const item of result) {
       expect(item.method).toBe("picker");
@@ -78,7 +69,7 @@ describe("CharacterDiscoveryServiceImpl.pickerCandidates", () => {
   });
 
   it("ASCII chars have inBaseOutput: true; non-ASCII chars have inBaseOutput: false", async () => {
-    const result = await frService.pickerCandidates(latnBase, "fr");
+    const result = await frService.pickerCandidates(baseKb, "fr");
     for (const item of result) {
       const cp = item.char.codePointAt(0) ?? 0;
       if (cp <= 0x7e) {
@@ -90,7 +81,7 @@ describe("CharacterDiscoveryServiceImpl.pickerCandidates", () => {
   });
 
   it("result is sorted ascending by codepoint", async () => {
-    const result = await nullService.pickerCandidates(latnBase);
+    const result = await nullService.pickerCandidates(baseKb);
     for (let i = 1; i < result.length; i++) {
       const prev = result[i - 1]!.char.codePointAt(0) ?? 0;
       const curr = result[i]!.char.codePointAt(0) ?? 0;

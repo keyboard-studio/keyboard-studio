@@ -71,6 +71,8 @@ export { applyIdentityStubMutation } from "./stub-mutator/index.js";
 // Issue #141 — character discovery service (Phase B).
 export { createCharacterDiscoveryService } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
 export type { LLMCompleter } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
-export { buildLinguistPrompt, parseLinguistJson, cldrCrossCheck } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
+export { buildLinguistPrompt } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
+export { parseLinguistJson } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
+export { cldrCrossCheck } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
 export type { CldrLoader, ExemplarResult, ParsedUnicodeSet } from "./character-discovery/cldr.js";
 export { createFetchCldrLoader, scriptBlockChars, SCRIPT_BLOCKS, parseUnicodeSet, loadExemplars } from "./character-discovery/cldr.js";

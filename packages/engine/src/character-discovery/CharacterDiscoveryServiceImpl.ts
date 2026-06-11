@@ -292,7 +292,7 @@ export class CharacterDiscoveryServiceImpl implements CharacterDiscoveryService 
     });
 
     return entries.map(([ch, count]) => {
-      // ASCII proxy — full accuracy needs BCP47 on BaseKeyboard
+      // TODO(#141-followup): ASCII proxy — replace with actual base-keyboard output-set lookup when BCP47 is wired onto BaseKeyboard
       const inBaseOutput = (ch.codePointAt(0) ?? 0) <= 0x7e;
       const item: InventoryChar = {
         char: ch,
