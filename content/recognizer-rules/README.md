@@ -11,7 +11,7 @@ scaffolder.
 
 `content/recognizer-rules/` defines how to *find* patterns in an existing
 keyboard's `KeyboardIR`. A recognizer rule YAML is used by the recognizer engine
-(issue #234) at import time. Each rule:
+(`packages/engine/src/recognizer/`) at import time. Each rule:
 
 1. Describes an IR node cluster shape (which `IRRule`, `IRStore`, and `IRGroup`
    field values indicate "this is an S-02 deadkey family").
@@ -21,12 +21,14 @@ keyboard's `KeyboardIR`. A recognizer rule YAML is used by the recognizer engine
 Recognition is a separate pass from authoring. A user may start a session from
 an imported keyboard (IR already exists) instead of from the survey.
 
-## Format status (provisional — pending issue #232)
+## Format status — ratified: TypeScript (issue #232 closed)
 
-The YAML format in this directory is **provisional**. Issue #232 will ratify the
-final rule format (TypeScript predicates vs. content YAML vs. both). The
-current files use structured YAML predicate blocks designed to convert cleanly
-to TypeScript predicates without structural rework.
+Issue #232 closed and ratified **TypeScript predicates** as the canonical rule format. The YAML files in this directory (`s01-direct-substitution.yaml`, `s02-deadkey-single-tap.yaml`) are **reference documentation** — design notes that informed the decision and serve as pre-work for issue #273. They are not parsed by any code.
+
+The working recognizer rules are TypeScript files in `packages/engine/src/recognizer/rules/`. Implement new rules by implementing the `RecognizerRule` interface from `packages/engine/src/recognizer/types.ts`.
+
+<details>
+<summary>Historical YAML format (reference only — not parsed)</summary>
 
 Fields in each file:
 
@@ -82,9 +84,11 @@ lifts_to:
       transform: <optional>       # e.g. "store_items_to_string"
 ```
 
+</details>
+
 ## File naming
 
-Files are named `s<NN>-<strategy-slug>.yaml`, matching the S-XX identifier in
+The reference YAML files in this directory are named `s<NN>-<strategy-slug>.yaml`, matching the S-XX identifier in
 `spec.md §7.3`. This makes the priority order from issue #240 immediately
 visible in a directory listing.
 
@@ -100,12 +104,9 @@ visible in a directory listing.
 
 ## Adding a new rule
 
-1. Read the matching Pattern YAML in `content/patterns/` to understand the
-   pattern's slot structure.
-2. Read the IR type definitions in
-   `packages/contracts/src/keyboard-ir.ts` to understand the node shapes.
-3. Find at least two keyboards in `content/scan_report.md` that use this
-   pattern; read their source `.kmn` to confirm the cluster shape.
-4. Author the YAML using the predicate block structure above.
-5. Add the keyboard IDs to `corpus_evidence.keyboards`.
-6. Open a PR with `refs #232` and request km-domain and km-keyman review.
+1. Read the matching Pattern in `content/patterns/` for the slot structure.
+2. Read `packages/engine/src/recognizer/types.ts` for the `RecognizerRule` interface.
+3. Implement `match(ir: KeyboardIR): MatchResult[]` and `lift(match: MatchResult): Pattern` in a new file under `packages/engine/src/recognizer/rules/s<NN>-<slug>.ts`.
+4. Register the new rule in the recognizer's rule registry.
+5. Add unit tests alongside the rule file.
+6. The YAML files in this directory may serve as design notes when authoring new rules.
