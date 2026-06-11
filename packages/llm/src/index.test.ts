@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createLLMClient } from "./client.js";
+import { DEFAULT_MODEL } from "./backends/base.js";
 
 // ---------------------------------------------------------------------------
 // Mock @anthropic-ai/sdk
@@ -173,5 +174,17 @@ describe("createLLMClient", () => {
 
     // The first chunk must have been yielded before the error
     expect(chunks).toEqual(["first chunk"]);
+  });
+
+  // 9. Omitting config.model resolves to DEFAULT_MODEL (cost guard — refs #290)
+  it("omitting config.model uses DEFAULT_MODEL", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-test-key");
+    mockCreate.mockResolvedValueOnce(makeTextResponse("ok"));
+
+    const client = createLLMClient({ mode: "prod-api" });
+    await client.complete("ping");
+
+    const callArg = mockCreate.mock.calls[0][0] as { model: string };
+    expect(callArg.model).toBe(DEFAULT_MODEL);
   });
 });

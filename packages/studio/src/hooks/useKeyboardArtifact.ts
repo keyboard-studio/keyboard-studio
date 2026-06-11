@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { BaseKeyboard, VirtualFS } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { LOCAL_PROXY_BASE } from "../lib/services.ts";
+import { useIRStore } from "../stores/irStore.ts";
 
 interface EngineModule {
   compile: (fs: VirtualFS, keyboardId: string) => Promise<CompileResult>;
@@ -13,6 +14,8 @@ interface EngineModule {
   ) => Promise<{ options?: Record<string, unknown>; filesLoaded?: string[]; warnings?: string[] }>;
   init: () => Promise<void>;
   isReady?: () => boolean;
+  parseKmn?: (text: string, keyboardId: string) => { ir: KeyboardIR; opaqueFeatures: Array<{ feature: string; count: number }> };
+  recognizePatterns?: (ir: KeyboardIR) => { ir: KeyboardIR; recognizedRatio: number };
 }
 
 async function loadEngine(): Promise<EngineModule | null> {
@@ -136,11 +139,25 @@ export function useKeyboardArtifact(
 
     let result: CompileResult;
     try {
-      result = await engineRef.current!.compile(vfs, kb.id);
+      const kmnPath = vfs.list().find((p) => p.endsWith('.kmn'));
+      const kmnText = kmnPath ? (vfs.get(kmnPath)!.content as string) : '';
+
+      const [compileResult, parseResult] = await Promise.all([
+        engineRef.current!.compile(vfs, kb.id),
+        Promise.resolve().then(() => {
+          if (!engineRef.current!.parseKmn || !engineRef.current!.recognizePatterns || !kmnPath) return null;
+          const pr = engineRef.current!.parseKmn(kmnText, kb.id);
+          const recognized = engineRef.current!.recognizePatterns(pr.ir);
+          return { ...pr, ir: recognized.ir };
+        }),
+      ]);
+      result = compileResult;
+      if (parseResult) {
+        useIRStore.getState().setIR(parseResult.ir);
+      }
     } catch (err: unknown) {
       if (runId.current !== thisRunId) return;
-      const message =
-        err instanceof Error ? err.message : "Unknown compile error";
+      const message = err instanceof Error ? err.message : 'Unknown compile error';
       setStage({ kind: "error", step: "compile", message });
       return;
     }
@@ -180,9 +197,11 @@ export function useKeyboardArtifact(
   useEffect(() => {
     if (baseKeyboard === null) {
       setStage({ kind: "idle" });
+      useIRStore.getState().clearIR();
       return;
     }
 
+    useIRStore.getState().clearIR();
     const thisRunId = ++runId.current;
     void run(baseKeyboard, thisRunId);
   }, [baseKeyboard, run]);

@@ -55,11 +55,6 @@ function deadkeyName(id: number): string {
   return "dk_" + id.toString(16).toUpperCase().padStart(4, "0");
 }
 
-// Format a deadkey id as U+XXXX.
-function deadkeyUPlus(id: number): string {
-  return "U+" + id.toString(16).toUpperCase().padStart(4, "0");
-}
-
 // Pick the "primary" trigger for naming: prefer the unshifted vkey trigger.
 function pickPrimaryTrigger(triggers: IRRule[]): IRRule {
   const unshifted = triggers.find((r) => {
@@ -72,8 +67,11 @@ function pickPrimaryTrigger(triggers: IRRule[]): IRRule {
 function triggerKeyName(rule: IRRule): string {
   const ctx = rule.context[0];
   if (ctx === undefined) return "";
-  if (ctx.kind === "vkey") return ctx.name;
-  // char trigger — return the char value
+  if (ctx.kind === "vkey") {
+    const mods = ctx.modifiers.length > 0 ? ctx.modifiers.join(" ") + " " : "";
+    return `${mods}${ctx.name}`;
+  }
+  // TODO: char-context triggers need a dedicated AnswerType (follow-up issue).
   if (ctx.kind === "char") return ctx.value;
   return "";
 }
@@ -98,6 +96,7 @@ function buildPattern(match: MatchResult): Pattern {
       {
         id: "deadkeyName",
         prompt: "Internal deadkey name",
+        // "text" not "store-content": holds a short identifier like dk_0060, not a store body.
         answerType: "text",
         default: match.slotValues["deadkeyName"] ?? "",
       },
@@ -113,16 +112,10 @@ function buildPattern(match: MatchResult): Pattern {
         answerType: "char-list",
         default: match.slotValues["accentedForms"] ?? "",
       },
-      {
-        id: "accentChar",
-        prompt: "Accent character codepoint (U+XXXX form)",
-        answerType: "text",
-        default: match.slotValues["accentChar"] ?? "",
-      },
     ],
     kmnFragment:
       "+ [{{triggerKey}}] > dk({{deadkeyName}})\n" +
-      "dk({{deadkeyName}}) any({{baseLetters}}) > index({{accentedForms}}, 2)",
+      "dk({{deadkeyName}}) + any({{baseLetters}}) > index({{accentedForms}}, 2)",
     tests: [],
     validatedForFamilies: [],
     sourceKeyboards: [],
@@ -223,7 +216,6 @@ export const s02Recognizer: RecognizerRule = {
           deadkeyName: deadkeyName(dkId),
           baseLetters: storeItemsToString(baseStore),
           accentedForms: storeItemsToString(outStore),
-          accentChar: deadkeyUPlus(dkId),
         },
       });
     }

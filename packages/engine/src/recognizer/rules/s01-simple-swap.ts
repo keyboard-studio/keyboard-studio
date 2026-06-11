@@ -16,7 +16,7 @@ function toUPlus(value: string): string {
 }
 
 // Format one rule line for the keystrokeCharacterMap slot.
-// e.g. [SHIFT K_Q],U+0190  or  [K_Q],U+025B
+// e.g. + [SHIFT K_Q] > U+0190  or  + [K_Q] > U+025B
 function formatMapLine(rule: IRRule): string {
   const ctx = rule.context[0];
   const out = rule.output[0];
@@ -29,7 +29,7 @@ function formatMapLine(rule: IRRule): string {
     return "";
   }
   const mods = ctx.modifiers.length > 0 ? ctx.modifiers.join(" ") + " " : "";
-  return `[${mods}${ctx.name}],${toUPlus(out.value)}`;
+  return `+ [${mods}${ctx.name}] > ${toUPlus(out.value)}`;
 }
 
 function isS01(rule: IRRule, groupName: string): boolean {
@@ -57,8 +57,9 @@ function buildPattern(matchResult: MatchResult): Pattern {
     questions: [
       {
         id: "keystrokeCharacterMap",
-        prompt: "Keystroke-to-character map (one entry per line: [MODS KEY],U+XXXX)",
-        answerType: "store-content",
+        prompt: "Keystroke-to-character map (one entry per line: + [MODS KEY] > U+XXXX)",
+        // "text" not "store-content": slot contains KMN rule lines, not a store body.
+        answerType: "text",
         default: matchResult.slotValues["keystrokeCharacterMap"] ?? "",
       },
     ],
@@ -71,6 +72,8 @@ function buildPattern(matchResult: MatchResult): Pattern {
   });
 }
 
+const S01_MAX_DISTINCT_KEYS = 5; // spec §7.3 S-01: at most 5 extra characters
+
 export const s01Recognizer: RecognizerRule = {
   id: "s01-simple-swap",
   strategyId: "S-01",
@@ -81,6 +84,15 @@ export const s01Recognizer: RecognizerRule = {
     for (const group of ir.groups) {
       const matchingRules = group.rules.filter((r) => isS01(r, group.name));
       if (matchingRules.length === 0) continue;
+
+      // Guard: spec §7.3 S-01 card says "1–5 extra characters" (≤5 inclusive); skip groups with more than 5 distinct base keys.
+      const distinctBaseNames = new Set(
+        matchingRules
+          .map((r) => r.context[0])
+          .filter((ctx): ctx is NonNullable<typeof ctx> & { kind: "vkey" } => ctx?.kind === "vkey")
+          .map((ctx) => ctx.name),
+      );
+      if (distinctBaseNames.size > S01_MAX_DISTINCT_KEYS) continue;
 
       const lines = matchingRules
         .map(formatMapLine)

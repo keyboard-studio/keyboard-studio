@@ -11,11 +11,8 @@ import { useEffect, useState, type ReactNode, type CSSProperties } from "react";
 import { PreviewShell } from "./components/PreviewShell.tsx";
 import { PhaseA, PhaseB, PhaseF } from "./survey/index.ts";
 import type { SurveyContext } from "./survey/types.ts";
-// ---------------------------------------------------------------------------
-// Route types
-// ---------------------------------------------------------------------------
-
-type RouteId = "pick-base" | "survey" | "gallery" | "preview" | "output";
+import { CarveGallery } from "./components/CarveGallery.tsx";
+import { type RouteId } from "./lib/navigate.ts";
 
 const VALID_ROUTES = new Set<RouteId>([
   "pick-base",
@@ -271,7 +268,7 @@ export function StudioShell() {
       content = <SurveyView />;
       break;
     case "gallery":
-      content = <RoutePlaceholder title="Gallery" />;
+      content = <CarveGallery />;
       break;
     case "preview":
       content = <RoutePlaceholder title="Preview" />;

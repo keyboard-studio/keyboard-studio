@@ -52,7 +52,7 @@ Design session to settle before the survey renderer is extended beyond identity 
 **#234** `feat(engine): Pattern recognizer — lift IR node clusters into Patterns with origin='recognized'` — *todo*
 Consumes content's #240 rule curation (S-01..S-09). Walk the IR after codec parse, run the curated rules, attach a `Pattern[]` with `origin: "recognized"` to `KeyboardIR.recognizedPatterns`.
 
-**#235** `feat(studio): Carve gallery — keep/edit/delete card view over the working IR` — *todo*
+**#235** `feat(studio): Carve gallery — keep/edit/delete card view over the working IR` — *in PR*
 Scrollable card UI over `KeyboardIR.recognizedPatterns + originBlocks`. The user keeps/edits/deletes patterns from the imported keyboard.
 
 **#38** `feat(studio): gallery rendering shell with mini-keyboard demo cards` — *todo*

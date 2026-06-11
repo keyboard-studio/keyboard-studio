@@ -551,6 +551,7 @@ Substitution is deterministic and reproducible: given the same answer map, the s
 ## 7. Strategy selection
 
 *Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
+*Revised 2026-06-11 (v1.1.1 placement priors). See [docs/spec-amendment-2026-06-11-placement-priors.md](docs/spec-amendment-2026-06-11-placement-priors.md).*
 
 Character coverage is **not** "simple substitution." Choosing how a character is output — a bare key swap, a deadkey-then-base composition, an ASCII transliteration, a tone cycle, a context-sensitive cluster, an OS IME callout — is the core decision the studio makes for the user. This section is that recommendation engine.
 
@@ -688,6 +689,7 @@ group(main) using keys
 **When to avoid:** When the diacritic should *replace* a previous one (S-07); when many families explode the table (S-06).
 **Combines well with:** S-04 (collapse the post-deadkey table); S-08 (when the trigger needs RAlt); S-11 (when the keyboard toggles between orthographic variants at runtime).
 **Pattern mapping:** `strategyId: "S-02"`; `combinesWith: ["S-04", "S-08", "S-11"]`. (This is the Sec 6 worked example, `latin_deadkey_acute_single`.)
+**Placement semantics:** the trigger key is the placement decision. Prefer the key users already associate with the diacritic family (`'` acute, `` ` `` grave, `^` circumflex, `"` diaeresis, `~` tilde); when that key is occupied or absent on the base layout, fall back along the anchor cascade to nearby low-frequency punctuation. A corpus prior (Sec 7.6) overrides the default when independent same-script-class keyboards converge on a different trigger.
 
 ```
 store(graveK) 'aeiouAEIOU'
@@ -738,6 +740,7 @@ dk(family) + any(K_lc1) > index(lc1, 2)
 **When to avoid:** When the user doesn't know the romanization scheme (S-02/S-06 with visual deadkey feedback is gentler).
 **Combines well with:** S-04, S-09 (script also needs cluster rules), S-11 (two romanization schemes).
 **Pattern mapping:** `strategyId: "S-05"`; `combinesWith: ["S-04", "S-09", "S-11"]`.
+**Placement semantics:** the key→character table *is* the placement. Seed it from the romanization scheme the community already knows (corpus priors from same-script transliteration keyboards, e.g. the ITRANS family); never invent a novel scheme when an established one exists. Case pairs must stay on one key (shift-pair consistency is a hard constraint).
 
 ```
 + "a"      > "अ"
@@ -753,6 +756,7 @@ dk(family) + any(K_lc1) > index(lc1, 2)
 **When to avoid:** A single diacritic family (S-02 suffices); when the user can't predict the family key.
 **Combines well with:** S-04 (essential for the per-family table), S-08 (RAlt to host the family keys), S-11 (when the keyboard toggles between orthographic variants at runtime).
 **Pattern mapping:** `strategyId: "S-06"`; `combinesWith: ["S-04", "S-08", "S-11"]`.
+**Placement semantics:** the first-tier *family* keys are the placement decision; second-tier base keys follow the base layout. Choose family keys the same way as S-02 triggers (diacritic-mnemonic punctuation first), hosting them on RAlt when the base plane is booked. The corpus prior (Sec 7.6) reports which family keys real S-06 keyboards chose for the same script class.
 
 ```
 + [K_LBRKT]                > dk(family_grave)
@@ -770,6 +774,7 @@ dk(family_acute) + any(K_vowels) > index(acute_out, 2)
 **When to avoid:** Genuinely stacked diacritics (S-02); when cycle order isn't obvious (use explicit tone keys).
 **Combines well with:** S-04 (parallel stores per tone state), smart-backspace (Sec 7.4.A).
 **Pattern mapping:** `strategyId: "S-07"`; `combinesWith: ["S-04"]`.
+**Placement semantics:** the cycle key is pressed at very high frequency, so ergonomics outranks mnemonics here — prefer strong-finger, home-adjacent keys. Where an established convention exists (TELEX `s`/`f`/`r`/`x`/`j` for Vietnamese tones — context-guarded bindings: the tone rule fires only after a vowel, so plain consonant typing is unaffected), it is effectively mandatory; diverging from a community's existing cycle keys is an escalation, not a default.
 
 ```
 store(vowels)       'aeiou'
@@ -789,6 +794,7 @@ any(vowels_sac) + 'f' > index(vowels_huyen, 1)    c f swaps acute → grave
 **When to avoid:** As a primary strategy. Discoverability is poor; on macOS, RAlt collides with Option-key shortcuts.
 **Combines well with:** Every primary strategy.
 **Pattern mapping:** `strategyId: "S-08"`; offered only as a secondary (rule 10).
+**Placement semantics:** none of its own (intentionally — S-08 is an add-on layer, not a placement-driving strategy); character placement *within* the RAlt layer follows the primary strategy's semantics and the Sec 7.6 priors.
 
 ```
 + [RALT K_SLASH]   > U+0301
@@ -804,6 +810,7 @@ any(vowels_sac) + 'f' > index(vowels_huyen, 1)    c f swaps acute → grave
 **When to avoid:** Purely alphabetic Latin/Cyrillic (S-02 / S-05 are simpler).
 **Combines well with:** S-05 (romanized input), S-04 (consonant/matra tables), smart-backspace (Sec 7.4.A).
 **Pattern mapping:** `strategyId: "S-09"`; `combinesWith: ["S-05", "S-04"]`.
+**Placement semantics:** allocate base-consonant slots first, on the phonetic grid the script community already uses (corpus priors from same-script keyboards dominate; shaping-engine and font expectations make divergence costly — see the precedence rule in Sec 7.6). Vowel signs / matras are secondary and ride post-base keys or deadkeys; cluster triggers (reph, halant) follow the script's established convention.
 
 ```
 any(ConsonantsU) + "R" > U+0930 U+094D index(ConsonantsU, 1)
@@ -980,11 +987,30 @@ Once import lands, the validation pass also runs against each exemplar's *import
 | `release/sil/sil_khmer/` | 4 layers: `default`, `shift`, `ctrl-alt`, `shift-ctrl-alt` | ✓ |
 | `release/sil/sil_hebrew/` | 4 layers: `default`, `shift`, `rightalt`, `rightalt-shift` | ✓ |
 
+#### 7.5.1 Corpus evaluation protocol
+
+The hand-enumerated table above is the **seed fixture set**; once the KeyboardIR codec (§5a) and pattern recognizer (§8 step 2) land, the same round-trip runs at corpus scale. For every `release/` keyboard that passes the Layer A' import-fidelity checks: parse to IR, run the recognizer, derive the axis vector from the lifted patterns and IR structure, run the decision tree (§7.2), and compare the tree-selected primary against the dominant `strategyId` among the recognized patterns. Disagreements are emitted as `StrategyDivergence` records in the supportability scanner output (§13). Divergence *clusters* — many keyboards mis-routed the same way — are how the tree finds its next rules: the EuroLatin and IPA mismatches above were found by hand; the corpus pass finds the rest. Isolated divergences are triaged the same way as the known mismatches: the tree may be wrong, or the keyboard may be idiosyncratic — the record carries enough provenance to decide.
+
+### 7.6 Corpus-derived placement priors
+
+*Added 2026-06-11 (v1.1.1). Full analysis: [docs/placement-intelligence-review.md](docs/placement-intelligence-review.md).*
+
+Strategy selection (Sec 7.2) decides **how** characters are entered; this section governs **where** they land — which key, modifier layer, and trigger the seeder proposes. The seeder's first-principles signals (the anchor cascade: NFD base → Unicode name → confusable → visual → phonetic) are complemented by an **empirical prior** mined from `keymanapp/keyboards/release/`: the placements that ~900 working, community-adopted keyboards actually chose.
+
+**Extraction.** A post-pass over the KeyboardIR codec — `emitPlacementMap(ir)` — recovers `(codepoint → key, modifier set, mechanism, BCP47 context, base-layout family)` tuples; the supportability scanner drives it in batch over `release/`, so keyboards failing Layer A' never enter the dataset. Mandatory filters: tag and exclude mnemonic-layout keyboards from the positional dataset; detect undeclared non-US bases (more than 3 letter-key assignments deviating from their US-QWERTY ASCII equivalents — a tunable threshold, calibrated to catch AZERTY's four remapped letter keys without flagging QWERTZ's single Z↔Y swap) and record their placements relative to the inferred base; collapse CAPS/NCAPS rule pairs to one canonical tuple; skip legacy `begin ANSI` groups (rare in current `release/` — mostly a `legacy/` and pre-2010 concern, and usually co-occurring with the mnemonic-layout tag); drop PUA output (U+E000–U+F8FF). The result is a versioned, pinned `placement-priors.json` built offline and shipped as data — never computed in the SPA (same policy as the seeder's vendored Unicode/CLDR data).
+
+**Aggregation and weighting.** For each (codepoint, script class, base-layout family): weight a candidate placement by the number of *independent* keyboards choosing it — fork-copy trees (near-identical rule sets under different names) collapse to one vote; standards-body and long-maintained flagship keyboards earn a bonus; keyboards matching the "free keys filled left-to-right" anti-pattern (codepoint order correlating with QWERTY free-key order) are discarded from the consensus pool. Priors never cross script classes or base families: AZERTY conventions (Francophone-Africa) are real and prescriptive *within* AZERTY, and must not bleed into QWERTY recommendations.
+
+**Blending with first principles.** The seeder ranks candidates: corpus prior (when ≥3 independent sources agree; otherwise the phonetic anchor leads) → phonetic anchor → shift-pair consistency (hard constraint: case pairs share a key) → visual/NFD anchor → base-key preservation (never silently displace a needed base character) → ergonomics tiebreak. Each per-character proposal carries its provenance (`priorSource`, `priorCount` on the placement-map type — fields settled at the same joint session that locks that type) and a ranked candidate list, not a single answer.
+
+**Precedence rule (precedent vs. first principles).** When the prior and the anchor cascade disagree: ≥3 independent converging keyboards → precedent wins, sources cited. Single-origin precedent (one root keyboard everyone copied) → first principles win, but the conflict is shown to the user with both options. For abjads and abugidas, community convention is effectively never overridden — shaping engines, fonts, and OS text stacks assume the converged sequences; a divergent first-principles suggestion is an escalation, not an auto-override. The studio **never resolves a placement conflict silently**: the author is the authority on what their community will adopt, and every proposal is confirmable, provenance-labeled, and overridable (the same *propose → cross-check → confirm* posture as the linguist agent, §8 Phase B).
+
 ---
 
 ## 8. Data flow
 
 *Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
+*Revised 2026-06-11 (v1.1.1 placement priors). See [docs/spec-amendment-2026-06-11-placement-priors.md](docs/spec-amendment-2026-06-11-placement-priors.md).*
 
 1. **Source selection.** The source-selection browser offers the user one of four sources for the session: the bundled US-English fallback (preselected), any `release/basic/*` layout, any other `keymanapp/keyboards/release/` keyboard, or an uploaded `.kmn`. The user picks exactly one. There is no multi-source merge.
 
@@ -997,6 +1023,8 @@ Once import lands, the validation pass also runs against each exemplar's *import
 5. **Survey — Phase A (Identity + routing).** User enters language name, localized language name (autonym), BCP47 tag (with langtags.json lookup), display name, copyright holder. System detects script group (QWERTY/QWERTZ, AZERTY, or non-Roman) from BCP47 + the IR's structural shape and confirms with the user. This routes all subsequent phases. Phase A also surfaces v1's desktop-first authoring posture (Decision 6, Sec 14) — mobile-primary authors are notified that the survey is anchored to physical-keyboard mental-model answers before they invest survey time. The touch layout is still produced in Phase E. Phase A optionally collects **provenance metadata** (`KeyboardProvenance` in `@keyboard-studio/contracts`) — requester identity and contact, language-community representative, speaker count, language status, regions, existing tools, orthography link, casing notes, and free-form notes (the intake fields carried over from the legacy manual request form). Provenance is **non-gating**: it never blocks a phase exit or the submit button, and is serialized into the package / PR body for attribution and contact at output (Sec 12), never into the `.kmn`. The localized name is the one provenance field that may also feed a build artifact (the `.kps` / `welcome.htm` display). This is metadata capture only — it is distinct from the out-of-scope triage tool (Sec 16) and implies no request queue or assignment workflow.
 
 6. **Survey — Phase B (Character coverage + strategy axes).** User pastes or lists target characters. Studio diffs against the IR's output set and, for each new character, the user states which key it lives on and under what modifier. Crucially, this phase also **computes the discovery axes** (Sec 7.1): the character count fixes A1 (scale), the diff and a few plain-language follow-ups fix A3 (phonetic intuition), A4 (diacritic behavior), and A7 (spare-key availability). The output method is **not** assumed to be simple substitution — Phase B feeds the axis vector to the strategy selector (Sec 7.2), which picks the right strategy. A simple one-key-per-character swap (S-01) is only the result when the inventory is tiny and phonetic; larger or diacritic-heavy inventories route to deadkey composition (S-02), mnemonic spelling (S-05), diacritic cycling (S-07), context-sensitive clusters (S-09), and so on.
+
+**Placement proposals.** When a placement map (the seeder output of Sec 7.6) is available for the session, its entries pre-fill the per-character key/modifier questions instead of leaving them blank: above the confidence threshold the proposal renders as an editable pre-fill; below it, as an advisory chip beside an empty field. Every proposal shows its provenance — a corpus citation ("N existing keyboards for similar languages place this here") or an anchor type (decomposition, name, look-alike, phonetic) — and is overridable in place. Collisions (two characters proposed onto the same key+modifier) are surfaced as a single resolve-one question rather than two silent pre-fills. Per-strategy key choices (the S-02 deadkey trigger, S-06 family keys, S-07 cycle key, S-09 consonant grid) follow the **Placement semantics** notes on the corresponding Sec 7.3 cards. The proposal flow never auto-commits: the user confirms or overrides each placement, mirroring the linguist-agent posture (propose → cross-check → confirm) used for the character inventory below.
 
 To seed this phase the studio offers several **character-discovery** methods (`CharacterDiscoveryService`). No single source is assumed available, so the methods are complementary and the inventory may be built from any combination:
 

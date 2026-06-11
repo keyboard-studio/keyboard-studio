@@ -23,21 +23,28 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | --- | --- | --- | --- | --- |
 | akan | `akan` | `ak` | dcshci lab | `../keyboards/release/a/akan` |
 | Alkelang | `alkelang` | `bfd`, `aal`, `agq`, `muc`, `bss`, `aku`, `ael`, `ato`, `azo`, `bbk`, `bfj`, `bwt`, `ksf`, `bkc`, `bqz` … (+263 more) | SOSA Developments | `../keyboards/experimental/a/alkelang` |
+| Amazigh Latin (SIL) | `amazigh_latin` | `auj-Latn`, `swn-Latn`, `siz-Latn`, `cnu-Latn`, `jbe-Latn`, `shi-Latn`, `tzm`, `zgh-Latn`, `kab`, `gha-Latn`, `jbn-Latn`, `sds-Latn`, `gho-Latn`, `oua-Latn`, `tjo-Latn` … (+12 more) | SIL Global | `../keyboards/release/a/amazigh_latin` |
+| Anii | `anii` | `blo-Latn` | Martin Zaske | `../keyboards/release/a/anii` |
 | Arabic Izza | `arabic_izza` | `ar-DZ` | Prof. Abdelmalek Bouhadjera | `../keyboards/release/a/arabic_izza` |
+| Arbore | `arbore` | `arv-Latn`, `amf` | Sophia Ku | `../keyboards/release/a/arbore` |
 | Armenian Mnemonic R | `armenian_mnemonic_r` | `hy` | Tigran Sarukhanyan | `../keyboards/release/a/armenian_mnemonic_r` |
 | Vai (Athinkra) | `athinkra_vai` | `vai` | Jason Glavy | `../keyboards/release/athinkra/athinkra_vai` |
 | Vai Typewriter (Athinkra) | `athinkra_vai_typewriter` | `vai` | Jason Glavy | `../keyboards/release/athinkra/athinkra_vai_typewriter` |
 | Balochi Scientific | `balochi_scientific` | `bal-Latn` | © 2017-2023 SIL International | `../keyboards/release/b/balochi_scientific` |
 | Balochi Urdu | `balochi_urdu` | `bal` | © SIL Global | `../keyboards/release/b/balochi_urdu` |
+| Bambara | `bambara` | `bm` | Sekou Goro | `../keyboards/release/b/bambara` |
+| Canadian French Basic | `basic_kbdca` | `fr-CA` | (c) 2009-2019 SIL International | `../keyboards/release/basic/basic_kbdca` |
 | French Basic | `basic_kbdfr` | `fr` | (c) 2009-2019 SIL International | `../keyboards/release/basic/basic_kbdfr` |
 | Khmer (NIDA) Basic | `basic_kbdkni` | `km` | © SIL Global | `../keyboards/release/basic/basic_kbdkni` |
 | US Basic | `basic_kbdus` | `en`, `bg-Latn`, `id`, `io-Latn`, `ia-Latn`, `zlm-Latn`, `ms`, `bi-Latn`, `gil-Latn`, `ht`, `mwl-Latn`, `blc-Latn`, `roo-Latn`, `so`, `sw` … (+6 more) | © 2008-2020 SIL International | `../keyboards/release/basic/basic_kbdus` |
+| BU Phonetic | `bu_phonetic` | `fr`, `de`, `und-Latn`, `es` | J. Albert Bickford | `../keyboards/release/b/bu_phonetic` |
 | Clavier du Burkina | `clavbur9` | `bm`, `bbo`, `beh`, `bfo`, `bib`, `bmq`, `bof`, `box`, `bwj`, `bwq`, `bwy`, `bxl`, `cme`, `dgd`, `dgs` … (+18 more) | © SIL Burkina Faso | `../keyboards/release/c/clavbur9` |
 | Simplified Chinese | `cs_pinyin` | `zh` | SIL International | `../keyboards/release/c/cs_pinyin` |
 | Common Devanagari | `common_devanagari` | `hi` | © 2021 WIn Publishing Trust | `../keyboards/release/c/common_devanagari` |
 | Naija NFD | `el_naija` | `abn-Latn`, `bky-Latn`, `bwr-Latn`, `deg-Latn`, `igb-Latn`, `bin-Latn`, `efi-Latn`, `eka-Latn`, `ekp-Latn`, `elm-Latn`, `enn-Latn`, `ish-Latn`, `gbr-Latn`, `aaa-Latn`, `gkn-Latn` … (+37 more) | Andrew Cunningham and Chinedu Uchechukwu | `../keyboards/release/el/el_naija` |
 | Pasifika | `el_pasifika` | `mi-Latn`, `rar-Latn`, `fj`, `haw-Latn`, `niu`, `sm`, `ty-Latn`, `to` | © 2018 Enabling Languages | `../keyboards/release/el/el_pasifika` |
 | Övdalsk | `elfdalian` | `ovd` | Craig Cornelius | `../keyboards/experimental/e/elfdalian` |
+| Enggano | `enggano` | `eno` | Mary Dalrymple | `../keyboards/release/e/enggano` |
 | ᓀᐦᐃᔭᐍᐏᐣ (Plains Cree) | `fv_plains_cree` | `crk` | (c) 2015-2025 FirstVoices, SIL Global, 2015 First Peoples' Cultural Foundation | `../keyboards/release/fv/fv_plains_cree` |
 | Gautami Bangla/Bengali | `gautami_bangla_bengali` | `bn-IN` | Gautam Sengupta | `../keyboards/release/gautami/gautami_bangla_bengali` |
 | Gautami Devanagari | `gautami_devanagari` | `hi`, `sa` | Gautam Sengupta | `../keyboards/release/gautami/gautami_devanagari` |
