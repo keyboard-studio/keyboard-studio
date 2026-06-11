@@ -24,6 +24,12 @@ $maxIterations    = 3
 $sleepBetweenSec  = 45
 $loopOnActions    = @("auto_fix_only","fix_and_mention")
 
+# Resolve the claude binary up front so Task Scheduler's restricted PATH gets an
+# absolute path baked in. Override with $env:CLAUDE_BIN; fall back to bare "claude".
+$claude = if ($env:CLAUDE_BIN) { $env:CLAUDE_BIN }
+          elseif (Get-Command claude -ErrorAction SilentlyContinue) { (Get-Command claude).Source }
+          else { "claude" }
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 function Get-Ts { (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") }
@@ -110,9 +116,13 @@ try {
 }
 
 # Refresh main so each claude call sees the latest crew/command definitions.
+# Stash any local changes so the pull can proceed; restore them after.
 git fetch origin main --quiet
 git checkout main --quiet
+$dirty = [bool](git status --porcelain)
+if ($dirty) { git stash push --include-untracked --quiet }
 git pull --ff-only --quiet
+if ($dirty) { git stash pop --quiet }
 
 # ── Iteration loop ─────────────────────────────────────────────────────────────
 
@@ -128,11 +138,17 @@ for ($i = 1; $i -le $maxIterations; $i++) {
 
   # ── Discover all open PRs (one API call per iteration) ──────────────────
 
+  # commits is omitted here — it blows the GraphQL node limit at --limit 50.
+  # HEAD SHA comes from headRefOid; commit authors are fetched per-PR lazily in Gate 7.
   $prsJson = gh pr list `
     --state open `
-    --json number,title,author,headRefName,baseRefName,labels,isDraft,mergeable,mergeStateStatus,statusCheckRollup,reviewDecision,commits,isCrossRepository,headRepositoryOwner `
+    --json number,title,author,headRefName,headRefOid,baseRefName,labels,isDraft,mergeable,mergeStateStatus,statusCheckRollup,reviewDecision,isCrossRepository,headRepositoryOwner `
     --limit 50
-  $prs = $prsJson | ConvertFrom-Json
+  if (-not $prsJson) {
+    "[km-triage] [WARN] gh pr list returned no output - ending sweep (check GraphQL node limit / auth)" | Tee-Object -FilePath $log -Append | Write-Host
+    break
+  }
+  $prs = @($prsJson | ConvertFrom-Json | Sort-Object number)
 
   $total  = $prs.Count
   $prNums = ($prs | ForEach-Object { $_.number }) -join ","
@@ -149,7 +165,7 @@ for ($i = 1; $i -le $maxIterations; $i++) {
   foreach ($pr in $prs) {
     $num     = $pr.number
     $title   = $pr.title
-    $headSha = if ($pr.commits -and $pr.commits.Count -gt 0) { $pr.commits[-1].oid } else { "unknown" }
+    $headSha = if ($pr.headRefOid) { $pr.headRefOid } else { "unknown" }
     $author  = $pr.author.login
     $triggerCommentId = $null   # populated lazily; reset each PR
 
@@ -226,9 +242,13 @@ Please rebase against ``main`` first; the next sweep will run the full review cr
       $nSkip++; continue
     }
 
-    # Gate 7 — solo tech-lead authorship
-    if ($pr.commits -and $pr.commits.Count -gt 0) {
-      $allEmails = $pr.commits | ForEach-Object { $_.authors | ForEach-Object { $_.email } } | Sort-Object -Unique
+    # Gate 7 — solo tech-lead authorship (lazy commits fetch — not in bulk query)
+    $prCommits = @()
+    try {
+      $prCommits = @((gh pr view $num --json commits --jq '.commits' | ConvertFrom-Json))
+    } catch { $prCommits = @() }
+    if ($prCommits.Count -gt 0) {
+      $allEmails = $prCommits | ForEach-Object { $_.authors | ForEach-Object { $_.email } } | Sort-Object -Unique
       $nonTl = $allEmails | Where-Object { $_ -ne $tlEmail }
       if (-not $nonTl) {
         "    skip: solo_tech_lead_author" | Tee-Object -FilePath $log -Append | Write-Host
@@ -280,10 +300,20 @@ Please rebase against ``main`` first; the next sweep will run the full review cr
     # All gates cleared - spawn a fresh, isolated Claude process for this PR
     "    -> spawning claude for PR #$num" | Tee-Object -FilePath $log -Append | Write-Host
     $nReview++
+    # Clear CLAUDECODE so a triage launched from inside a Claude Code session
+    # doesn't trigger the nested-session error in the spawned process.
+    $savedClaudeCode = $env:CLAUDECODE
+    $env:CLAUDECODE = ""
     try {
-      claude -p "/km-triage $num" --dangerously-skip-permissions --output-format text *>> $log
+      & $claude -p "/km-triage $num" --dangerously-skip-permissions --output-format text *>> $log
+      if ($LASTEXITCODE -ne 0) {
+        "    [WARN] claude exited $LASTEXITCODE for PR #$num" | Tee-Object -FilePath $log -Append | Write-Host
+      }
     } catch {
       "[WARN] claude exited with error for PR #$num : $_" | Add-Content $log
+    } finally {
+      if ($null -eq $savedClaudeCode) { Remove-Item Env:\CLAUDECODE -ErrorAction SilentlyContinue }
+      else { $env:CLAUDECODE = $savedClaudeCode }
     }
   }
 
