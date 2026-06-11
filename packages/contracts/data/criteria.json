@@ -872,7 +872,7 @@
     "section": "15. Deprecating a keyboard",
     "band": "red-checklist",
     "description": "Original author has granted permission to relicense under MIT",
-    "preSubmitChecklistText": "The original author has confirmed permission to relicense this keyboard under MIT"
+    "preSubmitChecklistText": "The original author has confirmed permission to relicense this keyboard under MIT — written confirmation is referenced in this PR or on file"
   },
   {
     "id": "15.2-new-keyboard-created-in-release",
@@ -928,7 +928,7 @@
     "section": "17. Build trigger",
     "band": "red-checklist",
     "description": "For a new author's first PR, the PR was pulled locally and checked thoroughly",
-    "preSubmitChecklistText": "If this is a new author's first PR, I have pulled the keyboard locally and verified it builds and runs correctly"
+    "preSubmitChecklistText": "For a first-time contributor: this PR has been pulled locally and the build verified clean before triggering TeamCity"
   },
   {
     "id": "17.3-build-issues-fed-back",
