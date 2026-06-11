@@ -12,7 +12,6 @@ import type { BaseKeyboard, KeyboardIdentity } from "@keyboard-studio/contracts"
 import { PreviewShell } from "./components/PreviewShell.tsx";
 import { PhaseA, PhaseB, PhaseF } from "./survey/index.ts";
 import type { SurveyContext } from "./survey/types.ts";
-import type { KeyboardIdentity } from "@keyboard-studio/contracts";
 import { CarveGallery } from "./components/CarveGallery.tsx";
 import { type RouteId } from "./lib/navigate.ts";
 import { useKeyboardArtifact } from "./hooks/useKeyboardArtifact.ts";
