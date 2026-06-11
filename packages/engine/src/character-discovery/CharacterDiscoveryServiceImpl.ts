@@ -8,7 +8,14 @@ import { makeLinguistInventory } from "@keyboard-studio/contracts";
 import type { CldrLoader } from "./cldr.js";
 import { loadExemplars, scriptBlockChars } from "./cldr.js";
 
-/** Injectable LLM backend — returns raw response text for a given prompt. */
+/**
+ * Injectable LLM backend — returns raw response text for a given prompt.
+ *
+ * Node-side composition: wrap the @keyboard-studio/llm client as
+ * `(p) => createLLMClient(config).complete(p)`. The engine package must NOT
+ * import @keyboard-studio/llm directly — that package is Node.js-only and
+ * would break browser bundling of the engine.
+ */
 export type LLMCompleter = (prompt: string) => Promise<string>;
 
 const LINGUIST_PROMPT_TEMPLATE = `You are an expert computational linguist specializing in typography, character
