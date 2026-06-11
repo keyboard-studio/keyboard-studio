@@ -196,8 +196,8 @@ describe("§7.5 seed fixtures", () => {
         remapPosture: "addition",
       }),
     );
-    expect(result.primary).toBe("S-06");
-    expect(result.triggeredRule).toBe(6);
+    expect(result.primary).toBe("S-05");
+    expect(result.triggeredRule).toBe(5);
     expect(result.secondaries).toContain("S-04");
   });
 

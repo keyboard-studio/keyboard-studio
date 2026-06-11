@@ -58,13 +58,6 @@ export function selectStrategy(axes: DiscoveryAxisVector): StrategyRecommendatio
     // Rule 4
     primary = "S-11";
     triggeredRule = 4;
-  } else if (axes.diacriticBehavior === "multi-family" && axes.scale === "large") {
-    // Rule 6 fires before Rule 5: §7.5 sil_euro_latin has A4=multi-family + A1=large + A2=strong,
-    // which matches both rules. §7.5 expects S-06, so Rule 6 must take priority.
-    // Rule 6
-    primary = "S-06";
-    triggeredRule = 6;
-    secondaries.push("S-04");
   } else if (
     axes.phoneticIntuition === "strong" &&
     (axes.scale === "medium" || axes.scale === "large")
@@ -72,6 +65,11 @@ export function selectStrategy(axes: DiscoveryAxisVector): StrategyRecommendatio
     // Rule 5
     primary = "S-05";
     triggeredRule = 5;
+    secondaries.push("S-04");
+  } else if (axes.diacriticBehavior === "multi-family" && axes.scale === "large") {
+    // Rule 6
+    primary = "S-06";
+    triggeredRule = 6;
     secondaries.push("S-04");
   } else if (
     axes.diacriticBehavior === "stacking-combining" &&

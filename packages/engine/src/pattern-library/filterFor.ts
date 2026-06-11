@@ -27,6 +27,8 @@ import { selectStrategy } from "../strategy-selector/index.js";
  * @param base  - The chosen base keyboard; `script` drives appliesTo matching
  *               and Three-group routing.
  * @param axes  - Optional fully-computed discovery axis vector (§7.1).
+ *   Must be fully elicited (all required fields present) before passing;
+ *   `session.axes` from {@link SurveySession} is `Partial` until Phase B completes.
  * @returns Strategy-ranked pattern matches for the gallery.
  *
  * @see spec.md §7.2
