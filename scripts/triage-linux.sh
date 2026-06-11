@@ -78,6 +78,18 @@ post_conflict_notice() {
   n_skip=$((n_skip + 1))
 }
 
+spawn_claude_for_pr() {
+  local pr_num="$1"
+  set +e
+  CLAUDECODE="" "$CLAUDE" -p "/km-triage $pr_num" --dangerously-skip-permissions --output-format text \
+    >> "$LOG" 2>&1
+  local exit_code=$?
+  set -e
+  if [[ "$exit_code" -ne 0 ]]; then
+    echo "  [WARN] claude exited $exit_code for PR #$pr_num" | tee -a "$LOG"
+  fi
+}
+
 # Returns the id of a lead-trigger comment (any TRIAGE_OWNERS member's
 # comment containing @km-triage) posted after since_ts, or empty string.
 find_trigger_comment() {
@@ -290,14 +302,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     # All gates cleared — spawn a fresh, isolated Claude process for this PR
     echo "  -> spawning claude for PR #$NUM" | tee -a "$LOG"
     n_review=$((n_review + 1))
-    set +e
-    CLAUDECODE="" "$CLAUDE" -p "/km-triage $NUM" --dangerously-skip-permissions --output-format text \
-      >> "$LOG" 2>&1
-    CLAUDE_EXIT=$?
-    set -e
-    if [[ "$CLAUDE_EXIT" -ne 0 ]]; then
-      echo "  [WARN] claude exited $CLAUDE_EXIT for PR #$NUM" | tee -a "$LOG"
-    fi
+    spawn_claude_for_pr "$NUM"
 
   done < <(echo "$PRS_JSON" | jq -c '.[]')
 
@@ -333,14 +338,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
         # Resolved to MERGEABLE — spawn Claude for full review
         echo "  PR #$RETRY_NUM resolved $RETRY_MERGEABLE — spawning claude" | tee -a "$LOG"
         n_review=$((n_review + 1))
-        set +e
-        CLAUDECODE="" "$CLAUDE" -p "/km-triage $RETRY_NUM" --dangerously-skip-permissions --output-format text \
-          >> "$LOG" 2>&1
-        CLAUDE_EXIT=$?
-        set -e
-        if [[ "$CLAUDE_EXIT" -ne 0 ]]; then
-          echo "  [WARN] claude exited $CLAUDE_EXIT for PR #$RETRY_NUM" | tee -a "$LOG"
-        fi
+        spawn_claude_for_pr "$RETRY_NUM"
       fi
     done
   fi
