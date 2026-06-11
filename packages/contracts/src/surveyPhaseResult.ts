@@ -45,7 +45,7 @@ export interface SurveyPhaseResult {
   answers: SurveyAnswer[];
   /** Typed identity fields resolved from Phase A; undefined for phases B..G. */
   identity?: KeyboardIdentity;
-  /** Axes resolved at this phase; merged across phases to build the full vector. */
+  /** Axes resolved at this phase. Use {@link mergePhaseResults} (surveySession.ts) to build the full merged vector across all phases. */
   computedAxes?: Partial<DiscoveryAxisVector>;
   /** Pattern IDs selected from the gallery during this phase. */
   selectedPatternIds?: string[];
