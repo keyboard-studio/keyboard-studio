@@ -111,11 +111,12 @@ tests:
       any(baseConsonants) + 'i' > context U+093F; stored as consonant THEN
       i-matra (U+0915 U+093F, canonical Unicode order); rendering engine
       positions i-matra visually to the left.
-  - input: ["U_0B95", "K_I"]
+  - input: ["K_H", "K_S"]
     expectedOutput: "கி"
     description: >
-      Tamil: U_0B95 (ka க) then K_I ('i' key) — rule fires producing
-      consonant THEN i-matra (U+0B95 U+0BBF, canonical Unicode order).
+      Tamil (ekwtamil99uni): K_H ('h' key → U+0B95 க) then K_S ('s' key) —
+      Rule 3 fires any(akara_meyT) + any(uyirE1) > index(akara_meyT,1) index(vow,2),
+      producing consonant THEN i-matra (U+0B95 U+0BBF, canonical Unicode order).
   - input: ["U_0995", "K_I"]
     expectedOutput: "কি"
     description: >
@@ -152,7 +153,7 @@ tests:
 validatedForFamilies: ["Deva", "Taml", "Beng", "Knda", "Mlym", "Orya", "Gujr", "Guru"]
 sourceKeyboards:
   - "release/sil/sil_devanagari_phonetic"
-  - "release/tamil/tamil99"
+  - "release/e/ekwtamil99uni"
   - "release/sil/sil_bengali_national_jatiya"
   - "release/nlci/nlci_kannada_winscript"
   - "release/m/mozhi_malayalam"
@@ -180,7 +181,7 @@ provenance:
       left. This is the primary S-09 exemplar cited in spec §7.3.
   # Hunk 5: keep theirs — context rules append the vowel after the consonant
   # (C+V correct); ours' V+C claim was incorrect for Unicode canonical Tamil.
-  - keyboard: "release/tamil/tamil99/source/tamil99.kmn"
+  - keyboard: "release/e/ekwtamil99uni/source/ekwtamil99uni.kmn"
     note: >
       Tamil99 standard layout. Tamil has four pre-base vowels: ி (U+0BBF),
       ெ (U+0BC6), ே (U+0BC7), ை (U+0BC8). All four are typed after the consonant

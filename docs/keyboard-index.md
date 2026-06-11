@@ -43,6 +43,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Naija NFD | `el_naija` | `abn-Latn`, `bky-Latn`, `bwr-Latn`, `deg-Latn`, `igb-Latn`, `bin-Latn`, `efi-Latn`, `eka-Latn`, `ekp-Latn`, `elm-Latn`, `enn-Latn`, `ish-Latn`, `gbr-Latn`, `aaa-Latn`, `gkn-Latn` … (+37 more) | Andrew Cunningham and Chinedu Uchechukwu | `../keyboards/release/el/el_naija` |
 | Pasifika | `el_pasifika` | `mi-Latn`, `rar-Latn`, `fj`, `haw-Latn`, `niu`, `sm`, `ty-Latn`, `to` | © 2018 Enabling Languages | `../keyboards/release/el/el_pasifika` |
 | Övdalsk | `elfdalian` | `ovd` | Craig Cornelius | `../keyboards/experimental/e/elfdalian` |
+| தமிழ்99 \| Tamil99 | `ekwtamil99uni` | `ta` | Mugunth, Umar, K. Sethu | `../keyboards/release/e/ekwtamil99uni` |
 | Enggano | `enggano` | `eno` | Mary Dalrymple | `../keyboards/release/e/enggano` |
 | ᓀᐦᐃᔭᐍᐏᐣ (Plains Cree) | `fv_plains_cree` | `crk` | (c) 2015-2025 FirstVoices, SIL Global, 2015 First Peoples' Cultural Foundation | `../keyboards/release/fv/fv_plains_cree` |
 | Gautami Bangla/Bengali | `gautami_bangla_bengali` | `bn-IN` | Gautam Sengupta | `../keyboards/release/gautami/gautami_bangla_bengali` |
