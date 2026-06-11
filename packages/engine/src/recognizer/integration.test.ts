@@ -127,7 +127,6 @@ describe("integration: recognizePatterns against real basic_kbdca source", () =>
       const { ir: out } = recognizePatterns(ir);
 
       const s02Patterns = out.recognizedPatterns.filter((p) => p.strategyId === "S-02");
-      expect(s02Patterns.length).toBeGreaterThanOrEqual(1);
       expect(s02Patterns).toHaveLength(5);
     },
   );
