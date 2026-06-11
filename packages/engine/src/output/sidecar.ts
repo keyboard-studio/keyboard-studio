@@ -6,15 +6,23 @@ import type { VirtualFS } from "@keyboard-studio/contracts";
 
 export const SIDECAR_SUFFIX = ".kmn.imported";
 
+/** Suffix for the SHA-256 companion file written alongside the sidecar at import time. */
+export const SIDECAR_HASH_SUFFIX = ".kmn.imported.sha256";
+
 /**
  * Path discriminator for sidecar files.
  *
  * Sidecars travel in the VFS for zip and local working-tree presence.
  * publishPR filters them out via isSourceFile() using this predicate,
  * keeping them out of the keymanapp/keyboards PR commit tree.
+ *
+ * Also matches the `.kmn.imported.sha256` companion (written at import time
+ * by importKeyboard to pin the hash of the original source for I5 verification).
+ * The hash file has the same lifecycle as the sidecar: zip-included,
+ * PR-excluded.
  */
 export function isSidecarPath(path: string): boolean {
-  return path.endsWith(SIDECAR_SUFFIX);
+  return path.endsWith(SIDECAR_SUFFIX) || path.endsWith(SIDECAR_HASH_SUFFIX);
 }
 
 /**

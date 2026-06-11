@@ -262,7 +262,7 @@ export interface ImportReport {
   keyboardId: string;
   status: ImportStatus;
   parseErrors: string[];
-  /** Per-feature count of opaque fragments (populated by check I5). */
+  /** Per-feature count of opaque fragments (populated by check I4). */
   opaqueFeatureInventory: Array<{ feature: string; count: number }>;
   /** Fraction of IR rules owned by a recognized Pattern (0–1). */
   recognizedRatio: number;
