@@ -74,7 +74,8 @@ export function buildLinguistPrompt(languageName: string, bcp47: string, orthogr
 
   if (orthographyUrl !== undefined) {
     // Anchor the LLM to a verified primary source rather than general knowledge alone
-    prompt += `\n\nGrounding source: A verified orthography reference for this language is available at: ${orthographyUrl}\nCross-reference this URL as a primary source, prioritizing it over general knowledge.`;
+    const safeUrl = new URL(orthographyUrl).href.replace(/[\r\n]/g, "");
+    prompt += `\n\nGrounding orthography reference: ${safeUrl}`;
   }
 
   return prompt;
