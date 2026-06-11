@@ -55,11 +55,6 @@ function deadkeyName(id: number): string {
   return "dk_" + id.toString(16).toUpperCase().padStart(4, "0");
 }
 
-// Format a deadkey id as U+XXXX.
-function deadkeyUPlus(id: number): string {
-  return "U+" + id.toString(16).toUpperCase().padStart(4, "0");
-}
-
 // Pick the "primary" trigger for naming: prefer the unshifted vkey trigger.
 function pickPrimaryTrigger(triggers: IRRule[]): IRRule {
   const unshifted = triggers.find((r) => {
@@ -220,7 +215,6 @@ export const s02Recognizer: RecognizerRule = {
           deadkeyName: deadkeyName(dkId),
           baseLetters: storeItemsToString(baseStore),
           accentedForms: storeItemsToString(outStore),
-          accentChar: deadkeyUPlus(dkId),
         },
       });
     }
