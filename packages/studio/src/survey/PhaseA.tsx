@@ -80,7 +80,6 @@ export function extractIdentity(
       "sea",
       "rtl",
       "syllabic",
-      "logographic",
       "alpha-nonlatin",
       "other",
     ]);

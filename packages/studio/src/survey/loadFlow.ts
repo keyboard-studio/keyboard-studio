@@ -20,5 +20,9 @@ export function parseFlow(raw: string): FlowDef {
   ) {
     throw new Error("Invalid flow YAML: missing flow_id or questions");
   }
+  const VALID_PHASES = new Set(["A", "B", "C", "C-prime", "D", "E", "F", "G"]);
+  if (!("phase" in parsed) || !VALID_PHASES.has((parsed as { phase?: string }).phase ?? "")) {
+    throw new Error("Invalid flow YAML: missing or unknown phase");
+  }
   return parsed as FlowDef;
 }

@@ -20,6 +20,10 @@ import type { SurveyContext, FlowDef } from "./types.ts";
 // @ts-ignore — Vite resolves ?raw at build/dev time
 import phaseBRaw from "../../../../content/flows/phase_b_characters.yaml?raw";
 
+// Question id in content/flows/phase_b_characters.yaml that begins the manual
+// step-by-step path. makeManualOnlyFlow routes pb_discovery_intro straight here.
+const PHASE_B_MANUAL_ENTRY = "pb_routing_branch";
+
 // ---------------------------------------------------------------------------
 // DiscoveryMethodStub — shown for unimplemented discovery methods
 // ---------------------------------------------------------------------------
@@ -46,7 +50,7 @@ function makeManualOnlyFlow(flow: FlowDef): FlowDef {
     ...flow,
     questions: flow.questions.map((q) =>
       q.id === "pb_discovery_intro"
-        ? { ...q, next: "pb_routing_branch" }
+        ? { ...q, required: false, next: PHASE_B_MANUAL_ENTRY }
         : q,
     ),
   };

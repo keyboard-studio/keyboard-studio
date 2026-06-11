@@ -11,7 +11,7 @@
 //     ctx.field != 'x', "or" (space-separated "or" tokens), "and" tokens.
 //     Full boolean DSL is out of scope — these cover the actual YAML content.
 
-import { useState, useCallback, useId } from "react";
+import { useState, useId, useMemo } from "react";
 import type { FlowDef, FlowQuestion, FlowGotoRule, SurveyContext, AnswerStackEntry } from "./types.ts";
 import type { SurveyAnswer, SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts";
 import { QuestionField } from "./QuestionField.tsx";
@@ -52,15 +52,19 @@ function evalCondition(
 
   const eq = condition.match(/^(value|ctx\.\w+)\s*==\s*'([^']*)'$/);
   if (eq !== null) {
-    const [, lhs, rhs] = eq;
-    const lhsVal = lhs === "value" ? strVal : ctx[lhs?.slice(4) ?? ""] ?? "";
+    // lhs is guaranteed by the regex capture group — non-null assertion is safe
+    const lhs = eq[1]!;
+    const rhs = eq[2]!;
+    const lhsVal = lhs === "value" ? strVal : ctx[lhs.slice(4)] ?? "";
     return lhsVal === rhs;
   }
 
   const ne = condition.match(/^(value|ctx\.\w+)\s*!=\s*'([^']*)'$/);
   if (ne !== null) {
-    const [, lhs, rhs] = ne;
-    const lhsVal = lhs === "value" ? strVal : ctx[lhs?.slice(4) ?? ""] ?? "";
+    // lhs is guaranteed by the regex capture group — non-null assertion is safe
+    const lhs = ne[1]!;
+    const rhs = ne[2]!;
+    const lhsVal = lhs === "value" ? strVal : ctx[lhs.slice(4)] ?? "";
     return lhsVal !== rhs;
   }
 
@@ -178,14 +182,19 @@ export function SurveyRunner({
   onBack,
   findings = [],
 }: SurveyRunnerProps) {
-  const allQuestions = [
-    ...flow.questions,
-    ...(flow.provenance_questions ?? []),
-  ];
-  const index = buildIndex(allQuestions);
-
-  // The first renderable question (skip engine_resolved at start)
-  const firstId = findFirstRenderable(allQuestions, index, context);
+  // Derive flow-level constants once per flow identity change.
+  // findFirstRenderable receives context but does not read it (params are
+  // underscore-prefixed), so keying on [flow] alone is correct.
+  const { allQuestions, index, firstId, approxTotal } = useMemo(() => {
+    const all = [...flow.questions, ...(flow.provenance_questions ?? [])];
+    const idx = buildIndex(all);
+    return {
+      allQuestions: all,
+      index: idx,
+      firstId: findFirstRenderable(all, idx, context),
+      approxTotal: all.filter((q) => q.engine_resolved !== true).length,
+    };
+  }, [flow]);
 
   const [stack, setStack] = useState<AnswerStackEntry[]>([
     { questionId: firstId ?? "", value: undefined },
@@ -214,8 +223,6 @@ export function SurveyRunner({
 
   const displayQ = interpolateQuestion(currentQ, context);
   const stepNum = stack.length;
-  // Approximate total: count non-engine-resolved questions in the entire flow
-  const approxTotal = allQuestions.filter((q) => q.engine_resolved !== true).length;
 
   const canGoBack = stack.length > 1 || onBack !== undefined;
 
@@ -224,7 +231,7 @@ export function SurveyRunner({
     const value = currentValue ?? currentEntry?.value;
 
     // Build the next question id, resolving engine_resolved nodes silently
-    const nextId = advanceThrough(currentQ, value, context, index, allQuestions);
+    const nextId = advanceThrough(currentQ, value, context, index);
 
     if (nextId === null) {
       // End of flow — build the result
@@ -403,12 +410,14 @@ function advanceThrough(
   value: string | string[] | undefined,
   ctx: SurveyContext,
   index: Map<string, FlowQuestion>,
-  _allQuestions: FlowQuestion[],
 ): string | null {
   let nextId = resolveNext(currentQ, value, ctx);
   while (nextId !== null) {
     const next = index.get(nextId);
-    if (next === undefined) return null;
+    if (next === undefined) {
+      console.error("SurveyRunner: unresolved goto target", nextId);
+      return null;
+    }
     if (next.engine_resolved !== true) return nextId;
     // Skip engine_resolved: evaluate its routing without a user value
     nextId = resolveNext(next, undefined, ctx);

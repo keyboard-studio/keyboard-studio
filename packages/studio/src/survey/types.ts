@@ -51,6 +51,8 @@ export interface FlowQuestion {
   next?: string | null | FlowGotoRule[];
   /** When true, this node is engine-resolved and never rendered to the user. */
   engine_resolved?: boolean;
+  /** Advisory (non-gating) question; runners may render it softer. Used by RTL questions. */
+  advisory?: boolean;
 }
 
 /** Top-level shape of a parsed phase_*.yaml file. */
