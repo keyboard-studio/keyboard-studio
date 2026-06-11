@@ -2,6 +2,7 @@ import type { IRGroup } from '@keyboard-studio/contracts';
 import { useIRStore } from '../../stores/irStore.ts';
 import { CarveActions } from './CarveActions.tsx';
 import { sampleGroupChars } from '../../lib/carveUtils.ts';
+import { makeCardStyle, makeHeadingStyle } from '../../lib/carveStyles.ts';
 
 interface GroupCardProps {
   group: IRGroup;
@@ -18,20 +19,8 @@ export function GroupCard({ group }: GroupCardProps) {
 
   const sample = sampleGroupChars(group);
 
-  const cardStyle: React.CSSProperties = {
-    padding: '1rem',
-    border: '1px solid #283040',
-    borderRadius: '6px',
-    background: '#0d1117',
-    opacity: isDeleted ? 0.4 : 1,
-  };
-
-  const headingStyle: React.CSSProperties = {
-    margin: '0 0 0.25rem',
-    fontSize: '1rem',
-    textDecoration: isDeleted ? 'line-through' : 'none',
-    color: '#e6edf3',
-  };
+  const cardStyle = makeCardStyle(isDeleted);
+  const headingStyle = makeHeadingStyle(isDeleted);
 
   return (
     <div style={cardStyle}>

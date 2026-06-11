@@ -40,7 +40,7 @@ describe('deleteNode', () => {
     expect(s.undoStack).toEqual(['n1']);
   });
 
-  it('deleting the same node twice does not duplicate undoStack entries', () => {
+  it('deleting the same node twice pushes two undoStack entries but deduplicates deletedNodeIds', () => {
     useIRStore.getState().deleteNode('n1');
     useIRStore.getState().deleteNode('n1');
     expect(useIRStore.getState().undoStack).toHaveLength(2);

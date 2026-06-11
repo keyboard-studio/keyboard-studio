@@ -56,7 +56,6 @@ export function CarveGallery() {
           <PatternCard
             key={p.id}
             pattern={p}
-            onEdit={() => { window.location.hash = `#survey?patternId=${p.id}`; }}
           />
         ))}
         {ir.groups.map((g) => (
