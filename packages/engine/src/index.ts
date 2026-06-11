@@ -67,3 +67,13 @@ export type { PatternFilter, LoadReport } from "./pattern-library/index.js";
 
 // Issue #248 — Sprint-1 identity stub mutator (deleted at Sprint-2 start per #238).
 export { applyIdentityStubMutation } from "./stub-mutator/index.js";
+
+// Issue #141 — character discovery service (Phase B).
+// Public surface: factory + injectable types only.
+// Internal helpers (buildLinguistPrompt, parseLinguistJson, cldrCrossCheck,
+// parseUnicodeSet, loadExemplars, SCRIPT_BLOCKS) are NOT re-exported here;
+// tests import them directly from the module file.
+export { createCharacterDiscoveryService } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
+export type { LLMCompleter } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
+export type { CldrLoader, ExemplarResult } from "./character-discovery/cldr.js";
+export { createFetchCldrLoader } from "./character-discovery/cldr.js";
