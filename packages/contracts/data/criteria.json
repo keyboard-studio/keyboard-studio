@@ -1029,7 +1029,7 @@
   {
     "id": "19.1-import-attribution-in-pr-body",
     "section": "19. Import output",
-    "band": "layer-c-enforce",
+    "band": "red-checklist",
     "lintRuleId": "KM_LINT_IMPORT_ATTRIBUTION_MISSING",
     "description": "When a keyboard was adapted from a release/ keyboard, the PR body must include the attribution block: adapted-from path, commit SHA, round-trip status, and opaque feature inventory. Enforced by the output service at PR submission time."
   }
