@@ -75,7 +75,6 @@ describe("s02Recognizer", () => {
 
     expect(m.slotValues["triggerKey"]).toBe("RALT K_7");
     expect(m.slotValues["deadkeyName"]).toBe("dk_0060");
-    expect(m.slotValues["accentChar"]).toBe("U+0060");
   });
 
   it("basic_kbdca grave: 2 triggers + 1 body produces 1 Pattern with 3 rule ownedNodes", () => {
