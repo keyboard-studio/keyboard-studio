@@ -96,7 +96,8 @@ function buildPattern(match: MatchResult): Pattern {
       {
         id: "deadkeyName",
         prompt: "Internal deadkey name",
-        answerType: "store-content",
+        // "text" not "store-content": holds a short identifier like dk_0060, not a store body.
+        answerType: "text",
         default: match.slotValues["deadkeyName"] ?? "",
       },
       {
@@ -113,8 +114,8 @@ function buildPattern(match: MatchResult): Pattern {
       },
     ],
     kmnFragment:
-      "+ [{{triggerKey}}] > deadkey({{deadkeyName}})\n" +
-      "deadkey({{deadkeyName}}) + any({{baseLetters}}) > index({{accentedForms}}, 2)",
+      "+ [{{triggerKey}}] > dk({{deadkeyName}})\n" +
+      "dk({{deadkeyName}}) + any({{baseLetters}}) > index({{accentedForms}}, 2)",
     tests: [],
     validatedForFamilies: [],
     sourceKeyboards: [],
