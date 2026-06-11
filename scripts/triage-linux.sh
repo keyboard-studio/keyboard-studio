@@ -175,20 +175,27 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
       n_skip=$((n_skip + 1)); continue
     fi
 
-    # Gate 4 — CONFLICTING: post notice via bot-gh directly, zero Claude credits
+    # Gate 4 — CONFLICTING: post notice once per head SHA, then skip silently
     if echo "$PR" | jq -e '.mergeable == "CONFLICTING"' > /dev/null 2>&1; then
-      echo "  skip: merge_conflict — posting notice" | tee -a "$LOG"
-      CONFLICT_FILE=$(mktemp)
-      if [[ "$AUTHOR" == "$TL_LOGIN" ]]; then
-        MENTION_LINE="@$TL_LOGIN — km-triage skipped this PR."
+      PRIOR_CONFLICT=$( [[ -f "$AUDIT_LOG" ]] && jq -c --argjson num "$NUM" --arg sha "$HEAD_SHA" \
+        'select(.pr == $num and .reason == "merge_conflict" and .head_sha == $sha)' \
+        "$AUDIT_LOG" 2>/dev/null | tail -1 || echo "" )
+      if [[ -z "$PRIOR_CONFLICT" ]]; then
+        echo "  skip: merge_conflict — posting notice" | tee -a "$LOG"
+        CONFLICT_FILE=$(mktemp)
+        if [[ "$AUTHOR" == "$TL_LOGIN" ]]; then
+          MENTION_LINE="@$TL_LOGIN — km-triage skipped this PR."
+        else
+          MENTION_LINE="@$TL_LOGIN @$AUTHOR — km-triage skipped this PR."
+        fi
+        printf '%s\n\nPR is in CONFLICTING merge state. Triage policy is not to auto-fix or review a branch that needs rebasing.\n\nPlease rebase against `main` first; the next sweep will run the full review crew and either auto-fix mechanical findings or @-mention you again with any open questions.\n' \
+          "$MENTION_LINE" > "$CONFLICT_FILE"
+        node utilities/km-triage-app/bot-gh.js pr comment "$NUM" \
+          --body-file "$CONFLICT_FILE" >> "$LOG" 2>&1 || true
+        rm -f "$CONFLICT_FILE"
       else
-        MENTION_LINE="@$TL_LOGIN @$AUTHOR — km-triage skipped this PR."
+        echo "  skip: merge_conflict (already notified at this SHA)" | tee -a "$LOG"
       fi
-      printf '%s\n\nPR is in CONFLICTING merge state. Triage policy is not to auto-fix or review a branch that needs rebasing.\n\nPlease rebase against `main` first; the next sweep will run the full review crew and either auto-fix mechanical findings or @-mention you again with any open questions.\n' \
-        "$MENTION_LINE" > "$CONFLICT_FILE"
-      node utilities/km-triage-app/bot-gh.js pr comment "$NUM" \
-        --body-file "$CONFLICT_FILE" >> "$LOG" 2>&1 || true
-      rm -f "$CONFLICT_FILE"
       audit_skip "$NUM" merge_conflict "$HEAD_SHA"
       n_skip=$((n_skip + 1)); continue
     fi
