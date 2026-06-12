@@ -105,7 +105,6 @@ function matchesSingleRole(rule: IRRule): boolean {
 // ---------------------------------------------------------------------------
 
 function checkStoreConstraints(
-  ir: KeyboardIR,
   constraints: StoreConstraint[],
   resolvedStores: Map<string, IRStore>,
 ): boolean {
@@ -130,8 +129,6 @@ function checkStoreConstraints(
     }
   }
 
-  // Unused parameter: suppress lint
-  void ir;
   return true;
 }
 
@@ -486,28 +483,20 @@ export function interpretLift(rule: RecognizerRuleYaml, match: MatchResult): Pat
 
   // Check combinedWith_if for flag_for_human_review actions.
   // The beep suffix above is the S-02 case — this is the general path.
-  let flaggedForReview = needsHumanReview;
   const combinedWithIf = rule.predicate.combinedWith_if ?? [];
-  for (const entry of combinedWithIf) {
-    if (entry.action === "flag_for_human_review" && needsHumanReview) {
-      flaggedForReview = true;
-    }
-  }
+  const flaggedForReview = needsHumanReview ||
+    combinedWithIf.some((e) => e.action === "flag_for_human_review");
 
   // Build provenance: if flagged, add an annotation entry so the author can
   // confirm A6=loud before S-10 is added. provenance[].notes is the only
   // existing Pattern field suitable for review annotations.
   const provenance: Array<{ keyboard: string; notes?: string }> = [];
   if (flaggedForReview) {
-    // Find the relevant combinedWith_if entry note
+    // Extract note from the flag_for_human_review entry if present
     let reviewNote =
       "Flagged for human review by YAML DSL interpreter (flag_for_human_review).";
-    for (const entry of combinedWithIf) {
-      if (entry.action === "flag_for_human_review" && entry.note !== undefined) {
-        reviewNote = entry.note.trim();
-        break;
-      }
-    }
+    const reviewEntry = combinedWithIf.find((e) => e.action === "flag_for_human_review");
+    if (reviewEntry?.note) reviewNote = reviewEntry.note.trim();
     provenance.push({ keyboard: "recognizer", notes: reviewNote });
   }
 

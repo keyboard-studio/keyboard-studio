@@ -92,7 +92,7 @@ const RULE_DEF = {
       "Some keyboards use context= \"\" (empty string literal) instead of a vkey context. These look like \"output only\" rules. Whether to treat them as S-01 or noise depends on the IR parser's handling of string-context rules. For now, require kind=vkey in context; string-context rules are disqualified.\n"
     ]
   }
-} as RecognizerRuleYaml;
+} satisfies RecognizerRuleYaml;
 
 export const rule: RecognizerRule = {
   id: "simple_swap",

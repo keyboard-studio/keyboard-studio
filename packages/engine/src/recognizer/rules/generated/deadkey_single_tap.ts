@@ -186,7 +186,7 @@ const RULE_DEF = {
       "If index().offset does not equal the 1-indexed position of the any() element in the fan-out rule's context, this is an unusual pattern that should not be silently lifted — do not assume offset is always 2.\n"
     ]
   }
-} as RecognizerRuleYaml;
+} satisfies RecognizerRuleYaml;
 
 export const rule: RecognizerRule = {
   id: "deadkey_single_tap",

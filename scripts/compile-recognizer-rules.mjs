@@ -87,7 +87,7 @@ import type { RecognizerRule } from "../../types.js";
 import { interpretPredicate, interpretLift } from "../../interpreter.js";
 import type { RecognizerRuleYaml } from "../../yaml-schema.js";
 
-const RULE_DEF = ${ruleDef} as RecognizerRuleYaml;
+const RULE_DEF = ${ruleDef} satisfies RecognizerRuleYaml;
 
 export const rule: RecognizerRule = {
   id: "${id}",
@@ -97,8 +97,15 @@ export const rule: RecognizerRule = {
 };
 `;
 
-  writeFileSync(outFile, ts, 'utf8');
-  console.log(`[OK] Generated ${outFile}`);
+  // Only write when content differs to avoid spurious git diffs
+  let existing = '';
+  try { existing = readFileSync(outFile, 'utf8'); } catch { /* file does not exist yet */ }
+  if (existing === ts) {
+    console.log(`[OK] Unchanged ${outFile}`);
+  } else {
+    writeFileSync(outFile, ts, 'utf8');
+    console.log(`[OK] Generated ${outFile}`);
+  }
   generated.push({ id, filename });
 }
 
@@ -113,5 +120,12 @@ const barrelLines = [
 ];
 
 const barrelPath = join(OUT_DIR, 'index.ts');
-writeFileSync(barrelPath, barrelLines.join('\n') + '\n', 'utf8');
-console.log(`[OK] Barrel: ${barrelPath}`);
+const barrelContent = barrelLines.join('\n') + '\n';
+let existingBarrel = '';
+try { existingBarrel = readFileSync(barrelPath, 'utf8'); } catch { /* file does not exist yet */ }
+if (existingBarrel === barrelContent) {
+  console.log(`[OK] Unchanged ${barrelPath}`);
+} else {
+  writeFileSync(barrelPath, barrelContent, 'utf8');
+  console.log(`[OK] Barrel: ${barrelPath}`);
+}
