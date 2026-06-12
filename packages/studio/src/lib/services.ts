@@ -1,9 +1,11 @@
 // Service container. Config flag: VITE_USE_REAL_ENGINE (default: true).
 // Set VITE_USE_REAL_ENGINE=false in .env.local to force mocks (test/CI only).
-// Note: mockBaseBrowser import here is intentional — services.ts is the
-// designated service boundary. Vite tree-shakes it in real builds.
-import type { BaseBrowserService } from "@keyboard-studio/contracts";
-import { mockBaseBrowser } from "@keyboard-studio/contracts/mocks";
+// Note: mockBaseBrowser / mockOutputService / mockScaffolder imports here are
+// intentional — services.ts is the designated service boundary. Vite
+// tree-shakes them in real builds. Do NOT add mocks imports elsewhere in
+// packages/studio/src/.
+import type { BaseBrowserService, ScaffolderService } from "@keyboard-studio/contracts";
+import { mockBaseBrowser, mockOutputService, mockScaffolder } from "@keyboard-studio/contracts/mocks";
 import { localBaseBrowser, LOCAL_PROXY_BASE } from "./localBaseBrowser.ts";
 
 export const USE_REAL = import.meta.env.VITE_USE_REAL_ENGINE !== "false";
@@ -16,4 +18,27 @@ export { LOCAL_PROXY_BASE };
 // the engine pointing at the GitHub API.
 export function getBaseBrowserService(): BaseBrowserService {
   return USE_REAL ? localBaseBrowser : mockBaseBrowser;
+}
+
+// ScaffolderService: when USE_REAL is false returns the mock scaffolder so
+// CI / test runs never touch WASM. When real, lazily imports from the engine
+// (mirrors the loadEngine() lazy-import pattern in useKeyboardArtifact).
+let scaffolderCache: ScaffolderService | null = null;
+export async function getScaffolderService(): Promise<ScaffolderService> {
+  if (!USE_REAL) return mockScaffolder;
+  if (scaffolderCache !== null) return scaffolderCache;
+  const { createScaffolderService } = await import(
+    /* @vite-ignore */ "@keyboard-studio/engine"
+  );
+  scaffolderCache = createScaffolderService({ proxyBase: LOCAL_PROXY_BASE });
+  return scaffolderCache;
+}
+
+// OutputService (zip path only): when USE_REAL is false returns the mock zip
+// serializer. When real, lazily imports toZip from the engine.
+// The GitHub OAuth publishPR path is separate (createGitHubOutputService).
+export async function getToZip(): Promise<(vfs: import("@keyboard-studio/contracts").VirtualFS) => Promise<Uint8Array>> {
+  if (!USE_REAL) return mockOutputService.toZip.bind(mockOutputService);
+  const { toZip } = await import(/* @vite-ignore */ "@keyboard-studio/engine");
+  return toZip as (vfs: import("@keyboard-studio/contracts").VirtualFS) => Promise<Uint8Array>;
 }
