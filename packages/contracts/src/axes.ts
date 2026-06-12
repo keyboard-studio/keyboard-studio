@@ -1,4 +1,4 @@
-// see spec.md section 7.1 - discovery axes A1..A7 plus sub-axes A2a, A7a
+// see spec.md section 7.1 - discovery axes A1..A7 plus sub-axes A2a, A3a, A7a
 
 export type Scale = "tiny" | "small" | "medium" | "large" | "massive";
 
@@ -34,6 +34,9 @@ export type SpareKeyAvailability = "many" | "RAlt only" | "fully booked";
 /** A7a - alphabetic-only sub-axis added in v1.0.1 (spec section 7.1). */
 export type RemapPosture = "addition" | "full-remap";
 
+/** A3a — mark-input order sub-axis (alphabetic scripts only). Parent axis: A3 (phoneticIntuition). */
+export type MarkInputOrder = "prefix" | "postfix";
+
 export interface DiscoveryAxisVector {
   /** @see spec.md §7.1 A1 */
   scale: Scale;
@@ -60,6 +63,32 @@ export interface DiscoveryAxisVector {
   clusterSensitivity?: boolean;
   /** @see spec.md §7.1 A3 */
   phoneticIntuition: PhoneticIntuition;
+  /**
+   * A3a — mark-input order sub-axis (alphabetic scripts only). Parent axis: A3 (phoneticIntuition),
+   * also gated by A2=alphabetic.
+   *
+   * Three valid states, all semantically distinct (same shape as
+   * {@link clusterSensitivity} and {@link remapPosture}):
+   * - `undefined` — not yet elicited (survey incomplete, A2 is non-alphabetic, or A3=weak
+   *   so A3a is N/A).
+   * - `"prefix"` — elicited; community uses mark-then-letter (press the accent key first,
+   *   then the base letter — classic deadkey / S-02 flow, e.g. ´ + a → á).
+   * - `"postfix"` — elicited; community uses letter-then-mark (type the base letter first,
+   *   then the suffix key — sequence-replace / S-03 flow, e.g. a + ´ → á).
+   *
+   * Elicitation gate: ask when A2=alphabetic AND A3=strong. When A3=weak or A2≠alphabetic,
+   * leave this field `undefined` — the question is N/A for shape-based or non-alphabetic
+   * keyboards.
+   *
+   * Decision-tree impact: when `markInputOrder="postfix"`, decision-tree rule 3a fires
+   * (before rules 5 and 7) and routes primary to S-03 (sequence replace) + S-04,
+   * overriding the A3=strong heuristic that would otherwise select S-02 (rule 7) or
+   * S-05 (rule 5). This closes the §7.5 IPA mismatch (sequence-modifier preference).
+   *
+   * @see spec.md §7.1 A3a
+   * @see spec.md §7.2 rule 3a
+   */
+  markInputOrder?: MarkInputOrder;
   /** @see spec.md §7.1 A4 */
   diacriticBehavior: DiacriticBehavior;
   /** @see spec.md §7.1 A5 */

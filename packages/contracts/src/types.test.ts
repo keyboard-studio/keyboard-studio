@@ -220,6 +220,27 @@ describe("SurveyPhaseResult interface", () => {
     expect(r.computedAxes?.scale).toBeUndefined();
   });
 
+  it("computedAxes accepts A3a markInputOrder sub-axis", () => {
+    const prefix: SurveyPhaseResult = {
+      phase: "B",
+      answers: [],
+      computedAxes: { markInputOrder: "prefix" },
+    };
+    const postfix: SurveyPhaseResult = {
+      phase: "B",
+      answers: [],
+      computedAxes: { markInputOrder: "postfix" },
+    };
+    const unelicited: SurveyPhaseResult = {
+      phase: "B",
+      answers: [],
+      computedAxes: { phoneticIntuition: "strong" },
+    };
+    expect(prefix.computedAxes?.markInputOrder).toBe("prefix");
+    expect(postfix.computedAxes?.markInputOrder).toBe("postfix");
+    expect(unelicited.computedAxes?.markInputOrder).toBeUndefined();
+  });
+
   it("answers accepts SurveyAnswer[]", () => {
     const a: SurveyAnswer = { questionId: "triggerKey", answerType: "key-name", value: "K_QUOTE" };
     const r: SurveyPhaseResult = { phase: "B", answers: [a] };
@@ -590,7 +611,7 @@ describe("StrategyRecommendation interface", () => {
   });
 
   it("accepts all valid PrimaryRuleNumber values (rules 9-10 excluded by type)", () => {
-    const validRules: PrimaryRuleNumber[] = [1, 2, 3, 4, 5, 6, 7, 8, 11, 12];
+    const validRules: PrimaryRuleNumber[] = [1, 2, 3, "3a", 4, 5, 6, 7, 8, 11, 12];
     validRules.forEach((rule) => {
       const r: StrategyRecommendation = {
         primary: "S-03",

@@ -570,6 +570,7 @@ The axis vector is computed from the working IR (§5a), the patterns the recogni
 | A1 | **Scale** | tiny (<5) / small (5–20) / medium (20–100) / large (100–300) / massive (1000+) | How many *new* characters the keyboard adds beyond a stock physical layout. **Phase B:** "Roughly how many new characters does your keyboard need — ones not already on a standard physical keyboard?" |
 | A2 | **Script class** | alphabetic / abugida / abjad / syllabary / logographic | Structural class of the writing system; drives one-char-per-key vs. cluster-shaped output. **Phase A** (Three-group routing, Sec 9) detects this from the BCP47 script subtag + base; confirmed in plain language: "What writing system does the keyboard produce?" |
 | A3 | **Phonetic intuition** | strong / weak | Strong = the user thinks "I'd type a Latin spelling of the sound." Weak = mapping is shape- or modifier-based. **Phase B/C:** "When you picture typing a special character — type the Latin spelling of the sound, or press a key that looks like it / a modifier + base key?" |
+| A3a | **Mark-input order** | prefix / postfix | "prefix" = mark-then-letter; "postfix" = letter-then-mark. Gated on A2=alphabetic AND A3=strong. **Phase B:** "When typing a letter with a diacritic, does the typist expect to press the diacritic key before the letter, or type the letter first and then the diacritic?" |
 | A4 | **Diacritic behavior** | none / stacking-combining / replacing-cycling / multi-family | How marks behave on a base. Cycling = a repeated mark key replaces the previous mark (Vietnamese-style). **Phase B/C:** "Do your characters have accent marks or tones — none, stacking, tone marks that replace on a second press, or many different accent families used together?" |
 | A5 | **Multi-mode** | single / two-orthography | Whether the keyboard exposes a runtime toggle between two orthographic styles (e.g. dotted vs. bar-under Yoruba). **Phase A/C:** "Does your language have more than one written form users switch between?" |
 | A6 | **Constraint enforcement** | none / soft / loud | What happens on an invalid sequence. Loud = audible beep; soft = silent suppression. **Phase C:** "Should the keyboard reject obviously invalid input — no, silently, or with a beep?" |
@@ -578,6 +579,8 @@ The axis vector is computed from the working IR (§5a), the patterns the recogni
 **A2a — cluster sensitivity (abugida/abjad only).** If A2 is abugida or abjad, one follow-up resolves whether output depends on prior context (Arabic positional forms, Indic reph/conjuncts, syllabary ligatures): "Does the keyboard need to choose different output based on what was typed before?" Yes → clusters needed; No → clusters not needed. The answer gates decision rule 2 (Sec 7.2).
 
 **A7a — full-remap detection (alphabetic only).** If A2 is alphabetic, one follow-up resolves the keyboard's posture toward the base layout: "Will the keys on your keyboard mostly show the same letters as the base layout (with just a few additions or changes), or will every key display a different letter?" Full-remap → every key reassigned (Russian/Armenian/Greek mnemonic style); addition → most base keys unchanged (Akan-style additive layout). The answer gates the new decision rule 8 (Sec 7.2). For Latin-target alphabetic keyboards on a Latin base, the answer defaults to addition; non-Latin alphabetic targets on a Latin base (Cyrillic, Armenian, Greek, Coptic, Cherokee, Adlam, etc.) are the typical full-remap case.
+
+**A3a — mark-input order (alphabetic only).** If A2=alphabetic and A3=strong, one follow-up resolves whether the community's mental model places the mark before or after the base letter: "When typing a letter with a diacritic, does the typist expect to press the diacritic key before the letter, or type the letter first and then the diacritic?" Prefix (mark-then-letter) → S-02 deadkey flow; postfix (letter-then-mark) → S-03 sequence-replace. This sub-axis closes the §7.5 IPA mismatch — IPA keyboard communities use postfix suffix sequences, not the mnemonic-spelling flow A3=strong would otherwise predict. When A3a=postfix and A4=stacking-combining both apply, rule 3a still fires (S-03 primary); implementations must emit base+combining mark in canonical NFC order to avoid normalization defects with stacking marks.
 
 ### 7.2 Decision tree
 
@@ -588,6 +591,7 @@ Ordered rules. The first matching rule fixes the **primary** strategy; rules 9�
 | 1 | A1=massive AND A2=logographic | **S-12** DLL IME callout | — |
 | 2 | A2=abjad OR (A2=abugida AND cluster sensitivity=yes) | **S-09** Context-sensitive cluster | + S-05 if A3=strong |
 | 3 | A4=replacing-cycling | **S-07** Diacritic cycle | + S-04 |
+| 3a | A2=alphabetic AND A3=strong AND A3a=postfix | **S-03** Sequence replace | + S-04 |
 | 4 | A5=two-orthography | **S-11** Stateful option toggle | (wraps whichever strategy fits the per-mode rules) |
 | 5 | A3=strong AND A1 ∈ {medium, large} | **S-05** Mnemonic spelling | + S-04 |
 | 6 | A4=multi-family AND A1=large | **S-06** Chained deadkeys (two-tier) | + S-04 |
@@ -600,7 +604,7 @@ Ordered rules. The first matching rule fixes the **primary** strategy; rules 9�
 
 **Firing order — important.** The table is numbered 1-12 but rules do NOT fire in raw 1→12 sequence. The actual order an implementation runs is:
 
-1. **Primary-fixing pass.** Try rules 1-8 in order; the first matching rule sets `primary`. If none of 1-8 match, try rule 11 (`A1=tiny AND A3=strong`); if it matches, primary is S-01. Otherwise rule 12 (catch-all) sets primary to S-03.
+1. **Primary-fixing pass.** Try rules 1, 2, 3, 3a, 4, 5, 6, 7, 8 in order (rule 3a, when A3a is elicited, intercepts postfix-preference keyboards before rules 5 and 7 can claim them); the first matching rule sets `primary`. If none of 1, 2, 3, 3a, 4, 5, 6, 7, 8 match, try rule 11 (`A1=tiny AND A3=strong`); if it matches, primary is S-01. Otherwise rule 12 (catch-all) sets primary to S-03.
 2. **Secondary-adding pass.** Regardless of which primary was chosen, rules 9 (A6=loud → +S-10) and 10 (A7=fully-booked → +S-08) fire to APPEND axis-conditional secondaries to `StrategyRecommendation.secondaries`. These rules never set the primary — see {@link PrimaryRuleNumber} in `packages/contracts` which excludes 9 and 10 from valid `triggeredRule` values.
 
 An implementation that walked the table top-to-bottom and halted on the first match would mis-categorize keyboards where rule 9 (A6=loud) fires before any 1-8 match — they'd be left with no primary. The Mermaid diagram below shows the correct flow (R1-R8 → R11 → R12 chain for primary, then `Sec → R9 → R10` for add-ons).
@@ -613,7 +617,9 @@ flowchart TD
     R2 -- yes --> S09[/"<b>S-09</b> Context-sensitive cluster<br/>+ S-05 if A3=strong"/]
     R2 -- no --> R3{A4=replacing-cycling?}
     R3 -- yes --> S07[/"<b>S-07</b> Diacritic cycle<br/>+ S-04"/]
-    R3 -- no --> R4{A5=two-orthography?}
+    R3 -- no --> R3a{A2=alphabetic AND<br/>A3=strong AND<br/>A3a=postfix?}
+    R3a -- yes --> S03a[/"<b>S-03</b> Sequence replace<br/>+ S-04 (postfix mental model)"/]
+    R3a -- no --> R4{A5=two-orthography?}
     R4 -- yes --> S11[/"<b>S-11</b> Stateful option toggle<br/>(wraps inner strategy)"/]
     R4 -- no --> R5{A3=strong AND<br/>A1 in medium,large?}
     R5 -- yes --> S05[/"<b>S-05</b> Mnemonic spelling<br/>+ S-04"/]
@@ -630,6 +636,7 @@ flowchart TD
     S12 --> Sec
     S09 --> Sec
     S07 --> Sec
+    S03a --> Sec
     S11 --> Sec
     S05 --> Sec
     S06 --> Sec
@@ -650,9 +657,9 @@ flowchart TD
     classDef primary fill:#dde9ff,stroke:#3060c0,color:#000
     classDef addon fill:#fff2cc,stroke:#b58900,color:#000
     classDef decision fill:#f5f5f5,stroke:#666,color:#000
-    class S01,S02,S03,S05,S06,S06full,S07,S09,S11,S12 primary
+    class S01,S02,S03,S03a,S05,S06,S06full,S07,S09,S11,S12 primary
     class Add08,Add10 addon
-    class R1,R2,R3,R4,R5,R6,R7,R8,R9,R10,R11,Sec decision
+    class R1,R2,R3,R3a,R4,R5,R6,R7,R8,R9,R10,R11,Sec decision
 ```
 
 **Prose summary.** Massive logographic → only the OS IME is fast enough; delegate (S-12). Indic/Arabic-shaped scripts need context-aware cluster rules (S-09); phonetic ones add mnemonic spelling. Tonal cycling (S-07) is neither stacking nor deadkey. Dual orthography (S-11) wraps a state toggle around the inner strategy. Big phonetic alphabets (S-05) — let the user type spellings, collapsed with `any`/`index`. Big diacritic palettes (S-06) — two-tier deadkey: first key picks the family, second the base. Small accent-heavy Latin (S-02) — classic deadkey composition. Non-Latin alphabetic full-remap (Russian/Armenian/Greek mnemonic) — chained deadkeys for case-and-diacritic alternates (S-06) plus an RAlt modifier plane (S-08) for the lesser-used letters. Loud feedback (S-10) and fully-booked layouts (S-08) are add-ons, never the whole answer. A handful of phonetic additions (S-01) — just swap them in. Otherwise (S-03) — short ASCII sequences expand to single chars.
@@ -944,30 +951,30 @@ nomatch > use(main)
 
 The decision tree must agree with the strategy each exemplar actually uses. This round-trip is the **regression suite**: if "Tree → strategy" disagrees with "Actual primary," the tree is wrong, not the keyboard. Re-run it after any edit to 7.1/7.2/7.3.
 
-| Exemplar | A1 | A2 | A3 | A4 | A5 | A6 | A7 | A7a | Tree → strategy | Actual primary |
-|----------|----|----|----|----|----|----|----|-----|-----------------|----------------|
-| `release/a/akan/` | tiny | alphabetic | strong | none | single | none | many | addition | rule 11 → S-01 | S-01 ✓ |
-| `release/sil/sil_euro_latin/` | large | alphabetic | strong | multi-family | single | none | RAlt only | addition | rule 5 → S-05 | S-02 + S-04/S-08 ✗ |
-| `release/sil/sil_ipa/` | medium | alphabetic | strong | none | single | none | many | addition | rule 5 → S-05 + S-04 | S-03 + S-04 ✗ |
-| `release/sil/sil_devanagari_phonetic/` | medium | abugida | strong | none | single | none | many | — | rule 2 → S-09 + S-05 | S-09 + S-05 ✓ |
-| `release/v/vietnamese_telex/` | medium | alphabetic | strong | replacing-cycling | single | none | many | addition | rule 3 → S-07 + S-04 | S-07 ✓ |
-| `release/sil/sil_yoruba8/` | medium | alphabetic | strong | multi-family | two-orthography | none | many | addition | rule 4 → S-11 wrap | S-11 ✓ |
-| `release/a/armenian_mnemonic_r/` | medium | alphabetic | weak | none | single | none | RAlt only | full-remap | rule 8 → S-06 + S-04 + S-08 | S-06 + S-04 + S-08 ✓ |
-| `release/el/el_pasifika/` | small | alphabetic | strong | stacking-combining | single | loud | many | addition | rule 7 → S-02 + rule 9 → +S-10 | S-02 + S-10 ✓ |
-| `release/c/cs_pinyin/` | massive | logographic | weak | none | single | none | many | — | rule 1 → S-12 | S-12 ✓ |
-| `release/itrans/itrans_devanagari_hindi/` | large | abugida | strong | none | two-orthography | none | many | — | rule 2 → S-09 + S-05; rule 4 wraps S-11 | S-09 + S-05 + S-11 ✓ |
-| `release/sil/sil_pan_africa_mnemonic/` | large | alphabetic | weak | multi-family | single | none | many | addition | rule 6 → S-06 + S-04 | S-06 + S-04 ✓ |
-| `release/a/arabic_izza/` | medium | abjad | weak | none | single | none | many | — | rule 2 → S-09 | S-09 ✓ |
-| `release/r/russian_mnemonic_r/` | medium | alphabetic | weak | none | single | none | RAlt only | full-remap | rule 8 → S-06 + S-04 + S-08 | S-06 + S-04 + S-08 ✓ |
+| Exemplar | A1 | A2 | A3 | A3a | A4 | A5 | A6 | A7 | A7a | Tree → strategy | Actual primary |
+|----------|----|----|----|-----|----|----|----|----|-----|-----------------|----------------|
+| `release/a/akan/` | tiny | alphabetic | strong | — | none | single | none | many | addition | rule 11 → S-01 | S-01 ✓ |
+| `release/sil/sil_euro_latin/` | large | alphabetic | strong | — | multi-family | single | none | RAlt only | addition | rule 6 → S-06 | S-02 + S-04/S-08 ✗ |
+| `release/sil/sil_ipa/` | medium | alphabetic | strong | postfix | none | single | none | many | addition | rule 3a → S-03 + S-04 | S-03 + S-04 ✓ |
+| `release/sil/sil_devanagari_phonetic/` | medium | abugida | strong | — | none | single | none | many | — | rule 2 → S-09 + S-05 | S-09 + S-05 ✓ |
+| `release/v/vietnamese_telex/` | medium | alphabetic | strong | — | replacing-cycling | single | none | many | addition | rule 3 → S-07 + S-04 | S-07 ✓ |
+| `release/sil/sil_yoruba8/` | medium | alphabetic | strong | — | multi-family | two-orthography | none | many | addition | rule 4 → S-11 wrap | S-11 ✓ |
+| `release/a/armenian_mnemonic_r/` | medium | alphabetic | weak | — | none | single | none | RAlt only | full-remap | rule 8 → S-06 + S-04 + S-08 | S-06 + S-04 + S-08 ✓ |
+| `release/el/el_pasifika/` | small | alphabetic | strong | — | stacking-combining | single | loud | many | addition | rule 7 → S-02 + rule 9 → +S-10 | S-02 + S-10 ✓ |
+| `release/c/cs_pinyin/` | massive | logographic | weak | — | none | single | none | many | — | rule 1 → S-12 | S-12 ✓ |
+| `release/itrans/itrans_devanagari_hindi/` | large | abugida | strong | — | none | two-orthography | none | many | — | rule 2 → S-09 + S-05; rule 4 wraps S-11 | S-09 + S-05 + S-11 ✓ |
+| `release/sil/sil_pan_africa_mnemonic/` | large | alphabetic | weak | — | multi-family | single | none | many | addition | rule 6 → S-06 + S-04 | S-06 + S-04 ✓ |
+| `release/a/arabic_izza/` | medium | abjad | weak | — | none | single | none | many | — | rule 2 → S-09 | S-09 ✓ |
+| `release/r/russian_mnemonic_r/` | medium | alphabetic | weak | — | none | single | none | RAlt only | full-remap | rule 8 → S-06 + S-04 + S-08 | S-06 + S-04 + S-08 ✓ |
 
 Note: S-04 (`any`/`index` table mechanism) is structurally embedded in every S-06 deployment; rows that list S-06 implicitly include S-04.
 
-**Known mismatches (intended v1.1 work, not bugs).** Rule 8 (added in v1.0.1) closed the alphabetic full-remap gap; Armenian and Russian mnemonic now round-trip correctly. Two exemplars still don't round-trip; each marks a tree gap to fix in v1.1:
+**Known mismatches (intended v1.1 work, not bugs).** Rule 8 (added in v1.0.1) closed the alphabetic full-remap gap; Armenian and Russian mnemonic now round-trip correctly. Rule 3a (added in v1.1.1) closed the IPA postfix-sequence gap. One exemplar still doesn't round-trip; it marks a tree gap to fix in v1.1:
 
-- **EuroLatin**: A2=alphabetic, A1=large, A4=multi-family, A3=strong, A7a=addition. Tree picks **S-05 (mnemonic phonetic layer)** but the actual keyboard uses **S-02 with broad parallel stores**. Add an A4=multi-family + A1=large tie-breaker inside rule 5 that prefers S-02 + broad S-04 over S-05 when the diacritic families are independent rather than nested.
-- **IPA**: A3=strong but the user prefers *sequence modifiers* (`<`, `=`, `>`) to mnemonic spelling. Add a sub-axis distinguishing "spell the sound" from "decorate with suffix keys."
+- **EuroLatin**: A2=alphabetic, A1=large, A4=multi-family, A3=strong, A7a=addition. Tree picks **S-06 (two-tier chained deadkeys)** but the actual keyboard uses **S-02 with broad parallel stores**. Add an A3-and-scale tie-breaker inside rule 6 that prefers S-02 + broad S-04 over S-06 when the diacritic families are independent rather than nested.
+- **IPA**: ~~A3=strong but the user prefers sequence modifiers~~ — closed in v1.1.1 by rule 3a (A3a=postfix → S-03 + S-04). See §7.1 A3a.
 
-These two remaining mismatches are **the value of the validation pass** — they pinpoint where v1 needs work before release. They are not v1 blockers: EuroLatin and IPA are expert-authored, well outside the target user's profile, and the strategies the tree picks (S-05 for EuroLatin, S-05 for IPA) produce working keyboards even if they differ from what SIL chose.
+This remaining mismatch is **the value of the validation pass** — it pinpoints where v1 needs work before release. It is not a v1 blocker: EuroLatin is expert-authored, well outside the target user's profile, and the strategy the tree picks (S-06) produces a working keyboard even if it differs from what SIL chose.
 
 **Phase-gated elicitation gaps (intended phased-delivery omissions, not tree bugs).**  The following §7.2 rules cannot fire from the currently shipped survey phases (A, B, F) because the required axis is not yet elicited.  Each is gated on Phase C delivery.  The §7.5 validation rows for these exemplars confirm the *tree logic* is correct when a full axis vector is supplied — the gap is upstream in the survey layer.
 
@@ -1022,7 +1029,7 @@ Strategy selection (Sec 7.2) decides **how** characters are entered; this sectio
 
 5. **Survey — Phase A (Identity + routing).** User enters language name, localized language name (autonym), BCP47 tag (with langtags.json lookup), display name, copyright holder. System detects script group (QWERTY/QWERTZ, AZERTY, or non-Roman) from BCP47 + the IR's structural shape and confirms with the user. This routes all subsequent phases. Phase A also surfaces v1's desktop-first authoring posture (Decision 6, Sec 14) — mobile-primary authors are notified that the survey is anchored to physical-keyboard mental-model answers before they invest survey time. The touch layout is still produced in Phase E. Phase A optionally collects **provenance metadata** (`KeyboardProvenance` in `@keyboard-studio/contracts`) — requester identity and contact, language-community representative, speaker count, language status, regions, existing tools, orthography link, casing notes, and free-form notes (the intake fields carried over from the legacy manual request form). Provenance is **non-gating**: it never blocks a phase exit or the submit button, and is serialized into the package / PR body for attribution and contact at output (Sec 12), never into the `.kmn`. The localized name is the one provenance field that may also feed a build artifact (the `.kps` / `welcome.htm` display). This is metadata capture only — it is distinct from the out-of-scope triage tool (Sec 16) and implies no request queue or assignment workflow.
 
-6. **Survey — Phase B (Character coverage + strategy axes).** User pastes or lists target characters. Studio diffs against the IR's output set and, for each new character, the user states which key it lives on and under what modifier. Crucially, this phase also **computes the discovery axes** (Sec 7.1): the character count fixes A1 (scale), the diff and a few plain-language follow-ups fix A3 (phonetic intuition), A4 (diacritic behavior), and A7 (spare-key availability). The output method is **not** assumed to be simple substitution — Phase B feeds the axis vector to the strategy selector (Sec 7.2), which picks the right strategy. A simple one-key-per-character swap (S-01) is only the result when the inventory is tiny and phonetic; larger or diacritic-heavy inventories route to deadkey composition (S-02), mnemonic spelling (S-05), diacritic cycling (S-07), context-sensitive clusters (S-09), and so on.
+6. **Survey — Phase B (Character coverage + strategy axes).** User pastes or lists target characters. Studio diffs against the IR's output set and, for each new character, the user states which key it lives on and under what modifier. Crucially, this phase also **computes the discovery axes** (Sec 7.1): the character count fixes A1 (scale), the diff and a few plain-language follow-ups fix A3 (phonetic intuition), A3a (mark-input order — alphabetic only), A4 (diacritic behavior), and A7 (spare-key availability). The output method is **not** assumed to be simple substitution — Phase B feeds the axis vector to the strategy selector (Sec 7.2), which picks the right strategy. A simple one-key-per-character swap (S-01) is only the result when the inventory is tiny and phonetic; larger or diacritic-heavy inventories route to deadkey composition (S-02), mnemonic spelling (S-05), diacritic cycling (S-07), context-sensitive clusters (S-09), and so on.
 
 **Placement proposals.** When a placement map (the seeder output of Sec 7.6) is available for the session, its entries pre-fill the per-character key/modifier questions instead of leaving them blank: above the confidence threshold the proposal renders as an editable pre-fill; below it, as an advisory chip beside an empty field. Every proposal shows its provenance — a corpus citation ("N existing keyboards for similar languages place this here") or an anchor type (decomposition, name, look-alike, phonetic) — and is overridable in place. Collisions (two characters proposed onto the same key+modifier) are surfaced as a single resolve-one question rather than two silent pre-fills. Per-strategy key choices (the S-02 deadkey trigger, S-06 family keys, S-07 cycle key, S-09 consonant grid) follow the **Placement semantics** notes on the corresponding Sec 7.3 cards. The proposal flow never auto-commits: the user confirms or overrides each placement, mirroring the linguist-agent posture (propose → cross-check → confirm) used for the character inventory below.
 
@@ -1034,6 +1041,20 @@ To seed this phase the studio offers several **character-discovery** methods (`C
 - **Visual picker** — browse a script-scoped grid (seeded from the language's CLDR exemplar characters, falling back to the script's Unicode block) and click the characters to include. This is the fallback when the author has neither text nor a language the agent can resolve.
 
 Whatever the method, the result pre-fills the target-character inventory, which the user confirms or edits; the strategy selector (Sec 7.2) then runs over the confirmed set. Discovery is **character enumeration only** — no wordlist or prediction model is built (Sec 16); frequency, where a method provides it, is advisory and may hint key placement. (The picker and the linguist agent's cross-check reuse the same pinned Unicode/CLDR signal as the kbgen placement seeder.) **Normalization note:** the linguist inventory is NFC for character identification and display; how the keyboard normalizes its *output* (e.g. the NFD reorder auto-emitted for Latin groups in Phase C' below) is a separate, later concern and is not constrained by the inventory's NFC form.
+
+**Placement habits (Q1 — existing keyboards, axis-refining).** Knowing which keyboards community members use today lets the studio propose key placements that feel familiar and predicts adoption of the new layout. "What do people in your language community use today to type — a standard keyboard meant for another language, an older Keyman keyboard, or some other workaround?"
+
+**Placement habits (Q2 — co-installed keyboards, axis-refining).** Other keyboards on the same machine constrain which key combinations must not be accidentally blocked or remapped. "Are there other keyboards that must keep working on the same device — for example, a French, English, Arabic, or Devanagari keyboard for a different language?"
+
+**Mark-input order (Q3 — A3a sub-axis, axis-refining, alphabetic only).** Whether the community presses the diacritic key before or after the base letter determines whether a deadkey or a sequence-replace strategy better matches their habits. "When typing a letter with a diacritic, does the typist expect to press the diacritic key before the letter, or type the letter first and then the diacritic?" This is the A3a elicitation question; it is shown only when A2=alphabetic AND A3=strong.
+
+**Contact-language loanwords (Q4 — placement advisory, non-gating).** Common borrowed words, names, and URLs constrain which base keys may be reassigned without breaking the community's ability to type contact-language text. "Are there common borrowed words, people's names, or website addresses that the keyboard must also be able to type?"
+
+**Legacy text encoding (Q5 — normalization advisory, non-gating).** Existing community documents may have been produced with keyboards using non-standard character sets; knowing this lets the studio surface compatibility warnings before Phase C'. "Does existing text in your language come from older systems where the keyboard used a non-standard character set — sometimes called a 'legacy encoding' — rather than the international Unicode standard?"
+
+**Primary use case (Q6 — placement advisory, non-gating).** Literacy and school materials require every character to be reachable without extra steps; texting and official-document workflows have different frequency-vs-completeness trade-offs. "What will this keyboard mainly be used for — school materials, everyday texting, or official documents?"
+
+Answers to Q1 and Q2 are advisory for the placement-prior lookup (§7.6): the prior query uses them as community-context to surface "communities with a similar existing keyboard chose…" in placement proposals. Q4–Q6 are non-gating advisories only; they never block a phase exit or the submit button.
 
 7. **Gallery — Phase C (Special inputs).** Driven by the strategy selector's result (primary + secondaries, Sec 7.2). The gallery surfaces the **recommended strategy's** patterns first as live mini-keyboards (e.g. a deadkey demo for S-02, a tone-cycle demo for S-07); secondary and less-common strategies sit behind "show me more." This phase also resolves the remaining axes that need a judgment call — A5 (multi-mode), A6 (constraint enforcement), and A2a (cluster sensitivity) — which can add S-11, S-10, or S-09 to the recommendation. User taps each demo, confirms the ones that match their language, and fills plain-language slot questions. Each selected pattern is inserted as a validated KMN skeleton tagged with its `strategyId`.
 

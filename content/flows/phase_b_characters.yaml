@@ -49,6 +49,31 @@ phase: "B"
 
 questions:
 
+  # -- Placement-habit context (Q1-Q2, axis-refining; asked before discovery) --
+
+  - id: pb_existing_keyboards
+    prompt: "What do people in your language community use today to type — a standard keyboard meant for another language, an older Keyman keyboard, or some other workaround?"
+    help_text: >
+      For example: a national keyboard designed for a neighboring language,
+      an older Keyman keyboard the community already uses, or a workaround
+      like typing two letters for one sound. Knowing their existing habits
+      lets the studio suggest key positions that feel familiar and are more
+      likely to be adopted.
+    type: text
+    required: false
+    next: pb_co_installed_keyboards
+
+  - id: pb_co_installed_keyboards
+    prompt: "Are there other keyboards that must keep working on the same device — for example, a French, English, Arabic, or Devanagari keyboard for a different language?"
+    help_text: >
+      If your users switch between keyboards on the same computer or phone,
+      this keyboard should not accidentally block or change key combinations
+      that the other keyboard uses. List any keyboards that your community
+      switches between regularly, or leave blank if there are none.
+    type: text
+    required: false
+    next: pb_discovery_intro
+
   # -- Discovery method introduction -------------------------------------------
 
   - id: pb_discovery_intro
@@ -340,6 +365,30 @@ questions:
         label: "Hold or press a special key first (like a key you press that makes no letter by itself), then press the base letter"
       - value: direct
         label: "Press one key that directly produces the letter with its accent"
+    next:
+      - condition: "value == 'phonetic'"
+        goto: pb_mark_input_order
+      - default: pb_special_letters
+
+  # -- Q3a: Mark-input order (A3a sub-axis; only asked when A3=strong) -----------
+
+  - id: pb_mark_input_order
+    prompt: "When typing a letter with a diacritic, does the typist expect to press the diacritic key before the letter, or type the letter first and then the diacritic?"
+    help_text: >
+      For example: pressing the diacritic key first and then the letter (like
+      pressing a key for an acute accent and then a to get a-with-acute, or
+      pressing an underdot key before s to get s-with-underdot), or typing
+      the letter first and then a suffix key (like typing a and then a special
+      key to add the diacritic after). There is no wrong answer -- this depends
+      on what feels natural to your community and what existing keyboards
+      already do.
+    type: radio
+    required: true
+    options:
+      - value: prefix
+        label: "Diacritic key first, then the letter (the diacritic key is pressed before the base letter)"
+      - value: postfix
+        label: "Letter first, then the diacritic key (type the base letter, then press a key to add the diacritic)"
     next: pb_special_letters
 
   # -- Q3: Special letters not on any standard keyboard -----------------------
@@ -489,7 +538,7 @@ questions:
         goto: pb_latin_qwerty_branch
       - condition: "ctx.routing_group == 'azerty'"
         goto: pb_latin_azerty_branch
-      - default: pb_additional_methods
+      - default: pb_contact_language
 
   # ============================================================================
   # LATIN QWERTY/QWERTZ BRANCH
@@ -526,7 +575,7 @@ questions:
       leave blank if all keys are needed.
     type: text
     required: false
-    next: pb_additional_methods
+    next: pb_contact_language
 
   # ============================================================================
   # LATIN AZERTY BRANCH
@@ -580,7 +629,7 @@ questions:
       you could spare, or leave blank if all are needed.
     type: text
     required: false
-    next: pb_additional_methods
+    next: pb_contact_language
 
   # ============================================================================
   # NON-ROMAN BRANCH (dispatches further by script_family)
@@ -939,6 +988,66 @@ questions:
     next: pb_special_letters
 
   # ============================================================================
+  # PLACEMENT ADVISORIES (Q4-Q6; non-gating; all branches pass through here)
+  # ============================================================================
+
+  - id: pb_contact_language
+    prompt: "Are there common borrowed words, people's names, or website addresses that the keyboard must also be able to type?"
+    help_text: >
+      For example, if French loanwords are common, the keyboard should still
+      be able to produce those letters without extra steps. Website addresses
+      and place names borrowed from other languages also count. List any
+      characters or words from other languages that speakers regularly need,
+      or leave blank if there are none.
+    type: text
+    required: false
+    advisory: true
+    next: pb_legacy_encoding
+
+  - id: pb_legacy_encoding
+    prompt: "Does existing text in your language come from older systems where the keyboard used a non-standard character set — sometimes called a 'legacy encoding' — rather than the international Unicode standard?"
+    help_text: >
+      Some older documents were produced with keyboards that stored
+      characters using a private or non-standard system (sometimes called a
+      'legacy font' or 'legacy encoding'). These documents may look correct
+      on screen but store characters differently from modern software. If
+      your community has documents like this, the studio can warn you about
+      compatibility before the keyboard is finished.
+    type: radio
+    required: false
+    advisory: true
+    options:
+      - value: yes-legacy
+        label: "Yes, some existing text uses a legacy encoding or legacy font"
+      - value: no-unicode
+        label: "No, existing text already uses the international Unicode standard"
+      - value: not-sure
+        label: "I am not sure"
+    next: pb_use_case
+
+  - id: pb_use_case
+    prompt: "What will this keyboard mainly be used for — school materials, everyday texting, or official documents?"
+    help_text: >
+      School and literacy materials often need every character to be easy
+      to reach without extra steps. Texting keyboards can put less common
+      characters behind a long press. Official and government documents may
+      need a more complete character set. Your answer helps the studio
+      suggest the best balance between ease of use and completeness.
+    type: radio
+    required: false
+    advisory: true
+    options:
+      - value: literacy
+        label: "School or literacy materials (every character should be quick to reach)"
+      - value: messaging
+        label: "Everyday texting and messaging (speed and common letters matter most)"
+      - value: official
+        label: "Official or government documents (completeness matters most)"
+      - value: general
+        label: "General use -- a mix of the above"
+    next: pb_additional_methods
+
+  # ============================================================================
   # ADDITIONAL METHODS OFFER (shown to all branches)
   # ============================================================================
 
@@ -990,6 +1099,16 @@ questions:
 #     pb_typing_approach == "lookalike"     -> A3: weak    (shape-based, not phonetic)
 #     pb_typing_approach == "modifier-base" -> A3: weak    (modifier-based, not phonetic)
 #     pb_typing_approach == "direct"        -> A3: weak
+#
+#   A3a (mark-input order sub-axis):  (§7.1: "prefix" | "postfix" | undefined)
+#     Elicited ONLY when A2=alphabetic AND A3=strong (i.e. pb_typing_approach=="phonetic"
+#     AND the alphabet/Latin branch of Phase A). pb_mark_input_order is only shown in
+#     that case; the question node is skipped entirely on non-alphabetic scripts.
+#     pb_mark_input_order == "prefix"   -> A3a: prefix   (accent key first, then letter)
+#     pb_mark_input_order == "postfix"  -> A3a: postfix  (letter first, then accent key)
+#     (not elicited / question skipped) -> A3a: undefined
+#     Decision-tree impact: A3a=postfix causes rule 3a to fire (→ S-03 + S-04),
+#     overriding the A3=strong heuristic. Closes the §7.5 IPA mismatch.
 #
 #   A4 (diacritic behaviour):
 #     (§7.1: "none" | "stacking-combining" | "replacing-cycling" | "multi-family")
@@ -1054,9 +1173,17 @@ questions:
 #     -> primary_strategy: S-09
 #        eligible_pattern_ids: patterns with strategyId == "S-09"
 #
+# Advisory answers (not axis values; stored in SurveyPhaseResult.answers):
+#   pb_existing_keyboards  -> free-text; used as context for placement-prior lookup
+#   pb_co_installed_keyboards -> free-text; informs base-layout / AltGr collision check
+#   pb_contact_language    -> free-text; constrains base-key displacement in placement seeder
+#   pb_legacy_encoding     -> "yes-legacy" | "no-unicode" | "not-sure"; triggers migration warning
+#   pb_use_case            -> "literacy" | "messaging" | "official" | "general"; weights frequency
+#                            vs. completeness in the placement ranking tiebreak
+#
 # Known §7.5 gaps (do not hard-assert these until resolved):
 #   EuroLatin profile (S-06 vs S-02) -- intentional v1.1 gap
-#   IPA profile (S-05 vs S-03)       -- intentional v1.1 gap
+#   IPA profile (S-05 vs S-03)       -- CLOSED by A3a / rule 3a (see A3a note above)
 #
 # AXES NOT COMPUTED BY PHASE B:
 #   - A2 (script class): set in Phase A from BCP47 + three-group routing (spec §7.1, §9)
@@ -1071,8 +1198,8 @@ questions:
 #     without a remap-posture probe, so §7.2 rule 8 (A7a=full-remap -> S-06+S-04+S-08)
 #     cannot fire for Cyrillic/Armenian/Greek users until Phase B adds an
 #     alpha-nonlatin remap probe. See spec §7.1 A7a and §7.5 phase-gated elicitation gaps.
-#   Phase B contributes A1, A3, A4 (partial -- see TIMING NOTE), A7 (partial -- A7a not
-#   elicited for alpha-nonlatin, see above) to the axis vector.
+#   Phase B contributes A1, A3, A3a (when elicited), A4 (partial -- see TIMING NOTE), A7
+#   (partial -- A7a not elicited for alpha-nonlatin, see above) to the axis vector.
 #
 # eligible_inventory_entries:
 #   Union of all InventoryChar[] from methods used (manual answers converted,

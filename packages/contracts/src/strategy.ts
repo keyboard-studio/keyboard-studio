@@ -37,12 +37,13 @@ export const ALL_STRATEGY_IDS: readonly StrategyId[] = [
  * rule 9 (`A6=loud`) adds S-10; rule 10 (`A7=fully-booked`) adds S-08;
  * neither sets the `primary` field of a {@link StrategyRecommendation}.
  *
- * Valid set: 1-8 (rules 1-7 + rule 8 alphabetic-full-remap) and 11-12
+ * Valid set: 1-8 (rules 1-7 + rule 8 alphabetic-full-remap), the string "3a"
+ * (rule 3a — A3a=postfix intercept, fires between rules 3 and 4), and 11-12
  * (rule 11 = `A1=tiny AND A3=strong → S-01`; rule 12 = catch-all fallback to S-03).
  *
  * @see spec.md §7.2
  */
-export type PrimaryRuleNumber = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 11 | 12;
+export type PrimaryRuleNumber = 1 | 2 | 3 | "3a" | 4 | 5 | 6 | 7 | 8 | 11 | 12;
 
 /** Output of the strategy selector - see spec.md section 7.2 decision tree. */
 export interface StrategyRecommendation {
