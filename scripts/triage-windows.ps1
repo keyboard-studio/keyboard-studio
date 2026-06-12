@@ -30,6 +30,9 @@ $claude = if ($env:CLAUDE_BIN) { $env:CLAUDE_BIN }
           elseif (Get-Command claude -ErrorAction SilentlyContinue) { (Get-Command claude).Source }
           else { "claude" }
 
+# Model the spawned triage runs on. Override with $env:KM_TRIAGE_MODEL.
+$model = if ($env:KM_TRIAGE_MODEL) { $env:KM_TRIAGE_MODEL } else { "haiku" }
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 function Get-Ts { (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") }
@@ -96,8 +99,8 @@ PRs and questions that need your attention. Append-only; the triage loop adds en
 if (-not (Test-Path $auditLog)) { New-Item -ItemType File -Path $auditLog | Out-Null }
 
 if (-not (Test-Path "$inboxDir\.labels-created")) {
-  gh label create tech-lead-ready-to-merge --color 0e8a16 `
-    --description "Triage approved - awaiting tech lead merge" 2>$null; $true
+  gh label create ready-to-merge --color 0e8a16 `
+    --description "Triage approved - ready to merge by any team member" 2>$null; $true
   gh label create review-needed --color d93f0b `
     --description "Triage escalated - awaiting submitter or tech-lead response" 2>$null; $true
   gh label create triage-skip --color cfd3d7 `
@@ -187,7 +190,7 @@ for ($i = 1; $i -le $maxIterations; $i++) {
 
     # Gate 3 — hard-skip labels
     $labelNames = $pr.labels | ForEach-Object { $_.name }
-    if ($labelNames -contains "tech-lead-ready-to-merge" -or $labelNames -contains "triage-skip") {
+    if ($labelNames -contains "ready-to-merge" -or $labelNames -contains "triage-skip") {
       "    skip: already_in_lead_queue (label)" | Tee-Object -FilePath $log -Append | Write-Host
       Write-AuditSkip $num "already_in_lead_queue" $headSha
       $nSkip++; continue
@@ -305,7 +308,7 @@ Please rebase against ``main`` first; the next sweep will run the full review cr
     $savedClaudeCode = $env:CLAUDECODE
     $env:CLAUDECODE = ""
     try {
-      & $claude -p "/km-triage $num" --dangerously-skip-permissions --output-format text *>> $log
+      & $claude -p "/km-triage $num" --model $model --dangerously-skip-permissions --output-format text *>> $log
       if ($LASTEXITCODE -ne 0) {
         "    [WARN] claude exited $LASTEXITCODE for PR #$num" | Tee-Object -FilePath $log -Append | Write-Host
       }

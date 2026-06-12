@@ -11,6 +11,55 @@ If `$ARGUMENTS` is a PR number, triage that one PR and exit. If it is empty, swe
 
 ---
 
+## Personal mode — interactive run under your own GitHub account
+
+**The escape hatch for running `/km-triage` by hand.** Everything below this section is written for the unattended service: it authenticates as the `km-triage[bot]` GitHub App, mints installation tokens, and posts under the bot identity. That path requires a one-time `node utilities/km-triage-app/setup.js` to install the App on the machine. A teammate who just wants to triage a PR interactively from their own Claude Code session has no bot identity and should not need one.
+
+**Personal mode** is that path. When active, the triage runs entirely under the operator's own `gh` auth (their PAT) and never touches the bot machinery.
+
+### When personal mode is active
+
+Decide once, at the very start of Phase 1, before the reachability check. Personal mode is active if **either**:
+
+1. **`$KM_TRIAGE_INTERACTIVE` is `1`** in the environment (explicit opt-in), **or**
+2. **Auto-fallback:** the bot token cannot be minted (`node utilities/km-triage-app/mint-token.js` fails) **and** a human is present (`$CLAUDECODE` is non-empty — true for any interactive Claude Code session; the scheduler wrappers deliberately clear it). In this case, print a one-line notice (`[km-triage] no bot identity; running in personal mode under your own gh account`) and continue in personal mode instead of fast-failing with `auth_failed`.
+
+Otherwise — `$CLAUDECODE` empty (a scheduler wrapper) and a bot token mints cleanly — run in **bot mode**, exactly as the rest of this document describes.
+
+Confirm `gh auth status` succeeds in personal mode; if it doesn't, write the normal `auth_failed` audit line and stop (a personal run with no `gh` auth can do nothing).
+
+### What changes in personal mode
+
+| Mechanism (bot mode) | Personal-mode behavior |
+|---|---|
+| **Phase 1 reachability check** (`mint-token.js`, fast-fail `auth_failed`) | **Skipped.** No token is minted. |
+| **`node utilities/km-triage-app/bot-gh.js <args>`** — every PR-mutating call (comments, label adds, the CONFLICTING / MENTION / ESCALATE comments) | **Replace with plain `gh <args>`.** Same arguments, your own PAT. Comments/labels are attributed to you, not `km-triage[bot]`. |
+| **`check-progress.js`** check-run publication (Phase 4 create, Phase 5/6 patches, Pre-filter D `success`) | **Skipped entirely.** It mints a bot token and needs the App's `checks: write`; you don't have it. Observability degrades to the local `progress.jsonl` only. The PR's merge gate is satisfied by your own review/merge as a human, not by a `km-triage/review` check. |
+| **Auto-fix `git push`** via `https://x-access-token:$(mint-token.js)@github.com/...` | **Push with your own git auth:** `git -C "$WORKTREE" push origin "HEAD:<HEAD_BRANCH>"`. The commit is attributed to you. All auto-fix gates (head-not-protected, SHA-unchanged, still-mergeable, worktree isolation) still apply unchanged. |
+| **`progress-emit.js`** local JSONL | **Unchanged** — pure local file write, no token. |
+
+The local `gh label create` calls in Phase 1 already use plain `gh` (the human PAT) in both modes — no change.
+
+### APPROVE-AND-PARK in personal mode
+
+The goal is identical to bot mode and to the same action everywhere: on a clean approve, **always** tag the PR ready for **any team member** to merge, and never require the operator who ran the triage (or the tech lead specifically) to be the one who merges. In bot mode the `km-triage[bot]` `--approve` satisfies `main`'s required-approving-review gate so any team member can click merge. Personal mode keeps that goal while running under a human PAT:
+
+- **Always** apply the `ready-to-merge` label and post a plain `gh pr comment` summarizing the specialists' verdicts (same body as bot mode, with a closing line noting it was a personal-mode run).
+- **If the operator is not the PR author:** also run `gh pr review --approve` under your own PAT. That satisfies the required-review gate, so any team member with write access can merge — no further action from anyone in particular.
+- **If the operator is the PR author:** GitHub blocks self-approval, so the label + comment stand on their own; the comment notes that one other team member's approving review is still needed before the merge button unlocks. That is a GitHub branch-protection rule, not a triage choice — the triage still never requires *you specifically* to be that approver.
+
+The merge itself is always a human click (per the Hard safety rules below, the triage never merges); the point of always-tagging is that any team member, not only the tech lead, can be the one to click it.
+
+All other actions (REQUEST-CHANGES, MENTION_ONLY, ESCALATE, auto-fix) behave identically to bot mode — only the wrapper changes from `bot-gh.js` to `gh`.
+
+### Permissions
+
+Run personal mode as an ordinary interactive slash command — **do not** pass `--dangerously-skip-permissions`. There is a human at the terminal to answer permission prompts; that is the whole point of this mode. (`--dangerously-skip-permissions` belongs only to the unattended scheduler wrappers, where the GitHub App permission ceiling, not the local prompt, is the safety boundary.)
+
+The **Hard safety rules** below (never merge, never rebase, never force-push, never mutate `main`, never close issues) apply in **both** modes, without exception.
+
+---
+
 ## Your single goal
 
 Move the tech lead out of the critical path of every PR. For each open PR:
@@ -18,7 +67,7 @@ Move the tech lead out of the critical path of every PR. For each open PR:
 1. Decide which review crew applies (engine, content, or both) — primarily from the GitHub team label.
 2. Dispatch the right specialists in parallel; collect their verdicts.
 3. Take **one** of three actions per PR:
-   - **APPROVE-AND-PARK** — label `tech-lead-ready-to-merge`, post an approval comment. **Do not merge.**
+   - **APPROVE-AND-PARK** — label `ready-to-merge`, post an approval comment. **Do not merge.**
    - **REQUEST-CHANGES** — post a review with the consolidated change requests via `gh pr review --request-changes`.
    - **ESCALATE** — label `review-needed`, append the question to `.tech-lead-inbox/INBOX.md`.
 4. Write one JSONL line per PR to `.tech-lead-inbox/audit-log.jsonl`.
@@ -112,7 +161,7 @@ For git pushes, mint inline and put the token in the remote URL (one-shot URL; n
 git -C "$WORKTREE" push "https://x-access-token:$(node utilities/km-triage-app/mint-token.js)@github.com/MattGyverLee/keyboard-studio.git" "HEAD:$HEAD_BRANCH"
 ```
 
-The code blocks in Phases 2–6 below show `bot-gh.js` on every PR-mutating call. Follow them exactly — silently falling back to direct `gh` attributes the action to the human PAT and (for APPROVE) gets rejected by GitHub as author-self-approval.
+The code blocks in Phases 2–6 below show `bot-gh.js` on every PR-mutating call. Follow them exactly **in bot mode** — silently falling back to direct `gh` attributes the action to the human PAT and (for APPROVE) gets rejected by GitHub as author-self-approval. (In **personal mode** the opposite holds: every `bot-gh.js` becomes plain `gh` by design, and APPROVE-AND-PARK is label + comment, never `--approve` — see the Personal mode section near the top.)
 
 ### Setup (one-time)
 
@@ -218,7 +267,7 @@ test -f .tech-lead-inbox/audit-log.jsonl || : > .tech-lead-inbox/audit-log.jsonl
 
 # Triage labels: create once per repo lifetime, guarded by a sentinel file.
 if [ ! -f .tech-lead-inbox/.labels-created ]; then
-  gh label create tech-lead-ready-to-merge --color 0e8a16 --description "Triage approved - awaiting tech lead merge" 2>/dev/null || true
+  gh label create ready-to-merge --color 0e8a16 --description "Triage approved - ready to merge by any team member" 2>/dev/null || true
   gh label create review-needed            --color d93f0b --description "Triage escalated - awaiting submitter or tech-lead response" 2>/dev/null || true
   gh label create triage-skip              --color cfd3d7 --description "Do not run triage on this PR" 2>/dev/null || true
   touch .tech-lead-inbox/.labels-created
@@ -227,7 +276,7 @@ fi
 
 `.tech-lead-inbox/` is in `.gitignore` already; the bootstrap is paranoia. The label-creation sentinel means three `gh label create` API calls happen on the first ever sweep and zero on every subsequent sweep.
 
-After the bootstrap, run the bot-identity reachability check (see "Phase 1 reachability check" in the Bot identity section above). It mints a throwaway token to confirm the App is installed and reachable, and fast-fails the sweep with `auth_failed` if not. Every subsequent PR-mutating action mints its own fresh token via [utilities/km-triage-app/bot-gh.js](utilities/km-triage-app/bot-gh.js) — no shell-state assumptions.
+After the bootstrap, **first decide bot vs personal mode** (see the Personal mode section near the top). In **personal mode**, skip this reachability check entirely — no token is minted. In **bot mode**, run the bot-identity reachability check (see "Phase 1 reachability check" in the Bot identity section above). It mints a throwaway token to confirm the App is installed and reachable, and fast-fails the sweep with `auth_failed` if not. Every subsequent PR-mutating action mints its own fresh token via [utilities/km-triage-app/bot-gh.js](utilities/km-triage-app/bot-gh.js) — no shell-state assumptions.
 
 ## Phase 2 — Discover PRs
 
@@ -259,8 +308,8 @@ For each PR, **skip** (with audit-log entry `action_taken: skipped, reason: <X>`
   ```
 
   Any other shape — Claude (`noreply@anthropic.com`), a teammate's email (`*@taylor.edu`, `*@sil.org` that isn't the lead's), or a Co-Authored-By trailer pointing elsewhere — means **triage the PR**. Do **not** key off `author.login` (who opened the PR) — that field is set to the tech lead's identity whenever a headless CLI run or a "push for me" workflow lands a PR under their credentials, and skipping on that signal would defeat the entire purpose of the triage.
-- Labels include `tech-lead-ready-to-merge` or `triage-skip` → reason `already_in_lead_queue`. These are unconditional hard skips: `tech-lead-ready-to-merge` means the crew already approved the PR and it awaits a human merge; `triage-skip` is an explicit opt-out. Neither is overridden by lead-trigger comments.
-- Label `review-needed` is present AND **no lead-trigger comment has been posted since the most recent audit entry's `ts`** → reason `already_in_lead_queue`. This is the "awaiting human response" state, so the same lead-trigger comment lookup defined under `no_new_commits_since_last_review` below applies here too. If a matching comment exists, do **not** skip: remove the `review-needed` label before proceeding into Phase 3 (Phase 6 will re-add it if the new outcome is still MENTION/ESCALATE, or replace it with `tech-lead-ready-to-merge` if the crew approves):
+- Labels include `ready-to-merge` or `triage-skip` → reason `already_in_lead_queue`. These are unconditional hard skips: `ready-to-merge` means the crew already approved the PR and it awaits a human merge; `triage-skip` is an explicit opt-out. Neither is overridden by lead-trigger comments.
+- Label `review-needed` is present AND **no lead-trigger comment has been posted since the most recent audit entry's `ts`** → reason `already_in_lead_queue`. This is the "awaiting human response" state, so the same lead-trigger comment lookup defined under `no_new_commits_since_last_review` below applies here too. If a matching comment exists, do **not** skip: remove the `review-needed` label before proceeding into Phase 3 (Phase 6 will re-add it if the new outcome is still MENTION/ESCALATE, or replace it with `ready-to-merge` if the crew approves):
   ```bash
   node utilities/km-triage-app/bot-gh.js api \
     repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels/review-needed -X DELETE || true
@@ -811,9 +860,9 @@ CONFLICTING PRs never reach this phase — Phase 2 catches them and posts a sepa
 
 ## Phase 6 — Execute the action
 
-The triage labels (`tech-lead-ready-to-merge`, `review-needed`, `triage-skip`) are created once in Phase 1 (guarded by the `.tech-lead-inbox/.labels-created` sentinel) — no further label-create calls run here.
+The triage labels (`ready-to-merge`, `review-needed`, `triage-skip`) are created once in Phase 1 (guarded by the `.tech-lead-inbox/.labels-created` sentinel) — no further label-create calls run here.
 
-**Every PR-mutating gh call in this Phase MUST go through `node utilities/km-triage-app/bot-gh.js`** per the Bot identity contract above. The code blocks below show the wrapper invocation explicitly. Falling back to direct `gh` attributes the action to the human PAT, which (a) breaks the identity-separation contract and (b) causes `gh pr review --approve` to be rejected by GitHub as author-self-approval on owner-authored PRs.
+**In bot mode, every PR-mutating gh call in this Phase MUST go through `node utilities/km-triage-app/bot-gh.js`** per the Bot identity contract above. The code blocks below show the wrapper invocation explicitly. Falling back to direct `gh` attributes the action to the human PAT, which (a) breaks the identity-separation contract and (b) causes `gh pr review --approve` to be rejected by GitHub as author-self-approval on owner-authored PRs. **In personal mode, the reverse is required:** replace each `bot-gh.js` below with plain `gh`, skip every `check-progress.js` call, and use the personal-mode APPROVE-AND-PARK (label + plain comment, no `--approve`) defined in the Personal mode section.
 
 Label additions use the REST API (the wrapper passes through to `gh api` cleanly with the App's installation token):
 
@@ -823,7 +872,7 @@ node utilities/km-triage-app/bot-gh.js api repos/MattGyverLee/keyboard-studio/is
 
 ### Action: APPROVE-AND-PARK (Phase 5 outcome)
 
-**Re-check before labelling.** Phase-2's `mergeable` and CI snapshots can be minutes old by the time the crew finishes. Before applying `tech-lead-ready-to-merge`, re-fetch the live state:
+**Re-check before labelling.** Phase-2's `mergeable` and CI snapshots can be minutes old by the time the crew finishes. Before applying `ready-to-merge`, re-fetch the live state:
 
 ```bash
 gh api repos/MattGyverLee/keyboard-studio/pulls/<NUM> \
@@ -839,7 +888,7 @@ If `mergeable_state` is `dirty` (CONFLICTING) or any required check is not `SUCC
 If both gates pass, label and submit a formal **APPROVE review** (not a plain comment — the review is what satisfies `main`'s required-approving-review-count rule):
 
 ```bash
-node utilities/km-triage-app/bot-gh.js api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=tech-lead-ready-to-merge"
+node utilities/km-triage-app/bot-gh.js api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=ready-to-merge"
 node utilities/km-triage-app/bot-gh.js pr review <NUM> --approve --body-file <approval-body.md>
 ```
 
@@ -852,10 +901,12 @@ Approval body:
 - <specialist-2>: <verdict.summary>
 - ...
 
-Labelled `tech-lead-ready-to-merge`. Awaiting tech lead merge.
+Labelled `ready-to-merge`. Ready to merge — any team member may merge.
 ```
 
 The `--approve` is the load-bearing change: it submits an approving review attributed to `km-triage[bot]`, which counts toward the ruleset's required-approving-review count without conflicting with author self-approval (the App is a separate identity from any human author). A `gh pr comment` here instead would label the PR but leave the merge button blocked by the ruleset.
+
+> **Personal mode:** **always** apply the `ready-to-merge` label with plain `gh` and post the approval body as a plain `gh pr comment`. If you are **not** the PR author, also run `gh pr review --approve` under your own PAT to clear `main`'s required-review gate so any team member can merge; if you **are** the author, GitHub blocks self-approval, so the label + comment stand and one other teammate's approval is still needed. The triage never requires a specific person to merge. See the Personal mode section near the top.
 
 ### Auto-fix preconditions (apply to AUTO_FIX_ONLY and FIX_AND_MENTION)
 

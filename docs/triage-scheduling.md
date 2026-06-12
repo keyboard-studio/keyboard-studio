@@ -6,7 +6,7 @@ This doc covers **how to run it on a schedule** so the tech lead does not have t
 
 ## Operational stance
 
-- **Week 1 (current):** approve-and-park. Clean PRs get labelled `tech-lead-ready-to-merge` and an approval comment. The tech lead clicks merge.
+- **Week 1 (current):** approve-and-park. Clean PRs get labelled `ready-to-merge` and an approval comment. Any team member clicks merge.
 - **Later, after ≥2 weeks of clean audit logs:** promote selected lanes (content-only / docs-only) to auto-merge via a separate `/km-triage-merge-aged` command. Not in scope for v1.
 
 ## Where to run it
@@ -162,8 +162,8 @@ Once a day (or whenever the inbox dings):
 
 1. Open `.tech-lead-inbox/INBOX.md`. Scan the timestamped entries. Each one is a PR # with a question.
 2. For each escalation: the submitter (preferred) or the tech lead answers the question on the PR itself (`gh pr comment <N>` or in the GitHub UI), then `gh pr edit <N> --remove-label review-needed`. The next triage sweep will re-review with the answer in the comment history.
-3. Open the GitHub PR list filtered to `label:tech-lead-ready-to-merge`. For each: read the diff if you want, then `gh pr merge <N> --squash --delete-branch`. The triage agent never does this for you.
-4. If a PR is parked but you disagree with the approval, comment your reasoning and `gh pr edit <N> --remove-label tech-lead-ready-to-merge`. Add `triage-skip` if you want the triage to stop touching it.
+3. Open the GitHub PR list filtered to `label:ready-to-merge`. For each: read the diff if you want, then `gh pr merge <N> --squash --delete-branch`. The triage agent never does this for you.
+4. If a PR is parked but you disagree with the approval, comment your reasoning and `gh pr edit <N> --remove-label ready-to-merge`. Add `triage-skip` if you want the triage to stop touching it.
 
 That's the whole job. Junior devs and content experts continue to push to their branches; triage picks up the next sweep.
 

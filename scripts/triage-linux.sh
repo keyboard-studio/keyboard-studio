@@ -24,6 +24,7 @@ TL_EMAIL="${KM_TRIAGE_TL_EMAIL:-matthew_lee@sil.org}"
 TL_LOGIN="${KM_TRIAGE_TL_LOGIN:-MattGyverLee}"
 TRIAGE_OWNERS_JSON='["MattGyverLee","gboltono","coopabla","KevinPNG","dhigby","myczka"]'
 CLAUDE="${CLAUDE_BIN:-/home/lee2mr/.local/bin/claude}"
+MODEL="${KM_TRIAGE_MODEL:-haiku}"
 
 INBOX_DIR=".tech-lead-inbox"
 AUDIT_LOG="$INBOX_DIR/audit-log.jsonl"
@@ -117,8 +118,8 @@ EOF
 touch -a "$AUDIT_LOG"
 
 if [[ ! -f "$INBOX_DIR/.labels-created" ]]; then
-  gh label create tech-lead-ready-to-merge --color 0e8a16 \
-    --description "Triage approved - awaiting tech lead merge" 2>/dev/null || true
+  gh label create ready-to-merge --color 0e8a16 \
+    --description "Triage approved - ready to merge by any team member" 2>/dev/null || true
   gh label create review-needed --color d93f0b \
     --description "Triage escalated - awaiting submitter or tech-lead response" 2>/dev/null || true
   gh label create triage-skip --color cfd3d7 \
@@ -201,8 +202,8 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
       n_skip=$((n_skip + 1)); continue
     fi
 
-    # Gate 3 — hard-skip labels (tech-lead-ready-to-merge, triage-skip)
-    if echo "$PR" | jq -e '[.labels[].name] | any(. == "tech-lead-ready-to-merge" or . == "triage-skip")' > /dev/null 2>&1; then
+    # Gate 3 — hard-skip labels (ready-to-merge, triage-skip)
+    if echo "$PR" | jq -e '[.labels[].name] | any(. == "ready-to-merge" or . == "triage-skip")' > /dev/null 2>&1; then
       echo "  skip: already_in_lead_queue (label)" | tee -a "$LOG"
       audit_skip "$NUM" already_in_lead_queue "$HEAD_SHA"
       n_skip=$((n_skip + 1)); continue
@@ -320,7 +321,14 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     # All gates cleared — spawn a fresh, isolated Claude process for this PR
     echo "  -> spawning claude for PR #$NUM" | tee -a "$LOG"
     n_review=$((n_review + 1))
-    spawn_claude_for_pr "$NUM"
+    set +e
+    CLAUDECODE="" "$CLAUDE" -p "/km-triage $NUM" --model "$MODEL" --dangerously-skip-permissions --output-format text \
+      >> "$LOG" 2>&1
+    CLAUDE_EXIT=$?
+    set -e
+    if [[ "$CLAUDE_EXIT" -ne 0 ]]; then
+      echo "  [WARN] claude exited $CLAUDE_EXIT for PR #$NUM" | tee -a "$LOG"
+    fi
 
   done < <(echo "$PRS_JSON" | jq -c '.[]')
 
