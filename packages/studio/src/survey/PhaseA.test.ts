@@ -26,6 +26,7 @@ function identityBase(overrides: Partial<Record<string, string>> = {}): Answer[]
     language_name_english: "French",
     pa_copyright_holder: "SIL International",
     layout_family: "qwerty",
+    iso_code: "fr",
     ...overrides,
   };
   return Object.entries(defaults).map(([k, v]) => a(k, v));
@@ -46,7 +47,12 @@ describe("extractIdentity — required fields", () => {
     expect(extractIdentity(result)).toBeUndefined();
   });
 
-  it("returns an object when both required fields are present", () => {
+  it("returns undefined when iso_code is blank (would produce unsubmittable 'und' tag)", () => {
+    const result = makeResult(identityBase({ iso_code: "" }));
+    expect(extractIdentity(result)).toBeUndefined();
+  });
+
+  it("returns an object when all required fields are present", () => {
     const result = makeResult(identityBase());
     expect(extractIdentity(result)).not.toBeUndefined();
   });
@@ -89,19 +95,13 @@ describe("extractIdentity — routingGroup", () => {
 
 describe("extractIdentity — bcp47Tag", () => {
   it("uses iso_code when present", () => {
-    const result = makeResult([...identityBase(), a("iso_code", "fr")]);
+    const result = makeResult(identityBase({ iso_code: "fr" }));
     expect(extractIdentity(result)?.bcp47Tag).toBe("fr");
-  });
-
-  it("falls back to 'und' when iso_code is absent", () => {
-    const result = makeResult(identityBase());
-    expect(extractIdentity(result)?.bcp47Tag).toBe("und");
   });
 
   it("composes language + script subtags when primary_script is present", () => {
     const result = makeResult([
-      ...identityBase(),
-      a("iso_code", "sr"),
+      ...identityBase({ iso_code: "sr" }),
       a("primary_script", "Cyrl"),
     ]);
     expect(extractIdentity(result)?.bcp47Tag).toBe("sr-Cyrl");
@@ -109,16 +109,10 @@ describe("extractIdentity — bcp47Tag", () => {
 
   it("does not append the 'Other' script sentinel", () => {
     const result = makeResult([
-      ...identityBase(),
-      a("iso_code", "xyz"),
+      ...identityBase({ iso_code: "xyz" }),
       a("primary_script", "Other"),
     ]);
     expect(extractIdentity(result)?.bcp47Tag).toBe("xyz");
-  });
-
-  it("keeps 'und' when iso_code is absent even if primary_script is set", () => {
-    const result = makeResult([...identityBase(), a("primary_script", "Latn")]);
-    expect(extractIdentity(result)?.bcp47Tag).toBe("und");
   });
 });
 

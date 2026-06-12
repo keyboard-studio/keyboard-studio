@@ -51,7 +51,12 @@ export function extractIdentity(
   const isoCode = answerString(result, "iso_code");
   const primaryScript = answerString(result, "primary_script");
 
-  if (languageName === "" || copyrightHolder === "") return undefined;
+  // Without an ISO 639 code the resulting bcp47Tag would be "und", which the
+  // keymanapp/keyboards submission validator rejects. Treat a blank iso_code
+  // the same as missing languageName/copyrightHolder and refuse to build an
+  // identity rather than emit an unsubmittable .kps.
+  if (languageName === "" || copyrightHolder === "" || isoCode === "")
+    return undefined;
 
   const routingGroup: KeyboardIdentity["routingGroup"] =
     layoutFamily === "azerty"
@@ -64,13 +69,11 @@ export function extractIdentity(
   // both are known (e.g. "bfd-Latn"). Minority-language tags benefit from an
   // explicit script subtag; suppress-script defaults are not applied here. The
   // primary_script "Other" choice is a UI sentinel, not a real script code, so
-  // it is never appended. Falls back to "und" when no language subtag is given.
+  // it is never appended.
   const bcp47Tag =
-    isoCode === ""
-      ? "und"
-      : primaryScript !== "" && primaryScript !== "Other"
-        ? `${isoCode}-${primaryScript}`
-        : isoCode;
+    primaryScript !== "" && primaryScript !== "Other"
+      ? `${isoCode}-${primaryScript}`
+      : isoCode;
   const displayName =
     langNameAutonym !== ""
       ? `${langNameAutonym} (${languageName})`
