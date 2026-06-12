@@ -153,9 +153,16 @@ function parseVkeyBracket(tok: string): { name: string; modifiers: string[] } | 
   return { name: vkeyParts[0] ?? "", modifiers: modParts };
 }
 
+// KMN store/group identifiers are more permissive than C-style: they allow
+// hyphens, dots, colons, and non-ASCII letters (e.g. `store(non-subdot)`,
+// `store(hamis-E:key)`, `store(a-ሳድስ)` in real released keyboards).
+// We require the first char to be a letter/underscore (no leading digit) and
+// allow any subsequent non-whitespace, non-paren character.
+const KMN_IDENT = String.raw`[^\s\d\(\)\,][^\s\(\)\,]*`;
+
 /** Returns a parser for keyword(storeName) → storeName. */
 function makeStoreParser(keyword: string): (tok: string) => string | null {
-  const re = new RegExp(`^${keyword}\\s*\\(\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\)$`, "i");
+  const re = new RegExp(`^${keyword}\\s*\\(\\s*(${KMN_IDENT})\\s*\\)$`, "i");
   return tok => { const m = re.exec(tok); return m ? (m[1] ?? null) : null; };
 }
 
@@ -167,7 +174,7 @@ const parseNotAny = makeStoreParser("notany");
 
 /** Parse index(storeName, N) → {storeRef, offset}, or null. */
 function parseIndex(tok: string): { storeRef: string; offset: number } | null {
-  const m = /^index\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,\s*(\d+)\s*\)$/i.exec(tok);
+  const m = new RegExp(`^index\\s*\\(\\s*(${KMN_IDENT})\\s*,\\s*(\\d+)\\s*\\)$`, "i").exec(tok);
   if (!m) return null;
   return { storeRef: m[1] ?? "", offset: parseInt(m[2] ?? "0", 10) };
 }
@@ -191,7 +198,7 @@ const parseOuts = makeStoreParser("outs");
 
 /** Parse use(groupName) → groupName, or null. */
 function parseUse(tok: string): string | null {
-  const m = /^use\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)$/i.exec(tok);
+  const m = new RegExp(`^use\\s*\\(\\s*(${KMN_IDENT})\\s*\\)$`, "i").exec(tok);
   return m ? (m[1] ?? null) : null;
 }
 
@@ -509,7 +516,7 @@ interface ParsedStore {
  * Throws on malformed syntax.
  */
 function parseStoreLine(text: string, line: number): ParsedStore {
-  const m = /^store\s*\(\s*(&?[A-Za-z_][A-Za-z0-9_]*)\s*\)\s*(.*)/is.exec(text);
+  const m = new RegExp(`^store\\s*\\(\\s*(&?${KMN_IDENT})\\s*\\)\\s*(.*)`, "is").exec(text);
   if (!m) {
     throw new Error(`Malformed store declaration at line ${line}: ${text}`);
   }
@@ -524,7 +531,7 @@ function parseStoreLine(text: string, line: number): ParsedStore {
 // ---------------------------------------------------------------------------
 
 function parseGroupLine(text: string): { name: string; usingKeys: boolean } | null {
-  const m = /^group\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)(.*)/i.exec(text);
+  const m = new RegExp(`^group\\s*\\(\\s*(${KMN_IDENT})\\s*\\)(.*)`, "i").exec(text);
   if (!m) return null;
   const usingKeys = /using\s+keys/i.test(m[2] ?? "");
   return { name: m[1] ?? "", usingKeys };
@@ -535,7 +542,7 @@ function parseGroupLine(text: string): { name: string; usingKeys: boolean } | nu
 // ---------------------------------------------------------------------------
 
 function parseBeginLine(text: string): { encoding: string; entryGroup: string } | null {
-  const m = /^begin\s+(\w+)\s*>\s*use\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)/i.exec(text);
+  const m = new RegExp(`^begin\\s+(\\w+)\\s*>\\s*use\\s*\\(\\s*(${KMN_IDENT})\\s*\\)`, "i").exec(text);
   if (!m) return null;
   return { encoding: m[1] ?? "Unicode", entryGroup: m[2] ?? "" };
 }
