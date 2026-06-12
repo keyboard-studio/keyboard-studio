@@ -2,6 +2,7 @@
 
 import type { VirtualFS } from "./virtualFS";
 import type { BaseKeyboard } from "./baseKeyboard";
+import type { KeyboardIR } from "./keyboard-ir";
 
 /**
  * Three-group routing identifier per spec §9. The scaffolder picks a
@@ -25,6 +26,18 @@ export interface ScaffoldOptions {
    * @see spec.md §9
    */
   group?: RoutingGroup;
+
+  /**
+   * Pre-parsed KeyboardIR to scaffold over. When supplied, the scaffolder
+   * runs the IR-native template-cleanup + identity-propagation pipeline
+   * (§8 step 3) directly on this IR instead of re-parsing the fetched
+   * base .kmn. Used by callers that already hold an IR — the imported
+   * `release/` path and the carve gallery — so a single IR is the source
+   * of truth across the session (decision D9).
+   *
+   * @see spec.md §8 step 3
+   */
+  ir?: KeyboardIR;
 }
 
 /**
