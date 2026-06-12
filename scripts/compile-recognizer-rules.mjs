@@ -57,6 +57,11 @@ for (const filename of yamlFiles) {
     process.exit(1);
   }
 
+  if (parsed === null || typeof parsed !== 'object') {
+    console.error(`[ERROR] ${filename}: empty or non-object YAML`);
+    process.exit(1);
+  }
+
   // Validate required top-level fields
   for (const field of REQUIRED_FIELDS) {
     if (parsed[field] === undefined || parsed[field] === null) {

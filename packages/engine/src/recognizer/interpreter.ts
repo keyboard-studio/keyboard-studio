@@ -10,6 +10,7 @@ import { makePattern } from "@keyboard-studio/contracts";
 import type { MatchResult } from "./types.js";
 import type { Pattern } from "@keyboard-studio/contracts";
 import { ruleRef, storeRef } from "./node-refs.js";
+import { toUPlus, storeItemsToCharString } from "./utils.js";
 import type {
   RecognizerRuleYaml,
   RuleEntry,
@@ -17,21 +18,6 @@ import type {
   CombinedWithEntry,
   SlotMapping,
 } from "./yaml-schema.js";
-
-// ---------------------------------------------------------------------------
-// Utility helpers
-// ---------------------------------------------------------------------------
-
-function toUPlus(value: string): string {
-  const parts: string[] = [];
-  for (const cp of value) {
-    const codePoint = cp.codePointAt(0);
-    if (codePoint !== undefined) {
-      parts.push("U+" + codePoint.toString(16).toUpperCase().padStart(4, "0"));
-    }
-  }
-  return parts.join(" ");
-}
 
 // rules_to_keystroke_char_map: produce "+ [MODS KEY] > U+XXXX" lines
 function applyRulesToKeystrokeCharMap(rules: IRRule[]): string {
@@ -52,13 +38,6 @@ function applyRulesToKeystrokeCharMap(rules: IRRule[]): string {
     }
   }
   return lines.join("\n");
-}
-
-// store_items_to_char_string: concatenate char items
-function applyStoreItemsToCharString(store: IRStore): string {
-  return store.items
-    .map((item) => (item.kind === "char" ? item.value : ""))
-    .join("");
 }
 
 // numeric_id_to_label: deadkey id -> "dk<N>"
@@ -364,7 +343,7 @@ function populateSlots(
       const store = ctx.stores.get(storeName) ?? ir.stores.find((s) => s.name === storeName);
       if (store === undefined) continue;
       if (transform === "store_items_to_char_string") {
-        result[slotId] = applyStoreItemsToCharString(store);
+        result[slotId] = storeItemsToCharString(store);
       }
       continue;
     }
@@ -378,7 +357,7 @@ function populateSlots(
         if (ctx0 === undefined) continue;
         if (ctx0.kind === "vkey") {
           const mods = ctx0.modifiers.length > 0 ? ctx0.modifiers.join(" ") + " " : "";
-          result[slotId] = transform === "none" ? `${mods}${ctx0.name}` : `${mods}${ctx0.name}`;
+          result[slotId] = `${mods}${ctx0.name}`;
         } else if (ctx0.kind === "char") {
           result[slotId] = ctx0.value;
         }
@@ -557,7 +536,13 @@ export function interpretLift(rule: RecognizerRuleYaml, match: MatchResult): Pat
     ...(provenance.length > 0 ? { provenance } : {}),
   };
 
-  return makePattern(patternInit);
+  try {
+    return makePattern(patternInit);
+  } catch (err) {
+    throw new Error(
+      `interpretLift: makePattern failed for pattern "${cleanPatternId}": ${String(err)}`
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
