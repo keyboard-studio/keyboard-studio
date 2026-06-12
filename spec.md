@@ -1154,7 +1154,7 @@ The 133 criteria in `criteria.md` are classified into four enforcement bands per
 
 | Band | Count | Example criterion | Enforcement |
 |---|---|---|---|
-| scaffolder-bake | 38 | "No leading zeros in version components" — regex-checkable, auto-fixable | Scaffolder resets version to `1.0`; further violations cannot be authored. |
+| scaffolder-bake | 39 | "No leading zeros in version components" — regex-checkable, auto-fixable | Scaffolder resets version to `1.0`; further violations cannot be authored. |
 | layer-c-enforce | 66 | "BCP47 tag well-formed; modifier names consistent across `.kmn`/`.kvks`/`.keyman-touch-layout`" | Layer C lint engine; blocks phase progression on `error`. |
 | yellow-survey | 32 | "BCP47 tag is correct for the language/script" — requires langtags.json lookup and linguistic judgment | Phase A survey asks for the tag; studio cross-checks against langtags.json and flags mismatches for user review. |
 | red-checklist | 10 | "If a third party submits a patch to an existing keyboard, original author was consulted" — requires direct author communication | Final checklist item in PR submission flow; PR body includes a reminder block. |

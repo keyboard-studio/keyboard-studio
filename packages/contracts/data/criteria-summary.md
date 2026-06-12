@@ -6,8 +6,8 @@ This document records the triage outcome for all criteria drawn from `docs/crite
 
 | Band | Count | % of total |
 |------|-------|-----------|
-| scaffolder-bake | 38 | 26% |
-| layer-c-enforce | 67 | 46% |
+| scaffolder-bake | 39 | 27% |
+| layer-c-enforce | 66 | 45% |
 | yellow-survey | 32 | 22% |
 | red-checklist | 10 | 7% |
 | **Total** | **147** | **100%** |
@@ -43,8 +43,8 @@ All four automation-hook fields are now fully populated across every entry:
 
 | Band | Field | Populated / Total |
 |------|-------|-------------------|
-| `layer-c-enforce` | `lintRuleId` | 67 / 67 |
-| `scaffolder-bake` | `scaffolderRule` | 38 / 38 |
+| `layer-c-enforce` | `lintRuleId` | 66 / 66 |
+| `scaffolder-bake` | `scaffolderRule` | 39 / 39 |
 | `yellow-survey` | `surveyQuestionId` | 32 / 32 |
 | `red-checklist` | `preSubmitChecklistText` | 10 / 10 |
 

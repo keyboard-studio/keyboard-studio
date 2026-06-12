@@ -460,8 +460,8 @@ describe("criteria.json schema conformance", () => {
     // heuristics + 1 split row (7.7a) from the flagged-criteria re-review
     // + 1 section-19 import-output criterion = 147 total.
     expect(records.length).toBe(147);
-    expect(counts["scaffolder-bake"]).toBe(38);
-    expect(counts["layer-c-enforce"]).toBe(67);
+    expect(counts["scaffolder-bake"]).toBe(39);
+    expect(counts["layer-c-enforce"]).toBe(66);
     expect(counts["yellow-survey"]).toBe(32);
     expect(counts["red-checklist"]).toBe(10);
   });
@@ -538,6 +538,14 @@ describe("criteria.json schema conformance", () => {
       if (c.band !== "red-checklist")
         expect("preSubmitChecklistText" in c, `${c.id} must not have preSubmitChecklistText`).toBe(false);
     });
+  });
+
+  it("section-19 import-output criterion has correct shape", () => {
+    const row = ALL_CRITERIA.find((c) => c.id === "19.1-import-attribution-in-pr-body");
+    expect(row).toBeDefined();
+    expect(row?.band).toBe("scaffolder-bake");
+    expect((row as { scaffolderRule?: string })?.scaffolderRule).toBe("emit-import-attribution-block");
+    expect(row?.section).toBe("19. Import output");
   });
 });
 
