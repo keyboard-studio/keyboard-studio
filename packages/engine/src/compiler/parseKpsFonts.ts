@@ -18,7 +18,9 @@ export interface KpsFontsResult {
 }
 
 function extractTagValues(xml: string, tag: string): string[] {
-  const re = new RegExp(`<${tag}\\s*>([^<]*)<\\/${tag}>`, "gi");
+  // [^>]* tolerates optional attributes on the opening tag, matching the
+  // style used in parseKvksFontFamily for the <encoding> element.
+  const re = new RegExp(`<${tag}[^>]*>([^<]*)<\\/${tag}>`, "gi");
   const out: string[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(xml)) !== null) {

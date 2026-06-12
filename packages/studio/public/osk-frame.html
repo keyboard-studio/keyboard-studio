@@ -142,15 +142,28 @@
         // Inject a @font-face rule into the frame document head so the compiled
         // keyboard JS can resolve the custom font by family name.
         // Idempotent: if a <style> with the same id already exists, skip.
+        // Security: family is sanitized to an allowlist before interpolation to
+        // prevent CSS injection via a crafted fontname attribute.  url is
+        // validated to be a blob: or data: URL (the only kinds the studio
+        // produces) before use.
         function injectFontFace(family, url) {
           if (!family || !url) return;
-          var slug = family.toLowerCase().replace(/[^a-z0-9]/g, "-");
+          // Strip any character that could break out of a CSS string or block.
+          // Keeps letters, digits, spaces, and hyphens (covers "Andika Afr" etc.).
+          var safeFamily = String(family).replace(/[^\w \-]/g, "").trim();
+          if (safeFamily.length === 0) return;
+          // Only inject blob: or data: URLs — the studio never produces anything else.
+          if (
+            typeof url !== "string" ||
+            (!url.startsWith("blob:") && !url.startsWith("data:"))
+          ) return;
+          var slug = safeFamily.toLowerCase().replace(/[^a-z0-9]/g, "-");
           var styleId = "kmw-studio-font-" + slug;
           if (document.getElementById(styleId)) return;
           var style = document.createElement("style");
           style.id = styleId;
           style.textContent =
-            "@font-face { font-family: \"" + family + "\"; src: url(\"" + url + "\"); }";
+            "@font-face { font-family: \"" + safeFamily + "\"; src: url(\"" + url + "\"); }";
           document.head.appendChild(style);
         }
 

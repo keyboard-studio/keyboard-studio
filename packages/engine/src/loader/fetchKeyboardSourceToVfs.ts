@@ -7,7 +7,7 @@
 // compiler flags. Writes everything flat into the VFS at `source/...`
 // (the layout CompilerService.compile() expects).
 
-import type { BaseKeyboard, VirtualFS } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, VirtualFS, KpsFontEntry } from "@keyboard-studio/contracts";
 import { parseKmnHeaderStores } from "../compiler/parseKmnHeaderStores.js";
 import { parseKpjFlags, type CompilerOptions } from "../compiler/parseKpjFlags.js";
 import { parseKpsFonts } from "../compiler/parseKpsFonts.js";
@@ -31,21 +31,9 @@ export interface FetchKeyboardSourceOptions {
   fetchImpl?: FetchFn;
 }
 
-/**
- * Describes a single font file fetched from the keyboards tree and written
- * into the VFS.  Consumed by the studio/frame side to inject @font-face rules
- * for the OSK preview.
- */
-export interface KpsFontEntry {
-  /** VFS path, keyboard-root-relative: "shared/fonts/sil/andika_subsets/AndikaAfr-R.ttf" */
-  vfsPath: string;
-  /** Repo-relative path: "release/shared/fonts/sil/andika_subsets/AndikaAfr-R.ttf" */
-  ttfRelPath: string;
-  /** True if referenced by <OSKFont>/<DisplayFont> (vs <File>-only). */
-  isOskFont: boolean;
-  /** CSS family from .kvks fontname attribute; set on OSK-font entries only. */
-  family?: string;
-}
+// KpsFontEntry is defined in @keyboard-studio/contracts and re-exported below
+// so callers that import from the engine barrel also get the type.
+export type { KpsFontEntry };
 
 export interface FetchKeyboardSourceResult {
   /** CompilerOptions derived from the .kpj (or defaults if .kpj absent). */
@@ -68,15 +56,19 @@ const DEFAULT_PROXY = "/kbd-proxy";
  * to its repo-relative path (e.g. "release/shared/fonts/sil/.../AndikaAfr-R.ttf").
  *
  * Returns null if the resolved path would escape the "release/" tree —
- * the caller must skip any null result.
+ * the "release/" prefix check is the intentional traversal safety net.
+ * The caller must skip any null result.
+ *
+ * Exported so unit tests can exercise path-traversal edge cases in isolation.
  */
-function resolveKpsFontPath(rawPath: string, kbPath: string): string | null {
+export function resolveKpsFontPath(rawPath: string, kbPath: string): string | null {
   const normalized = rawPath.replace(/\\/g, "/");
   // Start from <kbPath>/source (the directory the .kps lives in).
   const segments = [...kbPath.split("/"), "source"];
   for (const part of normalized.split("/")) {
     if (part === "..") {
-      segments.pop();
+      // Guard against underflow: only pop when there is a segment to remove.
+      if (segments.length > 0) segments.pop();
     } else if (part !== "." && part !== "") {
       segments.push(part);
     }

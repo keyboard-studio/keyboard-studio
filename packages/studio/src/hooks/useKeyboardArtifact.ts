@@ -1,17 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { BaseKeyboard, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, VirtualFS, KeyboardIR, KpsFontEntry } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { LOCAL_PROXY_BASE } from "../lib/services.ts";
 import { useIRStore } from "../stores/irStore.ts";
-
-/** Font entry returned by the engine's fetchKeyboardSourceToVfs. */
-interface KpsFontEntry {
-  vfsPath: string;
-  ttfRelPath: string;
-  isOskFont: boolean;
-  family?: string;
-}
 
 interface EngineModule {
   compile: (fs: VirtualFS, keyboardId: string) => Promise<CompileResult>;
@@ -214,8 +206,7 @@ export function useKeyboardArtifact(
     if (oskFontEntry) {
       const fontFile = vfs.get(oskFontEntry.vfsPath);
       if (fontFile && fontFile.content instanceof Uint8Array) {
-        const fontBytes: BlobPart = fontFile.content.buffer as ArrayBuffer;
-        const blob = new Blob([fontBytes], { type: "font/ttf" });
+          const blob = new Blob([fontFile.content], { type: "font/ttf" });
         fontFaceUrl = URL.createObjectURL(blob);
         fontFaceFamily = oskFontEntry.family;
         prevFontBlobUrl.current = fontFaceUrl;

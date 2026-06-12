@@ -38,3 +38,4 @@ export * from "./validator";
 // re-export as typed `readonly` arrays / records.
 // ---------------------------------------------------------------------------
 export * from "./criteriaData";
+export * from "./fontEntry";
