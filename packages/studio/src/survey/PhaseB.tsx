@@ -48,7 +48,7 @@ function makeManualOnlyFlow(flow: FlowDef): FlowDef {
     ...flow,
     questions: flow.questions.map((q) =>
       q.id === "pb_discovery_intro"
-        ? { ...q, required: false, next: PHASE_B_MANUAL_ENTRY }
+        ? { ...q, required: false, engine_resolved: true, next: PHASE_B_MANUAL_ENTRY }
         : q,
     ),
   };

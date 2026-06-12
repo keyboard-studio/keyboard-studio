@@ -16,9 +16,10 @@ import type { RoutingGroup } from "./scaffolder";
  *
  * `"alpha-nonlatin"` is emitted by the Phase A flow for users who select the
  * non-roman layout and identify their script as a non-Latin alphabet (e.g.
- * Coptic, Tifinagh, Adlam). Cyrillic, Greek, Georgian, and Armenian do NOT
- * reach this value — they are detected at `primary_script` and pre-routed to
- * the roman layout-family branch before `script_family` is asked. This value
+ * Coptic, Tifinagh, Adlam). Cyrillic, Greek, Georgian, and Armenian
+ * are pre-routed to layout_family at primary_script (where the roman option is
+ * the expected choice), but could still reach this value if the user overrides
+ * layout_family to non-roman. This value
  * routes directly to the shared universal tail in Phase B (pb_special_letters),
  * bypassing the Indic/SEA/RTL/syllabic sub-branches.
  *
