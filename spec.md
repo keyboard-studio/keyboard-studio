@@ -947,7 +947,7 @@ The decision tree must agree with the strategy each exemplar actually uses. This
 | Exemplar | A1 | A2 | A3 | A4 | A5 | A6 | A7 | A7a | Tree → strategy | Actual primary |
 |----------|----|----|----|----|----|----|----|-----|-----------------|----------------|
 | `release/a/akan/` | tiny | alphabetic | strong | none | single | none | many | addition | rule 11 → S-01 | S-01 ✓ |
-| `release/sil/sil_euro_latin/` | large | alphabetic | strong | multi-family | single | none | RAlt only | addition | rule 6 → S-06 | S-02 + S-04/S-08 ✗ |
+| `release/sil/sil_euro_latin/` | large | alphabetic | strong | multi-family | single | none | RAlt only | addition | rule 5 → S-05 | S-02 + S-04/S-08 ✗ |
 | `release/sil/sil_ipa/` | medium | alphabetic | strong | none | single | none | many | addition | rule 5 → S-05 + S-04 | S-03 + S-04 ✗ |
 | `release/sil/sil_devanagari_phonetic/` | medium | abugida | strong | none | single | none | many | — | rule 2 → S-09 + S-05 | S-09 + S-05 ✓ |
 | `release/v/vietnamese_telex/` | medium | alphabetic | strong | replacing-cycling | single | none | many | addition | rule 3 → S-07 + S-04 | S-07 ✓ |
@@ -964,10 +964,10 @@ Note: S-04 (`any`/`index` table mechanism) is structurally embedded in every S-0
 
 **Known mismatches (intended v1.1 work, not bugs).** Rule 8 (added in v1.0.1) closed the alphabetic full-remap gap; Armenian and Russian mnemonic now round-trip correctly. Two exemplars still don't round-trip; each marks a tree gap to fix in v1.1:
 
-- **EuroLatin**: A2=alphabetic, A1=large, A4=multi-family, A3=strong, A7a=addition. Tree picks **S-06 (two-tier chained deadkeys)** but the actual keyboard uses **S-02 with broad parallel stores**. Add an A3-and-scale tie-breaker inside rule 6 that prefers S-02 + broad S-04 over S-06 when the diacritic families are independent rather than nested.
+- **EuroLatin**: A2=alphabetic, A1=large, A4=multi-family, A3=strong, A7a=addition. Tree picks **S-05 (mnemonic phonetic layer)** but the actual keyboard uses **S-02 with broad parallel stores**. Add an A4=multi-family + A1=large tie-breaker inside rule 5 that prefers S-02 + broad S-04 over S-05 when the diacritic families are independent rather than nested.
 - **IPA**: A3=strong but the user prefers *sequence modifiers* (`<`, `=`, `>`) to mnemonic spelling. Add a sub-axis distinguishing "spell the sound" from "decorate with suffix keys."
 
-These two remaining mismatches are **the value of the validation pass** — they pinpoint where v1 needs work before release. They are not v1 blockers: EuroLatin and IPA are expert-authored, well outside the target user's profile, and the strategies the tree picks (S-06 for EuroLatin, S-05 for IPA) produce working keyboards even if they differ from what SIL chose.
+These two remaining mismatches are **the value of the validation pass** — they pinpoint where v1 needs work before release. They are not v1 blockers: EuroLatin and IPA are expert-authored, well outside the target user's profile, and the strategies the tree picks (S-05 for EuroLatin, S-05 for IPA) produce working keyboards even if they differ from what SIL chose.
 
 Once import lands, the validation pass also runs against each exemplar's *imported* IR — the round-trip emit must produce the same strategy attribution. A mismatch here surfaces as an `ImportStatus.RoundTripDivergence` for that exemplar in the supportability scanner output (§13).
 

@@ -48,11 +48,11 @@ export type PrimaryRuleNumber = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 11 | 12;
 export interface StrategyRecommendation {
   primary: StrategyId;
   /**
-   * Secondaries added by §7.2 rules 9-10 plus any primary's "Combines well with"
-   * list. Order matches rule firing: rule-9 secondaries (S-10) appear before
-   * rule-10 secondaries (S-08), with primary-specific "combines well with"
-   * entries appended after. No duplicates — each strategy appears at most
-   * once in this list.
+   * Secondaries in first-appearance order: (1) primary-specific "combines well with"
+   * entries from the §7.2 per-rule table (e.g. S-05 for rule 2, S-04 for rules 3/5–8),
+   * (2) S-11 wrapper if A5=two-orthography and rule 4 did not fire as primary,
+   * (3) rule-9 addition (S-10) if A6=loud, (4) rule-10 addition (S-08) if A7=fully booked.
+   * No duplicates — each strategy appears at most once in this list.
    */
   secondaries: StrategyId[];
   /**
