@@ -8,10 +8,10 @@ store(&COPYRIGHT) 'Copyright © 2020 Base Author'
 store(&VERSION) '5.0'
 store(&KEYBOARDVERSION) '1.0'
 store(&TARGETS) 'any'
-NCAPS + [CAPS K_A] > 'a'
-+ [K_A] > 'A'
 begin Unicode > use(main)
 group(main) using keys
++ [CAPS K_A] > 'a'
++ [K_A] > 'A'
 + [K_B] > 'b'
 `;
 
@@ -119,7 +119,7 @@ describe("createScaffolderService", () => {
 
       expect(content).not.toContain("NCAPS ");
       expect(content).not.toContain("[CAPS");
-      expect(content).toContain("store(&CasedKeys) [K_A]..[K_Z]");
+      expect(content).toContain("store(&CASEDKEYS) [K_A]..[K_Z]");
     });
 
     it("rewrites metadata stores", async () => {
@@ -225,7 +225,7 @@ describe("createScaffolderService", () => {
     });
 
     it("uses azerty CasedKeys for azerty group", async () => {
-      const kmnWithCaps = `store(&KEYBOARDVERSION) '1.0'\nNCAPStest [CAPS K_A] > 'x'\n+ [K_A] > 'a'\n`;
+      const kmnWithCaps = `store(&KEYBOARDVERSION) '1.0'\nbegin Unicode > use(main)\ngroup(main) using keys\n+ [CAPS K_A] > 'x'\n+ [K_A] > 'a'\n`;
       const mockFetch = vi.fn().mockImplementation((url: string) => {
         if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(kmnWithCaps));
         return Promise.resolve(makeNotFoundResponse());
@@ -238,11 +238,11 @@ describe("createScaffolderService", () => {
 
       const kmnEntry = vfs.get("source/my_keyboard.kmn");
       const content = kmnEntry!.content as string;
-      expect(content).toContain("store(&CasedKeys) [K_A]..[K_Z] [K_0]..[K_9]");
+      expect(content).toContain("store(&CASEDKEYS) [K_A]..[K_Z] [K_0]..[K_9]");
     });
 
     it("omits CasedKeys for non-roman group", async () => {
-      const kmnWithCaps = `store(&KEYBOARDVERSION) '1.0'\nNCAPStest [CAPS K_A] > 'x'\n+ [K_A] > 'a'\n`;
+      const kmnWithCaps = `store(&KEYBOARDVERSION) '1.0'\nbegin Unicode > use(main)\ngroup(main) using keys\n+ [CAPS K_A] > 'x'\n+ [K_A] > 'a'\n`;
       const mockFetch = vi.fn().mockImplementation((url: string) => {
         if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(kmnWithCaps));
         return Promise.resolve(makeNotFoundResponse());
@@ -255,7 +255,7 @@ describe("createScaffolderService", () => {
 
       const kmnEntry = vfs.get("source/my_keyboard.kmn");
       const content = kmnEntry!.content as string;
-      expect(content).not.toContain("store(&CasedKeys)");
+      expect(content).not.toContain("store(&CASEDKEYS)");
     });
   });
 });
@@ -353,13 +353,13 @@ describe("scaffold — additional coverage", () => {
     expect(vfs.get("source/my_keyboard.kmn")).toBeDefined();
   });
 
-  it("does not insert a second store(&CasedKeys) when base already has one", async () => {
-    const kmnWithExisting = BASE_KMN + "store(&CasedKeys) [K_A]..[K_Z]\n";
+  it("does not insert a second store(&CASEDKEYS) when base already has one", async () => {
+    const kmnWithExisting = BASE_KMN + "store(&CASEDKEYS) [K_A]..[K_Z]\n";
     const mockFetch = vi.fn().mockResolvedValue(makeTextResponse(kmnWithExisting));
     const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
     const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
     const content = vfs.get("source/my_keyboard.kmn")!.content as string;
-    const count = (content.match(/store\(&CasedKeys\)/g) ?? []).length;
+    const count = (content.match(/store\(&CASEDKEYS\)/gi) ?? []).length;
     expect(count).toBe(1);
   });
 
@@ -372,7 +372,7 @@ describe("scaffold — additional coverage", () => {
     const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
     const { vfs } = await service.scaffold(nonLatnBase, "my_keyboard", "My Keyboard");
     const content = vfs.get("source/my_keyboard.kmn")!.content as string;
-    expect(content).not.toContain("store(&CasedKeys)");
+    expect(content).not.toContain("store(&CASEDKEYS)");
   });
 
   it("removes phone layer, duplicates shift as caps, defaults nextlayer on regular keys", async () => {
