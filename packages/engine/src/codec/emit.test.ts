@@ -181,3 +181,31 @@ describe("emit", () => {
     expect(out).toContain("save(myFlag, 1)");
   });
 });
+
+describe("emit: SMP codepoints", () => {
+  it("emits SMP char in context as quoted literal, not U+XXXXX", () => {
+    const ir = makeIR();
+    // SMP char only in context; BMP char in output so assertions are isolated
+    ir.groups[0]?.rules.push({
+      nodeId: "rule#smp0",
+      context: [{ kind: "char", value: "\u{11700}" }],
+      output: [{ kind: "char", value: "a" }],
+    });
+    const out = emit(ir);
+    expect(out).toContain("'\u{11700}'");
+    expect(out).not.toContain("U+11700");
+  });
+
+  it("emits SMP char in output as quoted literal, not U+XXXXX", () => {
+    const ir = makeIR();
+    // BMP char in context; SMP char only in output so assertions are isolated
+    ir.groups[0]?.rules.push({
+      nodeId: "rule#smp1",
+      context: [{ kind: "char", value: "a" }],
+      output: [{ kind: "char", value: "\u{11701}" }],
+    });
+    const out = emit(ir);
+    expect(out).toContain("'\u{11701}'");
+    expect(out).not.toContain("U+11701");
+  });
+});
