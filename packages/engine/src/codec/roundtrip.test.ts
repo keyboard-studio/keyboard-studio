@@ -152,3 +152,30 @@ describe("round-trip: basic_kbdfr", () => {
     expect(true).toBe(true);
   });
 });
+
+const AHOM_PATH = resolve(
+  __dir,
+  "../../../../../keyboards/release/a/ahom_star/source/ahom_star.kmn"
+);
+const ahomAvailable = existsSync(AHOM_PATH);
+
+describe("round-trip: ahom_star", () => {
+  it.skipIf(!ahomAvailable)("typed rule count is preserved through emit→re-parse", () => {
+    const text = readFileSync(AHOM_PATH, "utf-8");
+    const { ir: ir1 } = parse(text, "ahom_star");
+    const emitted = emit(ir1);
+    const { ir: ir2 } = parse(emitted, "ahom_star");
+    expect(countRules(ir2)).toBe(countRules(ir1));
+  });
+
+  it.skipIf(!ahomAvailable)("deep structural equality after emit→re-parse", () => {
+    const text = readFileSync(AHOM_PATH, "utf-8");
+    const { ir: ir1 } = parse(text, "ahom_star");
+    const { ir: ir2 } = parse(emit(ir1), "ahom_star");
+    expect(normaliseForComparison(ir2)).toEqual(normaliseForComparison(ir1));
+  });
+
+  it("is a no-op when keyboard checkout is absent", () => {
+    expect(true).toBe(true);
+  });
+});
