@@ -1,13 +1,12 @@
 import type {
   KeyboardIR,
   IRRule,
-  IRStore,
   Pattern,
-  ContextElement,
 } from "@keyboard-studio/contracts";
 import { makePattern } from "@keyboard-studio/contracts";
 import type { MatchResult, RecognizerRule } from "../types.js";
 import { ruleRef, storeRef } from "../node-refs.js";
+import { storeItemsToCharString } from "../utils.js";
 
 // A trigger is a rule whose output is a single deadkey.
 // Context may be a single vkey OR a single char (sil_euro_latin uses char triggers).
@@ -41,13 +40,6 @@ function isFallback(rule: IRRule, deadkeyId: number): boolean {
   if (isBody(rule)) return false;
   const c0 = rule.context[0];
   return c0 !== undefined && c0.kind === "deadkey" && c0.id === deadkeyId;
-}
-
-// Join store items into a string of their character values.
-function storeItemsToString(store: IRStore): string {
-  return store.items
-    .map((item) => (item.kind === "char" ? item.value : ""))
-    .join("");
 }
 
 // Format a deadkey id as dk_XXXX (hex).
@@ -214,8 +206,8 @@ export const s02Recognizer: RecognizerRule = {
         slotValues: {
           triggerKey: triggerKeyName(primaryTrigger),
           deadkeyName: deadkeyName(dkId),
-          baseLetters: storeItemsToString(baseStore),
-          accentedForms: storeItemsToString(outStore),
+          baseLetters: storeItemsToCharString(baseStore),
+          accentedForms: storeItemsToCharString(outStore),
         },
       });
     }

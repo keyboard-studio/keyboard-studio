@@ -2,18 +2,7 @@ import type { KeyboardIR, IRRule, Pattern } from "@keyboard-studio/contracts";
 import { makePattern } from "@keyboard-studio/contracts";
 import type { MatchResult, RecognizerRule } from "../types.js";
 import { ruleRef } from "../node-refs.js";
-
-// Convert a JS string to "U+XXXX" or "U+XXXX U+YYYY" (multi-codepoint) form.
-function toUPlus(value: string): string {
-  const parts: string[] = [];
-  for (const cp of value) {
-    const codePoint = cp.codePointAt(0);
-    if (codePoint !== undefined) {
-      parts.push("U+" + codePoint.toString(16).toUpperCase().padStart(4, "0"));
-    }
-  }
-  return parts.join(" ");
-}
+import { toUPlus } from "../utils.js";
 
 // Format one rule line for the keystrokeCharacterMap slot.
 // e.g. + [SHIFT K_Q] > U+0190  or  + [K_Q] > U+025B
