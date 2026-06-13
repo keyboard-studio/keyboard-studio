@@ -16,6 +16,16 @@ export interface CompileArtifact {
    */
   url: string;
   sizeBytes: number;
+  /**
+   * Raw bytes of the artifact, populated by the compiler when running in an
+   * environment that has access to the raw kmc-kmn artifact data (e.g. Node
+   * tests, the headless simulator pipeline).
+   *
+   * Optional — existing consumers that only need the `url` for download are
+   * unaffected when this field is absent. The simulate() entry-point uses this
+   * to decode the `.js` artifact without a round-trip through a blob URL.
+   */
+  data?: Uint8Array;
 }
 
 /**

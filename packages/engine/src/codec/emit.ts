@@ -1,10 +1,10 @@
 /**
  * Canonical .kmn emitter: KeyboardIR -> string.
  *
- * Codepoint formatting: uppercase U+XXXX (e.g. U+00E0). This matches the
- * Keyman compiler's canonical form and is preferred by the spec. The choice
- * of uppercase over lowercase is intentional; callers that need lowercase
- * should post-process the output.
+ * Codepoint formatting: uppercase U+XXXX (e.g. U+00E0) for BMP characters;
+ * single-quoted literal (e.g. '𑜠') for SMP characters (> U+FFFF). This keeps
+ * SMP rules typed through emit→re-parse cycles. The choice of uppercase hex
+ * for BMP is intentional; callers that need lowercase should post-process.
  *
  * Emission order:
  *   1. System stores in canonical order (see SYSTEM_STORE_ORDER).
@@ -41,17 +41,23 @@ import type {
 // Codepoint formatting
 // ---------------------------------------------------------------------------
 
-/** Format a single Unicode character as U+XXXX (uppercase 4-digit minimum). */
+/**
+ * Format a single Unicode character as U+XXXX (uppercase 4-digit minimum),
+ * or as a quoted literal for SMP codepoints (> U+FFFF).
+ *
+ * SMP characters (e.g. U+11700 Ahom Letter Ka) would produce 5-digit U+XXXXX
+ * tokens that trigger `isSmpLiteral()` in the parser and go opaque. Quoting
+ * them ('𑜠') keeps the rule typed through emit→re-parse cycles, matching the
+ * convention used in original keyboard source files.
+ */
 function fmtCodepoint(ch: string): string {
   const cp = ch.codePointAt(0) ?? 0;
+  if (cp > 0xffff) {
+    return `'${ch}'`;
+  }
   const hex = cp.toString(16).toUpperCase();
   const padded = hex.padStart(4, "0");
   return `U+${padded}`;
-}
-
-/** Format a string as a sequence of U+XXXX tokens. */
-function fmtString(s: string): string {
-  return [...s].map(fmtCodepoint).join(" ");
 }
 
 /** Format a deadkey id as dk(XXXX). */
@@ -166,7 +172,7 @@ const SYSTEM_STORE_ORDER: readonly string[] = [
   "LAYOUTFILE",
   "COPYRIGHT",
   "KEYBOARDVERSION",
-  "CASEDKEYS",
+  "CasedKeys",
 ];
 
 // ---------------------------------------------------------------------------

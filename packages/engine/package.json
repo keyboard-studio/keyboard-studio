@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./simulator": {
+      "types": "./dist/simulator/index.d.ts",
+      "import": "./dist/simulator/index.js"
     }
   },
   "files": [
@@ -29,6 +33,7 @@
     "@keyboard-studio/contracts": "workspace:*",
     "@keyboard-studio/llm": "workspace:*",
     "@keymanapp/kmc-kmn": "19.0.240-alpha",
+    "eventemitter3": "^5.0.4",
     "fflate": "^0.8.3",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"

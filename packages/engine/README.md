@@ -25,6 +25,60 @@ wrapper landed in Issue #16.
   WASM fetch / instantiate / ABI failures. Never re-thrown to callers of
   `validateWithOracle()`.
 
+## Simulator
+
+`src/simulator/index.ts` exposes two functions exported from the
+`@keyboard-studio/engine/simulator` subpath (Node-only — kept off the main
+entry so the browser bundle never follows the vendored Keyman engine):
+
+- `simulate(compiled, keys)` — feeds a `SimKeyInput[]` sequence through the compiled Keyman `.js`
+  artifact via a vendored JS-processor in a Node `vm` sandbox and returns a `SimulationResult`
+  (full text output plus a per-step trace).
+- `runPatternTests(pattern, compiled)` — runs every `TestVector` in `pattern.tests` through
+  `simulate()` and returns a `PatternTestResult` (pass/fail per vector).
+
+### Contract boundary
+
+`simulate()` is the authoritative, deterministic path for:
+
+- vitest specs and CI cross-validation (it is synchronous and runtime-free from the test's perspective)
+- `Pattern.tests` round-trip vectors (spec §5)
+- doc-gallery and transcript rendering where a reproducible output is required
+
+**`simulate()` is Node-only.** It relies on `node:vm`; it cannot be called from the browser SPA.
+
+**The KeymanWeb iframe** (`packages/studio/public/osk-frame.html`, `OSKFrame.tsx`) is the separate,
+live-preview path for interactive, user-facing keyboard tryout. It is unaffected by this API.
+
+**Higher-fidelity `.kmx` round-trip** via Keyman Core is a distinct, future path tracked separately —
+`simulate()` operates on the compiled `.js` artifact only.
+
+Contract types (`SimKeyInput`, `DeadkeySnapshot`, `SimulationStep`, `SimulationResult`,
+`TestVectorResult`, `PatternTestResult`) live in
+[`packages/contracts/src/simulation.ts`](../contracts/src/simulation.ts) and are re-exported from
+`@keyboard-studio/contracts`.
+
+### Quick usage (Node / vitest)
+
+```ts
+import { simulate, runPatternTests } from "@keyboard-studio/engine/simulator";
+import type { SimKeyInput } from "@keyboard-studio/contracts";
+
+// Compile first (see "Compiler service" below), then:
+const keys: SimKeyInput[] = [
+  { vkey: "K_QUOTE", modifiers: [], caps: false },
+  { vkey: "K_A",     modifiers: [], caps: false },
+];
+const result = simulate(compiled, keys);
+// result.finalOutput === "á"
+// result.trace[0].pendingDeadkeys  → [{id: 0, position: 0}]
+// result.trace[1].pendingDeadkeys  → []
+
+// Or run all Pattern.tests in one call:
+const testResult = runPatternTests(pattern, compiled);
+// testResult.allPass, testResult.vectors[n].pass / .actualOutput
+```
+
 ## Quick start
 
 ```ts

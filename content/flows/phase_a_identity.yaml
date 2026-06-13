@@ -238,7 +238,7 @@ questions:
       - value: syllabic
         label: "Syllabic (each glyph represents a syllable or syllable unit, e.g. Cherokee, Canadian Aboriginal Syllabics, Vai)"
       - value: alpha-nonlatin
-        label: "Non-Latin alphabet (Cyrillic, Greek, Georgian, Armenian -- letters, not syllables or attached marks)"
+        label: "Non-Latin alphabet (Coptic, Tifinagh, Adlam -- letters, not syllables or attached marks)"
       - value: other
         label: "Other or I am not sure"
     required: true

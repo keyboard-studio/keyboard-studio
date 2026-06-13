@@ -123,6 +123,7 @@ describe("Pattern", () => {
       scriptClass: "alphabetic",
       clusterSensitivity: false,
       phoneticIntuition: "strong",
+      markInputOrder: "prefix",
       diacriticBehavior: "stacking-combining",
       multiMode: "single",
       constraintEnforcement: "none",
@@ -138,6 +139,7 @@ describe("Pattern", () => {
     expect(vec.constraintEnforcement).toBe("none");
     expect(vec.spareKeyAvailability).toBe("many");
     expect(vec.remapPosture).toBe("addition");
+    expect(vec.markInputOrder).toBe("prefix");
   });
 
   // (d) PatternMatch construction with strategyId both absent and present

@@ -8,10 +8,10 @@ store(&COPYRIGHT) 'Copyright © 2020 Base Author'
 store(&VERSION) '5.0'
 store(&KEYBOARDVERSION) '1.0'
 store(&TARGETS) 'any'
-NCAPS + [CAPS K_A] > 'a'
-+ [K_A] > 'A'
 begin Unicode > use(main)
 group(main) using keys
++ [CAPS K_A] > 'a'
++ [K_A] > 'A'
 + [K_B] > 'b'
 `;
 
@@ -136,7 +136,9 @@ describe("createScaffolderService", () => {
 
       expect(content).toContain("store(&NAME) 'My Keyboard'");
       expect(content).toMatch(/store\(&COPYRIGHT\) 'Copyright © \d{4} My Keyboard'/);
-      expect(content).toContain("store(&VERSION) '1.0'");
+      // &VERSION is the KMN file-format version — always 14.0 (minimum for &CasedKeys).
+      expect(content).toContain("store(&VERSION) '14.0'");
+      // &KEYBOARDVERSION is the human-visible release version — defaults to "1.0".
       expect(content).toContain("store(&KEYBOARDVERSION) '1.0'");
     });
 
@@ -225,7 +227,7 @@ describe("createScaffolderService", () => {
     });
 
     it("uses azerty CasedKeys for azerty group", async () => {
-      const kmnWithCaps = `store(&KEYBOARDVERSION) '1.0'\nNCAPStest [CAPS K_A] > 'x'\n+ [K_A] > 'a'\n`;
+      const kmnWithCaps = `store(&KEYBOARDVERSION) '1.0'\nbegin Unicode > use(main)\ngroup(main) using keys\n+ [CAPS K_A] > 'x'\n+ [K_A] > 'a'\n`;
       const mockFetch = vi.fn().mockImplementation((url: string) => {
         if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(kmnWithCaps));
         return Promise.resolve(makeNotFoundResponse());
@@ -242,7 +244,7 @@ describe("createScaffolderService", () => {
     });
 
     it("omits CasedKeys for non-roman group", async () => {
-      const kmnWithCaps = `store(&KEYBOARDVERSION) '1.0'\nNCAPStest [CAPS K_A] > 'x'\n+ [K_A] > 'a'\n`;
+      const kmnWithCaps = `store(&KEYBOARDVERSION) '1.0'\nbegin Unicode > use(main)\ngroup(main) using keys\n+ [CAPS K_A] > 'x'\n+ [K_A] > 'a'\n`;
       const mockFetch = vi.fn().mockImplementation((url: string) => {
         if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(kmnWithCaps));
         return Promise.resolve(makeNotFoundResponse());
@@ -359,7 +361,7 @@ describe("scaffold — additional coverage", () => {
     const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
     const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
     const content = vfs.get("source/my_keyboard.kmn")!.content as string;
-    const count = (content.match(/store\(&CasedKeys\)/g) ?? []).length;
+    const count = (content.match(/store\(&CasedKeys\)/gi) ?? []).length;
     expect(count).toBe(1);
   });
 

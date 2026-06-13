@@ -10,6 +10,12 @@ import {
   validateKeyboardId as contractsValidateKeyboardId,
 } from "@keyboard-studio/contracts";
 import { fetchKeyboardSourceToVfs, type FetchFn } from "../loader/fetchKeyboardSourceToVfs.js";
+import { parse } from "../codec/parse.js";
+import { emit } from "../codec/emit.js";
+import { scaffoldIR } from "./scaffold-ir.js";
+
+export { scaffoldIR } from "./scaffold-ir.js";
+export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffold-ir.js";
 
 export interface ScaffolderServiceOptions {
   proxyBase?: string;
@@ -29,6 +35,11 @@ function kmnStringEscape(s: string): string {
   return s.replace(/'/g, "’");
 }
 
+// Defuse PHP block-comment terminator '*/' for stub generation.
+function phpCommentEscape(s: string): string {
+  return s.replace(/\*\//g, "* /");
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -38,11 +49,6 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-// '*/' ends a PHP block comment; insert a space to defuse it.
-function phpCommentEscape(s: string): string {
-  return s.replace(/\*\//g, "* /");
-}
-
 function detectGroup(base: BaseKeyboard): RoutingGroup {
   if (base.script !== "Latn") return "non-roman";
   const id = base.id.toLowerCase();
@@ -50,62 +56,6 @@ function detectGroup(base: BaseKeyboard): RoutingGroup {
     return "azerty";
   }
   return "qwerty-qwertz";
-}
-
-function applyKmnTransforms(
-  content: string,
-  group: RoutingGroup,
-  displayName: string
-): string {
-  const year = new Date().getFullYear();
-
-  const hasCaps = content.split("\n").some((line) => line.includes("[CAPS"));
-  let result = content;
-
-  if (hasCaps) {
-    result = result.replace(/NCAPS /g, "");
-    result = result
-      .split("\n")
-      .filter((line) => !line.includes("[CAPS"))
-      .join("\n");
-
-    const lines = result.split("\n");
-    const noExistingCasedKeys = !lines.some((l) => l.includes("store(&CasedKeys)"));
-    if (noExistingCasedKeys && group !== "non-roman") {
-      const casedKeysValue =
-        group === "azerty"
-          ? "[K_A]..[K_Z] [K_0]..[K_9] [K_HYPHEN] [K_EQUAL] [K_LBRKT] [K_RBRKT] [K_BKSLASH] [K_QUOTE] [K_COMMA] [K_PERIOD] [K_SLASH] [K_COLON]"
-          : "[K_A]..[K_Z]";
-      const versionIdx = lines.findIndex((l) => l.includes("&KEYBOARDVERSION"));
-      if (versionIdx !== -1) {
-        lines.splice(versionIdx + 1, 0, `store(&CasedKeys) ${casedKeysValue}`);
-      }
-      result = lines.join("\n");
-    } else {
-      result = lines.join("\n");
-    }
-  }
-
-  result = result
-    .split("\n")
-    .map((line) => {
-      if (/^\s*store\s*\(\s*&NAME\s*\)/i.test(line)) {
-        return `store(&NAME) '${kmnStringEscape(displayName)}'`;
-      }
-      if (/^\s*store\s*\(\s*&COPYRIGHT\s*\)/i.test(line)) {
-        return `store(&COPYRIGHT) 'Copyright © ${year} ${kmnStringEscape(displayName)}'`;
-      }
-      if (/^\s*store\s*\(\s*&VERSION\s*\)/i.test(line)) {
-        return `store(&VERSION) '1.0'`;
-      }
-      if (/^\s*store\s*\(\s*&KEYBOARDVERSION\s*\)/i.test(line)) {
-        return `store(&KEYBOARDVERSION) '1.0'`;
-      }
-      return line;
-    })
-    .join("\n");
-
-  return result;
 }
 
 function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: string): void {
@@ -201,7 +151,7 @@ function generateStubs(vfs: VirtualFS, keyboardId: string, displayName: string):
   const stubs: Array<{ path: string; content: string | Uint8Array; isBinary?: boolean }> = [
     {
       path: `source/${keyboardId}.kmn`,
-      content: `store(&NAME) '${kmnStringEscape(displayName)}'\nstore(&VERSION) '1.0'\nstore(&KEYBOARDVERSION) '1.0'\nstore(&TARGETS) 'any'\nbegin Unicode > use(main)\ngroup(main) using keys\n`,
+      content: `store(&NAME) '${kmnStringEscape(displayName)}'\nstore(&VERSION) '14.0'\nstore(&KEYBOARDVERSION) '1.0'\nstore(&TARGETS) 'any'\nbegin Unicode > use(main)\ngroup(main) using keys\n`,
     },
     {
       path: `source/${keyboardId}.kps`,
@@ -304,8 +254,20 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
 
       const kmnEntry = vfs.get(`source/${actualBaseId}.kmn`);
       if (kmnEntry !== undefined && typeof kmnEntry.content === "string") {
-        const transformed = applyKmnTransforms(kmnEntry.content, group, displayName);
-        vfs.set(`source/${actualBaseId}.kmn`, transformed);
+        const ir = scaffoldOpts?.ir ?? parse(kmnEntry.content, actualBaseId).ir;
+        scaffoldIR(ir, {
+          identity: { keyboardId, displayName },
+          group,
+        });
+        vfs.set(`source/${actualBaseId}.kmn`, emit(ir));
+      } else if (scaffoldOpts?.ir !== undefined) {
+        // No base .kmn was fetched but caller supplied a pre-parsed IR — use it.
+        const ir = scaffoldOpts.ir;
+        scaffoldIR(ir, {
+          identity: { keyboardId, displayName },
+          group,
+        });
+        vfs.set(`source/${actualBaseId}.kmn`, emit(ir));
       }
 
       renameFilesInVfs(vfs, actualBaseId, keyboardId);

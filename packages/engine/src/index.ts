@@ -54,6 +54,13 @@ export type { ParseResult, OpaqueReason } from "./codec/index.js";
 export { addSidecar, isSidecarPath, buildImportAttributionBlock } from "./output/index.js";
 export type { ImportAttributionInput } from "./output/index.js";
 
+// Issue #183 — headless simulate() API is exposed via the `./simulator`
+// subpath export, NOT from this main entry. The vendored Keyman engine
+// uses bare import specifiers (e.g. `@keymanapp/common-types`) that resolve
+// via tsconfig paths at compile time but cannot be resolved by browser
+// bundlers like Vite. Keeping simulator off the main entry prevents the
+// browser-targeted SPA from following that import chain.
+
 // Issue #234 — pattern recognizer public surface.
 export { recognizePatterns } from "./recognizer/index.js";
 export type { RecognizerRule, MatchResult, RecognizeResult } from "./recognizer/index.js";

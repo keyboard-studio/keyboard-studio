@@ -14,6 +14,7 @@ export * from "./lintFinding";
 export * from "./pattern";
 export * from "./patternMatch";
 export * from "./provenance";
+export * from "./simulation";
 export * from "./strategy";
 export * from "./surveyPhaseResult";
 export * from "./surveySession";

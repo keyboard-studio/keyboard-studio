@@ -1,0 +1,25 @@
+c deadkey_acute.kmn — minimal deadkey keyboard for simulate() acceptance test (issue #183)
+c Rule: ' (K_QUOTE) sets a deadkey; then a (K_A) fires "dk + a -> á".
+c This validates the full end-to-end: compile -> simulate -> deadkey resolution.
+
+store(&NAME) 'DeadkeyAcute'
+store(&VERSION) '14.0'
+store(&KEYBOARDVERSION) '1.0'
+store(&TARGETS) 'any'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
+c ' key sets the acute deadkey (id 1)
++ [K_QUOTE] > deadkey(1)
+
+c deadkey(1) + 'a' -> á (U+00E1)
+deadkey(1) + [K_A] > U+00E1
+
+c Pass-through for other keys after deadkey (emit the apostrophe + the new char)
+deadkey(1) + [K_B] > "'" 'b'
+deadkey(1) + [K_E] > U+00E9
+deadkey(1) + [K_I] > U+00ED
+deadkey(1) + [K_O] > U+00F3
+deadkey(1) + [K_U] > U+00FA

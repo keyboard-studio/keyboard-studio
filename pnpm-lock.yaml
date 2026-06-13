@@ -32,6 +32,9 @@ importers:
       vitest:
         specifier: ^4.1.6
         version: 4.1.8(@types/node@22.19.19)(jsdom@26.1.0)(vite@7.3.5(@types/node@22.19.19)(yaml@2.9.0))
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
 
   packages/contracts:
     devDependencies:
@@ -53,6 +56,9 @@ importers:
       '@keymanapp/kmc-kmn':
         specifier: 19.0.240-alpha
         version: 19.0.240-alpha
+      eventemitter3:
+        specifier: ^5.0.4
+        version: 5.0.4
       fflate:
         specifier: ^0.8.3
         version: 0.8.3
@@ -100,6 +106,9 @@ importers:
       react-dom:
         specifier: ^18.3.1
         version: 18.3.1(react@18.3.1)
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
       zustand:
         specifier: ^5.0.14
         version: 5.0.14(@types/react@18.3.30)(react@18.3.1)

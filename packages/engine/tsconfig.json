@@ -4,7 +4,20 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "composite": true,
-    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "experimentalDecorators": true,
+    "paths": {
+      "@keymanapp/common-types": ["./src/simulator/vendor/keyman/common/types/main.ts"],
+      "keyman/engine/keyboard": ["./src/simulator/vendor/keyman/engine/keyboard/index.ts"],
+      "keyman/engine/keyboard/*": ["./src/simulator/vendor/keyman/engine/keyboard/*"],
+      "keyman/engine/js-processor": ["./src/simulator/vendor/keyman/engine/js-processor/index.ts"],
+      "keyman/engine/js-processor/*": ["./src/simulator/vendor/keyman/engine/js-processor/*"],
+      "keyman/common/web-utils": ["./src/simulator/vendor/keyman/common/web-utils/index.ts"],
+      "keyman/common/web-utils/*": ["./src/simulator/vendor/keyman/common/web-utils/*"],
+      "@keymanapp/keyman-version": ["./src/simulator/vendor/stubs/keyman-version.ts"]
+    }
   },
   "references": [
     { "path": "../contracts" },

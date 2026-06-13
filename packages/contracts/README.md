@@ -20,6 +20,7 @@ Contents map to [spec.md](../../spec.md):
 - `src/patternMatch.ts` - gallery match record (spec section 8, phase C)
 - `src/compileResult.ts` - WASM compiler service result (spec section 4)
 - `src/criteria.ts` - criteria.md band classification (spec sections 11 and 14, decision 4)
+- `src/simulation.ts` - contract types for the headless `simulate()` pipeline: `SimKeyInput`, `DeadkeySnapshot`, `SimulationStep`, `SimulationResult`, `TestVectorResult`, `PatternTestResult` (spec §5 test vectors)
 
 ## Revision policy
 

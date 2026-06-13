@@ -2,7 +2,7 @@
 
 **Issue:** #32 — Integration Day: swap mocks for real validator, compiler, scaffolder
 **Acceptance criterion:** #5 — committed smoke-run checklist at `packages/studio/docs/smoke-day-4.md`
-**Branch:** `km/issue-32-swap-mocks`
+**Branch:** `km/issue-32-integration-smoke`
 
 ---
 
@@ -35,19 +35,31 @@
    // runAllChecks is exposed on window.studioDebug in dev builds
    window.studioDebug.runAllChecks("bad source here")
    ```
-   Confirm the call returns an array of findings (non-empty). _(Note: in-editor source editing and live diagnostics from typed source arrive in issue #48.)_
+   Confirm the call returns an array of findings (non-empty).
 
-9. - [ ] Click the **Download** button in the toolbar. Confirm a `.js` file download is triggered by the browser.
+9. - [ ] Click the **New from base** button in the left pane to enter scaffold mode. With a base keyboard already selected, fill in the **ScaffoldForm** (Keyboard ID + Display name) and click **Create keyboard**. Confirm the right pane cycles through "fetching" → "compiling" and then renders the OSK for the new keyboard.
 
-10. - [ ] Open the downloaded file (or inspect via DevTools > Network) and confirm it is **non-empty** (size > 0 bytes).
+10. - [ ] With the scaffolded keyboard compiled and the **KmnEditor** visible in the left pane, add a mapping rule (e.g. `+ [K_C] > 'c'`), then pause typing. After the 300 ms debounce, confirm the OSK re-renders and the DiagnosticsPanel reflects the updated compile result.
+
+11. - [ ] Click the **Download .zip** button in the toolbar. Confirm a `.zip` file download is triggered by the browser and is **non-empty** (size > 0 bytes). The archive is a real `VirtualFS` zip produced by `toZip(vfs)`.
 
 ---
 
-## Intentional Limitations (Day-4 Scope)
+## Automated proof of the scaffold-compile chain
 
-- **Download artifact:** The download button produces the compiled `.js` artifact only. A full `VirtualFS` zip (`.kmp` bundle) is a follow-on item; tracking TBD.
-- **Scaffolder UI:** `createScaffolderService` from `@keyboard-studio/engine` is implemented and tested at the API level but is **not yet wired to a UI button**. Manual invocation via the browser console or a Node script is required for Day-4 validation. UI entry point arrives in issue #48.
-- **Live validator diagnostics from typed source:** The `runAllChecks` debounce loop (300 ms) is active, but the in-editor source-editing surface does not exist yet. Validator verification in step 8 is therefore console-only until issue #48.
+[packages/engine/src/scaffolder/scaffold-compile.integration.test.ts](../../../packages/engine/src/scaffolder/scaffold-compile.integration.test.ts)
+covers both paths automatically:
+
+- **Case A (fetch-OK):** scaffold from a base that returns a valid KMN → compile → 2 artifacts (`.kmx` + `.js`), 0 fatal/error diagnostics.
+- **Case B (404 stub):** scaffold when the base source is unreachable → header-only stub KMN → compile → at least a `.kmx` artifact, 0 fatal/error diagnostics.
+
+These tests encode the codec fixes that previously caused every scaffolded keyboard to produce zero artifacts: `&VERSION` file-format default raised from `'1.0'` to `'14.0'`, and `&CasedKeys` system-store casing corrected so `kmc-kmn` accepts it.
+
+---
+
+## Remaining limitations
+
+- **Full live browser E2E (Playwright):** end-to-end automated browser sign-off is tracked separately in issues #53/#54. The manual click-through in steps 9–11 above is the human sign-off in place of that automation until it lands.
 
 ---
 
@@ -65,3 +77,4 @@
 | 8    |        |        |      |
 | 9    |        |        |      |
 | 10   |        |        |      |
+| 11   |        |        |      |

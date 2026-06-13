@@ -382,13 +382,16 @@ export async function compile(
     };
   }
 
-  // Marshal artifacts to blob URLs.
+  // Marshal artifacts to blob URLs. Raw bytes are preserved in the optional
+  // `data` field so the headless simulator can decode the .js without a
+  // round-trip through a blob URL (see CompileArtifact.data JSDoc).
   const artifacts: CompileArtifact[] = [];
   if (raw.artifacts?.kmx) {
     artifacts.push({
       filename: raw.artifacts.kmx.filename,
       url: blobUrl(raw.artifacts.kmx.data),
       sizeBytes: raw.artifacts.kmx.data.byteLength,
+      data: new Uint8Array(raw.artifacts.kmx.data),
     });
   }
   if (raw.artifacts?.kvk) {
@@ -396,6 +399,7 @@ export async function compile(
       filename: raw.artifacts.kvk.filename,
       url: blobUrl(raw.artifacts.kvk.data),
       sizeBytes: raw.artifacts.kvk.data.byteLength,
+      data: new Uint8Array(raw.artifacts.kvk.data),
     });
   }
   if (raw.artifacts?.js) {
@@ -403,6 +407,7 @@ export async function compile(
       filename: raw.artifacts.js.filename,
       url: blobUrl(raw.artifacts.js.data),
       sizeBytes: raw.artifacts.js.data.byteLength,
+      data: new Uint8Array(raw.artifacts.js.data),
     });
   }
 

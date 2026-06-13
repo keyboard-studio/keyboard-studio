@@ -78,7 +78,7 @@ That's the whole loop.
 
 Never, under any circumstance, run:
 
-- `gh pr merge` (any flag — including `--admin`, `--squash`, `--auto`) **AND** any equivalent via the bot wrapper: `bot-gh.js pr merge`, `node utilities/km-triage-app/bot-gh.js pr merge`, or direct REST calls to `PUT /repos/.../pulls/<n>/merge` from any token (bot or human). The bot's installation deliberately has only `pull_requests: write`, `issues: write`, and `checks: write` — it does **not** have `contents: write` and is **not** in the ruleset's `bypass_actors` list. The bot can review, label, comment, and publish check runs; it cannot push commits or merge PRs. Merging stays a human action (`gh pr merge` from a maintainer's terminal) — and crucially, after the Checks API gate is in place (see Phase 6), `--admin` is no longer needed: the bot's `km-triage/review` check satisfies the merge gate the same way the CI build check does.
+- `gh pr merge` (any flag — including `--admin`, `--squash`, `--auto`) **AND** any equivalent via the bot wrapper: `bot-gh.js pr merge`, `node utilities/km-triage-app/bot-gh.js pr merge`, or direct REST calls to `PUT /repos/.../pulls/<n>/merge` from any token (bot or human). **What stops the bot is the branch ruleset, not a missing permission — do not assume the bot lacks `contents: write`; it has it** (that is how the Phase-6 auto-fix push lands commits on feature branches). The actual boundary: the `km-triage` App is **not** in the `bypass_actors` list of either `main` ruleset — `main: PR + review` (id 17331095) and `main: CI + integrity` (id 17331134), whose only bypass actor is the admin `RepositoryRole` (`pull_request` mode). So the bot cannot push to protected `main`, and cannot merge a PR that has not satisfied the required review + checks. On top of that GitHub-enforced boundary, these Hard Safety Rules forbid the *agent* from merging, rebasing, force-pushing, or mutating `main` under **any** circumstance — even a PR that technically satisfies the gate. Merging stays a human action (`gh pr merge` from a maintainer's terminal) — and crucially, after the Checks API gate is in place (see Phase 6), `--admin` is no longer needed: the bot's `km-triage/review` check satisfies the merge gate the same way the CI build check does.
 - `git push --force` / `--force-with-lease`
 - `git rebase` of any flavor — interactive or non-interactive, against `main` or any other base. Even when an auto-fix would resolve the merge conflict, the triage does not rebase. The human rebases.
 - `git commit --amend` / `git reset --hard`
@@ -266,15 +266,18 @@ EOF
 test -f .tech-lead-inbox/audit-log.jsonl || : > .tech-lead-inbox/audit-log.jsonl
 
 # Triage labels: create once per repo lifetime, guarded by a sentinel file.
-if [ ! -f .tech-lead-inbox/.labels-created ]; then
+# Bump the sentinel suffix whenever a label is added so existing installs
+# create the newcomer on their next sweep (then go quiet again).
+if [ ! -f .tech-lead-inbox/.labels-created-v2 ]; then
   gh label create ready-to-merge --color 0e8a16 --description "Triage approved - ready to merge by any team member" 2>/dev/null || true
   gh label create review-needed            --color d93f0b --description "Triage escalated - awaiting submitter or tech-lead response" 2>/dev/null || true
   gh label create triage-skip              --color cfd3d7 --description "Do not run triage on this PR" 2>/dev/null || true
-  touch .tech-lead-inbox/.labels-created
+  gh label create needs-rebase             --color fbca04 --description "Triage: branch conflicts with base - rebase needed (auto-clears once mergeable)" 2>/dev/null || true
+  touch .tech-lead-inbox/.labels-created-v2
 fi
 ```
 
-`.tech-lead-inbox/` is in `.gitignore` already; the bootstrap is paranoia. The label-creation sentinel means three `gh label create` API calls happen on the first ever sweep and zero on every subsequent sweep.
+`.tech-lead-inbox/` is in `.gitignore` already; the bootstrap is paranoia. The label-creation sentinel means the `gh label create` API calls happen on the first ever sweep (and once more after any label is added and the sentinel suffix bumped) and zero on every subsequent sweep.
 
 After the bootstrap, **first decide bot vs personal mode** (see the Personal mode section near the top). In **personal mode**, skip this reachability check entirely — no token is minted. In **bot mode**, run the bot-identity reachability check (see "Phase 1 reachability check" in the Bot identity section above). It mints a throwaway token to confirm the App is installed and reachable, and fast-fails the sweep with `auth_failed` if not. Every subsequent PR-mutating action mints its own fresh token via [utilities/km-triage-app/bot-gh.js](utilities/km-triage-app/bot-gh.js) — no shell-state assumptions.
 
@@ -295,19 +298,20 @@ gh pr list \
 node utilities/km-triage-app/progress-emit.js phase=sweep-start total_prs=<N> "prs=[<comma-separated PR numbers>]" || true
 ```
 
+**Label hygiene — clear stale `needs-rebase` (runs first, before any skip check).** For every PR in the list whose `mergeable` is **not** `CONFLICTING` (i.e. `MERGEABLE` or `UNKNOWN`), if it currently carries the `needs-rebase` label, remove it — the branch was rebased and the conflict is gone:
+
+```bash
+node utilities/km-triage-app/bot-gh.js api \
+  repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels/needs-rebase -X DELETE 2>/dev/null || true
+```
+
+This runs unconditionally up front, so the label clears even when the PR is then skipped for an unrelated reason (e.g. `ci_not_ready`). It is the "and go away when done" half of the conflict tag; the CONFLICTING skip below is the "show as a tag" half. (`UNKNOWN` is treated as not-conflicting for cleanup purposes — if GitHub later resolves it to `CONFLICTING`, the next sweep re-adds the label; leaving a stale tag on a now-mergeable PR is the worse failure.)
+
 For each PR, **skip** (with audit-log entry `action_taken: skipped, reason: <X>`) when any of these hold:
 
 - `isCrossRepository: true` → reason `external_pr_not_in_scope`. The triage only auto-handles PRs whose head branch is in `MattGyverLee/keyboard-studio` itself (the team's working branches). External / fork PRs (where `headRepositoryOwner.login != "MattGyverLee"` and `isCrossRepository == true`) are out of scope: no review crew is dispatched, no comments are posted, no labels are added. Optionally append a one-line note to `INBOX.md`: "PR #N is from an external fork (`<repo>:<branch>`); auto-triage is in-repo only — review manually if desired." The tech lead can pull the PR into an internal branch first if they want auto-triage to consider it. This gate also defuses an entire class of edge cases — cross-fork push, fork-branch-name collision, contributor-controlled commit message trailers — by simply not running the auto-handling path on PRs that originate outside the team's branches.
 - `isDraft: true` → reason `draft`.
-- **Solo-tech-lead authorship** — every commit on the PR is single-authored by the tech lead's git identity, with no Co-Authored-By trailers naming anyone else. Reason `solo_tech_lead_author`. Detection (derived in-process from the Phase-2 list response — no extra `gh` call needed since `commits[].authors[].email` is already in the JSON):
-
-  ```
-  TL_EMAIL  := $(git config user.email), default "matthew_lee@sil.org"
-  emails    := unique({ a.email for c in pr.commits for a in c.authors })
-  skip if   emails == { TL_EMAIL }
-  ```
-
-  Any other shape — Claude (`noreply@anthropic.com`), a teammate's email (`*@taylor.edu`, `*@sil.org` that isn't the lead's), or a Co-Authored-By trailer pointing elsewhere — means **triage the PR**. Do **not** key off `author.login` (who opened the PR) — that field is set to the tech lead's identity whenever a headless CLI run or a "push for me" workflow lands a PR under their credentials, and skipping on that signal would defeat the entire purpose of the triage.
+- **Authorship is never a skip reason.** The triage reviews every in-scope PR regardless of who authored it — including PRs the tech lead authored solo, and lead+Claude PRs. There is no `solo_tech_lead_author` skip. (In bot mode the `km-triage[bot]` identity can satisfy the required-approving-review gate on the lead's own PRs; the lead still clicks merge.) The opt-out is explicit and per-PR: apply the `triage-skip` label (next bullet). Do **not** re-introduce an authorship-based auto-skip — the lead wants review by default and opts out by hand. Note for attribution only: `commits[].authors[].email` and `author.login` are still read in Phase 3.5 (`directed_by` / `channel`), but they no longer gate whether the PR is triaged.
 - Labels include `ready-to-merge` or `triage-skip` → reason `already_in_lead_queue`. These are unconditional hard skips: `ready-to-merge` means the crew already approved the PR and it awaits a human merge; `triage-skip` is an explicit opt-out. Neither is overridden by lead-trigger comments.
 - Label `review-needed` is present AND **no lead-trigger comment has been posted since the most recent audit entry's `ts`** → reason `already_in_lead_queue`. This is the "awaiting human response" state, so the same lead-trigger comment lookup defined under `no_new_commits_since_last_review` below applies here too. If a matching comment exists, do **not** skip: remove the `review-needed` label before proceeding into Phase 3 (Phase 6 will re-add it if the new outcome is still MENTION/ESCALATE, or replace it with `ready-to-merge` if the crew approves):
   ```bash
@@ -315,15 +319,24 @@ For each PR, **skip** (with audit-log entry `action_taken: skipped, reason: <X>`
     repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels/review-needed -X DELETE || true
   ```
   Record `trigger: comment` and `triggering_comment_id: <id>` in the audit log.
-- `mergeable` is `CONFLICTING` → reason `merge_conflict`. The triage will not run the review crew on this PR (the user's directive: "don't try to fix a conflicting branch"). Instead, post **one** @-mention comment (via `node utilities/km-triage-app/bot-gh.js pr comment <NUM> --body-file <conflict-body.md>`) tagging both the tech lead and the PR's directing human (computed per the same Phase-3.5 logic the normal path uses — desktop case via commit author email → GitHub login; web case via `pr.author.login`). Body:
-  ```
-  @MattGyverLee @<directed_by-login> — km-triage skipped this PR.
+- `mergeable` is `CONFLICTING` → reason `merge_conflict`. The triage will not run the review crew on this PR (the user's directive: "don't try to fix a conflicting branch"). Instead it flags the PR with the **`needs-rebase`** label so the conflict state is visible at a glance and clears itself once resolved (see "Label hygiene" above). Behavior depends on whether the PR already carries the label:
+  - **`needs-rebase` not yet present** (first sweep to see this conflict): add the label and post **one** @-mention comment (via `node utilities/km-triage-app/bot-gh.js pr comment <NUM> --body-file <conflict-body.md>`) tagging both the tech lead and the PR's directing human (computed per the same Phase-3.5 logic the normal path uses — desktop case via commit author email → GitHub login; web case via `pr.author.login`):
+    ```bash
+    node utilities/km-triage-app/bot-gh.js api \
+      repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=needs-rebase"
+    ```
+    Comment body:
+    ```
+    @MattGyverLee @<directed_by-login> — km-triage skipped this PR.
 
-  PR is in CONFLICTING merge state. Triage policy is to not auto-fix or review a branch that needs rebasing.
+    PR is in CONFLICTING merge state. Triage policy is to not auto-fix or review a branch that needs rebasing.
 
-  Please rebase against `main` first; the next sweep will run the full review crew (engine or content, by team label / paths) and either auto-fix mechanical findings or @-mention you again with any open questions.
-  ```
-  Dedup the two mentions if `directed_by` resolves to the lead's own login. Audit-log entry uses `action_taken: skipped, reason: merge_conflict`. No labels added.
+    Please rebase against `main` first; the next sweep will run the full review crew (engine or content, by team label / paths) and either auto-fix mechanical findings or @-mention you again with any open questions. The `needs-rebase` label clears automatically once the branch is mergeable again.
+    ```
+    Dedup the two mentions if `directed_by` resolves to the lead's own login.
+  - **`needs-rebase` already present** (a prior sweep already flagged this and the author hasn't rebased yet): skip quietly — do **not** re-add the label and do **not** re-post the comment. The label is the persistent signal; re-commenting every sweep is noise.
+
+  Either way the audit-log entry uses `action_taken: skipped, reason: merge_conflict`.
 - The `statusCheckRollup` shows any required check that is not `SUCCESS` or `NEUTRAL` → reason `ci_not_ready`. Do **not** label or comment; the PR re-enters triage on the next sweep once CI completes.
 - `mergeable` is `UNKNOWN` → reason `mergeability_unknown`. GitHub computes mergeability asynchronously and the value is often `UNKNOWN` for a few seconds after a push. Skip and retry on the next sweep — by then GitHub will have resolved to `MERGEABLE` or `CONFLICTING` and the normal Phase-2 routing applies. Do not treat UNKNOWN as MERGEABLE; running the crew and pushing fixes against a PR whose merge state isn't yet computed risks the same race the `became_conflicting_during_review` gate guards against, just earlier.
 - The last commit SHA on the PR (`commits[-1].oid`) equals the SHA recorded in the most recent audit-log entry for this PR AND that entry's action was one of `approve_park`, `mention_only`, `fix_and_mention`, `escalate`, or `auto_fix_attempt_failed` AND **no new lead-trigger comment has been posted since that audit entry's `ts`** (see below) → reason `no_new_commits_since_last_review`. This is the idempotency gate; it keeps the inbox quiet when the lead hasn't merged (approve_park), the author hasn't pushed a fix (request-changes paths), or the lead hasn't answered (escalate). Note: `auto_fix_only` is **not** in this list because the auto-fix push changes the head SHA, so the next sweep naturally sees a new HEAD and re-runs the crew on the now-fixed code.
@@ -352,7 +365,7 @@ If `$ARGUMENTS` is a single valid PR number, fetch just that PR with the same fi
 node utilities/km-triage-app/progress-emit.js phase=pr-skip pr=<NUM> reason=<skip_reason> || true
 ```
 
-The `reason` value is the same one that goes into the audit log — `external_pr_not_in_scope`, `draft`, `solo_tech_lead_author`, `already_in_lead_queue`, `merge_conflict`, `ci_not_ready`, `mergeability_unknown`, or `no_new_commits_since_last_review`. Skip-action paths do not create a check_run (see Observability lifecycle table), so the GitHub merge gate stays at "Expected — waiting" for skipped PRs.
+The `reason` value is the same one that goes into the audit log — `external_pr_not_in_scope`, `draft`, `already_in_lead_queue`, `merge_conflict`, `ci_not_ready`, `mergeability_unknown`, or `no_new_commits_since_last_review`. Skip-action paths do not create a check_run (see Observability lifecycle table), so the GitHub merge gate stays at "Expected — waiting" for skipped PRs.
 
 ## Phase 3 — Classify each surviving PR
 
@@ -1231,7 +1244,7 @@ Field notes:
 - `bypass_trigger` names the Pre-filter D path that fired when `action_taken` is `bypass`. Two values: `process_title_prefix` (the PR title matched `^(feat|fix|docs|chore|maint|refactor|auto)\(process\):`), or `triage_bypass_label` (the PR carried the `triage-bypass` label). `null` for all other action_taken values — this field is always present in the JSON, but non-null only on bypass entries.
 - `reason` carries the per-action explanation when `action_taken` is `skipped` or `bypass`, or when an auto-fix or approve-park was rerouted to MENTION_ONLY by a precondition gate. Known values include:
   - Bypass reasons (Pre-filter D): `process_title_prefix`, `triage_bypass_label`. These match `bypass_trigger` exactly; both fields carry the same value on bypass entries.
-  - Skip reasons (Phase 2 / Pre-filter A): `external_pr_not_in_scope`, `draft`, `solo_tech_lead_author`, `already_in_lead_queue`, `merge_conflict`, `ci_not_ready`, `no_new_commits_since_last_review`, `no_content_changes_since_last_review`.
+  - Skip reasons (Phase 2 / Pre-filter A): `external_pr_not_in_scope`, `draft`, `already_in_lead_queue`, `merge_conflict`, `ci_not_ready`, `no_new_commits_since_last_review`, `no_content_changes_since_last_review`.
   - Auto-fix abort → MENTION_ONLY reroute (Phase 6 preconditions): `head_is_protected_branch`, `head_moved_during_fix`, `became_conflicting_during_review`.
   - Approve-park abort → MENTION_ONLY reroute (Phase 6 APPROVE-AND-PARK re-check): `became_conflicting_during_review`, `ci_red_during_review`.
   - Other: `auth_failed`, `missing_team_label` (informational; doesn't gate). Empty array `[]` means either no trailer was present or the trailer named only specialists in the always-run set (which never get skipped). This list is *informational* — it does not appear in `verdicts` since those specialists didn't run this sweep, but it lets a later audit reconstruct why the crew was smaller than the classification suggests.

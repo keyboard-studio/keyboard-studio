@@ -133,7 +133,7 @@ exactly.
 
 > Keep this section up to date as work lands. Update it whenever a delivery
 > option moves from "not started" to "in progress" or "done".
-> Last updated: 2026-06-04
+> Last updated: 2026-06-12
 
 ### Pipeline prerequisites (must exist before any delivery option works)
 
@@ -144,7 +144,7 @@ exactly.
 | Validator — WASM oracle | **Done** | Issue #16 — `packages/engine/src/validator/oracle.ts` + `wasmLoader.ts` |
 | Compiler service | **Done** | Issue #17 — `packages/engine/src/compiler/` |
 | Source loader (VFS hydration) | **Done** | Issue #39 — `packages/engine/src/loader/fetchKeyboardSourceToVfs.ts` |
-| Scaffolder (`ScaffolderService`) | Not started | Contract exists in `packages/contracts`; no implementation yet |
+| Scaffolder (`ScaffolderService`) | **Done** | Issue #32 — `packages/engine/src/scaffolder/`; `createScaffolderService().scaffold()` wired into studio UI via `ScaffoldForm`; codec fixes (`&VERSION` 1.0→14.0, `&CasedKeys` casing) proved by `scaffold-compile.integration.test.ts` (2 artifacts, 0 diagnostics) |
 | VirtualFS serialisation | **Done** | Delivered as part of issue #46 — `toZip` walks the VirtualFS |
 
 ### Option C — ZIP download
@@ -155,7 +155,7 @@ exactly.
 | `toZip` implementation | **Done** | Issue #46 — `packages/engine/src/output/zip.ts`; fflate, injects `NEXT_STEPS.md`, compiled artifacts included per spec §12, 11 vitest specs |
 | `serializeToZip` alias | **Done** | Exported from `packages/engine/src/output/zip.ts` |
 | `createOutputService()` factory | **Done** | `packages/engine/src/output/index.ts` — zip wired; GitHub path throws "not implemented" until issue #47 |
-| Studio UI — "Download ZIP" button | Not started | Wrap `Uint8Array` in `new Blob([bytes])` and trigger download |
+| Studio UI — "Download ZIP" button | **Done** | Issue #32 — `PreviewShell` calls `getToZip()(stage.vfs)`, wraps result in `Blob`, triggers anchor click; button label "Download .zip"; `USE_REAL` flag respected (mock fallback in CI) |
 
 ### Option A — User-fork, app-managed
 
@@ -182,7 +182,7 @@ exactly.
 ### Summary
 
 ```
-Option C  [==================--]  90%  engine done; studio "Download ZIP" button remaining
-Option A  [==============------]  70%  engine done; OAuth App + studio UI remaining
-Option B  [--------------------]   0%  design done (github_flow.md); nothing built
+Option C  [====================]  100%  engine + studio UI done; full end-to-end zip download wired (#32)
+Option A  [==============------]   70%  engine done; OAuth App + studio UI remaining
+Option B  [--------------------]    0%  design done (github_flow.md); nothing built
 ```
