@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { BaseKeyboard, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { LOCAL_PROXY_BASE } from "../lib/services.ts";
+import { LOCAL_PROXY_BASE, getScaffolderService } from "../lib/services.ts";
 import { useIRStore } from "../stores/irStore.ts";
+import { findKmnPath } from "../lib/findKmnPath.ts";
 
 interface EngineModule {
   compile: (fs: VirtualFS, keyboardId: string) => Promise<CompileResult>;
@@ -51,7 +52,7 @@ export type Stage =
    */
   | { kind: "vfs-loading" }
   | { kind: "compiling"; isWarmCompile: boolean }
-  | { kind: "ready"; compileResult: CompileResult; jsBlobUrl: string }
+  | { kind: "ready"; compileResult: CompileResult; jsBlobUrl: string; vfs: VirtualFS; scaffoldWarnings: string[] }
   | {
       kind: "error";
       step: "fetch" | "vfs" | "compile";
@@ -59,9 +60,18 @@ export type Stage =
       compileResult?: CompileResult;
     };
 
+/** Spec for a new scaffolded keyboard. When present, useKeyboardArtifact uses
+ * createScaffolderService().scaffold() instead of fetchKeyboardSourceToVfs. */
+export interface ScaffoldSpec {
+  keyboardId: string;
+  displayName: string;
+}
+
 export interface KeyboardArtifactResult {
   stage: Stage;
   retry: () => void;
+  /** Re-run the compile step against the current vfs ref. Debounce drives this. */
+  recompile: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -76,15 +86,96 @@ export interface KeyboardArtifactResult {
  *
  * Memory hygiene: previous blob URLs are revoked on every stage transition
  * that produces a new URL, preventing orphaned object URLs from accumulating.
+ *
+ * When `scaffoldSpec` is present, the VFS is populated via
+ * createScaffolderService().scaffold() (new keyboard authoring path).
+ * When absent, the original fetchKeyboardSourceToVfs path runs (open base).
  */
 export function useKeyboardArtifact(
-  baseKeyboard: BaseKeyboard | null
+  baseKeyboard: BaseKeyboard | null,
+  scaffoldSpec?: ScaffoldSpec | null
 ): KeyboardArtifactResult {
   const [stage, setStage] = useState<Stage>({ kind: "idle" });
   const prevBlobUrl = useRef<string | null>(null);
   const runId = useRef(0);
   const engineRef = useRef<EngineModule | null>(null);
   const engineLoadAttempted = useRef(false);
+  // Persistent VFS across recompiles — lifted out of the run closure.
+  const vfsRef = useRef<VirtualFS | null>(null);
+
+  // Separate compile step, callable independently for the recompile() path.
+  // `warnings` carries any scaffold warnings from the preceding fetch step;
+  // empty for recompile() calls (which don't re-scaffold).
+  const runCompile = useCallback(async (
+    kb: BaseKeyboard,
+    thisRunId: number,
+    warnings: string[] = [],
+  ): Promise<void> => {
+    const engine = engineRef.current;
+    const vfs = vfsRef.current;
+    if (engine === null || vfs === null) return;
+
+    if (runId.current !== thisRunId) return;
+
+    const isWarmCompile = engine.isReady?.() ?? false;
+    setStage({ kind: "compiling", isWarmCompile });
+
+    let result: CompileResult;
+    try {
+      const kmnPath = findKmnPath(vfs);
+      const kmnText = kmnPath ? (vfs.get(kmnPath)!.content as string) : "";
+
+      const compileId = scaffoldSpec?.keyboardId ?? kb.id;
+
+      const [compileResult, parseResult] = await Promise.all([
+        engine.compile(vfs, compileId),
+        Promise.resolve().then(() => {
+          if (!engine.parseKmn || !engine.recognizePatterns || !kmnPath) return null;
+          const pr = engine.parseKmn(kmnText, compileId);
+          const recognized = engine.recognizePatterns(pr.ir);
+          return { ...pr, ir: recognized.ir };
+        }),
+      ]);
+      result = compileResult;
+      if (parseResult) {
+        useIRStore.getState().setIR(parseResult.ir);
+      }
+    } catch (err: unknown) {
+      if (runId.current !== thisRunId) return;
+      const message = err instanceof Error ? err.message : "Unknown compile error";
+      setStage({ kind: "error", step: "compile", message });
+      return;
+    }
+
+    if (runId.current !== thisRunId) return;
+
+    const jsArtifact = result.artifacts.find((a) => a.filename.endsWith(".js"));
+
+    if (prevBlobUrl.current !== null) {
+      URL.revokeObjectURL(prevBlobUrl.current);
+      prevBlobUrl.current = null;
+    }
+
+    let jsBlobUrl: string;
+    if (jsArtifact) {
+      jsBlobUrl = jsArtifact.url;
+      if (jsBlobUrl.startsWith("blob:")) {
+        prevBlobUrl.current = jsBlobUrl;
+      }
+    } else if (!result.success && result.artifacts.length === 0) {
+      setStage({
+        kind: "error",
+        step: "compile",
+        message: "Compile failed: no usable artifacts produced.",
+        compileResult: result,
+      });
+      return;
+    } else {
+      jsBlobUrl = "";
+    }
+
+    setStage({ kind: "ready", compileResult: result, jsBlobUrl, vfs, scaffoldWarnings: warnings });
+  }, [scaffoldSpec?.keyboardId]);
 
   const run = useCallback(async (kb: BaseKeyboard, thisRunId: number) => {
     // Step 0: Lazily load the engine module once.
@@ -115,10 +206,22 @@ export function useKeyboardArtifact(
 
     setStage({ kind: "fetching" });
 
+    // Fresh VFS for each full run (new selection or retry).
     const vfs = createVirtualFS();
+    vfsRef.current = vfs;
+
+    const scaffoldWarnings: string[] = [];
 
     try {
-      if (engineRef.current) {
+      if (scaffoldSpec != null) {
+        // Scaffold path — new keyboard authoring. Routes through
+        // getScaffolderService() so USE_REAL=false uses the mock in CI.
+        const svc = await getScaffolderService();
+        const result = await svc.scaffold(kb, scaffoldSpec.keyboardId, scaffoldSpec.displayName);
+        vfsRef.current = result.vfs;
+        scaffoldWarnings.push(...result.warnings);
+      } else if (engineRef.current) {
+        // Open-base path — fetch existing keyboard source.
         await engineRef.current.fetchKeyboardSourceToVfs(kb, vfs, {
           proxyBase: LOCAL_PROXY_BASE,
         });
@@ -133,70 +236,14 @@ export function useKeyboardArtifact(
 
     if (runId.current !== thisRunId) return;
 
-    const isWarmCompile = engineRef.current?.isReady?.() ?? false;
-
-    setStage({ kind: "compiling", isWarmCompile });
-
-    let result: CompileResult;
-    try {
-      const kmnPath = vfs.list().find((p) => p.endsWith('.kmn'));
-      const kmnText = kmnPath ? (vfs.get(kmnPath)!.content as string) : '';
-
-      const [compileResult, parseResult] = await Promise.all([
-        engineRef.current!.compile(vfs, kb.id),
-        Promise.resolve().then(() => {
-          if (!engineRef.current!.parseKmn || !engineRef.current!.recognizePatterns || !kmnPath) return null;
-          const pr = engineRef.current!.parseKmn(kmnText, kb.id);
-          const recognized = engineRef.current!.recognizePatterns(pr.ir);
-          return { ...pr, ir: recognized.ir };
-        }),
-      ]);
-      result = compileResult;
-      if (parseResult) {
-        useIRStore.getState().setIR(parseResult.ir);
-      }
-    } catch (err: unknown) {
-      if (runId.current !== thisRunId) return;
-      const message = err instanceof Error ? err.message : 'Unknown compile error';
-      setStage({ kind: "error", step: "compile", message });
-      return;
-    }
-
-    if (runId.current !== thisRunId) return;
-
-    const jsArtifact = result.artifacts.find((a) =>
-      a.filename.endsWith(".js")
-    );
-
-    if (prevBlobUrl.current !== null) {
-      URL.revokeObjectURL(prevBlobUrl.current);
-      prevBlobUrl.current = null;
-    }
-
-    let jsBlobUrl: string;
-    if (jsArtifact) {
-      jsBlobUrl = jsArtifact.url;
-      if (jsBlobUrl.startsWith("blob:")) {
-        prevBlobUrl.current = jsBlobUrl;
-      }
-    } else if (!result.success && result.artifacts.length === 0) {
-      setStage({
-        kind: "error",
-        step: "compile",
-        message: "Compile failed: no usable artifacts produced.",
-        compileResult: result,
-      });
-      return;
-    } else {
-      jsBlobUrl = "";
-    }
-
-    setStage({ kind: "ready", compileResult: result, jsBlobUrl });
-  }, []);
+    // Pass scaffold warnings into runCompile so they surface on the ready Stage.
+    await runCompile(kb, thisRunId, scaffoldWarnings);
+  }, [scaffoldSpec, runCompile]);
 
   useEffect(() => {
     if (baseKeyboard === null) {
       setStage({ kind: "idle" });
+      vfsRef.current = null;
       useIRStore.getState().clearIR();
       return;
     }
@@ -204,7 +251,7 @@ export function useKeyboardArtifact(
     useIRStore.getState().clearIR();
     const thisRunId = ++runId.current;
     void run(baseKeyboard, thisRunId);
-  }, [baseKeyboard, run]);
+  }, [baseKeyboard, scaffoldSpec, run]);
 
   useEffect(() => {
     return () => {
@@ -222,5 +269,12 @@ export function useKeyboardArtifact(
     }
   }, [baseKeyboard, run]);
 
-  return { stage, retry };
+  const recompile = useCallback(() => {
+    if (baseKeyboard !== null && vfsRef.current !== null) {
+      const thisRunId = ++runId.current;
+      void runCompile(baseKeyboard, thisRunId);
+    }
+  }, [baseKeyboard, runCompile]);
+
+  return { stage, retry, recompile };
 }

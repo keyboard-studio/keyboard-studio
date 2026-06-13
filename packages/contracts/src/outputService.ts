@@ -121,10 +121,11 @@ export interface OutputService {
    *
    * `toZip` is the ONLY supported path to serialize the virtual FS — direct
    * serialization is intentionally not exposed on `VirtualFS` (see #97).
-   * Implementations apply criteria SS1's output-time transforms here:
-   * strip compiled artifacts (`.kmx`, `.kvk`, `.js`), inject
-   * `NEXT_STEPS.md`, etc., before producing the zip bytes. This is the
-   * safe path; consumers cannot accidentally produce a non-compliant zip.
+   * For the download archive (§12 "Download .zip") the zip intentionally
+   * includes compiled artifacts (`.kmx`, `.kvk`, `.js`) alongside source,
+   * and injects `NEXT_STEPS.md`. Artifact stripping (criteria SS1) applies
+   * ONLY to the `publishPR` path, not here — a downloaded zip is meant to be
+   * a complete, runnable bundle, whereas a PR commits source only.
    *
    * @param fs - Virtual FS snapshot to serialize.
    * @returns Raw zip bytes.

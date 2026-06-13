@@ -119,7 +119,7 @@ describe("createScaffolderService", () => {
 
       expect(content).not.toContain("NCAPS ");
       expect(content).not.toContain("[CAPS");
-      expect(content).toContain("store(&CASEDKEYS) [K_A]..[K_Z]");
+      expect(content).toContain("store(&CasedKeys) [K_A]..[K_Z]");
     });
 
     it("rewrites metadata stores", async () => {
@@ -136,7 +136,9 @@ describe("createScaffolderService", () => {
 
       expect(content).toContain("store(&NAME) 'My Keyboard'");
       expect(content).toMatch(/store\(&COPYRIGHT\) 'Copyright © \d{4} My Keyboard'/);
-      expect(content).toContain("store(&VERSION) '1.0'");
+      // &VERSION is the KMN file-format version — always 14.0 (minimum for &CasedKeys).
+      expect(content).toContain("store(&VERSION) '14.0'");
+      // &KEYBOARDVERSION is the human-visible release version — defaults to "1.0".
       expect(content).toContain("store(&KEYBOARDVERSION) '1.0'");
     });
 
@@ -238,7 +240,7 @@ describe("createScaffolderService", () => {
 
       const kmnEntry = vfs.get("source/my_keyboard.kmn");
       const content = kmnEntry!.content as string;
-      expect(content).toContain("store(&CASEDKEYS) [K_A]..[K_Z] [K_0]..[K_9]");
+      expect(content).toContain("store(&CasedKeys) [K_A]..[K_Z] [K_0]..[K_9]");
     });
 
     it("omits CasedKeys for non-roman group", async () => {
@@ -255,7 +257,7 @@ describe("createScaffolderService", () => {
 
       const kmnEntry = vfs.get("source/my_keyboard.kmn");
       const content = kmnEntry!.content as string;
-      expect(content).not.toContain("store(&CASEDKEYS)");
+      expect(content).not.toContain("store(&CasedKeys)");
     });
   });
 });
@@ -353,13 +355,13 @@ describe("scaffold — additional coverage", () => {
     expect(vfs.get("source/my_keyboard.kmn")).toBeDefined();
   });
 
-  it("does not insert a second store(&CASEDKEYS) when base already has one", async () => {
-    const kmnWithExisting = BASE_KMN + "store(&CASEDKEYS) [K_A]..[K_Z]\n";
+  it("does not insert a second store(&CasedKeys) when base already has one", async () => {
+    const kmnWithExisting = BASE_KMN + "store(&CasedKeys) [K_A]..[K_Z]\n";
     const mockFetch = vi.fn().mockResolvedValue(makeTextResponse(kmnWithExisting));
     const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
     const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
     const content = vfs.get("source/my_keyboard.kmn")!.content as string;
-    const count = (content.match(/store\(&CASEDKEYS\)/gi) ?? []).length;
+    const count = (content.match(/store\(&CasedKeys\)/gi) ?? []).length;
     expect(count).toBe(1);
   });
 
@@ -372,7 +374,7 @@ describe("scaffold — additional coverage", () => {
     const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
     const { vfs } = await service.scaffold(nonLatnBase, "my_keyboard", "My Keyboard");
     const content = vfs.get("source/my_keyboard.kmn")!.content as string;
-    expect(content).not.toContain("store(&CASEDKEYS)");
+    expect(content).not.toContain("store(&CasedKeys)");
   });
 
   it("removes phone layer, duplicates shift as caps, defaults nextlayer on regular keys", async () => {

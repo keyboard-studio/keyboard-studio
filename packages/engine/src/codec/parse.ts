@@ -30,6 +30,10 @@ import { tokenize, type Token } from "./tokenize.js";
 import { NodeIdMinter } from "./node-ids.js";
 import { OPAQUE_REASONS } from "./opaque-reasons.js";
 
+// System stores whose canonical spelling is NOT all-uppercase. The lookup key
+// is the uppercased form; the value is what gets stored in IRStore.name.
+const CANONICAL_SYSTEM_STORE: Record<string, string> = { CASEDKEYS: "CasedKeys" };
+
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
@@ -522,7 +526,8 @@ function parseStoreLine(text: string, line: number): ParsedStore {
   }
   const rawName = m[1] ?? "";
   const isSystem = rawName.startsWith("&");
-  const name = isSystem ? rawName.slice(1).toUpperCase() : rawName;
+  const upper = rawName.slice(1).toUpperCase();
+  const name = isSystem ? (CANONICAL_SYSTEM_STORE[upper] ?? upper) : rawName;
   return { name, isSystem, rawValue: (m[2] ?? "").trim() };
 }
 

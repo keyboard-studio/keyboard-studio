@@ -60,8 +60,8 @@ function setSystemStore(ir: KeyboardIR, name: string, value: string): void {
     return;
   }
   ir.stores.push({
-    nodeId: `store:${upper}`,
-    name: upper,
+    nodeId: `store:${name}`,
+    name: name,
     isSystem: true,
     items: stringToStoreItems(value),
   });
@@ -82,7 +82,11 @@ function hasSystemStore(ir: KeyboardIR, name: string): boolean {
  */
 export function resetIdentity(ir: KeyboardIR, identity: ScaffoldIRIdentity): void {
   const displayName = sanitizeDisplayName(identity.displayName);
-  const version = identity.version ?? "1.0";
+  // &VERSION is the KMN file-format version — minimum 14.0 for &CasedKeys support.
+  // It is NOT the human-visible keyboard release version.
+  const fileFormatVersion = "14.0";
+  // &KEYBOARDVERSION is the human-visible keyboard release version.
+  const keyboardVersion = identity.version ?? "1.0";
   const copyright =
     identity.copyright ?? `Copyright © ${currentYear()} ${displayName}`;
   const bcp47 = identity.bcp47 ?? [];
@@ -91,12 +95,12 @@ export function resetIdentity(ir: KeyboardIR, identity: ScaffoldIRIdentity): voi
   ir.header.name = displayName;
   ir.header.bcp47 = bcp47;
   ir.header.copyright = copyright;
-  ir.header.version = version;
+  ir.header.version = keyboardVersion;
 
   setSystemStore(ir, "NAME", kmnStringEscape(displayName));
   setSystemStore(ir, "COPYRIGHT", kmnStringEscape(copyright));
-  setSystemStore(ir, "VERSION", version);
-  setSystemStore(ir, "KEYBOARDVERSION", version);
+  setSystemStore(ir, "VERSION", fileFormatVersion);
+  setSystemStore(ir, "KEYBOARDVERSION", keyboardVersion);
 }
 
 function ruleHasModifier(rule: IRRule, modifier: string): boolean {
@@ -159,8 +163,8 @@ export function ensureCasedKeysStore(ir: KeyboardIR, group: RoutingGroup): void 
 
   const value = group === "azerty" ? CASED_KEYS_AZERTY : CASED_KEYS_QWERTY;
   const store: IRStore = {
-    nodeId: "store:CASEDKEYS",
-    name: "CASEDKEYS",
+    nodeId: "store:CasedKeys",
+    name: "CasedKeys",
     isSystem: true,
     items: [{ kind: "raw", text: value }],
   };

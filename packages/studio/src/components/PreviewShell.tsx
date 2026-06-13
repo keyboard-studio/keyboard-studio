@@ -7,10 +7,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BaseKeyboard, CompilerDiagnostic } from "@keyboard-studio/contracts";
-import { useKeyboardArtifact } from "../hooks/useKeyboardArtifact.ts";
+import { useKeyboardArtifact, type ScaffoldSpec } from "../hooks/useKeyboardArtifact.ts";
 import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
 import { OskModeToggle, type OskMode } from "./OskModeToggle.tsx";
 import { OSKFrame } from "./OSKFrame.tsx";
+import { ScaffoldForm } from "./ScaffoldForm.tsx";
+import { KmnEditor } from "./KmnEditor.tsx";
+import { getToZip } from "../lib/services.ts";
 
 // [TEMP] Per-fixture typing hints. Hardcoded until the Pattern schema's
 // `tests` field (spec §5) is wired into the UI to drive these automatically.
@@ -238,24 +241,44 @@ const LEFT_MIN_PCT = 20;
 const LEFT_MAX_PCT = 70;
 const LEFT_INIT_PCT = 40;
 
+type PickerMode = "open" | "scaffold";
+
 interface PreviewShellProps {
   onBaseKeyboardSelected?: (kb: BaseKeyboard) => void;
 }
 
 export function PreviewShell({ onBaseKeyboardSelected }: PreviewShellProps) {
   const [baseKeyboard, setBaseKeyboard] = useState<BaseKeyboard | null>(null);
+  const [pickerMode, setPickerMode] = useState<PickerMode>("open");
+  const [scaffoldSpec, setScaffoldSpec] = useState<ScaffoldSpec | null>(null);
 
   const handleBaseKeyboardChange = useCallback(
     (kb: BaseKeyboard | null) => {
       setBaseKeyboard(kb);
+      // When switching base, clear any active scaffold spec so we don't
+      // carry a stale new-keyboard identity into the open-base path.
+      if (pickerMode === "open") {
+        setScaffoldSpec(null);
+      }
       if (kb !== null) onBaseKeyboardSelected?.(kb);
     },
-    [onBaseKeyboardSelected]
+    [onBaseKeyboardSelected, pickerMode]
   );
+
+  const handlePickerModeChange = useCallback((mode: PickerMode) => {
+    setPickerMode(mode);
+    // Clear scaffold spec when returning to open mode.
+    if (mode === "open") {
+      setScaffoldSpec(null);
+    }
+  }, []);
+
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
   const [leftPct, setLeftPct] = useState(LEFT_INIT_PCT);
   const [handleHovered, setHandleHovered] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const zipBlobUrlRef = useRef<string | null>(null);
 
   // Track drag state in a ref so pointer-move handlers always see current values
   // without triggering re-renders on every pixel.
@@ -297,11 +320,22 @@ export function PreviewShell({ onBaseKeyboardSelected }: PreviewShellProps) {
     };
   }, [onPointerMove, onPointerUp]);
 
+  // Clean up any lingering zip blob URL on unmount.
+  useEffect(() => {
+    return () => {
+      if (zipBlobUrlRef.current !== null) {
+        URL.revokeObjectURL(zipBlobUrlRef.current);
+        zipBlobUrlRef.current = null;
+      }
+    };
+  }, []);
+
   const rightPct = 100 - leftPct;
 
   // Lifted from OSKFrame so DiagnosticsPanel and the download button can
   // read stage (and the embedded VFS) without prop-drilling through the iframe.
-  const { stage, retry } = useKeyboardArtifact(baseKeyboard);
+  const activeSpec = pickerMode === "scaffold" ? scaffoldSpec : null;
+  const { stage, retry, recompile } = useKeyboardArtifact(baseKeyboard, activeSpec);
 
   const diagnostics =
     stage.kind === "ready"
@@ -310,40 +344,51 @@ export function PreviewShell({ onBaseKeyboardSelected }: PreviewShellProps) {
         ? stage.compileResult.diagnostics
         : [];
 
-  const canDownload = stage.kind === "ready";
+  const canDownload = stage.kind === "ready" && stage.vfs !== undefined;
 
-  async function handleDownload() {
+  const handleDownload = useCallback(async () => {
     if (stage.kind !== "ready" || baseKeyboard === null) return;
     setDownloading(true);
+    setDownloadError(null);
     try {
-      // The VFS must be re-fetched from the hook; useKeyboardArtifact does not
-      // currently surface the VFS object in Stage.ready. As a day-4 interim,
-      // we download the compiled .js artifact blob directly via its existing
-      // blob URL. A full VFS-serializing zip lands when useKeyboardArtifact
-      // is extended to surface the VFS (tracked in the issue backlog).
-      // [LIMITATION] This downloads only the compiled JS artifact, not the
-      // full source + artifacts zip that toZip would produce.
-      const jsUrl = stage.jsBlobUrl;
-      if (jsUrl) {
-        const resp = await fetch(jsUrl);
-        const bytes = await resp.arrayBuffer();
-        const blob = new Blob([bytes], { type: "application/javascript" });
-        const url = URL.createObjectURL(blob);
-        try {
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `${baseKeyboard.id}.js`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-        } finally {
-          URL.revokeObjectURL(url);
-        }
+      const toZip = await getToZip();
+      const bytes = await toZip(stage.vfs);
+      // Coerce to ArrayBuffer to satisfy Blob constructor's strict BlobPart type.
+      const buf = bytes.buffer instanceof ArrayBuffer
+        ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+        : new Uint8Array(bytes).buffer;
+      const blob = new Blob([buf], { type: "application/zip" });
+
+      // Revoke previous zip URL before creating a new one.
+      if (zipBlobUrlRef.current !== null) {
+        URL.revokeObjectURL(zipBlobUrlRef.current);
+        zipBlobUrlRef.current = null;
       }
+
+      const url = URL.createObjectURL(blob);
+      zipBlobUrlRef.current = url;
+      try {
+        const a = document.createElement("a");
+        a.href = url;
+        const downloadId = pickerMode === "scaffold" && scaffoldSpec !== null
+          ? scaffoldSpec.keyboardId
+          : baseKeyboard.id;
+        a.download = `${downloadId}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } finally {
+        // Revoke after the click tick so the browser has time to start the download.
+        URL.revokeObjectURL(url);
+        zipBlobUrlRef.current = null;
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Download failed";
+      setDownloadError(msg);
     } finally {
       setDownloading(false);
     }
-  }
+  }, [stage, baseKeyboard, pickerMode, scaffoldSpec]);
 
   return (
     <div
@@ -382,10 +427,70 @@ export function PreviewShell({ onBaseKeyboardSelected }: PreviewShellProps) {
           Pick a base keyboard; the right pane compiles its source and renders
           the live preview.
         </p>
+
+        {/* Mode toggle: open base vs. scaffold new */}
+        <div
+          role="group"
+          aria-label="Keyboard source mode"
+          style={{ display: "flex", gap: 8, marginTop: 4 }}
+        >
+          <button
+            type="button"
+            onClick={() => { handlePickerModeChange("open"); }}
+            aria-pressed={pickerMode === "open"}
+            style={{
+              flex: 1,
+              padding: "6px 12px",
+              fontSize: 12,
+              fontFamily: "inherit",
+              cursor: "pointer",
+              borderRadius: 6,
+              border: "1px solid #283040",
+              background: pickerMode === "open" ? "#1f6feb" : "#161b22",
+              color: pickerMode === "open" ? "#e6edf3" : "#9aa7b8",
+              transition: "background 0.15s",
+            }}
+          >
+            Open base
+          </button>
+          <button
+            type="button"
+            onClick={() => { handlePickerModeChange("scaffold"); }}
+            aria-pressed={pickerMode === "scaffold"}
+            style={{
+              flex: 1,
+              padding: "6px 12px",
+              fontSize: 12,
+              fontFamily: "inherit",
+              cursor: "pointer",
+              borderRadius: 6,
+              border: "1px solid #283040",
+              background: pickerMode === "scaffold" ? "#1f6feb" : "#161b22",
+              color: pickerMode === "scaffold" ? "#e6edf3" : "#9aa7b8",
+              transition: "background 0.15s",
+            }}
+          >
+            New from base
+          </button>
+        </div>
+
         <div style={{ marginTop: 8 }}>
           <BaseKeyboardPicker value={baseKeyboard} onChange={handleBaseKeyboardChange} />
         </div>
-        {baseKeyboard !== null ? <MetadataCard kb={baseKeyboard} /> : null}
+
+        {/* Scaffold form — only shown in scaffold mode */}
+        {pickerMode === "scaffold" && baseKeyboard !== null && (
+          <ScaffoldForm
+            onSubmit={(spec) => { setScaffoldSpec(spec); }}
+          />
+        )}
+
+        {/* KMN editor — shown when a session VFS is available */}
+        {stage.kind === "ready" && (
+          <KmnEditor vfs={stage.vfs} onRecompile={recompile} />
+        )}
+
+        {baseKeyboard !== null && pickerMode === "open" ? <MetadataCard kb={baseKeyboard} /> : null}
       </section>
 
       {/* Drag handle */}
@@ -450,7 +555,7 @@ export function PreviewShell({ onBaseKeyboardSelected }: PreviewShellProps) {
               onClick={() => { void handleDownload(); }}
               aria-label={
                 canDownload
-                  ? `Download compiled keyboard ${baseKeyboard.id}`
+                  ? `Download keyboard ${pickerMode === "scaffold" && scaffoldSpec !== null ? scaffoldSpec.keyboardId : baseKeyboard.id} as zip`
                   : "Download unavailable until compile completes"
               }
               style={{
@@ -467,8 +572,13 @@ export function PreviewShell({ onBaseKeyboardSelected }: PreviewShellProps) {
                 transition: "background 0.15s",
               }}
             >
-              {downloading ? "Downloading..." : "Download .js"}
+              {downloading ? "Downloading..." : "Download .zip"}
             </button>
+            {downloadError !== null && (
+              <div role="alert" style={{ fontSize: 11, color: '#f0a0a0', marginTop: 4 }}>
+                {downloadError}
+              </div>
+            )}
             <DiagnosticsPanel diagnostics={diagnostics} />
           </>
         )}

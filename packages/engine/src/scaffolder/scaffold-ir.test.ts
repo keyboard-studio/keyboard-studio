@@ -49,7 +49,9 @@ describe("scaffoldIR — IR-native scaffolder operations", () => {
     expect(name?.items.map((i) => (i.kind === "char" ? i.value : "")).join("")).toBe(
       "My New Keyboard"
     );
-    expect(version?.items.map((i) => (i.kind === "char" ? i.value : "")).join("")).toBe("1.0");
+    // &VERSION is the KMN file-format version — always "14.0" (minimum for &CasedKeys).
+    expect(version?.items.map((i) => (i.kind === "char" ? i.value : "")).join("")).toBe("14.0");
+    // &KEYBOARDVERSION is the human-visible release version — defaults to "1.0".
     expect(kbVersion?.items.map((i) => (i.kind === "char" ? i.value : "")).join("")).toBe("1.0");
   });
 
@@ -82,17 +84,17 @@ describe("scaffoldIR — IR-native scaffolder operations", () => {
     expect(vkey?.kind === "vkey" && vkey.modifiers).toEqual(["SHIFT"]);
   });
 
-  it("ensureCasedKeysStore inserts &CASEDKEYS for qwerty group", () => {
+  it("ensureCasedKeysStore inserts &CasedKeys for qwerty group", () => {
     const { ir } = parse(US_BASE_KMN, "us_english");
     ensureCasedKeysStore(ir, "qwerty-qwertz");
-    const cased = ir.stores.find((s) => s.isSystem && s.name === "CASEDKEYS");
+    const cased = ir.stores.find((s) => s.isSystem && s.name === "CasedKeys");
     expect(cased).toBeDefined();
   });
 
   it("ensureCasedKeysStore inserts the AZERTY extended range for azerty group", () => {
     const { ir } = parse(US_BASE_KMN, "us_english");
     ensureCasedKeysStore(ir, "azerty");
-    const cased = ir.stores.find((s) => s.isSystem && s.name === "CASEDKEYS");
+    const cased = ir.stores.find((s) => s.isSystem && s.name === "CasedKeys");
     expect(cased).toBeDefined();
     // The AZERTY value is preserved as a raw store item.
     const first = cased!.items[0];
@@ -102,7 +104,7 @@ describe("scaffoldIR — IR-native scaffolder operations", () => {
   it("ensureCasedKeysStore is a no-op for non-roman group", () => {
     const { ir } = parse(US_BASE_KMN, "us_english");
     ensureCasedKeysStore(ir, "non-roman");
-    const cased = ir.stores.find((s) => s.isSystem && s.name === "CASEDKEYS");
+    const cased = ir.stores.find((s) => s.isSystem && s.name === "CasedKeys");
     expect(cased).toBeUndefined();
   });
 
@@ -110,7 +112,7 @@ describe("scaffoldIR — IR-native scaffolder operations", () => {
     const kmn = US_BASE_KMN + "store(&CasedKeys) [K_A]..[K_Z]\n";
     const { ir } = parse(kmn, "us_english");
     ensureCasedKeysStore(ir, "qwerty-qwertz");
-    const all = ir.stores.filter((s) => s.isSystem && s.name === "CASEDKEYS");
+    const all = ir.stores.filter((s) => s.isSystem && s.name === "CasedKeys");
     expect(all.length).toBe(1);
   });
 
@@ -140,7 +142,7 @@ describe("scaffoldIR — IR-native scaffolder operations", () => {
     }
 
     // &CasedKeys store present.
-    const cased = result.stores.find((s) => s.isSystem && s.name === "CASEDKEYS");
+    const cased = result.stores.find((s) => s.isSystem && s.name === "CasedKeys");
     expect(cased).toBeDefined();
 
     // Round-trip through emit so we exercise the full pipeline.
@@ -148,6 +150,6 @@ describe("scaffoldIR — IR-native scaffolder operations", () => {
     expect(emitted).not.toContain("[CAPS");
     expect(emitted).not.toContain("[NCAPS");
     expect(emitted).toContain("store(&NAME) 'My US Layout'");
-    expect(emitted).toMatch(/store\(&CASEDKEYS\)/);
+    expect(emitted).toMatch(/store\(&CasedKeys\)/);
   });
 });

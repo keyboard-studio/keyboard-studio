@@ -172,7 +172,7 @@ const SYSTEM_STORE_ORDER: readonly string[] = [
   "LAYOUTFILE",
   "COPYRIGHT",
   "KEYBOARDVERSION",
-  "CASEDKEYS",
+  "CasedKeys",
 ];
 
 // ---------------------------------------------------------------------------
