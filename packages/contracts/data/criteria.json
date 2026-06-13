@@ -1032,5 +1032,19 @@
     "principle": "standards",
     "preSubmitChecklistText": "This keyboard complies with any legislated or accessibility requirements for its target locale — if you are unsure whether requirements apply, check before submitting.",
     "description": "The keyboard meets any applicable legislated, societal, and accessibility requirements for its locale"
+  },
+  {
+    "id": "19.1-import-attribution-in-pr-body",
+    "section": "19. Import output",
+    "band": "scaffolder-bake",
+    "scaffolderRule": "emit-import-attribution-block",
+    "description": "When a keyboard was adapted from a release/ keyboard, the PR body must include the attribution block (adapted-from path, commit SHA, round-trip status, opaque feature inventory). Auto-enforced by the output service at PR submission time."
+  },
+  {
+    "id": "19.2-import-attribution-in-history-md",
+    "section": "19. Import output",
+    "band": "scaffolder-bake",
+    "scaffolderRule": "emit-import-attribution-history-bullet",
+    "description": "When a keyboard was adapted from a release/ keyboard, HISTORY.md must contain an 'Adapted from <sourcePath>' bullet under the 1.0 entry. Auto-enforced by the scaffolder at emit time (D14, mandatory carrier)."
   }
 ]
