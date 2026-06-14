@@ -18,6 +18,12 @@
 //   3. Identity — applyIdentityStubMutation writes &NAME (display name) into the
 //      .kmn so the compiled keyboard's spacebar shows the new name.
 //
+// The actual projection logic lives in projectWorkingCopyVfs
+// (packages/studio/src/lib/projectWorkingCopyVfs.ts), a pure (non-React)
+// function. serializeWorkingCopy (the download/output path) also calls
+// projectWorkingCopyVfs directly, so the OSK preview and the downloaded artifact
+// are guaranteed equivalent for the same working-copy state.
+//
 // Memoization key:
 //   - deletedNodeIds: serialized as a sorted join of the node ID strings.
 //   - assignments: serialized as a compact key string (same as GalleryPreviewWithPatterns).
@@ -30,9 +36,7 @@ import { useMemo } from "react";
 import type { Pattern, VirtualFS } from "@keyboard-studio/contracts";
 import type { VfsTransform } from "./useKeyboardArtifact.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { applyCarveToVfs } from "@keyboard-studio/engine";
-import { applyAssignmentsToVfs } from "@keyboard-studio/engine";
-import { applyIdentityStubMutation } from "@keyboard-studio/engine";
+import { projectWorkingCopyVfs } from "../lib/projectWorkingCopyVfs.ts";
 
 // ---------------------------------------------------------------------------
 // Parameters
@@ -56,6 +60,10 @@ export interface UseWorkingCopyTransformOptions {
 /**
  * Builds a memoized {@link VfsTransform} from the live working-copy layers.
  * Re-memoizes only when a layer value actually changes.
+ *
+ * The transform closure delegates to {@link projectWorkingCopyVfs} — the same
+ * pure helper used by {@link serializeWorkingCopy} — so the OSK preview and
+ * the downloaded artifact are guaranteed equivalent for the same working-copy state.
  *
  * Returns `null` when the working copy is not yet instantiated (no baseIr
  * means carve cannot run) — callers should pass `null` directly to
@@ -129,50 +137,34 @@ export function useWorkingCopyTransform(
     const capturedBaseIr = baseIr;
 
     return (vfs: VirtualFS, keyboardId: string): { warnings: string[] } => {
-      const warnings: string[] = [];
+      // Assignment-warning: when assignments exist but no patternMap was supplied,
+      // emit a diagnostic and skip assignments (pass empty array to projectWorkingCopyVfs).
+      const preWarnings: string[] = [];
+      const effectiveAssignments =
+        capturedPatternMap !== null
+          ? capturedAssignments
+          : (() => {
+              if (capturedAssignments.length > 0) {
+                preWarnings.push(
+                  "[working-copy-transform] assignments exist but no patternMap supplied — assignment projection skipped",
+                );
+              }
+              return [];
+            })();
 
-      // Step 1: Carve projection — re-emit IR with deleted nodes filtered out.
-      // Writes `source/<keyboardId>.kmn` back to the VFS. When deletedNodeIds
-      // is empty, applyCarveToVfs is a no-op (fast path).
-      const carveResult = applyCarveToVfs(
+      // Delegate to the pure projection helper. The VfsTransform contract is
+      // in-place mutation of `vfs`; projectWorkingCopyVfs also mutates in-place.
+      const { warnings: projectionWarnings } = projectWorkingCopyVfs({
         vfs,
         keyboardId,
-        capturedBaseIr,
-        capturedDeletedIds,
-      );
-      warnings.push(...carveResult.warnings);
+        baseIr: capturedBaseIr,
+        deletedNodeIds: capturedDeletedIds,
+        assignments: effectiveAssignments,
+        getPattern: (id) => capturedPatternMap?.get(id),
+        identity: capturedDisplayName !== null ? { displayName: capturedDisplayName } : null,
+      });
 
-      // Step 2: Assignments projection. Skipped when no patternMap is available
-      // or when there are no assignments to apply.
-      if (capturedPatternMap !== null && capturedAssignments.length > 0) {
-        const assignResult = applyAssignmentsToVfs(
-          vfs,
-          keyboardId,
-          capturedAssignments,
-          (id) => capturedPatternMap.get(id),
-        );
-        warnings.push(...assignResult.warnings);
-      } else if (capturedPatternMap === null && capturedAssignments.length > 0) {
-        warnings.push(
-          "[working-copy-transform] assignments exist but no patternMap supplied — assignment projection skipped",
-        );
-      }
-
-      // Step 3: Identity projection — re-write &NAME in the .kmn so the compiled
-      // keyboard's spacebar caption reflects the user's identity edit.
-      if (capturedDisplayName !== null) {
-        try {
-          applyIdentityStubMutation(vfs, keyboardId, { name: capturedDisplayName });
-        } catch (err: unknown) {
-          // The stub mutator throws if the file is missing — that can happen when
-          // carve projection removed all rules and the file no longer exists
-          // (pathological case). Warn rather than abort the compile.
-          const msg = err instanceof Error ? err.message : String(err);
-          warnings.push(`[working-copy-transform] identity projection skipped: ${msg}`);
-        }
-      }
-
-      return { warnings };
+      return { warnings: [...preWarnings, ...projectionWarnings] };
     };
     // Depend on primitive-stable memo keys + patternMap reference (stable when
     // the calling component memoizes it correctly, as GalleryPreviewWithPatterns does).

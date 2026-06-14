@@ -13,10 +13,10 @@ import { OskModeToggle, type OskMode } from "./OskModeToggle.tsx";
 import { OSKFrame } from "./OSKFrame.tsx";
 import { ScaffoldForm } from "./ScaffoldForm.tsx";
 import { KmnEditor } from "./KmnEditor.tsx";
-import { getToZip } from "../lib/services.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { confirmRebaseIfEdited } from "../lib/confirmRebase.ts";
 import { useWorkingCopyTransform } from "../hooks/useWorkingCopyTransform.ts";
+import { serializeWorkingCopy } from "../lib/serializeWorkingCopy.ts";
 
 // [TEMP] Per-fixture typing hints. Hardcoded until the Pattern schema's
 // `tests` field (spec §5) is wired into the UI to drive these automatically.
@@ -370,15 +370,39 @@ export function PreviewShell() {
         ? stage.compileResult.diagnostics
         : [];
 
-  const canDownload = stage.kind === "ready" && stage.vfs !== undefined;
+  // Working-copy instantiation state — used for canDownload and the
+  // not-instantiated guard in handleDownload.
+  const isInstantiated = useWorkingCopyStore((s) => s.baseKeyboard !== null);
+
+  // canDownload: require the compile to be ready AND the working copy to be
+  // instantiated (baseVfs + baseIr available in the store). The serializer
+  // builds the zip from the store's baseVfs, not from stage.vfs, so the
+  // download contains the full projected working copy including assignments.
+  const canDownload = stage.kind === "ready" && isInstantiated;
 
   const handleDownload = useCallback(async () => {
-    if (stage.kind !== "ready" || baseKeyboard === null) return;
+    // Guard: stage must be ready and the working copy must be instantiated.
+    if (stage.kind !== "ready") return;
     setDownloading(true);
     setDownloadError(null);
     try {
-      const toZip = await getToZip();
-      const bytes = await toZip(stage.vfs);
+      // Serialize via the canonical path: projectWorkingCopyVfs (carve +
+      // assignments + identity) → toZip. Returns null when the working copy is
+      // not instantiated (no baseVfs / baseIr in the store).
+      const result = await serializeWorkingCopy();
+      if (result === null) {
+        setDownloadError("Nothing to download — select a keyboard first.");
+        return;
+      }
+
+      // Surface any projection warnings to the user (carve safety gate, missing
+      // patterns, identity-injection failures). Warn-only: the download still
+      // proceeds so the user is not silently blocked.
+      if (result.warnings.length > 0) {
+        console.warn("[studio] download projection warnings:", result.warnings);
+      }
+
+      const { bytes } = result;
       // Coerce to ArrayBuffer to satisfy Blob constructor's strict BlobPart type.
       const buf = bytes.buffer instanceof ArrayBuffer
         ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
@@ -396,9 +420,9 @@ export function PreviewShell() {
       try {
         const a = document.createElement("a");
         a.href = url;
-        const downloadId = pickerMode === "scaffold" && scaffoldSpec !== null
-          ? scaffoldSpec.keyboardId
-          : baseKeyboard.id;
+        // Use the keyboardId from the serializer result (derived from the store's
+        // baseKeyboard.id) so the filename is always consistent with the content.
+        const downloadId = result.keyboardId;
         a.download = `${downloadId}.zip`;
         document.body.appendChild(a);
         a.click();
@@ -414,7 +438,7 @@ export function PreviewShell() {
     } finally {
       setDownloading(false);
     }
-  }, [stage, baseKeyboard, pickerMode, scaffoldSpec]);
+  }, [stage]);
 
   return (
     <div
