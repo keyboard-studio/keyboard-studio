@@ -124,7 +124,7 @@ function isDuplicateLine(trimmed: string, existingLines: Set<string>): boolean {
 
 /** Returns true if a trimmed line is a match/nomatch tail directive. */
 function isTailDirective(trimmed: string): boolean {
-  return /^\s*(match|nomatch)\s*>/i.test(trimmed);
+  return /^(match|nomatch)\s*>/i.test(trimmed);
 }
 
 /**

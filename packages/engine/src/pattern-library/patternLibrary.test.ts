@@ -25,6 +25,17 @@ describe("pattern-library loader", () => {
     expect(patterns.some(p => p.id === "test_borderline_pattern")).toBe(true);
   });
 
+  // Regression: authored YAML uses explicit `null` for touchLayoutFragment /
+  // reorderRules. The schema must accept null (not just undefined) or the real
+  // content/patterns catalog silently fails to load. null must coerce to omitted,
+  // since Pattern types these fields as `?: string`.
+  it("loads a pattern with null touch/reorder fragments and omits those fields", () => {
+    const p = getById("test_null_fragments_pattern");
+    expect(p).toBeDefined();
+    expect(p?.touchLayoutFragment).toBeUndefined();
+    expect(p?.reorderRules).toBeUndefined();
+  });
+
   it("filter by group_visibility=all", () => {
     const patterns = getPatterns({ group_visibility: "all" });
     expect(patterns.length).toBeGreaterThan(0);
