@@ -29,15 +29,12 @@ const REASON_COLOR: Record<SuggestReason, string> = {
 export interface BaseResolutionProps {
   /** The chosen (language, script) target from identity-lite. */
   target: SuggestTarget;
-  /** Optional phonebook map (base id → BCP47 tags) for language-aware ranking. */
-  languagesById?: Record<string, readonly string[]>;
   onResolved: (base: BaseKeyboard) => void;
   onBack?: () => void;
 }
 
 export function BaseResolution({
   target,
-  languagesById,
   onResolved,
   onBack,
 }: BaseResolutionProps) {
@@ -68,13 +65,20 @@ export function BaseResolution({
     };
   }, []);
 
-  const suggestions = useMemo(
+  // Build the phonebook from the loaded bases' .languages arrays so the caller
+  // need not thread a separate map. Each base's languages field (populated from
+  // its .kps <Languages> block) is used as-is; bases without languages degrade
+  // to script-match ranking via the empty-array default in suggestBases().
+  const languagesById = useMemo(
     () =>
-      suggestBases(
-        bases,
-        target,
-        languagesById !== undefined ? { languagesById } : {},
+      Object.fromEntries(
+        bases.map((b) => [b.id, b.languages ?? []] as const),
       ),
+    [bases],
+  );
+
+  const suggestions = useMemo(
+    () => suggestBases(bases, target, { languagesById }),
     [bases, target, languagesById],
   );
 

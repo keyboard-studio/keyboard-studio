@@ -5,13 +5,14 @@ import { describe, it, expect } from "vitest";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { suggestBases } from "./suggestBase";
 
-const mk = (id: string, script: string): BaseKeyboard => ({
+const mk = (id: string, script: string, languages?: string[]): BaseKeyboard => ({
   id,
   script,
   path: `release/x/${id}`,
   targets: ["windows"],
   displayName: id,
   version: "1.0",
+  ...(languages !== undefined ? { languages } : {}),
 });
 
 const usqwerty = mk("basic_kbdus", "Latn");
@@ -67,5 +68,22 @@ describe("suggestBases", () => {
 
   it("returns [] when no base matches and no fallback is present", () => {
     expect(suggestBases([eurolatin, devanagari], { script: "Ethi" })).toEqual([]);
+  });
+
+  it("uses base.languages to build languagesById when caller provides it", () => {
+    // When the caller constructs languagesById from base.languages (the pattern
+    // BaseResolution uses), language-match fires correctly.
+    const haBase = mk("hausa_latin", "Latn", ["ha", "ha-Latn"]);
+    const allBases = [usqwerty, eurolatin, haBase];
+    const languagesById = Object.fromEntries(
+      allBases.map((b) => [b.id, b.languages ?? []] as const),
+    );
+    const suggestions = suggestBases(
+      allBases,
+      { script: "Latn", bcp47: "ha-Latn" },
+      { languagesById },
+    );
+    expect(suggestions[0]?.base.id).toBe("hausa_latin");
+    expect(suggestions[0]?.reason).toBe("language-match");
   });
 });

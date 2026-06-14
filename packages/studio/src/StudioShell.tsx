@@ -307,10 +307,18 @@ function SurveyView({ baseKeyboard, onBaseSelected }: SurveyViewProps) {
   }
 
   // The (language, script) target for base suggestion — keyed on the CHOSEN
-  // script (decoupled from the language; spec §8/§9). Language-aware ranking is
-  // opt-in via a phonebook map, not yet wired (no ISO code captured here).
+  // script (decoupled from the language; spec §8/§9). The BCP47 tag (e.g.
+  // "ha-Latn", "hi-Deva") enables language-aware ranking in BaseResolution;
+  // an empty bcp47 degrades gracefully to script-match ranking.
   const suggestTarget: SuggestTarget | null =
-    identityResult !== null ? { script: identityResult.prefill.script } : null;
+    identityResult !== null
+      ? {
+          script: identityResult.prefill.script,
+          ...(identityResult.bcp47 !== ""
+            ? { bcp47: identityResult.bcp47 }
+            : {}),
+        }
+      : null;
 
   const questionsPaneStyle: CSSProperties = {
     flexBasis: `calc(${leftPct}% - ${SURVEY_DIVIDER_WIDTH / 2}px)`,
