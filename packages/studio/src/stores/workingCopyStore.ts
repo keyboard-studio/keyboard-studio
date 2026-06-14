@@ -170,9 +170,11 @@ export interface WorkingCopyState {
    * undoStack, phaseResults / assignments) so a fresh copy starts clean.
    * Sets instantiationMode = "new-from-base".
    *
-   * If called when `isInstantiated()` is already true (re-basing), the caller
-   * is responsible for confirming with the user before calling this — the store
-   * unconditionally replaces state.
+   * IDEMPOTENCE: if the working copy is already instantiated with the SAME
+   * `base.id`, this call is a NO-OP — the existing layers (phaseResults, carve
+   * deletions, identity) are preserved. Re-basing to a DIFFERENT base id still
+   * re-instantiates unconditionally; the caller is responsible for confirming
+   * with the user via `confirmRebaseIfEdited` before calling in that case.
    */
   instantiateFromBase: (
     base: BaseKeyboard,
@@ -350,7 +352,20 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
   // -- Instantiation actions (spec §8 v1.3.0) ----------------------------------
 
-  instantiateFromBase: (base, { vfs, ir }) =>
+  instantiateFromBase: (base, { vfs, ir }) => {
+    // Idempotence guard: if already instantiated with the SAME base keyboard id,
+    // do nothing. This prevents an async re-fire of onInstantiate from wiping
+    // recorded survey answers when the user has not actually changed the base.
+    // A different base id bypasses this guard and re-instantiates fully.
+    const current = get();
+    if (
+      current.instantiationMode === "new-from-base" &&
+      current.baseKeyboard !== null &&
+      current.baseKeyboard.id === base.id
+    ) {
+      return;
+    }
+
     // Track 1: new keyboard from base — identity RESET, edit layers cleared.
     set({
       instantiationMode: "new-from-base",
@@ -368,7 +383,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // the new IR after recognition runs).
       ...remerge({}, []),
       desktopLocked: false,
-    }),
+    });
+  },
 
   instantiateFromExisting: (keyboard, { vfs, ir }) =>
     // Track 2: adapt existing keyboard — identity PRESERVED from loaded keyboard.

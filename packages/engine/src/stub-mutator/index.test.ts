@@ -119,6 +119,48 @@ describe("applyIdentityStubMutation", () => {
     ).toThrow("stub-mutator: keyboard file not found");
   });
 
+  it("inserts store(&NAME) after the last system-store when no &NAME line exists", () => {
+    // A keyboard that has &COPYRIGHT and &KEYBOARDVERSION but no &NAME.
+    const noNameKmn = [
+      "store(&COPYRIGHT) 'Original Copyright'",
+      "store(&KEYBOARDVERSION) '1.0'",
+      "begin Unicode > use(main)",
+      "group(main) using keys",
+      "+ [K_A] > 'a'",
+    ].join("\n");
+    const vfs = createVirtualFS([
+      { path: `source/${KEYBOARD_ID}.kmn`, content: noNameKmn, isBinary: false },
+    ]);
+
+    applyIdentityStubMutation(vfs, KEYBOARD_ID, { name: "Inserted Name" });
+
+    const text = getText(vfs);
+    // The new store must be present.
+    expect(text).toContain("store(&NAME) 'Inserted Name'");
+    // The inserted line must appear BEFORE the begin line.
+    const lines = text.split("\n");
+    const nameIdx = lines.findIndex((l) => /store\s*\(\s*&NAME\s*\)/i.test(l));
+    const beginIdx = lines.findIndex((l) => /^\s*begin\b/i.test(l));
+    expect(nameIdx).toBeGreaterThanOrEqual(0);
+    expect(beginIdx).toBeGreaterThanOrEqual(0);
+    expect(nameIdx).toBeLessThan(beginIdx);
+    // Original content is intact.
+    expect(text).toContain("store(&COPYRIGHT) 'Original Copyright'");
+    expect(text).toContain("begin Unicode > use(main)");
+  });
+
+  it("rewrites an existing &NAME line rather than inserting a duplicate", () => {
+    const vfs = makeVfs(); // FIXTURE_KMN has store(&NAME) 'Original Name'
+    applyIdentityStubMutation(vfs, KEYBOARD_ID, { name: "Replaced Name" });
+    const text = getText(vfs);
+    expect(text).toContain("store(&NAME) 'Replaced Name'");
+    // Must not have two store(&NAME) lines.
+    const nameLineCount = text
+      .split("\n")
+      .filter((l) => /store\s*\(\s*&NAME\s*\)/i.test(l)).length;
+    expect(nameLineCount).toBe(1);
+  });
+
   it("replaces straight apostrophe with RIGHT SINGLE QUOTATION MARK (U+2019) in name", () => {
     const vfs = makeVfs();
     applyIdentityStubMutation(vfs, KEYBOARD_ID, { name: "O'Brien" });

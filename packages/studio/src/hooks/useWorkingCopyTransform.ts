@@ -106,9 +106,12 @@ export function useWorkingCopyTransform(
   );
 
   // Identity display name.
+  // Memo key is name-only because applyIdentityStubMutation currently consumes
+  // only the display name. bcp47 and targetScript are intentionally excluded.
+  // When identity projection is extended to also apply bcp47/targetScript,
+  // widen this key AND the mutation call in the closure together.
   const identityDisplayName = identity?.displayName ?? null;
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   return useMemo<VfsTransform | null>(() => {
     // No baseIr → carve step cannot run. The transform is not usable yet.
     if (baseIr === null) return null;

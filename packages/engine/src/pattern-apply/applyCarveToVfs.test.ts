@@ -175,23 +175,29 @@ describe("applyCarveToVfs — deletes a store", () => {
   });
 });
 
-describe("applyCarveToVfs — deletes a raw fragment", () => {
-  it("removes the deleted raw fragment from the emitted .kmn", () => {
-    const vfs = makeVfs();
+describe("applyCarveToVfs — safety gate: unsafe IR (has raw fragments)", () => {
+  it("skips re-emit and returns a warning when IR has opaque/raw fragments", () => {
+    const originalContent = "c original\n";
+    const vfs = makeVfs(originalContent);
     const ir: KeyboardIR = {
       ...makeIR([makeGroup("group#main", "main", [makeRule("rule#0")])]),
       raw: [
         { nodeId: "raw#0", origin: "imported", sourceText: "c OPAQUE FRAGMENT", reason: "call/return" },
       ],
     };
+    const setSpy = vi.spyOn(vfs, "set");
 
-    applyCarveToVfs(vfs, "test", ir, new Set(["raw#0"]));
+    const { warnings } = applyCarveToVfs(vfs, "test", ir, new Set(["rule#0"]));
 
-    const content = vfs.get("source/test.kmn")?.content as string;
-    expect(content).not.toContain("OPAQUE FRAGMENT");
+    // VFS must be unchanged.
+    expect(setSpy).not.toHaveBeenCalled();
+    expect(vfs.get("source/test.kmn")?.content).toBe(originalContent);
+    // A warning must be returned.
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings[0]).toMatch(/opaque\/raw fragment/i);
   });
 
-  it("does not mutate baseIr raw array", () => {
+  it("does not mutate baseIr when the safety gate fires", () => {
     const vfs = makeVfs();
     const ir: KeyboardIR = {
       ...makeIR([makeGroup("group#main", "main", [makeRule("rule#0")])]),
@@ -200,9 +206,47 @@ describe("applyCarveToVfs — deletes a raw fragment", () => {
       ],
     };
 
-    applyCarveToVfs(vfs, "test", ir, new Set(["raw#0"]));
+    applyCarveToVfs(vfs, "test", ir, new Set(["rule#0"]));
 
+    // baseIr.raw is unchanged.
     expect(ir.raw.length).toBe(1);
+  });
+});
+
+describe("applyCarveToVfs — safety gate: entry-group deletion", () => {
+  it("skips re-emit and returns a warning when the entry group would be deleted", () => {
+    const originalContent = "c original\n";
+    const vfs = makeVfs(originalContent);
+    // entryGroup is the first non-readonly group.
+    const entryGroup = makeGroup("group#entry", "main", [makeRule("rule#0")]);
+    const secondGroup = makeGroup("group#second", "extras", [makeRule("rule#1")]);
+    const ir = makeIR([entryGroup, secondGroup]);
+    const setSpy = vi.spyOn(vfs, "set");
+
+    const { warnings } = applyCarveToVfs(vfs, "test", ir, new Set(["group#entry"]));
+
+    // VFS must be unchanged.
+    expect(setSpy).not.toHaveBeenCalled();
+    expect(vfs.get("source/test.kmn")?.content).toBe(originalContent);
+    // Warning must mention the entry group.
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings[0]).toMatch(/entry group/i);
+  });
+
+  it("allows deletion of a non-entry group without triggering the entry-group guard", () => {
+    const vfs = makeVfs();
+    const entryGroup = makeGroup("group#entry", "main", [makeRule("rule#0")]);
+    const secondGroup = makeGroup("group#second", "extras", [makeRule("rule#1")]);
+    const ir = makeIR([entryGroup, secondGroup]);
+
+    const { warnings } = applyCarveToVfs(vfs, "test", ir, new Set(["group#second"]));
+
+    // No entry-group warning.
+    expect(warnings.every((w) => !w.includes("entry group"))).toBe(true);
+    // VFS was written (the re-emit ran).
+    const content = vfs.get("source/test.kmn")?.content as string;
+    expect(content).toContain("group(main)");
+    expect(content).not.toContain("group(extras)");
   });
 });
 

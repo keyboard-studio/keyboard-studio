@@ -165,6 +165,56 @@ describe("workingCopyStore — instantiateFromBase (Track 1)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// instantiateFromBase — idempotence (same base id)
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — instantiateFromBase idempotence", () => {
+  it("is a no-op when called a second time with the SAME base keyboard id", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    // First call — instantiates normally.
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+
+    // Record some phase progress.
+    const phaseA: SurveyPhaseResult = {
+      phase: "A",
+      answers: [],
+      computedAxes: { scriptClass: "alphabetic" },
+    };
+    useWorkingCopyStore.getState().recordPhase(phaseA);
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
+
+    // Second call with the SAME base id — must NOT clear phaseResults.
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
+    expect(useWorkingCopyStore.getState().phaseResults[0]?.phase).toBe("A");
+  });
+
+  it("re-instantiates (clears phaseResults) when called with a DIFFERENT base keyboard id", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+
+    // Record phase progress.
+    const phaseA: SurveyPhaseResult = {
+      phase: "A",
+      answers: [],
+      computedAxes: { scriptClass: "alphabetic" },
+    };
+    useWorkingCopyStore.getState().recordPhase(phaseA);
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
+
+    // A different base keyboard has a different id.
+    const differentBase = { ...basicKbdus, id: "different_keyboard_id" };
+    useWorkingCopyStore.getState().instantiateFromBase(differentBase, { vfs, ir });
+
+    // phaseResults must have been cleared.
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(0);
+    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe("different_keyboard_id");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // instantiateFromExisting — Track 2
 // ---------------------------------------------------------------------------
 
