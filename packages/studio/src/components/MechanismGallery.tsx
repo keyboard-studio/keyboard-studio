@@ -1125,6 +1125,31 @@ export function MechanismGallery({ selectedBaseKeyboard, onComplete, onBack }: M
   return (
     <div style={pageStyle}>
       <div style={{ maxWidth: 780, margin: "0 auto" }}>
+        {/* Back button — wizard affordance to return to Phase B (character inventory).
+            Rendered only when onBack is provided; disabled when the desktop layout
+            is locked (going back after locking could leave state inconsistent). */}
+        {onBack !== undefined && (
+          <button
+            type="button"
+            onClick={onBack}
+            disabled={desktopLocked}
+            style={{
+              marginBottom: 20,
+              padding: "8px 18px",
+              background: "transparent",
+              border: `1px solid ${BORDER}`,
+              borderRadius: 6,
+              color: TEXT_DIM,
+              fontSize: 13,
+              cursor: desktopLocked ? "not-allowed" : "pointer",
+              fontFamily: "inherit",
+              opacity: desktopLocked ? 0.5 : 1,
+            }}
+          >
+            ← Back
+          </button>
+        )}
+
         {/* Page header */}
         <header style={{ marginBottom: 24 }}>
           <h1 style={{ margin: "0 0 6px", fontSize: "1.2rem", color: ACCENT, fontWeight: 600 }}>
