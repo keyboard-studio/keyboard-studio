@@ -8,9 +8,13 @@
 //   #output               — output / delivery (stub; not yet implemented)
 
 import { useCallback, useEffect, useRef, useState, type ReactNode, type CSSProperties } from "react";
-import type { BaseKeyboard, KeyboardIdentity } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import { useSurveyResultsStore } from "./stores/surveyResultsStore.ts";
 import { PreviewShell } from "./components/PreviewShell.tsx";
-import { PhaseA, PhaseB, PhaseF } from "./survey/index.ts";
+import { IdentityLite, Prefill, PhaseB, PhaseF, type IdentityLiteResult } from "./survey/index.ts";
+import { BaseResolution } from "./components/BaseResolution.tsx";
+import { UnsupportedScriptStub } from "./components/UnsupportedScriptStub.tsx";
+import type { SuggestTarget } from "./lib/suggestBase.ts";
 import type { SurveyContext } from "./survey/types.ts";
 import { CarveGallery } from "./components/CarveGallery.tsx";
 import { type RouteId } from "./lib/navigate.ts";
@@ -146,14 +150,29 @@ const SURVEY_LEFT_MIN_PCT = 25;
 const SURVEY_LEFT_MAX_PCT = 65;
 const SURVEY_LEFT_INIT_PCT = 45;
 
-type SurveyPhase = "A" | "B" | "F" | "done";
+// Hybrid flow stage machine (spec §8 "Workflow ordering"): the survey head is
+// identity-lite -> base resolution -> base-derived prefill, then the existing
+// inventory (B) and remaining (F) phases. Gated scripts route to "unsupported".
+type SurveyStage = "identity" | "base" | "prefill" | "B" | "F" | "done" | "unsupported";
+
+/** Build the downstream SurveyContext from the identity-lite result. */
+function contextFromIdentity(identity: IdentityLiteResult): SurveyContext {
+  return {
+    language_name: identity.english || identity.autonym,
+    routing_group: identity.prefill.routingGroup,
+    script_family: identity.prefill.script,
+  };
+}
 
 interface SurveyViewProps {
   baseKeyboard: BaseKeyboard | null;
+  /** Lifts the in-survey base choice up so the preview + scaffold spine see it. */
+  onBaseSelected: (kb: BaseKeyboard) => void;
 }
 
-function SurveyView({ baseKeyboard }: SurveyViewProps) {
-  const [phase, setPhase] = useState<SurveyPhase>("A");
+function SurveyView({ baseKeyboard, onBaseSelected }: SurveyViewProps) {
+  const [stage, setStage] = useState<SurveyStage>("identity");
+  const [identityResult, setIdentityResult] = useState<IdentityLiteResult | null>(null);
   const [surveyContext, setSurveyContext] = useState<SurveyContext>({});
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
   const [leftPct, setLeftPct] = useState(SURVEY_LEFT_INIT_PCT);
@@ -199,38 +218,51 @@ function SurveyView({ baseKeyboard }: SurveyViewProps) {
     };
   }, [onPointerMove, onPointerUp]);
 
-  const { stage, retry } = useKeyboardArtifact(baseKeyboard);
+  const { stage: artifactStage, retry } = useKeyboardArtifact(baseKeyboard);
   const rightPct = 100 - leftPct;
 
-  function handlePhaseAComplete(
-    _result: unknown,
-    identity: KeyboardIdentity | undefined,
-    _provenance: unknown,
-  ) {
-    const ctx: SurveyContext = {};
-    if (identity !== undefined) {
-      ctx["language_name"] = identity.languageName;
-      ctx["routing_group"] = identity.routingGroup;
-      if (identity.scriptFamily !== undefined) {
-        ctx["script_family"] = identity.scriptFamily;
-      }
-    }
-    setSurveyContext(ctx);
-    setPhase("B");
+  // Survey results are persisted into the survey-results store (the data bus the
+  // gallery and §7.2 strategy selector read), not discarded. refs #334, #369.
+  const recordPhase = useSurveyResultsStore((s) => s.recordPhase);
+  const resetSurvey = useSurveyResultsStore((s) => s.reset);
+
+  // Identity-lite is the hybrid flow's head: it captures the language + the
+  // INDEPENDENT target script, deriving the routing/A2 prefill. Gated scripts
+  // (Ethi/Hani/Hang) end on the "not supported" stage. refs #369, spec §8/§9.
+  function handleIdentityComplete(result: SurveyPhaseResult, identity: IdentityLiteResult) {
+    recordPhase(result);
+    setIdentityResult(identity);
+    setSurveyContext(contextFromIdentity(identity));
+    setStage(identity.supported ? "base" : "unsupported");
   }
 
-  // TODO: persist Phase B/F results into a survey store so the gallery and
-  // §7.2 strategy selector can read survey context + answers. Discarding them
-  // is acceptable only while those consumers are scaffolded-not-built.
-  function handlePhaseBComplete(_result: unknown) {
-    // TODO: persist phase B answers to IR store once #141/#142 land
-    setPhase("F");
+  // The base chosen in-survey is lifted to the shell so the preview + scaffold
+  // spine use it; the chosen (language, script) target then back-fills prefill.
+  function handleBaseResolved(base: BaseKeyboard) {
+    onBaseSelected(base);
+    setStage("prefill");
   }
-  function handlePhaseFComplete(_result: unknown) {
-    // TODO: hand off survey results to strategy selector once scaffold-over-IR (#238) lands
-    setPhase("done");
+
+  function handlePhaseBComplete(result: SurveyPhaseResult) {
+    recordPhase(result);
+    setStage("F");
   }
-  function handleStartOver() { setSurveyContext({}); setPhase("A"); }
+  function handlePhaseFComplete(result: SurveyPhaseResult) {
+    recordPhase(result);
+    setStage("done");
+  }
+  function handleStartOver() {
+    resetSurvey();
+    setIdentityResult(null);
+    setSurveyContext({});
+    setStage("identity");
+  }
+
+  // The (language, script) target for base suggestion — keyed on the CHOSEN
+  // script (decoupled from the language; spec §8/§9). Language-aware ranking is
+  // opt-in via a phonebook map, not yet wired (no ISO code captured here).
+  const suggestTarget: SuggestTarget | null =
+    identityResult !== null ? { script: identityResult.prefill.script } : null;
 
   const questionsPaneStyle: CSSProperties = {
     flexBasis: `calc(${leftPct}% - ${SURVEY_DIVIDER_WIDTH / 2}px)`,
@@ -262,8 +294,8 @@ function SurveyView({ baseKeyboard }: SurveyViewProps) {
         Survey complete
       </h2>
       <p style={{ margin: 0, fontSize: 13, color: "#8b949e" }}>
-        All survey phases have been completed. Gallery hand-off is not yet
-        wired up, so your answers are not persisted yet.
+        All survey phases have been completed. Your answers are saved to the
+        survey-results store; the gallery and strategy selector read from there.
       </p>
       <button
         type="button"
@@ -298,22 +330,58 @@ function SurveyView({ baseKeyboard }: SurveyViewProps) {
     >
       {/* Left pane: survey questions */}
       <section aria-label="Survey questions" style={questionsPaneStyle}>
-        {phase === "done" && donePaneContent}
-        {phase === "A" && (
-          <PhaseA context={surveyContext} onComplete={handlePhaseAComplete} />
+        {stage === "done" && donePaneContent}
+        {stage === "identity" && (
+          <IdentityLite context={surveyContext} onComplete={handleIdentityComplete} />
         )}
-        {phase === "B" && (
+        {stage === "unsupported" && identityResult !== null && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "flex-start" }}>
+            <UnsupportedScriptStub script={identityResult.targetScriptRaw} />
+            <button
+              type="button"
+              onClick={handleStartOver}
+              style={{
+                padding: "8px 18px",
+                background: "transparent",
+                border: "1px solid #30363d",
+                borderRadius: 6,
+                color: "#8b949e",
+                fontSize: 13,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              Start over
+            </button>
+          </div>
+        )}
+        {stage === "base" && suggestTarget !== null && (
+          <BaseResolution
+            target={suggestTarget}
+            onResolved={handleBaseResolved}
+            onBack={() => setStage("identity")}
+          />
+        )}
+        {stage === "prefill" && identityResult !== null && baseKeyboard !== null && (
+          <Prefill
+            identity={identityResult}
+            base={baseKeyboard}
+            onConfirm={() => setStage("B")}
+            onBack={() => setStage("base")}
+          />
+        )}
+        {stage === "B" && (
           <PhaseB
             context={surveyContext}
             onComplete={handlePhaseBComplete}
-            onBack={() => setPhase("A")}
+            onBack={() => setStage("prefill")}
           />
         )}
-        {phase === "F" && (
+        {stage === "F" && (
           <PhaseF
             context={surveyContext}
             onComplete={handlePhaseFComplete}
-            onBack={() => setPhase("B")}
+            onBack={() => setStage("B")}
           />
         )}
       </section>
@@ -396,7 +464,7 @@ function SurveyView({ baseKeyboard }: SurveyViewProps) {
             <OSKFrame
               baseKeyboard={baseKeyboard}
               oskMode={oskMode}
-              stage={stage}
+              stage={artifactStage}
               retry={retry}
             />
           </>
@@ -423,7 +491,12 @@ export function StudioShell() {
       content = <PreviewShell onBaseKeyboardSelected={handleBaseKeyboardSelected} />;
       break;
     case "survey":
-      content = <SurveyView baseKeyboard={selectedBaseKeyboard} />;
+      content = (
+        <SurveyView
+          baseKeyboard={selectedBaseKeyboard}
+          onBaseSelected={handleBaseKeyboardSelected}
+        />
+      );
       break;
     case "gallery":
       content = <CarveGallery />;
