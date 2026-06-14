@@ -58,6 +58,51 @@ function detectGroup(base: BaseKeyboard): RoutingGroup {
   return "qwerty-qwertz";
 }
 
+// Escape regex metacharacters in a literal string so it can be used as a token.
+function escapeForRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Rewrite file-path references in .kps XML text.
+ * Mirrors kmc-copy's copyKpsSourceFile (../keyman/developer/src/kmc-copy/src/KeymanProjectCopier.ts):
+ * only <Name> values that look like file paths (contain "/" or ".") and exact-
+ * match <ID> values are rewritten. Free-text fields — <Info><Name>, <Author>,
+ * <Copyright>, <Description> — are left untouched because they do not look
+ * like file paths. Word-boundary anchors prevent partial-token rewrites.
+ */
+function rewriteKpsFilePaths(xml: string, baseId: string, keyboardId: string): string {
+  const escaped = escapeForRegex(baseId);
+  const tokenRe = new RegExp(`(?<![\\w])${escaped}(?![\\w])`, "g");
+  let out = xml.replace(
+    /(<Name\b[^>]*>)([^<]*)(<\/Name>)/gi,
+    (m, open: string, value: string, close: string) => {
+      if (!value.includes("/") && !value.includes(".")) return m;
+      return `${open}${value.replace(tokenRe, keyboardId)}${close}`;
+    }
+  );
+  out = out.replace(
+    new RegExp(`(<ID\\b[^>]*>)${escaped}(<\\/ID>)`, "gi"),
+    `$1${keyboardId}$2`
+  );
+  return out;
+}
+
+/**
+ * Rewrite the <kbdname> element in .kvks XML text.
+ * kmc-copy does NOT rewrite .kvks content at all (copySourceFile = generic copy).
+ * We scope to <kbdname> only because our generated stubs and the original kvks
+ * place the keyboard ID there. Free text in <encoding fontname="...">, layer
+ * names, and key contents is preserved.
+ */
+function rewriteKvksKbdname(xml: string, baseId: string, keyboardId: string): string {
+  const escaped = escapeForRegex(baseId);
+  return xml.replace(
+    new RegExp(`(<kbdname\\b[^>]*>)${escaped}(<\\/kbdname>)`, "gi"),
+    `$1${keyboardId}$2`
+  );
+}
+
 /** @internal Exported for unit testing only. */
 export function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: string): void {
   const extensions = [".kmn", ".kps", ".kvks", ".keyman-touch-layout", ".ico"];
@@ -69,8 +114,10 @@ export function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: str
       const newPath = `source/${keyboardId}${ext}`;
       let content = entry.content;
       if (!entry.isBinary && typeof content === "string") {
-        if (ext === ".kps" || ext === ".kvks") {
-          content = content.replaceAll(baseId, keyboardId);
+        if (ext === ".kps") {
+          content = rewriteKpsFilePaths(content, baseId, keyboardId);
+        } else if (ext === ".kvks") {
+          content = rewriteKvksKbdname(content, baseId, keyboardId);
         }
       }
       vfs.set(newPath, content, entry.isBinary);
