@@ -59,4 +59,13 @@ export interface SurveyPhaseResult {
    * for phases that produce no assignments (A/F and any gallery-free phase).
    */
   assignments?: MechanismAssignment[];
+  /**
+   * NFC graphemes the keyboard must produce, collected during the character-
+   * discovery phase (spec §8 step 4). **Additive** — optional on each phase
+   * result; populated by Phase B from manual-flow answers and other discovery
+   * methods. Merge across phases with {@link mergePhaseResults} (deduped union,
+   * first-appearance order, NFC-normalised, empties dropped). `undefined` for
+   * phases that do not run character discovery (A, C..G).
+   */
+  confirmedInventory?: string[];
 }

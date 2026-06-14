@@ -75,6 +75,41 @@ describe("surveyResultsStore", () => {
     expect(s.session.axes.scale).toBe("small");
   });
 
+  it("Phase B confirmedInventory surfaces on session.confirmedInventory", () => {
+    const phaseBWithInventory: SurveyPhaseResult = {
+      phase: "B",
+      answers: [],
+      computedAxes: { scale: "small" },
+      confirmedInventory: ["ŋ", "ɛ", "ɔ"],
+    };
+    useSurveyResultsStore.getState().recordPhase(phaseBWithInventory);
+    const s = useSurveyResultsStore.getState();
+    expect(s.session.confirmedInventory).toEqual(["ŋ", "ɛ", "ɔ"]);
+  });
+
+  it("confirmedInventory dedupes across a Phase B re-record", () => {
+    const phaseBv1: SurveyPhaseResult = {
+      phase: "B",
+      answers: [],
+      confirmedInventory: ["ŋ", "ɛ"],
+    };
+    const phaseBv2: SurveyPhaseResult = {
+      phase: "B",
+      answers: [],
+      confirmedInventory: ["ɛ", "ɔ"],
+    };
+    useSurveyResultsStore.getState().recordPhase(phaseBv1);
+    useSurveyResultsStore.getState().recordPhase(phaseBv2); // replaces Phase B
+    const s = useSurveyResultsStore.getState();
+    // Phase B replaced: only v2's inventory remains
+    expect(s.session.confirmedInventory).toEqual(["ɛ", "ɔ"]);
+  });
+
+  it("session.confirmedInventory is [] on an empty session", () => {
+    const s = useSurveyResultsStore.getState();
+    expect(s.session.confirmedInventory).toEqual([]);
+  });
+
   it("reset clears results and session", () => {
     useSurveyResultsStore.getState().recordPhase(phaseA);
     useSurveyResultsStore.getState().reset();
