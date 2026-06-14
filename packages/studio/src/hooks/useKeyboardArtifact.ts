@@ -298,6 +298,21 @@ export function useKeyboardArtifact(
         const result = await svc.scaffold(kb, scaffoldSpec.keyboardId, scaffoldSpec.displayName);
         vfsRef.current = result.vfs;
         scaffoldWarnings.push(...result.warnings);
+        // Build font + CSS blob URLs from scaffold result — mirrors the open-base path below.
+        // result.fonts / result.stylesheets forwarded by scaffold() from fetchKeyboardSourceToVfs.
+        const oskFontEntry = result.fonts.find((f) => f.isOskFont && f.family);
+        if (oskFontEntry) {
+          const fontFile = vfsRef.current.get(oskFontEntry.vfsPath);
+          if (fontFile && fontFile.content instanceof Uint8Array) {
+            const blob = new Blob([fontFile.content.slice().buffer], { type: "font/ttf" });
+            prevFontBlobUrl.current = URL.createObjectURL(blob);
+            fontFaceFamilyRef.current = oskFontEntry.family ?? null;
+          }
+        }
+        for (const sheet of result.stylesheets) {
+          const blob = new Blob([sheet.cssText], { type: "text/css" });
+          prevKeyboardCssBlobUrls.current.push(URL.createObjectURL(blob));
+        }
       } else if (engineRef.current) {
         // Open-base path — fetch existing keyboard source.
         const fetchResult = await engineRef.current.fetchKeyboardSourceToVfs(kb, vfs, {
