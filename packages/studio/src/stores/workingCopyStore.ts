@@ -59,6 +59,24 @@ export type IdentityPatch = Partial<{
   displayName: string;
   /** Raw target script subtag as entered by the user (e.g. "Latn", "Deva"). */
   targetScript: string;
+  /**
+   * New keyboard identifier chosen by the author (Track 1 only).
+   *
+   * Must satisfy validateKeyboardId (§10 Layer A check #1: 1-255 chars,
+   * no spaces / parens / brackets / commas). When set, serializeWorkingCopy
+   * uses this as the zip filename. Internal source path rename (from
+   * source/<baseId>.kmn to source/<keyboardId>.kmn) is deferred to the
+   * scaffolder's identity-propagation pipeline (full rename requires
+   * coordinated file-rename across .kmn, .kps, .kvks, .kpj).
+   *
+   * TODO(track1-internal-rename): wire keyboardId through the scaffolder's
+   * identity-propagation pipeline so source/<id>.kmn, .kps, .kvks, and .kpj
+   * are renamed when the author changes the keyboard id. Requires a joint
+   * session with km-output / km-keyman (scaffolder/VFS rename contract).
+   * Until then, the zip filename uses the author's id but internal paths
+   * remain on the base keyboard's id, with a warning surfaced in the download.
+   */
+  keyboardId: string;
 }>;
 
 // ---------------------------------------------------------------------------

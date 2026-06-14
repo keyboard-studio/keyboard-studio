@@ -74,7 +74,18 @@ export async function serializeWorkingCopy(): Promise<SerializeWorkingCopyResult
     return null;
   }
 
+  // Determine the keyboard id for projection (base id) and for the zip filename.
+  // The projection always runs against the base id (internal VFS paths are
+  // source/<baseId>.kmn until the scaffolder internal-rename pipeline lands).
+  // The zip filename uses the author-chosen identity.keyboardId when set,
+  // so the downloaded artifact is named after the new keyboard even though
+  // the internal paths still reference the base id.
+  //
+  // TODO(track1-internal-rename): when the scaffolder identity-propagation
+  // pipeline is wired (source/<id>.kmn/.kps/.kvks/.kpj rename), update this
+  // to project against identity.keyboardId and remove this comment.
   const keyboardId = baseKeyboard.id;
+  const outputKeyboardId = identity?.keyboardId ?? keyboardId;
 
   // 2. Collect physical assignments from phaseResults (mirrors useWorkingCopyTransform).
   //    projectWorkingCopyVfs also filters physical defensively, so this pre-filter is
@@ -128,5 +139,16 @@ export async function serializeWorkingCopy(): Promise<SerializeWorkingCopyResult
   const toZip = await getToZip();
   const bytes = await toZip(clonedVfs);
 
-  return { bytes, warnings, keyboardId };
+  // When the author chose a different keyboard id than the base id, emit a
+  // warning so the caller can surface it (internal paths still use base id).
+  const extraWarnings: string[] = [];
+  if (identity?.keyboardId !== undefined && identity.keyboardId !== keyboardId) {
+    extraWarnings.push(
+      `[serialize] zip named ${outputKeyboardId}.zip but internal source paths ` +
+      `still reference ${keyboardId} — full id rename requires the scaffolder ` +
+      `identity-propagation pipeline (see TODO(track1-internal-rename)).`,
+    );
+  }
+
+  return { bytes, warnings: [...warnings, ...extraWarnings], keyboardId: outputKeyboardId };
 }

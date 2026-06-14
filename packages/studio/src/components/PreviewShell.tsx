@@ -13,6 +13,7 @@ import { OskModeToggle, type OskMode } from "./OskModeToggle.tsx";
 import { OSKFrame } from "./OSKFrame.tsx";
 import { ScaffoldForm } from "./ScaffoldForm.tsx";
 import { KmnEditor } from "./KmnEditor.tsx";
+import { TrackOneIdentityPanel } from "./TrackOneIdentityPanel.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { confirmRebaseIfEdited } from "../lib/confirmRebase.ts";
 import { useWorkingCopyTransform } from "../hooks/useWorkingCopyTransform.ts";
@@ -373,6 +374,16 @@ export function PreviewShell() {
   // Working-copy instantiation state — used for canDownload and the
   // not-instantiated guard in handleDownload.
   const isInstantiated = useWorkingCopyStore((s) => s.baseKeyboard !== null);
+  // Identity-unset warning: shown non-blocking when Track 1 author has not
+  // set a unique keyboard id (id still equals the base keyboard's id).
+  const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
+  const storeIdentity = useWorkingCopyStore((s) => s.identity);
+  const storeBaseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
+  const showIdentityWarn =
+    instantiationMode === "new-from-base" &&
+    storeBaseKeyboard !== null &&
+    (storeIdentity?.keyboardId === undefined ||
+      storeIdentity.keyboardId === storeBaseKeyboard.id);
 
   // canDownload: require the compile to be ready AND the working copy to be
   // instantiated (baseVfs + baseIr available in the store). The serializer
@@ -535,6 +546,11 @@ export function PreviewShell() {
           />
         )}
 
+        {/* Identity panel — Track 1 only (new-from-base). Lets the author
+            set the display name (flows to spacebar caption via the identity
+            projection layer) and the keyboard id (used as the zip filename). */}
+        <TrackOneIdentityPanel />
+
         {/* KMN editor — shown when a session VFS is available */}
         {stage.kind === "ready" && (
           <KmnEditor vfs={stage.vfs} onRecompile={recompile} />
@@ -627,6 +643,16 @@ export function PreviewShell() {
             {downloadError !== null && (
               <div role="alert" style={{ fontSize: 11, color: '#f0a0a0', marginTop: 4 }}>
                 {downloadError}
+              </div>
+            )}
+            {showIdentityWarn && (
+              <div
+                role="status"
+                aria-live="polite"
+                style={{ fontSize: 12, color: "#d29922", marginTop: 4 }}
+              >
+                [WARN] Set your keyboard&rsquo;s name and id (left pane) before
+                submitting to the community repository.
               </div>
             )}
             <DiagnosticsPanel diagnostics={diagnostics} />

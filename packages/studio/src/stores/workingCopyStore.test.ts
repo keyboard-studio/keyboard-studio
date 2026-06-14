@@ -334,6 +334,21 @@ describe("workingCopyStore — setIdentity", () => {
     expect("bcp47" in (s.identity ?? {})).toBe(false);
     expect(s.identity?.targetScript).toBe("Latn");
   });
+
+  it("accepts keyboardId in the patch", () => {
+    useWorkingCopyStore.getState().setIdentity({ keyboardId: "ha_sil" });
+    expect(useWorkingCopyStore.getState().identity?.keyboardId).toBe("ha_sil");
+  });
+
+  it("setIdentity with keyboardId + displayName stores both fields", () => {
+    useWorkingCopyStore.getState().setIdentity({
+      keyboardId: "ha_sil",
+      displayName: "Hausa SIL",
+    });
+    const s = useWorkingCopyStore.getState();
+    expect(s.identity?.keyboardId).toBe("ha_sil");
+    expect(s.identity?.displayName).toBe("Hausa SIL");
+  });
 });
 
 // ---------------------------------------------------------------------------

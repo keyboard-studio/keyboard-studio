@@ -280,3 +280,50 @@ describe("serializeWorkingCopy — preview≡output equivalence", () => {
     expect([...outDeleted].sort()).toEqual([...preDeleted].sort());
   });
 });
+
+// ---------------------------------------------------------------------------
+// identity.keyboardId → zip filename
+// ---------------------------------------------------------------------------
+
+describe("serializeWorkingCopy — identity.keyboardId drives zip filename", () => {
+  it("keyboardId in result equals baseKeyboard.id when identity has no keyboardId", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedStore();
+    const result = await serializeWorkingCopy();
+    expect(result).not.toBeNull();
+    expect(result!.keyboardId).toBe(basicKbdus.id);
+  });
+
+  it("keyboardId in result equals identity.keyboardId when set", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedStore();
+    useWorkingCopyStore.getState().setIdentity({ keyboardId: "ha_sil" });
+    const result = await serializeWorkingCopy();
+    expect(result).not.toBeNull();
+    expect(result!.keyboardId).toBe("ha_sil");
+  });
+
+  it("warns when identity.keyboardId differs from base id (internal-path mismatch)", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedStore();
+    useWorkingCopyStore.getState().setIdentity({ keyboardId: "ha_sil" });
+    const result = await serializeWorkingCopy();
+    expect(result).not.toBeNull();
+    const hasMismatchWarn = result!.warnings.some((w) =>
+      w.includes("ha_sil") && w.includes(basicKbdus.id),
+    );
+    expect(hasMismatchWarn).toBe(true);
+  });
+
+  it("does NOT emit the internal-path mismatch warning when identity.keyboardId matches base id", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedStore();
+    useWorkingCopyStore.getState().setIdentity({ keyboardId: basicKbdus.id });
+    const result = await serializeWorkingCopy();
+    expect(result).not.toBeNull();
+    const hasMismatchWarn = result!.warnings.some((w) =>
+      w.includes("internal source paths"),
+    );
+    expect(hasMismatchWarn).toBe(false);
+  });
+});
