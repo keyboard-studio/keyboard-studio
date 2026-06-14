@@ -176,7 +176,7 @@ interface SurveyViewProps {
   baseKeyboard: BaseKeyboard | null;
 }
 
-function SurveyView({ baseKeyboard }: SurveyViewProps) {
+export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const [stage, setStage] = useState<SurveyStage>("identity");
   const [identityResult, setIdentityResult] = useState<IdentityLiteResult | null>(null);
   const [surveyContext, setSurveyContext] = useState<SurveyContext>({});
