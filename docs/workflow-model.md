@@ -54,9 +54,10 @@ A disconnect is any edge where the source's *produces* doesn't satisfy the targe
 ## 3. The hybrid authoring flow
 
 **Ratified 2026-06-13; working-copy spine + two-track framing ratified 2026-06-14
-(v1.3.0).** The hybrid flow is the implemented authoring path. It is a **hybrid** of
-base-first and survey-first: a light identity prompt first (so a base can be
-suggested), the base back-fills routing, then the heavy character/gallery work,
+(v1.3.0); base-first ordering applied editorially 2026-06-14.** The hybrid flow is
+the implemented authoring path. It is a **hybrid** of base-first and survey-first:
+base resolution comes first, then track choice, then identity-lite + project-name
+(Track 1 only), the base back-fills routing, then the heavy character/gallery work,
 then deferred paperwork. [spec.md](../spec.md) §8 is authoritative.
 
 ### Two authoring tracks, one working-copy spine (v1.3.0)
@@ -66,12 +67,15 @@ Every session is anchored to a single **persistent working copy**: a `KeyboardIR
 subsequent step, and serialized only at output. Two entry tracks converge on a shared
 spine after instantiation:
 
-- **Track 1 — new keyboard from a base** (`instantiateFromBase`): copies the base
-  keyboard's IR, resets the identity, and enters the hybrid survey flow below.
-- **Track 2 — adapt an existing keyboard** (`instantiateFromExisting`): loads the
-  existing keyboard's IR with identity preserved, enters via a source-picker, and
-  skips identity-lite (identity is already known). Both tracks converge on the same
-  spine at the carve gallery.
+- **Track 1 — new keyboard from a base** (`instantiateFromBase`): after base
+  resolution and track choice, collects identity-lite (autonym, English name, ISO 639
+  code, target script) and project-name (display name + auto-derived keyboardId),
+  copies the base keyboard's IR, resets the identity, and enters the shared spine.
+- **Track 2 — adapt an existing keyboard** (`instantiateFromExisting`): after base
+  resolution and track choice, loads the existing keyboard's IR with identity
+  preserved and enters the shared spine directly — skipping identity-lite and
+  project-name because identity is already known. Both tracks converge at
+  base-derived prefill.
 
 The OSK is bound to the working copy throughout; it re-renders on every mutation.
 Identity edits (language name, script) are visible as OSK mutations on the spacebar
@@ -79,18 +83,21 @@ caption. Script, base selection, carve deletions, and mechanism changes alter ke
 glyphs. Assignments and carve deletions are re-projected layers — not destructive IR
 edits.
 
-### The hybrid flow diagram (Track 1)
+### The hybrid flow diagram (Track 1 and Track 2)
 
 ```mermaid
 graph TD
-  Entry([app load]) --> ID["Identity-lite: language (autonym + English) + TARGET SCRIPT (independent choice: default / romanization-Latn / IPA-fonipa / other)"]
-  ID --> LOOKUP{"base in keyboard-index for this (language, script) pair?"}
+  Entry([app load]) --> LOOKUP{"base in keyboard-index?\n(enter language + script to search)"}
   LOOKUP -->|match| SUGGEST[Suggest base - confirm]
   LOOKUP -->|no match| MANUAL[Pick base manually]
   LOOKUP -->|none wanted| BLANK["Start from US QWERTY base (a 'blank' KM keyboard IS QWERTY)"]
-  SUGGEST --> PREFILL
-  MANUAL --> PREFILL
-  BLANK --> PREFILL
+  SUGGEST --> TRACK{Track choice}
+  MANUAL --> TRACK
+  BLANK --> TRACK
+  TRACK -->|Track 1: new keyboard from base| ID["Identity-lite: autonym + English name + ISO 639 code + target script (default / romanization-Latn / IPA-fonipa / other)"]
+  TRACK -->|Track 2: adapt existing keyboard| PREFILL
+  ID --> PROJNAME["Project-name: display name + auto-derived keyboardId"]
+  PROJNAME --> PREFILL
   PREFILL[Base-derived prefill: routing_group, A2, BCP47, existing inventory, A7 diff - shown as confirmations]
   PREFILL --> INV[Inventory: discovery diffed against base, seeded by identity]
   INV --> PROBE[Axis probes: only the still-unresolved A1/A3/A3a/A4]
@@ -108,9 +115,12 @@ graph TD
 
 ### Rationale
 
-- **Identity-lite first** (3 questions) is the cheap disambiguator that enables base
-  suggestion via [keyboard-index.md](keyboard-index.md) — the lookup substrate
-  already exists.
+- **Base resolution first** — the studio looks up a base keyboard immediately (keyed
+  on the entered language + script pair), presenting the track-choice prompt as soon
+  as a base is confirmed. Identity-lite (autonym, English name, ISO 639 code, target
+  script) and project-name (display name + auto-derived keyboardId) follow in Track 1
+  only; Track 2 skips both because identity is already known from the existing
+  keyboard.
 - **Language and script are decoupled.** The keyboard's target is a **(language,
   script) pair**, and the script is an *independent* choice — not derived from the
   language's default. The motivating cases are **romanizations** (a Latin keyboard for
@@ -301,9 +311,11 @@ script family that silently gets a degraded strategy. Both need an explicit
 
 ### Resolved
 
-- **Hybrid ordering adopted** (§3): identity-lite -> base resolution -> prefill ->
-  inventory -> physical gallery -> lock -> touch gallery -> docs. Ratified in
-  [spec.md](../spec.md) §8 (v1.2.0).
+- **Hybrid ordering adopted** (§3): base resolution -> track choice -> [Track 1:
+  identity-lite -> project-name ->] prefill -> inventory -> physical gallery -> lock
+  -> touch gallery -> docs. Track 2 skips identity-lite and project-name (identity is
+  preserved from the existing keyboard). Ratified in [spec.md](../spec.md) §8
+  (v1.2.0); base-first reordering applied editorially 2026-06-14.
 - **Gallery emits a scoped, multi-valued assignment map** (default / class /
   individual, with individual > class > default precedence; 1..N mechanisms per
   character; per modality), DISCUS-guided. See "scoped, multi-valued assignment map"
