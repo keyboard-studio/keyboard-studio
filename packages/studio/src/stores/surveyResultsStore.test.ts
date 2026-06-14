@@ -117,6 +117,42 @@ describe("surveyResultsStore", () => {
     expect(s.session.axes).toEqual({});
   });
 
+  // ---------------------------------------------------------------------------
+  // Desktop lock / unlock (spec §7.7 / §8 "Gallery instantiation")
+  // ---------------------------------------------------------------------------
+
+  it("desktopLocked starts as false", () => {
+    const s = useSurveyResultsStore.getState();
+    expect(s.desktopLocked).toBe(false);
+  });
+
+  it("lockDesktop sets desktopLocked to true", () => {
+    useSurveyResultsStore.getState().lockDesktop();
+    expect(useSurveyResultsStore.getState().desktopLocked).toBe(true);
+  });
+
+  it("unlockDesktop sets desktopLocked back to false", () => {
+    useSurveyResultsStore.getState().lockDesktop();
+    useSurveyResultsStore.getState().unlockDesktop();
+    expect(useSurveyResultsStore.getState().desktopLocked).toBe(false);
+  });
+
+  it("reset clears desktopLocked to false", () => {
+    useSurveyResultsStore.getState().lockDesktop();
+    expect(useSurveyResultsStore.getState().desktopLocked).toBe(true);
+    useSurveyResultsStore.getState().reset();
+    expect(useSurveyResultsStore.getState().desktopLocked).toBe(false);
+  });
+
+  it("reset also clears phase results when locked", () => {
+    useSurveyResultsStore.getState().recordPhase(phaseA);
+    useSurveyResultsStore.getState().lockDesktop();
+    useSurveyResultsStore.getState().reset();
+    const s = useSurveyResultsStore.getState();
+    expect(s.phaseResults).toEqual([]);
+    expect(s.desktopLocked).toBe(false);
+  });
+
   // recordAssignments convenience action (§7.7 gallery)
 
   it("recordAssignments creates a Phase C result with the given assignments", () => {

@@ -23,12 +23,31 @@ interface SurveyResultsState {
   phaseResults: SurveyPhaseResult[];
   /**
    * IR-derived axis baseline, set before/at Phase A from the working IR's
-   * recognized patterns. `{}` until IR seeding lands (#231/#232); updating it
-   * (e.g. after a carve-gallery decision) re-derives the session.
+   * recognized patterns. `{}` until IR seeding lands (see the IR seeding
+   * milestone); updating it (e.g. after a carve-gallery decision) re-derives the session.
    */
   irAxes: Partial<DiscoveryAxisVector>;
   /** Merged session: `mergePhaseResults(irAxes, phaseResults)`. The single source downstream consumers read. */
   session: SurveySession;
+  /**
+   * Desktop layout lock flag (spec §7.7 / §8 "Gallery instantiation").
+   *
+   * Design note: the locked desktop layout IS session.assignments (physical)
+   * frozen by convention. This flag prevents further physical edits (disabling
+   * the MechanismGallery controls) rather than deep-copying a snapshot. The
+   * assignments themselves continue to live in session.assignments — the lock
+   * is a UI gate, not a separate data copy.
+   *
+   * Promotion to a contract field on SurveySession is NOT done here to avoid a
+   * major-version contract change (spec §17 policy requires a joint
+   * engine+content session for schema mutations). Recommend surfacing this in the
+   * next schema joint session: if the lock flag needs to be persisted in the
+   * VFS or communicated to the output layer it should become a top-level field
+   * on SurveySession (or a separate DesktopLayoutSnapshot type). For studio-only
+   * gate purposes (no VFS/output impact yet), the store-local boolean is the
+   * right default.
+   */
+  desktopLocked: boolean;
   /**
    * Record a phase's result, then re-merge. Re-running a phase **replaces** its
    * earlier result (keyed by `phase`) rather than appending a duplicate, so the
@@ -48,7 +67,18 @@ interface SurveyResultsState {
   recordAssignments: (assignments: MechanismAssignment[]) => void;
   /** Update the IR-derived baseline (carve gallery / recognizer), then re-merge. */
   setIrAxes: (irAxes: Partial<DiscoveryAxisVector>) => void;
-  /** Reset to an empty session (start over). */
+  /**
+   * Lock the desktop layout. Once locked, the MechanismGallery controls are
+   * disabled and the touch gallery is unblocked. Requires at least one physical
+   * assignment to be meaningful (enforced in the UI, not the store).
+   */
+  lockDesktop: () => void;
+  /**
+   * Unlock the desktop layout, restoring MechanismGallery editing and re-gating
+   * the touch gallery.
+   */
+  unlockDesktop: () => void;
+  /** Reset to an empty session (start over). Clears desktopLocked to false. */
   reset: () => void;
 }
 
@@ -65,6 +95,7 @@ function remerge(
 
 export const useSurveyResultsStore = create<SurveyResultsState>((set, get) => ({
   ...remerge({}, []),
+  desktopLocked: false,
   recordPhase: (result) => {
     const prev = get().phaseResults;
     const idx = prev.findIndex((p) => p.phase === result.phase);
@@ -94,5 +125,7 @@ export const useSurveyResultsStore = create<SurveyResultsState>((set, get) => ({
     set(remerge(get().irAxes, updated));
   },
   setIrAxes: (irAxes) => set(remerge(irAxes, get().phaseResults)),
-  reset: () => set(remerge({}, [])),
+  lockDesktop: () => set({ desktopLocked: true }),
+  unlockDesktop: () => set({ desktopLocked: false }),
+  reset: () => set({ ...remerge({}, []), desktopLocked: false }),
 }));

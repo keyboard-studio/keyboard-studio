@@ -93,9 +93,10 @@ interface SlotFormProps {
   pattern: Pattern;
   slotValues: Record<string, string>;
   onSlotChange: (id: string, value: string) => void;
+  disabled?: boolean;
 }
 
-function SlotForm({ pattern, slotValues, onSlotChange }: SlotFormProps) {
+function SlotForm({ pattern, slotValues, onSlotChange, disabled = false }: SlotFormProps) {
   if (pattern.questions.length === 0) {
     return (
       <p style={{ margin: "4px 0 0", fontSize: 12, color: TEXT_DIM, fontStyle: "italic" }}>
@@ -113,7 +114,12 @@ function SlotForm({ pattern, slotValues, onSlotChange }: SlotFormProps) {
           <div key={q.id} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
             <label
               htmlFor={`slot-${pattern.id}-${q.id}`}
-              style={{ fontSize: 11, color: TEXT_DIM, fontFamily: FONT }}
+              style={{
+                fontSize: 11,
+                color: TEXT_DIM,
+                fontFamily: FONT,
+                opacity: disabled ? 0.6 : 1,
+              }}
             >
               {q.prompt}
               {isRequired && (
@@ -127,6 +133,7 @@ function SlotForm({ pattern, slotValues, onSlotChange }: SlotFormProps) {
               type="text"
               value={val}
               onChange={(e) => onSlotChange(q.id, e.target.value)}
+              disabled={disabled}
               style={{
                 background: BG_PAGE,
                 border: `1px solid ${BORDER}`,
@@ -137,6 +144,8 @@ function SlotForm({ pattern, slotValues, onSlotChange }: SlotFormProps) {
                 padding: "4px 8px",
                 outline: "none",
                 boxSizing: "border-box",
+                opacity: disabled ? 0.5 : 1,
+                cursor: disabled ? "not-allowed" : "text",
               }}
               aria-required={isRequired}
             />
@@ -158,6 +167,8 @@ interface MechanismCardProps {
   isApplied: boolean;
   onApply: (assignment: MechanismAssignment) => void;
   onRemove: (patternId: string) => void;
+  /** When true, all apply/remove/scope/slot controls are disabled (desktop layout locked). */
+  disabled?: boolean;
 }
 
 function MechanismCard({
@@ -167,6 +178,7 @@ function MechanismCard({
   isApplied,
   onApply,
   onRemove,
+  disabled = false,
 }: MechanismCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [scope, setScope] = useState<"keyboard-default" | "individual">(
@@ -374,11 +386,13 @@ function MechanismCard({
         >
           {/* Scope selector */}
           <fieldset
+            disabled={disabled}
             style={{
               border: `1px solid ${BORDER}`,
               borderRadius: 6,
               padding: "8px 12px",
               margin: 0,
+              opacity: disabled ? 0.5 : 1,
             }}
           >
             <legend style={{ fontSize: 11, color: TEXT_DIM, padding: "0 4px" }}>
@@ -394,7 +408,7 @@ function MechanismCard({
                     gap: 6,
                     fontSize: 12,
                     color: scope === s ? TEXT_MAIN : TEXT_DIM,
-                    cursor: "pointer",
+                    cursor: disabled ? "not-allowed" : "pointer",
                     fontFamily: FONT,
                   }}
                 >
@@ -404,6 +418,7 @@ function MechanismCard({
                     value={s}
                     checked={scope === s}
                     onChange={() => setScope(s)}
+                    disabled={disabled}
                     style={{ accentColor: ACCENT }}
                   />
                   {s === "keyboard-default" ? "Keyboard default" : "Individual characters"}
@@ -433,6 +448,7 @@ function MechanismCard({
                       aria-pressed={sel}
                       aria-label={`U+${cp ?? "????"} ${char}`}
                       onClick={() => toggleChar(char)}
+                      disabled={disabled}
                       title={`U+${cp ?? "????"}`}
                       style={{
                         minWidth: 36,
@@ -443,8 +459,9 @@ function MechanismCard({
                         color: sel ? ACCENT : TEXT_MAIN,
                         fontSize: 14,
                         fontFamily: "monospace",
-                        cursor: "pointer",
+                        cursor: disabled ? "not-allowed" : "pointer",
                         lineHeight: 1.4,
+                        opacity: disabled ? 0.5 : 1,
                       }}
                     >
                       {char}
@@ -460,6 +477,7 @@ function MechanismCard({
             pattern={pattern}
             slotValues={slotValues}
             onSlotChange={handleSlotChange}
+            disabled={disabled}
           />
 
           {/* Apply / Remove buttons */}
@@ -467,16 +485,18 @@ function MechanismCard({
             <button
               type="button"
               onClick={handleApply}
+              disabled={disabled}
               style={{
                 padding: "7px 16px",
-                background: ACCENT,
+                background: disabled ? "#1a2a40" : ACCENT,
                 border: "none",
                 borderRadius: 6,
-                color: "#0d1117",
+                color: disabled ? TEXT_DIM : "#0d1117",
                 fontSize: 12,
                 fontWeight: 600,
-                cursor: "pointer",
+                cursor: disabled ? "not-allowed" : "pointer",
                 fontFamily: FONT,
+                opacity: disabled ? 0.6 : 1,
               }}
             >
               Apply
@@ -485,6 +505,7 @@ function MechanismCard({
               <button
                 type="button"
                 onClick={handleRemoveClick}
+                disabled={disabled}
                 style={{
                   padding: "7px 16px",
                   background: "transparent",
@@ -492,8 +513,9 @@ function MechanismCard({
                   borderRadius: 6,
                   color: TEXT_DIM,
                   fontSize: 12,
-                  cursor: "pointer",
+                  cursor: disabled ? "not-allowed" : "pointer",
                   fontFamily: FONT,
+                  opacity: disabled ? 0.5 : 1,
                 }}
               >
                 Remove
@@ -636,12 +658,10 @@ function GalleryPreviewWithPatterns({
     [sessionAssignments],
   );
 
-  // Memoize patternMap identity — only changes when the loaded patterns change,
-  // not on every render.
-  const patternMapRef = useMemo(() => patternMap, [patternMap]);
-
-  // vfsTransform: stable per assignmentsKey + patternMap. Uses patternMapRef
-  // for synchronous pattern resolution without an async service round-trip.
+  // vfsTransform: stable per assignmentsKey + patternMap. Uses patternMap
+  // directly for synchronous pattern resolution without an async service round-trip.
+  // patternMap is a useState ref so it is already stable across renders when
+  // the loaded patterns have not changed.
   const vfsTransform = useMemo<VfsTransform>(
     () =>
       (vfs: VirtualFS, keyboardId: string) =>
@@ -649,10 +669,10 @@ function GalleryPreviewWithPatterns({
           vfs,
           keyboardId,
           sessionAssignments,
-          (id) => patternMapRef.get(id),
+          (id) => patternMap.get(id),
         ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [assignmentsKey, patternMapRef],
+    [assignmentsKey, patternMap],
   );
 
   const { stage, retry } = useKeyboardArtifact(
@@ -834,6 +854,9 @@ export interface MechanismGalleryProps {
 export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps) {
   const session = useSurveyResultsStore((s) => s.session);
   const recordAssignments = useSurveyResultsStore((s) => s.recordAssignments);
+  const desktopLocked = useSurveyResultsStore((s) => s.desktopLocked);
+  const lockDesktop = useSurveyResultsStore((s) => s.lockDesktop);
+  const unlockDesktop = useSurveyResultsStore((s) => s.unlockDesktop);
 
   const inventory = session.confirmedInventory;
 
@@ -922,19 +945,23 @@ export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps
 
   // handleApply: merge the new assignment into the full physical assignment list
   // and route through recordAssignments so the find/create-Phase-C logic lives
-  // only in the store.
+  // only in the store. Defense-in-depth: bail early when locked even if a caller
+  // somehow bypasses the disabled controls.
   const handleApply = useCallback((assignment: MechanismAssignment) => {
+    if (desktopLocked) return;
     const next = [...sessionAssignments, assignment];
     recordAssignments(next);
-  }, [sessionAssignments, recordAssignments]);
+  }, [desktopLocked, sessionAssignments, recordAssignments]);
 
   // handleRemove: drop all assignments for this patternId from the physical list.
+  // Defense-in-depth: bail early when locked.
   const handleRemove = useCallback((patternId: string) => {
+    if (desktopLocked) return;
     const next = sessionAssignments.filter(
       (a) => !a.mechanisms.some((m) => m.patternId === patternId),
     );
     recordAssignments(next);
-  }, [sessionAssignments, recordAssignments]);
+  }, [desktopLocked, sessionAssignments, recordAssignments]);
 
   // ---------------------------------------------------------------------------
   // Render — empty/error states
@@ -1002,6 +1029,10 @@ export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps
     );
   }
 
+  // True only when there is at least one physical assignment — the lock button
+  // is disabled until the layout has content to lock.
+  const hasAssignments = sessionAssignments.length > 0;
+
   return (
     <div style={pageStyle}>
       <div style={{ maxWidth: 780, margin: "0 auto" }}>
@@ -1019,6 +1050,65 @@ export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps
           </p>
         </header>
 
+        {/* Desktop-lock banner — shown when locked (role=status so screen
+            readers are notified when it appears). */}
+        {desktopLocked && (
+          <div
+            role="status"
+            aria-live="polite"
+            aria-label="Desktop layout locked"
+            style={{
+              background: "#0d2218",
+              border: "1px solid #238636",
+              borderRadius: 8,
+              padding: "12px 16px",
+              marginBottom: 20,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap",
+              fontFamily: FONT,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  background: "#56d364",
+                  flexShrink: 0,
+                }}
+                aria-hidden="true"
+              />
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#56d364" }}>
+                Desktop layout locked
+              </span>
+              <span style={{ fontSize: 12, color: TEXT_DIM }}>
+                — controls are read-only; unlock to make further changes
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={unlockDesktop}
+              style={{
+                padding: "5px 14px",
+                background: "transparent",
+                border: "1px solid #30363d",
+                borderRadius: 6,
+                color: TEXT_DIM,
+                fontSize: 12,
+                cursor: "pointer",
+                fontFamily: FONT,
+                whiteSpace: "nowrap",
+              }}
+            >
+              Unlock to edit
+            </button>
+          </div>
+        )}
+
         {/* Coverage indicator (criterion 18.6) */}
         <div style={{ marginBottom: 20 }}>
           <CoverageIndicator
@@ -1033,6 +1123,7 @@ export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps
         ) : loadError !== null ? (
           <div
             role="alert"
+            aria-live="assertive"
             style={{
               padding: "16px 20px",
               background: "#2a0a0a",
@@ -1075,10 +1166,62 @@ export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps
                     isApplied={appliedPatternIds.has(pattern.id)}
                     onApply={handleApply}
                     onRemove={handleRemove}
+                    disabled={desktopLocked}
                   />
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Lock desktop layout action — shown when not yet locked.
+            Enabled only when there is at least one physical assignment so the
+            author cannot lock an empty layout. */}
+        {!desktopLocked && (
+          <div
+            style={{
+              marginTop: 28,
+              borderTop: `1px solid ${BORDER}`,
+              paddingTop: 20,
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
+          >
+            <p style={{ margin: 0, fontSize: 13, color: TEXT_DIM }}>
+              When you are satisfied with your mechanism assignments, lock the
+              desktop layout to proceed to the touch gallery.
+            </p>
+            <button
+              type="button"
+              onClick={lockDesktop}
+              disabled={!hasAssignments}
+              title={
+                hasAssignments
+                  ? "Lock the desktop layout and enable the touch gallery"
+                  : "Apply at least one mechanism before locking"
+              }
+              style={{
+                padding: "8px 20px",
+                background: hasAssignments ? "#238636" : "#1a2a1a",
+                border: `1px solid ${hasAssignments ? "#2ea043" : BORDER}`,
+                borderRadius: 6,
+                color: hasAssignments ? "#ffffff" : TEXT_DIM,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: hasAssignments ? "pointer" : "not-allowed",
+                fontFamily: FONT,
+                width: "fit-content",
+                opacity: hasAssignments ? 1 : 0.55,
+              }}
+            >
+              Lock desktop layout
+            </button>
+            {!hasAssignments && (
+              <p style={{ margin: 0, fontSize: 11, color: TEXT_DIM, fontStyle: "italic" }}>
+                Apply at least one mechanism to enable locking.
+              </p>
+            )}
           </div>
         )}
 

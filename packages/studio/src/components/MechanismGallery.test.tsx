@@ -431,6 +431,174 @@ describe("MechanismGallery — preview ready state", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Desktop layout lock UI
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — desktop lock", () => {
+  it("Lock button is disabled when there are no assignments", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    const lockBtn = screen.getByRole("button", { name: /Lock desktop layout/i });
+    expect(lockBtn).toBeTruthy();
+    // disabled attribute present
+    expect((lockBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("Lock button is enabled when there is at least one assignment", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    // Apply a mechanism first.
+    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
+
+    const lockBtn = screen.getByRole("button", { name: /Lock desktop layout/i });
+    expect((lockBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("clicking Lock button sets desktopLocked and renders the locked banner", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    // Apply, then lock.
+    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Lock desktop layout/i }));
+
+    // Store reflects locked state.
+    expect(useSurveyResultsStore.getState().desktopLocked).toBe(true);
+    // Banner rendered with role=status and correct text.
+    const banner = screen.getByRole("status", { name: /Desktop layout locked/i });
+    expect(banner).toBeTruthy();
+    // Lock button disappears; unlock button appears.
+    expect(screen.queryByRole("button", { name: /Lock desktop layout/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /Unlock to edit/i })).toBeTruthy();
+  });
+
+  it("controls inside MechanismCard are disabled when locked", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    // Apply, lock.
+    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Lock desktop layout/i }));
+
+    // The Apply button inside the expanded card is disabled.
+    const applyBtn = screen.getByRole("button", { name: /^Apply$/i });
+    expect((applyBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("scope radios are disabled when locked", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    // Expand, apply, lock.
+    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Lock desktop layout/i }));
+
+    // Both scope radios must be disabled.
+    const radios = screen.getAllByRole("radio");
+    expect(radios.length).toBeGreaterThan(0);
+    for (const radio of radios) {
+      expect((radio as HTMLInputElement).disabled).toBe(true);
+    }
+  });
+
+  it("char-picker buttons are disabled when locked (individual scope)", async () => {
+    seedInventory(["á", "é"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    // Expand, switch to individual scope to show char picker, apply, lock.
+    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
+    fireEvent.click(screen.getByRole("radio", { name: /Individual characters/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Lock desktop layout/i }));
+
+    // All char-picker buttons in the inventory group should be disabled.
+    const charGroup = screen.getByRole("group", { name: /Inventory characters/i });
+    const charButtons = charGroup.querySelectorAll("button");
+    expect(charButtons.length).toBeGreaterThan(0);
+    for (const btn of charButtons) {
+      expect((btn as HTMLButtonElement).disabled).toBe(true);
+    }
+  });
+
+  it("slot inputs are disabled when locked", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    // Expand, apply, lock.
+    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Lock desktop layout/i }));
+
+    // All slot text inputs must be disabled.
+    // latinDeadkeyAcuteSingle has 5 questions; each renders a text input.
+    const slotInputs = screen.getAllByRole("textbox");
+    expect(slotInputs.length).toBeGreaterThan(0);
+    for (const input of slotInputs) {
+      expect((input as HTMLInputElement).disabled).toBe(true);
+    }
+  });
+
+  it("lock-bypass guard: handleApply does nothing when desktopLocked is true", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    // Apply, lock, then attempt to apply again via the store directly
+    // (simulates a bypass of the disabled control).
+    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
+    const beforeCount = useSurveyResultsStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical").length;
+    fireEvent.click(screen.getByRole("button", { name: /Lock desktop layout/i }));
+
+    // Force-click Apply even though it's disabled (simulates bypass).
+    const applyBtn = screen.getByRole("button", { name: /^Apply$/i });
+    fireEvent.click(applyBtn);
+
+    const afterCount = useSurveyResultsStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical").length;
+    // Count must not grow — the guard blocked the call.
+    expect(afterCount).toBe(beforeCount);
+  });
+
+  it("clicking Unlock restores editing (desktopLocked becomes false)", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    // Apply, lock, then unlock.
+    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Lock desktop layout/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Unlock to edit/i }));
+
+    // Store unlocked.
+    expect(useSurveyResultsStore.getState().desktopLocked).toBe(false);
+    // Banner gone; lock button back.
+    expect(screen.queryByRole("status", { name: /Desktop layout locked/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /Lock desktop layout/i })).toBeTruthy();
+    // Apply button enabled again.
+    const applyBtn = screen.getByRole("button", { name: /^Apply$/i });
+    expect((applyBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Preview wiring — vfsTransform calls applyAssignmentsToVfs
 // ---------------------------------------------------------------------------
 
