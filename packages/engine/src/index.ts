@@ -93,7 +93,7 @@ export type { CldrLoader, ExemplarResult } from "./character-discovery/cldr.js";
 export { createFetchCldrLoader } from "./character-discovery/cldr.js";
 
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.
-export { substituteSlots, applyAssignments, applyAssignmentsToVfs, resolveRenderableMechanisms } from "./pattern-apply/index.js";
+export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, resolveRenderableMechanisms } from "./pattern-apply/index.js";
 export type { SubstituteResult, ApplyAssignmentsResult } from "./pattern-apply/index.js";
 
 // Inventory diff (spec §8): static extraction of a keyboard's produced glyph set.

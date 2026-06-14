@@ -16,6 +16,7 @@ import { KmnEditor } from "./KmnEditor.tsx";
 import { getToZip } from "../lib/services.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { confirmRebaseIfEdited } from "../lib/confirmRebase.ts";
+import { useWorkingCopyTransform } from "../hooks/useWorkingCopyTransform.ts";
 
 // [TEMP] Per-fixture typing hints. Hardcoded until the Pattern schema's
 // `tests` field (spec §5) is wired into the UI to drive these automatically.
@@ -351,10 +352,16 @@ export function PreviewShell() {
     instantiateFromBase(base, { vfs, ir });
   }, [instantiateFromBase]);
 
+  // Working-copy transform — projects carve + identity layers into the pick-base
+  // OSK. No patternMap here (Phase C assignments are managed in the Mechanisms
+  // gallery which carries its own patternMap). Returns null when the working copy
+  // is not yet instantiated; useKeyboardArtifact treats null as "no transform".
+  const workingCopyTransform = useWorkingCopyTransform();
+
   // Lifted from OSKFrame so DiagnosticsPanel and the download button can
   // read stage (and the embedded VFS) without prop-drilling through the iframe.
   const activeSpec = pickerMode === "scaffold" ? scaffoldSpec : null;
-  const { stage, retry, recompile } = useKeyboardArtifact(baseKeyboard, activeSpec, null, onInstantiate);
+  const { stage, retry, recompile } = useKeyboardArtifact(baseKeyboard, activeSpec, workingCopyTransform, onInstantiate);
 
   const diagnostics =
     stage.kind === "ready"

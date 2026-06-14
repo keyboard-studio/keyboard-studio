@@ -26,6 +26,7 @@ import { CarveGallery } from "./components/CarveGallery.tsx";
 import { MechanismGallery } from "./components/MechanismGallery.tsx";
 import { type RouteId } from "./lib/navigate.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
+import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { OSKFrame } from "./components/OSKFrame.tsx";
 import { OskModeToggle, type OskMode } from "./components/OskModeToggle.tsx";
 
@@ -304,9 +305,16 @@ function SurveyView({ baseKeyboard }: SurveyViewProps) {
     instantiateFromBase(base, { vfs, ir });
   }, [instantiateFromBase]);
 
+  // Working-copy transform — projects carve + identity layers into the OSK.
+  // No patternMap here (Phase C assignments are not yet collected in the survey
+  // pane; even if they were, we have no patternMap to pass). Returns null when
+  // the working copy is not yet instantiated (baseIr = null on first load);
+  // useKeyboardArtifact treats null vfsTransform as "no transform" — safe.
+  const workingCopyTransform = useWorkingCopyTransform();
+
   // Use localBase (immediately updated on selection) to drive the pipeline,
   // not the store's baseKeyboard (updated only after compile completes).
-  const { stage: artifactStage, retry } = useKeyboardArtifact(localBase, null, null, onInstantiate);
+  const { stage: artifactStage, retry } = useKeyboardArtifact(localBase, null, workingCopyTransform, onInstantiate);
   const rightPct = 100 - leftPct;
 
   // Survey results are persisted into the survey-results store (the data bus the

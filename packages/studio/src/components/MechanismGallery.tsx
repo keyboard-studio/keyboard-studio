@@ -26,15 +26,13 @@ import type {
   PatternMatch,
   MechanismAssignment,
   DemoObject,
-  VirtualFS,
 } from "@keyboard-studio/contracts";
 import { uncoveredTargets } from "@keyboard-studio/contracts";
 import { useSurveyResultsStore } from "../stores/surveyResultsStore.ts";
 import { getPatternLibraryService } from "../lib/services.ts";
 import type { DiscoveryAxisVector } from "@keyboard-studio/contracts";
-import { applyAssignmentsToVfs } from "@keyboard-studio/engine";
 import { useKeyboardArtifact } from "../hooks/useKeyboardArtifact.ts";
-import type { VfsTransform } from "../hooks/useKeyboardArtifact.ts";
+import { useWorkingCopyTransform } from "../hooks/useWorkingCopyTransform.ts";
 import { OSKFrame } from "./OSKFrame.tsx";
 import { OskModeToggle } from "./OskModeToggle.tsx";
 import type { OskMode } from "./OskModeToggle.tsx";
@@ -635,45 +633,22 @@ function CoverageIndicator({ assignments, inventory }: CoverageIndicatorProps) {
 
 interface GalleryPreviewWithPatternsProps {
   selectedBaseKeyboard: BaseKeyboard;
-  sessionAssignments: MechanismAssignment[];
   patternMap: Map<string, Pattern>;
 }
 
 function GalleryPreviewWithPatterns({
   selectedBaseKeyboard,
-  sessionAssignments,
   patternMap,
 }: GalleryPreviewWithPatternsProps) {
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
 
-  // Build a stable memoization key from the assignment list.
-  const assignmentsKey = useMemo(
-    () =>
-      sessionAssignments
-        .map(
-          (a) =>
-            `${a.scope}:${a.target}:${a.mechanisms.map((m) => `${m.patternId}/${JSON.stringify(m.slotValues ?? {})}`).join(",")}`,
-        )
-        .join("|"),
-    [sessionAssignments],
-  );
-
-  // vfsTransform: stable per assignmentsKey + patternMap. Uses patternMap
-  // directly for synchronous pattern resolution without an async service round-trip.
-  // patternMap is a useState ref so it is already stable across renders when
-  // the loaded patterns have not changed.
-  const vfsTransform = useMemo<VfsTransform>(
-    () =>
-      (vfs: VirtualFS, keyboardId: string) =>
-        applyAssignmentsToVfs(
-          vfs,
-          keyboardId,
-          sessionAssignments,
-          (id) => patternMap.get(id),
-        ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [assignmentsKey, patternMap],
-  );
+  // Working-copy transform: projects carve + assignments + identity into the
+  // gallery OSK. The patternMap from the already-loaded gallery patterns is
+  // passed so assignment projection can run synchronously. The hook memoizes
+  // on carve/assignment/identity layer values (not object references) so it
+  // only recompiles when a layer actually changes. This unifies the gallery OSK
+  // with the survey/pick-base OSK — all three surfaces reflect the same layers.
+  const vfsTransform = useWorkingCopyTransform({ patternMap });
 
   const { stage, retry } = useKeyboardArtifact(
     selectedBaseKeyboard,
@@ -1232,7 +1207,6 @@ export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps
         {!loading && loadError === null && (
           <GalleryPreviewWithPatterns
             selectedBaseKeyboard={selectedBaseKeyboard}
-            sessionAssignments={sessionAssignments}
             patternMap={patternMap}
           />
         )}

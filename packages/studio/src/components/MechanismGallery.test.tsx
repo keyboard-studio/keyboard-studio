@@ -12,9 +12,10 @@ import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
 import { MechanismGallery } from "./MechanismGallery";
 import { useSurveyResultsStore } from "../stores/surveyResultsStore";
+import { useWorkingCopyStore } from "../stores/workingCopyStore";
 import type { PatternLibraryService, VirtualFS } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
+import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { latinDeadkeyAcuteSingle } from "@keyboard-studio/contracts/fixtures";
 import type { PatternMatch } from "@keyboard-studio/contracts";
 import type { Stage } from "../hooks/useKeyboardArtifact";
@@ -129,6 +130,7 @@ function seedInventory(chars: string[]) {
 afterEach(() => {
   cleanup();
   useSurveyResultsStore.getState().reset();
+  useWorkingCopyStore.getState().reset();
   vi.clearAllMocks();
   _mockStage = { kind: "idle" };
   _lastVfsTransform = undefined;
@@ -136,6 +138,7 @@ afterEach(() => {
 
 beforeEach(() => {
   useSurveyResultsStore.getState().reset();
+  useWorkingCopyStore.getState().reset();
 });
 
 // ---------------------------------------------------------------------------
@@ -611,8 +614,22 @@ describe("MechanismGallery — vfsTransform calls applyAssignmentsToVfs", () => 
     scaffoldWarnings: [],
   };
 
+  // Seed the working-copy store with a minimal baseIr so useWorkingCopyTransform
+  // returns a non-null transform. Phase 3 requires an instantiated working copy.
+  function seedWorkingCopy() {
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+      vfs,
+      ir: makeTestIR([]),
+    });
+  }
+
   it("passes a vfsTransform to useKeyboardArtifact when patterns have loaded", async () => {
     setMockStage(readyStage);
+    // Seed the working copy FIRST (instantiateFromBase resets phaseResults).
+    seedWorkingCopy();
     seedInventory(["á"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -625,6 +642,7 @@ describe("MechanismGallery — vfsTransform calls applyAssignmentsToVfs", () => 
 
   it("vfsTransform invokes applyAssignmentsToVfs with the session assignments", async () => {
     setMockStage(readyStage);
+    seedWorkingCopy();
     seedInventory(["á"]);
     // Apply a mechanism so there is a real assignment in the store.
     await act(async () => {
@@ -653,6 +671,7 @@ describe("MechanismGallery — vfsTransform calls applyAssignmentsToVfs", () => 
 
   it("vfsTransform resolves patterns from the patternMap (not the service)", async () => {
     setMockStage(readyStage);
+    seedWorkingCopy();
     seedInventory(["á"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
