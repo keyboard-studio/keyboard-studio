@@ -1,8 +1,6 @@
 # Workflow model — existing vs. intended authoring flow
 
-**Status:** working model, for intermingling. Not a spec. When the unified flow
-is ratified, fold the decisions back into [spec.md](../spec.md) §8 and update this
-file to describe what shipped.
+**Status:** working model, for intermingling. The hybrid ordering (section 7) has been ratified and folded into [spec.md](../spec.md) §8 (v1.2.0). The working-copy spine + two-track framing has been folded into [spec.md](../spec.md) §8 and §12 (v1.3.0). This file is now a supplementary reference — the tables, graphs, and question-level analysis here remain valid; [spec.md](../spec.md) §8 is authoritative.
 
 This document models the studio's user workflow as a typed directed graph so that
 disconnects (an edge whose target's preconditions aren't met by its source) and
@@ -388,6 +386,14 @@ character has ≥1 reachable mechanism. This is the workflow-graph dead-end test
 - **The gallery is instantiated twice**, once per modality, with distinct mechanism
   catalogs (physical: modifiers/dead keys/combos/rotas; touch: modifiers+layers/
   long-press/flicks/multitaps). See "The gallery is handled twice" above.
+- **Two authoring tracks, one working-copy spine (v1.3.0):** The hybrid flow in
+  the diagram above is Track 1 (new keyboard from a base). Track 2 (adapt an
+  existing keyboard) enters via source-picker, skips identity-lite (identity is
+  already known), and instantiates the working copy from the existing keyboard's
+  IR with identity preserved. Both tracks converge on the same spine at the carve
+  gallery. The working copy (`KeyboardIR` + `VirtualFS`) is the session's single
+  source of truth from instantiation to output, with no intermediate disk writes.
+  Ratified in [spec.md](../spec.md) §8 and §12 as part of v1.3.0 (extends D9).
 
 ### Open
 

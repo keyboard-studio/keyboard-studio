@@ -22,6 +22,26 @@ Contents map to [spec.md](../../spec.md):
 - `src/criteria.ts` - criteria.md band classification (spec sections 11 and 14, decision 4)
 - `src/simulation.ts` - contract types for the headless `simulate()` pipeline: `SimKeyInput`, `DeadkeySnapshot`, `SimulationStep`, `SimulationResult`, `TestVectorResult`, `PatternTestResult` (spec §5 test vectors)
 
+## Working-copy spine (v1.3.0)
+
+Per spec §8 and §12 (v1.3.0), the `VirtualFS` + `KeyboardIR` pair is the
+session's single persistent working copy, assembled from the contract types
+here. It is instantiated at keyboard selection via one of two tracks:
+
+- **Track 1** (`instantiateFromBase`) — copy a base + reset identity; enters
+  the §8 hybrid survey flow.
+- **Track 2** (`instantiateFromExisting`) — load an existing keyboard + preserve
+  identity; enters via source-picker.
+
+Both tracks converge on the same spine after instantiation; all survey and
+gallery operations mutate the same working copy. Serialization happens only at
+output (spec §12); there are no intermediate disk writes during authoring.
+
+An `instantiationMode` field (distinguishing Track 1 from Track 2 on
+`SurveySession`) is intentionally absent in v1.3.0. It will be added as an
+additive optional field in a forthcoming joint session when Phase 2 (explicit
+instantiation mode) is defined. Do not add it without that session.
+
 ## Revision policy
 
 Per [spec.md](../../spec.md) section 18, the `Pattern` interface is the

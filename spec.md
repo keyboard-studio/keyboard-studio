@@ -1,8 +1,8 @@
 # keyboard-studio — Spec
 
 **Repository:** https://github.com/MattGyverLee/keyboard-studio
-**Date:** 2026-06-13
-**Version:** 1.2.0
+**Date:** 2026-06-14
+**Version:** 1.3.0
 **Status:** Draft — pre-Day-1 sync
 
 ---
@@ -1051,13 +1051,25 @@ Precedence is **individual > character-class > keyboard-default**. A character w
 *Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
 *Revised 2026-06-11 (v1.1.1 placement priors). See [docs/spec-amendment-2026-06-11-placement-priors.md](docs/spec-amendment-2026-06-11-placement-priors.md).*
 *Revised 2026-06-13 (v1.2.0 hybrid workflow). Full model: [docs/workflow-model.md](docs/workflow-model.md).*
+*Revised 2026-06-14 (v1.3.0 working-copy spine + two authoring tracks). Extends Decision 9.*
+
+**Two authoring tracks, one working-copy spine.** Every session is anchored to a single **persistent working copy**: a `KeyboardIR` + `VirtualFS` pair that is instantiated when the keyboard is chosen, mutated by every subsequent step (carve, survey, gallery, OSK edits), and serialized only at output (§12). The OSK is bound to this working copy throughout; it re-renders on every mutation. This reinforces Decision 9 (IR is canonical) and keeps the two teams' work surfaces aligned — the engine reads and writes one object; the content team's survey/gallery calls mutate the same object.
+
+The working copy is reached via **two entry tracks** that converge on a shared spine after instantiation:
+
+- **Track 1 — new keyboard (copy a base and edit):** `instantiateFromBase` copies the chosen base keyboard's IR and resets its identity — the author assigns a new keyboard ID, and version is reset to 1.0. The session then enters the §8 hybrid survey flow (identity-lite → base resolution → prefill → inventory → gallery stages). This is the primary path for authors producing a keyboard from scratch or from a generic base.
+- **Track 2 — adapt an existing keyboard (load and edit):** `instantiateFromExisting` loads an existing keyboard (any `release/` source or uploaded `.kmn`), parses it to IR via the §5a codec, and makes the working copy **that IR with identity preserved** — keyboard ID and existing metadata are retained. Version is bumped in `store(&KEYBOARDVERSION)` and a new `HISTORY.md` entry is staged **at output** (step 15), not at instantiation — so a session that never reaches output leaves the source version untouched. The session enters via the source-picker head UI (§8 step 1 source selection), skipping the identity-lite prompt because the identity is already known. This is the v1.1.0 single-source-adaptation path.
+
+The two tracks differ in their head UI (survey prompt vs. source-picker) and in the instantiation call (`instantiateFromBase` = copy + reset identity; `instantiateFromExisting` = load + preserve identity). After instantiation they share one spine: the carve gallery (step 4), all survey/gallery phases (steps 5–11), live preview (step 13), lint (step 14), and output (step 15) all operate on the same working copy regardless of which track produced it.
+
+**OSK reflects identity as a visible mutation.** KeymanWeb renders the keyboard's display name on the spacebar caption by default (`spacebarTextMode` = `KEYBOARD`); the host may instead show the language, or both (`LANGUAGE_KEYBOARD`). Identity edits (keyboard name, BCP47 tag) therefore produce visible OSK mutations — the spacebar caption changes. Script, base-keyboard, carve, and mechanism (gallery) edits change the key labels. This means the OSK is a live observable of the working copy's full state, not just its rule output.
 
 **Workflow ordering (hybrid).** The phases below are reached in a **hybrid** order: a light identity prompt comes first so the studio can *suggest* a base keyboard, the base then back-fills routing as confirmations, and the engaging character/gallery work precedes the deferred paperwork. The adopted sequence is:
 
 - **Identity-lite** — language autonym, English name, **language subtag** (BCP47, for base language-match), and **target script** (a short subset of Phase A), enough to look up a base. **Language and script are decoupled:** the keyboard's target is a *(language, script) pair*, and script is its own question — not derived from the language's default. Alongside the language's default script(s), identity-lite offers **romanization (Latin)** and **IPA** (`-fonipa`) and "another script" as first-class options, so an alternate-script keyboard (e.g. a `hi-Latn` romanization, or an IPA keyboard) is a normal path. The *chosen* script — carried in the BCP47 tag (`-Latn`, `-fonipa`) — drives routing (§9), A2 (§7.1), base suggestion, and the inventory diff; the language does not.
 - **Base resolution** — suggest a base from [docs/keyboard-index.md](docs/keyboard-index.md) keyed on the *(language, script) pair* (so a romanization suggests a Latin base, not the language's default-script base), else let the user pick one, else start from the bundled US-QWERTY fallback (the "blank" fallback is the bundled `basic_kbdus` layout — the studio starts from *its* IR, not an empty `.kmn`; an empty file would rely on the OS baseline, not emit QWERTY itself). Then **parse to IR**, **scaffold over IR**, and the **carve gallery** (steps 2–4 below).
 - **Base-derived prefill** — routing group, script class (A2), spare-key availability (A7), and BCP47 are pre-filled from the base as confirmations (Sec 5 "Base-derived pre-fill"), not re-asked.
-- **Inventory** — character discovery, diffed against the base output set (step 6 below).
+- **Inventory** — character discovery, diffed against the base output set (step 6 below; the diff is realized by `buildProducedSet` in `packages/contracts/src/ir/producedSet.ts`).
 - **Axis probes** — only the axes the base and discovery did not already settle.
 - **Physical gallery (Phase C)** → **lock the desktop keyboard** → **touch gallery (Phase E)**: the gallery is instantiated once per modality (see "Gallery instantiation" after step 10). The physical desktop layout is fully locked before the touch layout is derived from it.
 - **Documentation + package details** — help docs (Phase F) plus the deferred author/copyright/region/code and provenance metadata, collected last.
@@ -1261,6 +1273,11 @@ Source-of-truth for the band assignments is `packages/contracts/data/criteria.js
 ## 12. Output artifacts
 
 *Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
+*Revised 2026-06-14 (v1.3.0 working-copy spine). Extends Decision 9.*
+
+**Working copy as the live edit target.** The `VirtualFS` is instantiated at keyboard selection (Track 1: `instantiateFromBase`; Track 2: `instantiateFromExisting` — see §8 "Two authoring tracks") and is the session's sole live edit target from that point forward. Every subsequent mutation — carve deletions, survey answers, gallery pattern insertions, OSK edits — is applied to this working copy. Assignments and carve deletions are applied as **re-projected layers on top of the IR**: they do not destructively rewrite IR nodes; instead, the emitter projects the current assignment map and carve state over the base IR at render time, so the original IR structure is always recoverable by unwinding the layers. The working copy is serialized to a `.zip` archive or committed as a fork+PR only at output (step 15) — the studio does not write to disk during authoring, and there is no intermediate persistence step between instantiation and output.
+
+**OSK spacebar caption as a visible identity mutation.** KeymanWeb renders the keyboard's display name on the spacebar caption by default (`spacebarTextMode` = `KEYBOARD`; the host may instead select language, or both via `LANGUAGE_KEYBOARD`), drawing on the `KeyboardIdentity` fields `displayName` and `bcp47`. Because the working copy is the live OSK target, identity edits are immediately visible in the OSK as spacebar caption changes. Script, base-keyboard, carve, and mechanism edits change the key labels. The OSK is therefore a complete observable of the working copy's current state.
 
 ### Virtual filesystem (in-memory, emitted at output time)
 

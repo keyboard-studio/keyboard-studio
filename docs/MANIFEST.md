@@ -35,6 +35,7 @@ Owned by `/km-doc`. Update this file whenever a doc is added, archived, or re-sc
 | [`docs/making-a-template.md`](making-a-template.md) | Template authoring guide | Template pipeline changes | live |
 | [`docs/Checking Keyman Keyboard Pull Requests.md`](<Checking Keyman Keyboard Pull Requests.md>) | PR review checklist | Criteria or review-process changes | live |
 | [`docs/triage-scheduling.md`](triage-scheduling.md) | Issue triage and scheduling guide | Process changes | live |
+| [`docs/workflow-model.md`](workflow-model.md) | Supplementary workflow graph + question analysis; authoritative hybrid ordering now in spec §8 | Spec §8 workflow changes; two-track authoring changes | live |
 
 ## Audit / inventory docs
 
@@ -68,5 +69,5 @@ Owned by `/km-doc`. Update this file whenever a doc is added, archived, or re-sc
 
 ---
 
-**Last verified:** 2026-06-12
+**Last verified:** 2026-06-14
 **Manifest owner:** `/km-doc`

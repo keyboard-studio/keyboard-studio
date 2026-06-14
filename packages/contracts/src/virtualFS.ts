@@ -15,6 +15,16 @@ export interface VirtualFSEntry {
  * NOT on this interface — see #97. Callers that want a zip must go
  * through `OutputService.toZip`, which is the safe path that honors
  * criteria SS1 (no compiled artifacts in PRs, spec §12).
+ *
+ * **Working-copy spine (spec §8 + §12 v1.3.0).** The `VirtualFS` is one half
+ * of the session's persistent working copy (the other half is the `KeyboardIR`).
+ * It is instantiated at keyboard selection — via Track 1 `instantiateFromBase`
+ * (new keyboard, identity reset) or Track 2 `instantiateFromExisting` (adapt
+ * existing keyboard, identity preserved) — and is mutated by every subsequent
+ * authoring step. It is NOT written to disk during authoring; serialization
+ * occurs only at output (spec §12). Assignments and carve deletions are applied
+ * as re-projected layers at render time; they do not destructively rewrite the
+ * underlying IR entries stored here.
  */
 export interface VirtualFS {
   get(path: string): VirtualFSEntry | undefined;

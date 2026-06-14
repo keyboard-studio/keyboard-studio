@@ -14,7 +14,7 @@ Update this file as new package skeletons land. Keep build/test/lint commands an
 
 ## Source of truth
 
-- **`spec.md`** — the v1.2.0 spec (v1.0 signed off; v1.1.0 KeyboardIR import amendment applied 2026-06-08; v1.1.1 placement-priors amendment applied 2026-06-11; v1.2.0 hybrid-workflow + scoped-gallery amendment applied 2026-06-13, see [docs/workflow-model.md](docs/workflow-model.md) — typed assignment-map contract held for the #5b joint session). Treat as authoritative for scope, schema, validator layering, team boundaries, and resolved decisions.
+- **`spec.md`** — the v1.3.0 spec (v1.0 signed off; v1.1.0 KeyboardIR import amendment applied 2026-06-08; v1.1.1 placement-priors amendment applied 2026-06-11; v1.2.0 hybrid-workflow + scoped-gallery amendment applied 2026-06-13, see [docs/workflow-model.md](docs/workflow-model.md) — typed assignment-map contract held for the #5b joint session; v1.3.0 working-copy spine + two authoring tracks amendment applied 2026-06-14 — single persistent working copy instantiated at keyboard selection via Track 1 `instantiateFromBase` or Track 2 `instantiateFromExisting`, all steps mutate it, serialized only at output; extends Decision 9). Treat as authoritative for scope, schema, validator layering, team boundaries, and resolved decisions.
 - **`docs/spec-signoff.md`** — review-cycle log and decision summary (D1–D9). Use this to see *why* a spec section reads the way it does before proposing changes.
 - **`README.md`** — one-line external description; do not expand without reason.
 - **`strategy tree/strategies.md`** — **superseded.** Merged into `spec.md §7`; now a stub pointer only. Do not edit it or treat it as a source.
