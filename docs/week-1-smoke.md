@@ -9,7 +9,7 @@
 
 ## Artifact under test
 
-The studio download button currently emits the compiled `.js` only (see the `[LIMITATION]` note in `packages/studio/src/components/PreviewShell.tsx`); the VirtualFS `.zip` path is engine-complete (`toZip`, spec §12) but not yet wired to a UI button. To unblock this smoke run, the zip is produced by [utilities/smoke-artifact/gen.ts](../utilities/smoke-artifact/gen.ts), which drives the **same** pipeline the button eventually will:
+The studio's **Download .zip** button is wired to the engine `toZip` pipeline ([PreviewShell.tsx:354](../packages/studio/src/components/PreviewShell.tsx#L354)), so the studio can already emit this artifact interactively. This smoke run uses a scripted generator instead — [utilities/smoke-artifact/gen.ts](../utilities/smoke-artifact/gen.ts) — for a **reproducible** artifact from a **known, pinned base** with no browser in the loop, driving the **same** pipeline the button does:
 
 ```
 pick base keyboard → createScaffolderService().scaffold() → toZip()
@@ -26,10 +26,10 @@ TSX_TSCONFIG_PATH=utilities/smoke-artifact/tsconfig.json \
 |-------|-------|
 | Primary artifact | `e2e_smoke_akan.zip` (scaffolded from `akan`, Latin/QWERTY — a codec-clean base) |
 | Engine path exercised | `scaffolder.scaffold()` (parse → scaffoldIR → emit, #351) + `output.toZip()` |
-| Built against | current `main` @ `8b0e9cb` (includes #351 scaffold-over-IR) |
-| Studio commit | _(fill in: `git rev-parse HEAD`)_ |
+| Built against | current `main` (rebased 2026-06-13); scaffold-over-IR is #351 @ `0fb5e1a` |
+| Studio commit | _fill in at run time:_ `git rev-parse HEAD` |
 
-> **Why `akan`, not the issue's `khmer_angkor` / `sil_euro_latin`?** Under #351 the scaffolder routes the base `.kmn` through the codec (`parse → emit`), and the codec cannot parse either named base — `sil_euro_latin` uses a `$keymanweb:` conditional directive and `khmer_angkor` uses RALT multi-key contexts, both of which throw `Malformed rule`. `akan` is one of the ~360 codec-"clean" release keyboards (per the supportability scanner), so it scaffolds. See Pre-flight finding #2.
+> **Why `akan`, not the issue's `khmer_angkor` / `sil_euro_latin`?** Under #351 the scaffolder routes the base `.kmn` through the codec (`parse → emit`), and the codec cannot parse either named base — `sil_euro_latin` uses a `$keymanweb:` conditional directive (a genuine, v1-out-of-scope codec feature gap) and `khmer_angkor` hits a tokenizer continuation bug (#365), both of which throw `Malformed rule`. `akan` is one of the ~360 codec-"clean" release keyboards (per the supportability scanner), so it scaffolds. See Pre-flight finding #2.
 
 ---
 
@@ -42,13 +42,15 @@ Regenerating the artifact on current `main` surfaced two scaffolder defects **be
    - `store(&VISUALKEYBOARD) 'akan.kvks'` → actual file `e2e_smoke_akan.kvks`
    - `store(&LAYOUTFILE) 'akan.keyman-touch-layout'` → actual file `e2e_smoke_akan.keyman-touch-layout`
 
-   The generated `.kpj` sets `CompilerWarningsAsErrors=True`, so KD's build is expected to **error** on three missing files. `bug(scaffolder)` follow-up (file before relying on scaffolded output).
+   The generated `.kpj` sets `CompilerWarningsAsErrors=True`, so KD's build is expected to **error** on three missing files. Filed as **#364**. The complete fix covers six file-reference stores (`&BITMAP`, `&VISUALKEYBOARD`, `&LAYOUTFILE`, `&KMW_HELPFILE`, `&KMW_EMBEDJS`, `&KMW_EMBEDCSS`); akan only uses the first three.
 
-2. **[scaffold failure on codec gaps] #351 routes scaffold through the codec, which can't parse many real keyboards.** `scaffold()` now does `parse → scaffoldIR → emit` ([index.ts:257](../packages/engine/src/scaffolder/index.ts#L257)); the `parse()` is outside the try/catch, so a codec parse error rejects the whole scaffold. Both of the issue's named bases fail:
-   - `sil_euro_latin` → `Malformed rule … $keymanweb: store(&CasedKeys) …` (conditional-compilation directive)
-   - `khmer_angkor` → `Malformed rule … [RALT K_EQUAL] [RALT K_3] …` (RALT multi-key context)
+   > **Interaction to watch in KD:** the scaffolded `.kpj` is retained under the *base* id (`akan.kpj`, not `e2e_smoke_akan.kpj`), so KD's auto-discovery project may not pick up `CompilerWarningsAsErrors` from it — in which case the build can **pass** and mask this defect. If the build is clean, manually confirm the `.kmn` store filenames against the files on disk before signing off AC #2.
 
-   This affects every base the codec can't parse — the supportability scanner counted **77 ParseFailures** + 408 round-trip-divergent of 912. `bug(scaffolder)`; relates to codec `bug` #349. `akan` was chosen as a codec-clean base so this run can proceed.
+2. **[scaffold failure on codec gaps] #351 routes scaffold through the codec, which can't parse many real keyboards.** `scaffold()` now does `parse → scaffoldIR → emit` ([index.ts:257](../packages/engine/src/scaffolder/index.ts#L257)); the `parse()` result is not guarded by a try/catch, so a codec parse error propagates to the caller and rejects the whole scaffold. Both of the issue's named bases fail, for **two different reasons**:
+   - `sil_euro_latin` → `Malformed rule … $keymanweb: store(&CasedKeys) …` — a **genuine codec feature gap**: the `$keymanweb:` conditional-compilation directive is not recognized (v1-out-of-scope).
+   - `khmer_angkor` → `Malformed rule at line 117 … [RALT K_EQUAL] [RALT K_3] …` — **not** a RALT-context problem (single-modifier vkeys parse fine). The real cause is a **tokenizer bug** (#365): physical line 116 ends with `\` + trailing whitespace, so the continuation is not joined and line 117 tokenizes as an orphaned, malformed rule.
+
+   This affects every base the codec can't parse — the supportability scanner counted **77 ParseFailures** + 408 round-trip-divergent of 912. Relates to codec `bug` #349. `akan` was chosen as a codec-clean base so this run can proceed.
 
 3. **[zip hygiene — moot for this run] Khmer shared-font path traversal.** `khmer_angkor.kmn` references `../../../shared/fonts/…`, which serialises as a `..` zip entry some tools reject. Khmer can't be scaffolded under #351 anyway (finding #2), so it is not the artifact; noted for whenever khmer becomes scaffoldable.
 
@@ -64,10 +66,13 @@ Regenerating the artifact on current `main` surfaced two scaffolder defects **be
 
 ## Smoke-Run Steps
 
-1. - [ ] Extract `e2e_smoke_akan.zip`. Confirm it expands without errors and contains `source/e2e_smoke_akan.kmn` plus siblings.
+1. - [ ] Extract `e2e_smoke_akan.zip`. Confirm it expands without errors and contains `source/e2e_smoke_akan.kmn` plus its sibling files under `source/`, with the `.kpj` and `NEXT_STEPS.md` at the zip root.
 2. - [ ] In Keyman Developer, **Open Project** → the `.kpj` in the extracted folder. _(It is a v2.0 auto-discovery project, so KD finds `source/*.kmn` regardless of the `.kpj` filename.)_ — **AC #1: opens cleanly.**
-3. - [ ] **Build** the project. — **AC #2: zero errors (warnings logged).** _(Per Pre-flight finding #1, expect `&BITMAP` / `&VISUALKEYBOARD` / `&LAYOUTFILE` file-not-found errors. Log the exact messages.)_
-4. - [ ] If build succeeds: **Install** the produced `.kmp`/keyboard into Windows.
+3. - [ ] **Build** the project. — **AC #2.** _Per Pre-flight finding #1, this build is **expected to fail** (until #364 lands) with `&BITMAP` / `&VISUALKEYBOARD` / `&LAYOUTFILE` file-not-found errors — **unless** the `.kpj`-naming interaction masks it (see finding #1). Outcomes:_
+       - _**Build fails with exactly those three errors** → expected; log the messages and treat AC #2 as **blocked on #364**, then stop (cannot proceed to install)._
+       - _**Build passes** → manually verify the three `.kmn` store filenames match the files on disk before accepting; record whether masking occurred._
+       - _**Any other error** → a new regression; log it under Discrepancies._
+4. - [ ] If build succeeds: **Install** the produced `.kmp`/keyboard into Windows. — **AC #5: installs without error.**
 5. - [ ] Pick a 5-keystroke smoke sequence and record the **expected** output from the studio preview (`simulate()`) first:
 
        | # | Key(s) pressed | Expected (studio simulate) |
@@ -89,17 +94,17 @@ File each row as its own follow-up issue (**AC #4 — discrepancies are follow-u
 
 | # | Keystrokes | studio simulate() | real KD | Severity | Issue filed |
 |---|-----------|-------------------|---------|----------|-------------|
-| 1 | _(build)_ | clean compile | _stale `&BITMAP`/`&VISUALKEYBOARD`/`&LAYOUTFILE` refs_ | major | bug(scaffolder) — pre-flight #1 |
+| 1 | _(build)_ | clean compile | _stale `&BITMAP`/`&VISUALKEYBOARD`/`&LAYOUTFILE` refs_ | major | #364 — pre-flight #1 |
 |   |           |                   |         |          |             |
 
 ---
 
 ## Screenshots
 
-_(Attach: KD build output panel; installed-keyboard typing result.)_
+_Attach at run time (add the files under `docs/img/` and link them here):_
 
-- ![KD build output](./img/week-1-smoke-build.png)
-- ![Typed output](./img/week-1-smoke-typing.png)
+- KD build output panel — `docs/img/week-1-smoke-build.png`
+- Installed-keyboard typing result — `docs/img/week-1-smoke-typing.png`
 
 ---
 
@@ -114,11 +119,11 @@ Decision criteria:
 
 | | |
 |---|---|
-| **Call** | ☐ GO ☐ NO-GO |
+| **Call** | [ ] GO  [ ] NO-GO |
 | **Rationale** | |
 | **Blocking follow-ups** | |
 | **Decided by / date** | |
-| **Recorded on board** | ☐ |
+| **Recorded on board** | [ ] |
 
 ---
 

@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url";
 
 import { createScaffolderService } from "../../packages/engine/src/scaffolder/index.ts";
 import { toZip } from "../../packages/engine/src/output/zip.ts";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import { makeBaseKeyboard, type BaseKeyboard } from "@keyboard-studio/contracts";
 import type { FetchFn } from "../../packages/engine/src/loader/fetchKeyboardSourceToVfs.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -35,35 +35,47 @@ const REPO_ROOT = resolve(HERE, "..", "..");
 const KEYBOARDS_ROOT = resolve(REPO_ROOT, "..", "keyboards");
 const PROXY = "local:";
 
-/** Known bases that exist in the local keymanapp/keyboards clone. */
+/**
+ * Known bases that exist in the local keymanapp/keyboards clone.
+ * Built via makeBaseKeyboard() so the entries satisfy BaseKeyboard at the type
+ * level (no casts) — in particular `targets` must be KeymanPlatformTarget[],
+ * not the free-form "any" this fixture originally used.
+ */
+const DESKTOP_AND_WEB = ["windows", "macosx", "linux", "web"] as const;
+
 const BASES: Record<string, BaseKeyboard> = {
-  khmer_angkor: {
+  khmer_angkor: makeBaseKeyboard({
     id: "khmer_angkor",
     path: "release/k/khmer_angkor",
     script: "Khmr",
-    targets: ["any"],
+    targets: [...DESKTOP_AND_WEB],
     displayName: "Khmer Angkor",
     version: "1.0",
-  } as BaseKeyboard,
-  sil_euro_latin: {
+  }),
+  sil_euro_latin: makeBaseKeyboard({
     id: "sil_euro_latin",
     path: "release/sil/sil_euro_latin",
     script: "Latn",
-    targets: ["any"],
+    targets: [...DESKTOP_AND_WEB],
     displayName: "SIL EuroLatin",
     version: "1.0",
-  } as BaseKeyboard,
-  akan: {
+  }),
+  akan: makeBaseKeyboard({
     id: "akan",
     path: "release/a/akan",
     script: "Latn",
-    targets: ["any"],
+    targets: [...DESKTOP_AND_WEB],
     displayName: "Akan",
     version: "1.0",
-  } as BaseKeyboard,
+  }),
 };
 
-/** Map `${PROXY}/<path>` URLs to local reads under the keyboards clone. */
+/**
+ * Map `${PROXY}/<path>` URLs to local reads under the keyboards clone.
+ * The real loader's `init` (headers) is intentionally ignored — local-disk
+ * reads have no use for them; flagged so a reviewer doesn't mistake the
+ * single-arg signature for an oversight.
+ */
 const localFetch: FetchFn = async (url) => {
   const rel = url.startsWith(`${PROXY}/`) ? url.slice(`${PROXY}/`.length) : url;
   const abs = resolve(KEYBOARDS_ROOT, rel);
@@ -104,7 +116,10 @@ async function main(): Promise<void> {
 
   const keyboardId = `e2e_smoke_${baseId.replace(/^sil_/, "")}`;
   const displayName = `E2E Smoke ${base.displayName}`;
+  // Default lands in the scratch dir two levels above the repo (e.g. E:\Temp\
+  // when the repo is E:\Projects\keyboard-studio). Override with --out.
   const outPath = resolve(arg("--out", resolve(REPO_ROOT, "..", "..", "Temp", `${keyboardId}.zip`)));
+  console.error(`[INFO] output path: ${outPath}`);
 
   const svc = createScaffolderService({ proxyBase: PROXY, fetchImpl: localFetch });
   const { vfs, warnings } = await svc.scaffold(base, keyboardId, displayName);
