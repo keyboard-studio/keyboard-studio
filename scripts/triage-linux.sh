@@ -24,7 +24,11 @@ TL_EMAIL="${KM_TRIAGE_TL_EMAIL:-matthew_lee@sil.org}"
 TL_LOGIN="${KM_TRIAGE_TL_LOGIN:-MattGyverLee}"
 TRIAGE_OWNERS_JSON='["MattGyverLee","gboltono","coopabla","KevinPNG","dhigby","myczka"]'
 CLAUDE="${CLAUDE_BIN:-/home/lee2mr/.local/bin/claude}"
-MODEL="${KM_TRIAGE_MODEL:-haiku}"
+# Server-track orchestrator model. Override with KM_TRIAGE_MODEL.
+# Review specialists keep `model: sonnet` from their agent frontmatter; only
+# the orchestrator is set here. Personal/interactive runs use sonnet by
+# convention — see the Personal mode section in .claude/commands/km-triage.md.
+MODEL="${KM_TRIAGE_MODEL:-opus}"
 
 INBOX_DIR=".tech-lead-inbox"
 AUDIT_LOG="$INBOX_DIR/audit-log.jsonl"

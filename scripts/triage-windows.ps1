@@ -30,8 +30,11 @@ $claude = if ($env:CLAUDE_BIN) { $env:CLAUDE_BIN }
           elseif (Get-Command claude -ErrorAction SilentlyContinue) { (Get-Command claude).Source }
           else { "claude" }
 
-# Model the spawned triage runs on. Override with $env:KM_TRIAGE_MODEL.
-$model = if ($env:KM_TRIAGE_MODEL) { $env:KM_TRIAGE_MODEL } else { "haiku" }
+# Server-track orchestrator model. Override with $env:KM_TRIAGE_MODEL.
+# Review specialists keep `model: sonnet` from their agent frontmatter; only the
+# orchestrator is set here. Personal/interactive runs use sonnet by convention —
+# see the Personal mode section in .claude/commands/km-triage.md.
+$model = if ($env:KM_TRIAGE_MODEL) { $env:KM_TRIAGE_MODEL } else { "opus" }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

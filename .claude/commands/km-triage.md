@@ -56,6 +56,13 @@ All other actions (REQUEST-CHANGES, MENTION_ONLY, ESCALATE, auto-fix) behave ide
 
 Run personal mode as an ordinary interactive slash command — **do not** pass `--dangerously-skip-permissions`. There is a human at the terminal to answer permission prompts; that is the whole point of this mode. (`--dangerously-skip-permissions` belongs only to the unattended scheduler wrappers, where the GitHub App permission ceiling, not the local prompt, is the safety boundary.)
 
+### Orchestrator model
+
+The km-triage **orchestrator** runs on a different model per track; the review specialists are unaffected (they keep `model: sonnet` from their agent frontmatter in both tracks):
+
+- **Personal track → sonnet.** Run personal triage on sonnet — e.g. `claude -p "/km-triage <N>" --model sonnet`, or just switch your interactive session to sonnet before invoking `/km-triage`. This is convention, not enforced: in a bare interactive session the operator's current session model wins.
+- **Server track → opus.** The scheduler wrappers ([scripts/triage-linux.sh](../../scripts/triage-linux.sh), [scripts/triage-windows.ps1](../../scripts/triage-windows.ps1)) default the orchestrator to opus. Override per-run with `KM_TRIAGE_MODEL`.
+
 The **Hard safety rules** below (never merge, never rebase, never force-push, never mutate `main`, never close issues) apply in **both** modes, without exception.
 
 ---
