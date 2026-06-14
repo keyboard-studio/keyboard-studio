@@ -30,6 +30,14 @@ describe("scriptClassOf (A2)", () => {
     expect(scriptClassOf("Cans")).toBe("syllabary");
     expect(scriptClassOf("Hani")).toBe("logographic");
   });
+  it("classifies Cherokee and Yi as syllabaries (not alphabetic)", () => {
+    expect(scriptClassOf("Cher")).toBe("syllabary");
+    expect(scriptClassOf("Yiii")).toBe("syllabary");
+  });
+  it("classifies Syriac and N'Ko as abjads (not the alphabetic default)", () => {
+    expect(scriptClassOf("Syrc")).toBe("abjad");
+    expect(scriptClassOf("Nkoo")).toBe("abjad");
+  });
   it("defaults unknown subtags to alphabetic", () => {
     expect(scriptClassOf("Zxxx")).toBe("alphabetic");
   });
@@ -43,6 +51,9 @@ describe("routingGroupOf (§9)", () => {
   it("routes everything else to non-roman", () => {
     expect(routingGroupOf("Deva")).toBe("non-roman");
     expect(routingGroupOf("Arab")).toBe("non-roman");
+    // Cherokee (syllabary) and Syriac (RTL abjad) must not land in qwerty-qwertz.
+    expect(routingGroupOf("Cher")).toBe("non-roman");
+    expect(routingGroupOf("Syrc")).toBe("non-roman");
   });
 });
 

@@ -6,8 +6,15 @@
 
 import type { ScriptClass } from "@keyboard-studio/contracts";
 
-/** Routing group per spec §9 three-group routing. */
-export type RoutingGroup = "qwerty-qwertz" | "azerty" | "non-roman";
+/**
+ * Routing groups derivable from the script subtag alone (spec §9). AZERTY is a
+ * base-layout refinement detected later from the chosen base's structural shape,
+ * so it is never produced from the script — see {@link RoutingGroup}.
+ */
+export type ScriptRoutingGroup = "qwerty-qwertz" | "non-roman";
+
+/** The full §9 three-group routing, including AZERTY (resolved post-base). */
+export type RoutingGroup = ScriptRoutingGroup | "azerty";
 
 /**
  * Normalize an `il_target_script` answer into a BCP47 script subtag + optional
@@ -23,14 +30,20 @@ export function normalizeTargetScript(raw: string): {
   return { script: raw };
 }
 
-// Latin-family alphabetic scripts typed on a QWERTY-family physical layout.
-const LATIN_ALPHABETIC = new Set(["Latn", "Cyrl", "Grek", "Geor", "Armn", "Cher"]);
+// Alphabetic scripts typed on a QWERTY-family physical layout (Latin plus the
+// non-Latin alphabets keyed on QWERTY hardware). NOT a "Latin-only" set.
+const LATIN_ALPHABETIC = new Set(["Latn", "Cyrl", "Grek", "Geor", "Armn"]);
+// Brahmic + SE-Asian abugidas. NOTE: Tibt (Tibetan) is an abugida but uses
+// subjoined-consonant stacking (U+0F90–U+0FAD) unlike the others — a pattern
+// designed for Devanagari will not handle Tibetan stacking; A2 alone underspecifies it.
 const ABUGIDA = new Set([
   "Deva", "Beng", "Taml", "Telu", "Knda", "Mlym", "Guru", "Gujr",
   "Orya", "Sinh", "Thai", "Khmr", "Mymr", "Laoo", "Tibt",
 ]);
-const ABJAD = new Set(["Arab", "Hebr"]);
-const SYLLABARY = new Set(["Cans", "Vaii"]);
+// Consonantal scripts. Syrc (Syriac) and Nkoo (N'Ko) are RTL abjads in active use.
+const ABJAD = new Set(["Arab", "Hebr", "Syrc", "Nkoo"]);
+// Cher (Cherokee) and Yiii (Yi) are true syllabaries, not alphabets.
+const SYLLABARY = new Set(["Cans", "Vaii", "Cher", "Yiii"]);
 const LOGOGRAPHIC = new Set(["Hani"]);
 
 /**
@@ -53,7 +66,7 @@ export function scriptClassOf(script: string): ScriptClass {
  * base-layout refinement not derivable from the script alone — it is detected
  * from the chosen base's structural shape, so it is never returned here.
  */
-export function routingGroupOf(script: string): RoutingGroup {
+export function routingGroupOf(script: string): ScriptRoutingGroup {
   return LATIN_ALPHABETIC.has(script) ? "qwerty-qwertz" : "non-roman";
 }
 
@@ -65,8 +78,8 @@ export interface ScriptPrefill {
   variant?: "fonipa";
   /** A2 script class (§7.1). */
   scriptClass: ScriptClass;
-  /** Routing group (§9). */
-  routingGroup: RoutingGroup;
+  /** Script-derived routing group (§9); AZERTY is resolved later, post-base. */
+  routingGroup: ScriptRoutingGroup;
 }
 
 /**
