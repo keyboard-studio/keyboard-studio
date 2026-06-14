@@ -11,7 +11,7 @@
 //     ctx.field != 'x', "or" (space-separated "or" tokens), "and" tokens.
 //     Full boolean DSL is out of scope — these cover the actual YAML content.
 
-import { useState, useId, useMemo } from "react";
+import { useState, useId, useMemo, useRef } from "react";
 import type { FlowDef, FlowQuestion, FlowGotoRule, SurveyContext, AnswerStackEntry } from "./types.ts";
 import type { SurveyAnswer, SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts";
 import { QuestionField } from "./QuestionField.tsx";
@@ -214,6 +214,27 @@ export interface SurveyRunnerProps {
   onComplete: (result: SurveyPhaseResult) => void;
   onBack?: () => void;
   findingsByQuestionId?: Record<string, LintFinding[]>;
+  /**
+   * Called when the user advances past a question, committing its answered value
+   * to the stack. Fires synchronously inside handleNext before the new question
+   * is pushed. Callers can use this to maintain a ref-based seed map for
+   * getSeedValue — the synchronous call guarantees the ref is current when
+   * getSeedValue is read for the very next push.
+   */
+  onAnswerCommit?: (questionId: string, value: string | string[] | undefined) => void;
+  /**
+   * Called when SurveyRunner is about to push a new question onto the stack.
+   * Return a seed value to pre-fill the question's input, or undefined to leave
+   * the input empty. The seed is only applied the first time a question is pushed
+   * (i.e., when arriving forward, not when restoring via Back — Back restores the
+   * previously-saved stack entry value instead).
+   *
+   * "Default once, then user owns it" contract: the seed populates the input on
+   * first arrival; the user can edit it freely; if the user goes Back and returns,
+   * Back discards the unsaved edit so the seed fires again on re-arrival. This is
+   * the expected behavior — Back is an explicit discard.
+   */
+  getSeedValue?: (questionId: string) => string | string[] | undefined;
 }
 
 export function SurveyRunner({
@@ -222,7 +243,16 @@ export function SurveyRunner({
   onComplete,
   onBack,
   findingsByQuestionId,
+  onAnswerCommit,
+  getSeedValue,
 }: SurveyRunnerProps) {
+  // Keep stable refs to the latest callback props so handleNext closures don't
+  // need these in dep arrays and don't capture stale values.
+  const onAnswerCommitRef = useRef(onAnswerCommit);
+  onAnswerCommitRef.current = onAnswerCommit;
+  const getSeedValueRef = useRef(getSeedValue);
+  getSeedValueRef.current = getSeedValue;
+
   // Derive flow-level constants once per flow identity change.
   // context is intentionally excluded from the deps array: findFirstRenderable
   // ignores it (underscore-prefixed params), so keying on [flow] alone is correct.
@@ -301,14 +331,29 @@ export function SurveyRunner({
       return;
     }
 
-    // Save current value onto the current stack entry, then push the next
+    // Notify the caller that this answer has been committed. Fires synchronously
+    // before the stack update so that any ref-based seed map the caller maintains
+    // (e.g. IdentityLite's autonymRef) is current when getSeedValue is called
+    // for the very next push below.
+    onAnswerCommitRef.current?.(currentQId, value);
+
+    // Resolve a seed value for the incoming question. getSeedValue is read via
+    // ref so callers can update their seed source synchronously in onAnswerCommit
+    // (above) and have the updated value visible here in the same tick.
+    const seedValue = getSeedValueRef.current?.(nextIdForCurrent);
+
+    // Save current value onto the current stack entry, then push the next.
+    // The new entry starts with the seed value (may be undefined) so the
+    // question's input is pre-filled when the user first arrives.
     setStack((prev) => {
       const updated = prev.map((e, i) =>
         i === prev.length - 1 ? { ...e, value } : e,
       );
-      return [...updated, { questionId: nextIdForCurrent, value: undefined }];
+      return [...updated, { questionId: nextIdForCurrent, value: seedValue }];
     });
-    setCurrentValue(undefined);
+    // If there is a seed, start currentValue from it so the input is populated
+    // immediately and Next is enabled (satisfies canAdvance for required fields).
+    setCurrentValue(seedValue);
   }
 
   function handleBack() {
