@@ -111,6 +111,7 @@ export function createBaseBrowser(
               script: meta.script,
               targets: meta.targets,
               sourceUrl: `https://github.com/${OWNER}/${REPO}/tree/${REF}/${folderPath}`,
+              ...(meta.languages.length > 0 ? { languages: meta.languages } : {}),
             })
           );
         } catch {

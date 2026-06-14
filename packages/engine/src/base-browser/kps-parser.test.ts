@@ -148,4 +148,32 @@ describe("parseKps", () => {
     );
     expect(parseKps(xml).script).toBe("Latn");
   });
+
+  it("returns languages array with single language ID", () => {
+    expect(parseKps(BASIC_XML).languages).toEqual(["en-Latn"]);
+  });
+
+  it("returns languages array with multiple language IDs", () => {
+    expect(parseKps(DEVA_XML).languages).toEqual(["hi-Deva", "ne-Deva"]);
+  });
+
+  it("returns languages array for language ID without script subtag", () => {
+    expect(parseKps(NO_SCRIPT_XML).languages).toEqual(["en"]);
+  });
+
+  it("returns empty languages array when no Language elements present", () => {
+    const xml = `<Package><Info><Name value="X"/></Info><Keyboards><Keyboard><Targets>windows</Targets></Keyboard></Keyboards></Package>`;
+    expect(parseKps(xml).languages).toEqual([]);
+  });
+
+  it("collects all languages even after script is found", () => {
+    // Both languages should appear; script stays at the first detected one
+    const xml = BASIC_XML.replace(
+      '<Language ID="en-Latn" Name="English"/>',
+      '<Language ID="en-Latn" Name="English"/><Language ID="fr-Latn" Name="French"/>'
+    );
+    const meta = parseKps(xml);
+    expect(meta.languages).toEqual(["en-Latn", "fr-Latn"]);
+    expect(meta.script).toBe("Latn");
+  });
 });

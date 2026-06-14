@@ -7,6 +7,7 @@ export interface KpsMetadata {
   version: string;
   targets: KeymanPlatformTarget[];
   script: string;
+  languages: string[];
 }
 
 const VALID_TARGETS = new Set<string>([
@@ -52,18 +53,24 @@ export function parseKps(xml: string): KpsMetadata {
     (t): t is KeymanPlatformTarget => VALID_TARGETS.has(t)
   );
 
-  // Extract script subtag: BCP47 four-letter script codes (Latn, Deva, Arab, …)
+  // Extract all BCP47 Language IDs and derive the script subtag from the first
+  // one that contains a four-letter script code (Latn, Deva, Arab, …).
   const langRe = /Language[^>]+ID="([^"]+)"/g;
+  const languages: string[] = [];
   let script = "Latn";
+  let scriptFound = false;
   for (const match of xml.matchAll(langRe)) {
     const langId = match[1];
     if (langId === undefined) continue;
-    const scriptPart = langId.split("-").find((p) => /^[A-Za-z]{4}$/.test(p));
-    if (scriptPart !== undefined) {
-      script =
-        scriptPart.charAt(0).toUpperCase() +
-        scriptPart.slice(1).toLowerCase();
-      break;
+    languages.push(langId);
+    if (!scriptFound) {
+      const scriptPart = langId.split("-").find((p) => /^[A-Za-z]{4}$/.test(p));
+      if (scriptPart !== undefined) {
+        script =
+          scriptPart.charAt(0).toUpperCase() +
+          scriptPart.slice(1).toLowerCase();
+        scriptFound = true;
+      }
     }
   }
 
@@ -72,5 +79,6 @@ export function parseKps(xml: string): KpsMetadata {
     version,
     targets: targets.length > 0 ? targets : ["windows"],
     script,
+    languages,
   };
 }
