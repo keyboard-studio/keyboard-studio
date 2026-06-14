@@ -23,6 +23,7 @@ import { createVirtualFS } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { getToZip, getPatternLibraryService } from "./services.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
+import { physicalAssignmentsOf } from "./physicalAssignments.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -91,9 +92,7 @@ export async function serializeWorkingCopy(): Promise<SerializeWorkingCopyResult
   //    projectWorkingCopyVfs also filters physical defensively, so this pre-filter is
   //    an optimization (skips pre-loading touch-only pattern refs), not a correctness
   //    requirement.
-  const sessionAssignments: MechanismAssignment[] = phaseResults
-    .flatMap((p) => p.assignments ?? [])
-    .filter((a) => a.modality === "physical");
+  const sessionAssignments: MechanismAssignment[] = physicalAssignmentsOf(phaseResults);
 
   // 3. Build a synchronous pattern resolver backed by the async pattern library.
   //    Pre-load all referenced patterns in one async batch, then expose a sync

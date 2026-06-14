@@ -15,7 +15,7 @@ import { ScaffoldForm } from "./ScaffoldForm.tsx";
 import { KmnEditor } from "./KmnEditor.tsx";
 import { TrackOneIdentityPanel } from "./TrackOneIdentityPanel.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { confirmRebaseIfEdited } from "../lib/confirmRebase.ts";
+import { instantiateFromBaseIfConfirmed } from "../lib/confirmRebase.ts";
 import { useWorkingCopyTransform } from "../hooks/useWorkingCopyTransform.ts";
 import { serializeWorkingCopy } from "../lib/serializeWorkingCopy.ts";
 
@@ -332,27 +332,16 @@ export function PreviewShell() {
 
   const rightPct = 100 - leftPct;
 
-  // Working-copy store — used for explicit instantiation at base selection.
-  const instantiateFromBase = useWorkingCopyStore((s) => s.instantiateFromBase);
-
   // onInstantiate: explicit working-copy instantiation (spec §8 v1.3.0, Track 1).
   // Called by useKeyboardArtifact after a full fetch→compile run succeeds.
-  // Reads live store state at call time via confirmRebaseIfEdited() (getState()
-  // inside the helper) so the stale-closure problem cannot arise even though
-  // this callback is memoised: the async compile may complete long after the
-  // render that created this closure.
+  // Delegates to instantiateFromBaseIfConfirmed which reads live store state via
+  // getState() so the stale-closure problem cannot arise even though this
+  // callback is memoised: the async compile may complete long after the render
+  // that created this closure. No store selector needed — the helper dispatches
+  // instantiateFromBase via getState() directly.
   const onInstantiate = useCallback<OnInstantiateCallback>((base, { vfs, ir }) => {
-    if (ir === null || vfs === null) {
-      // IR or VFS unavailable (mock engine path); cannot fully instantiate.
-      // The store's carve IR stays null — the gallery will show its empty state.
-      console.warn("[studio] instantiate skipped: no parsed IR (mock engine?)");
-      return;
-    }
-
-    if (!confirmRebaseIfEdited()) return;
-
-    instantiateFromBase(base, { vfs, ir });
-  }, [instantiateFromBase]);
+    instantiateFromBaseIfConfirmed(base, { vfs, ir });
+  }, []);
 
   // Working-copy transform — projects carve + identity layers into the pick-base
   // OSK. No patternMap here (Phase C assignments are managed in the Mechanisms
