@@ -2,8 +2,9 @@
 //
 // Routes:
 //   #pick-base (default)  — base-keyboard picker + live OSK preview
-//   #survey               — survey flow (stub; not yet implemented)
-//   #gallery              — pattern gallery (stub; not yet implemented)
+//   #survey               — survey flow (hybrid: identity → base → prefill → B → F)
+//   #gallery              — carve gallery (IR review, Phase D)
+//   #mechanisms           — §7.7 physical mechanism-assignment gallery (Phase C)
 //   #preview              — compiled preview (stub; not yet implemented)
 //   #output               — output / delivery (stub; not yet implemented)
 
@@ -17,6 +18,7 @@ import { UnsupportedScriptStub } from "./components/UnsupportedScriptStub.tsx";
 import type { SuggestTarget } from "./lib/suggestBase.ts";
 import type { SurveyContext } from "./survey/types.ts";
 import { CarveGallery } from "./components/CarveGallery.tsx";
+import { MechanismGallery } from "./components/MechanismGallery.tsx";
 import { type RouteId } from "./lib/navigate.ts";
 import { useKeyboardArtifact } from "./hooks/useKeyboardArtifact.ts";
 import { OSKFrame } from "./components/OSKFrame.tsx";
@@ -26,6 +28,7 @@ const VALID_ROUTES = new Set<RouteId>([
   "pick-base",
   "survey",
   "gallery",
+  "mechanisms",
   "preview",
   "output",
 ]);
@@ -90,6 +93,14 @@ const NAV_ITEMS: NavItem[] = [
   { id: "pick-base", label: "Pick Base" },
   { id: "survey", label: "Survey" },
   { id: "gallery", label: "Gallery" },
+  // #mechanisms — §7.7 physical mechanism-assignment gallery (Phase C).
+  // Placement: a dedicated route after the carve gallery (#gallery = Phase D)
+  // and the survey (#survey = Phases A/B). The MechanismGallery reads
+  // session.confirmedInventory (Phase B output) and session.axes (Phase A/B
+  // output) from the survey-results store, so it is naturally sequenced after
+  // the survey completes. A future sprint may inline it as a SurveyView stage
+  // (the store contract is compatible with either mounting point).
+  { id: "mechanisms", label: "Mechanisms" },
   { id: "preview", label: "Preview" },
   { id: "output", label: "Output" },
 ];
@@ -500,6 +511,11 @@ export function StudioShell() {
       break;
     case "gallery":
       content = <CarveGallery />;
+      break;
+    case "mechanisms":
+      // §7.7 physical mechanism-assignment gallery. Thread selectedBaseKeyboard
+      // so the gallery can call filterFor(base, axes) and label the base in UI.
+      content = <MechanismGallery selectedBaseKeyboard={selectedBaseKeyboard} />;
       break;
     case "preview":
       content = <RoutePlaceholder title="Preview" />;
