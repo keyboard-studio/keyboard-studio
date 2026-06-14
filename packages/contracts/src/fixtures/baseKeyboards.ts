@@ -31,7 +31,7 @@ export const silEuroLatin: BaseKeyboard = makeBaseKeyboard({
   script: "Latn",
   targets: ["windows", "macosx", "linux", "web"],
   displayName: "SIL Euro Latin",
-  version: "1.1",
+  version: "3.0.3",
   sourceUrl:
     "https://github.com/keymanapp/keyboards/tree/master/release/sil/sil_euro_latin",
   packageId: "sil_euro_latin",
@@ -45,7 +45,11 @@ export const silEuroLatin: BaseKeyboard = makeBaseKeyboard({
 /**
  * SIL Devanagari Phonetic — abugida + clusters exemplar (spec §7.5).
  * Used in the strategy validation table for abugida + cluster sensitivity.
- * Languages from sil_devanagari_phonetic.kps <Languages> block.
+ * Languages from sil_devanagari_phonetic.kps <Languages> block (verbatim).
+ * `hi`/`mai` are stored bare exactly as the .kps declares them; their
+ * suppress-script is Deva (IANA registry), so bare `hi` already implies `hi-Deva`.
+ * The suggestBases() script-guard additionally requires base.script === target.script,
+ * so a romanized `hi-Latn` target never false-matches this Devanagari base.
  */
 export const silDevanagariPhonetic: BaseKeyboard = makeBaseKeyboard({
   id: "sil_devanagari_phonetic",

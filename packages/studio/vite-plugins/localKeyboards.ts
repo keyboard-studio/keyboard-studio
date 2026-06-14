@@ -35,7 +35,12 @@ interface BaseKeyboardLite {
 const STORE_NAME_RE = /^\s*store\s*\(\s*&NAME\s*\)\s*'([^']*)'/im;
 const STORE_VERSION_RE = /^\s*store\s*\(\s*&VERSION\s*\)\s*'([^']*)'/im;
 
-/** Match each `<Language ID="bcp47-tag">` occurrence anywhere in a .kps file. */
+// Match each `<Language ID="bcp47-tag">` occurrence anywhere in the .kps text.
+// In the current .kps schema the ONLY `<Language ID=...>` elements live in the
+// single <Keyboard><Languages> block, and Keyman Developer always serializes
+// `ID` as the first attribute — so this unscoped scan is exact in practice. If a
+// future schema adds a `<Language ID=...>` elsewhere (e.g. an <Info>/<Files>
+// block), constrain this to the <Languages>...</Languages> span first.
 const KPS_LANGUAGE_ID_RE = /<Language\s+ID="([^"]+)"/g;
 
 /**
