@@ -14,12 +14,14 @@
 // for this slice and is not implemented — documented as a follow-up).
 
 import {
+  memo,
   useState,
   useEffect,
   useCallback,
   useMemo,
   type CSSProperties,
 } from "react";
+import { useShallow } from "zustand/react/shallow";
 import type {
   BaseKeyboard,
   Pattern,
@@ -170,7 +172,7 @@ interface MechanismCardProps {
   disabled?: boolean;
 }
 
-function MechanismCard({
+const MechanismCard = memo(function MechanismCard({
   match,
   pattern,
   inventory,
@@ -525,7 +527,7 @@ function MechanismCard({
       )}
     </article>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // CoverageIndicator — criterion 18.6
@@ -935,11 +937,20 @@ export interface MechanismGalleryProps {
 }
 
 export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps) {
-  const session = useWorkingCopyStore((s) => s.session);
   const recordAssignments = useWorkingCopyStore((s) => s.recordAssignments);
   const desktopLocked = useWorkingCopyStore((s) => s.desktopLocked);
   const lockDesktop = useWorkingCopyStore((s) => s.lockDesktop);
   const unlockDesktop = useWorkingCopyStore((s) => s.unlockDesktop);
+  // confirmedInventory and rawAssignments are read individually so memo keys
+  // only fire when these specific slices change.
+  const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
+  const rawAssignments = useWorkingCopyStore((s) => s.session.assignments);
+  // axes selected with useShallow so the filterFor effect only re-fires when an
+  // axis value actually changes — adding a new axis in the future cannot silently
+  // miss the dep list (the whole object is shallow-compared by zustand).
+  const axes = useWorkingCopyStore(
+    useShallow((s) => s.session.axes as Partial<DiscoveryAxisVector>),
+  );
 
   // §8 inventory diff: target only the letters the base does NOT already produce.
   // alreadyProduced is shown as an informational section (no assignment required).
@@ -947,32 +958,11 @@ export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps
   // so this is a strict superset of the old behavior (no regression).
   const { lettersToAdd, alreadyProduced } = useInventoryDiff();
 
-  // Full confirmed inventory — used only for the "nothing confirmed yet" guard
-  // (we need to detect the case where the author hasn't completed Phase B at all,
-  // which is independent of the diff).
-  const inventory = session.confirmedInventory;
-
-  // Memoize the axes object so the filterFor effect only re-fires when the
-  // underlying axis values actually change, not on every store update.
-  const rawAxes = session.axes as Partial<DiscoveryAxisVector>;
-  const axes = useMemo<Partial<DiscoveryAxisVector>>(
-    () => rawAxes,
-    // Enumerate all seven axis keys so the memo key is primitive-stable.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      rawAxes.scale,
-      rawAxes.scriptClass,
-      rawAxes.phoneticIntuition,
-      rawAxes.diacriticBehavior,
-      rawAxes.multiMode,
-      rawAxes.constraintEnforcement,
-      rawAxes.spareKeyAvailability,
-    ],
-  );
-
-  // All current physical assignments from the session.
-  const sessionAssignments = session.assignments.filter(
-    (a) => a.modality === "physical",
+  // All current physical assignments from the session — memoized so handleApply/
+  // handleRemove useCallbacks and appliedPatternIds don't recreate on every render.
+  const sessionAssignments = useMemo(
+    () => rawAssignments.filter((a) => a.modality === "physical"),
+    [rawAssignments],
   );
 
   // Gallery state: ranked matches + their full patterns.
@@ -1031,8 +1021,11 @@ export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps
   }, [selectedBaseKeyboard, axes]);
 
   // Track which patternIds currently have at least one applied assignment.
-  const appliedPatternIds = new Set(
-    sessionAssignments.flatMap((a) => a.mechanisms.map((m) => m.patternId)),
+  // Memoized so handleApply/handleRemove useCallbacks (which depend on this)
+  // don't recreate when unrelated state changes.
+  const appliedPatternIds = useMemo(
+    () => new Set(sessionAssignments.flatMap((a) => a.mechanisms.map((m) => m.patternId))),
+    [sessionAssignments],
   );
 
   // handleApply: merge the new assignment into the full physical assignment list

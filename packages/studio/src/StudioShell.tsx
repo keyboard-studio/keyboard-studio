@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import type { BaseKeyboard, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
-import { confirmRebaseIfEdited } from "./lib/confirmRebase.ts";
+import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
 import { PreviewShell } from "./components/PreviewShell.tsx";
 import { IdentityLite, Prefill, PhaseB, PhaseF, type IdentityLiteResult } from "./survey/index.ts";
 import { BaseResolution } from "./components/BaseResolution.tsx";
@@ -288,21 +288,13 @@ function SurveyView({ baseKeyboard }: SurveyViewProps) {
   }, [onPointerMove, onPointerUp]);
 
   // Working-copy store instantiation — Track 1 wiring for the survey path.
-  // The survey flow picks a base via BaseResolution; once the pipeline
-  // completes, instantiateFromBase is called here to make the working copy
-  // official. The re-base confirm guard reads live store state via
-  // confirmRebaseIfEdited() (getState() inside the helper) so stale closures
-  // cannot produce a wrong hasEdits decision when the async compile completes.
-  const instantiateFromBase = useWorkingCopyStore((s) => s.instantiateFromBase);
-
+  // Delegates to instantiateFromBaseIfConfirmed which reads live store state via
+  // getState() so stale closures cannot produce a wrong hasEdits decision when
+  // the async compile completes. No store selector needed here — the helper
+  // dispatches instantiateFromBase via getState() directly.
   const onInstantiate = useCallback<OnInstantiateCallback>((base, { vfs, ir }) => {
-    if (ir === null || vfs === null) {
-      console.warn("[studio] instantiate skipped: no parsed IR (mock engine?)");
-      return;
-    }
-    if (!confirmRebaseIfEdited()) return;
-    instantiateFromBase(base, { vfs, ir });
-  }, [instantiateFromBase]);
+    instantiateFromBaseIfConfirmed(base, { vfs, ir });
+  }, []);
 
   // Working-copy transform — projects carve + identity layers into the OSK.
   // No patternMap here (Phase C assignments are not yet collected in the survey

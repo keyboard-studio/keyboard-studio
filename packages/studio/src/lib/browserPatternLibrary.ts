@@ -129,6 +129,11 @@ function loadAll(): Pattern[] {
 
 const _allPatterns: Pattern[] = loadAll();
 
+// O(1) id lookup — built once alongside _allPatterns.
+const _patternById: Map<string, Pattern> = new Map(
+  _allPatterns.map((p) => [p.id, p]),
+);
+
 // ---------------------------------------------------------------------------
 // rankPatterns — replicated from engine filterFor.ts.
 // NOTE: If engine exposes a pure rankPatterns(all, base, axes) export, replace
@@ -204,7 +209,7 @@ class BrowserPatternLibraryService implements PatternLibraryService {
   }
 
   getById(id: string): Promise<Pattern | undefined> {
-    return Promise.resolve(_allPatterns.find((p) => p.id === id));
+    return Promise.resolve(_patternById.get(id));
   }
 
   filterFor(base: BaseKeyboard, axes?: DiscoveryAxisVector): Promise<PatternMatch[]> {

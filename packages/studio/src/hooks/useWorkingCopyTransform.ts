@@ -37,6 +37,7 @@ import type { Pattern, VirtualFS } from "@keyboard-studio/contracts";
 import type { VfsTransform } from "./useKeyboardArtifact.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "../lib/projectWorkingCopyVfs.ts";
+import { physicalAssignmentsOf } from "../lib/physicalAssignments.ts";
 
 // ---------------------------------------------------------------------------
 // Parameters
@@ -81,13 +82,9 @@ export function useWorkingCopyTransform(
   // Assignments: physical only (touch is a separate gallery).
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
 
-  // Derive the current physical assignments from phaseResults (same logic as
-  // MechanismGallery — avoids a second selector that would double-trigger).
+  // Derive the current physical assignments from phaseResults.
   const sessionAssignments = useMemo(
-    () =>
-      phaseResults
-        .flatMap((p) => p.assignments ?? [])
-        .filter((a) => a.modality === "physical"),
+    () => physicalAssignmentsOf(phaseResults),
     [phaseResults],
   );
 
