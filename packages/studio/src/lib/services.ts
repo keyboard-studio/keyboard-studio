@@ -4,9 +4,11 @@
 // intentional — services.ts is the designated service boundary. Vite
 // tree-shakes them in real builds. Do NOT add mocks imports elsewhere in
 // packages/studio/src/.
-import type { BaseBrowserService, ScaffolderService, VirtualFS } from "@keyboard-studio/contracts";
+import type { BaseBrowserService, PatternLibraryService, ScaffolderService, VirtualFS } from "@keyboard-studio/contracts";
 import { mockBaseBrowser, mockOutputService, mockScaffolder } from "@keyboard-studio/contracts/mocks";
 import { localBaseBrowser, LOCAL_PROXY_BASE } from "./localBaseBrowser.ts";
+import { getPatternLibraryService as getBrowserPatternLibraryService } from "./browserPatternLibrary.ts";
+import { mockPatternLibrary } from "@keyboard-studio/contracts/mocks";
 
 export const USE_REAL = import.meta.env.VITE_USE_REAL_ENGINE !== "false";
 
@@ -32,6 +34,13 @@ export async function getScaffolderService(): Promise<ScaffolderService> {
   );
   scaffolderCache = createScaffolderService({ proxyBase: LOCAL_PROXY_BASE });
   return scaffolderCache;
+}
+
+// PatternLibraryService: in the browser the BrowserPatternLibraryService loads
+// patterns via import.meta.glob (no node:fs). When USE_REAL is false returns
+// the mock so CI/test never triggers the glob loader.
+export function getPatternLibraryService(): PatternLibraryService {
+  return USE_REAL ? getBrowserPatternLibraryService() : mockPatternLibrary;
 }
 
 // OutputService (zip path only): when USE_REAL is false returns the mock zip

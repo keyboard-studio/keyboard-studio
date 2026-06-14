@@ -1,0 +1,25 @@
+id: test_null_fragments_pattern
+title: "Test Null Fragments Pattern"
+description: "Desktop pattern that marks touch/reorder fragments with explicit null."
+category: desktop
+appliesTo: ["Latn"]
+group_visibility: all
+priority: 2
+strategyId: "S-02"
+questions:
+  - id: triggerKey
+    prompt: "Which key triggers it?"
+    answerType: key-name
+    default: "K_QUOTE"
+kmnFragment: |
+  + [{{triggerKey}}] > deadkey(acute)
+touchLayoutFragment: null
+reorderRules: null
+tests:
+  - input: ["[K_QUOTE]"]
+    expectedOutput: ""
+    description: "trigger sets the deadkey state"
+validatedForFamilies: ["Latn"]
+sourceKeyboards: []
+reviewedBy: "test-suite"
+reviewDate: "2026-01-01"

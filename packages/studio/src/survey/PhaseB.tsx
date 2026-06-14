@@ -8,9 +8,14 @@
 // The runner detects which method the user chose from pb_discovery_intro and
 // intercepts the non-manual branches before SurveyRunner can navigate into
 // them, showing the stub instead.
+//
+// On completion, extractInventory() scans the Phase B answers for the question
+// ids that carry character data, splits them into NFC graphemes, and populates
+// SurveyPhaseResult.confirmedInventory (additive contract field). The gallery
+// reads this via session.confirmedInventory (mergePhaseResults union).
 
 import { useMemo, useState } from "react";
-import type { SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts";
+import type { SurveyAnswer, SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { parseFlow } from "./loadFlow.ts";
 import type { SurveyContext, FlowDef } from "./types.ts";
@@ -21,6 +26,61 @@ import phaseBRaw from "../../../../content/flows/phase_b_characters.yaml?raw";
 // Question id in content/flows/phase_b_characters.yaml that begins the manual
 // step-by-step path. makeManualOnlyFlow routes pb_discovery_intro straight here.
 const PHASE_B_MANUAL_ENTRY = "pb_routing_branch";
+
+// ---------------------------------------------------------------------------
+// Character extraction — populates confirmedInventory on the phase result
+// ---------------------------------------------------------------------------
+
+// Question ids whose answers contain character data (spec §8 step 4).
+// Text answers are split on whitespace; multi_select values are individual entries.
+const CHAR_TEXT_IDS = new Set<string>([
+  "pb_special_letters_list",    // "ŋ Ŋ ɛ Ɛ ɔ Ɔ" etc.
+  "pb_latin_digraphs_list",     // "sh ts ny ng"
+  "pb_indic_nukta_detail",      // consonant letters taking dot-below
+  "pb_indic_vowels_onset_list", // independent vowel letters
+  "pb_syllabic_finals_detail",  // final-consonant marks
+  "pb_other_free_entry",        // free-entry characters
+  "pb_rtl_special_letters",     // RTL language-specific letters
+]);
+
+// pb_picker_confirm is multi_select — each value is a single grapheme or token.
+const CHAR_MULTI_SELECT_ID = "pb_picker_confirm";
+
+/**
+ * Extract NFC graphemes from the character-bearing Phase B answers.
+ * Text answers are whitespace-split; picker multi_select entries are taken as-is.
+ * Empties and whitespace-only tokens are dropped. Deduplicated, first-appearance order.
+ */
+function extractInventory(answers: SurveyAnswer[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  function push(raw: string): void {
+    const g = raw.normalize("NFC").trim();
+    if (g.length > 0 && !seen.has(g)) {
+      seen.add(g);
+      result.push(g);
+    }
+  }
+
+  for (const answer of answers) {
+    if (CHAR_TEXT_IDS.has(answer.questionId) && answer.answerType === "text") {
+      // answer.value is a string; split on whitespace to get individual graphemes/tokens
+      for (const token of (answer.value as string).split(/\s+/)) {
+        push(token);
+      }
+    } else if (
+      answer.questionId === CHAR_MULTI_SELECT_ID &&
+      answer.answerType === "char-list"
+    ) {
+      for (const entry of answer.value as string[]) {
+        push(entry);
+      }
+    }
+  }
+
+  return result;
+}
 
 // ---------------------------------------------------------------------------
 // DiscoveryMethodStub — shown for unimplemented discovery methods
@@ -158,6 +218,14 @@ export function PhaseB({ context = {}, onComplete, onBack, findingsByQuestionId 
     );
   }
 
+  // Wrap onComplete to inject confirmedInventory before forwarding the result.
+  function handleComplete(result: SurveyPhaseResult): void {
+    onComplete({
+      ...result,
+      confirmedInventory: extractInventory(result.answers),
+    });
+  }
+
   // Manual path — use a patched flow that skips the intro question
   return (
     <div
@@ -181,7 +249,7 @@ export function PhaseB({ context = {}, onComplete, onBack, findingsByQuestionId 
         key={manualFlow.flow_id}
         flow={manualFlow}
         context={context}
-        onComplete={onComplete}
+        onComplete={handleComplete}
         onBack={() => setDiscoveryMethod(null)}
         {...(findingsByQuestionId !== undefined ? { findingsByQuestionId } : {})}
       />

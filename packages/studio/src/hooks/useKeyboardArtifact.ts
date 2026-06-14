@@ -67,6 +67,21 @@ export interface ScaffoldSpec {
   displayName: string;
 }
 
+/**
+ * Optional post-scaffold transform applied to the VFS before the compile step.
+ * Receives the populated VFS and the keyboardId; may mutate the VFS in-place
+ * (VFS entries are immutable values — use vfs.set() for updates) and MUST
+ * return any diagnostic warnings to surface in the UI.
+ *
+ * Called exactly once per run(), not on recompile() calls (which skip the
+ * scaffold step entirely). Keeping it here enforces the single compile cycle
+ * contract — no second compile path is created.
+ */
+export type VfsTransform = (
+  vfs: VirtualFS,
+  keyboardId: string,
+) => { warnings: string[] };
+
 export interface KeyboardArtifactResult {
   stage: Stage;
   retry: () => void;
@@ -90,10 +105,16 @@ export interface KeyboardArtifactResult {
  * When `scaffoldSpec` is present, the VFS is populated via
  * createScaffolderService().scaffold() (new keyboard authoring path).
  * When absent, the original fetchKeyboardSourceToVfs path runs (open base).
+ *
+ * When `vfsTransform` is present it is called once after VFS population and
+ * before the compile step. Its warnings are merged into scaffoldWarnings so
+ * they surface on the ready Stage. Keeps the single compile cycle intact —
+ * the transform does not trigger a second compile.
  */
 export function useKeyboardArtifact(
   baseKeyboard: BaseKeyboard | null,
-  scaffoldSpec?: ScaffoldSpec | null
+  scaffoldSpec?: ScaffoldSpec | null,
+  vfsTransform?: VfsTransform | null,
 ): KeyboardArtifactResult {
   const [stage, setStage] = useState<Stage>({ kind: "idle" });
   const prevBlobUrl = useRef<string | null>(null);
@@ -236,9 +257,30 @@ export function useKeyboardArtifact(
 
     if (runId.current !== thisRunId) return;
 
+    // Apply optional VFS transform (e.g. mechanism-assignment injection) before
+    // compile. Called once per run(), never on recompile(). Warnings are merged
+    // so they surface on the ready Stage. Errors in the transform abort the run
+    // and surface as a "vfs" step error — the transform must NOT throw for
+    // expected conditions (unknown patternId, missing slot); those are warnings.
+    if (vfsTransform !== null && vfsTransform !== undefined && vfsRef.current !== null) {
+      try {
+        const keyboardId = scaffoldSpec?.keyboardId ?? kb.id;
+        const transformResult = vfsTransform(vfsRef.current, keyboardId);
+        scaffoldWarnings.push(...transformResult.warnings);
+      } catch (err: unknown) {
+        if (runId.current !== thisRunId) return;
+        const message =
+          err instanceof Error ? err.message : "VFS transform failed";
+        setStage({ kind: "error", step: "vfs", message });
+        return;
+      }
+    }
+
+    if (runId.current !== thisRunId) return;
+
     // Pass scaffold warnings into runCompile so they surface on the ready Stage.
     await runCompile(kb, thisRunId, scaffoldWarnings);
-  }, [scaffoldSpec, runCompile]);
+  }, [scaffoldSpec, vfsTransform, runCompile]);
 
   useEffect(() => {
     if (baseKeyboard === null) {

@@ -1,15 +1,9 @@
 // PatternLibraryService.filterFor() — strategy-ranked pattern matching (spec §7.2 §9).
 
-import type { BaseKeyboard, DiscoveryAxisVector, Pattern, PatternMatch } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, DiscoveryAxisVector, PatternMatch } from "@keyboard-studio/contracts";
+import { toPatternMatch } from "@keyboard-studio/contracts";
 import { getPatterns } from "./loader.js";
 import { selectStrategy } from "../strategy-selector/index.js";
-
-const toMatch = (p: Pattern, rank: number, reason: PatternMatch["reason"]): PatternMatch => ({
-  patternId: p.id,
-  rank,
-  reason,
-  ...(p.strategyId !== undefined ? { strategyId: p.strategyId } : {}),
-});
 
 /**
  * Return strategy-ranked pattern matches for the given base keyboard.
@@ -59,7 +53,7 @@ export async function filterFor(
       p => p.appliesTo.length === 0 || p.appliesTo.includes(base.script),
     );
 
-    return matches.map((p, idx) => toMatch(p, idx + 1, "appliesTo-match"));
+    return matches.map((p, idx) => toPatternMatch(p, idx + 1, "appliesTo-match"));
   }
 
   // Axis vector present — run decision tree and partition.
@@ -95,6 +89,6 @@ export async function filterFor(
           ? "secondary-strategy"
           : "appliesTo-match";
 
-    return toMatch(p, rank, reason);
+    return toPatternMatch(p, rank, reason);
   });
 }

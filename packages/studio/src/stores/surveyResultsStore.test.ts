@@ -1,6 +1,5 @@
-// Tests for the survey-results store — persistence + re-merge semantics that
-// replace the three discarded-result TODOs (refs #334, #369). Zustand store is
-// exercised via getState() (no React needed).
+// Tests for the survey-results store — persistence + re-merge semantics.
+// Zustand store is exercised via getState() (no React needed).
 
 import { describe, it, expect, beforeEach } from "vitest";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
@@ -75,11 +74,125 @@ describe("surveyResultsStore", () => {
     expect(s.session.axes.scale).toBe("small");
   });
 
+  it("Phase B confirmedInventory surfaces on session.confirmedInventory", () => {
+    const phaseBWithInventory: SurveyPhaseResult = {
+      phase: "B",
+      answers: [],
+      computedAxes: { scale: "small" },
+      confirmedInventory: ["ŋ", "ɛ", "ɔ"],
+    };
+    useSurveyResultsStore.getState().recordPhase(phaseBWithInventory);
+    const s = useSurveyResultsStore.getState();
+    expect(s.session.confirmedInventory).toEqual(["ŋ", "ɛ", "ɔ"]);
+  });
+
+  it("confirmedInventory dedupes across a Phase B re-record", () => {
+    const phaseBv1: SurveyPhaseResult = {
+      phase: "B",
+      answers: [],
+      confirmedInventory: ["ŋ", "ɛ"],
+    };
+    const phaseBv2: SurveyPhaseResult = {
+      phase: "B",
+      answers: [],
+      confirmedInventory: ["ɛ", "ɔ"],
+    };
+    useSurveyResultsStore.getState().recordPhase(phaseBv1);
+    useSurveyResultsStore.getState().recordPhase(phaseBv2); // replaces Phase B
+    const s = useSurveyResultsStore.getState();
+    // Phase B replaced: only v2's inventory remains
+    expect(s.session.confirmedInventory).toEqual(["ɛ", "ɔ"]);
+  });
+
+  it("session.confirmedInventory is [] on an empty session", () => {
+    const s = useSurveyResultsStore.getState();
+    expect(s.session.confirmedInventory).toEqual([]);
+  });
+
   it("reset clears results and session", () => {
     useSurveyResultsStore.getState().recordPhase(phaseA);
     useSurveyResultsStore.getState().reset();
     const s = useSurveyResultsStore.getState();
     expect(s.phaseResults).toEqual([]);
     expect(s.session.axes).toEqual({});
+  });
+
+  // recordAssignments convenience action (§7.7 gallery)
+
+  it("recordAssignments creates a Phase C result with the given assignments", () => {
+    const assignments = [
+      {
+        scope: "keyboard-default" as const,
+        target: "",
+        modality: "physical" as const,
+        mechanisms: [{ patternId: "deadkey_single_tap", strategyId: "S-02" as const }],
+        source: "user" as const,
+      },
+    ];
+    useSurveyResultsStore.getState().recordAssignments(assignments);
+    const s = useSurveyResultsStore.getState();
+    expect(s.session.assignments).toHaveLength(1);
+    expect(s.session.assignments[0]?.mechanisms[0]?.patternId).toBe("deadkey_single_tap");
+  });
+
+  it("recordAssignments replaces prior Phase C assignments (last-wins)", () => {
+    const first = [
+      {
+        scope: "keyboard-default" as const,
+        target: "",
+        modality: "physical" as const,
+        mechanisms: [{ patternId: "deadkey_single_tap" }],
+      },
+    ];
+    const second = [
+      {
+        scope: "keyboard-default" as const,
+        target: "",
+        modality: "physical" as const,
+        mechanisms: [{ patternId: "modifier_as_layer_switch" }],
+      },
+    ];
+    useSurveyResultsStore.getState().recordAssignments(first);
+    useSurveyResultsStore.getState().recordAssignments(second);
+    const s = useSurveyResultsStore.getState();
+    // mergeAssignments last-wins: same (modality, scope, target) key → second wins.
+    expect(s.session.assignments).toHaveLength(1);
+    expect(s.session.assignments[0]?.mechanisms[0]?.patternId).toBe("modifier_as_layer_switch");
+  });
+
+  it("recordAssignments with empty array clears Phase C assignments", () => {
+    const assignments = [
+      {
+        scope: "individual" as const,
+        target: "ŋ",
+        modality: "physical" as const,
+        mechanisms: [{ patternId: "deadkey_single_tap" }],
+      },
+    ];
+    useSurveyResultsStore.getState().recordAssignments(assignments);
+    useSurveyResultsStore.getState().recordAssignments([]);
+    const s = useSurveyResultsStore.getState();
+    expect(s.session.assignments).toHaveLength(0);
+  });
+
+  it("recordAssignments preserves existing Phase C selectedPatternIds", () => {
+    const phaseC: SurveyPhaseResult = {
+      phase: "C",
+      answers: [],
+      selectedPatternIds: ["deadkey_single_tap"],
+      assignments: [],
+    };
+    useSurveyResultsStore.getState().recordPhase(phaseC);
+    useSurveyResultsStore.getState().recordAssignments([
+      {
+        scope: "keyboard-default" as const,
+        target: "",
+        modality: "physical" as const,
+        mechanisms: [{ patternId: "deadkey_single_tap" }],
+      },
+    ]);
+    const s = useSurveyResultsStore.getState();
+    expect(s.session.selectedPatternIds).toContain("deadkey_single_tap");
+    expect(s.session.assignments).toHaveLength(1);
   });
 });

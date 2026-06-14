@@ -50,6 +50,15 @@ export interface SurveySession {
    * `uncoveredTargets` (assignmentMap.ts).
    */
   assignments: MechanismAssignment[];
+  /**
+   * Deduped union of all phases' `confirmedInventory` (NFC graphemes the
+   * keyboard must produce). Populated by {@link mergePhaseResults} — empties and
+   * whitespace-only entries are dropped, first-appearance order is preserved,
+   * each entry is NFC-normalised. **Additive** — required on session but always
+   * populated via mergePhaseResults; literal SurveySession objects need
+   * `confirmedInventory: []`.
+   */
+  confirmedInventory: string[];
 }
 
 /**
@@ -76,12 +85,25 @@ export function mergePhaseResults(
     ...new Set(phaseResults.flatMap((p) => p.selectedPatternIds ?? [])),
   ];
   const assignments = mergeAssignments(phaseResults.map((p) => p.assignments));
+  // Deduped union across phases: NFC-normalise, drop empties/whitespace, first-appearance order.
+  const seen = new Set<string>();
+  const confirmedInventory: string[] = [];
+  for (const phase of phaseResults) {
+    for (const raw of phase.confirmedInventory ?? []) {
+      const g = raw.normalize("NFC").trim();
+      if (g.length > 0 && !seen.has(g)) {
+        seen.add(g);
+        confirmedInventory.push(g);
+      }
+    }
+  }
   return {
     axes,
     irAxes: { ...irAxes },
     phaseResults,
     selectedPatternIds,
     assignments,
+    confirmedInventory,
   };
 }
 

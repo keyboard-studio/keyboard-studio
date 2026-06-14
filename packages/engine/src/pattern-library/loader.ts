@@ -255,10 +255,12 @@ function toPattern(data: RawPattern): Pattern {
     ...base,
     ...(strategyId !== undefined ? { strategyId } : {}),
     ...(combinesWith !== undefined ? { combinesWith } : {}),
-    ...(data.touchLayoutFragment !== undefined
+    // null (authored "no fragment") and undefined both coerce to omitted —
+    // Pattern types these as `?: string`, so only a real string is forwarded.
+    ...(typeof data.touchLayoutFragment === "string"
       ? { touchLayoutFragment: data.touchLayoutFragment }
       : {}),
-    ...(data.reorderRules !== undefined ? { reorderRules: data.reorderRules } : {}),
+    ...(typeof data.reorderRules === "string" ? { reorderRules: data.reorderRules } : {}),
     ...(data.frequencyInCorpus !== undefined
       ? { frequencyInCorpus: data.frequencyInCorpus }
       : {}),

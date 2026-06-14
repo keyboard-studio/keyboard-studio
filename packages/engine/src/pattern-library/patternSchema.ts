@@ -57,8 +57,11 @@ export const PatternSchema = z
     combinesWith: z.array(z.string()).optional(),
     questions: z.array(PatternQuestionSchema),
     kmnFragment: z.string(),
-    touchLayoutFragment: z.string().optional(),
-    reorderRules: z.string().optional(),
+    // Authored YAML uses explicit `null` to mark "no touch/reorder fragment";
+    // accept null (not just undefined) so those patterns load. toPattern() in
+    // loader.ts coerces null -> omitted, since Pattern types these as `?: string`.
+    touchLayoutFragment: z.string().nullish(),
+    reorderRules: z.string().nullish(),
     tests: z.array(TestVectorSchema),
     validatedForFamilies: z.array(z.string()),
     sourceKeyboards: z.array(z.string()),

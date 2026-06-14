@@ -3,7 +3,7 @@
 // All route changes must go through navigateTo() — do not assign
 // window.location.hash directly in component files.
 
-export type RouteId = 'pick-base' | 'survey' | 'gallery' | 'preview' | 'output';
+export type RouteId = 'pick-base' | 'survey' | 'gallery' | 'mechanisms' | 'preview' | 'output';
 
 export function navigateTo(route: RouteId): void {
   window.location.hash = route;
