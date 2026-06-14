@@ -454,3 +454,25 @@ describe("SurveyView — F → mechanisms back-navigation", () => {
     expect(screen.queryByTestId("stage-B")).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Back-navigation 8: mechanisms → B
+// ---------------------------------------------------------------------------
+
+describe("SurveyView — mechanisms → B back-navigation", () => {
+  it("returns to B stage (not carve) when MechanismGallery onBack is called", async () => {
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
+    advanceToMechanisms();
+    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("mechanisms-back"));
+
+    expect(screen.getByTestId("stage-B")).toBeTruthy();
+    expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
+    // Confirm it did NOT go to carve (an adjacent stage).
+    expect(screen.queryByTestId("stage-carve")).toBeNull();
+  });
+});

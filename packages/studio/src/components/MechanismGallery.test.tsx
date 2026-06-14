@@ -157,6 +157,33 @@ describe("MechanismGallery — no base keyboard", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Back button — wizard affordance
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — Back button", () => {
+  it("does not render a Back button when onBack is not provided", () => {
+    render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    expect(screen.queryByRole("button", { name: /← back/i })).toBeNull();
+  });
+
+  it("renders an enabled Back button when onBack is provided and desktop is not locked", () => {
+    const onBack = vi.fn();
+    render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} />);
+    const btn = screen.getByRole("button", { name: /← back/i });
+    expect(btn).toBeTruthy();
+    expect((btn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("renders a disabled Back button when desktop is locked", () => {
+    useWorkingCopyStore.getState().lockDesktop();
+    const onBack = vi.fn();
+    render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} />);
+    const btn = screen.getByRole("button", { name: /← back/i });
+    expect((btn as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // No-inventory state
 // ---------------------------------------------------------------------------
 
