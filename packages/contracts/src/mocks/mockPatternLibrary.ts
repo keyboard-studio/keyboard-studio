@@ -4,7 +4,8 @@ import type { PatternLibraryService } from "../patternLibrary";
 import type { Pattern } from "../pattern";
 import type { BaseKeyboard } from "../baseKeyboard";
 import type { DiscoveryAxisVector } from "../axes";
-import type { PatternMatch, PatternMatchReason } from "../patternMatch";
+import type { PatternMatch } from "../patternMatch";
+import { toPatternMatch } from "../patternMatch";
 import { samplePatterns } from "../fixtures/index";
 
 /** In-memory index keyed by Pattern.id. */
@@ -53,15 +54,8 @@ export const mockPatternLibrary: PatternLibraryService = {
         p.appliesTo.includes(base.id)
     );
 
-    const toMatch = (p: Pattern, rank: number, reason: PatternMatchReason): PatternMatch => ({
-      patternId: p.id,
-      rank,
-      reason,
-      ...(p.strategyId !== undefined ? { strategyId: p.strategyId } : {}),
-    });
-
     if (axes === undefined) {
-      const matches = qualified.map((p, i) => toMatch(p, i + 1, "appliesTo-match"));
+      const matches = qualified.map((p, i) => toPatternMatch(p, i + 1, "appliesTo-match"));
       return Promise.resolve(matches);
     }
 
@@ -72,8 +66,8 @@ export const mockPatternLibrary: PatternLibraryService = {
     const primaries = qualified.filter(isPrimary);
     const rest = qualified.filter((p) => !isPrimary(p));
     const ranked: PatternMatch[] = [
-      ...primaries.map((p, i) => toMatch(p, i + 1, "primary-strategy")),
-      ...rest.map((p, i) => toMatch(p, primaries.length + i + 1, "appliesTo-match")),
+      ...primaries.map((p, i) => toPatternMatch(p, i + 1, "primary-strategy")),
+      ...rest.map((p, i) => toPatternMatch(p, primaries.length + i + 1, "appliesTo-match")),
     ];
     return Promise.resolve(ranked);
   },

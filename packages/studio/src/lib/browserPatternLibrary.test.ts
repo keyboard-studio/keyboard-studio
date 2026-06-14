@@ -5,8 +5,6 @@
 // degradation path (0 patterns), plus the mock path (USE_REAL=false gives
 // mockPatternLibrary). For the glob load logic itself, the engine's
 // patternLibrary.test.ts is the authoritative round-trip test.
-//
-// refs #370 #367
 
 import { describe, it, expect, vi, beforeAll } from "vitest";
 

@@ -7,13 +7,12 @@
 //
 // Scope support: keyboard-default and individual (character-class is OPTIONAL
 // for this slice and is not implemented — documented as a follow-up).
-//
-// refs #370 #367
 
 import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   type CSSProperties,
 } from "react";
 import type {
@@ -45,7 +44,10 @@ const TEXT_DIM = "#8b949e";
 const TEXT_MAIN = "#e6edf3";
 const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 
-const BADGE_COLORS: Record<PatternMatch["reason"], { bg: string; text: string }> = {
+// Fallback badge for any reason not in the map (e.g. future additions).
+const BADGE_FALLBACK = { bg: "#1a1a1a", text: TEXT_DIM };
+
+const BADGE_COLORS: Partial<Record<PatternMatch["reason"], { bg: string; text: string }>> = {
   "primary-strategy": { bg: "#0d2840", text: "#6ea8fe" },
   "secondary-strategy": { bg: "#1a2a1a", text: "#56d364" },
   "appliesTo-match": { bg: "#1a1a2a", text: "#8b949e" },
@@ -175,7 +177,7 @@ function MechanismCard({
     return defaults;
   });
 
-  const badgeStyle = BADGE_COLORS[match.reason];
+  const badgeStyle = BADGE_COLORS[match.reason] ?? BADGE_FALLBACK;
   const demoText = getDemoText(pattern.demo);
 
   const handleSlotChange = useCallback((id: string, value: string) => {
@@ -194,7 +196,7 @@ function MechanismCard({
     });
   }, []);
 
-  function handleApply() {
+  const handleApply = useCallback(() => {
     // Build the MechanismRef. slotValues only included when non-empty.
     const hasSlots = Object.keys(slotValues).length > 0;
     const mechanismRef = {
@@ -224,7 +226,11 @@ function MechanismCard({
         });
       }
     }
-  }
+  }, [slotValues, pattern.id, pattern.strategyId, scope, selectedChars, inventory, onApply]);
+
+  const handleRemoveClick = useCallback(() => {
+    onRemove(pattern.id);
+  }, [onRemove, pattern.id]);
 
   const cardStyle: CSSProperties = {
     background: BG_CARD,
@@ -470,7 +476,7 @@ function MechanismCard({
             {isApplied && (
               <button
                 type="button"
-                onClick={() => onRemove(pattern.id)}
+                onClick={handleRemoveClick}
                 style={{
                   padding: "7px 16px",
                   background: "transparent",
@@ -605,12 +611,12 @@ function KmnPreview({ assignments, patternMap }: KmnPreviewProps) {
 
   if (assignments.length === 0) return null;
 
-  function buildPreview(): { kmn: string; warnings: string[] } {
+  const buildPreview = (): { kmn: string; warnings: string[] } => {
     const getPattern = (id: string) => patternMap.get(id);
     // Apply to an empty KMN base. The result is the injected fragment only —
     // not a full compilable keyboard (that requires scaffolding the base source).
     return applyAssignments(assignments, getPattern, "");
-  }
+  };
 
   const previewButtonStyle: CSSProperties = {
     padding: "7px 14px",
@@ -718,10 +724,27 @@ export interface MechanismGalleryProps {
 
 export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps) {
   const session = useSurveyResultsStore((s) => s.session);
-  const recordPhase = useSurveyResultsStore((s) => s.recordPhase);
+  const recordAssignments = useSurveyResultsStore((s) => s.recordAssignments);
 
   const inventory = session.confirmedInventory;
-  const axes = session.axes as Partial<DiscoveryAxisVector>;
+
+  // Memoize the axes object so the filterFor effect only re-fires when the
+  // underlying axis values actually change, not on every store update.
+  const rawAxes = session.axes as Partial<DiscoveryAxisVector>;
+  const axes = useMemo<Partial<DiscoveryAxisVector>>(
+    () => rawAxes,
+    // Enumerate all seven axis keys so the memo key is primitive-stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      rawAxes.scale,
+      rawAxes.scriptClass,
+      rawAxes.phoneticIntuition,
+      rawAxes.diacriticBehavior,
+      rawAxes.multiMode,
+      rawAxes.constraintEnforcement,
+      rawAxes.spareKeyAvailability,
+    ],
+  );
 
   // All current physical assignments from the session.
   const sessionAssignments = session.assignments.filter(
@@ -732,15 +755,18 @@ export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps
   const [matches, setMatches] = useState<PatternMatch[]>([]);
   const [patternMap, setPatternMap] = useState<Map<string, Pattern>>(new Map());
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (selectedBaseKeyboard === null) {
       setMatches([]);
       setPatternMap(new Map());
+      setLoadError(null);
       return;
     }
 
     setLoading(true);
+    setLoadError(null);
     const svc = getPatternLibraryService();
 
     // Cast Partial<DiscoveryAxisVector> to DiscoveryAxisVector only when all
@@ -766,12 +792,16 @@ export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps
       for (const p of patterns) {
         if (p !== undefined) {
           map.set(p.id, p);
+        } else {
+          console.warn("[MechanismGallery] getById() returned undefined for a ranked patternId — the catalog may be out of sync");
         }
       }
       setPatternMap(map);
       setLoading(false);
     }).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
       console.error("[MechanismGallery] filterFor error:", err);
+      setLoadError(msg);
       setLoading(false);
     });
   }, [selectedBaseKeyboard, axes]);
@@ -781,47 +811,24 @@ export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps
     sessionAssignments.flatMap((a) => a.mechanisms.map((m) => m.patternId)),
   );
 
-  function handleApply(assignment: MechanismAssignment) {
-    // Merge into the phase C result.
-    // We rebuild the phase C assignments by replacing matching (scope, target)
-    // entries (last-wins per store contract) and accumulating the rest.
-    const existingPhaseC = session.phaseResults.find((p) => p.phase === "C");
-    const existing = existingPhaseC?.assignments ?? [];
+  // handleApply: merge the new assignment into the full physical assignment list
+  // and route through recordAssignments so the find/create-Phase-C logic lives
+  // only in the store.
+  const handleApply = useCallback((assignment: MechanismAssignment) => {
+    const next = [...sessionAssignments, assignment];
+    recordAssignments(next);
+  }, [sessionAssignments, recordAssignments]);
 
-    // Simple append — mergeAssignments (called by mergePhaseResults) handles
-    // last-wins deduplication across the full session.
-    const next = [...existing, assignment];
-
-    recordPhase({
-      phase: "C",
-      answers: [],
-      assignments: next,
-      // Preserve prior selectedPatternIds from phase C if any.
-      ...(existingPhaseC?.selectedPatternIds !== undefined
-        ? { selectedPatternIds: existingPhaseC.selectedPatternIds }
-        : {}),
-    });
-  }
-
-  function handleRemove(patternId: string) {
-    const existingPhaseC = session.phaseResults.find((p) => p.phase === "C");
-    const existing = existingPhaseC?.assignments ?? [];
-    // Remove all assignments whose mechanisms reference this patternId.
-    const next = existing.filter(
+  // handleRemove: drop all assignments for this patternId from the physical list.
+  const handleRemove = useCallback((patternId: string) => {
+    const next = sessionAssignments.filter(
       (a) => !a.mechanisms.some((m) => m.patternId === patternId),
     );
-    recordPhase({
-      phase: "C",
-      answers: [],
-      assignments: next,
-      ...(existingPhaseC?.selectedPatternIds !== undefined
-        ? { selectedPatternIds: existingPhaseC.selectedPatternIds }
-        : {}),
-    });
-  }
+    recordAssignments(next);
+  }, [sessionAssignments, recordAssignments]);
 
   // ---------------------------------------------------------------------------
-  // Render — empty/again states
+  // Render — empty/error states
   // ---------------------------------------------------------------------------
 
   const pageStyle: CSSProperties = {
@@ -914,6 +921,22 @@ export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps
         {/* Gallery grid */}
         {loading ? (
           <p style={{ color: TEXT_DIM, fontSize: 13 }}>Loading patterns...</p>
+        ) : loadError !== null ? (
+          <div
+            role="alert"
+            style={{
+              padding: "16px 20px",
+              background: "#2a0a0a",
+              border: "1px solid #f85149",
+              borderRadius: 8,
+              color: "#f85149",
+              fontSize: 13,
+            }}
+          >
+            Could not load patterns — see the browser console.
+            <br />
+            <span style={{ fontSize: 11, color: TEXT_DIM }}>{loadError}</span>
+          </div>
         ) : matches.length === 0 ? (
           <div
             style={{
@@ -959,3 +982,4 @@ export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps
     </div>
   );
 }
+

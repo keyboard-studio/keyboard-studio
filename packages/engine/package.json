@@ -14,6 +14,10 @@
     "./simulator": {
       "types": "./dist/simulator/index.d.ts",
       "import": "./dist/simulator/index.js"
+    },
+    "./pattern-schema": {
+      "types": "./dist/pattern-library/patternSchema.d.ts",
+      "import": "./dist/pattern-library/patternSchema.js"
     }
   },
   "files": [

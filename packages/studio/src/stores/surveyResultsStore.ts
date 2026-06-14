@@ -2,7 +2,7 @@
 // gallery and §7.2 strategy selector can read survey context + answers, instead
 // of discarding them on each phase transition. See spec §8 (data flow) and
 // docs/workflow-model.md (the survey-results store is the data bus that connects
-// the survey island to the scaffold/output spine). refs #334, #369.
+// the survey island to the scaffold/output spine).
 //
 // Mirrors the Zustand pattern in irStore.ts. The merged `session` is derived
 // from `irAxes` + `phaseResults` via the contract's mergePhaseResults(), so the

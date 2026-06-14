@@ -1,6 +1,5 @@
-// Tests for the survey-results store — persistence + re-merge semantics that
-// replace the three discarded-result TODOs (refs #334, #369). Zustand store is
-// exercised via getState() (no React needed).
+// Tests for the survey-results store — persistence + re-merge semantics.
+// Zustand store is exercised via getState() (no React needed).
 
 import { describe, it, expect, beforeEach } from "vitest";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";

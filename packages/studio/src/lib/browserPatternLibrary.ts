@@ -10,21 +10,19 @@
 // appliesTo-match). This avoids duplicating the partition logic: the engine's
 // filterFor() body is replicated here with a clear comment because extracting
 // a pure rankPatterns() helper from the engine package would require an
-// engine build-step change that is deferred (#5b joint session). If that
+// engine build-step change that is deferred to the #5b joint session. If that
 // refactor lands, replace the partition block below with a call to
 // rankPatterns(all, base, axes).
 //
-// PatternSchema is inlined from engine/src/pattern-library/patternSchema.ts
-// because the engine package's exports map only exposes "." and "./simulator".
-// If the engine exports the schema in a future build step, replace the inline
-// with that import.
-//
-// refs #370 #367
+// PatternSchema is imported from "@keyboard-studio/engine/pattern-schema"
+// via the dedicated "./pattern-schema" export added to the engine's package.json.
+// This closes the drift window: the schema is now a single source of truth.
 
 import { parse } from "yaml";
-import { z } from "zod";
 import { makePattern } from "@keyboard-studio/contracts";
 import { selectStrategy } from "@keyboard-studio/engine";
+import { toPatternMatch } from "@keyboard-studio/contracts";
+import { PatternSchema } from "@keyboard-studio/engine/pattern-schema";
 import type {
   Pattern,
   PatternCategory,
@@ -35,69 +33,7 @@ import type {
   PatternMatch,
   PatternLibraryService,
 } from "@keyboard-studio/contracts";
-
-// ---------------------------------------------------------------------------
-// PatternSchema — inlined from engine/src/pattern-library/patternSchema.ts.
-// Keep in sync if that file changes. The schema uses .passthrough() so extra
-// YAML-only fields do not cause validation failure.
-// ---------------------------------------------------------------------------
-
-const PatternQuestionSchema = z.object({
-  id: z.string(),
-  prompt: z.string(),
-  answerType: z.string(),
-  options: z
-    .array(z.object({ value: z.string(), label: z.string() }).passthrough())
-    .optional(),
-  default: z.string().optional(),
-  required: z.boolean().optional(),
-});
-
-const TestVectorSchema = z.object({
-  input: z.array(z.string()),
-  expectedOutput: z.string(),
-  description: z.string().optional(),
-});
-
-const ProvenanceEntrySchema = z
-  .object({
-    keyboard: z.string(),
-    rule: z.string().optional(),
-    notes: z.string().optional(),
-  })
-  .passthrough();
-
-const DemoSchema = z
-  .union([z.string(), z.object({}).passthrough(), z.null()])
-  .optional();
-
-const PatternSchema = z
-  .object({
-    id: z.union([z.string(), z.number()]),
-    title: z.string(),
-    description: z.string(),
-    category: z.string(),
-    appliesTo: z.array(z.string()),
-    strategyId: z.string().optional(),
-    combinesWith: z.array(z.string()).optional(),
-    questions: z.array(PatternQuestionSchema),
-    kmnFragment: z.string(),
-    touchLayoutFragment: z.string().nullish(),
-    reorderRules: z.string().nullish(),
-    tests: z.array(TestVectorSchema),
-    validatedForFamilies: z.array(z.string()),
-    sourceKeyboards: z.array(z.string()),
-    reviewedBy: z.union([z.string(), z.number()]),
-    reviewDate: z.union([z.string(), z.number()]),
-    frequencyInCorpus: z.number().optional(),
-    provenance: z.array(ProvenanceEntrySchema).optional(),
-    demo: DemoSchema,
-    group_visibility: z.string().optional(),
-    priority: z.number().optional(),
-  })
-  .passthrough();
-
-type RawPattern = z.infer<typeof PatternSchema>;
+import type { RawPattern } from "@keyboard-studio/engine/pattern-schema";
 
 // ---------------------------------------------------------------------------
 // Vite glob — eager, raw text. import.meta.glob resolves relative to THIS
@@ -200,17 +136,6 @@ const _allPatterns: Pattern[] = loadAll();
 // would require an engine build step that is deferred to the #5b joint session.
 // ---------------------------------------------------------------------------
 
-const toMatch = (
-  p: Pattern,
-  rank: number,
-  reason: PatternMatch["reason"],
-): PatternMatch => ({
-  patternId: p.id,
-  rank,
-  reason,
-  ...(p.strategyId !== undefined ? { strategyId: p.strategyId } : {}),
-});
-
 function rankPatterns(
   all: Pattern[],
   base: BaseKeyboard,
@@ -224,7 +149,7 @@ function rankPatterns(
     const matches = eligible.filter(
       (p) => p.appliesTo.length === 0 || p.appliesTo.includes(base.script),
     );
-    return matches.map((p, idx) => toMatch(p, idx + 1, "appliesTo-match"));
+    return matches.map((p, idx) => toPatternMatch(p, idx + 1, "appliesTo-match"));
   }
 
   const rec = selectStrategy(axes);
@@ -265,7 +190,7 @@ function rankPatterns(
         : p.strategyId !== undefined && rec.secondaries.includes(p.strategyId)
           ? "secondary-strategy"
           : "appliesTo-match";
-    return toMatch(p, rank, reason);
+    return toPatternMatch(p, rank, reason);
   });
 }
 
