@@ -39,8 +39,9 @@ import {
  * - `keyboardId`      — keyboard identifier used to derive source/<id>.kmn paths.
  * - `baseIr`          — the source-of-truth IR (never mutated by projection).
  * - `deletedNodeIds`  — set of carve deletions.
- * - `assignments`     — ALL mechanism assignments from phaseResults; physical-only
- *                       filtering is applied inside this function.
+ * - `assignments`     — mechanism assignments from phaseResults. Physical-only
+ *                       filtering is applied inside this function defensively, so
+ *                       callers may pass the full list or a pre-filtered physical one.
  * - `getPattern`      — synchronous pattern resolver for assignments.
  * - `identity`        — display name (and optionally other fields) to inject.
  */

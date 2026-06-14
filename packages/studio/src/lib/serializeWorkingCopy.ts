@@ -77,6 +77,9 @@ export async function serializeWorkingCopy(): Promise<SerializeWorkingCopyResult
   const keyboardId = baseKeyboard.id;
 
   // 2. Collect physical assignments from phaseResults (mirrors useWorkingCopyTransform).
+  //    projectWorkingCopyVfs also filters physical defensively, so this pre-filter is
+  //    an optimization (skips pre-loading touch-only pattern refs), not a correctness
+  //    requirement.
   const sessionAssignments: MechanismAssignment[] = phaseResults
     .flatMap((p) => p.assignments ?? [])
     .filter((a) => a.modality === "physical");
@@ -104,6 +107,10 @@ export async function serializeWorkingCopy(): Promise<SerializeWorkingCopyResult
   }
 
   // 4. Clone baseVfs so the original is not mutated (projectWorkingCopyVfs is in-place).
+  //    Shallow-entry clone is safe because the projection helpers replace whole
+  //    entries via vfs.set() rather than mutating an entry's content buffer in place
+  //    (VirtualFS.set contract). If a future projection step writes into an entry's
+  //    Uint8Array directly, deep-copy the binary entries here.
   const clonedVfs = createVirtualFS(baseVfs.entries());
 
   // 5. Project the working copy onto the cloned VFS.
