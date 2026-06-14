@@ -4,7 +4,7 @@
 // and the INDEPENDENT target script, deriving the routing/A2 prefill
 // confirmations (spec §5, §9). Language and script are decoupled. refs #369.
 
-import { useMemo } from "react";
+import { useMemo, useRef, useCallback } from "react";
 import type { SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { parseFlow } from "./loadFlow.ts";
@@ -115,6 +115,37 @@ export function IdentityLite({
 }: IdentityLiteProps) {
   const flow = useMemo(() => parseFlow(identityLiteRaw as string), []);
 
+  // Track the latest committed autonym synchronously via a ref so that
+  // getSeedValue can read it in the same tick as the onAnswerCommit call,
+  // without waiting for a React state update cycle.
+  const autonymRef = useRef<string>("");
+
+  const handleAnswerCommit = useCallback(
+    (questionId: string, value: string | string[] | undefined) => {
+      if (questionId === "il_language_autonym") {
+        autonymRef.current = typeof value === "string" ? value : "";
+      }
+    },
+    [],
+  );
+
+  // Pre-fill il_language_english with the autonym when the user first arrives
+  // at that question. Returns undefined for all other question IDs so they
+  // remain empty. The "default once, then user owns it" contract is upheld by
+  // SurveyRunner: the seed only fires on forward push; Back discards unsaved
+  // edits (standard stack pop behavior), so re-arriving re-seeds from the
+  // current autonym — which is the expected behavior.
+  const getSeedValue = useCallback(
+    (questionId: string): string | string[] | undefined => {
+      if (questionId === "il_language_english") {
+        const autonym = autonymRef.current;
+        return autonym !== "" ? autonym : undefined;
+      }
+      return undefined;
+    },
+    [],
+  );
+
   function handleComplete(result: SurveyPhaseResult) {
     onComplete(result, extractIdentityLite(result));
   }
@@ -142,6 +173,8 @@ export function IdentityLite({
         flow={flow}
         context={context}
         onComplete={handleComplete}
+        onAnswerCommit={handleAnswerCommit}
+        getSeedValue={getSeedValue}
         {...(onBack !== undefined ? { onBack } : {})}
         {...(findingsByQuestionId !== undefined ? { findingsByQuestionId } : {})}
       />

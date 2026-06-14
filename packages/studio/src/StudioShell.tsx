@@ -299,19 +299,14 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // INDEPENDENT target script, deriving the routing/A2 prefill. Gated scripts
   // (Ethi/Hani/Hang) end on the "not supported" stage. See spec §8/§9.
   //
-  // Change 4: if il_language_english is empty but il_language_autonym is set,
-  // default the English name to the autonym. SurveyRunner has no cross-field
-  // default mechanism — patch here in the post-onComplete handler.
+  // The autonym-to-English-name default is handled in the survey UI layer:
+  // IdentityLite passes getSeedValue to SurveyRunner so the English Name input
+  // is pre-filled with the autonym when the user first arrives at that question.
   function handleIdentityComplete(result: SurveyPhaseResult, identity: IdentityLiteResult) {
-    // Apply autonym-as-English-name default when English name is blank.
-    const patchedIdentity: IdentityLiteResult =
-      identity.english === "" && identity.autonym !== ""
-        ? { ...identity, english: identity.autonym }
-        : identity;
     recordPhase(result);
-    setIdentityResult(patchedIdentity);
-    setSurveyContext(contextFromIdentity(patchedIdentity));
-    setStage(patchedIdentity.supported ? "base" : "unsupported");
+    setIdentityResult(identity);
+    setSurveyContext(contextFromIdentity(identity));
+    setStage(identity.supported ? "base" : "unsupported");
   }
 
   // The base chosen in-survey is set on localBase so the pipeline starts
