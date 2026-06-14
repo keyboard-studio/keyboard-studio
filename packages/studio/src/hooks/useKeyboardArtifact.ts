@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { BaseKeyboard, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, VirtualFS, KeyboardIR, KpsFontEntry } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { LOCAL_PROXY_BASE, getScaffolderService } from "../lib/services.ts";
@@ -12,7 +12,7 @@ interface EngineModule {
     baseKeyboard: BaseKeyboard,
     fs: VirtualFS,
     opts?: { proxyBase?: string }
-  ) => Promise<{ options?: Record<string, unknown>; filesLoaded?: string[]; warnings?: string[] }>;
+  ) => Promise<{ options?: Record<string, unknown>; filesLoaded?: string[]; warnings?: string[]; fonts?: KpsFontEntry[] }>;
   init: () => Promise<void>;
   isReady?: () => boolean;
   parseKmn?: (text: string, keyboardId: string) => { ir: KeyboardIR; opaqueFeatures: Array<{ feature: string; count: number }> };
@@ -52,7 +52,7 @@ export type Stage =
    */
   | { kind: "vfs-loading" }
   | { kind: "compiling"; isWarmCompile: boolean }
-  | { kind: "ready"; compileResult: CompileResult; jsBlobUrl: string; vfs: VirtualFS; scaffoldWarnings: string[] }
+  | { kind: "ready"; compileResult: CompileResult; jsBlobUrl: string; vfs: VirtualFS; scaffoldWarnings: string[]; fontFaceUrl?: string; fontFaceFamily?: string }
   | {
       kind: "error";
       step: "fetch" | "vfs" | "compile";
@@ -118,6 +118,10 @@ export function useKeyboardArtifact(
 ): KeyboardArtifactResult {
   const [stage, setStage] = useState<Stage>({ kind: "idle" });
   const prevBlobUrl = useRef<string | null>(null);
+  const prevFontBlobUrl = useRef<string | null>(null);
+  // Current OSK font family, paired with prevFontBlobUrl. Persists across
+  // recompiles — the font only changes on a new fetch, not on recompile().
+  const fontFaceFamilyRef = useRef<string | null>(null);
   const runId = useRef(0);
   const engineRef = useRef<EngineModule | null>(null);
   const engineLoadAttempted = useRef(false);
@@ -195,7 +199,12 @@ export function useKeyboardArtifact(
       jsBlobUrl = "";
     }
 
-    setStage({ kind: "ready", compileResult: result, jsBlobUrl, vfs, scaffoldWarnings: warnings });
+    const readyStage: Extract<Stage, { kind: "ready" }> = {
+      kind: "ready", compileResult: result, jsBlobUrl, vfs, scaffoldWarnings: warnings,
+    };
+    if (prevFontBlobUrl.current !== null) readyStage.fontFaceUrl = prevFontBlobUrl.current;
+    if (fontFaceFamilyRef.current !== null) readyStage.fontFaceFamily = fontFaceFamilyRef.current;
+    setStage(readyStage);
   }, [scaffoldSpec?.keyboardId]);
 
   const run = useCallback(async (kb: BaseKeyboard, thisRunId: number) => {
@@ -233,6 +242,14 @@ export function useKeyboardArtifact(
 
     const scaffoldWarnings: string[] = [];
 
+    // Reset any OSK-font state carried over from a previous selection. A fresh
+    // run rebuilds it from the fetched source (or leaves it cleared).
+    if (prevFontBlobUrl.current !== null) {
+      URL.revokeObjectURL(prevFontBlobUrl.current);
+      prevFontBlobUrl.current = null;
+    }
+    fontFaceFamilyRef.current = null;
+
     try {
       if (scaffoldSpec != null) {
         // Scaffold path — new keyboard authoring. Routes through
@@ -243,9 +260,23 @@ export function useKeyboardArtifact(
         scaffoldWarnings.push(...result.warnings);
       } else if (engineRef.current) {
         // Open-base path — fetch existing keyboard source.
-        await engineRef.current.fetchKeyboardSourceToVfs(kb, vfs, {
+        const fetchResult = await engineRef.current.fetchKeyboardSourceToVfs(kb, vfs, {
           proxyBase: LOCAL_PROXY_BASE,
         });
+        // Build a blob URL for the OSK font so the frame can inject an
+        // @font-face rule before the keyboard JS executes. Stored in refs so
+        // it survives recompile() (the font only changes on a new fetch).
+        const oskFontEntry = (fetchResult.fonts ?? []).find((f) => f.isOskFont && f.family);
+        if (oskFontEntry) {
+          const fontFile = vfs.get(oskFontEntry.vfsPath);
+          if (fontFile && fontFile.content instanceof Uint8Array) {
+            // .slice() copies into a fresh ArrayBuffer-backed view — byte-correct
+            // (respects byteOffset/length) and a valid BlobPart under the TS lib.
+            const blob = new Blob([fontFile.content.slice().buffer], { type: "font/ttf" });
+            prevFontBlobUrl.current = URL.createObjectURL(blob);
+            fontFaceFamilyRef.current = oskFontEntry.family ?? null;
+          }
+        }
       }
     } catch (err: unknown) {
       if (runId.current !== thisRunId) return;
@@ -300,6 +331,10 @@ export function useKeyboardArtifact(
       if (prevBlobUrl.current !== null) {
         URL.revokeObjectURL(prevBlobUrl.current);
         prevBlobUrl.current = null;
+      }
+      if (prevFontBlobUrl.current !== null) {
+        URL.revokeObjectURL(prevFontBlobUrl.current);
+        prevFontBlobUrl.current = null;
       }
     };
   }, []);

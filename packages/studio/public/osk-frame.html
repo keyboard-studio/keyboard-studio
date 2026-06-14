@@ -14,11 +14,17 @@
       delivery model is decided.
 
       postMessage contract:
-        host -> frame: { type: "SET_KEYBOARD",  jsUrl, keyboardId }
+        host -> frame: { type: "SET_KEYBOARD",  jsUrl, keyboardId, fontFaceUrl?, fontFaceFamily? }
         host -> frame: { type: "SET_OSK_MODE",  mode: "desktop" | "touch" }
         frame -> host: { type: "ENGINE_READY" }
         frame -> host: { type: "ENGINE_ERROR", message }
         frame -> host: { type: "TEXT_UPDATED", value }
+
+      Font injection: when fontFaceUrl and fontFaceFamily are provided, a plain
+      CSS @font-face rule is injected into the frame document head BEFORE
+      window.keyman.addKeyboards() is called. This ensures the compiled keyboard
+      JS can resolve the custom font by family name without relying on KMW's
+      pathConfig.fonts mechanism (which is never set in this frame).
     -->
     <style>
       * { box-sizing: border-box; }
@@ -131,6 +137,34 @@
         function postError(message) {
           setStatus("ERROR: " + message);
           post({ type: "ENGINE_ERROR", message: message });
+        }
+
+        // Inject a @font-face rule into the frame document head so the compiled
+        // keyboard JS can resolve the custom font by family name.
+        // Idempotent: if a <style> with the same id already exists, skip.
+        // Security: family is sanitized to an allowlist before interpolation to
+        // prevent CSS injection via a crafted fontname attribute.  url is
+        // validated to be a blob: or data: URL (the only kinds the studio
+        // produces) before use.
+        function injectFontFace(family, url) {
+          if (!family || !url) return;
+          // Strip any character that could break out of a CSS string or block.
+          // Keeps letters, digits, spaces, and hyphens (covers "Andika Afr" etc.).
+          var safeFamily = String(family).replace(/[^\w \-]/g, "").trim();
+          if (safeFamily.length === 0) return;
+          // Only inject blob: or data: URLs — the studio never produces anything else.
+          if (
+            typeof url !== "string" ||
+            (!url.startsWith("blob:") && !url.startsWith("data:"))
+          ) return;
+          var slug = safeFamily.toLowerCase().replace(/[^a-z0-9]/g, "-");
+          var styleId = "kmw-studio-font-" + slug;
+          if (document.getElementById(styleId)) return;
+          var style = document.createElement("style");
+          style.id = styleId;
+          style.textContent =
+            "@font-face { font-family: \"" + safeFamily + "\"; src: url(\"" + url + "\"); }";
+          document.head.appendChild(style);
         }
 
         function checkMinVersion(jsText) {
@@ -262,11 +296,14 @@
           }
         }
 
-        function loadKeyboard(jsUrl, keyboardId) {
+        function loadKeyboard(jsUrl, keyboardId, fontFaceUrl, fontFaceFamily) {
           if (!window.keyman || typeof window.keyman.addKeyboards !== "function") {
             postError("KMW engine missing addKeyboards()");
             return;
           }
+          // Inject font BEFORE registering the keyboard so the compiled CSS
+          // can resolve the family name when the keyboard JS executes.
+          injectFontFace(fontFaceFamily, fontFaceUrl);
           setStatus("registering keyboard: " + keyboardId);
           var kmwId = "Keyboard_" + keyboardId;
           var stub = {
@@ -320,7 +357,7 @@
               if (pendingKeyboard) {
                 var k = pendingKeyboard;
                 pendingKeyboard = null;
-                loadKeyboard(k.jsUrl, k.keyboardId);
+                loadKeyboard(k.jsUrl, k.keyboardId, k.fontFaceUrl, k.fontFaceFamily);
               }
             })
             .catch(function (err) {
@@ -349,9 +386,14 @@
 
           if (msg.type === "SET_KEYBOARD") {
             if (!engineReady) {
-              pendingKeyboard = { jsUrl: msg.jsUrl, keyboardId: msg.keyboardId };
+              pendingKeyboard = {
+                jsUrl: msg.jsUrl,
+                keyboardId: msg.keyboardId,
+                fontFaceUrl: msg.fontFaceUrl || null,
+                fontFaceFamily: msg.fontFaceFamily || null,
+              };
             } else {
-              loadKeyboard(msg.jsUrl, msg.keyboardId);
+              loadKeyboard(msg.jsUrl, msg.keyboardId, msg.fontFaceUrl, msg.fontFaceFamily);
             }
             return;
           }

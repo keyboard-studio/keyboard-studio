@@ -7,9 +7,11 @@
 // compiler flags. Writes everything flat into the VFS at `source/...`
 // (the layout CompilerService.compile() expects).
 
-import type { BaseKeyboard, VirtualFS } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, VirtualFS, KpsFontEntry } from "@keyboard-studio/contracts";
 import { parseKmnHeaderStores } from "../compiler/parseKmnHeaderStores.js";
 import { parseKpjFlags, type CompilerOptions } from "../compiler/parseKpjFlags.js";
+import { parseKpsFonts } from "../compiler/parseKpsFonts.js";
+import { parseKvksFontFamily } from "../compiler/parseKvksFontFamily.js";
 
 /** Structural fetch type — avoids pulling in the DOM lib for an isomorphic package. */
 export type FetchFn = (
@@ -29,6 +31,10 @@ export interface FetchKeyboardSourceOptions {
   fetchImpl?: FetchFn;
 }
 
+// KpsFontEntry is defined in @keyboard-studio/contracts and re-exported below
+// so callers that import from the engine barrel also get the type.
+export type { KpsFontEntry };
+
 export interface FetchKeyboardSourceResult {
   /** CompilerOptions derived from the .kpj (or defaults if .kpj absent). */
   options: Required<CompilerOptions>;
@@ -36,9 +42,41 @@ export interface FetchKeyboardSourceResult {
   filesLoaded: string[];
   /** Non-fatal issues (missing optional siblings, .kpj 404). */
   warnings: string[];
+  /**
+   * Font files fetched from the keyboards tree and written into the VFS.
+   * Empty array when no .kps was found or no font entries were present.
+   */
+  fonts: KpsFontEntry[];
 }
 
 const DEFAULT_PROXY = "/kbd-proxy";
+
+/**
+ * Resolve a raw font path (as it appears in the .kps, relative to `source/`)
+ * to its repo-relative path (e.g. "release/shared/fonts/sil/.../AndikaAfr-R.ttf").
+ *
+ * Returns null if the resolved path would escape the "release/" tree —
+ * the "release/" prefix check is the intentional traversal safety net.
+ * The caller must skip any null result.
+ *
+ * Exported so unit tests can exercise path-traversal edge cases in isolation.
+ */
+export function resolveKpsFontPath(rawPath: string, kbPath: string): string | null {
+  const normalized = rawPath.replace(/\\/g, "/");
+  // Start from <kbPath>/source (the directory the .kps lives in).
+  const segments = [...kbPath.split("/"), "source"];
+  for (const part of normalized.split("/")) {
+    if (part === "..") {
+      // Guard against underflow: only pop when there is a segment to remove.
+      if (segments.length > 0) segments.pop();
+    } else if (part !== "." && part !== "") {
+      segments.push(part);
+    }
+  }
+  const resolved = segments.join("/");
+  if (!resolved.startsWith("release/")) return null;
+  return resolved;
+}
 const DEFAULT_OPTIONS: Required<CompilerOptions> = {
   compilerWarningsAsErrors: false,
   warnDeprecatedCode: true,
@@ -148,7 +186,110 @@ export async function fetchKeyboardSourceToVfs(
     filesLoaded.push(path);
   }
 
-  // Step 4: optional .kpj.
+  // Step 4: optional .kps — fetch font references.
+  // The raw .kps is NOT written to the VFS (it references compiled artifacts
+  // like ../build/*.kmx that must not leak into the VFS).
+  const fonts: KpsFontEntry[] = [];
+  const kpsUrl = `${baseUrl}/source/${baseKeyboard.id}.kps`;
+  const kpsResp = await getText(kpsUrl, fetchImpl);
+  if (kpsResp.ok && kpsResp.text !== undefined) {
+    const { oskFonts, fileFonts } = parseKpsFonts(kpsResp.text);
+
+    // Build a deduped map of rawPath -> isOskFont.
+    const allRaw = new Map<string, boolean>();
+    for (const p of oskFonts) allRaw.set(p, true);
+    for (const p of fileFonts) {
+      if (!allRaw.has(p)) allRaw.set(p, false);
+    }
+
+    // Resolve the .kvks font family (used on OSK-font entries).
+    const kvksVfsPath = `source/${baseKeyboard.id}.kvks`;
+    let kvksFamilyStr: string | undefined;
+    const kvksEntry = vfs.get(kvksVfsPath);
+    if (typeof kvksEntry === "string") {
+      kvksFamilyStr = parseKvksFontFamily(kvksEntry) ?? undefined;
+    }
+    // Fallback: check the touch-layout's top-level "font" value.
+    if (kvksFamilyStr === undefined) {
+      const tlVfsPath = `source/${baseKeyboard.id}.keyman-touch-layout`;
+      const tlEntry = vfs.get(tlVfsPath);
+      if (typeof tlEntry === "string") {
+        try {
+          const tlJson = JSON.parse(tlEntry) as Record<string, unknown>;
+          // Touch-layout root can have "phone"/"tablet" etc.; each may carry "font".
+          for (const section of Object.values(tlJson)) {
+            if (
+              section !== null &&
+              typeof section === "object" &&
+              "font" in section &&
+              typeof (section as Record<string, unknown>)["font"] === "string"
+            ) {
+              kvksFamilyStr = (section as Record<string, string>)["font"];
+              break;
+            }
+          }
+        } catch {
+          // malformed JSON — ignore
+        }
+      }
+    }
+
+    // Fetch each font file in parallel.
+    const fontFetchResults = await Promise.all(
+      [...allRaw.entries()].map(async ([rawPath, isOskFont]) => {
+        const ttfRelPath = resolveKpsFontPath(rawPath, baseKeyboard.path);
+        if (ttfRelPath === null) {
+          return {
+            ok: false as const,
+            warn: `font path '${rawPath}' resolves outside release/ tree — skipped`,
+          };
+        }
+        const fontUrl = `${proxyBase}/${ttfRelPath}`;
+        const r = await getBytes(fontUrl, fetchImpl);
+        if (!r.ok || r.bytes === undefined) {
+          const detail = r.networkError
+            ? `network error: ${r.networkError}`
+            : `HTTP ${r.status}`;
+          return {
+            ok: false as const,
+            warn: `font '${ttfRelPath}' not fetched (${detail}) — skipped`,
+          };
+        }
+        return { ok: true as const, ttfRelPath, isOskFont, bytes: r.bytes };
+      }),
+    );
+
+    for (const fr of fontFetchResults) {
+      if (!fr.ok) {
+        warnings.push(fr.warn);
+        continue;
+      }
+      // VFS path strips the leading "release/" so it sits alongside the
+      // keyboard source tree root (mirrors how shared/ assets are addressed
+      // relative to the keyboard root).
+      const vfsPath = fr.ttfRelPath.slice("release/".length);
+      vfs.set(vfsPath, fr.bytes);
+      filesLoaded.push(vfsPath);
+
+      const entry: KpsFontEntry = {
+        vfsPath,
+        ttfRelPath: fr.ttfRelPath,
+        isOskFont: fr.isOskFont,
+      };
+      // Attach the CSS family only to OSK-font entries and only when known.
+      if (fr.isOskFont && kvksFamilyStr !== undefined) {
+        entry.family = kvksFamilyStr;
+      }
+      fonts.push(entry);
+    }
+  } else {
+    const detail = kpsResp.networkError
+      ? `network error: ${kpsResp.networkError}`
+      : `HTTP ${kpsResp.status}`;
+    warnings.push(`.kps not found at ${kpsUrl} (${detail}); no fonts loaded`);
+  }
+
+  // Step 5: optional .kpj.
   const kpjUrl = `${baseUrl}/${baseKeyboard.id}.kpj`;
   const kpjResp = await getText(kpjUrl, fetchImpl);
   let options: Required<CompilerOptions> = DEFAULT_OPTIONS;
@@ -167,5 +308,5 @@ export async function fetchKeyboardSourceToVfs(
   // The KMW .js is produced by `CompilerService.compile()` running
   // @keymanapp/kmc-kmn's full pipeline in-browser — no need to fetch a
   // prebuilt stand-in. (Removed once kmw-compiler integration landed.)
-  return { options, filesLoaded, warnings };
+  return { options, filesLoaded, warnings, fonts };
 }

@@ -55,6 +55,8 @@ export function OSKFrame({
       type: "SET_KEYBOARD",
       jsUrl: stage.jsBlobUrl,
       keyboardId: baseKeyboard.id,
+      ...(stage.fontFaceUrl !== undefined ? { fontFaceUrl: stage.fontFaceUrl } : {}),
+      ...(stage.fontFaceFamily !== undefined ? { fontFaceFamily: stage.fontFaceFamily } : {}),
     });
   }, [stage, engineReady, baseKeyboard, send]);
 

@@ -10,6 +10,10 @@ export interface SetKeyboardCommand {
   type: "SET_KEYBOARD";
   jsUrl: string;
   keyboardId: string;
+  /** Blob URL for the OSK font file. Injected as @font-face before KMW loads the keyboard. */
+  fontFaceUrl?: string;
+  /** CSS font-family string, must exactly match the .kvks fontname (e.g. "Andika Afr"). */
+  fontFaceFamily?: string;
 }
 
 export interface SetOskModeCommand {
