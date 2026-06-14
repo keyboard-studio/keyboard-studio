@@ -1095,24 +1095,47 @@ export function MechanismGallery({ selectedBaseKeyboard, onComplete, onBack }: M
   if (inventory.length === 0) {
     return (
       <div style={pageStyle}>
-        <div
-          style={{
-            maxWidth: 560,
-            margin: "60px auto",
-            textAlign: "center",
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-            color: TEXT_DIM,
-          }}
-        >
-          <p style={{ fontSize: 15 }}>
-            No inventory confirmed yet. Complete the{" "}
-            <a href="#survey" style={{ color: ACCENT, textDecoration: "none" }}>
-              Survey
-            </a>{" "}
-            (Phase B) to confirm which characters your keyboard must produce.
-          </p>
+        <div style={{ maxWidth: 780, margin: "0 auto" }}>
+          {onBack !== undefined && (
+            <button
+              type="button"
+              onClick={onBack}
+              disabled={desktopLocked}
+              style={{
+                marginBottom: 20,
+                padding: "8px 18px",
+                background: "transparent",
+                border: `1px solid ${BORDER}`,
+                borderRadius: 6,
+                color: TEXT_DIM,
+                fontSize: 13,
+                cursor: desktopLocked ? "not-allowed" : "pointer",
+                fontFamily: "inherit",
+                opacity: desktopLocked ? 0.5 : 1,
+              }}
+            >
+              ← Back
+            </button>
+          )}
+          <div
+            style={{
+              maxWidth: 560,
+              margin: "60px auto",
+              textAlign: "center",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              color: TEXT_DIM,
+            }}
+          >
+            <p style={{ fontSize: 15 }}>
+              No inventory confirmed yet. Complete the{" "}
+              <a href="#survey" style={{ color: ACCENT, textDecoration: "none" }}>
+                Survey
+              </a>{" "}
+              (Phase B) to confirm which characters your keyboard must produce.
+            </p>
+          </div>
         </div>
       </div>
     );
