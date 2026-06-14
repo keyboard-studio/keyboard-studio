@@ -1,7 +1,7 @@
 // see spec.md section 11 — ScaffolderService mock
 
 import type { ScaffolderService, ScaffoldOptions, ScaffoldResult } from "../scaffolder";
-import { validateKeyboardId as contractsValidateKeyboardId } from "../scaffolder";
+import { validateScaffolderKeyboardId as contractsValidateKeyboardId } from "../scaffolder";
 import type { BaseKeyboard } from "../baseKeyboard";
 import { scaffoldedFS } from "./mockVirtualFS";
 
@@ -35,7 +35,7 @@ export const mockScaffolder: ScaffolderService = {
     // Returns the pre-built scaffolded FS fixture.
     // A real implementation would clone base, run template-cleanup pipeline
     // with the routing decision in opts.group (or auto-detected from base).
-    return Promise.resolve({ vfs: scaffoldedFS, warnings: [] });
+    return Promise.resolve({ vfs: scaffoldedFS, warnings: [], fonts: [], stylesheets: [] });
   },
 
   listTemplates(): Promise<string[]> {

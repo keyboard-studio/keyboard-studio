@@ -14,8 +14,9 @@ export function ScaffoldForm({ onSubmit }: ScaffoldFormProps) {
   const [keyboardId, setKeyboardId] = useState("");
   const [displayName, setDisplayName] = useState("");
 
-  const idError = validateKeyboardId(keyboardId.trim());
-  const isValid = idError === null && displayName.trim().length > 0;
+  const idValidation = validateKeyboardId(keyboardId.trim());
+  const idError = idValidation.valid ? null : (idValidation.reason ?? "invalid keyboard id");
+  const isValid = idValidation.valid && displayName.trim().length > 0;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

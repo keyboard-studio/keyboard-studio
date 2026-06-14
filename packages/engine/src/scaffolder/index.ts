@@ -7,7 +7,7 @@ import type {
 import type { BaseKeyboard, VirtualFS } from "@keyboard-studio/contracts";
 import {
   createVirtualFS,
-  validateKeyboardId as contractsValidateKeyboardId,
+  validateScaffolderKeyboardId as contractsValidateKeyboardId,
 } from "@keyboard-studio/contracts";
 import { fetchKeyboardSourceToVfs, type FetchFn } from "../loader/fetchKeyboardSourceToVfs.js";
 import { parse } from "../codec/parse.js";
@@ -58,7 +58,8 @@ function detectGroup(base: BaseKeyboard): RoutingGroup {
   return "qwerty-qwertz";
 }
 
-function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: string): void {
+/** @internal Exported for unit testing only. */
+export function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: string): void {
   const extensions = [".kmn", ".kps", ".kvks", ".keyman-touch-layout", ".ico"];
   for (const ext of extensions) {
     const oldPath = `source/${baseId}${ext}`;
@@ -81,6 +82,19 @@ function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: string): v
   if (helpEntry !== undefined) {
     vfs.delete(oldHelp);
     vfs.set(`source/help/${keyboardId}.php`, helpEntry.content, helpEntry.isBinary);
+  }
+
+  // Rewrite `.kmw-keyboard-<baseId>` selectors in every *.css entry.
+  // Word-boundary anchor ensures we don't rewrite substrings that start with
+  // the base id followed by additional alphanumerics (e.g. `base_id_extra`).
+  const cssBaseClassRe = new RegExp(`kmw-keyboard-${baseId}\\b`, "g");
+  for (const cssPath of vfs.list("").filter((p) => p.endsWith(".css"))) {
+    const cssEntry = vfs.get(cssPath);
+    if (cssEntry === undefined || typeof cssEntry.content !== "string") continue;
+    const rewritten = cssEntry.content.replace(cssBaseClassRe, `kmw-keyboard-${keyboardId}`);
+    if (rewritten !== cssEntry.content) {
+      vfs.set(cssPath, rewritten, false);
+    }
   }
 }
 
@@ -232,12 +246,17 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       const vfs = createVirtualFS();
       const warnings: string[] = [];
 
+      let loaderFonts: import("@keyboard-studio/contracts").KpsFontEntry[] = [];
+      let loaderStylesheets: import("@keyboard-studio/contracts").KpsStylesheetEntry[] = [];
       try {
         const loaderOpts = {
           ...(proxyBase !== undefined ? { proxyBase } : {}),
           ...(fetchImpl !== undefined ? { fetchImpl } : {}),
         };
-        await fetchKeyboardSourceToVfs(base, vfs, loaderOpts);
+        const loaderResult = await fetchKeyboardSourceToVfs(base, vfs, loaderOpts);
+        loaderFonts = loaderResult.fonts;
+        loaderStylesheets = loaderResult.stylesheets;
+        warnings.push(...loaderResult.warnings);
       } catch (err) {
         // fetchKeyboardSourceToVfs throws when the required .kmn is unreachable
         // (network error, 404, or offline). Fall through to stub-only output and
@@ -274,7 +293,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       applyTouchLayoutCleanup(vfs, keyboardId);
       generateStubs(vfs, keyboardId, displayName);
 
-      return { vfs, warnings };
+      return { vfs, warnings, fonts: loaderFonts, stylesheets: loaderStylesheets };
     },
 
     async listTemplates(): Promise<string[]> {

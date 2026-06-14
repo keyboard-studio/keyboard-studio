@@ -95,8 +95,9 @@ describe("scaffold→compile integration: fetch-OK base (Case A)", () => {
       "My Integration Keyboard",
     );
 
-    // Scaffolding itself must succeed with no warnings for an OK fetch.
-    expect(warnings).toEqual([]);
+    // Scaffolding itself must succeed; loader optional-file misses (.kps, .kpj)
+    // are now forwarded as non-fatal warnings (Change 2 of #405 follow-up).
+    expect(warnings.every((w) => w.includes("not found"))).toBe(true);
     expect(vfs.get("source/my_integration_kb.kmn")).toBeDefined();
   }, 10_000);
 
