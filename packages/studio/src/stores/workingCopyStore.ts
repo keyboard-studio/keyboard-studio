@@ -1,16 +1,19 @@
 // workingCopyStore — single canonical source of truth for the working copy.
 //
 // Holds the union of all state previously split across irStore and
-// surveyResultsStore, plus new Phase 2 scaffolding slots for the base
-// keyboard, base VFS, and base IR. irStore and surveyResultsStore are
-// re-implemented as typed adapter views over this store so existing
-// consumers continue to work byte-for-byte.
+// surveyResultsStore, plus base keyboard, base VFS, and base IR. irStore
+// and surveyResultsStore are re-implemented as typed adapter views over this
+// store so existing consumers continue to work byte-for-byte.
 //
 // Architecture contract:
 //   - State lives HERE. The adapter hooks are selectors, not independent stores.
-//   - `reset()` clears every slot including base + identity.
-//   - `instantiateFromBase()` and `setIdentity()` are no-ops for Phase 1;
-//     they set the new slots and will be wired to the session spine in Phase 2.
+//   - `reset()` clears every slot including base + identity + instantiationMode.
+//   - `instantiateFromBase()` is the explicit Track-1 entry point (spec §8 v1.3.0);
+//     it sets base slots, seeds the carve IR, resets identity and all edit layers,
+//     and records instantiationMode = "new-from-base".
+//   - `instantiateFromExisting()` is the Track-2 entry point; it preserves the
+//     loaded keyboard's identity and sets instantiationMode = "adapt-existing".
+//   - `setIdentity()` overlays a post-instantiation identity patch.
 //   - No host-disk writes. VirtualFS lives as a React-state reference.
 //   - Worker boundary upheld: WASM is not imported here.
 
@@ -23,6 +26,26 @@ import {
   type SurveyPhaseResult,
   type SurveySession,
 } from "@keyboard-studio/contracts";
+
+// ---------------------------------------------------------------------------
+// Instantiation mode — spec §8 v1.3.0, two authoring tracks.
+// ---------------------------------------------------------------------------
+
+/**
+ * Records which authoring track created this working copy.
+ *
+ * - `"new-from-base"`: Track 1 — author started fresh from a base keyboard;
+ *   identity was RESET (new keyboard id placeholder, version "1.0").
+ * - `"adapt-existing"`: Track 2 — author loaded an existing keyboard to adapt;
+ *   identity was PRESERVED (id, name, BCP47 kept from the loaded keyboard).
+ * - `null`: not yet instantiated (store is in pre-selection state).
+ *
+ * This is a studio-local field (not yet in the contracts package schema).
+ * It informs UI affordances (e.g. showing "Adapting: <name>" vs
+ * "New keyboard" in a future header bar) and will be promoted to a contracts
+ * field in a future joint session when the output layer needs it.
+ */
+export type InstantiationMode = "new-from-base" | "adapt-existing" | null;
 
 // ---------------------------------------------------------------------------
 // Identity patch — lightweight overlay for the "identity" phase result.
@@ -43,18 +66,28 @@ export type IdentityPatch = Partial<{
 // ---------------------------------------------------------------------------
 
 export interface WorkingCopyState {
-  // -- New canonical base slots (set by instantiateFromBase in Phase 2) --------
-  /** The keyboard the author chose as their adaptation base. Null until a base is selected. */
+  // -- Instantiation mode (spec §8 v1.3.0) ------------------------------------
+  /**
+   * Which authoring track created this working copy.
+   * Null until instantiateFromBase or instantiateFromExisting is called.
+   * See InstantiationMode for full semantics.
+   */
+  instantiationMode: InstantiationMode;
+
+  // -- Canonical base slots (set by instantiateFromBase / instantiateFromExisting) --
+  /** The keyboard the author chose as their adaptation base. Null until instantiation. */
   baseKeyboard: BaseKeyboard | null;
-  /** VFS snapshot of the fetched base keyboard source. Null until Phase 2 instantiation. */
+  /** VFS snapshot of the fetched base keyboard source. Null until instantiation. */
   baseVfs: VirtualFS | null;
-  /** IR parsed from the base keyboard source. Null until Phase 2 instantiation. */
+  /** IR parsed from the base keyboard source. Null until instantiation. */
   baseIr: KeyboardIR | null;
 
   // -- Identity patch (set by setIdentity) -------------------------------------
   /**
-   * Overlay produced by the identity survey step. Applied on top of base
-   * keyboard metadata at output time. Null until the user completes Phase A.
+   * Overlay produced by the identity survey step (Track 1) or preserved from
+   * the loaded keyboard (Track 2). Applied on top of base keyboard metadata at
+   * output time. Null until the user completes Phase A (Track 1) or until
+   * instantiateFromExisting sets it from the loaded keyboard's identity (Track 2).
    */
   identity: IdentityPatch | null;
 
@@ -126,25 +159,54 @@ export interface WorkingCopyState {
    */
   reset: () => void;
 
-  // -- Phase 2 scaffolding (no-ops for Phase 1) --------------------------------
+  // -- Instantiation actions (spec §8 v1.3.0) ----------------------------------
+
   /**
-   * Instantiate the working copy from a selected base keyboard. Sets
-   * baseKeyboard, baseVfs, and baseIr, then seeds the carve working IR
-   * from baseIr. No-op in Phase 1 (Phase 2 wires this to the session spine).
+   * Track 1 — copy a base, NEW identity (spec §8 v1.3.0).
+   *
+   * Sets baseKeyboard, baseVfs, baseIr, and seeds the carve working IR from
+   * baseIr. Resets identity to null (a fresh copy starts with no identity overlay
+   * until the user completes Phase A). Clears all edit layers (deletedNodeIds,
+   * undoStack, phaseResults / assignments) so a fresh copy starts clean.
+   * Sets instantiationMode = "new-from-base".
+   *
+   * If called when `isInstantiated()` is already true (re-basing), the caller
+   * is responsible for confirming with the user before calling this — the store
+   * unconditionally replaces state.
    */
   instantiateFromBase: (
     base: BaseKeyboard,
     opts: { vfs: VirtualFS; ir: KeyboardIR },
   ) => void;
+
+  /**
+   * Track 2 — adapt an existing keyboard, identity PRESERVED (spec §8 v1.3.0).
+   *
+   * Sets baseKeyboard, baseVfs, baseIr, and seeds the carve working IR from
+   * baseIr. Preserves identity from the loaded keyboard (id, name, BCP47 are
+   * set from `keyboard.displayName` / `keyboard.id` rather than reset).
+   * Clears edit layers so the adapt session starts clean.
+   * Sets instantiationMode = "adapt-existing".
+   *
+   * NOTE: The UI entry point for Track 2 (import/source-picker path) does not
+   * yet exist in the app. This action is store-ready; the wiring is a follow-up.
+   * TODO(track2-ui): wire to the import/source-picker path when that UX lands.
+   */
+  instantiateFromExisting: (
+    keyboard: BaseKeyboard,
+    opts: { vfs: VirtualFS; ir: KeyboardIR },
+  ) => void;
+
   /**
    * Apply an identity patch (language name, BCP47 tag, display name) over
-   * the base keyboard identity. No-op in Phase 1.
+   * the base keyboard identity. Replaces any prior patch (last-wins).
    */
   setIdentity: (patch: IdentityPatch) => void;
+
   /**
-   * Returns true once instantiateFromBase has been called (i.e. baseKeyboard
-   * is non-null). Callers that need the full triple (base + VFS + IR) should
-   * check all three slots directly.
+   * Returns true once instantiateFromBase or instantiateFromExisting has been
+   * called (i.e. baseKeyboard is non-null). Callers that need the full triple
+   * (base + VFS + IR) should check all three slots directly.
    */
   isInstantiated: () => boolean;
 }
@@ -176,8 +238,10 @@ const INITIAL_STATE: Omit<
   | "setIR" | "clearIR" | "deleteNode" | "undoDelete" | "restoreNode"
   | "isDeleted" | "keepAll" | "recordPhase" | "recordAssignments"
   | "setIrAxes" | "lockDesktop" | "unlockDesktop" | "reset"
-  | "instantiateFromBase" | "setIdentity" | "isInstantiated"
+  | "instantiateFromBase" | "instantiateFromExisting" | "setIdentity" | "isInstantiated"
 > = {
+  // instantiation mode
+  instantiationMode: null,
   // base slots
   baseKeyboard: null,
   baseVfs: null,
@@ -280,19 +344,51 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       ...INITIAL_STATE,
       // Re-initialize mutable objects so mutations do not bleed across resets.
       deletedNodeIds: new Set(),
+      // instantiationMode is null in INITIAL_STATE; explicit for clarity.
+      instantiationMode: null,
     }),
 
-  // -- Phase 2 scaffolding ---------------------------------------------------
+  // -- Instantiation actions (spec §8 v1.3.0) ----------------------------------
 
   instantiateFromBase: (base, { vfs, ir }) =>
+    // Track 1: new keyboard from base — identity RESET, edit layers cleared.
     set({
+      instantiationMode: "new-from-base",
       baseKeyboard: base,
       baseVfs: vfs,
       baseIr: ir,
+      // Reset identity: fresh copy has no overlay until Phase A completes.
+      identity: null,
       // Seed the carve working IR from the base IR; clear any prior carve state.
       ir,
       deletedNodeIds: new Set(),
       undoStack: [],
+      // Clear all survey results so the new keyboard starts without inherited
+      // phase data from a prior session. irAxes also cleared (re-derived from
+      // the new IR after recognition runs).
+      ...remerge({}, []),
+      desktopLocked: false,
+    }),
+
+  instantiateFromExisting: (keyboard, { vfs, ir }) =>
+    // Track 2: adapt existing keyboard — identity PRESERVED from loaded keyboard.
+    set({
+      instantiationMode: "adapt-existing",
+      baseKeyboard: keyboard,
+      baseVfs: vfs,
+      baseIr: ir,
+      // Preserve identity from the loaded keyboard's metadata.
+      identity: {
+        bcp47: keyboard.languages?.[0] ?? "",
+        displayName: keyboard.displayName,
+      },
+      // Seed the carve working IR from the existing keyboard's IR.
+      ir,
+      deletedNodeIds: new Set(),
+      undoStack: [],
+      // Edit layers start clean for an adapt session too.
+      ...remerge({}, []),
+      desktopLocked: false,
     }),
 
   setIdentity: (patch) =>

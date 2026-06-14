@@ -14,6 +14,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import type { BaseKeyboard, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useSurveyResultsStore } from "./stores/surveyResultsStore.ts";
+import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
+import { confirmRebaseIfEdited } from "./lib/confirmRebase.ts";
 import { PreviewShell } from "./components/PreviewShell.tsx";
 import { IdentityLite, Prefill, PhaseB, PhaseF, type IdentityLiteResult } from "./survey/index.ts";
 import { BaseResolution } from "./components/BaseResolution.tsx";
@@ -23,7 +25,7 @@ import type { SurveyContext } from "./survey/types.ts";
 import { CarveGallery } from "./components/CarveGallery.tsx";
 import { MechanismGallery } from "./components/MechanismGallery.tsx";
 import { type RouteId } from "./lib/navigate.ts";
-import { useKeyboardArtifact } from "./hooks/useKeyboardArtifact.ts";
+import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
 import { OSKFrame } from "./components/OSKFrame.tsx";
 import { OskModeToggle, type OskMode } from "./components/OskModeToggle.tsx";
 
@@ -213,18 +215,37 @@ function contextFromIdentity(identity: IdentityLiteResult): SurveyContext {
 }
 
 interface SurveyViewProps {
+  /**
+   * The instantiated base keyboard from the working-copy store.
+   * Null before the first base selection completes its compile cycle.
+   * Passed to the OSK preview in the right pane.
+   */
   baseKeyboard: BaseKeyboard | null;
-  /** Lifts the in-survey base choice up so the preview + scaffold spine see it. */
-  onBaseSelected: (kb: BaseKeyboard) => void;
 }
 
-function SurveyView({ baseKeyboard, onBaseSelected }: SurveyViewProps) {
+function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const [stage, setStage] = useState<SurveyStage>("identity");
   const [identityResult, setIdentityResult] = useState<IdentityLiteResult | null>(null);
   const [surveyContext, setSurveyContext] = useState<SurveyContext>({});
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
   const [leftPct, setLeftPct] = useState(SURVEY_LEFT_INIT_PCT);
   const [handleHovered, setHandleHovered] = useState(false);
+
+  // Local base selection that drives the compile pipeline immediately on pick.
+  // This is separate from baseKeyboard (the store's instantiated base) so that:
+  //   (a) the pipeline starts as soon as BaseResolution resolves, not after
+  //       the store updates (which only happens after compile completes); and
+  //   (b) the OSK preview shows the base the user just picked, even while
+  //       the compile is in progress.
+  // Once onInstantiate fires (compile succeeds), the store's baseKeyboard
+  // becomes the authoritative source and both values will agree.
+  const [localBase, setLocalBase] = useState<BaseKeyboard | null>(baseKeyboard);
+
+  // Sync localBase when the prop changes (e.g. if the user navigates to
+  // pick-base and picks a different keyboard, the survey sees it).
+  useEffect(() => {
+    setLocalBase(baseKeyboard);
+  }, [baseKeyboard]);
 
   const dragRef = useRef<{ startX: number; startPct: number } | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -266,7 +287,26 @@ function SurveyView({ baseKeyboard, onBaseSelected }: SurveyViewProps) {
     };
   }, [onPointerMove, onPointerUp]);
 
-  const { stage: artifactStage, retry } = useKeyboardArtifact(baseKeyboard);
+  // Working-copy store instantiation — Track 1 wiring for the survey path.
+  // The survey flow picks a base via BaseResolution; once the pipeline
+  // completes, instantiateFromBase is called here to make the working copy
+  // official. The re-base confirm guard reads live store state via
+  // confirmRebaseIfEdited() (getState() inside the helper) so stale closures
+  // cannot produce a wrong hasEdits decision when the async compile completes.
+  const instantiateFromBase = useWorkingCopyStore((s) => s.instantiateFromBase);
+
+  const onInstantiate = useCallback<OnInstantiateCallback>((base, { vfs, ir }) => {
+    if (ir === null || vfs === null) {
+      console.warn("[studio] instantiate skipped: no parsed IR (mock engine?)");
+      return;
+    }
+    if (!confirmRebaseIfEdited()) return;
+    instantiateFromBase(base, { vfs, ir });
+  }, [instantiateFromBase]);
+
+  // Use localBase (immediately updated on selection) to drive the pipeline,
+  // not the store's baseKeyboard (updated only after compile completes).
+  const { stage: artifactStage, retry } = useKeyboardArtifact(localBase, null, null, onInstantiate);
   const rightPct = 100 - leftPct;
 
   // Survey results are persisted into the survey-results store (the data bus the
@@ -284,10 +324,12 @@ function SurveyView({ baseKeyboard, onBaseSelected }: SurveyViewProps) {
     setStage(identity.supported ? "base" : "unsupported");
   }
 
-  // The base chosen in-survey is lifted to the shell so the preview + scaffold
-  // spine use it; the chosen (language, script) target then back-fills prefill.
+  // The base chosen in-survey is set on localBase so the pipeline starts
+  // immediately. The store's baseKeyboard updates after compile completes via
+  // onInstantiate. The survey stage advances to "prefill" so the Prefill step
+  // shows while the compile runs in the background.
   function handleBaseResolved(base: BaseKeyboard) {
-    onBaseSelected(base);
+    setLocalBase(base);
     setStage("prefill");
   }
 
@@ -303,6 +345,7 @@ function SurveyView({ baseKeyboard, onBaseSelected }: SurveyViewProps) {
     resetSurvey();
     setIdentityResult(null);
     setSurveyContext({});
+    setLocalBase(null);
     setStage("identity");
   }
 
@@ -418,10 +461,10 @@ function SurveyView({ baseKeyboard, onBaseSelected }: SurveyViewProps) {
             onBack={() => setStage("identity")}
           />
         )}
-        {stage === "prefill" && identityResult !== null && baseKeyboard !== null && (
+        {stage === "prefill" && identityResult !== null && localBase !== null && (
           <Prefill
             identity={identityResult}
-            base={baseKeyboard}
+            base={localBase}
             onConfirm={() => setStage("B")}
             onBack={() => setStage("base")}
           />
@@ -478,7 +521,7 @@ function SurveyView({ baseKeyboard, onBaseSelected }: SurveyViewProps) {
           fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
         }}
       >
-        {baseKeyboard === null ? (
+        {localBase === null ? (
           <div
             style={{
               flex: 1,
@@ -513,12 +556,12 @@ function SurveyView({ baseKeyboard, onBaseSelected }: SurveyViewProps) {
               }}
             >
               <h2 style={{ margin: 0, fontSize: "1.1rem", color: "#6ea8fe" }}>
-                {baseKeyboard.displayName}
+                {localBase.displayName}
               </h2>
               <OskModeToggle value={oskMode} onChange={setOskMode} />
             </div>
             <OSKFrame
-              baseKeyboard={baseKeyboard}
+              baseKeyboard={localBase}
               oskMode={oskMode}
               stage={artifactStage}
               retry={retry}
@@ -650,10 +693,19 @@ export function TouchGate() {
 
 export function StudioShell() {
   const route = useRoute();
-  const [selectedBaseKeyboard, setSelectedBaseKeyboard] = useState<BaseKeyboard | null>(null);
-  const handleBaseKeyboardSelected = useCallback((kb: BaseKeyboard) => {
-    setSelectedBaseKeyboard(kb);
-  }, []);
+
+  // selectedBaseKeyboard is now derived from the working-copy store rather than
+  // local state. This way, instantiateFromBase (fired by PreviewShell or
+  // SurveyView after a successful fetch→compile) automatically updates all
+  // consumers (MechanismGallery, SurveyView OSK preview) without a separate
+  // lifting step.
+  //
+  // NOTE: PreviewShell and SurveyView each maintain their own local baseKeyboard
+  // state for the pipeline (to track what the picker has selected before the
+  // compile completes). The store's baseKeyboard reflects the INSTANTIATED base
+  // (after compile success + onInstantiate fires). For MechanismGallery the
+  // distinction does not matter — it only needs the instantiated base.
+  const selectedBaseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
 
   // Read desktopLocked from the survey store so the NavBar can dim the Touch
   // item when the desktop layout has not been locked yet.
@@ -662,13 +714,15 @@ export function StudioShell() {
   let content: ReactNode;
   switch (route) {
     case "pick-base":
-      content = <PreviewShell onBaseKeyboardSelected={handleBaseKeyboardSelected} />;
+      // onBaseKeyboardSelected is kept for backward compat but is now a no-op:
+      // the working-copy store is updated directly by PreviewShell via
+      // onInstantiate → instantiateFromBase.
+      content = <PreviewShell />;
       break;
     case "survey":
       content = (
         <SurveyView
           baseKeyboard={selectedBaseKeyboard}
-          onBaseSelected={handleBaseKeyboardSelected}
         />
       );
       break;

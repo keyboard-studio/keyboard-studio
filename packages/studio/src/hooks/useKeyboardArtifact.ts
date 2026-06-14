@@ -3,7 +3,6 @@ import type { BaseKeyboard, VirtualFS, KeyboardIR, KpsFontEntry } from "@keyboar
 import type { CompileResult } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { LOCAL_PROXY_BASE, getScaffolderService } from "../lib/services.ts";
-import { useIRStore } from "../stores/irStore.ts";
 import { findKmnPath } from "../lib/findKmnPath.ts";
 
 interface EngineModule {
@@ -82,6 +81,21 @@ export type VfsTransform = (
   keyboardId: string,
 ) => { warnings: string[] };
 
+/**
+ * Called exactly once per successful fetch→compile run, after both the
+ * compile result and the parsed IR are available. The caller (PreviewShell,
+ * SurveyView) uses this to call instantiateFromBase or instantiateFromExisting
+ * on the workingCopyStore — separating the pipeline from store ownership.
+ *
+ * `ir` is null when the engine does not expose parseKmn/recognizePatterns (i.e.
+ * the real WASM engine is absent and only the mock compile path ran). Callers
+ * must guard on ir !== null before passing it to the store.
+ */
+export type OnInstantiateCallback = (
+  base: BaseKeyboard,
+  opts: { vfs: VirtualFS; ir: KeyboardIR | null },
+) => void;
+
 export interface KeyboardArtifactResult {
   stage: Stage;
   retry: () => void;
@@ -110,11 +124,17 @@ export interface KeyboardArtifactResult {
  * before the compile step. Its warnings are merged into scaffoldWarnings so
  * they surface on the ready Stage. Keeps the single compile cycle intact —
  * the transform does not trigger a second compile.
+ *
+ * `onInstantiate` — fired exactly once per successful full run (not on
+ * recompile). The hook no longer owns the working-copy IR; the caller decides
+ * whether to call instantiateFromBase or instantiateFromExisting. The callback
+ * receives ir=null when parseKmn is unavailable (mock engine path).
  */
 export function useKeyboardArtifact(
   baseKeyboard: BaseKeyboard | null,
   scaffoldSpec?: ScaffoldSpec | null,
   vfsTransform?: VfsTransform | null,
+  onInstantiate?: OnInstantiateCallback | null,
 ): KeyboardArtifactResult {
   const [stage, setStage] = useState<Stage>({ kind: "idle" });
   const prevBlobUrl = useRef<string | null>(null);
@@ -131,10 +151,13 @@ export function useKeyboardArtifact(
   // Separate compile step, callable independently for the recompile() path.
   // `warnings` carries any scaffold warnings from the preceding fetch step;
   // empty for recompile() calls (which don't re-scaffold).
+  // `isFullRun` distinguishes a full fetch→compile run (fires onInstantiate)
+  // from a recompile()-only call (does NOT fire onInstantiate — no VFS change).
   const runCompile = useCallback(async (
     kb: BaseKeyboard,
     thisRunId: number,
     warnings: string[] = [],
+    isFullRun: boolean = false,
   ): Promise<void> => {
     const engine = engineRef.current;
     const vfs = vfsRef.current;
@@ -146,6 +169,7 @@ export function useKeyboardArtifact(
     setStage({ kind: "compiling", isWarmCompile });
 
     let result: CompileResult;
+    let parsedIr: KeyboardIR | null = null;
     try {
       const kmnPath = findKmnPath(vfs);
       const kmnText = kmnPath ? (vfs.get(kmnPath)!.content as string) : "";
@@ -163,7 +187,7 @@ export function useKeyboardArtifact(
       ]);
       result = compileResult;
       if (parseResult) {
-        useIRStore.getState().setIR(parseResult.ir);
+        parsedIr = parseResult.ir;
       }
     } catch (err: unknown) {
       if (runId.current !== thisRunId) return;
@@ -199,13 +223,20 @@ export function useKeyboardArtifact(
       jsBlobUrl = "";
     }
 
+    // Fire onInstantiate on full runs only (not recompile). The working-copy
+    // store takes ownership of the IR here; the hook no longer calls setIR.
+    if (isFullRun && onInstantiate !== null && onInstantiate !== undefined) {
+      onInstantiate(kb, { vfs, ir: parsedIr });
+    }
+
+    // Carry font face info (added by the .kps font-loading path) onto the ready stage.
     const readyStage: Extract<Stage, { kind: "ready" }> = {
       kind: "ready", compileResult: result, jsBlobUrl, vfs, scaffoldWarnings: warnings,
     };
     if (prevFontBlobUrl.current !== null) readyStage.fontFaceUrl = prevFontBlobUrl.current;
     if (fontFaceFamilyRef.current !== null) readyStage.fontFaceFamily = fontFaceFamilyRef.current;
     setStage(readyStage);
-  }, [scaffoldSpec?.keyboardId]);
+  }, [scaffoldSpec?.keyboardId, onInstantiate]);
 
   const run = useCallback(async (kb: BaseKeyboard, thisRunId: number) => {
     // Step 0: Lazily load the engine module once.
@@ -310,18 +341,19 @@ export function useKeyboardArtifact(
     if (runId.current !== thisRunId) return;
 
     // Pass scaffold warnings into runCompile so they surface on the ready Stage.
-    await runCompile(kb, thisRunId, scaffoldWarnings);
+    // isFullRun=true: this is a full fetch→compile cycle; onInstantiate fires.
+    await runCompile(kb, thisRunId, scaffoldWarnings, true);
   }, [scaffoldSpec, vfsTransform, runCompile]);
 
   useEffect(() => {
     if (baseKeyboard === null) {
       setStage({ kind: "idle" });
       vfsRef.current = null;
-      useIRStore.getState().clearIR();
+      // IR ownership moved to the working-copy store; the hook no longer calls
+      // clearIR() here. The store's instantiateFromBase / reset owns IR lifecycle.
       return;
     }
 
-    useIRStore.getState().clearIR();
     const thisRunId = ++runId.current;
     void run(baseKeyboard, thisRunId);
   }, [baseKeyboard, scaffoldSpec, run]);

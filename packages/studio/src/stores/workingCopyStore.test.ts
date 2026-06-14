@@ -1,14 +1,20 @@
 // Tests for workingCopyStore — the single canonical source of truth.
 //
 // Coverage:
-//   1. New slots: instantiateFromBase, setIdentity, isInstantiated, reset clears base + identity.
-//   2. Adapter reflection: mutations via workingCopyStore are visible via the
+//   1. Initial state: all slots null/empty.
+//   2. instantiateFromBase (Track 1): sets base slots + seeds IR, resets identity +
+//      edit layers + phaseResults, sets instantiationMode = "new-from-base".
+//   3. instantiateFromExisting (Track 2): sets base slots + seeds IR, preserves
+//      identity from loaded keyboard, sets instantiationMode = "adapt-existing".
+//   4. setIdentity: stores and replaces identity patches.
+//   5. reset(): clears all slots including instantiationMode + identity + base slots.
+//   6. Adapter reflection: mutations via workingCopyStore are visible via the
 //      irStore and surveyResultsStore adapters (same memory, no copy).
-//   3. reset() clears all slots.
+//   7. Cross-adapter isolation: IR actions don't bleed into survey state.
 //
 // Tests in irStore.test.ts and surveyResultsStore.test.ts continue to
 // own exhaustive coverage of the carve and survey action semantics
-// respectively; this file focuses on the new Phase-1 surface.
+// respectively; this file focuses on the Phase-2 surface.
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { useWorkingCopyStore } from "./workingCopyStore.ts";
@@ -34,6 +40,10 @@ beforeEach(resetAll);
 // ---------------------------------------------------------------------------
 
 describe("workingCopyStore — initial state", () => {
+  it("instantiationMode starts null", () => {
+    expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
+  });
+
   it("base slots start null", () => {
     const s = useWorkingCopyStore.getState();
     expect(s.baseKeyboard).toBeNull();
@@ -57,16 +67,23 @@ describe("workingCopyStore — initial state", () => {
     expect(s.desktopLocked).toBe(false);
   });
 
-  it("isInstantiated returns false before instantiateFromBase", () => {
+  it("isInstantiated returns false before any instantiation", () => {
     expect(useWorkingCopyStore.getState().isInstantiated()).toBe(false);
   });
 });
 
 // ---------------------------------------------------------------------------
-// instantiateFromBase
+// instantiateFromBase — Track 1
 // ---------------------------------------------------------------------------
 
-describe("workingCopyStore — instantiateFromBase", () => {
+describe("workingCopyStore — instantiateFromBase (Track 1)", () => {
+  it("sets instantiationMode to new-from-base", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    expect(useWorkingCopyStore.getState().instantiationMode).toBe("new-from-base");
+  });
+
   it("sets baseKeyboard, baseVfs, baseIr, and seeds carve IR", () => {
     const vfs = createVirtualFS([
       { path: "source/test.kmn", content: "c hello\n", isBinary: false },
@@ -80,6 +97,18 @@ describe("workingCopyStore — instantiateFromBase", () => {
     expect(s.baseIr).toBe(ir);
     // carve IR seeded from base IR
     expect(s.ir).toBe(ir);
+  });
+
+  it("resets identity to null (new keyboard starts without an overlay)", () => {
+    // Set an identity first, then instantiate from a base.
+    useWorkingCopyStore.getState().setIdentity({ bcp47: "ha-Latn", displayName: "Hausa" });
+    expect(useWorkingCopyStore.getState().identity).not.toBeNull();
+
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+
+    expect(useWorkingCopyStore.getState().identity).toBeNull();
   });
 
   it("clears prior carve deletion state on instantiation", () => {
@@ -99,11 +128,133 @@ describe("workingCopyStore — instantiateFromBase", () => {
     expect(s.ir).toBe(newIr);
   });
 
+  it("clears prior phaseResults so a fresh session starts clean", () => {
+    const phaseA: SurveyPhaseResult = {
+      phase: "A",
+      answers: [],
+      computedAxes: { scriptClass: "alphabetic" },
+    };
+    useWorkingCopyStore.getState().recordPhase(phaseA);
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
+
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(0);
+    expect(useWorkingCopyStore.getState().session.axes).toEqual({});
+  });
+
+  it("clears desktopLocked on re-instantiation", () => {
+    useWorkingCopyStore.getState().lockDesktop();
+    expect(useWorkingCopyStore.getState().desktopLocked).toBe(true);
+
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+
+    expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);
+  });
+
   it("isInstantiated returns true after instantiateFromBase", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
     useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
     expect(useWorkingCopyStore.getState().isInstantiated()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// instantiateFromExisting — Track 2
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — instantiateFromExisting (Track 2)", () => {
+  it("sets instantiationMode to adapt-existing", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+    expect(useWorkingCopyStore.getState().instantiationMode).toBe("adapt-existing");
+  });
+
+  it("sets baseKeyboard, baseVfs, baseIr, and seeds carve IR", () => {
+    const vfs = createVirtualFS([
+      { path: "source/test.kmn", content: "c hello\n", isBinary: false },
+    ]);
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+
+    const s = useWorkingCopyStore.getState();
+    expect(s.baseKeyboard).toBe(basicKbdus);
+    expect(s.baseVfs).toBe(vfs);
+    expect(s.baseIr).toBe(ir);
+    expect(s.ir).toBe(ir);
+  });
+
+  it("preserves identity from loaded keyboard displayName", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+
+    const s = useWorkingCopyStore.getState();
+    expect(s.identity).not.toBeNull();
+    expect(s.identity?.displayName).toBe(basicKbdus.displayName);
+  });
+
+  it("does NOT reset identity to null (Track 2 preserves it)", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+    expect(useWorkingCopyStore.getState().identity).not.toBeNull();
+  });
+
+  it("clears carve deletion state on instantiation", () => {
+    const oldIr = makeTestIR([]);
+    useWorkingCopyStore.getState().setIR(oldIr);
+    useWorkingCopyStore.getState().deleteNode("n1");
+    expect(useWorkingCopyStore.getState().deletedNodeIds.size).toBe(1);
+
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+
+    expect(useWorkingCopyStore.getState().deletedNodeIds.size).toBe(0);
+    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
+  });
+
+  it("clears phaseResults so adapt session starts clean", () => {
+    const phaseA: SurveyPhaseResult = {
+      phase: "A",
+      answers: [],
+      computedAxes: { scriptClass: "alphabetic" },
+    };
+    useWorkingCopyStore.getState().recordPhase(phaseA);
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
+
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(0);
+  });
+
+  it("isInstantiated returns true after instantiateFromExisting", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+    expect(useWorkingCopyStore.getState().isInstantiated()).toBe(true);
+  });
+
+  it("track 1 and track 2 can be distinguished by instantiationMode", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    expect(useWorkingCopyStore.getState().instantiationMode).toBe("new-from-base");
+
+    useWorkingCopyStore.getState().reset();
+
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+    expect(useWorkingCopyStore.getState().instantiationMode).toBe("adapt-existing");
   });
 });
 
@@ -136,10 +287,30 @@ describe("workingCopyStore — setIdentity", () => {
 });
 
 // ---------------------------------------------------------------------------
-// reset clears all slots including base + identity
+// reset clears all slots including base + identity + instantiationMode
 // ---------------------------------------------------------------------------
 
 describe("workingCopyStore — reset", () => {
+  it("reset clears instantiationMode", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    expect(useWorkingCopyStore.getState().instantiationMode).toBe("new-from-base");
+
+    useWorkingCopyStore.getState().reset();
+    expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
+  });
+
+  it("reset clears instantiationMode (adapt-existing)", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+    expect(useWorkingCopyStore.getState().instantiationMode).toBe("adapt-existing");
+
+    useWorkingCopyStore.getState().reset();
+    expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
+  });
+
   it("reset clears baseKeyboard, baseVfs, baseIr, and identity", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
@@ -182,10 +353,19 @@ describe("workingCopyStore — reset", () => {
     expect(s.desktopLocked).toBe(false);
   });
 
-  it("isInstantiated returns false after reset", () => {
+  it("isInstantiated returns false after reset (from instantiateFromBase)", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
     useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    expect(useWorkingCopyStore.getState().isInstantiated()).toBe(true);
+    useWorkingCopyStore.getState().reset();
+    expect(useWorkingCopyStore.getState().isInstantiated()).toBe(false);
+  });
+
+  it("isInstantiated returns false after reset (from instantiateFromExisting)", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
     expect(useWorkingCopyStore.getState().isInstantiated()).toBe(true);
     useWorkingCopyStore.getState().reset();
     expect(useWorkingCopyStore.getState().isInstantiated()).toBe(false);

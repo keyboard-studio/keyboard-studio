@@ -7,13 +7,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BaseKeyboard, CompilerDiagnostic } from "@keyboard-studio/contracts";
-import { useKeyboardArtifact, type ScaffoldSpec } from "../hooks/useKeyboardArtifact.ts";
+import { useKeyboardArtifact, type ScaffoldSpec, type OnInstantiateCallback } from "../hooks/useKeyboardArtifact.ts";
 import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
 import { OskModeToggle, type OskMode } from "./OskModeToggle.tsx";
 import { OSKFrame } from "./OSKFrame.tsx";
 import { ScaffoldForm } from "./ScaffoldForm.tsx";
 import { KmnEditor } from "./KmnEditor.tsx";
 import { getToZip } from "../lib/services.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { confirmRebaseIfEdited } from "../lib/confirmRebase.ts";
 
 // [TEMP] Per-fixture typing hints. Hardcoded until the Pattern schema's
 // `tests` field (spec §5) is wired into the UI to drive these automatically.
@@ -243,11 +245,7 @@ const LEFT_INIT_PCT = 40;
 
 type PickerMode = "open" | "scaffold";
 
-interface PreviewShellProps {
-  onBaseKeyboardSelected?: (kb: BaseKeyboard) => void;
-}
-
-export function PreviewShell({ onBaseKeyboardSelected }: PreviewShellProps) {
+export function PreviewShell() {
   const [baseKeyboard, setBaseKeyboard] = useState<BaseKeyboard | null>(null);
   const [pickerMode, setPickerMode] = useState<PickerMode>("open");
   const [scaffoldSpec, setScaffoldSpec] = useState<ScaffoldSpec | null>(null);
@@ -260,9 +258,8 @@ export function PreviewShell({ onBaseKeyboardSelected }: PreviewShellProps) {
       if (pickerMode === "open") {
         setScaffoldSpec(null);
       }
-      if (kb !== null) onBaseKeyboardSelected?.(kb);
     },
-    [onBaseKeyboardSelected, pickerMode]
+    [pickerMode]
   );
 
   const handlePickerModeChange = useCallback((mode: PickerMode) => {
@@ -332,10 +329,32 @@ export function PreviewShell({ onBaseKeyboardSelected }: PreviewShellProps) {
 
   const rightPct = 100 - leftPct;
 
+  // Working-copy store — used for explicit instantiation at base selection.
+  const instantiateFromBase = useWorkingCopyStore((s) => s.instantiateFromBase);
+
+  // onInstantiate: explicit working-copy instantiation (spec §8 v1.3.0, Track 1).
+  // Called by useKeyboardArtifact after a full fetch→compile run succeeds.
+  // Reads live store state at call time via confirmRebaseIfEdited() (getState()
+  // inside the helper) so the stale-closure problem cannot arise even though
+  // this callback is memoised: the async compile may complete long after the
+  // render that created this closure.
+  const onInstantiate = useCallback<OnInstantiateCallback>((base, { vfs, ir }) => {
+    if (ir === null || vfs === null) {
+      // IR or VFS unavailable (mock engine path); cannot fully instantiate.
+      // The store's carve IR stays null — the gallery will show its empty state.
+      console.warn("[studio] instantiate skipped: no parsed IR (mock engine?)");
+      return;
+    }
+
+    if (!confirmRebaseIfEdited()) return;
+
+    instantiateFromBase(base, { vfs, ir });
+  }, [instantiateFromBase]);
+
   // Lifted from OSKFrame so DiagnosticsPanel and the download button can
   // read stage (and the embedded VFS) without prop-drilling through the iframe.
   const activeSpec = pickerMode === "scaffold" ? scaffoldSpec : null;
-  const { stage, retry, recompile } = useKeyboardArtifact(baseKeyboard, activeSpec);
+  const { stage, retry, recompile } = useKeyboardArtifact(baseKeyboard, activeSpec, null, onInstantiate);
 
   const diagnostics =
     stage.kind === "ready"
