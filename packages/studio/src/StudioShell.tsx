@@ -8,7 +8,8 @@
 //   #output               — output / delivery (stub; not yet implemented)
 
 import { useCallback, useEffect, useRef, useState, type ReactNode, type CSSProperties } from "react";
-import type { BaseKeyboard, KeyboardIdentity } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, KeyboardIdentity, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import { useSurveyResultsStore } from "./stores/surveyResultsStore.ts";
 import { PreviewShell } from "./components/PreviewShell.tsx";
 import { PhaseA, PhaseB, PhaseF } from "./survey/index.ts";
 import type { SurveyContext } from "./survey/types.ts";
@@ -202,11 +203,17 @@ function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const { stage, retry } = useKeyboardArtifact(baseKeyboard);
   const rightPct = 100 - leftPct;
 
+  // Survey results are persisted into the survey-results store (the data bus the
+  // gallery and §7.2 strategy selector read), not discarded. refs #334, #369.
+  const recordPhase = useSurveyResultsStore((s) => s.recordPhase);
+  const resetSurvey = useSurveyResultsStore((s) => s.reset);
+
   function handlePhaseAComplete(
-    _result: unknown,
+    result: SurveyPhaseResult,
     identity: KeyboardIdentity | undefined,
     _provenance: unknown,
   ) {
+    recordPhase(result);
     const ctx: SurveyContext = {};
     if (identity !== undefined) {
       ctx["language_name"] = identity.languageName;
@@ -219,18 +226,19 @@ function SurveyView({ baseKeyboard }: SurveyViewProps) {
     setPhase("B");
   }
 
-  // TODO: persist Phase B/F results into a survey store so the gallery and
-  // §7.2 strategy selector can read survey context + answers. Discarding them
-  // is acceptable only while those consumers are scaffolded-not-built.
-  function handlePhaseBComplete(_result: unknown) {
-    // TODO: persist phase B answers to IR store once #141/#142 land
+  function handlePhaseBComplete(result: SurveyPhaseResult) {
+    recordPhase(result);
     setPhase("F");
   }
-  function handlePhaseFComplete(_result: unknown) {
-    // TODO: hand off survey results to strategy selector once scaffold-over-IR (#238) lands
+  function handlePhaseFComplete(result: SurveyPhaseResult) {
+    recordPhase(result);
     setPhase("done");
   }
-  function handleStartOver() { setSurveyContext({}); setPhase("A"); }
+  function handleStartOver() {
+    resetSurvey();
+    setSurveyContext({});
+    setPhase("A");
+  }
 
   const questionsPaneStyle: CSSProperties = {
     flexBasis: `calc(${leftPct}% - ${SURVEY_DIVIDER_WIDTH / 2}px)`,
@@ -262,8 +270,8 @@ function SurveyView({ baseKeyboard }: SurveyViewProps) {
         Survey complete
       </h2>
       <p style={{ margin: 0, fontSize: 13, color: "#8b949e" }}>
-        All survey phases have been completed. Gallery hand-off is not yet
-        wired up, so your answers are not persisted yet.
+        All survey phases have been completed. Your answers are saved to the
+        survey-results store; the gallery and strategy selector read from there.
       </p>
       <button
         type="button"
