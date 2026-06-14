@@ -1,6 +1,6 @@
 {
-  "specVersion": "1.1.0",
-  "lastUpdated": "2026-06-11",
+  "specVersion": "1.3.0",
+  "lastUpdated": "2026-06-14",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -74,47 +74,52 @@
     },
     "§6": {
       "title": "6. Worked example",
-      "hash": "sha256:cd8447e0802fe336",
+      "hash": "sha256:0ecad32a0b9a43d4",
       "status": "reference",
       "implements": [],
       "decisions": [],
-      "notes": "Narrative walkthrough; validated by acceptance scenarios in §15."
+      "notes": "Narrative walkthrough; validated by acceptance scenarios in §15. v1.3.0 added 'Base-derived pre-fill' paragraph — PatternQuestion.default field is covered by §5 (no new contracts here)."
     },
     "§7": {
       "title": "7. Strategy selection",
-      "hash": "sha256:328c728951306c92",
+      "hash": "sha256:3faaf96376a742a0",
       "status": "partial",
       "implements": [
         "packages/contracts/src/strategy.ts",
         "packages/contracts/src/axes.ts",
-        "packages/contracts/src/surveyPhaseResult.ts"
+        "packages/contracts/src/surveyPhaseResult.ts",
+        "packages/contracts/src/assignmentMap.ts"
       ],
       "decisions": [
         "D1",
         "D2"
       ],
-      "notes": "A1-A7 axis types + strategy catalog types present. Decision tree engine (§7.2) + S-01..S-12 selectors not yet built."
+      "notes": "A1-A7 axis types + strategy catalog types present. Decision tree engine (§7.2) + S-01..S-12 selectors not yet built. v1.1.1 added §7.6 (corpus placement priors — seeder in utilities/kbgen, not yet a contracts type). v1.2.0 added §7.7 (scoped assignment map) — assignmentMap.ts implements the typed contract; SurveyPhaseResult.assignments? additive field already landed ahead of spec text."
     },
     "§8": {
       "title": "8. Data flow",
-      "hash": "sha256:343b89581754ed73",
+      "hash": "sha256:3bc0726bdc4d6564",
       "status": "partial",
       "implements": [
         "packages/contracts/src/characterDiscovery.ts",
-        "packages/contracts/src/linguistInventory.ts"
+        "packages/contracts/src/linguistInventory.ts",
+        "packages/contracts/src/ir/producedSet.ts",
+        "packages/contracts/src/surveySession.ts"
       ],
-      "decisions": [],
-      "notes": "CharacterDiscovery + LinguistInventory types exist. Survey-to-pattern pipeline not yet wired."
+      "decisions": [
+        "D9"
+      ],
+      "notes": "CharacterDiscovery + LinguistInventory types exist. Survey-to-pattern pipeline not yet wired. v1.1.1 added placement proposals (Phase B). v1.2.0/v1.3.0 added two-track working-copy spine (instantiateFromBase / instantiateFromExisting) — producedSet.ts and surveySession.ts implement those contracts. Engine pipeline not yet built."
     },
     "§9": {
       "title": "9. Three-group routing",
-      "hash": "sha256:d19630dd9b9b0a71",
+      "hash": "sha256:541063c7a40e8d55",
       "status": "unimplemented",
       "implements": [],
       "decisions": [
         "D5"
       ],
-      "notes": "Gallery routing (supported / CJK+Ethiopic stub / legacy) not yet built. D5 governs CJK/Ethiopic out-of-scope stub."
+      "notes": "Gallery routing (supported / CJK+Ethiopic stub / legacy) not yet built. D5 governs CJK/Ethiopic out-of-scope stub. v1.2.0 added language/script decoupling — routing follows the chosen target script (BCP47 subtag from identity-lite), not the language's default script. v1.3.0 added Phase A CJK/Ethiopic detection gate detail."
     },
     "§10": {
       "title": "10. Validator and lint engine",
@@ -133,29 +138,35 @@
       "notes": "All three-layer interfaces typed. Layer A 9 TS-portable checks + 5 WASM-only not yet implemented. D3 governs 300ms debounce."
     },
     "§11": {
-      "title": "11. Virtual FS",
-      "hash": "sha256:5acf160cf451fdbe",
-      "status": "unimplemented",
+      "title": "11. criteria.md compliance",
+      "hash": "sha256:5bbf571a7f80c609",
+      "status": "implemented",
       "implements": [
-        "packages/engine/src/output/index.ts"
+        "packages/contracts/data/criteria.json",
+        "packages/contracts/src/criteria.ts",
+        "packages/contracts/src/criteriaData.ts"
       ],
-      "decisions": [],
-      "notes": "In-memory FS mirroring keymanapp/keyboards layout. Serialized at output time to .zip or GitHub OAuth fork+PR. Not yet built beyond the output service stub."
+      "decisions": [
+        "D4"
+      ],
+      "notes": "Day-1 criteria catalog fully typed as Criterion[] with 148 entries (133 repo-hygiene + 12 DISCUS + 3 added post-v1.0: 1 from §7.7a KM_LINT_INVENTORY_UNCOVERED split, 2 import-output criteria). Loadable via ALL_CRITERIA / '/criteria' subpath. D4 governs the four-band enforcement model. Previously §11 was 'Virtual FS' — that content is now a subsection of §12."
     },
     "§12": {
       "title": "12. Output artifacts",
-      "hash": "sha256:95c621efa8371a3e",
+      "hash": "sha256:b2e4681ffb3c3c61",
       "status": "partial",
       "implements": [
         "packages/contracts/src/virtualFS.ts",
         "packages/contracts/src/outputService.ts",
         "packages/contracts/src/scaffolder.ts",
-        "packages/contracts/src/keyboardIdentity.ts"
+        "packages/contracts/src/keyboardIdentity.ts",
+        "packages/engine/src/output/index.ts"
       ],
       "decisions": [
-        "D6"
+        "D6",
+        "D9"
       ],
-      "notes": "VirtualFS + OutputService + Scaffolder interfaces typed. ZIP serialisation and GitHub OAuth fork+PR not yet built. D6 governs desktop-first scope."
+      "notes": "VirtualFS + OutputService + Scaffolder interfaces typed. ZIP and sidecar serialisation built in engine/src/output/; GitHub OAuth fork+PR built in engine/src/output/github.ts; buildImportAttributionBlock in engine/src/output/import-attribution.ts. D6 governs desktop-first scope; D9 covers IR-as-canonical-source for emit. v1.3.0 added working-copy spine (VirtualFS as persistent live edit target, Track 1/Track 2 instantiation, re-projected layers). Virtual FS content previously tracked as standalone §11 now lives here as a subsection."
     },
     "§13": {
       "title": "13. Team boundaries",
