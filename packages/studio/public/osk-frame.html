@@ -14,7 +14,7 @@
       delivery model is decided.
 
       postMessage contract:
-        host -> frame: { type: "SET_KEYBOARD",  jsUrl, keyboardId, fontFaceUrl?, fontFaceFamily? }
+        host -> frame: { type: "SET_KEYBOARD",  jsUrl, keyboardId, fontFaceUrl?, fontFaceFamily?, keyboardCssUrls? }
         host -> frame: { type: "SET_OSK_MODE",  mode: "desktop" | "touch" }
         frame -> host: { type: "ENGINE_READY" }
         frame -> host: { type: "ENGINE_ERROR", message }
@@ -25,6 +25,11 @@
       window.keyman.addKeyboards() is called. This ensures the compiled keyboard
       JS can resolve the custom font by family name without relying on KMW's
       pathConfig.fonts mechanism (which is never set in this frame).
+
+      Keyboard CSS injection: when keyboardCssUrls is non-empty, each blob: URL
+      is loaded as a <link rel="stylesheet"> (per-keyboard `.kmw-keyboard-<id>`
+      rules) after @font-face and before addKeyboards(). Mirrors what a real
+      Keyman install does when it copies the package CSS next to the .js.
     -->
     <style>
       * { box-sizing: border-box; }
@@ -146,6 +151,33 @@
         // prevent CSS injection via a crafted fontname attribute.  url is
         // validated to be a blob: or data: URL (the only kinds the studio
         // produces) before use.
+        // Inject per-keyboard CSS files (from .kps <File>...<FileType>.css</FileType>)
+        // as <link rel="stylesheet"> tags in the frame document head. The CSS is
+        // hosted on a blob: URL the parent created; we never see the bytes here.
+        // Each URL is tagged with a data-kmw-studio-keyboard-css attribute so
+        // subsequent keyboard selections can sweep the old ones first.
+        // Security: only blob: URLs are accepted — same posture as injectFontFace.
+        function sweepKeyboardCss() {
+          var existing = document.querySelectorAll("link[data-kmw-studio-keyboard-css]");
+          for (var i = 0; i < existing.length; i++) {
+            var el = existing[i];
+            if (el.parentNode) el.parentNode.removeChild(el);
+          }
+        }
+        function injectKeyboardCss(urls) {
+          sweepKeyboardCss();
+          if (!urls || !urls.length) return;
+          for (var i = 0; i < urls.length; i++) {
+            var url = urls[i];
+            if (typeof url !== "string" || !url.startsWith("blob:")) continue;
+            var link = document.createElement("link");
+            link.rel = "stylesheet";
+            link.href = url;
+            link.setAttribute("data-kmw-studio-keyboard-css", "1");
+            document.head.appendChild(link);
+          }
+        }
+
         function injectFontFace(family, url) {
           if (!family || !url) return;
           // Strip any character that could break out of a CSS string or block.
@@ -296,14 +328,17 @@
           }
         }
 
-        function loadKeyboard(jsUrl, keyboardId, fontFaceUrl, fontFaceFamily) {
+        function loadKeyboard(jsUrl, keyboardId, fontFaceUrl, fontFaceFamily, keyboardCssUrls) {
           if (!window.keyman || typeof window.keyman.addKeyboards !== "function") {
             postError("KMW engine missing addKeyboards()");
             return;
           }
-          // Inject font BEFORE registering the keyboard so the compiled CSS
-          // can resolve the family name when the keyboard JS executes.
+          // Inject font and per-keyboard CSS BEFORE registering the keyboard
+          // so the compiled CSS can resolve the family name and the keyboard's
+          // own `.kmw-keyboard-<id>` rules are present when the keyboard JS
+          // executes.
           injectFontFace(fontFaceFamily, fontFaceUrl);
+          injectKeyboardCss(keyboardCssUrls);
           setStatus("registering keyboard: " + keyboardId);
           var kmwId = "Keyboard_" + keyboardId;
           var stub = {
@@ -357,7 +392,7 @@
               if (pendingKeyboard) {
                 var k = pendingKeyboard;
                 pendingKeyboard = null;
-                loadKeyboard(k.jsUrl, k.keyboardId, k.fontFaceUrl, k.fontFaceFamily);
+                loadKeyboard(k.jsUrl, k.keyboardId, k.fontFaceUrl, k.fontFaceFamily, k.keyboardCssUrls);
               }
             })
             .catch(function (err) {
@@ -391,9 +426,16 @@
                 keyboardId: msg.keyboardId,
                 fontFaceUrl: msg.fontFaceUrl || null,
                 fontFaceFamily: msg.fontFaceFamily || null,
+                keyboardCssUrls: Array.isArray(msg.keyboardCssUrls) ? msg.keyboardCssUrls : null,
               };
             } else {
-              loadKeyboard(msg.jsUrl, msg.keyboardId, msg.fontFaceUrl, msg.fontFaceFamily);
+              loadKeyboard(
+                msg.jsUrl,
+                msg.keyboardId,
+                msg.fontFaceUrl,
+                msg.fontFaceFamily,
+                Array.isArray(msg.keyboardCssUrls) ? msg.keyboardCssUrls : null,
+              );
             }
             return;
           }

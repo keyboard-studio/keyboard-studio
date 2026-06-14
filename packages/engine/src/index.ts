@@ -42,6 +42,7 @@ export type {
   FetchKeyboardSourceOptions,
   FetchKeyboardSourceResult,
   KpsFontEntry,
+  KpsStylesheetEntry,
 } from "./loader/fetchKeyboardSourceToVfs.js";
 
 // Issues #46/#47 — output service (zip download + GitHub OAuth fork+PR).

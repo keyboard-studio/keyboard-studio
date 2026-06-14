@@ -1,11 +1,14 @@
-// Extract font file references from a Keyman package specification (.kps) XML.
+// Extract font and stylesheet references from a Keyman package specification (.kps) XML.
 //
-// Two categories are extracted:
-//   oskFonts  — paths from <OSKFont> and <DisplayFont> elements inside a
-//               <Keyboard> block.  These are the fonts the OSK preview must
-//               load for correct glyph rendering.
-//   fileFonts — paths from <File> entries whose <FileType> is ".ttf" or
-//               ".otf".  These may overlap with oskFonts; the loader deduplicates.
+// Three categories are extracted:
+//   oskFonts    — paths from <OSKFont> and <DisplayFont> elements inside a
+//                 <Keyboard> block.  These are the fonts the OSK preview must
+//                 load for correct glyph rendering.
+//   fileFonts   — paths from <File> entries whose <FileType> is ".ttf" or
+//                 ".otf".  These may overlap with oskFonts; the loader deduplicates.
+//   stylesheets — paths from <File> entries whose <FileType> is ".css". These
+//                 carry per-keyboard OSK styling (.kmw-keyboard-<id> rules)
+//                 that bind the OSK font and paint the keys.
 //
 // All paths are returned raw (backslashes intact) as they appear in the XML;
 // resolution against the keyboard tree is the loader's responsibility.
@@ -15,6 +18,8 @@ export interface KpsFontsResult {
   oskFonts: string[];
   /** Raw paths from <File> with <FileType>.ttf|.otf. Deduped. */
   fileFonts: string[];
+  /** Raw paths from <File> with <FileType>.css. Deduped. */
+  stylesheets: string[];
 }
 
 function extractTagValues(xml: string, tag: string): string[] {
@@ -56,18 +61,27 @@ export function parseKpsFonts(kpsText: string): KpsFontsResult {
   //   </File>
   const fileBlockRe = /<File\s*>([\s\S]*?)<\/File>/gi;
   const fileFonts: string[] = [];
+  const stylesheets: string[] = [];
   let blockMatch: RegExpExecArray | null;
   while ((blockMatch = fileBlockRe.exec(kpsText)) !== null) {
     const block = blockMatch[1] ?? "";
     const typeMatch = /<FileType\s*>([^<]*)<\/FileType>/i.exec(block);
     if (typeMatch === null) continue;
     const fileType = (typeMatch[1] ?? "").trim().toLowerCase();
-    if (fileType !== ".ttf" && fileType !== ".otf") continue;
     const nameMatch = /<Name\s*>([^<]*)<\/Name>/i.exec(block);
     if (nameMatch === null) continue;
     const name = (nameMatch[1] ?? "").trim();
-    if (name.length > 0) fileFonts.push(name);
+    if (name.length === 0) continue;
+    if (fileType === ".ttf" || fileType === ".otf") {
+      fileFonts.push(name);
+    } else if (fileType === ".css") {
+      stylesheets.push(name);
+    }
   }
 
-  return { oskFonts, fileFonts: dedup(fileFonts) };
+  return {
+    oskFonts,
+    fileFonts: dedup(fileFonts),
+    stylesheets: dedup(stylesheets),
+  };
 }

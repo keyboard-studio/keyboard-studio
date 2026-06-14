@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { BaseKeyboard, VirtualFS, KeyboardIR, KpsFontEntry } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, VirtualFS, KeyboardIR, KpsFontEntry, KpsStylesheetEntry } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { LOCAL_PROXY_BASE, getScaffolderService } from "../lib/services.ts";
@@ -11,7 +11,7 @@ interface EngineModule {
     baseKeyboard: BaseKeyboard,
     fs: VirtualFS,
     opts?: { proxyBase?: string }
-  ) => Promise<{ options?: Record<string, unknown>; filesLoaded?: string[]; warnings?: string[]; fonts?: KpsFontEntry[] }>;
+  ) => Promise<{ options?: Record<string, unknown>; filesLoaded?: string[]; warnings?: string[]; fonts?: KpsFontEntry[]; stylesheets?: KpsStylesheetEntry[] }>;
   init: () => Promise<void>;
   isReady?: () => boolean;
   parseKmn?: (text: string, keyboardId: string) => { ir: KeyboardIR; opaqueFeatures: Array<{ feature: string; count: number }> };
@@ -51,7 +51,7 @@ export type Stage =
    */
   | { kind: "vfs-loading" }
   | { kind: "compiling"; isWarmCompile: boolean }
-  | { kind: "ready"; compileResult: CompileResult; jsBlobUrl: string; vfs: VirtualFS; scaffoldWarnings: string[]; fontFaceUrl?: string; fontFaceFamily?: string }
+  | { kind: "ready"; compileResult: CompileResult; jsBlobUrl: string; vfs: VirtualFS; scaffoldWarnings: string[]; fontFaceUrl?: string; fontFaceFamily?: string; keyboardCssUrls?: string[] }
   | {
       kind: "error";
       step: "fetch" | "vfs" | "compile";
@@ -142,6 +142,9 @@ export function useKeyboardArtifact(
   // Current OSK font family, paired with prevFontBlobUrl. Persists across
   // recompiles — the font only changes on a new fetch, not on recompile().
   const fontFaceFamilyRef = useRef<string | null>(null);
+  // Per-keyboard CSS blob URLs. Same lifetime semantics as the font blob URL:
+  // rebuilt on every fresh fetch, revoked on teardown / next fetch.
+  const prevKeyboardCssBlobUrls = useRef<string[]>([]);
   const runId = useRef(0);
   const engineRef = useRef<EngineModule | null>(null);
   const engineLoadAttempted = useRef(false);
@@ -235,6 +238,9 @@ export function useKeyboardArtifact(
     };
     if (prevFontBlobUrl.current !== null) readyStage.fontFaceUrl = prevFontBlobUrl.current;
     if (fontFaceFamilyRef.current !== null) readyStage.fontFaceFamily = fontFaceFamilyRef.current;
+    if (prevKeyboardCssBlobUrls.current.length > 0) {
+      readyStage.keyboardCssUrls = prevKeyboardCssBlobUrls.current;
+    }
     setStage(readyStage);
   }, [scaffoldSpec?.keyboardId, onInstantiate]);
 
@@ -273,13 +279,16 @@ export function useKeyboardArtifact(
 
     const scaffoldWarnings: string[] = [];
 
-    // Reset any OSK-font state carried over from a previous selection. A fresh
-    // run rebuilds it from the fetched source (or leaves it cleared).
+    // Reset any OSK-font and keyboard-CSS state carried over from a previous
+    // selection. A fresh run rebuilds them from the fetched source (or leaves
+    // them cleared if the .kps has no font / .css entries).
     if (prevFontBlobUrl.current !== null) {
       URL.revokeObjectURL(prevFontBlobUrl.current);
       prevFontBlobUrl.current = null;
     }
     fontFaceFamilyRef.current = null;
+    for (const url of prevKeyboardCssBlobUrls.current) URL.revokeObjectURL(url);
+    prevKeyboardCssBlobUrls.current = [];
 
     try {
       if (scaffoldSpec != null) {
@@ -307,6 +316,14 @@ export function useKeyboardArtifact(
             prevFontBlobUrl.current = URL.createObjectURL(blob);
             fontFaceFamilyRef.current = oskFontEntry.family ?? null;
           }
+        }
+        // Build a blob URL for each per-keyboard CSS file the .kps declared.
+        // The OSK frame injects these as <style> tags so the keyboard's own
+        // `.kmw-keyboard-<id>` rules (key colors, font-family bindings, etc.)
+        // paint the preview the same way they paint a real install.
+        for (const sheet of fetchResult.stylesheets ?? []) {
+          const blob = new Blob([sheet.cssText], { type: "text/css" });
+          prevKeyboardCssBlobUrls.current.push(URL.createObjectURL(blob));
         }
       }
     } catch (err: unknown) {
@@ -368,6 +385,8 @@ export function useKeyboardArtifact(
         URL.revokeObjectURL(prevFontBlobUrl.current);
         prevFontBlobUrl.current = null;
       }
+      for (const url of prevKeyboardCssBlobUrls.current) URL.revokeObjectURL(url);
+      prevKeyboardCssBlobUrls.current = [];
     };
   }, []);
 

@@ -14,6 +14,13 @@ export interface SetKeyboardCommand {
   fontFaceUrl?: string;
   /** CSS font-family string, must exactly match the .kvks fontname (e.g. "Andika Afr"). */
   fontFaceFamily?: string;
+  /**
+   * Blob URLs for per-keyboard CSS files declared in the .kps. Injected as
+   * <style> tags inside the OSK iframe AFTER the @font-face and BEFORE
+   * addKeyboards() so the compiled keyboard's `.kmw-keyboard-<id>` rules
+   * apply to the rendered OSK.
+   */
+  keyboardCssUrls?: string[];
 }
 
 export interface SetOskModeCommand {

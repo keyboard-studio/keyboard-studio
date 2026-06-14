@@ -7,7 +7,7 @@
 // compiler flags. Writes everything flat into the VFS at `source/...`
 // (the layout CompilerService.compile() expects).
 
-import type { BaseKeyboard, VirtualFS, KpsFontEntry } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, VirtualFS, KpsFontEntry, KpsStylesheetEntry } from "@keyboard-studio/contracts";
 import { parseKmnHeaderStores } from "../compiler/parseKmnHeaderStores.js";
 import { parseKpjFlags, type CompilerOptions } from "../compiler/parseKpjFlags.js";
 import { parseKpsFonts } from "../compiler/parseKpsFonts.js";
@@ -31,9 +31,10 @@ export interface FetchKeyboardSourceOptions {
   fetchImpl?: FetchFn;
 }
 
-// KpsFontEntry is defined in @keyboard-studio/contracts and re-exported below
-// so callers that import from the engine barrel also get the type.
-export type { KpsFontEntry };
+// KpsFontEntry / KpsStylesheetEntry are defined in @keyboard-studio/contracts
+// and re-exported below so callers that import from the engine barrel also
+// get the types.
+export type { KpsFontEntry, KpsStylesheetEntry };
 
 export interface FetchKeyboardSourceResult {
   /** CompilerOptions derived from the .kpj (or defaults if .kpj absent). */
@@ -47,6 +48,13 @@ export interface FetchKeyboardSourceResult {
    * Empty array when no .kps was found or no font entries were present.
    */
   fonts: KpsFontEntry[];
+  /**
+   * Per-keyboard CSS stylesheets fetched from the keyboards tree and written
+   * into the VFS. The studio injects these into the OSK iframe so the
+   * keyboard's `.kmw-keyboard-<id>` rules apply to the preview. Empty when
+   * no .kps was found or no `.css` <File> entries were present.
+   */
+  stylesheets: KpsStylesheetEntry[];
 }
 
 const DEFAULT_PROXY = "/kbd-proxy";
@@ -186,14 +194,15 @@ export async function fetchKeyboardSourceToVfs(
     filesLoaded.push(path);
   }
 
-  // Step 4: optional .kps — fetch font references.
+  // Step 4: optional .kps — fetch font and stylesheet references.
   // The raw .kps is NOT written to the VFS (it references compiled artifacts
   // like ../build/*.kmx that must not leak into the VFS).
   const fonts: KpsFontEntry[] = [];
+  const stylesheets: KpsStylesheetEntry[] = [];
   const kpsUrl = `${baseUrl}/source/${baseKeyboard.id}.kps`;
   const kpsResp = await getText(kpsUrl, fetchImpl);
   if (kpsResp.ok && kpsResp.text !== undefined) {
-    const { oskFonts, fileFonts } = parseKpsFonts(kpsResp.text);
+    const { oskFonts, fileFonts, stylesheets: cssRefs } = parseKpsFonts(kpsResp.text);
 
     // Build a deduped map of rawPath -> isOskFont.
     const allRaw = new Map<string, boolean>();
@@ -203,19 +212,22 @@ export async function fetchKeyboardSourceToVfs(
     }
 
     // Resolve the .kvks font family (used on OSK-font entries).
+    // VFS.get() returns a VirtualFSEntry ({ path, content, isBinary }), not
+    // the raw content — read .content. Text siblings were written with
+    // string content; binary entries would have Uint8Array which we skip.
     const kvksVfsPath = `source/${baseKeyboard.id}.kvks`;
     let kvksFamilyStr: string | undefined;
     const kvksEntry = vfs.get(kvksVfsPath);
-    if (typeof kvksEntry === "string") {
-      kvksFamilyStr = parseKvksFontFamily(kvksEntry) ?? undefined;
+    if (kvksEntry !== undefined && typeof kvksEntry.content === "string") {
+      kvksFamilyStr = parseKvksFontFamily(kvksEntry.content) ?? undefined;
     }
     // Fallback: check the touch-layout's top-level "font" value.
     if (kvksFamilyStr === undefined) {
       const tlVfsPath = `source/${baseKeyboard.id}.keyman-touch-layout`;
       const tlEntry = vfs.get(tlVfsPath);
-      if (typeof tlEntry === "string") {
+      if (tlEntry !== undefined && typeof tlEntry.content === "string") {
         try {
-          const tlJson = JSON.parse(tlEntry) as Record<string, unknown>;
+          const tlJson = JSON.parse(tlEntry.content) as Record<string, unknown>;
           // Touch-layout root can have "phone"/"tablet" etc.; each may carry "font".
           for (const section of Object.values(tlJson)) {
             if (
@@ -282,6 +294,48 @@ export async function fetchKeyboardSourceToVfs(
       }
       fonts.push(entry);
     }
+
+    // Fetch each per-keyboard CSS file in parallel. These live next to the .kps
+    // in source/ and may use the same `..\..\..` traversal pattern as fonts;
+    // resolveKpsFontPath enforces the release/ tree boundary for both.
+    const cssFetchResults = await Promise.all(
+      cssRefs.map(async (rawPath) => {
+        const cssRelPath = resolveKpsFontPath(rawPath, baseKeyboard.path);
+        if (cssRelPath === null) {
+          return {
+            ok: false as const,
+            warn: `css path '${rawPath}' resolves outside release/ tree — skipped`,
+          };
+        }
+        const cssUrl = `${proxyBase}/${cssRelPath}`;
+        const r = await getText(cssUrl, fetchImpl);
+        if (!r.ok || r.text === undefined) {
+          const detail = r.networkError
+            ? `network error: ${r.networkError}`
+            : `HTTP ${r.status}`;
+          return {
+            ok: false as const,
+            warn: `css '${cssRelPath}' not fetched (${detail}) — skipped`,
+          };
+        }
+        return { ok: true as const, cssRelPath, cssText: r.text };
+      }),
+    );
+
+    for (const cr of cssFetchResults) {
+      if (!cr.ok) {
+        warnings.push(cr.warn);
+        continue;
+      }
+      const vfsPath = cr.cssRelPath.slice("release/".length);
+      vfs.set(vfsPath, cr.cssText);
+      filesLoaded.push(vfsPath);
+      stylesheets.push({
+        vfsPath,
+        cssRelPath: cr.cssRelPath,
+        cssText: cr.cssText,
+      });
+    }
   } else {
     const detail = kpsResp.networkError
       ? `network error: ${kpsResp.networkError}`
@@ -308,5 +362,5 @@ export async function fetchKeyboardSourceToVfs(
   // The KMW .js is produced by `CompilerService.compile()` running
   // @keymanapp/kmc-kmn's full pipeline in-browser — no need to fetch a
   // prebuilt stand-in. (Removed once kmw-compiler integration landed.)
-  return { options, filesLoaded, warnings, fonts };
+  return { options, filesLoaded, warnings, fonts, stylesheets };
 }

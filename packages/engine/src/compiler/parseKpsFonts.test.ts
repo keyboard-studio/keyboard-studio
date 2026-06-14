@@ -39,19 +39,20 @@ describe("parseKpsFonts", () => {
 
   describe("empty input", () => {
     it("returns empty arrays for empty string", () => {
-      expect(parseKpsFonts("")).toEqual({ oskFonts: [], fileFonts: [] });
+      expect(parseKpsFonts("")).toEqual({ oskFonts: [], fileFonts: [], stylesheets: [] });
     });
 
     it("returns empty arrays for whitespace-only input", () => {
       expect(parseKpsFonts("   \n  ")).toEqual({
         oskFonts: [],
         fileFonts: [],
+        stylesheets: [],
       });
     });
   });
 
   describe("<File> filtering", () => {
-    it("excludes a <File> whose <FileType> is not .ttf or .otf", () => {
+    it("excludes a <File> whose <FileType> is not .ttf, .otf, or .css", () => {
       const xml = `
         <Files>
           <File>
@@ -63,8 +64,9 @@ describe("parseKpsFonts", () => {
             <FileType>.htm</FileType>
           </File>
         </Files>`;
-      const { fileFonts } = parseKpsFonts(xml);
+      const { fileFonts, stylesheets } = parseKpsFonts(xml);
       expect(fileFonts).toEqual([]);
+      expect(stylesheets).toEqual([]);
     });
 
     it("includes a <File> with <FileType>.ttf</FileType>", () => {
@@ -99,6 +101,53 @@ describe("parseKpsFonts", () => {
         <OSKFont>path/to/font.ttf</OSKFont>`;
       const { oskFonts } = parseKpsFonts(xml);
       expect(oskFonts).toEqual(["path/to/font.ttf"]);
+    });
+  });
+
+  describe("stylesheets", () => {
+    it("includes a <File> with <FileType>.css</FileType>", () => {
+      const xml = `
+        <Files>
+          <File>
+            <Name>sil_cameroon_qwerty.css</Name>
+            <FileType>.css</FileType>
+          </File>
+        </Files>`;
+      const { stylesheets } = parseKpsFonts(xml);
+      expect(stylesheets).toEqual(["sil_cameroon_qwerty.css"]);
+    });
+
+    it("deduplicates repeated .css entries", () => {
+      const xml = `
+        <Files>
+          <File>
+            <Name>kb.css</Name>
+            <FileType>.css</FileType>
+          </File>
+          <File>
+            <Name>kb.css</Name>
+            <FileType>.css</FileType>
+          </File>
+        </Files>`;
+      const { stylesheets } = parseKpsFonts(xml);
+      expect(stylesheets).toEqual(["kb.css"]);
+    });
+
+    it("separates fonts and stylesheets when both are present", () => {
+      const xml = `
+        <Files>
+          <File>
+            <Name>MyFont.ttf</Name>
+            <FileType>.ttf</FileType>
+          </File>
+          <File>
+            <Name>kb.css</Name>
+            <FileType>.css</FileType>
+          </File>
+        </Files>`;
+      const { fileFonts, stylesheets } = parseKpsFonts(xml);
+      expect(fileFonts).toEqual(["MyFont.ttf"]);
+      expect(stylesheets).toEqual(["kb.css"]);
     });
   });
 });
