@@ -1,24 +1,33 @@
-// Survey-results store — persists phase results across the hybrid flow so the
-// gallery and §7.2 strategy selector can read survey context + answers, instead
-// of discarding them on each phase transition. See spec §8 (data flow) and
-// docs/workflow-model.md (the survey-results store is the data bus that connects
-// the survey island to the scaffold/output spine).
+// Survey-results store — adapter over workingCopyStore.
+//
+// All survey state lives in workingCopyStore. This module re-exports a
+// useSurveyResultsStore hook with the exact same call signatures as the
+// original Zustand store so every existing consumer (StudioShell.tsx,
+// MechanismGallery.tsx, TouchGate, non-React callers via .getState()) works
+// unchanged.
+//
+// See irStore.ts for the adapter technique.
 //
 // Mirrors the Zustand pattern in irStore.ts. The merged `session` is derived
 // from `irAxes` + `phaseResults` via the contract's mergePhaseResults(), so the
 // scoped assignment map (spec §7.7, SurveySession.assignments) and the merged
 // axis vector are available to downstream consumers from one place.
 
-import { create } from "zustand";
-import {
-  mergePhaseResults,
-  type MechanismAssignment,
-  type SurveyPhaseResult,
-  type SurveySession,
-  type DiscoveryAxisVector,
+import { useStore } from "zustand/react";
+import type {
+  DiscoveryAxisVector,
+  MechanismAssignment,
+  SurveyPhaseResult,
+  SurveySession,
 } from "@keyboard-studio/contracts";
+import { useWorkingCopyStore } from "./workingCopyStore.ts";
 
-interface SurveyResultsState {
+// ---------------------------------------------------------------------------
+// SurveyResultsState — the public type contract for existing consumers.
+// Matches the original surveyResultsStore interface byte-for-byte.
+// ---------------------------------------------------------------------------
+
+export interface SurveyResultsState {
   /** Phase results captured so far, in completion order (A → B → … → F). */
   phaseResults: SurveyPhaseResult[];
   /**
@@ -82,50 +91,85 @@ interface SurveyResultsState {
   reset: () => void;
 }
 
-function remerge(
-  irAxes: Partial<DiscoveryAxisVector>,
-  phaseResults: SurveyPhaseResult[],
-): Pick<SurveyResultsState, "phaseResults" | "irAxes" | "session"> {
+// ---------------------------------------------------------------------------
+// Selector — project the survey slice out of workingCopyStore state.
+// ---------------------------------------------------------------------------
+
+function selectSurveySlice(
+  s: ReturnType<typeof useWorkingCopyStore.getState>,
+): SurveyResultsState {
   return {
-    phaseResults,
-    irAxes,
-    session: mergePhaseResults(irAxes, phaseResults),
+    phaseResults: s.phaseResults,
+    irAxes: s.irAxes,
+    session: s.session,
+    desktopLocked: s.desktopLocked,
+    recordPhase: s.recordPhase,
+    recordAssignments: s.recordAssignments,
+    setIrAxes: s.setIrAxes,
+    lockDesktop: s.lockDesktop,
+    unlockDesktop: s.unlockDesktop,
+    reset: s.reset,
   };
 }
 
-export const useSurveyResultsStore = create<SurveyResultsState>((set, get) => ({
-  ...remerge({}, []),
-  desktopLocked: false,
-  recordPhase: (result) => {
-    const prev = get().phaseResults;
-    const idx = prev.findIndex((p) => p.phase === result.phase);
-    const next =
-      idx === -1
-        ? [...prev, result]
-        : prev.map((p, i) => (i === idx ? result : p));
-    set(remerge(get().irAxes, next));
-  },
-  recordAssignments: (assignments) => {
-    // Build / replace the Phase C result so the merge's last-wins semantics
-    // apply correctly. Any prior Phase C answers / selectedPatternIds are
-    // preserved; only the assignments field is replaced.
-    const prev = get().phaseResults;
-    const existingC = prev.find((p) => p.phase === "C");
-    const next: SurveyPhaseResult = {
-      phase: "C",
-      answers: existingC?.answers ?? [],
-      ...(existingC?.selectedPatternIds !== undefined
-        ? { selectedPatternIds: existingC.selectedPatternIds }
-        : {}),
-      assignments,
-    };
-    const idx = prev.findIndex((p) => p.phase === "C");
-    const updated =
-      idx === -1 ? [...prev, next] : prev.map((p, i) => (i === idx ? next : p));
-    set(remerge(get().irAxes, updated));
-  },
-  setIrAxes: (irAxes) => set(remerge(irAxes, get().phaseResults)),
-  lockDesktop: () => set({ desktopLocked: true }),
-  unlockDesktop: () => set({ desktopLocked: false }),
-  reset: () => set({ ...remerge({}, []), desktopLocked: false }),
-}));
+// ---------------------------------------------------------------------------
+// useSurveyResultsStore — the adapter hook.
+//
+// Calling convention (matches original):
+//   useSurveyResultsStore()                         — full SurveyResultsState
+//   useSurveyResultsStore((s) => s.desktopLocked)   — selected slice
+//   useSurveyResultsStore.getState()                — imperative read
+//   useSurveyResultsStore.setState({...})           — imperative partial write
+//   useSurveyResultsStore.subscribe(listener)       — subscribe to changes
+//   useSurveyResultsStore.getInitialState()         — initial state
+// ---------------------------------------------------------------------------
+
+function useSurveyResultsStoreHook(): SurveyResultsState;
+function useSurveyResultsStoreHook<U>(selector: (state: SurveyResultsState) => U): U;
+function useSurveyResultsStoreHook<U>(
+  selector?: (state: SurveyResultsState) => U,
+): SurveyResultsState | U {
+  if (selector === undefined) {
+    return useStore(useWorkingCopyStore, selectSurveySlice);
+  }
+  return useStore(useWorkingCopyStore, (wcs) => selector(selectSurveySlice(wcs)));
+}
+
+// ---------------------------------------------------------------------------
+// Bridge: attach .getState() / .setState() / .subscribe() / .getInitialState()
+// ---------------------------------------------------------------------------
+
+const getState = (): SurveyResultsState =>
+  selectSurveySlice(useWorkingCopyStore.getState());
+
+const setState = (
+  partial:
+    | Partial<SurveyResultsState>
+    | ((state: SurveyResultsState) => Partial<SurveyResultsState>),
+): void => {
+  if (typeof partial === "function") {
+    const current = getState();
+    const patch = partial(current);
+    useWorkingCopyStore.setState(patch);
+  } else {
+    useWorkingCopyStore.setState(partial);
+  }
+};
+
+const subscribe = (
+  listener: (state: SurveyResultsState, prev: SurveyResultsState) => void,
+) => {
+  return useWorkingCopyStore.subscribe((wcs, prev) => {
+    listener(selectSurveySlice(wcs), selectSurveySlice(prev));
+  });
+};
+
+const getInitialState = (): SurveyResultsState =>
+  selectSurveySlice(useWorkingCopyStore.getInitialState());
+
+export const useSurveyResultsStore = Object.assign(useSurveyResultsStoreHook, {
+  getState,
+  setState,
+  subscribe,
+  getInitialState,
+});
