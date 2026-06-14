@@ -19,6 +19,7 @@ describe("SurveySession interface", () => {
       irAxes: {},
       phaseResults: [],
       selectedPatternIds: [],
+      assignments: [],
     };
     expect(s.axes).toEqual({});
     expect(s.irAxes).toEqual({});
@@ -32,6 +33,7 @@ describe("SurveySession interface", () => {
       irAxes: {},
       phaseResults: [],
       selectedPatternIds: [],
+      assignments: [],
     };
     expect(s.axes.scriptClass).toBe("abugida");
     expect(s.axes.scale).toBe("small");
@@ -44,11 +46,62 @@ describe("SurveySession interface", () => {
 // ---------------------------------------------------------------------------
 
 describe("mergePhaseResults()", () => {
-  it("empty phases with empty irAxes yields axes={} and selectedPatternIds=[]", () => {
+  it("empty phases with empty irAxes yields axes={}, selectedPatternIds=[], assignments=[]", () => {
     const session = mergePhaseResults({}, []);
     expect(session.axes).toEqual({});
     expect(session.selectedPatternIds).toEqual([]);
+    expect(session.assignments).toEqual([]);
     expect(session.phaseResults).toHaveLength(0);
+  });
+
+  it("collects assignments across phases, last-wins per modality+scope+target", () => {
+    const phaseC: SurveyPhaseResult = {
+      phase: "C",
+      answers: [],
+      assignments: [
+        {
+          scope: "keyboard-default",
+          target: "",
+          modality: "physical",
+          mechanisms: [{ patternId: "latin_deadkey_acute_single", strategyId: "S-02" }],
+        },
+        {
+          scope: "individual",
+          target: "ŋ",
+          modality: "physical",
+          mechanisms: [{ patternId: "direct_key_swap" }],
+        },
+      ],
+    };
+    // A later gallery re-pass overrides the default and adds a touch assignment.
+    const phaseE: SurveyPhaseResult = {
+      phase: "E",
+      answers: [],
+      assignments: [
+        {
+          scope: "keyboard-default",
+          target: "",
+          modality: "physical",
+          mechanisms: [{ patternId: "latin_deadkey_acute_single", strategyId: "S-02" }, { patternId: "ralt_layer" }],
+        },
+        {
+          scope: "keyboard-default",
+          target: "",
+          modality: "touch",
+          mechanisms: [{ patternId: "longpress_alternates", strategyId: "S-13" }],
+        },
+      ],
+    };
+    const session = mergePhaseResults({}, [phaseC, phaseE]);
+    // physical default replaced by the later phase (2 mechanisms), individual kept, touch added.
+    expect(session.assignments).toHaveLength(3);
+    const physDefault = session.assignments.find(
+      (a) => a.modality === "physical" && a.scope === "keyboard-default"
+    );
+    expect(physDefault?.mechanisms).toHaveLength(2);
+    expect(
+      session.assignments.some((a) => a.modality === "touch")
+    ).toBe(true);
   });
 
   it("irAxes baseline appears in axes when no phases override it", () => {

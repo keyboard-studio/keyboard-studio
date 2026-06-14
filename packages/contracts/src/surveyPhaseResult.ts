@@ -3,6 +3,7 @@
 import type { AnswerType } from "./pattern";
 import type { DiscoveryAxisVector } from "./axes";
 import type { KeyboardIdentity } from "./keyboardIdentity";
+import type { MechanismAssignment } from "./assignmentMap";
 
 /**
  * Survey phase identifiers per spec §8.
@@ -49,4 +50,13 @@ export interface SurveyPhaseResult {
   computedAxes?: Partial<DiscoveryAxisVector>;
   /** Pattern IDs selected from the gallery during this phase. */
   selectedPatternIds?: string[];
+  /**
+   * Scoped, multi-valued mechanism assignments produced by the gallery this
+   * phase (spec §7.7). **Additive (issue #368)** — carried alongside the flat
+   * `selectedPatternIds`, not replacing it; the breaking redesign that collapses
+   * the two is the #5b joint-session deliverable. Merge across phases with
+   * {@link mergeAssignments} (last-wins per modality+scope+target). `undefined`
+   * for phases that produce no assignments (A/F and any gallery-free phase).
+   */
+  assignments?: MechanismAssignment[];
 }

@@ -3,6 +3,8 @@
 
 import type { DiscoveryAxisVector } from "./axes";
 import type { SurveyPhaseResult } from "./surveyPhaseResult";
+import type { MechanismAssignment } from "./assignmentMap";
+import { mergeAssignments } from "./assignmentMap";
 
 /**
  * Session-level running state across all survey phases.
@@ -39,6 +41,15 @@ export interface SurveySession {
   phaseResults: SurveyPhaseResult[];
   /** Pattern IDs selected across all phases (deduplicated). */
   selectedPatternIds: string[];
+  /**
+   * Merged scoped assignment map across all phases (spec §7.7), last-wins per
+   * `modality+scope+target` (see {@link mergeAssignments}). **Additive (issue
+   * #368)** — carried alongside `selectedPatternIds`. `[]` until a gallery phase
+   * produces assignments. Resolve per-character mechanisms with
+   * `effectiveMechanisms` and check coverage (criterion 18.6) with
+   * `uncoveredTargets` (assignmentMap.ts).
+   */
+  assignments: MechanismAssignment[];
 }
 
 /**
@@ -64,7 +75,14 @@ export function mergePhaseResults(
   const selectedPatternIds = [
     ...new Set(phaseResults.flatMap((p) => p.selectedPatternIds ?? [])),
   ];
-  return { axes, irAxes: { ...irAxes }, phaseResults, selectedPatternIds };
+  const assignments = mergeAssignments(phaseResults.map((p) => p.assignments));
+  return {
+    axes,
+    irAxes: { ...irAxes },
+    phaseResults,
+    selectedPatternIds,
+    assignments,
+  };
 }
 
 /**

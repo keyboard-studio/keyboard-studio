@@ -81,3 +81,57 @@ export const irSeedSession: SurveySession = mergePhaseResults(
   { scale: "large", phoneticIntuition: "weak", diacriticBehavior: "none" },
   [phaseA]
 );
+
+// ---------------------------------------------------------------------------
+// Assignment-map fixture (spec §7.7, issue #368)
+// ---------------------------------------------------------------------------
+
+/**
+ * Phase C carrying a scoped assignment map: a keyboard-default deadkey strategy,
+ * a per-class override for tone vowels, and an individual character (ŋ) reached
+ * by two mechanisms at once (multi-access). Demonstrates the additive
+ * `assignments` field alongside `selectedPatternIds`.
+ */
+const phaseCWithAssignments: SurveyPhaseResult = {
+  phase: "C",
+  answers: [],
+  computedAxes: { multiMode: "single", constraintEnforcement: "none" },
+  selectedPatternIds: ["latin_deadkey_acute_single"],
+  assignments: [
+    {
+      scope: "keyboard-default",
+      target: "",
+      modality: "physical",
+      mechanisms: [{ patternId: "latin_deadkey_acute_single", strategyId: "S-02" }],
+      source: "discus-suggested",
+    },
+    {
+      scope: "character-class",
+      target: "tone-vowels",
+      modality: "physical",
+      mechanisms: [{ patternId: "diacritic_cycle", strategyId: "S-07" }],
+      source: "user",
+    },
+    {
+      scope: "individual",
+      target: "ŋ",
+      modality: "physical",
+      mechanisms: [
+        { patternId: "direct_key_swap", strategyId: "S-01" },
+        { patternId: "latin_deadkey_acute_single", strategyId: "S-02" },
+      ],
+      source: "user",
+    },
+  ],
+};
+
+/**
+ * A+B+C session whose Phase C carries a populated assignment map. `assignments`
+ * on the merged session is non-empty; pass to `effectiveMechanisms` /
+ * `uncoveredTargets` (assignmentMap.ts) to resolve per-character mechanisms.
+ */
+export const assignmentSession: SurveySession = mergePhaseResults({}, [
+  phaseA,
+  phaseB,
+  phaseCWithAssignments,
+]);

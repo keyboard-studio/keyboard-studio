@@ -3,6 +3,7 @@
 // compiler / output pipeline pass between phases. Each module re-exports its
 // own factory (makeX) and any related Init type. Alphabetized within group.
 // ---------------------------------------------------------------------------
+export * from "./assignmentMap";
 export * from "./axes";
 export * from "./baseKeyboard";
 export * from "./compileResult";
