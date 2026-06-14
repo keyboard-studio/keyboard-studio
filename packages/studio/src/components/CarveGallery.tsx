@@ -1,4 +1,4 @@
-import { useIRStore } from '../stores/irStore.ts';
+import { useWorkingCopyStore } from '../stores/workingCopyStore.ts';
 import { PatternCard } from './carve/PatternCard.tsx';
 import { GroupCard } from './carve/GroupCard.tsx';
 import { StoreCard } from './carve/StoreCard.tsx';
@@ -6,10 +6,10 @@ import { RawFragmentCard } from './carve/RawFragmentCard.tsx';
 import { navigateTo } from '../lib/navigate.ts';
 
 export function CarveGallery() {
-  const ir = useIRStore((s) => s.ir);
-  const undoStack = useIRStore((s) => s.undoStack);
-  const keepAll = useIRStore((s) => s.keepAll);
-  const undoDelete = useIRStore((s) => s.undoDelete);
+  const ir = useWorkingCopyStore((s) => s.ir);
+  const undoStack = useWorkingCopyStore((s) => s.undoStack);
+  const keepAll = useWorkingCopyStore((s) => s.keepAll);
+  const undoDelete = useWorkingCopyStore((s) => s.undoDelete);
 
   if (!ir) {
     return (

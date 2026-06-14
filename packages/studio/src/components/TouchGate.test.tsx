@@ -5,15 +5,15 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { TouchGate } from "../StudioShell";
-import { useSurveyResultsStore } from "../stores/surveyResultsStore";
+import { useWorkingCopyStore } from "../stores/workingCopyStore";
 
 afterEach(() => {
   cleanup();
-  useSurveyResultsStore.getState().reset();
+  useWorkingCopyStore.getState().reset();
 });
 
 beforeEach(() => {
-  useSurveyResultsStore.getState().reset();
+  useWorkingCopyStore.getState().reset();
 });
 
 describe("TouchGate — unlocked state", () => {
@@ -39,19 +39,19 @@ describe("TouchGate — unlocked state", () => {
 
 describe("TouchGate — locked state", () => {
   it("shows the coming-soon stub when desktop is locked", () => {
-    useSurveyResultsStore.getState().lockDesktop();
+    useWorkingCopyStore.getState().lockDesktop();
     render(<TouchGate />);
     expect(screen.getByText(/coming soon/i)).toBeTruthy();
   });
 
   it("shows the Touch gallery heading when locked", () => {
-    useSurveyResultsStore.getState().lockDesktop();
+    useWorkingCopyStore.getState().lockDesktop();
     render(<TouchGate />);
     expect(screen.getByText(/Touch gallery/i)).toBeTruthy();
   });
 
   it("does NOT show the lock-first gate message when locked", () => {
-    useSurveyResultsStore.getState().lockDesktop();
+    useWorkingCopyStore.getState().lockDesktop();
     render(<TouchGate />);
     expect(screen.queryByText(/Desktop layout not locked/i)).toBeNull();
   });

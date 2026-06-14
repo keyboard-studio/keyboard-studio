@@ -11,7 +11,6 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
 import { MechanismGallery } from "./MechanismGallery";
-import { useSurveyResultsStore } from "../stores/surveyResultsStore";
 import { useWorkingCopyStore } from "../stores/workingCopyStore";
 import type { PatternLibraryService, VirtualFS } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
@@ -120,7 +119,7 @@ function setMockStage(s: Stage) {
 }
 
 function seedInventory(chars: string[]) {
-  useSurveyResultsStore.getState().recordPhase({
+  useWorkingCopyStore.getState().recordPhase({
     phase: "B",
     answers: [],
     confirmedInventory: chars,
@@ -129,7 +128,7 @@ function seedInventory(chars: string[]) {
 
 afterEach(() => {
   cleanup();
-  useSurveyResultsStore.getState().reset();
+  useWorkingCopyStore.getState().reset();
   useWorkingCopyStore.getState().reset();
   vi.clearAllMocks();
   _mockStage = { kind: "idle" };
@@ -137,7 +136,7 @@ afterEach(() => {
 });
 
 beforeEach(() => {
-  useSurveyResultsStore.getState().reset();
+  useWorkingCopyStore.getState().reset();
   useWorkingCopyStore.getState().reset();
 });
 
@@ -212,7 +211,7 @@ describe("MechanismGallery — apply mechanism at keyboard-default scope", () =>
     const applyBtn = screen.getByRole("button", { name: /^Apply$/i });
     fireEvent.click(applyBtn);
 
-    const state = useSurveyResultsStore.getState();
+    const state = useWorkingCopyStore.getState();
     const physicalAssignments = state.session.assignments.filter(
       (a) => a.modality === "physical",
     );
@@ -250,7 +249,7 @@ describe("MechanismGallery — apply at individual scope", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
 
-    const state = useSurveyResultsStore.getState();
+    const state = useWorkingCopyStore.getState();
     const assignments = state.session.assignments.filter(
       (a) => a.modality === "physical" && a.scope === "individual",
     );
@@ -276,7 +275,7 @@ describe("MechanismGallery — remove assignment", () => {
 
     // Verify it's applied.
     expect(
-      useSurveyResultsStore.getState().session.assignments.filter(
+      useWorkingCopyStore.getState().session.assignments.filter(
         (a) => a.modality === "physical",
       ),
     ).toHaveLength(1);
@@ -286,7 +285,7 @@ describe("MechanismGallery — remove assignment", () => {
     fireEvent.click(removeBtn);
 
     expect(
-      useSurveyResultsStore.getState().session.assignments.filter(
+      useWorkingCopyStore.getState().session.assignments.filter(
         (a) => a.modality === "physical",
       ),
     ).toHaveLength(0);
@@ -473,7 +472,7 @@ describe("MechanismGallery — desktop lock", () => {
     fireEvent.click(screen.getByRole("button", { name: /Lock desktop layout/i }));
 
     // Store reflects locked state.
-    expect(useSurveyResultsStore.getState().desktopLocked).toBe(true);
+    expect(useWorkingCopyStore.getState().desktopLocked).toBe(true);
     // Banner rendered with role=status and correct text.
     const banner = screen.getByRole("status", { name: /Desktop layout locked/i });
     expect(banner).toBeTruthy();
@@ -563,7 +562,7 @@ describe("MechanismGallery — desktop lock", () => {
     // (simulates a bypass of the disabled control).
     fireEvent.click(screen.getByRole("button", { name: /configure/i }));
     fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
-    const beforeCount = useSurveyResultsStore
+    const beforeCount = useWorkingCopyStore
       .getState()
       .session.assignments.filter((a) => a.modality === "physical").length;
     fireEvent.click(screen.getByRole("button", { name: /Lock desktop layout/i }));
@@ -572,7 +571,7 @@ describe("MechanismGallery — desktop lock", () => {
     const applyBtn = screen.getByRole("button", { name: /^Apply$/i });
     fireEvent.click(applyBtn);
 
-    const afterCount = useSurveyResultsStore
+    const afterCount = useWorkingCopyStore
       .getState()
       .session.assignments.filter((a) => a.modality === "physical").length;
     // Count must not grow — the guard blocked the call.
@@ -591,7 +590,7 @@ describe("MechanismGallery — desktop lock", () => {
     fireEvent.click(screen.getByRole("button", { name: /Unlock to edit/i }));
 
     // Store unlocked.
-    expect(useSurveyResultsStore.getState().desktopLocked).toBe(false);
+    expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);
     // Banner gone; lock button back.
     expect(screen.queryByRole("status", { name: /Desktop layout locked/i })).toBeNull();
     expect(screen.getByRole("button", { name: /Lock desktop layout/i })).toBeTruthy();

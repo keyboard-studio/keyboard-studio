@@ -1,5 +1,5 @@
 import type { Pattern } from '@keyboard-studio/contracts';
-import { useIRStore } from '../../stores/irStore.ts';
+import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
 import { CarveActions } from './CarveActions.tsx';
 import { makeCardStyle, makeHeadingStyle } from '../../lib/carveStyles.ts';
 
@@ -10,7 +10,7 @@ interface PatternCardProps {
 export function PatternCard({ pattern }: PatternCardProps) {
   // A Pattern instance may not have a nodeId on the Pattern type itself;
   // we use pattern.id as the stable deletion key for recognized patterns.
-  const isDeleted = useIRStore((s) => s.isDeleted(pattern.id));
+  const isDeleted = useWorkingCopyStore((s) => s.isDeleted(pattern.id));
 
   const cardStyle = makeCardStyle(isDeleted);
   const headingStyle = makeHeadingStyle(isDeleted);

@@ -1,5 +1,5 @@
 import type { IRGroup } from '@keyboard-studio/contracts';
-import { useIRStore } from '../../stores/irStore.ts';
+import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
 import { CarveActions } from './CarveActions.tsx';
 import { sampleGroupChars } from '../../lib/carveUtils.ts';
 import { makeCardStyle, makeHeadingStyle } from '../../lib/carveStyles.ts';
@@ -9,7 +9,7 @@ interface GroupCardProps {
 }
 
 export function GroupCard({ group }: GroupCardProps) {
-  const isDeleted = useIRStore((s) => s.isDeleted(group.nodeId));
+  const isDeleted = useWorkingCopyStore((s) => s.isDeleted(group.nodeId));
 
   // Only count rules not already owned by a recognized Pattern card.
   const nonOwnedCount = group.rules.filter((r) => r.ownedByPattern === undefined).length;

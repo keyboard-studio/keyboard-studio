@@ -13,7 +13,6 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import type { BaseKeyboard, SurveyPhaseResult } from "@keyboard-studio/contracts";
-import { useSurveyResultsStore } from "./stores/surveyResultsStore.ts";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { confirmRebaseIfEdited } from "./lib/confirmRebase.ts";
 import { PreviewShell } from "./components/PreviewShell.tsx";
@@ -317,10 +316,10 @@ function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const { stage: artifactStage, retry } = useKeyboardArtifact(localBase, null, workingCopyTransform, onInstantiate);
   const rightPct = 100 - leftPct;
 
-  // Survey results are persisted into the survey-results store (the data bus the
+  // Survey results are persisted into the working-copy store (the data bus the
   // gallery and §7.2 strategy selector read), not discarded on each phase transition.
-  const recordPhase = useSurveyResultsStore((s) => s.recordPhase);
-  const resetSurvey = useSurveyResultsStore((s) => s.reset);
+  const recordPhase = useWorkingCopyStore((s) => s.recordPhase);
+  const resetSurvey = useWorkingCopyStore((s) => s.reset);
 
   // Identity-lite is the hybrid flow's head: it captures the language + the
   // INDEPENDENT target script, deriving the routing/A2 prefill. Gated scripts
@@ -599,7 +598,7 @@ const TOUCH_GATE_FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-seri
 
 /** Exported for unit testing only. */
 export function TouchGate() {
-  const desktopLocked = useSurveyResultsStore((s) => s.desktopLocked);
+  const desktopLocked = useWorkingCopyStore((s) => s.desktopLocked);
 
   const containerStyle: CSSProperties = {
     height: "100%",
@@ -715,9 +714,9 @@ export function StudioShell() {
   // distinction does not matter — it only needs the instantiated base.
   const selectedBaseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
 
-  // Read desktopLocked from the survey store so the NavBar can dim the Touch
+  // Read desktopLocked from the working-copy store so the NavBar can dim the Touch
   // item when the desktop layout has not been locked yet.
-  const desktopLocked = useSurveyResultsStore((s) => s.desktopLocked);
+  const desktopLocked = useWorkingCopyStore((s) => s.desktopLocked);
 
   let content: ReactNode;
   switch (route) {

@@ -8,18 +8,15 @@
 //      identity from loaded keyboard, sets instantiationMode = "adapt-existing".
 //   4. setIdentity: stores and replaces identity patches.
 //   5. reset(): clears all slots including instantiationMode + identity + base slots.
-//   6. Adapter reflection: mutations via workingCopyStore are visible via the
-//      irStore and surveyResultsStore adapters (same memory, no copy).
-//   7. Cross-adapter isolation: IR actions don't bleed into survey state.
+//   6. State consistency: mutations via actions are visible in the same store.
+//   7. Cross-slice isolation: IR actions don't bleed into survey state.
 //
-// Tests in irStore.test.ts and surveyResultsStore.test.ts continue to
-// own exhaustive coverage of the carve and survey action semantics
-// respectively; this file focuses on the Phase-2 surface.
+// Tests in irStore.test.ts and surveyResultsStore.test.ts own exhaustive
+// coverage of the carve and survey action semantics respectively; this file
+// focuses on the Phase-2 / instantiation surface.
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { useWorkingCopyStore } from "./workingCopyStore.ts";
-import { useIRStore } from "./irStore.ts";
-import { useSurveyResultsStore } from "./surveyResultsStore.ts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS } from "@keyboard-studio/contracts";
@@ -438,70 +435,58 @@ describe("workingCopyStore — reset", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Adapter reflection — mutations via workingCopyStore visible in adapters
+// State consistency — mutations are visible in the same store
 // ---------------------------------------------------------------------------
 
-describe("workingCopyStore — adapter reflection (irStore)", () => {
-  it("setIR via workingCopyStore is visible in useIRStore.getState()", () => {
+describe("workingCopyStore — IR state consistency", () => {
+  it("setIR is visible in getState() immediately", () => {
     const ir = makeTestIR([]);
     useWorkingCopyStore.getState().setIR(ir);
-    expect(useIRStore.getState().ir).toBe(ir);
-  });
-
-  it("deleteNode via workingCopyStore is visible in useIRStore.getState()", () => {
-    useWorkingCopyStore.getState().deleteNode("n1");
-    expect(useIRStore.getState().deletedNodeIds.has("n1")).toBe(true);
-    expect(useIRStore.getState().isDeleted("n1")).toBe(true);
-  });
-
-  it("mutation via useIRStore.getState() is reflected in workingCopyStore", () => {
-    const ir = makeTestIR([]);
-    useIRStore.getState().setIR(ir);
     expect(useWorkingCopyStore.getState().ir).toBe(ir);
   });
 
-  it("useIRStore.setState() partial update is reflected in workingCopyStore", () => {
+  it("deleteNode is visible in getState() immediately", () => {
+    useWorkingCopyStore.getState().deleteNode("n1");
+    expect(useWorkingCopyStore.getState().deletedNodeIds.has("n1")).toBe(true);
+    expect(useWorkingCopyStore.getState().isDeleted("n1")).toBe(true);
+  });
+
+  it("setState partial update clears IR correctly", () => {
     const ir = makeTestIR([]);
-    // This mirrors the reset() pattern in irStore.test.ts.
-    useIRStore.setState({ ir: null, deletedNodeIds: new Set(), undoStack: [] });
+    // Mirrors the reset pattern in irStore.test.ts.
+    useWorkingCopyStore.setState({ ir: null, deletedNodeIds: new Set(), undoStack: [] });
     expect(useWorkingCopyStore.getState().ir).toBeNull();
-    // Now set IR via workingCopyStore and verify setState can clear it.
+    // Now set IR and verify setState can clear it.
     useWorkingCopyStore.getState().setIR(ir);
-    useIRStore.setState({ ir: null, deletedNodeIds: new Set(), undoStack: [] });
+    useWorkingCopyStore.setState({ ir: null, deletedNodeIds: new Set(), undoStack: [] });
     expect(useWorkingCopyStore.getState().ir).toBeNull();
   });
 });
 
-describe("workingCopyStore — adapter reflection (surveyResultsStore)", () => {
-  it("recordPhase via workingCopyStore is visible in useSurveyResultsStore.getState()", () => {
+describe("workingCopyStore — survey state consistency", () => {
+  it("recordPhase is visible in getState() immediately", () => {
     const phaseA: SurveyPhaseResult = {
       phase: "A",
       answers: [],
       computedAxes: { scriptClass: "alphabetic" },
     };
     useWorkingCopyStore.getState().recordPhase(phaseA);
-    const s = useSurveyResultsStore.getState();
+    const s = useWorkingCopyStore.getState();
     expect(s.phaseResults).toHaveLength(1);
     expect(s.session.axes.scriptClass).toBe("alphabetic");
   });
 
-  it("lockDesktop via workingCopyStore is visible in useSurveyResultsStore.getState()", () => {
+  it("lockDesktop is visible in getState() immediately", () => {
     useWorkingCopyStore.getState().lockDesktop();
-    expect(useSurveyResultsStore.getState().desktopLocked).toBe(true);
-  });
-
-  it("mutation via useSurveyResultsStore.getState() is reflected in workingCopyStore", () => {
-    useSurveyResultsStore.getState().lockDesktop();
     expect(useWorkingCopyStore.getState().desktopLocked).toBe(true);
   });
 
-  it("reset() via useSurveyResultsStore clears all survey AND base slots", () => {
+  it("reset() clears all survey AND base slots", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
     useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
-    useSurveyResultsStore.getState().lockDesktop();
-    // reset() in the adapter delegates to workingCopyStore.reset() which clears everything.
-    useSurveyResultsStore.getState().reset();
+    useWorkingCopyStore.getState().lockDesktop();
+    useWorkingCopyStore.getState().reset();
     expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);
     expect(useWorkingCopyStore.getState().baseKeyboard).toBeNull();
   });
@@ -523,7 +508,7 @@ describe("workingCopyStore — cross-adapter isolation", () => {
 
     // phaseResults unchanged by deleteNode
     expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
-    expect(useIRStore.getState().deletedNodeIds.has("n1")).toBe(true);
+    expect(useWorkingCopyStore.getState().deletedNodeIds.has("n1")).toBe(true);
   });
 
   it("survey recordPhase does not affect carve IR", () => {

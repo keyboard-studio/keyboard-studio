@@ -1,9 +1,9 @@
-// Tests for the survey-results store — persistence + re-merge semantics.
+// Tests for survey-results state in workingCopyStore — persistence + re-merge semantics.
 // Zustand store is exercised via getState() (no React needed).
 
 import { describe, it, expect, beforeEach } from "vitest";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
-import { useSurveyResultsStore } from "./surveyResultsStore";
+import { useWorkingCopyStore } from "./workingCopyStore.ts";
 
 const phaseA: SurveyPhaseResult = {
   phase: "A",
@@ -17,10 +17,10 @@ const phaseB: SurveyPhaseResult = {
 };
 
 describe("surveyResultsStore", () => {
-  beforeEach(() => useSurveyResultsStore.getState().reset());
+  beforeEach(() => useWorkingCopyStore.getState().reset());
 
   it("starts empty with a merged empty session", () => {
-    const s = useSurveyResultsStore.getState();
+    const s = useWorkingCopyStore.getState();
     expect(s.phaseResults).toEqual([]);
     expect(s.session.axes).toEqual({});
     expect(s.session.selectedPatternIds).toEqual([]);
@@ -28,23 +28,23 @@ describe("surveyResultsStore", () => {
   });
 
   it("recordPhase persists a result and re-merges the session", () => {
-    useSurveyResultsStore.getState().recordPhase(phaseA);
-    useSurveyResultsStore.getState().recordPhase(phaseB);
-    const s = useSurveyResultsStore.getState();
+    useWorkingCopyStore.getState().recordPhase(phaseA);
+    useWorkingCopyStore.getState().recordPhase(phaseB);
+    const s = useWorkingCopyStore.getState();
     expect(s.phaseResults.map((p) => p.phase)).toEqual(["A", "B"]);
     expect(s.session.axes.scriptClass).toBe("alphabetic");
     expect(s.session.axes.scale).toBe("small");
   });
 
   it("re-recording the same phase replaces it rather than duplicating", () => {
-    useSurveyResultsStore.getState().recordPhase(phaseB);
+    useWorkingCopyStore.getState().recordPhase(phaseB);
     const phaseBRedo: SurveyPhaseResult = {
       phase: "B",
       answers: [],
       computedAxes: { scale: "large", phoneticIntuition: "weak" },
     };
-    useSurveyResultsStore.getState().recordPhase(phaseBRedo);
-    const s = useSurveyResultsStore.getState();
+    useWorkingCopyStore.getState().recordPhase(phaseBRedo);
+    const s = useWorkingCopyStore.getState();
     expect(s.phaseResults).toHaveLength(1);
     expect(s.session.axes.scale).toBe("large");
   });
@@ -62,14 +62,14 @@ describe("surveyResultsStore", () => {
         },
       ],
     };
-    useSurveyResultsStore.getState().recordPhase(phaseC);
-    expect(useSurveyResultsStore.getState().session.assignments).toHaveLength(1);
+    useWorkingCopyStore.getState().recordPhase(phaseC);
+    expect(useWorkingCopyStore.getState().session.assignments).toHaveLength(1);
   });
 
   it("setIrAxes seeds the baseline and survey phases still override it", () => {
-    useSurveyResultsStore.getState().setIrAxes({ scale: "massive" });
-    useSurveyResultsStore.getState().recordPhase(phaseB); // scale: small
-    const s = useSurveyResultsStore.getState();
+    useWorkingCopyStore.getState().setIrAxes({ scale: "massive" });
+    useWorkingCopyStore.getState().recordPhase(phaseB); // scale: small
+    const s = useWorkingCopyStore.getState();
     expect(s.irAxes.scale).toBe("massive");
     expect(s.session.axes.scale).toBe("small");
   });
@@ -81,8 +81,8 @@ describe("surveyResultsStore", () => {
       computedAxes: { scale: "small" },
       confirmedInventory: ["ŋ", "ɛ", "ɔ"],
     };
-    useSurveyResultsStore.getState().recordPhase(phaseBWithInventory);
-    const s = useSurveyResultsStore.getState();
+    useWorkingCopyStore.getState().recordPhase(phaseBWithInventory);
+    const s = useWorkingCopyStore.getState();
     expect(s.session.confirmedInventory).toEqual(["ŋ", "ɛ", "ɔ"]);
   });
 
@@ -97,22 +97,22 @@ describe("surveyResultsStore", () => {
       answers: [],
       confirmedInventory: ["ɛ", "ɔ"],
     };
-    useSurveyResultsStore.getState().recordPhase(phaseBv1);
-    useSurveyResultsStore.getState().recordPhase(phaseBv2); // replaces Phase B
-    const s = useSurveyResultsStore.getState();
+    useWorkingCopyStore.getState().recordPhase(phaseBv1);
+    useWorkingCopyStore.getState().recordPhase(phaseBv2); // replaces Phase B
+    const s = useWorkingCopyStore.getState();
     // Phase B replaced: only v2's inventory remains
     expect(s.session.confirmedInventory).toEqual(["ɛ", "ɔ"]);
   });
 
   it("session.confirmedInventory is [] on an empty session", () => {
-    const s = useSurveyResultsStore.getState();
+    const s = useWorkingCopyStore.getState();
     expect(s.session.confirmedInventory).toEqual([]);
   });
 
   it("reset clears results and session", () => {
-    useSurveyResultsStore.getState().recordPhase(phaseA);
-    useSurveyResultsStore.getState().reset();
-    const s = useSurveyResultsStore.getState();
+    useWorkingCopyStore.getState().recordPhase(phaseA);
+    useWorkingCopyStore.getState().reset();
+    const s = useWorkingCopyStore.getState();
     expect(s.phaseResults).toEqual([]);
     expect(s.session.axes).toEqual({});
   });
@@ -122,33 +122,33 @@ describe("surveyResultsStore", () => {
   // ---------------------------------------------------------------------------
 
   it("desktopLocked starts as false", () => {
-    const s = useSurveyResultsStore.getState();
+    const s = useWorkingCopyStore.getState();
     expect(s.desktopLocked).toBe(false);
   });
 
   it("lockDesktop sets desktopLocked to true", () => {
-    useSurveyResultsStore.getState().lockDesktop();
-    expect(useSurveyResultsStore.getState().desktopLocked).toBe(true);
+    useWorkingCopyStore.getState().lockDesktop();
+    expect(useWorkingCopyStore.getState().desktopLocked).toBe(true);
   });
 
   it("unlockDesktop sets desktopLocked back to false", () => {
-    useSurveyResultsStore.getState().lockDesktop();
-    useSurveyResultsStore.getState().unlockDesktop();
-    expect(useSurveyResultsStore.getState().desktopLocked).toBe(false);
+    useWorkingCopyStore.getState().lockDesktop();
+    useWorkingCopyStore.getState().unlockDesktop();
+    expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);
   });
 
   it("reset clears desktopLocked to false", () => {
-    useSurveyResultsStore.getState().lockDesktop();
-    expect(useSurveyResultsStore.getState().desktopLocked).toBe(true);
-    useSurveyResultsStore.getState().reset();
-    expect(useSurveyResultsStore.getState().desktopLocked).toBe(false);
+    useWorkingCopyStore.getState().lockDesktop();
+    expect(useWorkingCopyStore.getState().desktopLocked).toBe(true);
+    useWorkingCopyStore.getState().reset();
+    expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);
   });
 
   it("reset also clears phase results when locked", () => {
-    useSurveyResultsStore.getState().recordPhase(phaseA);
-    useSurveyResultsStore.getState().lockDesktop();
-    useSurveyResultsStore.getState().reset();
-    const s = useSurveyResultsStore.getState();
+    useWorkingCopyStore.getState().recordPhase(phaseA);
+    useWorkingCopyStore.getState().lockDesktop();
+    useWorkingCopyStore.getState().reset();
+    const s = useWorkingCopyStore.getState();
     expect(s.phaseResults).toEqual([]);
     expect(s.desktopLocked).toBe(false);
   });
@@ -165,8 +165,8 @@ describe("surveyResultsStore", () => {
         source: "user" as const,
       },
     ];
-    useSurveyResultsStore.getState().recordAssignments(assignments);
-    const s = useSurveyResultsStore.getState();
+    useWorkingCopyStore.getState().recordAssignments(assignments);
+    const s = useWorkingCopyStore.getState();
     expect(s.session.assignments).toHaveLength(1);
     expect(s.session.assignments[0]?.mechanisms[0]?.patternId).toBe("deadkey_single_tap");
   });
@@ -188,9 +188,9 @@ describe("surveyResultsStore", () => {
         mechanisms: [{ patternId: "modifier_as_layer_switch" }],
       },
     ];
-    useSurveyResultsStore.getState().recordAssignments(first);
-    useSurveyResultsStore.getState().recordAssignments(second);
-    const s = useSurveyResultsStore.getState();
+    useWorkingCopyStore.getState().recordAssignments(first);
+    useWorkingCopyStore.getState().recordAssignments(second);
+    const s = useWorkingCopyStore.getState();
     // mergeAssignments last-wins: same (modality, scope, target) key → second wins.
     expect(s.session.assignments).toHaveLength(1);
     expect(s.session.assignments[0]?.mechanisms[0]?.patternId).toBe("modifier_as_layer_switch");
@@ -205,9 +205,9 @@ describe("surveyResultsStore", () => {
         mechanisms: [{ patternId: "deadkey_single_tap" }],
       },
     ];
-    useSurveyResultsStore.getState().recordAssignments(assignments);
-    useSurveyResultsStore.getState().recordAssignments([]);
-    const s = useSurveyResultsStore.getState();
+    useWorkingCopyStore.getState().recordAssignments(assignments);
+    useWorkingCopyStore.getState().recordAssignments([]);
+    const s = useWorkingCopyStore.getState();
     expect(s.session.assignments).toHaveLength(0);
   });
 
@@ -218,8 +218,8 @@ describe("surveyResultsStore", () => {
       selectedPatternIds: ["deadkey_single_tap"],
       assignments: [],
     };
-    useSurveyResultsStore.getState().recordPhase(phaseC);
-    useSurveyResultsStore.getState().recordAssignments([
+    useWorkingCopyStore.getState().recordPhase(phaseC);
+    useWorkingCopyStore.getState().recordAssignments([
       {
         scope: "keyboard-default" as const,
         target: "",
@@ -227,7 +227,7 @@ describe("surveyResultsStore", () => {
         mechanisms: [{ patternId: "deadkey_single_tap" }],
       },
     ]);
-    const s = useSurveyResultsStore.getState();
+    const s = useWorkingCopyStore.getState();
     expect(s.session.selectedPatternIds).toContain("deadkey_single_tap");
     expect(s.session.assignments).toHaveLength(1);
   });

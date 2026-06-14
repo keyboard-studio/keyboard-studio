@@ -277,6 +277,7 @@ export function PreviewShell() {
   const [handleHovered, setHandleHovered] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloadWarnings, setDownloadWarnings] = useState<string[]>([]);
   const zipBlobUrlRef = useRef<string | null>(null);
 
   // Track drag state in a ref so pointer-move handlers always see current values
@@ -396,6 +397,7 @@ export function PreviewShell() {
     if (stage.kind !== "ready") return;
     setDownloading(true);
     setDownloadError(null);
+    setDownloadWarnings([]);
     try {
       // Serialize via the canonical path: projectWorkingCopyVfs (carve +
       // assignments + identity) → toZip. Returns null when the working copy is
@@ -411,6 +413,7 @@ export function PreviewShell() {
       // proceeds so the user is not silently blocked.
       if (result.warnings.length > 0) {
         console.warn("[studio] download projection warnings:", result.warnings);
+        setDownloadWarnings(result.warnings);
       }
 
       const { bytes } = result;
@@ -643,6 +646,38 @@ export function PreviewShell() {
             {downloadError !== null && (
               <div role="alert" style={{ fontSize: 11, color: '#f0a0a0', marginTop: 4 }}>
                 {downloadError}
+              </div>
+            )}
+            {downloadWarnings.length > 0 && (
+              <div
+                role="status"
+                aria-live="polite"
+                aria-label="Download projection warnings"
+                style={{
+                  marginTop: 4,
+                  padding: "8px 12px",
+                  background: "#2a1a00",
+                  border: "1px solid #d29922",
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+                }}
+              >
+                <div style={{ color: "#d29922", fontWeight: 600, marginBottom: 4 }}>
+                  [WARN] Download completed with warnings:
+                </div>
+                <ul
+                  style={{
+                    margin: 0,
+                    paddingLeft: 18,
+                    color: "#d29922",
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {downloadWarnings.map((w, i) => (
+                    <li key={i}>{w}</li>
+                  ))}
+                </ul>
               </div>
             )}
             {showIdentityWarn && (

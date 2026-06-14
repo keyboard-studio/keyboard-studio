@@ -28,7 +28,7 @@ import type {
   DemoObject,
 } from "@keyboard-studio/contracts";
 import { uncoveredTargets } from "@keyboard-studio/contracts";
-import { useSurveyResultsStore } from "../stores/surveyResultsStore.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { getPatternLibraryService } from "../lib/services.ts";
 import type { DiscoveryAxisVector } from "@keyboard-studio/contracts";
 import { useKeyboardArtifact } from "../hooks/useKeyboardArtifact.ts";
@@ -935,11 +935,11 @@ export interface MechanismGalleryProps {
 }
 
 export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps) {
-  const session = useSurveyResultsStore((s) => s.session);
-  const recordAssignments = useSurveyResultsStore((s) => s.recordAssignments);
-  const desktopLocked = useSurveyResultsStore((s) => s.desktopLocked);
-  const lockDesktop = useSurveyResultsStore((s) => s.lockDesktop);
-  const unlockDesktop = useSurveyResultsStore((s) => s.unlockDesktop);
+  const session = useWorkingCopyStore((s) => s.session);
+  const recordAssignments = useWorkingCopyStore((s) => s.recordAssignments);
+  const desktopLocked = useWorkingCopyStore((s) => s.desktopLocked);
+  const lockDesktop = useWorkingCopyStore((s) => s.lockDesktop);
+  const unlockDesktop = useWorkingCopyStore((s) => s.unlockDesktop);
 
   // §8 inventory diff: target only the letters the base does NOT already produce.
   // alreadyProduced is shown as an informational section (no assignment required).

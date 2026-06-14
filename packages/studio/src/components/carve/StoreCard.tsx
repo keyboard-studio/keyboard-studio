@@ -1,5 +1,5 @@
 import type { IRStore } from '@keyboard-studio/contracts';
-import { useIRStore } from '../../stores/irStore.ts';
+import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
 import { CarveActions } from './CarveActions.tsx';
 import { storeCharSample } from '../../lib/carveUtils.ts';
 import { makeCardStyle, makeHeadingStyle } from '../../lib/carveStyles.ts';
@@ -9,7 +9,7 @@ interface StoreCardProps {
 }
 
 export function StoreCard({ store }: StoreCardProps) {
-  const isDeleted = useIRStore((s) => s.isDeleted(store.nodeId));
+  const isDeleted = useWorkingCopyStore((s) => s.isDeleted(store.nodeId));
 
   const sample = storeCharSample(store);
 

@@ -1,5 +1,5 @@
 import type { RawKmnFragment } from '@keyboard-studio/contracts';
-import { useIRStore } from '../../stores/irStore.ts';
+import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
 import { CarveActions } from './CarveActions.tsx';
 import { makeCardStyle, makeHeadingStyle } from '../../lib/carveStyles.ts';
 
@@ -8,7 +8,7 @@ interface RawFragmentCardProps {
 }
 
 export function RawFragmentCard({ fragment }: RawFragmentCardProps) {
-  const isDeleted = useIRStore((s) => s.isDeleted(fragment.nodeId));
+  const isDeleted = useWorkingCopyStore((s) => s.isDeleted(fragment.nodeId));
 
   const cardStyle = makeCardStyle(isDeleted, '#3d2b00');
   const headingStyle = makeHeadingStyle(isDeleted);
