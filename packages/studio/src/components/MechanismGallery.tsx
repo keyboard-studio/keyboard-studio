@@ -33,6 +33,7 @@ import { getPatternLibraryService } from "../lib/services.ts";
 import type { DiscoveryAxisVector } from "@keyboard-studio/contracts";
 import { useKeyboardArtifact } from "../hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "../hooks/useWorkingCopyTransform.ts";
+import { useInventoryDiff } from "../hooks/useInventoryDiff.ts";
 import { OSKFrame } from "./OSKFrame.tsx";
 import { OskModeToggle } from "./OskModeToggle.tsx";
 import type { OskMode } from "./OskModeToggle.tsx";
@@ -620,6 +621,113 @@ function CoverageIndicator({ assignments, inventory }: CoverageIndicatorProps) {
 }
 
 // ---------------------------------------------------------------------------
+// AlreadyProducedSection — informational, collapsible.
+// Shows the characters the base keyboard already produces so the author
+// understands the context without needing to assign mechanisms to these chars.
+// ---------------------------------------------------------------------------
+
+interface AlreadyProducedSectionProps {
+  chars: string[];
+}
+
+function AlreadyProducedSection({ chars }: AlreadyProducedSectionProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div
+      style={{
+        background: BG_CARD,
+        border: `1px solid ${BORDER}`,
+        borderRadius: 8,
+        padding: "10px 14px",
+        marginBottom: 16,
+        fontFamily: FONT,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+        }}
+      >
+        <span style={{ fontSize: 12, color: TEXT_DIM }}>
+          Already typed by the base keyboard ({chars.length}):
+        </span>
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-controls="already-produced-chars"
+          onClick={() => setExpanded((v) => !v)}
+          style={{
+            background: "transparent",
+            border: `1px solid ${BORDER}`,
+            borderRadius: 4,
+            color: TEXT_DIM,
+            fontSize: 11,
+            padding: "2px 8px",
+            cursor: "pointer",
+            fontFamily: FONT,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {expanded ? "hide" : "show"}
+        </button>
+      </div>
+
+      {expanded && (
+        <div
+          id="already-produced-chars"
+          role="list"
+          aria-label={`${chars.length} characters already produced by the base keyboard`}
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 4,
+            marginTop: 10,
+          }}
+        >
+          {chars.map((char) => {
+            const cp = char
+              .codePointAt(0)
+              ?.toString(16)
+              .toUpperCase()
+              .padStart(4, "0");
+            return (
+              <span
+                key={char}
+                role="listitem"
+                title={`U+${cp ?? "????"} — already produced by the base keyboard`}
+                aria-label={`U+${cp ?? "????"} ${char} — base keyboard`}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 3,
+                  padding: "2px 6px",
+                  background: BG_PAGE,
+                  border: `1px solid ${BORDER}`,
+                  borderRadius: 4,
+                  fontSize: 12,
+                  fontFamily: "monospace",
+                  color: TEXT_DIM,
+                  opacity: 0.75,
+                }}
+              >
+                <span>{char}</span>
+                <span style={{ fontSize: 10, color: TEXT_DIM }}>
+                  U+{cp ?? "????"}
+                </span>
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // GalleryPreviewWithPatterns — wraps GalleryPreview, injects a real sync
 // pattern resolver into the vfsTransform via a factory approach.
 //
@@ -833,6 +941,15 @@ export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps
   const lockDesktop = useSurveyResultsStore((s) => s.lockDesktop);
   const unlockDesktop = useSurveyResultsStore((s) => s.unlockDesktop);
 
+  // §8 inventory diff: target only the letters the base does NOT already produce.
+  // alreadyProduced is shown as an informational section (no assignment required).
+  // When baseIr is null (not yet instantiated) lettersToAdd === confirmedInventory,
+  // so this is a strict superset of the old behavior (no regression).
+  const { lettersToAdd, alreadyProduced } = useInventoryDiff();
+
+  // Full confirmed inventory — used only for the "nothing confirmed yet" guard
+  // (we need to detect the case where the author hasn't completed Phase B at all,
+  // which is independent of the diff).
   const inventory = session.confirmedInventory;
 
   // Memoize the axes object so the filterFor effect only re-fires when the
@@ -1084,13 +1201,23 @@ export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps
           </div>
         )}
 
-        {/* Coverage indicator (criterion 18.6) */}
+        {/* Coverage indicator (criterion 18.6) — denominated over lettersToAdd,
+            not the full confirmedInventory. Letters the base already produces
+            are shown separately below and do not need mechanism assignments. */}
         <div style={{ marginBottom: 20 }}>
           <CoverageIndicator
             assignments={sessionAssignments}
-            inventory={inventory}
+            inventory={lettersToAdd}
           />
         </div>
+
+        {/* Already-produced informational section — collapsed/secondary.
+            Shown only when baseIr is set (alreadyProduced.length > 0).
+            These characters do NOT require mechanism assignment; they are
+            already reachable via the base keyboard. */}
+        {alreadyProduced.length > 0 && (
+          <AlreadyProducedSection chars={alreadyProduced} />
+        )}
 
         {/* Gallery grid */}
         {loading ? (
@@ -1137,7 +1264,7 @@ export function MechanismGallery({ selectedBaseKeyboard }: MechanismGalleryProps
                   <MechanismCard
                     match={match}
                     pattern={pattern}
-                    inventory={inventory}
+                    inventory={lettersToAdd}
                     isApplied={appliedPatternIds.has(pattern.id)}
                     onApply={handleApply}
                     onRemove={handleRemove}
