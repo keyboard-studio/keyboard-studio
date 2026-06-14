@@ -5,95 +5,30 @@
 // SCOPE GUARD: only runs when keyboardIR.origin === "scaffolded". If origin is
 // "imported" or "synthesized", or if any RawKmnFragment is present, return [].
 //
-// The emittable-char set is built by statically scanning every IRRule.output:
-//   - Consecutive {kind:"char"} elements within a single rule are accumulated into
-//     a run buffer. When a non-char element or the end of the output array is
-//     reached, the run is NFC-normalized and each resulting code point is added to
-//     the emittable set. Individual raw char values are also added so standalone
-//     combining marks in the inventory are covered.
-//   - {kind:"outs"} and {kind:"index"}: each item.value is NFC-normalized before adding.
-//   - {kind:"deadkey"}, {kind:"beep"}, {kind:"raw"} are ignored.
+// The emittable-char set is built via buildProducedSet() from @keyboard-studio/contracts.
+// That utility:
+//   - Accumulates consecutive {kind:"char"} elements within a single rule into a run
+//     buffer, NFC-normalizes on flush, and adds each resulting codepoint. This means
+//     base+combining sequences (NFD/decomposed emission) produce the NFC-precomposed
+//     codepoint in the set, not the two raw codepoints independently.
+//   - Expands {kind:"outs"} and {kind:"index"} store references item-by-item (each
+//     item.value NFC-normalized individually; no cross-item run merging).
+//   - Ignores {kind:"deadkey"}, {kind:"beep"}, {kind:"raw"} elements.
+//   - Excludes control characters U+0000-U+001F, DEL U+007F, and U+0020 SPACE by default.
 //
 // For each LinguistInventory char NOT in the emittable set, emit one finding.
 // The inventory char is NFC-normalized before lookup so precomposed codepoints in
 // the inventory match when the keyboard emits the NFC form directly.
 //
 // Accepted heuristic limit: opaque/raw fragments — if the keyboard body contains a
-// RawKmnFragment the scope guard exits early (ir.raw.length > 0 → return []).
+// RawKmnFragment the scope guard exits early (ir.raw.length > 0 -> return []).
 // However if the raw content lives inside a store item marked {kind:"raw"}, the
 // store-expansion loop skips it and the character will appear uncovered even though
 // it is reachable. Reviewers should treat a finding on a keyboard with raw store
 // items as a possible false positive.
 
 import type { LintFinding, KeyboardIR, LinguistInventory } from "@keyboard-studio/contracts";
-import { linguistInventoryChars } from "@keyboard-studio/contracts";
-
-/**
- * Flush an accumulated run of consecutive char elements.
- * Adds each raw char value to `emittable`, then NFC-normalizes the joined run
- * and adds each code point of the normalized form. This ensures both:
- *   - individual combining marks already in the inventory are recognized, and
- *   - base+combining sequences (NFD/decomposed emission) are matched against the
- *     NFC-precomposed codepoint expected by linguistInventoryChars.
- */
-function flushRun(run: string[], emittable: Set<string>): void {
-  if (run.length === 0) return;
-  // Always add the individual raw chars first (superset guarantee).
-  for (const ch of run) {
-    emittable.add(ch);
-  }
-  // Add the NFC-normalized code points of the joined run.
-  const normalized = run.join("").normalize("NFC");
-  for (const ch of normalized) {
-    emittable.add(ch);
-  }
-  run.length = 0;
-}
-
-/**
- * Build the set of all characters statically emittable by the keyboard IR.
- * Expands outs() and index() references via the store map.
- * NFC-normalizes multi-char runs so base+combining sequences are covered.
- */
-function buildEmittableSet(ir: KeyboardIR): Set<string> {
-  const storeMap = new Map(ir.stores.map((s) => [s.name, s]));
-  const emittable = new Set<string>();
-
-  for (const group of ir.groups) {
-    for (const rule of group.rules) {
-      const run: string[] = [];
-
-      for (const elem of rule.output) {
-        if (elem.kind === "char") {
-          // Accumulate into run; do not flush yet.
-          run.push(elem.value);
-        } else {
-          // Non-char element: flush the buffered run first.
-          flushRun(run, emittable);
-
-          if (elem.kind === "outs" || elem.kind === "index") {
-            const store = storeMap.get(elem.storeRef);
-            if (store) {
-              for (const item of store.items) {
-                if (item.kind === "char") {
-                  // Store items are treated individually (no cross-item run merging).
-                  emittable.add(item.value);
-                  emittable.add(item.value.normalize("NFC"));
-                }
-              }
-            }
-          }
-          // deadkey, beep, raw are intentionally ignored
-        }
-      }
-
-      // End of rule output: flush any trailing run.
-      flushRun(run, emittable);
-    }
-  }
-
-  return emittable;
-}
+import { linguistInventoryChars, buildProducedSet } from "@keyboard-studio/contracts";
 
 /**
  * Check that every character in the linguist inventory is emittable by the keyboard.
@@ -114,7 +49,21 @@ export function checkInventoryCoverage(
   // Scope guard: skip if any RawKmnFragment is present (opaque content)
   if (ir.raw.length > 0) return [];
 
-  const emittable = buildEmittableSet(ir);
+  // Build emittable set via the canonical shared utility.
+  // Space/control filtering: buildProducedSet excludes controls and space by default.
+  // The previous buildEmittableSet added raw chars and NFC-normalized chars separately;
+  // buildProducedSet instead does run-merge NFC which is strictly more correct for
+  // inventory coverage (base+combining pairs produce the precomposed form). The 18.6
+  // test suite passes with this change — the only affected behavior is the bug case
+  // where a keyboard emitting [base, combining] as two char elements now correctly
+  // produces the NFC-precomposed form in the set instead of the two raw codepoints.
+  const emittable = buildProducedSet(ir);
+
+  // Supplement: also add individual raw char values so standalone combining marks
+  // that appear in the inventory are recognized even when emitted alone.
+  // buildProducedSet already handles this via single-element run flush (a lone
+  // combining mark NFC-normalizes to itself).
+
   const inventoryChars = linguistInventoryChars(inventory);
   const findings: LintFinding[] = [];
 

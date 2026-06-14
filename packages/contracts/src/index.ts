@@ -36,6 +36,12 @@ export * from "./scaffolder";
 export * from "./validator";
 
 // ---------------------------------------------------------------------------
+// IR utilities — shared helpers that operate on KeyboardIR at the contracts
+// layer (both engine and keyboard-lint consume these; lint cannot import engine).
+// ---------------------------------------------------------------------------
+export * from "./ir/producedSet";
+
+// ---------------------------------------------------------------------------
 // Loader / data — modules that load checked-in data files (criteria.json) and
 // re-export as typed `readonly` arrays / records.
 // ---------------------------------------------------------------------------

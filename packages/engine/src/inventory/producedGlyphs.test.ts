@@ -42,31 +42,29 @@ describe("producedGlyphs — direct char output", () => {
     expect(result).toContain("á");
   });
 
-  it("NFD input 'á' is NFC-normalised to 'á' (U+00E1)", () => {
-    // emit a + combining acute (NFD form)
-    const nfdA = "á";
+  it("two consecutive char elements [a, U+0301] run-merge to NFC 'é' (U+00E9) — not separate 'a' + combining", () => {
+    // NFC run-merge fix: consecutive {kind:"char"} elements are accumulated into a
+    // run buffer, joined, then NFC-normalized on flush. So ["e", U+0301] -> "é"
+    // -> NFC -> "é" (U+00E9).
     const ir = makeTestIR([
       makeGroup([
-        makeRule([{ kind: "char", value: "a" }, { kind: "char", value: "́" }]),
+        makeRule([{ kind: "char", value: "e" }, { kind: "char", value: "́" }]),
       ]),
     ]);
     const result = producedGlyphs(ir);
-    // Both 'a' (raw codepoint) and U+0301 appear as individual entries.
-    // NFC of "a" + U+0301 = "á" (U+00E1).
-    // Because each char elem is processed individually (not run-merged),
-    // 'a' and '́' each go through addNfcCodepoints independently.
-    // 'a'.normalize("NFC") === 'a'; '́'.normalize("NFC") === '́'.
-    // So the set contains 'a' and U+0301.
-    expect(result).toContain("a");
-    expect(result).toContain("́");
+    // After run-merge: "e" + U+0301 -> NFC -> "é"
+    expect(result).toContain("é");
+    // The individual raw codepoints must NOT appear when part of a merged run
+    expect(result).not.toContain("e");
+    expect(result).not.toContain("́");
 
-    // Verify: if the whole NFD string were passed as a single char value it normalises.
+    // Verify: a single char element whose value is the NFD string also normalizes.
+    // "é" is NFD; normalize("NFC") -> "é"
     const irSingle = makeTestIR([
-      makeGroup([makeRule([{ kind: "char", value: nfdA }])]),
+      makeGroup([makeRule([{ kind: "char", value: "é" }])]),
     ]);
     const resultSingle = producedGlyphs(irSingle);
-    // "á".normalize("NFC") => "á"
-    expect(resultSingle).toContain("á");
+    expect(resultSingle).toContain("é");
   });
 
   it("multiple distinct outputs produce a deduplicated set", () => {
@@ -95,7 +93,7 @@ describe("producedGlyphs — direct char output", () => {
     for (let i = 1; i < codes.length; i++) {
       expect(codes[i]).toBeGreaterThanOrEqual(codes[i - 1] as number);
     }
-    // Specific order: à (00E0) < é (00E9) < ñ (00F1)
+    // Specific order: à < é < ñ
     const relevant = result.filter((c) => "àéñ".includes(c));
     expect(relevant).toEqual(["à", "é", "ñ"]);
   });
@@ -184,7 +182,7 @@ describe("producedGlyphs — deadkey composition outputs", () => {
     const ir = makeTestIR(
       [
         makeGroup([
-          // Trigger rule: + [K_GRAVE] > deadkey(0x01) — deadkey token, no glyph
+          // Trigger rule: + [K_GRAVE] > deadkey(0x01) -- deadkey token, no glyph
           makeRule([{ kind: "deadkey", id: 1 }]),
           // Fan-out rule: index output (accented forms)
           makeRule([{ kind: "index", storeRef: "S_accented", offset: 2 }]),
@@ -211,7 +209,7 @@ describe("producedGlyphs — deadkey composition outputs", () => {
       ]),
     ]);
     const result = producedGlyphs(ir);
-    // Nothing collected — deadkey markers are state, not glyphs
+    // Nothing collected -- deadkey markers are state, not glyphs
     expect(result).toHaveLength(0);
   });
 });
