@@ -10,11 +10,9 @@
  * input artifact for AC #1/#2 of #54: extract it, open the `.kpj` in Keyman
  * Developer 17+, and Build.
  *
- * Why this exists: the studio download button currently emits the compiled
- * `.js` only (see PreviewShell.tsx [LIMITATION]); the VirtualFS `.zip` path is
- * engine-complete but not yet wired to a UI button. This generator produces
- * the same artifact the button eventually will, so the KD smoke run is not
- * blocked on that UI work.
+ * Why this exists: the studio download button already emits a `.zip` via
+ * `toZip`; this generator exists to produce the same artifact reproducibly,
+ * outside the browser, from a pinned base.
  *
  * Standalone CLI (modelled on utilities/supportability-scanner) — run with tsx:
  *   TSX_TSCONFIG_PATH=utilities/smoke-artifact/tsconfig.json \
@@ -28,6 +26,7 @@ import { fileURLToPath } from "node:url";
 import { createScaffolderService } from "../../packages/engine/src/scaffolder/index.ts";
 import { toZip } from "../../packages/engine/src/output/zip.ts";
 import { makeBaseKeyboard, type BaseKeyboard } from "@keyboard-studio/contracts";
+import { silEuroLatin } from "@keyboard-studio/contracts/fixtures";
 import type { FetchFn } from "../../packages/engine/src/loader/fetchKeyboardSourceToVfs.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -52,14 +51,7 @@ const BASES: Record<string, BaseKeyboard> = {
     displayName: "Khmer Angkor",
     version: "1.0",
   }),
-  sil_euro_latin: makeBaseKeyboard({
-    id: "sil_euro_latin",
-    path: "release/sil/sil_euro_latin",
-    script: "Latn",
-    targets: [...DESKTOP_AND_WEB],
-    displayName: "SIL EuroLatin",
-    version: "1.0",
-  }),
+  sil_euro_latin: silEuroLatin,
   akan: makeBaseKeyboard({
     id: "akan",
     path: "release/a/akan",
@@ -103,7 +95,7 @@ function arg(name: string, fallback: string): string {
 }
 
 async function main(): Promise<void> {
-  const baseId = arg("--base", "khmer_angkor");
+  const baseId = arg("--base", "akan");
   const base = BASES[baseId];
   if (!base) {
     console.error(`[ERROR] unknown --base ${baseId}. Known: ${Object.keys(BASES).join(", ")}`);
