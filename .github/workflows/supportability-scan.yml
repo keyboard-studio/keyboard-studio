@@ -1,0 +1,62 @@
+# Supportability-scan staleness gate — issue #237.
+#
+# Regenerates docs/import-corpus.json from the current codec and fails if the
+# committed file is out of date. Runs only when the codec or the Layer A'
+# check module changes (the scanner's inputs), plus the scanner itself.
+#
+# Needs the keymanapp/keyboards release/ tree, which is NOT vendored here — we
+# sparse + shallow checkout just release/ into ./.keyboards.
+
+name: Supportability scan
+
+on:
+  pull_request:
+    paths:
+      - "packages/engine/src/codec/**"
+      - "packages/engine/src/validator/layer-a-prime.ts"
+      - "packages/engine/src/recognizer/**"
+      - "utilities/supportability-scanner/**"
+      - "docs/import-corpus.json"
+
+jobs:
+  corpus-staleness:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout keyboard-studio
+        uses: actions/checkout@v4
+
+      - name: Checkout keymanapp/keyboards (release/ only, shallow)
+        uses: actions/checkout@v4
+        with:
+          repository: keymanapp/keyboards
+          path: .keyboards
+          fetch-depth: 1
+          sparse-checkout: release
+          sparse-checkout-cone-mode: true
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The scanner imports the codec/recognizer source via tsx; no package
+      # build is required. --check writes nothing and exits 1 on drift.
+      # TSX_TSCONFIG_PATH makes tsx use the scanner's tsconfig (the
+      # @keyboard-studio/contracts paths mapping) regardless of cwd.
+      - name: Check import-corpus is up to date
+        env:
+          TSX_TSCONFIG_PATH: utilities/supportability-scanner/tsconfig.json
+        run: >
+          pnpm dlx tsx utilities/supportability-scanner/scan.ts
+          --check --quiet
+          --release-dir "$GITHUB_WORKSPACE/.keyboards/release"

@@ -1,0 +1,14 @@
+{
+  "name": "supportability-scanner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone CLI (issue #237): runs the KeyboardIR codec over every keyboard in a keymanapp/keyboards release/ tree and emits docs/import-corpus.{md,json} — the import-readiness table the source-selection browser consumes. Built on the codec (#233); the functional WASM I2 oracle + formal Layer A' checks arrive with #236.",
+  "scripts": {
+    "scan": "tsx scan.ts",
+    "check": "tsx scan.ts --check --quiet"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
+  }
+}
