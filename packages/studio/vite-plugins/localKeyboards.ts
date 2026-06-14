@@ -29,10 +29,42 @@ interface BaseKeyboardLite {
   displayName: string;
   version: string;
   sourceUrl?: string;
+  languages?: string[];
 }
 
 const STORE_NAME_RE = /^\s*store\s*\(\s*&NAME\s*\)\s*'([^']*)'/im;
 const STORE_VERSION_RE = /^\s*store\s*\(\s*&VERSION\s*\)\s*'([^']*)'/im;
+
+// Match each `<Language ID="bcp47-tag">` occurrence anywhere in the .kps text.
+// In the current .kps schema the ONLY `<Language ID=...>` elements live in the
+// single <Keyboard><Languages> block, and Keyman Developer always serializes
+// `ID` as the first attribute — so this unscoped scan is exact in practice. If a
+// future schema adds a `<Language ID=...>` elsewhere (e.g. an <Info>/<Files>
+// block), constrain this to the <Languages>...</Languages> span first.
+const KPS_LANGUAGE_ID_RE = /<Language\s+ID="([^"]+)"/g;
+
+/**
+ * Extract BCP47 language tags from a keyboard's `.kps` package file.
+ * Reads the `<Languages><Language ID="...">` block via a regex scan.
+ * Returns an empty array when the file is absent, unreadable, or has no
+ * `<Languages>` block — the caller continues with script-match ranking.
+ */
+function parseKpsLanguages(kpsPath: string): string[] {
+  if (!fs.existsSync(kpsPath)) return [];
+  let xml: string;
+  try {
+    xml = fs.readFileSync(kpsPath, "utf8");
+  } catch {
+    return [];
+  }
+  const ids: string[] = [];
+  let m: RegExpExecArray | null;
+  KPS_LANGUAGE_ID_RE.lastIndex = 0;
+  while ((m = KPS_LANGUAGE_ID_RE.exec(xml)) !== null) {
+    if (m[1] !== undefined && m[1].length > 0) ids.push(m[1]);
+  }
+  return ids;
+}
 
 function parseKmnMetadata(kmnPath: string): { name: string; version: string } {
   try {
@@ -81,7 +113,9 @@ function scan(keyboardsRepoRoot: string): BaseKeyboardLite[] {
       const kmnPath = path.join(kbDir, "source", `${id}.kmn`);
       if (!fs.existsSync(kmnPath)) continue;
       const meta = parseKmnMetadata(kmnPath);
-      out.push({
+      const kpsPath = path.join(kbDir, "source", `${id}.kps`);
+      const languages = parseKpsLanguages(kpsPath);
+      const entry: BaseKeyboardLite = {
         id,
         path: `release/${vendor}/${id}`,
         // [SCAFFOLD] script hardcoded to "Latn" — derive from .kpj
@@ -91,7 +125,9 @@ function scan(keyboardsRepoRoot: string): BaseKeyboardLite[] {
         displayName: meta.name !== "" ? meta.name : id,
         version: meta.version,
         sourceUrl: `https://github.com/keymanapp/keyboards/tree/master/release/${vendor}/${id}`,
-      });
+      };
+      if (languages.length > 0) entry.languages = languages;
+      out.push(entry);
     }
   }
   out.sort((a, b) => a.id.localeCompare(b.id));

@@ -16,6 +16,13 @@
 #     <other subtag>     -> that script subtag
 #   See packages/studio/src/lib/scriptAxes.ts (normalizeTargetScript + axis maps).
 #   CJK/Ethiopic/Hangul are stub-gated here, consistent with §9 and Phase A.
+#
+#   il_language_code: the ISO 639 language subtag (e.g. "ha", "fr", "hi"). Region
+#   and variant refinement remain deferred to the documentation stage (spec §8
+#   Phase A ordering). This field drives the language-match tier in suggestBases()
+#   and is intentionally kept to the subtag only — it is NOT a full BCP47 tag.
+#   Combined with il_target_script, extractIdentityLite() builds the full
+#   IdentityLiteResult.bcp47 field (e.g. "ha-Latn", "hi-Deva").
 
 flow_id: identity_lite
 phase: "A"
@@ -39,6 +46,19 @@ questions:
       name, repeat the name you gave above.
     type: text
     required: true
+    next: il_language_code
+
+  - id: il_language_code
+    prompt: "What is the ISO 639 language subtag for this language?"
+    help_text: >
+      Enter the two- or three-letter ISO 639 code for your language — the short
+      code linguists and software systems use to identify it. Examples: "en"
+      (English), "fr" (French), "ha" (Hausa), "hi" (Hindi), "sw" (Swahili),
+      "bft" (Balti). Leave blank if you are unsure; you can add it later.
+      Note: enter only the language subtag, not a full BCP47 tag with region
+      or variant (those are added during the documentation stage).
+    type: text
+    required: false
     next: il_target_script
 
   - id: il_target_script

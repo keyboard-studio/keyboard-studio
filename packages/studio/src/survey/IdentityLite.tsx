@@ -9,7 +9,11 @@ import type { SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts"
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { parseFlow } from "./loadFlow.ts";
 import type { SurveyContext } from "./types.ts";
-import { deriveScriptPrefill, type ScriptPrefill } from "../lib/scriptAxes.ts";
+import {
+  deriveScriptPrefill,
+  normalizeTargetScript,
+  type ScriptPrefill,
+} from "../lib/scriptAxes.ts";
 
 import identityLiteRaw from "../../../../content/flows/identity_lite.yaml?raw";
 
@@ -23,12 +27,53 @@ export interface IdentityLiteResult {
   autonym: string;
   /** Language name in English. */
   english: string;
+  /**
+   * ISO 639 language subtag entered by the author (e.g. "ha", "hi", "fr").
+   * Empty string when the author left the field blank.
+   * Region and variant refinement are deferred to the documentation stage (§8).
+   */
+  languageSubtag: string;
   /** Raw `il_target_script` answer (e.g. "Latn", "romanization-Latn", "fonipa"). */
   targetScriptRaw: string;
+  /**
+   * Full BCP47 target tag combining language subtag + normalized script/variant,
+   * e.g. "ha-Latn", "hi-Deva", "fr-Latn", "und-fonipa".
+   * Empty string when `languageSubtag` was left blank — `suggestBases()` falls
+   * back to script-match ranking in that case.
+   */
+  bcp47: string;
   /** Whether the chosen target script is supported in v1. */
   supported: boolean;
   /** Routing/A2 prefill confirmations derived from the target script (spec §5). */
   prefill: ScriptPrefill;
+}
+
+/**
+ * Build the full BCP47 target tag from an ISO 639 language subtag and a raw
+ * `il_target_script` value.
+ *
+ * Rules (language + script → BCP47):
+ * - `lang` + plain script subtag (Latn/Deva/…) → `${lang}-${script}`
+ *   e.g. "ha" + "Latn" → "ha-Latn", "hi" + "Deva" → "hi-Deva"
+ * - `lang` + "romanization-Latn" → `${lang}-Latn`
+ *   (Latn script implied; the fact it is a romanization is a strategy detail)
+ * - `lang` + "fonipa" → `${lang}-fonipa`
+ *   (Latin is implied by the variant; BCP47 omits the script subtag for fonipa)
+ * - empty `lang` → "" (no BCP47; caller degrades to script-match ranking)
+ *
+ * @param languageSubtag  ISO 639 subtag from `il_language_code`, may be "".
+ * @param targetScriptRaw Raw `il_target_script` value from the survey.
+ */
+export function buildTargetBcp47(
+  languageSubtag: string,
+  targetScriptRaw: string,
+): string {
+  const lang = languageSubtag.trim();
+  if (lang === "") return "";
+  if (targetScriptRaw === "fonipa") return `${lang}-fonipa`;
+  if (targetScriptRaw === "romanization-Latn") return `${lang}-Latn`;
+  const { script } = normalizeTargetScript(targetScriptRaw);
+  return `${lang}-${script}`;
 }
 
 function answerString(result: SurveyPhaseResult, questionId: string): string {
@@ -43,10 +88,13 @@ function answerString(result: SurveyPhaseResult, questionId: string): string {
 /** Derive the typed identity-lite result from a completed flow. */
 export function extractIdentityLite(result: SurveyPhaseResult): IdentityLiteResult {
   const targetScriptRaw = answerString(result, "il_target_script");
+  const languageSubtag = answerString(result, "il_language_code");
   return {
     autonym: answerString(result, "il_language_autonym"),
     english: answerString(result, "il_language_english"),
+    languageSubtag,
     targetScriptRaw,
+    bcp47: buildTargetBcp47(languageSubtag, targetScriptRaw),
     supported: !UNSUPPORTED_SCRIPTS.has(targetScriptRaw),
     prefill: deriveScriptPrefill(targetScriptRaw),
   };

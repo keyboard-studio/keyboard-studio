@@ -80,6 +80,21 @@ export interface BaseKeyboard {
    * Most keyboards set this equal to `id`; omit when identical.
    */
   packageId?: string;
+
+  /**
+   * BCP47 language tags this keyboard supports, drawn from the `.kps`
+   * `<Languages><Language ID="...">` block. Used by `suggestBases()` to
+   * rank keyboards that already cover the author's target language above
+   * keyboards that only share the script.
+   *
+   * Absent for keyboards whose `.kps` has no `<Languages>` block (or for
+   * the US-QWERTY offline fallback constructed without `.kps` data); in
+   * that case `suggestBases()` falls back to script-match ranking.
+   *
+   * @example ["hi", "mai", "lif-Deva", "cdm-Deva"]
+   * @example ["en", "id", "ms", "ht"]
+   */
+  languages?: string[];
 }
 
 /**
@@ -95,6 +110,8 @@ export type BaseKeyboardInit = {
   version: string;
   sourceUrl?: string;
   packageId?: string;
+  /** See {@link BaseKeyboard.languages}. */
+  languages?: string[];
 };
 
 /**
@@ -117,5 +134,6 @@ export function makeBaseKeyboard(init: BaseKeyboardInit): BaseKeyboard {
     version: init.version,
     ...(init.sourceUrl !== undefined ? { sourceUrl: init.sourceUrl } : {}),
     ...(init.packageId !== undefined ? { packageId: init.packageId } : {}),
+    ...(init.languages !== undefined ? { languages: init.languages } : {}),
   };
 }
