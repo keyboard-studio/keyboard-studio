@@ -1,0 +1,13 @@
+{
+  "name": "smoke-artifact",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone CLI (issue #54): drives the real studio output pipeline outside the browser — createScaffolderService().scaffold() -> toZip() — reading the local ../keyboards clone via a file-backed fetch shim, to produce the KD-loadable .zip the Day-7 smoke run builds in Keyman Developer.",
+  "scripts": {
+    "gen": "tsx gen.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
+  }
+}
