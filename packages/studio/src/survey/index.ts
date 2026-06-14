@@ -1,3 +1,6 @@
+export { IdentityLite, extractIdentityLite } from "./IdentityLite.tsx";
+export type { IdentityLiteProps, IdentityLiteResult } from "./IdentityLite.tsx";
+
 export { PhaseA } from "./PhaseA.tsx";
 export type { PhaseAProps } from "./PhaseA.tsx";
 export { extractIdentity, extractProvenance } from "./PhaseA.tsx";
