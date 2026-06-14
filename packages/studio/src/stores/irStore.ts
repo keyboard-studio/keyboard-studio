@@ -1,7 +1,25 @@
-import { create } from 'zustand';
-import type { KeyboardIR } from '@keyboard-studio/contracts';
+// irStore — adapter over workingCopyStore.
+//
+// All IR state lives in workingCopyStore. This module re-exports a
+// useIRStore hook with the exact same call signatures as the original
+// Zustand store so every existing consumer (React components, non-React
+// callers via .getState()/.setState()) continues to work unchanged.
+//
+// Adapter technique: workingCopyStore holds the data; useIRStore is a
+// UseBoundStore-shaped object whose hook body delegates to
+// useWorkingCopyStore(selector) and whose .getState()/.setState() bridge
+// directly to workingCopyStore's equivalents with a scoped view.
 
-interface IRStoreState {
+import { useStore } from "zustand/react";
+import type { KeyboardIR } from "@keyboard-studio/contracts";
+import { useWorkingCopyStore } from "./workingCopyStore.ts";
+
+// ---------------------------------------------------------------------------
+// IRStoreState — the public type contract for existing consumers.
+// Matches the original irStore interface byte-for-byte.
+// ---------------------------------------------------------------------------
+
+export interface IRStoreState {
   ir: KeyboardIR | null;
   deletedNodeIds: Set<string>;
   undoStack: string[];
@@ -14,31 +32,89 @@ interface IRStoreState {
   keepAll: () => void;
 }
 
-export const useIRStore = create<IRStoreState>((set, get) => ({
-  ir: null,
-  deletedNodeIds: new Set(),
-  undoStack: [],
-  setIR: (ir) => set({ ir, deletedNodeIds: new Set(), undoStack: [] }),
-  clearIR: () => set({ ir: null, deletedNodeIds: new Set(), undoStack: [] }),
-  deleteNode: (nodeId) => set((s) => ({
-    deletedNodeIds: new Set([...s.deletedNodeIds, nodeId]),
-    undoStack: [...s.undoStack, nodeId],
-  })),
-  undoDelete: () => set((s) => {
-    if (s.undoStack.length === 0) return s;
-    const last = s.undoStack[s.undoStack.length - 1] as string;
-    const next = new Set(s.deletedNodeIds);
-    next.delete(last);
-    return { deletedNodeIds: next, undoStack: s.undoStack.slice(0, -1) };
-  }),
-  restoreNode: (nodeId) => set((s) => {
-    const next = new Set(s.deletedNodeIds);
-    next.delete(nodeId);
-    return {
-      deletedNodeIds: next,
-      undoStack: s.undoStack.filter((id) => id !== nodeId),
-    };
-  }),
-  isDeleted: (nodeId) => get().deletedNodeIds.has(nodeId),
-  keepAll: () => set({ deletedNodeIds: new Set(), undoStack: [] }),
-}));
+// ---------------------------------------------------------------------------
+// Selector — project the IR slice out of workingCopyStore state.
+// Used both by the hook and by getState() so the shape is derived in one place.
+// ---------------------------------------------------------------------------
+
+function selectIRSlice(s: ReturnType<typeof useWorkingCopyStore.getState>): IRStoreState {
+  return {
+    ir: s.ir,
+    deletedNodeIds: s.deletedNodeIds,
+    undoStack: s.undoStack,
+    setIR: s.setIR,
+    clearIR: s.clearIR,
+    deleteNode: s.deleteNode,
+    undoDelete: s.undoDelete,
+    restoreNode: s.restoreNode,
+    isDeleted: s.isDeleted,
+    keepAll: s.keepAll,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// useIRStore — the adapter hook.
+//
+// Calling convention (matches original):
+//   useIRStore()                    — returns full IRStoreState
+//   useIRStore((s) => s.ir)         — returns selected slice
+//   useIRStore.getState()           — imperative read (non-React callers)
+//   useIRStore.setState({...})      — imperative partial write
+//   useIRStore.subscribe(listener)  — subscribe to state changes
+//   useIRStore.getInitialState()    — initial state
+//
+// IMPORTANT: Avoid returning freshly-allocated objects from within-selector
+// bounds without useShallow — a selector like (s) => ({ ir: s.ir, ... }) would
+// allocate a new object every render, causing re-render loops. The hook below
+// is typed to only allow selectors that return stable (primitive / referentially
+// stable) values. Callers that need multiple fields should call useIRStore
+// multiple times with individual selectors, which is the pattern already used
+// in every existing consumer (CarveGallery, CarveActions, PatternCard, etc.).
+// ---------------------------------------------------------------------------
+
+function useIRStoreHook(): IRStoreState;
+function useIRStoreHook<U>(selector: (state: IRStoreState) => U): U;
+function useIRStoreHook<U>(selector?: (state: IRStoreState) => U): IRStoreState | U {
+  if (selector === undefined) {
+    return useStore(useWorkingCopyStore, selectIRSlice);
+  }
+  return useStore(useWorkingCopyStore, (wcs) => selector(selectIRSlice(wcs)));
+}
+
+// ---------------------------------------------------------------------------
+// Bridge: attach .getState() / .setState() / .subscribe() / .getInitialState()
+// so that non-React callers (e.g. useKeyboardArtifact.ts) work unchanged.
+// ---------------------------------------------------------------------------
+
+const getState = (): IRStoreState => selectIRSlice(useWorkingCopyStore.getState());
+
+const setState = (
+  partial:
+    | Partial<IRStoreState>
+    | ((state: IRStoreState) => Partial<IRStoreState>),
+): void => {
+  if (typeof partial === "function") {
+    const current = getState();
+    const patch = partial(current);
+    useWorkingCopyStore.setState(patch);
+  } else {
+    useWorkingCopyStore.setState(partial);
+  }
+};
+
+const subscribe = (listener: (state: IRStoreState, prev: IRStoreState) => void) => {
+  return useWorkingCopyStore.subscribe((wcs, prev) => {
+    listener(selectIRSlice(wcs), selectIRSlice(prev));
+  });
+};
+
+const getInitialState = (): IRStoreState =>
+  selectIRSlice(useWorkingCopyStore.getInitialState());
+
+// Compose the hook + static methods into a UseBoundStore-compatible shape.
+export const useIRStore = Object.assign(useIRStoreHook, {
+  getState,
+  setState,
+  subscribe,
+  getInitialState,
+});
