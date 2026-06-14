@@ -49,7 +49,7 @@ const {
   return {
     mockIdentityCompleteRef,
     mockBaseResolvedRef,
-    mockPrefillConfirmRef: mockPrefillBackRef,   // alias — not used but kept symmetric
+    mockPrefillConfirmRef,
     mockCarveDoneRef,
     mockCarveBackRef,
     mockPhaseBDoneRef,
@@ -58,8 +58,6 @@ const {
     mockMechBackRef,
     mockPhaseFDoneRef,
     mockPhaseFBackRef,
-    // expose the refs the tests actually need under cleaner names
-    _prefillConfirm: mockPrefillConfirmRef,
   };
 });
 
@@ -75,9 +73,6 @@ const _mockMechDoneRef = mockMechDoneRef;
 const _mockMechBackRef = mockMechBackRef;
 const _mockPhaseFDoneRef = mockPhaseFDoneRef;
 const _mockPhaseFBackRef = mockPhaseFBackRef;
-
-// Separate ref for the Prefill confirm callback — not combined in hoisted block above.
-let _prefillConfirmCb: (() => void) | null = null;
 
 // ---------------------------------------------------------------------------
 // Mock child survey components — shallow stubs that record callbacks.
@@ -112,7 +107,6 @@ vi.mock("./survey/index.ts", () => {
       );
     },
     Prefill: ({ onConfirm, onBack }: { onConfirm: () => void; onBack?: () => void }) => {
-      _prefillConfirmCb = onConfirm;
       return (
         <div data-testid="stage-prefill">
           <button type="button" data-testid="prefill-confirm" onClick={onConfirm}>
@@ -315,7 +309,6 @@ afterEach(() => {
   cleanup();
   useWorkingCopyStore.getState().reset();
   vi.clearAllMocks();
-  _prefillConfirmCb = null;
 });
 
 // ---------------------------------------------------------------------------

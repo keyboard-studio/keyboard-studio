@@ -13,7 +13,7 @@
 //   1. Carve deletions — re-emit the filtered IR into the VFS .kmn, replacing
 //      the fetched source. baseIr is never mutated; a filtered copy is used.
 //   2. Assignments — applyAssignmentsToVfs on the carved .kmn. If no patternMap
-//      is provided (survey/pick-base path), this step is skipped (no assignments
+//      is provided (SurveyView path), this step is skipped (no assignments
 //      to apply until Phase C completes).
 //   3. Identity — applyIdentityStubMutation writes &NAME (display name) into the
 //      .kmn so the compiled keyboard's spacebar shows the new name.
@@ -47,7 +47,7 @@ export interface UseWorkingCopyTransformOptions {
   /**
    * Synchronous pattern resolver required by applyAssignmentsToVfs.
    * Pass null/undefined when assignments should not be projected (e.g. the
-   * survey/pick-base path before Phase C completes). When assignments exist
+   * SurveyView path before Phase C completes). When assignments exist
    * in the store but no patternMap is supplied, a warning is added but the
    * transform still proceeds with carve + identity.
    */
