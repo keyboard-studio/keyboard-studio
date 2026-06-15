@@ -22,7 +22,10 @@ import { join, basename } from "node:path";
 import { parse, emit } from "./index.ts";
 import { scaffoldIR } from "../scaffolder/scaffold-ir.ts";
 
-const KEYBOARDS_ROOT = "D:/Github/_Projects/_KM/keyboards/release";
+const KEYBOARDS_ROOTS = [
+  "D:/Github/_Projects/_KM/keyboards/release",
+  "D:/Github/_Projects/_KM/keyboards/experimental",
+];
 
 interface Failure {
   keyboardId: string;
@@ -134,10 +137,15 @@ function detectFailures(keyboardId: string, path: string, emitted: string): Fail
   return fails;
 }
 
-describe("round-trip probe over all release keyboards", () => {
-  it("scans every release/**/*.kmn and aggregates emit-output issues", () => {
-    const all = listKmnSources(KEYBOARDS_ROOT);
-    console.log(`[probe] scanning ${all.length} keyboards`);
+describe("round-trip probe over all release + experimental keyboards", () => {
+  it("scans every {release,experimental}/**/*.kmn and aggregates emit-output issues", () => {
+    const all: string[] = [];
+    for (const root of KEYBOARDS_ROOTS) {
+      const found = listKmnSources(root);
+      console.log(`[probe] ${root.split("/").pop()}: ${found.length} keyboards`);
+      all.push(...found);
+    }
+    console.log(`[probe] scanning ${all.length} keyboards total`);
 
     const failures: Failure[] = [];
     const parseErrors: { path: string; message: string }[] = [];
