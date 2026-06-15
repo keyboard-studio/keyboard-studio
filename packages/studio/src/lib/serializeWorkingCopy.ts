@@ -36,6 +36,13 @@ export interface SerializeWorkingCopyResult {
   warnings: string[];
   /** The keyboard id resolved from the store (for the filename). */
   keyboardId: string;
+  /**
+   * The keyboard release version, for the `<id>-<version>.zip` filename.
+   * Read from the base IR header (`&KEYBOARDVERSION` on import, the scaffolder's
+   * keyboard release version on a fresh base), defaulting to `"1.0"`. This is the
+   * human-visible release version — NOT the `&VERSION` KMN file-format version.
+   */
+  version: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -87,6 +94,12 @@ export async function serializeWorkingCopy(): Promise<SerializeWorkingCopyResult
   // to project against identity.keyboardId and remove this comment.
   const keyboardId = baseKeyboard.id;
   const outputKeyboardId = identity?.keyboardId ?? keyboardId;
+
+  // Keyboard release version for the `<id>-<version>.zip` filename. baseIr.header.version
+  // carries &KEYBOARDVERSION on import (codec/parse prefers it over &VERSION) and the
+  // scaffolder's keyboard release version on a fresh base. Fall back to "1.0" if absent —
+  // never the &VERSION file-format version (e.g. "14.0").
+  const version = baseIr.header.version || "1.0";
 
   // 2. Collect physical assignments from phaseResults (mirrors useWorkingCopyTransform).
   //    projectWorkingCopyVfs also filters physical defensively, so this pre-filter is
@@ -149,5 +162,5 @@ export async function serializeWorkingCopy(): Promise<SerializeWorkingCopyResult
     );
   }
 
-  return { bytes, warnings: [...warnings, ...extraWarnings], keyboardId: outputKeyboardId };
+  return { bytes, warnings: [...warnings, ...extraWarnings], keyboardId: outputKeyboardId, version };
 }

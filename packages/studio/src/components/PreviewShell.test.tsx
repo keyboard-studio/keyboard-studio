@@ -24,7 +24,7 @@ const { mockSerializeResult, mockStage } = vi.hoisted(() => {
   return {
     mockSerializeResult: {
       current: null as
-        | { bytes: Uint8Array; warnings: string[]; keyboardId: string }
+        | { bytes: Uint8Array; warnings: string[]; keyboardId: string; version: string }
         | null,
     },
     mockStage: {
@@ -138,6 +138,7 @@ describe("PreviewShell — projection warnings", () => {
       bytes: new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
       warnings: [],
       keyboardId: "basic_kbdus",
+      version: "1.0",
     };
 
     render(<PreviewShell />);
@@ -164,6 +165,7 @@ describe("PreviewShell — projection warnings", () => {
         "[carve] opaque IR skipped",
       ],
       keyboardId: "ha_sil",
+      version: "1.0",
     };
 
     render(<PreviewShell />);
@@ -186,6 +188,7 @@ describe("PreviewShell — projection warnings", () => {
       bytes: new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
       warnings: ["[serialize] something"],
       keyboardId: "basic_kbdus",
+      version: "1.0",
     };
 
     render(<PreviewShell />);
@@ -207,6 +210,7 @@ describe("PreviewShell — projection warnings", () => {
       bytes: new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
       warnings: ["[serialize] first warning"],
       keyboardId: "basic_kbdus",
+      version: "1.0",
     };
 
     render(<PreviewShell />);
@@ -223,6 +227,7 @@ describe("PreviewShell — projection warnings", () => {
       bytes: new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
       warnings: [],
       keyboardId: "basic_kbdus",
+      version: "1.0",
     };
 
     await act(async () => {
@@ -231,5 +236,51 @@ describe("PreviewShell — projection warnings", () => {
 
     // Warning region should be gone.
     expect(screen.queryByRole("status", { name: /Download projection warnings/i })).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — download filename
+// ---------------------------------------------------------------------------
+
+describe("PreviewShell — download filename", () => {
+  it("names the download <keyboardId>-<version>.zip", async () => {
+    seedInstantiatedWorkingCopy();
+    mockSerializeResult.current = {
+      bytes: new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      warnings: [],
+      keyboardId: "basic_kbdus",
+      version: "2.5",
+    };
+
+    // Spy on createElement to capture the download anchor's filename. Override the
+    // anchor's click() to a no-op so we read the download attr without triggering
+    // jsdom's "navigation not implemented" noise.
+    const realCreateElement = document.createElement.bind(document);
+    let anchorDownload: string | null = null;
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation(((tag: string) => {
+        const el = realCreateElement(tag);
+        if (tag === "a") {
+          const a = el as HTMLAnchorElement;
+          a.click = () => {
+            anchorDownload = a.download;
+          };
+        }
+        return el;
+      }) as typeof document.createElement);
+
+    try {
+      render(<PreviewShell />);
+      fireEvent.click(screen.getByTestId("base-picker"));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /download/i }));
+      });
+
+      expect(anchorDownload).toBe("basic_kbdus-2.5.zip");
+    } finally {
+      createElementSpy.mockRestore();
+    }
   });
 });

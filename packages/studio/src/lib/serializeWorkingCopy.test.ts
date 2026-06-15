@@ -105,7 +105,7 @@ describe("serializeWorkingCopy — not-instantiated returns null", () => {
 // ---------------------------------------------------------------------------
 
 describe("serializeWorkingCopy — happy path", () => {
-  it("returns bytes, warnings, and keyboardId when instantiated", async () => {
+  it("returns bytes, warnings, keyboardId, and version when instantiated", async () => {
     const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
     seedStore();
     const result = await serializeWorkingCopy();
@@ -113,6 +113,8 @@ describe("serializeWorkingCopy — happy path", () => {
     expect(result!.bytes).toBeInstanceOf(Uint8Array);
     expect(Array.isArray(result!.warnings)).toBe(true);
     expect(result!.keyboardId).toBe(basicKbdus.id);
+    // makeTestIR defaults header.version to "1.0".
+    expect(result!.version).toBe("1.0");
   });
 
   it("keyboardId matches store baseKeyboard.id", async () => {
@@ -120,6 +122,22 @@ describe("serializeWorkingCopy — happy path", () => {
     seedStore();
     const result = await serializeWorkingCopy();
     expect(result!.keyboardId).toBe(basicKbdus.id);
+  });
+
+  it("version is read from baseIr.header.version (the release version, not &VERSION)", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    const { ir } = seedStore();
+    ir.header.version = "2.3";
+    const result = await serializeWorkingCopy();
+    expect(result!.version).toBe("2.3");
+  });
+
+  it("version falls back to \"1.0\" when baseIr.header.version is empty", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    const { ir } = seedStore();
+    ir.header.version = "";
+    const result = await serializeWorkingCopy();
+    expect(result!.version).toBe("1.0");
   });
 
   it("calls projectWorkingCopyVfs with baseIr, deletedNodeIds, identity from store", async () => {

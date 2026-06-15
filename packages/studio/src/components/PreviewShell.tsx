@@ -423,10 +423,11 @@ export function PreviewShell() {
       try {
         const a = document.createElement("a");
         a.href = url;
-        // Use the keyboardId from the serializer result (derived from the store's
-        // baseKeyboard.id) so the filename is always consistent with the content.
+        // Use the keyboardId + release version from the serializer result (derived
+        // from the store's baseKeyboard.id and baseIr.header.version) so the filename
+        // is always consistent with the content: <id>-<version>.zip.
         const downloadId = result.keyboardId;
-        a.download = `${downloadId}.zip`;
+        a.download = `${downloadId}-${result.version}.zip`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
