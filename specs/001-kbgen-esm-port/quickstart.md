@@ -9,11 +9,20 @@ Runnable checks that prove the port works end-to-end. Run from repo root.
 
 ## 1. Capture the pre-port baseline (oracle)
 
-Before converting, run the legacy tool on the Milestone-1 fixture and save its output:
+Before converting, run the legacy tool on the Milestone-1 fixture and save its output.
+
+**Fixture args used (Hausa-style explicit inventory, all letters occupied — no CLDR data required):**
 
 ```bash
-node utilities/kbgen/cli.js <milestone-1 fixture args> > /tmp/placement-map.baseline.json
+# Temporarily restore CJS package.json, then:
+node utilities/kbgen/cli.js --id demo --chars "ɓƁɗƊƙƘ" --used "abcdefghijklmnopqrstuvwxyz" --out /tmp/kbgen-baseline
+cp /tmp/kbgen-baseline/source/demo.placement-map.json /tmp/placement-map.baseline.json
 ```
+
+Rationale: the `data/cldr/` directory is not vendored in the repo (only `data/unicode/` is).
+The explicit `--chars`/`--used` path exercises the full analysis cascade (NAME signals)
+without requiring a network fetch, and matches the Milestone-1 Latin-extended / QWERTY
+coverage described in [README.md](../../utilities/kbgen/README.md).
 
 ## 2. Build & typecheck the ported tool
 

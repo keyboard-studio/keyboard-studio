@@ -1,9 +1,13 @@
 # kbgen — status and integration path
 
-**Status (2026-06-03): prototype, homed in `utilities/` while it matures.**
-Authored as a standalone Node CLI (its own README still refers to `tools/kbgen/...`).
-Moved here out of `packages/*` so it does not break `pnpm -r build` / `typecheck`
-(it has no tsconfig, no build/test wired to the workspace runner, and is CommonJS, not ESM TS).
+**Status (2026-06-15): ESM TypeScript, buildable and typechecked — homed in `utilities/` pending PlacementMap contract (#133).**
+Ported from CommonJS plain-JS to ESM TypeScript as part of issue #132.
+The toolchain now matches `packages/engine`: `tsconfig.json` extends `tsconfig.base.json`,
+`tsc -b` builds to `dist/`, `vitest run` runs the anchor-cascade test suite.
+Still kept out of `packages/*` (and out of `pnpm-workspace.yaml`) because the
+`PlacementMap` type (gap 2 below) is gated by #133 — adding kbgen to the workspace
+before that conformance lands would make `pnpm -r` traverse a package that does not yet
+satisfy `@keyboard-studio/contracts`. See D-INT-1 below.
 
 **Intended end state: a real engine deliverable** — a *placement seeder* that runs ahead of
 the survey to propose data-driven character placements the user then confirms, rather than
@@ -22,9 +26,10 @@ entering them by hand. See spec [§7 Strategy selection](../../spec.md) and [§8
 
 ## Conformance gaps to close before it joins `packages/`
 
-1. **Toolchain.** Port CommonJS → ESM TypeScript; add `tsconfig.json`, `build`/`typecheck`/`test`
+1. **Toolchain.** ~~Port CommonJS → ESM TypeScript; add `tsconfig.json`, `build`/`typecheck`/`test`
    scripts; migrate `node test/anchors.test.js` → vitest. Match the shape of
-   [packages/engine/package.json](../../packages/engine/package.json).
+   [packages/engine/package.json](../../packages/engine/package.json).~~ **DONE (issue #132).**
+   Run `pnpm --dir utilities/kbgen build` / `typecheck` / `test` directly.
 2. **Contract conformance.** The ad-hoc `placement-map.json` shape must either map to, or be
    formally added to, [packages/contracts](../../packages/contracts). Per CLAUDE.md the `Pattern`
    schema (§5) is a Day-1 contract — adding a placement type is a contracts change, **not** an
