@@ -32,6 +32,7 @@ const OUT_FILE = path.join(OUT_DIR, "list");
 
 const STORE_NAME_RE = /^\s*store\s*\(\s*&NAME\s*\)\s*'([^']*)'/im;
 const STORE_VERSION_RE = /^\s*store\s*\(\s*&VERSION\s*\)\s*'([^']*)'/im;
+const KPS_LANGUAGE_ID_RE = /<Language\s+ID="([^"]+)"/g;
 
 function log(msg) {
   process.stdout.write(`[build-keyboards-index] ${msg}\n`);
@@ -76,6 +77,23 @@ function ensureClone(target) {
     REPO_URL,
     target,
   ]);
+}
+
+function parseKpsLanguages(kpsPath) {
+  if (!fs.existsSync(kpsPath)) return [];
+  let xml;
+  try {
+    xml = fs.readFileSync(kpsPath, "utf8");
+  } catch {
+    return [];
+  }
+  const ids = [];
+  let m;
+  KPS_LANGUAGE_ID_RE.lastIndex = 0;
+  while ((m = KPS_LANGUAGE_ID_RE.exec(xml)) !== null) {
+    if (m[1] !== undefined && m[1].length > 0) ids.push(m[1]);
+  }
+  return ids;
 }
 
 function parseKmnMetadata(kmnPath) {
@@ -125,7 +143,9 @@ function scan(keyboardsRepoRoot, sourceRepoSlug) {
       const kmnPath = path.join(kbDir, "source", `${id}.kmn`);
       if (!fs.existsSync(kmnPath)) continue;
       const meta = parseKmnMetadata(kmnPath);
-      out.push({
+      const kpsPath = path.join(kbDir, "source", `${id}.kps`);
+      const languages = parseKpsLanguages(kpsPath);
+      const entry = {
         id,
         path: `release/${vendor}/${id}`,
         // [SCAFFOLD] script hardcoded to "Latn" — mirrors localKeyboards.ts;
@@ -135,7 +155,9 @@ function scan(keyboardsRepoRoot, sourceRepoSlug) {
         displayName: meta.name !== "" ? meta.name : id,
         version: meta.version,
         sourceUrl: `https://github.com/${sourceRepoSlug}/tree/${REPO_BRANCH}/release/${vendor}/${id}`,
-      });
+      };
+      if (languages.length > 0) entry.languages = languages;
+      out.push(entry);
     }
   }
   out.sort((a, b) => a.id.localeCompare(b.id));
