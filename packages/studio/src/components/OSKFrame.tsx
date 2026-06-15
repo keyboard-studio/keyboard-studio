@@ -63,17 +63,25 @@ export function OSKFrame({
     // KMW's setActiveKeyboard needs to match that exactly — using the
     // base id here would error with `Error registering the <base> keyboard`.
     const activeKeyboardId = identity?.keyboardId ?? baseKeyboard.id;
+    // Prefer the working-copy identity's bcp47 (Track 1 author-chosen language)
+    // over the base keyboard's first declared language. KMW's setActiveKeyboard
+    // needs the language tag the compiled .js registers under — otherwise it
+    // errors with "Cannot find the <id> keyboard for English".
+    const activeBcp47 =
+      (identity?.bcp47 && identity.bcp47.trim() !== "" ? identity.bcp47 : undefined) ??
+      baseKeyboard.languages?.[0];
     send({
       type: "SET_KEYBOARD",
       jsUrl: stage.jsBlobUrl,
       keyboardId: activeKeyboardId,
+      ...(activeBcp47 !== undefined && activeBcp47 !== "" ? { bcp47: activeBcp47 } : {}),
       ...(stage.fontFaceUrl !== undefined ? { fontFaceUrl: stage.fontFaceUrl } : {}),
       ...(stage.fontFaceFamily !== undefined ? { fontFaceFamily: stage.fontFaceFamily } : {}),
       ...(stage.keyboardCssUrls !== undefined && stage.keyboardCssUrls.length > 0
         ? { keyboardCssUrls: stage.keyboardCssUrls }
         : {}),
     });
-  }, [stage, engineReady, baseKeyboard, identity?.keyboardId, send]);
+  }, [stage, engineReady, baseKeyboard, identity?.keyboardId, identity?.bcp47, send]);
 
   useEffect(() => {
     if (!engineReady) return;
