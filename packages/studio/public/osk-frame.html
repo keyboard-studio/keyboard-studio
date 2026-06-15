@@ -14,7 +14,7 @@
       delivery model is decided.
 
       postMessage contract:
-        host -> frame: { type: "SET_KEYBOARD",  jsUrl, keyboardId, fontFaceUrl?, fontFaceFamily?, keyboardCssUrls? }
+        host -> frame: { type: "SET_KEYBOARD",  jsUrl, keyboardId, bcp47?, fontFaceUrl?, fontFaceFamily?, keyboardCssUrls? }
         host -> frame: { type: "SET_OSK_MODE",  mode: "desktop" | "touch" }
         frame -> host: { type: "ENGINE_READY" }
         frame -> host: { type: "ENGINE_ERROR", message }
@@ -328,7 +328,7 @@
           }
         }
 
-        function loadKeyboard(jsUrl, keyboardId, fontFaceUrl, fontFaceFamily, keyboardCssUrls) {
+        function loadKeyboard(jsUrl, keyboardId, fontFaceUrl, fontFaceFamily, keyboardCssUrls, bcp47) {
           if (!window.keyman || typeof window.keyman.addKeyboards !== "function") {
             postError("KMW engine missing addKeyboards()");
             return;
@@ -341,10 +341,16 @@
           injectKeyboardCss(keyboardCssUrls);
           setStatus("registering keyboard: " + keyboardId);
           var kmwId = "Keyboard_" + keyboardId;
+          // Use the keyboard's actual BCP47 (forwarded by the host) so the stub
+          // registers under and setActiveKeyboard activates the same tag the
+          // compiled .js declares. Falling back to "en" causes
+          // "Cannot find the <id> keyboard for English" on any non-English
+          // keyboard.
+          var languageCode = typeof bcp47 === "string" && bcp47.length > 0 ? bcp47 : "en";
           var stub = {
             id: keyboardId,
             name: keyboardId,
-            languages: { id: "en", name: "English" },
+            languages: { id: languageCode, name: languageCode },
             filename: jsUrl,
           };
           try {
@@ -355,7 +361,7 @@
           }
           setTimeout(function () {
             try {
-              window.keyman.setActiveKeyboard(kmwId, "en").then(function () {
+              window.keyman.setActiveKeyboard(kmwId, languageCode).then(function () {
                 setStatus("active: " + keyboardId);
                 setOsk();
                 try { oskTarget.focus(); } catch (_) {}
@@ -392,7 +398,7 @@
               if (pendingKeyboard) {
                 var k = pendingKeyboard;
                 pendingKeyboard = null;
-                loadKeyboard(k.jsUrl, k.keyboardId, k.fontFaceUrl, k.fontFaceFamily, k.keyboardCssUrls);
+                loadKeyboard(k.jsUrl, k.keyboardId, k.fontFaceUrl, k.fontFaceFamily, k.keyboardCssUrls, k.bcp47);
               }
             })
             .catch(function (err) {
@@ -427,6 +433,7 @@
                 fontFaceUrl: msg.fontFaceUrl || null,
                 fontFaceFamily: msg.fontFaceFamily || null,
                 keyboardCssUrls: Array.isArray(msg.keyboardCssUrls) ? msg.keyboardCssUrls : null,
+                bcp47: typeof msg.bcp47 === "string" ? msg.bcp47 : null,
               };
             } else {
               loadKeyboard(
@@ -435,6 +442,7 @@
                 msg.fontFaceUrl,
                 msg.fontFaceFamily,
                 Array.isArray(msg.keyboardCssUrls) ? msg.keyboardCssUrls : null,
+                typeof msg.bcp47 === "string" ? msg.bcp47 : null,
               );
             }
             return;

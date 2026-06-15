@@ -21,6 +21,13 @@ export interface SetKeyboardCommand {
    * apply to the rendered OSK.
    */
   keyboardCssUrls?: string[];
+  /**
+   * BCP47 language tag the compiled keyboard declares (e.g. "ewo", "ha-Latn").
+   * Used to register the KMW keyboard stub and activate it under the correct
+   * language. Defaults to "en" inside the frame if omitted, which fails for any
+   * non-English keyboard with "Cannot find the <id> keyboard for English".
+   */
+  bcp47?: string;
 }
 
 export interface SetOskModeCommand {
