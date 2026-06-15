@@ -2,12 +2,15 @@
   "name": "kbgen",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Logic-driven keyboard character placement engine. Decides where each non-base character goes on a layout (which key, which mechanism) from objective Unicode/CLDR signals, then emits Keyman source files (.kmn + .keyman-touch-layout + .kvks). Milestone 1: Latin-extended (African orthographies), QWERTY base.",
-  "type": "commonjs",
-  "bin": {
-    "kbgen": "cli.js"
-  },
   "scripts": {
-    "test": "node test/anchors.test.js"
+    "cli": "npx tsx cli.ts",
+    "fetch-data": "npx tsx fetch-data.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
   }
 }
