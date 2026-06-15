@@ -299,13 +299,17 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const resetSurvey = useWorkingCopyStore((s) => s.reset);
   const setStoreIdentity = useWorkingCopyStore((s) => s.setIdentity);
 
-  // Derive KMN source from the working copy's base VFS so the validator can
-  // produce findings while the survey is in progress.
+  // Derive KMN source from the working copy's base VFS (the scaffolded snapshot)
+  // so the validator can produce findings while the survey is in progress.
+  // Note: post-carve IR mutations are not reflected here; projectWorkingCopyVfs
+  // would be needed to validate the fully-projected state.
   const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
   const kmnSource = useMemo(() => {
     if (!baseVfs) return null;
     const path = findKmnPath(baseVfs);
-    return path ? (baseVfs.get(path)!.content as string) : null;
+    if (!path) return null;
+    const raw = baseVfs.get(path)!.content;
+    return typeof raw === "string" ? raw : null;
   }, [baseVfs]);
   const { findings } = useValidator(kmnSource);
   const findingsByQuestionId = useMemo(

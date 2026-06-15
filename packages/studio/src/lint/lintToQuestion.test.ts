@@ -29,4 +29,18 @@ describe("buildFindingsByQuestionId", () => {
     const result = buildFindingsByQuestionId([f1, f2]);
     expect(result["pb_standard_letters"]).toEqual([f1, f2]);
   });
+
+  it("places a display-name finding under language_name_english", () => {
+    const finding = makeFinding("KM_LINT_DISPLAY_NAME_UNDERSCORE");
+    const result = buildFindingsByQuestionId([finding]);
+    expect(result["language_name_english"]).toEqual([finding]);
+    expect(Object.keys(result)).toHaveLength(1);
+  });
+
+  it("places a region finding under region", () => {
+    const finding = makeFinding("KM_LINT_KPS_NUMERIC_REGION_TAG");
+    const result = buildFindingsByQuestionId([finding]);
+    expect(result["region"]).toEqual([finding]);
+    expect(Object.keys(result)).toHaveLength(1);
+  });
 });
