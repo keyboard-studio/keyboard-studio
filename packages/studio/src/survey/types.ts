@@ -86,3 +86,46 @@ export interface AnswerStackEntry {
   questionId: string;
   value: string | string[] | undefined;
 }
+
+/**
+ * Result of a per-question validate() call.
+ * ok:true — value passes; ok:false — message is surfaced in the editor gutter.
+ */
+export type ValidationResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+/**
+ * Per-question module shape (see packages/studio/src/survey/questions/).
+ *
+ * Each question module exports:
+ *   - definition  : the FlowQuestion node (id, type, prompt, next, …)
+ *   - validate    : optional client-side validator (called in the 300 ms cycle)
+ *   - mutate      : optional IR mutation hook — stub comment only for now;
+ *                   KeyboardIR mutation surface is not yet a real contract.
+ *   - fixtures    : test vectors consumed by colocated vitest specs
+ */
+export interface QuestionModule {
+  /** The static FlowQuestion definition, including routing in definition.next. */
+  definition: FlowQuestion;
+
+  /**
+   * Optional synchronous validator.
+   * Runs on the UI thread within the 300 ms debounce cycle.
+   * Must complete in <5 ms to stay inside budget.
+   */
+  validate?: (value: string | string[] | undefined) => ValidationResult;
+
+  /**
+   * Optional IR mutation hook.
+   * STUB: KeyboardIR mutation surface is not yet a real API.
+   * Signature reserved for fan-out cycle. Do not call.
+   */
+  // mutate?: (value: string | string[] | undefined, ctx: SurveyContext) => Partial<unknown>;
+
+  /** Test vectors exercised by the colocated vitest spec. */
+  fixtures: {
+    valid: Array<{ value: string; note?: string }>;
+    invalid: Array<{ value: string; note?: string; expectedError?: string }>;
+  };
+}
