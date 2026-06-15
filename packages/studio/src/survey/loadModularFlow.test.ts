@@ -101,6 +101,13 @@ describe("loadModularFlow — error paths", () => {
     const yaml = `flow_id: test\nphase: A`;
     expect(() => loadModularFlow(yaml)).toThrowError(/questions must be an array/);
   });
+
+  // An empty questions list is structurally meaningless; SurveyRunner behaviour on it
+  // is undefined. Loader rejects it eagerly rather than producing a broken FlowDef.
+  it("throws when questions is an empty list", () => {
+    const yaml = `flow_id: test\nphase: A\nquestions: []`;
+    expect(() => loadModularFlow(yaml)).toThrowError(/questions list must not be empty/);
+  });
 });
 
 // ---------------------------------------------------------------------------

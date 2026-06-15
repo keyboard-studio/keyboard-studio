@@ -7,6 +7,8 @@
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
 
+// `satisfies` preserves the literal type of next: "language_name_english" rather than
+// widening it to string | null | FlowGotoRule[]. Do NOT change this to `: FlowQuestion`.
 export const definition = {
   id: "language_name_autonym",
   prompt: "What is your language called in your own language?",
@@ -36,7 +38,7 @@ export function validate(
         : "";
 
   if (trimmed.length === 0) {
-    return { ok: false, message: "required" };
+    return { ok: false, code: "required", message: "Language name is required." };
   }
   return { ok: true };
 }
@@ -55,8 +57,8 @@ export const fixtures: QuestionModule["fixtures"] = {
     { value: "  Fula  ", note: "leading/trailing whitespace — trimmed to non-empty" },
   ],
   invalid: [
-    { value: "", expectedError: "required" },
-    { value: "   ", expectedError: "required", note: "whitespace-only" },
+    { value: "", expectedCode: "required" },
+    { value: "   ", expectedCode: "required", note: "whitespace-only" },
   ],
 };
 

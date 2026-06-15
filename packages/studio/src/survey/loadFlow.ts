@@ -5,6 +5,7 @@
 
 import { parse } from "yaml";
 import type { FlowDef } from "./types.ts";
+import { VALID_PHASES } from "./constants.ts";
 
 /**
  * Parse a raw YAML string (from a `?raw` Vite import) into a FlowDef.
@@ -20,7 +21,6 @@ export function parseFlow(raw: string): FlowDef {
   ) {
     throw new Error("Invalid flow YAML: missing flow_id or questions");
   }
-  const VALID_PHASES = new Set(["A", "B", "C", "C-prime", "D", "E", "F", "G"]);
   if (!("phase" in parsed) || !VALID_PHASES.has((parsed as { phase?: string }).phase ?? "")) {
     throw new Error("Invalid flow YAML: missing or unknown phase");
   }

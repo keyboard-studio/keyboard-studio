@@ -89,11 +89,13 @@ export interface AnswerStackEntry {
 
 /**
  * Result of a per-question validate() call.
- * ok:true — value passes; ok:false — message is surfaced in the editor gutter.
+ * ok:true — value passes; ok:false — code is the stable machine-readable
+ * identifier (e.g. "required", "too_long", "invalid_bcp47") asserted by tests;
+ * message is the human-readable form surfaced in the editor gutter.
  */
 export type ValidationResult =
   | { ok: true }
-  | { ok: false; message: string };
+  | { ok: false; code: string; message: string };
 
 /**
  * Per-question module shape (see packages/studio/src/survey/questions/).
@@ -121,11 +123,19 @@ export interface QuestionModule {
    * STUB: KeyboardIR mutation surface is not yet a real API.
    * Signature reserved for fan-out cycle. Do not call.
    */
-  // mutate?: (value: string | string[] | undefined, ctx: SurveyContext) => Partial<unknown>;
+  // mutate?: (value, ctx) => Partial<KeyboardIR>;
+  // Eventual consumer: SurveyAnswer in packages/contracts/src/surveyPhaseResult.ts
+  // → KeyboardIR mutation in packages/contracts/src/keyboard-ir.ts
+  // Currently surfaceless; do NOT implement until the engine has a real mutation seam.
 
   /** Test vectors exercised by the colocated vitest spec. */
   fixtures: {
-    valid: Array<{ value: string; note?: string }>;
-    invalid: Array<{ value: string; note?: string; expectedError?: string }>;
+    valid: Array<{ value: string | string[] | undefined; note?: string }>;
+    invalid: Array<{
+      value: string | string[] | undefined;
+      note?: string;
+      /** Asserts against ValidationResult.code (stable machine-readable id), not message text. */
+      expectedCode?: string;
+    }>;
   };
 }

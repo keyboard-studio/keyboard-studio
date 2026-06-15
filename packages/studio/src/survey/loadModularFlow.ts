@@ -20,6 +20,7 @@
 import { parse } from "yaml";
 import type { FlowDef } from "./types.ts";
 import { questionRegistry } from "./questions/registry.ts";
+import { VALID_PHASES } from "./constants.ts";
 
 // ---------------------------------------------------------------------------
 // Thin YAML shape
@@ -31,8 +32,6 @@ interface ThinFlowYaml {
   questions: string[];
   provenance_questions?: string[] | undefined;
 }
-
-const VALID_PHASES = new Set(["A", "B", "C", "C-prime", "D", "E", "F", "G"]);
 
 /**
  * Parse a thin-YAML string into a ThinFlowYaml.
@@ -82,9 +81,14 @@ function parseThinYaml(raw: string): ThinFlowYaml {
 
 /**
  * Resolve a list of question IDs against the registry.
- * Throws if any ID is unregistered — fail fast beats silent gaps.
+ * Throws if the list is empty (an empty flow is structurally meaningless and
+ * SurveyRunner's behaviour on it is undefined) or if any ID is unregistered —
+ * fail fast beats silent gaps.
  */
 function resolveIds(ids: string[]): FlowDef["questions"] {
+  if (ids.length === 0) {
+    throw new Error("loadModularFlow: questions list must not be empty");
+  }
   return ids.map((id) => {
     const mod = questionRegistry[id];
     if (mod === undefined) {
