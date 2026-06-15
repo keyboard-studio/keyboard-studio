@@ -95,9 +95,9 @@ function main() {
   let chars: string[] | null = null, used: string[] | null = null;
   if (o.locale) {
     const exemplars = loadExemplars(o.locale);
-    if (!exemplars) fail(`no CLDR exemplar data for locale "${o.locale}" -- fetch it (npx tsx fetch-data.ts ${o.locale}) or pass --chars/--used`);
-    used = [...exemplars!.used];
-    chars = exemplars!.specials;
+    if (!exemplars) return fail(`no CLDR exemplar data for locale "${o.locale}" -- fetch it (npx tsx fetch-data.ts ${o.locale}) or pass --chars/--used`);
+    used = [...exemplars.used];
+    chars = exemplars.specials;
   }
   if (o.chars) chars = [...o.chars];
   if (o['chars-file']) chars = [...fs.readFileSync(o['chars-file'], 'utf8').replace(/\s+/g, '')];

@@ -34,6 +34,7 @@ export interface DiffRow {
 }
 
 export function extractCorpus(touchFile: string, layout: Layout): Map<string, CorpusEntry> {
+  // structure unchecked -- diagnostic-only, faithful port of corpus-diff.js
   const j = JSON.parse(fs.readFileSync(touchFile, 'utf8')) as Record<string, unknown>;
   const found = new Map<string, CorpusEntry>(); // char -> { key, mechanism, restore }
   for (const plat of Object.values(j)) {
