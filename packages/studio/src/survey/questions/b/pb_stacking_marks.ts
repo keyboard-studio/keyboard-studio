@@ -17,6 +17,10 @@ export const definition = {
   required: true,
   next: [
     { condition: "value == 'true'", goto: "pb_mark_style" },
+    // Ported verbatim from source YAML: `- default: pb_mark_style`.
+    // The conditional branch above and this default resolve to the same target.
+    // The dead conditional is intentional source fidelity; tracked for cleanup
+    // in the source YAML via bug(content): pb_stacking_marks next routing collapses.
     { default: true, goto: "pb_mark_style" },
   ],
 } satisfies import("../../types.ts").FlowQuestion;

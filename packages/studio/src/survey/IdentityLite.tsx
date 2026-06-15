@@ -113,6 +113,7 @@ export function IdentityLite({
   onBack,
   findingsByQuestionId,
 }: IdentityLiteProps) {
+  // TODO(#410): switch to loadModularFlow + identity_lite.modular.yaml when fan-out cutover lands.
   const flow = useMemo(() => parseFlow(identityLiteRaw as string), []);
 
   // Track the latest committed autonym synchronously via a ref so that

@@ -143,6 +143,35 @@ describe("resolveNext", () => {
     };
     expect(resolveNext(question, "false", {})).toBeNull();
   });
+
+  // P1-D: both the bare-fallthrough form { goto: "..." } and the explicit
+  // advisory form { default: true, goto: "..." } must behave identically.
+  // resolveNext treats any rule without a `condition` field as the default
+  // branch regardless of whether `default: true` is set.
+  it("bare fallthrough { goto } and annotated { default: true, goto } are equivalent", () => {
+    const bare: FlowQuestion = {
+      id: "q1",
+      type: "bool",
+      next: [
+        { condition: "value == 'true'", goto: "yes_branch" },
+        { goto: "default_branch" },
+      ],
+    };
+    const annotated: FlowQuestion = {
+      id: "q1",
+      type: "bool",
+      next: [
+        { condition: "value == 'true'", goto: "yes_branch" },
+        { default: true, goto: "default_branch" },
+      ],
+    };
+    // Both should hit the default branch when value is "false"
+    expect(resolveNext(bare, "false", {})).toBe("default_branch");
+    expect(resolveNext(annotated, "false", {})).toBe("default_branch");
+    // Both should hit the conditional branch when value is "true"
+    expect(resolveNext(bare, "true", {})).toBe("yes_branch");
+    expect(resolveNext(annotated, "true", {})).toBe("yes_branch");
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -79,7 +79,7 @@ describe("SurveyRunner pin chip — debug ENABLED", () => {
 
     // The chip should be present — either label is fine
     expect(
-      screen.queryByText("Pin this answer") ?? screen.queryByText("📌 Pinned"),
+      screen.queryByText("[+] Pin this answer") ?? screen.queryByText("[PIN] Pinned"),
     ).not.toBeNull();
   });
 
@@ -95,7 +95,7 @@ describe("SurveyRunner pin chip — debug ENABLED", () => {
       />,
     );
 
-    expect(screen.getByText("Pin this answer")).toBeTruthy();
+    expect(screen.getByText("[+] Pin this answer")).toBeTruthy();
   });
 
   it("clicking pin chip writes to the store and updates label to Pinned", async () => {
@@ -118,7 +118,7 @@ describe("SurveyRunner pin chip — debug ENABLED", () => {
       fireEvent.change(input, { target: { value: "test-answer" } });
     });
 
-    const pinBtn = screen.getByText("Pin this answer");
+    const pinBtn = screen.getByText("[+] Pin this answer");
     await act(async () => {
       fireEvent.click(pinBtn);
     });
@@ -130,7 +130,7 @@ describe("SurveyRunner pin chip — debug ENABLED", () => {
     expect(pins["q-first"]).toBe("test-answer");
     // Also verify via the store instance (shares the same module cache)
     expect(store.isPinned("q-first")).toBe(true);
-    expect(screen.getByText("📌 Pinned")).toBeTruthy();
+    expect(screen.getByText("[PIN] Pinned")).toBeTruthy();
   });
 
   it("clicking Pinned chip unpins the question and resets label", async () => {
@@ -152,13 +152,13 @@ describe("SurveyRunner pin chip — debug ENABLED", () => {
       />,
     );
 
-    const pinnedBtn = screen.getByText("📌 Pinned");
+    const pinnedBtn = screen.getByText("[PIN] Pinned");
     await act(async () => {
       fireEvent.click(pinnedBtn);
     });
 
     expect(store.isPinned("q-first")).toBe(false);
-    expect(screen.getByText("Pin this answer")).toBeTruthy();
+    expect(screen.getByText("[+] Pin this answer")).toBeTruthy();
   });
 
   it("chip has correct aria-pressed attribute", async () => {
@@ -212,8 +212,8 @@ describe("SurveyRunner pin chip — debug DISABLED", () => {
       />,
     );
 
-    expect(screen.queryByText("Pin this answer")).toBeNull();
-    expect(screen.queryByText("📌 Pinned")).toBeNull();
+    expect(screen.queryByText("[+] Pin this answer")).toBeNull();
+    expect(screen.queryByText("[PIN] Pinned")).toBeNull();
     // Also verify by role
     expect(screen.queryByRole("button", { name: /pin/i })).toBeNull();
   });

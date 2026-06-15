@@ -474,7 +474,7 @@ export function SurveyRunner({
               userSelect: "none",
             }}
           >
-            {debugPinsStore.isPinned(currentQId) ? "📌 Pinned" : "Pin this answer"}
+            {debugPinsStore.isPinned(currentQId) ? "[PIN] Pinned" : "[+] Pin this answer"}
           </button>
         </div>
       )}

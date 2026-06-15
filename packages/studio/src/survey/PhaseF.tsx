@@ -25,6 +25,7 @@ export interface PhaseFProps {
 }
 
 export function PhaseF({ context = {}, onComplete, onBack, findingsByQuestionId }: PhaseFProps) {
+  // TODO(#410): switch to loadModularFlow + phase_f.modular.yaml when fan-out cutover lands.
   const flow = useMemo(() => parseFlow(phaseFRaw as string), []);
 
   return (

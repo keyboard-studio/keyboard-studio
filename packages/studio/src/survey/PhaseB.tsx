@@ -126,6 +126,7 @@ export interface PhaseBProps {
 }
 
 export function PhaseB({ context = {}, onComplete, onBack, findingsByQuestionId }: PhaseBProps) {
+  // TODO(#410): switch to loadModularFlow + phase_b_characters.modular.yaml when fan-out cutover lands.
   const flow = useMemo(() => parseFlow(phaseBRaw as string), []);
   const [discoveryMethod, setDiscoveryMethod] = useState<DiscoveryMethod>(null);
   // manualFlow is memoized here (before any early returns) to satisfy React's
