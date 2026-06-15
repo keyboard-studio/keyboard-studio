@@ -56,7 +56,7 @@ export interface BuildContext {
   };
 }
 
-export interface PlacementMap {
+export interface KbgenOutputMap {
   keyboard: { id: string; name: string };
   base: { id: string; name: string };
   source: BuildContext['source'];
@@ -74,7 +74,7 @@ export interface PlacementMap {
   warnings: string[];
 }
 
-export function build(planResult: PlanResult, layout: Layout, ctx: BuildContext): PlacementMap {
+export function build(planResult: PlanResult, layout: Layout, ctx: BuildContext): KbgenOutputMap {
   const physical: PhysicalEntry[] = [];
   const touch: TouchEntry[] = [];
 
@@ -145,7 +145,7 @@ export function build(planResult: PlanResult, layout: Layout, ctx: BuildContext)
 }
 
 // Two-column human summary for the console.
-export function format(map: PlacementMap): string {
+export function format(map: KbgenOutputMap): string {
   const L: string[] = [];
   L.push(`\n${map.keyboard.name}  (base ${map.base.name}; free keys: ${map.freeKeys.join(' ') || '(none)'})`);
   if (map.source.locale || map.source.unicodeVersion) {
