@@ -81,10 +81,31 @@ group(main) using keys
     expect(readStore("VISUALKEYBOARD")).toBe("ewondo.kvks");
     expect(readStore("LAYOUTFILE")).toBe("ewondo.keyman-touch-layout");
     expect(readStore("KMW_EMBEDCSS")).toBe("ewondo.css");
-    // &BITMAP is preserved — typical bases use a non-id-named icon
-    // (sil_cameroon_qwerty uses `Cameroon.ico`) and kmc-copy upstream
-    // leaves &BITMAP alone too.
+    // &BITMAP with a non-baseId-named icon (sil_cameroon_qwerty uses
+    // `Cameroon.ico`) is preserved — `renameFilesInVfs` won't rename
+    // the file either, so the store still points at a valid filename.
     expect(readStore("BITMAP")).toBe("Cameroon.ico");
+  });
+
+  it("resetIdentity rewrites &BITMAP when its basename matches the base keyboardId", () => {
+    // sil_akebu.ico is named after the base id — matches the file
+    // rename in renameFilesInVfs, so the store reference must move too.
+    const SOURCE = `store(&NAME) 'Akebu'
+store(&VERSION) '14.0'
+store(&KEYBOARDVERSION) '1.0'
+store(&TARGETS) 'any'
+store(&BITMAP) 'sil_akebu.ico'
+begin Unicode > use(main)
+group(main) using keys
++ [K_A] > 'a'
+`;
+    const { ir } = parse(SOURCE, "sil_akebu");
+    resetIdentity(ir, { keyboardId: "my_akebu_copy", displayName: "My Akebu Copy" });
+    const bitmap = ir.stores
+      .find((s) => s.isSystem && s.name.toUpperCase() === "BITMAP")!
+      .items.map((i) => (i.kind === "char" ? i.value : ""))
+      .join("");
+    expect(bitmap).toBe("my_akebu_copy.ico");
   });
 
   it("resetIdentity also rewrites &KMW_EMBEDJS and &KMW_HELPFILE when present", () => {

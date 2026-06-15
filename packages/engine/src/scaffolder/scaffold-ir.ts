@@ -109,17 +109,25 @@ function getSystemStoreString(ir: KeyboardIR, name: string): string | null {
  *   - KMW_EMBEDCSS    — embedded .css (TSS_KMW_EMBEDCSS)
  *   - KMW_EMBEDJS     — embedded .js  (TSS_KMW_EMBEDJS)
  *   - KMW_HELPFILE    — KeymanWeb help .htm (TSS_KMW_HELPFILE)
+ *   - BITMAP          — icon .ico (TSS_BITMAP) — conditional, see below
  *
  * Strategy: preserve the extension exactly (handles compound extensions like
  * `.keyman-touch-layout`); replace just the basename with the new keyboardId.
  * Bail out when the existing value doesn't look like a sibling filename
  * (no extension, or a bare absolute path), leaving it untouched.
  *
- * &BITMAP is intentionally NOT in the list — it points at an icon that is
- * usually NOT base-id-named (e.g. `Cameroon.ico` in sil_cameroon_qwerty)
- * and kmc-copy upstream leaves it alone too.
+ * &BITMAP is handled conditionally: its current basename may or may not match
+ * the base id (e.g. `sil_akebu.ico` does match; `Cameroon.ico` in
+ * sil_cameroon_qwerty does not). `renameFilesInVfs` only renames the icon
+ * when its filename is `<baseId>.ico`, so we mirror that here — rewrite the
+ * store only when the basename equals baseKeyboardId. Otherwise the file
+ * wasn't renamed and the store still points at a valid filename.
  */
-function rewriteSiblingPathStores(ir: KeyboardIR, keyboardId: string): void {
+function rewriteSiblingPathStores(
+  ir: KeyboardIR,
+  keyboardId: string,
+  baseKeyboardId: string,
+): void {
   const PATH_STORES = [
     "VISUALKEYBOARD",
     "LAYOUTFILE",
@@ -136,6 +144,19 @@ function rewriteSiblingPathStores(ir: KeyboardIR, keyboardId: string): void {
     const dotIdx = trimmed.indexOf(".");
     const extension = trimmed.slice(dotIdx); // includes leading dot
     setSystemStore(ir, name, `${keyboardId}${extension}`);
+  }
+
+  const bitmap = getSystemStoreString(ir, "BITMAP");
+  if (bitmap !== null) {
+    const trimmed = bitmap.trim();
+    if (
+      trimmed.includes(".") &&
+      !/[\\/]/.test(trimmed) &&
+      trimmed.slice(0, trimmed.indexOf(".")) === baseKeyboardId
+    ) {
+      const extension = trimmed.slice(trimmed.indexOf("."));
+      setSystemStore(ir, "BITMAP", `${keyboardId}${extension}`);
+    }
   }
 }
 
@@ -156,6 +177,10 @@ export function resetIdentity(ir: KeyboardIR, identity: ScaffoldIRIdentity): voi
     identity.copyright ?? `Copyright © ${currentYear()} ${displayName}`;
   const bcp47 = identity.bcp47 ?? [];
 
+  // Capture the base id before mutating header — needed to mirror
+  // renameFilesInVfs's <baseId>-named icon rename in &BITMAP.
+  const baseKeyboardId = ir.header.keyboardId;
+
   ir.header.keyboardId = identity.keyboardId;
   ir.header.name = displayName;
   ir.header.bcp47 = bcp47;
@@ -166,7 +191,7 @@ export function resetIdentity(ir: KeyboardIR, identity: ScaffoldIRIdentity): voi
   setSystemStore(ir, "COPYRIGHT", kmnStringEscape(copyright));
   setSystemStore(ir, "VERSION", fileFormatVersion);
   setSystemStore(ir, "KEYBOARDVERSION", keyboardVersion);
-  rewriteSiblingPathStores(ir, identity.keyboardId);
+  rewriteSiblingPathStores(ir, identity.keyboardId, baseKeyboardId);
 }
 
 function ruleHasModifier(rule: IRRule, modifier: string): boolean {
