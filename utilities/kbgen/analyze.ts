@@ -12,42 +12,63 @@
 //   (identity gap)     curated look-alike (ENG->n, EZH->z)       supplement.json   VISUAL
 //   "sounds like g"    phonetic / transliteration                supplement.json   PHONETIC
 //
-// UCD + confusables are the vendored full datasets (fetch-data.js); supplement.json is a
+// UCD + confusables are the vendored full datasets (fetch-data.ts); supplement.json is a
 // tiny curated layer for offline fallback + the letter-identity look-alikes UTS #39 omits.
-'use strict';
 
-const fs = require('fs');
-const path = require('path');
-const { keyForChar } = require('./layout');
-const ucd = require('./sources/ucd');
-const confusables = require('./sources/confusables');
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { keyForChar } from './layout.ts';
+import type { Layout, KeyEntry } from './layout.ts';
+import * as ucd from './sources/ucd.ts';
+import * as confusables from './sources/confusables.ts';
 
-const SUPP = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'supplement.json'), 'utf8')).chars;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+interface SuppEntry {
+  name?: string;
+  visual?: string;
+  ipa?: string;
+}
+
+interface Supplement {
+  chars: Record<string, SuppEntry>;
+}
+
+const SUPP: Record<string, SuppEntry> = (JSON.parse(
+  fs.readFileSync(path.join(__dirname, 'data', 'supplement.json'), 'utf8')
+) as Supplement).chars;
 
 // Confidence weights per signal, highest first. A character can match several; the
 // scorer keeps them all (ranked) so output can explain why a key was chosen.
-const WEIGHT = { DECOMPOSITION: 100, NAME: 90, CONFUSABLE: 70, VISUAL: 60, PHONETIC: 40 };
+export const WEIGHT: Record<string, number> = { DECOMPOSITION: 100, NAME: 90, CONFUSABLE: 70, VISUAL: 60, PHONETIC: 40 };
 
-const cp = (ch) => ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0');
-const isCombining = (ch) => {
-  const c = ch.codePointAt(0);
+const cp = (ch: string) => (ch.codePointAt(0) as number).toString(16).toUpperCase().padStart(4, '0');
+const isCombining = (ch: string) => {
+  const c = ch.codePointAt(0) as number;
   return (c >= 0x0300 && c <= 0x036F) || (c >= 0x1AB0 && c <= 0x1AFF) ||
          (c >= 0x1DC0 && c <= 0x1DFF) || (c >= 0x20D0 && c <= 0x20FF);
 };
+
+export interface ParseNameResult {
+  base: string | null;
+  upper: boolean | null;
+  mods: string[];
+}
 
 // Parse a Unicode character name into a base ASCII letter + descriptive modifiers.
 // "LATIN SMALL LETTER B WITH HOOK"  -> { base:'b', upper:false, mods:['HOOK'] }
 // "LATIN CAPITAL LETTER OPEN E"     -> { base:'E', upper:true,  mods:['OPEN'] }
 // "LATIN SMALL LETTER ENG"          -> { base:null }  (no base letter in the name)
-function parseName(name) {
+export function parseName(name: string | null): ParseNameResult {
   if (!name) return { base: null, upper: null, mods: [] };
   const upper = / CAPITAL /.test(name) ? true : (/ SMALL /.test(name) ? false : null);
   const m = name.match(/LETTER\s+(.*)$/);
   if (!m) return { base: null, upper, mods: [] };
-  const leading = [];
+  const leading: string[] = [];
   const LEAD = ['OPEN', 'TURNED', 'REVERSED', 'INVERTED', 'AFRICAN', 'SCRIPT', 'CLOSED', 'BARRED', 'DOTLESS'];
   let tokens = m[1].trim().split(/\s+/);
-  while (tokens.length > 1 && LEAD.includes(tokens[0])) leading.push(tokens.shift());
+  while (tokens.length > 1 && LEAD.includes(tokens[0])) leading.push(tokens.shift() as string);
   const base = tokens[0] && /^[A-Z]$/.test(tokens[0]) ? tokens[0] : null;
   const withIdx = tokens.indexOf('WITH');
   const mods = leading.concat(withIdx >= 0 ? tokens.slice(withIdx + 1) : tokens.slice(1));
@@ -55,8 +76,22 @@ function parseName(name) {
   return { base: upper ? base : base.toLowerCase(), upper, mods: mods.filter((t) => t !== 'WITH') };
 }
 
+export interface CharFeature {
+  ch: string;
+  code: string;
+  name: string | null;
+  upper: boolean | null;
+  decompBase: string | null;
+  marks: string[];
+  nameBase: string | null;
+  mods: string[];
+  confusable: string | null;
+  visual: string | null;
+  phonetic: string | null;
+}
+
 // Stage 1: full feature record for one character.
-function analyzeChar(ch) {
+export function analyzeChar(ch: string): CharFeature {
   const code = cp(ch);
   const supp = SUPP[code] || {};
   // Name: prefer the vendored UCD (covers all codepoints); fall back to the supplement.
@@ -65,8 +100,8 @@ function analyzeChar(ch) {
   // Signal 1 - canonical decomposition (NFD). A base letter + combining marks means the
   // base letter is the strongest anchor hint (handles precomposed accents like é).
   const nfd = ch.normalize('NFD');
-  let decompBase = null;
-  const marks = [];
+  let decompBase: string | null = null;
+  const marks: string[] = [];
   if (nfd.length > 1) {
     const chars = [...nfd];
     if (!isCombining(chars[0]) && chars.slice(1).every(isCombining)) {
@@ -92,13 +127,20 @@ function analyzeChar(ch) {
   };
 }
 
+export interface AnchorCandidate {
+  key: string;
+  char: string;
+  via: string;
+  weight: number;
+}
+
 // Stage 2: rank candidate anchor keys for a character against a base layout.
 // Returns [{ key, char, via, weight }] sorted by weight desc.
-function scoreAnchors(feature, layout) {
-  const out = [];
-  const add = (sourceChar, via) => {
+export function scoreAnchors(feature: CharFeature, layout: Layout): AnchorCandidate[] {
+  const out: AnchorCandidate[] = [];
+  const add = (sourceChar: string | null, via: string) => {
     if (!sourceChar) return;
-    const k = keyForChar(layout, sourceChar);
+    const k: KeyEntry | null = keyForChar(layout, sourceChar);
     if (k) out.push({ key: k.key, char: sourceChar, via, weight: WEIGHT[via] });
   };
   add(feature.decompBase, 'DECOMPOSITION');
@@ -107,7 +149,7 @@ function scoreAnchors(feature, layout) {
   add(feature.visual, 'VISUAL');
   add(feature.phonetic, 'PHONETIC');
 
-  const best = new Map();
+  const best = new Map<string, AnchorCandidate>();
   for (const c of out) {
     const prev = best.get(c.key);
     if (!prev || c.weight > prev.weight) best.set(c.key, c);
@@ -118,13 +160,11 @@ function scoreAnchors(feature, layout) {
 // Stage 3: which base-layout keys are "free" -- their letter is not used by the
 // orthography. `usedLetters` is the set of characters the language writes (CLDR
 // exemplars, or an explicit list). A free key can host a direct remap.
-function availability(layout, usedLetters) {
+export function availability(layout: Layout, usedLetters: Iterable<string> | null | undefined): Set<string> {
   const used = new Set([...(usedLetters || [])].map((c) => c.toLowerCase()));
-  const free = new Set();
+  const free = new Set<string>();
   for (const k of layout.keys) {
     if (!used.has(k.lower)) free.add(k.key);
   }
   return free;
 }
-
-module.exports = { analyzeChar, scoreAnchors, availability, parseName, WEIGHT };

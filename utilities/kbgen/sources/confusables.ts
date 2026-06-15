@@ -4,18 +4,20 @@
 //
 // Note: UTS #39 scope is visual SPOOFING, so it covers e.g. ɓ→b and ɣ→y but omits
 // letter-identity look-alikes like ŋ→n. Those gaps are filled by data/supplement.json.
-'use strict';
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const FILE = path.join(__dirname, '..', 'data', 'unicode', 'confusables.txt');
-let MAP = null; // int -> [int] prototype sequence
+let MAP: Map<number, number[]> | null = null; // int -> [int] prototype sequence
 
-function load() {
+function load(): Map<number, number[]> {
   if (MAP !== null) return MAP;
   MAP = new Map();
-  let text;
+  let text: string;
   try { text = fs.readFileSync(FILE, 'utf8'); } catch { return MAP; }
   for (const raw of text.split('\n')) {
     const line = raw.replace(/#.*$/, '').trim();
@@ -29,14 +31,14 @@ function load() {
   return MAP;
 }
 
-const available = () => load().size > 0;
-const isAsciiLetter = (cp) => (cp >= 0x41 && cp <= 0x5a) || (cp >= 0x61 && cp <= 0x7a);
+export const available = () => load().size > 0;
+const isAsciiLetter = (cp: number) => (cp >= 0x41 && cp <= 0x5a) || (cp >= 0x61 && cp <= 0x7a);
 
 // Resolve a character to the first base-layout ASCII letter reachable through its
 // confusable skeleton, or null. Follows the prototype chain a few hops.
-function skeletonBase(ch, depth = 0) {
+export function skeletonBase(ch: string, depth = 0): string | null {
   const m = load();
-  const cp = ch.codePointAt(0);
+  const cp = ch.codePointAt(0) as number;
   if (depth > 0 && isAsciiLetter(cp)) return String.fromCodePoint(cp);
   if (depth > 5) return null;
   const tgt = m.get(cp);
@@ -45,5 +47,3 @@ function skeletonBase(ch, depth = 0) {
   if (isAsciiLetter(head)) return String.fromCodePoint(head);
   return skeletonBase(String.fromCodePoint(head), depth + 1);
 }
-
-module.exports = { available, skeletonBase };

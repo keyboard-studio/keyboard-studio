@@ -3,26 +3,41 @@
 // it drives BOTH key availability (a base key whose letter isn't an exemplar is free)
 // and, optionally, the special-character inventory itself (the non-ASCII exemplars).
 //
-// Data is per-locale data/cldr/<locale>.json (fetch-data.js). Returns null if absent.
-'use strict';
+// Data is per-locale data/cldr/<locale>.json (fetch-data.ts). Returns null if absent.
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-function exemplarString(locale) {
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export interface ParsedExemplars {
+  used: Set<string>;
+  digraphs: string[];
+  specials: string[];
+}
+
+export interface LoadedExemplars {
+  raw: string;
+  used: Set<string>;
+  digraphs: string[];
+  specials: string[];
+}
+
+export function exemplarString(locale: string): string | null {
   const file = path.join(__dirname, '..', 'data', 'cldr', `${locale}.json`);
-  let j;
+  let j: Record<string, unknown>;
   try { j = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
-  const main = j.main && j.main[locale];
-  const ch = main && main.characters && main.characters.exemplarCharacters;
-  return ch || null;
+  const main = (j.main as Record<string, unknown> | undefined)?.[locale];
+  const ch = (main as Record<string, unknown> | undefined)?.characters as Record<string, unknown> | undefined;
+  return (ch?.exemplarCharacters as string) || null;
 }
 
 // Minimal UnicodeSet parser for the "[a b ɓ ... {sh} {ts} ... a-z]" exemplar syntax.
 // Returns { used:Set<char single>, digraphs:[str], specials:[char non-ASCII single] }.
-function parseUnicodeSet(str) {
-  const used = new Set();
-  const digraphs = [];
+export function parseUnicodeSet(str: string): ParsedExemplars {
+  const used = new Set<string>();
+  const digraphs: string[] = [];
   let s = str.trim();
   if (s.startsWith('[') && s.endsWith(']')) s = s.slice(1, -1);
   const chars = [...s];
@@ -40,19 +55,19 @@ function parseUnicodeSet(str) {
     }
     // range a-z
     if (chars[i + 1] === '-' && chars[i + 2] && chars[i + 2] !== ' ') {
-      const start = c.codePointAt(0), end = chars[i + 2].codePointAt(0);
+      const start = c.codePointAt(0) as number, end = chars[i + 2].codePointAt(0) as number;
       for (let cp = start; cp <= end; cp++) used.add(String.fromCodePoint(cp));
       i += 2;
       continue;
     }
     used.add(c);
   }
-  const specials = [...used].filter((ch) => ch.codePointAt(0) > 0x7f && /\p{L}/u.test(ch));
+  const specials = [...used].filter((ch) => (ch.codePointAt(0) as number) > 0x7f && /\p{L}/u.test(ch));
   return { used, digraphs, specials };
 }
 
 // Load exemplars for a locale. specials include uppercase variants where they differ.
-function loadExemplars(locale) {
+export function loadExemplars(locale: string): LoadedExemplars | null {
   const str = exemplarString(locale);
   if (!str) return null;
   const parsed = parseUnicodeSet(str);
@@ -63,5 +78,3 @@ function loadExemplars(locale) {
   }
   return { raw: str, used: parsed.used, digraphs: parsed.digraphs, specials: [...specials] };
 }
-
-module.exports = { loadExemplars, parseUnicodeSet };

@@ -8,17 +8,79 @@
 //              restore   RALT (+SHIFT) + key -> the base letter a direct remap displaced
 //   touch:     base      special occupies the key's slot; its longpress restores the base
 //              longpress special is a longpress (subkey) on the unchanged base key
-'use strict';
 
-const mods = (shift, ralt) => [...(shift ? ['SHIFT'] : []), ...(ralt ? ['RALT'] : [])];
+import type { Layout } from './layout.ts';
+import type { PlanResult, Completeness } from './place.ts';
 
-function build(planResult, layout, ctx) {
-  const physical = [];
-  const touch = [];
+const mods = (shift: boolean, ralt: boolean) => [...(shift ? ['SHIFT'] : []), ...(ralt ? ['RALT'] : [])];
+
+export interface AnchorInfo {
+  via: string;
+  weight: number;
+  baseChar: string | null;
+}
+
+export interface PhysicalEntry {
+  char: string;
+  codepoint: string;
+  key: string;
+  shift: boolean;
+  method: 'direct' | 'modifier' | 'restore';
+  modifiers: string[];
+  output: string;
+  displaces?: string | null;
+  anchor?: AnchorInfo;
+  restoreOf?: string;
+}
+
+export interface TouchEntry {
+  char: string;
+  codepoint: string;
+  key: string;
+  layer: 'default' | 'shift';
+  method: 'base' | 'longpress';
+  position: { row: number; col: number } | null;
+  host: string | null;
+  anchor: AnchorInfo;
+}
+
+export interface BuildContext {
+  id: string;
+  name: string;
+  completeness: Completeness;
+  freeKeys: string[];
+  source: {
+    locale: string | null;
+    unicodeVersion: string | null;
+    cldrVersion: string | null;
+  };
+}
+
+export interface KbgenOutputMap {
+  keyboard: { id: string; name: string };
+  base: { id: string; name: string };
+  source: BuildContext['source'];
+  freeKeys: string[];
+  summary: {
+    specials: number;
+    physicalEntries: number;
+    touchEntries: number;
+    unplaced: number;
+  };
+  physical: PhysicalEntry[];
+  touch: TouchEntry[];
+  completeness: Completeness;
+  unplaced: { ch: string; reason: string }[];
+  warnings: string[];
+}
+
+export function build(planResult: PlanResult, layout: Layout, ctx: BuildContext): KbgenOutputMap {
+  const physical: PhysicalEntry[] = [];
+  const touch: TouchEntry[] = [];
 
   for (const p of planResult.placements) {
     const pos = layout.byKey.get(p.anchorKey);
-    const anchor = { via: p.via, weight: p.weight, baseChar: pos ? (p.upper ? pos.upper : pos.lower) : null };
+    const anchor: AnchorInfo = { via: p.via, weight: p.weight, baseChar: pos ? (p.upper ? pos.upper : pos.lower) : null };
 
     if (p.mechanism === 'direct') {
       physical.push({
@@ -52,12 +114,12 @@ function build(planResult, layout, ctx) {
     const kp = planResult.keys.get(k.key);
     if (!kp) continue;
     if (kp.defOut != null) physical.push({
-      char: k.lower, codepoint: 'U+' + k.lower.codePointAt(0).toString(16).toUpperCase().padStart(4, '0'),
+      char: k.lower, codepoint: 'U+' + (k.lower.codePointAt(0) as number).toString(16).toUpperCase().padStart(4, '0'),
       key: k.key, shift: false, method: 'restore', modifiers: mods(false, true), output: k.lower,
       restoreOf: kp.defOut,
     });
     if (kp.shiftOut != null) physical.push({
-      char: k.upper, codepoint: 'U+' + k.upper.codePointAt(0).toString(16).toUpperCase().padStart(4, '0'),
+      char: k.upper, codepoint: 'U+' + (k.upper.codePointAt(0) as number).toString(16).toUpperCase().padStart(4, '0'),
       key: k.key, shift: true, method: 'restore', modifiers: mods(true, true), output: k.upper,
       restoreOf: kp.shiftOut,
     });
@@ -83,8 +145,8 @@ function build(planResult, layout, ctx) {
 }
 
 // Two-column human summary for the console.
-function format(map) {
-  const L = [];
+export function format(map: KbgenOutputMap): string {
+  const L: string[] = [];
   L.push(`\n${map.keyboard.name}  (base ${map.base.name}; free keys: ${map.freeKeys.join(' ') || '(none)'})`);
   if (map.source.locale || map.source.unicodeVersion) {
     L.push(`source: locale=${map.source.locale || '-'}  unicode=${map.source.unicodeVersion || '-'}  cldr=${map.source.cldrVersion || '-'}`);
@@ -93,7 +155,7 @@ function format(map) {
   L.push('  output  keys                method     anchor');
   for (const e of map.physical) {
     const combo = [...e.modifiers, e.key].join('+');
-    const why = e.method === 'restore' ? `restores, displaced by ${e.restoreOf}` : `${e.anchor.via} (${e.anchor.weight})`;
+    const why = e.method === 'restore' ? `restores, displaced by ${e.restoreOf}` : `${e.anchor!.via} (${e.anchor!.weight})`;
     L.push(`   ${e.char}      ${combo.padEnd(18)} ${e.method.padEnd(9)} ${why}`);
   }
   L.push('\nTOUCH keyboard');
@@ -114,5 +176,3 @@ function format(map) {
   }
   return L.join('\n');
 }
-
-module.exports = { build, format };

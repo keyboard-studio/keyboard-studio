@@ -2,7 +2,7 @@
 // is lossless (every base character still reachable).
 //
 // Policy (logic-driven, not convenience-driven):
-//   * The anchor key comes from analyze.js -- it is the visually/phonetically related
+//   * The anchor key comes from analyze.ts -- it is the visually/phonetically related
 //     key, NOT an arbitrary unused key. ɓ goes on B, never on a random free V.
 //   * If that anchor key is FREE in this orthography, remap it directly (fast to type,
 //     and still the logical key) and restore the displaced letter on the RALT layer.
@@ -15,25 +15,65 @@
 // Touch placement mirrors desktop: a direct remap shows the special on its slot with a
 // longpress to restore the original; an RALT placement becomes a longpress of the
 // special on the (unchanged) anchor key.
-'use strict';
 
-const { analyzeChar, scoreAnchors } = require('./analyze');
+import { analyzeChar, scoreAnchors } from './analyze.ts';
+import type { Layout } from './layout.ts';
 
-const hex = (ch) => 'U+' + ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0');
+const hex = (ch: string) => 'U+' + (ch.codePointAt(0) as number).toString(16).toUpperCase().padStart(4, '0');
+
+export interface KeyPlan {
+  key: string;
+  baseLower: string;
+  baseUpper: string;
+  defOut: string | null;
+  shiftOut: string | null;
+  raltDef: string | null;
+  raltShift: string | null;
+  skDef: string[];
+  skShift: string[];
+  displaced: boolean;
+}
+
+export interface Placement {
+  ch: string;
+  code: string;
+  upper: boolean;
+  anchorKey: string;
+  baseAnchorKey: string;
+  via: string;
+  weight: number;
+  mechanism: 'direct' | 'ralt';
+}
+
+export interface UnplacedChar {
+  ch: string;
+  reason: string;
+}
+
+export interface PlanResult {
+  keys: Map<string, KeyPlan>;
+  placements: Placement[];
+  warnings: string[];
+  unplaced: UnplacedChar[];
+}
+
+export interface PlanOptions {
+  freeSwap?: boolean;
+}
 
 // Build the placement plan for a character inventory.
 //   chars   : array of special output characters (e.g. ['ɓ','Ɓ','ɗ','Ɗ',...])
 //   layout  : indexed base layout from layout.getLayout()
 //   free    : Set of free key ids from analyze.availability()
 //   opts    : { freeSwap:false }
-function plan(chars, layout, free, opts = {}) {
-  const warnings = [];
-  const unplaced = [];
+export function plan(chars: string[], layout: Layout, free: Set<string>, opts: PlanOptions = {}): PlanResult {
+  const warnings: string[] = [];
+  const unplaced: UnplacedChar[] = [];
   // Per-key plan. Defaults: the key keeps its base letter on both layers.
-  const keys = new Map();
-  const keyPlan = (id) => {
+  const keys = new Map<string, KeyPlan>();
+  const keyPlan = (id: string): KeyPlan => {
     if (!keys.has(id)) {
-      const k = layout.byKey.get(id);
+      const k = layout.byKey.get(id)!;
       keys.set(id, {
         key: id, baseLower: k.lower, baseUpper: k.upper,
         defOut: null, shiftOut: null,                 // direct remap outputs (null = keep base)
@@ -42,12 +82,12 @@ function plan(chars, layout, free, opts = {}) {
         displaced: false,
       });
     }
-    return keys.get(id);
+    return keys.get(id)!;
   };
 
   // Track which (key, case, channel) slots are taken so collisions are caught.
-  const taken = new Set();
-  const placements = [];
+  const taken = new Set<string>();
+  const placements: Placement[] = [];
 
   // Sort by anchor confidence so the strongest signal claims a key first. The anchor is
   // resolved from the CASE-FOLDED (lowercase) form so a case pair always shares one key:
@@ -69,7 +109,7 @@ function plan(chars, layout, free, opts = {}) {
     }
     const upper = f.upper === true;
     let anchorKey = anchor.key;
-    let mechanism;
+    let mechanism: 'direct' | 'ralt';
 
     const isFree = free.has(anchorKey);
     if (!isFree && opts.freeSwap) {
@@ -117,10 +157,16 @@ function plan(chars, layout, free, opts = {}) {
   return { keys, placements, warnings, unplaced };
 }
 
+export interface Completeness {
+  complete: boolean;
+  missingBase: string[];
+  missingSpecial: string[];
+}
+
 // Stage 5: completeness invariant -- every base character must still be typeable, and
 // every requested special must be reachable on a hardware-key path (base or RALT).
-function checkComplete(planResult, layout, requestedChars) {
-  const reachable = new Set();
+export function checkComplete(planResult: PlanResult, layout: Layout, requestedChars: string[]): Completeness {
+  const reachable = new Set<string>();
   for (const k of layout.keys) {
     const kp = planResult.keys.get(k.key);
     // Base layer output (special if directly remapped, else the original letter).
@@ -131,12 +177,12 @@ function checkComplete(planResult, layout, requestedChars) {
       if (kp.raltShift != null) reachable.add(kp.raltShift);
     }
   }
-  const missingBase = [];
+  const missingBase: string[] = [];
   for (const k of layout.keys) {
     if (!reachable.has(k.lower)) missingBase.push(k.lower);
     if (!reachable.has(k.upper)) missingBase.push(k.upper);
   }
-  const missingSpecial = [];
+  const missingSpecial: string[] = [];
   for (const ch of requestedChars) {
     if (!reachable.has(ch)) missingSpecial.push(ch);
   }
@@ -146,5 +192,3 @@ function checkComplete(planResult, layout, requestedChars) {
     missingSpecial,
   };
 }
-
-module.exports = { plan, checkComplete };
