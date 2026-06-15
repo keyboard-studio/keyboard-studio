@@ -308,7 +308,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     if (!baseVfs) return null;
     const path = findKmnPath(baseVfs);
     if (!path) return null;
-    const raw = baseVfs.get(path)!.content;
+    const raw = baseVfs.get(path)?.content ?? null;
     return typeof raw === "string" ? raw : null;
   }, [baseVfs]);
   const { findings } = useValidator(kmnSource);
