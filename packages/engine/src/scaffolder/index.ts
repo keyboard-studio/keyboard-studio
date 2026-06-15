@@ -14,7 +14,7 @@ import { parse } from "../codec/parse.js";
 import { emit } from "../codec/emit.js";
 import { scaffoldIR } from "./scaffold-ir.js";
 
-export { scaffoldIR } from "./scaffold-ir.js";
+export { scaffoldIR, resetIdentity } from "./scaffold-ir.js";
 export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffold-ir.js";
 
 export interface ScaffolderServiceOptions {

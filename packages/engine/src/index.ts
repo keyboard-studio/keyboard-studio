@@ -68,8 +68,10 @@ export { recognizePatterns } from "./recognizer/index.js";
 export type { RecognizerRule, MatchResult, RecognizeResult } from "./recognizer/index.js";
 
 // Issue #19 — scaffolder (template-cleanup pipeline).
-export { createScaffolderService } from "./scaffolder/index.js";
+export { createScaffolderService, renameFilesInVfs } from "./scaffolder/index.js";
+export { scaffoldIR, resetIdentity } from "./scaffolder/scaffold-ir.js";
 export type { ScaffolderServiceOptions } from "./scaffolder/index.js";
+export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffolder/scaffold-ir.js";
 
 // Issue #21 — Pattern-library loader.
 export { loadPatterns, getPatterns, getById } from "./pattern-library/index.js";
