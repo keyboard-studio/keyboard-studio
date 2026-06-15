@@ -458,6 +458,9 @@ v1 ships single-source adaptation only — there is no path that combines IRs fr
 
 ## 6. Worked example
 
+> **Audience.** Primary: pattern curator (content team). Secondary: engine implementer.
+> A curator walks away knowing what fields a Pattern record carries and how survey questions feed `{{slotId}}` placeholders. The embedded `kmnFragment` literal is curator-authored but assumes KMN literacy — slot resolution into a compileable rule is implementer-side. Pair with an implementer when authoring fragments.
+
 The following YAML is the canonical record for the single-tap deadkey acute accent pattern, suitable for QWERTY/QWERTZ Latin keyboards.
 
 ```yaml
@@ -563,6 +566,9 @@ Substitution is deterministic and reproducible: given the same answer map, the s
 *Revised 2026-06-13 (v1.2.0 hybrid workflow). Full model: [docs/workflow-model.md](docs/workflow-model.md).*
 *Revised 2026-06-14 (v1.3.0 working-copy spine + two authoring tracks). Extends Decision 9.*
 
+> **Audience.** Primary: engine implementer. Secondary: content curator (for the survey-visible phase order).
+> An implementer walks away with the full 15-step pipeline: IR codec, scaffolder, working-copy mutations, gallery instantiation, lint cadence, output. The *survey-visible* phases (Identity-lite, Phase A/B/C/E/F) are the curator/UX surface; the rest is internal to the working-copy spine. When grilling this section, separate "what the studio user sees" from "what the engine does between user clicks."
+
 **Two authoring tracks, one working-copy spine.** Every session is anchored to a single **persistent working copy**: a `KeyboardIR` + `VirtualFS` pair that is instantiated when the keyboard is chosen, mutated by every subsequent step (carve, survey, gallery, OSK edits), and serialized only at output (§12). The OSK is bound to this working copy throughout; it re-renders on every mutation. This reinforces Decision 9 (IR is canonical) and keeps the two teams' work surfaces aligned — the engine reads and writes one object; the content team's survey/gallery calls mutate the same object.
 
 The working copy is reached via **two entry tracks** that converge on a shared spine after instantiation:
@@ -664,6 +670,9 @@ The mapping is not 1:1 — flicks and long-press menus have no physical analog, 
 
 *Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
 
+> **Audience.** Primary: content curator (for the three-group taxonomy + authoring emphasis). Secondary: engine implementer (for the BCP47-subtag detection algorithm, Phase A detection gates, and CJK/Ethiopic exclusion enforcement).
+> A curator walks away knowing which gallery patterns to surface per group and how reorder priority cascades. An implementer walks away knowing how to detect the group from BCP47 + IR structural shape and how to enforce the CJK/Ethiopic stub. The opening table + reorder-priority list is curator-facing; the "Routing decision" / "No mobile-first routing" / "CJK and Ethiopic" paragraphs are implementer-facing.
+
 The survey branches at Phase A based on BCP47 tag, base-keyboard choice, and user confirmation. The three groups share the same phase structure but differ in authoring emphasis, reordering load, and `&CasedKeys` content.
 
 | Group | Typical bases | Primary challenges | CasedKeys default | Reorder posture |
@@ -758,6 +767,11 @@ A failing I2 halts the authoring session: the IR cannot be trusted as the source
 ---
 
 ## 11. criteria.md compliance
+
+> **Audience.** Three voices, three readers — separated below.
+> - **Governance** assigns each criterion to a band (the Day-1 triage, recorded in `criteria.json`). Read the four-band definitions + the count table.
+> - **Engine implementer** enforces bands 1 and 2 (scaffolder bakes them in / Layer C lint catches them). Read the "Enforcement" column.
+> - **Content curator** surfaces bands 3 and 4 (yellow-survey questions, red-checklist items in the PR body). Read the "Example criterion" column to understand the author-facing phrasing.
 
 The 133 criteria in `criteria.md` are classified into four enforcement bands per Decision 4 (Sec 14). The Day-1 triage is recorded as a typed `Criterion[]` in `packages/contracts/data/criteria.json`; per-band rationale and any flagged-for-re-review entries live in `packages/contracts/data/criteria-summary.md`.
 
@@ -951,6 +965,9 @@ Rationale: Attribution must survive in the committed source tree independent of 
 ## 15. Acceptance scenarios
 
 *Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
+
+> **Audience.** Primary: engine implementer (for pass criteria — exit codes, oracle behavior, lint blocking). Secondary: QA / curator (for the scenarios themselves, which read as test vectors).
+> Scenarios A–C are author-walkthroughs: a curator or QA reviewer can read them as "what should happen when a typical user does this." Scenario D is lint-engine internals: implementer-only. When grilling, ask register-appropriate questions per scenario — A–C are about user-visible behavior; D is about the validator's enforcement contract.
 
 ### Scenario A: Latin QWERTY keyboard with a deadkey
 
