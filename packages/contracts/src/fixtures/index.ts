@@ -7,4 +7,5 @@ export * from "./compileResults";
 export * from "./provenance";
 export * from "./keyboard-ir";
 export * from "./linguistInventories";
+export * from "./placementMaps";
 export * from "./surveySessions";
