@@ -58,3 +58,6 @@ utilities/kbgen/data/cldr/
 tmp/
 probe-*.png
 probe-*.log
+packages/studio/scripts/probe-ewondo-emit.mjs
+.gitignore
+notes.md
