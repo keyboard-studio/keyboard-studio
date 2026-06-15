@@ -232,6 +232,49 @@ vi.mock("./components/UnsupportedScriptStub.tsx", () => ({
   ),
 }));
 
+vi.mock("./components/TrackStep.tsx", () => ({
+  TrackStep: ({ onNext, onBack }: { onNext: (t: "copy" | "adapt") => void; onBack?: () => void }) => (
+    <div data-testid="stage-track">
+      <button type="button" data-testid="track-copy" onClick={() => onNext("copy")}>
+        track-copy
+      </button>
+      <button type="button" data-testid="track-adapt" onClick={() => onNext("adapt")}>
+        track-adapt
+      </button>
+      {onBack !== undefined && (
+        <button type="button" data-testid="track-back" onClick={onBack}>
+          track-back
+        </button>
+      )}
+    </div>
+  ),
+}));
+
+vi.mock("./components/ProjectNameStep.tsx", () => ({
+  ProjectNameStep: ({
+    onNext,
+    onBack,
+  }: {
+    onNext: (displayName: string, keyboardId: string) => void;
+    onBack?: () => void;
+  }) => (
+    <div data-testid="stage-project-name">
+      <button
+        type="button"
+        data-testid="project-name-next"
+        onClick={() => onNext("Test Keyboard", "test_keyboard")}
+      >
+        project-name-next
+      </button>
+      {onBack !== undefined && (
+        <button type="button" data-testid="project-name-back" onClick={onBack}>
+          project-name-back
+        </button>
+      )}
+    </div>
+  ),
+}));
+
 vi.mock("./components/OSKFrame.tsx", () => ({
   OSKFrame: () => <div data-testid="osk-frame" />,
 }));
@@ -271,10 +314,23 @@ function advanceToBase() {
   fireEvent.click(screen.getByTestId("identity-complete"));
 }
 
-/** Drive from "identity" to "prefill" (identity → base → prefill). */
-function advanceToPrefill() {
+/** Drive from "identity" to "track" (identity → base → track). */
+function advanceToTrack() {
   advanceToBase();
   fireEvent.click(screen.getByTestId("base-resolved"));
+}
+
+/**
+ * Drive from "identity" to "prefill" via the default Track 1 (Copy) path:
+ * identity → base → track → project-name → prefill.
+ *
+ * Track 2 (Adapt) skips project-name; tests that need that path should
+ * click "track-adapt" instead.
+ */
+function advanceToPrefill() {
+  advanceToTrack();
+  fireEvent.click(screen.getByTestId("track-copy"));
+  fireEvent.click(screen.getByTestId("project-name-next"));
 }
 
 /** Drive from "identity" to "carve". */
