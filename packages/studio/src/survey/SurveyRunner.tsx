@@ -15,6 +15,7 @@ import { useState, useId, useMemo, useRef } from "react";
 import type { FlowDef, FlowQuestion, FlowGotoRule, SurveyContext, AnswerStackEntry } from "./types.ts";
 import type { SurveyAnswer, SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts";
 import { QuestionField } from "./QuestionField.tsx";
+import { debugPinsStore } from "../stores/debugPinsStore.ts";
 
 // ---------------------------------------------------------------------------
 // Condition evaluator
@@ -246,6 +247,12 @@ export function SurveyRunner({
   onAnswerCommit,
   getSeedValue,
 }: SurveyRunnerProps) {
+  // Single gate for all debug-mode behaviour — evaluated once per render so all
+  // branches are driven by the same boolean, not scattered checks.
+  const debugEnabled = debugPinsStore.isDebugEnabled();
+  // Bump this counter to force a re-render when pin state changes (chip label/style).
+  const [, setDebugPinTick] = useState(0);
+
   // Keep stable refs to the latest callback props so handleNext closures don't
   // need these in dep arrays and don't capture stale values.
   const onAnswerCommitRef = useRef(onAnswerCommit);
@@ -269,8 +276,15 @@ export function SurveyRunner({
 
   // Callers must provide key={flow.flow_id} so React remounts this component
   // when the flow identity changes — useState does not re-run its initialiser on re-renders.
+  // For the first question, check both getSeedValue (caller) and debugPinsStore (fallback).
+  const firstSeed: string | string[] | undefined = (() => {
+    if (firstId === null) return undefined;
+    const callerFirst = getSeedValue?.(firstId);
+    if (callerFirst !== undefined) return callerFirst;
+    return debugEnabled ? debugPinsStore.getPinned(firstId) : undefined;
+  })();
   const [stack, setStack] = useState<AnswerStackEntry[]>([
-    { questionId: firstId ?? "", value: undefined },
+    { questionId: firstId ?? "", value: firstSeed },
   ]);
   const [currentValue, setCurrentValue] = useState<string | string[] | undefined>(undefined);
 
@@ -340,7 +354,15 @@ export function SurveyRunner({
     // Resolve a seed value for the incoming question. getSeedValue is read via
     // ref so callers can update their seed source synchronously in onAnswerCommit
     // (above) and have the updated value visible here in the same tick.
-    const seedValue = getSeedValueRef.current?.(nextIdForCurrent);
+    // Caller-provided seed takes precedence; debug pin is the fallback so that
+    // the "default once, then user owns it" contract is preserved.
+    const callerSeed = getSeedValueRef.current?.(nextIdForCurrent);
+    const seedValue =
+      callerSeed !== undefined
+        ? callerSeed
+        : debugEnabled
+          ? debugPinsStore.getPinned(nextIdForCurrent)
+          : undefined;
 
     // Save current value onto the current stack entry, then push the next.
     // The new entry starts with the seed value (may be undefined) so the
@@ -413,6 +435,49 @@ export function SurveyRunner({
           />
         </div>
       </div>
+
+      {/* Debug pin chip — only rendered when debug mode is active */}
+      {debugEnabled && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <button
+            type="button"
+            aria-pressed={debugPinsStore.isPinned(currentQId)}
+            aria-label={
+              debugPinsStore.isPinned(currentQId)
+                ? `Unpin default answer for question ${currentQId}`
+                : `Pin current answer as default for question ${currentQId}`
+            }
+            onClick={() => {
+              if (debugPinsStore.isPinned(currentQId)) {
+                debugPinsStore.unpin(currentQId);
+              } else {
+                debugPinsStore.pin(currentQId, value);
+              }
+              // Force a re-render so aria-pressed and label update
+              setDebugPinTick((n) => n + 1);
+            }}
+            style={{
+              padding: "3px 10px",
+              background: debugPinsStore.isPinned(currentQId) ? "#2d3748" : "transparent",
+              border: `1px solid ${debugPinsStore.isPinned(currentQId) ? "#6ea8fe" : "#484f58"}`,
+              borderRadius: 12,
+              color: debugPinsStore.isPinned(currentQId) ? "#6ea8fe" : "#8b949e",
+              fontSize: 11,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              userSelect: "none",
+            }}
+          >
+            {debugPinsStore.isPinned(currentQId) ? "📌 Pinned" : "Pin this answer"}
+          </button>
+        </div>
+      )}
 
       {/* Question */}
       <QuestionField
