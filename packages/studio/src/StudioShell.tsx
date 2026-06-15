@@ -294,6 +294,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // gallery and §7.2 strategy selector read), not discarded on each phase transition.
   const recordPhase = useWorkingCopyStore((s) => s.recordPhase);
   const resetSurvey = useWorkingCopyStore((s) => s.reset);
+  const setStoreIdentity = useWorkingCopyStore((s) => s.setIdentity);
 
   // Identity-lite is the hybrid flow's head: it captures the language + the
   // INDEPENDENT target script, deriving the routing/A2 prefill. Gated scripts
@@ -331,9 +332,14 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   }
 
   // Handle project-name confirmation (Track 1 only).
-  // Set the scaffoldSpec so useKeyboardArtifact routes through scaffold().
+  // Set the scaffoldSpec so useKeyboardArtifact routes through scaffold(),
+  // AND push the new identity into the working-copy store so downstream
+  // consumers (OSKFrame's setActiveKeyboard, serializeWorkingCopy's zip
+  // filename, lint identity checks) see the scaffolded keyboardId rather
+  // than the base id.
   function handleProjectNameNext(displayName: string, keyboardId: string) {
     setScaffoldSpec({ keyboardId, displayName });
+    setStoreIdentity({ keyboardId, displayName });
     setStage("prefill");
   }
 
