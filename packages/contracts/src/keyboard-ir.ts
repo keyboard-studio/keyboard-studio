@@ -125,12 +125,26 @@ export interface IRHeader {
 }
 
 /** A single KMN store declaration. */
+/**
+ * Target-selector prefix applied to a source line by kmcmplib:
+ *   "keyman"     — `$keyman:`     applies to both Keyman desktop and KeymanWeb
+ *   "keymanweb"  — `$keymanweb:`  applies to KeymanWeb only
+ *   "keymanonly" — `$keymanonly:` applies to Keyman desktop only
+ * Source: keyman/developer/src/kmcmplib/src/Compiler.cpp::GetLinePrefixType
+ */
+export type TargetSelector = "keyman" | "keymanweb" | "keymanonly";
+
 export interface IRStore {
   nodeId: string;
   name: string;
   items: StoreItem[];
   /** True for system/compiler-directive stores (&NAME, &COPYRIGHT, etc.). */
   isSystem: boolean;
+  /**
+   * Set when the source line carried a `$keyman[web|only]:` prefix.
+   * Preserved structurally so the codec can round-trip per-target stores.
+   */
+  targetSelector?: TargetSelector;
 }
 
 /** A KMN group (begin / group ... using keys). */
@@ -158,6 +172,12 @@ export interface IRRule {
    * which kmcmplib rejects as KM_ERROR_KMCMP_InvalidToken.
    */
   matchKind?: "match" | "nomatch";
+  /**
+   * Set when the source line carried a `$keyman[web|only]:` prefix.
+   * Preserved structurally so the codec can round-trip per-target rules.
+   * See {@link TargetSelector} for the kmcmplib semantics.
+   */
+  targetSelector?: TargetSelector;
 }
 
 /** A KMN comment node. */

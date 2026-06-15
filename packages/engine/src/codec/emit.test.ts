@@ -378,3 +378,72 @@ describe("emit — match/nomatch group-transition rules", () => {
     expect(out).toContain("> use(somewhere)");
   });
 });
+
+// ---------------------------------------------------------------------------
+// emitRule / emitStore — $keyman[web|only]: target-selector preservation
+//
+// kmcmplib::GetLinePrefixType recognises three line-prefix directives that
+// scope a line to a compile target. The codec must round-trip them or
+// keyboards that use $keymanonly:/$keymanweb: for target-specific stores
+// (galaxie_greek_mnemonic, eo_plus, ...) lose their target gating.
+// ---------------------------------------------------------------------------
+
+describe("emit — target-selector prefix", () => {
+  it("prepends $keymanweb: to a rule when targetSelector=keymanweb", () => {
+    const base = makeIR();
+    base.groups[0]?.rules.push({
+      nodeId: "rule#kw",
+      context: [{ kind: "vkey", name: "K_Q", modifiers: [] }],
+      output: [{ kind: "char", value: "q" }],
+      targetSelector: "keymanweb",
+    });
+    const out = emit(base);
+    expect(out).toContain("$keymanweb: + [K_Q] > U+0071");
+  });
+
+  it("prepends $keymanonly: to a store when targetSelector=keymanonly", () => {
+    const base = makeIR();
+    base.stores.push({
+      nodeId: "store#kmo",
+      name: "euro",
+      items: [
+        { kind: "char", value: "C" },
+        { kind: "char", value: "c" },
+      ],
+      isSystem: false,
+      targetSelector: "keymanonly",
+    });
+    // Stores are emitted only when referenced; add a rule that references it.
+    base.groups[0]?.rules.push({
+      nodeId: "rule#use-euro",
+      context: [{ kind: "any", storeRef: "euro" }],
+      output: [{ kind: "index", storeRef: "euro", offset: 1 }],
+    });
+    const out = emit(base);
+    expect(out).toContain("$keymanonly: store(euro) 'Cc'");
+  });
+
+  it("prepends $keyman: when targetSelector=keyman (apply-to-both marker)", () => {
+    const base = makeIR();
+    base.groups[0]?.rules.push({
+      nodeId: "rule#kb",
+      context: [{ kind: "vkey", name: "K_Z", modifiers: [] }],
+      output: [{ kind: "char", value: "z" }],
+      targetSelector: "keyman",
+    });
+    const out = emit(base);
+    expect(out).toContain("$keyman: + [K_Z] > U+007A");
+  });
+
+  it("omits the prefix when targetSelector is unset", () => {
+    const base = makeIR();
+    base.groups[0]?.rules.push({
+      nodeId: "rule#plain",
+      context: [{ kind: "vkey", name: "K_X", modifiers: [] }],
+      output: [{ kind: "char", value: "x" }],
+    });
+    const out = emit(base);
+    expect(out).toContain("+ [K_X] > U+0078");
+    expect(out).not.toMatch(/\$keyman(web|only)?:\s*\+ \[K_X\]/);
+  });
+});

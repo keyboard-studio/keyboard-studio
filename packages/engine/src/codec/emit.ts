@@ -137,6 +137,12 @@ function emitRule(rule: IRRule): string {
   if (rule.trailingComment !== undefined) {
     line = `${line} c ${rule.trailingComment}`;
   }
+  // Target-selector prefix (`$keyman:`, `$keymanweb:`, `$keymanonly:`) — the
+  // source-line prefix that scopes a rule to a specific compile target. Must
+  // come first on the line per kmcmplib::GetLinePrefixType.
+  if (rule.targetSelector !== undefined) {
+    line = `$${rule.targetSelector}: ${line}`;
+  }
   return line;
 }
 
@@ -223,7 +229,11 @@ function emitStoreItems(items: StoreItem[]): string {
 function emitStore(store: IRStore): string {
   const nameToken = store.isSystem ? `&${store.name}` : store.name;
   const items = emitStoreItems(store.items);
-  return `store(${nameToken}) ${items}`;
+  const line = `store(${nameToken}) ${items}`;
+  // Target-selector prefix — same convention as emitRule.
+  return store.targetSelector !== undefined
+    ? `$${store.targetSelector}: ${line}`
+    : line;
 }
 
 // ---------------------------------------------------------------------------

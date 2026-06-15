@@ -167,9 +167,12 @@ function parseVkeyBracket(tok: string): { name: string; modifiers: string[] } | 
 // KMN store/group identifiers are more permissive than C-style: they allow
 // hyphens, dots, colons, and non-ASCII letters (e.g. `store(non-subdot)`,
 // `store(hamis-E:key)`, `store(a-ሳድስ)` in real released keyboards).
-// We require the first char to be a letter/underscore (no leading digit) and
-// allow any subsequent non-whitespace, non-paren character.
-const KMN_IDENT = String.raw`[^\s\d\(\)\,][^\s\(\)\,]*`;
+// kmcmplib's Validation::ValidateIdentifier only rejects empty names,
+// over-length names, control chars, spaces, commas, parens, and Unicode
+// non-characters — it does NOT reject leading digits, so `store(1)`,
+// `store(12)` (malar_braille) are valid. Match that exactly: any sequence
+// of one or more chars that are not whitespace, parens, or commas.
+const KMN_IDENT = String.raw`[^\s\(\)\,]+`;
 
 /** Returns a parser for keyword(storeName) → storeName. */
 function makeStoreParser(keyword: string): (tok: string) => string | null {
@@ -676,12 +679,14 @@ export function parse(text: string, keyboardId: string): ParseResult {
               reason: OPAQUE_REASONS.SMP_LITERAL,
             });
           } else {
-            stores.push({
+            const sysStore: IRStore = {
               nodeId: storeNodeId,
               name: parsed.name,
               items,
               isSystem: true,
-            });
+            };
+            if (tok.targetSelector !== undefined) sysStore.targetSelector = tok.targetSelector;
+            stores.push(sysStore);
           }
         } else {
           // User store — may belong to current group or be global.
@@ -702,6 +707,7 @@ export function parse(text: string, keyboardId: string): ParseResult {
               items,
               isSystem: false,
             };
+            if (tok.targetSelector !== undefined) irStore.targetSelector = tok.targetSelector;
             stores.push(irStore);
           }
         }
@@ -746,6 +752,7 @@ export function parse(text: string, keyboardId: string): ParseResult {
           output: outEl,
           matchKind: tok.kind,
         };
+        if (tok.targetSelector !== undefined) rule.targetSelector = tok.targetSelector;
         if (currentGroup) {
           currentGroup.rules.push(rule);
         }
@@ -821,6 +828,7 @@ export function parse(text: string, keyboardId: string): ParseResult {
                 context: ctxElements,
                 output: outElements,
               };
+          if (tok.targetSelector !== undefined) rule.targetSelector = tok.targetSelector;
           if (currentGroup) {
             currentGroup.rules.push(rule);
           }
