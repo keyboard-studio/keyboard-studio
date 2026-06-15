@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { createScaffolderService } from "./index.js";
+import { createScaffolderService, renameFilesInVfs } from "./index.js";
+import { createVirtualFS } from "@keyboard-studio/contracts";
 import { runAllChecks } from "../validator/index.js";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 
@@ -214,7 +215,7 @@ describe("createScaffolderService", () => {
       expect(vfs.get("source/new_keyboard.kmn")).toBeDefined();
     });
 
-    it("returns empty warnings on successful fetch", async () => {
+    it("returns no scaffolder-level warnings on successful .kmn fetch (loader optional-file warnings are forwarded)", async () => {
       const mockFetch = vi.fn().mockImplementation((url: string) => {
         if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(BASE_KMN));
         return Promise.resolve(makeNotFoundResponse());
@@ -223,7 +224,9 @@ describe("createScaffolderService", () => {
 
       const { warnings } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
 
-      expect(warnings).toEqual([]);
+      // The scaffolder itself adds no warnings; loader optional-file misses (.kps, .kpj)
+      // are forwarded and are non-fatal.
+      expect(warnings.every((w) => w.includes("not found"))).toBe(true);
     });
 
     it("uses azerty CasedKeys for azerty group", async () => {
@@ -335,6 +338,42 @@ describe("scaffold — displayName sanitization", () => {
     expect(content).not.toContain("\x00");
     expect(content).not.toContain("\x01");
     expect(content).toContain("My Keyboard Name");
+  });
+});
+
+describe("renameFilesInVfs — CSS selector rewriting", () => {
+  it("rewrites .kmw-keyboard-<baseId> selectors in .css files", () => {
+    const vfs = createVirtualFS();
+    // One matching selector; one near-miss that shares the base prefix but has
+    // extra alphanumerics (word-boundary anchor must prevent rewriting it).
+    const css = `.kmw-keyboard-sil_cameroon_qwerty { color: red; }\n.kmw-keyboard-sil_cameroon_qwerty_extra { color: blue; }\n`;
+    vfs.set("source/sil_cameroon_qwerty.css", css);
+
+    renameFilesInVfs(vfs, "sil_cameroon_qwerty", "my_new_keyboard");
+
+    const entry = vfs.get("source/sil_cameroon_qwerty.css");
+    expect(entry).toBeDefined();
+    const out = entry!.content as string;
+    // Exact match replaced.
+    expect(out).toContain(".kmw-keyboard-my_new_keyboard {");
+    // Near-miss NOT replaced (word boundary prevents it).
+    expect(out).toContain(".kmw-keyboard-sil_cameroon_qwerty_extra {");
+    // Old exact selector must be gone.
+    expect(out).not.toContain(".kmw-keyboard-sil_cameroon_qwerty {");
+  });
+
+  it("does not modify non-.css entries", () => {
+    const vfs = createVirtualFS();
+    const kmnContent = `c contains kmw-keyboard-base_id text\n`;
+    vfs.set("source/base_id.kmn", kmnContent);
+
+    renameFilesInVfs(vfs, "base_id", "new_id");
+
+    // The .kmn file path was renamed but its CSS-selector content is untouched
+    // by the CSS-rewriting step (only *.css entries are rewritten).
+    const entry = vfs.get("source/new_id.kmn");
+    expect(entry).toBeDefined();
+    expect(entry!.content as string).toContain("kmw-keyboard-base_id");
   });
 });
 

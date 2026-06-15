@@ -19,10 +19,12 @@ import type { SurveyContext } from "./survey/types.ts";
 import { CarveGallery } from "./components/CarveGallery.tsx";
 import { MechanismGallery } from "./components/MechanismGallery.tsx";
 import { type RouteId } from "./lib/navigate.ts";
-import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
+import { useKeyboardArtifact, type OnInstantiateCallback, type ScaffoldSpec } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { OSKFrame } from "./components/OSKFrame.tsx";
 import { OskModeToggle, type OskMode } from "./components/OskModeToggle.tsx";
+import { TrackStep, type Track } from "./components/TrackStep.tsx";
+import { ProjectNameStep } from "./components/ProjectNameStep.tsx";
 
 const VALID_ROUTES = new Set<RouteId>(["survey", "preview", "output"]);
 
@@ -145,11 +147,14 @@ const SURVEY_LEFT_MAX_PCT = 65;
 const SURVEY_LEFT_INIT_PCT = 45;
 
 // Studio wizard stage machine (spec §8 "Workflow ordering"):
-//   identity → base → prefill → carve (Phase D) → B → mechanisms (Phase C) → F → done
+//   identity → base → track → (project-name [copy only]) → prefill →
+//   carve (Phase D) → B → mechanisms (Phase C) → F → done
 // Gated scripts route to "unsupported".
 type SurveyStage =
   | "identity"
   | "base"
+  | "track"
+  | "project-name"
   | "prefill"
   | "carve"
   | "B"
@@ -183,6 +188,14 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
   const [leftPct, setLeftPct] = useState(SURVEY_LEFT_INIT_PCT);
   const [handleHovered, setHandleHovered] = useState(false);
+
+  // Track 1 (Copy) vs Track 2 (Adapt) — set at the "track" stage.
+  // Null until the user picks a track.
+  const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
+
+  // ScaffoldSpec for Track 1: populated after the project-name step.
+  // Null for Track 2 (adapt uses the base's existing id/name).
+  const [scaffoldSpec, setScaffoldSpec] = useState<ScaffoldSpec | null>(null);
 
   // Local base selection that drives the compile pipeline immediately on pick.
   // This is separate from baseKeyboard (the store's instantiated base) so that:
@@ -240,13 +253,28 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     };
   }, [onPointerMove, onPointerUp]);
 
-  // Working-copy store instantiation — Track 1 wiring for the survey path.
-  // Delegates to instantiateFromBaseIfConfirmed which reads live store state via
-  // getState() so stale closures cannot produce a wrong hasEdits decision when
-  // the async compile completes. No store selector needed here — the helper
-  // dispatches instantiateFromBase via getState() directly.
+  // Working-copy store instantiation — routes to Track 1 (instantiateFromBase)
+  // or Track 2 (instantiateFromExisting) based on which track the user selected.
+  // selectedTrack is captured in a ref so the memoised callback always sees the
+  // current value even when the async compile completes after selectedTrack changes.
+  const selectedTrackRef = useRef<Track | null>(null);
+  useEffect(() => {
+    selectedTrackRef.current = selectedTrack;
+  }, [selectedTrack]);
+
   const onInstantiate = useCallback<OnInstantiateCallback>((base, { vfs, ir }) => {
-    instantiateFromBaseIfConfirmed(base, { vfs, ir });
+    const track = selectedTrackRef.current;
+    if (track === "adapt") {
+      // Track 2: preserve existing keyboard identity.
+      if (ir === null || vfs === null) {
+        console.warn("[studio] Track 2 instantiate skipped: no parsed IR (mock engine?)");
+        return;
+      }
+      useWorkingCopyStore.getState().instantiateFromExisting(base, { vfs, ir });
+    } else {
+      // Track 1 (or null/default): new keyboard from base, with rebase guard.
+      instantiateFromBaseIfConfirmed(base, { vfs, ir });
+    }
   }, []);
 
   // Working-copy transform — projects carve + identity layers into the OSK.
@@ -258,7 +286,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
   // Use localBase (immediately updated on selection) to drive the pipeline,
   // not the store's baseKeyboard (updated only after compile completes).
-  const { stage: artifactStage, retry } = useKeyboardArtifact(localBase, null, workingCopyTransform, onInstantiate);
+  // Pass scaffoldSpec so Track 1 routes through scaffold() instead of fetchKeyboardSourceToVfs.
+  const { stage: artifactStage, retry } = useKeyboardArtifact(localBase, scaffoldSpec, workingCopyTransform, onInstantiate);
   const rightPct = 100 - leftPct;
 
   // Survey results are persisted into the working-copy store (the data bus the
@@ -269,19 +298,47 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Identity-lite is the hybrid flow's head: it captures the language + the
   // INDEPENDENT target script, deriving the routing/A2 prefill. Gated scripts
   // (Ethi/Hani/Hang) end on the "not supported" stage. See spec §8/§9.
+  //
+  // Change 4: if il_language_english is empty but il_language_autonym is set,
+  // default the English name to the autonym. SurveyRunner has no cross-field
+  // default mechanism — patch here in the post-onComplete handler.
   function handleIdentityComplete(result: SurveyPhaseResult, identity: IdentityLiteResult) {
+    // Apply autonym-as-English-name default when English name is blank.
+    const patchedIdentity: IdentityLiteResult =
+      identity.english === "" && identity.autonym !== ""
+        ? { ...identity, english: identity.autonym }
+        : identity;
     recordPhase(result);
-    setIdentityResult(identity);
-    setSurveyContext(contextFromIdentity(identity));
-    setStage(identity.supported ? "base" : "unsupported");
+    setIdentityResult(patchedIdentity);
+    setSurveyContext(contextFromIdentity(patchedIdentity));
+    setStage(patchedIdentity.supported ? "base" : "unsupported");
   }
 
   // The base chosen in-survey is set on localBase so the pipeline starts
-  // immediately. The store's baseKeyboard updates after compile completes via
-  // onInstantiate. The survey stage advances to "prefill" so the Prefill step
-  // shows while the compile runs in the background.
+  // immediately (compile can run in the background while the user picks track).
+  // The survey stage advances to "track" so the author chooses Copy vs Adapt.
   function handleBaseResolved(base: BaseKeyboard) {
     setLocalBase(base);
+    setStage("track");
+  }
+
+  // Handle track selection. Copy → project-name step. Adapt → skip to prefill
+  // (preserves base identity; pipeline already running in background).
+  function handleTrackSelected(track: Track) {
+    setSelectedTrack(track);
+    if (track === "copy") {
+      setStage("project-name");
+    } else {
+      // Track 2: no scaffoldSpec needed — adapt uses base's own id/displayName.
+      setScaffoldSpec(null);
+      setStage("prefill");
+    }
+  }
+
+  // Handle project-name confirmation (Track 1 only).
+  // Set the scaffoldSpec so useKeyboardArtifact routes through scaffold().
+  function handleProjectNameNext(displayName: string, keyboardId: string) {
+    setScaffoldSpec({ keyboardId, displayName });
     setStage("prefill");
   }
 
@@ -304,6 +361,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     setIdentityResult(null);
     setSurveyContext({});
     setLocalBase(null);
+    setSelectedTrack(null);
+    setScaffoldSpec(null);
     setStage("identity");
   }
 
@@ -442,12 +501,29 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
             onBack={() => setStage("identity")}
           />
         )}
+        {stage === "track" && localBase !== null && (
+          <TrackStep
+            base={localBase}
+            onNext={handleTrackSelected}
+            onBack={() => setStage("base")}
+          />
+        )}
+        {stage === "project-name" && identityResult !== null && (
+          <ProjectNameStep
+            defaultDisplayName={identityResult.autonym || identityResult.english}
+            onNext={handleProjectNameNext}
+            onBack={() => setStage("track")}
+          />
+        )}
         {stage === "prefill" && identityResult !== null && localBase !== null && (
           <Prefill
             identity={identityResult}
             base={localBase}
             onConfirm={() => setStage("carve")}
-            onBack={() => setStage("base")}
+            onBack={() => {
+              // Back from prefill returns to track choice (not base picker directly).
+              setStage(selectedTrack === "copy" ? "project-name" : "track");
+            }}
           />
         )}
         {stage === "B" && (

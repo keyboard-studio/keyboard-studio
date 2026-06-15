@@ -66,8 +66,9 @@ export function TrackOneIdentityPanel() {
     return null;
   }
 
-  const idError = validateKeyboardId(keyboardId.trim());
-  const isIdValid = idError === null;
+  const idValidation = validateKeyboardId(keyboardId.trim());
+  const idError = idValidation.valid ? null : (idValidation.reason ?? "invalid keyboard id");
+  const isIdValid = idValidation.valid;
   const isIdUntouched = keyboardId.trim() === baseKeyboard.id;
 
   // Propagate to the store on display-name change.
@@ -88,7 +89,7 @@ export function TrackOneIdentityPanel() {
     setIdTouched(true);
     const trimmed = next.trim();
     const validationError = validateKeyboardId(trimmed);
-    if (validationError === null) {
+    if (validationError.valid) {
       setIdentity({
         ...identity,
         keyboardId: trimmed,

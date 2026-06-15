@@ -3,6 +3,7 @@
 import type { VirtualFS } from "./virtualFS";
 import type { BaseKeyboard } from "./baseKeyboard";
 import type { KeyboardIR } from "./keyboard-ir";
+import type { KpsFontEntry, KpsStylesheetEntry } from "./fontEntry";
 
 /**
  * Three-group routing identifier per spec §9. The scaffolder picks a
@@ -51,6 +52,10 @@ export interface ScaffoldResult {
   vfs: VirtualFS;
   /** Non-fatal issues encountered during scaffolding (e.g. fetch failure). */
   warnings: string[];
+  /** OSK font entries forwarded from fetchKeyboardSourceToVfs — same shape, see PR #405. */
+  fonts: KpsFontEntry[];
+  /** Per-keyboard CSS forwarded from fetchKeyboardSourceToVfs — same shape, see PR #405. */
+  stylesheets: KpsStylesheetEntry[];
 }
 
 /**
@@ -67,9 +72,12 @@ export const KEYBOARD_ID_INVALID_CHARS = /[-\s(),[\]]/;
  * Returns `null` if `id` is valid; otherwise a short human-readable error
  * message describing the first failure.
  *
+ * Named `validateScaffolderKeyboardId` to avoid a name collision with the
+ * wizard-facing {@link validateKeyboardId} exported from `./keyboardId`.
+ *
  * @see spec.md §10 Layer A check #1
  */
-export function validateKeyboardId(id: string): string | null {
+export function validateScaffolderKeyboardId(id: string): string | null {
   if (id.length === 0) return "keyboard id cannot be empty";
   if (id.length > 255) return "keyboard id is longer than 255 characters";
   if (KEYBOARD_ID_INVALID_CHARS.test(id)) {
@@ -118,6 +126,7 @@ export interface ScaffolderService {
    * setup costs.
    *
    * @see spec.md §10 Layer A check #1
+   * @see validateScaffolderKeyboardId
    */
   validateKeyboardId(id: string): string | null;
 
