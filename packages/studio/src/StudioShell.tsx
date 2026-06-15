@@ -7,7 +7,7 @@
 //   #preview            — compiled preview (stub; not yet implemented)
 //   #output             — output / delivery (stub; not yet implemented)
 
-import { useCallback, useEffect, useRef, useState, type ReactNode, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import type { BaseKeyboard, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
@@ -25,6 +25,9 @@ import { OSKFrame } from "./components/OSKFrame.tsx";
 import { OskModeToggle, type OskMode } from "./components/OskModeToggle.tsx";
 import { TrackStep, type Track } from "./components/TrackStep.tsx";
 import { ProjectNameStep } from "./components/ProjectNameStep.tsx";
+import { useValidator } from "./hooks/useValidator.ts";
+import { findKmnPath } from "./lib/findKmnPath.ts";
+import { buildFindingsByQuestionId } from "./lint/lintToQuestion.ts";
 
 const VALID_ROUTES = new Set<RouteId>(["survey", "preview", "output"]);
 
@@ -296,6 +299,20 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const resetSurvey = useWorkingCopyStore((s) => s.reset);
   const setStoreIdentity = useWorkingCopyStore((s) => s.setIdentity);
 
+  // Derive KMN source from the working copy's base VFS so the validator can
+  // produce findings while the survey is in progress.
+  const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
+  const kmnSource = useMemo(() => {
+    if (!baseVfs) return null;
+    const path = findKmnPath(baseVfs);
+    return path ? (baseVfs.get(path)!.content as string) : null;
+  }, [baseVfs]);
+  const { findings } = useValidator(kmnSource);
+  const findingsByQuestionId = useMemo(
+    () => buildFindingsByQuestionId(findings),
+    [findings],
+  );
+
   // Identity-lite is the hybrid flow's head: it captures the language + the
   // INDEPENDENT target script, deriving the routing/A2 prefill. Gated scripts
   // (Ethi/Hani/Hang) end on the "not supported" stage. See spec §8/§9.
@@ -472,7 +489,11 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       <section aria-label="Survey questions" style={questionsPaneStyle}>
         {stage === "done" && donePaneContent}
         {stage === "identity" && (
-          <IdentityLite context={surveyContext} onComplete={handleIdentityComplete} />
+          <IdentityLite
+            context={surveyContext}
+            onComplete={handleIdentityComplete}
+            findingsByQuestionId={findingsByQuestionId}
+          />
         )}
         {stage === "unsupported" && identityResult !== null && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "flex-start" }}>
@@ -532,6 +553,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
             context={surveyContext}
             onComplete={handlePhaseBComplete}
             onBack={() => setStage("carve")}
+            findingsByQuestionId={findingsByQuestionId}
           />
         )}
         {stage === "F" && (
@@ -539,6 +561,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
             context={surveyContext}
             onComplete={handlePhaseFComplete}
             onBack={() => setStage("mechanisms")}
+            findingsByQuestionId={findingsByQuestionId}
           />
         )}
       </section>
