@@ -1,8 +1,8 @@
 # keyboard-studio — Spec
 
 **Repository:** https://github.com/MattGyverLee/keyboard-studio
-**Date:** 2026-06-14
-**Version:** 1.3.0
+**Date:** 2026-06-15
+**Version:** 1.3.1
 **Status:** Draft — pre-Day-1 sync
 
 ---
@@ -14,6 +14,7 @@
 3. [Target user](#3-target-user)
 3a. [What the user brings (skill envelope)](#3a-what-the-user-brings-skill-envelope)
 3b. [What success looks like (outcome envelope)](#3b-what-success-looks-like-outcome-envelope)
+3c. [Defaults are the product](#3c-defaults-are-the-product)
 4. [System overview](#4-system-overview)
 5. [Pattern schema](#5-pattern-schema)
 5a. [KeyboardIR (keyboard intermediate representation)](#5a-keyboardir-keyboard-intermediate-representation)
@@ -137,6 +138,28 @@ Success for the studio is **a working keyboard committed to `keymanapp/keyboards
 **Submission posture.** A **monolingual keyboard is typically a one-time submission** — the studio is sized for this: ship-it-and-leave with the option to re-open, not a multi-year project IDE. A **massively multilingual keyboard is a multi-year affair**, out of scope for new authoring; supported only as a Track 1 base (§7).
 
 **Licensing posture.** All submissions are MIT-licensed; the studio surfaces this in the documentation phase. Content-change rights remain with the original author or their successor by Keyman policy; others fork and submit their own. The studio makes a Keyman-repo-level fork easy; within-studio forks are not a separate concept.
+
+---
+
+## 3c. Defaults are the product
+
+*Added 2026-06-15. Companion to §3a (skill envelope) — the design principle that follows from the "naive users accept reasonable defaults" pattern.*
+
+The target user (§3, §3a) is, by design, **not** equipped to second-guess the studio. This has a direct consequence for every decision point in the flow:
+
+> Naive users accept reasonable defaults and do not question them. The studio's value sits in the defaults, not the override controls. A weak default is a user-visible failure regardless of whether override controls exist.
+
+This is the same failure mode §2 describes from the reviewer's side — the hygiene mistakes reviewers silently fix across dozens of PRs are, almost always, a default the upstream tool never proposed. Keyman Developer's blank canvas pushes the decision onto an author who lacks the context to make it; the studio's job is to make that decision *for* them and let them confirm it.
+
+**The posture is propose-then-confirm, everywhere.** This generalizes the §5 base-derived pre-fill rule — *never ask before you can pre-fill* — from base-derived answers to **every** answer the studio has data to propose. Wherever the studio holds a signal that bears on a decision — the chosen base, the BCP47 tag, CLDR, a placement corpus, the OAuth identity, already-collected survey answers, the discovery axes — that signal is converted into a **proposed default rendered as an editable confirmation**, never a blank field. A decision point left blank when a default was derivable is a defect, not a neutral hand-off.
+
+**Three zero-flag model patterns** (the §7 strategy framework already follows all three; the rest of the flow converges on them):
+
+- **Input-contract default-fill (§7.1–§7.2).** Missing axes are filled from a defensible structural prior (script class, routing group) rather than re-asked — the axis vector computed in §7.1 carries `axisFills` on the survey result so the source of each fill is auditable before the §7.2 decision tree consumes it.
+- **Corpus-derived priors (§7.6).** Where peers exist, the studio proposes **ranked candidates with provenance** ("N existing keyboards for similar languages chose this"), never a blank field. The studio researches a default by its **peers** — the language's BCP47 pair, its script family, comparable communities — and surfaces the ranked result. This is *research-by-pairs*: a default is something the studio looked up among comparable keyboards, not something it invented.
+- **Base-derived pre-fill (§5).** When the base or already-collected metadata fixes an answer, it is pre-filled as a confirmation the author edits in place.
+
+**Provenance is mandatory, silence is not.** Every proposed default carries a visible provenance label (corpus citation, CLDR, base, OAuth identity, derived-from-axis) and is overridable in place — the author is always the authority. The studio **never resolves a decision silently** and never presents a blank field where it could have proposed. Where a default is genuinely *not* derivable, that is recorded as a deliberate no-default decision adjacent to the question (with a prompt-*with-hint* as the floor — a hinted prompt, never an empty box), not left to silence. A **confidently wrong default is as much a failure as a blank one** — precisely because the naive user accepts it unquestioned; where the signal is weak or the field is attribution-sensitive (e.g. who holds copyright), the studio proposes a **structured choice** or a **hint** rather than asserting a single value it cannot stand behind. Identity, paperwork, and help-documentation phases are held to this same bar as the technical phases — there is no "it's just metadata" exemption.
 
 ---
 
