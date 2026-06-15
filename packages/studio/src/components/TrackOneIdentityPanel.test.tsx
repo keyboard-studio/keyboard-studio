@@ -137,7 +137,7 @@ describe("TrackOneIdentityPanel — setIdentity calls", () => {
     // Error appears because the field was touched (change fires blur simulation).
     const error = screen.queryByRole("alert");
     expect(error).not.toBeNull();
-    expect(error?.textContent).toMatch(/disallowed character/i);
+    expect(error?.textContent).toMatch(/invalid characters/i);
   });
 });
 
