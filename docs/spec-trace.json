@@ -263,6 +263,61 @@
       "implements": [],
       "decisions": [],
       "notes": "Defaults-first principle \"no default is a defect\" (v1.3.1); governance/UX principle informing the \u00a75/\u00a77.2/\u00a77.6 propose-then-confirm posture. No single-file implementation."
+    },
+    "specs/002-defaults-engine": {
+      "title": "Feature Specification: Defaults engine (propose-then-confirm proposers)",
+      "hash": "sha256:ae6c9d3989994003",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": "Defaults-engine feature spec (\u00a73c-derived). Coverage not yet triaged."
+    },
+    "specs/005-pattern-schema": {
+      "title": "Feature spec \u2014 Pattern schema (spec.md \u00a75)",
+      "hash": "sha256:269db42c81a1c560",
+      "status": "implemented",
+      "implements": [
+        "packages/contracts/src/pattern.ts",
+        "packages/contracts/src/schemas.ts",
+        "packages/contracts/src/patternLibrary.ts",
+        "packages/contracts/src/fixtures/patterns.ts"
+      ],
+      "decisions": [],
+      "notes": "Extracted \u00a75 Pattern-schema contract spec. Canonical type pattern.ts; zod mirror schemas.ts (compile-time drift-guarded). Locked contract (\u00a718)."
+    },
+    "specs/007-strategy-selection": {
+      "title": "Feature spec \u2014 Strategy selection (spec.md \u00a77)",
+      "hash": "sha256:822706880f9434a7",
+      "status": "partial",
+      "implements": [
+        "packages/contracts/src/strategy.ts",
+        "packages/contracts/src/axes.ts",
+        "packages/contracts/src/surveyPhaseResult.ts",
+        "packages/engine/src/strategy-selector"
+      ],
+      "decisions": [],
+      "notes": "Extracted \u00a77 strategy framework (A1-A7, decision tree, S-01..S-13, \u00a77.5 table)."
+    },
+    "specs/008-data-flow": {
+      "title": "Feature spec \u2014 Data flow (spec.md \u00a78)",
+      "hash": "sha256:ce83a5e8e3cdc4a4",
+      "status": "partial",
+      "implements": [
+        "packages/contracts/src/surveySession.ts",
+        "packages/contracts/src/characterDiscovery.ts",
+        "packages/contracts/src/ir/producedSet.ts",
+        "packages/engine/src/loader"
+      ],
+      "decisions": [],
+      "notes": "Extracted \u00a78 \u2014 the application meta-flow / data pipeline. Treated as architecture-core (see docs/architecture.md) despite living in specs/NNN."
+    },
+    "docs/architecture.md": {
+      "title": "Keyboard Studio \u2014 architecture & meta-flow",
+      "hash": "sha256:15a38e9713965f46",
+      "status": "reference",
+      "implements": [],
+      "decisions": [],
+      "notes": "Architecture / meta-flow composition layer \u2014 the system view spec-kit omits. An index over the spec architecture-core sections + the extracted feature specs; not code."
     }
   }
 }

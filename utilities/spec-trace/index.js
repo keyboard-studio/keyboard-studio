@@ -52,6 +52,60 @@ function hashSection(content) {
 }
 
 // ---------------------------------------------------------------------------
+// Tracked-unit collection
+//
+// The spec corpus is more than the monolith: extracted feature specs live in
+// specs/NNN/spec.md and the architecture/meta-flow doc in docs/architecture.md.
+// All three kinds are tracked the same way (id + content hash). Unit ids:
+//   §N            — a spec.md section heading (## N. ...)
+//   specs/<slug>  — an extracted feature spec (specs/<slug>/spec.md)
+//   docs/<file>   — a tracked standalone doc (e.g. docs/architecture.md)
+// ---------------------------------------------------------------------------
+
+const SPECS_DIR = path.join(REPO_ROOT, 'specs');
+const EXTRA_DOCS = [
+  { id: 'docs/architecture.md', file: path.join(REPO_ROOT, 'docs', 'architecture.md') }
+];
+
+function firstHeading(content, fallback) {
+  const m = content.match(/^#\s+(.+)$/m);
+  return m ? m[1].trim() : fallback;
+}
+
+function collectFeatureSpecs() {
+  if (!fs.existsSync(SPECS_DIR)) return [];
+  const out = [];
+  for (const entry of fs.readdirSync(SPECS_DIR, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const f = path.join(SPECS_DIR, entry.name, 'spec.md');
+    if (!fs.existsSync(f)) continue;
+    const content = fs.readFileSync(f, 'utf8');
+    out.push({ id: 'specs/' + entry.name, title: firstHeading(content, entry.name), content });
+  }
+  return out;
+}
+
+function collectExtraDocs() {
+  const out = [];
+  for (const d of EXTRA_DOCS) {
+    if (!fs.existsSync(d.file)) continue;
+    const content = fs.readFileSync(d.file, 'utf8');
+    out.push({ id: d.id, title: firstHeading(content, d.id), content });
+  }
+  return out;
+}
+
+// All tracked units: monolith sections + extracted feature specs + extra docs.
+function collectUnits() {
+  const specContent = fs.existsSync(SPEC_FILE) ? fs.readFileSync(SPEC_FILE, 'utf8') : '';
+  return [
+    ...parseSpecSections(specContent),
+    ...collectFeatureSpecs(),
+    ...collectExtraDocs()
+  ];
+}
+
+// ---------------------------------------------------------------------------
 // Trace file I/O
 // ---------------------------------------------------------------------------
 
@@ -77,7 +131,7 @@ function saveTrace(trace) {
 function seed() {
   if (!fs.existsSync(SPEC_FILE)) { console.log('[ERROR] spec.md not found at ' + SPEC_FILE); return; }
   const content = fs.readFileSync(SPEC_FILE, 'utf8');
-  const sections = parseSpecSections(content);
+  const sections = collectUnits();
   const existing = loadTrace() || {};
 
   const specVersion = (content.match(/v(\d+\.\d+(?:\.\d+)?)/) || [, 'unknown'])[1];
@@ -127,8 +181,7 @@ async function check() {
   }
 
   if (!fs.existsSync(SPEC_FILE)) { console.log('[ERROR] spec.md not found at ' + SPEC_FILE); return; }
-  const content = fs.readFileSync(SPEC_FILE, 'utf8');
-  const sections = parseSpecSections(content);
+  const sections = collectUnits();
   const drifted = [];
 
   for (const s of sections) {
@@ -178,8 +231,7 @@ function acknowledge(sectionId) {
   if (!trace) { console.log('[ERROR] docs/spec-trace.json not found'); process.exit(1); }
 
   if (!fs.existsSync(SPEC_FILE)) { console.log('[ERROR] spec.md not found at ' + SPEC_FILE); process.exit(1); }
-  const content = fs.readFileSync(SPEC_FILE, 'utf8');
-  const sections = parseSpecSections(content);
+  const sections = collectUnits();
   const section = sections.find(s => s.id === sectionId);
 
   if (!section) {
@@ -214,8 +266,7 @@ function report() {
   if (!trace) { console.log('[WARN] docs/spec-trace.json not found'); return; }
 
   if (!fs.existsSync(SPEC_FILE)) { console.log('[ERROR] spec.md not found at ' + SPEC_FILE); return; }
-  const content = fs.readFileSync(SPEC_FILE, 'utf8');
-  const sections = parseSpecSections(content);
+  const sections = collectUnits();
   const drifted = [];
 
   for (const s of sections) {
