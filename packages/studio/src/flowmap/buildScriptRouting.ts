@@ -16,6 +16,7 @@ import {
   type ScriptRoutingGroup,
 } from "../lib/scriptAxes.ts";
 import type { ScriptClass } from "@keyboard-studio/contracts";
+import { ruleTarget } from "./flowUtils.ts";
 
 export interface ScriptRoutingRow {
   /** Raw il_target_script option value (e.g. "Latn", "romanization-Latn"). */
@@ -43,13 +44,6 @@ function conditionMatches(condition: string | undefined, value: string): boolean
     const m = clause.trim().match(/^value\s*==\s*'([^']*)'$/);
     return m !== null && m[1] === value;
   });
-}
-
-/** Resolve a rule's target id (explicit `goto` or `default: <id>` shorthand). */
-function ruleTarget(rule: { goto?: string | null; default?: unknown }): string | null {
-  if (typeof rule.goto === "string") return rule.goto;
-  if (typeof rule.default === "string") return rule.default;
-  return null;
 }
 
 /** Resolve the goto target id for a given answer value, mirroring resolveNext. */

@@ -12,9 +12,7 @@ import {
   type ConditionalSecondary,
 } from "@keyboard-studio/engine";
 import type { StrategyId } from "@keyboard-studio/contracts";
-
-const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
-const SANS = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+import { MONO, SANS } from "./tokens.ts";
 
 function StrategyChip({ id, kind }: { id: StrategyId; kind: "primary" | "secondary" }) {
   const primary = kind === "primary";

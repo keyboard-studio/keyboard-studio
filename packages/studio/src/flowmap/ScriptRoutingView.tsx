@@ -5,9 +5,7 @@
 import { type CSSProperties } from "react";
 import { buildScriptRouting, type ScriptRoutingRow } from "./buildScriptRouting.ts";
 import type { ScriptRoutingGroup } from "../lib/scriptAxes.ts";
-
-const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
-const SANS = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+import { MONO, SANS } from "./tokens.ts";
 
 function GroupChip({ group, gated }: { group: ScriptRoutingGroup | null; gated: boolean }) {
   if (gated) {

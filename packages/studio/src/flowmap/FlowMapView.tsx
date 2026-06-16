@@ -21,9 +21,7 @@ import { buildFlowGraph } from "./buildFlowGraph.ts";
 import { FlowGraphView } from "./FlowGraphView.tsx";
 import { StrategyTreeView } from "./StrategyTreeView.tsx";
 import { ScriptRoutingView } from "./ScriptRoutingView.tsx";
-
-const SANS = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
-const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+import { MONO, SANS } from "./tokens.ts";
 
 type Section = "flow" | "routing" | "strategy";
 

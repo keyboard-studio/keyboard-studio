@@ -8,15 +8,13 @@ import { type CSSProperties } from "react";
 import type { GraphEdge } from "./model.ts";
 import { layoutFlowGraph, NODE_W, NODE_H, type LaidOutGraph, type PositionedNode } from "./layout.ts";
 import type { FlowGraph } from "./model.ts";
+import { MONO, SANS } from "./tokens.ts";
 
 const EDGE_COLOR: Record<GraphEdge["kind"], string> = {
   linear: "#4d5b7c",
   conditional: "#d29922",
   default: "#6e7681",
 };
-
-const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
-const SANS = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 
 interface Pt {
   x: number;

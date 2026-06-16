@@ -10,6 +10,7 @@
 import { parseFlow } from "../survey/loadFlow.ts";
 import type { FlowQuestion } from "../survey/types.ts";
 import type { FlowGraph, GraphEdge, GraphNode } from "./model.ts";
+import { ruleTarget } from "./flowUtils.ts";
 
 /**
  * Permissive view of a goto rule as actually authored in the flow YAML. The
@@ -22,17 +23,6 @@ interface RawGotoRule {
   condition?: string;
   goto?: string | null;
   default?: unknown;
-}
-
-/**
- * Resolve a rule's target id, or null for a terminal branch. Prefers an explicit
- * `goto`, then the `default: <id>` shorthand; anything non-string (null, true,
- * undefined) terminates.
- */
-function ruleTarget(rule: RawGotoRule): string | null {
-  if (typeof rule.goto === "string") return rule.goto;
-  if (typeof rule.default === "string") return rule.default;
-  return null;
 }
 
 /** prompt ?? label ?? id — the text the runner would surface. */
