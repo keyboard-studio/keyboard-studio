@@ -24,7 +24,7 @@ async function loadCorpus(): Promise<Map<string, string>> {
   if (_corpusCache !== null && _corpusCache !== "failed") return _corpusCache;
   try {
     // Dynamic import so the ~335 KB JSON never enters the initial chunk.
-    const mod = await import(/* @vite-ignore */ "../../../../docs/import-corpus.json");
+    const mod = await import("@docs/import-corpus.json");
     const data = (mod.default ?? mod) as { keyboards?: CorpusEntry[] };
     const map = new Map<string, string>();
     for (const entry of data.keyboards ?? []) {

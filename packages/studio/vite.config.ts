@@ -13,6 +13,7 @@ export default defineConfig({
       "path-browserify": fileURLToPath(
         new URL("./src/lib/pathShim.ts", import.meta.url),
       ),
+      "@docs": fileURLToPath(new URL("../../docs", import.meta.url)),
     },
   },
   optimizeDeps: {
