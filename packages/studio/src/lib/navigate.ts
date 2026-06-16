@@ -8,7 +8,8 @@
 export type RouteId =
   | 'survey'
   | 'preview'
-  | 'output';
+  | 'output'
+  | 'flowmap';
 
 export function navigateTo(route: RouteId): void {
   window.location.hash = route;

@@ -28,8 +28,9 @@ import { ProjectNameStep } from "./components/ProjectNameStep.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
 import { buildFindingsByQuestionId } from "./lint/lintToQuestion.ts";
+import { FlowMapView } from "./flowmap/FlowMapView.tsx";
 
-const VALID_ROUTES = new Set<RouteId>(["survey", "preview", "output"]);
+const VALID_ROUTES = new Set<RouteId>(["survey", "preview", "output", "flowmap"]);
 
 function isRouteId(v: string): v is RouteId {
   return VALID_ROUTES.has(v as RouteId);
@@ -91,6 +92,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "survey", label: "Studio" },
   { id: "preview", label: "Preview" },
   { id: "output", label: "Output" },
+  { id: "flowmap", label: "Flow Map" },
 ];
 
 interface NavBarProps {
@@ -672,6 +674,9 @@ export function StudioShell() {
       break;
     case "output":
       content = <RoutePlaceholder title="Output" />;
+      break;
+    case "flowmap":
+      content = <FlowMapView />;
       break;
   }
 
