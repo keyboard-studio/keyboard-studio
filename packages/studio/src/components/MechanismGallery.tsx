@@ -1,20 +1,22 @@
-// MechanismGallery — §7.7 physical mechanism-assignment gallery.
-// Mounted at the #mechanisms route in StudioShell (see StudioShell.tsx routing
-// comment for placement rationale). Reads confirmedInventory + axes from the
-// survey-results store; calls getPatternLibraryService().filterFor(base, axes)
-// to get strategy-ranked matches; renders mechanism cards with apply/scope UI
-// and a live coverage indicator (criterion 18.6).
+// MechanismGallery — Phase C "add a key" flow (two-pane redesign).
 //
-// Preview wiring (this cycle): useKeyboardArtifact (open-base fetch path) +
-// vfsTransform (applyAssignmentsToVfs) feeds the compiled result into OSKFrame,
-// giving the author a live view of the base keyboard WITH their mechanisms
-// applied. Recomputes when selectedBaseKeyboard or sessionAssignments change.
+// LEFT pane: one-character-at-a-time assignment loop.
+//   - Walks lettersToAdd in order; the first uncovered+unskipped char is current.
+//   - Offers up to two methods: S-03 (sequence) always; S-02 (deadkey) only for
+//     decomposable accented letters (NFD has exactly 2 code points, second is
+//     a combining mark U+0300-U+036F).
+//   - "Add key" records a MechanismAssignment(scope:"individual") and auto-advances.
+//   - "Skip" advances without recording (skipped chars count toward Done gate).
+//   - Done when every char in lettersToAdd is either covered or skipped.
 //
-// Scope support: keyboard-default and individual (character-class is OPTIONAL
-// for this slice and is not implemented — documented as a follow-up).
+// RIGHT pane: GalleryPreviewWithPatterns — live OSK preview, unchanged.
+//
+// Contract shapes: see packages/contracts/src/assignmentMap.ts
+// Pattern IDs/strategyIds: multi_char_sequence (S-03),
+//                           deadkey_single_tap (S-02)
+// (must match the `id:` fields in content/patterns/ — see PATTERN_* constants)
 
 import {
-  memo,
   useState,
   useEffect,
   useCallback,
@@ -27,13 +29,11 @@ import type {
   Pattern,
   PatternMatch,
   MechanismAssignment,
-  DemoObject,
 } from "@keyboard-studio/contracts";
-import { uncoveredTargets } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { getPatternLibraryService } from "../lib/services.ts";
 import type { DiscoveryAxisVector } from "@keyboard-studio/contracts";
-import { useKeyboardArtifact } from "../hooks/useKeyboardArtifact.ts";
+import { useKeyboardArtifact, type ScaffoldSpec } from "../hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "../hooks/useWorkingCopyTransform.ts";
 import { useInventoryDiff } from "../hooks/useInventoryDiff.ts";
 import { OSKFrame } from "./OSKFrame.tsx";
@@ -41,704 +41,55 @@ import { OskModeToggle } from "./OskModeToggle.tsx";
 import type { OskMode } from "./OskModeToggle.tsx";
 
 // ---------------------------------------------------------------------------
-// Style constants (dark palette from studio CLAUDE.md)
+// Style constants — dark palette matching PhaseB
 // ---------------------------------------------------------------------------
 
 const BG_PAGE = "#0d1117";
 const BG_CARD = "#161b22";
-const BG_CARD_HOVER = "#1c2230";
 const BORDER = "#30363d";
 const ACCENT = "#6ea8fe";
 const TEXT_DIM = "#8b949e";
 const TEXT_MAIN = "#e6edf3";
 const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
-
-// Fallback badge for any reason not in the map (e.g. future additions).
-const BADGE_FALLBACK = { bg: "#1a1a1a", text: TEXT_DIM };
-
-const BADGE_COLORS: Partial<Record<PatternMatch["reason"], { bg: string; text: string }>> = {
-  "primary-strategy": { bg: "#0d2840", text: "#6ea8fe" },
-  "secondary-strategy": { bg: "#1a2a1a", text: "#56d364" },
-  "appliesTo-match": { bg: "#1a1a2a", text: "#8b949e" },
-  "user-expanded": { bg: "#2a1a2a", text: "#d2a8ff" },
-};
+const BLUE_ACTION = "#1f6feb";
 
 // ---------------------------------------------------------------------------
-// Demo mini-preview helper
+// Helpers
 // ---------------------------------------------------------------------------
 
-function getDemoText(demo: Pattern["demo"]): string | null {
-  if (!demo) return null;
-  if (typeof demo === "string") return demo.slice(0, 300);
-  const d = demo as DemoObject;
-  // sample_output is string[] | null | undefined
-  if (Array.isArray(d.sample_output) && d.sample_output.length > 0) {
-    return d.sample_output.slice(0, 6).join("  ").slice(0, 300);
-  }
-  // sample_keys is string[] | null — entries may be plain strings in YAML
-  if (Array.isArray(d.sample_keys) && d.sample_keys.length > 0) {
-    // The YAML demo.sample_keys field uses plain strings; just join the first few.
-    return d.sample_keys.slice(0, 4).join(" + ").slice(0, 200);
-  }
-  if (typeof d.filled_kmn === "string") {
-    return d.filled_kmn.slice(0, 300);
-  }
-  return null;
+function cpStr(char: string): string {
+  const cp = char.codePointAt(0)?.toString(16).toUpperCase().padStart(4, "0");
+  return `U+${cp ?? "????"}`;
+}
+
+// Pattern IDs as they exist in the browser pattern library (content/patterns/).
+// These MUST match the `id:` fields in the YAML — a mismatch means getById()
+// returns undefined, the assignment can't resolve, and the live preview never
+// reflects the added key.
+const PATTERN_SEQUENCE = "multi_char_sequence"; // S-03
+const PATTERN_DEADKEY = "deadkey_single_tap"; // S-02
+
+/**
+ * A KMN-identifier-safe, per-target deadkey state name. Derived from the target
+ * codepoint so each accented character gets a unique deadkey state (avoids
+ * duplicate store() declarations when several accented letters are added).
+ */
+function deadkeyNameFor(char: string): string {
+  const cp = char.codePointAt(0)?.toString(16) ?? "x";
+  return `dk_${cp}`;
+}
+
+/** Returns true when char is an accented letter decomposable to base + combining mark. */
+function isDecomposableAccented(char: string): boolean {
+  const nfd = char.normalize("NFD");
+  const cps = [...nfd];
+  if (cps.length !== 2) return false;
+  const secondCp = cps[1]?.codePointAt(0) ?? 0;
+  return secondCp >= 0x0300 && secondCp <= 0x036f;
 }
 
 // ---------------------------------------------------------------------------
-// SlotForm — collect slotValues for required questions
-// ---------------------------------------------------------------------------
-
-interface SlotFormProps {
-  pattern: Pattern;
-  slotValues: Record<string, string>;
-  onSlotChange: (id: string, value: string) => void;
-  disabled?: boolean;
-}
-
-function SlotForm({ pattern, slotValues, onSlotChange, disabled = false }: SlotFormProps) {
-  if (pattern.questions.length === 0) {
-    return (
-      <p style={{ margin: "4px 0 0", fontSize: 12, color: TEXT_DIM, fontStyle: "italic" }}>
-        No slot parameters required.
-      </p>
-    );
-  }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
-      {pattern.questions.map((q) => {
-        const val = slotValues[q.id] ?? q.default ?? "";
-        const isRequired = q.required !== false;
-        return (
-          <div key={q.id} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            <label
-              htmlFor={`slot-${pattern.id}-${q.id}`}
-              style={{
-                fontSize: 11,
-                color: TEXT_DIM,
-                fontFamily: FONT,
-                opacity: disabled ? 0.6 : 1,
-              }}
-            >
-              {q.prompt}
-              {isRequired && (
-                <span style={{ color: "#f85149", marginLeft: 4 }} aria-label="required">
-                  *
-                </span>
-              )}
-            </label>
-            <input
-              id={`slot-${pattern.id}-${q.id}`}
-              type="text"
-              value={val}
-              onChange={(e) => onSlotChange(q.id, e.target.value)}
-              disabled={disabled}
-              style={{
-                background: BG_PAGE,
-                border: `1px solid ${BORDER}`,
-                borderRadius: 4,
-                color: TEXT_MAIN,
-                fontFamily: FONT,
-                fontSize: 12,
-                padding: "4px 8px",
-                outline: "none",
-                boxSizing: "border-box",
-                opacity: disabled ? 0.5 : 1,
-                cursor: disabled ? "not-allowed" : "text",
-              }}
-              aria-required={isRequired}
-            />
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// MechanismCard — one card per PatternMatch + Pattern
-// ---------------------------------------------------------------------------
-
-interface MechanismCardProps {
-  match: PatternMatch;
-  pattern: Pattern;
-  inventory: string[];
-  isApplied: boolean;
-  onApply: (assignment: MechanismAssignment) => void;
-  onRemove: (patternId: string) => void;
-  /** When true, all apply/remove/scope/slot controls are disabled (desktop layout locked). */
-  disabled?: boolean;
-}
-
-const MechanismCard = memo(function MechanismCard({
-  match,
-  pattern,
-  inventory,
-  isApplied,
-  onApply,
-  onRemove,
-  disabled = false,
-}: MechanismCardProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [scope, setScope] = useState<"keyboard-default" | "individual">(
-    "keyboard-default",
-  );
-  // Multi-select for individual scope — which inventory chars this applies to.
-  const [selectedChars, setSelectedChars] = useState<Set<string>>(new Set());
-  // Slot values seeded from question.default.
-  const [slotValues, setSlotValues] = useState<Record<string, string>>(() => {
-    const defaults: Record<string, string> = {};
-    for (const q of pattern.questions) {
-      if (q.default !== undefined) {
-        defaults[q.id] = q.default;
-      }
-    }
-    return defaults;
-  });
-
-  const badgeStyle = BADGE_COLORS[match.reason] ?? BADGE_FALLBACK;
-  const demoText = getDemoText(pattern.demo);
-
-  const handleSlotChange = useCallback((id: string, value: string) => {
-    setSlotValues((prev) => ({ ...prev, [id]: value }));
-  }, []);
-
-  const toggleChar = useCallback((char: string) => {
-    setSelectedChars((prev) => {
-      const next = new Set(prev);
-      if (next.has(char)) {
-        next.delete(char);
-      } else {
-        next.add(char);
-      }
-      return next;
-    });
-  }, []);
-
-  const handleApply = useCallback(() => {
-    // Build the MechanismRef. slotValues only included when non-empty.
-    const hasSlots = Object.keys(slotValues).length > 0;
-    const mechanismRef = {
-      patternId: pattern.id,
-      ...(pattern.strategyId !== undefined ? { strategyId: pattern.strategyId } : {}),
-      ...(hasSlots ? { slotValues: { ...slotValues } } : {}),
-    };
-
-    if (scope === "keyboard-default") {
-      onApply({
-        scope: "keyboard-default",
-        target: "",
-        modality: "physical",
-        mechanisms: [mechanismRef],
-        source: "user",
-      });
-    } else {
-      // individual — one assignment per selected char.
-      const targets = selectedChars.size > 0 ? [...selectedChars] : inventory;
-      for (const char of targets) {
-        onApply({
-          scope: "individual",
-          target: char,
-          modality: "physical",
-          mechanisms: [mechanismRef],
-          source: "user",
-        });
-      }
-    }
-  }, [slotValues, pattern.id, pattern.strategyId, scope, selectedChars, inventory, onApply]);
-
-  const handleRemoveClick = useCallback(() => {
-    onRemove(pattern.id);
-  }, [onRemove, pattern.id]);
-
-  const cardStyle: CSSProperties = {
-    background: BG_CARD,
-    border: `1px solid ${isApplied ? ACCENT : BORDER}`,
-    borderRadius: 8,
-    padding: "14px 16px",
-    display: "flex",
-    flexDirection: "column",
-    gap: 8,
-    fontFamily: FONT,
-    color: TEXT_MAIN,
-    transition: "border-color 150ms ease",
-  };
-
-  return (
-    <article style={cardStyle} aria-label={`Mechanism: ${pattern.title}`}>
-      {/* Header row */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <h3
-              style={{
-                margin: 0,
-                fontSize: 14,
-                fontWeight: 600,
-                color: isApplied ? ACCENT : TEXT_MAIN,
-              }}
-            >
-              {pattern.title}
-            </h3>
-            {/* Strategy badge */}
-            <span
-              style={{
-                fontSize: 11,
-                padding: "2px 7px",
-                borderRadius: 10,
-                background: badgeStyle.bg,
-                color: badgeStyle.text,
-                fontWeight: 500,
-                whiteSpace: "nowrap",
-              }}
-              title={`Strategy: ${pattern.strategyId ?? "none"} — ${match.reason}`}
-            >
-              {pattern.strategyId ?? "general"}
-            </span>
-            {match.reason === "primary-strategy" && (
-              <span
-                style={{
-                  fontSize: 11,
-                  padding: "2px 7px",
-                  borderRadius: 10,
-                  background: "#0d2840",
-                  color: ACCENT,
-                  fontWeight: 600,
-                }}
-              >
-                recommended
-              </span>
-            )}
-            {isApplied && (
-              <span
-                style={{
-                  fontSize: 11,
-                  padding: "2px 7px",
-                  borderRadius: 10,
-                  background: "#0d2840",
-                  color: "#56d364",
-                  fontWeight: 500,
-                }}
-                aria-label="Applied"
-              >
-                applied
-              </span>
-            )}
-          </div>
-          <p style={{ margin: "4px 0 0", fontSize: 12, color: TEXT_DIM, lineHeight: 1.5 }}>
-            {pattern.description}
-          </p>
-        </div>
-        <button
-          type="button"
-          aria-expanded={expanded}
-          aria-controls={`mechanism-detail-${pattern.id}`}
-          onClick={() => setExpanded((v) => !v)}
-          style={{
-            flexShrink: 0,
-            background: "transparent",
-            border: `1px solid ${BORDER}`,
-            borderRadius: 4,
-            color: TEXT_DIM,
-            fontSize: 11,
-            padding: "3px 8px",
-            cursor: "pointer",
-            fontFamily: FONT,
-          }}
-        >
-          {expanded ? "collapse" : "configure"}
-        </button>
-      </div>
-
-      {/* Mini demo */}
-      {demoText !== null && (
-        <pre
-          style={{
-            margin: 0,
-            padding: "8px 10px",
-            background: BG_PAGE,
-            borderRadius: 4,
-            border: `1px solid ${BORDER}`,
-            fontSize: 11,
-            color: TEXT_DIM,
-            overflowX: "auto",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-all",
-          }}
-          aria-label={`Demo for ${pattern.title}`}
-        >
-          {demoText}
-        </pre>
-      )}
-
-      {/* Expanded configuration panel */}
-      {expanded && (
-        <div
-          id={`mechanism-detail-${pattern.id}`}
-          style={{
-            borderTop: `1px solid ${BORDER}`,
-            paddingTop: 12,
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-          }}
-        >
-          {/* Scope selector */}
-          <fieldset
-            disabled={disabled}
-            style={{
-              border: `1px solid ${BORDER}`,
-              borderRadius: 6,
-              padding: "8px 12px",
-              margin: 0,
-              opacity: disabled ? 0.5 : 1,
-            }}
-          >
-            <legend style={{ fontSize: 11, color: TEXT_DIM, padding: "0 4px" }}>
-              Apply at scope
-            </legend>
-            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-              {(["keyboard-default", "individual"] as const).map((s) => (
-                <label
-                  key={s}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    fontSize: 12,
-                    color: scope === s ? TEXT_MAIN : TEXT_DIM,
-                    cursor: disabled ? "not-allowed" : "pointer",
-                    fontFamily: FONT,
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name={`scope-${pattern.id}`}
-                    value={s}
-                    checked={scope === s}
-                    onChange={() => setScope(s)}
-                    disabled={disabled}
-                    style={{ accentColor: ACCENT }}
-                  />
-                  {s === "keyboard-default" ? "Keyboard default" : "Individual characters"}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          {/* Individual char picker */}
-          {scope === "individual" && inventory.length > 0 && (
-            <div>
-              <p style={{ margin: "0 0 6px", fontSize: 11, color: TEXT_DIM }}>
-                Select characters (none = all inventory):
-              </p>
-              <div
-                role="group"
-                aria-label="Inventory characters"
-                style={{ display: "flex", flexWrap: "wrap", gap: 4 }}
-              >
-                {inventory.map((char) => {
-                  const cp = char.codePointAt(0)?.toString(16).toUpperCase().padStart(4, "0");
-                  const sel = selectedChars.has(char);
-                  return (
-                    <button
-                      key={char}
-                      type="button"
-                      aria-pressed={sel}
-                      aria-label={`U+${cp ?? "????"} ${char}`}
-                      onClick={() => toggleChar(char)}
-                      disabled={disabled}
-                      title={`U+${cp ?? "????"}`}
-                      style={{
-                        minWidth: 36,
-                        padding: "4px 6px",
-                        background: sel ? "#0d2840" : BG_PAGE,
-                        border: `1px solid ${sel ? ACCENT : BORDER}`,
-                        borderRadius: 4,
-                        color: sel ? ACCENT : TEXT_MAIN,
-                        fontSize: 14,
-                        fontFamily: "monospace",
-                        cursor: disabled ? "not-allowed" : "pointer",
-                        lineHeight: 1.4,
-                        opacity: disabled ? 0.5 : 1,
-                      }}
-                    >
-                      {char}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Slot form */}
-          <SlotForm
-            pattern={pattern}
-            slotValues={slotValues}
-            onSlotChange={handleSlotChange}
-            disabled={disabled}
-          />
-
-          {/* Apply / Remove buttons */}
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              type="button"
-              onClick={handleApply}
-              disabled={disabled}
-              style={{
-                padding: "7px 16px",
-                background: disabled ? "#1a2a40" : ACCENT,
-                border: "none",
-                borderRadius: 6,
-                color: disabled ? TEXT_DIM : "#0d1117",
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: disabled ? "not-allowed" : "pointer",
-                fontFamily: FONT,
-                opacity: disabled ? 0.6 : 1,
-              }}
-            >
-              Apply
-            </button>
-            {isApplied && (
-              <button
-                type="button"
-                onClick={handleRemoveClick}
-                disabled={disabled}
-                style={{
-                  padding: "7px 16px",
-                  background: "transparent",
-                  border: `1px solid ${BORDER}`,
-                  borderRadius: 6,
-                  color: TEXT_DIM,
-                  fontSize: 12,
-                  cursor: disabled ? "not-allowed" : "pointer",
-                  fontFamily: FONT,
-                  opacity: disabled ? 0.5 : 1,
-                }}
-              >
-                Remove
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-    </article>
-  );
-});
-
-// ---------------------------------------------------------------------------
-// CoverageIndicator — criterion 18.6
-// ---------------------------------------------------------------------------
-
-interface CoverageIndicatorProps {
-  assignments: MechanismAssignment[];
-  inventory: string[];
-}
-
-function CoverageIndicator({ assignments, inventory }: CoverageIndicatorProps) {
-  if (inventory.length === 0) {
-    return null;
-  }
-
-  // classesOf: no class-membership in this slice (character-class scope deferred).
-  const uncovered = uncoveredTargets(assignments, inventory, "physical");
-  const covered = inventory.length - uncovered.length;
-
-  const allCovered = uncovered.length === 0;
-  const indicatorColor = allCovered ? "#56d364" : "#f0883e";
-
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      aria-label={`Coverage: ${covered} of ${inventory.length} characters covered`}
-      style={{
-        background: BG_CARD,
-        border: `1px solid ${allCovered ? "#1a3a1a" : "#3a2000"}`,
-        borderRadius: 8,
-        padding: "12px 16px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-        fontFamily: FONT,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: "50%",
-            background: indicatorColor,
-            flexShrink: 0,
-          }}
-          aria-hidden="true"
-        />
-        <span style={{ fontSize: 13, fontWeight: 600, color: indicatorColor }}>
-          {allCovered
-            ? `All ${inventory.length} characters covered`
-            : `Covered ${covered} / ${inventory.length}`}
-        </span>
-      </div>
-
-      {uncovered.length > 0 && (
-        <div>
-          <p style={{ margin: "0 0 6px", fontSize: 11, color: TEXT_DIM }}>
-            Not yet covered (dead-end per criterion 18.6):
-          </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-            {uncovered.map((char) => {
-              const cp = char.codePointAt(0)?.toString(16).toUpperCase().padStart(4, "0");
-              return (
-                <span
-                  key={char}
-                  title={`U+${cp ?? "????"} — not covered`}
-                  aria-label={`U+${cp ?? "????"} ${char} uncovered`}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    padding: "2px 6px",
-                    background: BG_PAGE,
-                    border: `1px solid #f0883e`,
-                    borderRadius: 4,
-                    fontSize: 12,
-                    fontFamily: "monospace",
-                    color: "#f0883e",
-                  }}
-                >
-                  <span>{char}</span>
-                  <span style={{ fontSize: 10, color: TEXT_DIM }}>U+{cp ?? "????"}</span>
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// AlreadyProducedSection — informational, collapsible.
-// Shows the characters the base keyboard already produces so the author
-// understands the context without needing to assign mechanisms to these chars.
-// ---------------------------------------------------------------------------
-
-interface AlreadyProducedSectionProps {
-  chars: string[];
-}
-
-function AlreadyProducedSection({ chars }: AlreadyProducedSectionProps) {
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <div
-      style={{
-        background: BG_CARD,
-        border: `1px solid ${BORDER}`,
-        borderRadius: 8,
-        padding: "10px 14px",
-        marginBottom: 16,
-        fontFamily: FONT,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 10,
-        }}
-      >
-        <span style={{ fontSize: 12, color: TEXT_DIM }}>
-          Already typed by the base keyboard ({chars.length}):
-        </span>
-        <button
-          type="button"
-          aria-expanded={expanded}
-          aria-controls="already-produced-chars"
-          onClick={() => setExpanded((v) => !v)}
-          style={{
-            background: "transparent",
-            border: `1px solid ${BORDER}`,
-            borderRadius: 4,
-            color: TEXT_DIM,
-            fontSize: 11,
-            padding: "2px 8px",
-            cursor: "pointer",
-            fontFamily: FONT,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {expanded ? "hide" : "show"}
-        </button>
-      </div>
-
-      {expanded && (
-        <div
-          id="already-produced-chars"
-          role="list"
-          aria-label={`${chars.length} characters already produced by the base keyboard`}
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 4,
-            marginTop: 10,
-          }}
-        >
-          {chars.map((char) => {
-            const cp = char
-              .codePointAt(0)
-              ?.toString(16)
-              .toUpperCase()
-              .padStart(4, "0");
-            return (
-              <span
-                key={char}
-                role="listitem"
-                title={`U+${cp ?? "????"} — already produced by the base keyboard`}
-                aria-label={`U+${cp ?? "????"} ${char} — base keyboard`}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 3,
-                  padding: "2px 6px",
-                  background: BG_PAGE,
-                  border: `1px solid ${BORDER}`,
-                  borderRadius: 4,
-                  fontSize: 12,
-                  fontFamily: "monospace",
-                  color: TEXT_DIM,
-                  opacity: 0.75,
-                }}
-              >
-                <span>{char}</span>
-                <span style={{ fontSize: 10, color: TEXT_DIM }}>
-                  U+{cp ?? "????"}
-                </span>
-              </span>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// GalleryPreviewWithPatterns — wraps GalleryPreview, injects a real sync
-// pattern resolver into the vfsTransform via a factory approach.
-//
-// The problem: applyAssignmentsToVfs needs a synchronous (id: string) =>
-// Pattern | undefined resolver, but PatternLibraryService.getById() is async.
-// BrowserPatternLibraryService is synchronously backed (Promise.resolve of an
-// in-memory array) but the interface is async. We solve this by passing the
-// already-loaded patternMap from the gallery's existing async load as the
-// resolver, so the transform always has the patterns it needs.
+// GalleryPreviewWithPatterns — right pane (kept AS-IS from original)
 // ---------------------------------------------------------------------------
 
 interface GalleryPreviewWithPatternsProps {
@@ -752,19 +103,29 @@ function GalleryPreviewWithPatterns({
 }: GalleryPreviewWithPatternsProps) {
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
 
-  // Working-copy transform: projects carve + assignments + identity into the
-  // gallery OSK. The patternMap from the already-loaded gallery patterns is
-  // passed so assignment projection can run synchronously. The hook memoizes
-  // on carve/assignment/identity layer values (not object references) so it
-  // only recompiles when a layer actually changes. This unifies the gallery OSK
-  // with the SurveyView OSK — all three surfaces reflect the same layers.
+  const identity = useWorkingCopyStore((s) => s.identity);
+  const scaffoldSpec = useMemo<ScaffoldSpec | null>(
+    () =>
+      identity?.keyboardId != null
+        ? { keyboardId: identity.keyboardId, displayName: identity.displayName ?? "" }
+        : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [identity?.keyboardId, identity?.displayName],
+  );
+
   const vfsTransform = useWorkingCopyTransform({ patternMap });
+
+  // eslint-disable-next-line no-console
+  console.log(`[DIAG:GalleryPreview] render. kb=${selectedBaseKeyboard.id}, scaffoldSpec=${scaffoldSpec != null ? scaffoldSpec.keyboardId : "null"}, vfsTransform=${vfsTransform != null ? "SET" : "null"}`);
 
   const { stage, retry } = useKeyboardArtifact(
     selectedBaseKeyboard,
-    null,
+    scaffoldSpec,
     vfsTransform,
   );
+
+  // eslint-disable-next-line no-console
+  console.log(`[DIAG:GalleryPreview] stage.kind=${stage.kind}`);
 
   const applyWarnings =
     stage.kind === "ready" && stage.scaffoldWarnings.length > 0
@@ -775,12 +136,11 @@ function GalleryPreviewWithPatterns({
     <section
       aria-label="Live keyboard preview with mechanisms applied"
       style={{
-        marginTop: 28,
-        borderTop: `1px solid ${BORDER}`,
-        paddingTop: 20,
         display: "flex",
         flexDirection: "column",
         gap: 14,
+        height: "100%",
+        boxSizing: "border-box",
       }}
     >
       <div
@@ -801,7 +161,7 @@ function GalleryPreviewWithPatterns({
             fontFamily: FONT,
           }}
         >
-          Live preview — base with mechanisms
+          Live preview
         </h2>
         <OskModeToggle
           value={oskMode}
@@ -810,7 +170,6 @@ function GalleryPreviewWithPatterns({
         />
       </div>
 
-      {/* Apply warnings */}
       {applyWarnings.length > 0 && (
         <div
           role="alert"
@@ -834,8 +193,9 @@ function GalleryPreviewWithPatterns({
         </div>
       )}
 
-      {/* Loading state */}
-      {(stage.kind === "fetching" || stage.kind === "vfs-loading" || stage.kind === "compiling") && (
+      {(stage.kind === "fetching" ||
+        stage.kind === "vfs-loading" ||
+        stage.kind === "compiling") && (
         <div
           role="status"
           aria-live="polite"
@@ -856,7 +216,6 @@ function GalleryPreviewWithPatterns({
         </div>
       )}
 
-      {/* Error state */}
       {stage.kind === "error" && (
         <div
           role="alert"
@@ -879,7 +238,7 @@ function GalleryPreviewWithPatterns({
               style={{
                 padding: "5px 12px",
                 background: "transparent",
-                border: `1px solid #f85149`,
+                border: "1px solid #f85149",
                 borderRadius: 4,
                 color: "#f85149",
                 fontSize: 12,
@@ -893,7 +252,6 @@ function GalleryPreviewWithPatterns({
         </div>
       )}
 
-      {/* OSKFrame — always mounted so KMW stays warm; overlay handles non-ready states */}
       <div style={{ display: stage.kind === "error" ? "none" : "block" }}>
         <OSKFrame
           baseKeyboard={selectedBaseKeyboard}
@@ -903,7 +261,6 @@ function GalleryPreviewWithPatterns({
         />
       </div>
 
-      {/* Compile diagnostics */}
       {stage.kind === "ready" && stage.compileResult.diagnostics.length > 0 && (
         <div
           role="status"
@@ -929,6 +286,237 @@ function GalleryPreviewWithPatterns({
 }
 
 // ---------------------------------------------------------------------------
+// MethodChooser — S-03 / S-02 radio-style selection + slot inputs
+// ---------------------------------------------------------------------------
+
+type Method = "sequence" | "deadkey";
+
+interface MethodChooserProps {
+  currentChar: string;
+  method: Method;
+  onMethodChange: (m: Method) => void;
+  seqFirst: string;
+  seqSecond: string;
+  onSeqFirstChange: (v: string) => void;
+  onSeqSecondChange: (v: string) => void;
+  triggerKey: string;
+  onTriggerKeyChange: (v: string) => void;
+}
+
+const DEADKEY_OPTIONS = [
+  { value: "K_QUOTE", label: "K_QUOTE (apostrophe)" },
+  { value: "K_GRAVE", label: "K_GRAVE (backtick)" },
+  { value: "K_BKQUOTE", label: "K_BKQUOTE (grave)" },
+  { value: "K_SEMI", label: "K_SEMI (semicolon)" },
+] as const;
+
+function MethodChooser({
+  currentChar,
+  method,
+  onMethodChange,
+  seqFirst,
+  seqSecond,
+  onSeqFirstChange,
+  onSeqSecondChange,
+  triggerKey,
+  onTriggerKeyChange,
+}: MethodChooserProps) {
+  const showDeadkey = isDecomposableAccented(currentChar);
+  const nfd = currentChar.normalize("NFD");
+  const nfdCps = [...nfd];
+  const base = nfdCps[0] ?? "";
+
+  const btnBase: CSSProperties = {
+    padding: "10px 14px",
+    borderRadius: 8,
+    border: `1px solid ${BORDER}`,
+    background: BG_PAGE,
+    color: TEXT_MAIN,
+    fontSize: 13,
+    fontFamily: FONT,
+    cursor: "pointer",
+    textAlign: "left",
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
+    transition: "border-color 120ms ease, background 120ms ease",
+  };
+
+  const inputStyle: CSSProperties = {
+    width: 52,
+    padding: "6px 8px",
+    background: BG_PAGE,
+    border: `1px solid ${BORDER}`,
+    borderRadius: 6,
+    color: TEXT_MAIN,
+    fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
+    fontSize: 20,
+    textAlign: "center",
+    boxSizing: "border-box",
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <p
+        style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}
+      >
+        How to type it:
+      </p>
+
+      {/* S-03 option — always shown */}
+      <button
+        type="button"
+        aria-pressed={method === "sequence"}
+        onClick={() => onMethodChange("sequence")}
+        style={{
+          ...btnBase,
+          borderColor: method === "sequence" ? ACCENT : BORDER,
+          background: method === "sequence" ? "#0d2840" : BG_PAGE,
+        }}
+      >
+        <span style={{ fontWeight: 600, color: method === "sequence" ? ACCENT : TEXT_MAIN }}>
+          Type a sequence
+        </span>
+        <span style={{ fontSize: 11, color: TEXT_DIM }}>
+          Two keys in a row produce {currentChar}
+        </span>
+      </button>
+
+      {method === "sequence" && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "10px 14px",
+            background: "#0d2840",
+            borderRadius: 8,
+            border: `1px solid ${ACCENT}`,
+            flexWrap: "wrap",
+          }}
+        >
+          <span style={{ fontSize: 13, color: TEXT_DIM, fontFamily: FONT, whiteSpace: "nowrap" }}>
+            Type these two keys to get{" "}
+            <span style={{ color: TEXT_MAIN, fontFamily: "monospace", fontSize: 16 }}>
+              {currentChar}
+            </span>
+            :
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input
+              type="text"
+              value={seqFirst}
+              onChange={(e) => onSeqFirstChange(e.target.value)}
+              aria-label="First key in sequence"
+              maxLength={2}
+              style={inputStyle}
+            />
+            <span style={{ color: TEXT_DIM, fontSize: 14, fontFamily: FONT }}>then</span>
+            <input
+              type="text"
+              value={seqSecond}
+              onChange={(e) => onSeqSecondChange(e.target.value)}
+              aria-label="Second key in sequence"
+              maxLength={2}
+              style={inputStyle}
+            />
+            <span style={{ color: TEXT_DIM, fontSize: 14, fontFamily: FONT }}>
+              &rarr;{" "}
+              <span style={{ color: TEXT_MAIN, fontFamily: "monospace", fontSize: 18 }}>
+                {currentChar}
+              </span>
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* S-02 option — only for decomposable accented chars */}
+      {showDeadkey && (
+        <>
+          <button
+            type="button"
+            aria-pressed={method === "deadkey"}
+            onClick={() => onMethodChange("deadkey")}
+            style={{
+              ...btnBase,
+              borderColor: method === "deadkey" ? ACCENT : BORDER,
+              background: method === "deadkey" ? "#0d2840" : BG_PAGE,
+            }}
+          >
+            <span style={{ fontWeight: 600, color: method === "deadkey" ? ACCENT : TEXT_MAIN }}>
+              Tap an accent, then the letter
+            </span>
+            <span style={{ fontSize: 11, color: TEXT_DIM }}>
+              Press the trigger key, then{" "}
+              <span style={{ fontFamily: "monospace" }}>{base}</span>, to get{" "}
+              <span style={{ fontFamily: "monospace" }}>{currentChar}</span>
+            </span>
+          </button>
+
+          {method === "deadkey" && (
+            <div
+              style={{
+                padding: "10px 14px",
+                background: "#0d2840",
+                borderRadius: 8,
+                border: `1px solid ${ACCENT}`,
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
+              <p style={{ margin: 0, fontSize: 13, color: TEXT_DIM, fontFamily: FONT }}>
+                Tap the accent key, then{" "}
+                <span style={{ fontFamily: "monospace", color: TEXT_MAIN }}>
+                  {base}
+                </span>
+                , to get{" "}
+                <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>
+                  {currentChar}
+                </span>
+                .
+              </p>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 12,
+                  color: TEXT_DIM,
+                  fontFamily: FONT,
+                }}
+              >
+                Trigger key:
+                <select
+                  value={triggerKey}
+                  onChange={(e) => onTriggerKeyChange(e.target.value)}
+                  aria-label="Trigger key for deadkey"
+                  style={{
+                    background: BG_PAGE,
+                    border: `1px solid ${BORDER}`,
+                    borderRadius: 4,
+                    color: TEXT_MAIN,
+                    fontSize: 12,
+                    padding: "4px 8px",
+                    fontFamily: FONT,
+                  }}
+                >
+                  {DEADKEY_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // MechanismGallery — main component
 // ---------------------------------------------------------------------------
 
@@ -938,38 +526,65 @@ export interface MechanismGalleryProps {
   onBack?: () => void;
 }
 
-export function MechanismGallery({ selectedBaseKeyboard, onComplete, onBack }: MechanismGalleryProps) {
+export function MechanismGallery({
+  selectedBaseKeyboard,
+  onComplete,
+  onBack,
+}: MechanismGalleryProps) {
   const recordAssignments = useWorkingCopyStore((s) => s.recordAssignments);
-  const desktopLocked = useWorkingCopyStore((s) => s.desktopLocked);
-  const lockDesktop = useWorkingCopyStore((s) => s.lockDesktop);
-  const unlockDesktop = useWorkingCopyStore((s) => s.unlockDesktop);
-  // confirmedInventory and rawAssignments are read individually so memo keys
-  // only fire when these specific slices change.
   const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
   const rawAssignments = useWorkingCopyStore((s) => s.session.assignments);
-  // axes selected with useShallow so the filterFor effect only re-fires when an
-  // axis value actually changes — adding a new axis in the future cannot silently
-  // miss the dep list (the whole object is shallow-compared by zustand).
   const axes = useWorkingCopyStore(
     useShallow((s) => s.session.axes as Partial<DiscoveryAxisVector>),
   );
 
-  // §8 inventory diff: target only the letters the base does NOT already produce.
-  // alreadyProduced is shown as an informational section (no assignment required).
-  // When baseIr is null (not yet instantiated) lettersToAdd === confirmedInventory,
-  // so this is a strict superset of the old behavior (no regression).
   const { lettersToAdd, alreadyProduced } = useInventoryDiff();
 
-  // All current physical assignments from the session — memoized so handleApply/
-  // handleRemove useCallbacks and appliedPatternIds don't recreate on every render.
   const sessionAssignments = useMemo(
     () => rawAssignments.filter((a) => a.modality === "physical"),
     [rawAssignments],
   );
 
-  // Gallery state: ranked matches + their full patterns.
-  const [matches, setMatches] = useState<PatternMatch[]>([]);
-  const [patternMap, setPatternMap] = useState<Map<string, Pattern>>(new Map());
+  // The covered set: individual-scope assignments for chars in lettersToAdd.
+  const coveredChars = useMemo(
+    () =>
+      new Set(
+        sessionAssignments
+          .filter((a) => a.scope === "individual")
+          .map((a) => a.target)
+          .filter((t) => lettersToAdd.includes(t)),
+      ),
+    [sessionAssignments, lettersToAdd],
+  );
+
+  // Skipped chars — tracked in local state; these advance currentChar without
+  // recording an assignment. They count for the Done gate (done = covered | skipped).
+  const [skippedChars, setSkippedChars] = useState<Set<string>>(new Set());
+
+  // The current character: first in lettersToAdd that is neither covered nor skipped.
+  const currentChar = useMemo(
+    () =>
+      lettersToAdd.find((c) => !coveredChars.has(c) && !skippedChars.has(c)) ??
+      null,
+    [lettersToAdd, coveredChars, skippedChars],
+  );
+
+  // Done = every char in lettersToAdd is covered or skipped.
+  const isDone = useMemo(
+    () =>
+      lettersToAdd.length === 0 ||
+      lettersToAdd.every((c) => coveredChars.has(c) || skippedChars.has(c)),
+    [lettersToAdd, coveredChars, skippedChars],
+  );
+
+  // ---------------------------------------------------------------------------
+  // Pattern loading — needed for patternMap (GalleryPreviewWithPatterns)
+  // ---------------------------------------------------------------------------
+
+  const [patternMap, setPatternMap] = useState<Map<string, Pattern>>(
+    new Map(),
+  );
+  const [_matches, setMatches] = useState<PatternMatch[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -985,9 +600,6 @@ export function MechanismGallery({ selectedBaseKeyboard, onComplete, onBack }: M
     setLoadError(null);
     const svc = getPatternLibraryService();
 
-    // Cast Partial<DiscoveryAxisVector> to DiscoveryAxisVector only when all
-    // required fields are present. The axes may be partial when Phase B is
-    // incomplete; in that case we pass undefined and get appliesTo-only ranking.
     const fullAxes: DiscoveryAxisVector | undefined =
       axes.scale !== undefined &&
       axes.scriptClass !== undefined &&
@@ -999,76 +611,183 @@ export function MechanismGallery({ selectedBaseKeyboard, onComplete, onBack }: M
         ? (axes as DiscoveryAxisVector)
         : undefined;
 
-    svc.filterFor(selectedBaseKeyboard, fullAxes).then((ranked) => {
-      setMatches(ranked);
-      // Fetch full patterns for all matches.
-      return Promise.all(ranked.map((m) => svc.getById(m.patternId)));
-    }).then((patterns) => {
-      const map = new Map<string, Pattern>();
-      for (const p of patterns) {
-        if (p !== undefined) {
-          map.set(p.id, p);
-        } else {
-          console.warn("[MechanismGallery] getById() returned undefined for a ranked patternId — the catalog may be out of sync");
+    svc
+      .filterFor(selectedBaseKeyboard, fullAxes)
+      .then((ranked) => {
+        setMatches(ranked);
+        // Load ranked patterns PLUS the two the add-a-key UI offers. Axis-based
+        // ranking (rankPatterns) excludes off-strategy patterns, so S-02/S-03
+        // may be absent from `ranked`; load them explicitly so the preview
+        // transform can always resolve an applied assignment.
+        const ids = new Set<string>(ranked.map((m) => m.patternId));
+        ids.add(PATTERN_SEQUENCE);
+        ids.add(PATTERN_DEADKEY);
+        return Promise.all([...ids].map((id) => svc.getById(id)));
+      })
+      .then((patterns) => {
+        const map = new Map<string, Pattern>();
+        for (const p of patterns) {
+          if (p !== undefined) {
+            map.set(p.id, p);
+          } else {
+            console.warn(
+              "[MechanismGallery] getById() returned undefined for a patternId",
+            );
+          }
         }
-      }
-      setPatternMap(map);
-      setLoading(false);
-    }).catch((err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error("[MechanismGallery] filterFor error:", err);
-      setLoadError(msg);
-      setLoading(false);
-    });
+        setPatternMap(map);
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[MechanismGallery] filterFor error:", err);
+        setLoadError(msg);
+        setLoading(false);
+      });
   }, [selectedBaseKeyboard, axes]);
 
-  // Track which patternIds currently have at least one applied assignment.
-  // Memoized so handleApply/handleRemove useCallbacks (which depend on this)
-  // don't recreate when unrelated state changes.
-  const appliedPatternIds = useMemo(
-    () => new Set(sessionAssignments.flatMap((a) => a.mechanisms.map((m) => m.patternId))),
-    [sessionAssignments],
-  );
+  // ---------------------------------------------------------------------------
+  // Per-char method state — reset when currentChar changes
+  // ---------------------------------------------------------------------------
 
-  // handleApply: merge the new assignment into the full physical assignment list
-  // and route through recordAssignments so the find/create-Phase-C logic lives
-  // only in the store. Defense-in-depth: bail early when locked even if a caller
-  // somehow bypasses the disabled controls.
-  const handleApply = useCallback((assignment: MechanismAssignment) => {
-    if (desktopLocked) return;
-    const next = [...sessionAssignments, assignment];
-    recordAssignments(next);
-  }, [desktopLocked, sessionAssignments, recordAssignments]);
+  const [method, setMethod] = useState<Method>("sequence");
+  const [seqFirst, setSeqFirst] = useState("");
+  const [seqSecond, setSeqSecond] = useState("");
+  const [triggerKey, setTriggerKey] = useState("K_QUOTE");
 
-  // handleRemove: drop all assignments for this patternId from the physical list.
-  // Defense-in-depth: bail early when locked.
-  const handleRemove = useCallback((patternId: string) => {
-    if (desktopLocked) return;
-    const next = sessionAssignments.filter(
-      (a) => !a.mechanisms.some((m) => m.patternId === patternId),
-    );
-    recordAssignments(next);
-  }, [desktopLocked, sessionAssignments, recordAssignments]);
-
-  // handleLockAndContinue: lock the desktop layout and advance to the next stage.
-  const handleLockAndContinue = useCallback(() => {
-    lockDesktop();
-    onComplete?.();
-  }, [lockDesktop, onComplete]);
+  // Reset inputs whenever currentChar changes.
+  useEffect(() => {
+    setMethod("sequence");
+    setSeqFirst("");
+    setSeqSecond("");
+    setTriggerKey("K_QUOTE");
+  }, [currentChar]);
 
   // ---------------------------------------------------------------------------
-  // Render — empty/error states
+  // Apply action
+  // ---------------------------------------------------------------------------
+
+  const canApply = useMemo(() => {
+    if (currentChar === null) return false;
+    if (method === "sequence") {
+      // Both must be single graphemes (non-empty).
+      return seqFirst.trim().length > 0 && seqSecond.trim().length > 0;
+    }
+    // deadkey: triggerKey always has a value.
+    return true;
+  }, [currentChar, method, seqFirst, seqSecond]);
+
+  const handleApply = useCallback(() => {
+    if (currentChar === null || !canApply) return;
+
+    let assignment: MechanismAssignment;
+
+    if (method === "sequence") {
+      assignment = {
+        scope: "individual",
+        target: currentChar,
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_SEQUENCE,
+            strategyId: "S-03",
+            slotValues: {
+              firstLetterOut: seqFirst.trim(),
+              secondLetter: seqSecond.trim(),
+              collapsedChar: currentChar,
+            },
+          },
+        ],
+        source: "user",
+      };
+    } else {
+      const nfd = currentChar.normalize("NFD");
+      const nfdCps = [...nfd];
+      const base = nfdCps[0] ?? "";
+      const accentChar = nfdCps[1] ?? "";
+      assignment = {
+        scope: "individual",
+        target: currentChar,
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_DEADKEY,
+            strategyId: "S-02",
+            slotValues: {
+              triggerKey,
+              deadkeyName: deadkeyNameFor(currentChar),
+              baseLetters: base,
+              accentedForms: currentChar,
+              accentChar,
+            },
+          },
+        ],
+        source: "user",
+      };
+    }
+
+    // eslint-disable-next-line no-console
+    console.log(`[DIAG:handleApply] recording assignment for "${currentChar}", method=${method}, total=${sessionAssignments.length + 1}`);
+    recordAssignments([...sessionAssignments, assignment]);
+    // currentChar auto-advances because coveredChars will now include it.
+  }, [
+    currentChar,
+    canApply,
+    method,
+    seqFirst,
+    seqSecond,
+    triggerKey,
+    recordAssignments,
+    sessionAssignments,
+  ]);
+
+  const handleSkip = useCallback(() => {
+    if (currentChar === null) return;
+    setSkippedChars((prev) => new Set([...prev, currentChar]));
+  }, [currentChar]);
+
+  const handleRemoveCovered = useCallback(
+    (char: string) => {
+      const next = sessionAssignments.filter(
+        (a) => !(a.scope === "individual" && a.target === char),
+      );
+      recordAssignments(next);
+    },
+    [sessionAssignments, recordAssignments],
+  );
+
+  // ---------------------------------------------------------------------------
+  // AlreadyProduced collapsed section
+  // ---------------------------------------------------------------------------
+
+  const [alreadyExpanded, setAlreadyExpanded] = useState(false);
+
+  // ---------------------------------------------------------------------------
+  // Shared styles
   // ---------------------------------------------------------------------------
 
   const pageStyle: CSSProperties = {
     background: BG_PAGE,
     height: "100%",
-    overflowY: "auto",
-    padding: "24px 32px",
     boxSizing: "border-box",
     fontFamily: FONT,
     color: TEXT_MAIN,
   };
+
+  const ghostBtn: CSSProperties = {
+    padding: "8px 18px",
+    background: "transparent",
+    border: `1px solid ${BORDER}`,
+    borderRadius: 6,
+    color: TEXT_DIM,
+    fontSize: 13,
+    cursor: "pointer",
+    fontFamily: "inherit",
+  };
+
+  // ---------------------------------------------------------------------------
+  // Guard: no base keyboard
+  // ---------------------------------------------------------------------------
 
   if (selectedBaseKeyboard === null) {
     return (
@@ -1078,10 +797,8 @@ export function MechanismGallery({ selectedBaseKeyboard, onComplete, onBack }: M
             maxWidth: 560,
             margin: "60px auto",
             textAlign: "center",
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
             color: TEXT_DIM,
+            padding: "0 24px",
           }}
         >
           <p style={{ fontSize: 15 }}>
@@ -1092,29 +809,17 @@ export function MechanismGallery({ selectedBaseKeyboard, onComplete, onBack }: M
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Guard: no inventory
+  // ---------------------------------------------------------------------------
+
   if (inventory.length === 0) {
     return (
-      <div style={pageStyle}>
+      <div style={{ ...pageStyle, padding: "24px 32px" }}>
         <div style={{ maxWidth: 780, margin: "0 auto" }}>
           {onBack !== undefined && (
-            <button
-              type="button"
-              onClick={onBack}
-              disabled={desktopLocked}
-              style={{
-                marginBottom: 20,
-                padding: "8px 18px",
-                background: "transparent",
-                border: `1px solid ${BORDER}`,
-                borderRadius: 6,
-                color: TEXT_DIM,
-                fontSize: 13,
-                cursor: desktopLocked ? "not-allowed" : "pointer",
-                fontFamily: "inherit",
-                opacity: desktopLocked ? 0.5 : 1,
-              }}
-            >
-              ← Back
+            <button type="button" onClick={onBack} style={ghostBtn}>
+              &larr; Back
             </button>
           )}
           <div
@@ -1122,18 +827,12 @@ export function MechanismGallery({ selectedBaseKeyboard, onComplete, onBack }: M
               maxWidth: 560,
               margin: "60px auto",
               textAlign: "center",
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
               color: TEXT_DIM,
             }}
           >
             <p style={{ fontSize: 15 }}>
-              No inventory confirmed yet. Complete the{" "}
-              <a href="#survey" style={{ color: ACCENT, textDecoration: "none" }}>
-                Survey
-              </a>{" "}
-              (Phase B) to confirm which characters your keyboard must produce.
+              No inventory confirmed yet. Complete the Survey (Phase B) to
+              confirm which characters your keyboard must produce.
             </p>
           </div>
         </div>
@@ -1141,247 +840,392 @@ export function MechanismGallery({ selectedBaseKeyboard, onComplete, onBack }: M
     );
   }
 
-  // True only when there is at least one physical assignment — the lock button
-  // is disabled until the layout has content to lock.
-  const hasAssignments = sessionAssignments.length > 0;
+  // ---------------------------------------------------------------------------
+  // Compute coverage line: covered-in-lettersToAdd count / lettersToAdd.length
+  // ---------------------------------------------------------------------------
 
-  return (
-    <div style={pageStyle}>
-      <div style={{ maxWidth: 780, margin: "0 auto" }}>
-        {/* Back button — wizard affordance to return to Phase B (character inventory).
-            Rendered only when onBack is provided; disabled when the desktop layout
-            is locked (going back after locking could leave state inconsistent). */}
-        {onBack !== undefined && (
+  const coveredCount = lettersToAdd.filter((c) => coveredChars.has(c)).length;
+
+  // ---------------------------------------------------------------------------
+  // Left pane content
+  // ---------------------------------------------------------------------------
+
+  const leftContent = (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        padding: "24px 20px",
+        overflowY: "auto",
+        boxSizing: "border-box",
+        height: "100%",
+      }}
+    >
+      {/* Small coverage line */}
+      {lettersToAdd.length > 0 && (
+        <p
+          role="status"
+          aria-live="polite"
+          aria-label={`${coveredCount} of ${lettersToAdd.length} added`}
+          style={{
+            margin: 0,
+            fontSize: 12,
+            color: TEXT_DIM,
+            fontFamily: FONT,
+          }}
+        >
+          {coveredCount} of {lettersToAdd.length} added
+        </p>
+      )}
+
+      {/* Back button */}
+      {onBack !== undefined && !isDone && (
+        <button
+          type="button"
+          onClick={onBack}
+          style={{ ...ghostBtn, alignSelf: "flex-start", fontSize: 13 }}
+        >
+          &larr; Back
+        </button>
+      )}
+
+      {/* All-done / empty states */}
+      {lettersToAdd.length === 0 && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+            color: TEXT_DIM,
+          }}
+        >
+          <p style={{ margin: 0, fontSize: 14 }}>
+            No new characters to add.
+          </p>
           <button
             type="button"
-            onClick={onBack}
-            disabled={desktopLocked}
+            onClick={onComplete}
             style={{
-              marginBottom: 20,
-              padding: "8px 18px",
-              background: "transparent",
-              border: `1px solid ${BORDER}`,
+              padding: "10px 24px",
+              background: BLUE_ACTION,
+              border: "none",
               borderRadius: 6,
-              color: TEXT_DIM,
-              fontSize: 13,
-              cursor: desktopLocked ? "not-allowed" : "pointer",
-              fontFamily: "inherit",
-              opacity: desktopLocked ? 0.5 : 1,
-            }}
-          >
-            ← Back
-          </button>
-        )}
-
-        {/* Page header */}
-        <header style={{ marginBottom: 24 }}>
-          <h1 style={{ margin: "0 0 6px", fontSize: "1.2rem", color: ACCENT, fontWeight: 600 }}>
-            Mechanism Gallery
-          </h1>
-          <p style={{ margin: 0, fontSize: 13, color: TEXT_DIM }}>
-            Choose how each character in your inventory is typed. Apply one or more
-            mechanisms; the coverage indicator tracks which characters are still uncovered.
-            Base keyboard:{" "}
-            <strong style={{ color: TEXT_MAIN }}>{selectedBaseKeyboard.displayName}</strong>
-            {" — modality: physical"}
-          </p>
-        </header>
-
-        {/* Desktop-lock banner — shown when locked (role=status so screen
-            readers are notified when it appears). */}
-        {desktopLocked && (
-          <div
-            role="status"
-            aria-live="polite"
-            aria-label="Desktop layout locked"
-            style={{
-              background: "#0d2218",
-              border: "1px solid #238636",
-              borderRadius: 8,
-              padding: "12px 16px",
-              marginBottom: 20,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              flexWrap: "wrap",
+              color: "#e6edf3",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
               fontFamily: FONT,
+              alignSelf: "flex-start",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            Done
+          </button>
+        </div>
+      )}
+
+      {lettersToAdd.length > 0 && isDone && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <p style={{ margin: 0, fontSize: 14, color: TEXT_DIM }}>
+            All keys added.
+          </p>
+          <button
+            type="button"
+            onClick={onComplete}
+            style={{
+              padding: "10px 24px",
+              background: BLUE_ACTION,
+              border: "none",
+              borderRadius: 6,
+              color: "#e6edf3",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: FONT,
+              alignSelf: "flex-start",
+            }}
+          >
+            Done
+          </button>
+        </div>
+      )}
+
+      {/* Per-char UI */}
+      {currentChar !== null && (
+        <>
+          {/* Character heading */}
+          <div
+            style={{
+              background: BG_CARD,
+              border: `1px solid ${BORDER}`,
+              borderRadius: 10,
+              padding: "16px 18px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                fontSize: 12,
+                color: TEXT_DIM,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+              }}
+            >
+              Add a key
+            </p>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
               <span
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: "50%",
-                  background: "#56d364",
-                  flexShrink: 0,
-                }}
-                aria-hidden="true"
-              />
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#56d364" }}>
-                Desktop layout locked
+                style={{ fontSize: 36, fontFamily: "monospace", lineHeight: 1 }}
+                aria-label={`${cpStr(currentChar)} ${currentChar}`}
+              >
+                {currentChar}
               </span>
-              <span style={{ fontSize: 12, color: TEXT_DIM }}>
-                — controls are read-only; unlock to make further changes
+              <span style={{ fontSize: 13, color: TEXT_DIM }}>
+                {cpStr(currentChar)}
               </span>
             </div>
+          </div>
+
+          {/* Method chooser */}
+          <MethodChooser
+            currentChar={currentChar}
+            method={method}
+            onMethodChange={setMethod}
+            seqFirst={seqFirst}
+            seqSecond={seqSecond}
+            onSeqFirstChange={setSeqFirst}
+            onSeqSecondChange={setSeqSecond}
+            triggerKey={triggerKey}
+            onTriggerKeyChange={setTriggerKey}
+          />
+
+          {/* Apply + Skip actions */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button
               type="button"
-              onClick={unlockDesktop}
+              onClick={handleApply}
+              disabled={!canApply}
+              aria-label={`Add key for ${currentChar}`}
               style={{
-                padding: "5px 14px",
-                background: "transparent",
-                border: "1px solid #30363d",
+                padding: "9px 20px",
+                background: canApply ? BLUE_ACTION : "#21262d",
+                border: "none",
                 borderRadius: 6,
+                color: canApply ? "#e6edf3" : TEXT_DIM,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: canApply ? "pointer" : "not-allowed",
+                fontFamily: FONT,
+              }}
+            >
+              Add {currentChar}
+            </button>
+            <button
+              type="button"
+              onClick={handleSkip}
+              aria-label={`Skip ${currentChar}`}
+              style={{
+                background: "transparent",
+                border: "none",
                 color: TEXT_DIM,
                 fontSize: 12,
                 cursor: "pointer",
                 fontFamily: FONT,
-                whiteSpace: "nowrap",
+                padding: "4px 8px",
+                textDecoration: "underline",
               }}
             >
-              Unlock to edit
+              Skip this character
             </button>
           </div>
-        )}
+        </>
+      )}
 
-        {/* Coverage indicator (criterion 18.6) — denominated over lettersToAdd,
-            not the full confirmedInventory. Letters the base already produces
-            are shown separately below and do not need mechanism assignments. */}
-        <div style={{ marginBottom: 20 }}>
-          <CoverageIndicator
-            assignments={sessionAssignments}
-            inventory={lettersToAdd}
-          />
-        </div>
-
-        {/* Already-produced informational section — collapsed/secondary.
-            Shown only when baseIr is set (alreadyProduced.length > 0).
-            These characters do NOT require mechanism assignment; they are
-            already reachable via the base keyboard. */}
-        {alreadyProduced.length > 0 && (
-          <AlreadyProducedSection chars={alreadyProduced} />
-        )}
-
-        {/* Gallery grid */}
-        {loading ? (
-          <p style={{ color: TEXT_DIM, fontSize: 13 }}>Loading patterns...</p>
-        ) : loadError !== null ? (
-          <div
-            role="alert"
-            aria-live="assertive"
+      {/* Added chip row — characters already configured, removable */}
+      {coveredChars.size > 0 && (
+        <div>
+          <p
             style={{
-              padding: "16px 20px",
-              background: "#2a0a0a",
-              border: "1px solid #f85149",
-              borderRadius: 8,
-              color: "#f85149",
-              fontSize: 13,
-            }}
-          >
-            Could not load patterns — see the browser console.
-            <br />
-            <span style={{ fontSize: 11, color: TEXT_DIM }}>{loadError}</span>
-          </div>
-        ) : matches.length === 0 ? (
-          <div
-            style={{
-              padding: "20px 0",
+              margin: "0 0 6px",
+              fontSize: 11,
               color: TEXT_DIM,
-              fontSize: 13,
-              borderTop: `1px solid ${BORDER}`,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
             }}
           >
-            No patterns found for this base keyboard.
-          </div>
-        ) : (
+            Added
+          </p>
           <div
-            role="list"
-            aria-label="Mechanism patterns"
-            style={{ display: "flex", flexDirection: "column", gap: 12 }}
+            role="group"
+            aria-label="Added characters — click to remove"
+            style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
           >
-            {matches.map((match) => {
-              const pattern = patternMap.get(match.patternId);
-              if (pattern === undefined) return null;
-              return (
-                <div role="listitem" key={pattern.id}>
-                  <MechanismCard
-                    match={match}
-                    pattern={pattern}
-                    inventory={lettersToAdd}
-                    isApplied={appliedPatternIds.has(pattern.id)}
-                    onApply={handleApply}
-                    onRemove={handleRemove}
-                    disabled={desktopLocked}
-                  />
-                </div>
-              );
-            })}
+            {[...coveredChars].map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => handleRemoveCovered(c)}
+                aria-label={`Remove ${cpStr(c)} ${c}`}
+                title={`${cpStr(c)} — click to remove`}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "4px 8px",
+                  background: "#0d2218",
+                  border: "1px solid #238636",
+                  borderRadius: 16,
+                  color: "#56d364",
+                  fontSize: 13,
+                  fontFamily: "monospace",
+                  cursor: "pointer",
+                  lineHeight: 1.3,
+                }}
+              >
+                {c}
+                <span
+                  aria-hidden="true"
+                  style={{ fontSize: 11, color: "#56d364", opacity: 0.7 }}
+                >
+                  &times;
+                </span>
+              </button>
+            ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Lock desktop layout action — shown when not yet locked.
-            Enabled only when there is at least one physical assignment so the
-            author cannot lock an empty layout. */}
-        {!desktopLocked && (
-          <div
+      {/* Already on this keyboard — collapsed by default */}
+      {alreadyProduced.length > 0 && (
+        <div
+          style={{
+            borderTop: `1px solid ${BORDER}`,
+            paddingTop: 12,
+          }}
+        >
+          <button
+            type="button"
+            aria-expanded={alreadyExpanded}
+            aria-controls="already-produced-chars"
+            onClick={() => setAlreadyExpanded((v) => !v)}
             style={{
-              marginTop: 28,
-              borderTop: `1px solid ${BORDER}`,
-              paddingTop: 20,
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
+              background: "transparent",
+              border: "none",
+              color: TEXT_DIM,
+              fontSize: 12,
+              cursor: "pointer",
+              fontFamily: FONT,
+              padding: 0,
             }}
           >
-            <p style={{ margin: 0, fontSize: 13, color: TEXT_DIM }}>
-              When you are satisfied with your mechanism assignments, lock the
-              desktop layout to continue.
-            </p>
-            <button
-              type="button"
-              onClick={handleLockAndContinue}
-              disabled={!hasAssignments}
-              title={
-                hasAssignments
-                  ? "Lock the desktop layout and continue"
-                  : "Apply at least one mechanism before locking"
-              }
-              style={{
-                padding: "8px 20px",
-                background: hasAssignments ? "#238636" : "#1a2a1a",
-                border: `1px solid ${hasAssignments ? "#2ea043" : BORDER}`,
-                borderRadius: 6,
-                color: hasAssignments ? "#ffffff" : TEXT_DIM,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: hasAssignments ? "pointer" : "not-allowed",
-                fontFamily: FONT,
-                width: "fit-content",
-                opacity: hasAssignments ? 1 : 0.55,
-              }}
-            >
-              Lock desktop layout
-            </button>
-            {!hasAssignments && (
-              <p style={{ margin: 0, fontSize: 11, color: TEXT_DIM, fontStyle: "italic" }}>
-                Apply at least one mechanism to enable locking.
-              </p>
-            )}
-          </div>
-        )}
+            {alreadyExpanded ? "Hide" : "Show"} {alreadyProduced.length}{" "}
+            characters already covered &#9658;
+          </button>
 
-        {/* §7.7 OSK preview: scaffold→fetch→applyAssignmentsToVfs→compile→OSKFrame.
-            Shown once patterns have loaded (patternMap available for sync resolver).
-            Empty-assignments state: the preview still renders the unmodified base
-            so the author sees what they are building on top of. */}
-        {!loading && loadError === null && (
+          {alreadyExpanded && (
+            <div
+              id="already-produced-chars"
+              role="list"
+              aria-label={`${alreadyProduced.length} characters already produced by the base keyboard`}
+              style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}
+            >
+              {alreadyProduced.map((char) => (
+                <span
+                  key={char}
+                  role="listitem"
+                  title={`${cpStr(char)} — already produced by base keyboard`}
+                  aria-label={`${cpStr(char)} ${char} — base keyboard`}
+                  style={{
+                    padding: "2px 6px",
+                    background: BG_PAGE,
+                    border: `1px solid ${BORDER}`,
+                    borderRadius: 4,
+                    fontSize: 12,
+                    fontFamily: "monospace",
+                    color: TEXT_DIM,
+                    opacity: 0.7,
+                  }}
+                >
+                  {char}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Load error for patterns (non-blocking; preview won't show transform) */}
+      {loadError !== null && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          style={{
+            padding: "10px 14px",
+            background: "#2a0a0a",
+            border: "1px solid #f85149",
+            borderRadius: 6,
+            color: "#f85149",
+            fontSize: 12,
+            fontFamily: FONT,
+          }}
+        >
+          Pattern load error — preview transform may be incomplete.
+          <br />
+          <span style={{ fontSize: 11, color: TEXT_DIM }}>{loadError}</span>
+        </div>
+      )}
+    </div>
+  );
+
+  // ---------------------------------------------------------------------------
+  // Two-pane layout
+  // ---------------------------------------------------------------------------
+
+  return (
+    <div
+      style={{
+        ...pageStyle,
+        display: "flex",
+        flexDirection: "row",
+        height: "100%",
+        overflow: "hidden",
+      }}
+    >
+      {/* LEFT pane */}
+      <div
+        style={{
+          flexBasis: "45%",
+          flexShrink: 0,
+          borderRight: `1px solid ${BORDER}`,
+          overflowY: "auto",
+          boxSizing: "border-box",
+        }}
+      >
+        {leftContent}
+      </div>
+
+      {/* RIGHT pane */}
+      <div
+        style={{
+          flexGrow: 1,
+          overflowY: "auto",
+          padding: "24px 20px",
+          boxSizing: "border-box",
+        }}
+      >
+        {!loading && loadError === null ? (
           <GalleryPreviewWithPatterns
             selectedBaseKeyboard={selectedBaseKeyboard}
             patternMap={patternMap}
           />
-        )}
+        ) : loading ? (
+          <p style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT }}>
+            Loading patterns...
+          </p>
+        ) : null}
       </div>
     </div>
   );

@@ -4,7 +4,7 @@
 // intentional — services.ts is the designated service boundary. Vite
 // tree-shakes them in real builds. Do NOT add mocks imports elsewhere in
 // packages/studio/src/.
-import type { BaseBrowserService, PatternLibraryService, ScaffolderService, VirtualFS } from "@keyboard-studio/contracts";
+import type { BaseBrowserService, CharacterDiscoveryService, PatternLibraryService, ScaffolderService, VirtualFS } from "@keyboard-studio/contracts";
 import { mockBaseBrowser, mockOutputService, mockScaffolder } from "@keyboard-studio/contracts/mocks";
 import { localBaseBrowser, LOCAL_PROXY_BASE } from "./localBaseBrowser.ts";
 import { getPatternLibraryService as getBrowserPatternLibraryService } from "./browserPatternLibrary.ts";
@@ -41,6 +41,30 @@ export async function getScaffolderService(): Promise<ScaffolderService> {
 // the mock so CI/test never triggers the glob loader.
 export function getPatternLibraryService(): PatternLibraryService {
   return USE_REAL ? getBrowserPatternLibraryService() : mockPatternLibrary;
+}
+
+// CharacterDiscoveryService: when USE_REAL is false returns a minimal stub so
+// CI / test runs never touch the CLDR CDN or the LLM completer. When real,
+// lazily imports from the engine with the browser fetch-backed CLDR loader.
+// The LLM completer is not wired for text-sample (harvestFromText ignores it).
+let charDiscoveryCache: CharacterDiscoveryService | null = null;
+export async function getCharacterDiscoveryService(): Promise<CharacterDiscoveryService> {
+  if (!USE_REAL) {
+    const stub: CharacterDiscoveryService = {
+      harvestFromText: async () => [],
+      pickerCandidates: async () => [],
+      synthesizeInventory: async () => { throw new Error("LLM completer not configured in test mode"); },
+    };
+    return stub;
+  }
+  if (charDiscoveryCache !== null) return charDiscoveryCache;
+  const { createCharacterDiscoveryService, createFetchCldrLoader } = await import(
+    /* @vite-ignore */ "@keyboard-studio/engine"
+  );
+  const loader = createFetchCldrLoader();
+  const noopCompleter = async (): Promise<string> => { throw new Error("LLM completer not configured"); };
+  charDiscoveryCache = createCharacterDiscoveryService(loader, noopCompleter);
+  return charDiscoveryCache;
 }
 
 // OutputService (zip path only): when USE_REAL is false returns the mock zip

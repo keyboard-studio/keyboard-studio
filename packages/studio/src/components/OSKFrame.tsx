@@ -11,7 +11,6 @@ import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { isExcludedScript } from "../lib/excludedScriptFamilies.ts";
 import type { Stage } from "../hooks/useKeyboardArtifact.ts";
 import { useOskChannel } from "../hooks/useOskChannel.ts";
-import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { OskMode } from "./OskModeToggle.tsx";
 import { PreviewPaneOverlay } from "./PreviewPaneOverlay.tsx";
 import { UnsupportedScriptStub } from "./UnsupportedScriptStub.tsx";
@@ -35,12 +34,6 @@ export function OSKFrame({
 }: OSKFrameProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const channel = useOskChannel(iframeRef);
-  // Working-copy identity drives the KMW-side keyboardId so the
-  // setActiveKeyboard call matches the `Keyboard_<id>` function the
-  // scaffolder-emitted .js exposes. Track 2 (Adapt) leaves identity null,
-  // in which case the base id is used directly.
-  const identity = useWorkingCopyStore((s) => s.identity);
-
   // Pull stable references out of the channel — the returned object's
   // identity changes on every render even though `send` is useCallback-ed
   // and the booleans are primitives. Depending on the object directly
@@ -57,12 +50,12 @@ export function OSKFrame({
     if (!engineReady) return;
     if (!baseKeyboard) return;
     if (!stage.jsBlobUrl) return;
-    // Prefer the working-copy identity's keyboardId (Track 1: scaffolded
-    // new id like "ewondo") over the base id ("sil_cameroon_qwerty"). The
-    // scaffolder-emitted .js exposes `Keyboard_<scaffolded-id>`, and
-    // KMW's setActiveKeyboard needs to match that exactly — using the
-    // base id here would error with `Error registering the <base> keyboard`.
-    const activeKeyboardId = identity?.keyboardId ?? baseKeyboard.id;
+    // Use the keyboard ID that was actually compiled — it's carried on the
+    // ready stage so this always matches the `Keyboard_<id>` the .js exposes.
+    // Previously read from identity?.keyboardId, which failed for contexts
+    // (e.g. GalleryPreviewWithPatterns) that compile with baseKeyboard.id
+    // while the store identity holds a different Track-1 scaffolded id.
+    const activeKeyboardId = stage.keyboardId;
     send({
       type: "SET_KEYBOARD",
       jsUrl: stage.jsBlobUrl,
@@ -73,7 +66,7 @@ export function OSKFrame({
         ? { keyboardCssUrls: stage.keyboardCssUrls }
         : {}),
     });
-  }, [stage, engineReady, baseKeyboard, identity?.keyboardId, send]);
+  }, [stage, engineReady, baseKeyboard, send]);
 
   useEffect(() => {
     if (!engineReady) return;

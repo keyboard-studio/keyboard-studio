@@ -30,6 +30,7 @@ export type { CodeMapEntry } from "./validator/codeMap.js";
 
 // Issue #17 — Compiler service public surface (in-browser kmcmplib WASM).
 export { compile, init, isReady, compilerService } from "./compiler/index.js";
+export { stripDanglingAssetStores } from "./compiler/stripDanglingAssetStores.js";
 export { parseKmnHeaderStores } from "./compiler/parseKmnHeaderStores.js";
 export type { KmnHeaderStore } from "./compiler/parseKmnHeaderStores.js";
 export { parseKpjFlags } from "./compiler/parseKpjFlags.js";

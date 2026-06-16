@@ -171,7 +171,7 @@ export function localKeyboardsPlugin(opts: LocalKeyboardsOptions): Plugin {
         res.end(JSON.stringify(catalogCache));
       });
 
-      server.middlewares.use("/local-kbd-proxy", (req, res, next) => {
+      server.middlewares.use("/local-kbd-proxy", (req, res) => {
         const url = (req.url ?? "").split("?")[0] ?? "";
         if (url === "" || url === "/") {
           res.statusCode = 400;
@@ -206,7 +206,12 @@ export function localKeyboardsPlugin(opts: LocalKeyboardsOptions): Plugin {
           return;
         }
         if (!s.isFile()) {
-          next();
+          // A directory (or other non-file) at this path. Respond explicitly
+          // rather than calling next() — handing the request to Vite's middleware
+          // chain can leave it without a terminal handler, hanging the fetch and
+          // freezing the preview on "Loading keyboard source...".
+          res.statusCode = 404;
+          res.end(`not a file: ${decoded}`);
           return;
         }
         const ext = path.extname(fsPath).toLowerCase();
