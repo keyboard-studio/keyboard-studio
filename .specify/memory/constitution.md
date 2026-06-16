@@ -9,11 +9,16 @@ Constitution Check against the Articles below before tasks are generated.
 ## Core Principles
 
 ### I. Pattern schema is a locked contract
-The `Pattern` TS interface (spec §5), its field names, types, and `{{slotId}}`
-placeholder syntax are immutable. Any rename, type change, or removal requires a
-**major version bump of `@keyboard-studio/contracts` and a joint engine+content
-session** (spec §18). A plan that proposes editing the schema MUST stop and
-escalate to the user rather than proceed.
+The `Pattern` TS interface — canonical in `packages/contracts/src/pattern.ts`,
+specified in [`specs/005-pattern-schema/spec.md`](../../specs/005-pattern-schema/spec.md)
+(spec §5, extracted) — its field names, types, and `{{slotId}}` placeholder
+syntax are immutable. Any rename, type change, or removal requires a **major
+version bump of `@keyboard-studio/contracts` and a joint engine+content
+session** (spec §18). The type is mirrored by a runtime zod schema
+(`packages/contracts/src/schemas.ts`) with compile-time drift guards, so any
+edit to a locked field MUST update its schema in the same change. A plan that
+proposes editing the schema MUST stop and escalate to the user rather than
+proceed.
 
 ### II. KeyboardIR is the engine spine
 All scaffolding, import, validation, and mutation operate on the typed
