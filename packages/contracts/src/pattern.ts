@@ -44,7 +44,11 @@ export interface PatternQuestion {
   answerType: AnswerType;
   /** For "select" type: the available options. */
   options?: Array<{ value: string; label: string }>;
-  /** Default value pre-filled when the base keyboard suggests one. */
+  /**
+   * Statically-known default. The live default may instead be derived per session
+   * (base, corpus, axis fill, CLDR/identity) and carry its own provenance; optionality is a
+   * static-slot vs. runtime-fill split, not licence to ask blank (spec §3c / §5 "Base-derived pre-fill").
+   */
   default?: string;
   /**
    * Whether this slot must be filled before a Pattern can be applied.

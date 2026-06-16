@@ -155,7 +155,7 @@ This is the same failure mode §2 describes from the reviewer's side — the hyg
 
 **Three zero-flag model patterns** (the §7 strategy framework already follows all three; the rest of the flow converges on them):
 
-- **Input-contract default-fill (§7.1–§7.2).** Missing axes are filled from a defensible structural prior (script class, routing group) rather than re-asked — the axis vector computed in §7.1 carries `axisFills` on the survey result so the source of each fill is auditable before the §7.2 decision tree consumes it.
+- **Input-contract default-fill (§7.1–§7.2).** Missing axes are filled from a defensible structural prior (script class, routing group) rather than re-asked — the §7.1 axis vector is derived from the best available source before the §7.2 decision tree consumes it, never left blank. (Making the origin of each fill auditable via a named `axisFills` provenance record on the survey result is a planned hardening, not yet in the contract.)
 - **Corpus-derived priors (§7.6).** Where peers exist, the studio proposes **ranked candidates with provenance** ("N existing keyboards for similar languages chose this"), never a blank field. The studio researches a default by its **peers** — the language's BCP47 pair, its script family, comparable communities — and surfaces the ranked result. This is *research-by-pairs*: a default is something the studio looked up among comparable keyboards, not something it invented.
 - **Base-derived pre-fill (§5).** When the base or already-collected metadata fixes an answer, it is pre-filled as a confirmation the author edits in place.
 
@@ -264,7 +264,9 @@ export interface PatternQuestion {
   answerType: AnswerType;
   /** For "select" type: the available options. */
   options?: Array<{ value: string; label: string }>;
-  /** Default value pre-filled when the base keyboard suggests one. */
+  /** Statically-known default. The live default may instead be derived per session
+   *  (base, corpus §7.6, axis fill §7.1, CLDR/identity) with its own provenance;
+   *  optionality is a static-slot vs. runtime-fill split, not licence to ask blank (§3c). */
   default?: string;
 }
 
@@ -630,6 +632,8 @@ For `char-list` answers, the value is inserted verbatim as a quoted KMN string l
 Substitution is deterministic and reproducible: given the same answer map, the same KMN fragment is always produced. After substitution the full fragment is run through the Layer A validator and the WASM oracle before being merged into the project's `.kmn`; a substitution-time validation failure is surfaced to the user as a slot-fill error, not a compiler error.
 
 **Base-derived pre-fill.** A `PatternQuestion` (and a survey question, Sec 8) may declare a `default`. When the chosen base keyboard already determines the answer, the studio pre-fills that default from the base rather than asking blank: the BCP47 script subtag and the IR's structural shape fix the routing group (Sec 9) and script class (A2); the base-vs-inventory key diff fixes spare-key availability (A7); the base's BCP47 tag seeds the language code and region. Pre-filled answers render as **confirmations** (editable, already populated), never as empty fields — the principle is *never ask before you can pre-fill*. This is the same propose-then-confirm posture as the placement proposals (Sec 8 Phase B) and the linguist agent; the author confirms or overrides each pre-fill in place.
+
+**Optionality vs. §3c (the §7.1 axis-fill model).** The `default` field is *structurally* optional, but — exactly as with the discovery axes (§7.1) — that optionality marks a **static slot vs. a runtime fill**, not permission to ask blank. An axis is rarely a literal authored constant; it is derived from the best available source rather than asked blank (recording the origin of each fill via a named `axisFills` provenance record on the survey result is a planned hardening, not yet in the contract). A `PatternQuestion` default behaves the same way: the `default` field holds only the statically-known case, while the *live* default is derived per session — from the base (above), a corpus prior (§7.6), an axis fill (§7.1), or collected metadata (CLDR, OAuth identity, prior answers) — and rendered as a provenance-labeled confirmation. (The substitution engine does not read `default` as a fallback; it is the survey pre-fill / display hint, while the confirmed value flows through the assignment map's slot values — so this is a UI-default contract, not a change to slot substitution.) Per §3c, a question whose answer the studio *could* propose (statically or via any derivation source) yet renders blank is a **defect**, ranked with the §2 reviewer-hygiene fixes and surfaced at phase exit like a §11 yellow check — not a neutral omission. A question is legitimately left unprimed only when no source can supply a default, and that is recorded as a deliberate no-default decision (a hinted prompt as the floor, §3c), never left to silence. Hardening this into the type system — a required `default`, or a `defaultSource` discriminator that records a default's origin the way the planned `axisFills` will for an axis fill — is a `Pattern`-schema change: as an additive optional field it is strictly a minor bump under §18, but Pattern-schema additions are routed through the #5/#5b joint session by convention. Until then the field stays optional and the rule is enforced by review.
 
 ---
 
