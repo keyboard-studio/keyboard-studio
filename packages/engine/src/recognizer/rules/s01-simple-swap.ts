@@ -2,7 +2,7 @@ import type { KeyboardIR, IRRule, Pattern } from "@keyboard-studio/contracts";
 import { makePattern } from "@keyboard-studio/contracts";
 import type { MatchResult, RecognizerRule } from "../types.js";
 import { ruleRef } from "../node-refs.js";
-import { toUPlus } from "../utils.js";
+import { toUPlus, formatVKeyModifiers } from "../utils.js";
 
 // Format one rule line for the keystrokeCharacterMap slot.
 // e.g. + [SHIFT K_Q] > U+0190  or  + [K_Q] > U+025B
@@ -17,7 +17,7 @@ function formatMapLine(rule: IRRule): string {
   ) {
     return "";
   }
-  const mods = ctx.modifiers.length > 0 ? ctx.modifiers.join(" ") + " " : "";
+  const mods = formatVKeyModifiers(ctx.modifiers);
   return `+ [${mods}${ctx.name}] > ${toUPlus(out.value)}`;
 }
 

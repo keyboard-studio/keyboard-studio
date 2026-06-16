@@ -8,6 +8,7 @@
 //   #output             — output / delivery (stub; not yet implemented)
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
+import { useResizablePanes } from "./hooks/useResizablePanes.ts";
 import type { BaseKeyboard, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
@@ -189,8 +190,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const [identityResult, setIdentityResult] = useState<IdentityLiteResult | null>(null);
   const [surveyContext, setSurveyContext] = useState<SurveyContext>({});
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
-  const [leftPct, setLeftPct] = useState(SURVEY_LEFT_INIT_PCT);
-  const [handleHovered, setHandleHovered] = useState(false);
+  const { containerRef, leftPct, handleHovered, onPointerDown, setHandleHovered } =
+    useResizablePanes({ minPct: SURVEY_LEFT_MIN_PCT, maxPct: SURVEY_LEFT_MAX_PCT, initPct: SURVEY_LEFT_INIT_PCT });
 
   // Track 1 (Copy) vs Track 2 (Adapt) — set at the "track" stage.
   // Null until the user picks a track.
@@ -215,46 +216,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   useEffect(() => {
     setLocalBase(baseKeyboard);
   }, [baseKeyboard]);
-
-  const dragRef = useRef<{ startX: number; startPct: number } | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  const onPointerDown = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      dragRef.current = { startX: e.clientX, startPct: leftPct };
-      document.addEventListener("pointermove", onPointerMove);
-      document.addEventListener("pointerup", onPointerUp);
-    },
-    // leftPct captured via dragRef; document listeners registered once per drag
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [leftPct],
-  );
-
-  const onPointerMove = useCallback((e: PointerEvent) => {
-    if (dragRef.current === null || containerRef.current === null) return;
-    const containerW = containerRef.current.getBoundingClientRect().width;
-    if (containerW === 0) return;
-    const deltaPct = ((e.clientX - dragRef.current.startX) / containerW) * 100;
-    const next = Math.min(
-      SURVEY_LEFT_MAX_PCT,
-      Math.max(SURVEY_LEFT_MIN_PCT, dragRef.current.startPct + deltaPct),
-    );
-    setLeftPct(next);
-  }, []);
-
-  const onPointerUp = useCallback(() => {
-    dragRef.current = null;
-    document.removeEventListener("pointermove", onPointerMove);
-    document.removeEventListener("pointerup", onPointerUp);
-  }, [onPointerMove]);
-
-  useEffect(() => {
-    return () => {
-      document.removeEventListener("pointermove", onPointerMove);
-      document.removeEventListener("pointerup", onPointerUp);
-    };
-  }, [onPointerMove, onPointerUp]);
 
   // Working-copy store instantiation — routes to Track 1 (instantiateFromBase)
   // or Track 2 (instantiateFromExisting) based on which track the user selected.

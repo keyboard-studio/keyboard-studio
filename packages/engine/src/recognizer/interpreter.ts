@@ -8,7 +8,7 @@ import { makePattern } from "@keyboard-studio/contracts";
 import type { MatchResult } from "./types.js";
 import type { Pattern } from "@keyboard-studio/contracts";
 import { ruleRef, storeRef } from "./node-refs.js";
-import { toUPlus, storeItemsToCharString } from "./utils.js";
+import { toUPlus, storeItemsToCharString, formatVKeyModifiers, formatDkName } from "./utils.js";
 import type {
   RecognizerRuleYaml,
   SlotMapping,
@@ -26,7 +26,7 @@ function applyRulesToKeystrokeCharMap(rules: IRRule[]): string {
       out.kind !== "char"
     ) continue;
     if (ctx.kind === "vkey") {
-      const mods = ctx.modifiers.length > 0 ? ctx.modifiers.join(" ") + " " : "";
+      const mods = formatVKeyModifiers(ctx.modifiers);
       lines.push(`+ [${mods}${ctx.name}] > ${toUPlus(out.value)}`);
     } else if (ctx.kind === "char") {
       lines.push(`+ "${ctx.value}" > ${toUPlus(out.value)}`);
@@ -329,7 +329,7 @@ function populateSlots(
         const ctx0 = rule.context[0];
         if (ctx0 === undefined) continue;
         if (ctx0.kind === "vkey") {
-          const mods = ctx0.modifiers.length > 0 ? ctx0.modifiers.join(" ") + " " : "";
+          const mods = formatVKeyModifiers(ctx0.modifiers);
           result[slotId] = `${mods}${ctx0.name}`;
         } else if (ctx0.kind === "char") {
           result[slotId] = ctx0.value;
@@ -432,8 +432,7 @@ export function interpretPredicate(rule: RecognizerRuleYaml, ir: KeyboardIR): Ma
         storeRef(cluster.outStore.nodeId),
       ];
 
-      const suffix = `dk_${cluster.deadkeyId.toString(16).toUpperCase().padStart(4, "0")}`;
-      const patternIdBase = `${rule.lifts_to.patternId}#${suffix}`;
+      const patternIdBase = `${rule.lifts_to.patternId}#${formatDkName(cluster.deadkeyId)}`;
 
       results.push({
         patternId: patternIdBase,

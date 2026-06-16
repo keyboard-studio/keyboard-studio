@@ -62,12 +62,15 @@ function isSmpLiteral(tok: string): boolean {
   return parseInt(m[1] ?? "0", 16) > 0xffff;
 }
 
+/** True if the token is wrapped in matching single or double quotes. */
+function isQuoted(s: string): boolean {
+  return (s.startsWith("'") && s.endsWith("'")) ||
+         (s.startsWith('"') && s.endsWith('"'));
+}
+
 /** Strip single or double quotes from a quoted string token. */
 function unquote(s: string): string {
-  if ((s.startsWith("'") && s.endsWith("'")) ||
-      (s.startsWith('"') && s.endsWith('"'))) {
-    return s.slice(1, -1);
-  }
+  if (isQuoted(s)) return s.slice(1, -1);
   return s;
 }
 
@@ -233,8 +236,7 @@ function parseStoreItems(rawValue: string): { items: StoreItem[]; opaque: boolea
       continue;
     }
     // quoted string — expand to individual chars
-    if ((tok.startsWith("'") && tok.endsWith("'")) ||
-        (tok.startsWith('"') && tok.endsWith('"'))) {
+    if (isQuoted(tok)) {
       const str = unquote(tok);
       for (const ch of str) {
         items.push({ kind: "char", value: ch });
@@ -288,8 +290,7 @@ function parseContextElements(
       continue;
     }
     // quoted string
-    if ((tok.startsWith("'") && tok.endsWith("'")) ||
-        (tok.startsWith('"') && tok.endsWith('"'))) {
+    if (isQuoted(tok)) {
       const str = unquote(tok);
       for (const ch of str) {
         elements.push({ kind: "char", value: ch });
@@ -390,8 +391,7 @@ function parseOutputElements(
       continue;
     }
     // quoted string
-    if ((tok.startsWith("'") && tok.endsWith("'")) ||
-        (tok.startsWith('"') && tok.endsWith('"'))) {
+    if (isQuoted(tok)) {
       const str = unquote(tok);
       for (const ch of str) {
         elements.push({ kind: "char", value: ch });
