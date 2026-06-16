@@ -266,7 +266,11 @@ async function acknowledge(sectionId) {
   if (token && REPO) {
     await closeAcknowledgedIssue(sectionId, token);
   }
-  console.log('[INFO] Commit docs/spec-trace.json (the spec-drift Issue closes automatically in CI)');
+  if (token && REPO) {
+    console.log('[INFO] Commit docs/spec-trace.json (spec-drift Issue was closed above)');
+  } else {
+    console.log('[INFO] Commit docs/spec-trace.json (the spec-drift Issue closes automatically in CI)');
+  }
 }
 
 // ---------------------------------------------------------------------------
