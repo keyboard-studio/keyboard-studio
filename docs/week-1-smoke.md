@@ -3,13 +3,13 @@
 **Issue:** #54 — Day-7 buffer: E2E smoke test with real Keyman Developer (S-09)
 **Goal:** Take a studio-produced output zip, open + build it in Keyman Developer 17+ on Windows, install it, type a short sequence — catch anything the in-browser oracle (kmcmplib WASM + KeymanWeb `simulate()`) missed.
 
-> **Build half green; install + typing still human-run.** The **build** half (AC #1/#2) now passes against the real `kmc` 19.0 command-line compiler — a scaffolded `akan` builds end-to-end to an installable `.kmp` with zero diagnostics (see "Confirmed KD build evidence"). The two scaffolder defects that originally blocked it are fixed: **#364** (stale `&BITMAP` store, fixed in #421) and **#416** (stub `.kps`, fixed in #436). The **install + typing** half (AC #3/#5) still requires a person on Windows with the KD GUI, and the go/no-go (final section) is a project-leadership decision recorded on the project board.
+> **Build half green; install + typing still human-run.** The **build** half (AC #1/#2) now passes against the real `kmc` 19.0 command-line compiler — a scaffolded `akan` builds end-to-end to an installable `.kmp` with zero diagnostics (see "Confirmed KD build evidence"). The two scaffolder defects that originally blocked it are fixed: **#364** (stale `&BITMAP` store, fixed in #421) and **#416** (stub `.kps`, fixed in #436). The **install + typing** half (AC #3/#5) still requires a person on Windows with the KD GUI, and the go/no-go (AC #6, final section) is a project-leadership decision recorded on the project board.
 
 ---
 
 ## Artifact under test
 
-The studio's **Download .zip** button is wired to the engine `toZip` pipeline ([PreviewShell.tsx:354](../packages/studio/src/components/PreviewShell.tsx#L354)), so the studio can already emit this artifact interactively. This smoke run uses a scripted generator instead — [utilities/smoke-artifact/gen.ts](../utilities/smoke-artifact/gen.ts) — for a **reproducible** artifact from a **known, pinned base** with no browser in the loop, driving the **same** pipeline the button does:
+The studio's **Download .zip** button ([PreviewShell.tsx:383](../packages/studio/src/components/PreviewShell.tsx#L383), `handleDownload`) serialises via `serializeWorkingCopy()` → engine `toZip` ([serializeWorkingCopy.ts:151](../packages/studio/src/lib/serializeWorkingCopy.ts#L151)), so the studio can already emit this artifact interactively. This smoke run uses a scripted generator instead — [utilities/smoke-artifact/gen.ts](../utilities/smoke-artifact/gen.ts) — for a **reproducible** artifact from a **known, pinned base** with no browser in the loop, driving the **same** pipeline the button does:
 
 ```
 pick base keyboard → createScaffolderService().scaffold() → toZip()
@@ -26,11 +26,10 @@ TSX_TSCONFIG_PATH=utilities/smoke-artifact/tsconfig.json \
 |-------|-------|
 | Primary artifact | `e2e_smoke_akan.zip` (scaffolded from `akan`, Latin/QWERTY — a codec-clean base) |
 | Engine path exercised | `scaffolder.scaffold()` (parse → scaffoldIR → emit, #351) + `output.toZip()` |
-| Built against | `main` @ `f277e52` (post-#436) |
-| Studio commit | `f277e52` (2026-06-16) |
+| Built against | `main` @ `f277e52` (post-#436, 2026-06-16) |
 | Compiler used | Keyman Developer `kmc` **19.0.240-alpha** (≥ KD 17 requirement) |
 
-> **Why `akan`, not the issue's `khmer_angkor` / `sil_euro_latin`?** Under #351 the scaffolder routes the base `.kmn` through the codec (`parse → emit`). `khmer_angkor` originally hit a tokenizer continuation bug (#365, now **fixed** — it parses today), but `sil_euro_latin` still throws `Malformed rule` on its `$keymanweb:` conditional directive (a genuine, v1-out-of-scope codec feature gap). `akan` is a simple, codec-clean Latin/QWERTY base that builds end-to-end, so it remains the smoke artifact. See Pre-flight finding #3.
+> **Why `akan`, not the issue's `khmer_angkor` / `sil_euro_latin`?** Under #351 the scaffolder routes the base `.kmn` through the codec (`parse → emit`). Both named bases now parse — `khmer_angkor` since the #365 tokenizer fix, and `sil_euro_latin` (the codec recognises its `$keymanweb:` target-prefix directive). `akan` is used simply because it is a small, codec-clean Latin/QWERTY base that builds end-to-end to a `.kmp`. See Pre-flight finding #3.
 
 ---
 
@@ -40,13 +39,13 @@ Regenerating the artifact originally surfaced two scaffolder defects that blocke
 
 1. **[RESOLVED — #364, fixed in #421] Scaffolder left the `&BITMAP` file-reference store stale after rename.** `renameFilesInVfs` renamed `source/<baseId>.ico` to `<keyboardId>.ico` when the icon was id-named (akan ships `akan.ico`), but `rewriteSiblingPathStores` deliberately skipped `&BITMAP`, so the store still read `akan.ico` while the file was `e2e_smoke_akan.ico` → `kmc` errored `KM02031`. #421 rewrites `&BITMAP` when the icon basename matches the base id; all three file-reference stores (`&BITMAP` / `&VISUALKEYBOARD` / `&LAYOUTFILE`) now resolve and the `.kmn` builds clean.
 
-2. **[RESOLVED — #416, fixed in #436] Scaffolded `.kps` was an empty stub.** The scaffolder emitted `<Package><Info/><Files/></Package>` — no version, no `<FollowKeyboardVersion/>`, no files — so the package step failed `KM04021`. #436 emits a buildable `.kps` (`<FollowKeyboardVersion/>`, a non-empty `<Description>`, ≥1 language, and a `<Files>` list derived from the actual build outputs), so the package now compiles to a `.kmp`.
+2. **[RESOLVED — #416, fixed in #436] Scaffolded `.kps` was an empty stub.** The scaffolder emitted `<Package><Info/><Files/></Package>` — no version, no `<FollowKeyboardVersion/>`, no files — so the package step failed `KM04021` (blank package version) and, behind it, `KM09010` (missing `<Info><Description>`). #436 emits a buildable `.kps` (`<FollowKeyboardVersion/>`, a non-empty `<Description>`, ≥1 language, and a `<Files>` list derived from the actual build outputs), clearing both, so the package now compiles to a `.kmp`.
 
-3. **[codec coverage — informs base choice] #351 routes scaffold through the codec (`parse → scaffoldIR → emit`), so a base must be codec-parseable to scaffold.** Of the issue's named bases:
-   - `khmer_angkor` — originally failed on a tokenizer continuation bug (#365: a `\` + trailing whitespace at line 116 wasn't joined). **#365 is fixed**, so khmer parses today; it remains a more complex base (shared-font path traversal, finding #4) so `akan` is still used here.
-   - `sil_euro_latin` — still throws `Malformed rule … $keymanweb: store(&CasedKeys) …`, a **genuine codec feature gap** (the `$keymanweb:` conditional-compilation directive is unrecognised — v1-out-of-scope).
+3. **[codec coverage — informs base choice] #351 routes scaffold through the codec (`parse → scaffoldIR → emit`), so a base must be codec-parseable to scaffold.** Both of the issue's named bases now parse:
+   - `khmer_angkor` — originally failed on a tokenizer continuation bug (#365: a `\` + trailing whitespace at line 116 wasn't joined). **#365 is fixed**, so khmer parses today; it remains a more complex base (shared-font path traversal, finding #4), so `akan` is used here for simplicity.
+   - `sil_euro_latin` — parses today; the codec tokenises its `$keymanweb:` target-prefix lines (earlier doc versions reporting a `Malformed rule` throw are **stale**). The remaining limitation is semantic, not a parse failure: the codec does not yet enforce build-target *suppression* for `$keymanweb:`-scoped lines (v1-out-of-scope), so output fidelity for such keyboards isn't guaranteed.
 
-   Corpus context (supportability scanner, refreshed): **0 ParseFailures**, 426 round-trip-divergent of 912 (relates to codec `bug` #349). `akan` is a codec-clean base so this run proceeds.
+   Corpus context (supportability scanner, refreshed): **0 ParseFailures**, 426 round-trip-divergent of 912 (relates to codec `bug` #349). `akan` is a codec-clean base that round-trips and builds, so this run proceeds.
 
 4. **[zip hygiene — moot for this run] Khmer shared-font path traversal.** `khmer_angkor.kmn` references `../../../shared/fonts/…`, which serialises as a `..` zip entry some tools reject. khmer now parses (finding #3, #365 fixed), so this is no longer hypothetical — verify the `..` zip-entry handling whenever khmer is used as a base. `akan` (no shared-font refs) is the artifact here, so it does not arise for this run.
 
