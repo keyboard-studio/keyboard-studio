@@ -1,9 +1,9 @@
 {
-  "specVersion": "1.3.0",
-  "lastUpdated": "2026-06-14",
+  "specVersion": "1.3.1",
+  "lastUpdated": "2026-06-16",
   "specFile": "spec.md",
   "sections": {
-    "§1": {
+    "\u00a71": {
       "title": "1. Elevator pitch",
       "hash": "sha256:eb79e27237c413b1",
       "status": "reference",
@@ -11,7 +11,7 @@
       "decisions": [],
       "notes": "Background narrative; no direct code implementation."
     },
-    "§2": {
+    "\u00a72": {
       "title": "2. Why this exists",
       "hash": "sha256:888302e2a8922968",
       "status": "reference",
@@ -19,7 +19,7 @@
       "decisions": [],
       "notes": "Background narrative; no direct code implementation."
     },
-    "§3": {
+    "\u00a73": {
       "title": "3. Target user",
       "hash": "sha256:df008443bd62c655",
       "status": "reference",
@@ -27,7 +27,7 @@
       "decisions": [],
       "notes": "User-persona definition; informs UX, not code contracts."
     },
-    "§4": {
+    "\u00a74": {
       "title": "4. System overview",
       "hash": "sha256:5d07d9c4c8d1b481",
       "status": "partial",
@@ -38,9 +38,9 @@
       "decisions": [],
       "notes": "High-level architecture. BaseBrowser interface exists; SPA shell not yet built."
     },
-    "§5": {
+    "\u00a75": {
       "title": "5. Pattern schema",
-      "hash": "sha256:7c27c71a3e60f747",
+      "hash": "sha256:118ce662917c5930",
       "status": "implemented",
       "implements": [
         "packages/contracts/src/pattern.ts",
@@ -53,9 +53,10 @@
         "D4",
         "D5"
       ],
-      "notes": "Day-1 contract locked. Pattern + PatternMatch + PatternLibrary interfaces all present and tested."
+      "notes": "EXTRACTED to specs/005-pattern-schema/spec.md; spec.md body is a stub pointer (tracked hash is the stub). Day-1 contract locked. Pattern + PatternMatch + PatternLibrary interfaces all present and tested.",
+      "extractedTo": "specs/005-pattern-schema/spec.md"
     },
-    "§5a": {
+    "\u00a75a": {
       "title": "5a. KeyboardIR (keyboard intermediate representation)",
       "hash": "sha256:9ca9577cccfe0425",
       "status": "partial",
@@ -72,17 +73,17 @@
       ],
       "notes": "KeyboardIR types present (2026-06-08 amendment). Engine parse/emit not yet built."
     },
-    "§6": {
+    "\u00a76": {
       "title": "6. Worked example",
-      "hash": "sha256:0ecad32a0b9a43d4",
+      "hash": "sha256:2da7da2f1aaa3776",
       "status": "reference",
       "implements": [],
       "decisions": [],
-      "notes": "Narrative walkthrough; validated by acceptance scenarios in §15. v1.3.0 added 'Base-derived pre-fill' paragraph — PatternQuestion.default field is covered by §5 (no new contracts here)."
+      "notes": "Narrative walkthrough; validated by acceptance scenarios in \u00a715. v1.3.0 added 'Base-derived pre-fill' paragraph \u2014 PatternQuestion.default field is covered by \u00a75 (no new contracts here)."
     },
-    "§7": {
+    "\u00a77": {
       "title": "7. Strategy selection",
-      "hash": "sha256:3faaf96376a742a0",
+      "hash": "sha256:a3428f1dd19a7686",
       "status": "partial",
       "implements": [
         "packages/contracts/src/strategy.ts",
@@ -94,11 +95,12 @@
         "D1",
         "D2"
       ],
-      "notes": "A1-A7 axis types + strategy catalog types present. Decision tree engine (§7.2) + S-01..S-12 selectors not yet built. v1.1.1 added §7.6 (corpus placement priors — seeder in utilities/kbgen, not yet a contracts type). v1.2.0 added §7.7 (scoped assignment map) — assignmentMap.ts implements the typed contract; SurveyPhaseResult.assignments? additive field already landed ahead of spec text."
+      "notes": "EXTRACTED to specs/007-strategy-selection/spec.md; spec.md body is a stub pointer (tracked hash is the stub). A1-A7 axis types + strategy catalog types present. Decision tree engine (\u00a77.2) + S-01..S-12 selectors not yet built. v1.1.1 added \u00a77.6 (corpus placement priors \u2014 seeder in utilities/kbgen, not yet a contracts type). v1.2.0 added \u00a77.7 (scoped assignment map) \u2014 assignmentMap.ts implements the typed contract; SurveyPhaseResult.assignments? additive field already landed ahead of spec text.",
+      "extractedTo": "specs/007-strategy-selection/spec.md"
     },
-    "§8": {
+    "\u00a78": {
       "title": "8. Data flow",
-      "hash": "sha256:3bc0726bdc4d6564",
+      "hash": "sha256:6f04ac146776de27",
       "status": "partial",
       "implements": [
         "packages/contracts/src/characterDiscovery.ts",
@@ -109,19 +111,20 @@
       "decisions": [
         "D9"
       ],
-      "notes": "CharacterDiscovery + LinguistInventory types exist. Survey-to-pattern pipeline not yet wired. v1.1.1 added placement proposals (Phase B). v1.2.0/v1.3.0 added two-track working-copy spine (instantiateFromBase / instantiateFromExisting) — producedSet.ts and surveySession.ts implement those contracts. Engine pipeline not yet built."
+      "notes": "EXTRACTED to specs/008-data-flow/spec.md; spec.md body is a stub pointer (tracked hash is the stub). CharacterDiscovery + LinguistInventory types exist. Survey-to-pattern pipeline not yet wired. v1.1.1 added placement proposals (Phase B). v1.2.0/v1.3.0 added two-track working-copy spine (instantiateFromBase / instantiateFromExisting) \u2014 producedSet.ts and surveySession.ts implement those contracts. Engine pipeline not yet built.",
+      "extractedTo": "specs/008-data-flow/spec.md"
     },
-    "§9": {
+    "\u00a79": {
       "title": "9. Three-group routing",
-      "hash": "sha256:541063c7a40e8d55",
+      "hash": "sha256:c3458e711b6c278b",
       "status": "unimplemented",
       "implements": [],
       "decisions": [
         "D5"
       ],
-      "notes": "Gallery routing (supported / CJK+Ethiopic stub / legacy) not yet built. D5 governs CJK/Ethiopic out-of-scope stub. v1.2.0 added language/script decoupling — routing follows the chosen target script (BCP47 subtag from identity-lite), not the language's default script. v1.3.0 added Phase A CJK/Ethiopic detection gate detail."
+      "notes": "Gallery routing (supported / CJK+Ethiopic stub / legacy) not yet built. D5 governs CJK/Ethiopic out-of-scope stub. v1.2.0 added language/script decoupling \u2014 routing follows the chosen target script (BCP47 subtag from identity-lite), not the language's default script. v1.3.0 added Phase A CJK/Ethiopic detection gate detail."
     },
-    "§10": {
+    "\u00a710": {
       "title": "10. Validator and lint engine",
       "hash": "sha256:db644dd54c5ae5d7",
       "status": "partial",
@@ -137,9 +140,9 @@
       ],
       "notes": "All three-layer interfaces typed. Layer A 9 TS-portable checks + 5 WASM-only not yet implemented. D3 governs 300ms debounce."
     },
-    "§11": {
+    "\u00a711": {
       "title": "11. criteria.md compliance",
-      "hash": "sha256:5bbf571a7f80c609",
+      "hash": "sha256:6aa6972138b421d3",
       "status": "implemented",
       "implements": [
         "packages/contracts/data/criteria.json",
@@ -149,9 +152,9 @@
       "decisions": [
         "D4"
       ],
-      "notes": "Day-1 criteria catalog fully typed as Criterion[] with 148 entries (133 repo-hygiene + 12 DISCUS + 3 added post-v1.0: 1 from §7.7a KM_LINT_INVENTORY_UNCOVERED split, 2 import-output criteria). Loadable via ALL_CRITERIA / '/criteria' subpath. D4 governs the four-band enforcement model. Previously §11 was 'Virtual FS' — that content is now a subsection of §12."
+      "notes": "Day-1 criteria catalog fully typed as Criterion[] with 148 entries (133 repo-hygiene + 12 DISCUS + 3 added post-v1.0: 1 from \u00a77.7a KM_LINT_INVENTORY_UNCOVERED split, 2 import-output criteria). Loadable via ALL_CRITERIA / '/criteria' subpath. D4 governs the four-band enforcement model. Previously \u00a711 was 'Virtual FS' \u2014 that content is now a subsection of \u00a712."
     },
-    "§12": {
+    "\u00a712": {
       "title": "12. Output artifacts",
       "hash": "sha256:b2e4681ffb3c3c61",
       "status": "partial",
@@ -166,9 +169,9 @@
         "D6",
         "D9"
       ],
-      "notes": "VirtualFS + OutputService + Scaffolder interfaces typed. ZIP and sidecar serialisation built in engine/src/output/; GitHub OAuth fork+PR built in engine/src/output/github.ts; buildImportAttributionBlock in engine/src/output/import-attribution.ts. D6 governs desktop-first scope; D9 covers IR-as-canonical-source for emit. v1.3.0 added working-copy spine (VirtualFS as persistent live edit target, Track 1/Track 2 instantiation, re-projected layers). Virtual FS content previously tracked as standalone §11 now lives here as a subsection."
+      "notes": "VirtualFS + OutputService + Scaffolder interfaces typed. ZIP and sidecar serialisation built in engine/src/output/; GitHub OAuth fork+PR built in engine/src/output/github.ts; buildImportAttributionBlock in engine/src/output/import-attribution.ts. D6 governs desktop-first scope; D9 covers IR-as-canonical-source for emit. v1.3.0 added working-copy spine (VirtualFS as persistent live edit target, Track 1/Track 2 instantiation, re-projected layers). Virtual FS content previously tracked as standalone \u00a711 now lives here as a subsection."
     },
-    "§13": {
+    "\u00a713": {
       "title": "13. Team boundaries",
       "hash": "sha256:83900d7759b68db8",
       "status": "reference",
@@ -176,8 +179,8 @@
       "decisions": [],
       "notes": "Governance: engine vs content team split. Informs package ownership, not runtime code."
     },
-    "§14": {
-      "title": "14. Open questions — resolved decisions",
+    "\u00a714": {
+      "title": "14. Open questions \u2014 resolved decisions",
       "hash": "sha256:5c6e0dca84a7c8b1",
       "status": "reference",
       "implements": [],
@@ -194,15 +197,15 @@
       ],
       "notes": "Decision ledger. Drift here means a decision was re-opened or a new one added."
     },
-    "§15": {
+    "\u00a715": {
       "title": "15. Acceptance scenarios",
-      "hash": "sha256:8255410ef9943e1f",
+      "hash": "sha256:1d2bdc9b47a6b90d",
       "status": "unimplemented",
       "implements": [],
       "decisions": [],
       "notes": "End-to-end scenarios not yet wired as test vectors. See km-testing backlog."
     },
-    "§16": {
+    "\u00a716": {
       "title": "16. Out of scope",
       "hash": "sha256:56da5a20e944bd4b",
       "status": "reference",
@@ -213,7 +216,7 @@
       ],
       "notes": "Scope boundary definition. Drift here means v1 scope silently expanded."
     },
-    "§17": {
+    "\u00a717": {
       "title": "17. Glossary",
       "hash": "sha256:18fc42de7b78b116",
       "status": "reference",
@@ -221,7 +224,7 @@
       "decisions": [],
       "notes": "Terminology definitions; no code contract."
     },
-    "§18": {
+    "\u00a718": {
       "title": "18. Revision policy",
       "hash": "sha256:05c4a85c51be1de4",
       "status": "reference",
@@ -229,13 +232,37 @@
       "decisions": [],
       "notes": "Schema change governance; enforced by convention, not code."
     },
-    "§19": {
+    "\u00a719": {
       "title": "19. Reference",
       "hash": "sha256:8e9919d00e70c4e9",
       "status": "reference",
       "implements": [],
       "decisions": [],
       "notes": "External document links only."
+    },
+    "\u00a73a": {
+      "title": "3a. What the user brings (skill envelope)",
+      "hash": "sha256:0443812a6f9bc549",
+      "status": "reference",
+      "implements": [],
+      "decisions": [],
+      "notes": "Skill-envelope persona definition (v1.3.1); informs UX, not code contracts."
+    },
+    "\u00a73b": {
+      "title": "3b. What success looks like (outcome envelope)",
+      "hash": "sha256:11b3c8f11494d8c0",
+      "status": "reference",
+      "implements": [],
+      "decisions": [],
+      "notes": "Outcome-envelope definition (v1.3.1); informs UX/acceptance, not code contracts."
+    },
+    "\u00a73c": {
+      "title": "3c. Defaults are the product",
+      "hash": "sha256:b21138ce96b9aa5c",
+      "status": "reference",
+      "implements": [],
+      "decisions": [],
+      "notes": "Defaults-first principle \"no default is a defect\" (v1.3.1); governance/UX principle informing the \u00a75/\u00a77.2/\u00a77.6 propose-then-confirm posture. No single-file implementation."
     }
   }
 }
