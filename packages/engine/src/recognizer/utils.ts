@@ -23,3 +23,20 @@ export function storeItemsToCharString(store: IRStore): string {
     .map((item) => (item.kind === "char" ? item.value : ""))
     .join("");
 }
+
+/**
+ * Format a vkey modifier list as a space-separated prefix string.
+ * Returns e.g. "SHIFT " (with trailing space) or "" when there are no modifiers.
+ * Used to build rule context strings like "+ [SHIFT K_Q] > ...".
+ */
+export function formatVKeyModifiers(mods: string[]): string {
+  return mods.length > 0 ? mods.join(" ") + " " : "";
+}
+
+/**
+ * Format a deadkey id as "dk_XXXX" (uppercase hex, zero-padded to 4 digits).
+ * e.g. 96 -> "dk_0060"
+ */
+export function formatDkName(id: number): string {
+  return "dk_" + id.toString(16).toUpperCase().padStart(4, "0");
+}

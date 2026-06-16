@@ -7,6 +7,9 @@ import type { LLMClientConfig } from "../types.js";
 // Full Claude Code OAuth integration (without any API key) is deferred —
 // this mode currently requires either an API key in ~/.claude/settings.json
 // or ANTHROPIC_API_KEY.
+// TODO: when Claude Code exposes a stable OAuth token API, replace resolveKey()
+// with a direct token fetch so dev-subscription mode works without any
+// pre-configured API key. Track with a dedicated issue before expanding this shim.
 
 function resolveKey(config: LLMClientConfig): string {
   // 1. Explicit key in config

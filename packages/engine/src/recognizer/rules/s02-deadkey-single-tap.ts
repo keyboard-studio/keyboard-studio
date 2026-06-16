@@ -6,7 +6,7 @@ import type {
 import { makePattern } from "@keyboard-studio/contracts";
 import type { MatchResult, RecognizerRule } from "../types.js";
 import { ruleRef, storeRef } from "../node-refs.js";
-import { storeItemsToCharString } from "../utils.js";
+import { storeItemsToCharString, formatVKeyModifiers, formatDkName } from "../utils.js";
 
 // A trigger is a rule whose output is a single deadkey.
 // Context may be a single vkey OR a single char (sil_euro_latin uses char triggers).
@@ -42,11 +42,6 @@ function isFallback(rule: IRRule, deadkeyId: number): boolean {
   return c0 !== undefined && c0.kind === "deadkey" && c0.id === deadkeyId;
 }
 
-// Format a deadkey id as dk_XXXX (hex).
-function deadkeyName(id: number): string {
-  return "dk_" + id.toString(16).toUpperCase().padStart(4, "0");
-}
-
 // Pick the "primary" trigger for naming: prefer the unshifted vkey trigger.
 function pickPrimaryTrigger(triggers: IRRule[]): IRRule {
   const unshifted = triggers.find((r) => {
@@ -60,7 +55,7 @@ function triggerKeyName(rule: IRRule): string {
   const ctx = rule.context[0];
   if (ctx === undefined) return "";
   if (ctx.kind === "vkey") {
-    const mods = ctx.modifiers.length > 0 ? ctx.modifiers.join(" ") + " " : "";
+    const mods = formatVKeyModifiers(ctx.modifiers);
     return `${mods}${ctx.name}`;
   }
   // TODO: char-context triggers need a dedicated AnswerType (follow-up issue).
@@ -201,11 +196,11 @@ export const s02Recognizer: RecognizerRule = {
       ];
 
       results.push({
-        patternId: `deadkey-single-tap#${deadkeyName(dkId)}`,
+        patternId: `deadkey-single-tap#${formatDkName(dkId)}`,
         ownedNodes,
         slotValues: {
           triggerKey: triggerKeyName(primaryTrigger),
-          deadkeyName: deadkeyName(dkId),
+          deadkeyName: formatDkName(dkId),
           baseLetters: storeItemsToCharString(baseStore),
           accentedForms: storeItemsToCharString(outStore),
         },
