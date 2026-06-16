@@ -7,9 +7,12 @@
  *
  * Subcommands:
  *   seed                      initialise / refresh hashes (run once, then commit)
- *   check [--dry-run]         detect drift; create GitHub Issues when GITHUB_TOKEN set
+ *   check [--dry-run]         detect drift; create Issues for drifted sections and
+ *                             auto-close any open spec-drift Issue that no longer
+ *                             drifts (when GITHUB_TOKEN + SPEC_TRACE_REPO are set)
  *   report                    print coverage + unacknowledged drift summary
- *   acknowledge <section-id>  accept a reviewed section, update its hash
+ *   acknowledge <section-id>  accept a reviewed section, update its hash, and
+ *                             auto-close its open spec-drift Issue (when a token is set)
  *
  * The check subcommand never exits non-zero — drift is a warning, not a build failure.
  */
@@ -196,23 +199,25 @@ async function check() {
 
   if (drifted.length === 0) {
     console.log('[OK] No spec drift detected (' + sections.length + ' sections clean)');
-    return;
+  } else {
+    console.log('[WARN] ' + drifted.length + ' spec section(s) changed since last acknowledgement:');
+    for (const d of drifted) {
+      console.log('  ' + d.id + ' - ' + d.title + ' [' + d.reason + ']');
+    }
+    console.log('[INFO] Run: node utilities/spec-trace report');
+    console.log('[INFO] Acknowledge: node utilities/spec-trace acknowledge <section-id>');
   }
-
-  console.log('[WARN] ' + drifted.length + ' spec section(s) changed since last acknowledgement:');
-  for (const d of drifted) {
-    console.log('  ' + d.id + ' - ' + d.title + ' [' + d.reason + ']');
-  }
-  console.log('[INFO] Run: node utilities/spec-trace report');
-  console.log('[INFO] Acknowledge: node utilities/spec-trace acknowledge <section-id>');
 
   const token = process.env.GITHUB_TOKEN;
   const dryRun = process.argv.includes('--dry-run');
 
+  // Sync GitHub Issues both ways: open one per drifted section, and close any
+  // open spec-drift Issue whose section no longer drifts (acknowledged + merged).
+  // The close half is why this runs even when drifted is empty.
   if (token && !dryRun) {
-    await createIssues(drifted, token);
+    await syncDriftIssues(drifted, token);
   } else {
-    console.log('[INFO] GITHUB_TOKEN not set (or --dry-run) -- skipping issue creation');
+    console.log('[INFO] GITHUB_TOKEN not set (or --dry-run) -- skipping issue sync');
   }
 }
 
@@ -220,7 +225,7 @@ async function check() {
 // acknowledge
 // ---------------------------------------------------------------------------
 
-function acknowledge(sectionId) {
+async function acknowledge(sectionId) {
   if (!sectionId) {
     console.log('[ERROR] Usage: node utilities/spec-trace acknowledge <section-id>');
     console.log('[INFO] Section IDs: §1, §2, §3, §4, §5, §5a, §6 ... §19');
@@ -254,7 +259,14 @@ function acknowledge(sectionId) {
   trace.sections[sectionId].hash = hashSection(section.content);
   saveTrace(trace);
   console.log('[OK] Acknowledged ' + sectionId + ' -- hash updated');
-  console.log('[INFO] Commit docs/spec-trace.json and close the corresponding GitHub Issue');
+
+  // Close the matching open spec-drift Issue when a token is available; otherwise
+  // fall back to the manual reminder (the local-dev case, no token set).
+  const token = process.env.GITHUB_TOKEN;
+  if (token && REPO) {
+    await closeAcknowledgedIssue(sectionId, token);
+  }
+  console.log('[INFO] Commit docs/spec-trace.json (the spec-drift Issue closes automatically in CI)');
 }
 
 // ---------------------------------------------------------------------------
@@ -365,17 +377,93 @@ async function listOpenDriftIssues(owner, repo, token) {
   return Array.isArray(res.body) ? res.body : [];
 }
 
-async function createIssues(drifted, token) {
-  if (!REPO) { console.log('[INFO] SPEC_TRACE_REPO not set -- skipping issue creation'); return; }
+// Recover the tracked-unit id from an auto-created drift Issue title, which is
+// always `spec drift: <id> -- <title>` (ids never contain whitespace, so \S+ is safe).
+function extractSectionId(title) {
+  const m = (title || '').match(/^spec drift:\s*(\S+)\s+--/);
+  return m ? m[1] : null;
+}
+
+function parseRepo() {
+  if (!REPO) { console.log('[INFO] SPEC_TRACE_REPO not set -- skipping issue sync'); return null; }
   const parts = REPO.split('/');
   if (parts.length !== 2 || !parts[0] || !parts[1]) {
     console.log('[ERROR] SPEC_TRACE_REPO must be in "owner/repo" format, got: ' + REPO);
-    return;
+    return null;
   }
-  const [owner, repo] = parts;
+  return { owner: parts[0], repo: parts[1] };
+}
+
+async function closeIssue(owner, repo, token, number, comment) {
+  if (comment) {
+    await apiRequest({
+      hostname: 'api.github.com',
+      path: '/repos/' + owner + '/' + repo + '/issues/' + number + '/comments',
+      method: 'POST',
+      headers: { ...ghHeaders(token), 'Content-Type': 'application/json' }
+    }, { body: comment });
+  }
+  return apiRequest({
+    hostname: 'api.github.com',
+    path: '/repos/' + owner + '/' + repo + '/issues/' + number,
+    method: 'PATCH',
+    headers: { ...ghHeaders(token), 'Content-Type': 'application/json' }
+  }, { state: 'closed', state_reason: 'completed' });
+}
+
+// One CI-side reconciliation: list the open spec-drift Issues once, open any that
+// are missing for currently-drifted sections, and close any whose section no
+// longer drifts (its hash now matches the acknowledged spec-trace.json).
+async function syncDriftIssues(drifted, token) {
+  const r = parseRepo();
+  if (!r) return;
+  const { owner, repo } = r;
   await ensureLabel(owner, repo, token);
   const existing = await listOpenDriftIssues(owner, repo, token);
+  await createMissingIssues(drifted, token, owner, repo, existing);
+  await closeReconciledIssues(drifted, token, owner, repo, existing);
+}
 
+async function closeReconciledIssues(drifted, token, owner, repo, existing) {
+  const driftedIds = new Set(drifted.map(d => d.id));
+  for (const issue of existing) {
+    const id = extractSectionId(issue.title);
+    if (!id || driftedIds.has(id)) continue; // still drifting -> leave open
+    const comment =
+      'spec-trace: `' + id + '` no longer drifts -- its acknowledged hash in ' +
+      '`docs/spec-trace.json` now matches the current spec text. Auto-closing.\n\n' +
+      '_Closed by the spec-trace CI check._';
+    const res = await closeIssue(owner, repo, token, issue.number, comment);
+    if (res.status && res.status < 300) {
+      console.log('[OK] Closed reconciled drift issue #' + issue.number + ' (' + id + ')');
+    } else {
+      console.log('[WARN] Failed to close #' + issue.number + ': ' + JSON.stringify(res.body).slice(0, 120));
+    }
+  }
+}
+
+async function closeAcknowledgedIssue(sectionId, token) {
+  const r = parseRepo();
+  if (!r) return;
+  const { owner, repo } = r;
+  const existing = await listOpenDriftIssues(owner, repo, token);
+  const issue = existing.find(i => extractSectionId(i.title) === sectionId);
+  if (!issue) {
+    console.log('[INFO] No open spec-drift Issue for ' + sectionId + ' to close');
+    return;
+  }
+  const comment =
+    'spec-trace: acknowledged via `node utilities/spec-trace acknowledge ' + sectionId + '` -- ' +
+    'hash updated to match the current spec text. Auto-closing.';
+  const res = await closeIssue(owner, repo, token, issue.number, comment);
+  if (res.status && res.status < 300) {
+    console.log('[OK] Closed drift issue #' + issue.number + ' (' + sectionId + ')');
+  } else {
+    console.log('[WARN] Failed to close #' + issue.number + ': ' + JSON.stringify(res.body).slice(0, 120));
+  }
+}
+
+async function createMissingIssues(drifted, token, owner, repo, existing) {
   for (const d of drifted) {
     const dup = existing.find(i => i.title.startsWith('spec drift: ' + d.id + ' --'));
     if (dup) {
@@ -396,18 +484,18 @@ async function createIssues(drifted, token) {
       '- [ ] Identify which implementing files diverge from the revised spec text',
       '- [ ] Open a `refactor` or `feat` issue (or work it directly) to close the gap',
       '- [ ] Run `node utilities/spec-trace acknowledge ' + d.id + '`',
-      '- [ ] Commit `docs/spec-trace.json` and close this issue',
+      '- [ ] Commit `docs/spec-trace.json` (this issue auto-closes once the acknowledgement lands in CI)',
       '',
       '### Path B — spec needs an amendment',
       '- [ ] Open a spec-revision issue citing the original decision and new evidence (per §18)',
       '- [ ] Land the spec amendment via the review cycle in `docs/spec-signoff.md`',
       '- [ ] Run `node utilities/spec-trace acknowledge ' + d.id + '`',
-      '- [ ] Commit `docs/spec-trace.json` and close this issue',
+      '- [ ] Commit `docs/spec-trace.json` (this issue auto-closes once the acknowledgement lands in CI)',
       '',
       '### Path C — no code change needed (reference/governance section only)',
       '- [ ] Confirm no implementing files are affected',
       '- [ ] Run `node utilities/spec-trace acknowledge ' + d.id + '`',
-      '- [ ] Commit `docs/spec-trace.json` and close this issue',
+      '- [ ] Commit `docs/spec-trace.json` (this issue auto-closes once the acknowledgement lands in CI)',
       '',
       '_Auto-created by the spec-trace CI check._'
     ].join('\n');
@@ -435,7 +523,7 @@ const [,, cmd, ...args] = process.argv;
 switch (cmd) {
   case 'seed':        seed(); break;
   case 'check':       check().catch(e => console.error('[ERROR]', e.message)); break;
-  case 'acknowledge': acknowledge(args[0]); break;
+  case 'acknowledge': acknowledge(args[0]).catch(e => console.error('[ERROR]', e.message)); break;
   case 'report':      report(); break;
   default:
     console.log('spec-trace -- spec.md drift detector');
