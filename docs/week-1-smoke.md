@@ -9,7 +9,7 @@
 
 ## Artifact under test
 
-The studio's **Download .zip** button ([PreviewShell.tsx:383](../packages/studio/src/components/PreviewShell.tsx#L383), `handleDownload`) serialises via `serializeWorkingCopy()` → engine `toZip` ([serializeWorkingCopy.ts:151](../packages/studio/src/lib/serializeWorkingCopy.ts#L151)), so the studio can already emit this artifact interactively. This smoke run uses a scripted generator instead — [utilities/smoke-artifact/gen.ts](../utilities/smoke-artifact/gen.ts) — for a **reproducible** artifact from a **known, pinned base** with no browser in the loop, driving the **same** pipeline the button does:
+The studio's **Download .zip** button (`handleDownload` in [PreviewShell.tsx](../packages/studio/src/components/PreviewShell.tsx)) serialises via `serializeWorkingCopy()` → engine `toZip` ([serializeWorkingCopy.ts:151](../packages/studio/src/lib/serializeWorkingCopy.ts#L151)), so the studio can already emit this artifact interactively. This smoke run uses a scripted generator instead — [utilities/smoke-artifact/gen.ts](../utilities/smoke-artifact/gen.ts) — for a **reproducible** artifact from a **known, pinned base** with no browser in the loop, driving the **same** pipeline the button does:
 
 ```
 pick base keyboard → createScaffolderService().scaffold() → toZip()
