@@ -54,6 +54,11 @@ export default [
           destructuredArrayIgnorePattern: "^_",
         },
       ],
+      // Disallow console.* calls — use a structured logger instead. The
+      // eslint-disable-next-line suppression comments previously guarding
+      // deliberate console calls in compiler/index.ts were removed in #447;
+      // this rule activates that removal.
+      "no-console": "warn",
     },
   },
 ];
