@@ -1,5 +1,5 @@
 import type { LintFinding } from "@keyboard-studio/contracts";
-import { collectDeclaredStores, type StoreInfo } from "./_shared.js";
+import { collectDeclaredStores } from "./_shared.js";
 
 // index(store, N) bounds — lint.md check #13 (warn-only).
 // Validates that:

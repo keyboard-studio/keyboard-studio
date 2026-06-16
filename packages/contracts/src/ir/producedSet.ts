@@ -38,7 +38,7 @@
  * Pure, browser-safe, no I/O.
  */
 
-import type { KeyboardIR, IRStore, OutputElement } from "../keyboard-ir.js";
+import type { KeyboardIR, IRStore } from "../keyboard-ir.js";
 
 // ---------------------------------------------------------------------------
 // Options

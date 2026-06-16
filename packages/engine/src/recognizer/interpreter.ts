@@ -3,8 +3,6 @@ import type {
   IRRule,
   IRGroup,
   IRStore,
-  ContextElement,
-  OutputElement,
 } from "@keyboard-studio/contracts";
 import { makePattern } from "@keyboard-studio/contracts";
 import type { MatchResult } from "./types.js";
@@ -13,9 +11,6 @@ import { ruleRef, storeRef } from "./node-refs.js";
 import { toUPlus, storeItemsToCharString } from "./utils.js";
 import type {
   RecognizerRuleYaml,
-  RuleEntry,
-  StoreConstraint,
-  CombinedWithEntry,
   SlotMapping,
 } from "./yaml-schema.js";
 
@@ -104,33 +99,6 @@ function matchesSingleRole(rule: IRRule): boolean {
 // Store-constraint validation
 // ---------------------------------------------------------------------------
 
-function checkStoreConstraints(
-  constraints: StoreConstraint[],
-  resolvedStores: Map<string, IRStore>,
-): boolean {
-  for (const sc of constraints) {
-    const store = resolvedStores.get(sc.store);
-    if (store === undefined) return false;
-
-    if (sc.isSystem !== undefined && store.isSystem !== sc.isSystem) return false;
-
-    if (sc.items_kind !== undefined) {
-      // All items in the store must match items_kind.
-      // kind=any in store items disqualifies when we require char-only items.
-      for (const item of store.items) {
-        if (item.kind !== sc.items_kind) return false;
-      }
-    }
-
-    if (sc.same_length_as !== undefined) {
-      const other = resolvedStores.get(sc.same_length_as);
-      if (other === undefined) return false;
-      if (store.items.length !== other.items.length) return false;
-    }
-  }
-
-  return true;
-}
 
 // ---------------------------------------------------------------------------
 // Group guard

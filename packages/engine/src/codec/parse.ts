@@ -26,7 +26,7 @@ import type {
   StoreItem,
 } from "@keyboard-studio/contracts";
 
-import { tokenize, type Token } from "./tokenize.js";
+import { tokenize } from "./tokenize.js";
 import { NodeIdMinter } from "./node-ids.js";
 import { OPAQUE_REASONS } from "./opaque-reasons.js";
 
@@ -592,7 +592,7 @@ export function parse(text: string, keyboardId: string): ParseResult {
   }
 
   // Parse state.
-  let entryGroupName = "main";
+  let _entryGroupName = "main";
   let headerParsed = false; // true after we see `begin`
   let currentGroup: IRGroup | null = null;
 
@@ -640,7 +640,7 @@ export function parse(text: string, keyboardId: string): ParseResult {
         if (!parsed) {
           throw new Error(`Malformed begin directive at line ${tok.line}:${tok.col}: ${tok.text}`);
         }
-        entryGroupName = parsed.entryGroup;
+        _entryGroupName = parsed.entryGroup;
         headerParsed = true;
         flushCommentsFreestanding();
         break;

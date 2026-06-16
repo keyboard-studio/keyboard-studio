@@ -15,7 +15,6 @@
 // that path ("No §5 change").  It never round-trips through
 // Pattern.kmnFragment.  See D-INT-1 in utilities/kbgen/INTEGRATION.md.
 
-import type { KeyChord } from "./keyboard-ir";
 
 // ---------------------------------------------------------------------------
 // Discriminated unions

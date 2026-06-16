@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { verifyToken, publishPR, type GitHubFetchFn, type GitHubFetchResponse } from "./github.js";
-import type { PublishPROptions, VirtualFSEntry } from "@keyboard-studio/contracts";
+import type { PublishPROptions } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------

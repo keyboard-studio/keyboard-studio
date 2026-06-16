@@ -25,7 +25,7 @@ dk(0001) context(2) > U+0061
 
 describe("parse opaque features", () => {
   it("produces RawKmnFragment for save() rule", () => {
-    const { ir, opaqueFeatures } = parse(OPAQUE_KMN, "opaque-test");
+    const { ir } = parse(OPAQUE_KMN, "opaque-test");
     const reasons = ir.raw.map(r => r.reason);
     expect(reasons).toContain(OPAQUE_REASONS.OPTION_STORE_DIRECTIVE);
   });

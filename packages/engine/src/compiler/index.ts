@@ -250,7 +250,6 @@ export async function compile(
   // Build the kmc-kmn callback surface bridging to VFS.
   const callbacks = {
     reportMessage(message: Record<string, unknown>): void {
-      // eslint-disable-next-line no-console
       console.info("[kmcmplib] reportMessage:", message);
       // kmc-kmn message shape (per kmn-compiler-messages.js): the
       // factories return { code, message, ... } where `message` is the
@@ -411,11 +410,9 @@ export async function compile(
     });
   }
 
-  // eslint-disable-next-line no-console
   console.info(
     `[kmcmplib] artifacts: ${artifacts.map((a) => `${a.filename}(${a.sizeBytes})`).join(", ")}`,
   );
-  // eslint-disable-next-line no-console
   console.info(`[kmcmplib] diagnostics: ${diagnostics.length}`, diagnostics);
 
   const hasFatal = diagnostics.some(

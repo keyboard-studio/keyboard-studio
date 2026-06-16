@@ -22,7 +22,6 @@ import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 const {
   mockIdentityCompleteRef,
   mockBaseResolvedRef,
-  mockPrefillConfirmRef,
   mockCarveDoneRef,
   mockCarveBackRef,
   mockPhaseBDoneRef,
@@ -37,7 +36,6 @@ const {
   const mockIdentityCompleteRef = { current: null as null | ((...args: unknown[]) => void) };
   const mockBaseResolvedRef = { current: null as null | ((...args: unknown[]) => void) };
   const mockPrefillConfirmRef = { current: null as null | (() => void) };
-  const mockPrefillBackRef = { current: null as null | (() => void) };
   const mockCarveDoneRef = { current: null as null | (() => void) };
   const mockCarveBackRef = { current: null as null | (() => void) };
   const mockPhaseBDoneRef = { current: null as null | ((...args: unknown[]) => void) };

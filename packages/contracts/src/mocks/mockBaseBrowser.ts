@@ -4,7 +4,6 @@ import type { BaseBrowserService } from "../baseBrowser";
 import type { BaseKeyboard, KeymanPlatformTarget } from "../baseKeyboard";
 import {
   sampleBaseKeyboards,
-  basicKbdus,
 } from "../fixtures/index";
 
 /**

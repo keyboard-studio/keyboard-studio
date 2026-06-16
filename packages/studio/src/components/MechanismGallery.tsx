@@ -46,7 +46,6 @@ import type { OskMode } from "./OskModeToggle.tsx";
 
 const BG_PAGE = "#0d1117";
 const BG_CARD = "#161b22";
-const BG_CARD_HOVER = "#1c2230";
 const BORDER = "#30363d";
 const ACCENT = "#6ea8fe";
 const TEXT_DIM = "#8b949e";
