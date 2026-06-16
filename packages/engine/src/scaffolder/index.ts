@@ -4,7 +4,7 @@ import type {
   ScaffoldResult,
   RoutingGroup,
 } from "@keyboard-studio/contracts";
-import type { BaseKeyboard, KeymanPlatformTarget, VirtualFS } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, VirtualFS } from "@keyboard-studio/contracts";
 import {
   createVirtualFS,
   validateScaffolderKeyboardId as contractsValidateKeyboardId,
@@ -221,6 +221,24 @@ function applyTouchLayoutCleanup(vfs: VirtualFS, keyboardId: string): void {
   vfs.set(path, JSON.stringify(data, null, 2));
 }
 
+// &TARGETS tokens for which kmcmplib emits a KeymanWeb `.js` artifact. Desktop-only
+// tokens (windows/macosx/linux/desktop) produce no `.js`, so referencing one in the
+// package `<Files>` would make kmc fail with KM04003 (file not found); conversely a
+// web/touch target with no `.js` in the package warns KM0401A (fatal under
+// CompilerWarningsAsErrors). The list must therefore mirror what the build emits.
+// Derived from the emitted `.kmn`'s `&TARGETS` store (what kmc actually reads), not
+// from `BaseKeyboard.targets` — the two can diverge during scaffolding/import.
+const KMW_JS_TARGETS = new Set([
+  "any",
+  "web",
+  "mobile",
+  "tablet",
+  "iphone",
+  "ipad",
+  "androidphone",
+  "androidtablet",
+]);
+
 /**
  * Build a package (`.kps`) that Keyman Developer can compile to a `.kmp`.
  *
@@ -239,10 +257,11 @@ function buildKpsContent(
   displayName: string,
   kmnText: string,
   languages: string[],
-  targets: KeymanPlatformTarget[],
   version = "1.0",
 ): string {
-  const emitsJs = targets.some((t) => t === "web" || t === "mobile" || t === "tablet");
+  const targetsMatch = /store\s*\(\s*&TARGETS\s*\)\s*'([^']*)'/i.exec(kmnText);
+  const targetTokens = (targetsMatch?.[1] ?? "").toLowerCase().split(/[\s,]+/).filter(Boolean);
+  const emitsJs = targetTokens.some((t) => KMW_JS_TARGETS.has(t));
   const hasVisualKeyboard = /store\s*\(\s*&VISUALKEYBOARD\s*\)/i.test(kmnText);
 
   const files = [`..\\build\\${keyboardId}.kmx`];
@@ -282,7 +301,6 @@ function generateStubs(
   keyboardId: string,
   displayName: string,
   languages: string[],
-  targets: KeymanPlatformTarget[],
   version: string,
 ): void {
   const now = new Date();
@@ -351,7 +369,7 @@ function generateStubs(
     const kmnEntry = vfs.get(`source/${keyboardId}.kmn`);
     const kmnText =
       kmnEntry !== undefined && typeof kmnEntry.content === "string" ? kmnEntry.content : "";
-    vfs.set(kpsPath, buildKpsContent(keyboardId, displayName, kmnText, languages, targets, version), false);
+    vfs.set(kpsPath, buildKpsContent(keyboardId, displayName, kmnText, languages, version), false);
   }
 }
 
@@ -425,7 +443,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
 
       renameFilesInVfs(vfs, actualBaseId, keyboardId);
       applyTouchLayoutCleanup(vfs, keyboardId);
-      generateStubs(vfs, keyboardId, displayName, base.languages ?? [], base.targets, base.version ?? "1.0");
+      generateStubs(vfs, keyboardId, displayName, base.languages ?? [], base.version ?? "1.0");
 
       return { vfs, warnings, fonts: loaderFonts, stylesheets: loaderStylesheets };
     },
