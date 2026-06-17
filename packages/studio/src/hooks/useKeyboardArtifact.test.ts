@@ -56,6 +56,12 @@ const mockEngine = {
     ir: mockIr,
     recognizedRatio: 0,
   })),
+  // Preview compile strips dangling packaging-asset stores; the mock is a no-op
+  // passthrough (the test .kmn declares no asset stores).
+  stripDanglingAssetStores: vi.fn((kmn: string, _fs: VirtualFS) => ({
+    kmn,
+    stripped: [] as string[],
+  })),
 };
 
 // Mock @keyboard-studio/engine so loadEngine() finds compile+fetchKeyboardSourceToVfs+init.
@@ -162,5 +168,42 @@ describe("useKeyboardArtifact — onInstantiate timing", () => {
     });
 
     expect(onInstantiate).not.toHaveBeenCalled();
+  });
+
+  // Guardrail: a fetch that never settles must not strand the overlay on
+  // "fetching" forever — it should fall through to a retryable error/fetch
+  // stage once FETCH_TIMEOUT_MS (15s) elapses.
+  it("a never-settling fetch surfaces a retryable fetch error, not an infinite spinner", async () => {
+    vi.useFakeTimers();
+    try {
+      mockEngine.fetchKeyboardSourceToVfs.mockImplementationOnce(
+        () => new Promise(() => undefined), // never resolves
+      );
+
+      const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+      const { result } = renderHook(() =>
+        useKeyboardArtifact(baseKb, null, null, null),
+      );
+
+      // Flush engine load + init and reach the withTimeout() call (which
+      // registers the 15s fake timer). Stage should be parked on "fetching".
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(result.current.stage.kind).toBe("fetching");
+
+      // Advance past the fetch timeout -> rejection -> error/fetch stage.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(16_000);
+      });
+
+      expect(result.current.stage.kind).toBe("error");
+      if (result.current.stage.kind === "error") {
+        expect(result.current.stage.step).toBe("fetch");
+      }
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

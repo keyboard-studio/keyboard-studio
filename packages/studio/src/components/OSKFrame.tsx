@@ -35,12 +35,11 @@ export function OSKFrame({
 }: OSKFrameProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const channel = useOskChannel(iframeRef);
-  // Working-copy identity drives the KMW-side keyboardId so the
-  // setActiveKeyboard call matches the `Keyboard_<id>` function the
-  // scaffolder-emitted .js exposes. Track 2 (Adapt) leaves identity null,
-  // in which case the base id is used directly.
+  // Working-copy identity drives the bcp47 language tag passed to KMW's
+  // setActiveKeyboard — Track 1 (Copy) supplies the author-chosen language,
+  // Track 2 (Adapt) leaves it null and we fall back to the base's first
+  // declared language.
   const identity = useWorkingCopyStore((s) => s.identity);
-
   // Pull stable references out of the channel — the returned object's
   // identity changes on every render even though `send` is useCallback-ed
   // and the booleans are primitives. Depending on the object directly
@@ -57,12 +56,12 @@ export function OSKFrame({
     if (!engineReady) return;
     if (!baseKeyboard) return;
     if (!stage.jsBlobUrl) return;
-    // Prefer the working-copy identity's keyboardId (Track 1: scaffolded
-    // new id like "ewondo") over the base id ("sil_cameroon_qwerty"). The
-    // scaffolder-emitted .js exposes `Keyboard_<scaffolded-id>`, and
-    // KMW's setActiveKeyboard needs to match that exactly — using the
-    // base id here would error with `Error registering the <base> keyboard`.
-    const activeKeyboardId = identity?.keyboardId ?? baseKeyboard.id;
+    // Use the keyboard ID that was actually compiled — it's carried on the
+    // ready stage so this always matches the `Keyboard_<id>` the .js exposes.
+    // Previously read from identity?.keyboardId, which failed for contexts
+    // (e.g. GalleryPreviewWithPatterns) that compile with baseKeyboard.id
+    // while the store identity holds a different Track-1 scaffolded id.
+    const activeKeyboardId = stage.keyboardId;
     // Prefer the working-copy identity's bcp47 (Track 1 author-chosen language)
     // over the base keyboard's first declared language. KMW's setActiveKeyboard
     // needs the language tag the compiled .js registers under — otherwise it
@@ -81,7 +80,7 @@ export function OSKFrame({
         ? { keyboardCssUrls: stage.keyboardCssUrls }
         : {}),
     });
-  }, [stage, engineReady, baseKeyboard, identity?.keyboardId, identity?.bcp47, send]);
+  }, [stage, engineReady, baseKeyboard, identity?.bcp47, send]);
 
   useEffect(() => {
     if (!engineReady) return;

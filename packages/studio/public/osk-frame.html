@@ -341,6 +341,15 @@
           injectKeyboardCss(keyboardCssUrls);
           setStatus("registering keyboard: " + keyboardId);
           var kmwId = "Keyboard_" + keyboardId;
+          // Remove any stale registration before re-adding. KMW caches keyboards
+          // by ID — calling addKeyboards() again with the same ID but a new blob
+          // URL would be silently ignored, so the old compiled rules stay active.
+          // Deregistering first forces KMW to load fresh from the new URL.
+          try {
+            if (typeof window.keyman.removeKeyboards === "function") {
+              window.keyman.removeKeyboards(kmwId);
+            }
+          } catch (_) {}
           // Use the keyboard's actual BCP47 (forwarded by the host) so the stub
           // registers under and setActiveKeyboard activates the same tag the
           // compiled .js declares. Falling back to "en" causes

@@ -323,13 +323,18 @@ export async function compile(
   // wired correctly. kmc-kmn caches the WASM module at module scope, so
   // subsequent init() calls don't re-fetch the WASM — only the JS-side
   // state is fresh.
-  _compiler = new _compilerCtor();
-  const ok = await _compiler.init(callbacks, {
+  // Use a LOCAL compiler instance for this call's init()/run(). Assigning the
+  // module-scoped `_compiler` here and reading it back across the awaits below
+  // lets a second, concurrent compile() (or the validator oracle, which shares
+  // this module cache) clobber the reference mid-flight — the first call would
+  // then run() against the wrong instance and emit zero artifacts. Keeping the
+  // instance local makes concurrent compiles independent.
+  const activeCompiler = new _compilerCtor();
+  const ok = await activeCompiler.init(callbacks, {
     compilerWarningsAsErrors: options.compilerWarningsAsErrors,
     warnDeprecatedCode: options.warnDeprecatedCode,
   });
   if (!ok) {
-    _compiler = null;
     // Surface ANY diagnostics that kmc-kmn reported during init (e.g.
     // Fatal_MissingWasmModule) so the chain of cause is visible. If
     // none were reported, fall back to a bare "init returned false".
@@ -350,10 +355,15 @@ export async function compile(
     };
   }
 
+  // Mark the module warm for isReady()/warm-compile reporting. This is only a
+  // readiness signal — the active run below always uses the local instance, so
+  // a later concurrent compile reassigning _compiler cannot affect this run.
+  _compiler = activeCompiler;
+
   // Run the compile.
   let raw: KmnCompilerResult | null;
   try {
-    raw = await _compiler.run(kmnPath, `${keyboardId}.kmx`);
+    raw = await activeCompiler.run(kmnPath, `${keyboardId}.kmx`);
   } catch (err) {
     diagnostics.push({
       code: "KM_FATAL_KMCMP_THROWN",
@@ -432,3 +442,5 @@ export const compilerService: CompilerService = {
   isReady,
   compile,
 };
+
+export { stripDanglingAssetStores } from "./stripDanglingAssetStores.js";

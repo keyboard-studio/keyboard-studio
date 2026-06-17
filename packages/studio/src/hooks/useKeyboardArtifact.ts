@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { BaseKeyboard, VirtualFS, KeyboardIR, KpsFontEntry, KpsStylesheetEntry } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { getScaffolderService } from "../lib/services.ts";
+import { LOCAL_PROXY_BASE, getScaffolderService } from "../lib/services.ts";
 import { findKmnPath } from "../lib/findKmnPath.ts";
 
 interface EngineModule {
@@ -16,6 +16,14 @@ interface EngineModule {
   isReady?: () => boolean;
   parseKmn?: (text: string, keyboardId: string) => { ir: KeyboardIR; opaqueFeatures: Array<{ feature: string; count: number }> };
   recognizePatterns?: (ir: KeyboardIR) => { ir: KeyboardIR; recognizedRatio: number };
+  /**
+   * Remove dangling packaging-asset store references (BITMAP / VISUALKEYBOARD /
+   * LAYOUTFILE / …) whose target file is absent from the VFS. kmcmplib emits
+   * ZERO artifacts when it cannot open a referenced asset (reported only as a
+   * "warning"), so for the live preview — which needs none of those assets — a
+   * dangling reference must be stripped or the preview shows nothing.
+   */
+  stripDanglingAssetStores?: (kmn: string, fs: VirtualFS) => { kmn: string; stripped: string[] };
 }
 
 async function loadEngine(): Promise<EngineModule | null> {
@@ -36,6 +44,40 @@ async function loadEngine(): Promise<EngineModule | null> {
   }
 }
 
+// Maximum time the fetch step may run before we surface a retryable error.
+// A stalled proxy/network request would otherwise leave the preview overlay
+// stuck on "Loading keyboard source..." forever (the run is never superseded
+// when baseKeyboard is stable), so we bound it and fall through to the existing
+// "fetch" error stage, which renders the Retry button.
+const FETCH_TIMEOUT_MS = 15_000;
+
+/**
+ * Reject with a labelled timeout error if `p` has not settled within `ms`.
+ * The rejection lands in run()'s catch block and surfaces as a retryable
+ * `error/fetch` stage rather than an indefinite spinner.
+ */
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(
+        new Error(
+          `${label} timed out after ${ms / 1000}s — the keyboard source did not load (check the dev proxy / network).`,
+        ),
+      );
+    }, ms);
+    p.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e instanceof Error ? e : new Error(String(e)));
+      },
+    );
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Stage discriminated union
 // ---------------------------------------------------------------------------
@@ -51,7 +93,7 @@ export type Stage =
    */
   | { kind: "vfs-loading" }
   | { kind: "compiling"; isWarmCompile: boolean }
-  | { kind: "ready"; compileResult: CompileResult; jsBlobUrl: string; vfs: VirtualFS; scaffoldWarnings: string[]; fontFaceUrl?: string; fontFaceFamily?: string; keyboardCssUrls?: string[] }
+  | { kind: "ready"; compileResult: CompileResult; jsBlobUrl: string; vfs: VirtualFS; scaffoldWarnings: string[]; keyboardId: string; fontFaceUrl?: string; fontFaceFamily?: string; keyboardCssUrls?: string[] }
   | {
       kind: "error";
       step: "fetch" | "vfs" | "compile";
@@ -147,9 +189,50 @@ export function useKeyboardArtifact(
   const prevKeyboardCssBlobUrls = useRef<string[]>([]);
   const runId = useRef(0);
   const engineRef = useRef<EngineModule | null>(null);
-  const engineLoadAttempted = useRef(false);
+  // Shared engine load+init promise. Assigned once by the first run() call.
+  // Subsequent concurrent run() calls await the same promise so they don't
+  // skip the load block while engineRef.current is still null — which caused
+  // runCompile to abort with engine=null on every mount of GalleryPreviewWithPatterns
+  // until an explicit user action (assignment) happened to re-trigger a compile.
+  const engineReadyPromise = useRef<Promise<void> | null>(null);
   // Persistent VFS across recompiles — lifted out of the run closure.
   const vfsRef = useRef<VirtualFS | null>(null);
+  // Snapshot of the clean populated VFS (after fetch/scaffold, before any
+  // transform mutation). Restored into vfsRef before each transform-version
+  // reapply so that applyCarveToVfs's no-op fast-path (empty deletedNodeIds)
+  // does not cause assignments to accumulate on a stale .kmn.
+  const baseVfsRef = useRef<VirtualFS | null>(null);
+
+  // vfsTransform stored in a ref so that assignment changes (which produce a
+  // new function reference from useWorkingCopyTransform) do NOT re-trigger
+  // the full fetch→compile cycle. Only baseKeyboard / scaffoldSpec changes
+  // should restart from "fetching". Transform-only changes recompile cheaply.
+  const vfsTransformRef = useRef<VfsTransform | null | undefined>(vfsTransform);
+  // True once the first full fetch+compile cycle has completed. Used by the
+  // transform-change effect below to skip the initial render.
+  const hasFetchedRef = useRef(false);
+  // Version counter bumped when vfsTransform changes after the first fetch.
+  // Drives the re-apply+recompile effect without touching run()'s dep array.
+  const [transformVersion, setTransformVersion] = useState(0);
+
+  // Sync vfsTransformRef and trigger a re-apply+recompile when the transform
+  // changes after the initial fetch. We deliberately do NOT put vfsTransform
+  // in run()'s dep array — that would restart from "fetching" (re-downloading
+  // the keyboard source) on every assignment change, and also fire onInstantiate
+  // again, which triggers the "switching base keyboards" confirmation dialog.
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log(`[DIAG:vfsTransform-fx] changed. fn=${vfsTransform != null ? "SET" : "null"}, hasFetched=${hasFetchedRef.current}`);
+    vfsTransformRef.current = vfsTransform;
+    if (hasFetchedRef.current) {
+      // eslint-disable-next-line no-console
+      console.log("[DIAG:vfsTransform-fx] bumping transformVersion");
+      setTransformVersion((v) => v + 1);
+    } else {
+      // eslint-disable-next-line no-console
+      console.log("[DIAG:vfsTransform-fx] NOT bumping — hasFetched is false");
+    }
+  }, [vfsTransform]);
 
   // Separate compile step, callable independently for the recompile() path.
   // `warnings` carries any scaffold warnings from the preceding fetch step;
@@ -162,22 +245,57 @@ export function useKeyboardArtifact(
     warnings: string[] = [],
     isFullRun: boolean = false,
   ): Promise<void> => {
+    // eslint-disable-next-line no-console
+    console.log(`[DIAG:runCompile] called. kb=${kb.id}, thisRunId=${thisRunId}, currentRunId=${runId.current}, isFullRun=${isFullRun}`);
     const engine = engineRef.current;
     const vfs = vfsRef.current;
-    if (engine === null || vfs === null) return;
+    if (engine === null || vfs === null) {
+      // eslint-disable-next-line no-console
+      console.log(`[DIAG:runCompile] ABORT: engine=${engine != null ? "set" : "null"}, vfs=${vfs != null ? "set" : "null"}`);
+      return;
+    }
 
-    if (runId.current !== thisRunId) return;
+    if (runId.current !== thisRunId) {
+      // eslint-disable-next-line no-console
+      console.log(`[DIAG:runCompile] CANCELLED: runId.current=${runId.current} !== thisRunId=${thisRunId}`);
+      return;
+    }
 
     const isWarmCompile = engine.isReady?.() ?? false;
     setStage({ kind: "compiling", isWarmCompile });
 
     let result: CompileResult;
     let parsedIr: KeyboardIR | null = null;
+    const compileId = scaffoldSpec?.keyboardId ?? kb.id;
     try {
       const kmnPath = findKmnPath(vfs);
       const kmnText = kmnPath ? (vfs.get(kmnPath)!.content as string) : "";
 
-      const compileId = scaffoldSpec?.keyboardId ?? kb.id;
+      // Strip dangling packaging-asset references before compiling for preview.
+      // If the base names a BITMAP / VISUALKEYBOARD / LAYOUTFILE that wasn't
+      // fetched into the VFS, kmcmplib produces ZERO artifacts (only a warning),
+      // which surfaces as "no usable artifacts" and a blank preview. The preview
+      // needs none of these assets; present ones are kept (full-quality OSK).
+      // The output/zip path serializes the IR separately and is unaffected.
+      if (kmnPath && engine.stripDanglingAssetStores) {
+        const { kmn: cleaned, stripped } = engine.stripDanglingAssetStores(kmnText, vfs);
+        if (stripped.length > 0) {
+          vfs.set(kmnPath, cleaned);
+        }
+        // Compile reads source/<compileId>.kmn specifically; keep it in sync
+        // when findKmnPath resolved a different path than the compile id.
+        // Strip independently of whether kmnPath had danglers — compilePath
+        // may have its own dangling references even when kmnPath did not.
+        const compilePath = `source/${compileId}.kmn`;
+        if (compilePath !== kmnPath && vfs.get(compilePath) !== undefined) {
+          const compileEntry = vfs.get(compilePath)!.content as string;
+          const { kmn: cleanedCompile, stripped: strippedCompile } =
+            engine.stripDanglingAssetStores(compileEntry, vfs);
+          if (strippedCompile.length > 0) {
+            vfs.set(compilePath, cleanedCompile);
+          }
+        }
+      }
 
       const [compileResult, parseResult] = await Promise.all([
         engine.compile(vfs, compileId),
@@ -202,6 +320,8 @@ export function useKeyboardArtifact(
     if (runId.current !== thisRunId) return;
 
     const jsArtifact = result.artifacts.find((a) => a.filename.endsWith(".js"));
+    // eslint-disable-next-line no-console
+    console.log(`[DIAG:runCompile] compile done. success=${result.success}, artifacts=${result.artifacts.length}, jsArtifact=${jsArtifact?.filename ?? "NONE"}, diags=${result.diagnostics.length}`);
 
     if (prevBlobUrl.current !== null) {
       URL.revokeObjectURL(prevBlobUrl.current);
@@ -215,6 +335,8 @@ export function useKeyboardArtifact(
         prevBlobUrl.current = jsBlobUrl;
       }
     } else if (!result.success && result.artifacts.length === 0) {
+      // eslint-disable-next-line no-console
+      console.log(`[DIAG:runCompile] NO ARTIFACTS — compile failed. diagnostics:`, result.diagnostics.map((d) => `${d.severity}: ${d.message}`));
       setStage({
         kind: "error",
         step: "compile",
@@ -234,44 +356,58 @@ export function useKeyboardArtifact(
 
     // Carry font face info (added by the .kps font-loading path) onto the ready stage.
     const readyStage: Extract<Stage, { kind: "ready" }> = {
-      kind: "ready", compileResult: result, jsBlobUrl, vfs, scaffoldWarnings: warnings,
+      kind: "ready", compileResult: result, jsBlobUrl, vfs, scaffoldWarnings: warnings, keyboardId: compileId,
     };
     if (prevFontBlobUrl.current !== null) readyStage.fontFaceUrl = prevFontBlobUrl.current;
     if (fontFaceFamilyRef.current !== null) readyStage.fontFaceFamily = fontFaceFamilyRef.current;
     if (prevKeyboardCssBlobUrls.current.length > 0) {
       readyStage.keyboardCssUrls = prevKeyboardCssBlobUrls.current;
     }
+    // eslint-disable-next-line no-console
+    console.log(`[DIAG:runCompile] setting stage=ready. jsBlobUrl=${jsBlobUrl ? jsBlobUrl.slice(0, 50) + "…" : "(empty)"}`);
     setStage(readyStage);
   }, [scaffoldSpec?.keyboardId, onInstantiate]);
 
   const run = useCallback(async (kb: BaseKeyboard, thisRunId: number) => {
-    // Step 0: Lazily load the engine module once.
-    if (!engineLoadAttempted.current) {
-      engineLoadAttempted.current = true;
-      try {
+    // eslint-disable-next-line no-console
+    console.log(`[DIAG:run] START. kb=${kb.id}, thisRunId=${thisRunId}`);
+    // Reset so transform changes during this fetch do not trigger a premature
+    // re-apply+recompile before the new VFS is ready. It is set back to true
+    // after the transform is applied at the end of the fetch step.
+    hasFetchedRef.current = false;
+    // eslint-disable-next-line no-console
+    console.log(`[DIAG:run] hasFetchedRef → false`);
+
+    // Transition to fetching immediately so the preview pane shows a loading
+    // state rather than blank/idle during the async engine + source load.
+    setStage({ kind: "fetching" });
+
+    // Step 0: Lazily load the engine module. All concurrent run() calls share
+    // a single promise so the second call doesn't skip this block while
+    // engineRef.current is still null (the original one-shot flag race).
+    if (engineReadyPromise.current === null) {
+      engineReadyPromise.current = (async () => {
         const mod = await loadEngine();
         if (mod === null) {
-          setStage({
-            kind: "error",
-            step: "vfs",
-            message:
-              "Engine failed to load — check browser console for WASM errors.",
-          });
-          return;
+          throw new Error(
+            "Engine failed to load — check browser console for WASM errors.",
+          );
         }
         engineRef.current = mod;
         await mod.init();
-      } catch (err: unknown) {
-        const message =
-          err instanceof Error ? err.message : "WASM engine failed to load";
-        setStage({ kind: "error", step: "vfs", message });
-        return;
-      }
+      })();
+    }
+    try {
+      await engineReadyPromise.current;
+    } catch (err: unknown) {
+      if (runId.current !== thisRunId) return;
+      const message =
+        err instanceof Error ? err.message : "WASM engine failed to load";
+      setStage({ kind: "error", step: "vfs", message });
+      return;
     }
 
     if (runId.current !== thisRunId) return;
-
-    setStage({ kind: "fetching" });
 
     // Fresh VFS for each full run (new selection or retry).
     const vfs = createVirtualFS();
@@ -314,10 +450,16 @@ export function useKeyboardArtifact(
           prevKeyboardCssBlobUrls.current.push(URL.createObjectURL(blob));
         }
       } else if (engineRef.current) {
-        // Open-base path — fetch existing keyboard source.
-        // proxyBase defaults to "/kbd-proxy" inside fetchKeyboardSourceToVfs,
-        // which Vite proxies to raw.githubusercontent.com in both dev and prod.
-        const fetchResult = await engineRef.current.fetchKeyboardSourceToVfs(kb, vfs);
+        // Open-base path — fetch existing keyboard source. Bounded by a
+        // timeout so a stalled proxy/network request surfaces a retryable
+        // error instead of an indefinite "Loading keyboard source..." overlay.
+        const fetchResult = await withTimeout(
+          engineRef.current.fetchKeyboardSourceToVfs(kb, vfs, {
+            proxyBase: LOCAL_PROXY_BASE,
+          }),
+          FETCH_TIMEOUT_MS,
+          "Loading keyboard source",
+        );
         // Build a blob URL for the OSK font so the frame can inject an
         // @font-face rule before the keyboard JS executes. Stored in refs so
         // it survives recompile() (the font only changes on a new fetch).
@@ -356,11 +498,24 @@ export function useKeyboardArtifact(
     // so they surface on the ready Stage. Errors in the transform abort the run
     // and surface as a "vfs" step error — the transform must NOT throw for
     // expected conditions (unknown patternId, missing slot); those are warnings.
-    if (vfsTransform !== null && vfsTransform !== undefined && vfsRef.current !== null) {
+    // Uses vfsTransformRef.current (not the closure-captured vfsTransform) so
+    // assignment updates don't force run() to be recreated.
+    // Snapshot the clean populated VFS before the transform mutates it.
+    // The transformVersion effect restores this snapshot before each reapply
+    // so that stale accumulated .kmn text never poisons rule ordering.
+    if (vfsRef.current !== null) {
+      baseVfsRef.current = createVirtualFS(vfsRef.current.entries());
+    }
+
+    // eslint-disable-next-line no-console
+    console.log(`[DIAG:run] fetch complete. applying transform=${vfsTransformRef.current != null ? "YES" : "null/skip"}`);
+    if (vfsTransformRef.current !== null && vfsTransformRef.current !== undefined && vfsRef.current !== null) {
       try {
         const keyboardId = scaffoldSpec?.keyboardId ?? kb.id;
-        const transformResult = vfsTransform(vfsRef.current, keyboardId);
+        const transformResult = vfsTransformRef.current(vfsRef.current, keyboardId);
         scaffoldWarnings.push(...transformResult.warnings);
+        // eslint-disable-next-line no-console
+        console.log(`[DIAG:run] transform applied. warnings=${transformResult.warnings.length}`);
 
         // Rebuild the keyboard CSS blob URLs from the projected VFS so the OSK
         // frame's <style> tags carry the post-rename `.kmw-keyboard-<newId>`
@@ -391,25 +546,94 @@ export function useKeyboardArtifact(
       }
     }
 
+    // Mark that the first full fetch cycle has completed. The vfsTransform
+    // effect above uses this to skip triggering re-apply before the VFS exists.
+    hasFetchedRef.current = true;
+    // eslint-disable-next-line no-console
+    console.log(`[DIAG:run] hasFetchedRef → true. about to runCompile (isFullRun=true)`);
+
     if (runId.current !== thisRunId) return;
 
     // Pass scaffold warnings into runCompile so they surface on the ready Stage.
     // isFullRun=true: this is a full fetch→compile cycle; onInstantiate fires.
     await runCompile(kb, thisRunId, scaffoldWarnings, true);
-  }, [scaffoldSpec, vfsTransform, runCompile]);
+  }, [scaffoldSpec, runCompile]);
 
   useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log(`[DIAG:baseKeyboard-fx] fired. baseKeyboard=${baseKeyboard?.id ?? "null"}`);
     if (baseKeyboard === null) {
       setStage({ kind: "idle" });
       vfsRef.current = null;
+      baseVfsRef.current = null;
       // IR ownership moved to the working-copy store; the hook no longer calls
       // clearIR() here. The store's instantiateFromBase / reset owns IR lifecycle.
       return;
     }
 
+    // Reset transformVersion so no stale transform from the previous keyboard
+    // can survive into this keyboard's VFS via the transform-change effect.
+    setTransformVersion(0);
     const thisRunId = ++runId.current;
+    // eslint-disable-next-line no-console
+    console.log(`[DIAG:baseKeyboard-fx] calling run. thisRunId=${thisRunId}`);
     void run(baseKeyboard, thisRunId);
   }, [baseKeyboard, scaffoldSpec, run]);
+
+  // When the vfsTransform changes after the initial fetch (i.e. the user
+  // records an assignment), restore the clean base VFS snapshot, re-apply the
+  // transform, and recompile — no re-fetch required. The snapshot restore is
+  // necessary because applyCarveToVfs is a no-op when deletedNodeIds is empty,
+  // so without it the transform accumulates on a stale .kmn and rule-ordering
+  // fixes are bypassed by the idempotency check.
+  // isFullRun=false: onInstantiate is NOT fired, so no "switching base
+  // keyboards" confirmation dialog is triggered by assignment changes.
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log(`[DIAG:transformVersion-fx] fired. transformVersion=${transformVersion}, hasFetched=${hasFetchedRef.current}, kb=${baseKeyboard?.id ?? "null"}, vfsReady=${vfsRef.current !== null}`);
+    if (transformVersion === 0) {
+      // eslint-disable-next-line no-console
+      console.log("[DIAG:transformVersion-fx] skip: transformVersion===0");
+      return;
+    }
+    // hasFetchedRef is set to false synchronously inside run() before this
+    // effect fires. If it is false, a new fetch is in progress and the VFS
+    // is empty — skip recompile to avoid cancelling the in-flight run.
+    if (!hasFetchedRef.current) {
+      // eslint-disable-next-line no-console
+      console.log("[DIAG:transformVersion-fx] skip: hasFetchedRef is false (fetch in progress)");
+      return;
+    }
+    if (baseKeyboard === null || vfsRef.current === null) {
+      // eslint-disable-next-line no-console
+      console.log("[DIAG:transformVersion-fx] skip: baseKeyboard or vfsRef is null");
+      return;
+    }
+
+    const keyboardId = scaffoldSpec?.keyboardId ?? baseKeyboard.id;
+    if (vfsTransformRef.current !== null && vfsTransformRef.current !== undefined) {
+      // Restore the clean base VFS snapshot so the transform always starts from
+      // the unmodified keyboard source, not an accumulated previous result.
+      if (baseVfsRef.current !== null) {
+        vfsRef.current = createVirtualFS(baseVfsRef.current.entries());
+      }
+      // eslint-disable-next-line no-console
+      console.log(`[DIAG:transformVersion-fx] applying transform for keyboardId=${keyboardId}`);
+      try {
+        vfsTransformRef.current(vfsRef.current, keyboardId);
+      } catch {
+        // Transform errors surface as compile diagnostics; don't abort.
+      }
+    } else {
+      // eslint-disable-next-line no-console
+      console.log("[DIAG:transformVersion-fx] vfsTransformRef is null/undefined — skipping transform apply");
+    }
+
+    const thisRunId = ++runId.current;
+    // eslint-disable-next-line no-console
+    console.log(`[DIAG:transformVersion-fx] PROCEEDING with recompile. runId bumped to ${thisRunId}`);
+    void runCompile(baseKeyboard, thisRunId, [], false);
+  }, [transformVersion, baseKeyboard, scaffoldSpec, runCompile]);
 
   useEffect(() => {
     return () => {
@@ -436,7 +660,7 @@ export function useKeyboardArtifact(
   const recompile = useCallback(() => {
     if (baseKeyboard !== null && vfsRef.current !== null) {
       const thisRunId = ++runId.current;
-      void runCompile(baseKeyboard, thisRunId);
+      void runCompile(baseKeyboard, thisRunId, [], false);
     }
   }, [baseKeyboard, runCompile]);
 
