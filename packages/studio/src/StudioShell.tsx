@@ -4,8 +4,8 @@
 //   #survey  (default)  — full authoring wizard: identity → base → prefill →
 //                         carve (Phase D) → inventory (Phase B) →
 //                         mechanisms (Phase C) → help (Phase F) → done
-//   #preview            — compiled preview (stub; not yet implemented)
-//   #output             — output / delivery (stub; not yet implemented)
+//   #preview            — PreviewShell (OSK preview + diagnostics + download)
+//   #output             — PreviewShell (same combined shell; v1 — split is a later refinement)
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
@@ -30,6 +30,8 @@ import { useValidator } from "./hooks/useValidator.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
 import { buildFindingsByQuestionId } from "./lint/lintToQuestion.ts";
 import { FlowMapView } from "./flowmap/FlowMapView.tsx";
+import { PreviewShell } from "./components/PreviewShell.tsx";
+import { navigateTo } from "./lib/navigate.ts";
 
 // The Flow Map is a developer aid. It shows automatically in `vite dev`; in
 // hosted builds (Vercel previews, future production) it is gated by
@@ -66,28 +68,6 @@ function useRoute(): RouteId {
   }, []);  // empty deps: register once on mount; handler captures hashToRoute by closure
 
   return route;
-}
-
-// ---------------------------------------------------------------------------
-// RoutePlaceholder — stub for routes not yet implemented
-// ---------------------------------------------------------------------------
-
-function RoutePlaceholder({ title }: { title: string }) {
-  return (
-    <div
-      style={{
-        height: "100%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "#9aa7b8",
-        fontSize: 16,
-        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-      }}
-    >
-      {title} — coming soon
-    </div>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -350,6 +330,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   function handlePhaseFComplete(result: SurveyPhaseResult) {
     recordPhase(result);
     setStage("done");
+    navigateTo("output");
   }
   function handleStartOver() {
     resetSurvey();
@@ -641,10 +622,10 @@ export function StudioShell() {
       content = <SurveyView baseKeyboard={selectedBaseKeyboard} />;
       break;
     case "preview":
-      content = <RoutePlaceholder title="Preview" />;
+      content = <PreviewShell />;
       break;
     case "output":
-      content = <RoutePlaceholder title="Output" />;
+      content = <PreviewShell />;
       break;
     case "flowmap":
       content = <FlowMapView />;
