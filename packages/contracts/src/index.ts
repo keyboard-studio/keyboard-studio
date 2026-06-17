@@ -16,6 +16,7 @@ export * from "./lintFinding";
 export * from "./pattern";
 export * from "./patternMatch";
 export * from "./placementMap";
+export * from "./placementStrategy";
 export * from "./provenance";
 export * from "./simulation";
 export * from "./strategy";

@@ -535,6 +535,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           />
         )}
         {stage === "B" && (
+          // NOTE: `placementMap` is intentionally not supplied here in v1.
+          // Per decision D-INT-2 the seeder never runs inside the SPA; the real
+          // PlacementMap comes from a pinned placement-priors artifact produced
+          // offline and shipped as static data (tracked separately — see this
+          // change's PR). The prop stays optional and unsupplied in production;
+          // the consumption path (buildPlacementSeeds -> getSeedValue) is
+          // exercised by unit tests via the placement-map.sample.json fixture.
           <PhaseB
             context={surveyContext}
             onComplete={handlePhaseBComplete}

@@ -11,11 +11,12 @@
 // SurveyPhaseResult.confirmedInventory (additive contract field). The gallery
 // reads this via session.confirmedInventory (mergePhaseResults union).
 
-import { useMemo, useState, useRef, useEffect } from "react";
-import type { SurveyAnswer, SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts";
+import { useCallback, useMemo, useState, useRef, useEffect } from "react";
+import type { SurveyAnswer, SurveyPhaseResult, LintFinding, PlacementMap } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { loadModularFlow } from "./loadModularFlow.ts";
 import type { SurveyContext, FlowDef } from "./types.ts";
+import { buildPlacementSeeds } from "./placementSeeds.ts";
 
 // Vite ?raw import — typed via the `*.yaml?raw` declaration in src/vite-env.d.ts.
 import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modular.yaml?raw";
@@ -377,14 +378,46 @@ export interface PhaseBProps {
   onComplete: (result: SurveyPhaseResult) => void;
   onBack?: () => void;
   findingsByQuestionId?: Record<string, LintFinding[]>;
+  /**
+   * Optional placement map from the kbgen seeder (spec §7.6 / §8 Phase B).
+   * When present, PlacementMap codepoints above the confidence threshold are
+   * used to pre-fill pb_special_letters_list with the characters the seeder
+   * knows the language needs.
+   *
+   * The placement data (vkey, modifiers) is NOT wired to any Phase B question —
+   * Phase B has no question asking which key a character should go on.  The
+   * seeder's key-assignment proposals belong to a future Phase C placement
+   * confirmation step (out of scope for v1).
+   *
+   * Providing this prop does NOT affect the §7.2 StrategyRecommendation path
+   * (D3 scope guard): the seeded value populates the question input as a plain
+   * pre-fill; the user confirms or overrides it before it enters SurveyPhaseResult.
+   */
+  placementMap?: PlacementMap;
 }
 
-export function PhaseB({ context = {}, onComplete, onBack, findingsByQuestionId }: PhaseBProps) {
+export function PhaseB({ context = {}, onComplete, onBack, findingsByQuestionId, placementMap }: PhaseBProps) {
   const flow = useMemo(() => loadModularFlow(phaseBModularRaw as string), []);
   const [discoveryMethod, setDiscoveryMethod] = useState<DiscoveryMethod>(null);
   // manualFlow is memoized here (before any early returns) to satisfy React's
   // rules of hooks — useMemo must not be called after a conditional return.
   const manualFlow = useMemo(() => makeManualOnlyFlow(flow), [flow]);
+
+  // Build the placement seed lookup from the PlacementMap (if provided).
+  // Recompute only when placementMap changes (reference equality).
+  const placementSeeds = useMemo(
+    () => (placementMap !== undefined ? buildPlacementSeeds(placementMap) : new Map<string, string>()),
+    [placementMap],
+  );
+
+  // getSeedValue: called by SurveyRunner before pushing each question.
+  // Returns the seeded default for pb_special_letters_list when the placement
+  // map provided characters above the threshold; undefined otherwise.
+  const getSeedValue = useCallback(
+    (questionId: string): string | string[] | undefined => placementSeeds.get(questionId),
+    [placementSeeds],
+  );
+
 
   if (discoveryMethod === null) {
     return (
@@ -475,6 +508,9 @@ export function PhaseB({ context = {}, onComplete, onBack, findingsByQuestionId 
   }
 
   // Wrap onComplete to inject confirmedInventory before forwarding the result.
+  // Not wrapped in useCallback intentionally — mirrors the IdentityLite.tsx neighbor pattern;
+  // SurveyRunner captures onComplete via an internal ref (SurveyRunner.tsx:260), so a fresh
+  // reference per render is harmless.
   function handleComplete(result: SurveyPhaseResult): void {
     onComplete({
       ...result,
@@ -507,6 +543,7 @@ export function PhaseB({ context = {}, onComplete, onBack, findingsByQuestionId 
         context={context}
         onComplete={handleComplete}
         onBack={() => setDiscoveryMethod(null)}
+        getSeedValue={getSeedValue}
         {...(findingsByQuestionId !== undefined ? { findingsByQuestionId } : {})}
       />
     </div>
