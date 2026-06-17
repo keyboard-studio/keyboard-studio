@@ -103,12 +103,15 @@ spawn_claude_for_pr() {
 find_trigger_comment() {
   local num="$1" since_ts="$2"
   [[ -z "$since_ts" ]] && { echo ""; return; }
-  gh api "repos/$REPO/issues/$num/comments" \
-    --jq --argjson ts "\"$since_ts\"" --argjson owners "$TRIAGE_OWNERS_JSON" \
-    '[.[] | select(.created_at > $ts)
-           | select(.user.login as $u | $owners | any(. == $u))
-           | select(.body | ascii_downcase | contains("@km-triage"))]
-     | last | .id // empty' 2>/dev/null || echo ""
+  # NB: pipe into real `jq` — `gh api --jq` does NOT accept --arg/--argjson
+  # (it errors "unknown flag: --argjson"), which silently returned empty and
+  # left every review-needed PR parked even after an owner replied.
+  gh api "repos/$REPO/issues/$num/comments" 2>/dev/null \
+    | jq -r --arg ts "$since_ts" --argjson owners "$TRIAGE_OWNERS_JSON" \
+      '[.[] | select(.created_at > $ts)
+             | select(.user.login as $u | $owners | any(. == $u))
+             | select(.body | ascii_downcase | contains("@km-triage"))]
+       | last | .id // empty' 2>/dev/null || echo ""
 }
 
 # ── Phase 1: Bootstrap (once per cron tick) ──────────────────────────────────
