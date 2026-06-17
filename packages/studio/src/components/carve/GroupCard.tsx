@@ -1,39 +1,88 @@
+import { useState } from 'react';
 import type { IRGroup } from '@keyboard-studio/contracts';
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
-import { CarveActions } from './CarveActions.tsx';
-import { sampleGroupChars } from '../../lib/carveUtils.ts';
-import { makeCardStyle, makeHeadingStyle } from '../../lib/carveStyles.ts';
+import { CardShell } from './CardShell.tsx';
+import { KindBadge, KIND_COLOR } from './KindBadge.tsx';
+import { MapChip } from './MapChip.tsx';
+import { groupToGlyphs } from '../../lib/irToCarveNodes.ts';
 
 interface GroupCardProps {
   group: IRGroup;
+  flag?: string | undefined;
 }
 
-export function GroupCard({ group }: GroupCardProps) {
+const PREVIEW = 8;
+
+export function GroupCard({ group, flag }: GroupCardProps) {
+  const [open, setOpen] = useState(false);
   const isDeleted = useWorkingCopyStore((s) => s.isDeleted(group.nodeId));
+  const isItemDeleted = useWorkingCopyStore((s) => s.isItemDeleted);
+  const deleteNode = useWorkingCopyStore((s) => s.deleteNode);
+  const restoreNode = useWorkingCopyStore((s) => s.restoreNode);
+  const deleteItem = useWorkingCopyStore((s) => s.deleteItem);
+  const restoreItem = useWorkingCopyStore((s) => s.restoreItem);
 
-  // Only count rules not already owned by a recognized Pattern card.
-  const nonOwnedCount = group.rules.filter((r) => r.ownedByPattern === undefined).length;
+  const hasUnownedRules = group.rules.some((r) => r.ownedByPattern === undefined);
+  if (!hasUnownedRules) return null;
 
-  // Group is fully represented by Pattern cards — nothing to show here.
-  if (nonOwnedCount === 0) return null;
+  const glyphs = groupToGlyphs(group);
+  const shown = open ? glyphs : glyphs.slice(0, PREVIEW);
+  const color = KIND_COLOR.group;
+  const node = { nodeId: group.nodeId, flag };
 
-  const sample = sampleGroupChars(group);
-
-  const cardStyle = makeCardStyle(isDeleted);
-  const headingStyle = makeHeadingStyle(isDeleted);
+  const unownedCount = group.rules.filter((r) => r.ownedByPattern === undefined).length;
 
   return (
-    <div style={cardStyle}>
-      <h3 style={headingStyle}>{group.name}</h3>
-      {sample.length > 0 && (
-        <div style={{ fontSize: '1.2em', margin: '0.25rem 0', color: '#e6edf3' }}>
-          {sample.join('  ')}
-        </div>
+    <CardShell
+      node={node}
+      deleted={isDeleted}
+      onDelete={() => deleteNode(group.nodeId)}
+      onUndo={() => restoreNode(group.nodeId)}
+      title={group.name}
+      badge={<KindBadge kind="group" />}
+    >
+      {glyphs.length > 0 ? (
+        <>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+            {shown.map((g) => (
+              <MapChip
+                key={g.gid}
+                keys={g.keys}
+                ch={g.ch}
+                removed={isItemDeleted(g.gid)}
+                onToggle={() => isItemDeleted(g.gid) ? restoreItem(g.gid) : deleteItem(g.gid)}
+                color={color}
+              />
+            ))}
+          </div>
+          {glyphs.length > PREVIEW && (
+            <button onClick={() => setOpen((o) => !o)} style={discloseBtn}>
+              <ChevronIcon open={open} />
+              {open ? 'Show less' : `Show all ${glyphs.length} rules`}
+            </button>
+          )}
+        </>
+      ) : (
+        <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0 }}>
+          {unownedCount} rule{unownedCount !== 1 ? 's' : ''} — complex context, cannot be previewed
+        </p>
       )}
-      <p style={{ margin: '0 0 0.25rem', fontSize: '0.85rem', color: '#8b949e' }}>
-        {nonOwnedCount} rule{nonOwnedCount !== 1 ? 's' : ''}
-      </p>
-      <CarveActions nodeId={group.nodeId} />
-    </div>
+    </CardShell>
   );
 }
+
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+      style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+const discloseBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6,
+  marginTop: 10, padding: 0,
+  background: 'none', border: 'none',
+  color: 'var(--accent)', font: '600 13.5px var(--ui)', cursor: 'pointer',
+};

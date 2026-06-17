@@ -29,6 +29,13 @@ import {
 } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
+// Undo stack entry — discriminated union so node and item deletions share one stack.
+// ---------------------------------------------------------------------------
+
+/** One entry on the undo stack: 'n' = whole node deleted, 'i' = single item removed. */
+export type UndoEntry = { k: 'n'; id: string } | { k: 'i'; id: string };
+
+// ---------------------------------------------------------------------------
 // Instantiation mode — spec §8 v1.3.0, two authoring tracks.
 // ---------------------------------------------------------------------------
 
@@ -118,8 +125,14 @@ export interface WorkingCopyState {
    * Kept as a layer (not an eager IR mutation) so undo is O(1).
    */
   deletedNodeIds: Set<string>;
-  /** Ordered list of node IDs deleted (latest last) for undo semantics. */
-  undoStack: string[];
+  /**
+   * Set of item IDs (individual characters / rules within a node) the user
+   * has removed. Format: `"<nodeId>#<index>"` or `"<nodeId>#r<ruleIndex>"`.
+   */
+  deletedItemIds: Set<string>;
+  /** Ordered list of undo entries (latest last). Each entry is either a whole-node
+   * deletion or a single-item removal. */
+  undoStack: UndoEntry[];
 
   // -- Survey results (surveyResultsStore slots) --------------------------------
   /** Phase results captured so far, in completion order (A → B → … → F). */
@@ -156,14 +169,22 @@ export interface WorkingCopyState {
   clearIR: () => void;
   /** Mark a node as deleted and push to undo stack. */
   deleteNode: (nodeId: string) => void;
-  /** Pop the most recently deleted node from the undo stack. */
+  /** Pop the most recently deleted entry from the undo stack (node or item). */
   undoDelete: () => void;
   /** Restore a specific node by ID, removing all its undo stack entries. */
   restoreNode: (nodeId: string) => void;
   /** Returns true if the given nodeId is in the deletion set. */
   isDeleted: (nodeId: string) => boolean;
-  /** Clear all deletions and the undo stack without touching the IR. */
+  /** Mark an individual item (character / rule within a node) as removed. */
+  deleteItem: (itemId: string) => void;
+  /** Restore an individual item by ID. */
+  restoreItem: (itemId: string) => void;
+  /** Returns true if the given itemId is in the item deletion set. */
+  isItemDeleted: (itemId: string) => boolean;
+  /** Clear all deletions (nodes + items) and the undo stack without touching the IR. */
   keepAll: () => void;
+  /** Clear all deletions (nodes + items) and the undo stack. Alias for keepAll with clearer name. */
+  restoreAll: () => void;
 
   // -- Actions (surveyResultsStore) --------------------------------------------
   /**
@@ -283,7 +304,8 @@ const INITIAL_STATE: Omit<
   WorkingCopyState,
   // actions are excluded from the initial state snapshot
   | "setIR" | "clearIR" | "deleteNode" | "undoDelete" | "restoreNode"
-  | "isDeleted" | "keepAll" | "recordPhase" | "recordAssignments"
+  | "isDeleted" | "deleteItem" | "restoreItem" | "isItemDeleted" | "keepAll" | "restoreAll"
+  | "recordPhase" | "recordAssignments"
   | "setIrAxes" | "lockDesktop" | "unlockDesktop" | "recordTouchAssignments"
   | "setTouchLayoutJson" | "reset"
   | "instantiateFromBase" | "instantiateFromExisting" | "setIdentity" | "isInstantiated"
@@ -298,6 +320,7 @@ const INITIAL_STATE: Omit<
   // carve IR slots
   ir: null,
   deletedNodeIds: new Set(),
+  deletedItemIds: new Set(),
   undoStack: [],
   // survey slots
   ...INITIAL_SURVEY,
@@ -316,24 +339,30 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // -- irStore actions -------------------------------------------------------
 
   setIR: (ir) =>
-    set({ ir, deletedNodeIds: new Set(), undoStack: [] }),
+    set({ ir, deletedNodeIds: new Set(), deletedItemIds: new Set(), undoStack: [] }),
 
   clearIR: () =>
-    set({ ir: null, deletedNodeIds: new Set(), undoStack: [] }),
+    set({ ir: null, deletedNodeIds: new Set(), deletedItemIds: new Set(), undoStack: [] }),
 
   deleteNode: (nodeId) =>
     set((s) => ({
       deletedNodeIds: new Set([...s.deletedNodeIds, nodeId]),
-      undoStack: [...s.undoStack, nodeId],
+      undoStack: [...s.undoStack, { k: 'n', id: nodeId }],
     })),
 
   undoDelete: () =>
     set((s) => {
       if (s.undoStack.length === 0) return s;
-      const last = s.undoStack[s.undoStack.length - 1] as string;
-      const next = new Set(s.deletedNodeIds);
-      next.delete(last);
-      return { deletedNodeIds: next, undoStack: s.undoStack.slice(0, -1) };
+      const last = s.undoStack[s.undoStack.length - 1]!;
+      if (last.k === 'n') {
+        const next = new Set(s.deletedNodeIds);
+        next.delete(last.id);
+        return { deletedNodeIds: next, undoStack: s.undoStack.slice(0, -1) };
+      } else {
+        const next = new Set(s.deletedItemIds);
+        next.delete(last.id);
+        return { deletedItemIds: next, undoStack: s.undoStack.slice(0, -1) };
+      }
     }),
 
   restoreNode: (nodeId) =>
@@ -342,14 +371,35 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       next.delete(nodeId);
       return {
         deletedNodeIds: next,
-        undoStack: s.undoStack.filter((id) => id !== nodeId),
+        undoStack: s.undoStack.filter((e) => !(e.k === 'n' && e.id === nodeId)),
       };
     }),
 
   isDeleted: (nodeId) => get().deletedNodeIds.has(nodeId),
 
+  deleteItem: (itemId) =>
+    set((s) => ({
+      deletedItemIds: new Set([...s.deletedItemIds, itemId]),
+      undoStack: [...s.undoStack, { k: 'i', id: itemId }],
+    })),
+
+  restoreItem: (itemId) =>
+    set((s) => {
+      const next = new Set(s.deletedItemIds);
+      next.delete(itemId);
+      return {
+        deletedItemIds: next,
+        undoStack: s.undoStack.filter((e) => !(e.k === 'i' && e.id === itemId)),
+      };
+    }),
+
+  isItemDeleted: (itemId) => get().deletedItemIds.has(itemId),
+
   keepAll: () =>
-    set({ deletedNodeIds: new Set(), undoStack: [] }),
+    set({ deletedNodeIds: new Set(), deletedItemIds: new Set(), undoStack: [] }),
+
+  restoreAll: () =>
+    set({ deletedNodeIds: new Set(), deletedItemIds: new Set(), undoStack: [] }),
 
   // -- surveyResultsStore actions --------------------------------------------
 
@@ -400,6 +450,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       ...INITIAL_STATE,
       // Re-initialize mutable objects so mutations do not bleed across resets.
       deletedNodeIds: new Set(),
+      deletedItemIds: new Set(),
       // instantiationMode is null in INITIAL_STATE; explicit for clarity.
       instantiationMode: null,
     }),
@@ -431,6 +482,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // Seed the carve working IR from the base IR; clear any prior carve state.
       ir,
       deletedNodeIds: new Set(),
+      deletedItemIds: new Set(),
       undoStack: [],
       // Clear all survey results so the new keyboard starts without inherited
       // phase data from a prior session. irAxes also cleared (re-derived from
@@ -462,6 +514,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // Seed the carve working IR from the existing keyboard's IR.
       ir,
       deletedNodeIds: new Set(),
+      deletedItemIds: new Set(),
       undoStack: [],
       // Edit layers start clean for an adapt session too.
       ...remerge({}, []),

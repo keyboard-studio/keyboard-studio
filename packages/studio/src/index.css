@@ -1,1 +1,29 @@
-html, body { margin: 0; padding: 0; }
+:root {
+  --bg:            #15203a;
+  --card:          #1f2c49;
+  --card-2:        #27365a;
+  --border:        #33436a;
+  --border-strong: #44588a;
+  --text:          #eaf1fb;
+  --muted:         #aebcd6;
+  --subtle:        #8493b6;
+  --amber:         #d9a441;
+  --amber-text:    #ecc26a;
+  --amber-bg:      rgba(217,164,65,0.12);
+  --amber-border:  rgba(217,164,65,0.42);
+  --accent:        #5aa7f0;
+  --accent-bg:     rgba(90,167,240,0.16);
+  --primary:       #2b6fd6;
+  --primary-hover: #3f80e3;
+  --green:         #3fb950;
+  --green-hover:   #56d364;
+  --danger:        #f24e3c;
+  --danger-bg:     rgba(242,78,60,0.12);
+  --ui:      'Source Sans 3', system-ui, -apple-system, sans-serif;
+  --display: 'Playfair Display', Georgia, serif;
+  --mono:    ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  --serif:   'Lora', Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--ui); }
