@@ -95,3 +95,67 @@ describe("parse", () => {
     expect(() => parse(bad, "bad")).toThrow();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Numeric store names (malar_braille fix — #412)
+//
+// kmcmplib's Validation::ValidateIdentifier does NOT reject leading digits, so
+// `store(1) '1'` and `store(12) 'a'` are legal.  KMN_IDENT = /[^\s\(\)\,]+/
+// must match them without throwing.  Prior to the fix, a stricter identifier
+// regex rejected digit-only names and either threw or produced a RawKmnFragment
+// where a typed IRStore was expected.
+// ---------------------------------------------------------------------------
+
+const NUMERIC_STORE_KMN = `c malar_braille-style numeric store
+store(&VERSION) '10.0'
+store(&NAME) 'Numeric Test'
+store(&TARGETS) 'any'
+store(1) '1'
+store(12) 'abcdef'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [K_A] > any(1)
+`;
+
+describe("parse — numeric store names (#412)", () => {
+  it("parses a digit-only store name without throwing", () => {
+    expect(() => parse(NUMERIC_STORE_KMN, "numeric-test")).not.toThrow();
+  });
+
+  it("produces a typed IRStore for store(1) with name '1'", () => {
+    const { ir } = parse(NUMERIC_STORE_KMN, "numeric-test");
+    const store1 = ir.stores.find(s => s.name === "1");
+    expect(store1).toBeDefined();
+    expect(store1?.isSystem).toBe(false);
+    // store(1) '1' → one char item with value '1'
+    expect(store1?.items).toHaveLength(1);
+    expect(store1?.items[0]).toMatchObject({ kind: "char", value: "1" });
+  });
+
+  it("produces a typed IRStore for store(12) with name '12'", () => {
+    const { ir } = parse(NUMERIC_STORE_KMN, "numeric-test");
+    const store12 = ir.stores.find(s => s.name === "12");
+    expect(store12).toBeDefined();
+    expect(store12?.isSystem).toBe(false);
+    expect(store12?.items).toHaveLength(6);
+  });
+
+  it("numeric-named store does NOT land in ir.raw (must be typed, not opaque)", () => {
+    const { ir } = parse(NUMERIC_STORE_KMN, "numeric-test");
+    // If the store were mis-parsed as a RawKmnFragment it would show up here.
+    const rawStore = ir.raw.find(r => r.sourceText.includes("store(1)") || r.sourceText.includes("store(12)"));
+    expect(rawStore).toBeUndefined();
+  });
+
+  it("a digit-prefixed alphanumeric store name (e.g. store(1base)) also parses", () => {
+    // Digits-plus-letters: less common but also valid under kmcmplib rules.
+    const kmnWithMixed = `store(&VERSION) '10.0'\nstore(&NAME) 'T'\nstore(&TARGETS) 'any'\nstore(1base) 'xyz'\nbegin Unicode > use(main)\ngroup(main) using keys\n+ [K_A] > any(1base)\n`;
+    const { ir } = parse(kmnWithMixed, "mixed-id-test");
+    const storeMixed = ir.stores.find(s => s.name === "1base");
+    expect(storeMixed).toBeDefined();
+    expect(storeMixed?.isSystem).toBe(false);
+  });
+});
