@@ -197,6 +197,11 @@ export function useKeyboardArtifact(
   const engineReadyPromise = useRef<Promise<void> | null>(null);
   // Persistent VFS across recompiles — lifted out of the run closure.
   const vfsRef = useRef<VirtualFS | null>(null);
+  // Snapshot of the clean populated VFS (after fetch/scaffold, before any
+  // transform mutation). Restored into vfsRef before each transform-version
+  // reapply so that applyCarveToVfs's no-op fast-path (empty deletedNodeIds)
+  // does not cause assignments to accumulate on a stale .kmn.
+  const baseVfsRef = useRef<VirtualFS | null>(null);
 
   // vfsTransform stored in a ref so that assignment changes (which produce a
   // new function reference from useWorkingCopyTransform) do NOT re-trigger
@@ -495,6 +500,13 @@ export function useKeyboardArtifact(
     // expected conditions (unknown patternId, missing slot); those are warnings.
     // Uses vfsTransformRef.current (not the closure-captured vfsTransform) so
     // assignment updates don't force run() to be recreated.
+    // Snapshot the clean populated VFS before the transform mutates it.
+    // The transformVersion effect restores this snapshot before each reapply
+    // so that stale accumulated .kmn text never poisons rule ordering.
+    if (vfsRef.current !== null) {
+      baseVfsRef.current = createVirtualFS(vfsRef.current.entries());
+    }
+
     // eslint-disable-next-line no-console
     console.log(`[DIAG:run] fetch complete. applying transform=${vfsTransformRef.current != null ? "YES" : "null/skip"}`);
     if (vfsTransformRef.current !== null && vfsTransformRef.current !== undefined && vfsRef.current !== null) {
@@ -532,6 +544,7 @@ export function useKeyboardArtifact(
     if (baseKeyboard === null) {
       setStage({ kind: "idle" });
       vfsRef.current = null;
+      baseVfsRef.current = null;
       // IR ownership moved to the working-copy store; the hook no longer calls
       // clearIR() here. The store's instantiateFromBase / reset owns IR lifecycle.
       return;
@@ -547,10 +560,11 @@ export function useKeyboardArtifact(
   }, [baseKeyboard, scaffoldSpec, run]);
 
   // When the vfsTransform changes after the initial fetch (i.e. the user
-  // records an assignment), re-apply the transform to the existing VFS and
-  // recompile — no re-fetch required. The transform from useWorkingCopyTransform
-  // regenerates the .kmn from baseIr on every call, so re-applying to the
-  // already-transformed VFS is safe and idempotent.
+  // records an assignment), restore the clean base VFS snapshot, re-apply the
+  // transform, and recompile — no re-fetch required. The snapshot restore is
+  // necessary because applyCarveToVfs is a no-op when deletedNodeIds is empty,
+  // so without it the transform accumulates on a stale .kmn and rule-ordering
+  // fixes are bypassed by the idempotency check.
   // isFullRun=false: onInstantiate is NOT fired, so no "switching base
   // keyboards" confirmation dialog is triggered by assignment changes.
   useEffect(() => {
@@ -577,6 +591,11 @@ export function useKeyboardArtifact(
 
     const keyboardId = scaffoldSpec?.keyboardId ?? baseKeyboard.id;
     if (vfsTransformRef.current !== null && vfsTransformRef.current !== undefined) {
+      // Restore the clean base VFS snapshot so the transform always starts from
+      // the unmodified keyboard source, not an accumulated previous result.
+      if (baseVfsRef.current !== null) {
+        vfsRef.current = createVirtualFS(baseVfsRef.current.entries());
+      }
       // eslint-disable-next-line no-console
       console.log(`[DIAG:transformVersion-fx] applying transform for keyboardId=${keyboardId}`);
       try {
