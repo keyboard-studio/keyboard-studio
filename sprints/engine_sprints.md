@@ -4,7 +4,7 @@
 **Cadence:** Biweekly sprints
 **Milestone IDs:** KS-S1 through KS-S6 (v1.1 import-pipeline era)
 
-**Status key:** *todo* · *in progress by @username* · *in PR #NNN by @username* · *done*
+**Status key:** *backlog* · *todo* · *in progress by @username* · *in PR #NNN by @username* · *done*
 
 > **Plan revision: 2026-06-09.** Supersedes the v1.0 plan. The v1.1.0 KeyboardIR amendment (epic #231) reshapes the engine spine — text-based scaffolder #19 is being absorbed into scaffold-over-IR #238. Sprint 1 is built around a deliberately narrow working slice: import a keyboard, render Phase A's first 2-3 identity questions, mutate the imported `.kmn` in place. This proves the end-to-end pipeline with a throw-away regex stub for the mutation; the real IR codec lands in S2.
 
@@ -20,67 +20,67 @@ Joint engine+content contracts session. The Day-1-style lock for the v1.1 IR typ
 **#248** `feat(engine): identity-stub mutation applyIdentityStubMutation()` — *todo*
 A deliberately throw-away regex shim that mutates `store(&NAME)` and `store(&COPYRIGHT)` lines directly in the VFS `.kmn` text. Per the spec §14 D9 boundary, this is a temporary stand-in for the IR-layer mutation that lands in KS-S2. Must be clearly labelled in code as superseded by #238 and must NOT accumulate further mutation logic (no rule edits, no BCP47 changes). At sprint close, the follow-on issue `feat(engine): replace identity stub with IR-layer mutation` is filed as a KS-S2 deliverable.
 
-**#249** `feat(studio): Phase A first-3-question identity renderer (subset of #48)` — *todo*
+**#249** `feat(studio): Phase A first-3-question identity renderer (subset of #48)` — *done*
 Render only the first 2-3 identity questions from the already-shipped Phase A YAML (#49 PR #185): keyboard display name, copyright holder, and optionally targets. No Phase B, no Phase F yet. Wire each answer to `applyIdentityStubMutation()` (#248). Drop into the resizable-divider layout already shipped from #22 (PR #227).
 
-**#61** `feat(studio): Phase A surfaces v1 desktop-first scope (Decision 6)` — *todo*
+**#61** `feat(studio): Phase A surfaces v1 desktop-first scope (Decision 6)` — *in progress by @myczka*
 Needed alongside the survey renderer — Phase A must surface the desktop-only scope constraint when the user's base keyboard implies a script in the §16 stub list (CJK / Ethiopic). Small UI gate.
 
-**#192** `bug(flows): Phase A script_family divergence (flow 5 vs ScriptFamily type 7) + missing §16 stub gate` — *todo*
+**#192** `bug(flows): Phase A script_family divergence (flow 5 vs ScriptFamily type 7) + missing §16 stub gate` — *done*
 ScriptFamily enum mismatch and missing CJK/Ethiopic stub gate. Tightly related to #61 — fix together.
 
 ---
 
 ## Sprint 2 — KS-S2: KeyboardIR codec begins + replace identity stub
 
-**#233** `feat(engine): KeyboardIR codec — .kmn/.kvks/.keyman-touch-layout parser and emitter` — *todo*
+**#233** `feat(engine): KeyboardIR codec — .kmn/.kvks/.keyman-touch-layout parser and emitter` — *done*
 The first real codec pass. Scope for S2: parse + emit US-English fallback (`basic_kbdus`) and every `release/basic/*` keyboard with round-trip I2 fidelity. Other release/* keyboards can fall back to `RawKmnFragment` for opaque sections. Full coverage continues in S3.
 
 **`feat(engine): replace identity stub with IR-layer mutation`** — *new issue from KS-S1 close* — *todo*
 Reimplements #248's stub on top of `IRHeader.name` / `IRHeader.copyright`. Deletes the regex shim entirely. The Phase A renderer (#249) continues to call `applyIdentityMutation()` (renamed, same signature) — the change is internal.
 
-**#21** `feat(patterns): Pattern-library loader — parse content/patterns/*.yaml at startup` — *todo*
+**#21** `feat(patterns): Pattern-library loader — parse content/patterns/*.yaml at startup` — *done*
 The pattern YAML loader. Needed before the gallery (KS-S3) and the recognizer (KS-S3) can do anything useful.
 
-**#85** `chore(flows): SurveyAnswer.value is opaque string — boolean/select encoding unclear` — *todo*
+**#85** `chore(flows): SurveyAnswer.value is opaque string — boolean/select encoding unclear` — *done*
 Design session to settle before the survey renderer is extended beyond identity questions. Short.
 
 ---
 
 ## Sprint 3 — KS-S3: Recognizer + carve gallery + sidecar
 
-**#234** `feat(engine): Pattern recognizer — lift IR node clusters into Patterns with origin='recognized'` — *todo*
+**#234** `feat(engine): Pattern recognizer — lift IR node clusters into Patterns with origin='recognized'` — *done*
 Consumes content's #240 rule curation (S-01..S-09). Walk the IR after codec parse, run the curated rules, attach a `Pattern[]` with `origin: "recognized"` to `KeyboardIR.recognizedPatterns`.
 
-**#235** `feat(studio): Carve gallery — keep/edit/delete card view over the working IR` — *in PR*
+**#235** `feat(studio): Carve gallery — keep/edit/delete card view over the working IR` — *done*
 Scrollable card UI over `KeyboardIR.recognizedPatterns + originBlocks`. The user keeps/edits/deletes patterns from the imported keyboard.
 
 **#38** `feat(studio): gallery rendering shell with mini-keyboard demo cards` — *todo*
 Original gallery shell (for the surveyed-pattern gallery, not the carve gallery). Lands here once the pattern loader (#21, S2) is ready.
 
-**#236** `feat(engine): Layer A' import-fidelity checks I1-I5 in @keymanapp/kmn-validator` — *todo*
+**#236** `feat(engine): Layer A' import-fidelity checks I1-I5 in @keymanapp/kmn-validator` — *in PR #425 by @KevinPNG*
 I1 parse completeness, I2 round-trip, I3 header preservation, I4 opaque count budget, I5 sidecar hash. Pairs with #233 codec.
 
-**#239** `feat(output): .kmn.imported sidecar — include in .zip and OAuth working tree, exclude from PR commit` — *todo*
+**#239** `feat(output): .kmn.imported sidecar — include in .zip and OAuth working tree, exclude from PR commit` — *done*
 Sidecar storage in VirtualFS; zip serializer includes, OAuth PR-commit serializer excludes. Pairs with content's #241 criteria rows.
 
-**#106** `chore(scaffolder): scaffold() promises 'Layer-C-clean' but returns VirtualFS only` — *todo*
+**#106** `chore(scaffolder): scaffold() promises 'Layer-C-clean' but returns VirtualFS only` — *done*
 Design Q to settle before the carve-gallery commit step writes back to IR. Short session.
 
 ---
 
 ## Sprint 4 — KS-S4: Lint engine + lint UI + preview pane
 
-**#44** `feat(validator): Lint engine — criteria.md hygiene rules and htm/php parity` — *todo*
+**#44** `feat(validator): Lint engine — criteria.md hygiene rules and htm/php parity` — *done*
 Layer C hygiene rule implementation; runs against the scaffolded VirtualFS.
 
-**#45** `feat(validator): lint chip UI rendering Diagnostic[] inline` — *todo*
+**#45** `feat(validator): lint chip UI rendering Diagnostic[] inline` — *in progress by @coopabla*
 Close out remaining ACs (PR #217 landed the rendering but the issue body still tracks unfinished items). Pair with #44 going live.
 
-**#39** `feat(compiler): preview pane with KeymanWeb OSK and modifier toggles` — *todo*
+**#39** `feat(compiler): preview pane with KeymanWeb OSK and modifier toggles` — *done*
 Live interactive preview. Needs the codec (#233) emitting a clean `.kmn` for the compiler to compile.
 
-**#183** `feat(compiler): Deterministic simulate() API for tests, fixtures, and docs` — *todo*
+**#183** `feat(compiler): Deterministic simulate() API for tests, fixtures, and docs` — *done*
 Successor to the closed #18. Powers reproducible preview output for test fixtures and the §7.5 self-check table.
 
 **#156** `feat(engine): Section-18 DISCUS design-heuristic lint checks + TouchLayout type` — *in PR #352 by @gboltono*
@@ -90,13 +90,13 @@ Successor to the closed #18. Powers reproducible preview output for test fixture
 
 ## Sprint 5 — KS-S5: Output + integration day
 
-**#138** `feat(studio): Wire spec'd UI to GitHub-API BaseBrowserService` — *todo*
+**#138** `feat(studio): Wire spec'd UI to GitHub-API BaseBrowserService` — *in PR #414 by @gboltono*
 Swap the offline KBDus stub for the live GitHub Trees API in the base-keyboard picker.
 
-**#237** `feat(tools): Supportability scanner CLI — codec + Layer A' over release/` — *todo*
+**#237** `feat(tools): Supportability scanner CLI — codec + Layer A' over release/` — *in progress by @KevinPNG*
 CLI tool emitting `import-corpus.md` / `.json` for all `release/` keyboards. Validates the codec against the full corpus, not just `release/basic/`.
 
-**#147** `feat(studio): Wire Download ZIP button to OutputService.toZip` — *todo*
+**#147** `feat(studio): Wire Download ZIP button to OutputService.toZip` — *done*
 Small. OutputService is done; UI wire-up only.
 
 **#148** `feat(studio): GitHub OAuth flow + Submit PR button` — *todo*
@@ -105,7 +105,7 @@ OAuth App registration + PKCE flow + UI wire-up.
 **#226** `feat(flows): Phase C RTL direction-marks key placement` — *todo*
 Phase C answer (`pb_rtl_direction_marks`) feeds the scaffolder placement for U+200F/U+200E.
 
-**#32** `feat(studio): Integration Day — swap mocks for real validator, compiler, scaffolder` — *todo*
+**#32** `feat(studio): Integration Day — swap mocks for real validator, compiler, scaffolder` — *done*
 Original "Day 4 milestone" gate. End-to-end run with no mocks anywhere.
 
 **#53, #54** `Day-7 E2E smoke test — real Keyman Developer build` — *todo*
@@ -115,7 +115,7 @@ After #32 passes.
 
 ## Sprint 6 — KS-S6: kbgen track (after #131 joint session)
 
-**#131** `process(kbgen): Joint engine+content session to settle placement contract + scope` — *todo* — **blocker for this entire track**
+**#131** `process(kbgen): Joint engine+content session to settle placement contract + scope` — *in progress* — **blocker for this entire track**
 
 After #131:
 
@@ -123,8 +123,8 @@ After #131:
 **#133** `feat(contracts): Add placement-map type from joint session` — *todo*
 **#134** `feat(engine): Consume kbgen output as Phase B placement defaults` — *todo*
 **#135** `feat(tools): Expand kbgen strategy coverage beyond S-01/S-08` — *todo*
-**#141** `feat(engine): CharacterDiscoveryService — text harvest + CLDR-exemplar picker` — *todo*
-**#142** `feat(engine): Linguist agent — synthesizeInventory` — *todo*
+**#141** `feat(engine): CharacterDiscoveryService — text harvest + CLDR-exemplar picker` — *done*
+**#142** `feat(engine): Linguist agent — synthesizeInventory` — *done*
 
 ---
 

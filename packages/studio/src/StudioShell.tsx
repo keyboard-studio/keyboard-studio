@@ -4,10 +4,11 @@
 //   #survey  (default)  — full authoring wizard: identity → base → prefill →
 //                         carve (Phase D) → inventory (Phase B) →
 //                         mechanisms (Phase C) → help (Phase F) → done
-//   #preview            — compiled preview (stub; not yet implemented)
-//   #output             — output / delivery (stub; not yet implemented)
+//   #preview            — PreviewShell (OSK preview + diagnostics + download)
+//   #output             — PreviewShell (same combined shell; v1 — split is a later refinement)
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
+import { useResizablePanes } from "./hooks/useResizablePanes.ts";
 import type { BaseKeyboard, Pattern, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
@@ -30,8 +31,21 @@ import { findKmnPath } from "./lib/findKmnPath.ts";
 import { buildFindingsByQuestionId } from "./lint/lintToQuestion.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
 import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
+import { FlowMapView } from "./flowmap/FlowMapView.tsx";
+import { PreviewShell } from "./components/PreviewShell.tsx";
+import { navigateTo } from "./lib/navigate.ts";
 
-const VALID_ROUTES = new Set<RouteId>(["survey", "preview", "output"]);
+// The Flow Map is a developer aid. It shows automatically in `vite dev`; in
+// hosted builds (Vercel previews, future production) it is gated by
+// VITE_SHOW_FLOWMAP=1 so the kill switch lives in env config, not code.
+const SHOW_FLOWMAP =
+  import.meta.env.DEV || import.meta.env.VITE_SHOW_FLOWMAP === "1";
+
+const VALID_ROUTES = new Set<RouteId>(
+  (["survey", "preview", "output", "flowmap"] as const).filter(
+    (r) => r !== "flowmap" || SHOW_FLOWMAP,
+  ),
+);
 
 function isRouteId(v: string): v is RouteId {
   return VALID_ROUTES.has(v as RouteId);
@@ -59,28 +73,6 @@ function useRoute(): RouteId {
 }
 
 // ---------------------------------------------------------------------------
-// RoutePlaceholder — stub for routes not yet implemented
-// ---------------------------------------------------------------------------
-
-function RoutePlaceholder({ title }: { title: string }) {
-  return (
-    <div
-      style={{
-        height: "100%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "#9aa7b8",
-        fontSize: 16,
-        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-      }}
-    >
-      {title} — coming soon
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // NavBar
 // ---------------------------------------------------------------------------
 
@@ -93,6 +85,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "survey", label: "Studio" },
   { id: "preview", label: "Preview" },
   { id: "output", label: "Output" },
+  ...(SHOW_FLOWMAP ? [{ id: "flowmap" as const, label: "Flow Map" }] : []),
 ];
 
 interface NavBarProps {
@@ -191,8 +184,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const [identityResult, setIdentityResult] = useState<IdentityLiteResult | null>(null);
   const [surveyContext, setSurveyContext] = useState<SurveyContext>({});
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
-  const [leftPct, setLeftPct] = useState(SURVEY_LEFT_INIT_PCT);
-  const [handleHovered, setHandleHovered] = useState(false);
+  const { containerRef, leftPct, handleHovered, onPointerDown, setHandleHovered } =
+    useResizablePanes({ minPct: SURVEY_LEFT_MIN_PCT, maxPct: SURVEY_LEFT_MAX_PCT, initPct: SURVEY_LEFT_INIT_PCT });
 
   // Track 1 (Copy) vs Track 2 (Adapt) — set at the "track" stage.
   // Null until the user picks a track.
@@ -217,46 +210,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   useEffect(() => {
     setLocalBase(baseKeyboard);
   }, [baseKeyboard]);
-
-  const dragRef = useRef<{ startX: number; startPct: number } | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  const onPointerDown = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      dragRef.current = { startX: e.clientX, startPct: leftPct };
-      document.addEventListener("pointermove", onPointerMove);
-      document.addEventListener("pointerup", onPointerUp);
-    },
-    // leftPct captured via dragRef; document listeners registered once per drag
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [leftPct],
-  );
-
-  const onPointerMove = useCallback((e: PointerEvent) => {
-    if (dragRef.current === null || containerRef.current === null) return;
-    const containerW = containerRef.current.getBoundingClientRect().width;
-    if (containerW === 0) return;
-    const deltaPct = ((e.clientX - dragRef.current.startX) / containerW) * 100;
-    const next = Math.min(
-      SURVEY_LEFT_MAX_PCT,
-      Math.max(SURVEY_LEFT_MIN_PCT, dragRef.current.startPct + deltaPct),
-    );
-    setLeftPct(next);
-  }, []);
-
-  const onPointerUp = useCallback(() => {
-    dragRef.current = null;
-    document.removeEventListener("pointermove", onPointerMove);
-    document.removeEventListener("pointerup", onPointerUp);
-  }, [onPointerMove]);
-
-  useEffect(() => {
-    return () => {
-      document.removeEventListener("pointermove", onPointerMove);
-      document.removeEventListener("pointerup", onPointerUp);
-    };
-  }, [onPointerMove, onPointerUp]);
 
   // Working-copy store instantiation — routes to Track 1 (instantiateFromBase)
   // or Track 2 (instantiateFromExisting) based on which track the user selected.
@@ -405,6 +358,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   function handlePhaseFComplete(result: SurveyPhaseResult) {
     recordPhase(result);
     setStage("done");
+    navigateTo("output");
   }
   function handleStartOver() {
     resetSurvey();
@@ -696,10 +650,13 @@ export function StudioShell() {
       content = <SurveyView baseKeyboard={selectedBaseKeyboard} />;
       break;
     case "preview":
-      content = <RoutePlaceholder title="Preview" />;
+      content = <PreviewShell />;
       break;
     case "output":
-      content = <RoutePlaceholder title="Output" />;
+      content = <PreviewShell />;
+      break;
+    case "flowmap":
+      content = <FlowMapView />;
       break;
   }
 

@@ -59,6 +59,7 @@ const BASES: Record<string, BaseKeyboard> = {
     targets: [...DESKTOP_AND_WEB],
     displayName: "Akan",
     version: "1.0",
+    languages: ["ak"],
   }),
 };
 

@@ -11,6 +11,7 @@ import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { isExcludedScript } from "../lib/excludedScriptFamilies.ts";
 import type { Stage } from "../hooks/useKeyboardArtifact.ts";
 import { useOskChannel } from "../hooks/useOskChannel.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { OskMode } from "./OskModeToggle.tsx";
 import { PreviewPaneOverlay } from "./PreviewPaneOverlay.tsx";
 import { UnsupportedScriptStub } from "./UnsupportedScriptStub.tsx";
@@ -34,6 +35,11 @@ export function OSKFrame({
 }: OSKFrameProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const channel = useOskChannel(iframeRef);
+  // Working-copy identity drives the bcp47 language tag passed to KMW's
+  // setActiveKeyboard — Track 1 (Copy) supplies the author-chosen language,
+  // Track 2 (Adapt) leaves it null and we fall back to the base's first
+  // declared language.
+  const identity = useWorkingCopyStore((s) => s.identity);
   // Pull stable references out of the channel — the returned object's
   // identity changes on every render even though `send` is useCallback-ed
   // and the booleans are primitives. Depending on the object directly
@@ -56,17 +62,25 @@ export function OSKFrame({
     // (e.g. GalleryPreviewWithPatterns) that compile with baseKeyboard.id
     // while the store identity holds a different Track-1 scaffolded id.
     const activeKeyboardId = stage.keyboardId;
+    // Prefer the working-copy identity's bcp47 (Track 1 author-chosen language)
+    // over the base keyboard's first declared language. KMW's setActiveKeyboard
+    // needs the language tag the compiled .js registers under — otherwise it
+    // errors with "Cannot find the <id> keyboard for English".
+    const activeBcp47 =
+      (identity?.bcp47 && identity.bcp47.trim() !== "" ? identity.bcp47 : undefined) ??
+      baseKeyboard.languages?.[0];
     send({
       type: "SET_KEYBOARD",
       jsUrl: stage.jsBlobUrl,
       keyboardId: activeKeyboardId,
+      ...(activeBcp47 !== undefined && activeBcp47 !== "" ? { bcp47: activeBcp47 } : {}),
       ...(stage.fontFaceUrl !== undefined ? { fontFaceUrl: stage.fontFaceUrl } : {}),
       ...(stage.fontFaceFamily !== undefined ? { fontFaceFamily: stage.fontFaceFamily } : {}),
       ...(stage.keyboardCssUrls !== undefined && stage.keyboardCssUrls.length > 0
         ? { keyboardCssUrls: stage.keyboardCssUrls }
         : {}),
     });
-  }, [stage, engineReady, baseKeyboard, send]);
+  }, [stage, engineReady, baseKeyboard, identity?.bcp47, send]);
 
   useEffect(() => {
     if (!engineReady) return;

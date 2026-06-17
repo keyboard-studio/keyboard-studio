@@ -12,7 +12,8 @@ Package manager is **pnpm 9** (Node ≥ 20). Run from the repo root unless noted
 | Build everything | `pnpm build` (runs `prebuild` first — see below) |
 | Typecheck | `pnpm typecheck` |
 | Test everything | `pnpm test` (`pnpm -r test` → each package's vitest) |
-| Lint / format | `pnpm lint` (ESLint over `packages/*/src`) · `pnpm format` (Prettier) |
+| Lint / format | `pnpm lint` (ESLint over `packages/*/src`, then `pnpm depcruise`) · `pnpm format` (Prettier) |
+| Architecture boundaries | `pnpm depcruise` (dependency-cruiser fitness functions — cross-package layering/team-split/dependency-root rules in [.dependency-cruiser.cjs](.dependency-cruiser.cjs); also run by `pnpm lint`) |
 | Run the studio SPA | `pnpm dev` (builds `engine`, then runs `engine` watch + `studio` Vite dev server) |
 
 **`prebuild` is not optional for a clean checkout.** `pnpm build` runs it automatically, but a bare `tsc -b` inside a package will fail without it. It does two codegen/fetch steps, both producing build artifacts you should regenerate rather than hand-edit:
@@ -32,11 +33,11 @@ Package manager is **pnpm 9** (Node ≥ 20). Run from the repo root unless noted
 
 **Day-1 contract is locked and the engine + studio are now built out** (this supersedes the earlier "contracts only" status). Packages under `packages/*`:
 
-- **`@keyboard-studio/contracts`** — the locked Day-1 shared contract: TS types, the seven service interfaces + mocks, fixtures, and the criteria catalog at `packages/contracts/data/criteria.json` (148 rows — 133 repo-hygiene + 12 §18 DISCUS design-heuristic at Day-1 lock, plus post-lock additions; see spec §11 and [docs/discus-principles-integration.md](docs/discus-principles-integration.md)). The dependency root — everything else builds to it.
+- **`@keyboard-studio/contracts`** — the locked Day-1 shared contract: TS types, the seven service interfaces + mocks, fixtures, the criteria catalog at `packages/contracts/data/criteria.json` (148 rows — 133 repo-hygiene + 12 §18 DISCUS design-heuristic at Day-1 lock, plus post-lock additions; see spec §11 and [docs/discus-principles-integration.md](docs/discus-principles-integration.md)), and the runtime **zod schemas** (`src/schemas.ts`) that mirror the locked `Pattern`/`Criterion` types. The dependency root — everything else builds to it.
 - **`@keyboard-studio/engine`** — the real engine. Subsystems under `packages/engine/src/`: `codec` (.kmn ↔ KeyboardIR), `scaffolder`, `output` (VirtualFS → zip), `validator`, `compiler` (kmcmplib wrapper), `simulator`, `recognizer` (+ generated rules), `pattern-apply`, `pattern-library`, `strategy-selector`, `character-discovery`, `inventory`, `loader`, `base-browser`, `stub-mutator`.
 - **`@keymanapp/keyboard-lint`** — Layer C hygiene lint engine (`lintEngine.ts`, `checks/`, `parsers/`).
 - **`@keyboard-studio/llm`** — pluggable LLM client (`backends/`) for prompt-driven assistance.
-- **`@keyboard-studio/studio`** — the React + Vite SPA (three-pane gallery / editor / preview; working-copy spine). **`studio-poc` is a throwaway prototype — do not build on it.**
+- **`@keyboard-studio/studio`** — the React + Vite SPA (three-pane gallery / editor / preview; working-copy spine).
 - **`packages/compiler`** — holds only the fetched `kmcmplib.wasm` (no TS `package.json`); the service wrapping it lives in `engine/src/compiler`.
 
 Spec targets **not yet realised as written:** the `@keymanapp/kmn-validator` package has not been extracted — Layer A/B (and Layer A' import-fidelity) validation lives in `engine/src/validator` (see Architecture). Check a package's actual exports before referencing it.
@@ -49,10 +50,16 @@ Keep this file's commands, package inventory, and architecture map in sync with 
 
 ## Source of truth
 
-- **`spec.md`** — the v1.3.0 spec (v1.0 signed off; v1.1.0 KeyboardIR import amendment applied 2026-06-08; v1.1.1 placement-priors amendment applied 2026-06-11; v1.2.0 hybrid-workflow + scoped-gallery amendment applied 2026-06-13, see [docs/workflow-model.md](docs/workflow-model.md) — typed assignment-map contract held for the #5b joint session; v1.3.0 working-copy spine + two authoring tracks amendment applied 2026-06-14 — single persistent working copy instantiated at keyboard selection via Track 1 `instantiateFromBase` or Track 2 `instantiateFromExisting`, all steps mutate it, serialized only at output; extends Decision 9). Treat as authoritative for scope, schema, validator layering, team boundaries, and resolved decisions.
+- **`spec.md`** — the v1.3.1 spec (v1.0 signed off; v1.1.0 KeyboardIR import amendment applied 2026-06-08; v1.1.1 placement-priors amendment applied 2026-06-11; v1.2.0 hybrid-workflow + scoped-gallery amendment applied 2026-06-13, see [docs/workflow-model.md](docs/workflow-model.md) — typed assignment-map contract held for the #5b joint session; v1.3.0 working-copy spine + two authoring tracks amendment applied 2026-06-14 — single persistent working copy instantiated at keyboard selection via Track 1 `instantiateFromBase` or Track 2 `instantiateFromExisting`, all steps mutate it, serialized only at output; extends Decision 9; v1.3.1 defaults-first principle (§3c "Defaults are the product") + §8 defaults-audit follow-ups applied 2026-06-15 — propose-then-confirm everywhere, "no default is a defect"). Treat as authoritative for scope, schema, validator layering, team boundaries, and resolved decisions.
 - **`docs/spec-signoff.md`** — review-cycle log and decision summary (D1–D9). Use this to see *why* a spec section reads the way it does before proposing changes.
 - **`README.md`** — external-facing project description (what it is, status, layout, scope); keep it accurate and lean — don't expand without reason. The per-package inventory and build commands live here in CLAUDE.md; README points at this file rather than restating them.
 - **`strategy tree/strategies.md`** — **superseded.** Merged into `spec.md §7`; now a stub pointer only. Do not edit it or treat it as a source.
+
+**Contract source-of-truth chain (avoid divergent copies).** The `Pattern` / `Criterion` contract exists in several representations; this is their authority order, so edits land in the right place:
+- **Canonical types:** `packages/contracts/src/pattern.ts`, `criteria.ts`. The TypeScript is the contract.
+- **Runtime mirror:** `packages/contracts/src/schemas.ts` (zod). Bound to the canonical types by **compile-time drift guards** — the one *machine-enforced* link: change a type and its schema must change in the same commit or the build fails. The engine/studio loaders consume `RawPatternSchema` via `@keyboard-studio/engine/pattern-schema` (re-export, not a copy).
+- **Prose spec:** [`specs/005-pattern-schema/spec.md`](specs/005-pattern-schema/spec.md) (§5, extracted). The **Day-1 reference** — illustrative, may lag the code's non-breaking optional fields; not a second source. Field renames/type changes/removals are a locked-contract change (§18).
+- **Criteria data + count:** `packages/contracts/data/criteria.json` is the data; the per-band recompute lives in `criteria-summary.md`; the count (148; 40/66/32/10) is **enforced** by `packages/contracts/src/{types,schemas}.test.ts`. Prose mentions (spec §11, this file, README) cross-link rather than re-derive.
 
 **Relationship between `spec.md` and `strategies.md` (resolved — merged).** The two documents have been unified: the `.kmn` strategy framework (seven discovery axes A1–A7, the decision tree, the S-01…S-12 strategy catalog, building blocks, and the validation table) now lives in **`spec.md` Section 7 (Strategy selection)**. It is wired into the rest of the spec: the survey computes the axes (§7.1), the strategy selector runs the decision tree (§7.2) to pick a strategy, and each `Pattern` (§5) links to its strategy card via the (ratified) optional `strategyId` / `combinesWith` fields. The §7.5 validation table is a self-consistency regression suite — two intentional v1.1 gaps (EuroLatin, IPA) are documented; keep §7.1/§7.2/§7.3 and that table mutually consistent across any edit.
 
@@ -81,6 +88,8 @@ The `Pattern` TS interface in spec Sec 5 is the Day-1 contract (issue #5). Treat
 - Reopening a resolved decision (D1–D9, Sec 14) — explicit revision request citing original decision and new evidence; **not** informal.
 
 If a task seems to require schema-breaking changes, surface this to the user before editing — don't change the schema silently.
+
+**Runtime enforcement.** The locked types are mirrored by zod schemas in `packages/contracts/src/schemas.ts` (`PatternSchema`, `CriterionSchema`, plus the YAML-tolerant `RawPatternSchema` the engine/studio loaders consume via `@keyboard-studio/engine/pattern-schema`). The data-file boundaries parse through them — `criteria.json` in `criteriaData.ts`, pattern YAML in the engine loader — so malformed records fail loudly. **The hand-written interfaces stay canonical; the schemas mirror them.** Compile-time drift guards in `schemas.ts` fail the build if a schema and its interface diverge, so editing a locked type means editing its schema in the same change.
 
 ## Out of scope for v1 (do not implement)
 
@@ -155,6 +164,20 @@ The point: an issue with half its checkboxes flipped is more honest than one clo
 ### Use the crew for…
 
 Review cycles on spec or code changes; coordinated multi-specialist refactors; anything that benefits from parallel specialist perspectives. `docs/spec-signoff.md` is the model for what a completed cycle looks like.
+
+## Spec-kit (spec-driven feature loop)
+
+[spec-kit](https://github.com/github/spec-kit) provides the **per-feature** generative loop that sits *below* the monolithic [spec.md](spec.md). It is installed in `.specify/` (templates, scripts, `memory/constitution.md`) with the skills under `.claude/skills/speckit-*`. The CLI version is pinned in [scripts/spec-kit-version.json](scripts/spec-kit-version.json) — re-run `specify init --here` only after deliberately bumping that pin.
+
+**Section-by-section spec extraction (in progress, 2026-06-15→).** The monolithic `spec.md` is being migrated into `specs/NNN-<slug>/` folders one numbered section at a time, where `NNN` mirrors the spec.md section number (e.g. `specs/007-strategy-selection/` for §7). **The extracted folder is authoritative for its section once landed; `spec.md` keeps a stub pointer.** Sections not yet extracted remain authoritative in `spec.md`. The reference-only sections (§14 resolved decisions, §17 glossary, §18 revision policy, §19 reference) are not planned for extraction. Extracted so far: §7 (pilot, 2026-06-15), §8 (2026-06-15), §5 (Pattern schema, 2026-06-16).
+
+**Not everything is a feature — don't shred the architecture.** Only *feature / contract* sections extract into `specs/NNN/`. The **architecture-core** sections — §4 (system overview), §5a (KeyboardIR spine), §9 (routing), §10 (validator layering), §11 (criteria model), §12/§13 (output + team boundaries) — describe how the whole tool composes; they are **not** features and stay authoritative in `spec.md`, composed (with links to code + the extracted feature specs) in [docs/architecture.md](docs/architecture.md), the system/meta-flow layer. (§8 Data flow was extracted before this rule; it is the meta-flow and is treated as architecture-core wherever its text lives.) `docs/architecture.md` is the home for "how the tool works"; `spec.md` architecture-core sections are its detail; `constitution.md` holds the invariant rules. When deciding whether to extract a section, ask: *feature/contract → `specs/NNN`; architecture/meta-flow → stays, composed in `docs/architecture.md`; reference → stays.*
+
+**New features still get their own `specs/NNN-<slug>/`** with a creation-order `NNN`, and **cite the governing `spec.md §X` (or its extracted folder)** rather than re-deriving scope. The mirror-numbering convention only applies to spec sections being extracted — new features pick the next free `NNN` above the extracted-section range.
+
+- **`.specify/memory/constitution.md`** restates the locked gates (Pattern schema, KeyboardIR spine, working-copy spine, validator layering, VirtualFS, team boundaries, out-of-scope, conventions) so `/speckit-plan`'s Constitution Check enforces them mechanically. It does **not** amend the spec — on conflict `spec.md` + [docs/spec-signoff.md](docs/spec-signoff.md) win.
+- **Workflow:** `/speckit-specify` (+ `/speckit-clarify`) → `/speckit-plan` (Constitution Check) → `/speckit-tasks` → `/speckit-taskstoissues`, then `/km-lead` dispatches the crew against the tasks. `/speckit-analyze` runs as a `km-doc`/`km-synthesis` review check before `/speckit-implement`.
+- **Drift split:** `utilities/spec-trace` owns textual drift of the spec corpus — the monolith `spec.md` sections, the extracted feature specs (`specs/NNN/spec.md`), and the architecture/meta-flow doc (`docs/architecture.md`); it hashes each unit and flags un-acknowledged changes (`node utilities/spec-trace check|report|acknowledge`). `/speckit-analyze` owns per-feature `spec ↔ plan ↔ tasks` consistency. Do **not** install spec-kit's "Spec Trace" community extension — it duplicates the existing utility.
 
 ## Conventions
 

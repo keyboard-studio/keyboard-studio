@@ -1,6 +1,8 @@
 // Shared helpers for validator checks — internal to the checks directory.
 // Do NOT re-export from packages/engine/src/validator/index.ts.
 
+import type { LintCode, LintFinding } from "@keyboard-studio/contracts";
+
 // Forbidden characters per validation.cpp:79-127:
 // space, comma, parens, square brackets, C0 controls (U+0000-U+001F), DEL (U+007F),
 // Unicode non-characters (U+FDD0-U+FDEF, U+FFFE, U+FFFF)
@@ -15,6 +17,60 @@ export interface StoreInfo {
 
 // Matches a store declaration: store(name)
 export const STORE_DECL_RE = /^\s*store\s*\(\s*([^)]+?)\s*\)/i;
+
+/**
+ * Shared deduplication scanner used by checkDuplicateGroups and checkDuplicateStores.
+ *
+ * Walks `source` line by line, applying `declRe` (must have one capture group: the
+ * declared name) and emitting a `LintFinding` for each name seen more than once.
+ * Names are compared case-insensitively, matching Keyman's CheckForDuplicates logic.
+ *
+ * @param source      Raw .kmn source text.
+ * @param declRe      Regex that matches a declaration line and captures the name.
+ *                    Must begin with `^` so it only fires at the start of a line,
+ *                    consistent with CheckForDuplicates.cpp:13-29 / :31-52.
+ * @param code        The `LintFinding.code` to emit on a duplicate.
+ * @param elementName Human-readable label used in the error message (e.g. "group", "store").
+ * @param exemptPrefix  If set, names that start with this string are silently skipped
+ *                    (used to exempt system stores like &BITMAP from duplicate checking).
+ */
+export function checkForDuplicateDeclarations(
+  source: string,
+  declRe: RegExp,
+  code: LintCode,
+  elementName: string,
+  exemptPrefix?: string,
+): LintFinding[] {
+  const findings: LintFinding[] = [];
+  const seen = new Map<string, number>(); // lowercase name -> first line (1-based)
+  const lines = source.split("\n");
+
+  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    const line = lines[lineIdx] ?? "";
+    const match = declRe.exec(line);
+    if (!match) continue;
+
+    const name = (match[1] ?? "").trim();
+    if (exemptPrefix !== undefined && name.startsWith(exemptPrefix)) continue;
+
+    const key = name.toLowerCase();
+    const firstLine = seen.get(key);
+
+    if (firstLine !== undefined) {
+      findings.push({
+        code,
+        severity: "error",
+        layer: "A",
+        message: `Duplicate ${elementName} name "${name}" (first declared on line ${firstLine})`,
+        location: { file: "", line: lineIdx + 1, column: match.index + 1 },
+      });
+    } else {
+      seen.set(key, lineIdx + 1);
+    }
+  }
+
+  return findings;
+}
 
 // Matches a store declaration body (the quoted string that follows).
 // e.g. store(s) "abc" — captures "abc" (3 chars = length 3).

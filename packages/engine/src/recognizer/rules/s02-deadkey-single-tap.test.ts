@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { s02Recognizer } from "./s02-deadkey-single-tap.js";
 import type {
   IRGroup,
-  IRRule,
   IRStore,
 } from "@keyboard-studio/contracts";
 import { makeTestIR, charItems } from "@keyboard-studio/contracts/fixtures";

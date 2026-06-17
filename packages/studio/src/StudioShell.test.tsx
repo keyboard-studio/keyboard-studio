@@ -22,7 +22,6 @@ import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 const {
   mockIdentityCompleteRef,
   mockBaseResolvedRef,
-  mockPrefillConfirmRef,
   mockCarveDoneRef,
   mockCarveBackRef,
   mockPhaseBDoneRef,
@@ -37,7 +36,6 @@ const {
   const mockIdentityCompleteRef = { current: null as null | ((...args: unknown[]) => void) };
   const mockBaseResolvedRef = { current: null as null | ((...args: unknown[]) => void) };
   const mockPrefillConfirmRef = { current: null as null | (() => void) };
-  const mockPrefillBackRef = { current: null as null | (() => void) };
   const mockCarveDoneRef = { current: null as null | (() => void) };
   const mockCarveBackRef = { current: null as null | (() => void) };
   const mockPhaseBDoneRef = { current: null as null | ((...args: unknown[]) => void) };
@@ -299,11 +297,29 @@ vi.mock("./lib/confirmRebase.ts", () => ({
   instantiateFromBaseIfConfirmed: vi.fn(),
 }));
 
+// Shallow stub for PreviewShell — routing tests assert on the marker div, not
+// the internal pipeline. The real PreviewShell is covered by PreviewShell.test.tsx.
+vi.mock("./components/PreviewShell.tsx", () => ({
+  PreviewShell: () => <div data-testid="preview-shell-root">preview-shell</div>,
+}));
+
+// Shallow stub for FlowMapView — only rendered in dev/VITE_SHOW_FLOWMAP builds.
+vi.mock("./flowmap/FlowMapView.tsx", () => ({
+  FlowMapView: () => <div data-testid="flow-map-view">flow-map</div>,
+}));
+
+// Spy on navigateTo so the done-stage routing test can assert it was called
+// without actually mutating window.location.
+vi.mock("./lib/navigate.ts", () => ({
+  navigateTo: vi.fn(),
+}));
+
 // ---------------------------------------------------------------------------
 // Import the component under test — AFTER all vi.mock() declarations.
 // ---------------------------------------------------------------------------
 
-import { SurveyView } from "./StudioShell.tsx";
+import { SurveyView, StudioShell } from "./StudioShell.tsx";
+import { navigateTo } from "./lib/navigate.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -530,5 +546,63 @@ describe("SurveyView — mechanisms → B back-navigation", () => {
     expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
     // Confirm it did NOT go to carve (an adjacent stage).
     expect(screen.queryByTestId("stage-carve")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// StudioShell routing regression — #preview and #output mount PreviewShell,
+// NOT RoutePlaceholder.
+// ---------------------------------------------------------------------------
+
+describe("StudioShell — route: #preview renders PreviewShell", () => {
+  it("mounts PreviewShell (not RoutePlaceholder) when hash is #preview", async () => {
+    window.location.hash = "#preview";
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    // PreviewShell stub must be present.
+    expect(screen.getByTestId("preview-shell-root")).toBeTruthy();
+    // RoutePlaceholder renders "Preview — coming soon"; must NOT be present.
+    expect(screen.queryByText(/coming soon/i)).toBeNull();
+  });
+});
+
+describe("StudioShell — route: #output renders PreviewShell", () => {
+  it("mounts PreviewShell (not RoutePlaceholder) when hash is #output", async () => {
+    window.location.hash = "#output";
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("preview-shell-root")).toBeTruthy();
+    expect(screen.queryByText(/coming soon/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// StudioShell / SurveyView — done stage calls navigateTo('output')
+// ---------------------------------------------------------------------------
+
+describe("SurveyView — PhaseF done navigates to #output", () => {
+  it("calls navigateTo('output') when PhaseF onComplete fires", async () => {
+    window.location.hash = "#survey";
+
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
+    advanceToF();
+    expect(screen.getByTestId("stage-F")).toBeTruthy();
+
+    // Fire PhaseF completion.
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("phaseF-complete"));
+    });
+
+    // navigateTo should have been called with 'output'.
+    expect(navigateTo).toHaveBeenCalledWith("output");
   });
 });

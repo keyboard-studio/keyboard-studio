@@ -2,7 +2,7 @@
 // Each renderer receives the current value (string | string[] | undefined)
 // and calls onChange when the user modifies it.
 
-import type { FlowQuestion, FlowOption } from "./types.ts";
+import type { FlowQuestion } from "./types.ts";
 import type { LintFinding } from "@keyboard-studio/contracts";
 import { LintChip } from "../lint/LintChip.tsx";
 

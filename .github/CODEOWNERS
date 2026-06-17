@@ -1,0 +1,27 @@
+# Code ownership — automatic review routing.
+#
+# GitHub requests review from the listed owner when a PR touches a matching
+# path. This is the "human gate" layer (see docs/architecture.md ->
+# "Conformance gates"): it keeps the architect in the loop on the locked /
+# load-bearing surfaces without manual watching. Most of the tree is
+# intentionally unlisted — only the surfaces where silent drift is expensive
+# are owned here.
+
+# The locked Day-1 contract (Pattern/Criterion types + their zod mirror).
+# Changes here are a §18 locked-contract change: major contracts bump + joint
+# engine+content session.
+/packages/contracts/                     @MattGyverLee
+
+# Governance + architecture: the invariant rules and the system/meta-flow view.
+/.specify/memory/constitution.md         @MattGyverLee
+/docs/architecture.md                    @MattGyverLee
+
+# The spec corpus: the monolith and the extracted feature specs.
+/spec.md                                 @MattGyverLee
+/specs/                                  @MattGyverLee
+
+# Conformance-gate config itself — changing a gate should be a conscious,
+# reviewed act (the amendment ritual), not a drive-by.
+/eslint.config.mjs                       @MattGyverLee
+/.dependency-cruiser.cjs                 @MattGyverLee
+/utilities/spec-trace/                   @MattGyverLee

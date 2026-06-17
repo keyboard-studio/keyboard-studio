@@ -151,9 +151,17 @@ When asked "when did X change?" or "why does Y exist?":
 
 The authoritative source is **MattGyverLee's "Keyman Summer" project board** (project number 1). Sprint files mirror it; the board wins on conflict.
 
-Every issue line in `sprints/engine_sprints.md` and `sprints/content_sprints.md` carries one of four markers — the exact column names from the board:
+**Every issue must have a Status — never leave one untagged.** A newly-created issue added to the board lands with no Status; that is a defect, not a resting state. Whenever you touch the board or notice an issue with no Status, sort it into exactly one column. Use this rule (added 2026-06-15, when the Backlog column was introduced):
 
-- `— *todo*` — not yet picked up
+- **No sprint milestone (`KS-S*`) assigned → `Backlog`.** The issue is real but not yet pulled into a sprint. Backlog is the pre-Todo holding area.
+- **A sprint milestone is assigned → `Todo`** (unless it is already In progress / In PR / Done). Assigning a `KS-S*` milestone is the act of committing the issue to a sprint, which promotes it out of Backlog.
+
+So promoting Backlog → Todo means giving the issue a sprint milestone; demoting Todo → Backlog means removing it. Keep the milestone and the Status consistent in the same edit. Never leave an issue with neither Backlog nor a later status.
+
+Every issue line in `sprints/engine_sprints.md` and `sprints/content_sprints.md` carries one of five markers — the exact column names from the board:
+
+- `— *backlog*` — not yet pulled into a sprint (no `KS-S*` milestone)
+- `— *todo*` — committed to a sprint but not yet picked up
 - `— *in progress by @username*` — actively being worked; use the GitHub assignee(s) from the board (comma-separate multiple: `*in progress by @alice, @bob*`)
 - `— *in PR #NNN by @username*` — has an open PR under review (NNN = PR number, username = PR author)
 - `— *done*` — issue is closed / all acceptance criteria checked
@@ -179,12 +187,14 @@ for item in data['items']:
 
 | Board column | Sprint marker |
 |---|---|
+| Backlog | `*backlog*` |
 | Todo | `*todo*` |
 | In progress | `*in progress by @username*` |
 | In PR | `*in PR #NNN by @username*` |
 | Done | `*done*` |
 
 **When to run the sync:**
+- After creating or triaging any issue → verify it has a Status; if untagged, sort it into Backlog or Todo per the milestone rule above, then update the sprint file
 - After merging a PR that closes an issue → verify board moved to Done, update sprint file
 - After opening a PR for an issue → verify board moved to In PR, update sprint file
 - After someone self-assigns an issue → verify board moved to In progress, update sprint file

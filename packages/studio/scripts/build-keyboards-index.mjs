@@ -24,7 +24,7 @@ const DEFAULT_CACHE = path.join(REPO_ROOT, ".cache", "keyboards");
 
 const REPO_URL =
   process.env["KEYBOARDS_REPO_URL"] ??
-  "https://github.com/MattGyverLee/keyboards.git";
+  "https://github.com/keymanapp/keyboards.git";
 const REPO_BRANCH = process.env["KEYBOARDS_REPO_BRANCH"] ?? "master";
 
 const OUT_DIR = path.join(STUDIO_DIR, "dist", "local-kbd-api");
@@ -167,7 +167,7 @@ function scan(keyboardsRepoRoot, sourceRepoSlug) {
 function repoSlugFromUrl(url) {
   // strip optional .git suffix; accept https or ssh forms
   const m = url.match(/[:/]([^/:]+\/[^/]+?)(?:\.git)?$/);
-  return m !== null ? m[1] : "MattGyverLee/keyboards";
+  return m !== null ? m[1] : "keymanapp/keyboards";
 }
 
 function main() {

@@ -154,7 +154,7 @@ describe("round-trip probe over all release + experimental keyboards", () => {
     for (const p of all) {
       const id = basename(p, ".kmn");
       let src: string;
-      try { src = readFileSync(p, "utf-8"); } catch (e) { continue; }
+      try { src = readFileSync(p, "utf-8"); } catch { continue; }
       let ir;
       try {
         ir = parse(src, id).ir;
@@ -167,7 +167,7 @@ describe("round-trip probe over all release + experimental keyboards", () => {
           identity: { keyboardId: "probe_new", displayName: "Probe" },
           group: "qwerty-qwertz",
         });
-      } catch (e) {
+      } catch {
         // scaffold may throw on shapes it can't handle; skip but log.
         continue;
       }

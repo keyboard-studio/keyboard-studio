@@ -1,24 +1,18 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
-// [SCAFFOLD] localKeyboardsPlugin is a dev-only plugin; remove when the
-// engine's BaseBrowserService no longer needs a local-clone proxy.
 import { localKeyboardsPlugin } from "./vite-plugins/localKeyboards.ts";
 
-// keymanapp/keyboards sibling-clone path. Override with KEYBOARDS_REPO env var.
-const KEYBOARDS_REPO_ROOT = fileURLToPath(
-  new URL("../../../keyboards", import.meta.url),
-);
+// Sibling clone of keymanapp/keyboards (see CLAUDE.md). KEYBOARDS_REPO env
+// overrides for non-standard layouts. Resolves to <repoRoot>/../keyboards.
+const KEYBOARDS_REPO_ROOT =
+  process.env["KEYBOARDS_REPO"] ??
+  fileURLToPath(new URL("../../../keyboards", import.meta.url));
 
 export default defineConfig({
   plugins: [
     react(),
-    localKeyboardsPlugin({
-      keyboardsRepoRoot:
-        process.env["KEYBOARDS_REPO"] !== undefined
-          ? process.env["KEYBOARDS_REPO"]
-          : KEYBOARDS_REPO_ROOT,
-    }),
+    localKeyboardsPlugin({ keyboardsRepoRoot: KEYBOARDS_REPO_ROOT }),
   ],
   resolve: {
     alias: {
@@ -29,6 +23,7 @@ export default defineConfig({
       "path-browserify": fileURLToPath(
         new URL("./src/lib/pathShim.ts", import.meta.url),
       ),
+      "@docs": fileURLToPath(new URL("../../docs", import.meta.url)),
     },
   },
   optimizeDeps: {
@@ -40,10 +35,9 @@ export default defineConfig({
     port: 5273,
     strictPort: true,
     proxy: {
-      // [SCAFFOLD] Fallback GitHub proxy for when the local-keyboards
-      // plugin can't be used (no sibling clone). Production needs a
-      // CSP-safe alternative (cached artifact server or compile-on-demand
-      // backend) — tracked separately.
+      // Proxy for keyboard source files — rewrites /kbd-proxy/<path> to
+      // https://raw.githubusercontent.com/keymanapp/keyboards/master/<path>.
+      // fetchKeyboardSourceToVfs defaults to /kbd-proxy, so no override needed.
       "/kbd-proxy": {
         target: "https://raw.githubusercontent.com",
         changeOrigin: true,

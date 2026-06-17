@@ -1,6 +1,6 @@
 {
-  "specVersion": "1.3.0",
-  "lastUpdated": "2026-06-14",
+  "specVersion": "1.3.1",
+  "lastUpdated": "2026-06-16",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -40,7 +40,7 @@
     },
     "§5": {
       "title": "5. Pattern schema",
-      "hash": "sha256:7c27c71a3e60f747",
+      "hash": "sha256:118ce662917c5930",
       "status": "implemented",
       "implements": [
         "packages/contracts/src/pattern.ts",
@@ -53,7 +53,8 @@
         "D4",
         "D5"
       ],
-      "notes": "Day-1 contract locked. Pattern + PatternMatch + PatternLibrary interfaces all present and tested."
+      "notes": "EXTRACTED to specs/005-pattern-schema/spec.md; spec.md body is a stub pointer (tracked hash is the stub). Day-1 contract locked. Pattern + PatternMatch + PatternLibrary interfaces all present and tested.",
+      "extractedTo": "specs/005-pattern-schema/spec.md"
     },
     "§5a": {
       "title": "5a. KeyboardIR (keyboard intermediate representation)",
@@ -74,7 +75,7 @@
     },
     "§6": {
       "title": "6. Worked example",
-      "hash": "sha256:0ecad32a0b9a43d4",
+      "hash": "sha256:2da7da2f1aaa3776",
       "status": "reference",
       "implements": [],
       "decisions": [],
@@ -82,7 +83,7 @@
     },
     "§7": {
       "title": "7. Strategy selection",
-      "hash": "sha256:3faaf96376a742a0",
+      "hash": "sha256:a3428f1dd19a7686",
       "status": "partial",
       "implements": [
         "packages/contracts/src/strategy.ts",
@@ -94,11 +95,12 @@
         "D1",
         "D2"
       ],
-      "notes": "A1-A7 axis types + strategy catalog types present. Decision tree engine (§7.2) + S-01..S-12 selectors not yet built. v1.1.1 added §7.6 (corpus placement priors — seeder in utilities/kbgen, not yet a contracts type). v1.2.0 added §7.7 (scoped assignment map) — assignmentMap.ts implements the typed contract; SurveyPhaseResult.assignments? additive field already landed ahead of spec text."
+      "notes": "EXTRACTED to specs/007-strategy-selection/spec.md; spec.md body is a stub pointer (tracked hash is the stub). A1-A7 axis types + strategy catalog types present. Decision tree engine (§7.2) + S-01..S-12 selectors not yet built. v1.1.1 added §7.6 (corpus placement priors — seeder in utilities/kbgen, not yet a contracts type). v1.2.0 added §7.7 (scoped assignment map) — assignmentMap.ts implements the typed contract; SurveyPhaseResult.assignments? additive field already landed ahead of spec text.",
+      "extractedTo": "specs/007-strategy-selection/spec.md"
     },
     "§8": {
       "title": "8. Data flow",
-      "hash": "sha256:3bc0726bdc4d6564",
+      "hash": "sha256:6f04ac146776de27",
       "status": "partial",
       "implements": [
         "packages/contracts/src/characterDiscovery.ts",
@@ -109,11 +111,12 @@
       "decisions": [
         "D9"
       ],
-      "notes": "CharacterDiscovery + LinguistInventory types exist. Survey-to-pattern pipeline not yet wired. v1.1.1 added placement proposals (Phase B). v1.2.0/v1.3.0 added two-track working-copy spine (instantiateFromBase / instantiateFromExisting) — producedSet.ts and surveySession.ts implement those contracts. Engine pipeline not yet built."
+      "notes": "EXTRACTED to specs/008-data-flow/spec.md; spec.md body is a stub pointer (tracked hash is the stub). CharacterDiscovery + LinguistInventory types exist. Survey-to-pattern pipeline not yet wired. v1.1.1 added placement proposals (Phase B). v1.2.0/v1.3.0 added two-track working-copy spine (instantiateFromBase / instantiateFromExisting) — producedSet.ts and surveySession.ts implement those contracts. Engine pipeline not yet built.",
+      "extractedTo": "specs/008-data-flow/spec.md"
     },
     "§9": {
       "title": "9. Three-group routing",
-      "hash": "sha256:541063c7a40e8d55",
+      "hash": "sha256:c3458e711b6c278b",
       "status": "unimplemented",
       "implements": [],
       "decisions": [
@@ -139,7 +142,7 @@
     },
     "§11": {
       "title": "11. criteria.md compliance",
-      "hash": "sha256:5bbf571a7f80c609",
+      "hash": "sha256:6aa6972138b421d3",
       "status": "implemented",
       "implements": [
         "packages/contracts/data/criteria.json",
@@ -196,7 +199,7 @@
     },
     "§15": {
       "title": "15. Acceptance scenarios",
-      "hash": "sha256:8255410ef9943e1f",
+      "hash": "sha256:1d2bdc9b47a6b90d",
       "status": "unimplemented",
       "implements": [],
       "decisions": [],
@@ -236,6 +239,85 @@
       "implements": [],
       "decisions": [],
       "notes": "External document links only."
+    },
+    "§3a": {
+      "title": "3a. What the user brings (skill envelope)",
+      "hash": "sha256:0443812a6f9bc549",
+      "status": "reference",
+      "implements": [],
+      "decisions": [],
+      "notes": "Skill-envelope persona definition (v1.3.1); informs UX, not code contracts."
+    },
+    "§3b": {
+      "title": "3b. What success looks like (outcome envelope)",
+      "hash": "sha256:11b3c8f11494d8c0",
+      "status": "reference",
+      "implements": [],
+      "decisions": [],
+      "notes": "Outcome-envelope definition (v1.3.1); informs UX/acceptance, not code contracts."
+    },
+    "§3c": {
+      "title": "3c. Defaults are the product",
+      "hash": "sha256:b21138ce96b9aa5c",
+      "status": "reference",
+      "implements": [],
+      "decisions": [],
+      "notes": "Defaults-first principle \"no default is a defect\" (v1.3.1); governance/UX principle informing the §5/§7.2/§7.6 propose-then-confirm posture. No single-file implementation."
+    },
+    "specs/002-defaults-engine": {
+      "title": "Feature Specification: Defaults engine (propose-then-confirm proposers)",
+      "hash": "sha256:ae6c9d3989994003",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": "Defaults-engine feature spec (§3c-derived). Coverage not yet triaged."
+    },
+    "specs/005-pattern-schema": {
+      "title": "Feature spec — Pattern schema (spec.md §5)",
+      "hash": "sha256:269db42c81a1c560",
+      "status": "implemented",
+      "implements": [
+        "packages/contracts/src/pattern.ts",
+        "packages/contracts/src/schemas.ts",
+        "packages/contracts/src/patternLibrary.ts",
+        "packages/contracts/src/fixtures/patterns.ts"
+      ],
+      "decisions": [],
+      "notes": "Extracted §5 Pattern-schema contract spec. Canonical type pattern.ts; zod mirror schemas.ts (compile-time drift-guarded). Locked contract (§18)."
+    },
+    "specs/007-strategy-selection": {
+      "title": "Feature spec — Strategy selection (spec.md §7)",
+      "hash": "sha256:822706880f9434a7",
+      "status": "partial",
+      "implements": [
+        "packages/contracts/src/strategy.ts",
+        "packages/contracts/src/axes.ts",
+        "packages/contracts/src/surveyPhaseResult.ts",
+        "packages/engine/src/strategy-selector"
+      ],
+      "decisions": [],
+      "notes": "Extracted §7 strategy framework (A1-A7, decision tree, S-01..S-13, §7.5 table)."
+    },
+    "specs/008-data-flow": {
+      "title": "Feature spec — Data flow (spec.md §8)",
+      "hash": "sha256:ce83a5e8e3cdc4a4",
+      "status": "partial",
+      "implements": [
+        "packages/contracts/src/surveySession.ts",
+        "packages/contracts/src/characterDiscovery.ts",
+        "packages/contracts/src/ir/producedSet.ts",
+        "packages/engine/src/loader"
+      ],
+      "decisions": [],
+      "notes": "Extracted §8 — the application meta-flow / data pipeline. Treated as architecture-core (see docs/architecture.md) despite living in specs/NNN."
+    },
+    "docs/architecture.md": {
+      "title": "Keyboard Studio — architecture & meta-flow",
+      "hash": "sha256:d464dcc5f43f4acc",
+      "status": "reference",
+      "implements": [],
+      "decisions": [],
+      "notes": "Architecture / meta-flow composition layer — the system view spec-kit omits. An index over the spec architecture-core sections + the extracted feature specs; not code."
     }
   }
 }

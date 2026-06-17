@@ -42,7 +42,7 @@ group(main) using keys
 + [K_A] > U+0061
 `;
 
-const OPAQUE_KMN = `store(&VERSION) '10.0'
+const _OPAQUE_KMN = `store(&VERSION) '10.0'
 store(&NAME) 'Opaque KB'
 store(&TARGETS) 'any'
 store(&COPYRIGHT) '(c) 2024 SIL'

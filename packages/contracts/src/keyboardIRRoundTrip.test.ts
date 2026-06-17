@@ -8,7 +8,6 @@ import type {
   ContextElement,
   OutputElement,
   KeyboardIR,
-  IRHeader,
 } from "./keyboard-ir.js";
 
 // ---------------------------------------------------------------------------

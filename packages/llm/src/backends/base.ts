@@ -4,6 +4,14 @@ import type { LLMClient, LLMClientConfig, Message, CompleteOptions } from "../ty
 export const DEFAULT_MODEL = "claude-sonnet-4-6";
 export const DEFAULT_MAX_TOKENS = 4096;
 
+/** Shared SDK request options derived from CompleteOptions. */
+type SharedParams = {
+  model: string;
+  max_tokens: number;
+  system?: string;
+  temperature?: number;
+};
+
 /**
  * Base implementation of LLMClient backed by the Anthropic SDK.
  * Subclasses are responsible for resolving the API key and calling super().
@@ -17,14 +25,19 @@ export abstract class AnthropicBase implements LLMClient {
     this.model = config.model ?? DEFAULT_MODEL;
   }
 
-  async complete(prompt: string, opts?: CompleteOptions): Promise<string> {
-    const msg = await this.client.messages.create({
+  /** Build the shared SDK call parameters from CompleteOptions. */
+  private _sharedParams(opts?: CompleteOptions): SharedParams {
+    const params: SharedParams = {
       model: this.model,
       max_tokens: opts?.maxTokens ?? DEFAULT_MAX_TOKENS,
-      ...(opts?.system !== undefined ? { system: opts.system } : {}),
-      ...(opts?.temperature !== undefined ? { temperature: opts.temperature } : {}),
-      messages: [{ role: "user", content: prompt }],
-    });
+    };
+    if (opts?.system !== undefined) params.system = opts.system;
+    if (opts?.temperature !== undefined) params.temperature = opts.temperature;
+    return params;
+  }
+
+  /** Extract the text from a non-streaming SDK response, throwing on unexpected shapes. */
+  private _extractText(msg: Anthropic.Message): string {
     const block = msg.content[0];
     if (!block || block.type !== "text") {
       throw new Error(
@@ -32,6 +45,14 @@ export abstract class AnthropicBase implements LLMClient {
       );
     }
     return block.text;
+  }
+
+  async complete(prompt: string, opts?: CompleteOptions): Promise<string> {
+    const msg = await this.client.messages.create({
+      ...this._sharedParams(opts),
+      messages: [{ role: "user", content: prompt }],
+    });
+    return this._extractText(msg);
   }
 
   async chat(messages: Message[], opts?: CompleteOptions): Promise<string> {
@@ -40,28 +61,16 @@ export abstract class AnthropicBase implements LLMClient {
       content: m.content,
     }));
     const msg = await this.client.messages.create({
-      model: this.model,
-      max_tokens: opts?.maxTokens ?? DEFAULT_MAX_TOKENS,
-      ...(opts?.system !== undefined ? { system: opts.system } : {}),
-      ...(opts?.temperature !== undefined ? { temperature: opts.temperature } : {}),
+      ...this._sharedParams(opts),
       messages: sdkMessages,
     });
-    const block = msg.content[0];
-    if (!block || block.type !== "text") {
-      throw new Error(
-        `[keyboard-studio/llm] Unexpected response content: ${JSON.stringify(msg.content)}`
-      );
-    }
-    return block.text;
+    return this._extractText(msg);
   }
 
   async *completeStream(prompt: string, opts?: CompleteOptions): AsyncIterable<string> {
     try {
       const stream = await this.client.messages.create({
-        model: this.model,
-        max_tokens: opts?.maxTokens ?? DEFAULT_MAX_TOKENS,
-        ...(opts?.system !== undefined ? { system: opts.system } : {}),
-        ...(opts?.temperature !== undefined ? { temperature: opts.temperature } : {}),
+        ...this._sharedParams(opts),
         messages: [{ role: "user", content: prompt }],
         stream: true,
       });

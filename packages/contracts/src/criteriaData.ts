@@ -3,6 +3,7 @@
 // loader and the package's `./criteria` subpath export.
 
 import type { Criterion } from "./criteria";
+import { CriterionSchema } from "./schemas";
 import data from "../data/criteria.json" with { type: "json" };
 
 /**
@@ -12,11 +13,13 @@ import data from "../data/criteria.json" with { type: "json" };
  * section 19 (import output, 2 entries: 19.1 PR-body attribution block,
  * 19.2 HISTORY.md attribution bullet per D14) — enforced by the scaffolder/output service.
  *
- * Loaded statically from `packages/contracts/data/criteria.json`. The
- * `readonly Criterion[]` cast asserts conformance against the
- * {@link Criterion} discriminated union; a per-record schema test in
- * `types.test.ts` verifies the assertion holds at test time (#116 +
- * #71 coverage path).
+ * Loaded statically from `packages/contracts/data/criteria.json` and parsed
+ * through {@link CriterionSchema} at module-init time: every record is
+ * validated against the {@link Criterion} discriminated union (correct band,
+ * band-appropriate hook, no sibling-band hook) before the catalog is exposed.
+ * A malformed record throws here at load rather than surfacing as a
+ * silently-wrong value downstream. The schema is kept in lock-step with the
+ * {@link Criterion} type by the compile-time drift guards in `schemas.ts`.
  *
  * Consumers reach this catalog via the package barrel
  * (`@keyboard-studio/contracts`) or via the dedicated subpath export
@@ -27,7 +30,13 @@ import data from "../data/criteria.json" with { type: "json" };
  * @see spec.md §14 Decision 4
  * @see packages/contracts/data/criteria-summary.md
  */
-export const ALL_CRITERIA: readonly Criterion[] = data as readonly Criterion[];
+// `CriterionSchema.array().parse` throws on the first non-conforming record.
+// The `as readonly Criterion[]` only bridges zod's `T | undefined` optional
+// inference to the contract's exactOptionalPropertyTypes `?:` form — the data
+// is runtime-validated, not merely asserted.
+export const ALL_CRITERIA: readonly Criterion[] = CriterionSchema.array().parse(
+  data
+) as readonly Criterion[];
 
 /**
  * Per-band index built from {@link ALL_CRITERIA}. Useful for the Layer C

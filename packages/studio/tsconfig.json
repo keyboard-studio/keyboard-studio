@@ -5,7 +5,10 @@
     "jsx": "react-jsx",
     "noEmit": true,
     "allowImportingTsExtensions": true,
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "paths": {
+      "@docs/*": ["../../docs/*"]
+    }
   },
   "include": ["src/**/*", "vite.config.ts"],
   "exclude": ["dist", "node_modules", "src/**/*.test.ts", "src/**/*.test.tsx"]
