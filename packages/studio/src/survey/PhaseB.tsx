@@ -163,9 +163,18 @@ function TextSampleView({ onComplete, onBack }: TextSampleViewProps) {
   }, []);
 
   function add(): void {
-    const cluster = getFirstGrapheme(inputVal.trim().normalize("NFC"));
-    if (!cluster) return;
-    setChars((prev) => (prev.includes(cluster) ? prev : [...prev, cluster]));
+    const trimmed = inputVal.trim().normalize("NFC");
+    if (!trimmed) return;
+    const tokens = trimmed.split(/\s+/).filter(Boolean);
+    const newChars = tokens.map(getFirstGrapheme).filter(Boolean);
+    if (newChars.length === 0) return;
+    setChars((prev) => {
+      let result = [...prev];
+      for (const c of newChars) {
+        if (!result.includes(c)) result = [...result, c];
+      }
+      return result;
+    });
     setInputVal("");
     inputRef.current?.focus();
   }
@@ -228,7 +237,7 @@ function TextSampleView({ onComplete, onBack }: TextSampleViewProps) {
               add();
             }
           }}
-          placeholder="Type or paste a character…"
+          placeholder="Type characters (space-separated)…"
           aria-label="Character to add"
           style={{
             flex: 1,
