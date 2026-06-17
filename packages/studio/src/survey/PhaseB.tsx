@@ -317,6 +317,7 @@ function TextSampleView({ onComplete, onBack }: TextSampleViewProps) {
                     fontSize: 22,
                     fontFamily: "system-ui, sans-serif",
                     lineHeight: 1,
+                    color: "#58a6ff",
                   }}
                 >
                   {c}
