@@ -1,9 +1,5 @@
 import { KeySeq } from './KeySeq.tsx';
-
-const isCombining = (ch: string) => {
-  const c = ch?.codePointAt(0) ?? 0;
-  return c >= 0x0300 && c <= 0x036f;
-};
+import { isCombining } from '../../lib/irToCarveNodes.ts';
 
 interface MapChipProps {
   keys: string[];

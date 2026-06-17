@@ -6,8 +6,18 @@ import type {
   IRRule,
   IRGroup,
   KeyboardIR,
+  Pattern,
+  StoreItem,
 } from '@keyboard-studio/contracts';
-import type { Pattern } from '@keyboard-studio/contracts';
+
+// ---------------------------------------------------------------------------
+// isCombining — true for Unicode combining diacritical marks (U+0300–U+036F)
+// ---------------------------------------------------------------------------
+
+export const isCombining = (ch: string) => {
+  const c = ch?.codePointAt(0) ?? 0;
+  return c >= 0x0300 && c <= 0x036f;
+};
 
 export interface CarveGlyph {
   gid: string;
@@ -126,7 +136,7 @@ export function patternToGlyphs(pattern: Pattern, ir: KeyboardIR): CarveGlyph[] 
 // storeChars — extract displayable characters from a store's items
 // ---------------------------------------------------------------------------
 
-export function storeChars(store: { items: import('@keyboard-studio/contracts').StoreItem[] }): string[] {
+export function storeChars(store: { items: StoreItem[] }): string[] {
   return store.items
     .filter((item) => item.kind === 'char')
     .map((item) => (item as { kind: 'char'; value: string }).value);

@@ -3,18 +3,14 @@ import type { IRStore, KeyboardIR } from '@keyboard-studio/contracts';
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
 import { CardShell } from './CardShell.tsx';
 import { KindBadge } from './KindBadge.tsx';
-import { storeChars } from '../../lib/irToCarveNodes.ts';
+import { storeChars, isCombining } from '../../lib/irToCarveNodes.ts';
+import { ChevronIcon, discloseBtn } from './carveShared.tsx';
 
 interface StoreCardProps {
   store: IRStore;
   ir: KeyboardIR;
   flag?: string | undefined;
 }
-
-const isCombining = (ch: string) => {
-  const c = ch?.codePointAt(0) ?? 0;
-  return c >= 0x0300 && c <= 0x036f;
-};
 
 export function StoreCard({ store, ir, flag }: StoreCardProps) {
   const [open, setOpen] = useState(false);
@@ -76,18 +72,3 @@ export function StoreCard({ store, ir, flag }: StoreCardProps) {
   );
 }
 
-function ChevronIcon({ open }: { open: boolean }) {
-  return (
-    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
-      style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  );
-}
-
-const discloseBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 6,
-  marginTop: 10, padding: 0,
-  background: 'none', border: 'none',
-  color: 'var(--accent)', font: '600 13.5px var(--ui)', cursor: 'pointer',
-};

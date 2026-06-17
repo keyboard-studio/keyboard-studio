@@ -5,6 +5,7 @@ import { CardShell } from './CardShell.tsx';
 import { KindBadge, KIND_COLOR } from './KindBadge.tsx';
 import { MapChip } from './MapChip.tsx';
 import { groupToGlyphs } from '../../lib/irToCarveNodes.ts';
+import { ChevronIcon, discloseBtn } from './carveShared.tsx';
 
 interface GroupCardProps {
   group: IRGroup;
@@ -71,18 +72,3 @@ export function GroupCard({ group, flag }: GroupCardProps) {
   );
 }
 
-function ChevronIcon({ open }: { open: boolean }) {
-  return (
-    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
-      style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  );
-}
-
-const discloseBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 6,
-  marginTop: 10, padding: 0,
-  background: 'none', border: 'none',
-  color: 'var(--accent)', font: '600 13.5px var(--ui)', cursor: 'pointer',
-};

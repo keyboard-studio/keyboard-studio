@@ -3,7 +3,7 @@ import { useWorkingCopyStore } from './workingCopyStore.ts';
 import { makeTestIR } from '@keyboard-studio/contracts/fixtures';
 
 const reset = () =>
-  useWorkingCopyStore.setState({ ir: null, deletedNodeIds: new Set(), undoStack: [] });
+  useWorkingCopyStore.setState({ ir: null, deletedNodeIds: new Set(), deletedItemIds: new Set(), undoStack: [] });
 
 beforeEach(reset);
 
