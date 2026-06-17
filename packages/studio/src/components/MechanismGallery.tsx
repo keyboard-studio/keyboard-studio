@@ -33,6 +33,7 @@ import type {
   Pattern,
   PatternMatch,
   MechanismAssignment,
+  PlacementMap,
 } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { getPatternLibraryService } from "../lib/services.ts";
@@ -43,6 +44,8 @@ import { useInventoryDiff } from "../hooks/useInventoryDiff.ts";
 import { OSKFrame } from "./OSKFrame.tsx";
 import { OskModeToggle } from "./OskModeToggle.tsx";
 import type { OskMode } from "./OskModeToggle.tsx";
+import type { PlacementSeedEntry } from "../survey/placementSeeds.ts";
+import { getSuggestionForChar } from "../survey/placementSeeds.ts";
 
 // ---------------------------------------------------------------------------
 // Style constants — dark palette matching PhaseB
@@ -685,12 +688,20 @@ export interface MechanismGalleryProps {
   selectedBaseKeyboard: BaseKeyboard | null;
   onComplete?: () => void;
   onBack?: () => void;
+  /**
+   * Optional kbgen placement map. When supplied, MechanismGallery shows a
+   * suggestion row above the method chooser for any character that has a
+   * qualifying placement candidate (confidence >= default threshold).
+   * No kbgen data => no row; gallery behaves exactly as today.
+   */
+  placementMap?: PlacementMap;
 }
 
 export function MechanismGallery({
   selectedBaseKeyboard,
   onComplete,
   onBack,
+  placementMap,
 }: MechanismGalleryProps) {
   const recordAssignments = useWorkingCopyStore((s) => s.recordAssignments);
   const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
@@ -860,8 +871,24 @@ export function MechanismGallery({
   const [selectedSwapKey, setSelectedSwapKey] = useState("");
   const [selectedRaltKey, setSelectedRaltKey] = useState("");
 
+  // kbgen placement suggestion for the current character (null when no map or
+  // no qualifying candidate). Memoized against currentChar + placementMap so it
+  // only recomputes on actual input changes, not on unrelated re-renders.
+  const suggestion = useMemo(
+    (): PlacementSeedEntry | null =>
+      placementMap !== undefined && currentChar !== null
+        ? getSuggestionForChar(currentChar, placementMap)
+        : null,
+    [currentChar, placementMap],
+  );
+
+  // Whether the author has dismissed the suggestion row for the current char.
+  // Reset to false whenever currentChar changes (see effect below).
+  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
+
   // Reset inputs whenever currentChar changes.
   useEffect(() => {
+    setSuggestionDismissed(false);
     setMethod("sequence");
     setSeqFirst("");
     setSeqSecond("");
@@ -874,6 +901,57 @@ export function MechanismGallery({
       setDeadkeyBaseLetter("");
     }
   }, [currentChar]);
+
+  // ---------------------------------------------------------------------------
+  // Suggestion row handlers
+  // ---------------------------------------------------------------------------
+
+  // Accept: immediately apply the suggested assignment (same logic as handleApply
+  // for swap/ralt, but using the candidate's vkey directly to avoid the async
+  // state-update window that would occur if we pre-filled pickers first).
+  const handleSuggestionAccept = useCallback(() => {
+    if (suggestion === null || currentChar === null) return;
+    const { vkey } = suggestion.topCandidate;
+    let assignment: MechanismAssignment;
+    if (suggestion.strategyId === "S-01") {
+      const cp = currentChar.codePointAt(0)?.toString(16).toUpperCase().padStart(4, "0") ?? "0000";
+      assignment = {
+        scope: "individual",
+        target: currentChar,
+        modality: "physical",
+        mechanisms: [{ patternId: PATTERN_SWAP, strategyId: "S-01", slotValues: { kmnRules: `+ [${vkey}] > U+${cp}` } }],
+        source: "user",
+      };
+    } else if (suggestion.strategyId === "S-08") {
+      assignment = {
+        scope: "individual",
+        target: currentChar,
+        modality: "physical",
+        mechanisms: [{ patternId: PATTERN_RALT, strategyId: "S-08", slotValues: { altgrKeyList: `[RALT ${vkey}]`, altgrOutputList: currentChar } }],
+        source: "user",
+      };
+    } else {
+      setSuggestionDismissed(true);
+      console.warn(`[MechanismGallery] handleSuggestionAccept: unrecognised strategyId "${suggestion.strategyId}" — dismissing suggestion`);
+      return;
+    }
+    // eslint-disable-next-line no-console
+    console.log(`[DIAG:handleSuggestionAccept] recording assignment for "${currentChar}", strategyId=${suggestion.strategyId}`);
+    recordAssignments([...sessionAssignments, assignment]);
+    setSuggestionDismissed(true);
+    setMethod("sequence");
+    setSeqFirst("");
+    setSeqSecond("");
+    setTriggerKey("K_COLON");
+    setDeadkeyBaseLetter("");
+    setSelectedSwapKey("");
+    setSelectedRaltKey("");
+  }, [suggestion, currentChar, sessionAssignments, recordAssignments]);
+
+  // Change: dismiss the suggestion row; pickers stay blank for manual selection.
+  const handleSuggestionChange = useCallback(() => {
+    setSuggestionDismissed(true);
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Apply action
@@ -1369,6 +1447,85 @@ export function MechanismGallery({
                   </span>
                 </div>
               </div>
+
+              {/* kbgen suggestion row — shown above method chooser when a
+                  qualifying placement candidate exists and hasn't been dismissed.
+                  [Accept] pre-fills method + key picker; [Change] dismisses the
+                  row so the author can select manually. No kbgen data => null =>
+                  row is absent and gallery behaves exactly as today. */}
+              {suggestion !== null && !suggestionDismissed && (
+                <div
+                  role="note"
+                  aria-label="Placement suggestion from kbgen seeder"
+                  style={{
+                    background: "#0d2218",
+                    border: "1px solid #238636",
+                    borderRadius: 8,
+                    padding: "10px 14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 12,
+                      color: "#56d364",
+                      fontFamily: FONT,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {(() => {
+                      const keyName = suggestion.topCandidate.vkey.replace(/^K_/, "");
+                      return suggestion.strategyId === "S-01"
+                        ? `Suggested: Replace ${keyName} with ${currentChar ?? ""}`
+                        : `Suggested: Right Alt + ${keyName} for ${currentChar ?? ""}`;
+                    })()}
+                  </p>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={handleSuggestionAccept}
+                      aria-label={
+                        suggestion.strategyId === "S-01"
+                          ? `Accept suggestion: assign ${currentChar} to ${suggestion.topCandidate.vkey}`
+                          : `Accept suggestion: RAlt + ${suggestion.topCandidate.vkey} for ${currentChar}`
+                      }
+                      style={{
+                        padding: "5px 14px",
+                        background: "#238636",
+                        border: "none",
+                        borderRadius: 5,
+                        color: "#e6edf3",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        fontFamily: FONT,
+                      }}
+                    >
+                      Accept
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSuggestionChange}
+                      aria-label="Dismiss suggestion and choose method manually"
+                      style={{
+                        padding: "5px 14px",
+                        background: "transparent",
+                        border: `1px solid ${BORDER}`,
+                        borderRadius: 5,
+                        color: TEXT_DIM,
+                        fontSize: 12,
+                        cursor: "pointer",
+                        fontFamily: FONT,
+                      }}
+                    >
+                      Change
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Method chooser */}
               <MethodChooser

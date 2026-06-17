@@ -39,7 +39,7 @@
 //   We convert to the actual character via String.fromCodePoint.
 
 import type { PlacementMap, PlacementEntry, PlacementCandidate } from "@keyboard-studio/contracts";
-import { topCandidate, strategyForCandidate } from "@keyboard-studio/contracts";
+import { topCandidate, strategyForCandidate, parseUPlusNotation, toUPlusNotation } from "@keyboard-studio/contracts";
 import type { StrategyId } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
@@ -87,25 +87,6 @@ export interface PlacementSeedEntry {
    * (e.g. showing the proposed key in an advisory chip), NOT for strategy input.
    */
   topCandidate: PlacementCandidate;
-}
-
-// ---------------------------------------------------------------------------
-// Codepoint conversion
-// ---------------------------------------------------------------------------
-
-/**
- * Convert a "U+XXXX" codepoint string to the actual Unicode character.
- * Returns undefined if the codepoint string is not well-formed.
- */
-function codepointToChar(codepoint: string): string | undefined {
-  const match = /^U\+([0-9A-Fa-f]{4,6})$/.exec(codepoint);
-  if (match === null) return undefined;
-  const cp = parseInt(match[1]!, 16);
-  try {
-    return String.fromCodePoint(cp);
-  } catch {
-    return undefined;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -166,8 +147,8 @@ export function extractSeedEntries(
     const top = topCandidate(entry);
     if (top === undefined) continue;
 
-    const character = codepointToChar(entry.codepoint);
-    if (character === undefined) continue;
+    const character = parseUPlusNotation(entry.codepoint);
+    if (character === null) continue;
 
     result.push({
       character,
@@ -187,4 +168,50 @@ export function extractSeedEntries(
 function qualifiesForSeed(entry: PlacementEntry, threshold: number): boolean {
   const top = topCandidate(entry);
   return top !== undefined && top.confidence >= threshold;
+}
+
+// ---------------------------------------------------------------------------
+// Single-character lookup
+// ---------------------------------------------------------------------------
+
+/**
+ * Return the {@link PlacementSeedEntry} for a single character if the
+ * PlacementMap contains a qualifying entry for it, or `null` otherwise.
+ *
+ * Use this when a UI component needs to check whether one specific character
+ * already has a suggested placement (e.g. to decide whether to render a
+ * pre-fill chip next to a character-picker item).
+ *
+ * @param char          The Unicode character to look up (must be a single
+ *                      code point; callers are responsible for grapheme
+ *                      segmentation).
+ * @param placementMap  The seeder output from kbgen / the survey pipeline.
+ * @param threshold     Confidence threshold below which the top candidate is
+ *                      treated as absent.  Defaults to
+ *                      {@link PLACEMENT_SEED_CONFIDENCE_THRESHOLD} (0.5).
+ * @returns A {@link PlacementSeedEntry} if a qualifying entry exists, or
+ *          `null` if the character is not in the map or its top candidate
+ *          falls below the threshold.
+ */
+export function getSuggestionForChar(
+  char: string,
+  placementMap: PlacementMap,
+  threshold = PLACEMENT_SEED_CONFIDENCE_THRESHOLD,
+): PlacementSeedEntry | null {
+  if (char.length === 0) return null;
+
+  const codepoint = toUPlusNotation(char);
+
+  const entry = placementMap.entries.find((e) => e.codepoint === codepoint);
+  if (entry === undefined) return null;
+
+  const candidate = topCandidate(entry);
+  if (candidate === undefined || candidate.confidence < threshold) return null;
+
+  return {
+    character: char,
+    codepoint,
+    strategyId: strategyForCandidate(candidate),
+    topCandidate: candidate,
+  };
 }

@@ -204,7 +204,7 @@ describe("extractSeedEntries — edge cases", () => {
 
   it("malformed codepoint is silently skipped — no throw, char absent from seed", () => {
     // codepointToChar returns undefined for codepoints that are not valid U+XXXX format.
-    // Both "U+XYZ" (non-hex) and "0253" (missing U+ prefix) are malformed.
+    // "U+XYZ" and "Z253" are genuinely unparseable under the current parseUPlusNotation contract.
     const malformedMap: PlacementMap = {
       entries: [
         {
@@ -214,7 +214,7 @@ describe("extractSeedEntries — edge cases", () => {
           ],
         },
         {
-          codepoint: "0253",
+          codepoint: "Z253",
           candidates: [
             { vkey: "K_B", modifiers: [], mechanism: "direct", priorSource: "phonetic", priorCount: 0, confidence: 0.9 },
           ],
@@ -244,7 +244,7 @@ describe("extractSeedEntries — edge cases", () => {
     const seedStr = seeds!.get("pb_special_letters_list");
     expect(seedStr).toBe("ɛ");
     expect(seedStr).not.toContain("U+XYZ");
-    expect(seedStr).not.toContain("0253");
+    expect(seedStr).not.toContain("Z253");
   });
 
   it("buildPlacementSeeds(fixture, NaN) does not throw and returns an empty map", () => {

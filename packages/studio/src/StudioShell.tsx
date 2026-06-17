@@ -450,6 +450,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   if (stage === "mechanisms") {
     return (
       <div style={{ height: "100%", overflow: "hidden" }}>
+        {/* TODO(placementMap-wiring): thread the PlacementMap from the working-copy
+            context once it is stored there (requires a workingCopyStore field +
+            seeder integration). The `placementMap` prop on MechanismGallery is
+            optional — gallery behaves exactly as today when it is absent. */}
         <MechanismGallery
           selectedBaseKeyboard={localBase}
           onComplete={handleMechanismsComplete}

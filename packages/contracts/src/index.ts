@@ -53,6 +53,11 @@ export * from "./ir/producedSet";
 export * from "./keyboardIRRoundTrip";
 
 // ---------------------------------------------------------------------------
+// Utilities — shared pure helpers consumed across packages.
+// ---------------------------------------------------------------------------
+export * from "./utils/charUtils";
+
+// ---------------------------------------------------------------------------
 // Loader / data — modules that load checked-in data files (criteria.json) and
 // re-export as typed `readonly` arrays / records.
 // ---------------------------------------------------------------------------
