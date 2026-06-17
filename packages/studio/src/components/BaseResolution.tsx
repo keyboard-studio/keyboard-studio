@@ -1,7 +1,8 @@
 // Base-resolution step of the hybrid flow (spec §8 "Base resolution"). Given the
 // (language, script) target from identity-lite, lists the available bases via
-// BaseBrowserService, ranks them with suggestBases() (language > script >
-// US-QWERTY fallback), and lets the author accept a suggestion or pick any base.
+// BaseBrowserService, ranks them with suggestBases() (language+script >
+// script > language-cross-script > US-QWERTY fallback), and lets the author
+// accept a suggestion or pick any base.
 // The chosen base then back-fills the prefill confirmations. refs #369.
 
 import { useEffect, useMemo, useState } from "react";
@@ -17,12 +18,14 @@ import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
 const REASON_LABEL: Record<SuggestReason, string> = {
   "language-match": "Already supports your language",
   "script-match": "Matches your script",
+  "language-cross-script": "Supports your language, different script",
   "us-qwerty-fallback": "Start blank (US QWERTY)",
 };
 
 const REASON_COLOR: Record<SuggestReason, string> = {
   "language-match": "#2ea043",
   "script-match": "#6ea8fe",
+  "language-cross-script": "#d29922",
   "us-qwerty-fallback": "#8b949e",
 };
 
@@ -46,7 +49,7 @@ export function BaseResolution({
   useEffect(() => {
     let live = true;
     getBaseBrowserService()
-      .then((svc) => svc.listAll())
+      .listAll()
       .then(
         (kbs) => {
           if (!live) return;

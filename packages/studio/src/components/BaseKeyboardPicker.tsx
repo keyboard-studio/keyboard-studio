@@ -122,9 +122,8 @@ export function BaseKeyboardPicker({ value, onChange }: BaseKeyboardPickerProps)
     let cancelled = false;
     setLoading(true);
     setError(null);
-    // getBaseBrowserService() is now async (lazy engine import).
     getBaseBrowserService()
-      .then((svc) => svc.listAll())
+      .listAll()
       .then(
         (list) => {
           if (cancelled) return;

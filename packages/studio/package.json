@@ -8,6 +8,7 @@
     "dev": "vite",
     "prebuild": "pnpm --filter @keyboard-studio/contracts --filter @keyboard-studio/engine run build",
     "build": "tsc -b && vite build",
+    "postbuild": "node scripts/build-keyboards-index.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",

@@ -1,9 +1,19 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
+import { localKeyboardsPlugin } from "./vite-plugins/localKeyboards.ts";
+
+// Sibling clone of keymanapp/keyboards (see CLAUDE.md). KEYBOARDS_REPO env
+// overrides for non-standard layouts. Resolves to <repoRoot>/../keyboards.
+const KEYBOARDS_REPO_ROOT =
+  process.env["KEYBOARDS_REPO"] ??
+  fileURLToPath(new URL("../../../keyboards", import.meta.url));
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    localKeyboardsPlugin({ keyboardsRepoRoot: KEYBOARDS_REPO_ROOT }),
+  ],
   resolve: {
     alias: {
       // [SCAFFOLD] path shim required while @keymanapp/kmc-kmn is used

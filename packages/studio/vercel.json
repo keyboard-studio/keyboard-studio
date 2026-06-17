@@ -4,6 +4,10 @@
     {
       "source": "/kbd-proxy/:path*",
       "destination": "https://raw.githubusercontent.com/keymanapp/keyboards/master/:path*"
+    },
+    {
+      "source": "/local-kbd-proxy/:path*",
+      "destination": "https://raw.githubusercontent.com/keymanapp/keyboards/master/:path*"
     }
   ]
 }
