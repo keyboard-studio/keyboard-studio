@@ -82,16 +82,12 @@ export async function serializeWorkingCopy(): Promise<SerializeWorkingCopyResult
     return null;
   }
 
-  // Determine the keyboard id for projection (base id) and for the zip filename.
-  // The projection always runs against the base id (internal VFS paths are
-  // source/<baseId>.kmn until the scaffolder internal-rename pipeline lands).
-  // The zip filename uses the author-chosen identity.keyboardId when set,
-  // so the downloaded artifact is named after the new keyboard even though
-  // the internal paths still reference the base id.
-  //
-  // TODO(track1-internal-rename): when the scaffolder identity-propagation
-  // pipeline is wired (source/<id>.kmn/.kps/.kvks/.kpj rename), update this
-  // to project against identity.keyboardId and remove this comment.
+  // Carve / assignments / identity run against the base id (VFS paths are
+  // still source/<baseId>.kmn at that point). When identity.keyboardId is set
+  // and differs, projectWorkingCopyVfs's final rename step rewrites the .kmn
+  // path stores, renames source/<baseId>.* → source/<newId>.*, and rewrites
+  // `.kmw-keyboard-<baseId>` selectors in *.css plus <ID> / <kbdname>
+  // references in *.kps and *.kvks.
   const keyboardId = baseKeyboard.id;
   const outputKeyboardId = identity?.keyboardId ?? keyboardId;
 
@@ -137,10 +133,12 @@ export async function serializeWorkingCopy(): Promise<SerializeWorkingCopyResult
   //    Uint8Array directly, deep-copy the binary entries here.
   const clonedVfs = createVirtualFS(baseVfs.entries());
 
-  // 5. Project the working copy onto the cloned VFS.
+  // 5. Project the working copy onto the cloned VFS. targetKeyboardId triggers
+  //    the final rename pass when the author picked a different id.
   const { warnings } = projectWorkingCopyVfs({
     vfs: clonedVfs,
     keyboardId,
+    targetKeyboardId: outputKeyboardId,
     baseIr,
     deletedNodeIds,
     assignments: sessionAssignments,
@@ -152,16 +150,5 @@ export async function serializeWorkingCopy(): Promise<SerializeWorkingCopyResult
   const toZip = await getToZip();
   const bytes = await toZip(clonedVfs);
 
-  // When the author chose a different keyboard id than the base id, emit a
-  // warning so the caller can surface it (internal paths still use base id).
-  const extraWarnings: string[] = [];
-  if (identity?.keyboardId !== undefined && identity.keyboardId !== keyboardId) {
-    extraWarnings.push(
-      `[serialize] zip named ${outputKeyboardId}.zip but internal source paths ` +
-      `still reference ${keyboardId} — full id rename requires the scaffolder ` +
-      `identity-propagation pipeline (see TODO(track1-internal-rename)).`,
-    );
-  }
-
-  return { bytes, warnings: [...warnings, ...extraWarnings], keyboardId: outputKeyboardId, version };
+  return { bytes, warnings, keyboardId: outputKeyboardId, version };
 }

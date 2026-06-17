@@ -330,16 +330,16 @@ describe("serializeWorkingCopy — identity.keyboardId drives zip filename", () 
     expect(result!.keyboardId).toBe("ha_sil");
   });
 
-  it("warns when identity.keyboardId differs from base id (internal-path mismatch)", async () => {
+  it("does NOT emit the internal-path mismatch warning when identity.keyboardId differs from base id (rename now runs)", async () => {
     const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
     seedStore();
     useWorkingCopyStore.getState().setIdentity({ keyboardId: "ha_sil" });
     const result = await serializeWorkingCopy();
     expect(result).not.toBeNull();
     const hasMismatchWarn = result!.warnings.some((w) =>
-      w.includes("ha_sil") && w.includes(basicKbdus.id),
+      w.includes("internal source paths"),
     );
-    expect(hasMismatchWarn).toBe(true);
+    expect(hasMismatchWarn).toBe(false);
   });
 
   it("does NOT emit the internal-path mismatch warning when identity.keyboardId matches base id", async () => {

@@ -1,5 +1,7 @@
 # criteria.md triage summary
 
+> **Canonical per-band recompute.** The numbers below are recomputed directly from `criteria.json`. The total and per-band split (148; 40/66/32/10) are **enforced** by `packages/contracts/src/{types,schemas}.test.ts` — a change to `criteria.json` that breaks the count fails the build. Prose mentions elsewhere (spec.md §11, CLAUDE.md, README) cross-link here; update this file when the data changes.
+
 This document records the triage outcome for all criteria drawn from `docs/criteria.md`, performed as part of Day-1 issue #6. Each criterion was assigned to one of four enforcement bands defined in spec.md Section 14, Decision D4: `scaffolder-bake` (enforced at scaffold time), `layer-c-enforce` (blocked by the lint engine), `yellow-survey` (surfaced as a plain-language survey question), and `red-checklist` (manual pre-submit checklist item). The result is encoded in `packages/contracts/data/criteria.json` as a `Criterion[]` array conforming to the interface in `packages/contracts/src/criteria.ts`, as described in spec.md Section 11's example triage table.
 
 ## Per-band counts

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { BaseKeyboard, VirtualFS, KeyboardIR, KpsFontEntry, KpsStylesheetEntry } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { LOCAL_PROXY_BASE, getScaffolderService } from "../lib/services.ts";
+import { getScaffolderService } from "../lib/services.ts";
 import { findKmnPath } from "../lib/findKmnPath.ts";
 
 interface EngineModule {
@@ -453,10 +453,10 @@ export function useKeyboardArtifact(
         // Open-base path — fetch existing keyboard source. Bounded by a
         // timeout so a stalled proxy/network request surfaces a retryable
         // error instead of an indefinite "Loading keyboard source..." overlay.
+        // proxyBase defaults to "/kbd-proxy" inside fetchKeyboardSourceToVfs,
+        // which Vite proxies to raw.githubusercontent.com in both dev and prod.
         const fetchResult = await withTimeout(
-          engineRef.current.fetchKeyboardSourceToVfs(kb, vfs, {
-            proxyBase: LOCAL_PROXY_BASE,
-          }),
+          engineRef.current.fetchKeyboardSourceToVfs(kb, vfs),
           FETCH_TIMEOUT_MS,
           "Loading keyboard source",
         );
@@ -516,6 +516,27 @@ export function useKeyboardArtifact(
         scaffoldWarnings.push(...transformResult.warnings);
         // eslint-disable-next-line no-console
         console.log(`[DIAG:run] transform applied. warnings=${transformResult.warnings.length}`);
+
+        // Rebuild the keyboard CSS blob URLs from the projected VFS so the OSK
+        // frame's <style> tags carry the post-rename `.kmw-keyboard-<newId>`
+        // selectors. The stylesheets captured at fetch time (used to seed
+        // prevKeyboardCssBlobUrls) hold pre-rename cssText and would otherwise
+        // ship the base id's wrapper class — which KMW wraps the runtime
+        // keyboard in with the new id, so the rules never match.
+        const projectedVfs = vfsRef.current;
+        const cssPaths = projectedVfs
+          .list("")
+          .filter((p) => p.endsWith(".css"));
+        if (cssPaths.length > 0) {
+          for (const url of prevKeyboardCssBlobUrls.current) URL.revokeObjectURL(url);
+          prevKeyboardCssBlobUrls.current = [];
+          for (const cssPath of cssPaths) {
+            const entry = projectedVfs.get(cssPath);
+            if (entry === undefined || typeof entry.content !== "string") continue;
+            const blob = new Blob([entry.content], { type: "text/css" });
+            prevKeyboardCssBlobUrls.current.push(URL.createObjectURL(blob));
+          }
+        }
       } catch (err: unknown) {
         if (runId.current !== thisRunId) return;
         const message =

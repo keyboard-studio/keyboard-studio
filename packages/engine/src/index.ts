@@ -69,8 +69,10 @@ export { recognizePatterns } from "./recognizer/index.js";
 export type { RecognizerRule, MatchResult, RecognizeResult } from "./recognizer/index.js";
 
 // Issue #19 — scaffolder (template-cleanup pipeline).
-export { createScaffolderService } from "./scaffolder/index.js";
+export { createScaffolderService, renameFilesInVfs } from "./scaffolder/index.js";
+export { scaffoldIR, resetIdentity } from "./scaffolder/scaffold-ir.js";
 export type { ScaffolderServiceOptions } from "./scaffolder/index.js";
+export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffolder/scaffold-ir.js";
 
 // Issue #21 — Pattern-library loader.
 export { loadPatterns, getPatterns, getById } from "./pattern-library/index.js";
@@ -80,6 +82,18 @@ export { filterFor } from "./pattern-library/index.js";
 
 // Strategy selector: §7.2 decision tree.
 export { selectStrategy } from "./strategy-selector/index.js";
+// §7.2 decision tree as data — drives both selectStrategy and the studio Flow Map.
+export {
+  PRIMARY_RULES,
+  SECONDARY_RULES,
+  STRATEGY_LABELS,
+} from "./strategy-selector/rules.js";
+export type {
+  PrimaryRuleDef,
+  SecondaryRuleDef,
+  SecondaryRuleId,
+  ConditionalSecondary,
+} from "./strategy-selector/rules.js";
 
 // Issue #248 — Sprint-1 identity stub mutator (deleted at Sprint-2 start per #238).
 export { applyIdentityStubMutation } from "./stub-mutator/index.js";

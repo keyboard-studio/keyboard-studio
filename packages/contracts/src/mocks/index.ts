@@ -1,6 +1,6 @@
 // see spec.md section 12 — mocks barrel
 
-// Retained for studio-poc backward compatibility and mock fixture construction only.
+// Retained for mock fixture construction only.
 // New callers should use createVirtualFS() from @keyboard-studio/contracts instead.
 export { makeMockVirtualFS, scaffoldedFS } from "./mockVirtualFS";
 export { mockBaseBrowser } from "./mockBaseBrowser";

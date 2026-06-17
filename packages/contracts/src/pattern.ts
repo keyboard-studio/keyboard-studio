@@ -1,4 +1,8 @@
-// see spec.md section 5 - Pattern schema (Day-1 contract)
+// Pattern schema — the Day-1 contract. THIS interface is canonical.
+// Prose spec: specs/005-pattern-schema/spec.md (spec.md §5 is a stub pointer).
+// Runtime mirror + data-file validation: ./schemas.ts (zod; bound to this file
+// by compile-time drift guards — edit a field here and its schema there in the
+// same change, or the build fails).
 
 import type { StrategyId } from "./strategy";
 import type { IRNodeRef } from "./keyboard-ir";
@@ -44,7 +48,11 @@ export interface PatternQuestion {
   answerType: AnswerType;
   /** For "select" type: the available options. */
   options?: Array<{ value: string; label: string }>;
-  /** Default value pre-filled when the base keyboard suggests one. */
+  /**
+   * Statically-known default. The live default may instead be derived per session
+   * (base, corpus, axis fill, CLDR/identity) and carry its own provenance; optionality is a
+   * static-slot vs. runtime-fill split, not licence to ask blank (spec §3c / §5 "Base-derived pre-fill").
+   */
   default?: string;
   /**
    * Whether this slot must be filled before a Pattern can be applied.

@@ -15,21 +15,11 @@
 import type { Plugin } from "vite";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import type { BaseKeyboard } from "@keyboard-studio/contracts";
 
 export interface LocalKeyboardsOptions {
   /** Absolute path to the keymanapp/keyboards clone root. */
   keyboardsRepoRoot: string;
-}
-
-interface BaseKeyboardLite {
-  id: string;
-  path: string;
-  script: string;
-  targets: string[];
-  displayName: string;
-  version: string;
-  sourceUrl?: string;
-  languages?: string[];
 }
 
 const STORE_NAME_RE = /^\s*store\s*\(\s*&NAME\s*\)\s*'([^']*)'/im;
@@ -84,10 +74,10 @@ function parseKmnMetadata(kmnPath: string): { name: string; version: string } {
   }
 }
 
-function scan(keyboardsRepoRoot: string): BaseKeyboardLite[] {
+function scan(keyboardsRepoRoot: string): BaseKeyboard[] {
   const releaseDir = path.join(keyboardsRepoRoot, "release");
   if (!fs.existsSync(releaseDir)) return [];
-  const out: BaseKeyboardLite[] = [];
+  const out: BaseKeyboard[] = [];
   for (const vendor of fs.readdirSync(releaseDir)) {
     const vendorDir = path.join(releaseDir, vendor);
     let stat: fs.Stats;
@@ -115,7 +105,7 @@ function scan(keyboardsRepoRoot: string): BaseKeyboardLite[] {
       const meta = parseKmnMetadata(kmnPath);
       const kpsPath = path.join(kbDir, "source", `${id}.kps`);
       const languages = parseKpsLanguages(kpsPath);
-      const entry: BaseKeyboardLite = {
+      const entry: BaseKeyboard = {
         id,
         path: `release/${vendor}/${id}`,
         // [SCAFFOLD] script hardcoded to "Latn" — derive from .kpj
@@ -135,7 +125,7 @@ function scan(keyboardsRepoRoot: string): BaseKeyboardLite[] {
 }
 
 export function localKeyboardsPlugin(opts: LocalKeyboardsOptions): Plugin {
-  let catalogCache: BaseKeyboardLite[] | null = null;
+  let catalogCache: BaseKeyboard[] | null = null;
   return {
     name: "local-keyboards",
     configureServer(server) {

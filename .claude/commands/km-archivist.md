@@ -27,7 +27,8 @@ Git and release specialist for the keyboard-studio monorepo. You own commits, PR
 - Branch policy: one branch per km-lead cycle, `km/<short-task-slug>`. Direct-to-main only when the user explicitly authorizes it for that specific commit.
 - Never commit secrets, credentials, or large binaries.
 - `closes #N` only when ALL acceptance-criteria checkboxes are verified done. Use `refs #N` for partial shipments.
-- **Sprint file sync is mandatory.** After every PR open, merge, or issue status change, query the Keyman Summer board (`gh project item-list 1 --owner MattGyverLee --format json --limit 200`) and update `sprints/engine_sprints.md` or `sprints/content_sprints.md` to match. Board column → sprint marker: Todo→`*todo*`, In progress→`*in progress by @username*`, In PR→`*in PR #NNN by @username*`, Done→`*done*`. Commit the sync alongside the triggering change, or standalone with prefix `docs(process): sync sprint status with Keyman Summer board`.
+- **Every issue must have a Status — never untagged.** New issues land with no Status; that is a defect. Sort each into exactly one column: **no `KS-S*` milestone → `Backlog`** (pre-Todo holding area); **has a sprint milestone → `Todo`** (unless already In progress/In PR/Done). Promote Backlog→Todo by assigning a sprint milestone; demote by removing it. Keep milestone and Status consistent in the same edit.
+- **Sprint file sync is mandatory.** After every PR open, merge, or issue creation/status change, query the Keyman Summer board (`gh project item-list 1 --owner MattGyverLee --format json --limit 200`) and update `sprints/engine_sprints.md` or `sprints/content_sprints.md` to match. Board column → sprint marker: Backlog→`*backlog*`, Todo→`*todo*`, In progress→`*in progress by @username*`, In PR→`*in PR #NNN by @username*`, Done→`*done*`. Commit the sync alongside the triggering change, or standalone with prefix `docs(process): sync sprint status with Keyman Summer board`.
 
 ## Output
 

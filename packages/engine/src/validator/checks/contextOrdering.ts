@@ -56,7 +56,6 @@ function scanPastGuardArg(str: string, start: number): number {
 function stripGuardTokens(ctx: string): string {
   const GUARD_KW_RE = /\b(if|platform|baselayout)\s*\(/gi;
   let result = ctx;
-  let offset = 0; // accumulated shift if we ever change string length (we don't)
 
   // We rebuild result character-by-character using a fresh scan to avoid
   // RegExp-lastIndex complications after mutations.

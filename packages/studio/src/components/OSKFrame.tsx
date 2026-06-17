@@ -56,10 +56,16 @@ export function OSKFrame({
     // (e.g. GalleryPreviewWithPatterns) that compile with baseKeyboard.id
     // while the store identity holds a different Track-1 scaffolded id.
     const activeKeyboardId = stage.keyboardId;
+    // Forward the keyboard's declared language tag so KMW's setActiveKeyboard
+    // activates under the same bcp47 the compiled .js registers — otherwise it
+    // defaults to "en" and errors with "Cannot find the <id> keyboard for
+    // English" on any non-English keyboard.
+    const activeBcp47 = baseKeyboard.languages?.[0];
     send({
       type: "SET_KEYBOARD",
       jsUrl: stage.jsBlobUrl,
       keyboardId: activeKeyboardId,
+      ...(activeBcp47 !== undefined && activeBcp47 !== "" ? { bcp47: activeBcp47 } : {}),
       ...(stage.fontFaceUrl !== undefined ? { fontFaceUrl: stage.fontFaceUrl } : {}),
       ...(stage.fontFaceFamily !== undefined ? { fontFaceFamily: stage.fontFaceFamily } : {}),
       ...(stage.keyboardCssUrls !== undefined && stage.keyboardCssUrls.length > 0

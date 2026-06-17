@@ -40,6 +40,7 @@ export interface SuggestOptions {
 export type SuggestReason =
   | "language-match"
   | "script-match"
+  | "language-cross-script"
   | "us-qwerty-fallback";
 
 export interface BaseSuggestion {
@@ -55,10 +56,24 @@ function primarySubtag(tag: string): string {
   return first.toLowerCase();
 }
 
+/**
+ * True when the BCP47 tag carries an explicit ISO 15924 script subtag (a
+ * 4-letter token after the primary language subtag, e.g. `hi-Latn` → true,
+ * `ewo` → false). When the author has *explicitly* picked a script, the
+ * language-cross-script tier must not surface bases on other scripts —
+ * that would defeat the romanization the author just chose (spec §8/§9
+ * decoupling). When the tag has no script subtag the choice is open and
+ * cross-script suggestions are useful.
+ */
+function hasExplicitScriptSubtag(tag: string): boolean {
+  return tag.split("-").slice(1).some((part) => /^[A-Za-z]{4}$/.test(part));
+}
+
 const RANK: Record<SuggestReason, number> = {
   "language-match": 0,
   "script-match": 1,
-  "us-qwerty-fallback": 2,
+  "language-cross-script": 2,
+  "us-qwerty-fallback": 3,
 };
 
 /**
@@ -68,6 +83,9 @@ const RANK: Record<SuggestReason, number> = {
  *   base supports a BCP47 tag whose primary language subtag matches the target's
  *   (requires `opts.languagesById`).
  * - **script-match** — the base's `script` equals the target script.
+ * - **language-cross-script** — the base supports the target language but its
+ *   script differs from the target (requires `opts.languagesById`). Surfaces
+ *   keyboards a language already has, on other writing systems.
  * - **us-qwerty-fallback** — the US-QWERTY base (`opts.fallbackId`), always
  *   offered last if present in `bases`, even when nothing else matches (this is
  *   the "blank" keyboard, which *is* US QWERTY).
@@ -86,22 +104,28 @@ export function suggestBases(
 ): BaseSuggestion[] {
   const fallbackId = opts.fallbackId ?? DEFAULT_FALLBACK_ID;
   const targetLang = target.bcp47 ? primarySubtag(target.bcp47) : undefined;
+  const explicitScript =
+    target.bcp47 !== undefined && hasExplicitScriptSubtag(target.bcp47);
   const langs = opts.languagesById ?? {};
 
   const reasonFor = (base: BaseKeyboard): SuggestReason | null => {
     const scriptMatch = base.script === target.script;
-    const langMatch =
-      scriptMatch &&
+    const languageDeclared =
       targetLang !== undefined &&
       (langs[base.id] ?? []).some((tag) => primarySubtag(tag) === targetLang);
-    // A genuine language match is the strongest signal — surface it even for the
-    // fallback base (e.g. basic_kbdus genuinely covers English).
-    if (langMatch) return "language-match";
+    const langAndScriptMatch = scriptMatch && languageDeclared;
+    // A genuine language+script match is the strongest signal — surface it even
+    // for the fallback base (e.g. basic_kbdus genuinely covers English).
+    if (langAndScriptMatch) return "language-match";
     // Otherwise the US-QWERTY fallback is always the generic "blank" option,
-    // ranked last even when it happens to match the script — a more specific
-    // base should win.
+    // ranked below script and language-cross-script — a more specific base
+    // should win.
     if (base.id === fallbackId) return "us-qwerty-fallback";
     if (scriptMatch) return "script-match";
+    // language-cross-script suppressed when the author explicitly picked a
+    // script (e.g. hi-Latn) — surfacing the Devanagari base would defeat the
+    // romanization they just chose.
+    if (languageDeclared && !explicitScript) return "language-cross-script";
     return null;
   };
 

@@ -24,7 +24,7 @@ Language experts know their language's phonology, orthography, and character inv
 | [`docs/spec-signoff.md`](docs/spec-signoff.md) | The review-cycle log and the baked-in decisions (D1–D9). |
 | [`packages/contracts/`](packages/contracts/) | The locked Day-1 shared TypeScript contract: types, service interfaces, mocks, fixtures, and the triaged criteria catalog. Consumers import via `@keyboard-studio/contracts` (or the `./mocks`, `./fixtures`, `./criteria` subpaths). |
 | [`packages/engine/`](packages/engine/) | The engine: codec (`.kmn` ↔ KeyboardIR), scaffolder, validator (Layer A/A'/B), compiler (kmcmplib wrapper), simulator, recognizer, output (VirtualFS → zip), and the strategy selector. |
-| [`packages/studio/`](packages/studio/) | The React + Vite authoring SPA (three-pane gallery / editor / preview). (`packages/studio-poc` is a throwaway prototype — don't build on it.) |
+| [`packages/studio/`](packages/studio/) | The React + Vite authoring SPA (three-pane gallery / editor / preview). |
 | [`utilities/Template Cleanup/`](utilities/Template%20Cleanup/) | Python tooling for the template-cleanup pipeline (NCAPS strip, `[CAPS]` deletion, `&CasedKeys` insertion, touch-layout cleanup). Run against a `keymanapp/keyboards` checkout. |
 | [`Agents/`](Agents/) | Dispatcher stubs for the **LEX crew** — the subagent team (lead, domain expert, programmer, QC, verification, …) used to author and review the design. |
 | [`strategy tree/`](strategy%20tree/) | The original standalone `.kmn` strategy reference — now **merged into [`spec.md` §7](spec.md#7-strategy-selection)** and retained only as a stub. |

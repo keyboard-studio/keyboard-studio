@@ -1,7 +1,7 @@
 // Per-question module: pb_existing_keyboards (Phase B)
 // Ported verbatim from content/flows/phase_b_characters.yaml.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule } from "../../types.ts";
 
 export const definition = {
   id: "pb_existing_keyboards",

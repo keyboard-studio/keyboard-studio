@@ -52,6 +52,26 @@ describe("tokenize", () => {
     expect(storeToken?.line).toBe(1);
   });
 
+  it("joins a continuation line when the backslash carries trailing whitespace (#365)", () => {
+    // A `\` followed by trailing spaces is a common editor artifact that real
+    // sources ship — e.g. khmer_angkor line 116 ends `... K_QUOTE] \  `. The
+    // continuation must still join; otherwise the orphaned next line tokenizes
+    // as a standalone, malformed rule and parse() throws "Malformed rule".
+    const tokens = tokenize("[K_A] \\  \n[K_B] > 'c'\n");
+    const rules = tokens.filter(t => t.kind === "rule");
+    expect(rules).toHaveLength(1);
+    expect(rules[0]?.line).toBe(1);
+    expect(rules[0]?.text).toBe("[K_A] [K_B] > 'c'");
+  });
+
+  it("joins a continuation across a tab-padded backslash (#365)", () => {
+    // The same tolerance applies to a tab after the backslash.
+    const tokens = tokenize("store(&VERSION) \\\t\n  '10.0'\n");
+    const storeToken = tokens.find(t => t.kind === "store");
+    expect(storeToken?.line).toBe(1);
+    expect(storeToken?.text).toContain("10.0");
+  });
+
   it("recognizes begin directive", () => {
     const tokens = tokenize("begin Unicode > use(main)\n");
     expect(tokens.find(t => t.kind === "begin")).toBeDefined();

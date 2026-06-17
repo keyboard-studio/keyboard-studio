@@ -12,19 +12,24 @@ import { mockPatternLibrary } from "@keyboard-studio/contracts/mocks";
 
 export const USE_REAL = import.meta.env.VITE_USE_REAL_ENGINE !== "false";
 
-// Re-export the proxy base for callers that need it.
+// Re-export the proxy base for callers that need it (e.g. scaffolder).
 export { LOCAL_PROXY_BASE };
 
-// BaseBrowserService: in dev, the Vite plugin-backed local browser is the
-// real implementation. In production this would be createBaseBrowser() from
-// the engine pointing at the GitHub API.
+// BaseBrowserService: backed by the build-time/dev-server catalog at
+// /local-kbd-api/list. In dev the localKeyboards Vite plugin serves it from
+// the sibling keymanapp/keyboards clone; in production the build-keyboards-index
+// script materialises dist/local-kbd-api/list at deploy time. Both feed the
+// same localBaseBrowser implementation, so this stays synchronous and never
+// touches the GitHub API at runtime.
 export function getBaseBrowserService(): BaseBrowserService {
   return USE_REAL ? localBaseBrowser : mockBaseBrowser;
 }
 
 // ScaffolderService: when USE_REAL is false returns the mock scaffolder so
 // CI / test runs never touch WASM. When real, lazily imports from the engine
-// (mirrors the loadEngine() lazy-import pattern in useKeyboardArtifact).
+// (mirrors the loadEngine() lazy-import pattern in useKeyboardArtifact) and
+// pins it to /local-kbd-proxy so per-keyboard source fetches go through the
+// same Vercel/Vite rewrite as the catalog.
 let scaffolderCache: ScaffolderService | null = null;
 export async function getScaffolderService(): Promise<ScaffolderService> {
   if (!USE_REAL) return mockScaffolder;

@@ -28,10 +28,8 @@
 import type {
   KeyboardIR,
   IRStore,
-  IRGroup,
   IRRule,
   IRComment,
-  RawKmnFragment,
   ContextElement,
   OutputElement,
   StoreItem,

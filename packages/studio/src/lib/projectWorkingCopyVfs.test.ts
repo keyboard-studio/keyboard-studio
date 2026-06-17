@@ -340,3 +340,72 @@ describe("projectWorkingCopyVfs — in-place mutation", () => {
     expect(vfs.get("source/test_kb.kmn")?.content).toBe("c mutated\n");
   });
 });
+
+describe("projectWorkingCopyVfs — id rename (step 4)", () => {
+  it("renames sibling files and rewrites kmw-keyboard-<baseId> CSS selectors when targetKeyboardId differs", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const vfs = createVirtualFS([
+      { path: "source/sil_akebu.kmn", content: "c stub\n", isBinary: false },
+      {
+        path: "source/sil_akebu.css",
+        content:
+          ".kmw-keyboard-sil_akebu .kmw-key { color: red; }\n" +
+          ".ios .kmw-keyboard-sil_akebu .kmw-key[id*='T_0300'] { background: green; }\n",
+        isBinary: false,
+      },
+      {
+        path: "source/sil_akebu.kvks",
+        content: "<VisualKeyboard><kbdname>sil_akebu</kbdname></VisualKeyboard>",
+        isBinary: false,
+      },
+    ]);
+    projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "sil_akebu",
+      targetKeyboardId: "ewondo",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: { displayName: "Ewondo" },
+    });
+
+    // Files renamed.
+    expect(vfs.get("source/sil_akebu.css")).toBeUndefined();
+    expect(vfs.get("source/sil_akebu.kvks")).toBeUndefined();
+    const renamedCss = vfs.get("source/ewondo.css");
+    expect(renamedCss).toBeDefined();
+    // CSS selectors rewritten to the new id.
+    expect(renamedCss?.content).toContain(".kmw-keyboard-ewondo");
+    expect(renamedCss?.content).not.toContain("kmw-keyboard-sil_akebu");
+    // kvks <kbdname> rewritten.
+    const renamedKvks = vfs.get("source/ewondo.kvks");
+    expect(renamedKvks?.content).toContain("<kbdname>ewondo</kbdname>");
+  });
+
+  it("is a no-op when targetKeyboardId is omitted", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const vfs = createVirtualFS([
+      { path: "source/sil_akebu.kmn", content: "c stub\n", isBinary: false },
+      {
+        path: "source/sil_akebu.css",
+        content: ".kmw-keyboard-sil_akebu .x{}",
+        isBinary: false,
+      },
+    ]);
+    projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "sil_akebu",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+    // Sibling files untouched.
+    expect(vfs.get("source/sil_akebu.css")?.content).toContain(
+      "kmw-keyboard-sil_akebu",
+    );
+    expect(vfs.get("source/ewondo.css")).toBeUndefined();
+  });
+});

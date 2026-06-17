@@ -25,6 +25,10 @@ import {
   applyCarveToVfs,
   applyAssignmentsToVfs,
   applyIdentityStubMutation,
+  parseKmn,
+  emitKmn,
+  resetIdentity,
+  renameFilesInVfs,
 } from "@keyboard-studio/engine";
 
 // ---------------------------------------------------------------------------
@@ -47,14 +51,34 @@ import {
  */
 export interface ProjectWorkingCopyVfsInput {
   vfs: VirtualFS;
+  /**
+   * Keyboard identifier used to locate `source/<keyboardId>.kmn` for the carve /
+   * assignment / identity projection steps. This is the base keyboard's id while
+   * the rest of the VFS still uses base-id filenames; the optional id rename
+   * step (below) renames it to `targetKeyboardId` at the end.
+   */
   keyboardId: string;
+  /**
+   * Optional new keyboard id chosen by the author (Track 1 identity rename or
+   * Track 2 fork). When set and different from `keyboardId`, the projection
+   * adds a final pass that:
+   *   - rewrites the .kmn's sibling-file path stores (&KMW_EMBEDCSS,
+   *     &KMW_HELPFILE, &VISUALKEYBOARD, &LAYOUTFILE, &BITMAP) via resetIdentity,
+   *   - renames source/<keyboardId>.* → source/<targetKeyboardId>.* for
+   *     `.kmn .kps .kvks .keyman-touch-layout .ico .css .htm .js` and the
+   *     `help/<id>.php` sibling, and
+   *   - rewrites `.kmw-keyboard-<keyboardId>` selectors in *.css and
+   *     `<ID>` / `<kbdname>` references in *.kps and *.kvks.
+   * Omit or pass the same value as `keyboardId` to skip the rename pass.
+   */
+  targetKeyboardId?: string;
   baseIr: KeyboardIR;
   deletedNodeIds: ReadonlySet<string>;
   assignments: ReadonlyArray<MechanismAssignment>;
   /** Synchronous resolver. Pass `() => undefined` when no pattern library is available. */
   getPattern: (id: string) => Pattern | undefined;
   /** Identity overlay. Pass `null` to skip identity projection. */
-  identity: { displayName?: string; copyright?: string; version?: string } | null;
+  identity: { displayName?: string; copyright?: string; version?: string; bcp47?: string } | null;
 }
 
 export interface ProjectWorkingCopyVfsResult {
@@ -83,6 +107,7 @@ export function projectWorkingCopyVfs(
   const {
     vfs,
     keyboardId,
+    targetKeyboardId,
     baseIr,
     deletedNodeIds,
     assignments,
@@ -131,6 +156,41 @@ export function projectWorkingCopyVfs(
         );
       }
     }
+  }
+
+  // Step 4: Id rename — only when the author chose a different keyboard id.
+  // Rewrites the .kmn's sibling-file path stores (so &KMW_EMBEDCSS et al. point
+  // at the new filenames), renames source/<keyboardId>.* siblings, and rewrites
+  // `.kmw-keyboard-<keyboardId>` selectors in *.css plus <ID> / <kbdname>
+  // references in *.kps / *.kvks. Without this, a renamed keyboard ships with
+  // CSS that targets the base id's wrapper class and never matches.
+  if (
+    targetKeyboardId !== undefined &&
+    targetKeyboardId !== keyboardId
+  ) {
+    const kmnPath = `source/${keyboardId}.kmn`;
+    const kmnEntry = vfs.get(kmnPath);
+    if (kmnEntry !== undefined && typeof kmnEntry.content === "string") {
+      try {
+        const parsed = parseKmn(kmnEntry.content, keyboardId);
+        resetIdentity(parsed.ir, {
+          keyboardId: targetKeyboardId,
+          displayName: identity?.displayName ?? parsed.ir.header.name ?? targetKeyboardId,
+          ...(identity?.bcp47 !== undefined && identity.bcp47 !== ""
+            ? { bcp47: [identity.bcp47] }
+            : {}),
+          ...(identity?.version !== undefined ? { version: identity.version } : {}),
+          ...(identity?.copyright !== undefined ? { copyright: identity.copyright } : {}),
+        });
+        vfs.set(kmnPath, emitKmn(parsed.ir), false);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        warnings.push(
+          `[project-working-copy] id rename: .kmn store rewrite skipped: ${msg}`,
+        );
+      }
+    }
+    renameFilesInVfs(vfs, keyboardId, targetKeyboardId);
   }
 
   return { warnings };

@@ -1,0 +1,9 @@
+{
+  "tool": "specify-cli",
+  "version": "0.10.3.dev0",
+  "sourceCommit": "1b0556c",
+  "source": "github/spec-kit",
+  "integration": "claude",
+  "mode": "skills",
+  "note": "Pin for the spec-kit feature loop. Re-run `specify init --here` only after deliberately bumping this pin; spec-kit templates change between releases. Reinstall with: uv tool install --force specify-cli --from git+https://github.com/github/spec-kit.git@<tag>"
+}

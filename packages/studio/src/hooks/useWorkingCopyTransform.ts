@@ -110,26 +110,25 @@ export function useWorkingCopyTransform(
     [sessionAssignments],
   );
 
-  // Identity display name.
-  // Memo key is name-only because applyIdentityStubMutation currently consumes
-  // only the display name. bcp47 and targetScript are intentionally excluded.
-  // When identity projection is extended to also apply bcp47/targetScript,
-  // widen this key AND the mutation call in the closure together.
+  // Identity display name + Track-1 rename id + bcp47.
+  // identityKeyboardId triggers projectWorkingCopyVfs step 4 (rewrites
+  // `.kmw-keyboard-<baseId>` selectors and renames siblings) when it differs
+  // from the keyboardId the transform is invoked with.
+  // identityBcp47 is forwarded so resetIdentity inside step 4 stamps the
+  // chosen language tag onto the .kmn instead of falling back to the base's.
   const identityDisplayName = identity?.displayName ?? null;
+  const identityKeyboardId = identity?.keyboardId ?? null;
+  const identityBcp47 = identity?.bcp47 ?? null;
 
   return useMemo<VfsTransform | null>(() => {
     // No baseIr → carve step cannot run. The transform is not usable yet.
     if (baseIr === null) return null;
 
-    // Capture current values into the closure. The closure captures:
-    //   - baseIr (stable object reference from the store, never mutated)
-    //   - deletedNodeIds (the actual Set — snapshot frozen at memo creation time)
-    //   - sessionAssignments (array snapshot)
-    //   - identityDisplayName (string or null)
-    //   - patternMap (from the calling component)
     const capturedDeletedIds = deletedNodeIds;
     const capturedAssignments = sessionAssignments;
     const capturedDisplayName = identityDisplayName;
+    const capturedKeyboardId = identityKeyboardId;
+    const capturedBcp47 = identityBcp47;
     const capturedPatternMap = patternMap;
     const capturedBaseIr = baseIr;
 
@@ -151,20 +150,39 @@ export function useWorkingCopyTransform(
 
       // Delegate to the pure projection helper. The VfsTransform contract is
       // in-place mutation of `vfs`; projectWorkingCopyVfs also mutates in-place.
+      const identityArg =
+        capturedDisplayName !== null || capturedBcp47 !== null
+          ? {
+              ...(capturedDisplayName !== null ? { displayName: capturedDisplayName } : {}),
+              ...(capturedBcp47 !== null && capturedBcp47 !== ""
+                ? { bcp47: capturedBcp47 }
+                : {}),
+            }
+          : null;
+
       const { warnings: projectionWarnings } = projectWorkingCopyVfs({
         vfs,
         keyboardId,
+        ...(capturedKeyboardId !== null && capturedKeyboardId !== keyboardId
+          ? { targetKeyboardId: capturedKeyboardId }
+          : {}),
         baseIr: capturedBaseIr,
         deletedNodeIds: capturedDeletedIds,
         assignments: effectiveAssignments,
         getPattern: (id) => capturedPatternMap?.get(id),
-        identity: capturedDisplayName !== null ? { displayName: capturedDisplayName } : null,
+        identity: identityArg,
       });
 
       return { warnings: [...preWarnings, ...projectionWarnings] };
     };
-    // Depend on primitive-stable memo keys + patternMap reference (stable when
-    // the calling component memoizes it correctly, as GalleryPreviewWithPatterns does).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseIr, deletedKey, assignmentsKey, identityDisplayName, patternMap]);
+  }, [
+    baseIr,
+    deletedKey,
+    assignmentsKey,
+    identityDisplayName,
+    identityKeyboardId,
+    identityBcp47,
+    patternMap,
+  ]);
 }

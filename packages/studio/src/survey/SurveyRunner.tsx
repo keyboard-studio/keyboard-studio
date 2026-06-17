@@ -263,7 +263,6 @@ export function SurveyRunner({
   // Derive flow-level constants once per flow identity change.
   // context is intentionally excluded from the deps array: findFirstRenderable
   // ignores it (underscore-prefixed params), so keying on [flow] alone is correct.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const { index, firstId, approxTotal } = useMemo(() => {
     const all = [...flow.questions, ...(flow.provenance_questions ?? [])];
     const idx = buildIndex(all);
@@ -272,6 +271,7 @@ export function SurveyRunner({
       firstId: findFirstRenderable(all, idx, context),
       approxTotal: all.filter((q) => q.engine_resolved !== true).length,
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flow]);
 
   // Callers must provide key={flow.flow_id} so React remounts this component

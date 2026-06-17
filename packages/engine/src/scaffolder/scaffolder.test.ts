@@ -461,4 +461,73 @@ group(main) using keys
     const shiftKey = shiftLayer!.row[0].key[0];
     expect(shiftKey.nextlayer).toBe("default");
   });
+
+  // #416 — the scaffolded .kps must be a package KD can compile to a .kmp, not
+  // the empty `<Package><Info/><Files/></Package>` stub (which fails kmc with
+  // KM04021 / KM09010). The <Files> list is derived from the keyboard's actual
+  // build outputs so kmc neither errors on a missing file (KM04003) nor warns
+  // on a web target lacking its .js (KM0401A).
+  describe("buildable .kps package (#416)", () => {
+    const VK_KMN = BASE_KMN.replace(
+      "begin Unicode",
+      "store(&VISUALKEYBOARD) 'base_keyboard.kvks'\nbegin Unicode",
+    );
+    const DESKTOP_KMN = BASE_KMN.replace("store(&TARGETS) 'any'", "store(&TARGETS) 'windows'");
+
+    const fetchKmn = (kmn: string) =>
+      vi.fn().mockImplementation((url: string) =>
+        Promise.resolve(url.includes(".kmn") ? makeTextResponse(kmn) : makeNotFoundResponse()),
+      ) as unknown as typeof fetch;
+
+    const scaffoldKps = async (kmn: string, base: BaseKeyboard, id: string): Promise<string> => {
+      const service = createScaffolderService({ fetchImpl: fetchKmn(kmn) });
+      const { vfs } = await service.scaffold(base, id, "My Keyboard");
+      return vfs.get(`source/${id}.kps`)!.content as string;
+    };
+
+    it("emits a buildable .kps, not the empty stub (FollowKeyboardVersion + Description + populated Files)", async () => {
+      const kps = await scaffoldKps(BASE_KMN, baseKeyboard, "my_keyboard");
+      expect(kps).not.toBe("<Package><Info/><Files/></Package>");
+      expect(kps).toContain("<FollowKeyboardVersion/>");
+      expect(kps).toMatch(/<Description[^>]*>.+<\/Description>/);
+      expect(kps).toContain("..\\build\\my_keyboard.kmx");
+      expect(kps).toContain("<ID>my_keyboard</ID>");
+    });
+
+    it("lists the .js for web/touch targets and omits .kvk when there is no visual keyboard", async () => {
+      // BASE_KMN: &TARGETS 'any' (web) and no &VISUALKEYBOARD.
+      const kps = await scaffoldKps(BASE_KMN, baseKeyboard, "my_keyboard");
+      expect(kps).toContain("..\\build\\my_keyboard.js");
+      expect(kps).not.toContain("my_keyboard.kvk");
+    });
+
+    it("omits the .js for desktop-only targets (referencing an unproduced .js would fail kmc KM04003)", async () => {
+      const kps = await scaffoldKps(DESKTOP_KMN, baseKeyboard, "my_keyboard");
+      expect(kps).not.toContain("my_keyboard.js");
+      expect(kps).toContain("..\\build\\my_keyboard.kmx");
+    });
+
+    it("lists the .kvk when the keyboard declares a visual keyboard", async () => {
+      const kps = await scaffoldKps(VK_KMN, baseKeyboard, "my_keyboard");
+      expect(kps).toContain("..\\build\\my_keyboard.kvk");
+    });
+
+    it("threads base.languages into <Languages>, falling back to 'und' when absent", async () => {
+      const withLang: BaseKeyboard = { ...baseKeyboard, languages: ["ak", "en"] };
+      const kpsLang = await scaffoldKps(BASE_KMN, withLang, "kb_lang");
+      expect(kpsLang).toContain('<Language ID="ak">');
+      expect(kpsLang).toContain('<Language ID="en">');
+
+      const kpsUnd = await scaffoldKps(BASE_KMN, baseKeyboard, "kb_und");
+      expect(kpsUnd).toContain('<Language ID="und">');
+    });
+
+    it("propagates base.version into <Keyboard><Version> instead of hardcoding 1.0", async () => {
+      const v2Base: BaseKeyboard = { ...baseKeyboard, version: "2.0" };
+      const kps = await scaffoldKps(BASE_KMN, v2Base, "my_keyboard");
+      // Version must appear inside <Keyboards><Keyboard>, not as the hardcoded "1.0".
+      expect(kps).toContain("<Version>2.0</Version>");
+      expect(kps).not.toContain("<Version>1.0</Version>");
+    });
+  });
 });

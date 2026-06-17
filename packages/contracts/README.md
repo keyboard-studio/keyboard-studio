@@ -12,7 +12,7 @@ pulling in heavy dependencies.
 Contents map to [spec.md](../../spec.md):
 
 - `src/pattern.ts` - the `Pattern` schema (spec section 5)
-- `src/strategy.ts` - strategy IDs S-01..S-12 and the selector output (spec section 7.3)
+- `src/strategy.ts` - strategy IDs S-01..S-13 and the selector output (spec section 7.3)
 - `src/axes.ts` - the seven discovery axes plus sub-axes A2a and A7a (spec section 7.1)
 - `src/virtualFS.ts` - the in-memory filesystem interface (spec section 12, glossary)
 - `src/lintFinding.ts` - the validator/lint diagnostic shape, Layers A/B/C (spec section 10)

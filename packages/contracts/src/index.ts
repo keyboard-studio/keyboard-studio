@@ -15,12 +15,20 @@ export * from "./linguistInventory";
 export * from "./lintFinding";
 export * from "./pattern";
 export * from "./patternMatch";
+export * from "./placementMap";
 export * from "./provenance";
 export * from "./simulation";
 export * from "./strategy";
 export * from "./surveyPhaseResult";
 export * from "./surveySession";
 export * from "./virtualFS";
+
+// ---------------------------------------------------------------------------
+// Runtime schemas — zod mirrors of the locked contract types (spec §5, §11).
+// Used at the data-file load boundaries to validate criteria.json and the
+// pattern-library YAML; compile-time drift guards keep schema and type in sync.
+// ---------------------------------------------------------------------------
+export * from "./schemas";
 
 // ---------------------------------------------------------------------------
 // Service interfaces — runtime APIs each pipeline step exposes. Engine team

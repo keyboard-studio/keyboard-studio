@@ -2,10 +2,10 @@
 //
 // [SCAFFOLD] Left pane: currently a base-keyboard picker only. The full
 // survey UI (spec §4 / §8 Phase B) is not yet implemented and will replace
-// this pane. The right pane (compile + KMW iframe preview) is the working
-// deliverable ported from studio-poc.
+// this pane. The right pane is the compile + KMW iframe preview.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useResizablePanes } from "../hooks/useResizablePanes.ts";
 import type { BaseKeyboard, CompilerDiagnostic } from "@keyboard-studio/contracts";
 import { useKeyboardArtifact, type ScaffoldSpec, type OnInstantiateCallback } from "../hooks/useKeyboardArtifact.ts";
 import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
@@ -273,52 +273,12 @@ export function PreviewShell() {
   }, []);
 
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
-  const [leftPct, setLeftPct] = useState(LEFT_INIT_PCT);
-  const [handleHovered, setHandleHovered] = useState(false);
+  const { containerRef, leftPct, handleHovered, onPointerDown, setHandleHovered } =
+    useResizablePanes({ minPct: LEFT_MIN_PCT, maxPct: LEFT_MAX_PCT, initPct: LEFT_INIT_PCT });
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadWarnings, setDownloadWarnings] = useState<string[]>([]);
   const zipBlobUrlRef = useRef<string | null>(null);
-
-  // Track drag state in a ref so pointer-move handlers always see current values
-  // without triggering re-renders on every pixel.
-  const dragRef = useRef<{ startX: number; startPct: number } | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    dragRef.current = { startX: e.clientX, startPct: leftPct };
-    document.addEventListener("pointermove", onPointerMove);
-    document.addEventListener("pointerup", onPointerUp);
-  // leftPct captured via dragRef; no lint dep needed for the document listeners
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leftPct]);
-
-  const onPointerMove = useCallback((e: PointerEvent) => {
-    if (dragRef.current === null || containerRef.current === null) return;
-    const containerW = containerRef.current.getBoundingClientRect().width;
-    if (containerW === 0) return;
-    const deltaPct = ((e.clientX - dragRef.current.startX) / containerW) * 100;
-    const next = Math.min(
-      LEFT_MAX_PCT,
-      Math.max(LEFT_MIN_PCT, dragRef.current.startPct + deltaPct),
-    );
-    setLeftPct(next);
-  }, []);
-
-  const onPointerUp = useCallback(() => {
-    dragRef.current = null;
-    document.removeEventListener("pointermove", onPointerMove);
-    document.removeEventListener("pointerup", onPointerUp);
-  }, [onPointerMove]);
-
-  // Clean up listeners if the component unmounts mid-drag.
-  useEffect(() => {
-    return () => {
-      document.removeEventListener("pointermove", onPointerMove);
-      document.removeEventListener("pointerup", onPointerUp);
-    };
-  }, [onPointerMove, onPointerUp]);
 
   // Clean up any lingering zip blob URL on unmount.
   useEffect(() => {
