@@ -253,6 +253,13 @@ function renderWithBasePicked() {
   fireEvent.click(screen.getByTestId("base-picker"));
 }
 
+function getIdentityStatusRegion() {
+  const regions = screen.getAllByRole("status");
+  const el = regions.find((e) => e.textContent?.includes("base id"));
+  expect(el).toBeTruthy();
+  return el!;
+}
+
 describe("PreviewShell — identity-unset warning banner", () => {
   it("renders an actionable button with the identity-step aria-label when identity is unset (AC4)", () => {
     renderWithBasePicked();
@@ -262,18 +269,18 @@ describe("PreviewShell — identity-unset warning banner", () => {
       name: /go to the keyboard name and id step/i,
     });
     expect(btn).toBeTruthy();
+    // Clicking must not throw. TrackOneIdentityPanel is mocked in this suite,
+    // so #identity-keyboard-id is absent — the handler's getElementById returns
+    // null and the scroll/focus calls are guarded no-ops.
+    expect(() => fireEvent.click(btn)).not.toThrow();
   });
 
   it("actionable button is inside the role=status live region (AC4)", () => {
     renderWithBasePicked();
 
     // Find the status region that contains the identity-warn text.
-    const statusRegions = screen.getAllByRole("status");
-    const identityStatus = statusRegions.find((el) =>
-      el.textContent?.includes("base id"),
-    );
-    expect(identityStatus).toBeTruthy();
-    const innerBtn = identityStatus!.querySelector(
+    const identityStatus = getIdentityStatusRegion();
+    const innerBtn = identityStatus.querySelector(
       "[aria-label='Go to the keyboard name and id step']",
     );
     expect(innerBtn).toBeTruthy();
@@ -282,36 +289,16 @@ describe("PreviewShell — identity-unset warning banner", () => {
   it("banner text references the download/zip path (AC2)", () => {
     renderWithBasePicked();
 
-    const statusRegions = screen.getAllByRole("status");
-    const identityStatus = statusRegions.find((el) =>
-      el.textContent?.includes("base id"),
-    );
-    expect(identityStatus).toBeTruthy();
+    const identityStatus = getIdentityStatusRegion();
     // Must mention the ZIP download concern.
-    expect(identityStatus!.textContent).toMatch(/\.zip|download/i);
+    expect(identityStatus.textContent).toMatch(/\.zip|download/i);
   });
 
   it("banner text also references the community repository (AC2)", () => {
     renderWithBasePicked();
 
-    const statusRegions = screen.getAllByRole("status");
-    const identityStatus = statusRegions.find((el) =>
-      el.textContent?.includes("base id"),
-    );
-    expect(identityStatus).toBeTruthy();
-    expect(identityStatus!.textContent).toMatch(/community repository/i);
-  });
-
-  it("actionable button is present and has aria-label (AC4 — clickable)", () => {
-    renderWithBasePicked();
-
-    const btn = screen.getByRole("button", {
-      name: /go to the keyboard name and id step/i,
-    });
-    // Clicking must not throw. TrackOneIdentityPanel is mocked in this suite,
-    // so #identity-keyboard-id is absent — the handler's getElementById returns
-    // null and the scroll/focus calls are guarded no-ops.
-    expect(() => fireEvent.click(btn)).not.toThrow();
+    const identityStatus = getIdentityStatusRegion();
+    expect(identityStatus.textContent).toMatch(/community repository/i);
   });
 });
 
