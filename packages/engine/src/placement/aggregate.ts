@@ -116,12 +116,15 @@ export function computeFingerprintFromCandidates(
  * @param opts.supplementBonus  - Map from keyboardId → multiplier; applied
  *   as a standards-body bonus to the priorCount of any matching keyboard's
  *   candidates before deduplication (default: none).
+ * @param opts.generatedFrom    - Provenance string written into the output
+ *   JSON (e.g. "keymanapp/keyboards@<sha>"). Defaults to
+ *   "keymanapp/keyboards@unknown" when omitted.
  *
  * @see spec.md §7.6
  */
 export function aggregatePlacements(
   reports: KeyboardPlacementReport[],
-  opts?: { supplementBonus?: Record<string, number> },
+  opts?: { supplementBonus?: Record<string, number>; generatedFrom?: string },
 ): PlacementPriorsJSON {
   const bonus = opts?.supplementBonus ?? {};
 
@@ -240,7 +243,7 @@ export function aggregatePlacements(
 
   return {
     version: "1.0.0",
-    generatedFrom: "keymanapp/keyboards@unknown",
+    generatedFrom: opts?.generatedFrom ?? "keymanapp/keyboards@unknown",
     priorCount: survivingReports.length,
     entries,
   };

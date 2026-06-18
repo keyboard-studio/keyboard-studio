@@ -612,7 +612,9 @@ async function main(): Promise<void> {
 
   // --emit-placements: aggregate and write placement-priors.json.
   if (args.emitPlacements) {
-    const priorsJSON = aggregatePlacements(placementReports);
+    const priorsJSON = aggregatePlacements(placementReports, {
+      generatedFrom: `keymanapp/keyboards@${new Date().toISOString()}`,
+    });
     const priorsPath = join(args.outDir, "placement-priors.json");
     await fsp.writeFile(priorsPath, JSON.stringify(priorsJSON, null, 2) + "\n", "utf8");
     console.error(

@@ -22,8 +22,9 @@ export interface KeyboardPlacementReport {
   /** key = 4-char hex codepoint (e.g. "0253"), value = candidates for that codepoint. */
   candidatesByCodepoint: Map<string, PlacementCandidate[]>;
   /** SHA-256 fingerprint of the (codepoint → vkey+modifiers) map.
-   *  Used for fork-collapse: keyboards that share ≥90% of their placement
-   *  tuples collapse to one vote before aggregation. */
+   *  Used for fork-collapse: keyboards that produce an identical
+   *  (codepoint → vkey+modifiers) placement map are treated as one vote
+   *  (exact SHA-256 fingerprint match). */
   placementFingerprint: string;
 }
 
