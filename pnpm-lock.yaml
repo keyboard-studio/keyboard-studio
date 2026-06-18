@@ -123,6 +123,9 @@ importers:
       '@keyboard-studio/engine':
         specifier: workspace:*
         version: link:../engine
+      '@keymanapp/keyboard-lint':
+        specifier: workspace:*
+        version: link:../keyboard-lint
       react:
         specifier: ^18.3.1
         version: 18.3.1

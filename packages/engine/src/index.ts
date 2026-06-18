@@ -71,6 +71,7 @@ export type { RecognizerRule, MatchResult, RecognizeResult } from "./recognizer/
 // Issue #19 — scaffolder (template-cleanup pipeline).
 export { createScaffolderService, renameFilesInVfs } from "./scaffolder/index.js";
 export { scaffoldIR, resetIdentity } from "./scaffolder/scaffold-ir.js";
+export { scaffoldTouchLayout } from "./scaffolder/index.js";
 export type { ScaffolderServiceOptions } from "./scaffolder/index.js";
 export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffolder/scaffold-ir.js";
 

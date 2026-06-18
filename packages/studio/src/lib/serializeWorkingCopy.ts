@@ -75,7 +75,7 @@ export interface SerializeWorkingCopyResult {
 export async function serializeWorkingCopy(): Promise<SerializeWorkingCopyResult | null> {
   // 1. Read current working-copy store state.
   const state = useWorkingCopyStore.getState();
-  const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, phaseResults, identity } = state;
+  const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, phaseResults, identity, touchLayoutJson } = state;
 
   // Not-instantiated guard.
   if (baseVfs === null || baseIr === null || baseKeyboard === null) {
@@ -132,6 +132,16 @@ export async function serializeWorkingCopy(): Promise<SerializeWorkingCopyResult
   //    (VirtualFS.set contract). If a future projection step writes into an entry's
   //    Uint8Array directly, deep-copy the binary entries here.
   const clonedVfs = createVirtualFS(baseVfs.entries());
+
+  // 4a. Inject Phase E touch layout JSON into the cloned VFS before projection.
+  //     Option B (workingCopyStore): base VFS is immutable after instantiation;
+  //     touchLayoutJson is stored as a side-car string and written here at output time.
+  //     Path uses the base keyboard id — the rename pass in step 5 (projectWorkingCopyVfs
+  //     step 4) will rename source/<keyboardId>.keyman-touch-layout →
+  //     source/<targetKeyboardId>.keyman-touch-layout when the author chose a new id.
+  if (touchLayoutJson !== null) {
+    clonedVfs.set(`source/${keyboardId}.keyman-touch-layout`, touchLayoutJson, false);
+  }
 
   // 5. Project the working copy onto the cloned VFS. targetKeyboardId triggers
   //    the final rename pass when the author picked a different id.

@@ -16,3 +16,5 @@ export type { PhaseFProps } from "./PhaseF.tsx";
 
 export { SurveyRunner } from "./SurveyRunner.tsx";
 export type { SurveyRunnerProps } from "./SurveyRunner.tsx";
+
+export { TouchGallery } from "../components/TouchGallery.tsx";

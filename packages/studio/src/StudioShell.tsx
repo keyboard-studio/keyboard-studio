@@ -9,7 +9,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
-import type { BaseKeyboard, Pattern, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, Pattern, SurveyPhaseResult, TouchAssignment } from "@keyboard-studio/contracts";
+import { scaffoldTouchLayout } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
 import { IdentityLite, Prefill, PhaseB, PhaseF, type IdentityLiteResult } from "./survey/index.ts";
@@ -19,6 +20,7 @@ import type { SuggestTarget } from "./lib/suggestBase.ts";
 import type { SurveyContext } from "./survey/types.ts";
 import { CarveGallery } from "./components/CarveGallery.tsx";
 import { MechanismGallery } from "./components/MechanismGallery.tsx";
+import { TouchGallery } from "./components/TouchGallery.tsx";
 import { type RouteId } from "./lib/navigate.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback, type ScaffoldSpec } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
@@ -157,6 +159,7 @@ type SurveyStage =
   | "carve"
   | "B"
   | "mechanisms"
+  | "E"
   | "F"
   | "done"
   | "unsupported";
@@ -279,6 +282,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const recordPhase = useWorkingCopyStore((s) => s.recordPhase);
   const resetSurvey = useWorkingCopyStore((s) => s.reset);
   const setStoreIdentity = useWorkingCopyStore((s) => s.setIdentity);
+  const lockDesktop = useWorkingCopyStore((s) => s.lockDesktop);
+  const recordTouchAssignments = useWorkingCopyStore((s) => s.recordTouchAssignments);
+  const setTouchLayoutJson = useWorkingCopyStore((s) => s.setTouchLayoutJson);
+  const ir = useWorkingCopyStore((s) => s.ir);
 
   // Derive KMN source from the working copy's base VFS (the scaffolded snapshot)
   // so the validator can produce findings while the survey is in progress.
@@ -353,6 +360,18 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     setStage("mechanisms");
   }
   function handleMechanismsComplete() {
+    lockDesktop();
+    setStage("E");
+  }
+  function handlePhaseEComplete(assignments: TouchAssignment[]) {
+    recordTouchAssignments(assignments);
+    // Persist the scaffolded touch layout JSON so serializeWorkingCopy can
+    // inject it into source/<keyboardId>.keyman-touch-layout at output time.
+    // Option B: base VFS is immutable after instantiation; JSON stored as a
+    // side-car string and written into the cloned VFS before zipping.
+    if (ir !== null) {
+      setTouchLayoutJson(JSON.stringify(scaffoldTouchLayout(ir), null, 2));
+    }
     setStage("F");
   }
   function handlePhaseFComplete(result: SurveyPhaseResult) {
@@ -463,6 +482,14 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     );
   }
 
+  if (stage === "E") {
+    return (
+      <div style={{ height: "100%", overflow: "hidden" }}>
+        <TouchGallery onComplete={handlePhaseEComplete} />
+      </div>
+    );
+  }
+
   return (
     <div
       ref={containerRef}
@@ -557,7 +584,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           <PhaseF
             context={surveyContext}
             onComplete={handlePhaseFComplete}
-            onBack={() => setStage("mechanisms")}
+            onBack={() => setStage("E")}
             findingsByQuestionId={findingsByQuestionId}
           />
         )}

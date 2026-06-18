@@ -703,6 +703,7 @@ export function MechanismGallery({
   onBack,
   placementMap,
 }: MechanismGalleryProps) {
+  const locked = useWorkingCopyStore((s) => s.desktopLocked);
   const recordAssignments = useWorkingCopyStore((s) => s.recordAssignments);
   const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
@@ -1259,6 +1260,23 @@ export function MechanismGallery({
         height: "100%",
       }}
     >
+      {locked && (
+        <div
+          role="alert"
+          aria-live="polite"
+          style={{
+            padding: "10px 14px",
+            background: "#1a1209",
+            border: "1px solid #d29922",
+            borderRadius: 6,
+            color: "#d29922",
+            fontSize: 13,
+            fontFamily: FONT,
+          }}
+        >
+          Desktop layout locked — editing disabled
+        </div>
+      )}
       {/* Upfront "already covered" phase — ask about remapping before the loop */}
       {coveredPhase === "asking" && alreadyProduced.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -1271,6 +1289,7 @@ export function MechanismGallery({
               <button
                 key={c}
                 type="button"
+                disabled={locked}
                 onClick={() =>
                   setSelectedForRemap((prev) => {
                     const next = new Set(prev);
@@ -1295,6 +1314,7 @@ export function MechanismGallery({
           </div>
           <button
             type="button"
+            disabled={locked}
             onClick={() => {
               setRemapChars([...selectedForRemap]);
               setCoveredPhase("decided");
@@ -1486,6 +1506,7 @@ export function MechanismGallery({
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
                       type="button"
+                      disabled={locked}
                       onClick={handleSuggestionAccept}
                       aria-label={
                         suggestion.strategyId === "S-01"
@@ -1603,7 +1624,7 @@ export function MechanismGallery({
                 <button
                   type="button"
                   onClick={handleApply}
-                  disabled={!canApply}
+                  disabled={!canApply || locked}
                   aria-label={`Apply method for ${currentChar}`}
                   style={{
                     padding: "9px 20px",
@@ -1622,7 +1643,7 @@ export function MechanismGallery({
                 <button
                   type="button"
                   onClick={handleNext}
-                  disabled={!canGoNext}
+                  disabled={!canGoNext || locked}
                   aria-label={
                     isDone && canGoNext
                       ? "All methods applied, finish"
@@ -1645,6 +1666,7 @@ export function MechanismGallery({
                 <button
                   type="button"
                   onClick={handleSkip}
+                  disabled={locked}
                   aria-label={`Skip ${currentChar}`}
                   style={{
                     background: "transparent",

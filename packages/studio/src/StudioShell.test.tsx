@@ -224,6 +224,20 @@ vi.mock("./components/MechanismGallery.tsx", () => ({
   },
 }));
 
+vi.mock("./components/TouchGallery", () => ({
+  TouchGallery: ({ onComplete }: { onComplete: (a: unknown[]) => void }) => (
+    <div data-testid="stage-E">
+      <button
+        type="button"
+        data-testid="e-complete"
+        onClick={() => onComplete([])}
+      >
+        Continue
+      </button>
+    </div>
+  ),
+}));
+
 vi.mock("./components/UnsupportedScriptStub.tsx", () => ({
   UnsupportedScriptStub: ({ script }: { script: string }) => (
     <div data-testid="stage-unsupported">{script}</div>
@@ -371,6 +385,8 @@ function advanceToMechanisms() {
 function advanceToF() {
   advanceToMechanisms();
   fireEvent.click(screen.getByTestId("mechanisms-complete"));
+  // Stage E (TouchGallery) is now inserted between mechanisms and F.
+  fireEvent.click(screen.getByTestId("e-complete"));
 }
 
 // ---------------------------------------------------------------------------
@@ -456,10 +472,15 @@ describe("SurveyView — mechanisms → F transition", () => {
     advanceToMechanisms();
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
+    // mechanisms → E (TouchGallery) → F
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
+    expect(screen.getByTestId("stage-E")).toBeTruthy();
+    expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("e-complete"));
 
     expect(screen.getByTestId("stage-F")).toBeTruthy();
-    expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
+    expect(screen.queryByTestId("stage-E")).toBeNull();
   });
 });
 
@@ -506,11 +527,11 @@ describe("SurveyView — B → carve back-navigation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Back-navigation 7: F → mechanisms  (changed from F → B in PR #403)
+// Back-navigation 7: F → E  (Phase E inserted between mechanisms and F)
 // ---------------------------------------------------------------------------
 
-describe("SurveyView — F → mechanisms back-navigation", () => {
-  it("returns to mechanisms stage (not B) when PhaseF onBack is called", async () => {
+describe("SurveyView — F → E back-navigation", () => {
+  it("returns to Phase E (touch gallery, not B) when PhaseF onBack is called", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -520,7 +541,7 @@ describe("SurveyView — F → mechanisms back-navigation", () => {
 
     fireEvent.click(screen.getByTestId("phaseF-back"));
 
-    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
+    expect(screen.getByTestId("stage-E")).toBeTruthy();
     expect(screen.queryByTestId("stage-F")).toBeNull();
     // Confirm it did NOT go back to B (the old behavior).
     expect(screen.queryByTestId("stage-B")).toBeNull();

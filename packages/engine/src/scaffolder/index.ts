@@ -16,6 +16,7 @@ import { scaffoldIR } from "./scaffold-ir.js";
 
 export { scaffoldIR, resetIdentity } from "./scaffold-ir.js";
 export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffold-ir.js";
+export { scaffoldTouchLayout } from "./scaffoldTouchLayout.js";
 
 export interface ScaffolderServiceOptions {
   proxyBase?: string;
