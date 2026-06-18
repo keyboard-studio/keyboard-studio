@@ -6,10 +6,10 @@ export function KeyCap({ children }: KeyCapProps) {
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      minWidth: 18, height: 19, padding: '0 5px', borderRadius: 4,
-      font: '600 12px/1 var(--mono)',
-      background: 'var(--card-2)', border: '1px solid var(--border-strong)',
-      color: 'var(--text)', boxShadow: '0 1px 0 rgba(0,0,0,.35)',
+      minWidth: 14, height: 15, padding: '0 3px', borderRadius: 3,
+      font: '600 10px/1 var(--app-font-mono)',
+      background: 'var(--app-surface-2)', border: '1px solid var(--app-border-strong)',
+      color: 'var(--app-text-muted)',
     }}>
       {children}
     </span>

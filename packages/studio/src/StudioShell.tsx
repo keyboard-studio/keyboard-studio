@@ -462,7 +462,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
   if (stage === "carve") {
     return (
-      <div style={{ height: "100%", overflowY: "auto" }}>
+      <div style={{ height: "100%", overflow: "hidden" }}>
         <CarveGallery
           onComplete={handleCarveComplete}
           onBack={() => setStage("prefill")}

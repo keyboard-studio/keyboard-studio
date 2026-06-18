@@ -23,6 +23,26 @@
   --display: 'Playfair Display', Georgia, serif;
   --mono:    ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
   --serif:   'Lora', Georgia, serif;
+
+  /* --app-* aliases — used by carve components to match the prototype verbatim */
+  --app-bg:            #18243f;
+  --app-surface:       var(--card);
+  --app-surface-2:     var(--card-2);
+  --app-border:        var(--border);
+  --app-border-strong: var(--border-strong);
+  --app-text:          var(--text);
+  --app-text-muted:    var(--muted);
+  --app-text-subtle:   var(--subtle);
+  --app-accent:        var(--accent);
+  --app-accent-hover:  #74b6f4;
+  --app-accent-subtle: #243c61;
+  --app-accent-text:   #8fc4f6;
+  --app-font:          var(--ui);
+  --app-font-mono:     var(--mono);
+  --sil-orange:        var(--amber);
+  --sil-orange-dark:   var(--amber-text);
+  --sil-green:         #509E2F;
+  --sil-green-dark:    #38751C;
 }
 
 * { box-sizing: border-box; }

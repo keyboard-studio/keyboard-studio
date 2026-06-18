@@ -9,6 +9,7 @@ import type {
   Pattern,
   StoreItem,
 } from '@keyboard-studio/contracts';
+import type { CardKind } from '../components/carve/KindBadge.tsx';
 
 // ---------------------------------------------------------------------------
 // isCombining — true for Unicode combining diacritical marks (U+0300–U+036F)
@@ -141,3 +142,100 @@ export function storeChars(store: { items: StoreItem[] }): string[] {
     .filter((item) => item.kind === 'char')
     .map((item) => (item as { kind: 'char'; value: string }).value);
 }
+
+// ---------------------------------------------------------------------------
+// CarveNode — unified rail node type for the Rail + Inspector layout
+// ---------------------------------------------------------------------------
+
+export interface CarveNode {
+  nodeId: string;
+  kind: CardKind;
+  name: string;
+  trigger?: string | undefined;
+  strategy?: string | undefined;
+  loadBearing?: boolean | undefined;
+  glyphs?: CarveGlyph[] | undefined;       // patterns + groups
+  displayChars?: string[] | undefined;     // stores
+  rawReason?: string | undefined;          // raw fragments
+  referencedByNodeId?: string | undefined; // store: which pattern owns it
+  referencedByLabel?: string | undefined;  // store: that pattern's title
+}
+
+// ---------------------------------------------------------------------------
+// nodeState — tri-state based on individual glyph or node deletion
+// ---------------------------------------------------------------------------
+
+export function nodeState(
+  node: CarveNode,
+  isItemDeleted: (id: string) => boolean,
+  isDeleted: (id: string) => boolean,
+): 'on' | 'partial' | 'off' {
+  if (node.glyphs && node.glyphs.length > 0) {
+    const off = node.glyphs.filter((g) => isItemDeleted(g.gid)).length;
+    if (off === 0) return 'on';
+    if (off === node.glyphs.length) return 'off';
+    return 'partial';
+  }
+  return isDeleted(node.nodeId) ? 'off' : 'on';
+}
+
+// ---------------------------------------------------------------------------
+// toRailNodes — build the full node list for the Rail from a KeyboardIR
+// ---------------------------------------------------------------------------
+
+export function toRailNodes(ir: KeyboardIR): CarveNode[] {
+  const nodes: CarveNode[] = [];
+  const recognized = ir.recognizedPatterns.filter((p) => p.origin === 'recognized');
+
+  for (const pattern of recognized) {
+    const glyphs = patternToGlyphs(pattern, ir);
+    nodes.push({
+      nodeId: pattern.id,
+      kind: 'pattern',
+      name: pattern.title,
+      ...(glyphs[0]?.ch !== undefined ? { trigger: glyphs[0].ch } : {}),
+      ...(pattern.strategyId !== undefined ? { strategy: pattern.strategyId } : {}),
+      glyphs,
+    });
+  }
+
+  for (const group of ir.groups) {
+    if (!group.rules.some((r) => r.ownedByPattern === undefined)) continue;
+    const glyphs = groupToGlyphs(group);
+    nodes.push({
+      nodeId: group.nodeId,
+      kind: 'group',
+      name: group.name,
+      ...(glyphs[0]?.ch !== undefined ? { trigger: glyphs[0].ch } : {}),
+      glyphs,
+    });
+  }
+
+  for (const store of ir.stores) {
+    if (store.isSystem) continue;
+    const refPattern = recognized.find((p) =>
+      p.ownedNodes?.some((n) => n.nodeId === store.nodeId),
+    );
+    nodes.push({
+      nodeId: store.nodeId,
+      kind: 'store',
+      name: store.name,
+      displayChars: storeChars(store),
+      loadBearing: refPattern !== undefined,
+      ...(refPattern !== undefined ? { referencedByNodeId: refPattern.id, referencedByLabel: refPattern.title } : {}),
+    });
+  }
+
+  for (const frag of ir.raw) {
+    nodes.push({
+      nodeId: frag.nodeId,
+      kind: 'raw',
+      name: frag.reason,
+      rawReason: frag.reason,
+      loadBearing: true,
+    });
+  }
+
+  return nodes;
+}
+
