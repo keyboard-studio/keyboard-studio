@@ -161,7 +161,7 @@ To disable: `systemctl --user disable --now km-triage.timer`.
 Everything lives on GitHub — no local file to open. Whenever convenient:
 
 1. Open the GitHub PR list filtered to `label:review-needed`. Each one has a triage comment with a question (and any held change requests).
-2. For each escalation: the submitter (preferred) or any maintainer answers the question on the PR itself (`gh pr comment <N>` or in the GitHub UI), then `gh pr edit <N> --remove-label review-needed`. The next triage sweep will re-review with the answer in the comment history.
+2. For each escalation: the submitter (preferred) or any maintainer answers the question on the PR itself (`gh pr comment <N>` or in the GitHub UI), or just pushes the fix. The next triage sweep sees the new human comment / commit, **auto-removes `review-needed`**, and re-reviews with the answer in the comment history — no `@km-triage` string and no manual `--remove-label` needed (a sweep ignores its own bot comments, so only non-bot activity re-triggers).
 3. Open the GitHub PR list filtered to `label:ready-to-merge`. For each: read the diff if you want, then `gh pr merge <N> --squash --delete-branch`. The triage agent never does this for you.
 4. If a PR is parked but you disagree with the approval, comment your reasoning and `gh pr edit <N> --remove-label ready-to-merge`. Add `triage-skip` if you want the triage to stop touching it.
 
