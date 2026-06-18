@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // triage-watch.mjs - live terminal dashboard for /km-triage progress.
 //
-// Reads .tech-lead-inbox/progress.jsonl (the JSONL stream emitted by the
+// Reads .escalations/progress.jsonl (the JSONL stream emitted by the
 // triage agent via utilities/km-triage-app/progress-emit.js) and renders a
 // per-PR status board that refreshes as the file grows.
 //
@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 
-const PROGRESS_LOG = path.join('.tech-lead-inbox', 'progress.jsonl');
+const PROGRESS_LOG = path.join('.escalations', 'progress.jsonl');
 const POLL_MS = 500;
 const EVENT_TAIL_LINES = 12;
 

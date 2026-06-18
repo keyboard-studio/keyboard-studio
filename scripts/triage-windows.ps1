@@ -18,8 +18,8 @@ $tlEmail          = if ($env:KM_TRIAGE_TL_EMAIL) { $env:KM_TRIAGE_TL_EMAIL } els
 $tlLogin          = if ($env:KM_TRIAGE_TL_LOGIN) { $env:KM_TRIAGE_TL_LOGIN } else { "MattGyverLee" }
 $triageOwners     = @("MattGyverLee","gboltono","coopabla","KevinPNG","dhigby","myczka")
 
-$inboxDir         = ".tech-lead-inbox"
-$auditLog         = "$inboxDir\audit-log.jsonl"
+$stateDir         = ".escalations"
+$auditLog         = "$stateDir\audit-log.jsonl"
 $maxIterations    = 3
 $sleepBetweenSec  = 45
 $loopOnActions    = @("auto_fix_only","fix_and_mention")
@@ -86,34 +86,25 @@ function Find-TriggerComment {
 
 # ── Phase 1: Bootstrap (once per Task Scheduler tick) ────────────────────────
 
-New-Item -ItemType Directory -Force -Path "$inboxDir\runs" | Out-Null
-New-Item -ItemType Directory -Force -Path "$inboxDir\diffs" | Out-Null
-New-Item -ItemType Directory -Force -Path "$inboxDir\worktrees" | Out-Null
-
-if (-not (Test-Path "$inboxDir\INBOX.md")) {
-  Set-Content -Path "$inboxDir\INBOX.md" -Value @"
-# Tech Lead Inbox
-
-PRs and questions that need your attention. Append-only; the triage loop adds entries here.
-
-"@
-}
+New-Item -ItemType Directory -Force -Path "$stateDir\runs" | Out-Null
+New-Item -ItemType Directory -Force -Path "$stateDir\diffs" | Out-Null
+New-Item -ItemType Directory -Force -Path "$stateDir\worktrees" | Out-Null
 
 if (-not (Test-Path $auditLog)) { New-Item -ItemType File -Path $auditLog | Out-Null }
 
 # Triage labels: create once per repo lifetime, guarded by a sentinel file.
 # Bump the sentinel suffix whenever a label is added so existing installs
 # create the newcomer on their next sweep (then go quiet again).
-if (-not (Test-Path "$inboxDir\.labels-created-v2")) {
+if (-not (Test-Path "$stateDir\.labels-created-v2")) {
   gh label create ready-to-merge --color 0e8a16 `
     --description "Triage approved - ready to merge by any team member" 2>$null; $true
   gh label create review-needed --color d93f0b `
-    --description "Triage escalated - awaiting submitter or tech-lead response" 2>$null; $true
+    --description "Triage escalated - awaiting submitter or maintainer response on the PR" 2>$null; $true
   gh label create triage-skip --color cfd3d7 `
     --description "Do not run triage on this PR" 2>$null; $true
   gh label create needs-rebase --color fbca04 `
     --description "Triage: branch conflicts with base - rebase needed (auto-clears once mergeable)" 2>$null; $true
-  New-Item -ItemType File -Path "$inboxDir\.labels-created-v2" | Out-Null
+  New-Item -ItemType File -Path "$stateDir\.labels-created-v2" | Out-Null
 }
 
 try {
@@ -121,7 +112,7 @@ try {
 } catch {
   $ts = Get-Ts
   Add-Content -Path $auditLog -Value ('{"ts":"{0}","action_taken":"auth_failed","reason":"bot_token_unavailable"}' -f $ts)
-  Add-Content -Path "$inboxDir\INBOX.md" -Value "[$ts] km-triage bot-token mint failed; run ``node utilities/km-triage-app/setup.js`` to reinstall."
+  Write-Error "[$ts] km-triage bot-token mint failed; run ``node utilities/km-triage-app/setup.js`` to reinstall."
   Write-Error "[ERROR] bot-token unavailable - aborting"
   exit 1
 }
@@ -143,7 +134,7 @@ for ($i = 1; $i -le $maxIterations; $i++) {
   $stamp = Get-Date -Format "yyyy-MM-dd-HHmm"
   $sweepId = "$stamp-iter$i"
   $env:KM_TRIAGE_SWEEP_ID = $sweepId
-  $log = "$inboxDir\runs\$stamp-iter$i.log"
+  $log = "$stateDir\runs\$stamp-iter$i.log"
 
   "[km-triage] $sweepId starting" | Tee-Object -FilePath $log -Append | Write-Host
 
@@ -209,8 +200,8 @@ for ($i = 1; $i -le $maxIterations; $i++) {
 
     # Gate 3 — hard-skip labels
     if ($labelNames -contains "ready-to-merge" -or $labelNames -contains "triage-skip") {
-      "    skip: already_in_lead_queue (label)" | Tee-Object -FilePath $log -Append | Write-Host
-      Write-AuditSkip $num "already_in_lead_queue" $headSha
+      "    skip: already_awaiting_response (label)" | Tee-Object -FilePath $log -Append | Write-Host
+      Write-AuditSkip $num "already_awaiting_response" $headSha
       $nSkip++; continue
     }
 
@@ -297,8 +288,8 @@ Please rebase against ``main`` first; the next sweep will run the full review cr
     if ($labelNames -contains "review-needed") {
       $triggerCommentId = Find-TriggerComment $num $lastAuditTs
       if (-not $triggerCommentId) {
-        "    skip: already_in_lead_queue (review-needed, no trigger)" | Tee-Object -FilePath $log -Append | Write-Host
-        Write-AuditSkip $num "already_in_lead_queue" $headSha
+        "    skip: already_awaiting_response (review-needed, no trigger)" | Tee-Object -FilePath $log -Append | Write-Host
+        Write-AuditSkip $num "already_awaiting_response" $headSha
         $nSkip++; continue
       } else {
         "    trigger comment #$triggerCommentId - removing review-needed" | Tee-Object -FilePath $log -Append | Write-Host
@@ -312,7 +303,7 @@ Please rebase against ``main`` first; the next sweep will run the full review cr
     if ($lastAuditSha -and $lastAuditSha -eq $headSha) {
       if ($lastAuditAction -eq "auto_fix_only") {
         "    [WARN] auto_fix_push_unverified - re-running review" | Tee-Object -FilePath $log -Append | Write-Host
-        Add-Content -Path "$inboxDir\INBOX.md" -Value ("[{0}] PR #{1}: auto_fix_only recorded but head SHA unchanged - re-running" -f (Get-Ts), $num)
+        ("[{0}] PR #{1}: auto_fix_only recorded but head SHA unchanged - re-running" -f (Get-Ts), $num) | Tee-Object -FilePath $log -Append | Write-Host
         # fall through to Claude
       } else {
         if (-not $triggerCommentId) {
