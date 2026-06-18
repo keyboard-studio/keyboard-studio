@@ -3,7 +3,7 @@
 //
 // On first call for a (sweep, pr) pair this POSTs a fresh check_run and saves
 // the returned id in a per-sweep sidecar at
-//   .tech-lead-inbox/runs/<sweep_id>-checks.json
+//   .escalations/runs/<sweep_id>-checks.json
 // Subsequent calls PATCH the same check_run, so the GitHub PR page shows the
 // summary refresh in place as the triage moves through phases.
 //
@@ -60,7 +60,7 @@ function die(msg, code = 1) {
 }
 
 function sidecarPath(sweepId) {
-  return path.join('.tech-lead-inbox', 'runs', `${sweepId}-checks.json`);
+  return path.join('.escalations', 'runs', `${sweepId}-checks.json`);
 }
 
 function readSidecar(sweepId) {
@@ -112,7 +112,7 @@ function buildPayload(args, mode) {
 }
 
 function callBotGh(method, urlPath, payload) {
-  const tmpDir = path.join('.tech-lead-inbox', 'runs');
+  const tmpDir = path.join('.escalations', 'runs');
   fs.mkdirSync(tmpDir, { recursive: true });
   const tmpFile = path.join(tmpDir, `.check-progress-${process.pid}-${Date.now()}.json`);
   fs.writeFileSync(tmpFile, JSON.stringify(payload));

@@ -30,8 +30,8 @@ CLAUDE="${CLAUDE_BIN:-/home/lee2mr/.local/bin/claude}"
 # convention — see the Personal mode section in .claude/commands/km-triage.md.
 MODEL="${KM_TRIAGE_MODEL:-opus}"
 
-INBOX_DIR=".tech-lead-inbox"
-AUDIT_LOG="$INBOX_DIR/audit-log.jsonl"
+STATE_DIR=".escalations"
+AUDIT_LOG="$STATE_DIR/audit-log.jsonl"
 MAX_ITERATIONS=3
 SLEEP_BETWEEN_SEC=45
 LOOP_ON_ACTIONS="auto_fix_only fix_and_mention"
@@ -116,37 +116,29 @@ find_trigger_comment() {
 
 # ── Phase 1: Bootstrap (once per cron tick) ──────────────────────────────────
 
-mkdir -p "$INBOX_DIR/runs" "$INBOX_DIR/diffs" "$INBOX_DIR/worktrees"
-
-[[ -f "$INBOX_DIR/INBOX.md" ]] || cat > "$INBOX_DIR/INBOX.md" <<'EOF'
-# Tech Lead Inbox
-
-PRs and questions that need your attention. Append-only; the triage loop adds entries here.
-
-EOF
+mkdir -p "$STATE_DIR/runs" "$STATE_DIR/diffs" "$STATE_DIR/worktrees"
 
 touch -a "$AUDIT_LOG"
 
 # Triage labels: create once per repo lifetime, guarded by a sentinel file.
 # Bump the sentinel suffix whenever a label is added so existing installs
 # create the newcomer on their next sweep (then go quiet again).
-if [[ ! -f "$INBOX_DIR/.labels-created-v2" ]]; then
+if [[ ! -f "$STATE_DIR/.labels-created-v2" ]]; then
   gh label create ready-to-merge --color 0e8a16 \
     --description "Triage approved - ready to merge by any team member" 2>/dev/null || true
   gh label create review-needed --color d93f0b \
-    --description "Triage escalated - awaiting submitter or tech-lead response" 2>/dev/null || true
+    --description "Triage escalated - awaiting submitter or maintainer response on the PR" 2>/dev/null || true
   gh label create triage-skip --color cfd3d7 \
     --description "Do not run triage on this PR" 2>/dev/null || true
   gh label create needs-rebase --color fbca04 \
     --description "Triage: branch conflicts with base - rebase needed (auto-clears once mergeable)" 2>/dev/null || true
-  touch "$INBOX_DIR/.labels-created-v2"
+  touch "$STATE_DIR/.labels-created-v2"
 fi
 
 if ! node utilities/km-triage-app/mint-token.js > /dev/null 2>&1; then
   printf '{"ts":"%s","action_taken":"auth_failed","reason":"bot_token_unavailable"}\n' \
     "$(ts)" >> "$AUDIT_LOG"
-  echo "[$(ts)] km-triage bot-token mint failed; run \`node utilities/km-triage-app/setup.js\` to reinstall." \
-    >> "$INBOX_DIR/INBOX.md"
+  echo "[$(ts)] km-triage bot-token mint failed; run \`node utilities/km-triage-app/setup.js\` to reinstall." >&2
   echo "[ERROR] bot-token unavailable — aborting" >&2
   exit 1
 fi
@@ -168,7 +160,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
   STAMP=$(date -u +"%Y-%m-%d-%H%M")
   SWEEP_ID="${STAMP}-iter${i}"
   export KM_TRIAGE_SWEEP_ID="$SWEEP_ID"
-  LOG="$INBOX_DIR/runs/${STAMP}-iter${i}.log"
+  LOG="$STATE_DIR/runs/${STAMP}-iter${i}.log"
 
   echo "[km-triage] $SWEEP_ID starting" | tee -a "$LOG"
 
@@ -232,8 +224,8 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
 
     # Gate 3 — hard-skip labels (ready-to-merge, triage-skip)
     if echo "$PR" | jq -e '[.labels[].name] | any(. == "ready-to-merge" or . == "triage-skip")' > /dev/null 2>&1; then
-      echo "  skip: already_in_lead_queue (label)" | tee -a "$LOG"
-      audit_skip "$NUM" already_in_lead_queue "$HEAD_SHA"
+      echo "  skip: already_awaiting_response (label)" | tee -a "$LOG"
+      audit_skip "$NUM" already_awaiting_response "$HEAD_SHA"
       n_skip=$((n_skip + 1)); continue
     fi
 
@@ -314,8 +306,8 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     if echo "$PR" | jq -e '[.labels[].name] | any(. == "review-needed")' > /dev/null 2>&1; then
       TRIGGER_COMMENT_ID=$(find_trigger_comment "$NUM" "$LAST_AUDIT_TS")
       if [[ -z "$TRIGGER_COMMENT_ID" ]]; then
-        echo "  skip: already_in_lead_queue (review-needed, no trigger)" | tee -a "$LOG"
-        audit_skip "$NUM" already_in_lead_queue "$HEAD_SHA"
+        echo "  skip: already_awaiting_response (review-needed, no trigger)" | tee -a "$LOG"
+        audit_skip "$NUM" already_awaiting_response "$HEAD_SHA"
         n_skip=$((n_skip + 1)); continue
       else
         echo "  trigger comment #$TRIGGER_COMMENT_ID — removing review-needed" | tee -a "$LOG"
@@ -333,7 +325,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
       if [[ "$LAST_AUDIT_ACTION" == "auto_fix_only" ]]; then
         echo "  [WARN] auto_fix_push_unverified — re-running review" | tee -a "$LOG"
         printf '[%s] PR #%s: auto_fix_only recorded but head SHA unchanged — re-running\n' \
-          "$(ts)" "$NUM" >> "$INBOX_DIR/INBOX.md"
+          "$(ts)" "$NUM" | tee -a "$LOG"
         # fall through to Claude
       else
         # Reuse trigger check from Gate 8 if already fetched; otherwise fetch now

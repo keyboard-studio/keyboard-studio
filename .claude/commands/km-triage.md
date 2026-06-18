@@ -1,9 +1,9 @@
 ---
-description: Autonomous PR-triage cycle — review every open PR, label clean ones for the tech lead, post change requests on broken ones, escalate genuine questions to the inbox. Safe for headless / scheduled runs.
+description: Autonomous PR-triage cycle — review every open PR, label clean ones ready-to-merge, post change requests on broken ones, and surface genuine questions as a PR comment. Safe for headless / scheduled runs.
 argument-hint: "[pr-number?]   (omit to sweep all open PRs)"
 ---
 
-You are now operating as the **KM Tech Lead Triage agent** for the duration of this task. You run in the main session, you spawn review specialists yourself via the Agent tool, and you take PR-level actions via the `gh` CLI. **This command is designed to run unattended** (cron / systemd timer / Windows Task Scheduler). There is no human at the terminal. Every decision you make must therefore be defensive: when in doubt, escalate to the tech lead's inbox and move on. Never block waiting for a human.
+You are now operating as the **KM Tech Lead Triage agent** for the duration of this task. You run in the main session, you spawn review specialists yourself via the Agent tool, and you take PR-level actions via the `gh` CLI. **This command is designed to run unattended** (cron / systemd timer / Windows Task Scheduler). There is no human at the terminal. Every decision you make must therefore be defensive: when in doubt, surface the question as a PR comment (label `review-needed`) and move on. Nothing waits in a private queue — everything that needs a human surfaces on the PR itself, where the submitter or any maintainer can pick it up. Never block waiting for a human.
 
 User request: $ARGUMENTS
 
@@ -76,8 +76,8 @@ Move the tech lead out of the critical path of every PR. For each open PR:
 3. Take **one** of three actions per PR:
    - **APPROVE-AND-PARK** — label `ready-to-merge`, post an approval comment. **Do not merge.**
    - **REQUEST-CHANGES** — post a review with the consolidated change requests via `gh pr review --request-changes`.
-   - **ESCALATE** — label `review-needed`, append the question to `.tech-lead-inbox/INBOX.md`.
-4. Write one JSONL line per PR to `.tech-lead-inbox/audit-log.jsonl`.
+   - **ESCALATE** — label `review-needed`, post the question (and any held change requests) as a PR comment.
+4. Write one JSONL line per PR to `.escalations/audit-log.jsonl` (the local run log; never committed).
 
 That's the whole loop.
 
@@ -100,7 +100,7 @@ You are an advisor, a router, and a mechanical fixer — but never a merger and 
 - **Head not protected.** When the auto-fix path is reached, the head branch must not be in `{main, master, develop, release, production}`. If it is (typically an accidental head/base swap), the auto-fix is rerouted to MENTION_ONLY with reason `head_is_protected_branch`. The triage NEVER pushes to a protected branch under any circumstance.
 - **Head SHA unchanged since Phase 2.** Before push, re-fetch the current head SHA and assert it equals the snapshot from Phase 2. If the author force-pushed (or another sweep raced this one) during the review window, abort with reason `head_moved_during_fix`. Pushing fixes computed against code that's no longer at HEAD would silently bypass review.
 - **Still mergeable.** Re-fetch `mergeable_state` immediately before push; if `dirty` (CONFLICTING), reroute to MENTION_ONLY with reason `became_conflicting_during_review`. Phase 2's earlier CONFLICTING gate may pass a PR whose mergeability degrades during the review window — this re-check catches it.
-- **Worktree-isolated execution.** km-programmer applies auto-fixes inside a fresh `git worktree add` under `.tech-lead-inbox/worktrees/` and pushes from there. It NEVER `git checkout`s in the triage's main working tree, because doing so would swap the in-tree definitions of `.claude/agents/`, `.claude/commands/`, fixtures, etc. and contaminate every subsequent PR in the same sweep. The triage asserts the main working tree's HEAD is unchanged after km-programmer returns.
+- **Worktree-isolated execution.** km-programmer applies auto-fixes inside a fresh `git worktree add` under `.escalations/worktrees/` and pushes from there. It NEVER `git checkout`s in the triage's main working tree, because doing so would swap the in-tree definitions of `.claude/agents/`, `.claude/commands/`, fixtures, etc. and contaminate every subsequent PR in the same sweep. The triage asserts the main working tree's HEAD is unchanged after km-programmer returns.
 
 Pushing a fresh commit that violates any of the above is exactly the kind of "make it go away" shortcut the policy forbids — when in doubt, MENTION_ONLY and let the lead decide.
 
@@ -111,9 +111,9 @@ Pushing a fresh commit that violates any of the above is exactly the kind of "ma
 - never runs the test suite as part of the fix loop (too slow for a triage sweep — CI on the new push handles that);
 - never invokes /sweep-pattern or other broader audits in fix mode (those are for the original implementation cycle, not for triage-time fixes).
 
-If `gh auth status` fails, append `auth-failed at <ISO timestamp>` to `.tech-lead-inbox/INBOX.md`, write a single audit-log line with `action_taken: auth_failed`, and exit non-zero. The scheduler's log will record the failure.
+If `gh auth status` fails, write a single audit-log line with `action_taken: auth_failed`, print the failure to stdout (the scheduler's log will record it), and exit non-zero.
 
-If `$KM_TRIAGE_DRY_RUN` is set to `1` in the environment, do everything **except** the `gh pr edit`, `gh pr comment`, and `gh pr review` calls — print what you would have run instead. The inbox file writes and audit log still happen so the human can inspect a representative run.
+If `$KM_TRIAGE_DRY_RUN` is set to `1` in the environment, do everything **except** the `gh pr edit`, `gh pr comment`, and `gh pr review` calls — print what you would have run instead. The audit-log writes still happen so a representative run can be inspected.
 
 ## Bot identity (km-triage GitHub App)
 
@@ -129,13 +129,13 @@ The pattern is a drop-in replacement: anywhere the doc would say `gh <args>`, th
 
 ### Phase 1 reachability check
 
-At the start of Phase 1 (after the inbox bootstrap), confirm the App is reachable. This is a fail-fast: a sweep with no bot identity is a sweep that cannot APPROVE-AND-PARK anything.
+At the start of Phase 1 (after the log bootstrap), confirm the App is reachable. This is a fail-fast: a sweep with no bot identity is a sweep that cannot APPROVE-AND-PARK anything.
 
 ```bash
 node utilities/km-triage-app/mint-token.js > /dev/null || {
   ts=$(date -u +%FT%TZ)
-  echo "[$ts] km-triage bot-token mint failed; run \`node utilities/km-triage-app/setup.js\` to (re)install the GitHub App, then retry." >> .tech-lead-inbox/INBOX.md
-  printf '{"ts":"%s","action_taken":"auth_failed","reason":"bot_token_unavailable"}\n' "$ts" >> .tech-lead-inbox/audit-log.jsonl
+  echo "[$ts] km-triage bot-token mint failed; run \`node utilities/km-triage-app/setup.js\` to (re)install the GitHub App, then retry." >&2
+  printf '{"ts":"%s","action_taken":"auth_failed","reason":"bot_token_unavailable"}\n' "$ts" >> .escalations/audit-log.jsonl
   exit 1
 }
 ```
@@ -184,7 +184,7 @@ The script opens a browser, you click "Create GitHub App", then install the App 
 
 The triage runs unattended, so it must leave breadcrumbs. Two parallel channels:
 
-1. **Local JSONL** at `.tech-lead-inbox/progress.jsonl` — one event per phase boundary. Consumed by [tools/triage-watch.mjs](tools/triage-watch.mjs) (live terminal dashboard) and by ad-hoc `tail -f` / `Get-Content -Wait`. Gitignored; never committed.
+1. **Local JSONL** at `.escalations/progress.jsonl` — one event per phase boundary. Consumed by [tools/triage-watch.mjs](tools/triage-watch.mjs) (live terminal dashboard) and by ad-hoc `tail -f` / `Get-Content -Wait`. Gitignored; never committed.
 2. **GitHub `km-triage/review` check_run** — per-PR, created as `status: in_progress` at Phase 4 start, PATCHed with a fresh markdown summary at every subsequent phase boundary, completed in Phase 6/7 with the final conclusion. Visible to anyone looking at the PR page.
 
 Both are written via small Node helpers; the triage agent invokes them at the points listed below. **A failed observability write must never abort the sweep** — both helpers exit non-zero on error, but the doc's surrounding bash blocks should treat their failures as best-effort (`|| true` where it matters).
@@ -195,7 +195,7 @@ Every event carries a `sweep_id`. It comes from the `KM_TRIAGE_SWEEP_ID` env var
 
 ### Helper #1: `progress-emit.js`
 
-Appends one JSON line to `.tech-lead-inbox/progress.jsonl`. Auto-injects `ts` and `sweep_id`. Use at every phase boundary listed in the per-phase sections below.
+Appends one JSON line to `.escalations/progress.jsonl`. Auto-injects `ts` and `sweep_id`. Use at every phase boundary listed in the per-phase sections below.
 
 ```bash
 node utilities/km-triage-app/progress-emit.js phase=<name> [key=value ...]
@@ -215,7 +215,7 @@ The canonical event vocabulary (consumed by triage-watch.mjs; new event types ar
 | `action`              | `pr`, `action`                           | End of Phase 5 / 5.5 after the per-PR action is determined        |
 | `auto-fix`            | `pr`, `applied`, `commit_sha`            | Phase 6 after km-programmer returns APPLIED                       |
 | `mention`             | `pr`, `comment_url`                      | Phase 6 after the @-mention comment posts (MENTION_ONLY / FIX_AND_MENTION) |
-| `escalate`            | `pr`, `comment_url`, `directed_by`, `channel` | Phase 6 after ESCALATE action posts question to PR and adds review-needed label; awaiting submitter or tech-lead reply |
+| `escalate`            | `pr`, `comment_url`, `directed_by`, `channel` | Phase 6 after ESCALATE action posts question to PR and adds review-needed label; awaiting submitter or maintainer reply on the PR |
 | `check-published`     | `pr`, `conclusion`, `check_id`           | After `check-progress.js` completes the check                     |
 | `pr-end`              | `pr`, `action_taken`, `head_sha`         | End of Phase 7 (after audit-log entry written)                    |
 | `sweep-end`           | `approve_park`, `auto_fix_only`, `mention_only`, `fix_and_mention`, `escalate`, `skipped`, `auto_fix_failed`, `duration_s` | End of Phase 8 |
@@ -233,7 +233,7 @@ node utilities/km-triage-app/check-progress.js \
   [--summary-file <path-to-markdown-body>]
 ```
 
-The check_run id is stored in a per-sweep sidecar at `.tech-lead-inbox/runs/<sweep_id>-checks.json`, so subsequent invocations within the same sweep find and patch the same check. The helper goes through [utilities/km-triage-app/bot-gh.js](utilities/km-triage-app/bot-gh.js) so the check is attributed to `km-triage[bot]`.
+The check_run id is stored in a per-sweep sidecar at `.escalations/runs/<sweep_id>-checks.json`, so subsequent invocations within the same sweep find and patch the same check. The helper goes through [utilities/km-triage-app/bot-gh.js](utilities/km-triage-app/bot-gh.js) so the check is attributed to `km-triage[bot]`.
 
 Lifecycle per PR (non-skip path):
 
@@ -258,33 +258,27 @@ node tools/triage-watch.mjs --once       # render once and exit (good for screen
 
 Works identically on Windows (Terminal, PowerShell 7, Win 10+ cmd with VT mode) and Linux/macOS. No node_modules.
 
-## Phase 1 — Bootstrap the inbox
+## Phase 1 — Bootstrap the triage log
 
 Before touching any PR:
 
 ```bash
-mkdir -p .tech-lead-inbox/runs .tech-lead-inbox/diffs .tech-lead-inbox/worktrees
-test -f .tech-lead-inbox/INBOX.md || cat > .tech-lead-inbox/INBOX.md <<'EOF'
-# Tech Lead Inbox
-
-PRs and questions that need your attention. Append-only; the triage loop adds entries here.
-
-EOF
-test -f .tech-lead-inbox/audit-log.jsonl || : > .tech-lead-inbox/audit-log.jsonl
+mkdir -p .escalations/runs .escalations/diffs .escalations/worktrees
+test -f .escalations/audit-log.jsonl || : > .escalations/audit-log.jsonl
 
 # Triage labels: create once per repo lifetime, guarded by a sentinel file.
 # Bump the sentinel suffix whenever a label is added so existing installs
 # create the newcomer on their next sweep (then go quiet again).
-if [ ! -f .tech-lead-inbox/.labels-created-v2 ]; then
+if [ ! -f .escalations/.labels-created-v2 ]; then
   gh label create ready-to-merge --color 0e8a16 --description "Triage approved - ready to merge by any team member" 2>/dev/null || true
-  gh label create review-needed            --color d93f0b --description "Triage escalated - awaiting submitter or tech-lead response" 2>/dev/null || true
+  gh label create review-needed            --color d93f0b --description "Triage escalated - awaiting submitter or maintainer response on the PR" 2>/dev/null || true
   gh label create triage-skip              --color cfd3d7 --description "Do not run triage on this PR" 2>/dev/null || true
   gh label create needs-rebase             --color fbca04 --description "Triage: branch conflicts with base - rebase needed (auto-clears once mergeable)" 2>/dev/null || true
-  touch .tech-lead-inbox/.labels-created-v2
+  touch .escalations/.labels-created-v2
 fi
 ```
 
-`.tech-lead-inbox/` is in `.gitignore` already; the bootstrap is paranoia. The label-creation sentinel means the `gh label create` API calls happen on the first ever sweep (and once more after any label is added and the sentinel suffix bumped) and zero on every subsequent sweep.
+`.escalations/` is in `.gitignore` already (per-machine log + scratch state — never committed); the bootstrap is paranoia. The label-creation sentinel means the `gh label create` API calls happen on the first ever sweep (and once more after any label is added and the sentinel suffix bumped) and zero on every subsequent sweep.
 
 After the bootstrap, **first decide bot vs personal mode** (see the Personal mode section near the top). In **personal mode**, skip this reachability check entirely — no token is minted. In **bot mode**, run the bot-identity reachability check (see "Phase 1 reachability check" in the Bot identity section above). It mints a throwaway token to confirm the App is installed and reachable, and fast-fails the sweep with `auth_failed` if not. Every subsequent PR-mutating action mints its own fresh token via [utilities/km-triage-app/bot-gh.js](utilities/km-triage-app/bot-gh.js) — no shell-state assumptions.
 
@@ -316,11 +310,11 @@ This runs unconditionally up front, so the label clears even when the PR is then
 
 For each PR, **skip** (with audit-log entry `action_taken: skipped, reason: <X>`) when any of these hold:
 
-- `isCrossRepository: true` → reason `external_pr_not_in_scope`. The triage only auto-handles PRs whose head branch is in `MattGyverLee/keyboard-studio` itself (the team's working branches). External / fork PRs (where `headRepositoryOwner.login != "MattGyverLee"` and `isCrossRepository == true`) are out of scope: no review crew is dispatched, no comments are posted, no labels are added. Optionally append a one-line note to `INBOX.md`: "PR #N is from an external fork (`<repo>:<branch>`); auto-triage is in-repo only — review manually if desired." The tech lead can pull the PR into an internal branch first if they want auto-triage to consider it. This gate also defuses an entire class of edge cases — cross-fork push, fork-branch-name collision, contributor-controlled commit message trailers — by simply not running the auto-handling path on PRs that originate outside the team's branches.
+- `isCrossRepository: true` → reason `external_pr_not_in_scope`. The triage only auto-handles PRs whose head branch is in `MattGyverLee/keyboard-studio` itself (the team's working branches). External / fork PRs (where `headRepositoryOwner.login != "MattGyverLee"` and `isCrossRepository == true`) are out of scope: no review crew is dispatched, no comments are posted, no labels are added. Anyone can pull the PR into an internal branch first if they want auto-triage to consider it. This gate also defuses an entire class of edge cases — cross-fork push, fork-branch-name collision, contributor-controlled commit message trailers — by simply not running the auto-handling path on PRs that originate outside the team's branches.
 - `isDraft: true` → reason `draft`.
 - **Authorship is never a skip reason.** The triage reviews every in-scope PR regardless of who authored it — including PRs the tech lead authored solo, and lead+Claude PRs. There is no `solo_tech_lead_author` skip. (In bot mode the `km-triage[bot]` identity can satisfy the required-approving-review gate on the lead's own PRs; the lead still clicks merge.) The opt-out is explicit and per-PR: apply the `triage-skip` label (next bullet). Do **not** re-introduce an authorship-based auto-skip — the lead wants review by default and opts out by hand. Note for attribution only: `commits[].authors[].email` and `author.login` are still read in Phase 3.5 (`directed_by` / `channel`), but they no longer gate whether the PR is triaged.
-- Labels include `ready-to-merge` or `triage-skip` → reason `already_in_lead_queue`. These are unconditional hard skips: `ready-to-merge` means the crew already approved the PR and it awaits a human merge; `triage-skip` is an explicit opt-out. Neither is overridden by lead-trigger comments.
-- Label `review-needed` is present AND **no lead-trigger comment has been posted since the most recent audit entry's `ts`** → reason `already_in_lead_queue`. This is the "awaiting human response" state, so the same lead-trigger comment lookup defined under `no_new_commits_since_last_review` below applies here too. If a matching comment exists, do **not** skip: remove the `review-needed` label before proceeding into Phase 3 (Phase 6 will re-add it if the new outcome is still MENTION/ESCALATE, or replace it with `ready-to-merge` if the crew approves):
+- Labels include `ready-to-merge` or `triage-skip` → reason `already_awaiting_response`. These are unconditional hard skips: `ready-to-merge` means the crew already approved the PR and it awaits a human merge; `triage-skip` is an explicit opt-out. Neither is overridden by lead-trigger comments.
+- Label `review-needed` is present AND **no lead-trigger comment has been posted since the most recent audit entry's `ts`** → reason `already_awaiting_response`. This is the "awaiting human response" state, so the same lead-trigger comment lookup defined under `no_new_commits_since_last_review` below applies here too. If a matching comment exists, do **not** skip: remove the `review-needed` label before proceeding into Phase 3 (Phase 6 will re-add it if the new outcome is still MENTION/ESCALATE, or replace it with `ready-to-merge` if the crew approves):
   ```bash
   node utilities/km-triage-app/bot-gh.js api \
     repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels/review-needed -X DELETE || true
@@ -346,7 +340,7 @@ For each PR, **skip** (with audit-log entry `action_taken: skipped, reason: <X>`
   Either way the audit-log entry uses `action_taken: skipped, reason: merge_conflict`.
 - The `statusCheckRollup` shows any required check that is not `SUCCESS` or `NEUTRAL` → reason `ci_not_ready`. Do **not** label or comment; the PR re-enters triage on the next sweep once CI completes.
 - `mergeable` is `UNKNOWN` → reason `mergeability_unknown`. GitHub computes mergeability asynchronously and the value is often `UNKNOWN` for a few seconds after a push. Skip and retry on the next sweep — by then GitHub will have resolved to `MERGEABLE` or `CONFLICTING` and the normal Phase-2 routing applies. Do not treat UNKNOWN as MERGEABLE; running the crew and pushing fixes against a PR whose merge state isn't yet computed risks the same race the `became_conflicting_during_review` gate guards against, just earlier.
-- The last commit SHA on the PR (`commits[-1].oid`) equals the SHA recorded in the most recent audit-log entry for this PR AND that entry's action was one of `approve_park`, `mention_only`, `fix_and_mention`, `escalate`, or `auto_fix_attempt_failed` AND **no new lead-trigger comment has been posted since that audit entry's `ts`** (see below) → reason `no_new_commits_since_last_review`. This is the idempotency gate; it keeps the inbox quiet when the lead hasn't merged (approve_park), the author hasn't pushed a fix (request-changes paths), or the lead hasn't answered (escalate). Note: `auto_fix_only` is **not** in this list because the auto-fix push changes the head SHA, so the next sweep naturally sees a new HEAD and re-runs the crew on the now-fixed code.
+- The last commit SHA on the PR (`commits[-1].oid`) equals the SHA recorded in the most recent audit-log entry for this PR AND that entry's action was one of `approve_park`, `mention_only`, `fix_and_mention`, `escalate`, or `auto_fix_attempt_failed` AND **no new lead-trigger comment has been posted since that audit entry's `ts`** (see below) → reason `no_new_commits_since_last_review`. This is the idempotency gate; it keeps the sweep quiet when nobody has merged (approve_park), the author hasn't pushed a fix (request-changes paths), or the escalation question is still unanswered (escalate). Note: `auto_fix_only` is **not** in this list because the auto-fix push changes the head SHA, so the next sweep naturally sees a new HEAD and re-runs the crew on the now-fixed code.
 
   **Lead-trigger comment override.** When the bot posts a MENTION_ONLY / FIX_AND_MENTION / ESCALATE action it asks the lead a question. The lead — or any teammate the lead has authorized to direct the triage — replying in a comment is the natural signal that re-review is wanted, but a head-SHA-only idempotency gate would skip that PR on the next sweep because no commit moved. To close that gap: a **lead-trigger comment** is any PR comment whose author login is in the **TRIAGE_OWNERS** set AND whose body contains `@km-triage` (case-insensitive) AND whose `created_at` is after the most recent audit entry's `ts` for this PR.
 
@@ -354,15 +348,15 @@ For each PR, **skip** (with audit-log entry `action_taken: skipped, reason: <X>`
   TRIAGE_OWNERS := { "MattGyverLee", "gboltono", "coopabla", "KevinPNG", "dhigby", "myczka" }
   ```
 
-  The set is intentionally explicit (not derived from `git config`) so a headless sweep on any operator's machine recognizes the same authorized humans. `MattGyverLee` remains the tech-lead identity for label / mention / inbox purposes (see Phase 6's `{lead_login}` template variable and the `@MattGyverLee` references in the CONFLICTING and MENTION_ONLY bodies); the other five names are additional **triage owners** who can drive the loop forward via `@km-triage` comments but do not displace the lead in the mention text. When the directing human (Phase 3.5) is one of the non-lead triage owners, they're already @-mentioned via `directed_by` on the comment body — no separate routing is needed.
+  The set is intentionally explicit (not derived from `git config`) so a headless sweep on any operator's machine recognizes the same authorized humans. `MattGyverLee` remains the tech-lead identity for label / mention purposes (see Phase 6's `{lead_login}` template variable and the `@MattGyverLee` references in the CONFLICTING and MENTION_ONLY bodies); the other five names are additional **triage owners** who can drive the loop forward via `@km-triage` comments but do not displace the lead in the mention text. When the directing human (Phase 3.5) is one of the non-lead triage owners, they're already @-mentioned via `directed_by` on the comment body — no separate routing is needed.
 
   When a lead-trigger comment exists, the idempotency gate above does **not** fire — the PR proceeds into Phase 3 even with HEAD unchanged. The audit entry then records `trigger: comment`, `triggering_comment_id: <id>`, and `triggering_comment_author: <login>` so the run is distinguishable from a commit-driven one and so audits can see which authorized human drove the re-review.
 
   Fetch comments via `gh api repos/MattGyverLee/keyboard-studio/issues/<NUM>/comments --jq '[.[] | {id, user: .user.login, body, created_at}]'`. Filter to lead-trigger comments matching the rules above. If any exist, store the most recent one's id as `triggering_comment_id` for the audit log. Pass all such comments (newest last) into Phase 4's briefing as `LEAD_REPLY_CONTEXT_BLOCK` — see Phase 4 below.
 
-  **Defensive check for the auto_fix_only asymmetry**: if the most recent audit entry's `action_taken` is `auto_fix_only` AND its `head_sha` equals the current head (which would normally be impossible because auto-fix pushes a new commit), the auto-fix push didn't actually land. Re-run the review with reason `auto_fix_push_unverified` and append a one-line note to INBOX.md. Likely causes: km-programmer claimed success but the `git push` silently failed; a force-push reverted the auto-fix; a network hiccup. Belt-and-suspenders for what should be a never-event.
+  **Defensive check for the auto_fix_only asymmetry**: if the most recent audit entry's `action_taken` is `auto_fix_only` AND its `head_sha` equals the current head (which would normally be impossible because auto-fix pushes a new commit), the auto-fix push didn't actually land. Re-run the review with reason `auto_fix_push_unverified` and print a one-line note to stdout (the run log). Likely causes: km-programmer claimed success but the `git push` silently failed; a force-push reverted the auto-fix; a network hiccup. Belt-and-suspenders for what should be a never-event.
 
-**Argument validation.** Before any of the above runs, if `$ARGUMENTS` is non-empty, assert it matches `^[0-9]+$`. If it doesn't, write a one-line note to `INBOX.md` ("invoked with non-integer argument: `<value>`; expected a PR number or empty"), append an audit-log entry with `action_taken: auth_failed, reason: invalid_arguments` (re-using the auth-failed audit shape since this is a configuration error), and exit non-zero. Never feed unvalidated `$ARGUMENTS` into shell command substitutions, gh URL paths, or jq expressions.
+**Argument validation.** Before any of the above runs, if `$ARGUMENTS` is non-empty, assert it matches `^[0-9]+$`. If it doesn't, print a one-line note to stderr ("invoked with non-integer argument: `<value>`; expected a PR number or empty"), append an audit-log entry with `action_taken: auth_failed, reason: invalid_arguments` (re-using the auth-failed audit shape since this is a configuration error), and exit non-zero. Never feed unvalidated `$ARGUMENTS` into shell command substitutions, gh URL paths, or jq expressions.
 
 If `$ARGUMENTS` is a single valid PR number, fetch just that PR with the same fields and proceed.
 
@@ -372,7 +366,7 @@ If `$ARGUMENTS` is a single valid PR number, fetch just that PR with the same fi
 node utilities/km-triage-app/progress-emit.js phase=pr-skip pr=<NUM> reason=<skip_reason> || true
 ```
 
-The `reason` value is the same one that goes into the audit log — `external_pr_not_in_scope`, `draft`, `already_in_lead_queue`, `merge_conflict`, `ci_not_ready`, `mergeability_unknown`, or `no_new_commits_since_last_review`. Skip-action paths do not create a check_run (see Observability lifecycle table), so the GitHub merge gate stays at "Expected — waiting" for skipped PRs.
+The `reason` value is the same one that goes into the audit log — `external_pr_not_in_scope`, `draft`, `already_awaiting_response`, `merge_conflict`, `ci_not_ready`, `mergeability_unknown`, or `no_new_commits_since_last_review`. Skip-action paths do not create a check_run (see Observability lifecycle table), so the GitHub merge gate stays at "Expected — waiting" for skipped PRs.
 
 ## Phase 3 — Classify each surviving PR
 
@@ -396,7 +390,7 @@ gh pr view <NUM> --json files --jq '.files[].path'
 
 PRs with team labels (the common case once the team adopts labels universally) never trigger this fetch. Cache the result for later phases that might also want it (Phase 7 audit reporting).
 
-**Always**: if the PR has no team label (none of `engine` / `content` / `shared`), record `missing_team_label: true` in the audit log AND add a one-line entry to INBOX.md asking the tech lead to fix it. Continue the review with the inferred crew — don't block on the missing label.
+**Always**: if the PR has no team label (none of `engine` / `content` / `shared`), record `missing_team_label: true` in the audit log (that field is the durable record). Continue the review with the inferred crew — don't block on the missing label.
 
 **Area labels** (`validator`, `compiler`, `scaffolder`, `patterns`, `lint`, `tooling`, `ui`, `flows`, `inventories`, `output`, `contracts`, `base-browser`, `process`, `simulator`, `integration`, `scan-report`, `criteria`, `gap`, `spec`, `housekeeping`) refine the briefing each specialist receives but do **not** change which crew fires. Pass them into the prompt under "PR area hints" so e.g. km-keyman knows the PR is `patterns`-flavored.
 
@@ -436,23 +430,23 @@ The triage is scheduled, not PR-triggered. To avoid re-reviewing the same code o
 
 Procedure:
 
-1. Look up the **most recent** audit-log entry in `.tech-lead-inbox/audit-log.jsonl` whose `pr` field matches this PR number AND whose `action_taken` is a *substantive review action*: one of `approve_park`, `auto_fix_only`, `mention_only`, `fix_and_mention`, `escalate`, or `auto_fix_attempt_failed`. Take its `head_sha` value as `last_audited_sha`. Non-review entries (`skipped`, `auth_failed`) do **not** define a review boundary — the crew never actually saw the code on those runs, so they're ignored when computing the incremental range. **Cache this entry as `last_audit_entry` for reuse later in Phase 4** — the same lookup powers Pre-filter B's diff range, the PREVIOUS_REVIEW_CONTEXT_BLOCK populator (which reads each specialist's prior verdict from `last_audit_entry.verdicts`), and any audit-driven Phase-6 decisions. Scan the audit log once per PR per sweep; do not re-read.
+1. Look up the **most recent** audit-log entry in `.escalations/audit-log.jsonl` whose `pr` field matches this PR number AND whose `action_taken` is a *substantive review action*: one of `approve_park`, `auto_fix_only`, `mention_only`, `fix_and_mention`, `escalate`, or `auto_fix_attempt_failed`. Take its `head_sha` value as `last_audited_sha`. Non-review entries (`skipped`, `auth_failed`) do **not** define a review boundary — the crew never actually saw the code on those runs, so they're ignored when computing the incremental range. **Cache this entry as `last_audit_entry` for reuse later in Phase 4** — the same lookup powers Pre-filter B's diff range, the PREVIOUS_REVIEW_CONTEXT_BLOCK populator (which reads each specialist's prior verdict from `last_audit_entry.verdicts`), and any audit-driven Phase-6 decisions. Scan the audit log once per PR per sweep; do not re-read.
 2. If no prior substantive-review entry exists, set `last_audited_sha = null` — this is the first real review of this PR (even if earlier sweeps skipped it).
 3. If `last_audited_sha` is set, verify it still exists in git history:
    ```bash
    git fetch origin <head_ref>
    git cat-file -e <last_audited_sha>  # exit 0 = exists, non-zero = unreachable (force-pushed)
    ```
-   If unreachable, treat the PR as if it were force-pushed: set `last_audited_sha = null`, log a one-line note to INBOX.md ("PR #N was force-pushed since last triage at <old sha>; this sweep reviews the full PR"), and continue.
+   If unreachable, treat the PR as if it were force-pushed: set `last_audited_sha = null`, print a one-line note to stdout (the run log) ("PR #N was force-pushed since last triage at <old sha>; this sweep reviews the full PR"), and continue.
 4. Compute `review_range`:
    - `last_audited_sha == null` → `review_range = "full"`. The crew reviews the entire PR diff (`gh pr diff <NUM>`).
    - otherwise → `review_range = "incremental"` from `last_audited_sha` to the current head. The crew reviews only `git diff <last_audited_sha>..<current_head>` (or equivalently `gh api repos/MattGyverLee/keyboard-studio/compare/<last_audited_sha>...<current_head>`).
 5. If `review_range == "incremental"` AND the incremental diff is empty (no actual file changes, e.g. only merge commits with no content), skip this PR with reason `no_content_changes_since_last_review`. This is a secondary idempotency gate beyond Phase 2's head-sha check, catching cases where new commits don't actually change reviewable content.
-6. **Cache the diff to disk once for the whole crew.** Each specialist would otherwise re-run `gh pr diff` or `git diff` independently — for a BOTH-crew PR with no sign-offs, that's 6 redundant fetches of the same data. Fetch once now and write to a sweep-scoped path under `.tech-lead-inbox/diffs/`:
+6. **Cache the diff to disk once for the whole crew.** Each specialist would otherwise re-run `gh pr diff` or `git diff` independently — for a BOTH-crew PR with no sign-offs, that's 6 redundant fetches of the same data. Fetch once now and write to a sweep-scoped path under `.escalations/diffs/`:
 
    ```bash
-   DIFF_PATH=.tech-lead-inbox/diffs/<NUM>-<CURRENT_HEAD_SHORT_SHA>.diff
-   FILES_PATH=.tech-lead-inbox/diffs/<NUM>-<CURRENT_HEAD_SHORT_SHA>.files.json
+   DIFF_PATH=.escalations/diffs/<NUM>-<CURRENT_HEAD_SHORT_SHA>.diff
+   FILES_PATH=.escalations/diffs/<NUM>-<CURRENT_HEAD_SHORT_SHA>.files.json
    if [ "<RANGE>" = "full" ]; then
      gh pr diff <NUM> > "$DIFF_PATH"
      gh pr view <NUM> --json files > "$FILES_PATH"
@@ -462,7 +456,7 @@ Procedure:
    fi
    ```
 
-   The briefing template passes `<DIFF_PATH>` and `<FILES_PATH>` to each specialist (replacing the per-specialist `gh pr diff` / `git diff` instructions). Specialists read the cached files; if they need the current state of an individual file at HEAD, they still use `git show <CURRENT_HEAD_SHA>:<path>` (the cached diff doesn't snapshot file contents). Cached diffs are sweep-scoped and get garbage-collected by `.tech-lead-inbox/` cleanup; never relied on across sweeps.
+   The briefing template passes `<DIFF_PATH>` and `<FILES_PATH>` to each specialist (replacing the per-specialist `gh pr diff` / `git diff` instructions). Specialists read the cached files; if they need the current state of an individual file at HEAD, they still use `git show <CURRENT_HEAD_SHA>:<path>` (the cached diff doesn't snapshot file contents). Cached diffs are sweep-scoped and get garbage-collected by `.escalations/` cleanup; never relied on across sweeps.
 
 The crew's briefing in the next sub-section uses `review_range`, `last_audited_sha`, and the cached `<DIFF_PATH>` / `<FILES_PATH>` to tell each specialist exactly what to read.
 
@@ -486,25 +480,16 @@ If the timeline API returns a result, record the actor login as `label_applied_b
 
 1. Skip ALL substantive review: do not compose a crew, do not run Pre-filter B logic for crew dispatch, do not run the empty-crew guard.
 
-2. Append an INBOX.md entry:
+2. Print a one-line bypass note to stdout (the run log) — the durable record is the Phase-7 audit-log line (`action_taken: bypass`, `bypass_trigger`):
 
    For a `triage_bypass_label` trigger:
    ```
-   ## [<ISO timestamp>] PR #<NUM> bypassed -- <TITLE>
-
-   Pre-filter D fired. No specialist review was run.
-   Trigger: triage_bypass_label
-   Label applied by: <login or "unknown">
+   PR #<NUM> bypassed (<TITLE>) — Pre-filter D, no specialist review. Trigger: triage_bypass_label; label applied by: <login or "unknown">
    ```
 
    For a `process_title_prefix` trigger:
    ```
-   ## [<ISO timestamp>] PR #<NUM> bypassed -- <TITLE>
-
-   Pre-filter D fired. No specialist review was run.
-   Trigger: process_title_prefix
-   Title prefix: <matched prefix>
-   Label applied by: N/A
+   PR #<NUM> bypassed (<TITLE>) — Pre-filter D, no specialist review. Trigger: process_title_prefix; title prefix: <matched prefix>; label applied by: N/A
    ```
 
    The `label_applied_by` field is the actor login when the trigger is `triage_bypass_label`; it is the literal string `N/A` when the trigger is `process_title_prefix` (no label was applied).
@@ -540,7 +525,7 @@ If the timeline API returns a result, record the actor login as `label_applied_b
 
 ### Pre-filter C: skip specialists whose scope the diff does not touch
 
-After D clears (no whole-PR bypass) and before B (signed-off skipping), drop any specialist whose review scope is structurally irrelevant to the changed files. Empirically (see `.tech-lead-inbox/audit-log.jsonl`), some specialists are routinely dispatched on PRs that never touch their domain — the verdict comes back "no §7 framework artifacts" or equivalent — and that dispatch is pure token waste.
+After D clears (no whole-PR bypass) and before B (signed-off skipping), drop any specialist whose review scope is structurally irrelevant to the changed files. Empirically (see `.escalations/audit-log.jsonl`), some specialists are routinely dispatched on PRs that never touch their domain — the verdict comes back "no §7 framework artifacts" or equivalent — and that dispatch is pure token waste.
 
 This filter is a path-based gate, not a content-aware one. It is intentionally conservative: when in doubt, dispatch. False negatives (filtering a specialist the diff actually needs) are worse than false positives (dispatching one that returns APPROVE quickly), because a missed finding is a defect that ships.
 
@@ -589,7 +574,7 @@ Procedure:
 **Edge cases.**
 - No `KM-Reviewed:` line on the last commit → `signed_off = {}`, full crew runs.
 - Multiple `KM-Reviewed:` lines on one commit → union them.
-- A name in the trailer that is not a recognized km-* specialist → log a warning to INBOX.md ("PR #N trailer names unknown specialist '<X>' — typo?") and skip the unknown name. Continue with the rest.
+- A name in the trailer that is not a recognized km-* specialist → print a warning to stdout (the run log) ("PR #N trailer names unknown specialist '<X>' — typo?") and skip the unknown name. Continue with the rest.
 - The PR has zero commits accessible (defensive) → assume `signed_off = {}`.
 
 ### Crew compositions
@@ -616,7 +601,7 @@ node utilities/km-triage-app/progress-emit.js \
 # 3. Create the in_progress check_run on the PR's current head SHA. Use a
 #    short markdown body in a temp file so the GitHub PR page shows what's
 #    being reviewed (the same body is PATCHed later, in Phase 5 and Phase 6).
-DISPATCH_BODY=.tech-lead-inbox/runs/$KM_TRIAGE_SWEEP_ID-pr<NUM>-dispatch.md
+DISPATCH_BODY=.escalations/runs/$KM_TRIAGE_SWEEP_ID-pr<NUM>-dispatch.md
 mkdir -p "$(dirname "$DISPATCH_BODY")"
 cat > "$DISPATCH_BODY" <<EOF
 **km-triage is reviewing this PR.**
@@ -634,7 +619,7 @@ node utilities/km-triage-app/check-progress.js \
   --summary-file "$DISPATCH_BODY"
 ```
 
-The check_run id is now stored in `.tech-lead-inbox/runs/<sweep_id>-checks.json`; subsequent `check-progress.js` calls within the same sweep PATCH the same check rather than creating a new one.
+The check_run id is now stored in `.escalations/runs/<sweep_id>-checks.json`; subsequent `check-progress.js` calls within the same sweep PATCH the same check rather than creating a new one.
 
 ### Self-contained briefing template
 
@@ -823,7 +808,7 @@ After all specialists return:
    - `action = APPROVE-AND-PARK` iff **every** specialist returned `APPROVE` AND CI is green AND no merge conflict.
    - `action = ESCALATE` if **any** specialist returned `ESCALATE`. Escalation wins over REQUEST_CHANGES because the tech lead's answer may change which other comments matter.
    - `action = REQUEST_CHANGES` if any specialist returned `REQUEST_CHANGES` and no specialist returned `ESCALATE`.
-3. If action is `ESCALATE` AND `REQUEST_CHANGES` was also present, the change-request comments are *held* for the inbox entry — they don't drive any Phase-6 action until the tech lead answers. The held list is exactly the union of `comments` arrays from specialists whose status was `REQUEST_CHANGES`. Specialists whose status was `ESCALATE` contribute only their `question` field (per the verdict-block contract, ESCALATE verdicts omit `comments`). Specialists whose status was `APPROVE` contribute nothing. If the resulting held list is empty (no REQUEST_CHANGES verdicts in this cycle, only ESCALATE), the ESCALATE template renders the held-findings section as "none".
+3. If action is `ESCALATE` AND `REQUEST_CHANGES` was also present, the change-request comments are *held* — they don't drive any Phase-6 action (no `gh pr review --request-changes`) until the escalation question is answered, but they **are** surfaced: they ride along in the ESCALATE PR comment so the full picture is visible on the PR (nothing is kept in a private file). The held list is exactly the union of `comments` arrays from specialists whose status was `REQUEST_CHANGES`. Specialists whose status was `ESCALATE` contribute only their `question` field (per the verdict-block contract, ESCALATE verdicts omit `comments`). Specialists whose status was `APPROVE` contribute nothing. If the resulting held list is empty (no REQUEST_CHANGES verdicts in this cycle, only ESCALATE), the ESCALATE comment renders the held-findings section as "none".
 
 ### Observability — Phase 5 emissions and check-run update
 
@@ -842,7 +827,7 @@ node utilities/km-triage-app/progress-emit.js \
 # 3. Refresh the check_run summary with the verdict-so-far view. The same
 #    body is the canonical "what does the crew think" snapshot the GitHub
 #    PR page shows while Phase 6 is running.
-VERDICT_BODY=.tech-lead-inbox/runs/$KM_TRIAGE_SWEEP_ID-pr<NUM>-verdicts.md
+VERDICT_BODY=.escalations/runs/$KM_TRIAGE_SWEEP_ID-pr<NUM>-verdicts.md
 cat > "$VERDICT_BODY" <<EOF
 **km-triage crew has reported.**
 
@@ -880,7 +865,7 @@ CONFLICTING PRs never reach this phase — Phase 2 catches them and posts a sepa
 
 ## Phase 6 — Execute the action
 
-The triage labels (`ready-to-merge`, `review-needed`, `triage-skip`) are created once in Phase 1 (guarded by the `.tech-lead-inbox/.labels-created` sentinel) — no further label-create calls run here.
+The triage labels (`ready-to-merge`, `review-needed`, `triage-skip`) are created once in Phase 1 (guarded by the `.escalations/.labels-created` sentinel) — no further label-create calls run here.
 
 **In bot mode, every PR-mutating gh call in this Phase MUST go through `node utilities/km-triage-app/bot-gh.js`** per the Bot identity contract above. The code blocks below show the wrapper invocation explicitly. Falling back to direct `gh` attributes the action to the human PAT, which (a) breaks the identity-separation contract and (b) causes `gh pr review --approve` to be rejected by GitHub as author-self-approval on owner-authored PRs. **In personal mode, the reverse is required:** replace each `bot-gh.js` below with plain `gh`, skip every `check-progress.js` call, and use the personal-mode APPROVE-AND-PARK (label + plain comment, no `--approve`) defined in the Personal mode section.
 
@@ -961,8 +946,8 @@ Fixes to apply (each scoped to one file:line):
 Procedure (worktree-isolated — NEVER mutates the triage's own working tree):
 
 1. Compute a unique worktree path:
-     WORKTREE=.tech-lead-inbox/worktrees/triage-fix-<NUM>-<HEAD_SHORT_SHA>
-   (`.tech-lead-inbox/` is gitignored, so the worktree is invisible to git status.)
+     WORKTREE=.escalations/worktrees/triage-fix-<NUM>-<HEAD_SHORT_SHA>
+   (`.escalations/` is gitignored, so the worktree is invisible to git status.)
 2. git fetch origin <HEAD>
 3. git worktree add "$WORKTREE" "origin/<HEAD>"
 4. All subsequent commands run from within "$WORKTREE" (use `git -C "$WORKTREE" ...` or `pushd "$WORKTREE"`). DO NOT `git checkout` in the triage's main working tree — that would swap the in-tree definitions of .claude/agents/*, .claude/commands/*, fixtures, etc. to the PR author's version, and the next PR in the same sweep would be reviewed against the swapped definitions.
@@ -979,7 +964,7 @@ Procedure (worktree-isolated — NEVER mutates the triage's own working tree):
      git -C "$WORKTREE" push "https://x-access-token:$(node utilities/km-triage-app/mint-token.js)@github.com/MattGyverLee/keyboard-studio.git" "HEAD:<HEAD>"
 10. Clean up the worktree:
      git worktree remove "$WORKTREE"
-11. Post-condition (the triage runs this after km-programmer returns): verify the triage's main working-tree HEAD equals the SHA recorded at sweep start. If it changed, log a critical error to INBOX.md ("PR #<NUM> auto-fix appears to have bypassed worktree isolation — sweep aborted") and stop the entire sweep until investigated.
+11. Post-condition (the triage runs this after km-programmer returns): verify the triage's main working-tree HEAD equals the SHA recorded at sweep start. If it changed, print a critical error to stderr ("PR #<NUM> auto-fix appears to have bypassed worktree isolation — sweep aborted"), record it in the audit log, and stop the entire sweep until investigated.
 12. Return a verdict block:
 
 ```verdict
@@ -1092,59 +1077,39 @@ node utilities/km-triage-app/progress-emit.js \
 
 ### Action: ESCALATE (Phase 5 outcome — pure escalation, no REQUEST_CHANGES partition)
 
-Pure ESCALATE means at least one specialist could not grade the PR without lead input. The lead's answer may invalidate every other comment, so REQUEST_CHANGES findings (if any) are held without acting on them.
+Pure ESCALATE means at least one specialist could not grade the PR without a human answer. That answer may invalidate every other comment, so REQUEST_CHANGES findings (if any) are held without acting on them — but they are still **surfaced on the PR** so nothing is hidden in a private queue.
 
-ESCALATE now posts **both** an INBOX entry (local audit trail) and a PR comment (question only — held REQUEST_CHANGES findings remain INBOX-only, per issue #216). Append to `.tech-lead-inbox/INBOX.md`:
+ESCALATE posts a single PR comment carrying the question(s) **and** any held REQUEST_CHANGES findings, then applies the `review-needed` label. There is no local inbox file — the PR comment is the visible record, and the audit-log line (Phase 7) is the durable trail.
 
-```
-## [<ISO timestamp>] PR #<NUM> — <TITLE>
-
-- Author: @<LOGIN>
-- Directed by: <directed_by> (channel: <channel>)
-- Team: <engine|content|shared|MISSING>
-- Area hints: <list>
-- Branch: <HEAD> -> <BASE>
-- Open: gh pr view <NUM> --web
-- Diff: gh pr diff <NUM>
-
-### Questions for you
-
-- **<specialist-name>** (confidence: <X>): <question>
-- ...
-
-### REQUEST_CHANGES findings (held pending your answer)
-
-<bulleted `path:line - body` list, or "none">
-
----
-```
-
-Then post a PR comment with the question (question only — held REQUEST_CHANGES findings stay INBOX-only, see issue #216 rationale):
-
-Generate `.tech-lead-inbox/escalate-body-<NUM>.md` from the template below, then call:
+Generate `.escalations/escalate-body-<NUM>.md` from the template below, then call:
 
 ```bash
-node utilities/km-triage-app/bot-gh.js pr comment <NUM> --body-file .tech-lead-inbox/escalate-body-<NUM>.md
+node utilities/km-triage-app/bot-gh.js pr comment <NUM> --body-file .escalations/escalate-body-<NUM>.md
 ```
+
+(The `.escalations/escalate-body-<NUM>.md` file is transient scratch for the `--body-file` call, not a record to keep.)
 
 Capture the URL returned by that call (or extract it from `gh pr view <NUM> --json comments`) and stash it as `mention_comment_url` for the Phase-7 audit log.
 
 **escalate-body template** (substitute `{…}` placeholders before writing the file):
 
 ```
-@{lead_login} - km-triage needs your input on PR #{N}.
+@{lead_login} - km-triage needs a human answer on PR #{N}; anyone authorized to direct the triage can reply.
 
-@{author_login}: no action needed from you yet; the lead will reply here.
-You're welcome to add context if it helps.
+@{author_login}: no action needed from you yet, but you're welcome to answer if you have the context.
 
-Question for the tech lead:
+Questions:
 - **{specialist_name}** (confidence: {confidence}): {question}
+
+Change requests held pending the answer above:
+- {path}:{line} — {body}
+  (or "none")
 
 Reply on this PR with `@km-triage <your answer>` and the next sweep will
 route accordingly (auto-fix, request-changes, or approve-park).
 ```
 
-<!-- Held REQUEST_CHANGES findings stay INBOX-only — see issue #216 rationale. -->
+The "Change requests held pending the answer above" section is populated from the held list computed in Phase 5 (step 3 of the verdict-aggregation rules); render it as `none` when that list is empty.
 
 **@-mention dedup rule** (mirrors MENTION_ONLY's rule at lines ~758-760 above):
 Apply this before rendering the template.
@@ -1173,12 +1138,12 @@ node utilities/km-triage-app/progress-emit.js \
 
 ### Complete the `km-triage/review` check run (after the per-action steps)
 
-This is the gating step. The repo's `main: CI + integrity` ruleset (id 17331134) lists `km-triage/review` (integration_id 3984948 = the km-triage App) in `required_status_checks`. The ruleset's `main: PR + review` rule (id 17331095) has `required_approving_review_count: 0`. Net effect: a PR's merge button is grey until a `km-triage/review` check_run with `conclusion: success` is published against the current head SHA. The bot's review activity (APPROVE comments, REQUEST_CHANGES posts, ESCALATE inbox writes) is visible record-of-decision; the **check run** is what actually unblocks the merge.
+This is the gating step. The repo's `main: CI + integrity` ruleset (id 17331134) lists `km-triage/review` (integration_id 3984948 = the km-triage App) in `required_status_checks`. The ruleset's `main: PR + review` rule (id 17331095) has `required_approving_review_count: 0`. Net effect: a PR's merge button is grey until a `km-triage/review` check_run with `conclusion: success` is published against the current head SHA. The bot's review activity (APPROVE comments, REQUEST_CHANGES posts, ESCALATE PR comments) is visible record-of-decision; the **check run** is what actually unblocks the merge.
 
 After any substantive-review action (APPROVE-AND-PARK, AUTO_FIX_ONLY, MENTION_ONLY, FIX_AND_MENTION, ESCALATE), **PATCH the in-progress check_run created in Phase 4** to `completed` with the appropriate conclusion and a final summary body. Use `check-progress.js`, which looks up the existing check_id from the per-sweep sidecar and PATCHes it (rather than POSTing a fresh check):
 
 ```bash
-FINAL_BODY=.tech-lead-inbox/runs/$KM_TRIAGE_SWEEP_ID-pr<NUM>-final.md
+FINAL_BODY=.escalations/runs/$KM_TRIAGE_SWEEP_ID-pr<NUM>-final.md
 cat > "$FINAL_BODY" <<EOF
 **km-triage completed.**
 
@@ -1187,8 +1152,7 @@ Action: <APPROVE-AND-PARK|AUTO_FIX_ONLY|MENTION_ONLY|FIX_AND_MENTION|ESCALATE>
 <bulleted verdict list, same shape as Phase 5's summary>
 
 <one-paragraph human-facing description of what landed — auto-fix commit
-sha, comment URL, inbox-entry reference, etc. — same content as posted
-in the per-action comment or INBOX entry>
+sha, comment URL, etc. — same content as posted in the per-action PR comment>
 
 Sweep id: \`$KM_TRIAGE_SWEEP_ID\`
 EOF
@@ -1211,7 +1175,7 @@ Conclusion mapping by action:
 | `FIX_AND_MENTION` | `action_required` | Both: auto-fixes landed AND lead has questions; gate stays blocked. |
 | `ESCALATE` | `action_required` | Specialist couldn't grade; lead must respond before merge can proceed. |
 
-Then emit a `check-published` progress event so the dashboard records the conclusion (read the check_id back from the sidecar — `check-progress.js` writes it to `.tech-lead-inbox/runs/<sweep_id>-checks.json`):
+Then emit a `check-published` progress event so the dashboard records the conclusion (read the check_id back from the sidecar — `check-progress.js` writes it to `.escalations/runs/<sweep_id>-checks.json`):
 
 ```bash
 node utilities/km-triage-app/progress-emit.js \
@@ -1224,13 +1188,13 @@ Record the completed check's `id` and `conclusion` in the Phase-7 audit log for 
 
 **A note on stale checks**: a check_run is bound to a single SHA. When new commits land on a PR branch (e.g. via auto-fix push in AUTO_FIX_ONLY / FIX_AND_MENTION), GitHub treats the old check as orphaned (it shows in the rollup but doesn't satisfy the gate for the new head). The triage's incremental review (Pre-filter A) sees the new head and the next sweep creates a fresh in-progress check via Phase 4's `check-progress.js` call. This is the same lifecycle as any CI check.
 
-**A note on Phase-4 / Phase-6 symmetry**: `check-progress.js` is idempotent within a sweep — Phase 4 creates the check (sidecar entry written), Phase 5 PATCHes it (sidecar entry reused), Phase 6 PATCHes it again with `--status completed --conclusion <X>`. If Phase 4's create call failed silently and the sidecar entry is missing, Phase 6 will fall back to a fresh POST (no patching to do), so the gate still gets unblocked — but the check will lack the in-progress history. Treat that as a soft warning condition; an `INBOX.md` note is appropriate but the sweep should not abort.
+**A note on Phase-4 / Phase-6 symmetry**: `check-progress.js` is idempotent within a sweep — Phase 4 creates the check (sidecar entry written), Phase 5 PATCHes it (sidecar entry reused), Phase 6 PATCHes it again with `--status completed --conclusion <X>`. If Phase 4's create call failed silently and the sidecar entry is missing, Phase 6 will fall back to a fresh POST (no patching to do), so the gate still gets unblocked — but the check will lack the in-progress history. Treat that as a soft warning condition; a note to stderr (the run log) is appropriate but the sweep should not abort.
 
 **A note on auth**: every `check-progress.js` call goes through [utilities/km-triage-app/bot-gh.js](utilities/km-triage-app/bot-gh.js), which mints the bot token in-process. The App's `checks: write` permission scopes the call. The `integration_id` on the published check is implicitly the App's ID (3984948), which pins the check identity in the ruleset's required_status_checks list (no other App can spoof a `km-triage/review` check).
 
 ## Phase 7 — Audit log
 
-After every PR action (including skips), append exactly one JSON line to `.tech-lead-inbox/audit-log.jsonl`:
+After every PR action (including skips), append exactly one JSON line to `.escalations/audit-log.jsonl`:
 
 ```json
 {"ts":"<ISO timestamp>","pr":<NUM>,"author":"<LOGIN>","directed_by":"<email|login|\"unknown\">","channel":"desktop|web|unknown","team":"<engine|content|shared|null>","crew":"engine|content|both|none","head_sha":"<NUM's last commit SHA before triage>","last_audited_sha":"<previous audit's head_sha or null>","review_range":"full|incremental","signed_off_skipped":["km-qc","..."],"trigger":"schedule|comment|manual_arg","triggering_comment_id":<comment_id_or_null>,"triggering_comment_author":"<login_or_null>","verdicts":[{"specialist":"<name>","status":"APPROVE|REQUEST_CHANGES|ESCALATE","confidence":"<X>","summary":"<...>"}],"action_taken":"approve_park|auto_fix_only|mention_only|fix_and_mention|escalate|auto_fix_attempt_failed|skipped|auth_failed|bypass","ci_status":"<rollup>","missing_team_label":<bool>,"reason":"<skip reason or null>","bypass_trigger":"process_title_prefix|triage_bypass_label|null","auto_fix":{"applied":<int>,"escalated":<int>,"commit_sha":"<sha or null>"},"mention_comment_url":"<url or null>","mention_resolution":"ok|self_dedup|lookup_failed|n_a","check_run":{"id":<check_run_id_or_null>,"conclusion":"success|action_required|null"}}
@@ -1251,7 +1215,7 @@ Field notes:
 - `bypass_trigger` names the Pre-filter D path that fired when `action_taken` is `bypass`. Two values: `process_title_prefix` (the PR title matched `^(feat|fix|docs|chore|maint|refactor|auto)\(process\):`), or `triage_bypass_label` (the PR carried the `triage-bypass` label). `null` for all other action_taken values — this field is always present in the JSON, but non-null only on bypass entries.
 - `reason` carries the per-action explanation when `action_taken` is `skipped` or `bypass`, or when an auto-fix or approve-park was rerouted to MENTION_ONLY by a precondition gate. Known values include:
   - Bypass reasons (Pre-filter D): `process_title_prefix`, `triage_bypass_label`. These match `bypass_trigger` exactly; both fields carry the same value on bypass entries.
-  - Skip reasons (Phase 2 / Pre-filter A): `external_pr_not_in_scope`, `draft`, `already_in_lead_queue`, `merge_conflict`, `ci_not_ready`, `no_new_commits_since_last_review`, `no_content_changes_since_last_review`.
+  - Skip reasons (Phase 2 / Pre-filter A): `external_pr_not_in_scope`, `draft`, `already_awaiting_response`, `merge_conflict`, `ci_not_ready`, `no_new_commits_since_last_review`, `no_content_changes_since_last_review`.
   - Auto-fix abort → MENTION_ONLY reroute (Phase 6 preconditions): `head_is_protected_branch`, `head_moved_during_fix`, `became_conflicting_during_review`.
   - Approve-park abort → MENTION_ONLY reroute (Phase 6 APPROVE-AND-PARK re-check): `became_conflicting_during_review`, `ci_red_during_review`.
   - Other: `auth_failed`, `missing_team_label` (informational; doesn't gate). Empty array `[]` means either no trailer was present or the trailer named only specialists in the always-run set (which never get skipped). This list is *informational* — it does not appear in `verdicts` since those specialists didn't run this sweep, but it lets a later audit reconstruct why the crew was smaller than the classification suggests.
@@ -1287,7 +1251,7 @@ At the end of the sweep, print a short summary to stdout (it lands in the schedu
   auto-fix only:    <N>  (#D — auto-fixed <K> findings)
   mention only:     <N>  (#E — @-mentioned for <K> open questions)
   fix and mention:  <N>  (#F — auto-fixed <K1>, @-mentioned <K2> open)
-  escalated:        <N>  (#G — full ESCALATE, inbox entry)
+  escalated:        <N>  (#G — full ESCALATE, question posted to PR)
   skipped:          <N>  (reason breakdown)
   auto-fix failed:  <N>  (#H — programmer rolled back, escalated to lead)
   duration:         <Xs>
