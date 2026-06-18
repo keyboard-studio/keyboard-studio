@@ -77,7 +77,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       <div style={{ maxWidth: 880, margin: '0 auto', padding: '0 24px 120px' }}>
         <PageHeader removedCount={0} menuOpen={false} setMenuOpen={() => {}}
           ir={ir} deletedNodeIds={deletedNodeIds} deletedItemIds={deletedItemIds}
-          restoreAll={restoreAll} undoDelete={undoDelete} />
+          restoreAll={restoreAll} />
         <div style={{ padding: '1rem', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--muted)', fontSize: '0.9rem' }}>
           Nothing to review — these are standard keys.
         </div>
@@ -96,7 +96,6 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
         deletedNodeIds={deletedNodeIds}
         deletedItemIds={deletedItemIds}
         restoreAll={restoreAll}
-        undoDelete={undoDelete}
       />
 
       <main style={{ paddingTop: 14 }}>
@@ -131,7 +130,6 @@ interface PageHeaderProps {
   deletedNodeIds: Set<string>;
   deletedItemIds: Set<string>;
   restoreAll: () => void;
-  undoDelete: () => void;
 }
 
 function PageHeader({ removedCount, menuOpen, setMenuOpen, ir, deletedNodeIds, deletedItemIds, restoreAll }: PageHeaderProps) {
