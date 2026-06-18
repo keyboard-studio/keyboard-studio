@@ -27,6 +27,7 @@ import { OskModeToggle, type OskMode } from "./components/OskModeToggle.tsx";
 import { TrackStep, type Track } from "./components/TrackStep.tsx";
 import { ProjectNameStep } from "./components/ProjectNameStep.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
+import { usePlacementPriors } from "./hooks/usePlacementPriors.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
 import { buildFindingsByQuestionId } from "./lint/lintToQuestion.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
@@ -186,6 +187,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
   const { containerRef, leftPct, handleHovered, onPointerDown, setHandleHovered } =
     useResizablePanes({ minPct: SURVEY_LEFT_MIN_PCT, maxPct: SURVEY_LEFT_MAX_PCT, initPct: SURVEY_LEFT_INIT_PCT });
+
+  // Corpus placement priors — loaded lazily from docs/placement-priors.json.
+  // Null while loading or on error (gallery degrades gracefully without it).
+  const corpusPlacementMap = usePlacementPriors();
 
   // Track 1 (Copy) vs Track 2 (Adapt) — set at the "track" stage.
   // Null until the user picks a track.
@@ -450,14 +455,11 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   if (stage === "mechanisms") {
     return (
       <div style={{ height: "100%", overflow: "hidden" }}>
-        {/* TODO(placementMap-wiring): thread the PlacementMap from the working-copy
-            context once it is stored there (requires a workingCopyStore field +
-            seeder integration). The `placementMap` prop on MechanismGallery is
-            optional — gallery behaves exactly as today when it is absent. */}
         <MechanismGallery
           selectedBaseKeyboard={localBase}
           onComplete={handleMechanismsComplete}
           onBack={() => setStage("B")}
+          {...(corpusPlacementMap !== null ? { placementMap: corpusPlacementMap } : {})}
         />
       </div>
     );
