@@ -6,6 +6,16 @@
 # PRs that clear every gate each get a fresh, clean claude process —
 # no accumulated context across unrelated PRs.
 #
+# !! SYNC WARNING !! These bash gates are a re-implementation of the Phase 2
+# skip logic in .claude/commands/km-triage.md. The wrapper SHORT-CIRCUITS: a
+# PR skipped here never spawns Claude, so a change to km-triage.md's Phase 2
+# that is NOT mirrored here is silently a no-op for scheduled sweeps. They
+# MUST be edited together. This bit us once (#479 broadened the review-needed
+# re-review signal in km-triage.md only; the cron wrapper kept the old narrow
+# @km-triage-owner rule and parked PRs forever on a plain reply / new commit).
+# If you touch a gate below, update the matching km-triage.md section in the
+# same commit, and vice-versa.
+#
 # The outer iteration loop is unchanged: a sweep that auto-fixed any PR
 # re-sweeps (up to MAX_ITERATIONS) so the new head gets reviewed in the
 # same cron tick rather than waiting 30 min.
@@ -118,19 +128,28 @@ spawn_claude_for_pr() {
   fi
 }
 
-# Returns the id of a lead-trigger comment (any TRIAGE_OWNERS member's
-# comment containing @km-triage) posted after since_ts, or empty string.
-find_trigger_comment() {
+# Returns the id of the most recent human (non-[bot]) comment posted after
+# since_ts, or empty string. This is the generalized re-review signal from
+# km-triage.md #479: ANY non-bot comment counts — no @km-triage string and no
+# TRIAGE_OWNERS membership required (a submitter who pushes a fix and explains
+# it in a plain reply is the natural response to an escalation and cannot be
+# expected to know the @km-triage incantation). The `[bot]`-login exclusion is
+# load-bearing: it filters the bot's own MENTION/ESCALATE comment and CI bots
+# (vercel[bot]) so a sweep never re-triggers itself. The narrower
+# @km-triage-from-TRIAGE_OWNERS "lead-trigger comment" survives only as a
+# recognized subtype for audit attribution ($TRIAGE_OWNERS_JSON is retained
+# for that) — it is no longer required to drive a re-review here.
+#
+# NB: pipe into real `jq` — `gh api --jq` does NOT accept --arg (it errors
+# "unknown flag"), which silently returned empty and left every review-needed
+# PR parked even after a reply.
+find_human_comment() {
   local num="$1" since_ts="$2"
   [[ -z "$since_ts" ]] && { echo ""; return; }
-  # NB: pipe into real `jq` — `gh api --jq` does NOT accept --arg/--argjson
-  # (it errors "unknown flag: --argjson"), which silently returned empty and
-  # left every review-needed PR parked even after an owner replied.
   gh api "repos/$REPO/issues/$num/comments" 2>/dev/null \
-    | jq -r --arg ts "$since_ts" --argjson owners "$TRIAGE_OWNERS_JSON" \
+    | jq -r --arg ts "$since_ts" \
       '[.[] | select(.created_at > $ts)
-             | select(.user.login as $u | $owners | any(. == $u))
-             | select(.body | ascii_downcase | contains("@km-triage"))]
+             | select(.user.login | endswith("[bot]") | not)]
        | last | .id // empty' 2>/dev/null || echo ""
 }
 
@@ -322,15 +341,34 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     LAST_AUDIT_SHA=$(echo "$LAST_ENTRY" | jq -r '.head_sha // empty' 2>/dev/null || echo "")
     LAST_AUDIT_ACTION=$(echo "$LAST_ENTRY" | jq -r '.action_taken // empty' 2>/dev/null || echo "")
 
-    # Gate 8 — review-needed label + no trigger comment since last audit
+    # Gate 8 — review-needed label: skip unless a re-review signal exists.
+    # Per km-triage.md #479 the signal is EITHER of:
+    #   (a) a new commit by someone other than the bot — current HEAD differs
+    #       from the last review's head_sha AND the head commit's author login
+    #       is not km-triage[bot] (so the bot's own auto-fix push never counts);
+    #   (b) any human (non-[bot]) comment since the last review (find_human_comment).
+    # The pre-#479 gate looked ONLY for a TRIAGE_OWNERS @km-triage comment and
+    # ignored HEAD entirely, so a submitter who pushed fixes and explained them
+    # in a plain reply was parked forever. Keep this in lockstep with the
+    # review-needed gate in km-triage.md Phase 2 (see the sync warning above).
     if echo "$PR" | jq -e '[.labels[].name] | any(. == "review-needed")' > /dev/null 2>&1; then
-      TRIGGER_COMMENT_ID=$(find_trigger_comment "$NUM" "$LAST_AUDIT_TS")
-      if [[ -z "$TRIGGER_COMMENT_ID" ]]; then
-        echo "  skip: already_awaiting_response (review-needed, no trigger)" | tee -a "$LOG"
+      HEAD_AUTHOR=$(echo "$PR_COMMITS" | jq -r '.[-1].authors[0].login // ""')
+      NEW_COMMIT_SIGNAL=false
+      if [[ -n "$LAST_AUDIT_SHA" && "$HEAD_SHA" != "$LAST_AUDIT_SHA" \
+            && "$HEAD_AUTHOR" != "km-triage[bot]" ]]; then
+        NEW_COMMIT_SIGNAL=true
+      fi
+      TRIGGER_COMMENT_ID=$(find_human_comment "$NUM" "$LAST_AUDIT_TS")
+      if [[ "$NEW_COMMIT_SIGNAL" == false && -z "$TRIGGER_COMMENT_ID" ]]; then
+        echo "  skip: already_awaiting_response (review-needed, no re-review signal)" | tee -a "$LOG"
         audit_skip "$NUM" already_awaiting_response "$HEAD_SHA"
         n_skip=$((n_skip + 1)); continue
       else
-        echo "  trigger comment #$TRIGGER_COMMENT_ID — removing review-needed" | tee -a "$LOG"
+        if [[ "$NEW_COMMIT_SIGNAL" == true ]]; then
+          echo "  re-review signal: new commit ${HEAD_SHA:0:9} by $HEAD_AUTHOR — removing review-needed" | tee -a "$LOG"
+        else
+          echo "  re-review signal: human comment #$TRIGGER_COMMENT_ID — removing review-needed" | tee -a "$LOG"
+        fi
         node utilities/km-triage-app/bot-gh.js api \
           "repos/$REPO/issues/$NUM/labels/review-needed" \
           -X DELETE >> "$LOG" 2>&1 || true
@@ -348,9 +386,9 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
           "$(ts)" "$NUM" | tee -a "$LOG"
         # fall through to Claude
       else
-        # Reuse trigger check from Gate 8 if already fetched; otherwise fetch now
+        # Reuse human-comment check from Gate 8 if already fetched; else fetch now
         if [[ -z "$TRIGGER_COMMENT_ID" ]]; then
-          TRIGGER_COMMENT_ID=$(find_trigger_comment "$NUM" "$LAST_AUDIT_TS")
+          TRIGGER_COMMENT_ID=$(find_human_comment "$NUM" "$LAST_AUDIT_TS")
         fi
         if [[ -z "$TRIGGER_COMMENT_ID" ]]; then
           echo "  skip: no_new_commits_since_last_review" | tee -a "$LOG"
