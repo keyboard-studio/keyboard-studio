@@ -49,7 +49,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
     let total = 0;
     deletedNodeIds.forEach((id) => { total += ruleCount(ir, id); });
     deletedItemIds.forEach((id) => {
-      if (!deletedNodeIds.has(id.split('#')[0] ?? id)) total += 1;
+      if (!deletedNodeIds.has(id.split('#', 1)[0]!)) total += 1;
     });
     return total;
   }, [ir, deletedNodeIds, deletedItemIds]);

@@ -122,7 +122,7 @@ export function patternToGlyphs(pattern: Pattern, ir: KeyboardIR): CarveGlyph[] 
 
   // Walk all groups looking for rules owned by this pattern
   for (const group of ir.groups) {
-    group.rules.forEach((rule, ruleIdx) => {
+    group.rules.forEach((rule) => {
       if (!ownedIds.has(rule.nodeId)) return;
       const g = ruleToGlyph(rule, pattern.id, glyphs.length);
       if (g) glyphs.push({ ...g, gid: `${pattern.id}#${glyphs.length}` });

@@ -398,8 +398,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   keepAll: () =>
     set({ deletedNodeIds: new Set(), deletedItemIds: new Set(), undoStack: [] }),
 
-  restoreAll: () =>
-    set({ deletedNodeIds: new Set(), deletedItemIds: new Set(), undoStack: [] }),
+  restoreAll: () => get().keepAll(),
 
   // -- surveyResultsStore actions --------------------------------------------
 

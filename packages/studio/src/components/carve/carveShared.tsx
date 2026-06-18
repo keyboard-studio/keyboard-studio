@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+
 // Shared UI atoms used across multiple carve card components.
 
 export function ChevronIcon({ open }: { open: boolean }) {
@@ -9,7 +11,7 @@ export function ChevronIcon({ open }: { open: boolean }) {
   );
 }
 
-export const discloseBtn: React.CSSProperties = {
+export const discloseBtn: CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
   marginTop: 10, padding: 0,
   background: 'none', border: 'none',
