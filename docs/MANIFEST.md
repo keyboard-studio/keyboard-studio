@@ -15,6 +15,7 @@ Owned by `/km-doc`. Update this file whenever a doc is added, archived, or re-sc
 | [`packages/engine/README.md`](../packages/engine/README.md) | Engine package surface: validator, compiler, simulator, loader, output, codec | New engine module, public-API addition or removal | live |
 | [`packages/contracts/README.md`](../packages/contracts/README.md) | Contracts package: all shared TS types, revision policy | New type file added or removed from `packages/contracts/src/` | live |
 | [`packages/studio/README.md`](../packages/studio/README.md) | Studio SPA shell overview | SPA architecture changes | live |
+| [`docs/github-integration.md`](github-integration.md) | GitHub integration architecture: auth flow, delivery paths (A/B/C why), OAuth-backend contract | Delivery-path or OAuth architecture changes | live |
 
 ## Convention docs
 

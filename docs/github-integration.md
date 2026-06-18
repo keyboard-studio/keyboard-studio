@@ -54,8 +54,8 @@ The fork+PR pipeline already exists end-to-end on the SPA side; the missing piec
 
 `OutputService` is the seam between the studio (which knows nothing about GitHub) and the engine (which does). Two fields matter for this doc:
 
-- `importAttribution?: string` (on `PublishPROptions`) — non-null whenever the user picked a base or imported an existing keyboard; the engine appends the attribution block to the PR body from this string.
-- `PublishPRError` — discriminated union (`auth | scope | rate-limit | branch-exists | network | unknown`) so the SPA's submit screen has a finite set of remediation copies to render. Add a variant here before adding a new failure mode in `github.ts`.
+- `importAttribution?: string` (on `PublishPROptions`, not `OutputService`) — non-null whenever the session was initialized from an imported keyboard; build via `buildImportAttributionBlock()` in `packages/engine/src/output/import-attribution.ts`.
+- `PublishPRError` — discriminated union (`kind: "auth" | "scope" | "rate-limit" | "branch-exists" | "network" | "unknown"`) so the SPA's submit screen has a finite set of remediation copies to render. Add a variant here before adding a new failure mode in `github.ts`.
 
 The studio talks to the `OutputService` interface, not to the engine implementation. That is the *only* abstraction barrier protecting §3a's "no GitHub workflow knowledge required" rule on the SPA side.
 
@@ -91,8 +91,8 @@ SPA ──token──▶ createGitHubOutputService({ token }).publishPR(...)
 ```
 
 **Smooth-integration checklist for the engine side** (so we don't make Grace's life hard):
-- `PublishPRError` kind `"auth"` must be cleanly distinguishable from other 401s so the SPA knows to hit `/oauth/refresh` rather than re-prompting login.
-- Token-bearing calls should never be retried with the same token after a 401 — refresh first, then retry once, then surface kind `"auth"`.
+- `kind: "auth"` must be cleanly distinguishable from other 401s so the SPA knows to hit `/oauth/refresh` rather than re-prompting login. Note: `kind: "scope"` indicates missing scopes (re-auth required, not refresh).
+- Token-bearing calls should never be retried with the same token after a 401 — refresh first, then retry once, then surface `kind: "auth"`.
 - The engine must not log the token at any level. If a debug log of a request is needed, redact `Authorization:` before emitting.
 - If/when the SPA gains a "submit again" path (later session), it must re-acquire a fresh token via the SPA flow — the engine does not cache tokens across sessions.
 
