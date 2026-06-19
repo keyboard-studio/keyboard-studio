@@ -341,6 +341,22 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     LAST_AUDIT_SHA=$(echo "$LAST_ENTRY" | jq -r '.head_sha // empty' 2>/dev/null || echo "")
     LAST_AUDIT_ACTION=$(echo "$LAST_ENTRY" | jq -r '.action_taken // empty' 2>/dev/null || echo "")
 
+    # Defect-guard: some Claude-side Phase-7 writes have landed a substantive
+    # entry with an EMPTY "ts" (e.g. mention_only). That poisons the re-review
+    # signal: find_human_comment bails on an empty since_ts, so no human reply is
+    # ever detected and the review-needed PR is parked forever. Fall back to the
+    # most recent NON-EMPTY ts among this PR's substantive entries, so a missing
+    # ts on the latest entry degrades to "review everything since the last dated
+    # review" instead of "never re-review". km-triage.md Phase 7 now forces a
+    # non-empty ts at the source; this guard covers historical poisoned entries.
+    if [[ -z "$LAST_AUDIT_TS" ]]; then
+      LAST_AUDIT_TS=$(jq -r --argjson num "$NUM" \
+        'select(.pr == $num
+                and (.action_taken | IN("approve_park","auto_fix_only","mention_only","fix_and_mention","escalate","auto_fix_attempt_failed"))
+                and ((.ts // "") != "")) | .ts' \
+        "$AUDIT_LOG" 2>/dev/null | tail -1 || echo "")
+    fi
+
     # Gate 8 — review-needed label: skip unless a re-review signal exists.
     # Per km-triage.md #479 the signal is EITHER of:
     #   (a) a new commit by someone other than the bot — current HEAD differs
