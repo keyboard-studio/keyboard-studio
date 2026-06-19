@@ -442,7 +442,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     echo "[km-triage] retrying ${#prs_to_retry[@]} UNKNOWN-mergeability PR(s)" | tee -a "$LOG"
     for RETRY_NUM in "${prs_to_retry[@]}"; do
       RETRY_PR=$(gh pr view "$RETRY_NUM" \
-        --json number,mergeable,headRefOid,author,isDraft 2>/dev/null || echo "{}")
+        --json number,mergeable,headRefOid,author,isDraft,state 2>/dev/null || echo "{}")
       RETRY_MERGEABLE=$(echo "$RETRY_PR" | jq -r '.mergeable // "UNKNOWN"')
       RETRY_HEAD=$(echo "$RETRY_PR" | jq -r '.headRefOid // "unknown"')
       RETRY_AUTHOR=$(echo "$RETRY_PR" | jq -r '.author.login // "unknown"')
