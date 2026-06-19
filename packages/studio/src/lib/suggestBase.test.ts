@@ -2,7 +2,10 @@
 // language/script decoupling guarantee (spec §8/§9). refs #369.
 
 import { describe, it, expect } from "vitest";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type {
+  BaseKeyboard,
+  RelatednessProvenance,
+} from "@keyboard-studio/contracts";
 import { suggestBases } from "./suggestBase";
 
 const mk = (id: string, script: string, languages?: string[]): BaseKeyboard => ({
@@ -126,6 +129,103 @@ describe("suggestBases", () => {
     );
     expect(out.find((s) => s.base.id === "basic_kbdus")?.reason).toBe(
       "us-qwerty-fallback",
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // related-language-match tier (spec §8 step 1 — propose a related-language
+  // keyboard before the blank US-QWERTY fallback).
+  // ---------------------------------------------------------------------------
+
+  const verdict = (
+    init: Partial<RelatednessProvenance> & { tier: RelatednessProvenance["tier"] },
+  ): RelatednessProvenance => ({
+    sharedCharCount: 0,
+    targetCharCount: 0,
+    score: 0.5,
+    ...init,
+  });
+
+  it("ranks a related-language keyboard above bare script-match and the fallback", () => {
+    // dyu (Dyula) has no exact keyboard; bambara_latin is a Manding sibling.
+    const bambara = mk("bambara_latin", "Latn", ["bm"]);
+    const allBases = [usqwerty, eurolatin, bambara];
+    const out = suggestBases(
+      allBases,
+      { script: "Latn", bcp47: "dyu" },
+      {
+        languagesById: Object.fromEntries(
+          allBases.map((b) => [b.id, b.languages ?? []] as const),
+        ),
+        relatednessById: {
+          bambara_latin: verdict({
+            tier: "same-macrolanguage",
+            relatedLanguage: "Bambara",
+            sharedRegion: "Mali",
+            sharedCharCount: 18,
+            targetCharCount: 22,
+            score: 0.86,
+          }),
+        },
+      },
+    );
+    expect(out[0]?.base.id).toBe("bambara_latin");
+    expect(out[0]?.reason).toBe("related-language-match");
+    expect(out[0]?.relatedness?.relatedLanguage).toBe("Bambara");
+    // sil_euro_latin (no verdict) falls to script-match; fallback stays last.
+    expect(out.find((s) => s.base.id === "sil_euro_latin")?.reason).toBe(
+      "script-match",
+    );
+    expect(out.at(-1)?.reason).toBe("us-qwerty-fallback");
+  });
+
+  it("sub-sorts related-language matches by score, strongest first", () => {
+    const a = mk("rel_a", "Latn", ["aaa"]);
+    const b = mk("rel_b", "Latn", ["bbb"]);
+    const allBases = [a, b, usqwerty];
+    const out = suggestBases(
+      allBases,
+      { script: "Latn", bcp47: "zzz" },
+      {
+        relatednessById: {
+          rel_a: verdict({ tier: "same-family", score: 0.4 }),
+          rel_b: verdict({ tier: "same-genus", score: 0.9 }),
+        },
+      },
+    );
+    expect(out.map((s) => s.base.id).slice(0, 2)).toEqual(["rel_b", "rel_a"]);
+  });
+
+  it("HARD SCRIPT GATE: a relatedness verdict never promotes a cross-script base", () => {
+    // Even with a verdict, the Devanagari base must not be proposed for a Latn
+    // target — relatedness is gated on script equality.
+    const out = suggestBases(
+      bases,
+      { script: "Latn", bcp47: "ne" },
+      { relatednessById: { sil_devanagari: verdict({ tier: "same-family", score: 0.9 }) } },
+    );
+    expect(out.map((s) => s.base.id)).not.toContain("sil_devanagari");
+  });
+
+  it("never promotes the US-QWERTY fallback via a relatedness verdict", () => {
+    const out = suggestBases(
+      bases,
+      { script: "Latn", bcp47: "xyz" },
+      { relatednessById: { basic_kbdus: verdict({ tier: "same-family", score: 0.9 }) } },
+    );
+    expect(out.find((s) => s.base.id === "basic_kbdus")?.reason).toBe(
+      "us-qwerty-fallback",
+    );
+  });
+
+  it('treats an "unrelated" verdict as no match (stays script-match)', () => {
+    const out = suggestBases(
+      [eurolatin, usqwerty],
+      { script: "Latn", bcp47: "xyz" },
+      { relatednessById: { sil_euro_latin: verdict({ tier: "unrelated", score: 0.05 }) } },
+    );
+    expect(out.find((s) => s.base.id === "sil_euro_latin")?.reason).toBe(
+      "script-match",
     );
   });
 

@@ -1,14 +1,18 @@
 // Base-keyboard suggestion for the hybrid flow's base-resolution step
 // (spec §8 "Base resolution", workflow-model.md). Given the target *(language,
 // script) pair* from identity-lite, rank the available base keyboards:
-// language-match > script-match > US-QWERTY fallback.
+// language-match > related-language-match > script-match > language-cross-script > US-QWERTY fallback.
 //
 // Language and script are decoupled (spec §8/§9): matching keys on the chosen
 // TARGET script, never the language's default script. So a Hindi romanization
 // (hi-Latn) matches Latin bases that cover Hindi — never the Devanagari base —
 // and an IPA keyboard (und-fonipa) matches Latin/IPA bases. refs #369.
 
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import { primarySubtag } from "@keyboard-studio/engine";
+import type {
+  BaseKeyboard,
+  RelatednessProvenance,
+} from "@keyboard-studio/contracts";
 
 /** The (language, script) target the keyboard is being authored for. */
 export interface SuggestTarget {
@@ -33,12 +37,23 @@ export interface SuggestOptions {
    * ranking; when absent, suggestion falls back to script-match + fallback.
    */
   languagesById?: Record<string, readonly string[]>;
+  /**
+   * Optional map of base-keyboard `id` → its relatedness verdict for the target
+   * language, computed by the engine base-matching module (relatedness priors
+   * blended with character-overlap evidence; spec §8 step 1). When supplied, a
+   * base that shares the target script and whose verdict tier is not
+   * `"unrelated"` is surfaced as `related-language-match` — above bare
+   * script-match and the US-QWERTY fallback — and sub-sorted by `score`. When
+   * absent, ranking degrades to the language/script tiers only.
+   */
+  relatednessById?: Record<string, RelatednessProvenance>;
   /** Id of the guaranteed US-QWERTY fallback. Default `"basic_kbdus"`. */
   fallbackId?: string;
 }
 
 export type SuggestReason =
   | "language-match"
+  | "related-language-match"
   | "script-match"
   | "language-cross-script"
   | "us-qwerty-fallback";
@@ -46,15 +61,16 @@ export type SuggestReason =
 export interface BaseSuggestion {
   base: BaseKeyboard;
   reason: SuggestReason;
+  /**
+   * The relatedness verdict that produced a `related-language-match`, carried
+   * through so the picker can explain *why* (related language, shared region,
+   * character overlap) and show a strength badge. Present only for
+   * `related-language-match` suggestions.
+   */
+  relatedness?: RelatednessProvenance;
 }
 
 const DEFAULT_FALLBACK_ID = "basic_kbdus";
-
-/** Primary language subtag of a BCP47 tag, lowercased (`"hi-Latn"` → `"hi"`). */
-function primarySubtag(tag: string): string {
-  const first = tag.split("-")[0] ?? "";
-  return first.toLowerCase();
-}
 
 /**
  * True when the BCP47 tag carries an explicit ISO 15924 script subtag (a
@@ -71,9 +87,10 @@ function hasExplicitScriptSubtag(tag: string): boolean {
 
 const RANK: Record<SuggestReason, number> = {
   "language-match": 0,
-  "script-match": 1,
-  "language-cross-script": 2,
-  "us-qwerty-fallback": 3,
+  "related-language-match": 1,
+  "script-match": 2,
+  "language-cross-script": 3,
+  "us-qwerty-fallback": 4,
 };
 
 /**
@@ -82,6 +99,12 @@ const RANK: Record<SuggestReason, number> = {
  * - **language-match** — the base's `script` equals the target script AND the
  *   base supports a BCP47 tag whose primary language subtag matches the target's
  *   (requires `opts.languagesById`).
+ * - **related-language-match** — the base's `script` equals the target script
+ *   AND the engine's relatedness verdict (`opts.relatednessById`) for this base
+ *   is not `"unrelated"`. Surfaces keyboards for *related* languages (dialect
+ *   siblings, same family, regional neighbours) when the exact language has no
+ *   keyboard. Sub-sorted by the verdict `score` (relatedness prior × character
+ *   overlap), best-first.
  * - **script-match** — the base's `script` equals the target script.
  * - **language-cross-script** — the base supports the target language but its
  *   script differs from the target (requires `opts.languagesById`). Surfaces
@@ -107,8 +130,9 @@ export function suggestBases(
   const explicitScript =
     target.bcp47 !== undefined && hasExplicitScriptSubtag(target.bcp47);
   const langs = opts.languagesById ?? {};
+  const related = opts.relatednessById ?? {};
 
-  const reasonFor = (base: BaseKeyboard): SuggestReason | null => {
+  const classify = (base: BaseKeyboard): BaseSuggestion | null => {
     const scriptMatch = base.script === target.script;
     const languageDeclared =
       targetLang !== undefined &&
@@ -116,27 +140,49 @@ export function suggestBases(
     const langAndScriptMatch = scriptMatch && languageDeclared;
     // A genuine language+script match is the strongest signal — surface it even
     // for the fallback base (e.g. basic_kbdus genuinely covers English).
-    if (langAndScriptMatch) return "language-match";
+    if (langAndScriptMatch) return { base, reason: "language-match" };
     // Otherwise the US-QWERTY fallback is always the generic "blank" option,
-    // ranked below script and language-cross-script — a more specific base
-    // should win.
-    if (base.id === fallbackId) return "us-qwerty-fallback";
-    if (scriptMatch) return "script-match";
+    // ranked below every more specific tier — it must never be promoted by a
+    // relatedness verdict.
+    if (base.id === fallbackId) return { base, reason: "us-qwerty-fallback" };
+    // related-language-match — hard script gate, then a non-"unrelated" verdict
+    // from the engine. The provenance rides along for the picker to explain.
+    const verdict = related[base.id];
+    if (scriptMatch && verdict !== undefined && verdict.tier !== "unrelated") {
+      return { base, reason: "related-language-match", relatedness: verdict };
+    }
+    if (scriptMatch) return { base, reason: "script-match" };
     // language-cross-script suppressed when the author explicitly picked a
     // script (e.g. hi-Latn) — surfacing the Devanagari base would defeat the
     // romanization they just chose.
-    if (languageDeclared && !explicitScript) return "language-cross-script";
+    if (languageDeclared && !explicitScript) {
+      return { base, reason: "language-cross-script" };
+    }
     return null;
   };
 
   const suggestions: BaseSuggestion[] = [];
   for (const base of bases) {
-    const reason = reasonFor(base);
-    if (reason !== null) suggestions.push({ base, reason });
+    const suggestion = classify(base);
+    if (suggestion !== null) suggestions.push(suggestion);
   }
 
   return suggestions
     .map((s, i) => ({ s, i }))
-    .sort((a, b) => RANK[a.s.reason] - RANK[b.s.reason] || a.i - b.i)
+    .sort((a, b) => {
+      const byRank = RANK[a.s.reason] - RANK[b.s.reason];
+      if (byRank !== 0) return byRank;
+      // Within related-language-match, the stronger verdict (relatedness prior ×
+      // character overlap) wins; other tiers keep stable input order.
+      if (
+        a.s.reason === "related-language-match" &&
+        b.s.reason === "related-language-match"
+      ) {
+        const byScore =
+          (b.s.relatedness?.score ?? 0) - (a.s.relatedness?.score ?? 0);
+        if (byScore !== 0) return byScore;
+      }
+      return a.i - b.i;
+    })
     .map(({ s }) => s);
 }

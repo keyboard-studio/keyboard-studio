@@ -6,6 +6,7 @@
 export * from "./assignmentMap";
 export * from "./axes";
 export * from "./baseKeyboard";
+export * from "./baseMatching";
 export * from "./compileResult";
 export * from "./criteria";
 export * from "./keyboard-ir";

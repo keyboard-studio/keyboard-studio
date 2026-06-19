@@ -10,6 +10,7 @@ import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { getBaseBrowserService } from "../lib/services.ts";
 import {
   suggestBases,
+  type BaseSuggestion,
   type SuggestReason,
   type SuggestTarget,
 } from "../lib/suggestBase.ts";
@@ -17,6 +18,7 @@ import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
 
 const REASON_LABEL: Record<SuggestReason, string> = {
   "language-match": "Already supports your language",
+  "related-language-match": "Built for a related language",
   "script-match": "Matches your script",
   "language-cross-script": "Supports your language, different script",
   "us-qwerty-fallback": "Start blank (US QWERTY)",
@@ -24,10 +26,36 @@ const REASON_LABEL: Record<SuggestReason, string> = {
 
 const REASON_COLOR: Record<SuggestReason, string> = {
   "language-match": "#2ea043",
+  "related-language-match": "#3fb950",
   "script-match": "#6ea8fe",
   "language-cross-script": "#d29922",
   "us-qwerty-fallback": "#8b949e",
 };
+
+/**
+ * Plain-language explanation of *why* a related-language keyboard was proposed,
+ * shown under its row. Built from the engine's relatedness verdict (related
+ * language, shared region, character overlap) so the suggestion is never an
+ * unexplained default (spec §3c — provenance is mandatory).
+ */
+function relatednessDetail(s: BaseSuggestion): string | null {
+  const r = s.relatedness;
+  if (s.reason !== "related-language-match" || r === undefined) return null;
+  const parts: string[] = [];
+  if (r.relatedLanguage !== undefined) {
+    parts.push(
+      r.sharedRegion !== undefined
+        ? `Related to ${r.relatedLanguage} (${r.sharedRegion})`
+        : `Related to ${r.relatedLanguage}`,
+    );
+  }
+  if (r.targetCharCount > 0) {
+    parts.push(
+      `shares ${r.sharedCharCount} of your ${r.targetCharCount} characters`,
+    );
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
 
 export interface BaseResolutionProps {
   /** The chosen (language, script) target from identity-lite. */
@@ -111,43 +139,59 @@ export function BaseResolution({
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
-        {suggestions.map(({ base, reason }) => (
-          <button
-            key={base.id}
-            type="button"
-            onClick={() => onResolved(base)}
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 12,
-              padding: "10px 14px",
-              background: "#161b22",
-              border: "1px solid #30363d",
-              borderRadius: 8,
-              color: "#e6edf3",
-              fontSize: 14,
-              cursor: "pointer",
-              textAlign: "left",
-              fontFamily: "inherit",
-            }}
-          >
-            <span>
-              <strong>{base.displayName}</strong>{" "}
-              <span style={{ color: "#8b949e", fontSize: 12 }}>({base.id})</span>
-            </span>
-            <span
+        {suggestions.map((suggestion) => {
+          const { base, reason } = suggestion;
+          const detail = relatednessDetail(suggestion);
+          return (
+            <button
+              key={base.id}
+              type="button"
+              onClick={() => onResolved(base)}
               style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: REASON_COLOR[reason],
-                whiteSpace: "nowrap",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: detail !== null ? "flex-start" : "center",
+                gap: 12,
+                padding: "10px 14px",
+                background: "#161b22",
+                border: "1px solid #30363d",
+                borderRadius: 8,
+                color: "#e6edf3",
+                fontSize: 14,
+                cursor: "pointer",
+                textAlign: "left",
+                fontFamily: "inherit",
               }}
             >
-              {REASON_LABEL[reason]}
-            </span>
-          </button>
-        ))}
+              <span>
+                <strong>{base.displayName}</strong>{" "}
+                <span style={{ color: "#8b949e", fontSize: 12 }}>({base.id})</span>
+                {detail !== null && (
+                  <span
+                    style={{
+                      display: "block",
+                      marginTop: 3,
+                      color: "#8b949e",
+                      fontSize: 12,
+                    }}
+                  >
+                    {detail}
+                  </span>
+                )}
+              </span>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: REASON_COLOR[reason],
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {REASON_LABEL[reason]}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       <div style={{ borderTop: "1px solid #21262d", paddingTop: 16 }}>

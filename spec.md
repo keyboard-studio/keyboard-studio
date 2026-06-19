@@ -172,7 +172,9 @@ keyboard-studio
 |
 +-- source selection           [engine]   Picks ONE source: US-English fallback (default),
 |                                         release/basic/* layout, any release/ keyboard, or
-|                                         user-uploaded .kmn. No multi-keyboard merge.
+|                                         user-uploaded .kmn. No multi-keyboard merge. Ranks
+|                                         suggestions by related-language match before the
+|                                         blank fallback (base-matching; §8 step 1).
 |
 +-- KeyboardIR codec           [engine]   Parses the chosen .kmn (+ .kvks, .keyman-touch-layout)
 |                                         into the typed KeyboardIR (§5a). Emits IR back to
@@ -680,6 +682,7 @@ Compiled artifacts (`.kmx`, `.kvk`, `.js`) are produced by the in-browser compil
 ### Engine team owns
 
 - Base-keyboard browser (GitHub API client, offline fallback)
+- Related-language base-matching (`base-matching` module; corpus-index + relatedness ranking, §8 step 1) and the supportability scanner that emits `keyboard-corpus-index.json`
 - Project scaffolder (template-cleanup pipeline, virtual FS)
 - Studio UI shell (SPA framework, phase navigation, lint chip display)
 - Live preview pane (KeymanWeb embed, OSK toggle, debounce/compile loop)
