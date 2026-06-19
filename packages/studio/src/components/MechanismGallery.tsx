@@ -697,29 +697,7 @@ export function MechanismGallery({
     useShallow((s) => s.session.axes as Partial<DiscoveryAxisVector>),
   );
 
-  const { lettersToAdd, alreadyProduced } = useInventoryDiff();
-
-  const [coveredPhase, setCoveredPhase] = useState<"asking" | "decided">(() =>
-    alreadyProduced.length > 0 ? "asking" : "decided"
-  );
-  const [selectedForRemap, setSelectedForRemap] = useState<Set<string>>(new Set());
-  const [remapChars, setRemapChars] = useState<string[]>([]);
-
-  useEffect(() => {
-    setCoveredPhase(alreadyProduced.length > 0 ? "asking" : "decided");
-    setSelectedForRemap(new Set());
-    setRemapChars([]);
-    setSkippedChars(new Set());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedBaseKeyboard?.id]);
-
-  const effectiveLettersToAdd = useMemo(
-    () => [
-      ...lettersToAdd,
-      ...remapChars.filter((c) => !lettersToAdd.includes(c)),
-    ],
-    [lettersToAdd, remapChars],
-  );
+  const { lettersToAdd } = useInventoryDiff();
 
   // Read Phase C assignments directly (not the merged session.assignments view)
   // so multiple methods per character are preserved.
@@ -731,16 +709,16 @@ export function MechanismGallery({
     [phaseResults],
   );
 
-  // The covered set: chars in effectiveLettersToAdd that have at least one assignment.
+  // The covered set: chars in lettersToAdd that have at least one assignment.
   const coveredChars = useMemo(
     () =>
       new Set(
         sessionAssignments
           .filter((a) => a.scope === "individual")
           .map((a) => a.target)
-          .filter((t) => effectiveLettersToAdd.includes(t)),
+          .filter((t) => lettersToAdd.includes(t)),
       ),
-    [sessionAssignments, effectiveLettersToAdd],
+    [sessionAssignments, lettersToAdd],
   );
 
   // Skipped chars — tracked in local state; count toward Done gate.
@@ -749,17 +727,17 @@ export function MechanismGallery({
   // currentChar: explicit state — does NOT auto-advance when a method is applied.
   // Only advances when the user clicks "Next character →" or "Skip".
   const [currentChar, setCurrentChar] = useState<string | null>(null);
-  const lettersKey = effectiveLettersToAdd.join("\0");
+  const lettersKey = lettersToAdd.join("\0");
   useEffect(() => {
     setCurrentChar((prev) => {
       // Keep current char if it's still in the list (e.g., inventory refresh).
-      if (prev !== null && effectiveLettersToAdd.includes(prev)) return prev;
+      if (prev !== null && lettersToAdd.includes(prev)) return prev;
       // Pick the first uncovered+unskipped char, or the very first if all covered.
       return (
-        effectiveLettersToAdd.find(
+        lettersToAdd.find(
           (c) => !coveredChars.has(c) && !skippedChars.has(c),
         ) ??
-        effectiveLettersToAdd[0] ??
+        lettersToAdd[0] ??
         null
       );
     });
@@ -768,12 +746,12 @@ export function MechanismGallery({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lettersKey]);
 
-  // Done = every char in effectiveLettersToAdd is covered or skipped.
+  // Done = every char in lettersToAdd is covered or skipped.
   const isDone = useMemo(
     () =>
-      effectiveLettersToAdd.length === 0 ||
-      effectiveLettersToAdd.every((c) => coveredChars.has(c) || skippedChars.has(c)),
-    [effectiveLettersToAdd, coveredChars, skippedChars],
+      lettersToAdd.length === 0 ||
+      lettersToAdd.every((c) => coveredChars.has(c) || skippedChars.has(c)),
+    [lettersToAdd, coveredChars, skippedChars],
   );
 
   // ---------------------------------------------------------------------------
@@ -1105,38 +1083,38 @@ export function MechanismGallery({
 
   const handleNext = useCallback(() => {
     if (currentChar === null) return;
-    const idx = effectiveLettersToAdd.indexOf(currentChar);
+    const idx = lettersToAdd.indexOf(currentChar);
     const next =
-      effectiveLettersToAdd
+      lettersToAdd
         .slice(idx + 1)
         .find((c) => !coveredChars.has(c) && !skippedChars.has(c)) ??
-      effectiveLettersToAdd
+      lettersToAdd
         .slice(0, idx)
         .find((c) => !coveredChars.has(c) && !skippedChars.has(c)) ??
       null;
     // When no uncovered+unskipped char remains, explicitly land on null so the
     // "All done" branch (currentChar === null && isDone) becomes visible.
     setCurrentChar(next);
-  }, [currentChar, effectiveLettersToAdd, coveredChars, skippedChars]);
+  }, [currentChar, lettersToAdd, coveredChars, skippedChars]);
 
   const canGoBack = useMemo(() => {
     if (currentChar === null) return false;
-    return effectiveLettersToAdd.indexOf(currentChar) > 0;
-  }, [currentChar, effectiveLettersToAdd]);
+    return lettersToAdd.indexOf(currentChar) > 0;
+  }, [currentChar, lettersToAdd]);
 
   const handleBack = useCallback(() => {
     if (currentChar === null) return;
-    const idx = effectiveLettersToAdd.indexOf(currentChar);
+    const idx = lettersToAdd.indexOf(currentChar);
     if (idx <= 0) return;
-    setCurrentChar(effectiveLettersToAdd[idx - 1] ?? null);
-  }, [currentChar, effectiveLettersToAdd]);
+    setCurrentChar(lettersToAdd[idx - 1] ?? null);
+  }, [currentChar, lettersToAdd]);
 
   const handleSkip = useCallback(() => {
     if (currentChar === null) return;
     setSkippedChars((prev) => new Set([...prev, currentChar]));
-    const idx = effectiveLettersToAdd.indexOf(currentChar);
+    const idx = lettersToAdd.indexOf(currentChar);
     const next =
-      effectiveLettersToAdd
+      lettersToAdd
         .slice(idx + 1)
         .find(
           (c) =>
@@ -1144,7 +1122,7 @@ export function MechanismGallery({
             !skippedChars.has(c) &&
             c !== currentChar,
         ) ??
-      effectiveLettersToAdd
+      lettersToAdd
         .slice(0, idx)
         .find(
           (c) =>
@@ -1154,7 +1132,7 @@ export function MechanismGallery({
         ) ??
       null;
     setCurrentChar(next);
-  }, [currentChar, effectiveLettersToAdd, coveredChars, skippedChars]);
+  }, [currentChar, lettersToAdd, coveredChars, skippedChars]);
 
   const handleRemoveCovered = useCallback(
     (char: string) => {
@@ -1248,7 +1226,7 @@ export function MechanismGallery({
   // Compute coverage line: covered-in-lettersToAdd count / lettersToAdd.length
   // ---------------------------------------------------------------------------
 
-  const coveredCount = effectiveLettersToAdd.filter((c) => coveredChars.has(c)).length;
+  const coveredCount = lettersToAdd.filter((c) => coveredChars.has(c)).length;
 
   // ---------------------------------------------------------------------------
   // Left pane content
@@ -1283,76 +1261,13 @@ export function MechanismGallery({
           Desktop layout locked — editing disabled
         </div>
       )}
-      {/* Upfront "already covered" phase — ask about remapping before the loop */}
-      {coveredPhase === "asking" && alreadyProduced.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <p style={{ margin: 0, fontSize: 14, color: TEXT_MAIN, fontFamily: FONT }}>
-            These characters are already produced by your base keyboard.
-            Do you want to remap any to different keys?
-          </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {alreadyProduced.map((c) => (
-              <button
-                key={c}
-                type="button"
-                disabled={locked}
-                onClick={() =>
-                  setSelectedForRemap((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(c)) next.delete(c); else next.add(c);
-                    return next;
-                  })
-                }
-                style={{
-                  padding: "6px 12px",
-                  borderRadius: 8,
-                  border: `1px solid ${selectedForRemap.has(c) ? ACCENT : BORDER}`,
-                  background: selectedForRemap.has(c) ? "#0d2840" : BG_CARD,
-                  color: selectedForRemap.has(c) ? ACCENT : TEXT_MAIN,
-                  fontSize: 16,
-                  fontFamily: "monospace",
-                  cursor: "pointer",
-                }}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            disabled={locked}
-            onClick={() => {
-              setRemapChars([...selectedForRemap]);
-              setCoveredPhase("decided");
-            }}
-            style={{
-              padding: "9px 20px",
-              background: BLUE_ACTION,
-              border: "none",
-              borderRadius: 6,
-              color: "#e6edf3",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: FONT,
-              alignSelf: "flex-start",
-            }}
-          >
-            {selectedForRemap.size > 0
-              ? `Continue (remapping ${selectedForRemap.size})`
-              : "Continue (no changes)"}
-          </button>
-        </div>
-      )}
-
-      {coveredPhase === "decided" && (
-        <>
+      <>
           {/* Small coverage line */}
-          {effectiveLettersToAdd.length > 0 && (
+          {lettersToAdd.length > 0 && (
             <p
               role="status"
               aria-live="polite"
-              aria-label={`${coveredCount} of ${effectiveLettersToAdd.length} added`}
+              aria-label={`${coveredCount} of ${lettersToAdd.length} added`}
               style={{
                 margin: 0,
                 fontSize: 12,
@@ -1360,7 +1275,7 @@ export function MechanismGallery({
                 fontFamily: FONT,
               }}
             >
-              {coveredCount} of {effectiveLettersToAdd.length} added
+              {coveredCount} of {lettersToAdd.length} added
             </p>
           )}
 
@@ -1376,7 +1291,7 @@ export function MechanismGallery({
           )}
 
           {/* All-done / empty states */}
-          {effectiveLettersToAdd.length === 0 && (
+          {lettersToAdd.length === 0 && (
             <div
               style={{
                 display: "flex",
@@ -1409,7 +1324,7 @@ export function MechanismGallery({
             </div>
           )}
 
-          {effectiveLettersToAdd.length > 0 && isDone && currentChar === null && (
+          {lettersToAdd.length > 0 && isDone && currentChar === null && (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <p style={{ margin: 0, fontSize: 14, color: TEXT_DIM }}>
                 All keys added.
@@ -1744,8 +1659,7 @@ export function MechanismGallery({
               </div>
             </div>
           )}
-        </>
-      )}
+      </>
 
       {/* Load error for patterns (non-blocking; preview won't show transform) */}
       {loadError !== null && (
