@@ -7,6 +7,21 @@ export { runLexicalChecks, runSemanticChecks, runAllChecks } from "./validator/i
 export { createBaseBrowser } from "./base-browser/index.js";
 export type { BaseBrowserConfig } from "./base-browser/index.js";
 
+// Related-language base-matching (spec §8 step 1) — relatedness priors blended
+// with character-overlap evidence; ranks release/ keyboards as a starting base.
+export {
+  pairRelatedness,
+  primarySubtag,
+  TIER_PRIOR,
+  rankRelatedBases,
+  indexRelatednessData,
+} from "./base-matching/index.js";
+export type {
+  PairRelatedness,
+  RelatedCandidate,
+  RankRelatedOptions,
+} from "./base-matching/index.js";
+
 // Issue #16 — WASM oracle public surface.
 export {
   validateWithOracle,
