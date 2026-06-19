@@ -267,6 +267,9 @@ export function useKeyboardArtifact(
     let result: CompileResult;
     let parsedIr: KeyboardIR | null = null;
     const compileId = scaffoldSpec?.keyboardId ?? kb.id;
+    // Parse failure is captured here so it can be surfaced as a non-fatal
+    // warning rather than aborting the compile/preview flow (slice 4, AC #4).
+    let parseWarning: string | null = null;
     try {
       const kmnPath = findKmnPath(vfs);
       const kmnText = kmnPath ? (vfs.get(kmnPath)!.content as string) : "";
@@ -297,14 +300,30 @@ export function useKeyboardArtifact(
         }
       }
 
+      // compile() and the parse/recognize branch run concurrently, but the
+      // parse branch is wrapped in its own try/catch so a codec IR-parse gap
+      // (a real-world .kmn construct the codec can't yet model) does NOT reject
+      // the outer Promise.all. compile() is independent of the parsed IR —
+      // kmcmplib drives the preview and .kmx; IR features (recognizer, patterns)
+      // simply degrade to null when parse fails. Decision D3: single 300 ms
+      // cycle; we do not add a second timer here.
       const [compileResult, parseResult] = await Promise.all([
         engine.compile(vfs, compileId),
-        Promise.resolve().then(() => {
+        (async () => {
           if (!engine.parseKmn || !engine.recognizePatterns || !kmnPath) return null;
-          const pr = engine.parseKmn(kmnText, compileId);
-          const recognized = engine.recognizePatterns(pr.ir);
-          return { ...pr, ir: recognized.ir };
-        }),
+          try {
+            const pr = engine.parseKmn(kmnText, compileId);
+            const recognized = engine.recognizePatterns(pr.ir);
+            return { ...pr, ir: recognized.ir };
+          } catch (parseErr: unknown) {
+            // Record the gap so it surfaces as a warning on the ready stage.
+            // Do not re-throw — compile must still succeed independently.
+            parseWarning = parseErr instanceof Error
+              ? `IR features unavailable: ${parseErr.message}`
+              : "IR features unavailable: unknown parse error";
+            return null;
+          }
+        })(),
       ]);
       result = compileResult;
       if (parseResult) {
@@ -318,6 +337,12 @@ export function useKeyboardArtifact(
     }
 
     if (runId.current !== thisRunId) return;
+
+    // Fold any parse-gap note into the scaffold warnings so the ready stage
+    // surfaces "IR features unavailable: <reason>" without blocking the preview.
+    if (parseWarning !== null) {
+      warnings = [...warnings, parseWarning];
+    }
 
     const jsArtifact = result.artifacts.find((a) => a.filename.endsWith(".js"));
     // eslint-disable-next-line no-console
