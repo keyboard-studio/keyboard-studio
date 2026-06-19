@@ -1,8 +1,14 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      "@docs": fileURLToPath(new URL("../../docs", import.meta.url)),
+    },
+  },
   test: {
     environment: "jsdom",
     globals: false,

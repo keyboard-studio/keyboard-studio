@@ -133,7 +133,7 @@ exactly.
 
 > Keep this section up to date as work lands. Update it whenever a delivery
 > option moves from "not started" to "in progress" or "done".
-> Last updated: 2026-06-12
+> Last updated: 2026-06-18
 
 ### Pipeline prerequisites (must exist before any delivery option works)
 
@@ -167,6 +167,7 @@ exactly.
 | `publishPR` implementation | **Done** | Issue #47 — `packages/engine/src/output/github.ts`; fork-if-not-exists → tree → commit → branch ref → draft PR via GitHub Git Data API; compiled artifacts excluded (SS1); 13 vitest specs |
 | `createGitHubOutputService()` factory | **Done** | Injectable `GitHubFetchFn` for testability; default delegates to global fetch |
 | GitHub OAuth App registration | Not started | Infrastructure — register an OAuth App at github.com/settings/developers |
+| OAuth token-exchange backend | **Done (code) / deploy pending** | `utilities/oauth-backend/` — Fastify v5 service; `POST /oauth/exchange`, `POST /oauth/refresh`, `GET /oauth/health`; client secret server-side only; 30 vitest specs (service implemented; deploy target + GitHub OAuth App registration still pending) |
 | Studio UI — OAuth authorise flow | Not started | PKCE web-app flow; engine receives the token, does not manage the OAuth exchange |
 | Studio UI — "Submit PR" button | Not started | Wire `verifyToken` → gate button; call `publishPR` on confirm |
 
@@ -183,6 +184,6 @@ exactly.
 
 ```
 Option C  [====================]  100%  engine + studio UI done; full end-to-end zip download wired (#32)
-Option A  [==============------]   70%  engine done; OAuth App + studio UI remaining
+Option A  [================----]   80%  engine + token-exchange backend done; OAuth App + studio UI remaining
 Option B  [--------------------]    0%  design done (github_flow.md); nothing built
 ```

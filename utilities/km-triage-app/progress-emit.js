@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// progress-emit.js - append a JSONL progress event to .tech-lead-inbox/progress.jsonl
+// progress-emit.js - append a JSONL progress event to .escalations/progress.jsonl
 // so observers (tools/triage-watch.mjs, ad-hoc tail consumers) can see what the
 // triage agent is doing without waiting for the audit log at end-of-PR.
 //
@@ -23,7 +23,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const PROGRESS_LOG = path.join('.tech-lead-inbox', 'progress.jsonl');
+const PROGRESS_LOG = path.join('.escalations', 'progress.jsonl');
 
 function parseValue(s) {
   if (s === 'true') return true;

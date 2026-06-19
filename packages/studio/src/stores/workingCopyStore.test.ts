@@ -254,6 +254,17 @@ describe("workingCopyStore — instantiateFromExisting (Track 2)", () => {
     expect(useWorkingCopyStore.getState().identity).not.toBeNull();
   });
 
+  it("sets identity.keyboardId from the loaded keyboard's id (preserve-identity contract)", () => {
+    // Regression guard: downstream consumers (serializeWorkingCopy zip filename,
+    // MechanismGallery scaffoldSpec, lint identity checks) read identity.keyboardId
+    // — undefined here is a defect per spec v1.3.1 §3c.
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+    const s = useWorkingCopyStore.getState();
+    expect(s.identity?.keyboardId).toBe(basicKbdus.id);
+  });
+
   it("clears carve deletion state on instantiation", () => {
     const oldIr = makeTestIR([]);
     useWorkingCopyStore.getState().setIR(oldIr);
@@ -489,6 +500,129 @@ describe("workingCopyStore — survey state consistency", () => {
     useWorkingCopyStore.getState().reset();
     expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);
     expect(useWorkingCopyStore.getState().baseKeyboard).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase E — touchAssignments (recordTouchAssignments)
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — touchAssignments (Phase E)", () => {
+  it("initial state: touchAssignments starts as []", () => {
+    expect(useWorkingCopyStore.getState().touchAssignments).toEqual([]);
+  });
+
+  it("recordTouchAssignments stores the supplied assignments", () => {
+    const a1: import("@keyboard-studio/contracts").TouchAssignment = {
+      scope: "individual",
+      target: "a",
+      modality: "touch",
+      mechanisms: [{ patternId: "pat_a" }],
+    };
+    const a2: import("@keyboard-studio/contracts").TouchAssignment = {
+      scope: "individual",
+      target: "b",
+      modality: "touch",
+      mechanisms: [{ patternId: "pat_b" }],
+    };
+
+    useWorkingCopyStore.getState().recordTouchAssignments([a1, a2]);
+    const state = useWorkingCopyStore.getState();
+
+    expect(state.touchAssignments).toEqual([a1, a2]);
+  });
+
+  it("recordTouchAssignments replaces wholesale — second call overwrites first", () => {
+    const a1: import("@keyboard-studio/contracts").TouchAssignment = {
+      scope: "individual",
+      target: "a",
+      modality: "touch",
+      mechanisms: [{ patternId: "pat_a" }],
+    };
+    const a3: import("@keyboard-studio/contracts").TouchAssignment = {
+      scope: "keyboard-default",
+      target: "",
+      modality: "touch",
+      mechanisms: [{ patternId: "pat_default" }],
+    };
+
+    useWorkingCopyStore.getState().recordTouchAssignments([a1]);
+    expect(useWorkingCopyStore.getState().touchAssignments).toHaveLength(1);
+
+    useWorkingCopyStore.getState().recordTouchAssignments([a3]);
+    const state = useWorkingCopyStore.getState();
+
+    // Must be [a3] only — NOT [a1, a3]
+    expect(state.touchAssignments).toHaveLength(1);
+    expect(state.touchAssignments).toEqual([a3]);
+  });
+
+  it("recordTouchAssignments with [] clears the list", () => {
+    const a1: import("@keyboard-studio/contracts").TouchAssignment = {
+      scope: "individual",
+      target: "a",
+      modality: "touch",
+      mechanisms: [{ patternId: "pat_a" }],
+    };
+    useWorkingCopyStore.getState().recordTouchAssignments([a1]);
+    expect(useWorkingCopyStore.getState().touchAssignments).toHaveLength(1);
+
+    useWorkingCopyStore.getState().recordTouchAssignments([]);
+    expect(useWorkingCopyStore.getState().touchAssignments).toEqual([]);
+  });
+
+  it("reset() clears touchAssignments back to []", () => {
+    const a1: import("@keyboard-studio/contracts").TouchAssignment = {
+      scope: "individual",
+      target: "x",
+      modality: "touch",
+      mechanisms: [{ patternId: "pat_x" }],
+    };
+    useWorkingCopyStore.getState().recordTouchAssignments([a1]);
+    expect(useWorkingCopyStore.getState().touchAssignments).toHaveLength(1);
+
+    useWorkingCopyStore.getState().reset();
+
+    expect(useWorkingCopyStore.getState().touchAssignments).toEqual([]);
+  });
+
+  it("instantiateFromBase clears touchAssignments", () => {
+    const a1: import("@keyboard-studio/contracts").TouchAssignment = {
+      scope: "individual",
+      target: "z",
+      modality: "touch",
+      mechanisms: [{ patternId: "pat_z" }],
+    };
+    useWorkingCopyStore.getState().recordTouchAssignments([a1]);
+    expect(useWorkingCopyStore.getState().touchAssignments).toHaveLength(1);
+
+    // Use a different base id to bypass the idempotence guard.
+    const differentBase = { ...basicKbdus, id: "different_base_for_touch_test" };
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromBase(differentBase, { vfs, ir });
+
+    expect(useWorkingCopyStore.getState().touchAssignments).toEqual([]);
+  });
+
+  it("touchAssignments is isolated from phase C physical assignments", () => {
+    // Recording touch assignments must not affect phaseResults / assignments
+    // used by the physical (Phase C) machinery.
+    const touch: import("@keyboard-studio/contracts").TouchAssignment = {
+      scope: "individual",
+      target: "a",
+      modality: "touch",
+      mechanisms: [{ patternId: "pat_touch" }],
+    };
+    useWorkingCopyStore.getState().recordTouchAssignments([touch]);
+
+    // Phase C physical assignments go through recordAssignments (a different action).
+    const phaseResults = useWorkingCopyStore.getState().phaseResults;
+    const phaseC = phaseResults.find((p) => p.phase === "C");
+    // No phase C result should have been created.
+    expect(phaseC).toBeUndefined();
+    // touchAssignments must still be set.
+    expect(useWorkingCopyStore.getState().touchAssignments).toHaveLength(1);
   });
 });
 

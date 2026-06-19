@@ -61,11 +61,6 @@ questions:
 kmnFragment: |
   c Simple character substitution (S-01)
   c Each keystroke maps to exactly one character.
-  c No deadkeys, no combining, no case variants.
-
-  begin Unicode > use(main)
-
-  group(main) using keys
   {{kmnRules}}
 
 touchLayoutFragment: |

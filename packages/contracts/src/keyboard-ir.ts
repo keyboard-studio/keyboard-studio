@@ -122,6 +122,13 @@ export interface IRHeader {
   targets: string[];
   /** Additional file-level &-store directives beyond the typed fields above, in declaration order. Each entry is the raw KMN store body. */
   storeDirectives: string[];
+  /**
+   * KMN begin-directive encoding type, set by the parser from `begin Unicode`
+   * or `begin ANSI`.  Absent when the keyboard was constructed in-memory
+   * (scaffolded) rather than imported.  Used by isMnemonicKeyboard() to detect
+   * ANSI keyboards at import time without altering the stores array.
+   */
+  encoding?: "Unicode" | "ANSI";
 }
 
 /** A single KMN store declaration. */

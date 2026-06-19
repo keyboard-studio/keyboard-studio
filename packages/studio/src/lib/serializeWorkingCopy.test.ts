@@ -354,3 +354,148 @@ describe("serializeWorkingCopy — identity.keyboardId drives zip filename", () 
     expect(hasMismatchWarn).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Adapt-vs-copy path (Track 2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Seed the store with instantiateFromExisting (Track 2 / adapt-existing).
+ * baseIr.header.version is set to the given version string.
+ * Pass kpsContent to also seed source/basic_kbdus.kps in the VFS.
+ */
+function seedAdaptStore(originalVersion = "1.0", kpsContent?: string) {
+  const entries: Array<{ path: string; content: string; isBinary: boolean }> = [
+    { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+  ];
+  if (kpsContent !== undefined) {
+    entries.push({ path: "source/basic_kbdus.kps", content: kpsContent, isBinary: false });
+  }
+  const vfs = createVirtualFS(entries);
+  const ir = makeTestIR([]);
+  ir.header.version = originalVersion;
+  useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+  return { vfs, ir };
+}
+
+describe("serializeWorkingCopy — adapt-existing path (Track 2)", () => {
+  it("returns a bumped version when instantiationMode is adapt-existing", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedAdaptStore("1.0");
+    const result = await serializeWorkingCopy();
+    expect(result).not.toBeNull();
+    // "1.0" bumped → "1.1"
+    expect(result!.version).toBe("1.1");
+  });
+
+  it("copy path (new-from-base) leaves version unchanged", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    const { ir } = seedStore();
+    ir.header.version = "1.0";
+    const result = await serializeWorkingCopy();
+    expect(result).not.toBeNull();
+    // Track 1 — version stays at the original "1.0", not bumped.
+    expect(result!.version).toBe("1.0");
+  });
+
+  it("calls projectWorkingCopyVfs with version in identity on the adapt path", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedAdaptStore("2.0");
+    await serializeWorkingCopy();
+    expect(projectWorkingCopyVfsSpy).toHaveBeenCalledOnce();
+    const callArg = projectWorkingCopyVfsSpy.mock.calls[0]?.[0] as Record<string, unknown>;
+    // The identity forwarded to projectWorkingCopyVfs should have version "2.1".
+    expect((callArg["identity"] as Record<string, unknown> | null)?.["version"]).toBe("2.1");
+  });
+
+  // -------------------------------------------------------------------------
+  // .kps <Version> patch (F1/F2/F3/F7)
+  // -------------------------------------------------------------------------
+
+  it(".kps <Version> inside <Keyboards><Keyboard> is patched to the bumped version", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    // Minimal .kps with a <Version> element nested inside <Keyboards><Keyboard>.
+    const kpsContent = [
+      `<?xml version="1.0" encoding="utf-8"?>`,
+      `<Package>`,
+      `  <Info>`,
+      `    <Name value="Basic US" />`,
+      `  </Info>`,
+      `  <Keyboards>`,
+      `    <Keyboard>`,
+      `      <Name>Basic US</Name>`,
+      `      <ID>basic_kbdus</ID>`,
+      `      <Version>1.0</Version>`,
+      `    </Keyboard>`,
+      `  </Keyboards>`,
+      `</Package>`,
+    ].join("\n");
+    seedAdaptStore("1.0", kpsContent);
+    await serializeWorkingCopy();
+    // The VFS passed to projectWorkingCopyVfs has the patched .kps.
+    const callArg = projectWorkingCopyVfsSpy.mock.calls[0]?.[0] as Record<string, unknown>;
+    const vfs = callArg["vfs"] as ReturnType<typeof createVirtualFS>;
+    const kpsEntry = vfs.get("source/basic_kbdus.kps");
+    expect(kpsEntry).toBeDefined();
+    const kpsText = kpsEntry!.content as string;
+    expect(kpsText).toContain("<Version>1.1</Version>");
+    expect(kpsText).not.toContain("<Version>1.0</Version>");
+  });
+
+  it(".kps <Version> patch emits no warning when the regex matches", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    const kpsContent = [
+      `<Package><Keyboards><Keyboard><Version>1.0</Version></Keyboard></Keyboards></Package>`,
+    ].join("\n");
+    seedAdaptStore("1.0", kpsContent);
+    const result = await serializeWorkingCopy();
+    expect(result).not.toBeNull();
+    const hasKpsWarn = result!.warnings.some((w) => w.includes("could not update .kps"));
+    expect(hasKpsWarn).toBe(false);
+  });
+
+  it(".kps with <Version> only under <Info> (not under <Keyboards><Keyboard>) emits a warning and leaves .kps unchanged", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    // No <Version> under <Keyboards><Keyboard> — only under <Info>, which the
+    // tightened regex must NOT match (F7 anchor).
+    const kpsContent = [
+      `<?xml version="1.0" encoding="utf-8"?>`,
+      `<Package>`,
+      `  <Info>`,
+      `    <Version>1.0</Version>`,
+      `  </Info>`,
+      `  <Keyboards>`,
+      `    <Keyboard>`,
+      `      <Name>Basic US</Name>`,
+      `      <ID>basic_kbdus</ID>`,
+      `    </Keyboard>`,
+      `  </Keyboards>`,
+      `</Package>`,
+    ].join("\n");
+    seedAdaptStore("1.0", kpsContent);
+    const result = await serializeWorkingCopy();
+    expect(result).not.toBeNull();
+    // Warning must be emitted.
+    const kpsWarn = result!.warnings.find((w) => w.includes("could not update .kps"));
+    expect(kpsWarn).toBeDefined();
+    expect(kpsWarn).toContain("1.1"); // includes the bumped version
+    // .kps must be left unchanged (the <Info><Version> must NOT have been patched).
+    const callArg = projectWorkingCopyVfsSpy.mock.calls[0]?.[0] as Record<string, unknown>;
+    const vfs = callArg["vfs"] as ReturnType<typeof createVirtualFS>;
+    const kpsEntry = vfs.get("source/basic_kbdus.kps");
+    expect(kpsEntry).toBeDefined();
+    const kpsText = kpsEntry!.content as string;
+    // The original content should be intact (no patch applied).
+    expect(kpsText).toBe(kpsContent);
+  });
+
+  it("no warning emitted when no .kps exists in the VFS on the adapt path", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    // No kpsContent passed — no .kps in the VFS.
+    seedAdaptStore("1.0");
+    const result = await serializeWorkingCopy();
+    expect(result).not.toBeNull();
+    const hasKpsWarn = result!.warnings.some((w) => w.includes("could not update .kps"));
+    expect(hasKpsWarn).toBe(false);
+  });
+});

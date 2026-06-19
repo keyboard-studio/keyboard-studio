@@ -155,16 +155,25 @@ function makeOracle(load: LoadHandle): OracleInstance {
       if (h === null) return [];
 
       const wasmGroups = requested.filter((g) => WASM_GROUPS.has(g));
-      const raws = await h.lintWasmGroups(source, wasmGroups);
-      const requestedSet = new Set(requested);
-      const out: LintFinding[] = [];
-      for (const raw of raws) {
-        const { finding, group } = translateWasmFinding(raw, "");
-        if (requestedSet.has(group)) {
-          out.push(finding);
+      try {
+        const raws = await h.lintWasmGroups(source, wasmGroups);
+        const requestedSet = new Set(requested);
+        const out: LintFinding[] = [];
+        for (const raw of raws) {
+          const { finding, group } = translateWasmFinding(raw, "");
+          if (requestedSet.has(group)) {
+            out.push(finding);
+          }
         }
+        return out;
+      } catch (err: unknown) {
+        // Post-load WASM fault — treat identically to a load failure:
+        // mark WASM down and let the TS-portable findings survive.
+        // No logging: the engine package has no logger (see ensureHandle).
+        void err;
+        wasmDown = true;
+        return [];
       }
-      return out;
     })();
 
     const [tsFindings, wasmFindings] = await Promise.all([tsTask, wasmTask]);

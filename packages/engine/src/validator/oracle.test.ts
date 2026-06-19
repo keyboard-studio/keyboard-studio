@@ -181,6 +181,37 @@ describe("_createOracle(null) — simulating WASM-down", () => {
   });
 });
 
+describe("post-load WASM fault — lintWasmGroups throws at runtime", () => {
+  // Regression for issue #493: if lintWasmGroups() throws after a
+  // successful load, wasmTask must not reject Promise.all. Instead it must
+  // set wasmDown=true and return [], allowing TS findings to survive and
+  // KM_WARN_ORACLE_UNAVAILABLE to be appended (degraded mode).
+  it("folds a lintWasmGroups runtime throw into degraded mode; TS findings survive", async () => {
+    const throwingHandle: WasmOracleHandle = {
+      async lintWasmGroups(_source, _groups) {
+        throw new Error("synthetic post-load WASM fault");
+      },
+      dispose() {
+        /* no-op */
+      },
+    };
+    const oracle = _createOracle(throwingHandle);
+
+    // Must not reject.
+    const findings = await oracle.lint(knownBadSource);
+
+    const codes = findings.map((f) => f.code);
+    // TS-portable checks still ran.
+    expect(codes).toContain("KM_ERROR_DUPLICATE_STORE");
+    expect(codes).toContain("KM_ERROR_INVALID_IDENTIFIER");
+    // Degraded-mode warning appended exactly once.
+    expect(codes).toContain("KM_WARN_ORACLE_UNAVAILABLE");
+    expect(
+      findings.filter((f) => f.code === "KM_WARN_ORACLE_UNAVAILABLE")
+    ).toHaveLength(1);
+  });
+});
+
 describe("_createOracleWithLoader — loader rejection path", () => {
   // Exercises the `.catch` in makeOracle()'s lazy init: a LoadHandle that
   // rejects with a typed OracleLoadError must be absorbed (no throw to

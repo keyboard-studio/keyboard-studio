@@ -72,6 +72,51 @@ describe("tokenize", () => {
     expect(storeToken?.text).toContain("10.0");
   });
 
+  it("silent-corruption guard: continuation whose tail contains `>` must not produce a spurious rule (#412)", () => {
+    // The silent-corruption risk: if `\` + trailing whitespace is NOT joined,
+    // the orphaned second physical line `[K_B] > 'c'` tokenizes as a standalone
+    // rule with NO context key — a bogus mapping that compiles silently under
+    // some kmcmplib versions, corrupting the keyboard.  After the fix the two
+    // physical lines join into ONE rule `[K_A] [K_B] > 'c'`.  This test
+    // specifically uses a `>` on the continuation line to exercise that exact
+    // corruption path (the basic #365 test does not).
+    const src = "+ [K_A] \\   \n[K_B] > 'c'\n";
+    const tokens = tokenize(src);
+    const rules = tokens.filter(t => t.kind === "rule");
+    // Exactly one rule token — if two are produced the fix has regressed.
+    expect(rules).toHaveLength(1);
+    // The joined text contains both sides of the split: the context vkey AND
+    // the arrow with its output.  It must NOT start with `>` (which would mean
+    // only the orphaned half was returned).
+    const ruleText = rules[0]?.text ?? "";
+    expect(ruleText).toContain("[K_A]");
+    expect(ruleText).toContain("[K_B]");
+    expect(ruleText).toContain(">");
+    expect(ruleText).not.toMatch(/^\s*>/);
+  });
+
+  it("target-selector $keymanweb: prefix is stripped and stored on the token (#412)", () => {
+    // tokenize must parse the $keymanweb: prefix off the line, classify the
+    // remainder correctly (here a rule), and record targetSelector='keymanweb'.
+    const tokens = tokenize("$keymanweb: + [K_A] > U+0061\n");
+    const rules = tokens.filter(t => t.kind === "rule");
+    expect(rules).toHaveLength(1);
+    expect(rules[0]?.targetSelector).toBe("keymanweb");
+    // The text field must NOT contain the prefix — downstream parsers see clean text.
+    expect(rules[0]?.text).not.toContain("$keymanweb:");
+    expect(rules[0]?.text).toContain("[K_A]");
+  });
+
+  it("target-selector $keymanonly: prefix is stripped from a store line (#412)", () => {
+    // Same as above for the desktop-only prefix applied to a store declaration.
+    const tokens = tokenize("$keymanonly: store(euro) 'Cc'\n");
+    const stores = tokens.filter(t => t.kind === "store");
+    expect(stores).toHaveLength(1);
+    expect(stores[0]?.targetSelector).toBe("keymanonly");
+    expect(stores[0]?.text).not.toContain("$keymanonly:");
+    expect(stores[0]?.text).toContain("store(euro)");
+  });
+
   it("recognizes begin directive", () => {
     const tokens = tokenize("begin Unicode > use(main)\n");
     expect(tokens.find(t => t.kind === "begin")).toBeDefined();

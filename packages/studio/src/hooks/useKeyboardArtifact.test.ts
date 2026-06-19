@@ -5,6 +5,9 @@
 //   2. onInstantiate is NOT fired when recompile() is called (isFullRun=false).
 //   3. onInstantiate is NOT called when baseKeyboard is null (idle path).
 //   4. onInstantiate receives the base keyboard and a non-null IR on a full run.
+//   5. (slice 4) When parseKmn throws but compile succeeds, the hook reaches
+//      the "ready" stage (preview not blanked), parsedIr passed to onInstantiate
+//      is null, and a parse-gap warning appears in scaffoldWarnings.
 //
 // Approach: mock @keyboard-studio/engine with a minimal synchronous-ish
 // implementation so loadEngine() succeeds in jsdom, then use renderHook()
@@ -55,6 +58,12 @@ const mockEngine = {
   recognizePatterns: vi.fn((_ir: KeyboardIR) => ({
     ir: mockIr,
     recognizedRatio: 0,
+  })),
+  // Preview compile strips dangling packaging-asset stores; the mock is a no-op
+  // passthrough (the test .kmn declares no asset stores).
+  stripDanglingAssetStores: vi.fn((kmn: string, _fs: VirtualFS) => ({
+    kmn,
+    stripped: [] as string[],
   })),
 };
 
@@ -162,5 +171,118 @@ describe("useKeyboardArtifact — onInstantiate timing", () => {
     });
 
     expect(onInstantiate).not.toHaveBeenCalled();
+  });
+
+  // Guardrail: a fetch that never settles must not strand the overlay on
+  // "fetching" forever — it should fall through to a retryable error/fetch
+  // stage once FETCH_TIMEOUT_MS (15s) elapses.
+  it("a never-settling fetch surfaces a retryable fetch error, not an infinite spinner", async () => {
+    vi.useFakeTimers();
+    try {
+      mockEngine.fetchKeyboardSourceToVfs.mockImplementationOnce(
+        () => new Promise(() => undefined), // never resolves
+      );
+
+      const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+      const { result } = renderHook(() =>
+        useKeyboardArtifact(baseKb, null, null, null),
+      );
+
+      // Flush engine load + init and reach the withTimeout() call (which
+      // registers the 15s fake timer). Stage should be parked on "fetching".
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(result.current.stage.kind).toBe("fetching");
+
+      // Advance past the fetch timeout -> rejection -> error/fetch stage.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(16_000);
+      });
+
+      expect(result.current.stage.kind).toBe("error");
+      if (result.current.stage.kind === "error") {
+        expect(result.current.stage.step).toBe("fetch");
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Slice 4: graceful degradation when parseKmn throws (AC #4)
+// ---------------------------------------------------------------------------
+// When the codec can't model a real-world .kmn construct, parseKmn() throws.
+// The compile() call is independent and must still succeed, leaving the hook
+// in the "ready" stage (preview not blanked). The onInstantiate callback must
+// receive ir=null (parse gap), and the parse-gap message must appear in
+// scaffoldWarnings so the user sees "IR features unavailable: ..." without
+// losing the preview or the download path.
+// ---------------------------------------------------------------------------
+
+describe("useKeyboardArtifact — parseKmn graceful degradation (slice 4)", () => {
+  it("reaches ready stage when parseKmn throws, with ir=null and parse warning", async () => {
+    // Override parseKmn on the shared mock for this one test.
+    mockEngine.parseKmn.mockImplementationOnce(() => {
+      throw new Error("codec gap: unsupported real-world construct");
+    });
+
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+    const onInstantiate = vi.fn<Parameters<OnInstantiateCallback>, void>();
+
+    const { result } = renderHook(() =>
+      useKeyboardArtifact(baseKb, null, null, onInstantiate),
+    );
+
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    // 1. Hook must reach "ready" — preview not blanked.
+    expect(result.current.stage.kind).toBe("ready");
+
+    // 2. onInstantiate must still fire (full run succeeded).
+    expect(onInstantiate).toHaveBeenCalledTimes(1);
+
+    // 3. IR must be null — parse gap degrades IR-dependent features gracefully.
+    const [, calledOpts] = onInstantiate.mock.calls[0]!;
+    expect(calledOpts.ir).toBeNull();
+
+    // 4. Parse-gap message must appear in scaffoldWarnings (non-fatal signal).
+    const readyStage = result.current.stage;
+    expect(readyStage.kind).toBe("ready");
+    if (readyStage.kind === "ready") {
+      const parseWarn = readyStage.scaffoldWarnings.find((w) =>
+        w.startsWith("IR features unavailable:"),
+      );
+      expect(parseWarn).toBeDefined();
+      expect(parseWarn).toContain("codec gap: unsupported real-world construct");
+    }
+  });
+
+  it("compile failure still produces an error stage (genuine compile error path intact)", async () => {
+    // compile throws — must still reach "error" with step="compile".
+    mockEngine.compile.mockImplementationOnce(() =>
+      Promise.reject(new Error("kmcmplib: fatal syntax error at line 5")),
+    );
+
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+    const { result } = renderHook(() =>
+      useKeyboardArtifact(baseKb, null, null, null),
+    );
+
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.stage.kind).toBe("error");
+    if (result.current.stage.kind === "error") {
+      expect(result.current.stage.step).toBe("compile");
+      expect(result.current.stage.message).toContain("kmcmplib: fatal syntax error");
+    }
   });
 });

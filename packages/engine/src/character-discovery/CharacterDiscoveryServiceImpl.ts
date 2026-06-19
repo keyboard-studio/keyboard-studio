@@ -4,7 +4,7 @@ import type {
   BaseKeyboard,
   LinguistInventory,
 } from "@keyboard-studio/contracts";
-import { makeLinguistInventory } from "@keyboard-studio/contracts";
+import { makeLinguistInventory, parseUPlusNotation } from "@keyboard-studio/contracts";
 import type { CldrLoader } from "./cldr.js";
 import { loadExemplars, scriptBlockChars } from "./cldr.js";
 
@@ -94,15 +94,6 @@ export function buildLinguistPrompt(languageName: string, bcp47: string, orthogr
 }
 
 /**
- * Parse a U+XXXX codepoint string into the corresponding character.
- * Returns null if the string is not a valid U+ hex notation.
- */
-function parseUPlusHex(s: string): string | null {
-  const cp = parseInt(s.replace(/^U\+/i, ""), 16);
-  return isNaN(cp) ? null : String.fromCodePoint(cp);
-}
-
-/**
  * Returns true if `cp` falls within one of the Unicode bidi / format-control
  * ranges that are valid as literal direction-control characters:
  *   U+200B–U+200F  (zero-width spaces and directional marks)
@@ -162,7 +153,7 @@ function toDirectionControlNotation(s: string): string | null {
  * provided as literal characters rather than U+ codes).
  */
 function parseUPlusHexOrNFC(s: string): string {
-  const result = parseUPlusHex(s);
+  const result = parseUPlusNotation(s);
   return result !== null ? result : s.normalize("NFC");
 }
 

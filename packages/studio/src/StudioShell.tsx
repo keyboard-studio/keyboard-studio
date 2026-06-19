@@ -4,12 +4,13 @@
 //   #survey  (default)  — full authoring wizard: identity → base → prefill →
 //                         carve (Phase D) → inventory (Phase B) →
 //                         mechanisms (Phase C) → help (Phase F) → done
-//   #preview            — compiled preview (stub; not yet implemented)
-//   #output             — output / delivery (stub; not yet implemented)
+//   #preview            — PreviewShell (OSK preview + diagnostics + download)
+//   #output             — PreviewShell (same combined shell; v1 — split is a later refinement)
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
-import type { BaseKeyboard, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, Pattern, SurveyPhaseResult, TouchAssignment } from "@keyboard-studio/contracts";
+import { scaffoldTouchLayout } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
 import { IdentityLite, Prefill, PhaseB, PhaseF, type IdentityLiteResult } from "./survey/index.ts";
@@ -19,6 +20,7 @@ import type { SuggestTarget } from "./lib/suggestBase.ts";
 import type { SurveyContext } from "./survey/types.ts";
 import { CarveGallery } from "./components/CarveGallery.tsx";
 import { MechanismGallery } from "./components/MechanismGallery.tsx";
+import { TouchGallery } from "./components/TouchGallery.tsx";
 import { type RouteId } from "./lib/navigate.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback, type ScaffoldSpec } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
@@ -27,9 +29,14 @@ import { OskModeToggle, type OskMode } from "./components/OskModeToggle.tsx";
 import { TrackStep, type Track } from "./components/TrackStep.tsx";
 import { ProjectNameStep } from "./components/ProjectNameStep.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
+import { usePlacementPriors } from "./hooks/usePlacementPriors.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
 import { buildFindingsByQuestionId } from "./lint/lintToQuestion.ts";
+import { getPatternLibraryService } from "./lib/services.ts";
+import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
 import { FlowMapView } from "./flowmap/FlowMapView.tsx";
+import { PreviewShell } from "./components/PreviewShell.tsx";
+import { navigateTo } from "./lib/navigate.ts";
 
 // The Flow Map is a developer aid. It shows automatically in `vite dev`; in
 // hosted builds (Vercel previews, future production) it is gated by
@@ -66,28 +73,6 @@ function useRoute(): RouteId {
   }, []);  // empty deps: register once on mount; handler captures hashToRoute by closure
 
   return route;
-}
-
-// ---------------------------------------------------------------------------
-// RoutePlaceholder — stub for routes not yet implemented
-// ---------------------------------------------------------------------------
-
-function RoutePlaceholder({ title }: { title: string }) {
-  return (
-    <div
-      style={{
-        height: "100%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "#9aa7b8",
-        fontSize: 16,
-        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-      }}
-    >
-      {title} — coming soon
-    </div>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -175,6 +160,7 @@ type SurveyStage =
   | "carve"
   | "B"
   | "mechanisms"
+  | "E"
   | "F"
   | "done"
   | "unsupported";
@@ -204,6 +190,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
   const { containerRef, leftPct, handleHovered, onPointerDown, setHandleHovered } =
     useResizablePanes({ minPct: SURVEY_LEFT_MIN_PCT, maxPct: SURVEY_LEFT_MAX_PCT, initPct: SURVEY_LEFT_INIT_PCT });
+
+  // Corpus placement priors — loaded lazily from docs/placement-priors.json.
+  // Null while loading or on error (gallery degrades gracefully without it).
+  const corpusPlacementMap = usePlacementPriors();
 
   // Track 1 (Copy) vs Track 2 (Adapt) — set at the "track" stage.
   // Null until the user picks a track.
@@ -253,12 +243,38 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     }
   }, []);
 
-  // Working-copy transform — projects carve + identity layers into the OSK.
-  // No patternMap here (Phase C assignments are not yet collected in the survey
-  // pane; even if they were, we have no patternMap to pass). Returns null when
-  // the working copy is not yet instantiated (baseIr = null on first load);
-  // useKeyboardArtifact treats null vfsTransform as "no transform" — safe.
-  const workingCopyTransform = useWorkingCopyTransform();
+  // Pattern map for the working-copy transform — needed from Phase F onwards so
+  // mechanism assignments (Phase C) are projected into the OSK preview. Loaded
+  // lazily once assignments exist in the store: by the time the user reaches
+  // Phase F the patterns were already fetched during Phase C (service caches
+  // them), so getById resolves in a single microtask tick and causes at most
+  // one extra recompile cycle.
+  const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
+  const sessionAssignments = useMemo(() => physicalAssignmentsOf(phaseResults), [phaseResults]);
+  const [surveyPatternMap, setSurveyPatternMap] = useState<Map<string, Pattern>>(new Map());
+  useEffect(() => {
+    const ids = new Set(sessionAssignments.flatMap((a) => a.mechanisms.map((m) => m.patternId)));
+    if (ids.size === 0) return;
+    const svc = getPatternLibraryService();
+    Promise.all([...ids].map((id) => svc.getById(id)))
+      .then((patterns) => {
+        const map = new Map<string, Pattern>();
+        for (const p of patterns) {
+          if (p !== undefined) map.set(p.id, p);
+        }
+        setSurveyPatternMap(map);
+      })
+      .catch((err: unknown) => {
+        console.error("[SurveyView] pattern load for preview failed:", err);
+      });
+  }, [sessionAssignments]);
+
+  // Working-copy transform — projects carve + assignments + identity into the OSK.
+  // surveyPatternMap is empty until Phase C completes; useWorkingCopyTransform
+  // treats a null patternMap as "skip assignments" (safe — no assignments exist yet).
+  const workingCopyTransform = useWorkingCopyTransform({
+    patternMap: surveyPatternMap.size > 0 ? surveyPatternMap : null,
+  });
 
   // Use localBase (immediately updated on selection) to drive the pipeline,
   // not the store's baseKeyboard (updated only after compile completes).
@@ -271,6 +287,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const recordPhase = useWorkingCopyStore((s) => s.recordPhase);
   const resetSurvey = useWorkingCopyStore((s) => s.reset);
   const setStoreIdentity = useWorkingCopyStore((s) => s.setIdentity);
+  const lockDesktop = useWorkingCopyStore((s) => s.lockDesktop);
+  const recordTouchAssignments = useWorkingCopyStore((s) => s.recordTouchAssignments);
+  const setTouchLayoutJson = useWorkingCopyStore((s) => s.setTouchLayoutJson);
+  const ir = useWorkingCopyStore((s) => s.ir);
 
   // Derive KMN source from the working copy's base VFS (the scaffolded snapshot)
   // so the validator can produce findings while the survey is in progress.
@@ -345,11 +365,24 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     setStage("mechanisms");
   }
   function handleMechanismsComplete() {
+    lockDesktop();
+    setStage("E");
+  }
+  function handlePhaseEComplete(assignments: TouchAssignment[]) {
+    recordTouchAssignments(assignments);
+    // Persist the scaffolded touch layout JSON so serializeWorkingCopy can
+    // inject it into source/<keyboardId>.keyman-touch-layout at output time.
+    // Option B: base VFS is immutable after instantiation; JSON stored as a
+    // side-car string and written into the cloned VFS before zipping.
+    if (ir !== null) {
+      setTouchLayoutJson(JSON.stringify(scaffoldTouchLayout(ir), null, 2));
+    }
     setStage("F");
   }
   function handlePhaseFComplete(result: SurveyPhaseResult) {
     recordPhase(result);
     setStage("done");
+    navigateTo("output");
   }
   function handleStartOver() {
     resetSurvey();
@@ -445,7 +478,16 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           selectedBaseKeyboard={localBase}
           onComplete={handleMechanismsComplete}
           onBack={() => setStage("B")}
+          {...(corpusPlacementMap !== null ? { placementMap: corpusPlacementMap } : {})}
         />
+      </div>
+    );
+  }
+
+  if (stage === "E") {
+    return (
+      <div style={{ height: "100%", overflow: "hidden" }}>
+        <TouchGallery onComplete={handlePhaseEComplete} />
       </div>
     );
   }
@@ -526,6 +568,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           />
         )}
         {stage === "B" && (
+          // NOTE: `placementMap` is intentionally not supplied here in v1.
+          // Per decision D-INT-2 the seeder never runs inside the SPA; the real
+          // PlacementMap comes from a pinned placement-priors artifact produced
+          // offline and shipped as static data (tracked separately — see this
+          // change's PR). The prop stays optional and unsupplied in production;
+          // the consumption path (buildPlacementSeeds -> getSeedValue) is
+          // exercised by unit tests via the placement-map.sample.json fixture.
           <PhaseB
             context={surveyContext}
             onComplete={handlePhaseBComplete}
@@ -537,7 +586,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           <PhaseF
             context={surveyContext}
             onComplete={handlePhaseFComplete}
-            onBack={() => setStage("mechanisms")}
+            onBack={() => setStage("E")}
             findingsByQuestionId={findingsByQuestionId}
           />
         )}
@@ -641,10 +690,10 @@ export function StudioShell() {
       content = <SurveyView baseKeyboard={selectedBaseKeyboard} />;
       break;
     case "preview":
-      content = <RoutePlaceholder title="Preview" />;
+      content = <PreviewShell />;
       break;
     case "output":
-      content = <RoutePlaceholder title="Output" />;
+      content = <PreviewShell />;
       break;
     case "flowmap":
       content = <FlowMapView />;

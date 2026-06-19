@@ -139,6 +139,15 @@ function findLastIndex<T>(arr: T[], pred: (item: T) => boolean): number {
 }
 
 /**
+ * Extract the store name from a `store(name) ...` line.
+ * Returns null if the line is not a store declaration.
+ */
+function storeNameOf(trimmedLine: string): string | null {
+  const m = /^store\s*\(\s*([^)]+?)\s*\)/i.exec(trimmedLine);
+  return m ? (m[1] ?? null) : null;
+}
+
+/**
  * Parse a KMN source string into its header region + group blocks.
  *
  * The header region includes everything up to (and including) the `begin`
@@ -341,7 +350,7 @@ function mergeGroupBlock(
   return {
     name: base.name,
     headerLine: base.headerLine, // keep original header (e.g. `using keys`)
-    bodyLines: [...preTail, ...newBodyLines, ...mergedTail],
+    bodyLines: [...newBodyLines, ...preTail, ...mergedTail],
   };
 }
 
@@ -441,6 +450,62 @@ export function applyAssignments(
     }
   }
 
+  // Merge multiple modifier_as_layer_switch refs into one so that all
+  // RAlt assignments share a single store(altgrKeys)/store(altgrOutput) pair.
+  // Having multiple refs with the same patternId but different slots would
+  // produce duplicate store declarations → KMN compile error.
+  const RALT_PATTERN = "modifier_as_layer_switch";
+  const raltRefs = [...seen.values()].filter((r) => r.patternId === RALT_PATTERN);
+  if (raltRefs.length > 1) {
+    for (const r of raltRefs) seen.delete(mechanismKey(r));
+    const merged: MechanismRef = {
+      ...raltRefs[0]!,
+      slotValues: {
+        altgrKeyList: raltRefs
+          .map((r) => r.slotValues?.["altgrKeyList"] ?? "")
+          .filter(Boolean)
+          .join(" "),
+        altgrOutputList: raltRefs
+          .map((r) => r.slotValues?.["altgrOutputList"] ?? "")
+          .join(""),
+      },
+    };
+    seen.set(mechanismKey(merged), merged);
+  }
+
+  // Merge multiple deadkey_single_tap refs that share the same triggerKey so
+  // they produce a single combined store(bases)/store(output) pair. Without this
+  // the second ref's stores overwrite the first's via the replace-by-name logic,
+  // silently dropping the first character's compose rule.
+  const DEADKEY_PATTERN = "deadkey_single_tap";
+  const deadkeyRefs = [...seen.values()].filter((r) => r.patternId === DEADKEY_PATTERN);
+  if (deadkeyRefs.length > 1) {
+    // Group by triggerKey; only groups with >1 ref need merging.
+    const byTrigger = new Map<string, typeof deadkeyRefs>();
+    for (const r of deadkeyRefs) {
+      const k = r.slotValues?.["triggerKey"] ?? "";
+      if (!byTrigger.has(k)) byTrigger.set(k, []);
+      byTrigger.get(k)!.push(r);
+    }
+    for (const [, group] of byTrigger) {
+      if (group.length <= 1) continue;
+      for (const r of group) seen.delete(mechanismKey(r));
+      const first = group[0]!;
+      const merged: MechanismRef = {
+        ...first,
+        slotValues: {
+          triggerKey:    first.slotValues?.["triggerKey"] ?? "",
+          deadkeyName:   first.slotValues?.["deadkeyName"] ?? "",
+          baseLetters:   group.map((r) => r.slotValues?.["baseLetters"] ?? "").join(""),
+          accentedForms: group.map((r) => r.slotValues?.["accentedForms"] ?? "").join(""),
+          // Double-tap emits the first ref's accentChar (consistent with single-char case).
+          accentChar: first.slotValues?.["accentChar"] ?? "",
+        },
+      };
+      seen.set(mechanismKey(merged), merged);
+    }
+  }
+
   if (seen.size === 0) {
     return { kmn: kmnSource, warnings };
   }
@@ -524,10 +589,24 @@ export function applyAssignments(
   for (const frag of allFragments) {
     for (const storeLine of frag.storeLines) {
       const trimmed = storeLine.trim();
+      const storeName = storeNameOf(trimmed);
+      if (storeName !== null) {
+        // If a store with this same name already exists in the header,
+        // replace it in-place rather than adding a duplicate.
+        const existingIdx = baseParsed.headerLines.findIndex(
+          (l) => storeNameOf(l.trim()) === storeName,
+        );
+        if (existingIdx !== -1) {
+          const oldTrimmed = baseParsed.headerLines[existingIdx]!.trim();
+          existingTrimmed.delete(oldTrimmed);
+          baseParsed.headerLines[existingIdx] = storeLine;
+          existingTrimmed.add(trimmed);
+          continue;
+        }
+      }
       if (!isDuplicateLine(trimmed, existingTrimmed)) {
-        // Find the insertion point: just before `begin` in the header.
         const beginIdx = baseParsed.headerLines.findIndex((l) =>
-          /^\s*begin\s/i.test(l.trim())
+          /^\s*begin\s/i.test(l.trim()),
         );
         const insertAt =
           beginIdx === -1 ? baseParsed.headerLines.length : beginIdx;

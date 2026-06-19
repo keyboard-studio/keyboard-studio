@@ -15,6 +15,7 @@ export type { GitHubOutputConfig, GitHubFetchFn } from "./github.js";
 export { addSidecar, isSidecarPath } from "./sidecar.js";
 export { buildImportAttributionBlock } from "./import-attribution.js";
 export type { ImportAttributionInput } from "./import-attribution.js";
+export { bumpKeyboardVersion, stageAdaptHistory } from "./adapt-staging.js";
 
 /**
  * Create a partial {@link OutputService} with the zip-download path wired up.

@@ -6,6 +6,16 @@
 # PRs that clear every gate each get a fresh, clean claude process —
 # no accumulated context across unrelated PRs.
 #
+# !! SYNC WARNING !! These bash gates are a re-implementation of the Phase 2
+# skip logic in .claude/commands/km-triage.md. The wrapper SHORT-CIRCUITS: a
+# PR skipped here never spawns Claude, so a change to km-triage.md's Phase 2
+# that is NOT mirrored here is silently a no-op for scheduled sweeps. They
+# MUST be edited together. This bit us once (#479 broadened the review-needed
+# re-review signal in km-triage.md only; the cron wrapper kept the old narrow
+# @km-triage-owner rule and parked PRs forever on a plain reply / new commit).
+# If you touch a gate below, update the matching km-triage.md section in the
+# same commit, and vice-versa.
+#
 # The outer iteration loop is unchanged: a sweep that auto-fixed any PR
 # re-sweeps (up to MAX_ITERATIONS) so the new head gets reviewed in the
 # same cron tick rather than waiting 30 min.
@@ -30,8 +40,8 @@ CLAUDE="${CLAUDE_BIN:-/home/lee2mr/.local/bin/claude}"
 # convention — see the Personal mode section in .claude/commands/km-triage.md.
 MODEL="${KM_TRIAGE_MODEL:-opus}"
 
-INBOX_DIR=".tech-lead-inbox"
-AUDIT_LOG="$INBOX_DIR/audit-log.jsonl"
+STATE_DIR=".escalations"
+AUDIT_LOG="$STATE_DIR/audit-log.jsonl"
 MAX_ITERATIONS=3
 SLEEP_BETWEEN_SEC=45
 LOOP_ON_ACTIONS="auto_fix_only fix_and_mention"
@@ -83,6 +93,26 @@ post_conflict_notice() {
   n_skip=$((n_skip + 1))
 }
 
+# Just-in-time draft re-check. The bulk `gh pr list` snapshot is taken once at
+# the top of the iteration, but PRs are reviewed sequentially with a full,
+# minutes-long claude run between each — so by the time a given PR's turn
+# arrives the snapshot can be many minutes stale. A PR converted to draft
+# inside that window would pass the stale Gate 2 and spin up an entire claude
+# process only for its own Phase 2 to skip it as draft (wasted credits).
+# Re-fetch live isDraft immediately before spawning. Returns 0 (and logs +
+# audits the skip, bumping n_skip) when the PR is now a draft; 1 otherwise.
+jit_is_draft() {
+  local num="$1" head_sha="$2" live_draft
+  live_draft=$(gh pr view "$num" --json isDraft --jq '.isDraft' 2>/dev/null || echo "")
+  if [[ "$live_draft" == "true" ]]; then
+    echo "  skip: draft (converted since sweep snapshot)" | tee -a "$LOG"
+    audit_skip "$num" draft "$head_sha"
+    n_skip=$((n_skip + 1))
+    return 0
+  fi
+  return 1
+}
+
 spawn_claude_for_pr() {
   local pr_num="$1"
   set +e
@@ -98,47 +128,56 @@ spawn_claude_for_pr() {
   fi
 }
 
-# Returns the id of a lead-trigger comment (any TRIAGE_OWNERS member's
-# comment containing @km-triage) posted after since_ts, or empty string.
-find_trigger_comment() {
+# Returns the id of the most recent human (non-[bot]) comment posted after
+# since_ts, or empty string. This is the generalized re-review signal from
+# km-triage.md #479: ANY non-bot comment counts — no @km-triage string and no
+# TRIAGE_OWNERS membership required (a submitter who pushes a fix and explains
+# it in a plain reply is the natural response to an escalation and cannot be
+# expected to know the @km-triage incantation). The `[bot]`-login exclusion is
+# load-bearing: it filters the bot's own MENTION/ESCALATE comment and CI bots
+# (vercel[bot]) so a sweep never re-triggers itself. The narrower
+# @km-triage-from-TRIAGE_OWNERS "lead-trigger comment" survives only as a
+# recognized subtype for audit attribution ($TRIAGE_OWNERS_JSON is retained
+# for that) — it is no longer required to drive a re-review here.
+#
+# NB: pipe into real `jq` — `gh api --jq` does NOT accept --arg (it errors
+# "unknown flag"), which silently returned empty and left every review-needed
+# PR parked even after a reply.
+find_human_comment() {
   local num="$1" since_ts="$2"
   [[ -z "$since_ts" ]] && { echo ""; return; }
-  gh api "repos/$REPO/issues/$num/comments" \
-    --jq --argjson ts "\"$since_ts\"" --argjson owners "$TRIAGE_OWNERS_JSON" \
-    '[.[] | select(.created_at > $ts)
-           | select(.user.login as $u | $owners | any(. == $u))
-           | select(.body | ascii_downcase | contains("@km-triage"))]
-     | last | .id // empty' 2>/dev/null || echo ""
+  gh api "repos/$REPO/issues/$num/comments" 2>/dev/null \
+    | jq -r --arg ts "$since_ts" \
+      '[.[] | select(.created_at > $ts)
+             | select(.user.login | endswith("[bot]") | not)]
+       | last | .id // empty' 2>/dev/null || echo ""
 }
 
 # ── Phase 1: Bootstrap (once per cron tick) ──────────────────────────────────
 
-mkdir -p "$INBOX_DIR/runs" "$INBOX_DIR/diffs" "$INBOX_DIR/worktrees"
-
-[[ -f "$INBOX_DIR/INBOX.md" ]] || cat > "$INBOX_DIR/INBOX.md" <<'EOF'
-# Tech Lead Inbox
-
-PRs and questions that need your attention. Append-only; the triage loop adds entries here.
-
-EOF
+mkdir -p "$STATE_DIR/runs" "$STATE_DIR/diffs" "$STATE_DIR/worktrees"
 
 touch -a "$AUDIT_LOG"
 
-if [[ ! -f "$INBOX_DIR/.labels-created" ]]; then
+# Triage labels: create once per repo lifetime, guarded by a sentinel file.
+# Bump the sentinel suffix whenever a label is added so existing installs
+# create the newcomer on their next sweep (then go quiet again).
+if [[ ! -f "$STATE_DIR/.labels-created-v2" ]]; then
   gh label create ready-to-merge --color 0e8a16 \
     --description "Triage approved - ready to merge by any team member" 2>/dev/null || true
   gh label create review-needed --color d93f0b \
-    --description "Triage escalated - awaiting submitter or tech-lead response" 2>/dev/null || true
+    --description "Triage escalated - awaiting submitter or maintainer response on the PR" 2>/dev/null || true
   gh label create triage-skip --color cfd3d7 \
     --description "Do not run triage on this PR" 2>/dev/null || true
-  touch "$INBOX_DIR/.labels-created"
+  gh label create needs-rebase --color fbca04 \
+    --description "Triage: branch conflicts with base - rebase needed (auto-clears once mergeable)" 2>/dev/null || true
+  touch "$STATE_DIR/.labels-created-v2"
 fi
 
 if ! node utilities/km-triage-app/mint-token.js > /dev/null 2>&1; then
   printf '{"ts":"%s","action_taken":"auth_failed","reason":"bot_token_unavailable"}\n' \
     "$(ts)" >> "$AUDIT_LOG"
-  echo "[$(ts)] km-triage bot-token mint failed; run \`node utilities/km-triage-app/setup.js\` to reinstall." \
-    >> "$INBOX_DIR/INBOX.md"
+  echo "[$(ts)] km-triage bot-token mint failed; run \`node utilities/km-triage-app/setup.js\` to reinstall." >&2
   echo "[ERROR] bot-token unavailable — aborting" >&2
   exit 1
 fi
@@ -160,7 +199,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
   STAMP=$(date -u +"%Y-%m-%d-%H%M")
   SWEEP_ID="${STAMP}-iter${i}"
   export KM_TRIAGE_SWEEP_ID="$SWEEP_ID"
-  LOG="$INBOX_DIR/runs/${STAMP}-iter${i}.log"
+  LOG="$STATE_DIR/runs/${STAMP}-iter${i}.log"
 
   echo "[km-triage] $SWEEP_ID starting" | tee -a "$LOG"
 
@@ -197,6 +236,17 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
 
     printf '[km-triage] PR #%s: %s\n' "$NUM" "$TITLE" | tee -a "$LOG"
 
+    # Label hygiene — clear stale needs-rebase (the "go away when done" half).
+    # Runs first, before any gate's `continue`, so the tag clears even when the
+    # PR is then skipped for an unrelated reason (e.g. ci_not_ready). A PR that
+    # is still CONFLICTING keeps the tag (Gate 4 re-adds / leaves it).
+    if echo "$PR" | jq -e '.mergeable != "CONFLICTING"' > /dev/null 2>&1 \
+       && echo "$PR" | jq -e '[.labels[].name] | any(. == "needs-rebase")' > /dev/null 2>&1; then
+      echo "  clearing stale needs-rebase (mergeable again)" | tee -a "$LOG"
+      node utilities/km-triage-app/bot-gh.js api \
+        "repos/$REPO/issues/$NUM/labels/needs-rebase" -X DELETE >> "$LOG" 2>&1 || true
+    fi
+
     # Gate 1 — external fork
     if echo "$PR" | jq -e '.isCrossRepository == true' > /dev/null 2>&1; then
       echo "  skip: external_pr_not_in_scope" | tee -a "$LOG"
@@ -213,31 +263,34 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
 
     # Gate 3 — hard-skip labels (ready-to-merge, triage-skip)
     if echo "$PR" | jq -e '[.labels[].name] | any(. == "ready-to-merge" or . == "triage-skip")' > /dev/null 2>&1; then
-      echo "  skip: already_in_lead_queue (label)" | tee -a "$LOG"
-      audit_skip "$NUM" already_in_lead_queue "$HEAD_SHA"
+      echo "  skip: already_awaiting_response (label)" | tee -a "$LOG"
+      audit_skip "$NUM" already_awaiting_response "$HEAD_SHA"
       n_skip=$((n_skip + 1)); continue
     fi
 
-    # Gate 4 — CONFLICTING: post notice once per head SHA, then skip silently
+    # Gate 4 — CONFLICTING: flag with the needs-rebase tag, then skip silently.
+    # Dedup is by label presence (not head SHA): first sweep to see the conflict
+    # adds the tag + posts one @-mention notice; while the tag persists the PR is
+    # skipped quietly. The label-hygiene block above removes the tag once the
+    # branch is mergeable again, so the notice posts exactly once per conflict.
     if echo "$PR" | jq -e '.mergeable == "CONFLICTING"' > /dev/null 2>&1; then
-      PRIOR_CONFLICT=$( [[ -f "$AUDIT_LOG" ]] && jq -c --argjson num "$NUM" --arg sha "$HEAD_SHA" \
-        'select(.pr == $num and .reason == "merge_conflict" and .head_sha == $sha)' \
-        "$AUDIT_LOG" 2>/dev/null | tail -1 || echo "" )
-      if [[ -z "$PRIOR_CONFLICT" ]]; then
-        echo "  skip: merge_conflict — posting notice" | tee -a "$LOG"
+      if echo "$PR" | jq -e '[.labels[].name] | any(. == "needs-rebase")' > /dev/null 2>&1; then
+        echo "  skip: merge_conflict (already tagged needs-rebase)" | tee -a "$LOG"
+      else
+        echo "  skip: merge_conflict — tagging needs-rebase + posting notice" | tee -a "$LOG"
+        node utilities/km-triage-app/bot-gh.js api \
+          "repos/$REPO/issues/$NUM/labels" -X POST -f "labels[]=needs-rebase" >> "$LOG" 2>&1 || true
         CONFLICT_FILE=$(mktemp)
         if [[ "$AUTHOR" == "$TL_LOGIN" ]]; then
           MENTION_LINE="@$TL_LOGIN — km-triage skipped this PR."
         else
           MENTION_LINE="@$TL_LOGIN @$AUTHOR — km-triage skipped this PR."
         fi
-        printf '%s\n\nPR is in CONFLICTING merge state. Triage policy is not to auto-fix or review a branch that needs rebasing.\n\nPlease rebase against `main` first; the next sweep will run the full review crew and either auto-fix mechanical findings or @-mention you again with any open questions.\n' \
+        printf '%s\n\nPR is in CONFLICTING merge state. Triage policy is not to auto-fix or review a branch that needs rebasing.\n\nPlease rebase against `main` first; the next sweep will run the full review crew and either auto-fix mechanical findings or @-mention you again with any open questions. The `needs-rebase` label clears automatically once the branch is mergeable again.\n' \
           "$MENTION_LINE" > "$CONFLICT_FILE"
         node utilities/km-triage-app/bot-gh.js pr comment "$NUM" \
           --body-file "$CONFLICT_FILE" >> "$LOG" 2>&1 || true
         rm -f "$CONFLICT_FILE"
-      else
-        echo "  skip: merge_conflict (already notified at this SHA)" | tee -a "$LOG"
       fi
       audit_skip "$NUM" merge_conflict "$HEAD_SHA"
       n_skip=$((n_skip + 1)); continue
@@ -288,15 +341,50 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     LAST_AUDIT_SHA=$(echo "$LAST_ENTRY" | jq -r '.head_sha // empty' 2>/dev/null || echo "")
     LAST_AUDIT_ACTION=$(echo "$LAST_ENTRY" | jq -r '.action_taken // empty' 2>/dev/null || echo "")
 
-    # Gate 8 — review-needed label + no trigger comment since last audit
+    # Defect-guard: some Claude-side Phase-7 writes have landed a substantive
+    # entry with an EMPTY "ts" (e.g. mention_only). That poisons the re-review
+    # signal: find_human_comment bails on an empty since_ts, so no human reply is
+    # ever detected and the review-needed PR is parked forever. Fall back to the
+    # most recent NON-EMPTY ts among this PR's substantive entries, so a missing
+    # ts on the latest entry degrades to "review everything since the last dated
+    # review" instead of "never re-review". km-triage.md Phase 7 now forces a
+    # non-empty ts at the source; this guard covers historical poisoned entries.
+    if [[ -z "$LAST_AUDIT_TS" ]]; then
+      LAST_AUDIT_TS=$(jq -r --argjson num "$NUM" \
+        'select(.pr == $num
+                and (.action_taken | IN("approve_park","auto_fix_only","mention_only","fix_and_mention","escalate","auto_fix_attempt_failed"))
+                and ((.ts // "") != "")) | .ts' \
+        "$AUDIT_LOG" 2>/dev/null | tail -1 || echo "")
+    fi
+
+    # Gate 8 — review-needed label: skip unless a re-review signal exists.
+    # Per km-triage.md #479 the signal is EITHER of:
+    #   (a) a new commit by someone other than the bot — current HEAD differs
+    #       from the last review's head_sha AND the head commit's author login
+    #       is not km-triage[bot] (so the bot's own auto-fix push never counts);
+    #   (b) any human (non-[bot]) comment since the last review (find_human_comment).
+    # The pre-#479 gate looked ONLY for a TRIAGE_OWNERS @km-triage comment and
+    # ignored HEAD entirely, so a submitter who pushed fixes and explained them
+    # in a plain reply was parked forever. Keep this in lockstep with the
+    # review-needed gate in km-triage.md Phase 2 (see the sync warning above).
     if echo "$PR" | jq -e '[.labels[].name] | any(. == "review-needed")' > /dev/null 2>&1; then
-      TRIGGER_COMMENT_ID=$(find_trigger_comment "$NUM" "$LAST_AUDIT_TS")
-      if [[ -z "$TRIGGER_COMMENT_ID" ]]; then
-        echo "  skip: already_in_lead_queue (review-needed, no trigger)" | tee -a "$LOG"
-        audit_skip "$NUM" already_in_lead_queue "$HEAD_SHA"
+      HEAD_AUTHOR=$(echo "$PR_COMMITS" | jq -r '.[-1].authors[0].login // ""')
+      NEW_COMMIT_SIGNAL=false
+      if [[ -n "$LAST_AUDIT_SHA" && "$HEAD_SHA" != "$LAST_AUDIT_SHA" \
+            && "$HEAD_AUTHOR" != "km-triage[bot]" ]]; then
+        NEW_COMMIT_SIGNAL=true
+      fi
+      TRIGGER_COMMENT_ID=$(find_human_comment "$NUM" "$LAST_AUDIT_TS")
+      if [[ "$NEW_COMMIT_SIGNAL" == false && -z "$TRIGGER_COMMENT_ID" ]]; then
+        echo "  skip: already_awaiting_response (review-needed, no re-review signal)" | tee -a "$LOG"
+        audit_skip "$NUM" already_awaiting_response "$HEAD_SHA"
         n_skip=$((n_skip + 1)); continue
       else
-        echo "  trigger comment #$TRIGGER_COMMENT_ID — removing review-needed" | tee -a "$LOG"
+        if [[ "$NEW_COMMIT_SIGNAL" == true ]]; then
+          echo "  re-review signal: new commit ${HEAD_SHA:0:9} by $HEAD_AUTHOR — removing review-needed" | tee -a "$LOG"
+        else
+          echo "  re-review signal: human comment #$TRIGGER_COMMENT_ID — removing review-needed" | tee -a "$LOG"
+        fi
         node utilities/km-triage-app/bot-gh.js api \
           "repos/$REPO/issues/$NUM/labels/review-needed" \
           -X DELETE >> "$LOG" 2>&1 || true
@@ -311,12 +399,12 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
       if [[ "$LAST_AUDIT_ACTION" == "auto_fix_only" ]]; then
         echo "  [WARN] auto_fix_push_unverified — re-running review" | tee -a "$LOG"
         printf '[%s] PR #%s: auto_fix_only recorded but head SHA unchanged — re-running\n' \
-          "$(ts)" "$NUM" >> "$INBOX_DIR/INBOX.md"
+          "$(ts)" "$NUM" | tee -a "$LOG"
         # fall through to Claude
       else
-        # Reuse trigger check from Gate 8 if already fetched; otherwise fetch now
+        # Reuse human-comment check from Gate 8 if already fetched; else fetch now
         if [[ -z "$TRIGGER_COMMENT_ID" ]]; then
-          TRIGGER_COMMENT_ID=$(find_trigger_comment "$NUM" "$LAST_AUDIT_TS")
+          TRIGGER_COMMENT_ID=$(find_human_comment "$NUM" "$LAST_AUDIT_TS")
         fi
         if [[ -z "$TRIGGER_COMMENT_ID" ]]; then
           echo "  skip: no_new_commits_since_last_review" | tee -a "$LOG"
@@ -327,7 +415,12 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
       fi
     fi
 
-    # All gates cleared — spawn a fresh, isolated Claude process for this PR
+    # All gates cleared — but the Phase-2 snapshot may be stale by now (this PR
+    # may have sat behind other PRs' multi-minute claude runs). Re-check draft
+    # live so a just-converted draft never spins up a claude process.
+    if jit_is_draft "$NUM" "$HEAD_SHA"; then continue; fi
+
+    # Spawn a fresh, isolated Claude process for this PR
     echo "  -> spawning claude for PR #$NUM" | tee -a "$LOG"
     n_review=$((n_review + 1))
     set +e
@@ -349,7 +442,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     echo "[km-triage] retrying ${#prs_to_retry[@]} UNKNOWN-mergeability PR(s)" | tee -a "$LOG"
     for RETRY_NUM in "${prs_to_retry[@]}"; do
       RETRY_PR=$(gh pr view "$RETRY_NUM" \
-        --json number,mergeable,headRefOid,author 2>/dev/null || echo "{}")
+        --json number,mergeable,headRefOid,author,isDraft,state 2>/dev/null || echo "{}")
       RETRY_MERGEABLE=$(echo "$RETRY_PR" | jq -r '.mergeable // "UNKNOWN"')
       RETRY_HEAD=$(echo "$RETRY_PR" | jq -r '.headRefOid // "unknown"')
       RETRY_AUTHOR=$(echo "$RETRY_PR" | jq -r '.author.login // "unknown"')
@@ -370,6 +463,12 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
       elif [[ "$RETRY_MERGEABLE" == "CONFLICTING" ]]; then
         echo "  PR #$RETRY_NUM resolved CONFLICTING — posting notice" | tee -a "$LOG"
         post_conflict_notice "$RETRY_NUM" "$RETRY_AUTHOR" "$RETRY_HEAD"
+
+      elif [[ "$(echo "$RETRY_PR" | jq -r '.isDraft // false')" == "true" ]]; then
+        # Converted to draft while we were processing the other PRs.
+        echo "  PR #$RETRY_NUM converted to draft — skipping" | tee -a "$LOG"
+        audit_skip "$RETRY_NUM" draft "$RETRY_HEAD"
+        n_skip=$((n_skip + 1))
 
       else
         # Resolved to MERGEABLE — spawn Claude for full review

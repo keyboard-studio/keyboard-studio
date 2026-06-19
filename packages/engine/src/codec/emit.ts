@@ -325,7 +325,7 @@ export function emit(ir: KeyboardIR): string {
   const entryGroup = ir.groups.find(g => !g.readonly);
   const entryName = entryGroup?.name ?? "main";
   lines.push("");
-  lines.push(`begin Unicode > use(${entryName})`);
+  lines.push(`begin ${ir.header.encoding ?? "Unicode"} > use(${entryName})`);
 
   // Groups.
   for (const group of ir.groups) {

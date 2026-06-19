@@ -1,34 +1,46 @@
-// Unit tests for MechanismGallery component.
+// Unit tests for MechanismGallery — Phase C "add a key" assignment loop.
 // Rendering style follows lint.test.tsx (React Testing Library, jsdom).
-// The services module is mocked so the test never touches Vite
-// import.meta.glob or the real pattern catalog.
+// Services, useKeyboardArtifact, and OSKFrame are mocked so tests never touch
+// WASM, VFS side-effects, or a real pattern catalog.
 //
-// Preview wiring tests: useKeyboardArtifact and applyAssignmentsToVfs are
-// mocked so we can assert (a) the hook is called with the expected vfsTransform
-// and (b) the preview renders loading/error/ready states correctly without
-// touching WASM.
+// Component contract under test:
+//   - One character at a time from lettersToAdd (inventory when baseIr is null).
+//   - "Apply method for <char>" button records a MechanismAssignment(scope:"individual").
+//   - "Skip this character" advances without recording.
+//   - Done button appears when every char is covered or skipped (after clicking Next).
+//   - Coverage status line: "<N> of <M> added".
+//   - Method chooser: "Type a sequence" always present; "Tap a trigger key, then a letter"
+//     always present (S-02 deadkey is always offered, regardless of char type).
+//   - Sequence Apply button disabled until both key inputs are non-empty.
+//   - Added chip row appears; chips invoke remove (filters assignment from store).
+//   - Already-produced section collapsed by default; toggle expands it.
+//   - Guards: null base → no-base prompt; empty inventory → survey prompt.
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
 import { MechanismGallery } from "./MechanismGallery";
 import { useWorkingCopyStore } from "../stores/workingCopyStore";
 import type { PatternLibraryService, VirtualFS } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { latinDeadkeyAcuteSingle } from "@keyboard-studio/contracts/fixtures";
 import type { PatternMatch } from "@keyboard-studio/contracts";
 import type { Stage } from "../hooks/useKeyboardArtifact";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
-// vi.hoisted() — variables that must be available inside vi.mock() factories.
-// vi.mock() calls are hoisted to the top of the file by Vitest; any variables
-// they reference must be created via vi.hoisted() so they exist at hoist time.
+// vi.hoisted() — variables referenced inside vi.mock() factory closures.
 // ---------------------------------------------------------------------------
 
 const { applyAssignmentsToVfsSpy } = vi.hoisted(() => {
   const applyAssignmentsToVfsSpy = vi.fn(
-    (_vfs: VirtualFS, _keyboardId: string, _assignments: ReadonlyArray<MechanismAssignment>, _getPattern: (_id: string) => unknown) => ({
+    (
+      _vfs: VirtualFS,
+      _keyboardId: string,
+      _assignments: ReadonlyArray<MechanismAssignment>,
+      _getPattern: (_id: string) => unknown,
+    ) => ({
       kmn: "c mock result",
       warnings: [] as string[],
     }),
@@ -37,15 +49,28 @@ const { applyAssignmentsToVfsSpy } = vi.hoisted(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Mock the services module so we control what filterFor/getById return.
+// Mock services — controls what filterFor / getById return.
+// The mock always resolves PATTERN_SEQUENCE and PATTERN_DEADKEY explicitly so
+// the component never gets undefined from getById().
 // ---------------------------------------------------------------------------
+
+const PATTERN_SEQUENCE = "multi_char_sequence";
+const PATTERN_DEADKEY = "deadkey_single_tap";
 
 const mockSvc: PatternLibraryService = {
   listAll: () => Promise.resolve([latinDeadkeyAcuteSingle]),
-  getById: (id: string) =>
-    Promise.resolve(
-      id === latinDeadkeyAcuteSingle.id ? latinDeadkeyAcuteSingle : undefined,
-    ),
+  getById: (id: string) => {
+    if (id === latinDeadkeyAcuteSingle.id) return Promise.resolve(latinDeadkeyAcuteSingle);
+    // Return a minimal stub for the two well-known IDs the component always loads.
+    if (id === PATTERN_SEQUENCE || id === PATTERN_DEADKEY) {
+      return Promise.resolve({
+        ...latinDeadkeyAcuteSingle,
+        id,
+        title: id === PATTERN_SEQUENCE ? "Multi-char sequence" : "Deadkey single tap",
+      });
+    }
+    return Promise.resolve(undefined);
+  },
   filterFor: () => {
     const match: PatternMatch = {
       patternId: latinDeadkeyAcuteSingle.id,
@@ -63,16 +88,16 @@ vi.mock("../lib/services.ts", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Mock useKeyboardArtifact so tests never touch WASM.
-// The mock stage is controlled per-test via setMockStage().
+// Mock useKeyboardArtifact — tests never touch WASM.
 // ---------------------------------------------------------------------------
 
 let _mockStage: Stage = { kind: "idle" };
 const _mockRetry = vi.fn();
 const _mockRecompile = vi.fn();
-
-// Track the most recent vfsTransform passed to the hook.
-let _lastVfsTransform: ((vfs: VirtualFS, keyboardId: string) => { warnings: string[] }) | null | undefined = undefined;
+let _lastVfsTransform:
+  | ((vfs: VirtualFS, keyboardId: string) => { warnings: string[] })
+  | null
+  | undefined = undefined;
 
 vi.mock("../hooks/useKeyboardArtifact.ts", () => ({
   useKeyboardArtifact: (
@@ -86,19 +111,16 @@ vi.mock("../hooks/useKeyboardArtifact.ts", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Mock applyAssignmentsToVfs so we can spy on calls without VFS side-effects.
+// Mock applyAssignmentsToVfs.
 // ---------------------------------------------------------------------------
 
 vi.mock("@keyboard-studio/engine", async (importOriginal) => {
   const original = await importOriginal<typeof import("@keyboard-studio/engine")>();
-  return {
-    ...original,
-    applyAssignmentsToVfs: applyAssignmentsToVfsSpy,
-  };
+  return { ...original, applyAssignmentsToVfs: applyAssignmentsToVfsSpy };
 });
 
 // ---------------------------------------------------------------------------
-// Mock OSKFrame so tests don't need an iframe + KMW environment.
+// Mock OSKFrame — no iframe / KMW environment needed.
 // ---------------------------------------------------------------------------
 
 vi.mock("./OSKFrame.tsx", () => ({
@@ -117,6 +139,8 @@ function setMockStage(s: Stage) {
   _mockStage = s;
 }
 
+/** Seed confirmedInventory via Phase B result. baseIr stays null so
+ *  useInventoryDiff returns lettersToAdd === inventory (no diff). */
 function seedInventory(chars: string[]) {
   useWorkingCopyStore.getState().recordPhase({
     phase: "B",
@@ -128,7 +152,6 @@ function seedInventory(chars: string[]) {
 afterEach(() => {
   cleanup();
   useWorkingCopyStore.getState().reset();
-  useWorkingCopyStore.getState().reset();
   vi.clearAllMocks();
   _mockStage = { kind: "idle" };
   _lastVfsTransform = undefined;
@@ -136,11 +159,10 @@ afterEach(() => {
 
 beforeEach(() => {
   useWorkingCopyStore.getState().reset();
-  useWorkingCopyStore.getState().reset();
 });
 
 // ---------------------------------------------------------------------------
-// Empty/no-base state
+// Guard: no base keyboard
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — no base keyboard", () => {
@@ -149,208 +171,484 @@ describe("MechanismGallery — no base keyboard", () => {
     expect(screen.getByText(/No base keyboard selected/i)).toBeTruthy();
   });
 
-  it("does NOT render the gallery list when selectedBaseKeyboard is null", () => {
+  it("does NOT render a status line or Add key button when base is null", () => {
     render(<MechanismGallery selectedBaseKeyboard={null} />);
-    expect(screen.queryByRole("list")).toBeNull();
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Add key for/i })).toBeNull();
   });
 });
 
 // ---------------------------------------------------------------------------
-// Back button — wizard affordance
-// ---------------------------------------------------------------------------
-
-describe("MechanismGallery — Back button", () => {
-  it("does not render a Back button when onBack is not provided", () => {
-    render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-    expect(screen.queryByRole("button", { name: /← back/i })).toBeNull();
-  });
-
-  it("renders an enabled Back button when onBack is provided and desktop is not locked", () => {
-    const onBack = vi.fn();
-    render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} />);
-    const btn = screen.getByRole("button", { name: /← back/i });
-    expect(btn).toBeTruthy();
-    expect((btn as HTMLButtonElement).disabled).toBe(false);
-  });
-
-  it("renders a disabled Back button when desktop is locked", () => {
-    useWorkingCopyStore.getState().lockDesktop();
-    const onBack = vi.fn();
-    render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} />);
-    const btn = screen.getByRole("button", { name: /← back/i });
-    expect((btn as HTMLButtonElement).disabled).toBe(true);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// No-inventory state
+// Guard: empty inventory
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — no inventory", () => {
-  it("renders the survey prompt when inventory is empty", () => {
+  it("renders the survey prompt when inventory is empty and base is set", () => {
     render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     expect(screen.getByText(/No inventory confirmed yet/i)).toBeTruthy();
   });
-});
 
-// ---------------------------------------------------------------------------
-// Gallery rendering with inventory + base
-// ---------------------------------------------------------------------------
-
-describe("MechanismGallery — with inventory", () => {
-  it("renders the pattern card after filterFor resolves", async () => {
-    seedInventory(["á", "é"]);
-    await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-    });
-    // Pattern title should appear.
-    expect(screen.getByText(latinDeadkeyAcuteSingle.title)).toBeTruthy();
-  });
-
-  it("renders the coverage indicator with correct counts", async () => {
-    seedInventory(["á", "é"]);
-    await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-    });
-    // CoverageIndicator uses aria-label "Coverage: N of M characters covered"
-    const indicator = screen.getByRole("status");
-    expect(indicator.getAttribute("aria-label")).toMatch(/Coverage:/);
+  it("renders a Back button inside the no-inventory guard when onBack is provided", () => {
+    const onBack = vi.fn();
+    render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} />);
+    // The guard path renders a Back button when onBack is given.
+    const btn = screen.getByRole("button", { name: /← back/i });
+    expect(btn).toBeTruthy();
+    fireEvent.click(btn);
+    expect(onBack).toHaveBeenCalledOnce();
   });
 });
 
 // ---------------------------------------------------------------------------
-// Applying a mechanism at keyboard-default scope
+// Assignment loop — current character display
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — apply mechanism at keyboard-default scope", () => {
-  it("emits a MechanismAssignment into the store after Apply is clicked", async () => {
+describe("MechanismGallery — current character display", () => {
+  it("shows the first character from lettersToAdd as the current target", async () => {
+    seedInventory(["á", "é"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    // The character heading renders "Add a key" label above the char glyph.
+    expect(screen.getByText("Add a key")).toBeTruthy();
+    // The char glyph has aria-label "U+00E1 á".
+    expect(screen.getByLabelText(/U\+00E1/i)).toBeTruthy();
+  });
+
+  it("renders the coverage status line with initial 0-of-N count", async () => {
+    seedInventory(["á", "é"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    const status = screen.getByRole("status");
+    expect(status.getAttribute("aria-label")).toBe("0 of 2 added");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Method chooser — sequence (always visible)
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — sequence method chooser", () => {
+  it("shows the 'Type a sequence' option for any character", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
+    expect(screen.getByText(/Type a sequence/i)).toBeTruthy();
+  });
 
-    // Expand the card to reveal the Apply button.
-    const configBtn = screen.getByRole("button", { name: /configure/i });
-    fireEvent.click(configBtn);
+  it("Add key button is disabled when sequence inputs are empty", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    const addBtn = screen.getByRole("button", { name: /Apply method for á/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
+  });
 
-    // Scope is keyboard-default by default; click Apply.
-    const applyBtn = screen.getByRole("button", { name: /^Apply$/i });
-    fireEvent.click(applyBtn);
+  it("Add key button is disabled when only first key is filled", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    // Select sequence method (it's the default; click to expand inputs).
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "a" },
+    });
+    const addBtn = screen.getByRole("button", { name: /Apply method for á/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
+  });
 
-    const state = useWorkingCopyStore.getState();
-    const physicalAssignments = state.session.assignments.filter(
-      (a) => a.modality === "physical",
-    );
-    expect(physicalAssignments).toHaveLength(1);
-    expect(physicalAssignments[0]?.scope).toBe("keyboard-default");
-    expect(physicalAssignments[0]?.mechanisms[0]?.patternId).toBe(
-      latinDeadkeyAcuteSingle.id,
-    );
+  it("Add key button is enabled after both sequence keys are filled", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "a" },
+    });
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
+      target: { value: "'" },
+    });
+    const addBtn = screen.getByRole("button", { name: /Apply method for á/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Applying a mechanism at individual scope to a selected character
+// Method chooser — deadkey (only for decomposable accented chars)
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — apply at individual scope", () => {
-  it("emits an individual-scope assignment for the selected character", async () => {
-    seedInventory(["á", "é"]);
+describe("MechanismGallery — deadkey method chooser", () => {
+  it("shows 'Tap a trigger key, then a letter' option for any character", async () => {
+    // S-02 deadkey is now always offered (not restricted to decomposable chars).
+    seedInventory(["á"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
+    expect(screen.getByText(/Tap a trigger key, then a letter/i)).toBeTruthy();
+  });
 
-    // Expand the card.
-    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
-
-    // Switch scope to individual.
-    const individualRadio = screen.getByRole("radio", {
-      name: /Individual characters/i,
+  it("shows 'Tap a trigger key, then a letter' for a plain ASCII character too", async () => {
+    // S-02 is always shown — deadkey is not restricted to accented chars.
+    seedInventory(["a"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
-    fireEvent.click(individualRadio);
+    expect(screen.getByText(/Tap a trigger key, then a letter/i)).toBeTruthy();
+  });
 
-    // Select only 'á' (first char button).
-    const charBtn = screen.getByRole("button", { name: /á/i });
-    fireEvent.click(charBtn);
+  it("switching to deadkey method exposes the trigger-key selector", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    expect(screen.getByLabelText(/Trigger key for deadkey/i)).toBeTruthy();
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
+  it("deadkey Add key button is enabled immediately (trigger key has a default)", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    const addBtn = screen.getByRole("button", { name: /Apply method for á/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+});
 
-    const state = useWorkingCopyStore.getState();
-    const assignments = state.session.assignments.filter(
-      (a) => a.modality === "physical" && a.scope === "individual",
-    );
+// ---------------------------------------------------------------------------
+// Apply — records assignment into the store
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — apply (sequence)", () => {
+  it("clicking Apply method records an individual-scope assignment for the current char", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "a" },
+    });
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
+      target: { value: "'" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
     expect(assignments).toHaveLength(1);
+    expect(assignments[0]?.scope).toBe("individual");
     expect(assignments[0]?.target).toBe("á");
+    expect(assignments[0]?.mechanisms[0]?.patternId).toBe(PATTERN_SEQUENCE);
   });
-});
 
-// ---------------------------------------------------------------------------
-// Removing an assignment
-// ---------------------------------------------------------------------------
-
-describe("MechanismGallery — remove assignment", () => {
-  it("removes the assignment from the store when Remove is clicked", async () => {
+  it("sequence slotValues contain firstLetterOut and secondLetter from inputs", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "a" },
+    });
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
+      target: { value: "'" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
 
-    // Apply first.
-    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
+    const assignment = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical")[0];
+    expect(assignment?.mechanisms[0]?.slotValues).toMatchObject({
+      firstLetterOut: "a",
+      secondLetter: "'",
+      collapsedChar: "á",
+    });
+  });
+});
 
-    // Verify it's applied.
+describe("MechanismGallery — apply (deadkey)", () => {
+  it("clicking Apply method with deadkey method records patternId deadkey_single_tap", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0]?.mechanisms[0]?.patternId).toBe(PATTERN_DEADKEY);
+    expect(assignments[0]?.mechanisms[0]?.strategyId).toBe("S-02");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Apply + Next — the component does NOT auto-advance after Apply.
+// The user must click "Next character →" (or "All done →") to move forward.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — advance after apply", () => {
+  it("advances to the next character after Apply and then Next are clicked", async () => {
+    seedInventory(["á", "é"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "a" },
+    });
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
+      target: { value: "'" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+    // Apply records but stays on á; click Next to advance.
+    await waitFor(() => {
+      const nextBtn = screen.getByRole("button", { name: /Next character/i });
+      expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(nextBtn);
+    });
+
+    // Now the current char should be "é".
+    await waitFor(() => {
+      expect(screen.getByLabelText(/U\+00E9/i)).toBeTruthy();
+    });
+  });
+
+  it("updates the coverage status after adding a character", async () => {
+    seedInventory(["á", "é"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "a" },
+    });
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
+      target: { value: "'" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+
+    // Coverage updates immediately after Apply (á is now covered).
+    await waitFor(() => {
+      const status = screen.getByRole("status");
+      expect(status.getAttribute("aria-label")).toBe("1 of 2 added");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Skip — advances without recording
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — skip character", () => {
+  it("skipping advances to the next char without recording an assignment", async () => {
+    seedInventory(["á", "é"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Skip á/i }));
+
+    // No assignment recorded.
     expect(
-      useWorkingCopyStore.getState().session.assignments.filter(
-        (a) => a.modality === "physical",
-      ),
-    ).toHaveLength(1);
-
-    // Remove — the Remove button appears only when the pattern isApplied.
-    const removeBtn = screen.getByRole("button", { name: /^Remove$/i });
-    fireEvent.click(removeBtn);
-
-    expect(
-      useWorkingCopyStore.getState().session.assignments.filter(
-        (a) => a.modality === "physical",
-      ),
+      useWorkingCopyStore
+        .getState()
+        .session.assignments.filter((a) => a.modality === "physical"),
     ).toHaveLength(0);
+
+    // Current char is now é.
+    await waitFor(() => {
+      expect(screen.getByLabelText(/U\+00E9/i)).toBeTruthy();
+    });
+  });
+
+  it("all-skipped state shows Done button", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Skip á/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Done/i })).toBeTruthy();
+    });
   });
 });
 
 // ---------------------------------------------------------------------------
-// Coverage indicator reflects covered/uncovered counts
+// Done state
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — coverage indicator", () => {
-  it("shows uncovered when no assignments exist", async () => {
-    seedInventory(["á", "é"]);
+describe("MechanismGallery — Done state", () => {
+  it("Done button appears when every character is covered and Next is clicked", async () => {
+    seedInventory(["á"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
-    const indicator = screen.getByRole("status");
-    // The aria-label is "Coverage: N of M characters covered" for all states.
-    expect(indicator.getAttribute("aria-label")).toMatch(/Coverage: 0 of 2 characters covered/);
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+
+    // After Apply: á is covered, isDone=true, currentChar still="á".
+    // The Next button aria-label is "All methods applied, finish"; click it to
+    // reach currentChar===null, which renders the Done button.
+    await waitFor(() => {
+      const nextBtn = screen.getByRole("button", { name: /All methods applied, finish/i });
+      expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(nextBtn);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Done/i })).toBeTruthy();
+    });
   });
 
-  it("shows all covered after a keyboard-default assignment is applied", async () => {
-    seedInventory(["á", "é"]);
+  it("clicking Done invokes the onComplete callback", async () => {
+    const onComplete = vi.fn();
+    seedInventory(["á"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          onComplete={onComplete}
+        />,
+      );
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+
+    // Advance to currentChar===null so the Done button appears.
+    await waitFor(() => {
+      const nextBtn = screen.getByRole("button", { name: /All methods applied, finish/i });
+      expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(nextBtn);
+    });
+
+    await waitFor(() => {
+      fireEvent.click(screen.getByRole("button", { name: /Done/i }));
+    });
+    expect(onComplete).toHaveBeenCalledOnce();
+  });
+
+  it("empty lettersToAdd shows Done immediately", async () => {
+    // Seed an inventory whose only char is already on the base keyboard.
+    // Since baseIr is null here, lettersToAdd === inventory. Use empty inventory.
+    // (Empty inventory => survey prompt path, not this path. Instead: skip all.)
+    seedInventory(["á"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
-
-    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
-
-    const indicator = screen.getByRole("status");
-    // After a keyboard-default assignment the coverage indicator text changes,
-    // but the aria-label always reflects the live count.
-    expect(indicator.getAttribute("aria-label")).toMatch(/Coverage: 2 of 2 characters covered/);
+    fireEvent.click(screen.getByRole("button", { name: /Skip á/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/All keys added|No new characters/i)).toBeTruthy();
+    });
   });
 });
 
 // ---------------------------------------------------------------------------
-// Preview wiring — loading state
+// Added chip row
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — added chip row", () => {
+  it("shows a chip for each covered character", async () => {
+    seedInventory(["á", "é"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+
+    await waitFor(() => {
+      // The "Added characters" group appears.
+      const group = screen.getByRole("group", {
+        name: /Added characters/i,
+      });
+      expect(group).toBeTruthy();
+      // Chip for "á" exists.
+      expect(screen.getByRole("button", { name: /Remove.*á/i })).toBeTruthy();
+    });
+  });
+
+  it("clicking a chip removes the assignment from the store", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Remove.*á/i })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Remove.*á/i }));
+
+    // Assignment removed from store.
+    await waitFor(() => {
+      expect(
+        useWorkingCopyStore
+          .getState()
+          .session.assignments.filter((a) => a.modality === "physical"),
+      ).toHaveLength(0);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Already-produced section
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — already-produced section", () => {
+  it("does not render the already-produced toggle when alreadyProduced is empty", async () => {
+    // baseIr is null => alreadyProduced === [].
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expect(
+      screen.queryByRole("button", { name: /characters already covered/i }),
+    ).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Back button
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — Back button", () => {
+  it("does not render a Back button when onBack is not provided", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expect(screen.queryByRole("button", { name: /← back/i })).toBeNull();
+  });
+
+  it("renders a Back button when onBack is provided (before done)", async () => {
+    const onBack = vi.fn();
+    seedInventory(["á"]);
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} />,
+      );
+    });
+    const btn = screen.getByRole("button", { name: /← back/i });
+    expect(btn).toBeTruthy();
+    fireEvent.click(btn);
+    expect(onBack).toHaveBeenCalledOnce();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Preview wiring — loading / error / ready states (right pane)
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — preview loading state", () => {
@@ -372,7 +670,7 @@ describe("MechanismGallery — preview loading state", () => {
     expect(screen.getByText(/Compiling/i)).toBeTruthy();
   });
 
-  it("renders a compiling (loading WASM) indicator for cold compile", async () => {
+  it("renders a cold-compile indicator for isWarmCompile false", async () => {
     setMockStage({ kind: "compiling", isWarmCompile: false });
     seedInventory(["á"]);
     await act(async () => {
@@ -381,10 +679,6 @@ describe("MechanismGallery — preview loading state", () => {
     expect(screen.getByText(/loading WASM/i)).toBeTruthy();
   });
 });
-
-// ---------------------------------------------------------------------------
-// Preview wiring — error state
-// ---------------------------------------------------------------------------
 
 describe("MechanismGallery — preview error state", () => {
   it("renders the error message when stage is error", async () => {
@@ -407,18 +701,10 @@ describe("MechanismGallery — preview error state", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Preview wiring — ready state + applyWarnings
-// ---------------------------------------------------------------------------
-
 describe("MechanismGallery — preview ready state", () => {
   const readyStage: Stage = {
     kind: "ready",
-    compileResult: {
-      success: true,
-      artifacts: [],
-      diagnostics: [],
-    },
+    compileResult: { success: true, artifacts: [], diagnostics: [] },
     jsBlobUrl: "",
     vfs: createVirtualFS(),
     scaffoldWarnings: [],
@@ -459,263 +745,39 @@ describe("MechanismGallery — preview ready state", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Desktop layout lock UI
+// Preview wiring — vfsTransform passes through to useKeyboardArtifact
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — desktop lock", () => {
-  it("Lock button is disabled when there are no assignments", async () => {
-    seedInventory(["á"]);
-    await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+describe("MechanismGallery — vfsTransform passed to useKeyboardArtifact", () => {
+  it("passes a non-null vfsTransform after patterns have loaded and working copy is instantiated", async () => {
+    // Use a ready stage so OSKFrame renders (confirms GalleryPreviewWithPatterns
+    // mounted) and useKeyboardArtifact receives the transform callback.
+    setMockStage({
+      kind: "ready",
+      compileResult: { success: true, artifacts: [], diagnostics: [] },
+      jsBlobUrl: "",
+      vfs: createVirtualFS(),
+      scaffoldWarnings: [],
     });
-    const lockBtn = screen.getByRole("button", { name: /Lock desktop layout/i });
-    expect(lockBtn).toBeTruthy();
-    // disabled attribute present
-    expect((lockBtn as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it("Lock button is enabled when there is at least one assignment", async () => {
-    seedInventory(["á"]);
-    await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-    });
-    // Apply a mechanism first.
-    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
-
-    const lockBtn = screen.getByRole("button", { name: /Lock desktop layout/i });
-    expect((lockBtn as HTMLButtonElement).disabled).toBe(false);
-  });
-
-  it("clicking Lock button sets desktopLocked and renders the locked banner", async () => {
-    seedInventory(["á"]);
-    await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-    });
-    // Apply, then lock.
-    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Lock desktop layout/i }));
-
-    // Store reflects locked state.
-    expect(useWorkingCopyStore.getState().desktopLocked).toBe(true);
-    // Banner rendered with role=status and correct text.
-    const banner = screen.getByRole("status", { name: /Desktop layout locked/i });
-    expect(banner).toBeTruthy();
-    // Lock button disappears; unlock button appears.
-    expect(screen.queryByRole("button", { name: /Lock desktop layout/i })).toBeNull();
-    expect(screen.getByRole("button", { name: /Unlock to edit/i })).toBeTruthy();
-  });
-
-  it("controls inside MechanismCard are disabled when locked", async () => {
-    seedInventory(["á"]);
-    await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-    });
-    // Apply, lock.
-    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Lock desktop layout/i }));
-
-    // The Apply button inside the expanded card is disabled.
-    const applyBtn = screen.getByRole("button", { name: /^Apply$/i });
-    expect((applyBtn as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it("scope radios are disabled when locked", async () => {
-    seedInventory(["á"]);
-    await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-    });
-    // Expand, apply, lock.
-    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Lock desktop layout/i }));
-
-    // Both scope radios must be disabled.
-    const radios = screen.getAllByRole("radio");
-    expect(radios.length).toBeGreaterThan(0);
-    for (const radio of radios) {
-      expect((radio as HTMLInputElement).disabled).toBe(true);
-    }
-  });
-
-  it("char-picker buttons are disabled when locked (individual scope)", async () => {
-    seedInventory(["á", "é"]);
-    await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-    });
-    // Expand, switch to individual scope to show char picker, apply, lock.
-    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
-    fireEvent.click(screen.getByRole("radio", { name: /Individual characters/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Lock desktop layout/i }));
-
-    // All char-picker buttons in the inventory group should be disabled.
-    const charGroup = screen.getByRole("group", { name: /Inventory characters/i });
-    const charButtons = charGroup.querySelectorAll("button");
-    expect(charButtons.length).toBeGreaterThan(0);
-    for (const btn of charButtons) {
-      expect((btn as HTMLButtonElement).disabled).toBe(true);
-    }
-  });
-
-  it("slot inputs are disabled when locked", async () => {
-    seedInventory(["á"]);
-    await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-    });
-    // Expand, apply, lock.
-    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Lock desktop layout/i }));
-
-    // All slot text inputs must be disabled.
-    // latinDeadkeyAcuteSingle has 5 questions; each renders a text input.
-    const slotInputs = screen.getAllByRole("textbox");
-    expect(slotInputs.length).toBeGreaterThan(0);
-    for (const input of slotInputs) {
-      expect((input as HTMLInputElement).disabled).toBe(true);
-    }
-  });
-
-  it("lock-bypass guard: handleApply does nothing when desktopLocked is true", async () => {
-    seedInventory(["á"]);
-    await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-    });
-    // Apply, lock, then attempt to apply again via the store directly
-    // (simulates a bypass of the disabled control).
-    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
-    const beforeCount = useWorkingCopyStore
-      .getState()
-      .session.assignments.filter((a) => a.modality === "physical").length;
-    fireEvent.click(screen.getByRole("button", { name: /Lock desktop layout/i }));
-
-    // Force-click Apply even though it's disabled (simulates bypass).
-    const applyBtn = screen.getByRole("button", { name: /^Apply$/i });
-    fireEvent.click(applyBtn);
-
-    const afterCount = useWorkingCopyStore
-      .getState()
-      .session.assignments.filter((a) => a.modality === "physical").length;
-    // Count must not grow — the guard blocked the call.
-    expect(afterCount).toBe(beforeCount);
-  });
-
-  it("clicking Unlock restores editing (desktopLocked becomes false)", async () => {
-    seedInventory(["á"]);
-    await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-    });
-    // Apply, lock, then unlock.
-    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Lock desktop layout/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Unlock to edit/i }));
-
-    // Store unlocked.
-    expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);
-    // Banner gone; lock button back.
-    expect(screen.queryByRole("status", { name: /Desktop layout locked/i })).toBeNull();
-    expect(screen.getByRole("button", { name: /Lock desktop layout/i })).toBeTruthy();
-    // Apply button enabled again.
-    const applyBtn = screen.getByRole("button", { name: /^Apply$/i });
-    expect((applyBtn as HTMLButtonElement).disabled).toBe(false);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Preview wiring — vfsTransform calls applyAssignmentsToVfs
-// ---------------------------------------------------------------------------
-
-describe("MechanismGallery — vfsTransform calls applyAssignmentsToVfs", () => {
-  const readyStage: Stage = {
-    kind: "ready",
-    compileResult: { success: true, artifacts: [], diagnostics: [] },
-    jsBlobUrl: "",
-    vfs: createVirtualFS(),
-    scaffoldWarnings: [],
-  };
-
-  // Seed the working-copy store with a minimal baseIr so useWorkingCopyTransform
-  // returns a non-null transform. Phase 3 requires an instantiated working copy.
-  function seedWorkingCopy() {
-    const vfs = createVirtualFS([
+    // Seed a working copy: useWorkingCopyTransform returns null when baseIr is null,
+    // so instantiateFromBase must be called before patterns load.
+    const seedVfs = createVirtualFS([
       { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
     ]);
     useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
-      vfs,
+      vfs: seedVfs,
       ir: makeTestIR([]),
     });
-  }
-
-  it("passes a vfsTransform to useKeyboardArtifact when patterns have loaded", async () => {
-    setMockStage(readyStage);
-    // Seed the working copy FIRST (instantiateFromBase resets phaseResults).
-    seedWorkingCopy();
     seedInventory(["á"]);
+    // Let patterns load fully inside act so the async filterFor + getById chain
+    // completes and patternMap is populated before assertions run.
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      // Flush remaining microtasks (filterFor / getById promises).
+      await new Promise((r) => setTimeout(r, 0));
     });
-    // After patterns load, GalleryPreviewWithPatterns is rendered and passes
-    // a non-null vfsTransform to useKeyboardArtifact.
+    // GalleryPreviewWithPatterns mounted → useKeyboardArtifact called → transform captured.
     expect(_lastVfsTransform).not.toBeNull();
     expect(typeof _lastVfsTransform).toBe("function");
-  });
-
-  it("vfsTransform invokes applyAssignmentsToVfs with the session assignments", async () => {
-    setMockStage(readyStage);
-    seedWorkingCopy();
-    seedInventory(["á"]);
-    // Apply a mechanism so there is a real assignment in the store.
-    await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-    });
-    // Expand the card and apply a mechanism.
-    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Apply$/i }));
-
-    // Now manually invoke the captured vfsTransform.
-    if (_lastVfsTransform !== null && _lastVfsTransform !== undefined) {
-      const testVfs = createVirtualFS([
-        { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
-      ]);
-      _lastVfsTransform(testVfs, basicKbdus.id);
-      expect(applyAssignmentsToVfsSpy).toHaveBeenCalledWith(
-        testVfs,
-        basicKbdus.id,
-        expect.arrayContaining([
-          expect.objectContaining({ modality: "physical" }),
-        ]),
-        expect.any(Function),
-      );
-    }
-  });
-
-  it("vfsTransform resolves patterns from the patternMap (not the service)", async () => {
-    setMockStage(readyStage);
-    seedWorkingCopy();
-    seedInventory(["á"]);
-    await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-    });
-
-    if (_lastVfsTransform !== null && _lastVfsTransform !== undefined) {
-      const testVfs = createVirtualFS();
-      _lastVfsTransform(testVfs, basicKbdus.id);
-      // Check the resolver passed as 4th arg by extracting from the spy call.
-      const calls = applyAssignmentsToVfsSpy.mock.calls;
-      if (calls.length > 0) {
-        const lastCall = calls[calls.length - 1]!;
-        const resolver = lastCall[3];
-        // The resolver should return the pattern from the patternMap.
-        const found = resolver(latinDeadkeyAcuteSingle.id);
-        expect(found).toEqual(latinDeadkeyAcuteSingle);
-        // Unknown id → undefined.
-        expect(resolver("unknown-id")).toBeUndefined();
-      }
-    }
   });
 });

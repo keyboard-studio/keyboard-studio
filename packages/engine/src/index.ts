@@ -30,6 +30,7 @@ export type { CodeMapEntry } from "./validator/codeMap.js";
 
 // Issue #17 — Compiler service public surface (in-browser kmcmplib WASM).
 export { compile, init, isReady, compilerService } from "./compiler/index.js";
+export { stripDanglingAssetStores } from "./compiler/stripDanglingAssetStores.js";
 export { parseKmnHeaderStores } from "./compiler/parseKmnHeaderStores.js";
 export type { KmnHeaderStore } from "./compiler/parseKmnHeaderStores.js";
 export { parseKpjFlags } from "./compiler/parseKpjFlags.js";
@@ -49,12 +50,15 @@ export type {
 export { createOutputService, toZip, serializeToZip } from "./output/index.js";
 
 // Issue #233 — KeyboardIR codec public surface.
-export { parse as parseKmn, emit as emitKmn, parseKvks, parseTouchLayout, OPAQUE_REASONS } from "./codec/index.js";
+export { parse as parseKmn, emit as emitKmn, parseKvks, parseTouchLayout, emitTouchLayout, OPAQUE_REASONS } from "./codec/index.js";
 export type { ParseResult, OpaqueReason } from "./codec/index.js";
 
 // Issue #239 — .kmn.imported sidecar + import-attribution.
 export { addSidecar, isSidecarPath, buildImportAttributionBlock } from "./output/index.js";
 export type { ImportAttributionInput } from "./output/index.js";
+
+// Track 2 adapt-staging helpers (output-only; not used in the OSK preview path).
+export { bumpKeyboardVersion, stageAdaptHistory } from "./output/index.js";
 
 // Issue #183 — headless simulate() API is exposed via the `./simulator`
 // subpath export, NOT from this main entry. The vendored Keyman engine
@@ -70,6 +74,7 @@ export type { RecognizerRule, MatchResult, RecognizeResult } from "./recognizer/
 // Issue #19 — scaffolder (template-cleanup pipeline).
 export { createScaffolderService, renameFilesInVfs } from "./scaffolder/index.js";
 export { scaffoldIR, resetIdentity } from "./scaffolder/scaffold-ir.js";
+export { scaffoldTouchLayout, buildMinimalPhoneTouchLayout } from "./scaffolder/index.js";
 export type { ScaffolderServiceOptions } from "./scaffolder/index.js";
 export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffolder/scaffold-ir.js";
 
@@ -108,7 +113,7 @@ export type { CldrLoader, ExemplarResult } from "./character-discovery/cldr.js";
 export { createFetchCldrLoader } from "./character-discovery/cldr.js";
 
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.
-export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, resolveRenderableMechanisms } from "./pattern-apply/index.js";
+export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, applyKeycapLabelsToVfs, resolveRenderableMechanisms } from "./pattern-apply/index.js";
 export type { SubstituteResult, ApplyAssignmentsResult } from "./pattern-apply/index.js";
 
 // Inventory diff (spec §8): static extraction of a keyboard's produced glyph set.

@@ -1,0 +1,72 @@
+{
+  "entries": [
+    {
+      "codepoint": "U+0253",
+      "candidates": [
+        {
+          "vkey": "K_B",
+          "modifiers": [],
+          "mechanism": "direct",
+          "priorSource": "unicode-decomp",
+          "priorCount": 0,
+          "confidence": 0.9
+        }
+      ]
+    },
+    {
+      "codepoint": "U+0257",
+      "candidates": [
+        {
+          "vkey": "K_D",
+          "modifiers": [],
+          "mechanism": "direct",
+          "priorSource": "unicode-decomp",
+          "priorCount": 0,
+          "confidence": 0.9
+        }
+      ]
+    },
+    {
+      "codepoint": "U+0259",
+      "candidates": [
+        {
+          "vkey": "K_E",
+          "modifiers": ["RALT"],
+          "mechanism": "direct",
+          "priorSource": "confusable",
+          "priorCount": 0,
+          "confidence": 0.6
+        }
+      ]
+    },
+    {
+      "codepoint": "U+014B",
+      "candidates": [
+        {
+          "vkey": "K_N",
+          "modifiers": ["RALT"],
+          "mechanism": "direct",
+          "priorSource": "confusable",
+          "priorCount": 0,
+          "confidence": 0.6
+        }
+      ]
+    },
+    {
+      "codepoint": "U+025B",
+      "candidates": [
+        {
+          "vkey": "K_E",
+          "modifiers": [],
+          "mechanism": "direct",
+          "priorSource": "unicode-decomp",
+          "priorCount": 0,
+          "confidence": 0.9
+        }
+      ]
+    }
+  ],
+  "bcp47Context": "ha-Latn-NG",
+  "baseLayoutFamily": "QWERTY",
+  "pinnedPriorsVersion": "kbgen-v1"
+}

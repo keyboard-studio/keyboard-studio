@@ -35,12 +35,12 @@ export function parseKmnHeaderStores(kmnText: string): KmnHeaderStore[] {
   const beginMatch = /^\s*begin\s/im.exec(kmnText);
   const header = beginMatch !== null ? kmnText.slice(0, beginMatch.index) : kmnText;
 
-  const re = /^\s*store\s*\(\s*&([A-Z_][A-Z0-9_]*)\s*\)\s*'([^']*)'/gim;
+  const re = /^\s*store\s*\(\s*&([A-Z_][A-Z0-9_]*)\s*\)\s*(?:'([^']*)'|"([^"]*)")/gim;
   const out: KmnHeaderStore[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(header)) !== null) {
     const storeName = (m[1] ?? "").toUpperCase();
-    const path = m[2] ?? "";
+    const path = (m[2] ?? m[3] ?? "");
     if (path.length === 0) continue;
     if (!(storeName in SYSTEM_STORES)) continue;
     out.push({ storeName, path, required: SYSTEM_STORES[storeName] ?? false });

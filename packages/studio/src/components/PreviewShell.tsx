@@ -636,8 +636,30 @@ export function PreviewShell() {
                 aria-live="polite"
                 style={{ fontSize: 12, color: "#d29922", marginTop: 4 }}
               >
-                [WARN] Set your keyboard&rsquo;s name and id (left pane) before
-                submitting to the community repository.
+                [WARN] Your keyboard id is still set to the base keyboard&rsquo;s
+                id. Downloading now will name the .zip and its internal file
+                paths after the base id. Set your own keyboard name and id
+                before downloading or submitting to the community repository.{" "}
+                <button
+                  type="button"
+                  aria-label="Go to the keyboard name and id step"
+                  onClick={() => {
+                    const el = document.getElementById("identity-keyboard-id");
+                    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    (el as HTMLInputElement | null)?.focus();
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    color: "#d29922",
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                    font: "inherit",
+                  }}
+                >
+                  Go to name &amp; id
+                </button>
               </div>
             )}
             <DiagnosticsPanel diagnostics={diagnostics} />

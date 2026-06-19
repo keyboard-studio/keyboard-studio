@@ -25,6 +25,7 @@ import {
   applyCarveToVfs,
   applyAssignmentsToVfs,
   applyIdentityStubMutation,
+  applyKeycapLabelsToVfs,
   parseKmn,
   emitKmn,
   resetIdentity,
@@ -78,8 +79,21 @@ export interface ProjectWorkingCopyVfsInput {
   /** Synchronous resolver. Pass `() => undefined` when no pattern library is available. */
   getPattern: (id: string) => Pattern | undefined;
   /** Identity overlay. Pass `null` to skip identity projection. */
-  identity: { displayName?: string; copyright?: string; version?: string; bcp47?: string } | null;
+  identity: IdentityOverlay | null;
 }
+
+/**
+ * Shape of the optional identity overlay accepted by {@link ProjectWorkingCopyVfsInput}.
+ *
+ * Exported so callers (e.g. serializeWorkingCopy) can type their local overlay
+ * variable against this single source rather than repeating the inline literal.
+ */
+export type IdentityOverlay = {
+  displayName?: string;
+  copyright?: string;
+  version?: string;
+  bcp47?: string;
+};
 
 export interface ProjectWorkingCopyVfsResult {
   /** Warnings from any of the three projection steps (empty when all is well). */
@@ -155,6 +169,20 @@ export function projectWorkingCopyVfs(
           `[project-working-copy] identity projection skipped: ${msg}`,
         );
       }
+    }
+  }
+
+  // Step 3.5: Keycap label projection — patch .kvks and .keyman-touch-layout so
+  // the desktop and touch OSK preview shows the swapped character on the keycap.
+  // Runs after identity (which only touches .kmn) and before id-rename (which
+  // renames source/<keyboardId>.* siblings — patched assets are carried along).
+  if (physicalAssignments.length > 0) {
+    try {
+      const keycapResult = applyKeycapLabelsToVfs(vfs, keyboardId, physicalAssignments);
+      warnings.push(...keycapResult.warnings);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      warnings.push(`[project-working-copy] keycap label projection skipped: ${msg}`);
     }
   }
 

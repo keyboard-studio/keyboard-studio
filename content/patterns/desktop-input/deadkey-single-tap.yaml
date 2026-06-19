@@ -51,9 +51,9 @@ kmnFragment: |
   store(dk_{{deadkeyName}}_bases)  '{{baseLetters}}'
   store(dk_{{deadkeyName}}_output) '{{accentedForms}}'
 
-  + [{{triggerKey}}] > deadkey({{deadkeyName}})
-  deadkey({{deadkeyName}}) + any(dk_{{deadkeyName}}_bases) > index(dk_{{deadkeyName}}_output, 2)
-  deadkey({{deadkeyName}}) + [{{triggerKey}}] > '{{accentChar}}'
+  dk({{deadkeyName}}) + any(dk_{{deadkeyName}}_bases) > index(dk_{{deadkeyName}}_output, 2)
+  dk({{deadkeyName}}) + [{{triggerKey}}] > '{{accentChar}}'
+  + [{{triggerKey}}] > dk({{deadkeyName}})
 
 touchLayoutFragment: |
   {
@@ -166,9 +166,9 @@ skeleton:
     store(dk_{{deadkeyName}}_bases)  '{{baseLetters}}'
     store(dk_{{deadkeyName}}_output) '{{accentedForms}}'
 
-    + [{{triggerKey}}] > deadkey({{deadkeyName}})
-    deadkey({{deadkeyName}}) + any(dk_{{deadkeyName}}_bases) > index(dk_{{deadkeyName}}_output, 2)
-    deadkey({{deadkeyName}}) + [{{triggerKey}}] > '{{accentChar}}'
+    dk({{deadkeyName}}) + any(dk_{{deadkeyName}}_bases) > index(dk_{{deadkeyName}}_output, 2)
+    dk({{deadkeyName}}) + [{{triggerKey}}] > '{{accentChar}}'
+    + [{{triggerKey}}] > dk({{deadkeyName}})
 
   parameters:
     - id: triggerKey

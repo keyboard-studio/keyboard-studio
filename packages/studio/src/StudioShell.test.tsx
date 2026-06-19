@@ -224,6 +224,20 @@ vi.mock("./components/MechanismGallery.tsx", () => ({
   },
 }));
 
+vi.mock("./components/TouchGallery", () => ({
+  TouchGallery: ({ onComplete }: { onComplete: (a: unknown[]) => void }) => (
+    <div data-testid="stage-E">
+      <button
+        type="button"
+        data-testid="e-complete"
+        onClick={() => onComplete([])}
+      >
+        Continue
+      </button>
+    </div>
+  ),
+}));
+
 vi.mock("./components/UnsupportedScriptStub.tsx", () => ({
   UnsupportedScriptStub: ({ script }: { script: string }) => (
     <div data-testid="stage-unsupported">{script}</div>
@@ -297,11 +311,29 @@ vi.mock("./lib/confirmRebase.ts", () => ({
   instantiateFromBaseIfConfirmed: vi.fn(),
 }));
 
+// Shallow stub for PreviewShell — routing tests assert on the marker div, not
+// the internal pipeline. The real PreviewShell is covered by PreviewShell.test.tsx.
+vi.mock("./components/PreviewShell.tsx", () => ({
+  PreviewShell: () => <div data-testid="preview-shell-root">preview-shell</div>,
+}));
+
+// Shallow stub for FlowMapView — only rendered in dev/VITE_SHOW_FLOWMAP builds.
+vi.mock("./flowmap/FlowMapView.tsx", () => ({
+  FlowMapView: () => <div data-testid="flow-map-view">flow-map</div>,
+}));
+
+// Spy on navigateTo so the done-stage routing test can assert it was called
+// without actually mutating window.location.
+vi.mock("./lib/navigate.ts", () => ({
+  navigateTo: vi.fn(),
+}));
+
 // ---------------------------------------------------------------------------
 // Import the component under test — AFTER all vi.mock() declarations.
 // ---------------------------------------------------------------------------
 
-import { SurveyView } from "./StudioShell.tsx";
+import { SurveyView, StudioShell } from "./StudioShell.tsx";
+import { navigateTo } from "./lib/navigate.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -353,6 +385,8 @@ function advanceToMechanisms() {
 function advanceToF() {
   advanceToMechanisms();
   fireEvent.click(screen.getByTestId("mechanisms-complete"));
+  // Stage E (TouchGallery) is now inserted between mechanisms and F.
+  fireEvent.click(screen.getByTestId("e-complete"));
 }
 
 // ---------------------------------------------------------------------------
@@ -438,10 +472,15 @@ describe("SurveyView — mechanisms → F transition", () => {
     advanceToMechanisms();
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
+    // mechanisms → E (TouchGallery) → F
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
+    expect(screen.getByTestId("stage-E")).toBeTruthy();
+    expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("e-complete"));
 
     expect(screen.getByTestId("stage-F")).toBeTruthy();
-    expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
+    expect(screen.queryByTestId("stage-E")).toBeNull();
   });
 });
 
@@ -488,11 +527,11 @@ describe("SurveyView — B → carve back-navigation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Back-navigation 7: F → mechanisms  (changed from F → B in PR #403)
+// Back-navigation 7: F → E  (Phase E inserted between mechanisms and F)
 // ---------------------------------------------------------------------------
 
-describe("SurveyView — F → mechanisms back-navigation", () => {
-  it("returns to mechanisms stage (not B) when PhaseF onBack is called", async () => {
+describe("SurveyView — F → E back-navigation", () => {
+  it("returns to Phase E (touch gallery, not B) when PhaseF onBack is called", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -502,7 +541,7 @@ describe("SurveyView — F → mechanisms back-navigation", () => {
 
     fireEvent.click(screen.getByTestId("phaseF-back"));
 
-    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
+    expect(screen.getByTestId("stage-E")).toBeTruthy();
     expect(screen.queryByTestId("stage-F")).toBeNull();
     // Confirm it did NOT go back to B (the old behavior).
     expect(screen.queryByTestId("stage-B")).toBeNull();
@@ -528,5 +567,121 @@ describe("SurveyView — mechanisms → B back-navigation", () => {
     expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
     // Confirm it did NOT go to carve (an adjacent stage).
     expect(screen.queryByTestId("stage-carve")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// StudioShell routing regression — #preview and #output mount PreviewShell,
+// NOT RoutePlaceholder.
+// ---------------------------------------------------------------------------
+
+describe("StudioShell — route: #preview renders PreviewShell", () => {
+  it("mounts PreviewShell (not RoutePlaceholder) when hash is #preview", async () => {
+    window.location.hash = "#preview";
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    // PreviewShell stub must be present.
+    expect(screen.getByTestId("preview-shell-root")).toBeTruthy();
+    // RoutePlaceholder renders "Preview — coming soon"; must NOT be present.
+    expect(screen.queryByText(/coming soon/i)).toBeNull();
+  });
+});
+
+describe("StudioShell — route: #output renders PreviewShell", () => {
+  it("mounts PreviewShell (not RoutePlaceholder) when hash is #output", async () => {
+    window.location.hash = "#output";
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("preview-shell-root")).toBeTruthy();
+    expect(screen.queryByText(/coming soon/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// StudioShell / SurveyView — done stage calls navigateTo('output')
+// ---------------------------------------------------------------------------
+
+describe("SurveyView — PhaseF done navigates to #output", () => {
+  it("calls navigateTo('output') when PhaseF onComplete fires", async () => {
+    window.location.hash = "#survey";
+
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
+    advanceToF();
+    expect(screen.getByTestId("stage-F")).toBeTruthy();
+
+    // Fire PhaseF completion.
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("phaseF-complete"));
+    });
+
+    // navigateTo should have been called with 'output'.
+    expect(navigateTo).toHaveBeenCalledWith("output");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Track 2 (Adapt) routing — issue #388
+// ---------------------------------------------------------------------------
+//
+// The Track 2 path clicks "track-adapt" instead of "track-copy", which skips
+// the project-name step and calls instantiateFromExisting (not instantiateFromBase).
+//
+// useKeyboardArtifact is mocked to return { stage: { kind: "idle" } } which means
+// onInstantiate never fires in this shallow test. We can still verify the ROUTING
+// shape (which stage the wizard advances to, and that instantiationMode stays null
+// because the mock onInstantiate never fires). A deeper integration test would
+// require a real VFS/IR compile cycle — that belongs in a separate integration test.
+//
+// What this test covers:
+//   - Clicking "track-adapt" advances to "prefill" (skips project-name).
+//   - The project-name stage is NOT rendered on the adapt path.
+//   - After clicking track-adapt, instantiationMode remains null (onInstantiate
+//     never fires in this mock — the routing test confirms stage progression, not
+//     store instantiation, which is covered exhaustively in workingCopyStore.test.ts).
+
+describe("SurveyView — Track 2 (adapt) routing", () => {
+  it("clicking track-adapt advances to prefill, skipping project-name", async () => {
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
+    // Drive to the track stage.
+    advanceToTrack();
+    expect(screen.getByTestId("stage-track")).toBeTruthy();
+
+    // Click adapt (Track 2).
+    fireEvent.click(screen.getByTestId("track-adapt"));
+
+    // Should be at prefill, not project-name.
+    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+    expect(screen.queryByTestId("stage-project-name")).toBeNull();
+    expect(screen.queryByTestId("stage-track")).toBeNull();
+  });
+
+  it("track-copy still advances through project-name to prefill (regression guard)", async () => {
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
+    advanceToTrack();
+    fireEvent.click(screen.getByTestId("track-copy"));
+
+    // Should be at project-name, not prefill yet.
+    expect(screen.getByTestId("stage-project-name")).toBeTruthy();
+    expect(screen.queryByTestId("stage-prefill")).toBeNull();
+
+    // Advance through project-name.
+    fireEvent.click(screen.getByTestId("project-name-next"));
+    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+    expect(screen.queryByTestId("stage-project-name")).toBeNull();
   });
 });
