@@ -284,6 +284,20 @@ function buildRow(
   );
 }
 
+/**
+ * Build the required functional bottom row (options, space, backspace, enter).
+ * These keys are mandatory in every layer for kmcmplib to produce artifacts.
+ * sp:1 = special (system) key; width is in Keyman touch-layout units (total ~1000).
+ */
+export function buildFunctionalRow(minter: NodeIdMinter): TouchKeyIR[] {
+  return [
+    { nodeId: minter.mint("touchKey"), id: "K_LOPT",  sp: 1, width: 100 },
+    { nodeId: minter.mint("touchKey"), id: "K_SPACE",  text: " ", output: " ", width: 700 },
+    { nodeId: minter.mint("touchKey"), id: "K_BKSP",  sp: 1, width: 100 },
+    { nodeId: minter.mint("touchKey"), id: "K_ENTER", sp: 1, width: 100 },
+  ];
+}
+
 // ---------------------------------------------------------------------------
 // Layer builders
 // ---------------------------------------------------------------------------
@@ -306,9 +320,12 @@ function buildPhoneLayersFromDesktop(
   if (hasAltgr) layersToEmit.push("altgr");
 
   for (const layerId of layersToEmit) {
-    const rows = QWERTY_ROWS.map((rowVkeys) => ({
-      keys: buildRow(rowVkeys, layerId, keyMap, deadkeySuccessors, minter),
-    }));
+    const rows = [
+      ...QWERTY_ROWS.map((rowVkeys) => ({
+        keys: buildRow(rowVkeys, layerId, keyMap, deadkeySuccessors, minter),
+      })),
+      { keys: buildFunctionalRow(minter) },
+    ];
     layers.push({ id: layerId, rows });
   }
 
@@ -369,6 +386,57 @@ function augmentExistingPhoneLayers(
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
+
+/**
+ * Build a fixed minimal phone touch layout — NOT derived from desktop rules.
+ *
+ * Returns a hardcoded QWERTY-shaped layout with a default layer (lower-case),
+ * a shift layer (upper-case), and the required functional row on both.
+ * This is used as the Phase E preview seed when the keyboard has no existing
+ * .keyman-touch-layout; it is intentionally simple and independent of the IR.
+ *
+ * @see spec.md §8 Phase E (touch gallery)
+ */
+export function buildMinimalPhoneTouchLayout(): TouchLayoutIR {
+  const minter = new NodeIdMinter();
+
+  const ROWS: Array<Array<[string, string]>> = [
+    [["K_Q","q"],["K_W","w"],["K_E","e"],["K_R","r"],["K_T","t"],
+     ["K_Y","y"],["K_U","u"],["K_I","i"],["K_O","o"],["K_P","p"]],
+    [["K_A","a"],["K_S","s"],["K_D","d"],["K_F","f"],["K_G","g"],
+     ["K_H","h"],["K_J","j"],["K_K","k"],["K_L","l"]],
+    [["K_Z","z"],["K_X","x"],["K_C","c"],["K_V","v"],
+     ["K_B","b"],["K_N","n"],["K_M","m"]],
+  ];
+
+  const SHIFT_ROWS: Array<Array<[string, string]>> = ROWS.map(row =>
+    row.map(([id, ch]) => [id, ch.toUpperCase()] as [string, string])
+  );
+
+  function makeRow(pairs: Array<[string, string]>): { keys: TouchKeyIR[] } {
+    return {
+      keys: pairs.map(([id, ch]) => ({
+        nodeId: minter.mint("touchKey"),
+        id,
+        text: ch,
+        output: ch,
+      })),
+    };
+  }
+
+  const funcRow = { keys: buildFunctionalRow(minter) };
+
+  return {
+    platforms: [{
+      id: "phone",
+      layers: [
+        { id: "default", rows: [...ROWS.map(makeRow), funcRow] },
+        { id: "shift",   rows: [...SHIFT_ROWS.map(makeRow), funcRow] },
+      ],
+    }],
+    nodeIds: [],
+  };
+}
 
 /**
  * Derive a {@link TouchLayoutIR} for the phone platform from the keyboard IR.
