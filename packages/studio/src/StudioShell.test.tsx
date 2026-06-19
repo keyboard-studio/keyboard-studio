@@ -1,8 +1,8 @@
 // Unit tests for SurveyView stage-machine transitions.
 //
-// Coverage: the 4 new forward transitions added in PR #403 (prefill→carve,
-// carve→B, B→mechanisms, mechanisms→F) plus the 3 back-navigation changes
-// (carve→prefill, B→carve, F→mechanisms).
+// Coverage: the 4 new forward transitions (prefill→B, B→carve, carve→mechanisms,
+// mechanisms→F) plus the back-navigation changes (B→prefill, carve→B, F→E,
+// mechanisms→B). Stage order (issue #508): prefill → B → carve → mechanisms → E → F → done.
 //
 // Strategy: mock every child component at the shallowest level so each mock
 // renders a unique data-testid and a single button that fires its callback.
@@ -363,22 +363,28 @@ function advanceToPrefill() {
   fireEvent.click(screen.getByTestId("project-name-next"));
 }
 
-/** Drive from "identity" to "carve". */
-function advanceToCarve() {
+/**
+ * Drive from "identity" to "B".
+ * New order (issue #508): prefill-confirm now goes directly to "B".
+ */
+function advanceToB() {
   advanceToPrefill();
   fireEvent.click(screen.getByTestId("prefill-confirm"));
 }
 
-/** Drive from "identity" to "B". */
-function advanceToB() {
-  advanceToCarve();
-  fireEvent.click(screen.getByTestId("carve-complete"));
+/**
+ * Drive from "identity" to "carve".
+ * New order (issue #508): prefill → B → carve (phaseB-complete lands on carve).
+ */
+function advanceToCarve() {
+  advanceToB();
+  fireEvent.click(screen.getByTestId("phaseB-complete"));
 }
 
 /** Drive from "identity" to "mechanisms". */
 function advanceToMechanisms() {
-  advanceToB();
-  fireEvent.click(screen.getByTestId("phaseB-complete"));
+  advanceToCarve();
+  fireEvent.click(screen.getByTestId("carve-complete"));
 }
 
 /** Drive from "identity" to "F". */
@@ -400,11 +406,11 @@ afterEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Forward transition 1: prefill → carve
+// Forward transition 1: prefill → B  (issue #508: was prefill → carve)
 // ---------------------------------------------------------------------------
 
-describe("SurveyView — prefill → carve transition", () => {
-  it("renders the carve stage after Prefill onConfirm is called", async () => {
+describe("SurveyView — prefill → B transition", () => {
+  it("renders the B stage after Prefill onConfirm is called", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -414,37 +420,17 @@ describe("SurveyView — prefill → carve transition", () => {
 
     fireEvent.click(screen.getByTestId("prefill-confirm"));
 
-    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+    expect(screen.getByTestId("stage-B")).toBeTruthy();
     expect(screen.queryByTestId("stage-prefill")).toBeNull();
   });
 });
 
 // ---------------------------------------------------------------------------
-// Forward transition 2: carve → B
+// Forward transition 2: B → carve  (issue #508: was carve → B)
 // ---------------------------------------------------------------------------
 
-describe("SurveyView — carve → B transition", () => {
-  it("renders the B stage after CarveGallery onComplete is called", async () => {
-    await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
-    });
-
-    advanceToCarve();
-    expect(screen.getByTestId("stage-carve")).toBeTruthy();
-
-    fireEvent.click(screen.getByTestId("carve-complete"));
-
-    expect(screen.getByTestId("stage-B")).toBeTruthy();
-    expect(screen.queryByTestId("stage-carve")).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Forward transition 3: B → mechanisms
-// ---------------------------------------------------------------------------
-
-describe("SurveyView — B → mechanisms transition", () => {
-  it("renders the mechanisms stage after PhaseB onComplete is called", async () => {
+describe("SurveyView — B → carve transition", () => {
+  it("renders the carve stage after PhaseB onComplete is called", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -454,8 +440,28 @@ describe("SurveyView — B → mechanisms transition", () => {
 
     fireEvent.click(screen.getByTestId("phaseB-complete"));
 
-    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
+    expect(screen.getByTestId("stage-carve")).toBeTruthy();
     expect(screen.queryByTestId("stage-B")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Forward transition 3: carve → mechanisms  (issue #508: was B → mechanisms)
+// ---------------------------------------------------------------------------
+
+describe("SurveyView — carve → mechanisms transition", () => {
+  it("renders the mechanisms stage after CarveGallery onComplete is called", async () => {
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
+    advanceToCarve();
+    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("carve-complete"));
+
+    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
+    expect(screen.queryByTestId("stage-carve")).toBeNull();
   });
 });
 
@@ -485,31 +491,11 @@ describe("SurveyView — mechanisms → F transition", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Back-navigation 5: carve → prefill
+// Back-navigation 5: B → prefill  (issue #508: was carve → prefill)
 // ---------------------------------------------------------------------------
 
-describe("SurveyView — carve → prefill back-navigation", () => {
-  it("returns to prefill stage when CarveGallery onBack is called", async () => {
-    await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
-    });
-
-    advanceToCarve();
-    expect(screen.getByTestId("stage-carve")).toBeTruthy();
-
-    fireEvent.click(screen.getByTestId("carve-back"));
-
-    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
-    expect(screen.queryByTestId("stage-carve")).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Back-navigation 6: B → carve  (changed from B → prefill in PR #403)
-// ---------------------------------------------------------------------------
-
-describe("SurveyView — B → carve back-navigation", () => {
-  it("returns to carve stage (not prefill) when PhaseB onBack is called", async () => {
+describe("SurveyView — B → prefill back-navigation", () => {
+  it("returns to prefill stage when PhaseB onBack is called", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -519,9 +505,29 @@ describe("SurveyView — B → carve back-navigation", () => {
 
     fireEvent.click(screen.getByTestId("phaseB-back"));
 
-    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
     expect(screen.queryByTestId("stage-B")).toBeNull();
-    // Confirm it did NOT go to prefill (the old behavior).
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Back-navigation 6: carve → B  (issue #508: was B → carve)
+// ---------------------------------------------------------------------------
+
+describe("SurveyView — carve → B back-navigation", () => {
+  it("returns to B stage (not prefill) when CarveGallery onBack is called", async () => {
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
+    advanceToCarve();
+    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("carve-back"));
+
+    expect(screen.getByTestId("stage-B")).toBeTruthy();
+    expect(screen.queryByTestId("stage-carve")).toBeNull();
+    // Confirm it did NOT go to prefill (the old pre-#508 behavior).
     expect(screen.queryByTestId("stage-prefill")).toBeNull();
   });
 });
@@ -549,11 +555,11 @@ describe("SurveyView — F → E back-navigation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Back-navigation 8: mechanisms → B
+// Back-navigation 8: mechanisms → carve  (issue #508: was mechanisms → B)
 // ---------------------------------------------------------------------------
 
-describe("SurveyView — mechanisms → B back-navigation", () => {
-  it("returns to B stage (not carve) when MechanismGallery onBack is called", async () => {
+describe("SurveyView — mechanisms → carve back-navigation", () => {
+  it("returns to carve stage (not B) when MechanismGallery onBack is called", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -563,10 +569,10 @@ describe("SurveyView — mechanisms → B back-navigation", () => {
 
     fireEvent.click(screen.getByTestId("mechanisms-back"));
 
-    expect(screen.getByTestId("stage-B")).toBeTruthy();
+    expect(screen.getByTestId("stage-carve")).toBeTruthy();
     expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
-    // Confirm it did NOT go to carve (an adjacent stage).
-    expect(screen.queryByTestId("stage-carve")).toBeNull();
+    // Confirm it did NOT go to B (the old pre-#508 behavior).
+    expect(screen.queryByTestId("stage-B")).toBeNull();
   });
 });
 
