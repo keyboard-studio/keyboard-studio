@@ -591,7 +591,12 @@ function main(): void {
       ? readFileSync(corpusIndexPath, "utf8")
       : "";
     if (existing !== json || existingIndex !== corpusIndex) {
-      const stale = [existing !== json ? 'docs/import-corpus.json' : '', existingIndex !== corpusIndex ? 'docs/keyboard-corpus-index.json' : ''].filter(Boolean).join(' and ');
+      const stale = [
+        existing !== json ? 'docs/import-corpus.json' : '',
+        existingIndex !== corpusIndex ? 'docs/keyboard-corpus-index.json' : '',
+      ]
+        .filter(Boolean)
+        .join(' and ');
       console.error(`[ERROR] ${stale} is stale relative to current codec output.`);
       console.error("        Re-run the scanner and commit the regenerated outputs:");
       console.error(
