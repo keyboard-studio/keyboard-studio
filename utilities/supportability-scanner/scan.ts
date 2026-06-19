@@ -39,13 +39,18 @@
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
+import { execSync } from "node:child_process";
 import { join, dirname, basename, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parse, emit } from "../../packages/engine/src/codec/index.ts";
-import { recognizePatterns } from "../../packages/engine/src/recognizer/index.ts";
+import { promises as fsp } from "node:fs";
+import { parse, emit } from "../../packages/engine/src/codec/index.js";
+import { recognizePatterns } from "../../packages/engine/src/recognizer/index.js";
+import { emitPlacementMap, detectBaseLayoutFamily } from "../../packages/engine/src/placement/index.js";
+import { aggregatePlacements, computeFingerprintFromCandidates } from "../../packages/engine/src/placement/aggregate.js";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { ImportStatus } from "@keyboard-studio/contracts";
+import type { KeyboardPlacementReport } from "../../packages/engine/src/placement/model.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..");
@@ -60,6 +65,7 @@ interface Args {
   limit: number | null;
   check: boolean;
   quiet: boolean;
+  emitPlacements: boolean;
 }
 
 /** Read the value following a value-taking flag, erroring out if it is missing. */
@@ -80,6 +86,7 @@ function parseArgs(argv: string[]): Args {
     limit: null,
     check: false,
     quiet: false,
+    emitPlacements: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -104,6 +111,9 @@ function parseArgs(argv: string[]): Args {
         break;
       case "--quiet":
         out.quiet = true;
+        break;
+      case "--emit-placements":
+        out.emitPlacements = true;
         break;
       case "--help":
       case "-h":
@@ -132,6 +142,7 @@ function printHelp(): void {
       "  --check               regenerate to a temp buffer and fail if the",
       "                        committed import-corpus.json is stale (CI mode)",
       "  --quiet               suppress per-keyboard progress",
+      "  --emit-placements     also emit docs/placement-priors.json (§7.6 corpus priors)",
       "  -h, --help            show this help",
     ].join("\n"),
   );
@@ -145,9 +156,9 @@ function printHelp(): void {
 function findKpjFiles(dir: string): string[] {
   const out: string[] = [];
   const walk = (d: string): void => {
-    let entries: ReturnType<typeof readdirSync>;
+    let entries: import('node:fs').Dirent<string>[];
     try {
-      entries = readdirSync(d, { withFileTypes: true });
+      entries = readdirSync(d, { withFileTypes: true, encoding: 'utf8' });
     } catch {
       return;
     }
@@ -260,7 +271,27 @@ interface ScanReport {
   rawFragmentCount: number;
 }
 
-function scanOne(kmnPath: string, releaseDir: string): ScanReport {
+// ---------------------------------------------------------------------------
+// Placement helpers (--emit-placements support, spec §7.6)
+// ---------------------------------------------------------------------------
+
+/**
+ * Detect the base keyboard layout family from the unshifted letter layer.
+ *
+ * Heuristic: compare K_Q/K_A/K_Z outputs against known families:
+ *   QWERTY  q/a/z, AZERTY  a/q/w, QWERTZ  q/a/y
+ */
+// detectBaseLayoutFamily and computeFingerprint are provided by the placement module.
+
+/**
+ * Scan one .kmn file.  Returns the scan report and, optionally, the parsed IR
+ * for downstream passes (e.g. --emit-placements).  When parsing fails, ir is
+ * null.
+ */
+function scanOne(
+  kmnPath: string,
+  releaseDir: string,
+): { report: ScanReport; ir: KeyboardIR | null } {
   const keyboardId = basename(kmnPath, ".kmn");
   const source = relative(releaseDir, kmnPath).replace(/\\/g, "/");
   const base: ScanReport = {
@@ -281,7 +312,7 @@ function scanOne(kmnPath: string, releaseDir: string): ScanReport {
     text = readFileSync(kmnPath, "utf8");
   } catch (err) {
     base.parseErrors = [`cannot read source: ${(err as Error).message}`];
-    return base;
+    return { report: base, ir: null };
   }
 
   let parsed: ReturnType<typeof parse>;
@@ -289,7 +320,7 @@ function scanOne(kmnPath: string, releaseDir: string): ScanReport {
     parsed = parse(text, keyboardId);
   } catch (err) {
     base.parseErrors = [(err as Error).message];
-    return base; // ImportStatus.ParseFailure
+    return { report: base, ir: null }; // ImportStatus.ParseFailure
   }
 
   const { ir, opaqueFeatures } = parsed;
@@ -318,7 +349,7 @@ function scanOne(kmnPath: string, releaseDir: string): ScanReport {
   } else {
     base.status = ImportStatus.Clean;
   }
-  return base;
+  return { report: base, ir };
 }
 
 // ---------------------------------------------------------------------------
@@ -467,10 +498,33 @@ function buildMarkdown(sorted: ScanReport[], opaque: OpaqueEntry[]): string {
 }
 
 // ---------------------------------------------------------------------------
+// Provenance helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the git SHA of the keyboards checkout for provenance. Returns
+ * "keymanapp/keyboards@<sha>" or "keymanapp/keyboards@unknown" if the SHA
+ * cannot be determined (not a git checkout, git unavailable, etc).
+ */
+function resolveKeyboardsProvenance(releaseDir: string): string {
+  try {
+    const root = dirname(releaseDir);
+    const sha = execSync("git rev-parse HEAD", {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    return sha ? `keymanapp/keyboards@${sha}` : "keymanapp/keyboards@unknown";
+  } catch {
+    return "keymanapp/keyboards@unknown";
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
-function main(): void {
+async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
 
   if (!existsSync(args.releaseDir)) {
@@ -484,6 +538,8 @@ function main(): void {
   if (!args.quiet) console.error(`[OK] found ${kpjFiles.length} .kpj projects`);
 
   const reports: ScanReport[] = [];
+  const placementReports: KeyboardPlacementReport[] = [];
+
   // A single .kmn can be referenced by more than one .kpj — the aggregate
   // bundle projects under release/packages/ point at .kmn files that also have
   // their own standalone project. Scan each physical file exactly once.
@@ -495,8 +551,28 @@ function main(): void {
       if (args.limit != null && scanned >= args.limit) break;
       if (seenKmn.has(kmn) || !existsSync(kmn)) continue;
       seenKmn.add(kmn);
-      const report = scanOne(kmn, args.releaseDir);
+      const { report, ir } = scanOne(kmn, args.releaseDir);
       reports.push(report);
+
+      // --emit-placements: extract placement candidates from the parsed IR.
+      if (args.emitPlacements && ir !== null) {
+        try {
+          const candidatesByCodepoint = emitPlacementMap(ir);
+          if (candidatesByCodepoint.size > 0) {
+            const flat = [...candidatesByCodepoint.values()].flat();
+            placementReports.push({
+              keyboardId: report.keyboardId,
+              bcp47: ir.header.bcp47,
+              baseLayoutFamily: detectBaseLayoutFamily(ir),
+              candidatesByCodepoint,
+              placementFingerprint: computeFingerprintFromCandidates(flat),
+            });
+          }
+        } catch {
+          // Placement extraction is non-fatal; continue.
+        }
+      }
+
       scanned++;
       if (!args.quiet && scanned % 100 === 0) {
         console.error(`[..] ${scanned} keyboards scanned`);
@@ -533,6 +609,18 @@ function main(): void {
   writeFileSync(jsonPath, json, "utf8");
   writeFileSync(mdPath, md, "utf8");
 
+  // --emit-placements: aggregate and write placement-priors.json.
+  if (args.emitPlacements) {
+    const priorsJSON = aggregatePlacements(placementReports, {
+      generatedFrom: resolveKeyboardsProvenance(args.releaseDir),
+    });
+    const priorsPath = join(args.outDir, "placement-priors.json");
+    await fsp.writeFile(priorsPath, JSON.stringify(priorsJSON, null, 2) + "\n", "utf8");
+    console.error(
+      `[OK] placement-priors.json written (${placementReports.length} keyboards with candidates) -> ${relative(REPO_ROOT, priorsPath).replace(/\\/g, "/")}`,
+    );
+  }
+
   const counts = summarise(reports);
   console.error(
     `[OK] scanned ${reports.length} keyboards in ${(elapsedMs / 1000).toFixed(1)}s -> ${relative(REPO_ROOT, jsonPath).replace(/\\/g, "/")}`,
@@ -543,4 +631,7 @@ function main(): void {
   );
 }
 
-main();
+main().catch((err: unknown) => {
+  console.error("[ERROR]", err instanceof Error ? err.message : String(err));
+  process.exit(1);
+});

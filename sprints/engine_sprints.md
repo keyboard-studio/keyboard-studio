@@ -130,6 +130,9 @@ After #131:
 
 ## Deferred / polish
 
+**#296** `feat(tools): mine placement priors from release/ — emitPlacementMap post-pass + weighted aggregation` — *in PR #480 by @coopabla*
+AC #2–5 done; AC #1 (Tier 2 store/any/index + per-tuple BCP47/base-layout) deferred. No sprint milestone yet.
+
 **#19** `feat(scaffolder): implement template-cleanup per Making a Template.md` — superseded by #238 scaffold-over-IR; close as obsolete or fold acceptance criteria into #238
 **#100** `chore(base-browser): publishPR no progress callback; listAll no pagination` — post-integration UX
 **#89** `chore(validator): SourceLocation file/line-only vs structured Keyman events` — design Q

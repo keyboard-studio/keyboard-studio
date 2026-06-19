@@ -18,6 +18,10 @@
     "./pattern-schema": {
       "types": "./dist/pattern-library/patternSchema.d.ts",
       "import": "./dist/pattern-library/patternSchema.js"
+    },
+    "./placement": {
+      "types": "./dist/placement/index.d.ts",
+      "import": "./dist/placement/index.js"
     }
   },
   "files": [

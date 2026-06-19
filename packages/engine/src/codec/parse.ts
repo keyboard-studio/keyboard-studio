@@ -596,6 +596,8 @@ export function parse(text: string, keyboardId: string): ParseResult {
   // multi-group keyboards are supported; v1 assumes the single "main" group.
   let headerParsed = false; // true after we see `begin`
   let currentGroup: IRGroup | null = null;
+  // Encoding from the first `begin` directive; stored in IRHeader.encoding.
+  let beginEncoding: "Unicode" | "ANSI" | undefined;
 
   // Track "pending leading comments" — comments that haven't been anchored yet.
   let pendingComments: Array<{ text: string; line: number }> = [];
@@ -641,8 +643,17 @@ export function parse(text: string, keyboardId: string): ParseResult {
         if (!parsed) {
           throw new Error(`Malformed begin directive at line ${tok.line}:${tok.col}: ${tok.text}`);
         }
-        // parsed.entryGroup intentionally discarded — see TODO above.
+        // Record the encoding for IRHeader.encoding so that isMnemonicKeyboard()
+        // can detect ANSI vs Unicode keyboards at import time.  The encoding
+        // value from the FIRST begin directive wins (Unicode beats ANSI when
+        // both are present in the same file — the parser tracks last-seen, but
+        // for v1 keyboards with a single begin directive this is unambiguous).
         headerParsed = true;
+        // Store the encoding string so we can attach it to the header after the
+        // loop. Use a local variable captured by the closure below.
+        if (beginEncoding === undefined) {
+          beginEncoding = parsed.encoding as "Unicode" | "ANSI";
+        }
         flushCommentsFreestanding();
         break;
       }
@@ -883,6 +894,7 @@ export function parse(text: string, keyboardId: string): ParseResult {
     version: keyboardVersion || version,
     targets,
     storeDirectives,
+    ...(beginEncoding !== undefined ? { encoding: beginEncoding } : {}),
   };
 
   // ---------------------------------------------------------------------------
