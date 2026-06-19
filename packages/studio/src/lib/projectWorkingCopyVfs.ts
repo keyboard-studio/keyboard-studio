@@ -76,7 +76,7 @@ export interface ProjectWorkingCopyVfsInput {
   baseIr: KeyboardIR;
   deletedNodeIds: ReadonlySet<string>;
   /** Individual rule nodeIds removed via glyph-level carving (GlyphCell clicks). */
-  deletedItemIds: ReadonlySet<string>;
+  deletedItemIds?: ReadonlySet<string>;
   assignments: ReadonlyArray<MechanismAssignment>;
   /** Synchronous resolver. Pass `() => undefined` when no pattern library is available. */
   getPattern: (id: string) => Pattern | undefined;
@@ -126,7 +126,7 @@ export function projectWorkingCopyVfs(
     targetKeyboardId,
     baseIr,
     deletedNodeIds,
-    deletedItemIds,
+    deletedItemIds = new Set<string>(),
     assignments,
     getPattern,
     identity,
