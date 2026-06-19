@@ -31,7 +31,6 @@ import { useShallow } from "zustand/react/shallow";
 import type {
   BaseKeyboard,
   Pattern,
-  PatternMatch,
   MechanismAssignment,
   PlacementMap,
 } from "@keyboard-studio/contracts";
@@ -154,17 +153,11 @@ function GalleryPreviewWithPatterns({
 
   const vfsTransform = useWorkingCopyTransform({ patternMap });
 
-  // eslint-disable-next-line no-console
-  console.log(`[DIAG:GalleryPreview] render. kb=${selectedBaseKeyboard.id}, scaffoldSpec=${scaffoldSpec != null ? scaffoldSpec.keyboardId : "null"}, vfsTransform=${vfsTransform != null ? "SET" : "null"}`);
-
   const { stage, retry } = useKeyboardArtifact(
     selectedBaseKeyboard,
     scaffoldSpec,
     vfsTransform,
   );
-
-  // eslint-disable-next-line no-console
-  console.log(`[DIAG:GalleryPreview] stage.kind=${stage.kind}`);
 
   const applyWarnings =
     stage.kind === "ready" && stage.scaffoldWarnings.length > 0
@@ -384,13 +377,13 @@ const KEY_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
 ];
 
 const selectStyle: CSSProperties = {
-  background: "#0d1117",
-  border: "1px solid #30363d",
+  background: BG_PAGE,
+  border: `1px solid ${BORDER}`,
   borderRadius: 4,
-  color: "#e6edf3",
+  color: TEXT_MAIN,
   fontSize: 12,
   padding: "4px 8px",
-  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  fontFamily: FONT,
 };
 
 function MethodChooser({
@@ -796,13 +789,11 @@ export function MechanismGallery({
   const [patternMap, setPatternMap] = useState<Map<string, Pattern>>(
     new Map(),
   );
-  const [_matches, setMatches] = useState<PatternMatch[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (selectedBaseKeyboard === null) {
-      setMatches([]);
       setPatternMap(new Map());
       setLoadError(null);
       return;
@@ -826,7 +817,6 @@ export function MechanismGallery({
     svc
       .filterFor(selectedBaseKeyboard, fullAxes)
       .then((ranked) => {
-        setMatches(ranked);
         // Load ranked patterns PLUS all four methods the add-a-key UI offers.
         // Axis-based ranking may exclude off-strategy patterns, so load them
         // explicitly so the preview transform can always resolve an applied
@@ -887,21 +877,28 @@ export function MechanismGallery({
   // Reset to false whenever currentChar changes (see effect below).
   const [suggestionDismissed, setSuggestionDismissed] = useState(false);
 
-  // Reset inputs whenever currentChar changes.
-  useEffect(() => {
-    setSuggestionDismissed(false);
+  // ---------------------------------------------------------------------------
+  // Method-input reset — called after apply or suggestion accept
+  // ---------------------------------------------------------------------------
+
+  const resetMethodState = useCallback(() => {
     setMethod("sequence");
     setSeqFirst("");
     setSeqSecond("");
     setTriggerKey("K_COLON");
+    setDeadkeyBaseLetter("");
     setSelectedSwapKey("");
     setSelectedRaltKey("");
+  }, []);
+
+  // Reset inputs whenever currentChar changes.
+  useEffect(() => {
+    setSuggestionDismissed(false);
+    resetMethodState();
     if (currentChar !== null && isDecomposableAccented(currentChar)) {
       setDeadkeyBaseLetter([...currentChar.normalize("NFD")][0] ?? "");
-    } else {
-      setDeadkeyBaseLetter("");
     }
-  }, [currentChar]);
+  }, [currentChar, resetMethodState]);
 
   // ---------------------------------------------------------------------------
   // Suggestion row handlers
@@ -936,18 +933,10 @@ export function MechanismGallery({
       console.warn(`[MechanismGallery] handleSuggestionAccept: unrecognised strategyId "${suggestion.strategyId}" — dismissing suggestion`);
       return;
     }
-    // eslint-disable-next-line no-console
-    console.log(`[DIAG:handleSuggestionAccept] recording assignment for "${currentChar}", strategyId=${suggestion.strategyId}`);
     recordAssignments([...sessionAssignments, assignment]);
     setSuggestionDismissed(true);
-    setMethod("sequence");
-    setSeqFirst("");
-    setSeqSecond("");
-    setTriggerKey("K_COLON");
-    setDeadkeyBaseLetter("");
-    setSelectedSwapKey("");
-    setSelectedRaltKey("");
-  }, [suggestion, currentChar, sessionAssignments, recordAssignments]);
+    resetMethodState();
+  }, [suggestion, currentChar, sessionAssignments, recordAssignments, resetMethodState]);
 
   // Change: dismiss the suggestion row; pickers stay blank for manual selection.
   const handleSuggestionChange = useCallback(() => {
@@ -1064,17 +1053,8 @@ export function MechanismGallery({
       };
     }
 
-    // eslint-disable-next-line no-console
-    console.log(`[DIAG:handleApply] recording assignment for "${currentChar}", method=${method}, total=${sessionAssignments.length + 1}`);
     recordAssignments([...sessionAssignments, assignment]);
-    // Reset method inputs but stay on currentChar — user must click Next to advance.
-    setMethod("sequence");
-    setSeqFirst("");
-    setSeqSecond("");
-    setTriggerKey("K_COLON");
-    setDeadkeyBaseLetter("");
-    setSelectedSwapKey("");
-    setSelectedRaltKey("");
+    resetMethodState();
   }, [
     currentChar,
     canApply,
@@ -1087,6 +1067,7 @@ export function MechanismGallery({
     selectedRaltKey,
     recordAssignments,
     sessionAssignments,
+    resetMethodState,
   ]);
 
   // How many methods have already been applied to the current character.
