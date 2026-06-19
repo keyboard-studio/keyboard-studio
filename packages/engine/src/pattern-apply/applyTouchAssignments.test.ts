@@ -127,15 +127,17 @@ function getKey(layout: TouchLayoutIR, keyId: string): TouchKeyIR | undefined {
 // ---------------------------------------------------------------------------
 
 describe("applyTouchAssignments — longpress", () => {
-  it("adds an sk entry with correct output and text", () => {
+  it("adds an sk entry with correct text and U_ id (no output field)", () => {
     const layout = makeLayout([makeKey("K_A")]);
     const { layout: out, warnings } = applyTouchAssignments(layout, [longpress("K_A", "á")]);
 
     expect(warnings).toHaveLength(0);
     const key = getKey(out, "K_A")!;
     expect(key.sk).toHaveLength(1);
-    expect(key.sk![0]!.output).toBe("á");
+    // U_-id form: character is derived from the id; no output field needed.
+    expect(key.sk![0]!.id).toBe("U_00E1");
     expect(key.sk![0]!.text).toBe("á");
+    expect(key.sk![0]!.output).toBeUndefined();
   });
 
   it("sets hint when hint was previously undefined", () => {
@@ -153,13 +155,16 @@ describe("applyTouchAssignments — longpress", () => {
 });
 
 describe("applyTouchAssignments — flick", () => {
-  it("sets key.flick[direction].output to char", () => {
+  it("sets key.flick[direction].text to char and uses U_ id (no output field)", () => {
     const layout = makeLayout([makeKey("K_A")]);
     const { layout: out, warnings } = applyTouchAssignments(layout, [flick("K_A", "n", "à")]);
 
     expect(warnings).toHaveLength(0);
     const key = getKey(out, "K_A")!;
-    expect(key.flick?.["n"]?.output).toBe("à");
+    // U_-id form: text is the glyph; output is omitted.
+    expect(key.flick?.["n"]?.id).toBe("U_00E0");
+    expect(key.flick?.["n"]?.text).toBe("à");
+    expect(key.flick?.["n"]?.output).toBeUndefined();
   });
 
   it("creates flick object from scratch when absent", () => {
@@ -167,7 +172,8 @@ describe("applyTouchAssignments — flick", () => {
     const { layout: out } = applyTouchAssignments(layout, [flick("K_A", "s", "ã")]);
     const key = getKey(out, "K_A")!;
     expect(key.flick).toBeDefined();
-    expect(key.flick?.["s"]?.output).toBe("ã");
+    expect(key.flick?.["s"]?.id).toBe("U_00E3");
+    expect(key.flick?.["s"]?.text).toBe("ã");
   });
 
   it("last-wins per direction (two flicks to same dir)", () => {
@@ -176,19 +182,22 @@ describe("applyTouchAssignments — flick", () => {
       flick("K_A", "n", "à"),
       flick("K_A", "n", "ä"),
     ]);
-    expect(getKey(out, "K_A")!.flick?.["n"]?.output).toBe("ä");
+    expect(getKey(out, "K_A")!.flick?.["n"]?.id).toBe("U_00E4");
+    expect(getKey(out, "K_A")!.flick?.["n"]?.text).toBe("ä");
   });
 });
 
 describe("applyTouchAssignments — multitap", () => {
-  it("adds an entry to multitap[]", () => {
+  it("adds an entry to multitap[] with U_ id and text (no output field)", () => {
     const layout = makeLayout([makeKey("K_A")]);
     const { layout: out, warnings } = applyTouchAssignments(layout, [multitap("K_A", "â")]);
 
     expect(warnings).toHaveLength(0);
     const key = getKey(out, "K_A")!;
     expect(key.multitap).toHaveLength(1);
-    expect(key.multitap![0]!.output).toBe("â");
+    expect(key.multitap![0]!.id).toBe("U_00E2");
+    expect(key.multitap![0]!.text).toBe("â");
+    expect(key.multitap![0]!.output).toBeUndefined();
   });
 
   it("creates multitap array from scratch when absent", () => {
@@ -253,7 +262,7 @@ describe("applyTouchAssignments — host key not found", () => {
     // One warning for the missing key; the valid one still applies
     expect(warnings).toHaveLength(1);
     expect(getKey(out, "K_B")!.sk).toHaveLength(1);
-    expect(getKey(out, "K_B")!.sk![0]!.output).toBe("β");
+    expect(getKey(out, "K_B")!.sk![0]!.text).toBe("β");
   });
 });
 
@@ -270,8 +279,8 @@ describe("applyTouchAssignments — two chars on the same host key", () => {
     ]);
     const sk = getKey(out, "K_A")!.sk!;
     expect(sk).toHaveLength(2);
-    expect(sk[0]!.output).toBe("á");
-    expect(sk[1]!.output).toBe("à");
+    expect(sk[0]!.text).toBe("á");
+    expect(sk[1]!.text).toBe("à");
   });
 });
 
@@ -407,10 +416,13 @@ describe("applyTouchAssignments — emit-side verification", () => {
 
     expect(Array.isArray(keyA["sk"])).toBe(true);
     const sk = keyA["sk"] as Array<Record<string, unknown>>;
-    expect(sk[0]!["output"]).toBe("á");
+    // U_-id sub-key: text is the glyph; output is omitted (kmc-kmn derives it from U_ id).
+    expect(sk[0]!["id"]).toBe("U_00E1");
+    expect(sk[0]!["text"]).toBe("á");
+    expect(sk[0]!["output"]).toBeUndefined();
   });
 
-  it("flick entry appears in emitted JSON at the correct direction", () => {
+  it("flick entry appears in emitted JSON at the correct direction with U_ id", () => {
     const layout = makeLayout([makeKey("K_A")]);
     const { layout: out } = applyTouchAssignments(layout, [flick("K_A", "n", "à")]);
 
@@ -423,10 +435,12 @@ describe("applyTouchAssignments — emit-side verification", () => {
 
     expect(keyA["flick"]).toBeDefined();
     const flickMap = keyA["flick"] as Record<string, Record<string, unknown>>;
-    expect(flickMap["n"]!["output"]).toBe("à");
+    expect(flickMap["n"]!["id"]).toBe("U_00E0");
+    expect(flickMap["n"]!["text"]).toBe("à");
+    expect(flickMap["n"]!["output"]).toBeUndefined();
   });
 
-  it("multitap entry appears in emitted JSON", () => {
+  it("multitap entry appears in emitted JSON with U_ id", () => {
     const layout = makeLayout([makeKey("K_A")]);
     const { layout: out } = applyTouchAssignments(layout, [multitap("K_A", "â")]);
 
@@ -439,6 +453,8 @@ describe("applyTouchAssignments — emit-side verification", () => {
 
     expect(Array.isArray(keyA["multitap"])).toBe(true);
     const mt = keyA["multitap"] as Array<Record<string, unknown>>;
-    expect(mt[0]!["output"]).toBe("â");
+    expect(mt[0]!["id"]).toBe("U_00E2");
+    expect(mt[0]!["text"]).toBe("â");
+    expect(mt[0]!["output"]).toBeUndefined();
   });
 });

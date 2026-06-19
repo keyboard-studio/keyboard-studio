@@ -1,0 +1,9 @@
+store(&NAME) 'LongpressTouch'
+store(&VERSION) '14.0'
+store(&KEYBOARDVERSION) '1.0'
+store(&TARGETS) 'any'
+store(&LAYOUTFILE) 'longpress_touch.keyman-touch-layout'
+begin Unicode > use(main)
+group(main) using keys
++ [K_A] > 'a'
++ [K_S] > 's'

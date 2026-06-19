@@ -14,6 +14,27 @@ import type { TouchAssignment } from "@keyboard-studio/contracts";
 import { NodeIdMinter } from "../codec/node-ids.js";
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert a Unicode character to its Keyman touch-layout sub-key id.
+ *
+ * Keyman derives the output character directly from a `U_<UPPERHEX>` key id —
+ * no `output` field is needed (and including one alongside a U_ id is
+ * redundant and can confuse kmc-kmn). The hex is uppercase, zero-padded to at
+ * least 4 digits (5 for astral planes, e.g. U_1F600).
+ *
+ * @see https://help.keyman.com/developer/language/guide/touch-layout-ids
+ */
+function charToUnicodeKeyId(char: string): string {
+  const cp = char.codePointAt(0);
+  if (cp === undefined) return "U_FFFD"; // replacement character as fallback
+  const hex = cp.toString(16).toUpperCase().padStart(4, "0");
+  return `U_${hex}`;
+}
+
+// ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
 
@@ -128,16 +149,21 @@ export function applyTouchAssignments(
       }
 
       const existingSk = key.sk ?? [];
-      // Dedupe: skip if already present.
-      if (existingSk.some((s) => s.output === char)) {
+      // Dedupe: skip if already present. Check text (the glyph displayed on
+      // the key) because U_-id sk entries no longer carry an `output` field;
+      // fall back to output for backwards-compat with any pre-existing entries.
+      if (existingSk.some((s) => (s.text ?? s.output) === char)) {
         continue;
       }
 
       const newSkKey: TouchKeyIR = {
         nodeId: minter.mint("touchKey"),
-        id: `${hostKey}_sk_${char.codePointAt(0)?.toString(16) ?? "x"}`,
+        // U_<UPPERHEX> id: Keyman outputs the Unicode codepoint directly from
+        // this id form — no `output` field needed (adding one is redundant and
+        // can cause kmc-kmn to fail to produce artifacts). `text` is kept so
+        // the on-key glyph is rendered correctly in the OSK.
+        id: charToUnicodeKeyId(char),
         text: char,
-        output: char,
       };
 
       const updated: TouchKeyIR = {
@@ -169,9 +195,10 @@ export function applyTouchAssignments(
 
       const newFlickKey: TouchKeyIR = {
         nodeId: minter.mint("touchKey"),
-        id: `${hostKey}_flick_${direction}`,
+        // U_<UPPERHEX> id: same rationale as longpress sk — Keyman derives
+        // output from the id; `text` provides the on-key glyph.
+        id: charToUnicodeKeyId(char),
         text: char,
-        output: char,
       };
 
       // Merge with existing flick map; avoid spreading `undefined`.
@@ -202,17 +229,17 @@ export function applyTouchAssignments(
       }
 
       const existingMt = key.multitap ?? [];
-      // Dedupe: skip if already present.
-      if (existingMt.some((s) => s.output === char)) {
+      // Dedupe: same text/output fallback as longpress sk above.
+      if (existingMt.some((s) => (s.text ?? s.output) === char)) {
         continue;
       }
 
-      const index = existingMt.length;
       const newMtKey: TouchKeyIR = {
         nodeId: minter.mint("touchKey"),
-        id: `${hostKey}_mt_${index}`,
+        // U_<UPPERHEX> id: same rationale as longpress sk — Keyman derives
+        // output from the id; `text` provides the on-key glyph.
+        id: charToUnicodeKeyId(char),
         text: char,
-        output: char,
       };
 
       const updated: TouchKeyIR = {

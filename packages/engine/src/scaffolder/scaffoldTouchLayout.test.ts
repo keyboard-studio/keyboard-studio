@@ -293,7 +293,7 @@ describe("scaffoldTouchLayout", () => {
       expect(targetKey?.sk?.length).toBeGreaterThan(0);
     });
 
-    it("sk[] entries carry the correct successor character output", () => {
+    it("sk[] entries carry the correct successor character (via text; U_-id, no output field)", () => {
       const vkey = "K_E";
       const successorChar = "é";
       const ownedNodeId = freshId("rule");
@@ -319,8 +319,13 @@ describe("scaffoldTouchLayout", () => {
       const allKeys = defaultLayer.rows.flatMap((r) => r.keys);
       const targetKey = allKeys.find((k) => k.id === vkey)!;
 
-      const skOutputs = targetKey.sk!.map((s) => s.output);
-      expect(skOutputs).toContain(successorChar);
+      // U_-id sk entries: character is in `text`; `output` is omitted.
+      // é = U+00E9 → id "U_00E9"
+      const skTexts = targetKey.sk!.map((s) => s.text);
+      expect(skTexts).toContain(successorChar);
+      // Confirm the id is in U_ form, not the old _sk_ compound form.
+      const skIds = targetKey.sk!.map((s) => s.id);
+      expect(skIds.some((id) => /^U_[0-9A-F]{4,5}$/i.test(id))).toBe(true);
     });
 
     it("the hint is set to the first successor character for a S-02 key", () => {
@@ -560,8 +565,9 @@ describe("scaffoldTouchLayout", () => {
       expect(targetKey).toBeDefined();
       expect(targetKey?.sk).toBeDefined();
       expect(targetKey?.sk?.length).toBeGreaterThan(0);
-      const skOutputs = targetKey?.sk?.map((s) => s.output);
-      expect(skOutputs).toContain(successorChar);
+      // U_-id sk entries: character is in `text`; `output` is omitted.
+      const skTexts = targetKey?.sk?.map((s) => s.text);
+      expect(skTexts).toContain(successorChar);
     });
   });
 });

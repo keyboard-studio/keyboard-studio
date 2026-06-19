@@ -32,6 +32,28 @@ import type {
 import { NodeIdMinter } from "../codec/node-ids.js";
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert a Unicode character to its Keyman touch-layout sub-key id.
+ *
+ * Keyman derives the output character directly from a `U_<UPPERHEX>` key id —
+ * no `output` field is needed alongside it. The hex is uppercase, zero-padded
+ * to at least 4 digits (5 for astral planes, e.g. U_1F600).
+ *
+ * @see applyTouchAssignments.ts — identical helper, kept local to avoid
+ *      introducing a cross-module dependency between scaffolder and
+ *      pattern-apply.
+ */
+function charToUnicodeKeyId(char: string): string {
+  const cp = char.codePointAt(0);
+  if (cp === undefined) return "U_FFFD";
+  const hex = cp.toString(16).toUpperCase().padStart(4, "0");
+  return `U_${hex}`;
+}
+
+// ---------------------------------------------------------------------------
 // QWERTY physical-keyboard row layout (phone platform seed)
 // Standard US-QWERTY row ordering by physical position (top → bottom).
 // Used only when no existing touch layout is present in the IR.
@@ -260,9 +282,10 @@ function buildTouchKey(
     }
     key.sk = successors.map((ch) => ({
       nodeId: minter.mint("touchKey"),
-      id: `${vkey}_sk_${ch.codePointAt(0)?.toString(16) ?? "?"}`,
+      // U_<UPPERHEX> id: Keyman outputs the codepoint from this id form — no
+      // `output` field needed. `text` provides the on-key glyph display.
+      id: charToUnicodeKeyId(ch),
       text: ch,
-      output: ch,
     }));
   }
 
@@ -353,12 +376,13 @@ function augmentExistingPhoneLayers(
 
         const existingSk = key.sk ?? [];
         const newSk: TouchKeyIR[] = successors
-          .filter((ch) => !existingSk.some((s) => s.output === ch))
+          .filter((ch) => !existingSk.some((s) => s.text === ch))
           .map((ch) => ({
             nodeId: minter.mint("touchKey"),
-            id: `${key.id}_sk_${ch.codePointAt(0)?.toString(16) ?? "?"}`,
+            // U_<UPPERHEX> id: Keyman outputs the codepoint from this id form — no
+            // `output` field needed. `text` provides the on-key glyph display.
+            id: charToUnicodeKeyId(ch),
             text: ch,
-            output: ch,
           }));
 
         if (newSk.length === 0) return key;
