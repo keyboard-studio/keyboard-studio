@@ -165,94 +165,109 @@ describe("TouchGallery — empty inventory guard", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Defect A — vfsTransform injects the edited touch layout into the VFS
+// Inject-only-when-real-edits — vfsTransform behaviour
 // ---------------------------------------------------------------------------
+//
+// Core contract: the vfsTransform MUST NOT inject source/<id>.keyman-touch-layout
+// when there are no real (non-inherited) touch edits, so KMW can render its own
+// polished native default. It MUST inject the path (with JSON containing the sk)
+// when the author has made at least one longpress / flick / multitap assignment.
 
-describe("TouchGallery — vfsTransform reflects edits (Defect A)", () => {
-  it("injects a .keyman-touch-layout into the VFS when the transform runs", async () => {
+describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
+  it("does NOT set source/<id>.keyman-touch-layout when there are no real touch edits", async () => {
     seedStore({ withInventory: ["ä"] });
 
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} />);
     });
 
-    // The transform is called on first render. Invoke it and assert the path exists.
+    // With charTouch empty (no edits at all), the path must be absent.
     const vfs = runTransform("basic_kbdus");
-    const entry = vfs.get("source/basic_kbdus.keyman-touch-layout");
-    expect(entry).not.toBeUndefined();
-    // Initial state: charTouch is empty, so buildTouchLayoutJson gets [].
-    // The mock JSON contains assignments: [].
-    expect(entry?.content).toContain("_mock");
+    expect(vfs.get("source/basic_kbdus.keyman-touch-layout")).toBeUndefined();
+    // buildTouchLayoutJson must NOT have been called (no real edits to build).
+    expect(buildTouchLayoutJsonSpy).not.toHaveBeenCalled();
   });
 
-  it("produces different injected JSON after the author applies a longpress assignment", async () => {
+  it("does NOT set source/<id>.keyman-touch-layout when ALL assignments are touch_inherited", async () => {
     seedStore({ withInventory: ["ä"] });
 
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} />);
     });
 
-    // Capture the injected JSON BEFORE any edit.
-    const jsonBefore = JSON.stringify(runTransform("basic_kbdus").get("source/basic_kbdus.keyman-touch-layout")?.content);
+    // Accept "Already in layout" — this records a touch_inherited assignment,
+    // which is NOT a real edit. The path should still be absent.
+    const allButtons = screen.queryAllByRole("button");
+    const alreadyBtn = allButtons.find(
+      (b) => b.textContent?.toLowerCase().includes("already in layout"),
+    ) ?? null;
+    expect(alreadyBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(alreadyBtn!);
+    });
 
-    // Simulate: choose "Assign a method" (dismiss the suggestion card), pick
-    // longpress, set a host key, and click Apply. We drive this through the UI.
-    // The suggestion card "Already in layout" / "Choose method" should be visible
-    // for "ä" (the first inventory character).
-
-    // Click "Choose method" to dismiss the suggestion card and show method picker.
-    const chooseBtn = screen.queryByRole("button", { name: /choose method/i });
-    if (chooseBtn) {
-      fireEvent.click(chooseBtn);
-    }
-
-    // Expand the "Longpress" card if present.
-    const longpressOption = screen.queryByText(/longpress/i);
-    if (longpressOption) {
-      fireEvent.click(longpressOption);
-    }
-
-    // Set a host key via the select (K_A is a common option).
-    const hostKeySelect = screen.queryByRole("combobox", { name: /host key/i });
-    if (hostKeySelect) {
-      fireEvent.change(hostKeySelect, { target: { value: "K_A" } });
-    }
-
-    // Click Apply.
-    const applyBtn = screen.queryByRole("button", { name: /apply method/i });
-    if (applyBtn && !(applyBtn as HTMLButtonElement).disabled) {
-      await act(async () => {
-        fireEvent.click(applyBtn);
-      });
-    }
-
-    // Capture the injected JSON AFTER the edit.
-    const jsonAfter = JSON.stringify(runTransform("basic_kbdus").get("source/basic_kbdus.keyman-touch-layout")?.content);
-
-    // After a longpress assignment is applied, buildTouchLayoutJson should have
-    // been called with a non-empty assignments array, so the JSON differs from
-    // the initial empty state.
-    // Note: if the UI flow above didn't fully apply an assignment (e.g. the
-    // "Choose method" button was absent because the component renders differently),
-    // we still assert the transform exists and produces consistent output. The
-    // important regression guard is that jsonBefore and jsonAfter are DIFFERENT
-    // ONLY when an assignment was actually applied — if no assignment was applied,
-    // the spy call count tells us.
-    const spyCallCount = buildTouchLayoutJsonSpy.mock.calls.length;
-    expect(spyCallCount).toBeGreaterThan(0);
-
-    // If an assignment was applied (host key select was found and changed),
-    // the two JSON strings must differ.
-    if (hostKeySelect) {
-      expect(jsonAfter).not.toEqual(jsonBefore);
-    }
+    const vfs = runTransform("basic_kbdus");
+    expect(vfs.get("source/basic_kbdus.keyman-touch-layout")).toBeUndefined();
+    // buildTouchLayoutJson must NOT have been called (only inherited assignments).
+    expect(buildTouchLayoutJsonSpy).not.toHaveBeenCalled();
   });
 
-  it("two successive edits produce different vfsTransform outputs — Defect A guarantee (unconditional)", async () => {
-    // Drive assignment state directly via the store so the guarantee is
-    // asserted regardless of jsdom's rendering of the method-picker UI.
-    // buildTouchLayoutJsonSpy is keyed on the assignments array, so two
-    // different charTouch states must produce two different JSON strings.
+  it("DOES set source/<id>.keyman-touch-layout with sk JSON after a longpress edit", async () => {
+    seedStore({ withInventory: ["ä"] });
+
+    buildTouchLayoutJsonSpy.mockImplementation(
+      (_baseIr: unknown, assignments: Array<{ target: string; mechanisms: Array<{ patternId: string }> }>) => ({
+        json: JSON.stringify({ _mock: true, assignments }),
+        warnings: [],
+      }),
+    );
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} />);
+    });
+
+    // Before any edit: path must be absent.
+    expect(runTransform("basic_kbdus").get("source/basic_kbdus.keyman-touch-layout")).toBeUndefined();
+
+    // Click "Choose method" button — text content is "Choose method",
+    // aria-label is "Choose touch method manually". Find by text content.
+    const allBtns = screen.queryAllByRole("button");
+    const chooseBtn = allBtns.find((b) => b.textContent?.trim() === "Choose method") ?? null;
+    expect(chooseBtn).not.toBeNull();
+    await act(async () => { fireEvent.click(chooseBtn!); });
+
+    // Select "Long-press on a key".
+    const longpressOption = screen.queryByText(/long.press on a key/i);
+    expect(longpressOption).not.toBeNull();
+    await act(async () => { fireEvent.click(longpressOption!); });
+
+    // Set a host key.
+    const hostKeySelect = screen.queryByRole("combobox", { name: /host key/i });
+    expect(hostKeySelect).not.toBeNull();
+    await act(async () => {
+      fireEvent.change(hostKeySelect!, { target: { value: "K_A" } });
+    });
+
+    // Click Apply — button text is "Apply method".
+    const applyBtns = screen.queryAllByRole("button");
+    const applyBtn = applyBtns.find((b) => b.textContent?.trim() === "Apply method") ?? null;
+    expect(applyBtn).not.toBeNull();
+    expect((applyBtn as HTMLButtonElement).disabled).toBe(false);
+    await act(async () => { fireEvent.click(applyBtn!); });
+
+    // After the longpress edit: path MUST be present and contain the assignment.
+    const vfsAfter = runTransform("basic_kbdus");
+    const entry = vfsAfter.get("source/basic_kbdus.keyman-touch-layout");
+    expect(entry).not.toBeUndefined();
+    expect(String(entry?.content)).toContain("longpress_alternates");
+    // buildTouchLayoutJson must have been called with the non-inherited assignment.
+    expect(buildTouchLayoutJsonSpy).toHaveBeenCalledTimes(1);
+    const [, passedAssignments] = buildTouchLayoutJsonSpy.mock.calls[0]!;
+    expect((passedAssignments as Array<{mechanisms: Array<{patternId: string}>}>)[0]?.mechanisms[0]?.patternId)
+      .toBe("longpress_alternates");
+  });
+
+  it("produces different vfsTransform outputs before and after a real edit (Defect A guarantee)", async () => {
     seedStore({ withInventory: ["ä"] });
 
     let callCount = 0;
@@ -267,75 +282,39 @@ describe("TouchGallery — vfsTransform reflects edits (Defect A)", () => {
       render(<TouchGallery onComplete={vi.fn()} />);
     });
 
-    // Baseline: transform produces JSON with empty assignments.
-    const vfsBefore = createVirtualFS([]);
-    capturedVfsTransformRef.current?.(vfsBefore, "basic_kbdus");
-    const jsonBefore = vfsBefore.get("source/basic_kbdus.keyman-touch-layout")?.content;
-    expect(jsonBefore).toBeDefined();
-    const countBefore = callCount;
+    // Baseline: no real edits → path absent, spy not called.
+    const vfsBefore = runTransform("basic_kbdus");
+    expect(vfsBefore.get("source/basic_kbdus.keyman-touch-layout")).toBeUndefined();
+    expect(callCount).toBe(0);
 
-    // Apply an assignment by clicking the "Already in layout" button, which
-    // calls handleSuggestionAccept and updates charTouch — the simplest
-    // unconditional path in the component.
-    // The button has visible text "Already in layout"; query by text content
-    // to avoid brittleness from aria-label variations.
-    const allButtons = screen.queryAllByRole("button");
-    const alreadyBtn = allButtons.find(
-      (b) => b.textContent?.toLowerCase().includes("already in layout"),
-    ) ?? null;
-    expect(alreadyBtn).not.toBeNull(); // guard: must render or test fails loudly
+    // Click "Choose method" — find by text content (aria-label differs).
+    const allBtns = screen.queryAllByRole("button");
+    const chooseBtn = allBtns.find((b) => b.textContent?.trim() === "Choose method") ?? null;
+    expect(chooseBtn).not.toBeNull();
+    await act(async () => { fireEvent.click(chooseBtn!); });
+
+    const longpressOption = screen.queryByText(/long.press on a key/i);
+    expect(longpressOption).not.toBeNull();
+    await act(async () => { fireEvent.click(longpressOption!); });
+
+    const hostKeySelect = screen.queryByRole("combobox", { name: /host key/i });
+    expect(hostKeySelect).not.toBeNull();
     await act(async () => {
-      fireEvent.click(alreadyBtn!);
+      fireEvent.change(hostKeySelect!, { target: { value: "K_A" } });
     });
 
-    // After the click, charTouch has one entry → vfsTransform rebuilds.
-    const vfsAfter = createVirtualFS([]);
-    capturedVfsTransformRef.current?.(vfsAfter, "basic_kbdus");
-    const jsonAfter = vfsAfter.get("source/basic_kbdus.keyman-touch-layout")?.content;
-    expect(jsonAfter).toBeDefined();
+    const applyBtns2 = screen.queryAllByRole("button");
+    const applyBtn = applyBtns2.find((b) => b.textContent?.trim() === "Apply method") ?? null;
+    expect(applyBtn).not.toBeNull();
+    await act(async () => { fireEvent.click(applyBtn!); });
 
-    // Spy must have been called at least once more after the state change.
-    expect(callCount).toBeGreaterThan(countBefore);
-    // The two JSON strings must differ (Defect A guarantee).
-    expect(jsonAfter).not.toEqual(jsonBefore);
-  });
-
-  it("two successive distinct edits produce different vfsTransform outputs", async () => {
-    seedStore({ withInventory: ["ä", "ö"] });
-
-    // Mock buildTouchLayoutJson with a counter so we can distinguish calls.
-    let callCount = 0;
-    buildTouchLayoutJsonSpy.mockImplementation(
-      (_baseIr: unknown, assignments: unknown[]) => ({
-        json: JSON.stringify({ call: ++callCount, assignments }),
-        warnings: [],
-      }),
-    );
-
-    await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} />);
-    });
-
-    // Capture initial state.
-    const initial = capturedVfsTransformRef.current;
-    const initialVfs = createVirtualFS([]);
-    initial?.(initialVfs, "basic_kbdus");
-    const initialJson = initialVfs.get("source/basic_kbdus.keyman-touch-layout")?.content;
-    const initialCallCount = callCount;
-
-    // buildTouchLayoutJson was called at least once (on first render with empty map).
-    expect(callCount).toBeGreaterThanOrEqual(1);
-
-    // We verified: the transform is memoized on touchKey. When the component
-    // re-renders with no charTouch changes the transform reference is stable,
-    // and when charTouch changes a new transform is produced. The spy call
-    // count only increases when charTouch changes. This test guards the
-    // structural invariant — the transform always injects the touch layout path.
-    expect(initialJson).toBeDefined();
-    // The injected content uses buildTouchLayoutJson output (not minimalTouchJson
-    // when baseIr is set), confirming the fix for Defect A is active.
-    expect(String(initialJson)).toContain("call");
-    void initialCallCount;
+    // After the edit: path present, spy called once, content non-null.
+    const vfsAfter = runTransform("basic_kbdus");
+    const entry = vfsAfter.get("source/basic_kbdus.keyman-touch-layout");
+    expect(entry).not.toBeUndefined();
+    expect(callCount).toBeGreaterThan(0);
+    // Defect A guarantee: injected JSON is non-null and contains assignment info.
+    expect(String(entry?.content)).toContain("defectA");
   });
 });
 

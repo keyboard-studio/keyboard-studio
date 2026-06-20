@@ -827,13 +827,13 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     expect(stored).toContain("K_A");
   });
 
-  it("setTouchLayoutJson is NOT called when baseIr is null", async () => {
+  it("setTouchLayoutJson(null) when baseIr is null (no real edits possible)", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    // baseIr is null — store is not seeded. handlePhaseEComplete must skip
-    // setTouchLayoutJson rather than calling it with bad data.
+    // baseIr is null — store is not seeded. handlePhaseEComplete must call
+    // setTouchLayoutJson(null) rather than attempting to build a layout.
     _mockTouchEAssignmentsRef.current = [];
 
     advanceToMechanisms();
@@ -843,7 +843,37 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
       fireEvent.click(screen.getByTestId("e-complete"));
     });
 
-    // Store baseIr is null → setTouchLayoutJson must NOT have been called.
+    // Store baseIr is null → touchLayoutJson must remain null.
+    expect(useWorkingCopyStore.getState().touchLayoutJson).toBeNull();
+  });
+
+  it("setTouchLayoutJson(null) when assignments is empty even with baseIr set", async () => {
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
+    // Seed baseIr so the branch condition is clear: assignments empty → null,
+    // regardless of baseIr presence.
+    const fakeIr = makeTestIR([]);
+    act(() => {
+      useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+        vfs: createVirtualFS([]),
+        ir: fakeIr,
+      });
+    });
+
+    // Empty assignments — no real touch edits were made.
+    _mockTouchEAssignmentsRef.current = [];
+
+    advanceToMechanisms();
+    fireEvent.click(screen.getByTestId("mechanisms-complete"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("e-complete"));
+    });
+
+    // No real edits → touchLayoutJson must be null so serializeWorkingCopy
+    // leaves the VFS untouched and KMW uses its native default.
     expect(useWorkingCopyStore.getState().touchLayoutJson).toBeNull();
   });
 });

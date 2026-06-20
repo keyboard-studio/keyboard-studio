@@ -28,7 +28,6 @@
 import { useState, useEffect, useMemo, useCallback, type CSSProperties } from "react";
 import type { TouchAssignment } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { buildMinimalPhoneTouchLayout, emitTouchLayout } from "@keyboard-studio/engine";
 import { buildTouchLayoutJson } from "../lib/buildTouchLayoutJson.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { LintSummary } from "../lint/LintSummary.tsx";
@@ -569,7 +568,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       identity?.keyboardId != null
         ? { keyboardId: identity.keyboardId, displayName: identity.displayName ?? "" }
         : null,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [identity?.keyboardId, identity?.displayName],
   );
 
@@ -585,10 +583,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       ? new Map(touchDraft.charTouchEntries)
       : new Map(),
   );
-
-  // Minimal Keyman-default phone layout — fallback when baseIr is not yet set.
-  // Not derived from desktop rules; used only when baseIr === null.
-  const minimalTouchJson = useMemo(() => emitTouchLayout(buildMinimalPhoneTouchLayout()), []);
 
   // Stable primitive key serializing the current charTouch map so useMemo fires
   // exactly when the author's edits change (mirrors assignmentsKey in
@@ -606,31 +600,38 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     [charTouch],
   );
 
-  // Build applied touch layout JSON from baseIr + non-inherited assignments.
-  // The filter here matches handleContinue exactly (the single source of truth
-  // for what "non-inherited" means). When baseIr is null the preview falls back
-  // to minimalTouchJson so the OSK still renders.
+  // Build applied touch layout JSON only when the author has made real (non-inherited)
+  // touch edits. When there are no such edits, return null so the VFS is left
+  // untouched and KMW renders its own polished native default (or the keyboard's
+  // shipped .keyman-touch-layout file is used verbatim).
+  //
+  // "Real edit" = at least one assignment whose patternId !== "touch_inherited".
+  // This filter matches handleContinue exactly (the single source of truth).
   const touchLayoutJson = useMemo(() => {
-    if (baseIr === null) return null;
-    const applied = [...charTouch.values()].filter(
+    const appliedEdits = [...charTouch.values()].filter(
       (a) => a.mechanisms[0]?.patternId !== "touch_inherited",
     );
-    return buildTouchLayoutJson(baseIr, applied).json;
+    if (appliedEdits.length === 0) return null;
+    if (baseIr === null) return null;
+    return buildTouchLayoutJson(baseIr, appliedEdits).json;
     // touchKey drives re-evaluation when charTouch changes (Map identity is
     // not stable; the key is). baseIr is a stable snapshot post-lockDesktop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseIr, touchKey]);
 
-  // VFS transform: always overwrite the phone layout with the scaffold+apply
-  // result. Phase E is the authoritative source for the touch layout — the
-  // existing base file (if any) is superseded once the author enters Phase E.
-  // Falls back to minimalTouchJson only when baseIr is not yet available.
+  // VFS transform: inject the generated touch layout only when the author has
+  // made real (non-inherited) touch edits. When touchLayoutJson is null — either
+  // because no real edits exist or because the emit pipeline failed — leave the
+  // VFS untouched so KMW renders its own polished native default (or the
+  // keyboard's shipped .keyman-touch-layout file is used verbatim).
   const vfsTransform = useMemo<VfsTransform>(
     () => (vfs, kbId) => {
-      vfs.set(`source/${kbId}.keyman-touch-layout`, touchLayoutJson ?? minimalTouchJson);
+      if (touchLayoutJson !== null) {
+        vfs.set(`source/${kbId}.keyman-touch-layout`, touchLayoutJson);
+      }
       return { warnings: [] };
     },
-    [touchLayoutJson, minimalTouchJson],
+    [touchLayoutJson],
   );
 
   const { stage, retry } = useKeyboardArtifact(baseKeyboard, scaffoldSpec, vfsTransform);
@@ -920,7 +921,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     const cloned = createVirtualFS(baseVfs.entries());
     cloned.set(`source/${keyboardId}.keyman-touch-layout`, touchLayoutJson);
     return cloned;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseVfs, touchLayoutJson, keyboardId]);
 
   // Touch lint — runs on the projected (edited) VFS so checks 18.1–18.5 reflect

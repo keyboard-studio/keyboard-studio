@@ -208,10 +208,12 @@ export interface WorkingCopyState {
   recordTouchAssignments: (assignments: TouchAssignment[]) => void;
   /**
    * Persist the serialized `.keyman-touch-layout` JSON produced at Phase E
-   * completion. Replaces any prior value (last-wins). Pass the result of
-   * `JSON.stringify(scaffoldTouchLayout(ir), null, 2)` from the call site.
+   * completion. Replaces any prior value (last-wins).
+   * Pass `null` when there are no real touch edits — the store will clear any
+   * previously stored layout so `serializeWorkingCopy` leaves the VFS untouched
+   * and KMW renders its own native default (or the keyboard's shipped file).
    */
-  setTouchLayoutJson: (json: string) => void;
+  setTouchLayoutJson: (json: string | null) => void;
   /**
    * Persist the in-progress Phase E draft so it survives an unmount/remount
    * caused by back-navigation to Phase C. Call from TouchGallery whenever

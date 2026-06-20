@@ -372,10 +372,14 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     recordTouchAssignments(assignments);
     // assignments arriving here are already filtered to non-inherited by
     // TouchGallery.handleContinue — do NOT double-filter.
-    // Persist the applied touch layout JSON so serializeWorkingCopy can inject
-    // it into source/<keyboardId>.keyman-touch-layout at output time.
-    // Seed from baseIr (the post-lockDesktop snapshot) to match the preview.
-    if (baseIr !== null) {
+    //
+    // Inject-only-when-real-edits policy: if there are no non-inherited
+    // assignments, clear any previously stored touch layout and let KMW use
+    // its own native default (or the keyboard's shipped .keyman-touch-layout).
+    // Only generate and store a layout when there is something real to inject.
+    if (assignments.length === 0 || baseIr === null) {
+      setTouchLayoutJson(null);
+    } else {
       try {
         const { json, warnings } = buildTouchLayoutJson(baseIr, assignments);
         if (warnings.length > 0) {
@@ -383,11 +387,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         }
         // json is null when the emit pipeline threw — omit the touch layout
         // rather than injecting null/empty. setStage("F") still runs below.
-        if (json !== null) {
-          setTouchLayoutJson(json);
-        }
+        setTouchLayoutJson(json);
       } catch (err) {
         console.error("[handlePhaseEComplete] buildTouchLayoutJson threw unexpectedly:", err);
+        setTouchLayoutJson(null);
       }
     }
     setStage("F");
