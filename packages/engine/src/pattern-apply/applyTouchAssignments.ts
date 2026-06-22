@@ -230,6 +230,32 @@ export function applyTouchAssignments(
       continue;
     }
 
+    if (patternId === "touch_key_replace") {
+      const hostKey = slotValues?.["hostKey"] ?? "";
+      const char = slotValues?.["char"] ?? "";
+
+      const key = getWorkingKey(hostKey);
+      if (!key) {
+        warnings.push(
+          `[touch-apply] host key "${hostKey}" not found in phone default layer — assignment for "${char}" skipped`
+        );
+        continue;
+      }
+
+      // Destructure out any existing `output` field so the U_-id supersedes it.
+      // Preserve all other properties: nodeId, geometry (pad, width, sp),
+      // nextlayer, and any existing sk / flick / multitap.
+      const { output: _omit, ...rest } = key;
+      const updated: TouchKeyIR = {
+        ...rest,
+        id: charToUnicodeKeyId(char),
+        text: char,
+      };
+
+      setWorkingKey(hostKey, updated);
+      continue;
+    }
+
     // Unknown patternId — one warning per assignment.
     warnings.push(
       `[touch-apply] unknown patternId "${patternId}" — assignment skipped`
