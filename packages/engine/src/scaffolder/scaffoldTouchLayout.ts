@@ -324,7 +324,7 @@ function buildLetterKey(
  *   Row 2 (10): K_SHIFT(sp:1→shift / sp:2→default) Z X C V B N M  K_PERIOD  K_BKSP(sp:1)
  *   Row 3  (4): K_NUMLOCK("*123*",sp:1,w:150,nextlayer:numeric)
  *               K_LOPT("*Menu*",sp:1,w:120)
- *               K_SPACE("",sp:0,w:610)
+ *               K_SPACE("", width:610)
  *               K_ENTER("*Enter*",sp:1,w:150)
  *
  * numeric layer:

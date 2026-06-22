@@ -156,7 +156,7 @@ describe("TouchGallery — empty inventory guard", () => {
   it("renders the no-inventory prompt when confirmedInventory is empty", async () => {
     seedStore();
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
     // With empty inventory the component renders a guard message and no OSK.
     expect(screen.getByText(/No characters in inventory yet/i)).toBeTruthy();
@@ -178,7 +178,7 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     seedStore({ withInventory: ["ä"] });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
     // With charTouch empty (no edits at all), the path must be absent.
@@ -192,7 +192,7 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     seedStore({ withInventory: ["ä"] });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
     // Accept "Already in layout" — this records a touch_inherited assignment,
@@ -223,7 +223,7 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     );
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
     // Before any edit: path must be absent.
@@ -279,7 +279,7 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     );
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
     // Baseline: no real edits → path absent, spy not called.

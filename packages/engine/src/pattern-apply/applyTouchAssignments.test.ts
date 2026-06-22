@@ -312,14 +312,21 @@ describe("applyTouchAssignments — idempotency", () => {
   });
 
   it("applying a list that includes a duplicate sk entry for a key that already has that sk entry", () => {
-    // Simulate existing sk already having "á"
+    // Simulate existing sk already having "á" — intentionally uses a legacy/imported
+    // compound id form ("K_A_sk_e1") to verify that dedup is by output/text, not by
+    // id form. Pre-existing/imported layouts may carry old-form ids; dedup must
+    // still recognise a match based on the produced character.
     const keyWithSk = makeKey("K_A", {
       sk: [{ nodeId: "pre_sk", id: "K_A_sk_e1", text: "á", output: "á" }],
     });
     const layout = makeLayout([keyWithSk]);
     const { layout: out } = applyTouchAssignments(layout, [longpress("K_A", "á")]);
-    // Should still be exactly 1 — deduped
+    // Should still be exactly 1 — deduped by output/text, not by id form
     expect(getKey(out, "K_A")!.sk).toHaveLength(1);
+    // Dedup-by-output guarantee: no second entry with the same produced character
+    const skEntries = getKey(out, "K_A")!.sk ?? [];
+    const textsForA = skEntries.filter((e) => e.text === "á");
+    expect(textsForA).toHaveLength(1);
   });
 });
 

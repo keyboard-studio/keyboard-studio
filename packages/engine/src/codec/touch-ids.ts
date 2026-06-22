@@ -16,6 +16,10 @@
  * kmc-kmn). The hex is uppercase, zero-padded to at least 4 digits (5 for
  * astral planes, e.g. U_1F600).
  *
+ * The input is normalized to NFC before extracting the code point so that
+ * NFD inputs (base + combining mark as separate code points) yield the same
+ * id as their precomposed NFC equivalent — e.g. "á" → "U_00E1".
+ *
  * Returns `"U_FFFD"` (REPLACEMENT CHARACTER) when the input string has no
  * valid code point (empty string edge case).
  *
@@ -26,7 +30,7 @@
  *   charToUnicodeKeyId("$")  // "U_0024"
  */
 export function charToUnicodeKeyId(char: string): string {
-  const cp = char.codePointAt(0);
+  const cp = char.normalize("NFC").codePointAt(0);
   if (cp === undefined) return "U_FFFD";
   const hex = cp.toString(16).toUpperCase().padStart(4, "0");
   return `U_${hex}`;
