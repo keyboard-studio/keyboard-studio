@@ -1554,6 +1554,7 @@ export function MechanismGallery({
               )}
               {appliedForCurrentChar > 0 && (
                 <div
+                  role="group"
                   aria-label="Applied methods — click to remove"
                   style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 2 }}
                 >
