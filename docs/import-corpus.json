@@ -11654,7 +11654,7 @@
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
-      "ruleCount": 413,
+      "ruleCount": 430,
       "groupCount": 4,
       "rawFragmentCount": 3
     },
@@ -12258,9 +12258,9 @@
           "count": 101
         }
       ],
-      "recognizedRatio": 0.003436426116838488,
+      "recognizedRatio": 0.0034071550255536627,
       "i2": "structural-divergence",
-      "ruleCount": 1164,
+      "ruleCount": 1174,
       "groupCount": 4,
       "rawFragmentCount": 104
     },
