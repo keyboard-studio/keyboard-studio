@@ -1,13 +1,17 @@
-// Tests for PreviewShell — projection-warning surface (Task 2).
+// Tests for PreviewScreen and OutputScreen — the two screens produced by the
+// preview/output split.
 //
-// Coverage:
-//   1. No warning region when serializeWorkingCopy returns no warnings.
-//   2. Warning region renders with all warning strings when non-empty.
-//   3. Warning region has role="status" and aria-live="polite" (non-blocking).
-//   4. Warning region is cleared on a fresh download attempt.
+// PreviewScreen ("try it"):
+//   - Renders OSK (testid osk-frame) and DiagnosticsPanel.
+//   - Does NOT render a "Download .zip" button.
+//   - Does NOT render GitHubSubmitPanel.
 //
-// The heavy pipeline (useKeyboardArtifact, serializeWorkingCopy, BaseKeyboardPicker,
-// OSKFrame, etc.) is mocked so we can exercise the UI state machine without WASM.
+// OutputScreen ("ship it"):
+//   - Renders "Download .zip" button and GitHubSubmitPanel.
+//   - Does NOT render an interactive OSK (no osk-frame testid).
+//   - projection-warning surface (original PreviewShell.test coverage, re-homed here)
+//   - identity-unset warning banner (AC2 + AC4)
+//   - download filename
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
@@ -39,6 +43,7 @@ const { mockSerializeResult, mockStage } = vi.hoisted(() => {
 
 vi.mock("../lib/serializeWorkingCopy.ts", () => ({
   serializeWorkingCopy: () => Promise.resolve(mockSerializeResult.current),
+  projectWorkingCopyForOutput: () => Promise.resolve(null),
 }));
 
 vi.mock("../hooks/useKeyboardArtifact.ts", () => ({
@@ -82,13 +87,33 @@ vi.mock("./OskModeToggle.tsx", () => ({
 
 vi.mock("../lib/confirmRebase.ts", () => ({
   confirmRebaseIfEdited: () => true,
+  instantiateFromBaseIfConfirmed: vi.fn(),
+}));
+
+vi.mock("../hooks/useWorkingCopyTransform.ts", () => ({
+  useWorkingCopyTransform: () => null,
+}));
+
+// GitHubSubmitPanel pulls heavy deps (useGitHubAuth, services); mock it to a
+// recognisable testid so we can assert its presence/absence without importing
+// the real module.
+vi.mock("./GitHubSubmitPanel.tsx", () => ({
+  GitHubSubmitPanel: () => (
+    <section
+      data-testid="github-submit-panel"
+      aria-label="Submit to community repository"
+    >
+      GitHub submit panel
+    </section>
+  ),
 }));
 
 // ---------------------------------------------------------------------------
-// Import the component under test AFTER mocks are registered.
+// Import components under test AFTER mocks are registered.
 // ---------------------------------------------------------------------------
 
-import { PreviewShell } from "./PreviewShell.tsx";
+import { PreviewScreen } from "./PreviewScreen.tsx";
+import { OutputScreen } from "./OutputScreen.tsx";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -106,10 +131,11 @@ function seedInstantiatedWorkingCopy() {
 
 const readyStage: Stage = {
   kind: "ready",
-  compileResult: { success: true, artifacts: [], diagnostics: [] },
+  compileResult: { success: true, artifacts: [], diagnostics: [], compileMs: 0, isWarmCompile: true },
   jsBlobUrl: "",
   vfs: createVirtualFS(),
   scaffoldWarnings: [],
+  keyboardId: "basic_kbdus",
 };
 
 // ---------------------------------------------------------------------------
@@ -128,10 +154,67 @@ afterEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests — projection warning surface
+// Route-split assertions (AC)
 // ---------------------------------------------------------------------------
 
-describe("PreviewShell — projection warnings", () => {
+describe("PreviewScreen — route-split AC", () => {
+  it("renders the OSK frame (osk-frame testid)", () => {
+    render(<PreviewScreen />);
+    expect(screen.getByTestId("osk-frame")).toBeTruthy();
+  });
+
+  it("renders DiagnosticsPanel (no-diagnostics message) after base is picked", () => {
+    render(<PreviewScreen />);
+    fireEvent.click(screen.getByTestId("base-picker"));
+    // DiagnosticsPanel renders "No compiler diagnostics." when empty.
+    expect(screen.getByText(/no compiler diagnostics/i)).toBeTruthy();
+  });
+
+  it("does NOT render a Download .zip button", () => {
+    render(<PreviewScreen />);
+    fireEvent.click(screen.getByTestId("base-picker"));
+    expect(screen.queryByRole("button", { name: /download/i })).toBeNull();
+  });
+
+  it("does NOT render GitHubSubmitPanel", () => {
+    render(<PreviewScreen />);
+    fireEvent.click(screen.getByTestId("base-picker"));
+    expect(screen.queryByTestId("github-submit-panel")).toBeNull();
+  });
+});
+
+describe("OutputScreen — route-split AC", () => {
+  it("renders the Download .zip button after base is picked", () => {
+    seedInstantiatedWorkingCopy();
+    mockSerializeResult.current = {
+      bytes: new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      warnings: [],
+      keyboardId: "basic_kbdus",
+      version: "1.0",
+    };
+    render(<OutputScreen />);
+    fireEvent.click(screen.getByTestId("base-picker"));
+    expect(screen.getByRole("button", { name: /download/i })).toBeTruthy();
+  });
+
+  it("renders GitHubSubmitPanel after base is picked", () => {
+    render(<OutputScreen />);
+    fireEvent.click(screen.getByTestId("base-picker"));
+    expect(screen.getByTestId("github-submit-panel")).toBeTruthy();
+  });
+
+  it("does NOT render an interactive OSK (no osk-frame testid)", () => {
+    render(<OutputScreen />);
+    fireEvent.click(screen.getByTestId("base-picker"));
+    expect(screen.queryByTestId("osk-frame")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — projection warning surface (re-homed from PreviewShell.test)
+// ---------------------------------------------------------------------------
+
+describe("OutputScreen — projection warnings", () => {
   it("does NOT render a warning region when serializeWorkingCopy returns no warnings", async () => {
     seedInstantiatedWorkingCopy();
     mockSerializeResult.current = {
@@ -141,7 +224,7 @@ describe("PreviewShell — projection warnings", () => {
       version: "1.0",
     };
 
-    render(<PreviewShell />);
+    render(<OutputScreen />);
 
     // Click the base picker to set the base keyboard (renders the Download button).
     fireEvent.click(screen.getByTestId("base-picker"));
@@ -168,7 +251,7 @@ describe("PreviewShell — projection warnings", () => {
       version: "1.0",
     };
 
-    render(<PreviewShell />);
+    render(<OutputScreen />);
     fireEvent.click(screen.getByTestId("base-picker"));
 
     await act(async () => {
@@ -191,7 +274,7 @@ describe("PreviewShell — projection warnings", () => {
       version: "1.0",
     };
 
-    render(<PreviewShell />);
+    render(<OutputScreen />);
     fireEvent.click(screen.getByTestId("base-picker"));
 
     await act(async () => {
@@ -213,7 +296,7 @@ describe("PreviewShell — projection warnings", () => {
       version: "1.0",
     };
 
-    render(<PreviewShell />);
+    render(<OutputScreen />);
     fireEvent.click(screen.getByTestId("base-picker"));
 
     await act(async () => {
@@ -243,13 +326,13 @@ describe("PreviewShell — projection warnings", () => {
 // Tests — identity-unset warning banner (AC2 + AC4)
 // ---------------------------------------------------------------------------
 
-// Helper: render with the base-picker clicked so local baseKeyboard is set
-// (the identity-warn banner is inside {baseKeyboard !== null && ...}).
+// Helper: render OutputScreen with the base-picker clicked so local
+// baseKeyboard is set (the identity-warn banner is inside {baseKeyboard !== null}).
 // seedInstantiatedWorkingCopy() seeds the store first so the idempotence guard
 // in instantiateFromBase keeps identity = null → showIdentityWarn = true.
-function renderWithBasePicked() {
+function renderOutputWithBasePicked() {
   seedInstantiatedWorkingCopy();
-  render(<PreviewShell />);
+  render(<OutputScreen />);
   fireEvent.click(screen.getByTestId("base-picker"));
 }
 
@@ -260,9 +343,9 @@ function getIdentityStatusRegion() {
   return el!;
 }
 
-describe("PreviewShell — identity-unset warning banner", () => {
+describe("OutputScreen — identity-unset warning banner", () => {
   it("renders an actionable button with the identity-step aria-label when identity is unset (AC4)", () => {
-    renderWithBasePicked();
+    renderOutputWithBasePicked();
 
     // The banner must contain a button that directs the user to the id step.
     const btn = screen.getByRole("button", {
@@ -276,7 +359,7 @@ describe("PreviewShell — identity-unset warning banner", () => {
   });
 
   it("actionable button is inside the role=status live region (AC4)", () => {
-    renderWithBasePicked();
+    renderOutputWithBasePicked();
 
     // Find the status region that contains the identity-warn text.
     const identityStatus = getIdentityStatusRegion();
@@ -287,7 +370,7 @@ describe("PreviewShell — identity-unset warning banner", () => {
   });
 
   it("banner text references the download/zip path (AC2)", () => {
-    renderWithBasePicked();
+    renderOutputWithBasePicked();
 
     const identityStatus = getIdentityStatusRegion();
     // Must mention the ZIP download concern.
@@ -295,7 +378,7 @@ describe("PreviewShell — identity-unset warning banner", () => {
   });
 
   it("banner text also references the community repository (AC2)", () => {
-    renderWithBasePicked();
+    renderOutputWithBasePicked();
 
     const identityStatus = getIdentityStatusRegion();
     expect(identityStatus.textContent).toMatch(/community repository/i);
@@ -306,7 +389,7 @@ describe("PreviewShell — identity-unset warning banner", () => {
 // Tests — download filename
 // ---------------------------------------------------------------------------
 
-describe("PreviewShell — download filename", () => {
+describe("OutputScreen — download filename", () => {
   it("names the download <keyboardId>-<version>.zip", async () => {
     seedInstantiatedWorkingCopy();
     mockSerializeResult.current = {
@@ -316,9 +399,9 @@ describe("PreviewShell — download filename", () => {
       version: "2.5",
     };
 
-    // Spy on createElement to capture the download anchor's filename. Override the
-    // anchor's click() to a no-op so we read the download attr without triggering
-    // jsdom's "navigation not implemented" noise.
+    // Spy on createElement to capture the download anchor's filename. Override
+    // the anchor's click() to a no-op so we read the download attr without
+    // triggering jsdom's "navigation not implemented" noise.
     const realCreateElement = document.createElement.bind(document);
     let anchorDownload: string | null = null;
     const createElementSpy = vi
@@ -335,7 +418,7 @@ describe("PreviewShell — download filename", () => {
       }) as typeof document.createElement);
 
     try {
-      render(<PreviewShell />);
+      render(<OutputScreen />);
       fireEvent.click(screen.getByTestId("base-picker"));
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: /download/i }));

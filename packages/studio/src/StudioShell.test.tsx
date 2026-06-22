@@ -350,10 +350,14 @@ vi.mock("./lib/buildTouchLayoutJson.ts", () => ({
   }),
 }));
 
-// Shallow stub for PreviewShell — routing tests assert on the marker div, not
-// the internal pipeline. The real PreviewShell is covered by PreviewShell.test.tsx.
-vi.mock("./components/PreviewShell.tsx", () => ({
-  PreviewShell: () => <div data-testid="preview-shell-root">preview-shell</div>,
+// Shallow stubs for PreviewScreen and OutputScreen — routing tests assert on
+// the marker divs, not the internal pipeline.
+vi.mock("./components/PreviewScreen.tsx", () => ({
+  PreviewScreen: () => <div data-testid="preview-screen-root">preview-screen</div>,
+}));
+
+vi.mock("./components/OutputScreen.tsx", () => ({
+  OutputScreen: () => <div data-testid="output-screen-root">output-screen</div>,
 }));
 
 // Shallow stub for FlowMapView — only rendered in dev/VITE_SHOW_FLOWMAP builds.
@@ -618,34 +622,39 @@ describe("SurveyView — mechanisms → carve back-navigation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// StudioShell routing regression — #preview and #output mount PreviewShell,
-// NOT RoutePlaceholder.
+// StudioShell routing regression — #preview mounts PreviewScreen and #output
+// mounts OutputScreen (distinct screens, NOT RoutePlaceholder).
 // ---------------------------------------------------------------------------
 
-describe("StudioShell — route: #preview renders PreviewShell", () => {
-  it("mounts PreviewShell (not RoutePlaceholder) when hash is #preview", async () => {
+describe("StudioShell — route: #preview renders PreviewScreen", () => {
+  it("mounts PreviewScreen (not RoutePlaceholder) when hash is #preview", async () => {
     window.location.hash = "#preview";
 
     await act(async () => {
       render(<StudioShell />);
     });
 
-    // PreviewShell stub must be present.
-    expect(screen.getByTestId("preview-shell-root")).toBeTruthy();
+    // PreviewScreen stub must be present.
+    expect(screen.getByTestId("preview-screen-root")).toBeTruthy();
+    // OutputScreen must NOT be present — these are distinct screens.
+    expect(screen.queryByTestId("output-screen-root")).toBeNull();
     // RoutePlaceholder renders "Preview — coming soon"; must NOT be present.
     expect(screen.queryByText(/coming soon/i)).toBeNull();
   });
 });
 
-describe("StudioShell — route: #output renders PreviewShell", () => {
-  it("mounts PreviewShell (not RoutePlaceholder) when hash is #output", async () => {
+describe("StudioShell — route: #output renders OutputScreen", () => {
+  it("mounts OutputScreen (not RoutePlaceholder) when hash is #output", async () => {
     window.location.hash = "#output";
 
     await act(async () => {
       render(<StudioShell />);
     });
 
-    expect(screen.getByTestId("preview-shell-root")).toBeTruthy();
+    // OutputScreen stub must be present.
+    expect(screen.getByTestId("output-screen-root")).toBeTruthy();
+    // PreviewScreen must NOT be present — these are distinct screens.
+    expect(screen.queryByTestId("preview-screen-root")).toBeNull();
     expect(screen.queryByText(/coming soon/i)).toBeNull();
   });
 });

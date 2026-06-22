@@ -4,8 +4,10 @@
 //   #survey  (default)  — full authoring wizard: identity → base → prefill →
 //                         B (inventory) → carve (Phase D) →
 //                         mechanisms (Phase C) → E → help (Phase F) → done
-//   #preview            — PreviewShell (OSK preview + diagnostics + download)
-//   #output             — PreviewShell (same combined shell; v1 — split is a later refinement)
+//   #preview            — PreviewScreen: "try it" — OSK preview + diagnostics
+//                         (no Download button, no GitHubSubmitPanel)
+//   #output             — OutputScreen: "ship it" — Download .zip +
+//                         GitHubSubmitPanel (no interactive OSK)
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
@@ -35,7 +37,8 @@ import { buildFindingsByQuestionId } from "./lint/lintToQuestion.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
 import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
 import { FlowMapView } from "./flowmap/FlowMapView.tsx";
-import { PreviewShell } from "./components/PreviewShell.tsx";
+import { PreviewScreen } from "./components/PreviewScreen.tsx";
+import { OutputScreen } from "./components/OutputScreen.tsx";
 import { navigateTo } from "./lib/navigate.ts";
 
 // The Flow Map is a developer aid. It shows automatically in `vite dev`; in
@@ -709,10 +712,10 @@ export function StudioShell() {
       content = <SurveyView baseKeyboard={selectedBaseKeyboard} />;
       break;
     case "preview":
-      content = <PreviewShell />;
+      content = <PreviewScreen />;
       break;
     case "output":
-      content = <PreviewShell />;
+      content = <OutputScreen />;
       break;
     case "flowmap":
       content = <FlowMapView />;
