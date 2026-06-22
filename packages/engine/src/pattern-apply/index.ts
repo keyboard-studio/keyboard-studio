@@ -19,4 +19,3 @@ export type { ApplyTouchAssignmentsResult } from "./applyTouchAssignments.js";
 export { applyTouchAssignmentsToRawJson } from "./applyTouchAssignmentsToRawJson.js";
 export type { ApplyTouchAssignmentsToRawJsonResult } from "./applyTouchAssignmentsToRawJson.js";
 
-export { isTouchSubKeyDuplicate } from "./touch-mechanism-shared.js";

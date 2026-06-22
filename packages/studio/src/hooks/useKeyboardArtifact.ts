@@ -337,7 +337,8 @@ export function useKeyboardArtifact(
               if (touchEntry && typeof touchEntry.content === "string") {
                 try {
                   ir = { ...ir, touchLayout: engine.parseTouchLayout(touchEntry.content) };
-                } catch {
+                } catch (e) {
+                  console.warn("[useKeyboardArtifact] parseTouchLayout failed, falling back to generated default:", e);
                   // Leave ir.touchLayout undefined; fall back to the generated default.
                 }
               }
