@@ -247,6 +247,49 @@ describe("useWorkingCopyTransform — memoization", () => {
   });
 });
 
+describe("useWorkingCopyTransform — touch layout injection (step 0)", () => {
+  it("injects touchLayoutJson into source/<keyboardId>.keyman-touch-layout when store field is set", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedBase();
+    const touchJson = '{"phone":{"displayUnderlying":false,"layer":[]}}';
+    useWorkingCopyStore.getState().setTouchLayoutJson(touchJson);
+    const { result } = renderHook(() => useWorkingCopyTransform());
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    result.current!(vfs, "basic_kbdus");
+    // projectWorkingCopyVfs step 0 writes the touch layout directly into the VFS.
+    const entry = vfs.get("source/basic_kbdus.keyman-touch-layout");
+    expect(entry).toBeDefined();
+    expect(entry?.content).toBe(touchJson);
+  });
+
+  it("does NOT create .keyman-touch-layout when touchLayoutJson is null in the store", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedBase();
+    // touchLayoutJson is null after instantiateFromBase.
+    expect(useWorkingCopyStore.getState().touchLayoutJson).toBeNull();
+    const { result } = renderHook(() => useWorkingCopyTransform());
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    result.current!(vfs, "basic_kbdus");
+    expect(vfs.get("source/basic_kbdus.keyman-touch-layout")).toBeUndefined();
+  });
+
+  it("returns a new transform reference when touchLayoutJson changes", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedBase();
+    const { result } = renderHook(() => useWorkingCopyTransform());
+    const first = result.current;
+    act(() => {
+      useWorkingCopyStore.getState().setTouchLayoutJson('{"phone":{"displayUnderlying":false,"layer":[]}}');
+    });
+    // touchLayoutJson is a memo dependency — the transform reference must change.
+    expect(result.current).not.toBe(first);
+  });
+});
+
 describe("useWorkingCopyTransform — assignment-warning when patternMap is null", () => {
   it("adds a warning when assignments exist but patternMap is null", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");

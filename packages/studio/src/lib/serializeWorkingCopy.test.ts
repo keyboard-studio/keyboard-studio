@@ -356,6 +356,34 @@ describe("serializeWorkingCopy — identity.keyboardId drives zip filename", () 
 });
 
 // ---------------------------------------------------------------------------
+// Touch layout passthrough (regression guard — refactor must be behavior-preserving)
+// ---------------------------------------------------------------------------
+
+describe("serializeWorkingCopy — touchLayoutJson forwarded to projectWorkingCopyVfs", () => {
+  it("passes touchLayoutJson from store into projectWorkingCopyVfs when set", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedStore();
+    const touchJson = '{"phone":{"displayUnderlying":false,"layer":[]}}';
+    useWorkingCopyStore.getState().setTouchLayoutJson(touchJson);
+    await serializeWorkingCopy();
+    expect(projectWorkingCopyVfsSpy).toHaveBeenCalledOnce();
+    const callArg = projectWorkingCopyVfsSpy.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(callArg["touchLayoutJson"]).toBe(touchJson);
+  });
+
+  it("passes touchLayoutJson: null to projectWorkingCopyVfs when store field is null", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedStore();
+    // touchLayoutJson is null by default after instantiateFromBase.
+    expect(useWorkingCopyStore.getState().touchLayoutJson).toBeNull();
+    await serializeWorkingCopy();
+    expect(projectWorkingCopyVfsSpy).toHaveBeenCalledOnce();
+    const callArg = projectWorkingCopyVfsSpy.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(callArg["touchLayoutJson"]).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Adapt-vs-copy path (Track 2)
 // ---------------------------------------------------------------------------
 

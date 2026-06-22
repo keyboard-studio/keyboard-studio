@@ -10,6 +10,9 @@
 // (single 300 ms debounce contract upheld; spec §8 Decision D3).
 //
 // Projection order (§12 "re-projected layers"):
+//   0. Touch layout — inject Phase E touchLayoutJson into .keyman-touch-layout so
+//      the OSK preview reflects the touch layout the author built. Omitted when
+//      touchLayoutJson is null (no Phase E edits yet).
 //   1. Carve deletions — re-emit the filtered IR into the VFS .kmn, replacing
 //      the fetched source. baseIr is never mutated; a filtered copy is used.
 //   2. Assignments — applyAssignmentsToVfs on the carved .kmn. If no patternMap
@@ -80,8 +83,11 @@ export function useWorkingCopyTransform(
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const identity = useWorkingCopyStore((s) => s.identity);
-  // Assignments: physical only (touch is a separate gallery).
+  // Assignments: physical only (touch is projected via touchLayoutJson below).
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
+  // Phase E touch layout — a primitive string | null; injected into the VFS by
+  // projectWorkingCopyVfs (step 0) so the OSK preview reflects Phase E edits.
+  const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
 
   // Derive the current physical assignments from phaseResults.
   const sessionAssignments = useMemo(
@@ -133,6 +139,7 @@ export function useWorkingCopyTransform(
     const capturedBcp47 = identityBcp47;
     const capturedPatternMap = patternMap;
     const capturedBaseIr = baseIr;
+    const capturedTouchLayoutJson = touchLayoutJson;
 
     return (vfs: VirtualFS, keyboardId: string): { warnings: string[] } => {
       // Assignment-warning: when assignments exist but no patternMap was supplied,
@@ -174,6 +181,7 @@ export function useWorkingCopyTransform(
         assignments: effectiveAssignments,
         getPattern: (id) => capturedPatternMap?.get(id),
         identity: identityArg,
+        touchLayoutJson: capturedTouchLayoutJson,
       });
 
       return { warnings: [...preWarnings, ...projectionWarnings] };
@@ -187,5 +195,6 @@ export function useWorkingCopyTransform(
     identityKeyboardId,
     identityBcp47,
     patternMap,
+    touchLayoutJson,
   ]);
 }

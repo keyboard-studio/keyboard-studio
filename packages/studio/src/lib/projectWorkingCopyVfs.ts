@@ -1,5 +1,5 @@
-// projectWorkingCopyVfs — pure (non-React) helper that applies the three
-// working-copy projection layers onto a VirtualFS.
+// projectWorkingCopyVfs — pure (non-React) helper that applies the working-copy
+// projection layers onto a VirtualFS.
 //
 // Called by both:
 //   - useWorkingCopyTransform (hook, React path) — for the live OSK preview;
@@ -12,9 +12,18 @@
 // working-copy state.
 //
 // Projection order (spec §12 "re-projected layers"):
+//   0. Touch layout     — inject Phase E touchLayoutJson into .keyman-touch-layout
 //   1. Carve deletions  — applyCarveToVfs (re-emits filtered IR into .kmn)
 //   2. Assignments      — applyAssignmentsToVfs (injects mechanism patterns)
 //   3. Identity         — applyIdentityStubMutation (writes &NAME)
+//
+// Touch layout is injected FIRST (step 0) so:
+//   - Step 3.5 keycap-label patch (applyKeycapLabelsToVfs) patches the injected layout.
+//   - Step 4 id-rename pass renames source/<keyboardId>.keyman-touch-layout →
+//     source/<targetKeyboardId>.keyman-touch-layout when the author chose a new id.
+// Previously the output path (serializeWorkingCopy) injected touchLayoutJson inline
+// before calling this helper; centralizing it here ensures the preview path also
+// receives the Phase E touch layout.
 //
 // The function mutates `vfs` in-place. Callers that need the original VFS
 // preserved must clone it before calling (e.g. createVirtualFS(baseVfs.entries())).
@@ -48,6 +57,10 @@ import {
  *                       filtering is applied inside this function defensively, so
  *                       callers may pass the full list or a pre-filtered physical one.
  * - `getPattern`      — synchronous pattern resolver for assignments.
+ * - `touchLayoutJson` — optional Phase E touch layout JSON string to inject into
+ *                       `source/<keyboardId>.keyman-touch-layout` before any other
+ *                       projection step. When `null` or `undefined`, no touch layout
+ *                       is written (the base VFS touch layout file, if any, is used).
  * - `identity`        — display name (and optionally other fields) to inject.
  */
 export interface ProjectWorkingCopyVfsInput {
@@ -80,6 +93,15 @@ export interface ProjectWorkingCopyVfsInput {
   assignments: ReadonlyArray<MechanismAssignment>;
   /** Synchronous resolver. Pass `() => undefined` when no pattern library is available. */
   getPattern: (id: string) => Pattern | undefined;
+  /**
+   * Optional Phase E touch layout JSON string. When provided (non-null, non-undefined),
+   * written into `source/<keyboardId>.keyman-touch-layout` at step 0, before carve,
+   * assignments, identity, and the keycap-label + id-rename passes.
+   *
+   * Injecting first ensures the keycap-label patch (step 3.5) and the id-rename pass
+   * (step 4) operate on the Phase E layout rather than the base VFS's layout.
+   */
+  touchLayoutJson?: string | null;
   /** Identity overlay. Pass `null` to skip identity projection. */
   identity: IdentityOverlay | null;
 }
@@ -130,9 +152,21 @@ export function projectWorkingCopyVfs(
     assignments,
     getPattern,
     identity,
+    touchLayoutJson,
   } = input;
 
   const warnings: string[] = [];
+
+  // Step 0: Touch layout injection — write the Phase E touch layout JSON into
+  // `source/<keyboardId>.keyman-touch-layout` before any other projection step.
+  // Injecting here (rather than at each call site) ensures that:
+  //   - the keycap-label patch (step 3.5) patches the injected layout, and
+  //   - the id-rename pass (step 4) renames the file when the author chose a new id.
+  // Previously serializeWorkingCopy injected this inline before calling this helper;
+  // centralizing it here is the fix that makes the OSK preview equivalent to the ZIP.
+  if (touchLayoutJson !== null && touchLayoutJson !== undefined) {
+    vfs.set(`source/${keyboardId}.keyman-touch-layout`, touchLayoutJson, false);
+  }
 
   // Step 1: Carve projection — re-emit IR with deleted nodes filtered out.
   // Writes `source/<keyboardId>.kmn` back into vfs. When deletedNodeIds is

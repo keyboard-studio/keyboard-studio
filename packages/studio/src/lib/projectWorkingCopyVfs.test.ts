@@ -341,6 +341,105 @@ describe("projectWorkingCopyVfs — in-place mutation", () => {
   });
 });
 
+describe("projectWorkingCopyVfs — touch layout injection (step 0)", () => {
+  it("writes touchLayoutJson into source/<keyboardId>.keyman-touch-layout when provided", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const vfs = makeVfs();
+    const touchJson = '{"phone":{"displayUnderlying":false,"layer":[]}}';
+    projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+      touchLayoutJson: touchJson,
+    });
+    const entry = vfs.get("source/test_kb.keyman-touch-layout");
+    expect(entry).toBeDefined();
+    expect(entry?.content).toBe(touchJson);
+  });
+
+  it("does NOT create a .keyman-touch-layout entry when touchLayoutJson is null", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const vfs = makeVfs();
+    projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+      touchLayoutJson: null,
+    });
+    expect(vfs.get("source/test_kb.keyman-touch-layout")).toBeUndefined();
+  });
+
+  it("does NOT create a .keyman-touch-layout entry when touchLayoutJson is undefined (omitted)", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const vfs = makeVfs();
+    projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+      // touchLayoutJson intentionally omitted
+    });
+    expect(vfs.get("source/test_kb.keyman-touch-layout")).toBeUndefined();
+  });
+
+  it("leaves a pre-existing base .keyman-touch-layout entry unchanged when touchLayoutJson is null", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const baseContent = '{"phone":{"displayUnderlying":false,"layer":[]}}';
+    const vfs = createVirtualFS([
+      { path: "source/test_kb.kmn", content: "c test\n", isBinary: false },
+      { path: "source/test_kb.keyman-touch-layout", content: baseContent, isBinary: false },
+    ]);
+    projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+      touchLayoutJson: null,
+    });
+    // Pre-existing entry must not be overwritten.
+    expect(vfs.get("source/test_kb.keyman-touch-layout")?.content).toBe(baseContent);
+  });
+
+  it("injected .keyman-touch-layout is renamed to source/<targetKeyboardId>.keyman-touch-layout by the id-rename pass", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const touchJson = '{"tablet":{"displayUnderlying":false,"layer":[]}}';
+    const vfs = createVirtualFS([
+      { path: "source/sil_base.kmn", content: "c stub\n", isBinary: false },
+    ]);
+    projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "sil_base",
+      targetKeyboardId: "ha_sil",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: { displayName: "Hausa" },
+      touchLayoutJson: touchJson,
+    });
+    // Old path must be gone after rename.
+    expect(vfs.get("source/sil_base.keyman-touch-layout")).toBeUndefined();
+    // New path must hold the injected content.
+    const renamed = vfs.get("source/ha_sil.keyman-touch-layout");
+    expect(renamed).toBeDefined();
+    expect(renamed?.content).toBe(touchJson);
+  });
+});
+
 describe("projectWorkingCopyVfs — id rename (step 4)", () => {
   it("renames sibling files and rewrites kmw-keyboard-<baseId> CSS selectors when targetKeyboardId differs", async () => {
     const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
