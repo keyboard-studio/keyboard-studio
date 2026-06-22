@@ -29,6 +29,7 @@ import { useState, useEffect, useMemo, useCallback, type CSSProperties } from "r
 import type { TouchAssignment } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { buildTouchLayoutJson } from "../lib/buildTouchLayoutJson.ts";
+import { resolveBaseTouchJson } from "../lib/resolveBaseTouchJson.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { LintSummary } from "../lint/LintSummary.tsx";
 import { useTouchLint } from "../hooks/useTouchLint.ts";
@@ -710,11 +711,14 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     );
     if (appliedEdits.length === 0) return null;
     if (baseIr === null) return null;
-    return buildTouchLayoutJson(baseIr, appliedEdits).json;
+    // Case B: base ships a touch layout → apply faithfully onto raw JSON copy.
+    // Case A: no shipped touch layout (or baseVfs not yet loaded) → IR-based path.
+    return buildTouchLayoutJson(baseIr, appliedEdits, resolveBaseTouchJson(baseVfs)).json;
     // touchKey drives re-evaluation when charTouch changes (Map identity is
     // not stable; the key is). baseIr is a stable snapshot post-lockDesktop.
+    // baseVfs is stable after instantiation but included for correctness.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseIr, touchKey]);
+  }, [baseIr, touchKey, baseVfs]);
 
   // VFS transform: inject the generated touch layout only when the author has
   // made real (non-inherited) touch edits. When touchLayoutJson is null — either
@@ -1881,56 +1885,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             onKeyTap={handleKeyTap}
           />
         </div>
-      </div>
-
-      {/* Footer — Continue button */}
-      <div
-        style={{
-          padding: "14px 24px",
-          borderTop: `1px solid ${BORDER}`,
-          flexShrink: 0,
-          display: "flex",
-          gap: 12,
-          alignItems: "center",
-        }}
-      >
-        <button
-          type="button"
-          onClick={handleContinue}
-          aria-label={
-            charTouch.size > 0
-              ? `Continue with ${charTouch.size} character${charTouch.size !== 1 ? "s" : ""} configured`
-              : "Continue without touch configuration"
-          }
-          style={{
-            padding: "10px 28px",
-            background: BLUE_ACTION,
-            border: "none",
-            borderRadius: 6,
-            color: "#e6edf3",
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: "pointer",
-            fontFamily: FONT,
-          }}
-        >
-          Continue
-        </button>
-        {charTouch.size > 0 && (
-          <span style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-            {charTouch.size} character
-            {charTouch.size !== 1 ? "s" : ""} configured
-          </span>
-        )}
-        {charTouch.size === 0 && !isDone && (
-          <button
-            type="button"
-            onClick={handleContinue}
-            style={{ ...ghostBtn, fontSize: 12, padding: "5px 12px" }}
-          >
-            Skip touch configuration
-          </button>
-        )}
       </div>
     </div>
   );

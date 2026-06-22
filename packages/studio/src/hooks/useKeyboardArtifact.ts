@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { BaseKeyboard, VirtualFS, KeyboardIR, KpsFontEntry, KpsStylesheetEntry } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, VirtualFS, KeyboardIR, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { LOCAL_PROXY_BASE, getScaffolderService } from "../lib/services.ts";
 import { findKmnPath } from "../lib/findKmnPath.ts";
+import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
 
 interface EngineModule {
   compile: (fs: VirtualFS, keyboardId: string) => Promise<CompileResult>;
@@ -16,6 +17,13 @@ interface EngineModule {
   isReady?: () => boolean;
   parseKmn?: (text: string, keyboardId: string) => { ir: KeyboardIR; opaqueFeatures: Array<{ feature: string; count: number }> };
   recognizePatterns?: (ir: KeyboardIR) => { ir: KeyboardIR; recognizedRatio: number };
+  /**
+   * Parse a `.keyman-touch-layout` JSON string into a TouchLayoutIR. Used at
+   * import time to carry the base's shipped touch layout into `ir.touchLayout`
+   * so downstream touch authoring edits a copy of it rather than regenerating a
+   * default layout from scratch.
+   */
+  parseTouchLayout?: (json: string) => TouchLayoutIR;
   /**
    * Remove dangling packaging-asset store references (BITMAP / VISUALKEYBOARD /
    * LAYOUTFILE / …) whose target file is absent from the VFS. kmcmplib emits
@@ -314,7 +322,28 @@ export function useKeyboardArtifact(
           try {
             const pr = engine.parseKmn(kmnText, compileId);
             const recognized = engine.recognizePatterns(pr.ir);
-            return { ...pr, ir: recognized.ir };
+            let ir = recognized.ir;
+            // Carry the base's shipped .keyman-touch-layout into the IR so that
+            // touch authoring (Phase E preview + Phase F output) edits a COPY of
+            // the existing layout — scaffoldTouchLayout Case B (preserve +
+            // augment) — instead of regenerating a default layout from scratch
+            // (Case A) the moment the author makes an edit. This mirrors how the
+            // desktop keyboard is adapted from the base rather than rebuilt.
+            // A malformed/absent touch file leaves ir.touchLayout undefined, so
+            // the generated default remains the fallback.
+            if (engine.parseTouchLayout && ir.touchLayout === undefined) {
+              const touchPath = findTouchLayoutPath(vfs);
+              const touchEntry = touchPath ? vfs.get(touchPath) : undefined;
+              if (touchEntry && typeof touchEntry.content === "string") {
+                try {
+                  ir = { ...ir, touchLayout: engine.parseTouchLayout(touchEntry.content) };
+                } catch (e) {
+                  console.warn("[useKeyboardArtifact] parseTouchLayout failed, falling back to generated default:", e);
+                  // Leave ir.touchLayout undefined; fall back to the generated default.
+                }
+              }
+            }
+            return { ...pr, ir };
           } catch (parseErr: unknown) {
             // Record the gap so it surfaces as a warning on the ready stage.
             // Do not re-throw — compile must still succeed independently.

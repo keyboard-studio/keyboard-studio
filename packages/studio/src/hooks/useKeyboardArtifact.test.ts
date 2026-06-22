@@ -59,6 +59,12 @@ const mockEngine = {
     ir: mockIr,
     recognizedRatio: 0,
   })),
+  // parseTouchLayout lets the import path carry a base's shipped touch layout
+  // into ir.touchLayout. Returns a minimal one-platform TouchLayoutIR.
+  parseTouchLayout: vi.fn((_json: string) => ({
+    platforms: [{ id: "phone" as const, layers: [{ id: "default", rows: [] }] }],
+    nodeIds: [] as Array<[string, unknown]>,
+  })),
   // Preview compile strips dangling packaging-asset stores; the mock is a no-op
   // passthrough (the test .kmn declares no asset stores).
   stripDanglingAssetStores: vi.fn((kmn: string, _fs: VirtualFS) => ({
@@ -155,6 +161,59 @@ describe("useKeyboardArtifact — onInstantiate timing", () => {
     // parseKmn + recognizePatterns mocked above → IR must be non-null.
     expect(calledOpts.ir).not.toBeNull();
     expect(calledOpts.vfs).not.toBeNull();
+  });
+
+  it("carries the base's shipped .keyman-touch-layout into ir.touchLayout", async () => {
+    // When the base ships a touch layout, the import path must attach it to the
+    // IR so downstream touch authoring edits a COPY of the existing layout
+    // (scaffoldTouchLayout Case B) rather than regenerating a default (Case A).
+    mockEngine.fetchKeyboardSourceToVfs.mockImplementationOnce(
+      (_baseKeyboard: BaseKeyboard, vfs: VirtualFS) => {
+        vfs.set("source/test_kb.kmn", "c test\n", false);
+        vfs.set(
+          "source/test_kb.keyman-touch-layout",
+          JSON.stringify({ phone: { layer: [{ id: "default", row: [] }] } }),
+          false,
+        );
+        return Promise.resolve({});
+      },
+    );
+
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+    const onInstantiate = vi.fn<Parameters<OnInstantiateCallback>, void>();
+
+    renderHook(() => useKeyboardArtifact(baseKb, null, null, onInstantiate));
+
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(onInstantiate).toHaveBeenCalledTimes(1);
+    expect(mockEngine.parseTouchLayout).toHaveBeenCalledTimes(1);
+    const [, calledOpts] = onInstantiate.mock.calls[0]!;
+    expect(calledOpts.ir).not.toBeNull();
+    expect(calledOpts.ir?.touchLayout).toBeDefined();
+    expect(calledOpts.ir?.touchLayout?.platforms[0]?.id).toBe("phone");
+  });
+
+  it("does not call parseTouchLayout when the base ships no touch layout", async () => {
+    // Default fetch seeds only the .kmn — no touch file, so the branch is skipped
+    // and the generated default remains the fallback.
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+    const onInstantiate = vi.fn<Parameters<OnInstantiateCallback>, void>();
+
+    renderHook(() => useKeyboardArtifact(baseKb, null, null, onInstantiate));
+
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(onInstantiate).toHaveBeenCalledTimes(1);
+    expect(mockEngine.parseTouchLayout).not.toHaveBeenCalled();
+    const [, calledOpts] = onInstantiate.mock.calls[0]!;
+    expect(calledOpts.ir?.touchLayout).toBeUndefined();
   });
 
   it("onInstantiate is NOT called when baseKeyboard is null (idle path)", async () => {

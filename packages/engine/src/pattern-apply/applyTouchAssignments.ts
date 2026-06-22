@@ -13,6 +13,7 @@ import type { TouchLayoutIR, TouchKeyIR } from "@keyboard-studio/contracts";
 import type { TouchAssignment } from "@keyboard-studio/contracts";
 import { NodeIdMinter } from "../codec/node-ids.js";
 import { charToUnicodeKeyId } from "../codec/touch-ids.js";
+import { isTouchSubKeyDuplicate } from "./touch-mechanism-shared.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -129,10 +130,9 @@ export function applyTouchAssignments(
       }
 
       const existingSk = key.sk ?? [];
-      // Dedupe: skip if already present. Check text (the glyph displayed on
-      // the key) because U_-id sk entries no longer carry an `output` field;
-      // fall back to output for backwards-compat with any pre-existing entries.
-      if (existingSk.some((s) => (s.text ?? s.output) === char)) {
+      // Dedupe: skip if already present by text/output OR by U_ id (shared
+      // predicate — covers id-only sk entries that carry no text/output field).
+      if (existingSk.some((s) => isTouchSubKeyDuplicate(s, char))) {
         continue;
       }
 
@@ -208,8 +208,8 @@ export function applyTouchAssignments(
       }
 
       const existingMt = key.multitap ?? [];
-      // Dedupe: same text/output fallback as longpress sk above.
-      if (existingMt.some((s) => (s.text ?? s.output) === char)) {
+      // Dedupe: same predicate as longpress sk — covers id-only multitap entries.
+      if (existingMt.some((s) => isTouchSubKeyDuplicate(s, char))) {
         continue;
       }
 

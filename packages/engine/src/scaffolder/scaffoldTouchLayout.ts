@@ -1,6 +1,13 @@
 /**
  * scaffoldTouchLayout — spec §8 Phase E: physical → touch layout derivation.
  *
+ * **GENERATE-FROM-SCRATCH path only.** This function is used when the base
+ * keyboard ships NO `.keyman-touch-layout` file (Case A).  When the base DOES
+ * ship a touch layout, Phase E assignments are applied via
+ * [applyTouchAssignmentsToRawJson](../pattern-apply/applyTouchAssignmentsToRawJson.ts)
+ * instead, which preserves the shipped layout verbatim and does NOT auto-seed
+ * deadkey sk[] entries.
+ *
  * Derives a TouchLayoutIR for the phone platform from the IR's desktop key rules
  * and (optionally) from an existing .keyman-touch-layout already in the IR.
  *

@@ -33,6 +33,7 @@ import { ProjectNameStep } from "./components/ProjectNameStep.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
 import { usePlacementPriors } from "./hooks/usePlacementPriors.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
+import { resolveBaseTouchJson } from "./lib/resolveBaseTouchJson.ts";
 import { buildFindingsByQuestionId } from "./lint/lintToQuestion.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
 import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
@@ -384,7 +385,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       setTouchLayoutJson(null);
     } else {
       try {
-        const { json, warnings } = buildTouchLayoutJson(baseIr, assignments);
+        // Case B: base ships a touch layout → apply faithfully onto raw JSON copy.
+        // Case A: no shipped touch layout (or baseVfs not yet loaded) → IR-based path.
+        const { json, warnings } = buildTouchLayoutJson(baseIr, assignments, resolveBaseTouchJson(baseVfs));
         if (warnings.length > 0) {
           console.error("[handlePhaseEComplete] buildTouchLayoutJson warnings:", warnings);
         }

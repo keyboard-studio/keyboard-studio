@@ -15,3 +15,7 @@ export { applyKeycapLabelsToVfs } from "./applyKeycapLabelsToVfs.js";
 
 export { applyTouchAssignments } from "./applyTouchAssignments.js";
 export type { ApplyTouchAssignmentsResult } from "./applyTouchAssignments.js";
+
+export { applyTouchAssignmentsToRawJson } from "./applyTouchAssignmentsToRawJson.js";
+export type { ApplyTouchAssignmentsToRawJsonResult } from "./applyTouchAssignmentsToRawJson.js";
+
