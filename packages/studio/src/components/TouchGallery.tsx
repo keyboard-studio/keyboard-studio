@@ -44,6 +44,7 @@ import { useKeyboardArtifact } from "../hooks/useKeyboardArtifact.ts";
 import type { ScaffoldSpec, VfsTransform } from "../hooks/useKeyboardArtifact.ts";
 import { scaffoldTouchLayout } from "@keyboard-studio/engine";
 import { GalleryPreviewPane } from "./GalleryPreviewPane.tsx";
+import { GalleryIntroSplash } from "./GalleryIntroSplash.tsx";
 import { KEY_OPTIONS, VALID_HOST_KEYS } from "../lib/keyOptions.ts";
 import {
   BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
@@ -1047,111 +1048,32 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
   if (showIntro) {
     return (
-      <div style={{ ...pageStyle, padding: "24px 32px", overflowY: "auto" }}>
-        <div style={{ maxWidth: 600, margin: "0 auto" }}>
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label="Back to mechanisms (Phase C)"
-            style={ghostBtn}
-          >
-            &larr; Back
-          </button>
-
-          <div
-            style={{
-              marginTop: 40,
-              background: BG_CARD,
-              border: `1px solid ${BORDER}`,
-              borderRadius: 12,
-              padding: "28px 32px",
-              display: "flex",
-              flexDirection: "column",
-              gap: 16,
-            }}
-          >
-            <p
-              style={{
-                margin: 0,
-                fontSize: 12,
-                color: TEXT_DIM,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                fontFamily: FONT,
-              }}
-            >
-              Next step &middot; Touch
-            </p>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: "1.4rem",
-                fontWeight: 600,
-                color: ACCENT,
-                fontFamily: FONT,
-              }}
-            >
-              Welcome to the Touch Gallery
-            </h1>
-            <p
-              style={{
-                margin: 0,
-                fontSize: 14,
-                lineHeight: 1.6,
-                color: TEXT_MAIN,
-                fontFamily: FONT,
-              }}
-            >
-              Your desktop layout is locked in. Now you&rsquo;ll set how each
-              character is reached on phones and tablets, where there is no
-              physical keyboard.
-            </p>
-            <ul
-              style={{
-                margin: 0,
-                paddingLeft: 20,
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-                fontSize: 13,
-                lineHeight: 1.5,
-                color: TEXT_DIM,
-                fontFamily: FONT,
-              }}
-            >
-              <li>You&rsquo;ll go character by character, just like the desktop gallery.</li>
-              <li>
-                Pick a touch method &mdash; long-press, flick, multitap, or
-                replace &mdash; or Skip characters that already work.
-              </li>
-              <li>These choices apply to touch only and never change your desktop layout.</li>
-            </ul>
-            <button
-              type="button"
-              onClick={() => {
-                markGalleryIntroSeen("touch");
-                setShowIntro(false);
-              }}
-              aria-label="Start the touch gallery"
-              style={{
-                alignSelf: "flex-start",
-                marginTop: 4,
-                padding: "10px 24px",
-                background: BLUE_ACTION,
-                border: "none",
-                borderRadius: 6,
-                color: "#e6edf3",
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: FONT,
-              }}
-            >
-              Get started &rarr;
-            </button>
-          </div>
-        </div>
-      </div>
+      <GalleryIntroSplash
+        eyebrow="Next step · Touch"
+        title="Welcome to the Touch Gallery"
+        body={
+          <>
+            Your desktop layout is locked in. Now you&rsquo;ll set how each
+            character is reached on phones and tablets, where there is no
+            physical keyboard.
+          </>
+        }
+        bullets={[
+          <>You&rsquo;ll go character by character, just like the desktop gallery.</>,
+          <>
+            Pick a touch method &mdash; long-press, flick, multitap, or replace
+            &mdash; or Skip characters that already work.
+          </>,
+          <>These choices apply to touch only and never change your desktop layout.</>,
+        ]}
+        startAriaLabel="Start the touch gallery"
+        onStart={() => {
+          markGalleryIntroSeen("touch");
+          setShowIntro(false);
+        }}
+        onBack={onBack}
+        backAriaLabel="Back to mechanisms (Phase C)"
+      />
     );
   }
 

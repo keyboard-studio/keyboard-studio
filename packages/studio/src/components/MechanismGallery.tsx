@@ -49,6 +49,7 @@ import type { PlacementSeedEntry } from "../survey/placementSeeds.ts";
 import { getSuggestionForChar } from "../survey/placementSeeds.ts";
 import { KEY_OPTIONS, ALL_PICKABLE_KEYS } from "../lib/keyOptions.ts";
 import { GalleryPreviewPane } from "./GalleryPreviewPane.tsx";
+import { GalleryIntroSplash } from "./GalleryIntroSplash.tsx";
 import {
   BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
 } from "../lib/galleryTheme.ts";
@@ -1073,108 +1074,31 @@ export function MechanismGallery({
 
   if (showIntro) {
     return (
-      <div style={{ ...pageStyle, padding: "24px 32px", overflowY: "auto" }}>
-        <div style={{ maxWidth: 600, margin: "0 auto" }}>
-          {onBack !== undefined && (
-            <button type="button" onClick={onBack} style={ghostBtn}>
-              &larr; Back
-            </button>
-          )}
-
-          <div
-            style={{
-              marginTop: 40,
-              background: BG_CARD,
-              border: `1px solid ${BORDER}`,
-              borderRadius: 12,
-              padding: "28px 32px",
-              display: "flex",
-              flexDirection: "column",
-              gap: 16,
-            }}
-          >
-            <p
-              style={{
-                margin: 0,
-                fontSize: 12,
-                color: TEXT_DIM,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                fontFamily: FONT,
-              }}
-            >
-              Getting started &middot; Desktop
-            </p>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: "1.4rem",
-                fontWeight: 600,
-                color: ACCENT,
-                fontFamily: FONT,
-              }}
-            >
-              Welcome to the Mechanism Gallery
-            </h1>
-            <p
-              style={{
-                margin: 0,
-                fontSize: 14,
-                lineHeight: 1.6,
-                color: TEXT_MAIN,
-                fontFamily: FONT,
-              }}
-            >
-              This is where you build your keyboard. For each character your
-              language needs that the base layout doesn&rsquo;t already have,
-              you&rsquo;ll choose how to type it on a physical (desktop) keyboard.
-            </p>
-            <ul
-              style={{
-                margin: 0,
-                paddingLeft: 20,
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-                fontSize: 13,
-                lineHeight: 1.5,
-                color: TEXT_DIM,
-                fontFamily: FONT,
-              }}
-            >
-              <li>You&rsquo;ll go character by character through the list from your survey.</li>
-              <li>
-                Pick a method &mdash; type a sequence, use a dead key, swap a
-                key, or use AltGr &mdash; or Skip characters you don&rsquo;t need.
-              </li>
-              <li>Phones and tablets come later, in the Touch gallery.</li>
-            </ul>
-            <button
-              type="button"
-              onClick={() => {
-                markGalleryIntroSeen("mechanism");
-                setShowIntro(false);
-              }}
-              aria-label="Start the mechanism gallery"
-              style={{
-                alignSelf: "flex-start",
-                marginTop: 4,
-                padding: "10px 24px",
-                background: BLUE_ACTION,
-                border: "none",
-                borderRadius: 6,
-                color: "#e6edf3",
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: FONT,
-              }}
-            >
-              Get started &rarr;
-            </button>
-          </div>
-        </div>
-      </div>
+      <GalleryIntroSplash
+        eyebrow="Getting started · Desktop"
+        title="Welcome to the Mechanism Gallery"
+        body={
+          <>
+            This is where you build your keyboard. For each character your
+            language needs that the base layout doesn&rsquo;t already have,
+            you&rsquo;ll choose how to type it on a physical (desktop) keyboard.
+          </>
+        }
+        bullets={[
+          <>You&rsquo;ll go character by character through the list from your survey.</>,
+          <>
+            Pick a method &mdash; type a sequence, use a dead key, swap a key, or
+            use AltGr &mdash; or Skip characters you don&rsquo;t need.
+          </>,
+          <>Phones and tablets come later, in the Touch gallery.</>,
+        ]}
+        startAriaLabel="Start the mechanism gallery"
+        onStart={() => {
+          markGalleryIntroSeen("mechanism");
+          setShowIntro(false);
+        }}
+        {...(onBack !== undefined ? { onBack } : {})}
+      />
     );
   }
 
