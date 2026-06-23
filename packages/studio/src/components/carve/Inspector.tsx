@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import type { CarveNode } from '../../lib/irToCarveNodes.ts';
-import { nodeState, isCombining } from '../../lib/irToCarveNodes.ts';
+import { nodeState, displayChar } from '../../lib/irToCarveNodes.ts';
 import { ToggleBox } from './ToggleBox.tsx';
 import { GlyphCell } from './GlyphCell.tsx';
 import { KindBadge, KIND_COLOR } from './KindBadge.tsx';
 import { WarnIcon } from './carveShared.tsx';
+import { useHoverInfoStore } from '../../stores/hoverInfoStore.ts';
 
 const btnGhost: React.CSSProperties = {
   font: '600 12.5px var(--app-font)', cursor: 'pointer',
@@ -148,7 +149,7 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode }: St
               opacity: off ? 0.6 : 1,
             }}>
               <span style={{ font: "400 22px/1 'Lora', serif", color: off ? 'var(--app-text-subtle)' : 'var(--app-text)' }}>
-                {isCombining(ch) ? '◌' + ch : ch}
+                {displayChar(ch)}
               </span>
             </span>
           ))}
@@ -190,6 +191,8 @@ interface InspectorProps {
 export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetManyGlyphs, isDeleted, onToggleNode }: InspectorProps) {
   const [q, setQ] = useState('');
   useEffect(() => { setQ(''); }, [node?.nodeId]);
+  const setInfo = useHoverInfoStore((s) => s.setInfo);
+  const clearInfo = useHoverInfoStore((s) => s.clearInfo);
 
   if (!node) {
     return (
@@ -226,7 +229,14 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
             {node.strategy !== undefined && <StrategyChip id={node.strategy} />}
           </div>
         </div>
-        <button onClick={() => onSetManyGlyphs(glyphs.map((x) => x.gid), st !== 'off')} style={btnGhost}>
+        <button
+          onClick={() => onSetManyGlyphs(glyphs.map((x) => x.gid), st !== 'off')}
+          onMouseEnter={() => setInfo({ kind: 'text', title: st === 'off' ? 'Keep all' : 'Remove all', body: st === 'off' ? 'Restore every key shown here so it types again.' : 'Remove every key shown here at once — you can restore them later from the removed-items menu.' })}
+          onFocus={() => setInfo({ kind: 'text', title: st === 'off' ? 'Keep all' : 'Remove all', body: st === 'off' ? 'Restore every key shown here so it types again.' : 'Remove every key shown here at once — you can restore them later from the removed-items menu.' })}
+          onMouseLeave={clearInfo}
+          onBlur={clearInfo}
+          style={btnGhost}
+        >
           {st === 'off' ? 'Keep all' : 'Remove all'}
         </button>
       </div>
@@ -253,7 +263,7 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
             keys={x.keys}
             off={isItemDeleted(x.gid)}
             color={KIND_COLOR[node.kind]}
-            onClick={() => onToggleGlyph(x.gid)}
+            onToggle={onToggleGlyph}
           />
         ))}
       </div>

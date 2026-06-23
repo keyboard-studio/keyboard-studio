@@ -4,6 +4,7 @@ import { KIND_COLOR } from './KindBadge.tsx';
 import { ToggleBox } from './ToggleBox.tsx';
 import { WarnIcon } from './carveShared.tsx';
 import type { MouseEvent } from 'react';
+import { useHoverInfoStore } from '../../stores/hoverInfoStore.ts';
 
 interface RailSection {
   label: string;
@@ -48,6 +49,9 @@ interface RailProps {
 }
 
 export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, onSetManyGlyphs, onToggleNode }: RailProps) {
+  const setInfo = useHoverInfoStore((s) => s.setInfo);
+  const clearInfo = useHoverInfoStore((s) => s.clearInfo);
+
   return (
     <div style={{ width: 308, flex: '0 0 auto', borderRight: '1px solid var(--app-border)', background: 'var(--app-surface)', overflowY: 'auto' }}>
       {SECTIONS.map((sec) => {
@@ -74,6 +78,11 @@ export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, on
             <div
               key={node.nodeId}
               onClick={() => onSelect(node.nodeId)}
+              onMouseEnter={() => setInfo({ kind: 'node', node })}
+              onFocus={() => setInfo({ kind: 'node', node })}
+              onMouseLeave={clearInfo}
+              onBlur={clearInfo}
+              tabIndex={0}
               style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', cursor: 'pointer',
                 background: active ? 'var(--app-accent-subtle)' : 'transparent',
@@ -101,7 +110,7 @@ export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, on
                     <span style={{ font: '600 9px/1 var(--app-font-mono)', color: chipColor, border: '1px solid currentColor', borderRadius: 3, padding: '1px 4px', opacity: 0.85 }}>{chipLabel}</span>
                   )}
                   {node.loadBearing === true && (
-                    <span title="load-bearing" style={{ color: 'var(--sil-orange)', display: 'inline-flex' }}>
+                    <span aria-label="load-bearing" style={{ color: 'var(--sil-orange)', display: 'inline-flex' }}>
                       <WarnIcon size={11} />
                     </span>
                   )}

@@ -1,5 +1,7 @@
-import { isCombining } from '../../lib/irToCarveNodes.ts';
+import { memo } from 'react';
+import { displayChar } from '../../lib/irToCarveNodes.ts';
 import { KeySeq } from './KeySeq.tsx';
+import { useHoverInfoStore } from '../../stores/hoverInfoStore.ts';
 
 interface GlyphCellProps {
   gid: string;
@@ -7,15 +9,20 @@ interface GlyphCellProps {
   keys: string[];
   off: boolean;
   color: string;
-  onClick: () => void;
+  onToggle: (gid: string) => void;
 }
 
-export function GlyphCell({ ch, keys, off, color, onClick }: GlyphCellProps) {
-  const display = isCombining(ch) ? '◌' + ch : ch;
+export const GlyphCell = memo(function GlyphCell({ gid, ch, keys, off, color, onToggle }: GlyphCellProps) {
+  const setInfo = useHoverInfoStore((s) => s.setInfo);
+  const clearInfo = useHoverInfoStore((s) => s.clearInfo);
+  const display = displayChar(ch);
   return (
     <button
-      onClick={onClick}
-      title={`${keys.join(' ')} → ${ch}${off ? ' · removed' : ''}`}
+      onClick={() => onToggle(gid)}
+      onMouseEnter={() => setInfo({ kind: 'key', keys, ch, off })}
+      onMouseLeave={clearInfo}
+      onFocus={() => setInfo({ kind: 'key', keys, ch, off })}
+      onBlur={clearInfo}
       style={{
         position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'center', gap: 8,
@@ -37,4 +44,4 @@ export function GlyphCell({ ch, keys, off, color, onClick }: GlyphCellProps) {
       <KeySeq keys={keys} dim={off} />
     </button>
   );
-}
+});

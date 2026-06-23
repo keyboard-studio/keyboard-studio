@@ -19,6 +19,16 @@ export const isCombining = (ch: string) => {
   return /^\p{Mn}$/u.test(ch ?? '');
 };
 
+// Render-ready character: prefix combining marks with a dotted circle so they're visible standalone.
+export function displayChar(ch: string): string {
+  return isCombining(ch) ? '◌' + ch : ch;
+}
+
+// A glyph tile the user is hovering/focusing, plus its current removed state — used by the Info View.
+export interface HoverGlyph extends Pick<CarveGlyph, 'keys' | 'ch'> {
+  off: boolean;
+}
+
 export interface CarveGlyph {
   gid: string;
   keys: string[];

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useWorkingCopyStore } from '../stores/workingCopyStore.ts';
 import { toRailNodes, nodeState } from '../lib/irToCarveNodes.ts';
 import type { CarveNode } from '../lib/irToCarveNodes.ts';
@@ -8,6 +8,9 @@ import { DepBanner } from './carve/DepBanner.tsx';
 import type { DepNode } from './carve/DepBanner.tsx';
 import { Rail } from './carve/Rail.tsx';
 import { Inspector } from './carve/Inspector.tsx';
+import { InfoView } from './carve/InfoView.tsx';
+import { InfoIcon } from './carve/carveShared.tsx';
+import { useHoverInfoStore } from '../stores/hoverInfoStore.ts';
 
 interface CarveGalleryProps {
   onComplete: () => void;
@@ -28,6 +31,12 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   const restoreAll = useWorkingCopyStore((s) => s.restoreAll);
   const keepAll = useWorkingCopyStore((s) => s.keepAll);
 
+  const setInfo = useHoverInfoStore((s) => s.setInfo);
+  const clearInfo = useHoverInfoStore((s) => s.clearInfo);
+
+  // Clear stale hover info when CarveGallery unmounts (e.g. navigating away).
+  useEffect(() => () => clearInfo(), [clearInfo]);
+
   const nodes = useMemo(() => (ir ? toRailNodes(ir) : []), [ir]);
 
   // Gate: show the "all clear" screen only when ALL of the following hold:
@@ -44,6 +53,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
     return totalGlyphs <= 20;
   }, [nodes, instantiationMode]);
   const [forceOpen, setForceOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(true);
 
   const [selectedId, setSelectedId] = useState<string | null>(() => null);
   const selectedNode = useMemo<CarveNode | undefined>(
@@ -53,15 +63,15 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
   // Handlers for Rail/Inspector callbacks
   const handleSetManyGlyphs = useCallback((gids: string[], off: boolean) => {
-    gids.forEach((gid) => { off ? deleteItem(gid) : restoreItem(gid); });
+    gids.forEach((gid) => { if (off) { deleteItem(gid); } else { restoreItem(gid); } });
   }, [deleteItem, restoreItem]);
 
   const handleToggleNode = useCallback((nodeId: string, off: boolean) => {
-    off ? deleteNode(nodeId) : restoreNode(nodeId);
+    if (off) { deleteNode(nodeId); } else { restoreNode(nodeId); }
   }, [deleteNode, restoreNode]);
 
   const handleToggleGlyph = useCallback((gid: string) => {
-    isItemDeleted(gid) ? restoreItem(gid) : deleteItem(gid);
+    if (isItemDeleted(gid)) { restoreItem(gid); } else { deleteItem(gid); }
   }, [isItemDeleted, restoreItem, deleteItem]);
 
   // Kept / total counts
@@ -200,7 +210,14 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 22px', borderBottom: '1px solid var(--app-border)', flexShrink: 0 }}>
         {onBack !== undefined && (
-          <button onClick={onBack} style={{ font: '600 13px var(--app-font)', cursor: 'pointer', color: 'var(--app-text-muted)', background: 'transparent', border: 'none', padding: '4px 0', whiteSpace: 'nowrap' }}>
+          <button
+            onClick={onBack}
+            onMouseEnter={() => setInfo({ kind: 'text', title: 'Back', body: 'Return to the previous step.' })}
+            onFocus={() => setInfo({ kind: 'text', title: 'Back', body: 'Return to the previous step.' })}
+            onMouseLeave={clearInfo}
+            onBlur={clearInfo}
+            style={{ font: '600 13px var(--app-font)', cursor: 'pointer', color: 'var(--app-text-muted)', background: 'transparent', border: 'none', padding: '4px 0', whiteSpace: 'nowrap' }}
+          >
             ← Back
           </button>
         )}
@@ -213,14 +230,34 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
           </h1>
         </div>
         <button
+          onClick={() => setInfoOpen((v) => { if (v) clearInfo(); return !v; })}
+          aria-pressed={infoOpen}
+          aria-label={infoOpen ? 'Hide info panel' : 'Show info panel'}
+          onMouseEnter={() => setInfo({ kind: 'text', title: 'Info panel', body: 'Show or hide this panel. It describes whatever your cursor is over.' })}
+          onFocus={() => setInfo({ kind: 'text', title: 'Info panel', body: 'Show or hide this panel. It describes whatever your cursor is over.' })}
+          onMouseLeave={clearInfo}
+          onBlur={clearInfo}
+          style={{ font: '600 13px var(--app-font)', cursor: 'pointer', borderRadius: 8, padding: '7px 13px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5, marginRight: 4, background: infoOpen ? 'var(--app-accent)' : 'transparent', color: infoOpen ? '#fff' : 'var(--app-text-muted)', border: infoOpen ? '1px solid var(--app-accent)' : '1px solid var(--app-border-strong)', fontWeight: infoOpen ? 700 : 600 }}
+        >
+          <InfoIcon size={14} />
+          Info
+        </button>
+        <button
           onClick={() => { keepAll(); onComplete(); }}
-          title="Skip removal — keep all rules"
+          onMouseEnter={() => setInfo({ kind: 'text', title: 'Skip carving', body: 'Keep every rule and continue without removing anything.' })}
+          onFocus={() => setInfo({ kind: 'text', title: 'Skip carving', body: 'Keep every rule and continue without removing anything.' })}
+          onMouseLeave={clearInfo}
+          onBlur={clearInfo}
           style={{ font: '600 13px var(--app-font)', cursor: 'pointer', color: 'var(--app-text-muted)', background: 'transparent', border: '1px solid var(--app-border-strong)', borderRadius: 8, padding: '7px 13px', whiteSpace: 'nowrap', marginRight: 6 }}
         >
           Skip
         </button>
         <button
           onClick={onComplete}
+          onMouseEnter={() => setInfo({ kind: 'text', title: 'Continue', body: 'Save your changes and move to the next step.' })}
+          onFocus={() => setInfo({ kind: 'text', title: 'Continue', body: 'Save your changes and move to the next step.' })}
+          onMouseLeave={clearInfo}
+          onBlur={clearInfo}
           style={{ font: '600 13px var(--app-font)', cursor: 'pointer', color: '#fff', background: 'var(--app-accent)', border: 'none', borderRadius: 8, padding: '9px 18px' }}
         >
           Continue →
@@ -254,15 +291,18 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
           onSetManyGlyphs={handleSetManyGlyphs}
           onToggleNode={handleToggleNode}
         />
-        <Inspector
-          node={selectedNode}
-          nodes={nodes}
-          isItemDeleted={isItemDeleted}
-          onToggleGlyph={handleToggleGlyph}
-          onSetManyGlyphs={handleSetManyGlyphs}
-          isDeleted={isDeleted}
-          onToggleNode={handleToggleNode}
-        />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <Inspector
+            node={selectedNode}
+            nodes={nodes}
+            isItemDeleted={isItemDeleted}
+            onToggleGlyph={handleToggleGlyph}
+            onSetManyGlyphs={handleSetManyGlyphs}
+            isDeleted={isDeleted}
+            onToggleNode={handleToggleNode}
+          />
+          {infoOpen && <InfoView />}
+        </div>
       </div>
     </div>
   );

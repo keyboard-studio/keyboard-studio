@@ -14,7 +14,7 @@ export function ToggleBox({ glyph, state, size = 30, onClick }: ToggleBoxProps) 
   return (
     <button
       onClick={onClick}
-      title={off ? 'Click to keep' : 'Click to remove'}
+      aria-label={off ? 'Keep' : 'Remove'}
       style={{
         position: 'relative', width: size, height: size, flex: '0 0 auto',
         borderRadius: Math.round(size * 0.27), cursor: 'pointer', padding: 0,
