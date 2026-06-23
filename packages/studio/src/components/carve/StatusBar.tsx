@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { KindBadge } from './KindBadge.tsx';
+import { useHoverInfoStore } from '../../stores/hoverInfoStore.ts';
 import type { CardKind } from './KindBadge.tsx';
 import { KeySeq } from './KeySeq.tsx';
 import { ChevronIcon, UndoIcon, CheckIcon } from './carveShared.tsx';
@@ -81,9 +82,17 @@ export function StatusBar({ kept, total, removedList, onRestore, onRestoreAll }:
   const [open, setOpen] = useState(false);
   useEffect(() => { if (removedList.length === 0) setOpen(false); }, [removedList.length]);
 
+  const setInfo = useHoverInfoStore((s) => s.setInfo);
+  const clearInfo = useHoverInfoStore((s) => s.clearInfo);
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '12px 22px', borderBottom: '1px solid var(--app-border)', background: 'var(--app-surface)' }}>
-      <div>
+      <div
+        onMouseEnter={() => setInfo({ kind: 'text', title: 'Characters kept', body: 'How many characters you are keeping out of the total in this keyboard.' })}
+        onFocus={() => setInfo({ kind: 'text', title: 'Characters kept', body: 'How many characters you are keeping out of the total in this keyboard.' })}
+        onMouseLeave={clearInfo}
+        onBlur={clearInfo}
+      >
         <div style={{ fontSize: 13, color: 'var(--app-text-muted)' }}>
           <b style={{ color: 'var(--app-accent-text)', fontSize: 18 }}>{kept}</b> of {total} characters kept
         </div>
@@ -95,6 +104,10 @@ export function StatusBar({ kept, total, removedList, onRestore, onRestoreAll }:
         <button
           onClick={() => setOpen((o) => !o)}
           disabled={removedList.length === 0}
+          onMouseEnter={() => setInfo({ kind: 'text', title: 'Removed items', body: 'Open this to see what you removed and restore anything you change your mind about.' })}
+          onFocus={() => setInfo({ kind: 'text', title: 'Removed items', body: 'Open this to see what you removed and restore anything you change your mind about.' })}
+          onMouseLeave={clearInfo}
+          onBlur={clearInfo}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 13px', borderRadius: 999,
             border: '1px solid ' + (removedList.length > 0 ? 'var(--app-accent)' : 'var(--app-border)'),
