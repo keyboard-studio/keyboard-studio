@@ -166,22 +166,23 @@ describe("fetchKeyboardSourceToVfs — required KMW_EMBEDJS sibling missing", ()
     });
 
     const vfs = createVirtualFS();
-    await expect(
-      fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl }),
-    ).rejects.toThrow(
-      // Error must name: storeName, filename, URL, keyboard id.
-      expect.objectContaining({
-        message: expect.stringMatching(/KMW_EMBEDJS/),
-      }),
+    // Single invocation: capture the rejection, then assert every field the
+    // error must name. Resolving instead of rejecting fails the test with a
+    // clear message.
+    const error = await fetchKeyboardSourceToVfs(euroLatinKb, vfs, {
+      proxyBase: PROXY,
+      fetchImpl,
+    }).then(
+      () => {
+        throw new Error(
+          "expected fetchKeyboardSourceToVfs to reject for a missing required sibling, but it resolved",
+        );
+      },
+      (e: unknown) => e as Error,
     );
 
-    // Separate assertions for the individual fields the error must name.
-    let thrownMessage = "";
-    try {
-      await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl });
-    } catch (e) {
-      thrownMessage = (e as Error).message;
-    }
+    const thrownMessage = error.message;
+    // The error must name: storeName, filename, URL, and keyboard id.
     expect(thrownMessage).toContain("KMW_EMBEDJS");
     expect(thrownMessage).toContain("sil_euro_latin_js.txt");
     expect(thrownMessage).toContain(sourceUrl(euroLatinKb, "sil_euro_latin_js.txt"));
@@ -273,8 +274,9 @@ describe("fetchKeyboardSourceToVfs — optional siblings missing (BITMAP / KMW_H
 });
 
 // ---------------------------------------------------------------------------
-// Test 4: proxyBase is used in the .kmn fetch URL (regression guard for
-// the 2f3b8a4 proxy-selection regression — dropping proxyBase must turn red).
+// Test 4: proxyBase is used in the .kmn fetch URL (regression guard: dropping
+// the proxyBase option falls back to the default /kbd-proxy prefix, which must
+// turn this test red).
 // ---------------------------------------------------------------------------
 
 describe("fetchKeyboardSourceToVfs — proxyBase pass-through", () => {

@@ -3,6 +3,10 @@ import type { BaseKeyboard, VirtualFS, KeyboardIR, TouchLayoutIR, KpsFontEntry, 
 import type { CompileResult } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { LOCAL_PROXY_BASE, getScaffolderService } from "../lib/services.ts";
+// Re-exported so tests can assert the open-base fetch passes this exact proxy
+// base by reference, rather than hardcoding the literal (which a rename could
+// silently desync from).
+export { LOCAL_PROXY_BASE };
 import { findKmnPath } from "../lib/findKmnPath.ts";
 import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
 
