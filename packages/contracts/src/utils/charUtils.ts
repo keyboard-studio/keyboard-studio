@@ -3,6 +3,24 @@
 // parsing so every consumer (engine, studio) uses the same logic.
 // ---------------------------------------------------------------------------
 
+/** Converts the first code point of `char` to a `U+XXXX` string.
+ *  Precondition: `char` is a non-empty string; only the first code point is used. */
+export function toUPlusNotation(char: string): string {
+  const cp = char.codePointAt(0)!;
+  return "U+" + cp.toString(16).toUpperCase().padStart(4, "0");
+}
+
+/** Returns true when `char` is an accented letter decomposable to base + combining mark
+ *  (i.e. NFD produces exactly two code points and the second is in the Combining Diacritical
+ *  Marks block U+0300–U+036F). */
+export function isDecomposableAccented(char: string): boolean {
+  const nfd = char.normalize("NFD");
+  const cps = [...nfd];
+  if (cps.length !== 2) return false;
+  const secondCp = cps[1]?.codePointAt(0) ?? 0;
+  return secondCp >= 0x0300 && secondCp <= 0x036f;
+}
+
 /**
  * Convert a U+XXXX codepoint string (or bare hex) to the actual Unicode
  * character.
@@ -21,13 +39,6 @@
  * @param s  The codepoint string to parse.
  * @returns  The Unicode character, or `null` if `s` is not well-formed.
  */
-/** Converts the first code point of `char` to a `U+XXXX` string.
- *  Precondition: `char` is a non-empty string; only the first code point is used. */
-export function toUPlusNotation(char: string): string {
-  const cp = char.codePointAt(0)!;
-  return "U+" + cp.toString(16).toUpperCase().padStart(4, "0");
-}
-
 export function parseUPlusNotation(s: string): string | null {
   // Accept optional "U+" / "u+" prefix, then 4–6 hex digits.
   const match = /^(?:[Uu]\+)?([0-9A-Fa-f]{4,6})$/.exec(s);

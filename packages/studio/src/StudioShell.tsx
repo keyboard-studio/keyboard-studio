@@ -292,7 +292,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const resetSurvey = useWorkingCopyStore((s) => s.reset);
   const setStoreIdentity = useWorkingCopyStore((s) => s.setIdentity);
   const lockDesktop = useWorkingCopyStore((s) => s.lockDesktop);
-  const recordTouchAssignments = useWorkingCopyStore((s) => s.recordTouchAssignments);
   const setTouchLayoutJson = useWorkingCopyStore((s) => s.setTouchLayoutJson);
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
 
@@ -373,7 +372,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     setStage("E");
   }
   function handlePhaseEComplete(assignments: TouchAssignment[]) {
-    recordTouchAssignments(assignments);
     // assignments arriving here are already filtered to non-inherited by
     // TouchGallery.handleContinue — do NOT double-filter.
     //
@@ -396,6 +394,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         setTouchLayoutJson(json);
       } catch (err) {
         console.error("[handlePhaseEComplete] buildTouchLayoutJson threw unexpectedly:", err);
+        // Per spec, the transition to stage "F" proceeds regardless of touch-layout
+        // build failure — omit the touch layout rather than blocking the phase.
+        // Degradation is graceful: with no touch layout file, KMW falls back to the
+        // keyboard's shipped .keyman-touch-layout (or its own native default).
         setTouchLayoutJson(null);
       }
     }

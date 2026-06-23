@@ -34,48 +34,33 @@ import type {
   MechanismAssignment,
   PlacementMap,
 } from "@keyboard-studio/contracts";
+import { toUPlusNotation, isDecomposableAccented } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { getPatternLibraryService } from "../lib/services.ts";
 import type { DiscoveryAxisVector } from "@keyboard-studio/contracts";
 import { useKeyboardArtifact, type ScaffoldSpec, type Stage } from "../hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "../hooks/useWorkingCopyTransform.ts";
 import { useInventoryDiff } from "../hooks/useInventoryDiff.ts";
-import { OSKFrame } from "./OSKFrame.tsx";
-import { OskModeToggle } from "./OskModeToggle.tsx";
-import type { OskMode } from "./OskModeToggle.tsx";
 import type { PlacementSeedEntry } from "../survey/placementSeeds.ts";
 import { getSuggestionForChar } from "../survey/placementSeeds.ts";
-
-// ---------------------------------------------------------------------------
-// Style constants — dark palette matching PhaseB
-// ---------------------------------------------------------------------------
-
-const BG_PAGE = "#0d1117";
-const BG_CARD = "#161b22";
-const BORDER = "#30363d";
-const ACCENT = "#6ea8fe";
-const TEXT_DIM = "#8b949e";
-const TEXT_MAIN = "#e6edf3";
-const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
-const BLUE_ACTION = "#1f6feb";
+import { KEY_OPTIONS, ALL_PICKABLE_KEYS } from "../lib/keyOptions.ts";
+import { GalleryPreviewPane } from "./GalleryPreviewPane.tsx";
+import {
+  BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
+} from "../lib/galleryTheme.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function cpStr(char: string): string {
-  const cp = char.codePointAt(0)?.toString(16).toUpperCase().padStart(4, "0");
-  return `U+${cp ?? "????"}`;
-}
-
 // Pattern IDs as they exist in the browser pattern library (content/patterns/).
 // These MUST match the `id:` fields in the YAML — a mismatch means getById()
 // returns undefined, the assignment can't resolve, and the live preview never
 // reflects the added key.
-const PATTERN_SEQUENCE = "multi_char_sequence"; // S-03
-const PATTERN_DEADKEY = "deadkey_single_tap"; // S-02
-const PATTERN_SWAP = "simple_swap"; // S-01
-const PATTERN_RALT = "modifier_as_layer_switch"; // S-08
+export const PATTERN_SEQUENCE = "multi_char_sequence"; // S-03
+export const PATTERN_DEADKEY = "deadkey_single_tap"; // S-02
+export const PATTERN_SWAP = "simple_swap"; // S-01
+export const PATTERN_RALT = "modifier_as_layer_switch"; // S-08
 
 function methodLabel(ref: { patternId: string; slotValues?: Record<string, string> }): string {
   const sv = ref.slotValues ?? {};
@@ -117,15 +102,6 @@ function deadkeyNameFor(triggerKey: string): string {
   return "dead0";
 }
 
-/** Returns true when char is an accented letter decomposable to base + combining mark. */
-function isDecomposableAccented(char: string): boolean {
-  const nfd = char.normalize("NFD");
-  const cps = [...nfd];
-  if (cps.length !== 2) return false;
-  const secondCp = cps[1]?.codePointAt(0) ?? 0;
-  return secondCp >= 0x0300 && secondCp <= 0x036f;
-}
-
 // ---------------------------------------------------------------------------
 // GalleryPreviewWithPatterns — right pane
 //
@@ -152,164 +128,16 @@ function GalleryPreviewWithPatterns({
   retry,
   onKeyTap,
 }: GalleryPreviewWithPatternsProps) {
-  const [oskMode, setOskMode] = useState<OskMode>("desktop");
-
-  const applyWarnings =
-    stage.kind === "ready" && stage.scaffoldWarnings.length > 0
-      ? stage.scaffoldWarnings
-      : [];
-
   return (
-    <section
-      aria-label="Live keyboard preview with mechanisms applied"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 14,
-        height: "100%",
-        boxSizing: "border-box",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 10,
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            fontSize: "1rem",
-            fontWeight: 600,
-            color: ACCENT,
-            fontFamily: FONT,
-          }}
-        >
-          Live preview
-        </h2>
-        <OskModeToggle
-          value={oskMode}
-          onChange={setOskMode}
-          disabled={stage.kind !== "ready"}
-        />
-      </div>
-
-      {applyWarnings.length > 0 && (
-        <div
-          role="alert"
-          aria-live="polite"
-          style={{
-            background: "#2a1a00",
-            border: "1px solid #f0883e",
-            borderRadius: 6,
-            padding: "8px 12px",
-            fontSize: 12,
-            color: "#f0883e",
-            fontFamily: FONT,
-          }}
-        >
-          <strong>Apply warnings:</strong>
-          <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
-            {applyWarnings.map((w, i) => (
-              <li key={i}>{w}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {(stage.kind === "fetching" ||
-        stage.kind === "vfs-loading" ||
-        stage.kind === "compiling") && (
-        <div
-          role="status"
-          aria-live="polite"
-          aria-label="Loading keyboard preview"
-          style={{
-            padding: "24px 0",
-            textAlign: "center",
-            color: TEXT_DIM,
-            fontSize: 13,
-            fontFamily: FONT,
-          }}
-        >
-          {stage.kind === "fetching"
-            ? "Fetching keyboard source..."
-            : stage.kind === "compiling"
-              ? `Compiling${stage.isWarmCompile ? "" : " (loading WASM)"}...`
-              : "Loading..."}
-        </div>
-      )}
-
-      {stage.kind === "error" && (
-        <div
-          role="alert"
-          aria-live="assertive"
-          style={{
-            padding: "16px 20px",
-            background: "#2a0a0a",
-            border: "1px solid #f85149",
-            borderRadius: 8,
-            color: "#f85149",
-            fontSize: 13,
-            fontFamily: FONT,
-          }}
-        >
-          <strong>[ERROR]</strong> Preview failed ({stage.step}): {stage.message}
-          <div style={{ marginTop: 10 }}>
-            <button
-              type="button"
-              onClick={retry}
-              style={{
-                padding: "5px 12px",
-                background: "transparent",
-                border: "1px solid #f85149",
-                borderRadius: 4,
-                color: "#f85149",
-                fontSize: 12,
-                cursor: "pointer",
-                fontFamily: FONT,
-              }}
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div style={{ display: stage.kind === "error" ? "none" : "block" }}>
-        <OSKFrame
-          baseKeyboard={selectedBaseKeyboard}
-          oskMode={oskMode}
-          stage={stage}
-          retry={retry}
-          {...(onKeyTap !== undefined ? { onKeyTap } : {})}
-        />
-      </div>
-
-      {stage.kind === "ready" && stage.compileResult.diagnostics.length > 0 && (
-        <div
-          role="status"
-          aria-live="polite"
-          aria-label={`${stage.compileResult.diagnostics.length} compiler diagnostic(s)`}
-          style={{
-            background: BG_CARD,
-            border: `1px solid ${BORDER}`,
-            borderRadius: 6,
-            padding: "8px 12px",
-            fontSize: 11,
-            color: TEXT_DIM,
-            fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
-          }}
-        >
-          <span style={{ color: "#d29922" }}>
-            {stage.compileResult.diagnostics.length} compiler diagnostic(s).
-          </span>
-        </div>
-      )}
-    </section>
+    <GalleryPreviewPane
+      baseKeyboard={selectedBaseKeyboard}
+      stage={stage}
+      retry={retry}
+      {...(onKeyTap !== undefined ? { onKeyTap } : {})}
+      defaultOskMode="desktop"
+      heading="Live preview"
+      warningLabel="Apply warnings:"
+    />
   );
 }
 
@@ -344,38 +172,8 @@ const DEADKEY_OPTIONS = [
   { value: "K_BKQUOTE", label: "K_BKQUOTE (backtick `)" },
 ] as const;
 
-// Physical key options for the S-01 and S-08 key selectors.
-const KEY_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
-  { value: "", label: "-- choose a key --" },
-  { value: "K_A", label: "K_A (A)" }, { value: "K_B", label: "K_B (B)" },
-  { value: "K_C", label: "K_C (C)" }, { value: "K_D", label: "K_D (D)" },
-  { value: "K_E", label: "K_E (E)" }, { value: "K_F", label: "K_F (F)" },
-  { value: "K_G", label: "K_G (G)" }, { value: "K_H", label: "K_H (H)" },
-  { value: "K_I", label: "K_I (I)" }, { value: "K_J", label: "K_J (J)" },
-  { value: "K_K", label: "K_K (K)" }, { value: "K_L", label: "K_L (L)" },
-  { value: "K_M", label: "K_M (M)" }, { value: "K_N", label: "K_N (N)" },
-  { value: "K_O", label: "K_O (O)" }, { value: "K_P", label: "K_P (P)" },
-  { value: "K_Q", label: "K_Q (Q)" }, { value: "K_R", label: "K_R (R)" },
-  { value: "K_S", label: "K_S (S)" }, { value: "K_T", label: "K_T (T)" },
-  { value: "K_U", label: "K_U (U)" }, { value: "K_V", label: "K_V (V)" },
-  { value: "K_W", label: "K_W (W)" }, { value: "K_X", label: "K_X (X)" },
-  { value: "K_Y", label: "K_Y (Y)" }, { value: "K_Z", label: "K_Z (Z)" },
-  { value: "K_0", label: "K_0 (0)" }, { value: "K_1", label: "K_1 (1)" },
-  { value: "K_2", label: "K_2 (2)" }, { value: "K_3", label: "K_3 (3)" },
-  { value: "K_4", label: "K_4 (4)" }, { value: "K_5", label: "K_5 (5)" },
-  { value: "K_6", label: "K_6 (6)" }, { value: "K_7", label: "K_7 (7)" },
-  { value: "K_8", label: "K_8 (8)" }, { value: "K_9", label: "K_9 (9)" },
-  { value: "K_LBRKT", label: "K_LBRKT ([)" }, { value: "K_RBRKT", label: "K_RBRKT (])" },
-  { value: "K_BKSLASH", label: "K_BKSLASH (\\)" }, { value: "K_SEMI", label: "K_SEMI (;)" },
-  { value: "K_QUOTE", label: "K_QUOTE (')" }, { value: "K_COMMA", label: "K_COMMA (,)" },
-  { value: "K_PERIOD", label: "K_PERIOD (.)" }, { value: "K_SLASH", label: "K_SLASH (/)" },
-  { value: "K_BKQUOTE", label: "K_BKQUOTE (`)" },
-];
-
 // Module-level Sets for O(1) membership checks in handleKeyTap.
-const VALID_SWAP_RALT_KEYS: ReadonlySet<string> = new Set(
-  KEY_OPTIONS.filter((o) => o.value !== "").map((o) => o.value),
-);
+// ALL_PICKABLE_KEYS is imported from keyOptions.ts.
 const VALID_DEADKEY_TRIGGER_KEYS: ReadonlySet<string> = new Set(
   DEADKEY_OPTIONS.map((o) => o.value),
 );
@@ -1165,9 +963,9 @@ export function MechanismGallery({
   const handleKeyTap = useCallback(
     (keyId: string) => {
       if (locked) return;
-      if (method === "swap" && VALID_SWAP_RALT_KEYS.has(keyId)) {
+      if (method === "swap" && ALL_PICKABLE_KEYS.has(keyId)) {
         setSelectedSwapKey(keyId);
-      } else if (method === "ralt" && VALID_SWAP_RALT_KEYS.has(keyId)) {
+      } else if (method === "ralt" && ALL_PICKABLE_KEYS.has(keyId)) {
         setSelectedRaltKey(keyId);
       } else if (method === "deadkey" && VALID_DEADKEY_TRIGGER_KEYS.has(keyId)) {
         setTriggerKey(keyId);
@@ -1437,12 +1235,12 @@ export function MechanismGallery({
                 <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
                   <span
                     style={{ fontSize: 36, fontFamily: "monospace", lineHeight: 1 }}
-                    aria-label={`${cpStr(currentChar)} ${currentChar}`}
+                    aria-label={`${toUPlusNotation(currentChar)} ${currentChar}`}
                   >
                     {currentChar}
                   </span>
                   <span style={{ fontSize: 13, color: TEXT_DIM }}>
-                    {cpStr(currentChar)}
+                    {toUPlusNotation(currentChar)}
                   </span>
                 </div>
               </div>
@@ -1702,8 +1500,8 @@ export function MechanismGallery({
                     key={c}
                     type="button"
                     onClick={() => handleRemoveCovered(c)}
-                    aria-label={`Remove ${cpStr(c)} ${c}`}
-                    title={`${cpStr(c)} — click to remove`}
+                    aria-label={`Remove ${toUPlusNotation(c)} ${c}`}
+                    title={`${toUPlusNotation(c)} — click to remove`}
                     style={{
                       display: "inline-flex",
                       alignItems: "center",

@@ -147,12 +147,6 @@ export interface WorkingCopyState {
   /** Desktop layout lock — prevents further physical edits until unlocked. */
   desktopLocked: boolean;
   /**
-   * Touch-modality assignments produced by Phase E (touch gallery).
-   * Stored as a flat list mirroring how Phase C assignments are kept.
-   * Initialized to [] and replaced wholesale on each `recordTouchAssignments` call.
-   */
-  touchAssignments: TouchAssignment[];
-  /**
    * Serialized JSON for the `.keyman-touch-layout` artifact, derived from
    * scaffoldTouchLayout(ir) at Phase E completion. Written into the cloned
    * VFS in serializeWorkingCopy before zipping (Option B — the base VFS is
@@ -218,15 +212,6 @@ export interface WorkingCopyState {
   lockDesktop: () => void;
   /** Unlock the desktop layout (restores MechanismGallery editing). */
   unlockDesktop: () => void;
-  /**
-   * Record Phase E (touch gallery) assignments, replacing any prior touch
-   * assignments wholesale (last-wins). Call with [] to clear.
-   *
-   * These are stored separately from Phase C physical assignments because
-   * Phase E runs after the desktop layout is locked and its output targets
-   * the `.keyman-touch-layout` artifact rather than `.kmn` rules.
-   */
-  recordTouchAssignments: (assignments: TouchAssignment[]) => void;
   /**
    * Persist the serialized `.keyman-touch-layout` JSON produced at Phase E
    * completion. Replaces any prior value (last-wins).
@@ -331,7 +316,7 @@ const INITIAL_STATE: Omit<
   | "setIR" | "clearIR" | "deleteNode" | "undoDelete" | "restoreNode"
   | "isDeleted" | "deleteItem" | "restoreItem" | "isItemDeleted" | "keepAll" | "restoreAll"
   | "recordPhase" | "recordAssignments"
-  | "setIrAxes" | "lockDesktop" | "unlockDesktop" | "recordTouchAssignments"
+  | "setIrAxes" | "lockDesktop" | "unlockDesktop"
   | "setTouchLayoutJson" | "setTouchDraft" | "reset"
   | "instantiateFromBase" | "instantiateFromExisting" | "setIdentity" | "isInstantiated"
 > = {
@@ -350,7 +335,6 @@ const INITIAL_STATE: Omit<
   // survey slots
   ...INITIAL_SURVEY,
   desktopLocked: false,
-  touchAssignments: [],
   touchLayoutJson: null,
   touchDraft: null,
 };
@@ -464,9 +448,6 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   unlockDesktop: () =>
     set({ desktopLocked: false }),
 
-  recordTouchAssignments: (assignments) =>
-    set({ touchAssignments: assignments }),
-
   setTouchLayoutJson: (json) =>
     set({ touchLayoutJson: json }),
 
@@ -517,7 +498,6 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // the new IR after recognition runs).
       ...remerge({}, []),
       desktopLocked: false,
-      touchAssignments: [],
       touchLayoutJson: null,
       touchDraft: null,
     });
@@ -548,7 +528,6 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // Edit layers start clean for an adapt session too.
       ...remerge({}, []),
       desktopLocked: false,
-      touchAssignments: [],
       touchLayoutJson: null,
       touchDraft: null,
     }),

@@ -27,7 +27,7 @@
 
 import { useState, useEffect, useMemo, useCallback, type CSSProperties } from "react";
 import type { TouchAssignment } from "@keyboard-studio/contracts";
-import { createVirtualFS } from "@keyboard-studio/contracts";
+import { createVirtualFS, toUPlusNotation, isDecomposableAccented } from "@keyboard-studio/contracts";
 import { buildTouchLayoutJson } from "../lib/buildTouchLayoutJson.ts";
 import { resolveBaseTouchJson } from "../lib/resolveBaseTouchJson.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -35,41 +35,16 @@ import { LintSummary } from "../lint/LintSummary.tsx";
 import { useTouchLint } from "../hooks/useTouchLint.ts";
 import { useKeyboardArtifact } from "../hooks/useKeyboardArtifact.ts";
 import type { ScaffoldSpec, VfsTransform } from "../hooks/useKeyboardArtifact.ts";
-import { OskModeToggle } from "./OskModeToggle.tsx";
-import type { OskMode } from "./OskModeToggle.tsx";
-import { OSKFrame } from "./OSKFrame.tsx";
 import { scaffoldTouchLayout } from "@keyboard-studio/engine";
-
-// ---------------------------------------------------------------------------
-// Style constants — dark palette matching MechanismGallery / PhaseB
-// ---------------------------------------------------------------------------
-
-const BG_PAGE = "#0d1117";
-const BG_CARD = "#161b22";
-const BORDER = "#30363d";
-const ACCENT = "#6ea8fe";
-const TEXT_DIM = "#8b949e";
-const TEXT_MAIN = "#e6edf3";
-const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
-const BLUE_ACTION = "#1f6feb";
+import { GalleryPreviewPane } from "./GalleryPreviewPane.tsx";
+import { KEY_OPTIONS, VALID_HOST_KEYS } from "../lib/keyOptions.ts";
+import {
+  BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
+} from "../lib/galleryTheme.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function cpStr(char: string): string {
-  const cp = char.codePointAt(0)?.toString(16).toUpperCase().padStart(4, "0");
-  return `U+${cp ?? "????"}`;
-}
-
-/** Returns true when char is an accented letter decomposable to base + combining mark. */
-function isDecomposableAccented(char: string): boolean {
-  const nfd = char.normalize("NFD");
-  const cps = [...nfd];
-  if (cps.length !== 2) return false;
-  const secondCp = cps[1]?.codePointAt(0) ?? 0;
-  return secondCp >= 0x0300 && secondCp <= 0x036f;
-}
 
 /** Strip K_ prefix from a key id for user-facing display. */
 function hostKeyShortLabel(keyId: string): string {
@@ -103,43 +78,14 @@ function touchMethodLabel(a: TouchAssignment): string {
   return a.target;
 }
 
-// Physical key options for the long-press / flick / multitap selectors.
-// Copied verbatim from MechanismGallery.tsx KEY_OPTIONS (lines 359–384).
-const KEY_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
-  { value: "", label: "-- choose a key --" },
-  { value: "K_A", label: "K_A (A)" }, { value: "K_B", label: "K_B (B)" },
-  { value: "K_C", label: "K_C (C)" }, { value: "K_D", label: "K_D (D)" },
-  { value: "K_E", label: "K_E (E)" }, { value: "K_F", label: "K_F (F)" },
-  { value: "K_G", label: "K_G (G)" }, { value: "K_H", label: "K_H (H)" },
-  { value: "K_I", label: "K_I (I)" }, { value: "K_J", label: "K_J (J)" },
-  { value: "K_K", label: "K_K (K)" }, { value: "K_L", label: "K_L (L)" },
-  { value: "K_M", label: "K_M (M)" }, { value: "K_N", label: "K_N (N)" },
-  { value: "K_O", label: "K_O (O)" }, { value: "K_P", label: "K_P (P)" },
-  { value: "K_Q", label: "K_Q (Q)" }, { value: "K_R", label: "K_R (R)" },
-  { value: "K_S", label: "K_S (S)" }, { value: "K_T", label: "K_T (T)" },
-  { value: "K_U", label: "K_U (U)" }, { value: "K_V", label: "K_V (V)" },
-  { value: "K_W", label: "K_W (W)" }, { value: "K_X", label: "K_X (X)" },
-  { value: "K_Y", label: "K_Y (Y)" }, { value: "K_Z", label: "K_Z (Z)" },
-  { value: "K_0", label: "K_0 (0)" }, { value: "K_1", label: "K_1 (1)" },
-  { value: "K_2", label: "K_2 (2)" }, { value: "K_3", label: "K_3 (3)" },
-  { value: "K_4", label: "K_4 (4)" }, { value: "K_5", label: "K_5 (5)" },
-  { value: "K_6", label: "K_6 (6)" }, { value: "K_7", label: "K_7 (7)" },
-  { value: "K_8", label: "K_8 (8)" }, { value: "K_9", label: "K_9 (9)" },
-  { value: "K_LBRKT", label: "K_LBRKT ([)" }, { value: "K_RBRKT", label: "K_RBRKT (])" },
-  { value: "K_BKSLASH", label: "K_BKSLASH (\\)" }, { value: "K_SEMI", label: "K_SEMI (;)" },
-  { value: "K_QUOTE", label: "K_QUOTE (')" }, { value: "K_COMMA", label: "K_COMMA (,)" },
-  { value: "K_PERIOD", label: "K_PERIOD (.)" }, { value: "K_SLASH", label: "K_SLASH (/)" },
-  { value: "K_BKQUOTE", label: "K_BKQUOTE (`)" },
-];
-
 const selectStyle: CSSProperties = {
-  background: "#0d1117",
-  border: "1px solid #30363d",
+  background: BG_PAGE,
+  border: `1px solid ${BORDER}`,
   borderRadius: 4,
-  color: "#e6edf3",
+  color: TEXT_MAIN,
   fontSize: 12,
   padding: "4px 8px",
-  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  fontFamily: FONT,
 };
 
 // ---------------------------------------------------------------------------
@@ -147,11 +93,6 @@ const selectStyle: CSSProperties = {
 // ---------------------------------------------------------------------------
 
 type TouchMethod = "touch_inherited" | "touch_key_replace" | "longpress_alternates" | "flick_gestures" | "multitap";
-
-// Module-level set of valid KEY_OPTIONS values (non-empty) for tap-to-select routing.
-const VALID_HOST_KEYS = new Set(
-  KEY_OPTIONS.filter((o) => o.value !== "").map((o) => o.value),
-);
 
 // ---------------------------------------------------------------------------
 // TouchMethodChooser — 4 expandable cards
@@ -454,178 +395,7 @@ function TouchMethodChooser({
   );
 }
 
-// ---------------------------------------------------------------------------
-// TouchPreviewPane — right pane (kept unchanged from prior cycle)
-// ---------------------------------------------------------------------------
-
-interface TouchPreviewPaneProps {
-  baseKeyboard: import("@keyboard-studio/contracts").BaseKeyboard | null;
-  stage: ReturnType<typeof useKeyboardArtifact>["stage"];
-  retry: ReturnType<typeof useKeyboardArtifact>["retry"];
-  onKeyTap?: (keyId: string) => void;
-}
-
-function TouchPreviewPane({ baseKeyboard, stage, retry, onKeyTap }: TouchPreviewPaneProps) {
-  const [oskMode, setOskMode] = useState<OskMode>("touch");
-
-  const applyWarnings =
-    stage.kind === "ready" && stage.scaffoldWarnings.length > 0
-      ? stage.scaffoldWarnings
-      : [];
-
-  return (
-    <section
-      aria-label="Live touch keyboard preview"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 14,
-        height: "100%",
-        boxSizing: "border-box",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 10,
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            fontSize: "1rem",
-            fontWeight: 600,
-            color: ACCENT,
-            fontFamily: FONT,
-          }}
-        >
-          Touch preview
-        </h2>
-        <OskModeToggle
-          value={oskMode}
-          onChange={setOskMode}
-          disabled={stage.kind !== "ready"}
-        />
-      </div>
-
-      {applyWarnings.length > 0 && (
-        <div
-          role="alert"
-          aria-live="polite"
-          style={{
-            background: "#2a1a00",
-            border: "1px solid #f0883e",
-            borderRadius: 6,
-            padding: "8px 12px",
-            fontSize: 12,
-            color: "#f0883e",
-            fontFamily: FONT,
-          }}
-        >
-          <strong>Preview warnings:</strong>
-          <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
-            {applyWarnings.map((w, i) => (
-              <li key={i}>{w}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {(stage.kind === "fetching" ||
-        stage.kind === "vfs-loading" ||
-        stage.kind === "compiling") && (
-        <div
-          role="status"
-          aria-live="polite"
-          aria-label="Loading keyboard preview"
-          style={{
-            padding: "24px 0",
-            textAlign: "center",
-            color: TEXT_DIM,
-            fontSize: 13,
-            fontFamily: FONT,
-          }}
-        >
-          {stage.kind === "fetching"
-            ? "Fetching keyboard source..."
-            : stage.kind === "compiling"
-              ? `Compiling${stage.isWarmCompile ? "" : " (loading WASM)"}...`
-              : "Loading..."}
-        </div>
-      )}
-
-      {stage.kind === "error" && (
-        <div
-          role="alert"
-          aria-live="assertive"
-          style={{
-            padding: "16px 20px",
-            background: "#2a0a0a",
-            border: "1px solid #f85149",
-            borderRadius: 8,
-            color: "#f85149",
-            fontSize: 13,
-            fontFamily: FONT,
-          }}
-        >
-          <strong>[ERROR]</strong> Preview failed ({stage.step}): {stage.message}
-          <div style={{ marginTop: 10 }}>
-            <button
-              type="button"
-              onClick={retry}
-              style={{
-                padding: "5px 12px",
-                background: "transparent",
-                border: "1px solid #f85149",
-                borderRadius: 4,
-                color: "#f85149",
-                fontSize: 12,
-                cursor: "pointer",
-                fontFamily: FONT,
-              }}
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div style={{ display: stage.kind === "error" ? "none" : "block" }}>
-        <OSKFrame
-          baseKeyboard={baseKeyboard}
-          oskMode={oskMode}
-          stage={stage}
-          retry={retry}
-          {...(onKeyTap !== undefined ? { onKeyTap } : {})}
-        />
-      </div>
-
-      {stage.kind === "ready" && stage.compileResult.diagnostics.length > 0 && (
-        <div
-          role="status"
-          aria-live="polite"
-          aria-label={`${stage.compileResult.diagnostics.length} compiler diagnostic(s)`}
-          style={{
-            background: BG_CARD,
-            border: `1px solid ${BORDER}`,
-            borderRadius: 6,
-            padding: "8px 12px",
-            fontSize: 11,
-            color: TEXT_DIM,
-            fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
-          }}
-        >
-          <span style={{ color: "#d29922" }}>
-            {stage.compileResult.diagnostics.length} compiler diagnostic(s).
-          </span>
-        </div>
-      )}
-    </section>
-  );
-}
+// TouchPreviewPane is now GalleryPreviewPane (shared component) — see GalleryPreviewPane.tsx.
 
 // ---------------------------------------------------------------------------
 // TouchGallery — main component
@@ -1373,12 +1143,12 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
               <span
                 style={{ fontSize: 36, fontFamily: "monospace", lineHeight: 1 }}
-                aria-label={`${cpStr(currentChar)} ${currentChar}`}
+                aria-label={`${toUPlusNotation(currentChar)} ${currentChar}`}
               >
                 {currentChar}
               </span>
               <span style={{ fontSize: 13, color: TEXT_DIM }}>
-                {cpStr(currentChar)}
+                {toUPlusNotation(currentChar)}
               </span>
             </div>
           </div>
@@ -1433,7 +1203,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                     <button
                       type="button"
                       onClick={handleUseSuggestion}
-                      aria-label={`Use suggested long-press method for ${cpStr(currentChar)} ${currentChar}`}
+                      aria-label={`Use suggested long-press method for ${toUPlusNotation(currentChar)} ${currentChar}`}
                       style={{
                         padding: "5px 14px",
                         background: "#238636",
@@ -1487,7 +1257,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                     <button
                       type="button"
                       onClick={handleUseSuggestion}
-                      aria-label={`Use suggested replace method for ${cpStr(currentChar)} ${currentChar}`}
+                      aria-label={`Use suggested replace method for ${toUPlusNotation(currentChar)} ${currentChar}`}
                       style={{
                         padding: "5px 14px",
                         background: "#238636",
@@ -1539,7 +1309,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                     <button
                       type="button"
                       onClick={handleSuggestionAccept}
-                      aria-label={`Keep ${cpStr(currentChar)} ${currentChar} as already in touch layout`}
+                      aria-label={`Keep ${toUPlusNotation(currentChar)} ${currentChar} as already in touch layout`}
                       style={{
                         padding: "5px 14px",
                         background: "#238636",
@@ -1632,7 +1402,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                 type="button"
                 onClick={handleApply}
                 disabled={!canApply}
-                aria-label={`Apply touch method for ${cpStr(currentChar)} ${currentChar}`}
+                aria-label={`Apply touch method for ${toUPlusNotation(currentChar)} ${currentChar}`}
                 style={{
                   padding: "9px 20px",
                   background: canApply ? BLUE_ACTION : "#21262d",
@@ -1674,7 +1444,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             <button
               type="button"
               onClick={handleSkip}
-              aria-label={`Skip ${cpStr(currentChar)} ${currentChar}`}
+              aria-label={`Skip ${toUPlusNotation(currentChar)} ${currentChar}`}
               style={{
                 background: "transparent",
                 border: "none",
@@ -1716,8 +1486,8 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                 key={c}
                 type="button"
                 onClick={() => handleRemoveConfigured(c)}
-                aria-label={`Remove ${cpStr(c)} ${c}`}
-                title={`${cpStr(c)} — click to remove`}
+                aria-label={`Remove ${toUPlusNotation(c)} ${c}`}
+                title={`${toUPlusNotation(c)} — click to remove`}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -1878,11 +1648,14 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             boxSizing: "border-box",
           }}
         >
-          <TouchPreviewPane
+          <GalleryPreviewPane
             baseKeyboard={baseKeyboard}
             stage={stage}
             retry={retry}
-            onKeyTap={handleKeyTap}
+            {...(handleKeyTap !== undefined ? { onKeyTap: handleKeyTap } : {})}
+            defaultOskMode="touch"
+            heading="Touch preview"
+            warningLabel="Preview warnings:"
           />
         </div>
       </div>

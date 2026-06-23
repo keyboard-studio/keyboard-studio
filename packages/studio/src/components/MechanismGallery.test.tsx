@@ -18,7 +18,7 @@
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
-import { MechanismGallery } from "./MechanismGallery";
+import { MechanismGallery, PATTERN_SEQUENCE, PATTERN_DEADKEY } from "./MechanismGallery";
 import { useWorkingCopyStore } from "../stores/workingCopyStore";
 import type { PatternLibraryService, VirtualFS } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
@@ -53,9 +53,6 @@ const { applyAssignmentsToVfsSpy } = vi.hoisted(() => {
 // The mock always resolves PATTERN_SEQUENCE and PATTERN_DEADKEY explicitly so
 // the component never gets undefined from getById().
 // ---------------------------------------------------------------------------
-
-const PATTERN_SEQUENCE = "multi_char_sequence";
-const PATTERN_DEADKEY = "deadkey_single_tap";
 
 const mockSvc: PatternLibraryService = {
   listAll: () => Promise.resolve([latinDeadkeyAcuteSingle]),
