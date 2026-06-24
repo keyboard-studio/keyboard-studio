@@ -3,7 +3,7 @@
 //
 // Resolves `<proxyBase>/<baseKeyboard.path>/source/<id>.kmn`, parses the
 // header for sibling deps (LAYOUTFILE / VISUALKEYBOARD / KMW_EMBEDJS /
-// BITMAP / KMW_HELPFILE), fetches each, plus the optional <id>.kpj for
+// KMW_EMBEDCSS / BITMAP / KMW_HELPFILE), fetches each, plus the optional <id>.kpj for
 // compiler flags. Writes everything flat into the VFS at `source/...`
 // (the layout CompilerService.compile() expects).
 
@@ -124,7 +124,7 @@ async function getBytes(
  *
  * Throws on a missing required file (the `.kmn` itself, or a required
  * sibling named in a LAYOUTFILE / VISUALKEYBOARD / KMW_EMBEDJS store).
- * Returns silently on missing optional files (BITMAP / KMW_HELPFILE / .kpj),
+ * Returns silently on missing optional files (BITMAP / KMW_HELPFILE / KMW_EMBEDCSS / .kpj),
  * adding a warning string.
  */
 export async function fetchKeyboardSourceToVfs(
