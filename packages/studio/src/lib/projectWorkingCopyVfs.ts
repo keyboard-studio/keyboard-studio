@@ -178,11 +178,10 @@ export function projectWorkingCopyVfs(
   //   b) Whole-node item ids: bare rule/store nodeIds from glyph-level carving.
   //
   // Partition them so the two mechanisms receive the correct inputs.
-  // An id that parses as a slot id (has the "<storeNodeId>#<index>" form) but whose
-  // left-of-# portion is NOT a known store nodeId deliberately falls through to
-  // wholeNodeItemIds, where it becomes a no-op whole-node deletion if it matches
-  // nothing — the transform guards in applyStoreSlotRemovals handle the real
-  // validation once we know the id is intended as a slot id.
+  // An id that does not parse as a slot id (parseSlotId returns null — e.g. bare
+  // rule nodeIds whose suffix is not an integer) falls through to wholeNodeItemIds
+  // and is treated as a whole-node deletion. Real slot ids whose store cannot be
+  // found are caught by applyStoreSlotRemovals' guards.
   const storeNodeIdSet = new Set(baseIr.stores.map((s) => s.nodeId));
 
   const slotIds = new Set<string>();

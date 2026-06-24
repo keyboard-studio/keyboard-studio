@@ -1,9 +1,6 @@
 /**
  * Parse a store-slot deletion id of the form "<storeNodeId>#<itemsIndex>".
  * itemsIndex is 0-based into IRStore.items. Returns null if the id is not a slot id.
- * NOTE: the storeNodeId capture is greedy (.+), so the LAST '#' is the separator —
- * a storeNodeId may itself contain '#' (e.g. fixture ids like "store#dkt"). Do not
- * make it lazy. The trailing \d+$ anchor disambiguates.
  */
 
 /** Regex that matches a slot id: "<storeNodeId>#<itemsIndex>". */

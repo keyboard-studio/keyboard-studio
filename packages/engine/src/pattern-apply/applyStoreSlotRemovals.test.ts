@@ -67,7 +67,7 @@ function makeParallelStoreGroup(
  * Minimal parallel-store IR with one output store dktX, one input store dkfX,
  * and a rule: dk(0x003b) any(dkfX) > index(dktX, 2).
  *
- * Output store items: ['À', 'ε', raw(nul), raw(nul)]
+ * Output store items: ['À', 'ε' (U+03B5 Greek — fixture placeholder; Cameroon IPA open-e is U+025B), raw(nul), raw(nul)]
  *   (mix a non-char before/after a char to prove items-index vs display-index)
  */
 function makeBaseIr(
