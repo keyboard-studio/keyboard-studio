@@ -173,7 +173,8 @@ export async function fetchKeyboardSourceToVfs(
       if (r.store.required) {
         throw new Error(
           `fetchKeyboardSourceToVfs: required sibling ` +
-            `&${r.store.storeName} '${r.store.path}' not found at ${r.url} (${detail})`,
+            `&${r.store.storeName} '${r.store.path}' not found at ${r.url} (${detail})` +
+            ` for keyboard '${baseKeyboard.id}'`,
         );
       }
       warnings.push(

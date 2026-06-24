@@ -8,6 +8,8 @@
 //   5. (slice 4) When parseKmn throws but compile succeeds, the hook reaches
 //      the "ready" stage (preview not blanked), parsedIr passed to onInstantiate
 //      is null, and a parse-gap warning appears in scaffoldWarnings.
+//   6. The open-base fetch path passes proxyBase: LOCAL_PROXY_BASE
+//      to fetchKeyboardSourceToVfs — dropping it must turn this test red.
 //
 // Approach: mock @keyboard-studio/engine with a minimal synchronous-ish
 // implementation so loadEngine() succeeds in jsdom, then use renderHook()
@@ -343,5 +345,49 @@ describe("useKeyboardArtifact — parseKmn graceful degradation (slice 4)", () =
       expect(result.current.stage.step).toBe("compile");
       expect(result.current.stage.message).toContain("kmcmplib: fatal syntax error");
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression guard: proxyBase pass-through on the open-base path.
+//
+// A past regression dropped the `{ proxyBase: LOCAL_PROXY_BASE }` option from
+// the fetchKeyboardSourceToVfs() call in the open-base fetch path, causing the
+// loader to fall back to the default "/kbd-proxy" prefix — which could not
+// reach upstream for keyboards whose source lives only under LOCAL_PROXY_BASE.
+//
+// This test asserts that fetchKeyboardSourceToVfs() is always called with
+// proxyBase: LOCAL_PROXY_BASE in the open-base path. Dropping that option from
+// the call site must turn this test red.
+// ---------------------------------------------------------------------------
+
+describe("useKeyboardArtifact — open-base proxyBase pass-through (regression guard)", () => {
+  it("calls fetchKeyboardSourceToVfs with proxyBase: LOCAL_PROXY_BASE", async () => {
+    // Pull the constant from the same dynamic import as the hook so the
+    // assertion is by reference, without a top-level value import (which would
+    // eagerly load the mocked engine and break vi.mock hoisting).
+    const { useKeyboardArtifact, LOCAL_PROXY_BASE } = await import(
+      "./useKeyboardArtifact"
+    );
+
+    renderHook(() => useKeyboardArtifact(baseKb, null, null, null));
+
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    // The mock spy captures every call including options.
+    // The hook's open-base path calls engineRef.current.fetchKeyboardSourceToVfs(kb, vfs, opts).
+    expect(mockEngine.fetchKeyboardSourceToVfs).toHaveBeenCalled();
+
+    const [, , opts] =
+      mockEngine.fetchKeyboardSourceToVfs.mock.calls[0] as [unknown, unknown, Record<string, string> | undefined];
+
+    // proxyBase must be LOCAL_PROXY_BASE — asserted by reference so a rename of
+    // the constant can't let a same-root-cause regression pass a green suite.
+    // If the call site drops proxyBase the opts object will be undefined or
+    // omit the key, and this assertion will fail — that is the intended signal.
+    expect(opts).toBeDefined();
+    expect((opts as { proxyBase?: string })?.proxyBase).toBe(LOCAL_PROXY_BASE);
   });
 });
