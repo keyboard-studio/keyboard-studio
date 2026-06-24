@@ -8,6 +8,42 @@ Lives in `utilities/oauth-backend/` — a standalone deployable service kept out
 
 ## Endpoints
 
+### `POST /oauth/google/exchange`
+
+Exchange a Google authorization code (PKCE) for verified identity claims. Google is identity-only — no Google API access is needed after the exchange.
+
+**Request body (JSON):**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `code` | string | yes | One-time authorization code from Google's redirect |
+| `code_verifier` | string | yes | PKCE code verifier (S256 flow) |
+| `redirect_uri` | string (URL) | yes | Redirect URI used in the original auth request |
+
+**Success response `200`:**
+
+```json
+{
+  "sub": "12345678901234567890",
+  "email": "user@example.com",
+  "email_verified": true,
+  "name": "Test User",
+  "picture": "https://lh3.googleusercontent.com/..."
+}
+```
+
+Neither the `id_token` nor the Google `access_token` is forwarded to the SPA.
+
+**Error response `400`:**
+
+```json
+{ "error": "invalid_grant" }
+```
+
+Safe error codes: `invalid_grant`, `invalid_client`, `redirect_uri_mismatch`, `access_denied`, `invalid_request`, `invalid_id_token`, `google_error`. `502` is returned for Google upstream errors.
+
+---
+
 ### `POST /oauth/exchange`
 
 Exchange a GitHub authorization code for an access token.
@@ -70,12 +106,14 @@ Liveness probe. No authentication required. Used by container healthcheck.
 |---|---|---|---|
 | `GITHUB_CLIENT_ID` | **yes** | — | GitHub OAuth App client ID |
 | `GITHUB_CLIENT_SECRET` | **yes** | — | GitHub OAuth App client secret — never logged, never in responses |
+| `GOOGLE_CLIENT_ID` | **yes** | — | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | **yes** | — | Google OAuth client secret — never logged, never in responses |
 | `OAUTH_ALLOWED_ORIGINS` | no | _(none)_ | Comma-separated extra CORS origins e.g. `https://studio.example.com` |
 | `PORT` | no | `8787` | TCP port to listen on |
 
 `http://localhost:5173` (Vite default) is included in the CORS allowlist only when `NODE_ENV` is not `production`. In production, only the origins listed in `OAUTH_ALLOWED_ORIGINS` are accepted. Wildcard `*` is never used.
 
-The service exits at startup with a fatal error if `GITHUB_CLIENT_ID` or `GITHUB_CLIENT_SECRET` are absent.
+The service exits at startup with a fatal error if any of `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, or `GOOGLE_CLIENT_SECRET` are absent.
 
 ## Running
 

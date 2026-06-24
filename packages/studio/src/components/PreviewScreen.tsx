@@ -4,7 +4,7 @@
 // TrackOneIdentityPanel, KmnEditor, MetadataCard).
 // Right pane: OskModeToggle + OSKFrame + DiagnosticsPanel.
 //
-// NO Download button. NO GitHubSignUpPanel.
+// NO Download button. NO SignUpPanel.
 
 import { useState } from "react";
 import { useResizablePanes } from "../hooks/useResizablePanes.ts";

@@ -2,13 +2,16 @@
  * OAuth token-exchange backend — Fastify server entry point.
  *
  * Endpoints:
- *   POST /oauth/exchange  — authorization_code → access_token
- *   POST /oauth/refresh   — refresh_token → new access_token
- *   GET  /oauth/health    — liveness probe (no auth)
+ *   POST /oauth/exchange         — GitHub authorization_code → access_token
+ *   POST /oauth/refresh          — GitHub refresh_token → new access_token
+ *   POST /oauth/google/exchange  — Google authorization_code → identity claims
+ *   GET  /oauth/health           — liveness probe (no auth)
  *
  * Environment variables (see README.md for full reference):
  *   GITHUB_CLIENT_ID       required
  *   GITHUB_CLIENT_SECRET   required — never logged, never in responses
+ *   GOOGLE_CLIENT_ID       required
+ *   GOOGLE_CLIENT_SECRET   required — never logged, never in responses
  *   OAUTH_ALLOWED_ORIGINS  comma-separated list of allowed CORS origins
  *   PORT                   default 8787
  */
@@ -26,18 +29,40 @@ import {
   type HandlerConfig,
   type OAuthFetchFn,
 } from "./handlers.js";
+import { GoogleExchangeBodySchema } from "./google-schemas.js";
+import {
+  googleExchange,
+  type GoogleHandlerConfig,
+} from "./google-handlers.js";
 
 // ---------------------------------------------------------------------------
 // Startup validation — fail fast if secrets are absent
 // ---------------------------------------------------------------------------
 
-function loadConfig(): { clientId: string; clientSecret: string; allowedOrigins: string[]; port: number } {
-  const clientId = process.env["GITHUB_CLIENT_ID"];
-  const clientSecret = process.env["GITHUB_CLIENT_SECRET"];
+function loadConfig(): {
+  clientId: string;
+  clientSecret: string;
+  googleClientId: string;
+  googleClientSecret: string;
+  allowedOrigins: string[];
+  port: number;
+} {
+  const clientId = (process.env["GITHUB_CLIENT_ID"] ?? "").trim();
+  const clientSecret = (process.env["GITHUB_CLIENT_SECRET"] ?? "").trim();
 
   if (!clientId || !clientSecret) {
     console.error(
       "[oauth-backend] FATAL: GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET must be set."
+    );
+    process.exit(1);
+  }
+
+  const googleClientId = (process.env["GOOGLE_CLIENT_ID"] ?? "").trim();
+  const googleClientSecret = (process.env["GOOGLE_CLIENT_SECRET"] ?? "").trim();
+
+  if (!googleClientId || !googleClientSecret) {
+    console.error(
+      "[oauth-backend] FATAL: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set."
     );
     process.exit(1);
   }
@@ -59,7 +84,7 @@ function loadConfig(): { clientId: string; clientSecret: string; allowedOrigins:
 
   const port = parseInt(process.env["PORT"] ?? "8787", 10);
 
-  return { clientId, clientSecret, allowedOrigins, port };
+  return { clientId, clientSecret, googleClientId, googleClientSecret, allowedOrigins, port };
 }
 
 // ---------------------------------------------------------------------------
@@ -95,6 +120,8 @@ function staticZodDetail(issue: ZodIssue): string {
 export async function buildServer(opts: {
   clientId: string;
   clientSecret: string;
+  googleClientId: string;
+  googleClientSecret: string;
   allowedOrigins: string[];
   /** Injected fetch implementation — defaults to globalThis.fetch */
   fetchFn?: OAuthFetchFn;
@@ -153,6 +180,12 @@ export async function buildServer(opts: {
     fetch: nodeFetch,
   };
 
+  const googleHandlerConfig: GoogleHandlerConfig = {
+    googleClientId: opts.googleClientId,
+    googleClientSecret: opts.googleClientSecret,
+    fetch: nodeFetch,
+  };
+
   // -------------------------------------------------------------------------
   // GET /oauth/health
   // -------------------------------------------------------------------------
@@ -173,6 +206,25 @@ export async function buildServer(opts: {
     }
 
     const result = await exchange(parsed.data, handlerConfig);
+    if (!result.ok) {
+      return reply.status(result.status).send({ error: result.error });
+    }
+    return reply.status(200).send(result.data);
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /oauth/google/exchange
+  // -------------------------------------------------------------------------
+  app.post("/oauth/google/exchange", async (req, reply) => {
+    const parsed = GoogleExchangeBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        details: parsed.error.issues.map(staticZodDetail),
+      });
+    }
+
+    const result = await googleExchange(parsed.data, googleHandlerConfig);
     if (!result.ok) {
       return reply.status(result.status).send({ error: result.error });
     }
@@ -212,7 +264,13 @@ const isMain =
 
 if (isMain) {
   const config = loadConfig();
-  const app = await buildServer(config);
+  const app = await buildServer({
+    clientId: config.clientId,
+    clientSecret: config.clientSecret,
+    googleClientId: config.googleClientId,
+    googleClientSecret: config.googleClientSecret,
+    allowedOrigins: config.allowedOrigins,
+  });
   const address = await app.listen({ port: config.port, host: "0.0.0.0" });
   app.log.info(`[oauth-backend] listening on ${address}`);
 }
