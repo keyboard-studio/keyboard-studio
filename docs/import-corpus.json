@@ -4,9 +4,9 @@
   "totals": {
     "keyboards": 916,
     "clean": 413,
-    "clean-with-opaque": 75,
+    "clean-with-opaque": 76,
     "parse-failure": 0,
-    "round-trip-divergence": 428
+    "round-trip-divergence": 427
   },
   "opaqueFeatureTotals": [
     {
@@ -15,7 +15,7 @@
     },
     {
       "feature": "named-deadkey",
-      "count": 5711
+      "count": 5710
     },
     {
       "feature": "smp-literal",
@@ -23,7 +23,7 @@
     },
     {
       "feature": "outs-expansion",
-      "count": 566
+      "count": 911
     },
     {
       "feature": "option-store-directive",
@@ -5739,13 +5739,17 @@
         {
           "feature": "named-deadkey",
           "count": 5
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 2
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-pass",
       "ruleCount": 72,
       "groupCount": 1,
-      "rawFragmentCount": 5
+      "rawFragmentCount": 7
     },
     {
       "keyboardId": "nlci_kannada_winscript",
@@ -5756,13 +5760,17 @@
         {
           "feature": "named-deadkey",
           "count": 7
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 2
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-pass",
       "ruleCount": 67,
       "groupCount": 1,
-      "rawFragmentCount": 7
+      "rawFragmentCount": 9
     },
     {
       "keyboardId": "nlci_oriya_winscript",
@@ -5773,13 +5781,17 @@
         {
           "feature": "named-deadkey",
           "count": 11
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 2
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-pass",
       "ruleCount": 57,
       "groupCount": 1,
-      "rawFragmentCount": 11
+      "rawFragmentCount": 13
     },
     {
       "keyboardId": "nyiakeng_puachue_hmong",
@@ -6075,6 +6087,23 @@
       "rawFragmentCount": 8
     },
     {
+      "keyboardId": "sil_kcho",
+      "source": "sil/sil_kcho/source/sil_kcho.kmn",
+      "status": "clean-with-opaque",
+      "parseErrors": [],
+      "opaqueFeatureInventory": [
+        {
+          "feature": "outs-expansion",
+          "count": 1
+        }
+      ],
+      "recognizedRatio": 0,
+      "i2": "structural-pass",
+      "ruleCount": 36,
+      "groupCount": 1,
+      "rawFragmentCount": 1
+    },
+    {
       "keyboardId": "sil_lpo_plrd",
       "source": "sil/sil_lpo_plrd/source/sil_lpo_plrd.kmn",
       "status": "clean-with-opaque",
@@ -6303,13 +6332,17 @@
         {
           "feature": "option-store-directive",
           "count": 8
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 14
         }
       ],
       "recognizedRatio": 0.009900990099009901,
       "i2": "structural-divergence",
       "ruleCount": 101,
       "groupCount": 2,
-      "rawFragmentCount": 13
+      "rawFragmentCount": 27
     },
     {
       "keyboardId": "amazigh_latin",
@@ -7510,14 +7543,14 @@
       "opaqueFeatureInventory": [
         {
           "feature": "outs-expansion",
-          "count": 263
+          "count": 339
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 454,
       "groupCount": 2,
-      "rawFragmentCount": 263
+      "rawFragmentCount": 339
     },
     {
       "keyboardId": "burushaski_girminas",
@@ -7740,13 +7773,17 @@
         {
           "feature": "if-option-store",
           "count": 1
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 10
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 63,
       "groupCount": 2,
-      "rawFragmentCount": 1
+      "rawFragmentCount": 11
     },
     {
       "keyboardId": "el_harari_latin",
@@ -7765,12 +7802,17 @@
       "source": "el/el_naija/source/el_naija.kmn",
       "status": "round-trip-divergence",
       "parseErrors": [],
-      "opaqueFeatureInventory": [],
+      "opaqueFeatureInventory": [
+        {
+          "feature": "outs-expansion",
+          "count": 3
+        }
+      ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 55,
       "groupCount": 3,
-      "rawFragmentCount": 0
+      "rawFragmentCount": 3
     },
     {
       "keyboardId": "el_nuer",
@@ -7781,13 +7823,17 @@
         {
           "feature": "if-option-store",
           "count": 1
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 11
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 19,
       "groupCount": 2,
-      "rawFragmentCount": 1
+      "rawFragmentCount": 12
     },
     {
       "keyboardId": "el_osmanya",
@@ -7815,13 +7861,17 @@
         {
           "feature": "if-option-store",
           "count": 2
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 10
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 10,
       "groupCount": 2,
-      "rawFragmentCount": 2
+      "rawFragmentCount": 12
     },
     {
       "keyboardId": "embera_north",
@@ -7865,13 +7915,17 @@
         {
           "feature": "option-store-directive",
           "count": 28
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 1
         }
       ],
       "recognizedRatio": 0.012422360248447204,
       "i2": "structural-divergence",
       "ruleCount": 161,
       "groupCount": 17,
-      "rawFragmentCount": 89
+      "rawFragmentCount": 90
     },
     {
       "keyboardId": "farsi_phonetic",
@@ -8975,12 +9029,17 @@
       "source": "g/galaxie_greek_mnemonic/source/galaxie_greek_mnemonic.kmn",
       "status": "round-trip-divergence",
       "parseErrors": [],
-      "opaqueFeatureInventory": [],
+      "opaqueFeatureInventory": [
+        {
+          "feature": "outs-expansion",
+          "count": 3
+        }
+      ],
       "recognizedRatio": 0.0042643923240938165,
       "i2": "structural-divergence",
       "ruleCount": 469,
       "groupCount": 1,
-      "rawFragmentCount": 0
+      "rawFragmentCount": 3
     },
     {
       "keyboardId": "galaxie_greek_positional",
@@ -8999,12 +9058,17 @@
       "source": "g/galaxie_hebrew_mnemonic/source/galaxie_hebrew_mnemonic.kmn",
       "status": "round-trip-divergence",
       "parseErrors": [],
-      "opaqueFeatureInventory": [],
+      "opaqueFeatureInventory": [
+        {
+          "feature": "outs-expansion",
+          "count": 4
+        }
+      ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 69,
       "groupCount": 2,
-      "rawFragmentCount": 0
+      "rawFragmentCount": 4
     },
     {
       "keyboardId": "gandhari",
@@ -9445,6 +9509,10 @@
           "count": 4
         },
         {
+          "feature": "outs-expansion",
+          "count": 1
+        },
+        {
           "feature": "smp-literal",
           "count": 1
         }
@@ -9453,19 +9521,24 @@
       "i2": "structural-divergence",
       "ruleCount": 3,
       "groupCount": 1,
-      "rawFragmentCount": 5
+      "rawFragmentCount": 6
     },
     {
       "keyboardId": "gondi_dev",
       "source": "g/gondi_dev/source/gondi_dev.kmn",
       "status": "round-trip-divergence",
       "parseErrors": [],
-      "opaqueFeatureInventory": [],
+      "opaqueFeatureInventory": [
+        {
+          "feature": "outs-expansion",
+          "count": 1
+        }
+      ],
       "recognizedRatio": 0.013100436681222707,
       "i2": "structural-divergence",
       "ruleCount": 229,
       "groupCount": 1,
-      "rawFragmentCount": 0
+      "rawFragmentCount": 1
     },
     {
       "keyboardId": "greek_tonizo",
@@ -9476,13 +9549,17 @@
         {
           "feature": "if-option-store",
           "count": 28
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 7
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 119,
       "groupCount": 7,
-      "rawFragmentCount": 28
+      "rawFragmentCount": 35
     },
     {
       "keyboardId": "greekclassical",
@@ -9517,13 +9594,17 @@
         {
           "feature": "named-deadkey",
           "count": 3
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 9
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 97,
       "groupCount": 2,
-      "rawFragmentCount": 3
+      "rawFragmentCount": 12
     },
     {
       "keyboardId": "hausa_ajami_qwerty",
@@ -9674,13 +9755,17 @@
         {
           "feature": "option-store-directive",
           "count": 2
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 1
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 155,
       "groupCount": 1,
-      "rawFragmentCount": 9
+      "rawFragmentCount": 10
     },
     {
       "keyboardId": "itrans_devanagari_hindi",
@@ -9695,13 +9780,17 @@
         {
           "feature": "option-store-directive",
           "count": 2
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 1
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 192,
       "groupCount": 1,
-      "rawFragmentCount": 19
+      "rawFragmentCount": 20
     },
     {
       "keyboardId": "itrans_devanagari_sanskrit_vedic",
@@ -9716,13 +9805,17 @@
         {
           "feature": "option-store-directive",
           "count": 2
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 1
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 307,
       "groupCount": 1,
-      "rawFragmentCount": 9
+      "rawFragmentCount": 10
     },
     {
       "keyboardId": "itrans_gujarati",
@@ -9737,25 +9830,34 @@
         {
           "feature": "option-store-directive",
           "count": 2
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 1
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 166,
       "groupCount": 1,
-      "rawFragmentCount": 9
+      "rawFragmentCount": 10
     },
     {
       "keyboardId": "itrans_gurmukhi",
       "source": "itrans/itrans_gurmukhi/source/itrans_gurmukhi.kmn",
       "status": "round-trip-divergence",
       "parseErrors": [],
-      "opaqueFeatureInventory": [],
+      "opaqueFeatureInventory": [
+        {
+          "feature": "outs-expansion",
+          "count": 1
+        }
+      ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 129,
       "groupCount": 1,
-      "rawFragmentCount": 0
+      "rawFragmentCount": 1
     },
     {
       "keyboardId": "itrans_odia",
@@ -9770,25 +9872,34 @@
         {
           "feature": "option-store-directive",
           "count": 2
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 1
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 168,
       "groupCount": 1,
-      "rawFragmentCount": 9
+      "rawFragmentCount": 10
     },
     {
       "keyboardId": "jawa",
       "source": "j/jawa/source/jawa.kmn",
       "status": "round-trip-divergence",
       "parseErrors": [],
-      "opaqueFeatureInventory": [],
+      "opaqueFeatureInventory": [
+        {
+          "feature": "outs-expansion",
+          "count": 14
+        }
+      ],
       "recognizedRatio": 0.036036036036036036,
       "i2": "structural-divergence",
       "ruleCount": 111,
       "groupCount": 1,
-      "rawFragmentCount": 0
+      "rawFragmentCount": 14
     },
     {
       "keyboardId": "jumjum",
@@ -9899,13 +10010,17 @@
         {
           "feature": "if-option-store",
           "count": 4
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 6
         }
       ],
       "recognizedRatio": 0.03816793893129771,
       "i2": "structural-divergence",
       "ruleCount": 262,
       "groupCount": 5,
-      "rawFragmentCount": 4
+      "rawFragmentCount": 10
     },
     {
       "keyboardId": "khudawadi_inscript",
@@ -9929,12 +10044,17 @@
       "source": "k/kmhmu_2008/source/kmhmu_2008.kmn",
       "status": "round-trip-divergence",
       "parseErrors": [],
-      "opaqueFeatureInventory": [],
+      "opaqueFeatureInventory": [
+        {
+          "feature": "outs-expansion",
+          "count": 1
+        }
+      ],
       "recognizedRatio": 0.2727272727272727,
       "i2": "structural-divergence",
       "ruleCount": 33,
       "groupCount": 2,
-      "rawFragmentCount": 0
+      "rawFragmentCount": 1
     },
     {
       "keyboardId": "koalibrere",
@@ -9987,13 +10107,17 @@
         {
           "feature": "named-deadkey",
           "count": 25
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 1
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 80,
       "groupCount": 5,
-      "rawFragmentCount": 37
+      "rawFragmentCount": 38
     },
     {
       "keyboardId": "kreative_superipa",
@@ -10038,13 +10162,17 @@
         {
           "feature": "named-deadkey",
           "count": 246
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 8
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 474,
       "groupCount": 2,
-      "rawFragmentCount": 246
+      "rawFragmentCount": 254
     },
     {
       "keyboardId": "kui_odia_winscript",
@@ -10055,13 +10183,17 @@
         {
           "feature": "named-deadkey",
           "count": 11
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 2
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 55,
       "groupCount": 1,
-      "rawFragmentCount": 11
+      "rawFragmentCount": 13
     },
     {
       "keyboardId": "lahu",
@@ -10099,26 +10231,31 @@
         },
         {
           "feature": "outs-expansion",
-          "count": 1
+          "count": 8
         }
       ],
       "recognizedRatio": 0.02631578947368421,
       "i2": "structural-divergence",
       "ruleCount": 152,
       "groupCount": 4,
-      "rawFragmentCount": 23
+      "rawFragmentCount": 30
     },
     {
       "keyboardId": "lao_phonetic",
       "source": "l/lao_phonetic/source/lao_phonetic.kmn",
       "status": "round-trip-divergence",
       "parseErrors": [],
-      "opaqueFeatureInventory": [],
+      "opaqueFeatureInventory": [
+        {
+          "feature": "outs-expansion",
+          "count": 5
+        }
+      ],
       "recognizedRatio": 0.013114754098360656,
       "i2": "structural-divergence",
       "ruleCount": 305,
       "groupCount": 24,
-      "rawFragmentCount": 0
+      "rawFragmentCount": 5
     },
     {
       "keyboardId": "lavanya",
@@ -10129,13 +10266,17 @@
         {
           "feature": "named-deadkey",
           "count": 16
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 2
         }
       ],
       "recognizedRatio": 0.07575757575757576,
       "i2": "structural-divergence",
       "ruleCount": 66,
       "groupCount": 1,
-      "rawFragmentCount": 16
+      "rawFragmentCount": 18
     },
     {
       "keyboardId": "laz",
@@ -10239,13 +10380,17 @@
         {
           "feature": "option-store-directive",
           "count": 2
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 1
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 169,
       "groupCount": 1,
-      "rawFragmentCount": 10
+      "rawFragmentCount": 11
     },
     {
       "keyboardId": "meroitic_cursive",
@@ -10341,12 +10486,17 @@
       "source": "n/nailangs/source/nailangs.kmn",
       "status": "round-trip-divergence",
       "parseErrors": [],
-      "opaqueFeatureInventory": [],
+      "opaqueFeatureInventory": [
+        {
+          "feature": "outs-expansion",
+          "count": 8
+        }
+      ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 55,
       "groupCount": 5,
-      "rawFragmentCount": 0
+      "rawFragmentCount": 8
     },
     {
       "keyboardId": "nias",
@@ -10393,13 +10543,17 @@
         {
           "feature": "named-deadkey",
           "count": 11
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 2
         }
       ],
       "recognizedRatio": 0.09090909090909091,
       "i2": "structural-divergence",
       "ruleCount": 55,
       "groupCount": 1,
-      "rawFragmentCount": 11
+      "rawFragmentCount": 13
     },
     {
       "keyboardId": "nlci_gujarati_winscript",
@@ -10410,13 +10564,17 @@
         {
           "feature": "named-deadkey",
           "count": 10
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 1
         }
       ],
       "recognizedRatio": 0.0784313725490196,
       "i2": "structural-divergence",
       "ruleCount": 51,
       "groupCount": 1,
-      "rawFragmentCount": 10
+      "rawFragmentCount": 11
     },
     {
       "keyboardId": "nlci_gurmukhi_winscript",
@@ -10427,13 +10585,17 @@
         {
           "feature": "named-deadkey",
           "count": 13
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 2
         }
       ],
       "recognizedRatio": 0.09259259259259259,
       "i2": "structural-divergence",
       "ruleCount": 54,
       "groupCount": 1,
-      "rawFragmentCount": 13
+      "rawFragmentCount": 15
     },
     {
       "keyboardId": "nlci_malayalam_winscript",
@@ -10444,13 +10606,17 @@
         {
           "feature": "named-deadkey",
           "count": 7
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 2
         }
       ],
       "recognizedRatio": 0.06153846153846154,
       "i2": "structural-divergence",
       "ruleCount": 65,
       "groupCount": 1,
-      "rawFragmentCount": 7
+      "rawFragmentCount": 9
     },
     {
       "keyboardId": "nlci_tamil_winscript",
@@ -10463,15 +10629,19 @@
           "count": 8
         },
         {
+          "feature": "outs-expansion",
+          "count": 2
+        },
+        {
           "feature": "smp-literal",
           "count": 3
         }
       ],
-      "recognizedRatio": 0.05,
+      "recognizedRatio": 0.06557377049180328,
       "i2": "structural-divergence",
-      "ruleCount": 60,
+      "ruleCount": 61,
       "groupCount": 1,
-      "rawFragmentCount": 11
+      "rawFragmentCount": 13
     },
     {
       "keyboardId": "nlci_telugu_winscript",
@@ -10482,13 +10652,17 @@
         {
           "feature": "named-deadkey",
           "count": 7
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 2
         }
       ],
       "recognizedRatio": 0.07272727272727272,
       "i2": "structural-divergence",
       "ruleCount": 55,
       "groupCount": 1,
-      "rawFragmentCount": 7
+      "rawFragmentCount": 9
     },
     {
       "keyboardId": "northern_sierra_miwok",
@@ -10566,6 +10740,10 @@
           "count": 3
         },
         {
+          "feature": "outs-expansion",
+          "count": 1
+        },
+        {
           "feature": "smp-literal",
           "count": 3
         }
@@ -10574,7 +10752,7 @@
       "i2": "structural-divergence",
       "ruleCount": 67,
       "groupCount": 5,
-      "rawFragmentCount": 6
+      "rawFragmentCount": 7
     },
     {
       "keyboardId": "old_hungarian_carpathian_highlands",
@@ -10587,6 +10765,10 @@
           "count": 3
         },
         {
+          "feature": "outs-expansion",
+          "count": 1
+        },
+        {
           "feature": "smp-literal",
           "count": 27
         }
@@ -10595,7 +10777,7 @@
       "i2": "structural-divergence",
       "ruleCount": 77,
       "groupCount": 5,
-      "rawFragmentCount": 30
+      "rawFragmentCount": 31
     },
     {
       "keyboardId": "old_permic",
@@ -10659,14 +10841,14 @@
       "opaqueFeatureInventory": [
         {
           "feature": "outs-expansion",
-          "count": 9
+          "count": 11
         }
       ],
       "recognizedRatio": 0.007936507936507936,
       "i2": "structural-divergence",
       "ruleCount": 126,
       "groupCount": 1,
-      "rawFragmentCount": 9
+      "rawFragmentCount": 11
     },
     {
       "keyboardId": "persian_phonetic",
@@ -10713,14 +10895,14 @@
         },
         {
           "feature": "outs-expansion",
-          "count": 83
+          "count": 84
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 0,
       "groupCount": 1,
-      "rawFragmentCount": 189
+      "rawFragmentCount": 190
     },
     {
       "keyboardId": "pid_piaroa",
@@ -10804,12 +10986,17 @@
       "source": "r/rohingya_arab/source/rohingya_arab.kmn",
       "status": "round-trip-divergence",
       "parseErrors": [],
-      "opaqueFeatureInventory": [],
+      "opaqueFeatureInventory": [
+        {
+          "feature": "outs-expansion",
+          "count": 3
+        }
+      ],
       "recognizedRatio": 0.047619047619047616,
       "i2": "structural-divergence",
       "ruleCount": 42,
       "groupCount": 1,
-      "rawFragmentCount": 0
+      "rawFragmentCount": 3
     },
     {
       "keyboardId": "romanian_popak",
@@ -10942,7 +11129,7 @@
       "opaqueFeatureInventory": [],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
-      "ruleCount": 144,
+      "ruleCount": 145,
       "groupCount": 1,
       "rawFragmentCount": 0
     },
@@ -10963,12 +11150,17 @@
       "source": "sil/sil_busa/source/sil_busa.kmn",
       "status": "round-trip-divergence",
       "parseErrors": [],
-      "opaqueFeatureInventory": [],
+      "opaqueFeatureInventory": [
+        {
+          "feature": "outs-expansion",
+          "count": 2
+        }
+      ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 19,
       "groupCount": 1,
-      "rawFragmentCount": 0
+      "rawFragmentCount": 2
     },
     {
       "keyboardId": "sil_cameroon_azerty",
@@ -11060,12 +11252,17 @@
       "source": "sil/sil_dzongkha/source/sil_dzongkha.kmn",
       "status": "round-trip-divergence",
       "parseErrors": [],
-      "opaqueFeatureInventory": [],
+      "opaqueFeatureInventory": [
+        {
+          "feature": "outs-expansion",
+          "count": 6
+        }
+      ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 4,
       "groupCount": 2,
-      "rawFragmentCount": 0
+      "rawFragmentCount": 6
     },
     {
       "keyboardId": "sil_el_ethiopian_latin",
@@ -11088,13 +11285,17 @@
         {
           "feature": "if-option-store",
           "count": 20
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 1
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 121,
       "groupCount": 5,
-      "rawFragmentCount": 20
+      "rawFragmentCount": 21
     },
     {
       "keyboardId": "sil_extended_urdu_np",
@@ -11121,14 +11322,14 @@
       "opaqueFeatureInventory": [
         {
           "feature": "outs-expansion",
-          "count": 121
+          "count": 122
         }
       ],
       "recognizedRatio": 0.0048543689320388345,
       "i2": "structural-divergence",
       "ruleCount": 206,
       "groupCount": 2,
-      "rawFragmentCount": 121
+      "rawFragmentCount": 122
     },
     {
       "keyboardId": "sil_hebr_grek_trans",
@@ -11246,13 +11447,17 @@
         {
           "feature": "if-option-store",
           "count": 2
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 2
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 119,
       "groupCount": 3,
-      "rawFragmentCount": 2
+      "rawFragmentCount": 4
     },
     {
       "keyboardId": "sil_kayah_mymr",
@@ -11262,26 +11467,14 @@
       "opaqueFeatureInventory": [
         {
           "feature": "outs-expansion",
-          "count": 7
+          "count": 9
         }
       ],
       "recognizedRatio": 0.007575757575757576,
       "i2": "structural-divergence",
       "ruleCount": 132,
       "groupCount": 1,
-      "rawFragmentCount": 7
-    },
-    {
-      "keyboardId": "sil_kcho",
-      "source": "sil/sil_kcho/source/sil_kcho.kmn",
-      "status": "round-trip-divergence",
-      "parseErrors": [],
-      "opaqueFeatureInventory": [],
-      "recognizedRatio": 0,
-      "i2": "structural-divergence",
-      "ruleCount": 36,
-      "groupCount": 1,
-      "rawFragmentCount": 0
+      "rawFragmentCount": 9
     },
     {
       "keyboardId": "sil_khmer",
@@ -11300,12 +11493,17 @@
       "source": "sil/sil_kmhmu/source/sil_kmhmu.kmn",
       "status": "round-trip-divergence",
       "parseErrors": [],
-      "opaqueFeatureInventory": [],
+      "opaqueFeatureInventory": [
+        {
+          "feature": "outs-expansion",
+          "count": 1
+        }
+      ],
       "recognizedRatio": 0.24,
       "i2": "structural-divergence",
       "ruleCount": 25,
       "groupCount": 2,
-      "rawFragmentCount": 0
+      "rawFragmentCount": 1
     },
     {
       "keyboardId": "sil_korda_jamo",
@@ -11407,36 +11605,51 @@
       "source": "sil/sil_mali_azerty/source/sil_mali_azerty.kmn",
       "status": "round-trip-divergence",
       "parseErrors": [],
-      "opaqueFeatureInventory": [],
+      "opaqueFeatureInventory": [
+        {
+          "feature": "outs-expansion",
+          "count": 3
+        }
+      ],
       "recognizedRatio": 0.04285714285714286,
       "i2": "structural-divergence",
       "ruleCount": 70,
       "groupCount": 5,
-      "rawFragmentCount": 0
+      "rawFragmentCount": 3
     },
     {
       "keyboardId": "sil_mali_qwerty",
       "source": "sil/sil_mali_qwerty/source/sil_mali_qwerty.kmn",
       "status": "round-trip-divergence",
       "parseErrors": [],
-      "opaqueFeatureInventory": [],
+      "opaqueFeatureInventory": [
+        {
+          "feature": "outs-expansion",
+          "count": 3
+        }
+      ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 147,
       "groupCount": 5,
-      "rawFragmentCount": 0
+      "rawFragmentCount": 3
     },
     {
       "keyboardId": "sil_mali_qwertz",
       "source": "sil/sil_mali_qwertz/source/sil_mali_qwertz.kmn",
       "status": "round-trip-divergence",
       "parseErrors": [],
-      "opaqueFeatureInventory": [],
+      "opaqueFeatureInventory": [
+        {
+          "feature": "outs-expansion",
+          "count": 1
+        }
+      ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 97,
       "groupCount": 5,
-      "rawFragmentCount": 0
+      "rawFragmentCount": 1
     },
     {
       "keyboardId": "sil_mende_kikakui",
@@ -11501,14 +11714,14 @@
       "opaqueFeatureInventory": [
         {
           "feature": "outs-expansion",
-          "count": 7
+          "count": 8
         }
       ],
       "recognizedRatio": 0.00909090909090909,
       "i2": "structural-divergence",
       "ruleCount": 110,
       "groupCount": 1,
-      "rawFragmentCount": 7
+      "rawFragmentCount": 8
     },
     {
       "keyboardId": "sil_nigeria_dot",
@@ -11581,14 +11794,14 @@
       "opaqueFeatureInventory": [
         {
           "feature": "outs-expansion",
-          "count": 8
+          "count": 10
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 69,
       "groupCount": 3,
-      "rawFragmentCount": 8
+      "rawFragmentCount": 10
     },
     {
       "keyboardId": "sil_pan_africa_positional",
@@ -11598,14 +11811,14 @@
       "opaqueFeatureInventory": [
         {
           "feature": "outs-expansion",
-          "count": 8
+          "count": 10
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 75,
       "groupCount": 3,
-      "rawFragmentCount": 8
+      "rawFragmentCount": 10
     },
     {
       "keyboardId": "sil_philippines",
@@ -11751,14 +11964,14 @@
       "opaqueFeatureInventory": [
         {
           "feature": "outs-expansion",
-          "count": 2
+          "count": 10
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 201,
       "groupCount": 1,
-      "rawFragmentCount": 2
+      "rawFragmentCount": 10
     },
     {
       "keyboardId": "sil_taang",
@@ -11768,14 +11981,14 @@
       "opaqueFeatureInventory": [
         {
           "feature": "outs-expansion",
-          "count": 5
+          "count": 6
         }
       ],
       "recognizedRatio": 0.05357142857142857,
       "i2": "structural-divergence",
       "ruleCount": 56,
       "groupCount": 1,
-      "rawFragmentCount": 5
+      "rawFragmentCount": 6
     },
     {
       "keyboardId": "sil_tai_dam_latin",
@@ -11914,13 +12127,17 @@
         {
           "feature": "named-deadkey",
           "count": 16
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 22
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 160,
       "groupCount": 1,
-      "rawFragmentCount": 16
+      "rawFragmentCount": 38
     },
     {
       "keyboardId": "sil_yoruba_dot",
@@ -11931,13 +12148,17 @@
         {
           "feature": "named-deadkey",
           "count": 16
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 23
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 152,
       "groupCount": 1,
-      "rawFragmentCount": 16
+      "rawFragmentCount": 39
     },
     {
       "keyboardId": "sil_yoruba8",
@@ -11952,13 +12173,17 @@
         {
           "feature": "named-deadkey",
           "count": 10
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 23
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 111,
       "groupCount": 1,
-      "rawFragmentCount": 36
+      "rawFragmentCount": 59
     },
     {
       "keyboardId": "sil_ywq_plrd",
@@ -12160,14 +12385,14 @@
       "opaqueFeatureInventory": [
         {
           "feature": "outs-expansion",
-          "count": 17
+          "count": 19
         }
       ],
       "recognizedRatio": 0.018518518518518517,
       "i2": "structural-divergence",
       "ruleCount": 162,
       "groupCount": 5,
-      "rawFragmentCount": 17
+      "rawFragmentCount": 19
     },
     {
       "keyboardId": "tibetan_ewts",
@@ -12205,14 +12430,18 @@
         },
         {
           "feature": "named-deadkey",
-          "count": 130
+          "count": 129
+        },
+        {
+          "feature": "outs-expansion",
+          "count": 2
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-divergence",
       "ruleCount": 182,
       "groupCount": 5,
-      "rawFragmentCount": 164
+      "rawFragmentCount": 165
     },
     {
       "keyboardId": "udi_keyboard",
