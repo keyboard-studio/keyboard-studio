@@ -133,7 +133,7 @@ exactly.
 
 > Keep this section up to date as work lands. Update it whenever a delivery
 > option moves from "not started" to "in progress" or "done".
-> Last updated: 2026-06-19
+> Last updated: 2026-06-24
 
 ### Pipeline prerequisites (must exist before any delivery option works)
 
@@ -168,8 +168,8 @@ exactly.
 | `createGitHubOutputService()` factory | **Done** | Injectable `GitHubFetchFn` for testability; default delegates to global fetch |
 | GitHub OAuth App registration | Not started | Infrastructure — register an OAuth App at github.com/settings/developers |
 | OAuth token-exchange backend | **Done (code) / deploy pending** | `utilities/oauth-backend/` — Fastify v5 service; `POST /oauth/exchange`, `POST /oauth/refresh`, `GET /oauth/health`; client secret server-side only; 30 vitest specs (service implemented; deploy target + GitHub OAuth App registration still pending) |
-| Studio UI — OAuth authorise flow | **Done** | Issue #148 — `packages/studio/src/lib/githubOAuth.ts` (PKCE + sessionStorage token store), `lib/handleOAuthCallback.ts`, `hooks/useGitHubAuth.ts`; engine `verifyToken` consumed via `services.ts` `getGitHubOutputService()`; copyright-attestation gate per spec §12/Scenario E |
-| Studio UI — "Submit PR" button | **Done** | Issue #148 — `components/GitHubSubmitPanel.tsx`; gates on `verifyToken`, calls `publishPR` on confirm via `services.ts` `getGitHubOutputService()`; full `PublishPRError` message matrix; lint-checklist PR-body composer (green/yellow/red) deferred to follow-up — ships editable default body stub |
+| Studio UI — OAuth authorise flow | **Done** | Issue #148 — `packages/studio/src/lib/githubOAuth.ts` (PKCE + sessionStorage token store), `lib/handleOAuthCallback.ts`, `hooks/useGitHubAuth.ts`; engine `verifyToken` consumed via `services.ts` `getGitHubOutputService()`. Reused by the decoupled sign-up panel |
+| Studio UI — sign-up vs. submit | **Decoupled (§1a)** | The coupled "Connect GitHub + Submit PR" panel (`GitHubSubmitPanel`) was **removed** from the Output screen and replaced by a decoupled **"Sign up with GitHub"** identity panel (`components/GitHubSignUpPanel.tsx`, reuses `useGitHubAuth`) — identity only, no fork/branch/PR exposed (docs/github-integration.md §1a). The submit/publish *action* now defaults to **Option B** (org-mediated); `publishPR` engine code is retained for the opt-in self-fork path |
 
 ### Option B — Org-mediated, abstracted
 
@@ -184,6 +184,6 @@ exactly.
 
 ```
 Option C  [====================]  100%  engine + studio UI done; full end-to-end zip download wired (#32)
-Option A  [==================--]   90%  engine + studio UI done (#148); OAuth App registration + backend deploy remaining
-Option B  [--------------------]    0%  design done (github_flow.md); nothing built
+Option A  [==================--]   90%  engine + OAuth backend + studio sign-up (identity) UI done; submit action deferred to Option B (§1a); OAuth App registration + backend deploy remaining
+Option B  [--------------------]    0%  now the DEFAULT submit path (§1a); design done (github_flow.md); nothing built
 ```

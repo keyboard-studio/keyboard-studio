@@ -3,7 +3,7 @@
 // Left pane: shared PickerPane (BaseKeyboardPicker, mode toggle, ScaffoldForm,
 // TrackOneIdentityPanel, KmnEditor, MetadataCard).
 // Right pane: Download .zip button + downloadError + downloadWarnings banner +
-// showIdentityWarn banner + GitHubSubmitPanel.
+// showIdentityWarn banner + GitHubSignUpPanel.
 //
 // NO OSKFrame. NO OskModeToggle.
 //
@@ -20,7 +20,7 @@ import { ScaffoldForm } from "./ScaffoldForm.tsx";
 import { KmnEditor } from "./KmnEditor.tsx";
 import { TrackOneIdentityPanel } from "./TrackOneIdentityPanel.tsx";
 import { PickerPane } from "./PickerPane.tsx";
-import { GitHubSubmitPanel } from "./GitHubSubmitPanel.tsx";
+import { GitHubSignUpPanel } from "./GitHubSignUpPanel.tsx";
 import { ResizeHandle } from "./ResizeHandle.tsx";
 import { DIVIDER_WIDTH, LEFT_MIN_PCT, LEFT_MAX_PCT, LEFT_INIT_PCT } from "./previewOutputLayout.ts";
 
@@ -204,9 +204,10 @@ export function OutputScreen() {
                 </button>
               </div>
             )}
-            {/* GitHub OAuth fork+PR delivery (spec §12 "Option A"). Gated on the
-                same working-copy readiness as the .zip download. */}
-            <GitHubSubmitPanel canSubmitArtifact={canDownload} />
+            {/* Decoupled "Sign up with GitHub" identity step (docs/github-integration.md
+                §1a). Establishes who the user is — NOT a submit/PR action, and not
+                gated on artifact readiness (you can sign up any time). */}
+            <GitHubSignUpPanel />
           </>
         )}
       </section>

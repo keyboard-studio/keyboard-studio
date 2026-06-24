@@ -4,10 +4,10 @@
 // PreviewScreen ("try it"):
 //   - Renders OSK (testid osk-frame) and DiagnosticsPanel.
 //   - Does NOT render a "Download .zip" button.
-//   - Does NOT render GitHubSubmitPanel.
+//   - Does NOT render GitHubSignUpPanel.
 //
 // OutputScreen ("ship it"):
-//   - Renders "Download .zip" button and GitHubSubmitPanel.
+//   - Renders "Download .zip" button and GitHubSignUpPanel.
 //   - Does NOT render an interactive OSK (no osk-frame testid).
 //   - projection-warning surface (original PreviewShell.test coverage, re-homed here)
 //   - identity-unset warning banner (AC2 + AC4)
@@ -94,16 +94,13 @@ vi.mock("../hooks/useWorkingCopyTransform.ts", () => ({
   useWorkingCopyTransform: () => null,
 }));
 
-// GitHubSubmitPanel pulls heavy deps (useGitHubAuth, services); mock it to a
+// GitHubSignUpPanel pulls heavy deps (useGitHubAuth, services); mock it to a
 // recognisable testid so we can assert its presence/absence without importing
 // the real module.
-vi.mock("./GitHubSubmitPanel.tsx", () => ({
-  GitHubSubmitPanel: () => (
-    <section
-      data-testid="github-submit-panel"
-      aria-label="Submit to community repository"
-    >
-      GitHub submit panel
+vi.mock("./GitHubSignUpPanel.tsx", () => ({
+  GitHubSignUpPanel: () => (
+    <section data-testid="github-signup-panel" aria-label="Submit your keyboard">
+      GitHub sign-up panel
     </section>
   ),
 }));
@@ -176,10 +173,10 @@ describe("PreviewScreen — route-split AC", () => {
     expect(screen.queryByRole("button", { name: /download/i })).toBeNull();
   });
 
-  it("does NOT render GitHubSubmitPanel", () => {
+  it("does NOT render GitHubSignUpPanel", () => {
     render(<PreviewScreen />);
     fireEvent.click(screen.getByTestId("base-picker"));
-    expect(screen.queryByTestId("github-submit-panel")).toBeNull();
+    expect(screen.queryByTestId("github-signup-panel")).toBeNull();
   });
 });
 
@@ -197,10 +194,10 @@ describe("OutputScreen — route-split AC", () => {
     expect(screen.getByRole("button", { name: /download/i })).toBeTruthy();
   });
 
-  it("renders GitHubSubmitPanel after base is picked", () => {
+  it("renders GitHubSignUpPanel after base is picked", () => {
     render(<OutputScreen />);
     fireEvent.click(screen.getByTestId("base-picker"));
-    expect(screen.getByTestId("github-submit-panel")).toBeTruthy();
+    expect(screen.getByTestId("github-signup-panel")).toBeTruthy();
   });
 
   it("does NOT render an interactive OSK (no osk-frame testid)", () => {
