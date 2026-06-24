@@ -315,3 +315,57 @@ describe("fetchKeyboardSourceToVfs — proxyBase pass-through", () => {
     expect(calls).toContain(customSourceUrl("sil_euro_latin.kmn"));
   });
 });
+
+// ---------------------------------------------------------------------------
+// Test 5: KMW_EMBEDCSS sibling is fetched into the VFS as text.
+// The visual-keyboard CSS the KMW compiler embeds — previously absent from the
+// fetched-sibling list, so it never reached the VFS and the compiler's
+// loadFile() returned null; kmc-kmn then ran TextDecoder().decode(null), a
+// confusing TypeError that silently dropped the keyboard's styling from the OSK
+// preview (sil_cameroon_azerty: store(&KMW_EMBEDCSS) 'sil_cameroon_azerty.css').
+// ---------------------------------------------------------------------------
+
+describe("fetchKeyboardSourceToVfs — KMW_EMBEDCSS sibling", () => {
+  const kmnWithEmbedCss = `c kb
+store(&KMW_EMBEDCSS) 'sil_euro_latin.css'
+begin Unicode > use(main)
+group(main) using keys
++ 'a' > 'b'
+`;
+
+  it("fetches the .css sibling into source/<file> as text (not null at compile)", async () => {
+    const cssBody = ".kmw-key-text { font-family: 'Andika Afr'; }\n";
+    const { fetchImpl, calls } = makeMockFetch({
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kmn")]: { ok: true, status: 200, body: kmnWithEmbedCss },
+      [sourceUrl(euroLatinKb, "sil_euro_latin.css")]: { ok: true, status: 200, body: cssBody },
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kps")]: { ok: false, status: 404, body: "" },
+      [`${PROXY}/${euroLatinKb.path}/sil_euro_latin.kpj`]: { ok: false, status: 404, body: "" },
+    });
+
+    const vfs = createVirtualFS();
+    const result = await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl });
+
+    // The CSS must land in the VFS as a STRING, so the compiler's loadFile()
+    // returns real bytes for the KMW_EMBEDCSS step rather than null.
+    const entry = vfs.get("source/sil_euro_latin.css");
+    expect(entry).toBeDefined();
+    expect(typeof entry!.content).toBe("string");
+    expect(entry!.content).toBe(cssBody);
+    expect(result.filesLoaded).toContain("source/sil_euro_latin.css");
+    expect(calls).toContain(sourceUrl(euroLatinKb, "sil_euro_latin.css"));
+  });
+
+  it("is optional — a missing .css warns and does not throw", async () => {
+    const { fetchImpl } = makeMockFetch({
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kmn")]: { ok: true, status: 200, body: kmnWithEmbedCss },
+      [sourceUrl(euroLatinKb, "sil_euro_latin.css")]: { ok: false, status: 404, body: "" },
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kps")]: { ok: false, status: 404, body: "" },
+      [`${PROXY}/${euroLatinKb.path}/sil_euro_latin.kpj`]: { ok: false, status: 404, body: "" },
+    });
+
+    const vfs = createVirtualFS();
+    const result = await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl });
+    expect(vfs.get("source/sil_euro_latin.css")).toBeUndefined();
+    expect(result.warnings.find((w) => w.includes("KMW_EMBEDCSS"))).toBeDefined();
+  });
+});

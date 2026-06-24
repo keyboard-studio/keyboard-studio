@@ -7,6 +7,10 @@
 // DISPLAYMAP added: PUA-font JSON sidecars (e.g. KbdArab.json) referenced via
 // relative paths that traverse into release/shared/; kmc warns (not errors) if
 // absent, but the compile fails for PUA-mapped keyboards when it cannot resolve.
+// KMW_EMBEDCSS added: the visual-keyboard CSS the KMW compiler embeds into the
+// .js (kmw-compiler reads it via loadFile, then `TextDecoder().decode(data)` —
+// when the sibling is absent loadFile returns null and that decode throws a
+// confusing TypeError, so the styling is silently dropped from the OSK preview).
 
 export interface KmnHeaderStore {
   /** Store name without the leading '&', uppercased (e.g. "LAYOUTFILE"). */
@@ -22,6 +26,7 @@ const SYSTEM_STORES: Record<string, boolean> = {
   VISUALKEYBOARD: true,
   BITMAP: false,
   KMW_EMBEDJS: true,
+  KMW_EMBEDCSS: false,
   KMW_HELPFILE: false,
   DISPLAYMAP: false,
 };
