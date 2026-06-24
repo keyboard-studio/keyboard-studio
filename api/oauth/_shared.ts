@@ -77,7 +77,10 @@ export async function runTokenHandler<T>(
   configOverride?: HandlerConfig,
 ): Promise<Response> {
   if (req.method !== "POST") {
-    return jsonResponse(405, { error: "method_not_allowed" });
+    return new Response(JSON.stringify({ error: "method_not_allowed" }), {
+      status: 405,
+      headers: { "content-type": "application/json", Allow: "POST" },
+    });
   }
 
   let config: HandlerConfig;
