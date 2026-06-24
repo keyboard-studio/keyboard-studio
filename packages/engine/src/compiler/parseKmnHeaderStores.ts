@@ -11,6 +11,17 @@
 // .js (kmw-compiler reads it via loadFile, then `TextDecoder().decode(data)` —
 // when the sibling is absent loadFile returns null and that decode throws a
 // confusing TypeError, so the styling is silently dropped from the OSK preview).
+// INCLUDECODES added: the Unicode name-constants file kmcmplib reads via
+// CodeConstants->LoadFile(); a declared-but-unfetched file makes the C++ compile
+// fail hard with ERROR_CannotLoadIncludeFile. Unlike the packaging-asset stores
+// (BITMAP / VISUALKEYBOARD / LAYOUTFILE / DISPLAYMAP), it is NOT stripped for the
+// preview compile — the keyboard's rules reference its constants — so it must be
+// fetched; required:true surfaces a clear early error rather than that opaque one.
+//
+// Architectural limitation: this scans only header system stores, so it cannot
+// see `.call_js` extension files (named by `call(Fn)` rule statements, not by an
+// `&` store). kmc-kmn emits an alert() stub for a missing one, so the compile
+// does not hard-fail — but the .call_js sibling is never fetched by this loader.
 
 export interface KmnHeaderStore {
   /** Store name without the leading '&', uppercased (e.g. "LAYOUTFILE"). */
@@ -29,6 +40,7 @@ const SYSTEM_STORES: Record<string, boolean> = {
   KMW_EMBEDCSS: false,
   KMW_HELPFILE: false,
   DISPLAYMAP: false,
+  INCLUDECODES: true,
 };
 
 /**

@@ -3,9 +3,9 @@
 //
 // Resolves `<proxyBase>/<baseKeyboard.path>/source/<id>.kmn`, parses the
 // header for sibling deps (LAYOUTFILE / VISUALKEYBOARD / KMW_EMBEDJS /
-// KMW_EMBEDCSS / BITMAP / KMW_HELPFILE), fetches each, plus the optional <id>.kpj for
-// compiler flags. Writes everything flat into the VFS at `source/...`
-// (the layout CompilerService.compile() expects).
+// KMW_EMBEDCSS / BITMAP / KMW_HELPFILE / DISPLAYMAP / INCLUDECODES), fetches each,
+// plus the optional <id>.kpj for compiler flags. Writes everything flat into the
+// VFS at `source/...` (the layout CompilerService.compile() expects).
 
 import type { BaseKeyboard, VirtualFS, KpsFontEntry, KpsStylesheetEntry } from "@keyboard-studio/contracts";
 import { parseKmnHeaderStores } from "../compiler/parseKmnHeaderStores.js";
@@ -123,9 +123,9 @@ async function getBytes(
  * Populate the VFS with the source files for the chosen base keyboard.
  *
  * Throws on a missing required file (the `.kmn` itself, or a required
- * sibling named in a LAYOUTFILE / VISUALKEYBOARD / KMW_EMBEDJS store).
- * Returns silently on missing optional files (BITMAP / KMW_HELPFILE / KMW_EMBEDCSS / .kpj),
- * adding a warning string.
+ * sibling named in a LAYOUTFILE / VISUALKEYBOARD / KMW_EMBEDJS / INCLUDECODES store).
+ * Returns silently on missing optional files (BITMAP / KMW_HELPFILE / KMW_EMBEDCSS /
+ * DISPLAYMAP / .kpj), adding a warning string.
  */
 export async function fetchKeyboardSourceToVfs(
   baseKeyboard: BaseKeyboard,
@@ -186,7 +186,7 @@ export async function fetchKeyboardSourceToVfs(
     // Text vs binary: kmcmplib's text inputs are .kmn / .keyman-touch-layout / .kvks
     // (XML) / .js (KMW_EMBEDJS) / .css (KMW_EMBEDCSS) / .htm. Binary: .ico / fonts.
     const isText =
-      /\.(kmn|keyman-touch-layout|kvks|js|css|htm|html|txt|xml)$/i.test(r.store.path);
+      /\.(kmn|keyman-touch-layout|kvks|js|css|htm|html|txt|xml|json)$/i.test(r.store.path);
     if (isText) {
       vfs.set(path, new TextDecoder().decode(r.bytes));
     } else {
