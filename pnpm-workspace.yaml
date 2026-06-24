@@ -1,2 +1,6 @@
 packages:
   - "packages/*"
+  # Co-located OAuth functions (api/oauth/*) reuse this service's tested core,
+  # so it must be installable. Scoped to this one utility — the rest of
+  # utilities/* stays out of the workspace (and out of `pnpm -r`) by design.
+  - "utilities/oauth-backend"
