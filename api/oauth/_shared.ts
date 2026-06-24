@@ -58,10 +58,14 @@ export function envConfig(fetchFn: OAuthFetchFn = webFetch): HandlerConfig {
   return { clientId, clientSecret, fetch: fetchFn };
 }
 
-function jsonResponse(status: number, body: unknown): Response {
+function jsonResponse(
+  status: number,
+  body: unknown,
+  extraHeaders?: Record<string, string>,
+): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...extraHeaders },
   });
 }
 
@@ -77,10 +81,7 @@ export async function runTokenHandler<T>(
   configOverride?: HandlerConfig,
 ): Promise<Response> {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "method_not_allowed" }), {
-      status: 405,
-      headers: { "content-type": "application/json", Allow: "POST" },
-    });
+    return jsonResponse(405, { error: "method_not_allowed" }, { Allow: "POST" });
   }
 
   let config: HandlerConfig;
