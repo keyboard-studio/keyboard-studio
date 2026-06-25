@@ -6,9 +6,24 @@ import type {
   PublishPROptions,
   PublishPRResult,
   PublishPRError,
+  PublishStepName,
   VerifyTokenResult,
 } from "@keyboard-studio/contracts";
 import { isSidecarPath } from "./sidecar.js";
+
+// Canonical 1-based position of each publishPR phase in the 8-phase flow.
+// `fork-create` (2) fires only when the fork must be created, so emitted
+// indices may skip 2 — they remain the phase's stable position, not a count.
+const PUBLISH_STEP_INDEX: Record<PublishStepName, number> = {
+  "fork-check": 1,
+  "fork-create": 2,
+  "master-ref": 3,
+  "parent-commit": 4,
+  tree: 5,
+  commit: 6,
+  branch: 7,
+  "pr-open": 8,
+};
 
 // ---------------------------------------------------------------------------
 // Fetch abstraction — extends the base-browser FetchFn with method + body
@@ -164,7 +179,10 @@ export async function publishPR(
   opts: PublishPROptions,
   fetchFn: GitHubFetchFn
 ): Promise<PublishPRResult> {
-  const { token, forkOwner, branchName, commitMessage, prTitle, prBody, importAttribution } = opts;
+  const { token, forkOwner, branchName, commitMessage, prTitle, prBody, importAttribution, onProgress } = opts;
+  // Emit a progress event as each phase begins. No-op when no sink is wired.
+  const report = (name: PublishStepName): void =>
+    onProgress?.({ name, index: PUBLISH_STEP_INDEX[name], total: 8 });
   // Append the import-attribution block when supplied (spec §12 line 1157).
   // The caller (studio UI) builds the block via buildImportAttributionBlock()
   // and passes it through PublishPROptions.importAttribution.
@@ -178,6 +196,7 @@ export async function publishPR(
   // ------------------------------------------------------------------
   // 1. Ensure the fork exists under forkOwner
   // ------------------------------------------------------------------
+  report("fork-check");
   let forkCheckRes: GitHubFetchResponse;
   try {
     forkCheckRes = await ghFetch(forkBase, token, fetchFn);
@@ -195,6 +214,7 @@ export async function publishPR(
       } satisfies PublishPRError;
 
     // 404 — fork doesn't exist yet; create it
+    report("fork-create");
     let createRes: GitHubFetchResponse;
     try {
       createRes = await ghFetch(`${upstreamBase}/forks`, token, fetchFn, "POST", {});
@@ -214,6 +234,7 @@ export async function publishPR(
   // ------------------------------------------------------------------
   // 2. Get master HEAD commit SHA on the fork
   // ------------------------------------------------------------------
+  report("master-ref");
   let masterRefRes: GitHubFetchResponse;
   try {
     masterRefRes = await ghFetch(
@@ -236,6 +257,7 @@ export async function publishPR(
   // ------------------------------------------------------------------
   // 3. Get the base tree SHA from the parent commit
   // ------------------------------------------------------------------
+  report("parent-commit");
   let parentCommitRes: GitHubFetchResponse;
   try {
     parentCommitRes = await ghFetch(
@@ -271,6 +293,7 @@ export async function publishPR(
   // ------------------------------------------------------------------
   // 5. Create the new tree
   // ------------------------------------------------------------------
+  report("tree");
   let newTreeRes: GitHubFetchResponse;
   try {
     newTreeRes = await ghFetch(`${forkBase}/git/trees`, token, fetchFn, "POST", {
@@ -294,6 +317,7 @@ export async function publishPR(
   // ------------------------------------------------------------------
   // 6. Create the commit
   // ------------------------------------------------------------------
+  report("commit");
   let newCommitRes: GitHubFetchResponse;
   try {
     newCommitRes = await ghFetch(
@@ -324,6 +348,7 @@ export async function publishPR(
   // ------------------------------------------------------------------
   // 7. Create branch ref (fail with branch-exists if already present)
   // ------------------------------------------------------------------
+  report("branch");
   let branchRes: GitHubFetchResponse;
   try {
     branchRes = await ghFetch(`${forkBase}/git/refs`, token, fetchFn, "POST", {
@@ -351,6 +376,7 @@ export async function publishPR(
   // ------------------------------------------------------------------
   // 8. Open draft PR on upstream
   // ------------------------------------------------------------------
+  report("pr-open");
   let prRes: GitHubFetchResponse;
   try {
     prRes = await ghFetch(`${upstreamBase}/pulls`, token, fetchFn, "POST", {
