@@ -3,6 +3,36 @@
 import type { VirtualFS } from "./virtualFS";
 
 /**
+ * The ordered phases of the {@link OutputService.publishPR} fork+PR flow (§12).
+ * `fork-create` fires ONLY when the fork does not yet exist — on a pre-existing
+ * fork that phase is skipped and no event is emitted for it.
+ */
+export type PublishStepName =
+  | "fork-check"
+  | "fork-create"
+  | "master-ref"
+  | "parent-commit"
+  | "tree"
+  | "commit"
+  | "branch"
+  | "pr-open";
+
+/**
+ * Progress event emitted as `publishPR` enters each phase (see
+ * {@link PublishPROptions.onProgress}). `index` is the phase's canonical
+ * 1-based position in the full 8-phase flow — so when `fork-create` is skipped
+ * the observed indices are 1,3,4,5,6,7,8 rather than a contiguous run.
+ */
+export interface PublishStep {
+  /** Which phase is now starting. */
+  name: PublishStepName;
+  /** Canonical 1-based position of this phase in the 8-phase flow. */
+  index: number;
+  /** Total phases in the flow (always 8). */
+  total: number;
+}
+
+/**
  * Options for the GitHub OAuth fork-and-PR delivery path.
  * @see spec.md §12 "GitHub OAuth fork+PR"
  */
@@ -45,6 +75,15 @@ export interface PublishPROptions {
    * @see spec.md §12 line 1157
    */
   importAttribution?: string;
+  /**
+   * Optional progress sink, invoked synchronously as `publishPR` enters each
+   * phase of the fork+PR flow (see {@link PublishStep}). Additive and
+   * non-breaking — implementations that ignore it behave as before. Intended
+   * for the studio to surface per-step progress on large source trees; a
+   * console/log sink is a valid v1 consumer. Must not throw; implementations
+   * are not required to guard against a throwing callback.
+   */
+  onProgress?: (step: PublishStep) => void;
 }
 
 /**
@@ -165,6 +204,9 @@ export interface OutputService {
    * Pre-check the token with {@link verifyToken} before calling this —
    * scope/auth failures here cost a network round-trip and a half-started
    * fork.
+   *
+   * Pass {@link PublishPROptions.onProgress} to observe per-phase progress
+   * (8 phases; `fork-create` only when the fork is new).
    *
    * @param fs - Virtual FS snapshot to publish (source files only).
    * @param opts - GitHub OAuth credentials and PR metadata.

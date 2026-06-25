@@ -220,6 +220,10 @@ export function GitHubSubmitPanel({ canSubmitArtifact }: GitHubSubmitPanelProps)
         commitMessage: prTitle,
         prTitle,
         prBody,
+        // v1 sink: log per-step progress (no UI calcification yet, per #448).
+        // A future iteration can route this into setPhase for a progress bar.
+        onProgress: (step) =>
+          console.info(`[publishPR] step ${step.index}/${step.total}: ${step.name}`),
       };
       const svc = await getGitHubOutputService();
       const result = await svc.publishPR(projected.vfs, opts);

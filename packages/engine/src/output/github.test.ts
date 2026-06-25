@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { verifyToken, publishPR, type GitHubFetchFn, type GitHubFetchResponse } from "./github.js";
-import type { PublishPROptions } from "@keyboard-studio/contracts";
+import type { PublishPROptions, PublishStep } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
@@ -314,5 +314,66 @@ describe("publishPR", () => {
     const prBody = capturedBodies.find((b) => b.includes('"draft"')) ?? "";
     expect(prBody).toContain("## Summary");
     expect(prBody).not.toContain("Import attribution");
+  });
+
+  // -------------------------------------------------------------------------
+  // onProgress callback — #448 (publishPR per-step progress)
+  // -------------------------------------------------------------------------
+
+  it("emits onProgress for each phase in order, skipping fork-create when the fork exists", async () => {
+    const steps: PublishStep[] = [];
+    const fetch = buildMockFetch(happyPathRoutes()); // fork exists (no 404)
+    await publishPR(makeSourceFS(), makeOpts({ onProgress: (s) => steps.push(s) }), fetch);
+
+    expect(steps.map((s) => s.name)).toEqual([
+      "fork-check",
+      "master-ref",
+      "parent-commit",
+      "tree",
+      "commit",
+      "branch",
+      "pr-open",
+    ]);
+    // fork-create must NOT fire when the fork already exists.
+    expect(steps.some((s) => s.name === "fork-create")).toBe(false);
+    // index is the canonical 1-based position (so fork-exists skips 2), total is always 8.
+    expect(steps.map((s) => s.index)).toEqual([1, 3, 4, 5, 6, 7, 8]);
+    expect(steps.every((s) => s.total === 8)).toBe(true);
+  });
+
+  it("emits fork-create (index 2) when the fork must be created (404)", async () => {
+    const routes = happyPathRoutes();
+    routes.set(`GET ${API}/repos/${FORK_OWNER}/keyboards`, { ok: false, status: 404, body: {} });
+    routes.set(`POST ${API}/repos/keymanapp/keyboards/forks`, { ok: true, status: 202, body: { full_name: `${FORK_OWNER}/keyboards` } });
+    const steps: PublishStep[] = [];
+    const fetch = buildMockFetch(routes);
+    await publishPR(makeSourceFS(), makeOpts({ onProgress: (s) => steps.push(s) }), fetch);
+
+    expect(steps.map((s) => s.name)).toEqual([
+      "fork-check",
+      "fork-create",
+      "master-ref",
+      "parent-commit",
+      "tree",
+      "commit",
+      "branch",
+      "pr-open",
+    ]);
+    expect(steps.map((s) => s.index)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+  });
+
+  it("does not emit a phase event past the point of failure", async () => {
+    const routes = happyPathRoutes();
+    // Fail at branch creation (step 7) — pr-open (8) must never be reported.
+    routes.set(`POST ${API}/repos/${FORK_OWNER}/keyboards/git/refs`, { ok: false, status: 422, body: { message: "exists" } });
+    const steps: PublishStep[] = [];
+    const fetch = buildMockFetch(routes);
+    await expect(
+      publishPR(makeSourceFS(), makeOpts({ onProgress: (s) => steps.push(s) }), fetch),
+    ).rejects.toMatchObject({ kind: "branch-exists" });
+
+    const names = steps.map((s) => s.name);
+    expect(names).toContain("branch");
+    expect(names).not.toContain("pr-open");
   });
 });
