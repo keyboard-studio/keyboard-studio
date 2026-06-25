@@ -8,6 +8,7 @@ import {
   detectOAuthCallback,
   type OAuthProvider,
 } from "./lib/handleOAuthCallback.ts";
+import { rehydrateWorkingCopyFromSession } from "./lib/persistWorkingCopy.ts";
 
 function requireRoot(): HTMLElement {
   const rootEl = document.getElementById("root");
@@ -19,6 +20,12 @@ function requireRoot(): HTMLElement {
 
 function mountApp(): void {
   const rootEl = requireRoot();
+
+  // Rehydrate the working copy from the pre-redirect snapshot (if present).
+  // On a normal (non-OAuth-return) load this is a no-op: the key is absent.
+  // Consume-and-clear semantics ensure a stale snapshot from a previous
+  // interrupted session does not clobber a freshly-instantiated working copy.
+  rehydrateWorkingCopyFromSession();
 
   const isDemoLint =
     typeof window !== "undefined" &&

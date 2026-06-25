@@ -19,6 +19,7 @@ import {
 } from "../lib/googleOAuth.ts";
 import type { GoogleIdentitySession } from "../lib/identity.ts";
 import type { OAuthCallbackFailureReason } from "../lib/handleOAuthCallback.ts";
+import { snapshotWorkingCopyToSession } from "../lib/persistWorkingCopy.ts";
 
 /**
  * Static, user-facing copy for each Google OAuth-callback failure reason.
@@ -118,6 +119,7 @@ export function useGoogleAuth(): UseGoogleAuthResult {
     setError(null);
     try {
       const url = await beginGoogleAuthorize();
+      snapshotWorkingCopyToSession();
       window.location.assign(url);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to start Google sign-in.");
