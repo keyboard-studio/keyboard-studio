@@ -46,6 +46,9 @@ const KMN_PATH = resolve(
  * - Strip `sourceLine` fields — after emit→re-parse, line numbers change
  *   because the canonical emitter reflows the file (blank lines, store order).
  *   sourceLine is a parser annotation, not a semantic field of the IR contract.
+ * - Strip `groupNodeId` fields on RawKmnFragment — holds a minted group nodeId;
+ *   after emit→re-parse the owning group gets a new minted id (already covered
+ *   by the nodeId strip, but groupNodeId is a differently-named field).
  * - Sort the `stores` array by name so file-order vs canonical-order
  *   differences do not cause false failures (see caveat 2 above).
  * - Sort the `raw` array by reason (order not semantically significant).
@@ -57,6 +60,7 @@ function normaliseForComparison(ir: KeyboardIR): unknown {
     JSON.stringify(ir, (key, value) => {
       if (key === "nodeId") return "__stripped__";
       if (key === "sourceLine") return undefined;
+      if (key === "groupNodeId") return "__stripped__";
       if (key === "anchorRef" && value != null && typeof value === "object") {
         return { ...(value as object), nodeId: "__stripped__" };
       }

@@ -215,6 +215,7 @@ function kmnPathsForProject(kpjPath: string): string[] {
  * Normalise an IR for round-trip comparison. Mirrors
  * packages/engine/src/codec/roundtrip.test.ts::normaliseForComparison:
  *  - strip minting-order nodeIds
+ *  - strip sourceLine (parser annotation; changes after emit reflows the file)
  *  - sort stores by name and raw fragments by reason
  *  - drop comments (anchor assignment is a best-effort heuristic)
  */
@@ -222,6 +223,10 @@ function normalise(ir: KeyboardIR): unknown {
   const clone = JSON.parse(
     JSON.stringify(ir, (key, value) => {
       if (key === "nodeId") return "__stripped__";
+      if (key === "sourceLine") return undefined;
+      // groupNodeId holds a minted group nodeId — strip like nodeId so minting
+      // differences between the two parse runs don't cause false divergence.
+      if (key === "groupNodeId") return "__stripped__";
       if (key === "anchorRef" && value != null && typeof value === "object") {
         return { ...(value as object), nodeId: "__stripped__" };
       }
