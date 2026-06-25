@@ -30,6 +30,7 @@ import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { parse } from "./parse.js";
 import { emit } from "./emit.js";
+import { normaliseForComparison } from "./normalise-ir.js";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 
 // Path to the real keyboard source (sibling checkout).
@@ -39,37 +40,9 @@ const KMN_PATH = resolve(
   "../../../../../keyboards/release/basic/basic_kbdfr/source/basic_kbdfr.kmn"
 );
 
-/**
- * Normalise an IR for round-trip comparison:
- *
- * - Strip all nodeId strings (IDs are minting-order artefacts, not semantic).
- * - Sort the `stores` array by name so file-order vs canonical-order
- *   differences do not cause false failures (see caveat 2 above).
- * - Sort the `raw` array by reason (order not semantically significant).
- * - Exclude `comments` — anchor assignment is a best-effort heuristic that
- *   can legitimately differ between passes (see caveat 1 above).
- */
-function normaliseForComparison(ir: KeyboardIR): unknown {
-  const clone = JSON.parse(
-    JSON.stringify(ir, (key, value) => {
-      if (key === "nodeId") return "__stripped__";
-      if (key === "anchorRef" && value != null && typeof value === "object") {
-        return { ...(value as object), nodeId: "__stripped__" };
-      }
-      if (key === "comments") return [];
-      return value;
-    })
-  ) as {
-    stores: Array<{ name: string }>;
-    raw: Array<{ reason: string }>;
-    [k: string]: unknown;
-  };
-
-  clone.stores.sort((a, b) => a.name.localeCompare(b.name));
-  clone.raw.sort((a, b) => a.reason.localeCompare(b.reason));
-
-  return clone;
-}
+// normaliseForComparison (stores/raw sort + nodeId/comment stripping) lives in
+// ./normalise-ir.ts so the supportability scanner's I2 check shares one source
+// of truth. Caveats 1 & 2 above document why comments/store-order are normalised.
 
 /** Count all typed IRRules across all groups. */
 function countRules(ir: KeyboardIR): number {

@@ -44,7 +44,7 @@ import { join, dirname, basename, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { promises as fsp } from "node:fs";
-import { parse, emit } from "../../packages/engine/src/codec/index.js";
+import { parse, emit, normaliseForComparison } from "../../packages/engine/src/codec/index.js";
 import { recognizePatterns } from "../../packages/engine/src/recognizer/index.js";
 import { emitPlacementMap, detectBaseLayoutFamily } from "../../packages/engine/src/placement/index.js";
 import { aggregatePlacements, computeFingerprintFromCandidates } from "../../packages/engine/src/placement/aggregate.js";
@@ -211,37 +211,14 @@ function kmnPathsForProject(kpjPath: string): string[] {
 // I2 structural round-trip (proxy until #236 lands the functional WASM check)
 // ---------------------------------------------------------------------------
 
-/**
- * Normalise an IR for round-trip comparison. Mirrors
- * packages/engine/src/codec/roundtrip.test.ts::normaliseForComparison:
- *  - strip minting-order nodeIds
- *  - sort stores by name and raw fragments by reason
- *  - drop comments (anchor assignment is a best-effort heuristic)
- */
-function normalise(ir: KeyboardIR): unknown {
-  const clone = JSON.parse(
-    JSON.stringify(ir, (key, value) => {
-      if (key === "nodeId") return "__stripped__";
-      if (key === "anchorRef" && value != null && typeof value === "object") {
-        return { ...(value as object), nodeId: "__stripped__" };
-      }
-      if (key === "comments") return [];
-      return value;
-    }),
-  ) as { stores: Array<{ name: string }>; raw: Array<{ reason: string }> };
-  clone.stores.sort((a, b) => a.name.localeCompare(b.name));
-  clone.raw.sort((a, b) => a.reason.localeCompare(b.reason));
-  return clone;
-}
-
 type I2Result = "structural-pass" | "structural-divergence" | "error";
 
 function structuralRoundTrip(ir: KeyboardIR, keyboardId: string): I2Result {
   try {
     const emitted = emit(ir);
     const { ir: ir2 } = parse(emitted, keyboardId);
-    const a = JSON.stringify(normalise(ir));
-    const b = JSON.stringify(normalise(ir2));
+    const a = JSON.stringify(normaliseForComparison(ir));
+    const b = JSON.stringify(normaliseForComparison(ir2));
     return a === b ? "structural-pass" : "structural-divergence";
   } catch {
     return "error";
