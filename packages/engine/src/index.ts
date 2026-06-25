@@ -110,8 +110,11 @@ export { applyIdentityStubMutation } from "./stub-mutator/index.js";
 // tests import them directly from the module file.
 export { createCharacterDiscoveryService } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
 export type { LLMCompleter } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
-export type { CldrLoader, ExemplarResult } from "./character-discovery/cldr.js";
-export { createFetchCldrLoader } from "./character-discovery/cldr.js";
+export type { CldrLoader, CldrFullLoader, ExemplarResult } from "./character-discovery/cldr.js";
+export { createFetchCldrLoader, createFetchCldrFullLoader } from "./character-discovery/cldr.js";
+// Phase B high-confidence missing-character suggestions (CLDR-grounded, no LLM).
+export { suggestMissingCharacters } from "./character-discovery/suggestMissing.js";
+export type { MissingCharSuggestions } from "./character-discovery/suggestMissing.js";
 
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.
 export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, applyKeycapLabelsToVfs, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyStoreSlotRemovals, parseSlotId } from "./pattern-apply/index.js";

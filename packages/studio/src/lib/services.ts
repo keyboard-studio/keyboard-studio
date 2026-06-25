@@ -11,7 +11,9 @@ import type {
   PatternLibraryService,
   ScaffolderService,
   VirtualFS,
+  KeyboardIR,
 } from "@keyboard-studio/contracts";
+import type { MissingCharSuggestions, CldrFullLoader } from "@keyboard-studio/engine";
 import { mockBaseBrowser, mockOutputService, mockScaffolder } from "@keyboard-studio/contracts/mocks";
 import { localBaseBrowser, LOCAL_PROXY_BASE } from "./localBaseBrowser.ts";
 import { getPatternLibraryService as getBrowserPatternLibraryService } from "./browserPatternLibrary.ts";
@@ -110,3 +112,32 @@ export async function getGitHubOutputService(): Promise<GitHubOutputService> {
   gitHubOutputServiceCache = createGitHubOutputService();
   return gitHubOutputServiceCache;
 }
+
+// suggestMissingChars — Phase B CLDR-grounded missing-character suggestions.
+// When USE_REAL is false returns null (deterministic, no network) so tests
+// render the neutral "no data" note without real CLDR traffic.
+// When real, lazy-imports suggestMissingCharacters + createFetchCldrFullLoader
+// from the engine; caches the full loader across calls (one instance per session).
+let cldrFullLoaderCache: CldrFullLoader | null = null;
+export async function suggestMissingChars(
+  bcp47: string,
+  baseIr: KeyboardIR,
+  languageName?: string,
+): Promise<MissingCharSuggestions | null> {
+  if (!USE_REAL) return null;
+  const { suggestMissingCharacters, createFetchCldrFullLoader } = await import(
+    /* @vite-ignore */ "@keyboard-studio/engine"
+  );
+  if (cldrFullLoaderCache === null) {
+    cldrFullLoaderCache = createFetchCldrFullLoader();
+  }
+  return suggestMissingCharacters({
+    bcp47,
+    baseIr,
+    loader: cldrFullLoaderCache,
+    ...(languageName !== undefined ? { languageName } : {}),
+  });
+}
+
+// Re-export the type so callers can use it without a direct engine import.
+export type { MissingCharSuggestions };
