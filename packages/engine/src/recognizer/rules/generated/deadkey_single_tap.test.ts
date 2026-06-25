@@ -3,9 +3,10 @@
 // Behavioural divergence documented here:
 //   - The interpreter (generated rule) requires an escape rule in the deadkeys group;
 //     the hand-written s02Recognizer treats fallback/escape rules as optional.
-//   - The deadkeyName slot differs in format: generated uses decimal ("dk96"),
-//     hand-written uses underscore-hex ("dk_0060"). Only slots that agree between
-//     the two implementations are compared in the round-trip assertions.
+//   - The deadkeyName slot now agrees between both paths (underscore-hex,
+//     e.g. "dk_0060"): the interpreter's numeric_id_to_label transform delegates
+//     to formatDkName, matching the hand-written rule. The round-trip assertions
+//     below verify the two implementations produce identical deadkeyName values.
 //   - patternId bases differ by naming convention ("deadkey_single_tap" vs
 //     "deadkey-single-tap"); only the suffix after '#' is compared.
 //
@@ -184,6 +185,10 @@ describe("generated/deadkey_single_tap round-trip vs s02Recognizer", () => {
 
     // The triggerKey slot must agree
     expect(gen.slotValues["triggerKey"]).toBe(ref.slotValues["triggerKey"]);
+
+    // The deadkeyName slot must agree (both produce underscore-hex "dk_0060")
+    expect(gen.slotValues["deadkeyName"]).toBe(ref.slotValues["deadkeyName"]);
+    expect(gen.slotValues["deadkeyName"]).toBe("dk_0060");
 
     // The baseLetters and accentedForms slots must agree
     expect(gen.slotValues["baseLetters"]).toBe(ref.slotValues["baseLetters"]);

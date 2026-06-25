@@ -147,7 +147,7 @@ lifts_to:
 
     deadkeyName:
       source: rules[trigger].output_pattern[0].id   # The deadkey numeric id, DK
-      transform: numeric_id_to_label   # e.g. 1 -> "dk1"; content team may rename
+      transform: numeric_id_to_label   # underscore-hex label, e.g. 0x0060 -> "dk_0060" (matches the hand-written S-02 rule)
 
     baseLetters:
       source: stores[S_bases].items

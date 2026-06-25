@@ -35,9 +35,11 @@ function applyRulesToKeystrokeCharMap(rules: IRRule[]): string {
   return lines.join("\n");
 }
 
-// numeric_id_to_label: deadkey id -> "dk<N>"
+// numeric_id_to_label: deadkey id -> underscore-hex label, e.g. 0x0060 -> "dk_0060".
+// Delegates to formatDkName so this transform and the hand-written S-02 reference
+// rule (s02-deadkey-single-tap.ts) emit byte-identical deadkeyName slot values.
 function applyNumericIdToLabel(id: number): string {
-  return "dk" + String(id);
+  return formatDkName(id);
 }
 
 // ---------------------------------------------------------------------------
