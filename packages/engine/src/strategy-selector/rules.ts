@@ -25,6 +25,16 @@ import type {
  * Human-readable label for each strategy id, mirroring the §7.2 table / §7.3
  * catalog headings. Used by the developer Flow Map; not part of the engine's
  * runtime decision (which works purely on ids).
+ *
+ * S-13 ("Touch layer switch") is intentionally absent from PRIMARY_RULES and
+ * SECONDARY_RULES. It is not selected by the A1–A7 desktop decision tree at
+ * all — it is selected by a separate touch-layout inspection pass that detects
+ * the presence of more than one named layer (confirmed by `"nextlayer":` on one
+ * or more keys). See spec §7.2 "Touch keyboards and S-13" and §7.5 "Touch
+ * strategy validation (S-13)". The Flow Map does not render S-13 as a node
+ * because no rule in PRIMARY_RULES or SECONDARY_RULES references it; it appears
+ * here only so the full catalog label set is complete for any code that maps all
+ * StrategyId values to display strings.
  */
 export const STRATEGY_LABELS: Readonly<Record<StrategyId, string>> = {
   "S-01": "Simple swap",
