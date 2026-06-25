@@ -365,11 +365,11 @@ describe('capabilityHint — not-removable:opaque', () => {
 });
 
 describe('capabilityHint — not-removable:context-sensitive', () => {
-  it('mentions surrounding context', () => {
-    expect(capabilityHint('not-removable:context-sensitive')).toMatch(/surrounding context/i);
+  it('explains the character depends on previously-typed characters', () => {
+    expect(capabilityHint('not-removable:context-sensitive')).toMatch(/already been typed/i);
   });
-  it("mentions can't be removed individually", () => {
-    expect(capabilityHint('not-removable:context-sensitive')).toMatch(/individually/i);
+  it("explains removing on its own isn't supported yet", () => {
+    expect(capabilityHint('not-removable:context-sensitive')).toMatch(/on its own.*isn't supported|isn't supported/i);
   });
 });
 

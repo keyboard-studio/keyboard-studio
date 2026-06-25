@@ -26,7 +26,7 @@ export function capabilityHint(capability: RemovalCapability): string {
     case 'not-removable:opaque':
       return "Uses advanced syntax the editor can't rewrite, so removing it here won't take effect.";
     case 'not-removable:context-sensitive':
-      return "Depends on surrounding context, so it can't be removed individually yet.";
+      return "These keys only type this character after certain other characters have already been typed. Removing this on its own could break related rules, so it isn't supported yet.";
     case 'not-removable:unknown':
       return "The editor couldn't determine whether this is safe to remove.";
   }
