@@ -16,3 +16,5 @@ export { OPAQUE_REASONS } from "./opaque-reasons.js";
 export type { OpaqueReason } from "./opaque-reasons.js";
 
 export { computeSha256Hex } from "./hash.js";
+
+export { normaliseForComparison } from "./normalise-ir.js";
