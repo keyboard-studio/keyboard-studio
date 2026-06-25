@@ -300,14 +300,14 @@ gh pr list \
 node utilities/km-triage-app/progress-emit.js phase=sweep-start total_prs=<N> "prs=[<comma-separated PR numbers>]" || true
 ```
 
-**Label hygiene — clear stale `needs-rebase` (runs first, before any skip check).** For every PR in the list whose `mergeable` is **not** `CONFLICTING` (i.e. `MERGEABLE` or `UNKNOWN`), if it currently carries the `needs-rebase` label, remove it — the branch was rebased and the conflict is gone:
+**Label hygiene — clear stale `needs-rebase` (runs first, before any skip check).** For every PR in the list that currently carries `needs-rebase` and whose snapshot `mergeable` is not `CONFLICTING`, do a **live re-check** before clearing. Remove the label only when the live state is `MERGEABLE`; keep it for `UNKNOWN` (or if the live state has flipped back to `CONFLICTING`):
 
 ```bash
 node utilities/km-triage-app/bot-gh.js api \
   repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels/needs-rebase -X DELETE 2>/dev/null || true
 ```
 
-This runs unconditionally up front, so the label clears even when the PR is then skipped for an unrelated reason (e.g. `ci_not_ready`). It is the "and go away when done" half of the conflict tag; the CONFLICTING skip below is the "show as a tag" half. (`UNKNOWN` is treated as not-conflicting for cleanup purposes — if GitHub later resolves it to `CONFLICTING`, the next sweep re-adds the label; leaving a stale tag on a now-mergeable PR is the worse failure.)
+This still runs up front, so the label can clear even when the PR is then skipped for an unrelated reason (e.g. `ci_not_ready`), but the live check prevents UNKNOWN snapshot churn from doing a clear-then-readd in the same sweep window. It is the "and go away when done" half of the conflict tag; the CONFLICTING skip below is the "show as a tag" half.
 
 For each PR, **skip** (with audit-log entry `action_taken: skipped, reason: <X>`) when any of these hold:
 
@@ -325,8 +325,8 @@ For each PR, **skip** (with audit-log entry `action_taken: skipped, reason: <X>`
     repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels/review-needed -X DELETE || true
   ```
   Record the trigger in the audit log: `trigger: schedule` when the signal is a new commit (and no newer human comment), or `trigger: comment` with `triggering_comment_id: <id>` and `triggering_comment_author: <login>` of the most recent human comment otherwise.
-- `mergeable` is `CONFLICTING` → reason `merge_conflict`. The triage will not run the review crew on this PR (the user's directive: "don't try to fix a conflicting branch"). Instead it flags the PR with the **`needs-rebase`** label so the conflict state is visible at a glance and clears itself once resolved (see "Label hygiene" above). Behavior depends on whether the PR already carries the label:
-  - **`needs-rebase` not yet present** (first sweep to see this conflict): add the label and post **one** @-mention comment (via `node utilities/km-triage-app/bot-gh.js pr comment <NUM> --body-file <conflict-body.md>`) tagging both the tech lead and the PR's directing human (computed per the same Phase-3.5 logic the normal path uses — desktop case via commit author email → GitHub login; web case via `pr.author.login`):
+- `mergeable` is `CONFLICTING` → reason `merge_conflict`. The triage will not run the review crew on this PR (the user's directive: "don't try to fix a conflicting branch"). Instead it flags the PR with the **`needs-rebase`** label so the conflict state is visible at a glance and clears itself once resolved (see "Label hygiene" above). Dedup is performed by a **live label check** immediately before posting:
+  - **`needs-rebase` not present live** (first sweep to see this conflict): add the label and post one @-mention comment (via `node utilities/km-triage-app/bot-gh.js pr comment <NUM> --body-file <conflict-body.md>`) tagging both the tech lead and the PR's directing human (computed per the same Phase-3.5 logic the normal path uses — desktop case via commit author email → GitHub login; web case via `pr.author.login`):
     ```bash
     node utilities/km-triage-app/bot-gh.js api \
       repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=needs-rebase"
@@ -340,7 +340,7 @@ For each PR, **skip** (with audit-log entry `action_taken: skipped, reason: <X>`
     Please rebase against `main` first; the next sweep will run the full review crew (engine or content, by team label / paths) and either auto-fix mechanical findings or @-mention you again with any open questions. The `needs-rebase` label clears automatically once the branch is mergeable again.
     ```
     Dedup the two mentions if `directed_by` resolves to the lead's own login.
-  - **`needs-rebase` already present** (a prior sweep already flagged this and the author hasn't rebased yet): skip quietly — do **not** re-add the label and do **not** re-post the comment. The label is the persistent signal; re-commenting every sweep is noise.
+  - **`needs-rebase` already present live** (a prior sweep already flagged this and the author hasn't rebased yet): skip quietly — do not re-add the label and do not re-post the comment. The label is the persistent signal; re-commenting every sweep is noise.
 
   Either way the audit-log entry uses `action_taken: skipped, reason: merge_conflict`.
 - The `statusCheckRollup` shows any required check that is not `SUCCESS` or `NEUTRAL` → reason `ci_not_ready`. Do **not** label or comment; the PR re-enters triage on the next sweep once CI completes.
