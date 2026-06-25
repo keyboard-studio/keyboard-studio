@@ -77,7 +77,22 @@ last_audit_entry() {
 # increments n_skip.  $1=pr_num  $2=author_login  $3=head_sha
 post_conflict_notice() {
   local pr_num="$1" author_login="$2" head_sha="$3"
-  local mention_line f
+  local mention_line f labels_json
+
+  # Live-dedupe on label presence so UNKNOWN->CONFLICTING retry paths do not
+  # repost/relabel when a stale snapshot missed the existing tag.
+  labels_json=$(gh pr view "$pr_num" --json labels --jq '[.labels[].name]' 2>/dev/null || echo '[]')
+  if echo "$labels_json" | jq -e 'any(. == "needs-rebase")' > /dev/null 2>&1; then
+    echo "  skip: merge_conflict (already tagged needs-rebase)" | tee -a "$LOG"
+    audit_skip "$pr_num" merge_conflict "$head_sha"
+    n_skip=$((n_skip + 1))
+    return
+  fi
+
+  echo "  skip: merge_conflict — tagging needs-rebase + posting notice" | tee -a "$LOG"
+  node utilities/km-triage-app/bot-gh.js api \
+    "repos/$REPO/issues/$pr_num/labels" -X POST -f "labels[]=needs-rebase" >> "$LOG" 2>&1 || true
+
   if [[ "$author_login" == "$TL_LOGIN" ]]; then
     mention_line="@$TL_LOGIN — km-triage skipped this PR."
   else
@@ -91,6 +106,24 @@ post_conflict_notice() {
   rm -f "$f"
   audit_skip "$pr_num" merge_conflict "$head_sha"
   n_skip=$((n_skip + 1))
+}
+
+# Clears needs-rebase only when a live re-check confirms the PR is stably
+# non-conflicting. UNKNOWN is treated as unresolved and keeps the tag.
+maybe_clear_needs_rebase() {
+  local pr_num="$1" snapshot_mergeable="$2"
+  local live_mergeable
+  [[ "$snapshot_mergeable" == "CONFLICTING" ]] && return
+
+  live_mergeable=$(gh pr view "$pr_num" --json mergeable --jq '.mergeable' 2>/dev/null || echo "$snapshot_mergeable")
+  if [[ "$live_mergeable" != "MERGEABLE" ]]; then
+    echo "  keeping needs-rebase (live mergeable: $live_mergeable)" | tee -a "$LOG"
+    return
+  fi
+
+  echo "  clearing stale needs-rebase (mergeable again)" | tee -a "$LOG"
+  node utilities/km-triage-app/bot-gh.js api \
+    "repos/$REPO/issues/$pr_num/labels/needs-rebase" -X DELETE >> "$LOG" 2>&1 || true
 }
 
 # Just-in-time draft re-check. The bulk `gh pr list` snapshot is taken once at
@@ -242,9 +275,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     # is still CONFLICTING keeps the tag (Gate 4 re-adds / leaves it).
     if echo "$PR" | jq -e '.mergeable != "CONFLICTING"' > /dev/null 2>&1 \
        && echo "$PR" | jq -e '[.labels[].name] | any(. == "needs-rebase")' > /dev/null 2>&1; then
-      echo "  clearing stale needs-rebase (mergeable again)" | tee -a "$LOG"
-      node utilities/km-triage-app/bot-gh.js api \
-        "repos/$REPO/issues/$NUM/labels/needs-rebase" -X DELETE >> "$LOG" 2>&1 || true
+      maybe_clear_needs_rebase "$NUM" "$(echo "$PR" | jq -r '.mergeable // "UNKNOWN"')"
     fi
 
     # Gate 1 — external fork
@@ -274,26 +305,8 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     # skipped quietly. The label-hygiene block above removes the tag once the
     # branch is mergeable again, so the notice posts exactly once per conflict.
     if echo "$PR" | jq -e '.mergeable == "CONFLICTING"' > /dev/null 2>&1; then
-      if echo "$PR" | jq -e '[.labels[].name] | any(. == "needs-rebase")' > /dev/null 2>&1; then
-        echo "  skip: merge_conflict (already tagged needs-rebase)" | tee -a "$LOG"
-      else
-        echo "  skip: merge_conflict — tagging needs-rebase + posting notice" | tee -a "$LOG"
-        node utilities/km-triage-app/bot-gh.js api \
-          "repos/$REPO/issues/$NUM/labels" -X POST -f "labels[]=needs-rebase" >> "$LOG" 2>&1 || true
-        CONFLICT_FILE=$(mktemp)
-        if [[ "$AUTHOR" == "$TL_LOGIN" ]]; then
-          MENTION_LINE="@$TL_LOGIN — km-triage skipped this PR."
-        else
-          MENTION_LINE="@$TL_LOGIN @$AUTHOR — km-triage skipped this PR."
-        fi
-        printf '%s\n\nPR is in CONFLICTING merge state. Triage policy is not to auto-fix or review a branch that needs rebasing.\n\nPlease rebase against `main` first; the next sweep will run the full review crew and either auto-fix mechanical findings or @-mention you again with any open questions. The `needs-rebase` label clears automatically once the branch is mergeable again.\n' \
-          "$MENTION_LINE" > "$CONFLICT_FILE"
-        node utilities/km-triage-app/bot-gh.js pr comment "$NUM" \
-          --body-file "$CONFLICT_FILE" >> "$LOG" 2>&1 || true
-        rm -f "$CONFLICT_FILE"
-      fi
-      audit_skip "$NUM" merge_conflict "$HEAD_SHA"
-      n_skip=$((n_skip + 1)); continue
+      post_conflict_notice "$NUM" "$AUTHOR" "$HEAD_SHA"
+      continue
     fi
 
     # Gate 5 — mergeability unknown: defer to end of sweep rather than next cron tick.
