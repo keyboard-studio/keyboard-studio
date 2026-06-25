@@ -1,6 +1,6 @@
 # GitHub integration — architecture
 
-Status: **draft, not yet ratified into [spec.md](../spec.md).** Captures architecture decisions from the 2026-06-15 §3a/§3b user-skill conversation (which previously lived only in claude-mem, not in any PR or commit) and reconciles them with the Day-1 OAuth fork+PR pipeline already implemented in [packages/engine/src/output/github.ts](../packages/engine/src/output/github.ts) and the in-flight [oauth-backend PR #459](https://github.com/MattGyverLee/keyboard-studio/pull/459).
+Status: **draft, not yet ratified into [spec.md](../spec.md).** Captures architecture decisions from the 2026-06-15 §3a/§3b user-skill conversation (which previously lived only in claude-mem, not in any PR or commit) and reconciles them with the Day-1 OAuth fork+PR pipeline already implemented in [packages/engine/src/output/github.ts](../packages/engine/src/output/github.ts) and the in-flight [oauth-backend PR #459](https://github.com/keyboard-studio/keyboard-studio/pull/459).
 
 This is the home for "how does the keyboard get into `keymanapp/keyboards`?" Cross-link from here when adding new delivery paths, not the other way around.
 
@@ -79,7 +79,7 @@ The studio talks to the `OutputService` interface, not to the engine implementat
 
 ## 4. Auth — integrating with PR #459 (`packages/oauth-backend/`)
 
-[PR #459 (gboltono)](https://github.com/MattGyverLee/keyboard-studio/pull/459) is the server-side companion the existing `github.ts` pipeline has been waiting for. Treat it as the assumed shape going forward; do not reinvent the boundary on the engine side.
+[PR #459 (gboltono)](https://github.com/keyboard-studio/keyboard-studio/pull/459) is the server-side companion the existing `github.ts` pipeline has been waiting for. Treat it as the assumed shape going forward; do not reinvent the boundary on the engine side.
 
 **What it is.** A Fastify v5 service that holds `GITHUB_CLIENT_SECRET` server-side so the SPA can complete the GitHub web-app flow without exposing the secret to the browser.
 
@@ -133,5 +133,5 @@ SPA ──token──▶ createGitHubOutputService({ token }).publishPR(...)
 - [packages/engine/src/output/github.ts](../packages/engine/src/output/github.ts) — `publishPR()` 8-step pipeline
 - [packages/engine/src/output/index.ts](../packages/engine/src/output/index.ts) — `createOutputService` vs `createGitHubOutputService` split
 - [packages/contracts/src/outputService.ts](../packages/contracts/src/outputService.ts) — `OutputService`, `PublishPRError`
-- [PR #459](https://github.com/MattGyverLee/keyboard-studio/pull/459) — `packages/oauth-backend/` (Grace, closes #63)
+- [PR #459](https://github.com/keyboard-studio/keyboard-studio/pull/459) — `packages/oauth-backend/` (Grace, closes #63)
 - claude-mem observations: #3619 (north-star goal), #3618 (submission posture, MIT/author-gated), #2815 (publishPR pipeline), #2830 (OAuth Fork+PR implementation), #2820 (stub vs real service split), #2817 (`OutputService` contract shape)

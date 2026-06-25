@@ -1,7 +1,7 @@
 # Working Agreement
 
 > Norms for the keyboard-studio sprint. Revisit on a rolling basis as the project evolves.
-> Resolves [#7](https://github.com/MattGyverLee/keyboard-studio/issues/7).
+> Resolves [#7](https://github.com/keyboard-studio/keyboard-studio/issues/7).
 
 ## Teams and Members
 

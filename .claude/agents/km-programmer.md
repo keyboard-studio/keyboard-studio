@@ -187,7 +187,7 @@ def risky_operation(data):
    test covering the class)
 7. **Decide workflow shape based on the receiving repo's norms.**
    - **Direct-commit workflow (default for solo forks / single-author repos
-     like `MattGyverLee/keyboard-studio`):** Commit straight to `main` with
+     like `keyboard-studio/keyboard-studio`):** Commit straight to `main` with
      `closes #N` in the message body. The "Pattern audit" section lives
      in the commit message body, between the prose summary and the
      `Co-Authored-By` footer. No feature branch needed.

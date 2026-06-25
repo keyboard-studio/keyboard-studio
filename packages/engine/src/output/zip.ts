@@ -29,7 +29,7 @@ Email the zip archive to keymanhelp@sil.org with the subject:
 ## Resources
 
 - Keyman keyboard contribution guide: https://help.keyman.com/developer/keyboards/
-- keyboard-studio documentation: https://github.com/MattGyverLee/keyboard-studio
+- keyboard-studio documentation: https://github.com/keyboard-studio/keyboard-studio
 `;
 
 /**

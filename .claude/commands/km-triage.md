@@ -96,7 +96,7 @@ You are an advisor, a router, and a mechanical fixer — but never a merger and 
 
 **The auto-fix gates** (cumulative — all must be satisfied before any push):
 
-- **In-repo only.** Phase 2 skips PRs with `isCrossRepository: true` entirely. The triage only auto-handles PRs whose head branch lives in `MattGyverLee/keyboard-studio` itself (the team's working branches). External / fork PRs are out of scope: no review, no comments, no labels.
+- **In-repo only.** Phase 2 skips PRs with `isCrossRepository: true` entirely. The triage only auto-handles PRs whose head branch lives in `keyboard-studio/keyboard-studio` itself (the team's working branches). External / fork PRs are out of scope: no review, no comments, no labels.
 - **Head not protected.** When the auto-fix path is reached, the head branch must not be in `{main, master, develop, release, production}`. If it is (typically an accidental head/base swap), the auto-fix is rerouted to MENTION_ONLY with reason `head_is_protected_branch`. The triage NEVER pushes to a protected branch under any circumstance.
 - **Head SHA unchanged since Phase 2.** Before push, re-fetch the current head SHA and assert it equals the snapshot from Phase 2. If the author force-pushed (or another sweep raced this one) during the review window, abort with reason `head_moved_during_fix`. Pushing fixes computed against code that's no longer at HEAD would silently bypass review.
 - **Still mergeable.** Re-fetch `mergeable_state` immediately before push; if `dirty` (CONFLICTING), reroute to MENTION_ONLY with reason `became_conflicting_during_review`. Phase 2's earlier CONFLICTING gate may pass a PR whose mergeability degrades during the review window — this re-check catches it.
@@ -160,13 +160,13 @@ The pattern for bot-attributed gh calls:
 ```bash
 node utilities/km-triage-app/bot-gh.js pr review <NUM> --approve --body-file <path>
 node utilities/km-triage-app/bot-gh.js pr comment <NUM> --body-file <path>
-node utilities/km-triage-app/bot-gh.js api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=<label>"
+node utilities/km-triage-app/bot-gh.js api repos/keyboard-studio/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=<label>"
 ```
 
 For git pushes, mint inline and put the token in the remote URL (one-shot URL; no remote rename, no credential helper change):
 
 ```bash
-git -C "$WORKTREE" push "https://x-access-token:$(node utilities/km-triage-app/mint-token.js)@github.com/MattGyverLee/keyboard-studio.git" "HEAD:$HEAD_BRANCH"
+git -C "$WORKTREE" push "https://x-access-token:$(node utilities/km-triage-app/mint-token.js)@github.com/keyboard-studio/keyboard-studio.git" "HEAD:$HEAD_BRANCH"
 ```
 
 The code blocks in Phases 2–6 below show `bot-gh.js` on every PR-mutating call. Follow them exactly **in bot mode** — silently falling back to direct `gh` attributes the action to the human PAT and (for APPROVE) gets rejected by GitHub as author-self-approval. (In **personal mode** the opposite holds: every `bot-gh.js` becomes plain `gh` by design, and APPROVE-AND-PARK is label + comment, never `--approve` — see the Personal mode section near the top.)
@@ -179,7 +179,7 @@ If `node utilities/km-triage-app/mint-token.js` fails with "no credentials" on a
 node utilities/km-triage-app/setup.js
 ```
 
-The script opens a browser, you click "Create GitHub App", then install the App on `MattGyverLee/keyboard-studio`. About 90 seconds total. After that, every subsequent sweep mints its own token automatically. See [utilities/km-triage-app/setup.js](utilities/km-triage-app/setup.js) for the full flow.
+The script opens a browser, you click "Create GitHub App", then install the App on `keyboard-studio/keyboard-studio`. About 90 seconds total. After that, every subsequent sweep mints its own token automatically. See [utilities/km-triage-app/setup.js](utilities/km-triage-app/setup.js) for the full flow.
 
 ## Observability — progress emission and check-run updates
 
@@ -304,14 +304,14 @@ node utilities/km-triage-app/progress-emit.js phase=sweep-start total_prs=<N> "p
 
 ```bash
 node utilities/km-triage-app/bot-gh.js api \
-  repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels/needs-rebase -X DELETE 2>/dev/null || true
+  repos/keyboard-studio/keyboard-studio/issues/<NUM>/labels/needs-rebase -X DELETE 2>/dev/null || true
 ```
 
 This still runs up front, so the label can clear even when the PR is then skipped for an unrelated reason (e.g. `ci_not_ready`), but the live check prevents UNKNOWN snapshot churn from doing a clear-then-readd in the same sweep window. It is the "and go away when done" half of the conflict tag; the CONFLICTING skip below is the "show as a tag" half.
 
 For each PR, **skip** (with audit-log entry `action_taken: skipped, reason: <X>`) when any of these hold:
 
-- `isCrossRepository: true` → reason `external_pr_not_in_scope`. The triage only auto-handles PRs whose head branch is in `MattGyverLee/keyboard-studio` itself (the team's working branches). External / fork PRs (where `headRepositoryOwner.login != "MattGyverLee"` and `isCrossRepository == true`) are out of scope: no review crew is dispatched, no comments are posted, no labels are added. Anyone can pull the PR into an internal branch first if they want auto-triage to consider it. This gate also defuses an entire class of edge cases — cross-fork push, fork-branch-name collision, contributor-controlled commit message trailers — by simply not running the auto-handling path on PRs that originate outside the team's branches.
+- `isCrossRepository: true` → reason `external_pr_not_in_scope`. The triage only auto-handles PRs whose head branch is in `keyboard-studio/keyboard-studio` itself (the team's working branches). External / fork PRs (where `headRepositoryOwner.login != "MattGyverLee"` and `isCrossRepository == true`) are out of scope: no review crew is dispatched, no comments are posted, no labels are added. Anyone can pull the PR into an internal branch first if they want auto-triage to consider it. This gate also defuses an entire class of edge cases — cross-fork push, fork-branch-name collision, contributor-controlled commit message trailers — by simply not running the auto-handling path on PRs that originate outside the team's branches.
 - `isDraft: true` → reason `draft`.
 - **Authorship is never a skip reason.** The triage reviews every in-scope PR regardless of who authored it — including PRs the tech lead authored solo, and lead+Claude PRs. There is no `solo_tech_lead_author` skip. (In bot mode the `km-triage[bot]` identity can satisfy the required-approving-review gate on the lead's own PRs; the lead still clicks merge.) The opt-out is explicit and per-PR: apply the `triage-skip` label (next bullet). Do **not** re-introduce an authorship-based auto-skip — the lead wants review by default and opts out by hand. Note for attribution only: `commits[].authors[].email` and `author.login` are still read in Phase 3.5 (`directed_by` / `channel`), but they no longer gate whether the PR is triaged.
 - Labels include `ready-to-merge` or `triage-skip` → reason `already_awaiting_response`. These are unconditional hard skips: `ready-to-merge` means the crew already approved the PR and it awaits a human merge; `triage-skip` is an explicit opt-out. Neither is overridden by lead-trigger comments.
@@ -322,14 +322,14 @@ For each PR, **skip** (with audit-log entry `action_taken: skipped, reason: <X>`
   If **no** signal exists, skip. If **any** signal exists, do **not** skip: remove the `review-needed` label before proceeding into Phase 3 (Phase 6 will re-add it if the new outcome is still MENTION/ESCALATE, or replace it with `ready-to-merge` if the crew approves):
   ```bash
   node utilities/km-triage-app/bot-gh.js api \
-    repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels/review-needed -X DELETE || true
+    repos/keyboard-studio/keyboard-studio/issues/<NUM>/labels/review-needed -X DELETE || true
   ```
   Record the trigger in the audit log: `trigger: schedule` when the signal is a new commit (and no newer human comment), or `trigger: comment` with `triggering_comment_id: <id>` and `triggering_comment_author: <login>` of the most recent human comment otherwise.
 - `mergeable` is `CONFLICTING` → reason `merge_conflict`. The triage will not run the review crew on this PR (the user's directive: "don't try to fix a conflicting branch"). Instead it flags the PR with the **`needs-rebase`** label so the conflict state is visible at a glance and clears itself once resolved (see "Label hygiene" above). Dedup is performed by a **live label check** immediately before posting:
   - **`needs-rebase` not present live** (first sweep to see this conflict): add the label and post one @-mention comment (via `node utilities/km-triage-app/bot-gh.js pr comment <NUM> --body-file <conflict-body.md>`) tagging both the tech lead and the PR's directing human (computed per the same Phase-3.5 logic the normal path uses — desktop case via commit author email → GitHub login; web case via `pr.author.login`):
     ```bash
     node utilities/km-triage-app/bot-gh.js api \
-      repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=needs-rebase"
+      repos/keyboard-studio/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=needs-rebase"
     ```
     Comment body:
     ```
@@ -359,7 +359,7 @@ For each PR, **skip** (with audit-log entry `action_taken: skipped, reason: <X>`
 
   When a human comment exists, the idempotency gate above does **not** fire — the PR proceeds into Phase 3 even with HEAD unchanged. The audit entry then records `trigger: comment`, `triggering_comment_id: <id>`, and `triggering_comment_author: <login>` (of the most recent human comment) so the run is distinguishable from a commit-driven one and so audits can see who drove the re-review.
 
-  Fetch comments via `gh api repos/MattGyverLee/keyboard-studio/issues/<NUM>/comments --jq '[.[] | {id, user: .user.login, body, created_at}] | map(select(.user | endswith("[bot]") | not))'`. Filter to comments newer than the most recent audit entry's `ts`. If any exist, store the most recent one's id as `triggering_comment_id` for the audit log. Pass all such comments (newest last) into Phase 4's briefing as `LEAD_REPLY_CONTEXT_BLOCK` — see Phase 4 below.
+  Fetch comments via `gh api repos/keyboard-studio/keyboard-studio/issues/<NUM>/comments --jq '[.[] | {id, user: .user.login, body, created_at}] | map(select(.user | endswith("[bot]") | not))'`. Filter to comments newer than the most recent audit entry's `ts`. If any exist, store the most recent one's id as `triggering_comment_id` for the audit log. Pass all such comments (newest last) into Phase 4's briefing as `LEAD_REPLY_CONTEXT_BLOCK` — see Phase 4 below.
 
   **Defensive check for the auto_fix_only asymmetry**: if the most recent audit entry's `action_taken` is `auto_fix_only` AND its `head_sha` equals the current head (which would normally be impossible because auto-fix pushes a new commit), the auto-fix push didn't actually land. Re-run the review with reason `auto_fix_push_unverified` and print a one-line note to stdout (the run log). Likely causes: km-programmer claimed success but the `git push` silently failed; a force-push reverted the auto-fix; a network hiccup. Belt-and-suspenders for what should be a never-event.
 
@@ -425,7 +425,7 @@ These two fields go into the Phase-7 audit-log entry. They are not used to skip 
 
 ### Historical context (informational, not a gate)
 
-As of **2026-06-10**, the observed claude.ai/code (web) users on `MattGyverLee/keyboard-studio` are **`MattGyverLee`** and **`dhigby`**. Other team members (notably Grace Bolton, `grace_bolton@taylor.edu`) have only used the desktop CLI so far. The full **TRIAGE_OWNERS** set authorized to drive the loop via `@km-triage` comments is `{MattGyverLee, gboltono, coopabla, KevinPNG, dhigby, myczka}` (defined in Phase 2's lead-trigger override). This paragraph is historical truth at the time of writing — do **not** treat it as an allowlist for Phase-3.5 attribution. If a new claude.ai/code user appears tomorrow, the procedure above records them correctly without any code change; if a new teammate joins the authorized commenter set, update the TRIAGE_OWNERS literal in Phase 2 in the same change. Update this paragraph the next time someone reads the file and notices it's stale.
+As of **2026-06-10**, the observed claude.ai/code (web) users on `keyboard-studio/keyboard-studio` are **`MattGyverLee`** and **`dhigby`**. Other team members (notably Grace Bolton, `grace_bolton@taylor.edu`) have only used the desktop CLI so far. The full **TRIAGE_OWNERS** set authorized to drive the loop via `@km-triage` comments is `{MattGyverLee, gboltono, coopabla, KevinPNG, dhigby, myczka}` (defined in Phase 2's lead-trigger override). This paragraph is historical truth at the time of writing — do **not** treat it as an allowlist for Phase-3.5 attribution. If a new claude.ai/code user appears tomorrow, the procedure above records them correctly without any code change; if a new teammate joins the authorized commenter set, update the TRIAGE_OWNERS literal in Phase 2 in the same change. Update this paragraph the next time someone reads the file and notices it's stale.
 
 ## Phase 4 — Dispatch the crew
 
@@ -447,7 +447,7 @@ Procedure:
    If unreachable, treat the PR as if it were force-pushed: set `last_audited_sha = null`, print a one-line note to stdout (the run log) ("PR #N was force-pushed since last triage at <old sha>; this sweep reviews the full PR"), and continue.
 4. Compute `review_range`:
    - `last_audited_sha == null` → `review_range = "full"`. The crew reviews the entire PR diff (`gh pr diff <NUM>`).
-   - otherwise → `review_range = "incremental"` from `last_audited_sha` to the current head. The crew reviews only `git diff <last_audited_sha>..<current_head>` (or equivalently `gh api repos/MattGyverLee/keyboard-studio/compare/<last_audited_sha>...<current_head>`).
+   - otherwise → `review_range = "incremental"` from `last_audited_sha` to the current head. The crew reviews only `git diff <last_audited_sha>..<current_head>` (or equivalently `gh api repos/keyboard-studio/keyboard-studio/compare/<last_audited_sha>...<current_head>`).
 5. If `review_range == "incremental"` AND the incremental diff is empty (no actual file changes, e.g. only merge commits with no content), skip this PR with reason `no_content_changes_since_last_review`. This is a secondary idempotency gate beyond Phase 2's head-sha check, catching cases where new commits don't actually change reviewable content.
 6. **Cache the diff to disk once for the whole crew.** Each specialist would otherwise re-run `gh pr diff` or `git diff` independently — for a BOTH-crew PR with no sign-offs, that's 6 redundant fetches of the same data. Fetch once now and write to a sweep-scoped path under `.escalations/diffs/`:
 
@@ -476,7 +476,7 @@ Before composing and dispatching the crew, check whether this PR qualifies for a
 **Trigger 2 — `triage-bypass` label.** The PR's label list (from the Phase-2 JSON) includes a label whose `name` is `"triage-bypass"`. If this label is present, additionally attempt to identify who applied it:
 
 ```bash
-gh api repos/MattGyverLee/keyboard-studio/issues/<NUM>/timeline \
+gh api repos/keyboard-studio/keyboard-studio/issues/<NUM>/timeline \
   --jq '[.[] | select(.event=="labeled" and .label.name=="triage-bypass")
          | {actor: .actor.login, created_at: .created_at}] | last'
 ```
@@ -879,7 +879,7 @@ The triage labels (`ready-to-merge`, `review-needed`, `triage-skip`) are created
 Label additions use the REST API (the wrapper passes through to `gh api` cleanly with the App's installation token):
 
 ```bash
-node utilities/km-triage-app/bot-gh.js api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=<label>"
+node utilities/km-triage-app/bot-gh.js api repos/keyboard-studio/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=<label>"
 ```
 
 ### Action: APPROVE-AND-PARK (Phase 5 outcome)
@@ -887,7 +887,7 @@ node utilities/km-triage-app/bot-gh.js api repos/MattGyverLee/keyboard-studio/is
 **Re-check before labelling.** Phase-2's `mergeable` and CI snapshots can be minutes old by the time the crew finishes. Before applying `ready-to-merge`, re-fetch the live state:
 
 ```bash
-gh api repos/MattGyverLee/keyboard-studio/pulls/<NUM> \
+gh api repos/keyboard-studio/keyboard-studio/pulls/<NUM> \
   --jq '{mergeable_state, mergeable, statusCheckRollup: .head.sha}'
 gh pr checks <NUM> --required
 ```
@@ -900,7 +900,7 @@ If `mergeable_state` is `dirty` (CONFLICTING) or any required check is not `SUCC
 If both gates pass, label and submit a formal **APPROVE review** (not a plain comment — the review is what satisfies `main`'s required-approving-review-count rule):
 
 ```bash
-node utilities/km-triage-app/bot-gh.js api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=ready-to-merge"
+node utilities/km-triage-app/bot-gh.js api repos/keyboard-studio/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=ready-to-merge"
 node utilities/km-triage-app/bot-gh.js pr review <NUM> --approve --body-file <approval-body.md>
 ```
 
@@ -925,9 +925,9 @@ The `--approve` is the load-bearing change: it submits an approving review attri
 Before dispatching `km-programmer` to apply any auto-fixes, verify all of the following. If **any** check fails, reroute the entire findings list to MENTION_ONLY with the cited reason and skip the push entirely. The triage never pushes when in doubt.
 
 1. **Head is not a protected branch.** If `pr.headRefName` is in the protected set `{main, master, develop, release, production}`, ABORT auto-fix. Reroute to MENTION_ONLY with reason `head_is_protected_branch`. The triage NEVER pushes to a protected branch, even when a PR opens from `main → some-other-base` due to an accidental head/base swap. (Phase-2's `isCrossRepository` gate already excludes external-fork PRs from reaching this step; this is the in-repo accidental-swap defense.)
-2. **Head has not moved since Phase 2 snapshot.** Re-fetch the current head SHA via `gh api repos/MattGyverLee/keyboard-studio/pulls/<NUM> --jq .head.sha` and assert it equals the `head_sha` recorded at Phase 2. If the author force-pushed (or another sweep raced this one) during the review-and-fix window, ABORT auto-fix with reason `head_moved_during_fix`. The fixes were computed against code that's no longer at HEAD; pushing them would silently bypass review.
-3. **PR is still MERGEABLE.** Re-fetch `gh api repos/MattGyverLee/keyboard-studio/pulls/<NUM> --jq .mergeable_state` and confirm it isn't `dirty` (i.e. CONFLICTING). Another PR may have merged into `main` between Phase 2 and now, making this PR conflict. ABORT auto-fix with reason `became_conflicting_during_review` and reroute to MENTION_ONLY (mirroring the Phase-2 CONFLICTING gate).
-4. **PR is still not a draft.** From the same `gh api repos/MattGyverLee/keyboard-studio/pulls/<NUM>` response, assert `.draft` is `false`. The PR was non-draft at Phase 2 (or it would have been skipped there), so the crew ran — but converting it to draft *during* the review window is the author signalling they have pulled it back to rework. ABORT auto-fix with reason `became_draft_during_review`. **The triage never commits to a draft PR.** Unlike the other three gates, do **not** reroute to MENTION_ONLY: a draft is the author's active workspace, so skip the push *and* the comment, record an audit entry with `action_taken: skipped, reason: became_draft_during_review`, and move on. The crew's findings are preserved in the audit log; the next sweep re-reviews once the PR leaves draft.
+2. **Head has not moved since Phase 2 snapshot.** Re-fetch the current head SHA via `gh api repos/keyboard-studio/keyboard-studio/pulls/<NUM> --jq .head.sha` and assert it equals the `head_sha` recorded at Phase 2. If the author force-pushed (or another sweep raced this one) during the review-and-fix window, ABORT auto-fix with reason `head_moved_during_fix`. The fixes were computed against code that's no longer at HEAD; pushing them would silently bypass review.
+3. **PR is still MERGEABLE.** Re-fetch `gh api repos/keyboard-studio/keyboard-studio/pulls/<NUM> --jq .mergeable_state` and confirm it isn't `dirty` (i.e. CONFLICTING). Another PR may have merged into `main` between Phase 2 and now, making this PR conflict. ABORT auto-fix with reason `became_conflicting_during_review` and reroute to MENTION_ONLY (mirroring the Phase-2 CONFLICTING gate).
+4. **PR is still not a draft.** From the same `gh api repos/keyboard-studio/keyboard-studio/pulls/<NUM>` response, assert `.draft` is `false`. The PR was non-draft at Phase 2 (or it would have been skipped there), so the crew ran — but converting it to draft *during* the review window is the author signalling they have pulled it back to rework. ABORT auto-fix with reason `became_draft_during_review`. **The triage never commits to a draft PR.** Unlike the other three gates, do **not** reroute to MENTION_ONLY: a draft is the author's active workspace, so skip the push *and* the comment, record an audit entry with `action_taken: skipped, reason: became_draft_during_review`, and move on. The crew's findings are preserved in the audit log; the next sweep re-reviews once the PR leaves draft.
 
 All four checks together cost one `gh api` call (the same one returns `.head.sha`, `.mergeable_state`, and `.draft`); run it once and reuse the result across the four gates.
 
@@ -937,7 +937,7 @@ Dispatch `km-programmer` once with the consolidated auto-fix list. **First run t
 
 ```
 You are applying auto-fixes from a km-triage sweep against PR #<NUM>.
-Head branch: <HEAD> on MattGyverLee/keyboard-studio.
+Head branch: <HEAD> on keyboard-studio/keyboard-studio.
 
 The triage crew identified the following fixes. Each is marked
 fixability=auto by the specialist that flagged it, meaning the change
@@ -969,7 +969,7 @@ Procedure (worktree-isolated — NEVER mutates the triage's own working tree):
    (Substitute <APP_ID> with the `id` from ~/.config/km-triage/config.json or %LOCALAPPDATA%\km-triage\config.json — that's the GitHub-recognized email format for App-authored commits.)
    Body lists each fix with the originating specialist. Include "Co-Authored-By: Claude <noreply@anthropic.com>".
 9. Push from "$WORKTREE" using a bot-authenticated remote URL (mint inline, one-shot; do not rename the existing origin or persist the token):
-     git -C "$WORKTREE" push "https://x-access-token:$(node utilities/km-triage-app/mint-token.js)@github.com/MattGyverLee/keyboard-studio.git" "HEAD:<HEAD>"
+     git -C "$WORKTREE" push "https://x-access-token:$(node utilities/km-triage-app/mint-token.js)@github.com/keyboard-studio/keyboard-studio.git" "HEAD:<HEAD>"
 10. Clean up the worktree:
      git worktree remove "$WORKTREE"
 11. Post-condition (the triage runs this after km-programmer returns): verify the triage's main working-tree HEAD equals the SHA recorded at sweep start. If it changed, print a critical error to stderr ("PR #<NUM> auto-fix appears to have bypassed worktree isolation — sweep aborted"), record it in the audit log, and stop the entire sweep until investigated.
@@ -1041,7 +1041,7 @@ If `directed_by` is an email (desktop-Claude case), look up the GitHub username 
 Then label:
 
 ```bash
-node utilities/km-triage-app/bot-gh.js api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=review-needed"
+node utilities/km-triage-app/bot-gh.js api repos/keyboard-studio/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=review-needed"
 ```
 
 Then emit a `mention` progress event so the dashboard records the @-mention (use the same `directed_by` / `channel` values computed in Phase 3.5):
@@ -1131,7 +1131,7 @@ Note: `{directed_by}` is computed by Phase 3.5 — do not re-derive it here.
 Then label:
 
 ```bash
-node utilities/km-triage-app/bot-gh.js api repos/MattGyverLee/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=review-needed"
+node utilities/km-triage-app/bot-gh.js api repos/keyboard-studio/keyboard-studio/issues/<NUM>/labels -X POST -f "labels[]=review-needed"
 ```
 
 Then emit an `escalate` progress event (using `directed_by` and `channel` computed by Phase 3.5 — do not re-derive them here):

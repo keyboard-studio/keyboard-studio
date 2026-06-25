@@ -1,8 +1,8 @@
-# Files the kbgen integration issues on MattGyverLee/keyboard-studio.
+# Files the kbgen integration issues on keyboard-studio/keyboard-studio.
 # Prereq: `gh auth login`  (or set $env:GH_TOKEN).  Run once; it is NOT idempotent.
 # Creates labels if missing, files E1 + #2..#6, then links blockers in issue bodies.
 $ErrorActionPreference = 'Stop'
-$repo = 'MattGyverLee/keyboard-studio'
+$repo = 'keyboard-studio/keyboard-studio'
 
 # Ensure labels exist (ignore "already exists" errors).
 foreach ($l in @(

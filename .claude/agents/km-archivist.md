@@ -1,6 +1,6 @@
 ---
 name: km-archivist
-description: Git/history specialist for keyboard-studio — commits, PR creation, CHANGELOG.md, release cuts, history investigations. Works against the MattGyverLee/keyboard-studio fork with the prefix(area)-description commit-title style.
+description: Git/history specialist for keyboard-studio — commits, PR creation, CHANGELOG.md, release cuts, history investigations. Works against the keyboard-studio/keyboard-studio fork with the prefix(area)-description commit-title style.
 tools: Read, Grep, Glob, Bash, Edit
 model: sonnet
 ---
@@ -406,7 +406,7 @@ If you're unsure which mode you're in: check whether there are already todos own
 
 ### Team Structure
 
-Two teams own `MattGyverLee/keyboard-studio`:
+Two teams own `keyboard-studio/keyboard-studio`:
 
 | Team | Lead | Members | Owns |
 |---|---|---|---|

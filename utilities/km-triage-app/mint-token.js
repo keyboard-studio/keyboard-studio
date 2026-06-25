@@ -2,7 +2,7 @@
 // km-triage GitHub App — installation-token mint.
 //
 // Reads the App credentials saved by setup.js, signs a short-lived JWT, exchanges
-// it for a 1-hour installation access token on MattGyverLee/keyboard-studio, and
+// it for a 1-hour installation access token on keyboard-studio/keyboard-studio, and
 // prints the token (and only the token) to stdout. The km-triage command pipes
 // this into $env:GH_TOKEN for any gh invocation that should be attributed to
 // km-triage[bot] (reviews, comments, label adds, auto-fix pushes).
@@ -19,7 +19,7 @@
 //   3  network / GitHub API error
 //
 // Environment overrides:
-//   KM_TRIAGE_REPO — target repo, default "MattGyverLee/keyboard-studio"
+//   KM_TRIAGE_REPO — target repo, default "keyboard-studio/keyboard-studio"
 
 const crypto = require('crypto');
 const fs = require('fs');
@@ -32,7 +32,7 @@ const CONFIG_DIR = process.platform === 'win32'
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 const KEY_FILE = path.join(CONFIG_DIR, 'private-key.pem');
 const INSTALL_CACHE = path.join(CONFIG_DIR, 'installation.json');
-const REPO = process.env.KM_TRIAGE_REPO || 'MattGyverLee/keyboard-studio';
+const REPO = process.env.KM_TRIAGE_REPO || 'keyboard-studio/keyboard-studio';
 
 function b64url(input) {
   return Buffer.from(input).toString('base64')

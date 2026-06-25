@@ -29,7 +29,7 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_DIR"
 
-REPO="${KM_TRIAGE_REPO:-MattGyverLee/keyboard-studio}"
+REPO="${KM_TRIAGE_REPO:-keyboard-studio/keyboard-studio}"
 TL_EMAIL="${KM_TRIAGE_TL_EMAIL:-matthew_lee@sil.org}"
 TL_LOGIN="${KM_TRIAGE_TL_LOGIN:-MattGyverLee}"
 TRIAGE_OWNERS_JSON='["MattGyverLee","gboltono","coopabla","KevinPNG","dhigby","myczka"]'

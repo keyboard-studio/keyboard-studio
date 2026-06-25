@@ -30,7 +30,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const REPO = 'MattGyverLee/keyboard-studio';
+const REPO = 'keyboard-studio/keyboard-studio';
 const CHECK_NAME = 'km-triage/review';
 
 function parseArgs() {

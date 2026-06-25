@@ -1,6 +1,6 @@
 # kbgen integration — issue set
 
-**Filed on MattGyverLee/keyboard-studio (2026-06-03).** Titles follow the repo convention
+**Filed on keyboard-studio/keyboard-studio (2026-06-03).** Titles follow the repo convention
 `<prefix>(<area>): <description>`. **#131** is the blocking gate — the contract type and
 strategy scope must be settled in a joint session before the TS port or engine wiring conform.
 
@@ -8,12 +8,12 @@ Dependency order: **#130** (epic) tracks all · **#131** (gate) → **#132**, **
 
 | Filed | Was | Title | Labels |
 |---|---|---|---|
-| [#130](https://github.com/MattGyverLee/keyboard-studio/issues/130) | E1 | epic(kbgen): integrate the placement seeder into the engine pipeline | shared, integration, enhancement |
-| [#131](https://github.com/MattGyverLee/keyboard-studio/issues/131) | #2 | process(kbgen): joint engine+content session to settle placement contract + scope | shared, process, blocker |
-| [#132](https://github.com/MattGyverLee/keyboard-studio/issues/132) | #3 | chore(tools): port kbgen to ESM TypeScript and wire it into the workspace | engine, tooling, build |
-| [#133](https://github.com/MattGyverLee/keyboard-studio/issues/133) | #4 | feat(contracts): add the placement-map type | engine, contracts, enhancement |
-| [#134](https://github.com/MattGyverLee/keyboard-studio/issues/134) | #5 | feat(engine): consume kbgen output as Phase B placement defaults | engine, integration, enhancement |
-| [#135](https://github.com/MattGyverLee/keyboard-studio/issues/135) | #6 | feat(tools): expand kbgen strategy coverage beyond S-01/S-08 | engine, tooling, enhancement |
+| [#130](https://github.com/keyboard-studio/keyboard-studio/issues/130) | E1 | epic(kbgen): integrate the placement seeder into the engine pipeline | shared, integration, enhancement |
+| [#131](https://github.com/keyboard-studio/keyboard-studio/issues/131) | #2 | process(kbgen): joint engine+content session to settle placement contract + scope | shared, process, blocker |
+| [#132](https://github.com/keyboard-studio/keyboard-studio/issues/132) | #3 | chore(tools): port kbgen to ESM TypeScript and wire it into the workspace | engine, tooling, build |
+| [#133](https://github.com/keyboard-studio/keyboard-studio/issues/133) | #4 | feat(contracts): add the placement-map type | engine, contracts, enhancement |
+| [#134](https://github.com/keyboard-studio/keyboard-studio/issues/134) | #5 | feat(engine): consume kbgen output as Phase B placement defaults | engine, integration, enhancement |
+| [#135](https://github.com/keyboard-studio/keyboard-studio/issues/135) | #6 | feat(tools): expand kbgen strategy coverage beyond S-01/S-08 | engine, tooling, enhancement |
 
 The section bodies below were the drafting source; the filed issues match them. The
 `file-issues.ps1` script in this folder is now spent (issues already exist) — keep it only as a

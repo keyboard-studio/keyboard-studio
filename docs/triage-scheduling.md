@@ -81,7 +81,7 @@ systemd timers beat crontab here because failures land in `journalctl` and you c
 ```bash
 # Clone the repo to a stable location
 sudo mkdir -p /srv && sudo chown $USER /srv
-git clone https://github.com/MattGyverLee/keyboard-studio.git /srv/keyboard-studio
+git clone https://github.com/keyboard-studio/keyboard-studio.git /srv/keyboard-studio
 cd /srv/keyboard-studio
 
 # Authenticate gh as the tech lead's GitHub user (interactive, one-time)

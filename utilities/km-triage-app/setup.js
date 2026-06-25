@@ -16,7 +16,7 @@
 //   KM_TRIAGE_SETUP_PORT — localhost port for the callback (default 4567)
 //
 // After this script finishes successfully it prints an install URL. Open it,
-// install the App on MattGyverLee/keyboard-studio, then run mint-token.js to
+// install the App on keyboard-studio/keyboard-studio, then run mint-token.js to
 // verify a token mints cleanly.
 
 const http = require('http');
@@ -39,7 +39,7 @@ const KEY_FILE = path.join(CONFIG_DIR, 'private-key.pem');
 
 const manifest = {
   name: APP_NAME,
-  url: 'https://github.com/MattGyverLee/keyboard-studio',
+  url: 'https://github.com/keyboard-studio/keyboard-studio',
   description: 'Scheduled PR-triage agent for keyboard-studio. Reviews PRs, posts mechanical fixes, and labels lead-ready items. Authored by km-triage so its reviews count toward branch-protection requirements without conflicting with author self-approval rules.',
   // GitHub requires hook_attributes.url even when active=false. Use a placeholder
   // — no webhook deliveries will fire because active is false.
@@ -75,7 +75,7 @@ function homePage() {
     <h1>km-triage GitHub App setup</h1>
     <p>This will create a GitHub App named <code>${APP_NAME}</code> on your personal account.</p>
     <p>Click below to open GitHub's confirmation page. After you click <strong>Create GitHub App</strong> there, GitHub redirects back to <code>${REDIRECT_URL}</code> and this script saves the credentials.</p>
-    <p>Make sure you're signed into GitHub as the account that owns <code>MattGyverLee/keyboard-studio</code> before clicking.</p>
+    <p>Make sure you're signed into GitHub as the account that owns <code>keyboard-studio/keyboard-studio</code> before clicking.</p>
     <form id="manifest-form" action="https://github.com/settings/apps/new?state=${state}" method="post">
       <input type="hidden" name="manifest" id="manifest-input">
       <button type="submit">Create GitHub App on github.com</button>
@@ -150,7 +150,7 @@ const server = http.createServer(async (req, res) => {
         <p>Credentials saved to <code>${CONFIG_DIR}</code>.</p>
         <h2>Next step: install the App on the repo</h2>
         <p><a href="${installUrl}" target="_blank"><button>Open install page</button></a></p>
-        <p>Pick <strong>Only select repositories</strong> and choose <code>MattGyverLee/keyboard-studio</code>.</p>
+        <p>Pick <strong>Only select repositories</strong> and choose <code>keyboard-studio/keyboard-studio</code>.</p>
         <p>After installing, close this tab and run <code>node utilities/km-triage-app/mint-token.js</code> from a terminal to confirm a token mints.</p>
       `));
       console.log('');

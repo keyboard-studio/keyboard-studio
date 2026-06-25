@@ -13,7 +13,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 Set-Location (Split-Path -Parent $PSScriptRoot)
 
-$repo             = if ($env:KM_TRIAGE_REPO)    { $env:KM_TRIAGE_REPO }    else { "MattGyverLee/keyboard-studio" }
+$repo             = if ($env:KM_TRIAGE_REPO)    { $env:KM_TRIAGE_REPO }    else { "keyboard-studio/keyboard-studio" }
 $tlEmail          = if ($env:KM_TRIAGE_TL_EMAIL) { $env:KM_TRIAGE_TL_EMAIL } else { "matthew_lee@sil.org" }
 $tlLogin          = if ($env:KM_TRIAGE_TL_LOGIN) { $env:KM_TRIAGE_TL_LOGIN } else { "MattGyverLee" }
 $triageOwners     = @("MattGyverLee","gboltono","coopabla","KevinPNG","dhigby","myczka")
