@@ -29,6 +29,9 @@ const ORACLE_DOWN: LintFinding = {
   message: "WASM oracle unavailable — only TS-portable checks ran.",
 };
 
+// Slightly longer than DEBOUNCE_MS (300) so a leaked validation would have run.
+const DEBOUNCE_GRACE_MS = 400;
+
 describe("useValidator (#494)", () => {
   beforeEach(() => {
     validateWithOracleMock.mockReset();
@@ -73,6 +76,3 @@ describe("useValidator (#494)", () => {
     });
   });
 });
-
-// Slightly longer than DEBOUNCE_MS (300) so a leaked validation would have run.
-const DEBOUNCE_GRACE_MS = 400;
