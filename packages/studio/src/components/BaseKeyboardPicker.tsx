@@ -1,12 +1,14 @@
-// Metadata-only picker — dropdown over BaseBrowserService.listAll().
-// Text filter narrows by displayName, id, script, and BCP47 language tags
-// (client-side, over the already-loaded listAll() result).
+// Metadata-only combobox picker — WAI-ARIA 1.2 editable combobox + listbox popup
+// over BaseBrowserService.listAll(). Results ranked by rankBases() —
+// exact script/BCP-47 match first, then name/id substring (AC#1).
 // CJK/Ethiopic guard lives in OSKFrame, not here.
 
-import { useEffect, useState, useDeferredValue } from "react";
+import { useEffect, useState, useDeferredValue, useMemo, useRef, useId } from "react";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { ImportStatus } from "@keyboard-studio/contracts";
 import { getBaseBrowserService } from "../lib/services.ts";
+import { rankBases, type RankedBase } from "../lib/rankBases.ts";
+import type { SuggestTarget } from "../lib/suggestBase.ts";
 
 // ---------------------------------------------------------------------------
 // Import corpus — lazy-loaded so it never bloats the initial bundle.
@@ -40,7 +42,11 @@ async function loadCorpus(): Promise<Map<string, string>> {
 }
 
 // ---------------------------------------------------------------------------
-// Badge styling per ImportStatus
+// Badge styling per ImportStatus — colored via design-system tokens
+// clean  → var(--sil-green)
+// opaque → var(--app-accent)
+// diverged → var(--sil-orange-dark)
+// parse-err → var(--danger)
 // ---------------------------------------------------------------------------
 
 const STATUS_LABEL: Record<string, string> = {
@@ -51,15 +57,15 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const STATUS_COLOR: Record<string, string> = {
-  [ImportStatus.Clean]: "#2ea043",
-  [ImportStatus.CleanWithOpaque]: "#6ea8fe",
-  [ImportStatus.ParseFailure]: "#f85149",
-  [ImportStatus.RoundTripDivergence]: "#d29922",
+  [ImportStatus.Clean]: "var(--sil-green)",
+  [ImportStatus.CleanWithOpaque]: "var(--app-accent)",
+  [ImportStatus.ParseFailure]: "var(--danger)",
+  [ImportStatus.RoundTripDivergence]: "var(--sil-orange-dark)",
 };
 
 function ImportBadge({ status }: { status: string }) {
   const label = STATUS_LABEL[status] ?? status;
-  const color = STATUS_COLOR[status] ?? "#8b949e";
+  const color = STATUS_COLOR[status] ?? "var(--app-text-muted)";
   return (
     <span
       style={{
@@ -82,21 +88,25 @@ function ImportBadge({ status }: { status: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Filter predicate — case-insensitive substring across id, displayName,
-// script, and BCP-47 language tags.
+// Highlighted text renderer — bolds the match range without dangerouslySetInnerHTML
 // ---------------------------------------------------------------------------
 
-// Filters the already-loaded listAll() result in memory. BaseBrowserService.search()
-// is intentionally not used here: it is for server-side filtering, and per-keystroke
-// async calls would be wasteful and potentially rate-limited.
-function matchesFilter(kb: BaseKeyboard, query: string): boolean {
-  if (query === "") return true;
-  const q = query.toLowerCase();
-  if (kb.id.toLowerCase().includes(q)) return true;
-  if (kb.displayName.toLowerCase().includes(q)) return true;
-  if (kb.script.toLowerCase().includes(q)) return true;
-  if (kb.languages?.some((l) => l.toLowerCase().includes(q))) return true;
-  return false;
+function HighlightedText({
+  text,
+  start,
+  end,
+}: {
+  text: string;
+  start: number;
+  end: number;
+}) {
+  return (
+    <>
+      {text.slice(0, start)}
+      <strong>{text.slice(start, end)}</strong>
+      {text.slice(end)}
+    </>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -106,17 +116,67 @@ function matchesFilter(kb: BaseKeyboard, query: string): boolean {
 export interface BaseKeyboardPickerProps {
   value: BaseKeyboard | null;
   onChange: (kb: BaseKeyboard | null) => void;
+  target?: SuggestTarget;
 }
 
-export function BaseKeyboardPicker({ value, onChange }: BaseKeyboardPickerProps) {
+// Render/screen-reader-noise cap — not a hard data limit; the full ranked list is
+// retained in state and filtering continues as the user types.
+const MAX_VISIBLE = 100;
+
+export function BaseKeyboardPicker({ value, onChange, target }: BaseKeyboardPickerProps) {
   const [keyboards, setKeyboards] = useState<BaseKeyboard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filterText, setFilterText] = useState("");
   const [corpus, setCorpus] = useState<Map<string, string>>(new Map());
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
 
-  // Defer the filter value so the dropdown stays responsive while typing.
-  const deferredFilter = useDeferredValue(filterText);
+  // Stable unique id prefix — avoids broken aria-* if the component ever mounts twice.
+  const uid = useId();
+
+  // Refs for scrollIntoView on active option
+  const optionRefs = useRef<(HTMLLIElement | null)[]>([]);
+  // Ref for click-outside detection
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Defer the query so ranking stays responsive while typing.
+  const deferredQuery = useDeferredValue(query);
+
+  // Stable memo keys from target to avoid ranking on referentially-new objects each render.
+  const targetScript = target?.script;
+  const targetBcp47 = target?.bcp47;
+
+  const stableTarget = useMemo<SuggestTarget | undefined>(
+    () => {
+      if (targetScript === undefined) return undefined;
+      if (targetBcp47 !== undefined) return { script: targetScript, bcp47: targetBcp47 };
+      return { script: targetScript };
+    },
+    [targetScript, targetBcp47],
+  );
+
+  const languagesById = useMemo(
+    () => Object.fromEntries(keyboards.map((k) => [k.id, k.languages ?? []] as const)),
+    [keyboards],
+  );
+
+  const ranked = useMemo(
+    () => rankBases(keyboards, deferredQuery, stableTarget, languagesById),
+    [keyboards, deferredQuery, stableTarget, languagesById],
+  );
+
+  const visibleRanked = ranked.slice(0, MAX_VISIBLE);
+
+  // Clamp activeIndex so aria-* attributes never reference a non-existent option
+  // when the deferred list resolves to fewer items than the current activeIndex.
+  // Raw activeIndex stays in state and arrow-key math so clamping is only a derived read.
+  const safeActiveIndex =
+    visibleRanked.length === 0 ? -1 : Math.min(activeIndex, visibleRanked.length - 1);
+
+  // ---------------------------------------------------------------------------
+  // Data loading
+  // ---------------------------------------------------------------------------
 
   useEffect(() => {
     let cancelled = false;
@@ -156,150 +216,424 @@ export function BaseKeyboardPicker({ value, onChange }: BaseKeyboardPickerProps)
     };
   }, [keyboards.length]);
 
-  const filtered = keyboards.filter((k) => matchesFilter(k, deferredFilter));
-  const selectedId = value?.id ?? "";
+  // ---------------------------------------------------------------------------
+  // Scroll active option into view
+  // ---------------------------------------------------------------------------
 
-  // P0: when the author has a keyboard selected and then types a filter that
-  // excludes it, notify the parent immediately so it does not resolve a keyboard
-  // that is no longer visible. Keyed on the deferred filter + filtered list
-  // length so the effect only fires when the visible set actually changes, not
-  // on every render. onChange is excluded from deps because it is a stable
-  // setter from the parent; including it would create a render loop if the
-  // parent does not memoize it.
   useEffect(() => {
-    if (value !== null && !filtered.some((k) => k.id === value.id)) {
-      onChange(null);
+    if (open && safeActiveIndex >= 0) {
+      optionRefs.current[safeActiveIndex]?.scrollIntoView?.({ block: "nearest" });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deferredFilter, filtered.length]);
+  }, [safeActiveIndex, open]);
 
-  // Ensure the currently-selected value is still in the filtered list; if not,
-  // clear it so the <select> doesn't show a stale option.
-  const selectedInFiltered =
-    value === null || filtered.some((k) => k.id === selectedId);
+  // ---------------------------------------------------------------------------
+  // Click-outside — close list when pointer goes outside the combobox root
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: PointerEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [open]);
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  function commit(kb: BaseKeyboard) {
+    onChange(kb);
+    setQuery("");
+    setOpen(false);
+    setActiveIndex(-1);
+  }
+
+  // Single source of truth for what the input displays.
+  // When the list is open we show the live query; when closed we show the
+  // selected value's name (or the last query if nothing is selected).
+  const inputText = open ? query : (value !== null ? value.displayName : query);
+
+  // ---------------------------------------------------------------------------
+  // Keyboard handler
+  // ---------------------------------------------------------------------------
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    // Never hijack IME candidate confirmation.
+    if (e.nativeEvent.isComposing) return;
+
+    const len = visibleRanked.length;
+
+    switch (e.key) {
+      case "ArrowDown": {
+        e.preventDefault();
+        if (!open) {
+          // Find index of current value in ranked list, or default to 0.
+          const currentIdx = value !== null
+            ? visibleRanked.findIndex((r) => r.base.id === value.id)
+            : -1;
+          setOpen(true);
+          setActiveIndex(currentIdx >= 0 ? currentIdx : 0);
+        } else {
+          setActiveIndex((i) => Math.min(i + 1, len - 1));
+        }
+        break;
+      }
+      case "ArrowUp": {
+        e.preventDefault();
+        if (!open) {
+          setOpen(true);
+          setActiveIndex(len - 1);
+        } else {
+          setActiveIndex((i) => Math.max(i - 1, 0));
+        }
+        break;
+      }
+      case "Home": {
+        if (open) { e.preventDefault(); setActiveIndex(0); }
+        break;
+      }
+      case "End": {
+        if (open) { e.preventDefault(); setActiveIndex(len - 1); }
+        break;
+      }
+      case "Enter": {
+        if (open && activeIndex >= 0) {
+          const item = visibleRanked[activeIndex];
+          if (item !== undefined) {
+            e.preventDefault();
+            commit(item.base);
+          }
+        }
+        break;
+      }
+      case "Escape": {
+        e.preventDefault();
+        if (open) {
+          // First Esc: close the list.
+          setOpen(false);
+          setActiveIndex(-1);
+        } else {
+          // Second Esc (list already closed): clear query AND selection.
+          setQuery("");
+          onChange(null);
+        }
+        break;
+      }
+      case "Tab": {
+        setOpen(false);
+        setActiveIndex(-1);
+        // Do not prevent default — let focus move naturally.
+        break;
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
+  const inputId = `${uid}-input`;
+  const listboxId = `${uid}-listbox`;
+
+  const activeId =
+    open && safeActiveIndex >= 0
+      ? `${uid}-opt-${visibleRanked[safeActiveIndex]?.base.id ?? ""}`
+      : undefined;
+
+  const selectedStatus = value !== null ? corpus.get(value.id) : undefined;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    <div
+      ref={rootRef}
+      style={{ display: "flex", flexDirection: "column", gap: 6, position: "relative" }}
+    >
+      {/* Accessible label */}
       <label
-        htmlFor="kbd-picker"
+        htmlFor={inputId}
         style={{
           fontSize: 12,
           textTransform: "uppercase",
           letterSpacing: "0.08em",
-          color: "#9aa7b8",
+          color: "var(--app-text-subtle)",
           fontWeight: 600,
+          fontFamily: "var(--app-font)",
         }}
       >
         Base keyboard
       </label>
 
-      {/* Text filter — only shown once keyboards have loaded */}
-      {!loading && error === null && (
-        <input
-          type="search"
-          aria-label="Filter base keyboards"
-          placeholder="Filter by name, id, script, or language…"
-          value={filterText}
-          onChange={(e) => setFilterText(e.currentTarget.value)}
+      {/* Loading state */}
+      {loading && (
+        <div
+          role="status"
           style={{
-            background: "#0d1117",
-            color: "#e6edf3",
-            border: "1px solid #283040",
-            borderRadius: 6,
-            padding: "6px 10px",
             fontSize: 13,
-            fontFamily: "inherit",
-            outline: "none",
+            color: "var(--app-text-muted)",
+            padding: "6px 10px",
+            background: "var(--app-bg)",
+            border: "1px solid var(--app-border)",
+            borderRadius: 6,
           }}
-        />
+        >
+          Loading base keyboards...
+        </div>
       )}
 
-      <select
-        id="kbd-picker"
-        value={selectedInFiltered ? selectedId : ""}
-        disabled={loading || error !== null}
-        onChange={(e) => {
-          const id = e.currentTarget.value;
-          const kb = filtered.find((k) => k.id === id) ?? null;
-          onChange(kb);
-        }}
-        style={{
-          background: "#161b22",
-          color: "#e6edf3",
-          border: `1px solid ${error ? "#7a2a2a" : "#283040"}`,
-          borderRadius: 8,
-          padding: "10px 12px",
-          fontSize: 14,
-          fontFamily: "inherit",
-          cursor: loading ? "wait" : "pointer",
-        }}
-      >
-        <option value="" disabled>
-          {loading
-            ? "loading..."
-            : error
-              ? "failed to load keyboards"
-              : filtered.length === 0 && keyboards.length > 0
-                ? "no keyboards match filter"
-                : keyboards.length === 0
-                  ? "no keyboards available"
-                  : "-- choose a base keyboard --"}
-        </option>
-        {filtered.map((k) => {
-          const importStatus = corpus.get(k.id);
-          const label = importStatus != null
-            ? `${k.displayName} (${k.id} · ${k.script}) [${STATUS_LABEL[importStatus] ?? importStatus}]`
-            : `${k.displayName} (${k.id} · ${k.script})`;
-          return (
-            <option key={k.id} value={k.id}>
-              {label}
-            </option>
-          );
-        })}
-      </select>
-
-      {/* Import-status badge for the currently-selected keyboard */}
-      {(() => {
-        const selectedStatus = value !== null ? corpus.get(value.id) : undefined;
-        return selectedStatus !== undefined ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#8b949e" }}>
-            <span>Import readiness:</span>
-            <ImportBadge status={selectedStatus} />
+      {/* Error state */}
+      {error !== null && (
+        <>
+          <input
+            id={inputId}
+            disabled
+            placeholder="failed to load keyboards"
+            style={{
+              background: "var(--app-bg)",
+              color: "var(--app-text-muted)",
+              border: "1px solid var(--danger)",
+              borderRadius: 6,
+              padding: "6px 10px",
+              fontSize: 13,
+              fontFamily: "var(--app-font)",
+              outline: "none",
+              cursor: "not-allowed",
+            }}
+          />
+          <div
+            role="alert"
+            style={{ fontSize: 12, color: "var(--danger)", lineHeight: 1.4 }}
+          >
+            {error}
           </div>
-        ) : null;
-      })()}
+        </>
+      )}
 
-      {/* Empty-catalog hint */}
+      {/* Empty catalog */}
       {!loading && error === null && keyboards.length === 0 && (
         <div
           role="status"
-          style={{ fontSize: 12, color: "#8b949e", paddingTop: 4 }}
+          style={{ fontSize: 12, color: "var(--app-text-muted)", paddingTop: 4 }}
         >
           No base keyboards found. Check your connection and try again.
         </div>
       )}
 
-      {/* Zero-match hint when filter is active */}
-      {!loading && error === null && keyboards.length > 0 && filtered.length === 0 && filterText !== "" && (
-        <div
-          role="status"
-          style={{ fontSize: 12, color: "#8b949e", paddingTop: 4 }}
-        >
-          No keyboards match &ldquo;{filterText}&rdquo;.
-        </div>
-      )}
+      {/* Main combobox — only rendered when keyboards are available */}
+      {!loading && error === null && keyboards.length > 0 && (
+        <>
+          {/* Combobox input */}
+          <input
+            id={inputId}
+            role="combobox"
+            aria-expanded={open}
+            aria-controls={listboxId}
+            aria-activedescendant={activeId}
+            aria-autocomplete="list"
+            aria-label={undefined /* label provided via htmlFor */}
+            type="text"
+            autoComplete="off"
+            placeholder="Type to search by name, id, script, or language…"
+            value={inputText}
+            onFocus={() => {
+              if (!open) setOpen(true);
+            }}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setQuery(v);
+              setOpen(true);
+              setActiveIndex(0);
+            }}
+            onKeyDown={handleKeyDown}
+            style={{
+              background: "var(--app-bg)",
+              color: "var(--app-text)",
+              border: `1px solid var(--app-border)`,
+              borderRadius: 6,
+              padding: "6px 10px",
+              fontSize: 13,
+              fontFamily: "var(--app-font)",
+              outline: "none",
+              cursor: "text",
+            }}
+          />
 
-      {error !== null && (
-        <div
-          role="alert"
-          style={{
-            fontSize: 12,
-            color: "#f0a0a0",
-            lineHeight: 1.4,
-          }}
-        >
-          {error}
-        </div>
+          {/* Listbox popup */}
+          {open && (
+            <ul
+              id={listboxId}
+              role="listbox"
+              aria-label="Base keyboard options"
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: 0,
+                right: 0,
+                zIndex: 50,
+                margin: "2px 0 0",
+                padding: 0,
+                listStyle: "none",
+                background: "var(--app-surface)",
+                border: "1px solid var(--app-border-strong)",
+                borderRadius: 8,
+                boxShadow: "0 8px 24px color-mix(in srgb, var(--app-bg) 22%, transparent)",
+                maxHeight: 260,
+                overflowY: "auto",
+              }}
+            >
+              {ranked.length === 0 && (
+                <li
+                  role="status"
+                  style={{
+                    padding: "10px 12px",
+                    fontSize: 13,
+                    color: "var(--app-text-muted)",
+                    fontFamily: "var(--app-font)",
+                  }}
+                >
+                  No keyboards match &ldquo;{query}&rdquo;.
+                </li>
+              )}
+
+              {(optionRefs.current = [], visibleRanked).map((rb: RankedBase, i: number) => {
+                const kb = rb.base;
+                const isActive = i === safeActiveIndex;
+                const importStatus = corpus.get(kb.id);
+
+                // Build highlighted displayName children.
+                const dnRange = rb.matchRanges?.find((r) => r.field === "displayName");
+                const idRange = rb.matchRanges?.find((r) => r.field === "id");
+
+                return (
+                  <li
+                    key={kb.id}
+                    id={`${uid}-opt-${kb.id}`}
+                    role="option"
+                    aria-selected={i === safeActiveIndex}
+                    ref={(el) => { optionRefs.current[i] = el; }}
+                    // onMouseDown prevents blur-close before click fires.
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => commit(kb)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 8,
+                      padding: "7px 12px",
+                      cursor: "pointer",
+                      background: isActive ? "var(--app-accent-subtle)" : "transparent",
+                      color: "var(--app-text)",
+                      fontFamily: "var(--app-font)",
+                      fontSize: 13,
+                      borderBottom: "1px solid var(--app-border)",
+                      userSelect: "none",
+                    }}
+                  >
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span
+                        style={{
+                          fontWeight: isActive ? 600 : 400,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          display: "block",
+                        }}
+                      >
+                        {dnRange !== undefined ? (
+                          <HighlightedText
+                            text={kb.displayName}
+                            start={dnRange.start}
+                            end={dnRange.end}
+                          />
+                        ) : (
+                          kb.displayName
+                        )}
+                        {importStatus !== undefined && <ImportBadge status={importStatus} />}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: "var(--app-text-muted)",
+                          fontFamily: "var(--app-font-mono)",
+                        }}
+                      >
+                        {idRange !== undefined ? (
+                          <HighlightedText
+                            text={kb.id}
+                            start={idRange.start}
+                            end={idRange.end}
+                          />
+                        ) : (
+                          kb.id
+                        )}
+                        {" · "}
+                        {kb.script}
+                      </span>
+                    </span>
+                  </li>
+                );
+              })}
+
+              {/* Truncation footer — non-option, not selectable */}
+              {ranked.length > MAX_VISIBLE && (
+                <li
+                  aria-hidden="true"
+                  style={{
+                    padding: "6px 12px",
+                    fontSize: 11,
+                    color: "var(--app-text-subtle)",
+                    fontFamily: "var(--app-font)",
+                    textAlign: "center",
+                    borderTop: "1px solid var(--app-border)",
+                  }}
+                >
+                  showing {MAX_VISIBLE} of {ranked.length} — keep typing to narrow
+                </li>
+              )}
+            </ul>
+          )}
+
+          {/* Visually-hidden live region for result count announcements */}
+          <span
+            role="status"
+            aria-live="polite"
+            style={{
+              position: "absolute",
+              width: 1,
+              height: 1,
+              overflow: "hidden",
+              clip: "rect(0,0,0,0)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {open
+              ? ranked.length === 0
+                ? `No keyboards match "${query}".`
+                : `${ranked.length} keyboard${ranked.length === 1 ? "" : "s"} found.`
+              : ""}
+          </span>
+
+          {/* Import-status badge for the committed value (AC#2) */}
+          {selectedStatus !== undefined && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: 12,
+                color: "var(--app-text-muted)",
+                fontFamily: "var(--app-font)",
+              }}
+            >
+              <span>Import readiness:</span>
+              <ImportBadge status={selectedStatus} />
+            </div>
+          )}
+        </>
       )}
     </div>
   );

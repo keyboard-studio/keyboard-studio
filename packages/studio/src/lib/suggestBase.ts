@@ -51,7 +51,7 @@ export interface BaseSuggestion {
 const DEFAULT_FALLBACK_ID = "basic_kbdus";
 
 /** Primary language subtag of a BCP47 tag, lowercased (`"hi-Latn"` → `"hi"`). */
-function primarySubtag(tag: string): string {
+export function primarySubtag(tag: string): string {
   const first = tag.split("-")[0] ?? "";
   return first.toLowerCase();
 }
@@ -65,7 +65,7 @@ function primarySubtag(tag: string): string {
  * decoupling). When the tag has no script subtag the choice is open and
  * cross-script suggestions are useful.
  */
-function hasExplicitScriptSubtag(tag: string): boolean {
+export function hasExplicitScriptSubtag(tag: string): boolean {
   return tag.split("-").slice(1).some((part) => /^[A-Za-z]{4}$/.test(part));
 }
 

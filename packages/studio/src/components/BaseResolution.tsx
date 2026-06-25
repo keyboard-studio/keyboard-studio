@@ -22,11 +22,16 @@ const REASON_LABEL: Record<SuggestReason, string> = {
   "us-qwerty-fallback": "Start blank (US QWERTY)",
 };
 
+// Token-mapped reason colors:
+//   language-match       → var(--sil-green)
+//   script-match         → var(--app-accent)
+//   language-cross-script→ var(--sil-orange-dark)
+//   us-qwerty-fallback   → var(--app-text-subtle)
 const REASON_COLOR: Record<SuggestReason, string> = {
-  "language-match": "#2ea043",
-  "script-match": "#6ea8fe",
-  "language-cross-script": "#d29922",
-  "us-qwerty-fallback": "#8b949e",
+  "language-match": "var(--sil-green)",
+  "script-match": "var(--app-accent)",
+  "language-cross-script": "var(--sil-orange-dark)",
+  "us-qwerty-fallback": "var(--app-text-subtle)",
 };
 
 export interface BaseResolutionProps {
@@ -88,22 +93,28 @@ export function BaseResolution({
   const heading: React.CSSProperties = {
     margin: "0 0 8px 0",
     fontSize: "1.1rem",
-    color: "#6ea8fe",
+    color: "var(--app-accent)",
     fontWeight: 600,
+    fontFamily: "var(--app-font)",
   };
-  const subtle: React.CSSProperties = { margin: "0 0 20px 0", fontSize: 13, color: "#8b949e" };
+  const subtle: React.CSSProperties = {
+    margin: "0 0 20px 0",
+    fontSize: 13,
+    color: "var(--app-text-muted)",
+    fontFamily: "var(--app-font)",
+  };
 
-  if (loading) return <div role="status" style={{ color: "#8b949e" }}>Loading base keyboards...</div>;
-  if (error !== null) return <div style={{ color: "#f85149" }}>{error}</div>;
+  if (loading) return <div role="status" style={{ color: "var(--app-text-muted)", fontFamily: "var(--app-font)" }}>Loading base keyboards...</div>;
+  if (error !== null) return <div style={{ color: "var(--danger)", fontFamily: "var(--app-font)" }}>{error}</div>;
   if (bases.length === 0)
     return (
-      <div role="status" style={{ color: "#8b949e", fontSize: 13 }}>
+      <div role="status" style={{ color: "var(--app-text-muted)", fontSize: 13, fontFamily: "var(--app-font)" }}>
         No base keyboards found. Check your connection and try again.
       </div>
     );
 
   return (
-    <div style={{ color: "#e6edf3", fontFamily: "system-ui, sans-serif" }}>
+    <div style={{ color: "var(--app-text)", fontFamily: "var(--app-font)" }}>
       <h2 style={heading}>Choose a starting keyboard</h2>
       <p style={subtle}>
         Based on your language and chosen script, here are the closest starting
@@ -122,19 +133,19 @@ export function BaseResolution({
               alignItems: "center",
               gap: 12,
               padding: "10px 14px",
-              background: "#161b22",
-              border: "1px solid #30363d",
+              background: "var(--app-surface)",
+              border: "1px solid var(--app-border)",
               borderRadius: 8,
-              color: "#e6edf3",
+              color: "var(--app-text)",
               fontSize: 14,
               cursor: "pointer",
               textAlign: "left",
-              fontFamily: "inherit",
+              fontFamily: "var(--app-font)",
             }}
           >
             <span>
               <strong>{base.displayName}</strong>{" "}
-              <span style={{ color: "#8b949e", fontSize: 12 }}>({base.id})</span>
+              <span style={{ color: "var(--app-text-muted)", fontSize: 12 }}>({base.id})</span>
             </span>
             <span
               style={{
@@ -150,9 +161,9 @@ export function BaseResolution({
         ))}
       </div>
 
-      <div style={{ borderTop: "1px solid #21262d", paddingTop: 16 }}>
+      <div style={{ borderTop: "1px solid var(--app-border)", paddingTop: 16 }}>
         <p style={{ ...subtle, marginBottom: 8 }}>Or pick any base keyboard:</p>
-        <BaseKeyboardPicker value={picked} onChange={setPicked} />
+        <BaseKeyboardPicker value={picked} onChange={setPicked} target={target} />
         <button
           type="button"
           disabled={picked === null}
@@ -160,13 +171,13 @@ export function BaseResolution({
           style={{
             marginTop: 10,
             padding: "8px 18px",
-            background: picked === null ? "transparent" : "#1f6feb",
-            border: "1px solid #30363d",
+            background: picked === null ? "transparent" : "var(--app-accent)",
+            border: "1px solid var(--app-border)",
             borderRadius: 6,
-            color: picked === null ? "#484f58" : "#fff",
+            color: picked === null ? "var(--app-text-subtle)" : "var(--app-text)",
             fontSize: 13,
             cursor: picked === null ? "not-allowed" : "pointer",
-            fontFamily: "inherit",
+            fontFamily: "var(--app-font)",
           }}
         >
           Use this keyboard
@@ -181,12 +192,12 @@ export function BaseResolution({
             marginTop: 20,
             padding: "6px 14px",
             background: "transparent",
-            border: "1px solid #30363d",
+            border: "1px solid var(--app-border)",
             borderRadius: 6,
-            color: "#8b949e",
+            color: "var(--app-text-muted)",
             fontSize: 13,
             cursor: "pointer",
-            fontFamily: "inherit",
+            fontFamily: "var(--app-font)",
           }}
         >
           &larr; Back
