@@ -1,7 +1,9 @@
 // Tests for githubOAuth — PKCE generation, the token store, and scope helpers.
 //
-// Browser-only crypto (crypto.subtle / getRandomValues / randomUUID) and
-// sessionStorage are provided by the jsdom environment.
+// Browser-only crypto (crypto.subtle / getRandomValues / randomUUID) comes from
+// the Node global `crypto` (a default global on Node >= 20; polyfilled for older
+// runtimes in src/test-setup.ts — jsdom does NOT provide it). sessionStorage is
+// provided by the jsdom environment.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
