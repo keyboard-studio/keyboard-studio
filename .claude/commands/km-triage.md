@@ -396,6 +396,8 @@ Decision precedence (first match wins):
 | No team label, mixed paths (e.g. `packages/contracts/src/fixtures/patterns.ts` alongside `content/**`) | BOTH (fallback) |
 | No team label, no clear path signal | BOTH (defensive) |
 
+**Path-triggered specialists override the label.** The table above is a *label* classifier, and it historically decided whether the linguistic/Keyman reviewers ran at all — so an `engine`-labeled PR that modified `.kmn` or codec character-mapping code never saw `km-domain` or `km-keyman`, while a docs-only `content`/`both` PR dispatched them to rubber-stamp prose. That is backwards: whether a Keyman or linguistic reviewer is *needed* depends on **what code the diff touches, not how the PR is tagged**. So `km-domain`, `km-keyman`, and `km-strategy` are no longer composed by this table — they are **path-triggered on every reviewed PR**, label-independent: each fires iff a changed file matches its glob set in Pre-filter C, and is skipped (recorded in `scope_skipped`) otherwise. The label classification above now governs only the engine code-quality trio (`km-qc`, `km-verification`, `km-synthesis`); the `(km-domain + km-keyman + km-strategy)` annotation on the CONTENT/BOTH rows is retained only to show eligibility — the real include/skip decision for those three is Pre-filter C's path match. (Pre-filter C reads the changed-file list already cached by Pre-filter A, so this adds no extra `gh` call.)
+
 **Lazy `files` fetch.** `files` was dropped from the Phase-2 list call (it's expensive and only relevant to the fallback rows above). When this phase needs to inspect `files[].path` — i.e. the PR has no team label AND the routing falls through to a path-based rule — fetch the file list per-PR now:
 
 ```bash
@@ -612,23 +614,23 @@ This filter is a path-based gate, not a content-aware one. It is intentionally c
 | Specialist | Skip when NONE of the changed file paths match any of: |
 |---|---|
 | `km-strategy` | `**/*pattern*.{json,ts}`, `**/strategy/**`, `strategy tree/**`, `packages/contracts/src/fixtures/patterns.ts`, `packages/engine/**/strategy*`, `spec.md` |
+| `km-keyman` | `**/*.kmn`, `**/*.kps`, `**/*.kvks`, `**/*pattern*.{json,ts,yaml,yml}`, `**/keyboards/**`, `packages/contracts/**`, `packages/engine/src/codec/**`, `packages/engine/src/compiler/**`, `packages/engine/src/validator/**`, `packages/engine/src/scaffolder/**`, `packages/engine/src/pattern-apply/**`, `packages/engine/src/pattern-library/**`, `spec.md` |
+| `km-domain` | `**/*.kmn`, `**/*.kps`, `content/**`, `**/*pattern*.{json,ts,yaml,yml}`, `packages/contracts/data/**`, `packages/engine/src/codec/**`, `packages/engine/src/character-discovery/**`, `packages/engine/src/recognizer/**`, `packages/engine/src/inventory/**`, `packages/engine/src/pattern-apply/**`, `packages/engine/src/placement/**`, `spec.md` |
 
 The path globs are matched against the cached `<FILES_PATH>` from Pre-filter A (`git diff --name-status` for incremental, `gh pr view --json files` for full). Paths come pre-normalized; no need to handle Windows-vs-POSIX separators.
 
-Other specialists (`km-domain`, `km-keyman`, `km-qc`, `km-verification`, `km-synthesis`) are **not** filterable here:
+`km-domain`, `km-keyman`, and `km-strategy` are **path-triggered specialists** (see the Phase-3 override note): this gate is the *sole* include/skip decision for them, evaluated on every reviewed PR regardless of label. Their glob sets are deliberately **generous** — they cover every engine subsystem that touches characters, scripts, normalization, the Pattern schema, Layer-A checks, or the `keyboards/` layout, so a real concern in any plausible source file still pulls them in. The `codec`/`pattern-apply` paths in particular cover the kind of NFD/key-id mapping bug `km-domain` has caught before (`charToUnicodeKeyId` in `packages/engine/src/codec/touch-ids.ts`). What they correctly skip is the docs/prose/plumbing PR with no domain file at all (GitHub-integration architecture drafts, OAuth/output wiring) — the empirically expensive no-op that motivated this gate.
 
-- `km-domain` is the linguistic error-catcher — script names, BCP47 tags, and Unicode pitfalls can hide in any file (commit messages, doc strings, comments), so a path-based gate would miss them. Keep it in the loop.
-- `km-keyman` likewise — `.kmn` semantics and Pattern-schema invariants leak into adjacent docs, tests, and fixtures.
-- `km-qc`, `km-verification`, `km-synthesis` apply to any code change in the engine crew.
+`km-qc`, `km-verification`, and `km-synthesis` are **not** filterable here — they apply to any code change in the engine crew.
 
 **Procedure:**
 
-1. For each filterable specialist in the dispatched crew, check whether any path in `<FILES_PATH>` matches the specialist's glob set. Use minimatch semantics (`*` does not cross `/`, `**` does).
-2. If no path matches, remove the specialist from the dispatch list and record it under `scope_skipped` in the audit-log entry (parallel to `signed_off_skipped`). The recorded shape is the bare specialist name, e.g. `"scope_skipped": ["km-strategy"]`.
-3. If at least one path matches, dispatch the specialist normally.
-4. The crew composition rule from Phase 3 ("ENGINE = …, CONTENT = …, BOTH = …") still defines which specialists are eligible; C only removes already-classified ones. C does not add specialists.
+1. For each of the three path-triggered specialists (`km-domain`, `km-keyman`, `km-strategy`), check whether any path in `<FILES_PATH>` matches its glob set. Use minimatch semantics (`*` does not cross `/`, `**` does). This check runs on **every** reviewed PR, regardless of the Phase-3 label.
+2. If no path matches, the specialist does not run; record it under `scope_skipped` in the audit-log entry (parallel to `signed_off_skipped`). The recorded shape is the bare specialist name, e.g. `"scope_skipped": ["km-strategy"]`.
+3. If at least one path matches, dispatch the specialist — even if the Phase-3 label would not have classified it onto the crew (e.g. an `engine`-labeled PR that edits `packages/engine/src/codec/**` dispatches `km-keyman` and `km-domain`). This is the one case where C **adds** a specialist the label classification omitted: the path match is authoritative for these three.
+4. The Phase-3 label classification still composes the engine code-quality trio (`km-qc`, `km-verification`, `km-synthesis`); C neither adds nor removes those.
 
-**Empty-crew interaction.** Pre-filter B's empty-crew guard runs after C. If C strips a specialist and B then strips the rest, the same ESCALATE-with-question fallback fires — the guard does not distinguish between scope-skipped and signed-off-skipped reasons. (For the current filter set this is unreachable, since `km-domain` and `km-keyman` are unfilterable and always populate CONTENT-flavored crews.)
+**Empty-crew interaction.** Pre-filter B's empty-crew guard runs after C. If C strips a specialist and B then strips the rest, the same ESCALATE-with-question fallback fires — the guard does not distinguish between scope-skipped and signed-off-skipped reasons. Now that `km-domain` and `km-keyman` are path-triggered, a PR whose diff matches none of the three path-triggered globs **and** carries no engine code-quality work (e.g. a docs-only `content/` README) can legitimately leave the crew empty via C alone; the ESCALATE-with-question fallback then asks a human to confirm the PR genuinely has no reviewable surface rather than APPROVE-by-vacuous-truth.
 
 **Audit-log fields.** `scope_skipped: [<names>]` sits next to `signed_off_skipped` and `triage_approved_skipped` in the Phase-7 audit schema. When no filter strips anyone, all three fields are `[]`. Auditors can read these fields together to see exactly who was dropped and why.
 
@@ -642,7 +644,7 @@ Procedure:
 
 1. Read the **last** commit's message body via the Phase-2 JSON: `pr.commits[-1].messageBody`. Multi-commit PRs use only the last commit — this matches the squash-merge mental model where the last commit's state is what lands in `main`.
 2. Look for a line matching `^KM-Reviewed:\s*(.+)$`. Parse the comma-separated specialist names into a `signed_off` set.
-3. **Always-run set** (these are NEVER skipped, regardless of sign-off): `km-domain`, `km-keyman`, `km-simplify`. These three are context-sensitive enough that a fresh re-review at triage time is cheap insurance — linguistic context can shift, Keyman semantics depend on the surrounding diff, and refactor-fitness opportunities can emerge from the diff as a whole.
+3. **Always-run set** (these are NEVER skipped, regardless of sign-off): `km-domain`, `km-keyman`, `km-simplify`. These three are context-sensitive enough that a fresh re-review at triage time is cheap insurance — linguistic context can shift, Keyman semantics depend on the surrounding diff, and refactor-fitness opportunities can emerge from the diff as a whole. **C runs before B**, so this protection only applies to `km-domain`/`km-keyman` when Pre-filter C already included them on a path match: if the diff touched none of their globs, C dropped them and there is nothing for the always-run rule to protect (a sign-off cannot resurrect a specialist the code never invoked).
 4. Filter the crew composition (from Phase 3's classification) by removing any specialist in `signed_off` that is **not** in the always-run set.
 5. **Empty-crew guard.** If after filtering the dispatched crew is empty (i.e. every classified specialist was in the signed-off set AND none of them happen to be in the always-run set), do **not** APPROVE-AND-PARK by vacuous truth. Instead, promote the PR's action to ESCALATE with question "All classified specialists were signed off via the KM-Reviewed: trailer and none of the always-run trio applies to this crew. Confirm the trailer's sign-offs are accurate before merging." This is most likely on ENGINE-only PRs whose trailer claims `km-verification, km-qc, km-synthesis` — none of those overlap with the always-run set `{km-domain, km-keyman, km-simplify}`, so a literal reading of Pre-filter B would dispatch zero specialists.
 6. Record `signed_off_skipped: [<names>]` in the audit-log entry so the audit shows which specialists were trusted from prior work.
@@ -684,6 +686,8 @@ Procedure:
 - **ENGINE crew**: `km-verification`, `km-qc`, `km-synthesis` — parallel.
 - **CONTENT crew**: `km-domain`, `km-keyman`, `km-strategy` — parallel.
 - **BOTH**: all six in parallel.
+
+These are the *label-eligible* compositions. The three content specialists (`km-domain`, `km-keyman`, `km-strategy`) are actually dispatched by Pre-filter C's path match, not by this label, so the real crew can differ from the label composition: an `engine`-labeled PR that touches codec/Pattern-schema code adds them on top of the engine trio, and a `content`/`both` PR whose diff matches none of their globs drops them. Only the engine trio is fixed by the label.
 
 `km-author` (upstream parity) and `security-review` are deliberately not in scope here — they fire only when the tech lead manually invokes them. Triage is fast-path review.
 
