@@ -146,8 +146,13 @@ export async function verifyToken(
     .map((s) => s.trim())
     .filter(Boolean);
 
-  // public_repo is sufficient; repo (full) is a superset and also acceptable
-  const hasAccess = scopes.includes("public_repo") || scopes.includes("repo");
+  // OAuth Apps return X-OAuth-Scopes; public_repo (or its superset repo) is required.
+  // GitHub App user tokens return no X-OAuth-Scopes header — their access is governed by
+  // the App installation, not OAuth scopes. A successful GET /user already proves the token
+  // authenticates, so when no scope header is present we treat access as granted rather than
+  // reporting a spurious missing scope.
+  const hasScopeHeader = scopes.length > 0;
+  const hasAccess = !hasScopeHeader || scopes.includes("public_repo") || scopes.includes("repo");
   const missingScopes: string[] = hasAccess ? [] : ["public_repo"];
 
   return {
