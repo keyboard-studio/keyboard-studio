@@ -5,9 +5,9 @@
 //                         B (inventory) → carve (Phase D) →
 //                         mechanisms (Phase C) → E → help (Phase F) → done
 //   #preview            — PreviewScreen: "try it" — OSK preview + diagnostics
-//                         (no Download button, no GitHubSignUpPanel)
+//                         (no Download button, no SignUpPanel)
 //   #output             — OutputScreen: "ship it" — Download .zip +
-//                         GitHubSignUpPanel (no interactive OSK)
+//                         SignUpPanel (no interactive OSK)
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";

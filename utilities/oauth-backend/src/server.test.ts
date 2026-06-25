@@ -37,12 +37,50 @@ const errorFetch = stubFetch({ error: "bad_verification_code" }, false);
 // Server lifecycle
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Google identity helpers
+// ---------------------------------------------------------------------------
+
+const GOOGLE_CLIENT_ID = "ci-google-client-id";
+
+/** Build a minimal valid id_token JWT for use in server-level tests. */
+function buildGoogleIdToken(payloadOverrides: Record<string, unknown> = {}): string {
+  const header = { alg: "RS256", typ: "JWT" };
+  const payload: Record<string, unknown> = {
+    sub: "google-sub-12345",
+    email: "user@example.com",
+    email_verified: true,
+    name: "Test User",
+    picture: "https://example.com/photo.jpg",
+    iss: "https://accounts.google.com",
+    aud: GOOGLE_CLIENT_ID,
+    exp: Math.floor(Date.now() / 1000) + 3600,
+    ...payloadOverrides,
+  };
+  const encodeB64url = (obj: object) =>
+    Buffer.from(JSON.stringify(obj))
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=/g, "");
+  return `${encodeB64url(header)}.${encodeB64url(payload)}.fakesig`;
+}
+
+const googleSuccessFetch = stubFetch({ id_token: buildGoogleIdToken() });
+
+// ---------------------------------------------------------------------------
+// Server lifecycle
+// ---------------------------------------------------------------------------
+
 let app: Awaited<ReturnType<typeof buildServer>>;
 
 beforeAll(async () => {
   app = await buildServer({
     clientId: "ci-client-id",
     clientSecret: "ci-client-secret-SHOULD-NEVER-APPEAR",
+    googleOAuthEnabled: true,
+    googleClientId: GOOGLE_CLIENT_ID,
+    googleClientSecret: "ci-google-client-secret-SHOULD-NEVER-APPEAR",
     allowedOrigins: [ALLOWED_ORIGIN],
     fetchFn: successFetch,
   });
@@ -153,6 +191,7 @@ describe("POST /oauth/exchange — secret leakage", () => {
     const errApp = await buildServer({
       clientId: "ci-client-id",
       clientSecret: "ci-client-secret-SHOULD-NEVER-APPEAR",
+      googleOAuthEnabled: false,
       allowedOrigins: [ALLOWED_ORIGIN],
       fetchFn: errorFetch,
     });
@@ -184,6 +223,7 @@ describe("POST /oauth/exchange — upstream gateway errors", () => {
     const gatewayApp = await buildServer({
       clientId: "ci-client-id",
       clientSecret: "ci-client-secret-SHOULD-NEVER-APPEAR",
+      googleOAuthEnabled: false,
       allowedOrigins: [ALLOWED_ORIGIN],
       fetchFn: rateLimitFetch,
     });
@@ -242,6 +282,7 @@ describe("POST /oauth/refresh — body validation", () => {
     const rotationApp = await buildServer({
       clientId: "ci-client-id",
       clientSecret: "ci-client-secret-SHOULD-NEVER-APPEAR",
+      googleOAuthEnabled: false,
       allowedOrigins: [ALLOWED_ORIGIN],
       fetchFn: rotationFetch,
     });
@@ -296,5 +337,285 @@ describe("CORS preflight", () => {
     const acaoHeader = res.headers["access-control-allow-origin"] as string | undefined;
     expect(acaoHeader).not.toBe(DISALLOWED_ORIGIN);
     expect(acaoHeader).not.toBe("*");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /oauth/google/exchange — body validation
+// ---------------------------------------------------------------------------
+
+describe("POST /oauth/google/exchange — body validation", () => {
+  let googleApp: Awaited<ReturnType<typeof buildServer>>;
+
+  beforeAll(async () => {
+    googleApp = await buildServer({
+      clientId: "ci-client-id",
+      clientSecret: "ci-client-secret-SHOULD-NEVER-APPEAR",
+      googleOAuthEnabled: true,
+      googleClientId: GOOGLE_CLIENT_ID,
+      googleClientSecret: "ci-google-client-secret-SHOULD-NEVER-APPEAR",
+      allowedOrigins: [ALLOWED_ORIGIN],
+      fetchFn: googleSuccessFetch,
+    });
+    await googleApp.ready();
+  });
+
+  afterAll(async () => {
+    await googleApp.close();
+  });
+
+  it("returns 400 when body is missing all required fields", async () => {
+    const res = await googleApp.inject({
+      method: "POST",
+      url: "/oauth/google/exchange",
+      headers: { "content-type": "application/json" },
+      payload: {},
+    });
+    expect(res.statusCode).toBe(400);
+    const body = JSON.parse(res.body) as { error: string };
+    expect(body.error).toBe("invalid_request");
+  });
+
+  it("returns 400 when code is empty string", async () => {
+    const res = await googleApp.inject({
+      method: "POST",
+      url: "/oauth/google/exchange",
+      payload: {
+        code: "",
+        code_verifier: "verifier",
+        redirect_uri: "http://localhost:5173/callback",
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("returns 400 when code_verifier is missing", async () => {
+    const res = await googleApp.inject({
+      method: "POST",
+      url: "/oauth/google/exchange",
+      payload: {
+        code: "some-code",
+        redirect_uri: "http://localhost:5173/callback",
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("returns 400 when redirect_uri is not a valid URL", async () => {
+    const res = await googleApp.inject({
+      method: "POST",
+      url: "/oauth/google/exchange",
+      payload: {
+        code: "some-code",
+        code_verifier: "verifier",
+        redirect_uri: "not-a-url",
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("returns 200 identity claims on valid exchange", async () => {
+    const res = await googleApp.inject({
+      method: "POST",
+      url: "/oauth/google/exchange",
+      payload: {
+        code: "google-auth-code",
+        code_verifier: "pkce-verifier",
+        redirect_uri: "http://localhost:5173/callback",
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body) as {
+      sub: string;
+      email: string;
+      email_verified: boolean;
+      name: string;
+      picture: string;
+    };
+    expect(body.sub).toBe("google-sub-12345");
+    expect(body.email).toBe("user@example.com");
+    expect(body.email_verified).toBe(true);
+    expect(body.name).toBe("Test User");
+    expect(typeof body.picture).toBe("string");
+  });
+
+  it("response does NOT contain access_token or id_token fields", async () => {
+    const res = await googleApp.inject({
+      method: "POST",
+      url: "/oauth/google/exchange",
+      payload: {
+        code: "google-auth-code",
+        code_verifier: "pkce-verifier",
+        redirect_uri: "http://localhost:5173/callback",
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body) as Record<string, unknown>;
+    expect(body["access_token"]).toBeUndefined();
+    expect(body["id_token"]).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /oauth/google/exchange — secret never leaks
+// ---------------------------------------------------------------------------
+
+describe("POST /oauth/google/exchange — secret leakage", () => {
+  it("does not include Google client secret in success response", async () => {
+    const secretApp = await buildServer({
+      clientId: "ci-client-id",
+      clientSecret: "ci-client-secret",
+      googleOAuthEnabled: true,
+      googleClientId: GOOGLE_CLIENT_ID,
+      googleClientSecret: "ci-google-secret-SHOULD-NEVER-APPEAR",
+      allowedOrigins: [ALLOWED_ORIGIN],
+      fetchFn: googleSuccessFetch,
+    });
+    await secretApp.ready();
+
+    const res = await secretApp.inject({
+      method: "POST",
+      url: "/oauth/google/exchange",
+      payload: {
+        code: "some-code",
+        code_verifier: "verifier",
+        redirect_uri: "http://localhost:5173/callback",
+      },
+    });
+    expect(res.body).not.toContain("ci-google-secret-SHOULD-NEVER-APPEAR");
+
+    await secretApp.close();
+  });
+
+  it("does not include Google client secret in error response", async () => {
+    const errFetch: OAuthFetchFn = async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: "invalid_grant" }),
+    });
+    const secretErrApp = await buildServer({
+      clientId: "ci-client-id",
+      clientSecret: "ci-client-secret",
+      googleOAuthEnabled: true,
+      googleClientId: GOOGLE_CLIENT_ID,
+      googleClientSecret: "ci-google-secret-SHOULD-NEVER-APPEAR",
+      allowedOrigins: [ALLOWED_ORIGIN],
+      fetchFn: errFetch,
+    });
+    await secretErrApp.ready();
+
+    const res = await secretErrApp.inject({
+      method: "POST",
+      url: "/oauth/google/exchange",
+      payload: {
+        code: "bad-code",
+        code_verifier: "verifier",
+        redirect_uri: "http://localhost:5173/callback",
+      },
+    });
+    expect(res.body).not.toContain("ci-google-secret-SHOULD-NEVER-APPEAR");
+    expect(res.statusCode).toBe(400);
+
+    await secretErrApp.close();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /oauth/google/exchange — CORS parity
+// ---------------------------------------------------------------------------
+
+describe("POST /oauth/google/exchange — CORS parity", () => {
+  let corsApp: Awaited<ReturnType<typeof buildServer>>;
+
+  beforeAll(async () => {
+    corsApp = await buildServer({
+      clientId: "ci-client-id",
+      clientSecret: "ci-client-secret",
+      googleOAuthEnabled: true,
+      googleClientId: GOOGLE_CLIENT_ID,
+      googleClientSecret: "ci-google-client-secret",
+      allowedOrigins: [ALLOWED_ORIGIN],
+      fetchFn: googleSuccessFetch,
+    });
+    await corsApp.ready();
+  });
+
+  afterAll(async () => {
+    await corsApp.close();
+  });
+
+  it("allows preflight from an allowed origin", async () => {
+    const res = await corsApp.inject({
+      method: "OPTIONS",
+      url: "/oauth/google/exchange",
+      headers: {
+        Origin: ALLOWED_ORIGIN,
+        "Access-Control-Request-Method": "POST",
+      },
+    });
+    expect(res.statusCode).toBe(204);
+    expect(res.headers["access-control-allow-origin"]).toBe(ALLOWED_ORIGIN);
+  });
+
+  it("rejects preflight from a disallowed origin with no ACAO header", async () => {
+    const res = await corsApp.inject({
+      method: "OPTIONS",
+      url: "/oauth/google/exchange",
+      headers: {
+        Origin: DISALLOWED_ORIGIN,
+        "Access-Control-Request-Method": "POST",
+      },
+    });
+    expect(res.statusCode).not.toBe(500);
+    const acaoHeader = res.headers["access-control-allow-origin"] as string | undefined;
+    expect(acaoHeader).not.toBe(DISALLOWED_ORIGIN);
+    expect(acaoHeader).not.toBe("*");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Google identity disabled — GitHub-only deployment
+// ---------------------------------------------------------------------------
+
+describe("Google identity disabled (GitHub-only deployment)", () => {
+  let ghOnlyApp: Awaited<ReturnType<typeof buildServer>>;
+
+  beforeAll(async () => {
+    // No Google credentials supplied — mirrors an existing GitHub-only operator
+    // upgrading without configuring Google. The server must still build.
+    ghOnlyApp = await buildServer({
+      clientId: "ci-client-id",
+      clientSecret: "ci-client-secret",
+      googleOAuthEnabled: false,
+      allowedOrigins: [ALLOWED_ORIGIN],
+      fetchFn: successFetch,
+    });
+    await ghOnlyApp.ready();
+  });
+
+  afterAll(async () => {
+    await ghOnlyApp.close();
+  });
+
+  it("does not register /oauth/google/exchange (returns 404)", async () => {
+    const res = await ghOnlyApp.inject({
+      method: "POST",
+      url: "/oauth/google/exchange",
+      payload: {
+        code: "google-auth-code",
+        code_verifier: "pkce-verifier",
+        redirect_uri: "http://localhost:5173/callback",
+      },
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("still serves the GitHub exchange route", async () => {
+    const res = await ghOnlyApp.inject({
+      method: "POST",
+      url: "/oauth/exchange",
+      payload: { code: "github-code-abc" },
+    });
+    expect(res.statusCode).toBe(200);
   });
 });
