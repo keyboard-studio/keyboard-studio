@@ -12,9 +12,11 @@ category: touch
 appliesTo: []
 priority: 1
 group_visibility: any
-# strategyId omitted: touch layer-switch is a touch-layout mechanism (nextlayer
-# JSON property), not an S-01..S-12 output strategy from spec §7.3. There is no
-# S-13 in the current strategy catalog.
+# S-13 is the touch layer-switch mechanism (nextlayer JSON property). It is a
+# structural wrapper selected outside the desktop A1–A7 decision tree — see the
+# §7.3 "S-13 Touch layer switch" card. combinesWith is left empty: the card
+# defers the choice of content strategy (any S-01–S-09) to the author.
+strategyId: "S-13"
 combinesWith: []
 
 questions:
