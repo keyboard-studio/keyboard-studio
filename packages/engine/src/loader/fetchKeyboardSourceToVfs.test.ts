@@ -8,8 +8,11 @@
 //   3. Optional sibling missing (BITMAP / KMW_HELPFILE): does NOT throw; records
 //      a warning. Locks the required-vs-optional classification so a future
 //      reclassification is a conscious test change.
+//   4. proxyBase pass-through: the .kmn fetch URL is built from proxyBase
+//      (regression guard against dropping the proxy prefix).
 //   5. KMW_EMBEDCSS sibling fetched as text (optional).
-//   6. INCLUDECODES constants file fetched as text (required — missing throws).
+//   6. INCLUDECODES constants file fetched as text (required — missing throws);
+//      includes a .json-sibling case that locks the isText `.json` classification.
 //
 // No network traffic — all fetches use the injected mockFetch.
 
@@ -407,6 +410,34 @@ group(main) using keys
     expect(entry!.content).toBe(codesBody);
     expect(result.filesLoaded).toContain("source/codes.txt");
     expect(calls).toContain(sourceUrl(euroLatinKb, "codes.txt"));
+  });
+
+  // Locks the `.json` entry in the loader's isText regex: a sibling with a .json
+  // extension must be stored as a string (text), not raw bytes. Non-behavioral
+  // today (entryContentAsBytes re-encodes either way), but this guards against a
+  // future regex edit silently reclassifying .json siblings as binary.
+  it("classifies a .json constants sibling as text (locks isText `.json`)", async () => {
+    const kmnWithJsonCodes = `c kb
+store(&INCLUDECODES) 'codes.json'
+begin Unicode > use(main)
+group(main) using keys
++ 'a' > 'b'
+`;
+    const jsonBody = '{"U_ALPHA":"U+0391"}';
+    const { fetchImpl } = makeMockFetch({
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kmn")]: { ok: true, status: 200, body: kmnWithJsonCodes },
+      [sourceUrl(euroLatinKb, "codes.json")]: { ok: true, status: 200, body: jsonBody },
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kps")]: { ok: false, status: 404, body: "" },
+      [`${PROXY}/${euroLatinKb.path}/sil_euro_latin.kpj`]: { ok: false, status: 404, body: "" },
+    });
+
+    const vfs = createVirtualFS();
+    await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl });
+
+    const entry = vfs.get("source/codes.json");
+    expect(entry).toBeDefined();
+    expect(typeof entry!.content).toBe("string");
+    expect(entry!.content).toBe(jsonBody);
   });
 
   it("is required — a missing constants file throws naming the store, file, URL, and keyboard id", async () => {
