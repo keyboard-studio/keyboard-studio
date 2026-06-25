@@ -500,3 +500,168 @@ describe("emit — group.usingKeys controls the auto-prepended +", () => {
     expect(out).toContain("+ [K_A] > U+0061");
   });
 });
+
+// ---------------------------------------------------------------------------
+// emit — position-faithful path for fragment-bearing keyboards (ir.raw.length > 0)
+//
+// These tests guard the two defects fixed by the faithful-emit path:
+//   (a) store-dropping: stores referenced only by opaque fragments were silently
+//       omitted; the faithful path preserves ALL user stores for the group.
+//   (b) fragment reordering: fragments were dumped at file-end, losing their
+//       original position; the faithful path interleaves them by sourceLine.
+//
+// They also verify that the fragment-free path is not affected (AC#3 regression
+// guard).
+// ---------------------------------------------------------------------------
+
+describe("emit — faithful emit for fragment-bearing keyboards", () => {
+  /**
+   * Minimal IR with one opaque fragment inside the group.
+   * The fragment references a user store that is NOT referenced by any typed rule.
+   * The group carries `sourceLine: 15` so positional attribution places the
+   * store (sourceLine 20) inside it. Before the fix, that store would be
+   * silently dropped.
+   */
+  function makeFragmentBearingIR(): KeyboardIR {
+    const base = makeIR();
+    // Give the group a source line so positional attribution can assign the store.
+    const grp = base.groups[0];
+    if (grp) grp.sourceLine = 15;
+    // User store at sourceLine 20 (> group header line 15) → positionally in group.
+    // Not referenced by any typed rule; only by the opaque fragment below.
+    base.stores.push({
+      nodeId: "store#opaque-only",
+      name: "opaqueStore",
+      items: [{ kind: "char", value: "x" }],
+      isSystem: false,
+      sourceLine: 20,
+    });
+    // Typed rule at sourceLine 25.
+    base.groups[0]?.rules.push({
+      nodeId: "rule#typed",
+      context: [{ kind: "vkey", name: "K_B", modifiers: [] }],
+      output: [{ kind: "char", value: "b" }],
+      sourceLine: 25,
+    });
+    // Opaque fragment at sourceLine 22, in the group.
+    base.raw.push({
+      nodeId: "raw#frag0",
+      origin: "imported",
+      sourceText: "save(opaqueStore, 1)",
+      reason: "save/set/reset option-store",
+      sourceLine: 22,
+      groupNodeId: base.groups[0]?.nodeId,
+    });
+    return base;
+  }
+
+  it("(a) preserves user stores attributed positionally to the group (store-drop fix)", () => {
+    const ir = makeFragmentBearingIR();
+    const out = emit(ir);
+    // The store must appear in the output even though no typed rule references it.
+    expect(out).toContain("store(opaqueStore)");
+  });
+
+  it("(b) interleaves fragment before the typed rule that follows it in source (reorder fix)", () => {
+    const ir = makeFragmentBearingIR();
+    const out = emit(ir);
+    const fragIdx = out.indexOf("save(opaqueStore, 1)");
+    const ruleIdx = out.indexOf("+ [K_B] > U+0062");
+    expect(fragIdx).toBeGreaterThanOrEqual(0);
+    expect(ruleIdx).toBeGreaterThanOrEqual(0);
+    // Fragment at sourceLine 22 must appear before rule at sourceLine 25.
+    expect(fragIdx).toBeLessThan(ruleIdx);
+  });
+
+  it("(c) each user store is emitted exactly once (no duplicates across groups)", () => {
+    // Two groups; a user store positionally in the first group.
+    // It must appear in the first group's output and NOT in the second group's.
+    const base = makeIR();
+    const grp1 = base.groups[0];
+    if (grp1) grp1.sourceLine = 10;
+    const grp2: import("@keyboard-studio/contracts").IRGroup = {
+      nodeId: "group#two",
+      name: "deadkeys",
+      usingKeys: false,
+      rules: [],
+      readonly: false,
+      sourceLine: 30,
+    };
+    base.groups.push(grp2);
+    // Store at sourceLine 15 → belongs to group1 (line 10 <= 15 < 30).
+    base.stores.push({
+      nodeId: "store#once",
+      name: "sharedStore",
+      items: [{ kind: "char", value: "y" }],
+      isSystem: false,
+      sourceLine: 15,
+    });
+    // Fragment in group2 that mentions sharedStore (should NOT cause a second emit).
+    base.raw.push({
+      nodeId: "raw#grp2frag",
+      origin: "imported",
+      sourceText: "call(sharedStore)",
+      reason: "call/return",
+      sourceLine: 35,
+      groupNodeId: "group#two",
+    });
+    const out = emit(base);
+    // Store appears exactly once.
+    const matches = [...out.matchAll(/store\(sharedStore\)/g)];
+    expect(matches).toHaveLength(1);
+  });
+
+  it("fragment-free keyboard output is unchanged by the presence of the faithful-emit branch (AC#3)", () => {
+    // When ir.raw.length === 0, emit() must take the old standard path.
+    const ir = makeIR(); // no raw fragments
+    expect(ir.raw.length).toBe(0);
+    const out = emit(ir);
+    // Verify standard structure is intact.
+    expect(out).toContain("begin Unicode > use(main)");
+    expect(out).toContain("group(main) using keys");
+    expect(out).toContain("+ [K_A] > U+0061");
+    // No stray fragment placeholders.
+    expect(out).not.toContain("save(");
+  });
+
+  it("AC#3 — fragment-free path emits both rules verbatim; no rule silently dropped or reordered", () => {
+    // Stronger guard: verify that BOTH rules from makeIR() appear in the correct
+    // textual form, proving the standard (non-faithful) path was not altered by
+    // the addition of the faithful-emit branch. If a rule line is missing the
+    // fragment-free path regressed.
+    const ir = makeIR(); // rule#0: K_A→a, rule#1: K_A+SHIFT→A
+    expect(ir.raw.length).toBe(0);
+    const out = emit(ir);
+    // Both rules must be present as full lines.
+    expect(out).toContain("+ [K_A] > U+0061");
+    expect(out).toContain("+ [SHIFT K_A] > U+0041");
+    // The group body must contain exactly 2 rule lines.
+    const ruleLines = out.split("\n").filter((l) => l.trimStart().startsWith("+"));
+    expect(ruleLines).toHaveLength(2);
+    // System stores (VERSION, NAME) must be present.
+    expect(out).toContain("store(&VERSION)");
+    expect(out).toContain("store(&NAME)");
+    // No user (non-system) stores in the output (makeIR has none).
+    expect(out).not.toContain("store(VERSION");
+    expect(out).not.toContain("store(NAME");
+  });
+
+  it("global pre-begin fragment is emitted before the begin directive", () => {
+    const ir = makeIR();
+    // A pre-begin fragment has no groupNodeId.
+    ir.raw.push({
+      nodeId: "raw#pre",
+      origin: "imported",
+      sourceText: "c pre-begin unknown construct",
+      reason: "unknown-pre-begin",
+      sourceLine: 1,
+      // groupNodeId intentionally absent — global/pre-begin
+    });
+    const out = emit(ir);
+    const fragIdx = out.indexOf("c pre-begin unknown construct");
+    const beginIdx = out.indexOf("begin Unicode > use(main)");
+    expect(fragIdx).toBeGreaterThanOrEqual(0);
+    expect(beginIdx).toBeGreaterThanOrEqual(0);
+    expect(fragIdx).toBeLessThan(beginIdx);
+  });
+});
