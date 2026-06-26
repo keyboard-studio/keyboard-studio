@@ -52,6 +52,7 @@ export * from "./validator";
 // ---------------------------------------------------------------------------
 export * from "./ir/producedSet";
 export * from "./keyboardIRRoundTrip";
+export * from "./parseTouchLayout";
 
 // ---------------------------------------------------------------------------
 // Utilities — shared pure helpers consumed across packages.
