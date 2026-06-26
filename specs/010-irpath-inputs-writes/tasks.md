@@ -110,7 +110,9 @@
 
 **Independent Test**: A converted module resolves by `definition.id` exactly as a flat `<id>.ts`; its mirrored test still maps.
 
-- [ ] T022 [US5] Discovery: enumerate modules with companion artifacts (inline sample-text blocks, images, custom render components) across `packages/studio/src/survey/questions/**` (research R7); produce the conversion list (may be empty/small) and record it in this file
+- [x] T022 [US5] Discovery: enumerate modules with companion artifacts (inline sample-text blocks, images, custom render components) across `packages/studio/src/survey/questions/**` (research R7); produce the conversion list (may be empty/small) and record it in this file
+
+  Discovery result (2026-06-26): **NONE.** Scanned all 93 question modules across phases a/, b/, f/. Every module exports only `definition`, `validate` (where applicable), `fixtures`, and a default `QuestionModule` object. No module imports image/SVG/CSS/asset files, React/JSX components, or contains non-trivial co-located assets that would justify a folder-per-question layout. No subdirectories exist under any phase directory. The conversion list is empty — T023 and T024 are no-ops.
 - [ ] T023 [US5] Convert each identified module to `packages/studio/src/survey/questions/<phase>/<id>/index.ts` + `extras/`, updating its phase sub-registry import to `…/<id>/index.ts` (explicit extension); confirm `questionRegistry` resolves by `definition.id`
 - [ ] T024 [US5] Confirm the mirrored test path still resolves for each converted module (mirror path derives from the source path; the FR-009 check from T015 covers this)
 
