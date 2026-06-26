@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { emit } from "./emit.js";
+import { parse } from "./parse.js";
+import { normaliseForComparison } from "./normalise-ir.js";
 import type { KeyboardIR, IRGroup, IRRule, IRStore, IRComment } from "@keyboard-studio/contracts";
 
 function makeIR(): KeyboardIR {
@@ -663,5 +665,286 @@ describe("emit — faithful emit for fragment-bearing keyboards", () => {
     expect(fragIdx).toBeGreaterThanOrEqual(0);
     expect(beginIdx).toBeGreaterThanOrEqual(0);
     expect(fragIdx).toBeLessThan(beginIdx);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// emit — fragment-free orphan store preservation (ir.raw.length === 0)
+//
+// A user store declared in a keyboard but never referenced by any typed rule
+// was previously silently dropped on the fragment-free path because the emitter
+// only output user stores that appeared in a rule's storeRef. The fix adds an
+// explicit orphan pass that emits such stores before the `begin` directive so
+// that emit → re-parse produces a structurally equal IR.
+// ---------------------------------------------------------------------------
+
+describe("emit — fragment-free path preserves orphan user stores", () => {
+  it("preserves a user store not referenced by any rule (unit — IR constructed directly)", () => {
+    const ir = makeIR(); // ir.raw.length === 0 by construction
+    expect(ir.raw.length).toBe(0);
+    // Add a user store that no typed rule references.
+    ir.stores.push({
+      nodeId: "store#orphan",
+      name: "orphanDict",
+      items: [{ kind: "char", value: "a" }, { kind: "char", value: "b" }, { kind: "char", value: "c" }],
+      isSystem: false,
+    });
+    // The existing rules in makeIR() reference neither orphanDict in context nor output.
+    const out = emit(ir);
+    expect(out).toContain("store(orphanDict)");
+    // The orphan store must appear before the begin directive.
+    const storeIdx = out.indexOf("store(orphanDict)");
+    const beginIdx = out.indexOf("begin Unicode > use(main)");
+    expect(storeIdx).toBeGreaterThanOrEqual(0);
+    expect(beginIdx).toBeGreaterThanOrEqual(0);
+    expect(storeIdx).toBeLessThan(beginIdx);
+  });
+
+  it("round-trips a keyboard with an unreferenced user store through parse → emit → re-parse", () => {
+    // Inline .kmn — no opaque constructs, so ir.raw.length === 0 after parse.
+    const kmn = [
+      "store(&VERSION) '10.0'",
+      "store(&NAME) 'OrphanTest'",
+      "store(&COPYRIGHT) ''",
+      "store(&TARGETS) 'any'",
+      "store(&LANGUAGE) ''",
+      "store(orphanDict) 'abc'",
+      "",
+      "begin Unicode > use(main)",
+      "",
+      "group(main) using keys",
+      "+ [K_A] > U+0061",
+    ].join("\n");
+
+    const { ir: ir1 } = parse(kmn, "orphan_test");
+    expect(ir1.raw.length).toBe(0);
+    // The parsed IR must contain orphanDict.
+    expect(ir1.stores.some(s => s.name === "orphanDict")).toBe(true);
+
+    const emitted = emit(ir1);
+    // Emitted text must include the orphan store.
+    expect(emitted).toContain("store(orphanDict)");
+
+    const { ir: ir2 } = parse(emitted, "orphan_test");
+    // Re-parsed IR must also contain orphanDict — round-trip fidelity.
+    expect(ir2.stores.some(s => s.name === "orphanDict")).toBe(true);
+
+    // Deep structural equality after normalisation.
+    expect(normaliseForComparison(ir2)).toEqual(normaliseForComparison(ir1));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// emit — faithful path catch-all for unsourced stores referenced only by a
+// global fragment (ir.raw.length > 0)
+//
+// An unsourced store (sourceLine: undefined) whose only name-reference lives
+// inside a global fragment (groupNodeId: undefined) is invisible to every
+// group's per-group name-reference check in emitGroupBodyFaithful: global
+// fragments never appear in any group's `groupFragments` slice, so the
+// per-group fallback never sees the store name. Without the post-group
+// catch-all sweep the store is silently dropped.
+//
+// The fix: after the group loop, emit any unsourced store not yet recorded in
+// emittedStores. This test constructs the precise condition — unsourced store,
+// global fragment referencing it, single typed group that does NOT reference it
+// in its own typed rules or group-owned fragments.
+// ---------------------------------------------------------------------------
+
+describe("emit — faithful path preserves an unsourced store referenced only by a global fragment", () => {
+  function makeGlobalFragmentIR(): KeyboardIR {
+    const base = makeIR(); // gives us system stores + group(main) using keys
+
+    // Give the group a sourceLine so attributeStoresToGroups can work positionally.
+    const grp = base.groups[0];
+    if (grp) grp.sourceLine = 10;
+
+    // Unsourced user store: no sourceLine → falls into unsourcedStores list.
+    // No typed rule in any group references it.
+    base.stores.push({
+      nodeId: "store#ghost",
+      name: "ghostStore",
+      items: [{ kind: "char", value: "g" }],
+      isSystem: false,
+      // sourceLine intentionally absent
+    });
+
+    // A global fragment (groupNodeId: undefined) whose text contains ghostStore.
+    // Global fragments are emitted before `begin`, never inside any group's block.
+    // emitGroupBodyFaithful therefore never sees "ghostStore" in its groupFragments
+    // scan, so without the catch-all the store is dropped.
+    base.raw.push({
+      nodeId: "raw#global",
+      origin: "imported",
+      sourceText: "any(ghostStore) > nul",
+      reason: "any-store-global",
+      sourceLine: 5,
+      // groupNodeId intentionally absent — this is a global/pre-begin fragment
+    });
+
+    return base;
+  }
+
+  it("emitted text contains store(ghostStore) (catch-all sweep)", () => {
+    const ir = makeGlobalFragmentIR();
+    expect(ir.raw.length).toBeGreaterThan(0); // faithful path must be active
+    const out = emit(ir);
+    expect(out).toContain("store(ghostStore)");
+  });
+
+  it("store(ghostStore) appears exactly once in the emitted text (no duplicates)", () => {
+    const ir = makeGlobalFragmentIR();
+    const out = emit(ir);
+    const matches = [...out.matchAll(/store\(ghostStore\)/g)];
+    expect(matches).toHaveLength(1);
+  });
+
+  it("round-trip: re-parsing emitted text produces an IR that contains a store named ghostStore", () => {
+    const ir = makeGlobalFragmentIR();
+    const out = emit(ir);
+    const { ir: ir2 } = parse(out, "ghost_test");
+    expect(ir2.stores.some(s => s.name === "ghostStore")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// emit — faithful path catch-all: broadened to ALL userStores (not only unsourced)
+//
+// The catch-all backstop was widened to iterate ALL non-system userStores,
+// deduped by emittedStores.has(nodeId). This closes two gaps:
+//
+//   Test 1 — degenerate keyboard: sourced store in a keyboard where every group
+//   is readonly so the pre-group bucket reassignment finds no firstGroup and
+//   cannot promote the store. The sourced store has a sourceLine that precedes
+//   all group headers, so attributeStoresToGroups() places it in the "" bucket.
+//   With no non-readonly firstGroup the bucket is deleted and the store is never
+//   emitted by the positional pass. The widened catch-all (all userStores, not
+//   only unsourced) recovers it.
+//
+//   Test 2 — no double-emission: a store that IS emitted by the normal faithful
+//   pass (positionally attributed to a real group) must appear EXACTLY ONCE in
+//   the output. The emittedStores dedup guard in the catch-all must prevent a
+//   second emission.
+// ---------------------------------------------------------------------------
+
+describe("emit — faithful path catch-all emits sourced stores dropped by all-readonly groups", () => {
+  /**
+   * IR where every group is readonly and the single user store has a sourceLine
+   * that precedes all group headers.
+   *
+   * Before the catch-all was broadened from unsourcedStores to userStores, the
+   * sourced store had a sourceLine and therefore was excluded from unsourcedStores.
+   * The pre-group bucket ("") could not be promoted because ir.groups.find(g =>
+   * !g.readonly) returns undefined. The store was silently dropped.
+   *
+   * After the broadening the catch-all sweeps all userStores; the sourced store
+   * is not in emittedStores yet, so it is emitted.
+   */
+  function makeAllReadonlyIR(): KeyboardIR {
+    const base = makeIR();
+
+    // Replace the writable group with a readonly one that still has a sourceLine.
+    const grp = base.groups[0];
+    if (grp) {
+      grp.readonly = true;
+      grp.sourceLine = 10;
+    }
+
+    // User store at sourceLine 1 — precedes the group header at line 10,
+    // so attributeStoresToGroups() places it in the "" (pre-group) bucket.
+    base.stores.push({
+      nodeId: "store#sourced-pregroup",
+      name: "preGroupStore",
+      items: [{ kind: "char", value: "p" }],
+      isSystem: false,
+      sourceLine: 1,
+    });
+
+    // At least one RawKmnFragment so the faithful path (ir.raw.length > 0) is active.
+    base.raw.push({
+      nodeId: "raw#readonly-frag",
+      origin: "imported",
+      sourceText: "c opaque line requiring faithful path",
+      reason: "unknown-construct",
+      sourceLine: 12,
+      groupNodeId: grp?.nodeId,
+    });
+
+    return base;
+  }
+
+  it("emits the sourced pre-group store when all groups are readonly (catch-all coverage)", () => {
+    const ir = makeAllReadonlyIR();
+    expect(ir.raw.length).toBeGreaterThan(0); // faithful path must be active
+    // Confirm truly all-readonly.
+    expect(ir.groups.every(g => g.readonly)).toBe(true);
+    const out = emit(ir);
+    expect(out).toContain("store(preGroupStore)");
+  });
+
+  it("store(preGroupStore) appears exactly once (catch-all does not duplicate)", () => {
+    const ir = makeAllReadonlyIR();
+    const out = emit(ir);
+    const matches = [...out.matchAll(/store\(preGroupStore\)/g)];
+    expect(matches).toHaveLength(1);
+  });
+});
+
+describe("emit — faithful path catch-all dedup prevents double-emission of a normally-emitted store", () => {
+  /**
+   * IR with ir.raw.length > 0 and a sourced user store that IS emitted by the
+   * normal positional pass (the store's sourceLine puts it inside a non-readonly
+   * group). The catch-all sweep runs after the group loop; without the
+   * emittedStores guard it would emit the store a second time.
+   *
+   * This test verifies the guard works: exactly one store(alreadyEmitted) in output.
+   */
+  function makeNormallyEmittedStoreIR(): KeyboardIR {
+    const base = makeIR();
+
+    // Give the group a sourceLine so positional attribution can assign the store.
+    const grp = base.groups[0];
+    if (grp) grp.sourceLine = 10;
+
+    // Sourced store at sourceLine 15 — inside the group (line 10 <= 15).
+    // Positional pass will emit it during emitGroupBodyFaithful.
+    base.stores.push({
+      nodeId: "store#normal-emitted",
+      name: "alreadyEmitted",
+      items: [{ kind: "char", value: "n" }],
+      isSystem: false,
+      sourceLine: 15,
+    });
+
+    // A typed rule at sourceLine 20 so the group is non-empty.
+    base.groups[0]?.rules.push({
+      nodeId: "rule#normal",
+      context: [{ kind: "vkey", name: "K_N", modifiers: [] }],
+      output: [{ kind: "char", value: "n" }],
+      sourceLine: 20,
+    });
+
+    // Fragment in the same group to activate the faithful path.
+    base.raw.push({
+      nodeId: "raw#normal-frag",
+      origin: "imported",
+      sourceText: "c fragment that activates faithful path",
+      reason: "unknown-construct",
+      sourceLine: 25,
+      groupNodeId: grp?.nodeId,
+    });
+
+    return base;
+  }
+
+  it("store emitted by the positional pass appears exactly once (dedup guard fires)", () => {
+    const ir = makeNormallyEmittedStoreIR();
+    expect(ir.raw.length).toBeGreaterThan(0); // faithful path must be active
+    const out = emit(ir);
+    // The store must be present.
+    expect(out).toContain("store(alreadyEmitted)");
+    // The dedup guard must prevent a second emission.
+    const matches = [...out.matchAll(/store\(alreadyEmitted\)/g)];
+    expect(matches).toHaveLength(1);
   });
 });

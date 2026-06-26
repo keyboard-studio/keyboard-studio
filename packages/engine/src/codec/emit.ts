@@ -9,14 +9,22 @@
  * Emission order:
  *   1. System stores in canonical order (see SYSTEM_STORE_ORDER).
  *   2. blank line.
- *   3. begin Unicode > use(<entryGroup>).
- *   4. For each group:
+ *   3. Fragment-free path only: non-system user stores referenced by no typed
+ *      rule in any group (orphan stores) emitted before `begin`, in ir.stores
+ *      declaration order. Store declarations are global/position-independent so
+ *      re-parsing produces the same IR regardless of their placement. (D9 faithful
+ *      emit — lossless store round-trip.)
+ *   4. begin Unicode > use(<entryGroup>).
+ *   5. For each group:
  *        blank line
  *        group(<name>) [using keys]
  *        user stores attached to the group (heuristic: stores whose names
  *        appear in the group's rules)
  *        rules (or RawKmnFragment source text)
- *   5. Trailing newline.
+ *   6. Faithful path only: any unsourced user stores not yet emitted via the
+ *      per-group pass are swept here as a catch-all, preserving the invariant
+ *      that ALL user stores in the IR appear in the output. (D9)
+ *   7. Trailing newline.
  *
  * Comments:
  *   - "leading" comments are emitted immediately before their anchorRef's line.
@@ -285,6 +293,27 @@ function pushLeadingComments(nodeId: string, commentMap: Map<string, IRComment[]
 }
 
 // ---------------------------------------------------------------------------
+// Store-reference helpers (shared between fragment-free and faithful paths)
+// ---------------------------------------------------------------------------
+
+/**
+ * Collect the names of every user store referenced by a set of typed rules.
+ *
+ * Shared across the fragment-free and faithful store-emission paths. Extracted
+ * once to avoid duplicating the element-kind enumeration at each call site.
+ */
+function referencedStoreNamesIn(rules: IRRule[]): Set<string> {
+  const names = new Set<string>();
+  for (const rule of rules) {
+    for (const el of rule.context)
+      if (el.kind === "any" || el.kind === "notany" || el.kind === "index") names.add(el.storeRef);
+    for (const el of rule.output)
+      if (el.kind === "index" || el.kind === "outs") names.add(el.storeRef);
+  }
+  return names;
+}
+
+// ---------------------------------------------------------------------------
 // Position-faithful emit helpers (fragment-bearing keyboards only)
 // ---------------------------------------------------------------------------
 
@@ -378,6 +407,10 @@ function storeNameInText(storeName: string, text: string): boolean {
  * typed rules + fragment text as fallback for unsourced stores. Each user store
  * is emitted exactly once across all groups (dedup by nodeId via emittedStores).
  *
+ * Unsourced stores whose only reference lives inside a fragment attributed to a
+ * DIFFERENT group pass no per-group check here. The caller emits a catch-all
+ * sweep after the group loop to ensure no unsourced store is dropped (D9).
+ *
  * Items without sourceLine sort to the BACK (Number.MAX_SAFE_INTEGER fallback)
  * so unsourced synthesized nodes append after the original source-ordered content.
  */
@@ -406,19 +439,7 @@ function emitGroupBodyFaithful(
 
   // Name-reference fallback for stores without sourceLine: include if referenced
   // by a typed rule OR found (token-bounded) in a group-owned fragment.
-  const referencedNames = new Set<string>();
-  for (const rule of group.rules) {
-    for (const el of rule.context) {
-      if (el.kind === "any" || el.kind === "notany" || el.kind === "index") {
-        referencedNames.add(el.storeRef);
-      }
-    }
-    for (const el of rule.output) {
-      if (el.kind === "index" || el.kind === "outs") {
-        referencedNames.add(el.storeRef);
-      }
-    }
-  }
+  const referencedNames = referencedStoreNamesIn(group.rules);
   for (const store of unsourcedStores) {
     if (emittedStores.has(store.nodeId)) continue;
     const nameRef = referencedNames.has(store.name) ||
@@ -474,12 +495,17 @@ function emitGroupBodyFaithful(
  * Emit canonical .kmn text from a KeyboardIR.
  *
  * When `ir.raw.length === 0` (all fragment-free keyboards, the common case),
- * this produces byte-for-byte identical output to the pre-fix implementation.
+ * system stores are emitted first, then any non-system user stores referenced by
+ * no typed rule in any group (orphan stores) are emitted before `begin` so they
+ * are not silently dropped. Store declarations are global/position-independent
+ * in .kmn so re-parsing yields the same IR regardless of their placement. (D9)
  *
  * When `ir.raw.length > 0` (fragment-bearing keyboards), a position-faithful
  * emit path is used that interleaves stores, rules, and fragments in their
  * original source order within each group, and preserves ALL user stores
- * (not just those referenced by typed rules).
+ * (not just those referenced by typed rules). Unsourced stores whose only
+ * reference lives in a fragment attributed to a different group are caught by a
+ * post-group sweep that emits any remaining unsourced stores not yet output. (D9)
  *
  * @param ir  The keyboard IR to serialize.
  * @returns   Canonical .kmn text with trailing newline.
@@ -511,6 +537,25 @@ export function emit(ir: KeyboardIR): string {
   const remainingSys = [...sysMap.values()].sort((a, b) => a.name.localeCompare(b.name));
   for (const store of remainingSys) {
     lines.push(emitStore(store));
+  }
+
+  // Preserve non-system user stores referenced by no typed rule in any group
+  // (orphan stores) — previously silently dropped on the fragment-free path.
+  // Emitted before `begin` in ir.stores declaration order, matching real .kmn
+  // source layout; store declarations are global/position-independent so this
+  // re-parses identically. Preserve over warn — emit() has no diagnostic
+  // channel and faithful emit (D9) requires lossless store round-trip.
+  if (ir.raw.length === 0) {
+    const allReferenced = new Set<string>();
+    for (const g of ir.groups) {
+      for (const n of referencedStoreNamesIn(g.rules)) allReferenced.add(n);
+    }
+    for (const store of ir.stores) {
+      if (!store.isSystem && !allReferenced.has(store.name)) {
+        pushLeadingComments(store.nodeId, commentMap, lines);
+        lines.push(emitStore(store));
+      }
+    }
   }
 
   // When fragments are present, emit global (pre-begin) fragments before the
@@ -583,19 +628,7 @@ export function emit(ir: KeyboardIR): string {
       // User stores that belong to this group: heuristic — stores referenced in
       // this group's rules. Iterated in ir.stores declaration order to preserve
       // round-trip comment anchoring (I3).
-      const referencedStoreNames = new Set<string>();
-      for (const rule of group.rules) {
-        for (const el of rule.context) {
-          if (el.kind === "any" || el.kind === "notany" || el.kind === "index") {
-            referencedStoreNames.add(el.storeRef);
-          }
-        }
-        for (const el of rule.output) {
-          if (el.kind === "index" || el.kind === "outs") {
-            referencedStoreNames.add(el.storeRef);
-          }
-        }
-      }
+      const referencedStoreNames = referencedStoreNamesIn(group.rules);
       for (const store of ir.stores) {
         if (!store.isSystem && referencedStoreNames.has(store.name)) {
           pushLeadingComments(store.nodeId, commentMap, lines);
@@ -614,6 +647,26 @@ export function emit(ir: KeyboardIR): string {
   // When fragments are absent, there are none to emit. When they are present,
   // group-owned fragments were already emitted inside each group block above.
   // Global fragments were emitted before the begin directive. Nothing remains.
+
+  // Catch-all backstop: emit any non-system user store not yet output by the
+  // positional or per-group passes. This covers two cases:
+  //   (a) unsourced stores whose only reference lives in a fragment attributed
+  //       to a different group (pass no per-group name-ref check above); and
+  //   (b) sourced stores that precede ALL group headers in a degenerate keyboard
+  //       with no non-readonly group — the pre-group bucket reassignment has
+  //       nowhere to attach them, so the positional pass never emits them.
+  // Using userStores (all non-system stores) rather than unsourcedStores alone
+  // closes this gap with no effect on correct keyboards — every normally-emitted
+  // store is already in emittedStores and is therefore skipped.
+  // (D9 faithful emit — preserve ALL user stores.)
+  if (ir.raw.length > 0) {
+    for (const store of userStores) {
+      if (emittedStores.has(store.nodeId)) continue;
+      emittedStores.add(store.nodeId);
+      pushLeadingComments(store.nodeId, commentMap, lines);
+      lines.push(emitStore(store));
+    }
+  }
 
   lines.push(""); // trailing newline
   return lines.join("\n");
