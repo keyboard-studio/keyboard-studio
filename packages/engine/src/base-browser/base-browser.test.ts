@@ -435,4 +435,38 @@ describe("createBaseBrowser", () => {
     await createBaseBrowser({ fetch: createFixtureFetch() }).listAll();
     expect(warn).not.toHaveBeenCalled();
   });
+
+  it("warns when a per-subfolder fetch fails and still returns keyboards from the other subfolders", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // Build on createTruncatedFetch but make the release/b subfolder reject.
+    const baseFetch = createTruncatedFetch();
+    const faultingFetch: FetchFn = async (url, init) => {
+      if (url === `${TREES_BASE}/bsha?recursive=1`) {
+        throw new Error("simulated network failure");
+      }
+      return baseFetch(url, init);
+    };
+
+    const service = createBaseBrowser({ fetch: faultingFetch });
+    const keyboards = await service.listAll();
+
+    // A warn was emitted for the failing subfolder (b), naming it.
+    const warnMessages = warn.mock.calls.map((c) => String(c[0]));
+    const subfolderWarn = warnMessages.find((m) => m.includes("release/b/"));
+    expect(subfolderWarn).toBeDefined();
+    expect(subfolderWarn).toContain("[base-browser]");
+    expect(subfolderWarn).toContain("simulated network failure");
+
+    // Keyboards from the surviving subfolder (s) are still returned.
+    const ids = keyboards.map((k) => k.id);
+    expect(ids).toContain("sil_euro_latin");
+    expect(ids).toContain("sil_devanagari_phonetic");
+    // Only two keyboards came from API tree entries (both from subfolder s);
+    // the offline bundle may pad the list but no extra API keyboards are added.
+    const apiIds = ids.filter(
+      (id) => id === "sil_euro_latin" || id === "sil_devanagari_phonetic"
+    );
+    expect(apiIds).toHaveLength(2);
+  });
 });

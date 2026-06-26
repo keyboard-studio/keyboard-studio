@@ -75,7 +75,7 @@ async function collectReleaseTreeItems(
  * (`release/<group>/`) via non-recursive tree reads, then recursively fetch
  * each subfolder's (bounded) subtree. Subtree entry paths are relative to the
  * subfolder root, so they are re-prefixed to full `release/<group>/…` paths.
- * Per-subfolder failures are skipped rather than aborting the whole listing.
+ * Per-subfolder failures are warned and skipped rather than aborting the whole listing.
  */
 async function collectReleaseItemsIncrementally(
   clientOpts: GithubClientOptions
@@ -94,7 +94,13 @@ async function collectReleaseItemsIncrementally(
       let sub: GitTree;
       try {
         sub = await fetchTree(OWNER, REPO, group.sha, clientOpts, true);
-      } catch {
+      } catch (err) {
+        console.warn(
+          "[base-browser] failed to list release/" +
+            group.path +
+            "/; skipping (its keyboards will be missing from the gallery): " +
+            (err instanceof Error ? err.message : String(err))
+        );
         return [];
       }
       return sub.tree.map((item) => ({
