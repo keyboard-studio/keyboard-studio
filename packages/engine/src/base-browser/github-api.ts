@@ -46,23 +46,48 @@ function buildApiHeaders(token?: string): Record<string, string> {
 }
 
 /**
- * Fetch the recursive git tree for `ref` in one round trip.
- * Returns `truncated: true` when the tree exceeds the GitHub 100k-entry limit.
+ * Fetch a single git tree by ref or tree SHA.
+ *
+ * With `recursive: false` (default) returns just that tree's immediate
+ * children — used to walk `release/` one level at a time. With
+ * `recursive: true` returns the whole subtree in one round trip; for a
+ * subtree SHA the entry `path`s are RELATIVE to that subtree root.
+ *
+ * Either form sets `truncated: true` when the result exceeds the GitHub
+ * 100k-entry / 7 MB limit.
  *
  * @see https://docs.github.com/en/rest/git/trees#get-a-tree
  */
-export async function fetchRecursiveTree(
+export async function fetchTree(
   owner: string,
   repo: string,
-  ref: string,
-  options: GithubClientOptions
+  treeIsh: string,
+  options: GithubClientOptions,
+  recursive = false
 ): Promise<GitTree> {
-  const url = `https://api.github.com/repos/${owner}/${repo}/git/trees/${ref}?recursive=1`;
+  const url = `https://api.github.com/repos/${owner}/${repo}/git/trees/${treeIsh}${
+    recursive ? "?recursive=1" : ""
+  }`;
   const res = await options.fetch(url, { headers: buildApiHeaders(options.token) });
   if (!res.ok) {
     throw new Error(`GitHub Trees API ${res.status}: ${res.statusText}`);
   }
   return res.json() as Promise<GitTree>;
+}
+
+/**
+ * Fetch the recursive git tree for `ref` in one round trip.
+ * Returns `truncated: true` when the tree exceeds the GitHub 100k-entry limit.
+ *
+ * @see https://docs.github.com/en/rest/git/trees#get-a-tree
+ */
+export function fetchRecursiveTree(
+  owner: string,
+  repo: string,
+  ref: string,
+  options: GithubClientOptions
+): Promise<GitTree> {
+  return fetchTree(owner, repo, ref, options, true);
 }
 
 /**

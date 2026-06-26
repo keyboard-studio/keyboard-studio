@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { createBaseBrowser } from "./base-browser.js";
 import type { FetchFn } from "./github-api.js";
 import treeFixture from "./__fixtures__/tree-response.json";
@@ -117,10 +117,74 @@ function createFixtureFetch(): FetchFn {
 }
 
 // ---------------------------------------------------------------------------
+// Truncated-tree mock — drives the incremental per-subfolder fallback (#449).
+// The recursive root fetch reports truncated:true with no entries; the walker
+// then reads release/ non-recursively and each letter-subtree recursively.
+// Subtree paths are RELATIVE to the subfolder root (no release/<letter>/ prefix).
+// ---------------------------------------------------------------------------
+
+const TREES_BASE = "https://api.github.com/repos/keymanapp/keyboards/git/trees";
+
+function treeItem(path: string, type: "blob" | "tree", sha: string) {
+  return { path, mode: type === "tree" ? "040000" : "100644", type, sha, url: "" };
+}
+
+function jsonOk(body: unknown) {
+  return { ok: true, status: 200, statusText: "OK", json: async () => body, text: async () => JSON.stringify(body) };
+}
+
+function createTruncatedFetch(): FetchFn {
+  return async (url) => {
+    // Recursive root → truncated, no entries (forces the incremental fallback).
+    if (url === `${TREES_BASE}/master?recursive=1`) {
+      return jsonOk({ sha: "rootsha", url: "", truncated: true, tree: [] });
+    }
+    // Non-recursive root → the release/ subtree.
+    if (url === `${TREES_BASE}/master`) {
+      return jsonOk({ sha: "rootsha", url: "", truncated: false, tree: [treeItem("release", "tree", "relsha")] });
+    }
+    // release/ → letter subfolders.
+    if (url === `${TREES_BASE}/relsha`) {
+      return jsonOk({
+        sha: "relsha", url: "", truncated: false,
+        tree: [treeItem("b", "tree", "bsha"), treeItem("s", "tree", "ssha")],
+      });
+    }
+    // release/b recursively (paths relative to the subfolder root).
+    if (url === `${TREES_BASE}/bsha?recursive=1`) {
+      return jsonOk({
+        sha: "bsha", url: "", truncated: false,
+        tree: [treeItem("basic_kbdus/basic_kbdus.kps", "blob", "k1")],
+      });
+    }
+    // release/s recursively.
+    if (url === `${TREES_BASE}/ssha?recursive=1`) {
+      return jsonOk({
+        sha: "ssha", url: "", truncated: false,
+        tree: [
+          treeItem("sil_euro_latin/sil_euro_latin.kps", "blob", "k2"),
+          treeItem("sil_devanagari_phonetic/sil_devanagari_phonetic.kps", "blob", "k3"),
+        ],
+      });
+    }
+    // Raw .kps fetches reuse the shared KPS fixtures.
+    if (url.startsWith(RAW_BASE + "/")) {
+      const body = KPS_RESPONSES[url.slice(RAW_BASE.length + 1)];
+      if (body !== undefined) return { ok: true, status: 200, statusText: "OK", json: async () => ({}), text: async () => body };
+    }
+    return { ok: false, status: 404, statusText: "Not Found", json: async () => ({}), text: async () => "" };
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 describe("createBaseBrowser", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("listAll returns keyboards from API, sorted by id ascending", async () => {
     const service = createBaseBrowser({ fetch: createFixtureFetch() });
     const keyboards = await service.listAll();
@@ -327,5 +391,82 @@ describe("createBaseBrowser", () => {
 
     const treeHeaders = capturedHeaders[0];
     expect(treeHeaders?.["Authorization"]).toBeUndefined();
+  });
+
+  // -------------------------------------------------------------------------
+  // Truncated recursive tree → warn + incremental per-subfolder walk (#449)
+  // -------------------------------------------------------------------------
+
+  it("warns and reassembles the full listing incrementally when the recursive tree is truncated", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const service = createBaseBrowser({ fetch: createTruncatedFetch() });
+    const keyboards = await service.listAll();
+
+    // All three keyboards are recovered via the per-subfolder walk — NOT a
+    // silent partial list (the recursive tree came back empty + truncated).
+    const ids = keyboards.map((k) => k.id);
+    expect(ids).toContain("basic_kbdus");
+    expect(ids).toContain("sil_euro_latin");
+    expect(ids).toContain("sil_devanagari_phonetic");
+
+    // Full repo paths are reconstructed from the relative subtree paths.
+    expect(keyboards.find((k) => k.id === "sil_euro_latin")?.path).toBe(
+      "release/s/sil_euro_latin"
+    );
+
+    // A truncation warning was surfaced (not silently swallowed).
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toContain("recursive-tree limit");
+  });
+
+  it("warning suggests a token only when none is configured", async () => {
+    const withToken = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await createBaseBrowser({ fetch: createTruncatedFetch(), token: "ghp_x" }).listAll();
+    expect(String(withToken.mock.calls[0]?.[0])).not.toContain("token");
+    withToken.mockRestore();
+
+    const noToken = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await createBaseBrowser({ fetch: createTruncatedFetch() }).listAll();
+    expect(String(noToken.mock.calls[0]?.[0])).toContain("token");
+  });
+
+  it("does not warn on the non-truncated fast path", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await createBaseBrowser({ fetch: createFixtureFetch() }).listAll();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("warns when a per-subfolder fetch fails and still returns keyboards from the other subfolders", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // Build on createTruncatedFetch but make the release/b subfolder reject.
+    const baseFetch = createTruncatedFetch();
+    const faultingFetch: FetchFn = async (url, init) => {
+      if (url === `${TREES_BASE}/bsha?recursive=1`) {
+        throw new Error("simulated network failure");
+      }
+      return baseFetch(url, init);
+    };
+
+    const service = createBaseBrowser({ fetch: faultingFetch });
+    const keyboards = await service.listAll();
+
+    // A warn was emitted for the failing subfolder (b), naming it.
+    const warnMessages = warn.mock.calls.map((c) => String(c[0]));
+    const subfolderWarn = warnMessages.find((m) => m.includes("release/b/"));
+    expect(subfolderWarn).toBeDefined();
+    expect(subfolderWarn).toContain("[base-browser]");
+    expect(subfolderWarn).toContain("simulated network failure");
+
+    // Keyboards from the surviving subfolder (s) are still returned.
+    const ids = keyboards.map((k) => k.id);
+    expect(ids).toContain("sil_euro_latin");
+    expect(ids).toContain("sil_devanagari_phonetic");
+    // Only two keyboards came from API tree entries (both from subfolder s);
+    // the offline bundle may pad the list but no extra API keyboards are added.
+    const apiIds = ids.filter(
+      (id) => id === "sil_euro_latin" || id === "sil_devanagari_phonetic"
+    );
+    expect(apiIds).toHaveLength(2);
   });
 });
