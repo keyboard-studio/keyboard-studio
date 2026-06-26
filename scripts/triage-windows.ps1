@@ -138,6 +138,14 @@ for ($i = 1; $i -le $maxIterations; $i++) {
 
   "[km-triage] $sweepId starting" | Tee-Object -FilePath $log -Append | Write-Host
 
+  # Worktree-isolation baseline: snapshot main tree state before touching any PR.
+  # Re-asserted after every fix-mode claude call; mismatch aborts the sweep.
+  # NOTE: this is separate from the pre-pull $dirty check at line ~124 above.
+  # Wrap in @(...) so empty or single-line output is always an array; snapshot
+  # and post-check must use identical capture so a clean tree compares equal.
+  $mainPorcelainSnapshot = [string]::Join("`n", @(git status --porcelain=v1 --untracked-files=all))
+  $mainHeadSnapshot      = (git rev-parse HEAD).Trim()
+
   # ── Discover all open PRs (one API call per iteration) ──────────────────
 
   # commits is omitted here — it blows the GraphQL node limit at --limit 50.
@@ -346,6 +354,42 @@ Please rebase against ``main`` first; the next sweep will run the full review cr
     } finally {
       if ($null -eq $savedClaudeCode) { Remove-Item Env:\CLAUDECODE -ErrorAction SilentlyContinue }
       else { $env:CLAUDECODE = $savedClaudeCode }
+    }
+
+    # ── Worktree-isolation post-condition ──────────────────────────────────────
+    # Assert km-programmer did not leak files into the main working tree.
+    $postHead = (git rev-parse HEAD).Trim()
+    if ($postHead -ne $mainHeadSnapshot) {
+      $msg = "[CRITICAL] worktree isolation breach on PR #$num - HEAD moved in main tree ($mainHeadSnapshot -> $postHead)"
+      $msg | Tee-Object -FilePath $log -Append | Write-Host
+      Write-Error $msg
+      $ts = Get-Ts
+      Add-Content -Path $auditLog -Value (
+        '{"ts":"{0}","action_taken":"isolation_breach_head","pr":{1},"old_sha":"{2}","new_sha":"{3}"}' -f $ts, $num, $mainHeadSnapshot, $postHead
+      )
+      Add-Content -Path "$stateDir\INBOX.md" -Value (
+        "## [CRITICAL] Isolation breach on PR #$num - HEAD moved`n$mainHeadSnapshot -> $postHead"
+      )
+      break
+    }
+    # Snapshot and post must use identical capture so a clean tree compares equal.
+    $postPorcelain = [string]::Join("`n", @(git status --porcelain=v1 --untracked-files=all))
+    if ($postPorcelain -ne $mainPorcelainSnapshot) {
+      $msg = "[CRITICAL] worktree isolation breach on PR #$num - main tree contaminated (stray index/untracked files)"
+      $msg | Tee-Object -FilePath $log -Append | Write-Host
+      Write-Error $msg
+      $ts = Get-Ts
+      Add-Content -Path $auditLog -Value (
+        '{"ts":"{0}","action_taken":"isolation_breach_porcelain","pr":{1}}' -f $ts, $num
+      )
+      # Produce a +/- line-level diff matching the Linux output shape.
+      $diffLines = Compare-Object ($mainPorcelainSnapshot -split "`n") ($postPorcelain -split "`n") |
+        ForEach-Object { if ($_.SideIndicator -eq '=>') { "+$($_.InputObject)" } else { "-$($_.InputObject)" } }
+      Add-Content -Path "$stateDir\INBOX.md" -Value (
+        "## [CRITICAL] Isolation breach on PR #$num - working tree contaminated`nDiff:`n" +
+        ($diffLines -join "`n")
+      )
+      break
     }
   }
 

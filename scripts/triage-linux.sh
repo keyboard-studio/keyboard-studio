@@ -236,6 +236,11 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
 
   echo "[km-triage] $SWEEP_ID starting" | tee -a "$LOG"
 
+  # Worktree-isolation baseline: snapshot main tree state before touching any PR.
+  # Re-asserted after every fix-mode claude call; mismatch aborts the sweep.
+  MAIN_PORCELAIN_SNAPSHOT="$(git status --porcelain=v1 --untracked-files=all)"
+  MAIN_HEAD_SNAPSHOT="$(git rev-parse HEAD)"
+
   # ── Discover all open PRs (one API call per iteration) ────────────────────
 
   # commits is omitted here — it blows the GraphQL node limit at --limit 50.
@@ -445,6 +450,37 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     set -e
     if [[ "$CLAUDE_EXIT" -ne 0 ]]; then
       echo "  [WARN] claude exited $CLAUDE_EXIT for PR #$NUM" | tee -a "$LOG"
+    fi
+
+    # ── Worktree-isolation post-condition ─────────────────────────────────────
+    # Assert that km-programmer (if it ran in fix mode) did not leak files into
+    # the main working tree. Check HEAD SHA and porcelain state independently.
+    POST_HEAD="$(git rev-parse HEAD)"
+    if [[ "$POST_HEAD" != "$MAIN_HEAD_SNAPSHOT" ]]; then
+      echo "[CRITICAL] worktree isolation breach on PR #$NUM — HEAD moved in main tree ($MAIN_HEAD_SNAPSHOT -> $POST_HEAD)" >&2
+      printf '[CRITICAL] worktree isolation breach on PR #%s — HEAD moved in main tree (%s -> %s)\n' \
+        "$NUM" "$MAIN_HEAD_SNAPSHOT" "$POST_HEAD" | tee -a "$LOG"
+      printf '{"ts":"%s","action_taken":"isolation_breach_head","pr":%s,"old_sha":"%s","new_sha":"%s"}\n' \
+        "$(ts)" "$NUM" "$MAIN_HEAD_SNAPSHOT" "$POST_HEAD" >> "$AUDIT_LOG"
+      {
+        printf '## [CRITICAL] Isolation breach on PR #%s — HEAD moved\n' "$NUM"
+        printf '%s -> %s\n' "$MAIN_HEAD_SNAPSHOT" "$POST_HEAD"
+      } >> "$STATE_DIR/INBOX.md"
+      break
+    fi
+    POST_PORCELAIN="$(git status --porcelain=v1 --untracked-files=all)"
+    if [[ "$POST_PORCELAIN" != "$MAIN_PORCELAIN_SNAPSHOT" ]]; then
+      echo "[CRITICAL] worktree isolation breach on PR #$NUM — main tree contaminated (stray index/untracked files)" >&2
+      printf '[CRITICAL] worktree isolation breach on PR #%s — main tree contaminated\n' "$NUM" | tee -a "$LOG"
+      printf '{"ts":"%s","action_taken":"isolation_breach_porcelain","pr":%s}\n' \
+        "$(ts)" "$NUM" >> "$AUDIT_LOG"
+      {
+        printf '## [CRITICAL] Isolation breach on PR #%s — working tree contaminated\n' "$NUM"
+        printf 'Diff:\n'
+        diff <(echo "$MAIN_PORCELAIN_SNAPSHOT") <(echo "$POST_PORCELAIN") | grep '^[<>]' \
+          | sed 's/^< /-/; s/^> /+/' || true
+      } >> "$STATE_DIR/INBOX.md"
+      break
     fi
 
   done 3< <(echo "$PRS_JSON" | jq -c '.[]')

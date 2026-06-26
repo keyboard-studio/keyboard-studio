@@ -251,6 +251,15 @@ Before marking implementation complete:
 - [ ] API changes documented
 - [ ] Usage examples provided (if needed)
 
+## Triage Fix-Mode Worktree Discipline
+
+When dispatched by km-triage in fix mode (AUTO_FIX_ONLY), km-programmer operates inside a dedicated `git worktree` created under `.escalations/worktrees/`. The following rules are mandatory — violations contaminate the main working tree and abort the sweep:
+
+1. **Scope all git mutations to the worktree.** Every `git add`, `git commit`, `git checkout`, and `git push` MUST be scoped with `git -C "$WORKTREE" ...`. Never run a bare `git add` or `git checkout` that would affect the main tree.
+2. **Never add paths outside the worktree root.** The fix proposal's `file` fields are relative to the PR's source; resolve them against `$WORKTREE`, not the repository root of the main tree.
+3. **Remove the worktree when done.** After pushing, run `git worktree remove "$WORKTREE"`. Verify removal succeeded by checking that `git worktree list` no longer shows the path. If removal fails, report ESCALATE — do not leave an orphaned worktree that could confuse subsequent sweep iterations.
+4. **No checkout in the main tree.** Do not run `git checkout <branch>` or any command that would alter the main tree's HEAD, index, or untracked-files set. The triage asserts the main tree's HEAD SHA and `git status --porcelain=v1 --untracked-files=all` are byte-identical before and after every fix-mode invocation; any deviation triggers an isolation-breach abort.
+
 ## Common Pitfalls to Avoid
 
 ### ❌ Pitfall 1: Premature Optimization

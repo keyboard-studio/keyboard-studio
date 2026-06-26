@@ -101,7 +101,7 @@ You are an advisor, a router, and a mechanical fixer — but never a merger and 
 - **Head SHA unchanged since Phase 2.** Before push, re-fetch the current head SHA and assert it equals the snapshot from Phase 2. If the author force-pushed (or another sweep raced this one) during the review window, abort with reason `head_moved_during_fix`. Pushing fixes computed against code that's no longer at HEAD would silently bypass review.
 - **Still mergeable.** Re-fetch `mergeable_state` immediately before push; if `dirty` (CONFLICTING), reroute to MENTION_ONLY with reason `became_conflicting_during_review`. Phase 2's earlier CONFLICTING gate may pass a PR whose mergeability degrades during the review window — this re-check catches it.
 - **Still not a draft.** Re-fetch `.draft` immediately before push (the same `gh api .../pulls/<NUM>` call that returns the head SHA and `mergeable_state`); if the PR went to draft during the review window, abort with reason `became_draft_during_review` and skip the push (and the comment). The triage never commits to a draft PR. Phase 2's earlier draft gate may pass a PR the author later pulls back to draft — this re-check catches it.
-- **Worktree-isolated execution.** km-programmer applies auto-fixes inside a fresh `git worktree add` under `.escalations/worktrees/` and pushes from there. It NEVER `git checkout`s in the triage's main working tree, because doing so would swap the in-tree definitions of `.claude/agents/`, `.claude/commands/`, fixtures, etc. and contaminate every subsequent PR in the same sweep. The triage asserts the main working tree's HEAD is unchanged after km-programmer returns.
+- **Worktree-isolated execution.** km-programmer applies auto-fixes inside a fresh `git worktree add` under `.escalations/worktrees/` and pushes from there. It NEVER `git checkout`s in the triage's main working tree, because doing so would swap the in-tree definitions of `.claude/agents/`, `.claude/commands/`, fixtures, etc. and contaminate every subsequent PR in the same sweep. The triage asserts BOTH that the main working tree's HEAD SHA is unchanged AND that its index/untracked-files set (as captured by `git status --porcelain=v1 --untracked-files=all`) is byte-identical after km-programmer returns. Either mismatch aborts the sweep immediately.
 
 Pushing a fresh commit that violates any of the above is exactly the kind of "make it go away" shortcut the policy forbids — when in doubt, MENTION_ONLY and let the lead decide.
 
@@ -266,6 +266,12 @@ Before touching any PR:
 ```bash
 mkdir -p .escalations/runs .escalations/diffs .escalations/worktrees
 test -f .escalations/audit-log.jsonl || : > .escalations/audit-log.jsonl
+
+# Worktree-isolation baseline: snapshot the main tree state before any PR is
+# touched. Both values are re-asserted after every km-programmer fix-mode call
+# (AUTO_FIX_ONLY step 11). Either mismatch aborts the entire sweep.
+SWEEP_START_HEAD=$(git rev-parse HEAD)
+SWEEP_START_PORCELAIN=$(git status --porcelain=v1 --untracked-files=all)
 
 # Triage labels: create once per repo lifetime, guarded by a sentinel file.
 # Bump the sentinel suffix whenever a label is added so existing installs
@@ -996,7 +1002,13 @@ Procedure (worktree-isolated — NEVER mutates the triage's own working tree):
      git -C "$WORKTREE" push "https://x-access-token:$(node utilities/km-triage-app/mint-token.js)@github.com/keyboard-studio/keyboard-studio.git" "HEAD:<HEAD>"
 10. Clean up the worktree:
      git worktree remove "$WORKTREE"
-11. Post-condition (the triage runs this after km-programmer returns): verify the triage's main working-tree HEAD equals the SHA recorded at sweep start. If it changed, print a critical error to stderr ("PR #<NUM> auto-fix appears to have bypassed worktree isolation — sweep aborted"), record it in the audit log, and stop the entire sweep until investigated.
+11. Post-condition (the triage runs this after km-programmer returns): assert BOTH of the following against the values recorded at sweep start.
+
+    a. **HEAD SHA unchanged.** `git rev-parse HEAD` must equal the sweep-start HEAD SHA. If it differs: print `[CRITICAL] PR #<NUM> auto-fix appears to have bypassed worktree isolation — HEAD moved in main tree — sweep aborted` to stderr, record `action_taken: isolation_breach_head` in the audit log, append a critical note to `.escalations/INBOX.md` (format: `## [CRITICAL] Isolation breach on PR #<NUM> — HEAD moved\n<old SHA> -> <new SHA>`), and stop the entire sweep — do not continue to the next PR.
+
+    b. **Porcelain/index/untracked set unchanged.** `git status --porcelain=v1 --untracked-files=all` must be byte-identical to the snapshot taken at sweep start. If it differs: print `[CRITICAL] PR #<NUM> auto-fix leaked stray index/untracked files into the main working tree — sweep aborted` to stderr, record `action_taken: isolation_breach_porcelain` in the audit log, append a critical note to `.escalations/INBOX.md` (format: `## [CRITICAL] Isolation breach on PR #<NUM> — working tree contaminated\nDiff:\n<lines that differ, prefixed with + or ->`) and stop the entire sweep — do not continue to the next PR.
+
+    Both checks must pass. A clean main tree (nothing staged, no untracked files) has an empty porcelain output — that is the expected baseline for a scheduled sweep.
 12. Return a verdict block:
 
 ```verdict
