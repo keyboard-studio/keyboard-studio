@@ -1,5 +1,6 @@
 import type {
   KeyboardIR,
+  IRGroup,
   IRRule,
   Pattern,
 } from "@keyboard-studio/contracts";
@@ -111,102 +112,122 @@ function buildPattern(match: MatchResult): Pattern {
   });
 }
 
+// Index trigger rules (output = single deadkey) by deadkey id, from every
+// non-deadkeys group.
+function buildTriggerIndex(ir: KeyboardIR): Map<number, IRRule[]> {
+  const triggersByDkId = new Map<number, IRRule[]>();
+  for (const group of ir.groups) {
+    if (group.name === "deadkeys") continue;
+    for (const rule of group.rules) {
+      if (!isTrigger(rule)) continue;
+      const out = rule.output[0];
+      if (out === undefined || out.kind !== "deadkey") continue;
+      const existing = triggersByDkId.get(out.id) ?? [];
+      existing.push(rule);
+      triggersByDkId.set(out.id, existing);
+    }
+  }
+  return triggersByDkId;
+}
+
+// Index body rules by deadkey id (first body wins per id).
+function buildBodyIndex(deadkeysGroup: IRGroup): Map<number, IRRule> {
+  const bodyByDkId = new Map<number, IRRule>();
+  for (const rule of deadkeysGroup.rules) {
+    if (!isBody(rule)) continue;
+    const c0 = rule.context[0];
+    if (c0 === undefined || c0.kind !== "deadkey") continue;
+    if (!bodyByDkId.has(c0.id)) bodyByDkId.set(c0.id, rule);
+  }
+  return bodyByDkId;
+}
+
+// Index fallback rules by deadkey id, for the deadkey ids that have a body.
+function buildFallbackIndex(
+  deadkeysGroup: IRGroup,
+  bodyByDkId: Map<number, IRRule>,
+): Map<number, IRRule[]> {
+  const fallbacksByDkId = new Map<number, IRRule[]>();
+  for (const dkId of bodyByDkId.keys()) {
+    const fallbacks = deadkeysGroup.rules.filter((r) => isFallback(r, dkId));
+    if (fallbacks.length > 0) fallbacksByDkId.set(dkId, fallbacks);
+  }
+  return fallbacksByDkId;
+}
+
+// Assemble the MatchResult for one deadkey id, or null when the body's base/out
+// stores are missing or non-parallel (Layer A error per spec §10 Check #13).
+function buildMatchResult(
+  ir: KeyboardIR,
+  dkId: number,
+  triggers: IRRule[],
+  body: IRRule,
+  fallbacks: IRRule[],
+): MatchResult | null {
+  const c1 = body.context[1];
+  const outEl = body.output[0];
+  if (
+    c1 === undefined ||
+    c1.kind !== "any" ||
+    outEl === undefined ||
+    outEl.kind !== "index"
+  ) {
+    return null;
+  }
+
+  const baseStore = ir.stores.find((s) => s.name === c1.storeRef);
+  const outStore = ir.stores.find((s) => s.name === outEl.storeRef);
+  if (baseStore === undefined || outStore === undefined) return null;
+  if (baseStore.items.length !== outStore.items.length) return null;
+
+  const primaryTrigger = pickPrimaryTrigger(triggers);
+  const ownedNodes = [
+    ...triggers.map((r) => ruleRef(r.nodeId)),
+    ruleRef(body.nodeId),
+    ...fallbacks.map((r) => ruleRef(r.nodeId)),
+    storeRef(baseStore.nodeId),
+    storeRef(outStore.nodeId),
+  ];
+
+  return {
+    patternId: `deadkey-single-tap#${formatDkName(dkId)}`,
+    ownedNodes,
+    slotValues: {
+      triggerKey: triggerKeyName(primaryTrigger),
+      deadkeyName: formatDkName(dkId),
+      baseLetters: storeItemsToCharString(baseStore),
+      accentedForms: storeItemsToCharString(outStore),
+    },
+  };
+}
+
 export const s02Recognizer: RecognizerRule = {
   id: "s02-deadkey-single-tap",
   strategyId: "S-02",
 
+  // High-level orchestration: index triggers/bodies/fallbacks by deadkey id,
+  // then emit one MatchResult per deadkey id that has both a trigger and a body.
   match(ir: KeyboardIR): MatchResult[] {
-    // 1. Index trigger rules by deadkey id (from non-deadkeys groups).
-    const triggersByDkId = new Map<number, IRRule[]>();
-    for (const group of ir.groups) {
-      if (group.name === "deadkeys") continue;
-      for (const rule of group.rules) {
-        if (!isTrigger(rule)) continue;
-        const out = rule.output[0];
-        if (out === undefined || out.kind !== "deadkey") continue;
-        const existing = triggersByDkId.get(out.id) ?? [];
-        existing.push(rule);
-        triggersByDkId.set(out.id, existing);
-      }
-    }
-
-    // 2. Find the deadkeys group.
     const deadkeysGroup = ir.groups.find((g) => g.name === "deadkeys");
     if (deadkeysGroup === undefined) return [];
 
-    // 3. Index body rules by deadkey id.
-    const bodyByDkId = new Map<number, IRRule>();
-    for (const rule of deadkeysGroup.rules) {
-      if (!isBody(rule)) continue;
-      const c0 = rule.context[0];
-      if (c0 === undefined || c0.kind !== "deadkey") continue;
-      // First body wins per deadkey id.
-      if (!bodyByDkId.has(c0.id)) {
-        bodyByDkId.set(c0.id, rule);
-      }
-    }
+    const triggersByDkId = buildTriggerIndex(ir);
+    const bodyByDkId = buildBodyIndex(deadkeysGroup);
+    const fallbacksByDkId = buildFallbackIndex(deadkeysGroup, bodyByDkId);
 
-    // 4. Index fallback rules by deadkey id.
-    const fallbacksByDkId = new Map<number, IRRule[]>();
-    for (const dkId of bodyByDkId.keys()) {
-      const fallbacks = deadkeysGroup.rules.filter((r) => isFallback(r, dkId));
-      if (fallbacks.length > 0) {
-        fallbacksByDkId.set(dkId, fallbacks);
-      }
-    }
-
-    // 5. Build one MatchResult per deadkey id that has both triggers and a body.
     const results: MatchResult[] = [];
-
     for (const [dkId, triggers] of triggersByDkId.entries()) {
       const body = bodyByDkId.get(dkId);
       if (body === undefined) continue;
-
-      // Verify parallel stores.
-      const c1 = body.context[1];
-      const outEl = body.output[0];
-      if (
-        c1 === undefined ||
-        c1.kind !== "any" ||
-        outEl === undefined ||
-        outEl.kind !== "index"
-      ) {
-        continue;
-      }
-
-      const baseStoreName = c1.storeRef;
-      const outStoreName = outEl.storeRef;
-
-      const baseStore = ir.stores.find((s) => s.name === baseStoreName);
-      const outStore = ir.stores.find((s) => s.name === outStoreName);
-
-      if (baseStore === undefined || outStore === undefined) continue;
-      // Non-parallel stores: skip (Layer A error per spec §10 Check #13).
-      if (baseStore.items.length !== outStore.items.length) continue;
-
-      const fallbacks = fallbacksByDkId.get(dkId) ?? [];
-      const primaryTrigger = pickPrimaryTrigger(triggers);
-
-      const ownedNodes = [
-        ...triggers.map((r) => ruleRef(r.nodeId)),
-        ruleRef(body.nodeId),
-        ...fallbacks.map((r) => ruleRef(r.nodeId)),
-        storeRef(baseStore.nodeId),
-        storeRef(outStore.nodeId),
-      ];
-
-      results.push({
-        patternId: `deadkey-single-tap#${formatDkName(dkId)}`,
-        ownedNodes,
-        slotValues: {
-          triggerKey: triggerKeyName(primaryTrigger),
-          deadkeyName: formatDkName(dkId),
-          baseLetters: storeItemsToCharString(baseStore),
-          accentedForms: storeItemsToCharString(outStore),
-        },
-      });
+      const result = buildMatchResult(
+        ir,
+        dkId,
+        triggers,
+        body,
+        fallbacksByDkId.get(dkId) ?? [],
+      );
+      if (result !== null) results.push(result);
     }
-
     return results;
   },
 
