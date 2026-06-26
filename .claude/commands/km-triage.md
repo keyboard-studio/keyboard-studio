@@ -451,14 +451,99 @@ Procedure:
 5. If `review_range == "incremental"` AND the incremental diff is empty (no actual file changes, e.g. only merge commits with no content), skip this PR with reason `no_content_changes_since_last_review`. This is a secondary idempotency gate beyond Phase 2's head-sha check, catching cases where new commits don't actually change reviewable content.
 6. **Cache the diff to disk once for the whole crew.** Each specialist would otherwise re-run `gh pr diff` or `git diff` independently — for a BOTH-crew PR with no sign-offs, that's 6 redundant fetches of the same data. Fetch once now and write to a sweep-scoped path under `.escalations/diffs/`:
 
+   Before fetching, identify files to **exclude from the cached diff body** so that large generated artifacts do not corrupt line-number offsets in specialist findings (see PR #350 regression: `scan.ts` cited at line 13617 vs. real line 195 because `docs/import-corpus.json` inflated the unified diff). Two exclusion criteria:
+
+   ```bash
+   # -- Configurable known-generated set --
+   # Add committed generated outputs here whenever a new large artifact is introduced.
+   KNOWN_GENERATED=(
+     "docs/import-corpus.json"
+     "docs/import-corpus.md"
+   )
+
+   # -- Per-file size threshold (changed lines = added + deleted from --numstat) --
+   # Any file whose diff exceeds this threshold is excluded even if not in the known set.
+   OVERSIZED_THRESHOLD=2000
+   ```
+
+   Build the exclusion list dynamically using `git diff --numstat` on the relevant range, then produce the cached diff and file list:
+
    ```bash
    DIFF_PATH=.escalations/diffs/<NUM>-<CURRENT_HEAD_SHORT_SHA>.diff
    FILES_PATH=.escalations/diffs/<NUM>-<CURRENT_HEAD_SHORT_SHA>.files.json
+
    if [ "<RANGE>" = "full" ]; then
-     gh pr diff <NUM> > "$DIFF_PATH"
+     # Resolve base/head OIDs for the PR so we can use git pathspecs.
+     # gh pr diff does not accept pathspec exclusions; git diff does.
+     BASE_OID=$(gh pr view <NUM> --json baseRefOid --jq '.baseRefOid')
+     HEAD_OID=$(gh pr view <NUM> --json headRefOid --jq '.headRefOid')
+     git fetch --quiet origin "$BASE_OID" "$HEAD_OID" 2>/dev/null || true
+
+     # Compute oversized files from the full PR range.
+     EXCLUDE_PATHSPECS=()
+     EXCLUDED_LOG=()
+     while IFS=$'\t' read -r added deleted path; do
+       reason=""
+       # Binary files: git diff --numstat emits "-\t-\t<path>"; arithmetic on "-" is 0,
+       # which silently passes OVERSIZED_THRESHOLD. Catch them first.
+       if [ "$added" = "-" ] || [ "$deleted" = "-" ]; then
+         reason="binary"
+       else
+         total=$(( added + deleted ))
+         for gen in "${KNOWN_GENERATED[@]}"; do
+           [ "$path" = "$gen" ] && reason="generated" && break
+         done
+         [ -z "$reason" ] && [ "$total" -gt "$OVERSIZED_THRESHOLD" ] && reason="oversized: $total lines"
+       fi
+       if [ -n "$reason" ]; then
+         EXCLUDE_PATHSPECS+=(":(exclude)$path")
+         EXCLUDED_LOG+=("$path ($reason)")
+       fi
+     done < <(git diff --numstat "$BASE_OID"..."$HEAD_OID" 2>/dev/null)
+
+     # Log exclusions (required — no silent caps).
+     if [ "${#EXCLUDED_LOG[@]}" -gt 0 ]; then
+       echo "[km-triage] Pre-filter A excluded ${#EXCLUDED_LOG[@]} file(s) from cached diff: $(IFS=', '; echo "${EXCLUDED_LOG[*]}"). Files remain in <FILES_PATH>; spot-check via git show."
+       # Regression intent: on a PR like #350 (large committed generated file), findings must
+       # cite real file line numbers because the generated file body is no longer in the cached diff.
+     fi
+
+     git diff "$BASE_OID"..."$HEAD_OID" -- . "${EXCLUDE_PATHSPECS[@]}" > "$DIFF_PATH"
+     # Keep the FULL file list (do not exclude here — specialists must still see the file changed).
      gh pr view <NUM> --json files > "$FILES_PATH"
+
    else
-     git diff <LAST_AUDITED_SHA>..<CURRENT_HEAD_SHA> > "$DIFF_PATH"
+     # Incremental: compute oversized files over the incremental range.
+     EXCLUDE_PATHSPECS=()
+     EXCLUDED_LOG=()
+     while IFS=$'\t' read -r added deleted path; do
+       reason=""
+       # Binary files: git diff --numstat emits "-\t-\t<path>"; arithmetic on "-" is 0,
+       # which silently passes OVERSIZED_THRESHOLD. Catch them first.
+       if [ "$added" = "-" ] || [ "$deleted" = "-" ]; then
+         reason="binary"
+       else
+         total=$(( added + deleted ))
+         for gen in "${KNOWN_GENERATED[@]}"; do
+           [ "$path" = "$gen" ] && reason="generated" && break
+         done
+         [ -z "$reason" ] && [ "$total" -gt "$OVERSIZED_THRESHOLD" ] && reason="oversized: $total lines"
+       fi
+       if [ -n "$reason" ]; then
+         EXCLUDE_PATHSPECS+=(":(exclude)$path")
+         EXCLUDED_LOG+=("$path ($reason)")
+       fi
+     done < <(git diff --numstat <LAST_AUDITED_SHA>..<CURRENT_HEAD_SHA>)
+
+     # Log exclusions (required — no silent caps).
+     if [ "${#EXCLUDED_LOG[@]}" -gt 0 ]; then
+       echo "[km-triage] Pre-filter A excluded ${#EXCLUDED_LOG[@]} file(s) from cached diff: $(IFS=', '; echo "${EXCLUDED_LOG[*]}"). Files remain in <FILES_PATH>; spot-check via git show."
+       # Regression intent: on a PR like #350 (large committed generated file), findings must
+       # cite real file line numbers because the generated file body is no longer in the cached diff.
+     fi
+
+     git diff <LAST_AUDITED_SHA>..<CURRENT_HEAD_SHA> -- . "${EXCLUDE_PATHSPECS[@]}" > "$DIFF_PATH"
+     # Keep the FULL file list (do not exclude here — specialists must still see the file changed).
      git diff --name-status <LAST_AUDITED_SHA>..<CURRENT_HEAD_SHA> > "$FILES_PATH"
    fi
    ```
@@ -683,10 +768,23 @@ Read it from:
 File list (paths only) for this review range:
   <FILES_PATH>
 
+IMPORTANT — generated/oversized file exclusion: the cached diff at
+<DIFF_PATH> omits the diff bodies of any files identified as generated
+(see the KNOWN_GENERATED list in Pre-filter A, step 6) or oversized
+(exceeding the OVERSIZED_THRESHOLD). The [km-triage] log lines printed
+at diff-cache time name every excluded file and the reason. Those files
+still appear in <FILES_PATH> so you can see they changed. Line numbers
+in the cached diff map to real file offsets for the included files only.
+To review an excluded file, use:
+  git show <CURRENT_HEAD_SHA>:<path>
+  (incremental sweeps only) git diff <LAST_AUDITED_SHA>..<CURRENT_HEAD_SHA> -- <path>
+Do NOT cite line numbers from an excluded file's diff — the body is not
+in the cache; fetch it directly as above and cite real file line numbers.
+
 Do NOT re-run `gh pr diff` or `git diff` yourself — the cached files
-above contain the same data. If a file in the cached diff references
-context from outside the range that you need to read in full, fetch
-it with `git show <CURRENT_HEAD_SHA>:<path>`.
+above contain the same data for included files. If a file in the cached
+diff references context from outside the range that you need to read in
+full, fetch it with `git show <CURRENT_HEAD_SHA>:<path>`.
 
 <PREVIOUS_REVIEW_CONTEXT_BLOCK>
 
