@@ -50,6 +50,10 @@ export type {
 export { createOutputService, toZip, serializeToZip, createGitHubOutputService } from "./output/index.js";
 export type { GitHubOutputConfig, GitHubFetchFn } from "./output/index.js";
 
+// Option B (org-mediated PR) output service.
+export { createManagedPROutputService } from "./output/index.js";
+export type { ManagedPRFetchFn, ManagedPROutputConfig } from "./output/index.js";
+
 // Issue #233 — KeyboardIR codec public surface.
 export { parse as parseKmn, emit as emitKmn, parseKvks, parseTouchLayout, emitTouchLayout, OPAQUE_REASONS } from "./codec/index.js";
 export type { ParseResult, OpaqueReason } from "./codec/index.js";

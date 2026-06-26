@@ -110,3 +110,38 @@ export async function getGitHubOutputService(): Promise<GitHubOutputService> {
   gitHubOutputServiceCache = createGitHubOutputService();
   return gitHubOutputServiceCache;
 }
+
+// ManagedPROutputService (publishManagedPR — the org-mediated Option B path,
+// docs/github_flow.md "Option B"): when USE_REAL is false returns the mock
+// (which implements publishManagedPR against fixture data). When real, lazily
+// imports createManagedPROutputService from the engine, which POSTs to the
+// oauth-backend proxy. Cached after first construction.
+//
+// proxyEndpoint is resolved from VITE_OAUTH_BACKEND_URL (same config the OAuth
+// flow uses via getBackendUrl) + "/submit/managed-pr". Same-origin ("") is the
+// default so requests go to /submit/managed-pr on the page host (Vercel
+// co-located serverless function).
+type ManagedPROutputService = Pick<OutputService, "publishManagedPR">;
+let managedPROutputServiceCache: ManagedPROutputService | null = null;
+export async function getManagedPROutputService(): Promise<ManagedPROutputService> {
+  if (!USE_REAL) return mockOutputService;
+  if (managedPROutputServiceCache !== null) return managedPROutputServiceCache;
+  const { createManagedPROutputService } = await import(
+    /* @vite-ignore */ "@keyboard-studio/engine"
+  );
+  managedPROutputServiceCache = createManagedPROutputService();
+  return managedPROutputServiceCache;
+}
+
+/**
+ * The backend proxy URL for the Option B managed-PR submit endpoint.
+ *
+ * Reads from VITE_OAUTH_BACKEND_URL (same config the OAuth flow uses via
+ * getBackendUrl in lib/githubOAuth.ts). Defaults to same-origin ("") so
+ * requests hit /submit/managed-pr on the page's own host (Vercel co-located
+ * serverless function — see MEMORY deployment note). Not hard-coded.
+ */
+export function getManagedPRProxyEndpoint(): string {
+  const base = import.meta.env.VITE_OAUTH_BACKEND_URL ?? "";
+  return `${base}/submit/managed-pr`;
+}

@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { buildServer } from "./server.js";
-import type { OAuthFetchFn } from "./handlers.js";
+import type { GitHubPipelineFetchFn } from "./github-pipeline.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -17,11 +17,14 @@ import type { OAuthFetchFn } from "./handlers.js";
 const ALLOWED_ORIGIN = "http://localhost:5173";
 const DISALLOWED_ORIGIN = "https://evil.example.com";
 
-function stubFetch(response: object, ok = true): OAuthFetchFn {
+function stubFetch(response: object, ok = true): GitHubPipelineFetchFn {
   return async () => ({
     ok,
     status: ok ? 200 : 400,
+    statusText: ok ? "OK" : "Bad Request",
+    headers: { get: () => null },
     json: async () => response,
+    text: async () => JSON.stringify(response),
   });
 }
 
@@ -186,7 +189,8 @@ describe("POST /oauth/exchange — secret leakage", () => {
   });
 
   it("does not include client secret in error response body", async () => {
-    // Build a separate server wired with the error fetch
+    // Build a separate server wired with the error fetch; errorFetch already
+    // satisfies GitHubPipelineFetchFn via the updated stubFetch() helper.
     const errApp = await buildServer({
       clientId: "ci-client-id",
       clientSecret: "ci-client-secret-SHOULD-NEVER-APPEAR",
@@ -215,10 +219,13 @@ describe("POST /oauth/exchange — secret leakage", () => {
 
 describe("POST /oauth/exchange — upstream gateway errors", () => {
   it("returns 502 upstream_error when GitHub responds non-ok without error field", async () => {
-    const rateLimitFetch: OAuthFetchFn = async () => ({
+    const rateLimitFetch: GitHubPipelineFetchFn = async () => ({
       ok: false,
       status: 429,
+      statusText: "Too Many Requests",
+      headers: { get: () => null },
       json: async () => ({ message: "rate limited" }),
+      text: async () => '{"message":"rate limited"}',
     });
     const gatewayApp = await buildServer({
       clientId: "ci-client-id",
@@ -270,15 +277,18 @@ describe("POST /oauth/refresh — body validation", () => {
   });
 
   it("forwards a rotated refresh_token when GitHub returns one", async () => {
-    const rotationFetch: OAuthFetchFn = async () => ({
+    const rotationFetch: GitHubPipelineFetchFn = async () => ({
       ok: true,
       status: 200,
+      statusText: "OK",
+      headers: { get: () => null },
       json: async () => ({
         access_token: "gho_new_access",
         token_type: "bearer",
         scope: "public_repo",
         refresh_token: "ghr_new_rotated",
       }),
+      text: async () => "{}",
     });
     const rotationApp = await buildServer({
       clientId: "ci-client-id",
@@ -488,10 +498,13 @@ describe("POST /oauth/google/exchange — secret leakage", () => {
   });
 
   it("does not include Google client secret in error response", async () => {
-    const errFetch: OAuthFetchFn = async () => ({
+    const errFetch: GitHubPipelineFetchFn = async () => ({
       ok: false,
       status: 400,
+      statusText: "Bad Request",
+      headers: { get: () => null },
       json: async () => ({ error: "invalid_grant" }),
+      text: async () => '{"error":"invalid_grant"}',
     });
     const secretErrApp = await buildServer({
       clientId: "ci-client-id",
@@ -578,20 +591,31 @@ describe("POST /oauth/google/exchange — CORS parity", () => {
 const ORG_TOKEN = "gho_ORG_TOKEN_SHOULD_NEVER_APPEAR";
 const ORG_LOGIN = "keyboard-studio-bot";
 
+/** Build a minimal pipeline-compatible ok response. */
+function pipelineOk(body: object, status = 200): Awaited<ReturnType<GitHubPipelineFetchFn>> {
+  return {
+    ok: true,
+    status,
+    statusText: "OK",
+    headers: { get: () => null },
+    json: async () => body,
+    text: async () => JSON.stringify(body),
+  };
+}
+
 /** Multi-call fetch stub that walks the managed-PR pipeline happy path. */
-const managedPipelineFetch: OAuthFetchFn = async (url, init) => {
+const managedPipelineFetch: GitHubPipelineFetchFn = async (url, init) => {
   const method = init?.method ?? "GET";
-  const ok = (body: object, status = 200) => ({ ok: true, status, json: async () => body });
-  if (url.endsWith("/forks") && method === "POST") return ok({}, 202);
-  if (url.includes("/git/ref/heads/master")) return ok({ object: { sha: "masterSha" } });
-  if (url.includes("/git/commits/masterSha")) return ok({ tree: { sha: "treeSha" } });
-  if (url.endsWith("/git/trees") && method === "POST") return ok({ sha: "newTree" });
+  if (url.endsWith("/forks") && method === "POST") return pipelineOk({}, 202);
+  if (url.includes("/git/ref/heads/master")) return pipelineOk({ object: { sha: "masterSha" } });
+  if (url.includes("/git/commits/masterSha")) return pipelineOk({ tree: { sha: "treeSha" } });
+  if (url.endsWith("/git/trees") && method === "POST") return pipelineOk({ sha: "newTree" });
   if (url.endsWith("/git/commits") && method === "POST")
-    return ok({ sha: "abc1234000000000000000000000000000000000" });
-  if (url.endsWith("/git/refs") && method === "POST") return ok({ ref: "ok" }, 201);
+    return pipelineOk({ sha: "abc1234000000000000000000000000000000000" });
+  if (url.endsWith("/git/refs") && method === "POST") return pipelineOk({ ref: "ok" }, 201);
   if (url.endsWith("/pulls") && method === "POST")
-    return ok({ html_url: "https://github.com/keymanapp/keyboards/pull/77" }, 201);
-  return ok({ full_name: `${ORG_LOGIN}/keyboards` }); // fork-exists GET
+    return pipelineOk({ html_url: "https://github.com/keymanapp/keyboards/pull/77" }, 201);
+  return pipelineOk({ full_name: `${ORG_LOGIN}/keyboards` }); // fork-exists GET
 };
 
 function validManagedBody(overrides: Record<string, unknown> = {}) {
@@ -605,7 +629,7 @@ function validManagedBody(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function buildManagedServer(fetchFn: OAuthFetchFn = managedPipelineFetch) {
+async function buildManagedServer(fetchFn: GitHubPipelineFetchFn = managedPipelineFetch) {
   const srv = await buildServer({
     clientId: "ci-client-id",
     clientSecret: "ci-client-secret",
@@ -736,7 +760,14 @@ describe("POST /submit/managed-pr — org token never leaks", () => {
   });
 
   it("is absent from an error (502) response body", async () => {
-    const failFetch: OAuthFetchFn = async () => ({ ok: false, status: 401, json: async () => ({}) });
+    const failFetch: GitHubPipelineFetchFn = async () => ({
+      ok: false,
+      status: 401,
+      statusText: "Unauthorized",
+      headers: { get: () => null },
+      json: async () => ({}),
+      text: async () => "{}",
+    });
     const mApp = await buildManagedServer(failFetch);
     const res = await mApp.inject({
       method: "POST",
@@ -749,9 +780,18 @@ describe("POST /submit/managed-pr — org token never leaks", () => {
     await mApp.close();
   });
 
-  it("sets Retry-After and maps a 429 to rate_limited", async () => {
-    const rateFetch: OAuthFetchFn = async (url, init) => {
-      if (url.includes("/git/ref/heads/master")) return { ok: false, status: 429, json: async () => ({}) };
+  it("sets Retry-After header and maps a 429 to rate_limited with retryAfterSeconds from header", async () => {
+    const rateFetch: GitHubPipelineFetchFn = async (url, init) => {
+      if (url.includes("/git/ref/heads/master")) {
+        return {
+          ok: false,
+          status: 429,
+          statusText: "Too Many Requests",
+          headers: { get: (name: string) => (name.toLowerCase() === "retry-after" ? "120" : null) },
+          json: async () => ({}),
+          text: async () => "{}",
+        };
+      }
       return managedPipelineFetch(url, init);
     };
     const mApp = await buildManagedServer(rateFetch);
@@ -761,7 +801,7 @@ describe("POST /submit/managed-pr — org token never leaks", () => {
       payload: validManagedBody(),
     });
     expect(res.statusCode).toBe(429);
-    expect(res.headers["retry-after"]).toBeDefined();
+    expect(res.headers["retry-after"]).toBe("120");
     await mApp.close();
   });
 });

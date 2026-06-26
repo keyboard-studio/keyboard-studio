@@ -133,7 +133,7 @@ exactly.
 
 > Keep this section up to date as work lands. Update it whenever a delivery
 > option moves from "not started" to "in progress" or "done".
-> Last updated: 2026-06-25
+> Last updated: 2026-06-26
 
 ### Pipeline prerequisites (must exist before any delivery option works)
 
@@ -175,18 +175,18 @@ exactly.
 
 | Step | Status | Notes |
 |---|---|---|
-| Contract extension (`publishManagedPR`) | **Done** | `packages/contracts/src/outputService.ts` — `publishManagedPR()`, `PublishManagedPROptions`, `ManagedPRAttribution`, and a distinct `PublishManagedPRError` union (no `auth`/`scope`: the user holds no token here) |
+| Contract extension (`publishManagedPR`) | **Done** | `packages/contracts/src/outputService.ts` — `PublishManagedPR*` types + method |
 | Engine client (`createManagedPROutputService`) | **Done** | `packages/engine/src/output/managed-pr.ts` — filters VFS to source files (SS1, reuses `isSourceFile`), POSTs to the proxy, maps HTTP status → `PublishManagedPRError`; 13 vitest specs |
-| Backend pipeline + route (`POST /submit/managed-pr`) | **Done (code) / deploy pending** | `utilities/oauth-backend/src/github-pipeline.ts` + `managed-pr-schemas.ts`; org-token fork→tree→commit→branch→draft-PR; raised `bodyLimit`; 35+ vitest specs (schema rejection, token-never-leaks, CORS, error mapping, stateless) |
-| Attribution (Co-authored-by) commit format | **Done** | `buildCommitMessage()` in `github-pipeline.ts` — org committer + `Co-authored-by: <name> <email>` trailer |
+| Backend pipeline + route (`POST /submit/managed-pr`) | **Done (code) / deploy pending** | `utilities/oauth-backend/` POST /submit/managed-pr + `github-pipeline.ts` (vendored); org token from env `KEYBOARD_STUDIO_ORG_TOKEN`/`GITHUB_ORG_TOKEN`, fork owner from env; 106 vitest specs; real org account + deploy still pending infra |
+| Attribution (Co-authored-by) commit format | **Done** | `Co-authored-by` trailer + `[<keyboardId>]` PR title normalisation + PR-body provenance block naming the human author (name+email) for maintainer reachability — keymanapp upstream parity; `github-pipeline.ts` |
 | Branch-collision suffix (§5 Q1) | **Done** | `buildManagedBranchName()` — `add/<keyboardId>-<short7sha>`; content-unique, no `Date`/random |
-| Org bot identity + deploy (§5 Q3) | Not started | `GITHUB_ORG_TOKEN` / `GITHUB_ORG_LOGIN` unset → route returns `503`; org service-account + standing fork still to be provisioned (tracked with #550 deploy) |
-| Studio UI — attribution form + submit routing | Not started | Default submit action must collect displayName/email and call `publishManagedPR`. Gated on §5 Q7 (working copy must survive the OAuth redirect — currently the in-memory zustand store does not persist) |
+| Org bot identity + deploy (§5 Q3) | Not started | `KEYBOARD_STUDIO_ORG_TOKEN`/`GITHUB_ORG_TOKEN` unset → route returns `503`; org service-account + standing fork still to be provisioned (tracked with #550 deploy) |
+| Studio UI — attribution form + submit | **Done** | `packages/studio/src/components/ManagedPRSubmitPanel.tsx` wired into `OutputScreen` as primary submit action; attribution form (displayName/email) + copyright-attestation gate + result/error states; prefill from `IdentitySession` |
 
 ### Summary
 
 ```
 Option C  [====================]  100%  engine + studio UI done; full end-to-end zip download wired (#32)
 Option A  [==================--]   90%  engine + OAuth backend + studio sign-up (identity) UI done; submit action deferred to Option B (§1a); OAuth App registration + backend deploy remaining
-Option B  [=============-------]   65%  DEFAULT submit path (§1a); contract + engine client + backend pipeline/route done & tested; remaining: org bot identity + deploy (§5 Q3), studio attribution-form UI (gated on §5 Q7 working-copy-survives-redirect)
+Option B  [=================---]   85%  DEFAULT submit path (§1a); contract + engine client + backend pipeline/route + studio attribution-form UI done & tested; remaining: org bot identity + deploy only (§5 Q3)
 ```

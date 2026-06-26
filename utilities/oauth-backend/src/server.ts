@@ -38,6 +38,7 @@ import { ManagedPRBodySchema } from "./managed-pr-schemas.js";
 import {
   submitManagedPR,
   type ManagedPRPipelineConfig,
+  type GitHubPipelineFetchFn,
 } from "./github-pipeline.js";
 
 // ---------------------------------------------------------------------------
@@ -94,6 +95,15 @@ function loadConfig(): {
   // the managed-PR route returns 503 until they are provisioned.
   const orgToken = (process.env["GITHUB_ORG_TOKEN"] ?? "").trim();
   const orgLogin = (process.env["GITHUB_ORG_LOGIN"] ?? "").trim();
+
+  // Exactly one of the pair being set is always a misconfiguration — both are
+  // required for the managed-PR route to be active. Warn so operators notice
+  // at startup rather than discovering it from a 503 in production.
+  if ((orgToken.length > 0) !== (orgLogin.length > 0)) {
+    console.warn(
+      "[WARN] managed submission is disabled: GITHUB_ORG_TOKEN and GITHUB_ORG_LOGIN must both be set or both be absent — only one is present."
+    );
+  }
 
   const port = parseInt(process.env["PORT"] ?? "8787", 10);
 
@@ -162,8 +172,14 @@ export async function buildServer(opts: {
    */
   orgToken?: string;
   orgLogin?: string;
-  /** Injected fetch implementation — defaults to globalThis.fetch */
-  fetchFn?: OAuthFetchFn;
+  /**
+   * Injected fetch implementation — defaults to globalThis.fetch.
+   *
+   * Must satisfy GitHubPipelineFetchFn (statusText + headers.get + text()) so
+   * the managed-PR pipeline can read Retry-After on 429 responses. The real
+   * global fetch Response already provides these fields; test stubs must too.
+   */
+  fetchFn?: GitHubPipelineFetchFn;
 }): Promise<ReturnType<typeof Fastify>> {
   const app = Fastify({ logger: { level: "warn" } });
 
@@ -193,7 +209,11 @@ export async function buildServer(opts: {
   // -------------------------------------------------------------------------
   // Handler config — secret is scoped here, never returned to routes
   // -------------------------------------------------------------------------
-  const nodeFetch: OAuthFetchFn =
+
+  // Pipeline fetch: satisfies GitHubPipelineFetchFn (required method+headers,
+  // full response including statusText/headers/text). Used by the managed-PR
+  // pipeline so it can read Retry-After on 429 responses.
+  const pipelineFetch: GitHubPipelineFetchFn =
     opts.fetchFn ??
     (async (url, init) => {
       const res = await (globalThis as unknown as { fetch: typeof fetch }).fetch(
@@ -209,8 +229,21 @@ export async function buildServer(opts: {
       return {
         ok: res.ok,
         status: res.status,
+        statusText: res.statusText,
+        headers: { get: (name: string) => res.headers.get(name) },
         json: () => res.json() as Promise<unknown>,
+        text: () => res.text(),
       };
+    });
+
+  // OAuth handler fetch: OAuthFetchFn has optional init/method/headers, which
+  // is incompatible with GitHubPipelineFetchFn by contravariance. Provide a
+  // wrapper that matches the OAuthFetchFn signature and delegates to pipelineFetch.
+  const nodeFetch: OAuthFetchFn = (url, init) =>
+    pipelineFetch(url, {
+      method: init?.method ?? "GET",
+      headers: init?.headers ?? {},
+      ...(init?.body !== undefined ? { body: init.body } : {}),
     });
 
   const handlerConfig: HandlerConfig = {
@@ -228,7 +261,7 @@ export async function buildServer(opts: {
   // Managed-PR pipeline config is present only when org credentials are set.
   const managedPRConfig: ManagedPRPipelineConfig | undefined =
     opts.orgToken && opts.orgLogin
-      ? { orgToken: opts.orgToken, orgLogin: opts.orgLogin, fetch: nodeFetch }
+      ? { orgToken: opts.orgToken, orgLogin: opts.orgLogin, fetch: pipelineFetch }
       : undefined;
 
   // -------------------------------------------------------------------------

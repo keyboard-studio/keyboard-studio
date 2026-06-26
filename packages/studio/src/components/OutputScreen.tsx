@@ -15,12 +15,15 @@
 
 import { useResizablePanes } from "../hooks/useResizablePanes.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
+import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
+import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
 import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
 import { ScaffoldForm } from "./ScaffoldForm.tsx";
 import { KmnEditor } from "./KmnEditor.tsx";
 import { TrackOneIdentityPanel } from "./TrackOneIdentityPanel.tsx";
 import { PickerPane } from "./PickerPane.tsx";
 import { SignUpPanel } from "./SignUpPanel.tsx";
+import { ManagedPRSubmitPanel } from "./ManagedPRSubmitPanel.tsx";
 import { ResizeHandle } from "./ResizeHandle.tsx";
 import { DIVIDER_WIDTH, LEFT_MIN_PCT, LEFT_MAX_PCT, LEFT_INIT_PCT } from "./previewOutputLayout.ts";
 
@@ -41,6 +44,22 @@ export function OutputScreen() {
     handleDownload,
     showIdentityWarn,
   } = artifact;
+
+  // Identity prefill for the Option B submit form. Read from whichever auth
+  // provider is active. GitHub: login name (no email — only user:email scope
+  // was requested at sign-up, and that is not surfaced in the SPA). Google:
+  // name + email from the stored identity claims.
+  const { login: ghLogin } = useGitHubAuth();
+  const { identity: googleIdentity } = useGoogleAuth();
+
+  // Derive prefill: Google identity takes precedence (has both name + email).
+  // GitHub provides only the login handle as a name hint.
+  const submitPrefill: { displayName?: string; email?: string } =
+    googleIdentity !== null
+      ? { displayName: googleIdentity.name, email: googleIdentity.email }
+      : ghLogin !== null
+        ? { displayName: ghLogin }
+        : {};
 
   const rightPct = 100 - leftPct;
 
@@ -204,6 +223,17 @@ export function OutputScreen() {
                 </button>
               </div>
             )}
+            {/* Option B (org-mediated PR) submit — PRIMARY submit action per
+                docs/github-integration.md §1a. Calls the backend proxy; the
+                user never sees a branch or PR workflow. Gated on canDownload
+                (compile ready + working copy instantiated), same guard as the
+                zip download. Attribution prefill from whichever identity
+                provider is active. */}
+            <ManagedPRSubmitPanel
+              canSubmit={canDownload}
+              prefill={submitPrefill}
+            />
+
             {/* Decoupled "Sign up with GitHub / Google" identity step (docs/github-integration.md
                 §1a). Establishes who the user is — NOT a submit/PR action, and not
                 gated on artifact readiness (you can sign up any time). */}
