@@ -30,8 +30,12 @@ export declare function formatIRPath(path: IRPath): string;
   any `IRPath` naming it → typecheck failure (no codegen to re-run).
 - **G3 (coverage)**: paths exist for both surfaces — physical
   (`groups[]`/`stores[]`/…) and touch
-  (`touchLayout.platforms[].layers[].rows[].keys[]`).
+  (`touchLayout.platforms[].layers[].rows[].keys[]`). `raw[]` (opaque fragment
+  list) is addressable as a terminal; sub-fields of individual fragments are not
+  (opaque fragments are not survey-editable).
 - **G4 (bound)**: P2 does not recurse into `TouchKeyIR.sk`/`flick`/`multitap`.
+  Likewise, `RawKmnFragment` is an atomic leaf — `raw[ARRAY_INDEX]` is the
+  terminal path; further descent is not addressable.
 - **G5 (serializable)**: `formatIRPath` yields a stable string the dashboard can
   render; the tuple is the canonical comparison key for the orphan-input lint.
 
@@ -45,17 +49,17 @@ export interface QuestionModule {
   fixtures: { valid: …; invalid: … };
 
   /** NEW — IR locations this question READS. Same IRPath space as `writes`. */
-  inputs?: IRPath[];
+  inputs?: readonly IRPath[];
   /** NEW — IR locations this question will POPULATE (declared now, executed in P5). */
-  writes?: IRPath[];
+  writes?: readonly IRPath[];
 
   // mutate stays the documented stub — DO NOT implement (P5 / #5b / #232).
 }
 ```
 
 **Guarantees**:
-- **G6 (single address space)**: `inputs` and `writes` are both `IRPath[]` over
-  the same `KeyboardIR` space → directly comparable (orphan-input lint).
+- **G6 (single address space)**: `inputs` and `writes` are both `readonly IRPath[]`
+  over the same `KeyboardIR` space → directly comparable (orphan-input lint).
 - **G7 (presence, not non-empty)**: shipped modules declare **present** fields;
   empty arrays are valid and deliberate for read-/write-nothing questions. CI
   fails only on an absent field.

@@ -18,7 +18,11 @@ path segments; a string form exists for display.
 - **Coverage (both surfaces)**:
   - Physical: `header.*`, `stores[]` (and `IRStore` fields), `groups[]` →
     `rules[]` (and `IRRule` `context`/`output`), `comments[]`, `raw[]`,
-    `recognizedPatterns[]`.
+    `recognizedPatterns[]`. `raw[]` is a **terminal**: the opaque-fragment list
+    is addressable (a question may declare it reads `raw[]` to warn the user),
+    but sub-fields of individual `RawKmnFragment` entries (`raw[].sourceText`,
+    `raw[].reason`, …) are not — opaque fragments are not survey-editable
+    (out-of-scope rule; mirrors how `Pattern` is also a terminal).
   - Touch: `touchLayout.platforms[].layers[].rows[].keys[]` (bounded — see
     below).
   - Visual: `visualKeyboard.layers[].keys[]`.
@@ -48,14 +52,14 @@ fields. No existing field changes; `mutate` stays the commented stub.
 | `definition` | `FlowQuestion` | yes | unchanged |
 | `validate?` | `(value) => ValidationResult` | no | unchanged |
 | `fixtures` | `{ valid[], invalid[] }` | yes | unchanged |
-| **`inputs?`** | `IRPath[]` | no (field) | IR locations this question **reads**; same address space as `writes` |
-| **`writes?`** | `IRPath[]` | no (field) | IR locations this question will **populate** |
+| **`inputs?`** | `readonly IRPath[]` | no (field) | IR locations this question **reads**; same address space as `writes` |
+| **`writes?`** | `readonly IRPath[]` | no (field) | IR locations this question will **populate** |
 | `mutate` | — | — | stays commented-out stub (P5; #5b/#232) |
 
 - **Address-space rule (clarification Q1)**: `inputs` and `writes` are **both**
-  `IRPath[]` over the same `KeyboardIR` space — a survey-answer dependency is
-  expressed as the IR location that answer ultimately populates. No separate
-  answer-key space, so `inputs` and `writes` are directly comparable.
+  `readonly IRPath[]` over the same `KeyboardIR` space — a survey-answer
+  dependency is expressed as the IR location that answer ultimately populates.
+  No separate answer-key space, so `inputs` and `writes` are directly comparable.
 - **Coverage rule (clarification Q2 / FR-006)**: every shipped module declares
   **present** `inputs`/`writes` fields; a read-/write-nothing question declares
   an explicit empty array (`inputs: []` / `writes: []`). "Carries" = field
