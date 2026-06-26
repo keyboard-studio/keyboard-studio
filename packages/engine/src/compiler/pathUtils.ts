@@ -40,4 +40,18 @@ export const pathUtils = {
     const dot = base.lastIndexOf(".");
     return dot <= 0 ? "" : base.slice(dot);
   },
+  // POSIX-normalise a path: convert backslashes to slashes, then resolve `.`,
+  // `..`, and empty segments. `..` past the root is dropped (no leading `..` is
+  // kept), matching the VirtualFS's rootless, relative path model.
+  normalize: (p: string): string => {
+    const segments: string[] = [];
+    for (const part of p.replace(/\\/g, "/").split("/")) {
+      if (part === "..") {
+        if (segments.length > 0) segments.pop();
+      } else if (part !== "." && part !== "") {
+        segments.push(part);
+      }
+    }
+    return segments.join("/");
+  },
 };

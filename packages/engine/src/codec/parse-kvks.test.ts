@@ -90,4 +90,14 @@ describe("parseKvks", () => {
     expect(ref?.kind).toBe("kvksKey");
     expect(typeof ref?.nodeId).toBe("string");
   });
+
+  it("extracts the OSK font family from <encoding fontname=...> (refs #357)", () => {
+    const ir = parseKvks(MINIMAL_KVKS);
+    expect(ir.fontFamily).toBe("Arial");
+  });
+
+  it("leaves fontFamily undefined when <encoding> has no fontname", () => {
+    const ir = parseKvks(NO_ALTGR_KVKS);
+    expect(ir.fontFamily).toBeUndefined();
+  });
 });

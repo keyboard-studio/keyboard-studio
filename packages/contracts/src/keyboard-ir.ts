@@ -254,6 +254,8 @@ export interface KvksIR {
   kvksVersion?: string;
   /** Optional keyboard display name from the <kbdname> header element. */
   kbdname?: string;
+  /** Optional OSK font family from the `<encoding fontname="...">` attribute. */
+  fontFamily?: string;
   layers: Array<{
     shift: string;
     keys: Array<{

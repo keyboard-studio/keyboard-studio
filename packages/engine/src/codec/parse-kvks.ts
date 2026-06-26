@@ -65,6 +65,10 @@ export function parseKvks(xml: string): KvksIR {
   const kvksVersion = kvksVersionMatch ? unescapeXml(kvksVersionMatch[1]?.trim() ?? "") : undefined;
   const kbdnameMatch = /<kbdname\b[^>]*>([\s\S]*?)<\/kbdname>/i.exec(xml);
   const kbdname = kbdnameMatch ? unescapeXml(kbdnameMatch[1]?.trim() ?? "") : undefined;
+  // OSK font family from the <encoding fontname="..."> attribute (the CSS
+  // font-family the studio uses when injecting @font-face for the OSK preview).
+  const fontnameMatch = /<encoding\b[^>]*\bfontname\s*=\s*"([^"]*)"/i.exec(xml);
+  const fontFamily = fontnameMatch ? unescapeXml((fontnameMatch[1] ?? "").trim()) : undefined;
 
   // Detect <usealtgr/> in header flags.
   const usealtgr = /<usealtgr\s*\/?>/i.test(xml);
@@ -103,5 +107,6 @@ export function parseKvks(xml: string): KvksIR {
   const result: KvksIR = { layers, usealtgr, nodeIds };
   if (kvksVersion) result.kvksVersion = kvksVersion;
   if (kbdname) result.kbdname = kbdname;
+  if (fontFamily) result.fontFamily = fontFamily;
   return result;
 }
