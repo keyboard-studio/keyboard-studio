@@ -10,7 +10,7 @@
 import type { BaseKeyboard, VirtualFS, KpsFontEntry, KpsStylesheetEntry } from "@keyboard-studio/contracts";
 import { parseKmnHeaderStores } from "../compiler/parseKmnHeaderStores.js";
 import { parseKpjFlags, type CompilerOptions } from "../compiler/parseKpjFlags.js";
-import { parseKpsFonts } from "../compiler/parseKpsFonts.js";
+import { parseKpsFontRefs } from "../base-browser/kps-parser.js";
 import { parseKvks } from "../codec/parse-kvks.js";
 import { pathUtils } from "../compiler/pathUtils.js";
 
@@ -197,7 +197,7 @@ export async function fetchKeyboardSourceToVfs(
   const kpsUrl = `${baseUrl}/source/${baseKeyboard.id}.kps`;
   const kpsResp = await getText(kpsUrl, fetchImpl);
   if (kpsResp.ok && kpsResp.text !== undefined) {
-    const { oskFonts, fileFonts, stylesheets: cssRefs } = parseKpsFonts(kpsResp.text);
+    const { oskFonts, fileFonts, stylesheets: cssRefs } = parseKpsFontRefs(kpsResp.text);
 
     // Build a deduped map of rawPath -> isOskFont.
     const allRaw = new Map<string, boolean>();
