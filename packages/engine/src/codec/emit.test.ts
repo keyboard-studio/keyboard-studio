@@ -169,6 +169,26 @@ describe("emit", () => {
     expect(out).toContain("store(myStore)");
   });
 
+  // Orphan-store preservation — a user store that no rule references must
+  // still be emitted (before the begin directive) so round-trip is lossless.
+  it("emits orphan user store not referenced by any rule", () => {
+    const ir = makeIR();
+    ir.stores.push({
+      nodeId: "store#orphan",
+      name: "orphanDict",
+      items: [{ kind: "char", value: "a" }, { kind: "char", value: "b" }, { kind: "char", value: "c" }],
+      isSystem: false,
+    });
+    // No rule references orphanDict — it is an orphan store.
+    const out = emit(ir);
+    expect(out).toContain("store(orphanDict)");
+    // The orphan store declaration must appear before the begin directive.
+    const storeIdx = out.indexOf("store(orphanDict)");
+    const beginIdx = out.indexOf("begin Unicode");
+    expect(storeIdx).toBeGreaterThanOrEqual(0);
+    expect(beginIdx).toBeGreaterThan(storeIdx);
+  });
+
   it("emits RawKmnFragment sourceText verbatim", () => {
     const ir = makeIR();
     ir.raw.push({
@@ -498,5 +518,71 @@ describe("emit — group.usingKeys controls the auto-prepended +", () => {
     expect(base.groups[0]?.usingKeys).toBe(true);
     const out = emit(base);
     expect(out).toContain("+ [K_A] > U+0061");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// No double-emission: referenced store + orphan store coexist without
+// duplication.
+//
+// Invariants:
+//   - A store referenced by a rule (via any()) must appear EXACTLY ONCE in the
+//     output, inside its group section (after the begin directive).
+//   - An orphan store (not referenced by any rule) must appear EXACTLY ONCE in
+//     the output, BEFORE the begin directive.
+//
+// Pre-fix emitters would either drop orphan stores or emit referenced stores
+// twice (once at the orphan-guard pass, once at the rule-reference pass).
+// ---------------------------------------------------------------------------
+
+describe("emit — no double-emission: referenced store and orphan store coexist", () => {
+  it("each store appears exactly once; orphan precedes begin, referenced store follows begin", () => {
+    const ir = makeIR();
+
+    // A user store that IS referenced by a rule.
+    ir.stores.push({
+      nodeId: "store#refStore",
+      name: "refStore",
+      items: [{ kind: "char", value: "x" }, { kind: "char", value: "y" }],
+      isSystem: false,
+    });
+
+    // A user store that is NOT referenced by any rule (orphan).
+    ir.stores.push({
+      nodeId: "store#orphanStore",
+      name: "orphanStore",
+      items: [{ kind: "char", value: "p" }, { kind: "char", value: "q" }],
+      isSystem: false,
+    });
+
+    // Rule that references refStore via any() — makes it a referenced store.
+    ir.groups[0]?.rules.push({
+      nodeId: "rule#use-refStore",
+      context: [{ kind: "any", storeRef: "refStore" }],
+      output: [{ kind: "char", value: "z" }],
+    });
+
+    const out = emit(ir);
+
+    // Count occurrences of each store declaration.
+    const refCount = (out.match(/store\(refStore\)/g) ?? []).length;
+    const orphanCount = (out.match(/store\(orphanStore\)/g) ?? []).length;
+
+    expect(refCount, "store(refStore) must appear exactly once").toBe(1);
+    expect(orphanCount, "store(orphanStore) must appear exactly once").toBe(1);
+
+    const beginIdx = out.indexOf("begin Unicode");
+    const refIdx = out.indexOf("store(refStore)");
+    const orphanIdx = out.indexOf("store(orphanStore)");
+
+    expect(beginIdx).toBeGreaterThanOrEqual(0);
+    expect(refIdx).toBeGreaterThanOrEqual(0);
+    expect(orphanIdx).toBeGreaterThanOrEqual(0);
+
+    // Orphan store must precede the begin directive.
+    expect(orphanIdx, "orphan store must appear before begin Unicode").toBeLessThan(beginIdx);
+
+    // Referenced store must appear after the begin directive (inside its group).
+    expect(refIdx, "referenced store must appear after begin Unicode").toBeGreaterThan(beginIdx);
   });
 });

@@ -126,6 +126,47 @@ describe("round-trip: basic_kbdfr", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Orphan-store round-trip — a user store not referenced by any rule must
+// survive parse→emit→re-parse without being dropped.
+// ---------------------------------------------------------------------------
+describe("round-trip: orphan store preservation", () => {
+  // Inline .kmn with all required system stores + an unreferenced user store.
+  const KMN = `
+store(&VERSION) '10.0'
+store(&NAME) 'OrphanTest'
+store(&TARGETS) 'any'
+store(&COPYRIGHT) 'Test'
+store(&KEYBOARDVERSION) '1.0'
+store(orphanDict) 'abc'
+
+begin Unicode > use(main)
+
+group(main) using keys
++ [K_A] > U+0061
+`.trimStart();
+
+  it("parse() sees orphanDict in ir1", () => {
+    const { ir: ir1 } = parse(KMN, "orphan_test");
+    const found = ir1.stores.some(s => s.name === "orphanDict");
+    expect(found, "ir1 should contain orphanDict after parse").toBe(true);
+  });
+
+  it("emit→re-parse preserves an unreferenced (orphan) store", () => {
+    const { ir: ir1 } = parse(KMN, "orphan_test");
+    const emitted = emit(ir1);
+    const { ir: ir2 } = parse(emitted, "orphan_test");
+    const found = ir2.stores.some(s => s.name === "orphanDict");
+    expect(found, "ir2 must contain orphanDict after emit→re-parse; pre-fix emitter would drop it").toBe(true);
+  });
+
+  it("normalised ir1 deep-equals normalised ir2", () => {
+    const { ir: ir1 } = parse(KMN, "orphan_test");
+    const { ir: ir2 } = parse(emit(ir1), "orphan_test");
+    expect(normaliseForComparison(ir2)).toEqual(normaliseForComparison(ir1));
+  });
+});
+
 const AHOM_PATH = resolve(
   __dir,
   "../../../../../keyboards/release/a/ahom_star/source/ahom_star.kmn"

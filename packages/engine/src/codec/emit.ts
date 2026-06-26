@@ -8,15 +8,22 @@
  *
  * Emission order:
  *   1. System stores in canonical order (see SYSTEM_STORE_ORDER).
- *   2. blank line.
- *   3. begin Unicode > use(<entryGroup>).
- *   4. For each group:
+ *   2. Non-system user stores not referenced by any typed rule in any group
+ *      ("orphan" stores), emitted in ir.stores declaration order.
+ *   3. blank line.
+ *   4. begin Unicode > use(<entryGroup>).
+ *   5. For each group:
  *        blank line
  *        group(<name>) [using keys]
  *        user stores attached to the group (heuristic: stores whose names
  *        appear in the group's rules)
  *        rules (or RawKmnFragment source text)
- *   5. Trailing newline.
+ *   6. Trailing newline.
+ *
+ * All non-system user stores are preserved: referenced stores attach to their
+ * group; unreferenced ("orphan") stores are emitted before `begin` in
+ * declaration order. Store declarations are global/position-independent in
+ * .kmn, so the re-parsed IR is semantically identical regardless of placement.
  *
  * Comments:
  *   - "leading" comments are emitted immediately before their anchorRef's line.
@@ -283,6 +290,35 @@ function pushLeadingComments(nodeId: string, commentMap: Map<string, IRComment[]
 }
 
 // ---------------------------------------------------------------------------
+// Store-reference helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Collect every user-store name referenced by any context or output element
+ * in `rules`. Used both to attach stores to their group and — globally — to
+ * identify orphan stores that no group references.
+ *
+ * Note: references inside opaque RawKmnFragments are NOT visible to this
+ * typed-element scan; a store referenced only there is treated as an orphan
+ * and emitted globally before `begin` (a deliberate, safe gap — the IRStore
+ * remains the single declaration).
+ */
+function referencedStoreNamesIn(rules: IRRule[]): Set<string> {
+  const names = new Set<string>();
+  for (const rule of rules) {
+    for (const el of rule.context) {
+      if (el.kind === "any" || el.kind === "notany" || el.kind === "index")
+        names.add(el.storeRef);
+    }
+    for (const el of rule.output) {
+      if (el.kind === "index" || el.kind === "outs")
+        names.add(el.storeRef);
+    }
+  }
+  return names;
+}
+
+// ---------------------------------------------------------------------------
 // Main emit function
 // ---------------------------------------------------------------------------
 
@@ -321,6 +357,23 @@ export function emit(ir: KeyboardIR): string {
     lines.push(emitStore(store));
   }
 
+  // Preserve non-system user stores referenced by no typed rule (orphan
+  // stores) — these were previously silently dropped. Emitted before `begin`
+  // in ir.stores declaration order, matching real .kmn source layout; store
+  // declarations are global/position-independent so this re-parses identically.
+  // Decision: preserve over warn — emit() has no diagnostic channel and faithful
+  // emit (D9) requires lossless store round-trip.
+  const allReferenced = ir.groups.reduce<Set<string>>(
+    (acc, g) => { for (const name of referencedStoreNamesIn(g.rules)) acc.add(name); return acc; },
+    new Set<string>(),
+  );
+  for (const store of ir.stores) {
+    if (!store.isSystem && !allReferenced.has(store.name)) {
+      pushLeadingComments(store.nodeId, commentMap, lines);
+      lines.push(emitStore(store));
+    }
+  }
+
   // begin directive.
   const entryGroup = ir.groups.find(g => !g.readonly);
   const entryName = entryGroup?.name ?? "main";
@@ -338,19 +391,7 @@ export function emit(ir: KeyboardIR): string {
     // User stores that belong to this group: heuristic — stores referenced in
     // this group's rules. Iterated in ir.stores declaration order to preserve
     // round-trip comment anchoring (I3).
-    const referencedStoreNames = new Set<string>();
-    for (const rule of group.rules) {
-      for (const el of rule.context) {
-        if (el.kind === "any" || el.kind === "notany" || el.kind === "index") {
-          referencedStoreNames.add(el.storeRef);
-        }
-      }
-      for (const el of rule.output) {
-        if (el.kind === "index" || el.kind === "outs") {
-          referencedStoreNames.add(el.storeRef);
-        }
-      }
-    }
+    const referencedStoreNames = referencedStoreNamesIn(group.rules);
     for (const store of ir.stores) {
       if (!store.isSystem && referencedStoreNames.has(store.name)) {
         pushLeadingComments(store.nodeId, commentMap, lines);
