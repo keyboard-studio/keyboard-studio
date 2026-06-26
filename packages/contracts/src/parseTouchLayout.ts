@@ -77,6 +77,12 @@ type RawTouchLayout = Record<string, RawPlatform>;
 
 const PLATFORM_ORDER = ["desktop", "tablet", "phone"] as const;
 
+// Keyman defines exactly these 8 compass flick directions. The parser
+// intentionally restricts to them (unlike the older lint parser, which mapped
+// every raw.flick entry): a non-standard direction — and any `nextlayer` it
+// carries — is deliberately dropped rather than surfaced. On valid corpus this
+// is unreachable; the tightening only affects malformed/non-standard input,
+// where dropping a bogus direction (incl. its check-18-5 reachability) is correct.
 const FLICK_DIRECTIONS = ["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const;
 
 // ---------------------------------------------------------------------------

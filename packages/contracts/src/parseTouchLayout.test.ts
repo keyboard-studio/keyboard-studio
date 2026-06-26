@@ -85,6 +85,25 @@ describe("parseTouchLayoutString — flick", () => {
     expect(Object.keys(key.flick!)).not.toContain("xyz");
   });
 
+  it("drops a nextlayer carried on a non-standard flick direction (intended tightening)", () => {
+    // Regression for the documented FLICK_DIRECTIONS tightening: the old lint
+    // parser mapped every raw.flick entry, so a nextlayer on a bogus direction
+    // would reach check-18-5 reachability. The canonical parser restricts to the
+    // 8 compass directions, so such a nextlayer is intentionally not surfaced.
+    const json = makeLayout({
+      flick: {
+        e:    { id: "K_FE", nextlayer: "numeric" },
+        down: { id: "K_BAD", nextlayer: "shift" },
+      },
+    });
+    const key = firstKey(json);
+
+    // Canonical direction (and its nextlayer) survives
+    expect(key.flick!.e?.nextlayer).toBe("numeric");
+    // Non-standard direction is absent — its nextlayer never reaches the IR
+    expect(Object.keys(key.flick!)).not.toContain("down");
+  });
+
   it("leaves key.flick undefined when no flick field is present", () => {
     const key = firstKey(makeLayout({}));
     expect(key.flick).toBeUndefined();
