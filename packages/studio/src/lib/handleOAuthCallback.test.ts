@@ -8,7 +8,12 @@
 // sessionStorage keys and POSTs to /oauth/google/exchange.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { processOAuthCallback, processGoogleOAuthCallback } from "./handleOAuthCallback.ts";
+import {
+  processOAuthCallback,
+  processGoogleOAuthCallback,
+  redirectTargetForResult,
+  type OAuthCallbackResult,
+} from "./handleOAuthCallback.ts";
 import { setOAuthScratch, getStoredToken } from "./githubOAuth.ts";
 import {
   setGoogleOAuthScratch,
@@ -217,5 +222,35 @@ describe("processGoogleOAuthCallback — happy path", () => {
     expect(result.ok).toBe(false);
     expect(result.ok === false && result.reason).toBe("exchange-failed");
     expect(sessionStorage.getItem(GOOGLE_IDENTITY_KEY)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// redirectTargetForResult — the URL the boot screen redirects to post-exchange
+// ---------------------------------------------------------------------------
+
+describe("redirectTargetForResult", () => {
+  const success: OAuthCallbackResult = { ok: true };
+  const failure: OAuthCallbackResult = {
+    ok: false,
+    reason: "exchange-failed",
+    message: "irrelevant",
+  };
+
+  it("redirects to the app root on success (no error param)", () => {
+    expect(redirectTargetForResult("github", success)).toBe("/");
+    expect(redirectTargetForResult("google", success)).toBe("/");
+  });
+
+  it("carries the safe reason enum in the GitHub error param on failure", () => {
+    expect(redirectTargetForResult("github", failure)).toBe(
+      "/?oauth_error=exchange-failed",
+    );
+  });
+
+  it("carries the safe reason enum in the Google error param on failure", () => {
+    expect(redirectTargetForResult("google", failure)).toBe(
+      "/?google_oauth_error=exchange-failed",
+    );
   });
 });
