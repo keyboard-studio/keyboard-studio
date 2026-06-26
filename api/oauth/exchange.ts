@@ -3,6 +3,10 @@
 // SPA, so VITE_OAUTH_BACKEND_URL stays empty).
 import { runTokenHandler, exchangeCore, ExchangeBodySchema } from "./_shared.js";
 
-export default function handler(req: Request): Promise<Response> {
-  return runTokenHandler(req, ExchangeBodySchema, exchangeCore);
-}
+// Web-standard `{ fetch }` default export — see the note in health.ts for why a
+// bare `export default function (req, res)` would hang on Vercel's Node runtime.
+export default {
+  fetch(req: Request): Promise<Response> {
+    return runTokenHandler(req, ExchangeBodySchema, exchangeCore);
+  },
+};
