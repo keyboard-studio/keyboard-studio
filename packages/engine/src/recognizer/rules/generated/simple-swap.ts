@@ -4,7 +4,7 @@ import { interpretPredicate, interpretLift } from "../../interpreter.js";
 import type { RecognizerRuleYaml } from "../../yaml-schema.js";
 
 const RULE_DEF = {
-  "id": "simple_swap",
+  "id": "simple-swap",
   "strategyId": "S-01",
   "patternRef": "content/patterns/substitute/simple-swap.yaml",
   "format_status": "provisional",

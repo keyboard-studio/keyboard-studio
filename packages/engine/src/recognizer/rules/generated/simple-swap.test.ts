@@ -4,7 +4,7 @@
 // because the two implementations use different id strings ("simple_swap" vs
 // "simple-swap").
 import { describe, it, expect } from "vitest";
-import { rule as generatedSimpleSwap } from "./simple_swap.js";
+import { rule as generatedSimpleSwap } from "./simple-swap.js";
 import { s01Recognizer } from "../s01-simple-swap.js";
 import type { IRGroup } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
@@ -47,7 +47,7 @@ function sortedNodeIds(matches: import("../../types.js").MatchResult[]): string[
 // Round-trip tests
 // ---------------------------------------------------------------------------
 
-describe("generated/simple_swap round-trip vs s01Recognizer", () => {
+describe("generated/simple-swap round-trip vs s01Recognizer", () => {
   it("3 S-01 rules in one group: both rules produce 1 match with 3 ownedNodes and matching slot", () => {
     const group: IRGroup = {
       nodeId: "group#0",
@@ -225,7 +225,7 @@ describe("generated/simple_swap round-trip vs s01Recognizer", () => {
 // lift() smoke tests (generated rule)
 // ---------------------------------------------------------------------------
 
-describe("generated/simple_swap lift()", () => {
+describe("generated/simple-swap lift()", () => {
   it("lift returns a Pattern with origin=recognized and strategyId=S-01", () => {
     const match = {
       patternId: "simple_swap#main",

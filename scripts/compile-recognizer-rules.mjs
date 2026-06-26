@@ -80,8 +80,8 @@ for (const filename of yamlFiles) {
     continue;
   }
 
-  // Emit generated TypeScript file
-  const outFile = join(OUT_DIR, `${rawId}.ts`);
+  // Emit generated TypeScript file (kebab-case id → kebab-case filename)
+  const outFile = join(OUT_DIR, `${id}.ts`);
   const ruleDef = JSON.stringify(parsed, null, 2);
 
   const ts = `// generated — do not edit; source: content/recognizer-rules/${filename}
@@ -114,10 +114,10 @@ export const rule: RecognizerRule = {
 // Emit barrel
 const barrelLines = [
   '// generated — do not edit',
-  ...generated.map(({ rawId }) => {
-    // rawId (snake_case) -> camelCase export alias: "simple_swap" -> "simpleSwapRule"
-    const camel = rawId.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
-    return `export { rule as ${camel}Rule } from "./${rawId}.js";`;
+  ...generated.map(({ id }) => {
+    // kebab-case id -> camelCase export alias: "simple-swap" -> "simpleSwapRule"
+    const camel = id.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    return `export { rule as ${camel}Rule } from "./${id}.js";`;
   }),
 ];
 

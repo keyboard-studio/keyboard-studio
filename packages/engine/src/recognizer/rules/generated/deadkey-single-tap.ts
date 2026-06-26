@@ -4,7 +4,7 @@ import { interpretPredicate, interpretLift } from "../../interpreter.js";
 import type { RecognizerRuleYaml } from "../../yaml-schema.js";
 
 const RULE_DEF = {
-  "id": "deadkey_single_tap",
+  "id": "deadkey-single-tap",
   "strategyId": "S-02",
   "patternRef": "content/patterns/desktop-input/deadkey-single-tap.yaml",
   "format_status": "provisional",

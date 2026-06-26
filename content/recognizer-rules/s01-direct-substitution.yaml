@@ -11,7 +11,7 @@
 #
 # Format: provisional — see README.md. Pending ratification at issue #232.
 
-id: simple_swap
+id: simple-swap
 strategyId: S-01
 patternRef: content/patterns/substitute/simple-swap.yaml   # repo-root-relative
 format_status: provisional

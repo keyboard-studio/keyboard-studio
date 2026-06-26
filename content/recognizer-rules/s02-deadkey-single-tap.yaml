@@ -8,7 +8,7 @@
 #
 # Format: provisional — see README.md. Pending ratification at issue #232.
 
-id: deadkey_single_tap
+id: deadkey-single-tap
 strategyId: S-02
 patternRef: content/patterns/desktop-input/deadkey-single-tap.yaml   # repo-root-relative
 format_status: provisional

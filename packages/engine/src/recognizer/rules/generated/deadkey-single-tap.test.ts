@@ -13,7 +13,7 @@
 // Fixtures in this file include escape rules so both rules produce matches.
 // Negative cases and divergence cases are documented explicitly.
 import { describe, it, expect } from "vitest";
-import { rule as generatedDeadkeySingleTap } from "./deadkey_single_tap.js";
+import { rule as generatedDeadkeySingleTap } from "./deadkey-single-tap.js";
 import { s02Recognizer } from "../s02-deadkey-single-tap.js";
 import type { IRGroup, IRRule, IRStore } from "@keyboard-studio/contracts";
 import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
@@ -145,7 +145,7 @@ function buildTwoTriggerGraveIR() {
 // Round-trip tests
 // ---------------------------------------------------------------------------
 
-describe("generated/deadkey_single_tap round-trip vs s02Recognizer", () => {
+describe("generated/deadkey-single-tap round-trip vs s02Recognizer", () => {
   it("complete grave cluster (trigger + fan-out + escape): both rules produce 1 match", () => {
     const { ir, triggerNodeId, bodyNodeId } = buildCompleteGraveIR();
 
@@ -429,7 +429,7 @@ describe("generated/deadkey_single_tap round-trip vs s02Recognizer", () => {
 // lift() smoke tests (generated rule)
 // ---------------------------------------------------------------------------
 
-describe("generated/deadkey_single_tap lift()", () => {
+describe("generated/deadkey-single-tap lift()", () => {
   it("lift returns a Pattern with origin=recognized and strategyId=S-02", () => {
     const { ir } = buildCompleteGraveIR();
     const matches = generatedDeadkeySingleTap.match(ir);
