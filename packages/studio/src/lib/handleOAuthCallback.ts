@@ -59,6 +59,48 @@ export type OAuthCallbackResult =
   | { ok: true }
   | { ok: false; reason: OAuthCallbackFailureReason; message: string };
 
+/** Which OAuth provider a callback path belongs to. */
+export type OAuthProvider = "github" | "google";
+
+/**
+ * Determine whether the current pathname is an OAuth callback, and for which
+ * provider — returns null on every normal app path. Lets the boot code mount a
+ * "completing sign-in" screen (see components/OAuthCallbackScreen) instead of
+ * the app on callback paths. Browser-only (reads window.location.pathname).
+ */
+export function detectOAuthCallback(): OAuthProvider | null {
+  if (typeof window === "undefined") return null;
+  const pathname = window.location.pathname;
+  if (pathname === OAUTH_CALLBACK_PATH) return "github";
+  if (pathname === GOOGLE_OAUTH_CALLBACK_PATH) return "google";
+  return null;
+}
+
+/** Run the provider-appropriate callback processor over a query string. */
+export function processOAuthCallbackForProvider(
+  provider: OAuthProvider,
+  search: string,
+): Promise<OAuthCallbackResult> {
+  return provider === "google"
+    ? processGoogleOAuthCallback(search)
+    : processOAuthCallback(search);
+}
+
+/**
+ * The app-root URL to redirect to once a callback completes. Success → "/";
+ * failure carries the safe reason enum in the provider-specific error param
+ * (`oauth_error` for GitHub, `google_oauth_error` for Google) — which the auth
+ * hooks map to a static user-facing string. Never interpolates backend text.
+ */
+export function redirectTargetForResult(
+  provider: OAuthProvider,
+  result: OAuthCallbackResult,
+): string {
+  if (result.ok) return "/";
+  const param = provider === "google" ? "google_oauth_error" : "oauth_error";
+  return `/?${param}=${encodeURIComponent(result.reason)}`;
+}
+
 /**
  * Process the OAuth callback query params. Pure of routing side effects except
  * the sessionStorage writes — the caller decides whether/where to redirect.
@@ -123,25 +165,13 @@ export async function processOAuthCallback(search: string): Promise<OAuthCallbac
  * should NOT render the app this tick).
  */
 export async function runOAuthCallbackIfPresent(): Promise<boolean> {
-  const pathname = window.location.pathname;
-
-  if (pathname === GOOGLE_OAUTH_CALLBACK_PATH) {
-    const result = await processGoogleOAuthCallback(window.location.search);
-    const target = result.ok
-      ? "/"
-      : `/?google_oauth_error=${encodeURIComponent(result.reason)}`;
-    window.location.replace(target);
-    return true;
-  }
-
-  if (pathname !== OAUTH_CALLBACK_PATH) {
-    return false;
-  }
-  const result = await processOAuthCallback(window.location.search);
-  const target = result.ok
-    ? "/"
-    : `/?oauth_error=${encodeURIComponent(result.reason)}`;
-  window.location.replace(target);
+  const provider = detectOAuthCallback();
+  if (provider === null) return false;
+  const result = await processOAuthCallbackForProvider(
+    provider,
+    window.location.search,
+  );
+  window.location.replace(redirectTargetForResult(provider, result));
   return true;
 }
 
