@@ -1,8 +1,8 @@
-// Round-trip test: generated simple_swap rule vs hand-written s01Recognizer.
+// Round-trip test: generated simple-swap rule vs hand-written s01Recognizer.
 // For each IR fixture: run both rules, compare ownedNodes and the
-// keystrokeCharacterMap slot value.  PatternId bases are compared before '#'
-// because the two implementations use different id strings ("simple_swap" vs
-// "simple-swap").
+// keystrokeCharacterMap slot value.  PatternId bases are NOT compared directly
+// because lifts_to.patternId in the generated YAML stays snake_case ("simple_swap#...")
+// while the hand-written rule uses kebab ("simple-swap#..."); only the suffix after '#' is asserted.
 import { describe, it, expect } from "vitest";
 import { rule as generatedSimpleSwap } from "./simple-swap.js";
 import { s01Recognizer } from "../s01-simple-swap.js";

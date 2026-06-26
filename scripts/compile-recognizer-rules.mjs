@@ -73,6 +73,8 @@ for (const filename of yamlFiles) {
   const { id: rawId, strategyId } = parsed;
   // Normalize to kebab-case so generated rule ids match hand-written convention
   const id = rawId.replace(/_/g, '-');
+  // NOTE: only rule.id is normalized. lifts_to.patternId stays as authored (snake_case, e.g.
+  // "deadkey_single_tap") because applyAssignments.ts matches it verbatim — do not normalize parsed.
 
   // Gate check: only emit for supported strategies
   if (!SUPPORTED_STRATEGIES.has(strategyId)) {
@@ -108,7 +110,7 @@ export const rule: RecognizerRule = {
     writeFileSync(outFile, ts, 'utf8');
     console.log(`[OK] Generated ${outFile}`);
   }
-  generated.push({ id, rawId, filename });
+  generated.push({ id, filename });
 }
 
 // Emit barrel
