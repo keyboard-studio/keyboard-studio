@@ -16,6 +16,15 @@ versioning is governed by spec §18 (the joint engine+content session,
 2026-06-26) and Constitution Article I. `mutate()` execution is explicitly
 **out of scope** here and remains a documented stub (P5, gated on #5b/#232).
 
+## Clarifications
+
+### Session 2026-06-26
+
+- Q: How should `inputs` address survey-answer dependencies, given `inputs`/`writes` must share one address space for the orphan-input lint? → A: Single `IRPath` space — both `inputs` and `writes` are `IRPath[]` over the same `KeyboardIR` address space; an answer-dependency is expressed as the IR location that answer ultimately populates (one path algebra; the orphan-input lint is well-defined by construction).
+- Q: How should the coverage check treat a question that genuinely reads/writes nothing (e.g. a display-only notice)? → A: Explicit empty array required — such a question MUST declare `inputs: []` / `writes: []`; "carries" means the field is present (possibly empty), and CI fails only on an absent field (the empty case is a deliberate, auditable declaration).
+- Q: Is FR-008's write-surface test a P2 completion gate or deferred, given it depends on the incrementally-built §7.7 write surface? → A: Conditional gate — P2 is complete when the test **exists and passes for whatever portion of the §7.7 write surface is available at P2 close**; remaining strategy-bearing questions are covered as §7.7 lands. P2 ships the test wired to the available surface but does not block on full §7.7.
+- Q: Does the orphan-input lint apply to library/reserve questions (referenced by no flow manifest, §3.8)? → A: Manifest-scoped only — the lint runs only over questions a flow manifest references (it needs an ordered upstream to check against); library/reserve questions are exempt from the lint while unreferenced, but still carry `inputs`/`writes` and a mirrored test. Promoting a library question into a manifest naturally brings it into lint scope on the next run.
+
 ## User Scenarios & Testing *(mandatory)*
 
 The "users" of this feature are **question authors** (Content team) who declare
@@ -186,6 +195,10 @@ maps to it.
   (Design AC + Drift AC).
 - **FR-003**: The `QuestionModule` contract MUST be extended with optional
   `inputs?: IRPath[]` and `writes?: IRPath[]` fields, declared as static data.
+  Both `inputs` and `writes` MUST address the **same `IRPath` space** over
+  `KeyboardIR`; a survey-answer dependency is expressed as the IR location that
+  answer ultimately populates (one path algebra — there is no separate
+  answer-key address space), so `inputs` and `writes` are directly comparable.
 - **FR-004**: The contract addition (`inputs`/`writes`/`IRPath` on `QuestionModule`)
   MUST be released as a **MAJOR version bump of `@keyboard-studio/contracts`**
   (spec §18 joint engine+content session, 2026-06-26; Constitution Article I),
@@ -193,14 +206,25 @@ maps to it.
 - **FR-005**: `mutate()` MUST remain a documented stub; no IR-write execution is
   implemented in this feature (deferred to P5, gated on #5b/#232).
 - **FR-006**: All 93 existing question modules (Phase A = 30, Phase B = 55,
-  Phase F = 8) MUST carry declared `inputs`/`writes`.
+  Phase F = 8) MUST carry declared `inputs`/`writes`. A question that genuinely
+  reads or writes nothing MUST declare an **explicit empty array**
+  (`inputs: []` / `writes: []`); "carries" means the field is **present**
+  (possibly empty). The coverage CI check fails only on an **absent** field, so
+  the empty case is a deliberate, auditable declaration — not an oversight.
 - **FR-007**: A manifest lint MUST assert that each question's declared `inputs`
   are produced by some upstream step's `writes` (no orphan inputs) and fail
-  naming any orphan.
+  naming any orphan. The lint is **manifest-scoped**: it runs only over
+  questions a flow manifest references (it requires an ordered upstream to check
+  against). Library/reserve questions (referenced by no manifest, §3.8) are
+  **exempt while unreferenced**; promoting one into a manifest brings it into
+  lint scope on the next run.
 - **FR-008**: A unit test MUST assert that every strategy-bearing question's
-  declared `writes` match its `Pattern.strategyId` write surface. This test
-  lands as/once the §7.7 typed assignment-map write surface becomes available
-  and MUST NOT block the rest of P2.
+  declared `writes` match its `Pattern.strategyId` write surface. This is a
+  **conditional gate**: P2 is complete when the test **exists and passes for
+  whatever portion of the §7.7 typed assignment-map write surface is available
+  at P2 close**; strategy-bearing questions whose write surface is not yet
+  exposed by §7.7 are covered incrementally as §7.7 lands. P2 ships the test
+  wired to the available surface and MUST NOT block on full §7.7 availability.
 - **FR-009**: Per-question tests MUST live in the mirrored tree under
   `packages/studio/tests/survey/questions/<phase>/<id>.test.ts` (mirror path
   derived from the source path), and a module without a mirrored test file MUST
@@ -210,7 +234,8 @@ maps to it.
   resolve every question by `definition.id` (both forms identical to callers).
 - **FR-011**: Library / reserve modules (registered but referenced by no flow
   manifest, §3.8) MUST carry the same `inputs`/`writes`, compile, and tests; they
-  MUST NOT be deleted and are excluded only from flow-integration/E2E.
+  MUST NOT be deleted and are excluded only from flow-integration/E2E and the
+  manifest-scoped orphan-input lint (FR-007) while unreferenced.
 - **FR-012**: The `IRPath` / `inputs` / `writes` data shape MUST be locked and
   exported as a **named contract** so the P0 dashboard spec can consume it
   directly rather than re-deriving it.
@@ -226,6 +251,8 @@ maps to it.
   generated lens set) is a P2 design decision deferred to `/speckit-plan`.
 - **`QuestionModule.inputs` / `.writes`**: Optional `IRPath[]` arrays declaring,
   as static data, what a question reads and the IR locations it will populate.
+  Both sides address the **same `IRPath` space** over `KeyboardIR` (no separate
+  answer-key space), so they are directly comparable for the orphan-input lint.
   Consumed by tooling without invoking `mutate()`.
 - **Question module (flat / folder form)**: The `<id>.ts` (flat default) or
   `<id>/index.ts` + `extras/` (folder opt-in) unit, always resolved by
