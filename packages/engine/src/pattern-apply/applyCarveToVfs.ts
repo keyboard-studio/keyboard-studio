@@ -38,7 +38,7 @@ import { emit } from "../codec/emit.js";
  *   `deletedNodeIds` is empty. Use this when a preceding transform (e.g.
  *   `applyStoreSlotRemovals`) has already modified `baseIr` and the updated IR
  *   must be written into the VFS regardless of whether any whole-node deletions
- *   are present. Both safety gates (raw-fragment, entry-group) still apply.
+ *   are present. The entry-group safety gate still applies.
  */
 export interface ApplyCarveToVfsOpts {
   forceEmit?: boolean;

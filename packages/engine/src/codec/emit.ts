@@ -351,10 +351,21 @@ function attributeStoresToGroups(
  * identifier token in `text` (surrounded by non-identifier characters or
  * string boundaries). Avoids the false-positive where a store named "a" would
  * match inside "any(abc)".
+ *
+ * The compiled RegExp is cached in a module-level Map keyed by store name.
+ * The regex depends only on the store name, so the cache is safe for the
+ * lifetime of the module. On keyboards with many fragments (e.g. taigi_viet_telex
+ * at ~948 fragments), this avoids O(stores x fragments) recompilations per group.
  */
+const STORE_NAME_REGEXP_CACHE = new Map<string, RegExp>();
 function storeNameInText(storeName: string, text: string): boolean {
-  const escaped = storeName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?<![A-Za-z0-9_])${escaped}(?![A-Za-z0-9_])`).test(text);
+  let re = STORE_NAME_REGEXP_CACHE.get(storeName);
+  if (re === undefined) {
+    const escaped = storeName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    re = new RegExp(`(?<![A-Za-z0-9_])${escaped}(?![A-Za-z0-9_])`);
+    STORE_NAME_REGEXP_CACHE.set(storeName, re);
+  }
+  return re.test(text);
 }
 
 /**
