@@ -167,3 +167,124 @@ describe("projectWorkingCopyVfs deleted-items end-to-end — real engine, no moc
     expect(ir.groups[0]?.rules[0]?.nodeId).toBe("rule#0");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Fragment-bearing keyboards — AC#1 durability (real engine, no mock)
+// ---------------------------------------------------------------------------
+// These tests exercise the full pipeline for keyboards that have opaque/raw
+// fragments (ir.raw.length > 0). Prior to the #564 fix, applyCarveToVfs
+// would bail out with a gate-1 warning and leave the VFS unchanged.
+// With the fix, the position-faithful emit path runs and the deletion reaches
+// the .kmn file.
+
+describe("projectWorkingCopyVfs deleted-items + fragment-bearing keyboard — real engine, no mock", () => {
+  // AC#1 durability: delete a rule from a fragment-bearing IR and verify:
+  //   (a) the deleted rule is absent from the emitted .kmn
+  //   (b) the surviving rule is still present
+  //   (c) the user store referenced only by the opaque fragment is still present
+  //   (d) the fragment itself appears in the emitted .kmn
+  //   (e) the fragment appears before the surviving rule (position-faithful)
+  //   (f) no opaque-fragment gate warning is returned
+  //   (g) baseIr is not mutated
+  it("AC#1: deletes a rule from a fragment-bearing keyboard; user store and fragment survive in order", () => {
+    // Rule at sourceLine 30 (to be deleted).
+    const rule0 = makeRule("rule#0", "K_A", "a");
+    // Rule at sourceLine 35 (must survive).
+    const rule1 = makeRule("rule#1", "K_B", "b");
+    const entryGroup = makeGroup("group#main", "main", [rule0, rule1]);
+
+    // Build a fragment-bearing IR:
+    //   - A user store referenced only by the fragment (not by any typed rule)
+    //     at sourceLine 22. Without the store-drop fix this would be silently
+    //     omitted from the output.
+    //   - An opaque fragment at sourceLine 25 that references opaqueStore.
+    //   - Two typed rules at sourceLInes 30 and 35.
+    const ir = makeTestIR([entryGroup]);
+    ir.stores.push({
+      nodeId: "store#opaque",
+      name: "opaqueStore",
+      items: [{ kind: "char", value: "x" }],
+      isSystem: false,
+      sourceLine: 22,
+    });
+    ir.raw.push({
+      nodeId: "raw#frag",
+      origin: "imported" as const,
+      sourceText: "save(opaqueStore, 1)",
+      reason: "save/set/reset option-store",
+      sourceLine: 25,
+      groupNodeId: "group#main",
+    });
+    // Attach sourceLine to the typed rules so the faithful-emit path can interleave them.
+    (entryGroup.rules[0] as IRRule).sourceLine = 30;
+    (entryGroup.rules[1] as IRRule).sourceLine = 35;
+
+    const vfs = makeVfs("test_kb");
+
+    const { warnings } = projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: ir,
+      deletedNodeIds: new Set(),
+      deletedItemIds: new Set(["rule#0"]),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+
+    // (f) No gate-1 warning about opaque/raw fragments.
+    expect(warnings.every((w) => !w.toLowerCase().includes("opaque"))).toBe(true);
+
+    const content = vfs.get("source/test_kb.kmn")?.content as string;
+    expect(typeof content).toBe("string");
+
+    // (a) Deleted rule (K_A) must be absent.
+    expect(content).not.toContain("K_A");
+
+    // (b) Surviving rule (K_B) must be present.
+    expect(content).toContain("K_B");
+
+    // (c) User store referenced only by the fragment must be preserved.
+    expect(content).toContain("store(opaqueStore)");
+
+    // (d) The fragment itself must appear in the output.
+    expect(content).toContain("save(opaqueStore, 1)");
+
+    // (e) Fragment (sourceLine 25) must appear before the surviving rule (sourceLine 35).
+    const fragIdx = content.indexOf("save(opaqueStore, 1)");
+    const ruleIdx = content.indexOf("K_B");
+    expect(fragIdx).toBeLessThan(ruleIdx);
+  });
+
+  // (g) baseIr must not be mutated by the projection.
+  it("does not mutate baseIr when projecting a fragment-bearing keyboard", () => {
+    const rule0 = makeRule("rule#0", "K_A", "a");
+    const entryGroup = makeGroup("group#main", "main", [rule0]);
+    const ir = makeTestIR([entryGroup]);
+    ir.raw.push({
+      nodeId: "raw#frag",
+      origin: "imported" as const,
+      sourceText: "c OPAQUE",
+      reason: "call/return",
+      groupNodeId: "group#main",
+    });
+    const vfs = makeVfs("test_kb");
+
+    projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: ir,
+      deletedNodeIds: new Set(),
+      deletedItemIds: new Set(["rule#0"]),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+
+    // raw array is unchanged.
+    expect(ir.raw.length).toBe(1);
+    expect(ir.raw[0]?.nodeId).toBe("raw#frag");
+    // groups are unchanged.
+    expect(ir.groups[0]?.rules.length).toBe(1);
+  });
+});

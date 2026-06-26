@@ -159,6 +159,13 @@ export interface IRStore {
    * Preserved structurally so the codec can round-trip per-target stores.
    */
   targetSelector?: TargetSelector;
+  /**
+   * 1-based source line number from the original .kmn file, set by the parser.
+   * Used by the position-faithful emit path to interleave stores with fragments
+   * and rules in their original source order when `ir.raw.length > 0`.
+   * Absent for in-memory (scaffolded/synthesized) stores.
+   */
+  sourceLine?: number;
 }
 
 /** A KMN group (begin / group ... using keys). */
@@ -169,6 +176,13 @@ export interface IRGroup {
   rules: IRRule[];
   /** True for groups the emitter must not modify (e.g. those inside a RawKmnFragment). */
   readonly: boolean;
+  /**
+   * 1-based source line number of the `group(...)` header token, set by the parser.
+   * Used by the position-faithful emit path to attribute user stores to their owning
+   * group by position (a store belongs to the group whose header sourceLine is the
+   * greatest one <= the store's sourceLine). Absent for in-memory (scaffolded) groups.
+   */
+  sourceLine?: number;
 }
 
 /** A single KMN rule within a group. */
@@ -192,6 +206,13 @@ export interface IRRule {
    * See {@link TargetSelector} for the kmcmplib semantics.
    */
   targetSelector?: TargetSelector;
+  /**
+   * 1-based source line number from the original .kmn file, set by the parser.
+   * Used by the position-faithful emit path to interleave rules with stores and
+   * fragments in their original source order when `ir.raw.length > 0`.
+   * Absent for in-memory (scaffolded/synthesized) rules.
+   */
+  sourceLine?: number;
 }
 
 /** A KMN comment node. */
@@ -217,6 +238,19 @@ export interface RawKmnFragment {
    *   | "outs()" | "SMP 5-digit literal"
    */
   reason: string;
+  /**
+   * 1-based source line number from the original .kmn file, set by the parser.
+   * Used by the position-faithful emit path to interleave fragments with rules
+   * and stores in their original source order when `ir.raw.length > 0`.
+   * Absent for fragments with no traceable source line.
+   */
+  sourceLine?: number;
+  /**
+   * nodeId of the IRGroup that contains this fragment, or undefined for global
+   * fragments (e.g. pre-begin unknown constructs). Used by the position-faithful
+   * emit path to place fragments inside the correct group's output block.
+   */
+  groupNodeId?: string;
 }
 
 /**

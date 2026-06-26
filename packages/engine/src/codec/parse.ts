@@ -722,18 +722,22 @@ export function parse(text: string, keyboardId: string): ParseResult {
         const { items, opaqueReason } = parseStoreItems(parsed.rawValue);
         if (opaqueReason !== null) {
           bumpOpaque(opaqueReason);
-          rawFragments.push({
+          const frag: RawKmnFragment = {
             nodeId: storeNodeId,
             origin: "imported",
             sourceText: tok.text,
             reason: opaqueReason,
-          });
+            sourceLine: tok.line,
+          };
+          if (currentGroup !== null) frag.groupNodeId = currentGroup.nodeId;
+          rawFragments.push(frag);
         } else {
           const irStore: IRStore = {
             nodeId: storeNodeId,
             name: parsed.name,
             items,
             isSystem: parsed.isSystem,
+            sourceLine: tok.line,
           };
           if (tok.targetSelector !== undefined) irStore.targetSelector = tok.targetSelector;
           stores.push(irStore);
@@ -753,6 +757,7 @@ export function parse(text: string, keyboardId: string): ParseResult {
           usingKeys: parsed.usingKeys,
           rules: [],
           readonly: false,
+          sourceLine: tok.line,
         };
         groups.push(currentGroup);
         headerParsed = true; // groups also mark end of header
@@ -778,6 +783,7 @@ export function parse(text: string, keyboardId: string): ParseResult {
           context: ctxEl,
           output: outEl,
           matchKind: tok.kind,
+          sourceLine: tok.line,
         };
         if (tok.targetSelector !== undefined) rule.targetSelector = tok.targetSelector;
         if (currentGroup) {
@@ -796,6 +802,8 @@ export function parse(text: string, keyboardId: string): ParseResult {
             origin: "imported",
             sourceText: tok.text,
             reason: OPAQUE_REASONS.UNKNOWN_PRE_BEGIN,
+            sourceLine: tok.line,
+            // groupNodeId is intentionally absent: pre-begin = global/no group
           });
           break;
         }
@@ -836,12 +844,15 @@ export function parse(text: string, keyboardId: string): ParseResult {
           // Opaque — wrap as raw fragment.
           const reason = opaqueCheck.reason ?? "unknown";
           bumpOpaque(reason);
-          rawFragments.push({
+          const frag: RawKmnFragment = {
             nodeId: ruleNodeId,
             origin: "imported",
             sourceText: tok.text,
             reason,
-          });
+            sourceLine: tok.line,
+          };
+          if (currentGroup !== null) frag.groupNodeId = currentGroup.nodeId;
+          rawFragments.push(frag);
         } else {
           const rule: IRRule = parsedLine.trailingComment !== undefined
             ? {
@@ -849,11 +860,13 @@ export function parse(text: string, keyboardId: string): ParseResult {
                 context: ctxElements,
                 output: outElements,
                 trailingComment: parsedLine.trailingComment,
+                sourceLine: tok.line,
               }
             : {
                 nodeId: ruleNodeId,
                 context: ctxElements,
                 output: outElements,
+                sourceLine: tok.line,
               };
           if (tok.targetSelector !== undefined) rule.targetSelector = tok.targetSelector;
           if (currentGroup) {

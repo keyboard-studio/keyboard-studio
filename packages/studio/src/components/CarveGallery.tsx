@@ -151,10 +151,10 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   const hasRawFragments = ir.raw.length > 0;
 
   // Gate screen — shown for simple keyboards with nothing complex to carve.
-  // Skipped when hasRawFragments: the warning must be visible and the user
-  // should see the carver (even if it can't apply changes) rather than a
-  // misleading "looks good" screen.
-  if (isSimple && !forceOpen && !hasRawFragments) {
+  // No longer gated on hasRawFragments: isSimple already returns false whenever
+  // any raw-kind node exists, so the gate screen is naturally suppressed for
+  // fragment-bearing keyboards without a redundant guard here.
+  if (isSimple && !forceOpen) {
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--app-bg)', color: 'var(--app-text)', gap: 24, padding: '0 32px', textAlign: 'center' }}>
         <svg width={56} height={56} viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
@@ -199,12 +199,16 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--app-bg)', color: 'var(--app-text)' }}>
-      {/* Raw-fragment warning — deletions won't apply when the codec can't re-emit */}
+      {/* Raw-fragment note — informational only; removals apply normally */}
       {hasRawFragments && (
-        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 22px', background: 'var(--amber-bg)', borderBottom: '1px solid var(--amber-border)', fontSize: 13, color: 'var(--amber-text)', lineHeight: 1.5 }}>
-          <span style={{ flexShrink: 0, marginTop: 1 }}>⚠</span>
+        <div
+          role="note"
+          aria-label="Advanced rule blocks preserved"
+          style={{ flexShrink: 0, display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 22px', background: 'var(--accent-bg)', borderBottom: '1px solid color-mix(in srgb, var(--app-accent) 35%, transparent)', fontSize: 13, color: 'var(--app-text-muted)', lineHeight: 1.5 }}
+        >
+          <span style={{ flexShrink: 0, marginTop: 1, color: 'var(--app-accent)', display: 'inline-flex' }}><InfoIcon size={14} /></span>
           <span>
-            <b>Removals won't apply to this keyboard.</b> It contains advanced rules the editor can't rewrite ({ir.raw.length} fragment{ir.raw.length !== 1 ? 's' : ''}), so deletions you make here won't show up in the preview or the downloaded zip.
+            This keyboard contains {ir.raw.length} advanced rule block{ir.raw.length !== 1 ? 's' : ''} the editor preserves as-is. Removals you make here are applied normally — the preserved blocks are left unchanged.
           </span>
         </div>
       )}
