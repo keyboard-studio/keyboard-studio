@@ -1,8 +1,8 @@
-// Tests for ruleModifier(), modifierLabel(), and glyph-shape integration in irToCarveNodes.ts
+// Tests for ruleModifier(), modifierLabel(), glyph-shape integration, and StoreUsage.patternRefs in irToCarveNodes.ts
 
 import { describe, it, expect } from 'vitest';
-import type { IRRule, IRGroup } from '@keyboard-studio/contracts';
-import { ruleModifier, modifierLabel, groupToGlyphs, glyphsTriState } from './irToCarveNodes.ts';
+import type { IRRule, IRGroup, KeyboardIR } from '@keyboard-studio/contracts';
+import { ruleModifier, modifierLabel, groupToGlyphs, glyphsTriState, toRailNodes } from './irToCarveNodes.ts';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -233,5 +233,167 @@ describe('glyphsTriState', () => {
 
   it('returns partial when some are deleted', () => {
     expect(glyphsTriState(glyphs, (id) => id === 'g1')).toBe('partial');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// StoreUsage.patternRefs — analyzeStoreUsage via toRailNodes
+// ---------------------------------------------------------------------------
+
+/** Minimal KeyboardIR fixture — only the fields toRailNodes reads. */
+function makeIR(overrides: Partial<KeyboardIR> = {}): KeyboardIR {
+  return {
+    origin: {} as KeyboardIR['origin'],
+    header: {} as KeyboardIR['header'],
+    stores: [],
+    groups: [],
+    comments: [],
+    raw: [],
+    recognizedPatterns: [],
+    ...overrides,
+  } as unknown as KeyboardIR;
+}
+
+describe('StoreUsage.patternRefs', () => {
+  it('is empty when no recognized patterns exist', () => {
+    const ir = makeIR({
+      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false } as any],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule-1',
+          context: [{ kind: 'any', storeRef: 'composed' }],
+          output: [{ kind: 'char', value: 'á' }],
+        }],
+      }],
+      recognizedPatterns: [],
+    });
+    const nodes = toRailNodes(ir);
+    const store = nodes.find((n) => n.name === 'composed');
+    expect(store?.storeUsage?.patternRefs).toEqual([]);
+  });
+
+  it('populates patternRefs when a recognized pattern owns a rule referencing the store via any()', () => {
+    const ir = makeIR({
+      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false } as any],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule-1',
+          context: [{ kind: 'any', storeRef: 'composed' }],
+          output: [{ kind: 'index', storeRef: 'comp-dia', position: 1 }],
+          ownedByPattern: 'pattern-1',
+        }],
+      }],
+      recognizedPatterns: [{
+        id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
+        ownedNodes: [{ kind: 'rule', nodeId: 'rule-1' }],
+        description: '', category: 'substitution' as any, appliesTo: [],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+    const store = nodes.find((n) => n.name === 'composed');
+    expect(store?.storeUsage?.patternRefs).toEqual([
+      expect.objectContaining({ patternId: 'pattern-1', patternTitle: 'Dead Keys', ruleCount: 1 }),
+    ]);
+  });
+
+  it('populates patternRefs for the output store (index()) too', () => {
+    const ir = makeIR({
+      stores: [{ nodeId: 'store-2', name: 'comp-dia', items: [], isSystem: false } as any],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule-1',
+          context: [{ kind: 'any', storeRef: 'composed' }],
+          output: [{ kind: 'index', storeRef: 'comp-dia', position: 1 }],
+          ownedByPattern: 'pattern-1',
+        }],
+      }],
+      recognizedPatterns: [{
+        id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
+        ownedNodes: [{ kind: 'rule', nodeId: 'rule-1' }],
+        description: '', category: 'substitution' as any, appliesTo: [],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+    const store = nodes.find((n) => n.name === 'comp-dia');
+    expect(store?.storeUsage?.patternRefs).toEqual([
+      expect.objectContaining({ patternId: 'pattern-1', patternTitle: 'Dead Keys', ruleCount: 1 }),
+    ]);
+  });
+
+  it('is empty for a store used only in a non-pattern (unowned) rule', () => {
+    const ir = makeIR({
+      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false } as any],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule-1',
+          context: [{ kind: 'any', storeRef: 'composed' }],
+          output: [{ kind: 'char', value: 'á' }],
+          // no ownedByPattern — unowned rule
+        }],
+      }],
+      recognizedPatterns: [{
+        id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
+        ownedNodes: [{ kind: 'rule', nodeId: 'rule-OTHER' }], // doesn't own rule-1
+        description: '', category: 'substitution' as any, appliesTo: [],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+    const store = nodes.find((n) => n.name === 'composed');
+    expect(store?.storeUsage?.patternRefs).toEqual([]);
+  });
+
+  it('groupRefs is empty when no unowned rules reference the store', () => {
+    const ir = makeIR({
+      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false } as any],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule-1', context: [{ kind: 'any', storeRef: 'composed' }], output: [{ kind: 'char', value: 'á' }], ownedByPattern: 'pattern-1' }],
+      }],
+      recognizedPatterns: [],
+    });
+    const nodes = toRailNodes(ir);
+    const store = nodes.find((n) => n.name === 'composed');
+    expect(store?.storeUsage?.groupRefs).toEqual([]);
+  });
+
+  it('populates groupRefs for unowned rules referencing the store', () => {
+    const ir = makeIR({
+      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false } as any],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule-1', context: [{ kind: 'any', storeRef: 'composed' }], output: [{ kind: 'char', value: 'á' }] }],
+      }],
+      recognizedPatterns: [],
+    });
+    const nodes = toRailNodes(ir);
+    const store = nodes.find((n) => n.name === 'composed');
+    expect(store?.storeUsage?.groupRefs).toEqual([
+      expect.objectContaining({ groupId: 'g1', groupName: 'main', ruleCount: 1 }),
+    ]);
+  });
+
+  it('aggregates rule count when a pattern owns multiple rules referencing the same store', () => {
+    const ir = makeIR({
+      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false } as any],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          { nodeId: 'rule-1', context: [{ kind: 'any', storeRef: 'composed' }], output: [{ kind: 'index', storeRef: 'comp-dia', position: 1 }], ownedByPattern: 'pattern-1' },
+          { nodeId: 'rule-2', context: [{ kind: 'any', storeRef: 'composed' }], output: [{ kind: 'index', storeRef: 'comp-dia2', position: 1 }], ownedByPattern: 'pattern-1' },
+        ],
+      }],
+      recognizedPatterns: [{
+        id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
+        ownedNodes: [{ kind: 'rule', nodeId: 'rule-1' }, { kind: 'rule', nodeId: 'rule-2' }],
+        description: '', category: 'substitution' as any, appliesTo: [],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+    const store = nodes.find((n) => n.name === 'composed');
+    expect(store?.storeUsage?.patternRefs[0]?.ruleCount).toBe(2);
   });
 });

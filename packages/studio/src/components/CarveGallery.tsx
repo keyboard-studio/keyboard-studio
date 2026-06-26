@@ -118,7 +118,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
   const handleRestore = useCallback((item: RemovedItem) => {
     if (item.type === 'item') { restoreItem(item.id); return; }
-    if (item.glyphIds) { item.glyphIds.forEach((gid) => restoreItem(gid)); }
+    if (item.glyphIds) { item.glyphIds.forEach((gid) => restoreItem(gid)); restoreNode(item.id); }
     else { restoreNode(item.id); }
   }, [restoreItem, restoreNode]);
 
@@ -127,7 +127,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
     const orphaned: DepNode[] = [];
     const unusedStores: DepNode[] = [];
     nodes.forEach((node) => {
-      if ((node.kind === 'pattern' || node.kind === 'group') && nodeState(node, isItemDeleted, isDeleted) === 'off') {
+      if ((node.kind === 'pattern' || node.kind === 'group') && !isDeleted(node.nodeId) && nodeState(node, isItemDeleted, isDeleted) === 'off') {
         orphaned.push({ nodeId: node.nodeId, name: node.name });
       }
       if (node.kind === 'store' && node.referencedByNodeId !== undefined && !isDeleted(node.nodeId)) {
@@ -135,6 +135,24 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
         if (refNode && nodeState(refNode, isItemDeleted, isDeleted) === 'off') {
           unusedStores.push({ nodeId: node.nodeId, name: node.name });
         }
+      }
+      // Stores orphaned by any()/index() consumers — all referencing patterns AND groups are now off
+      if (
+        node.kind === 'store' &&
+        node.referencedByNodeId === undefined &&
+        !isDeleted(node.nodeId) &&
+        node.storeUsage !== undefined &&
+        (node.storeUsage.patternRefs.length > 0 || node.storeUsage.groupRefs.length > 0) &&
+        node.storeUsage.patternRefs.every((r) => {
+          const pNode = nodes.find((n) => n.nodeId === r.patternId);
+          return pNode ? nodeState(pNode, isItemDeleted, isDeleted) === 'off' : isDeleted(r.patternId);
+        }) &&
+        node.storeUsage.groupRefs.every((r) => {
+          const gNode = nodes.find((n) => n.nodeId === r.groupId);
+          return gNode ? nodeState(gNode, isItemDeleted, isDeleted) === 'off' : isDeleted(r.groupId);
+        })
+      ) {
+        unusedStores.push({ nodeId: node.nodeId, name: node.name });
       }
     });
     return { orphanedNodes: orphaned, unusedStoreNodes: unusedStores };

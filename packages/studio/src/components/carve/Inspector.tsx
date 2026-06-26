@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import type { CarveNode } from '../../lib/irToCarveNodes.ts';
-import { nodeState, displayChar, MOD_GROUP_DEFS, glyphsTriState } from '../../lib/irToCarveNodes.ts';
+import type { CarveNode, CarveGlyph, StoreRuleDetail } from '../../lib/irToCarveNodes.ts';
+import { nodeState, displayChar, invisibleCharLabel, MOD_GROUP_DEFS, glyphsTriState } from '../../lib/irToCarveNodes.ts';
 import { ToggleBox } from './ToggleBox.tsx';
 import { GlyphCell } from './GlyphCell.tsx';
 import { KindBadge, KIND_COLOR } from './KindBadge.tsx';
@@ -36,15 +36,15 @@ const blurbStyle: React.CSSProperties = {
 
 function storeBlurb(node: CarveNode): string {
   if (node.referencedByNodeId !== undefined)
-    return "Stores are named character lists. This one belongs to the pattern above — its removal is managed through the pattern.";
+    return "Stores are named character lists that rules in patterns and groups reference, not the rules themselves. This store belongs to the pattern above; its removal is managed through that pattern.";
   const u = node.storeUsage;
   if (!u)
-    return "Stores are named character lists. This one isn't referenced by any active rules, so it's likely safe to remove on its own.";
+    return "Stores are named character lists that rules in patterns and groups reference, not the rules themselves. This one isn't referenced by any active rules, so it's likely safe to remove on its own.";
   if (u.asSource && u.asOutput)
-    return "Stores are named character lists. This one appears on both sides of rules: the keyboard watches for these characters AND inserts from them.";
+    return "Stores are named character lists that rules in patterns and groups reference, not the rules themselves. This one is used on both sides: rules scan your input against it AND pick their output from it.";
   if (u.asSource)
-    return "Stores are named character lists. The keyboard scans what you type against this list — when a character matches, a rule fires.";
-  return "Stores are named character lists. When a rule fires, it picks the corresponding character from this list to insert into your text.";
+    return "Stores are named character lists that rules in patterns and groups reference, not the rules themselves. Rules scan your input against this list; when a character matches, the rule fires.";
+  return "Stores are named character lists that rules in patterns and groups reference, not the rules themselves. Rules pick their output character from this list based on which key was pressed.";
 }
 
 // ---------------------------------------------------------------------------
@@ -57,10 +57,14 @@ interface RawDetailProps {
 }
 function RawDetail({ node, isDeleted, onToggleNode }: RawDetailProps) {
   const off = isDeleted(node.nodeId);
+  const [confirming, setConfirming] = useState(false);
+  // Reset confirm state whenever this node changes or gets restored
+  useEffect(() => { setConfirming(false); }, [node.nodeId, off]);
+
   return (
     <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '20px 24px' }}>
       <p style={{ ...blurbStyle, margin: '0 0 14px' }}>
-        Advanced rules use syntax the tool can't model automatically — deadkey chains, context-sensitive substitutions, or platform-specific behaviour. They're kept exactly as written from the original keyboard.
+        Advanced rules use syntax the tool can't model automatically: deadkey chains, context-sensitive substitutions, or platform-specific behaviour. They're kept exactly as written from the original keyboard.
       </p>
       <div style={{
         display: 'flex', gap: 13, padding: '16px 18px', borderRadius: 12, opacity: off ? 0.6 : 1,
@@ -73,18 +77,40 @@ function RawDetail({ node, isDeleted, onToggleNode }: RawDetailProps) {
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
             <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--app-text)', textDecoration: off ? 'line-through' : 'none' }}>
-              Advanced rule — kept verbatim
+              Advanced rule (kept verbatim)
             </h2>
             <KindBadge kind="raw" />
           </div>
           <p style={{ margin: '7px 0 0', fontSize: 13.5, color: 'var(--app-text-muted)', lineHeight: 1.6 }}>
-            Can't be previewed or edited — there's no typed structure to show. Reason:{' '}
+            Can't be previewed or edited. There's no typed structure to show. Reason:{' '}
             <b style={{ color: 'var(--app-text)', fontFamily: 'var(--app-font-mono)' }}>{node.rawReason}</b>.<br />
             These look like noise but are usually <b>load-bearing</b>. Remove only if you're certain this behaviour is unused by your language.
           </p>
-          <button onClick={() => onToggleNode(node.nodeId, !off)} style={{ ...btnGhost, marginTop: 14 }}>
-            {off ? 'Restore' : 'Remove anyway'}
-          </button>
+          {off ? (
+            <button onClick={() => onToggleNode(node.nodeId, false)} style={{ ...btnGhost, marginTop: 14 }}>
+              Restore
+            </button>
+          ) : confirming ? (
+            <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12.5, color: 'var(--app-text-muted)', flex: '1 1 100%' }}>Remove this rule? It may be load-bearing.</span>
+              <button
+                onClick={() => { onToggleNode(node.nodeId, true); setConfirming(false); }}
+                style={{ font: '600 12px var(--app-font)', cursor: 'pointer', color: 'var(--sil-orange-dark)', background: 'color-mix(in srgb, var(--sil-orange) 16%, transparent)', border: '1px solid color-mix(in srgb, var(--sil-orange) 55%, transparent)', borderRadius: 7, padding: '5px 12px', whiteSpace: 'nowrap' }}
+              >
+                Yes, remove
+              </button>
+              <button
+                onClick={() => setConfirming(false)}
+                style={{ font: '600 12px var(--app-font)', cursor: 'pointer', color: 'var(--app-text-muted)', background: 'transparent', border: '1px solid var(--app-border)', borderRadius: 7, padding: '5px 12px', whiteSpace: 'nowrap' }}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirming(true)} style={{ ...btnGhost, marginTop: 14 }}>
+              Remove anyway
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -117,19 +143,103 @@ function storeRoleChip(node: CarveNode): React.ReactNode {
 }
 
 
+function ruleDetailLabel(r: { isKeystroke: boolean; isContextSensitive: boolean; precedingLabel: string; producesOutput: boolean }): string {
+  const base = r.isKeystroke
+    ? 'type a character from this list, then the keyboard replaces it with its matching output'
+    : r.producesOutput
+      ? 'when this character is already in the buffer, then the keyboard replaces it with its matching output'
+      : 'when this character is already in the buffer, used as context to trigger the rule';
+  if (!r.isContextSensitive) return base.replace(/^(type|when)/, (m) => m.charAt(0).toUpperCase() + m.slice(1));
+  const after = r.precedingLabel ? `After ${r.precedingLabel}: ` : 'After specific input: ';
+  return after + base;
+}
+
+type RuleGroup = {
+  key: string;
+  isKeystroke: boolean;
+  isContextSensitive: boolean;
+  precedingLabel: string;
+  producesOutput: boolean;
+  platformGuard: string | null;
+  rules: StoreRuleDetail[];
+};
+
+function groupRuleDetails(rules: StoreRuleDetail[]): RuleGroup[] {
+  const map = new Map<string, RuleGroup>();
+  for (const r of rules) {
+    const key = `${r.isKeystroke}-${r.isContextSensitive}-${r.precedingLabel}-${r.producesOutput}-${r.platformGuard ?? ''}`;
+    if (!map.has(key)) map.set(key, { key, isKeystroke: r.isKeystroke, isContextSensitive: r.isContextSensitive, precedingLabel: r.precedingLabel, producesOutput: r.producesOutput, platformGuard: r.platformGuard, rules: [] });
+    map.get(key)!.rules.push(r);
+  }
+  return [...map.values()];
+}
+
+function RuleTypeBadge({ conditional }: { conditional: boolean }) {
+  return (
+    <span style={{
+      font: '600 9px/1 var(--app-font)', padding: '2px 5px', borderRadius: 3, flexShrink: 0,
+      background: conditional ? 'color-mix(in srgb, var(--sil-orange) 13%, var(--app-surface))' : 'var(--app-accent-subtle)',
+      border: '1px solid ' + (conditional ? 'color-mix(in srgb, var(--sil-orange) 35%, transparent)' : 'var(--app-border)'),
+      color: conditional ? 'var(--sil-orange-dark)' : 'var(--app-accent-text)',
+    }}>
+      {conditional ? 'CONDITIONAL' : 'DIRECT'}
+    </span>
+  );
+}
+
+function PlatformBadge({ platform }: { platform: string }) {
+  return (
+    <span style={{
+      font: '600 9px/1 var(--app-font)', padding: '2px 5px', borderRadius: 3, flexShrink: 0,
+      background: 'color-mix(in srgb, var(--app-text-muted) 10%, var(--app-surface))',
+      border: '1px solid var(--app-border)',
+      color: 'var(--app-text-muted)',
+    }}>
+      {platform.toUpperCase()} ONLY
+    </span>
+  );
+}
+
+const RULE_GROUP_THRESHOLD = 10;
+
 function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode }: StoreDetailProps) {
   const off = isDeleted(node.nodeId);
+  const setInfo = useHoverInfoStore((s) => s.setInfo);
+  const clearInfo = useHoverInfoStore((s) => s.clearInfo);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (key: string) => setExpandedGroups((prev) => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
   const refNode = node.referencedByNodeId !== undefined
     ? nodes.find((n) => n.nodeId === node.referencedByNodeId)
     : undefined;
   const refAlive = refNode !== undefined && nodeState(refNode, isItemDeleted, isDeleted) !== 'off';
   const chars = node.displayChars ?? [];
 
+  // Build combined consumer list from patternRefs + groupRefs for the dependency chain
+  const consumers = [
+    ...(node.storeUsage?.patternRefs ?? []).map((r) => ({
+      id: r.patternId,
+      label: r.patternTitle,
+      ruleCount: r.ruleCount,
+      rules: r.rules,
+      dead: isDeleted(r.patternId),
+    })),
+    ...(node.storeUsage?.groupRefs ?? []).map((r) => {
+      const gNode = nodes.find((n) => n.nodeId === r.groupId);
+      const dead = gNode ? nodeState(gNode, isItemDeleted, isDeleted) === 'off' : isDeleted(r.groupId);
+      return { id: r.groupId, label: r.groupName, ruleCount: r.ruleCount, rules: r.rules, dead };
+    }),
+  ];
+  const allConsumersDead = consumers.length > 0 && consumers.every((c) => c.dead);
+
   return (
     <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '20px 24px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
         <ToggleBox glyph="⊷" state={off ? 'off' : 'on'} size={40} onClick={() => onToggleNode(node.nodeId, !off)} />
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, fontFamily: 'var(--app-font-mono)', color: 'var(--app-text)' }}>{node.name}</h2>
             <KindBadge kind="store" />
@@ -143,20 +253,107 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode }: St
       </div>
       {chars.length > 0 && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 18 }}>
-          {chars.map((ch, i) => (
-            <span key={i} style={{
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              padding: '9px 13px', borderRadius: 8, cursor: 'default',
-              border: '1px solid ' + (off ? 'var(--app-border)' : 'var(--app-border-strong)'),
-              borderTop: '3px solid ' + (off ? 'var(--app-border-strong)' : KIND_COLOR.store),
-              background: off ? 'var(--app-surface-2)' : 'var(--app-surface)',
-              opacity: off ? 0.6 : 1,
-            }}>
-              <span style={{ font: "400 22px/1 'Lora', serif", color: off ? 'var(--app-text-subtle)' : 'var(--app-text)' }}>
-                {displayChar(ch)}
+          {chars.map((ch, i) => {
+            const label = invisibleCharLabel(ch);
+            return (
+              <span key={i} style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                padding: label ? '9px 10px' : '9px 13px', borderRadius: 8, cursor: 'default',
+                border: '1px solid ' + (off ? 'var(--app-border)' : 'var(--app-border-strong)'),
+                borderTop: '3px solid ' + (off ? 'var(--app-border-strong)' : KIND_COLOR.store),
+                background: off ? 'var(--app-surface-2)' : 'var(--app-surface)',
+                opacity: off ? 0.6 : 1,
+              }}>
+                {label ? (
+                  <span style={{ font: '600 10px/1 var(--app-font-mono)', color: off ? 'var(--app-text-subtle)' : 'var(--app-text-muted)', letterSpacing: '0.04em' }} title={`U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`}>
+                    {label}
+                  </span>
+                ) : (
+                  <span style={{ font: "400 22px/1 'Lora', serif", color: off ? 'var(--app-text-subtle)' : 'var(--app-text)' }}>
+                    {displayChar(ch)}
+                  </span>
+                )}
               </span>
-            </span>
+            );
+          })}
+        </div>
+      )}
+      {consumers.length > 0 && (
+        <div
+          style={{
+            marginTop: 18, padding: '12px 15px', borderRadius: 10,
+            background: allConsumersDead ? 'color-mix(in srgb, var(--sil-orange) 9%, var(--app-surface))' : 'var(--app-surface)',
+            border: '1px solid ' + (allConsumersDead ? 'color-mix(in srgb, var(--sil-orange) 45%, transparent)' : 'var(--app-border)'),
+          }}
+          onMouseEnter={() => setInfo({ kind: 'text', title: 'Relationship Advice', body: 'This panel shows every rule group that depends on this store. Stores are shared character lists. Removing one while rules still reference it will break those rules at compile time. Use this section to understand what\'s connected before you remove anything.' })}
+          onMouseLeave={clearInfo}
+        >
+          <div style={{ font: '600 10px/1 var(--app-font)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--app-text-subtle)', marginBottom: 6 }}>
+            Used by
+          </div>
+          <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--app-text-subtle)', lineHeight: 1.5 }}>
+            {node.storeUsage?.asSource && node.storeUsage?.asOutput
+              ? 'These rules scan your input against this list and also pick their output character from it.'
+              : node.storeUsage?.asSource
+              ? 'These rules scan your input against this list; when you type a matching character, the rule fires.'
+              : 'These rules pick their output character from this list based on which key you pressed.'}
+          </p>
+          {consumers.map((c) => (
+            <div key={c.id} style={{ padding: '4px 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: c.dead ? 400 : 600, color: c.dead ? 'var(--app-text-subtle)' : 'var(--app-text)', textDecoration: c.dead ? 'line-through' : 'none' }}>
+                  {c.label}
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--app-text-subtle)', whiteSpace: 'nowrap' }}>
+                  {c.ruleCount} {c.ruleCount === 1 ? 'rule' : 'rules'}
+                </span>
+              </div>
+              {c.rules.length > RULE_GROUP_THRESHOLD ? (
+                groupRuleDetails(c.rules).map((g) => {
+                  const gKey = `${c.id}-${g.key}`;
+                  const expanded = expandedGroups.has(gKey);
+                  return (
+                    <div key={g.key} style={{ marginTop: 3, paddingLeft: 10 }}>
+                      <button
+                        onClick={() => toggleGroup(gKey)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', padding: 0, cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                      >
+                        <RuleTypeBadge conditional={g.isContextSensitive} />
+                        {g.platformGuard && <PlatformBadge platform={g.platformGuard} />}
+                        <span style={{ flex: 1, fontSize: 11, color: c.dead ? 'var(--app-text-subtle)' : 'var(--app-text-muted)', lineHeight: 1.45, textDecoration: c.dead ? 'line-through' : 'none' }}>
+                          {ruleDetailLabel(g)}
+                        </span>
+                        <span style={{ fontSize: 10, color: 'var(--app-text-subtle)', whiteSpace: 'nowrap' }}>×{g.rules.length} {expanded ? '▼' : '▶'}</span>
+                      </button>
+                      {expanded && g.rules.map((r, i) => (
+                        <div key={r.nodeId} style={{ fontSize: 11, color: 'var(--app-text-subtle)', paddingLeft: 10, lineHeight: 1.6 }}>
+                          Rule {i + 1}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })
+              ) : (
+                c.rules.map((r) => (
+                  <div key={r.nodeId} style={{ display: 'flex', alignItems: 'flex-start', gap: 5, marginTop: 3, paddingLeft: 10 }}>
+                    <RuleTypeBadge conditional={r.isContextSensitive} />
+                    {r.platformGuard && <PlatformBadge platform={r.platformGuard} />}
+                    <span style={{ fontSize: 11, color: c.dead ? 'var(--app-text-subtle)' : 'var(--app-text-muted)', lineHeight: 1.45, textDecoration: c.dead ? 'line-through' : 'none' }}>
+                      {ruleDetailLabel(r)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
           ))}
+          <p style={{ margin: '8px 0 0', fontSize: 12, lineHeight: 1.5, color: allConsumersDead ? 'var(--sil-orange-dark)' : 'var(--app-text-subtle)' }}>
+            {allConsumersDead
+              ? 'All consumers removed. This store is now orphaned and safe to drop.'
+              : (() => {
+                  const total = node.storeUsage?.ruleCount ?? consumers.reduce((s, c) => s + c.ruleCount, 0);
+                  return `If this store is removed, the ${total} ${total === 1 ? 'rule' : 'rules'} above that depend on it will break at compile time.`;
+                })()}
+          </p>
         </div>
       )}
       {node.referencedByLabel !== undefined && (
@@ -171,7 +368,7 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode }: St
           <div style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--app-text)' }}>
             {refAlive
               ? <>Referenced by <b>{node.referencedByLabel}</b>. Keep this unless you remove that pattern too.</>
-              : <><b>No longer referenced</b> — {node.referencedByLabel} was removed, so this store is now unused and safe to drop.</>}
+              : <><b>No longer referenced.</b> {node.referencedByLabel} was removed, so this store is now unused and safe to drop.</>}
           </div>
         </div>
       )}
@@ -247,14 +444,14 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
           </div>
           <p style={{ ...blurbStyle, margin: 0 }}>
             {node.kind === 'pattern'
-              ? 'A recognized pattern groups related key rules by purpose — for example, "vowels with diacritics" or "base alphabet". Removing it removes all rules that produce those characters.'
-              : 'A group is a block of key rules from the original keyboard that hasn\'t been recognized as a named pattern. Removing it removes every rule inside it.'}
+              ? 'A recognized pattern groups related key rules by purpose, for example "vowels with diacritics" or "base alphabet". The tiles below show rules with visible character output. The pattern may also own store-dependent rules that don\'t appear as tiles; those are shown in the relevant stores\' "Used by" panels. Removing this pattern removes all of it.'
+              : 'A group is a block of key rules from the original keyboard that hasn\'t been recognized as a named pattern. The tiles below show rules with visible character output. The group may also contain store-dependent rules that don\'t appear as tiles; those are shown in the relevant stores\' "Used by" panels. Removing this group removes all of it.'}
           </p>
         </div>
         <button
           onClick={() => onSetManyGlyphs(glyphs.map((x) => x.gid), st !== 'off')}
-          onMouseEnter={() => setInfo({ kind: 'text', title: st === 'off' ? 'Keep all' : 'Remove all', body: st === 'off' ? 'Restore every key shown here so it types again.' : 'Remove every key shown here at once — you can restore them later from the removed-items menu.' })}
-          onFocus={() => setInfo({ kind: 'text', title: st === 'off' ? 'Keep all' : 'Remove all', body: st === 'off' ? 'Restore every key shown here so it types again.' : 'Remove every key shown here at once — you can restore them later from the removed-items menu.' })}
+          onMouseEnter={() => setInfo({ kind: 'text', title: st === 'off' ? 'Keep all' : 'Remove all', body: st === 'off' ? 'Restore every key shown here so it types again.' : 'Remove every key shown here at once. You can restore them later from the removed-items menu.' })}
+          onFocus={() => setInfo({ kind: 'text', title: st === 'off' ? 'Keep all' : 'Remove all', body: st === 'off' ? 'Restore every key shown here so it types again.' : 'Remove every key shown here at once. You can restore them later from the removed-items menu.' })}
           onMouseLeave={clearInfo}
           onBlur={clearInfo}
           style={btnGhost}
@@ -305,8 +502,8 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
               {/* Per-group bulk button */}
               <button
                 onClick={() => onSetManyGlyphs(grp.glyphs.map((g) => g.gid), grpState !== 'off')}
-                onMouseEnter={() => setInfo({ kind: 'text', title: grpState === 'off' ? 'Keep all' : 'Remove all', body: grpState === 'off' ? `Restore every ${grp.label} key in this group.` : `Remove every ${grp.label} key in this group — you can restore them later.` })}
-                onFocus={() => setInfo({ kind: 'text', title: grpState === 'off' ? 'Keep all' : 'Remove all', body: grpState === 'off' ? `Restore every ${grp.label} key in this group.` : `Remove every ${grp.label} key in this group — you can restore them later.` })}
+                onMouseEnter={() => setInfo({ kind: 'text', title: grpState === 'off' ? 'Keep all' : 'Remove all', body: grpState === 'off' ? `Restore every ${grp.label} key in this group.` : `Remove every ${grp.label} key in this group. You can restore them later.` })}
+                onFocus={() => setInfo({ kind: 'text', title: grpState === 'off' ? 'Keep all' : 'Remove all', body: grpState === 'off' ? `Restore every ${grp.label} key in this group.` : `Remove every ${grp.label} key in this group. You can restore them later.` })}
                 onMouseLeave={clearInfo}
                 onBlur={clearInfo}
                 style={{ ...btnGhost, fontSize: 11, padding: '5px 10px' }}

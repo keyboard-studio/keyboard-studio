@@ -28,7 +28,7 @@ export function DepBanner({ orphanedNodes, unusedStoreNodes, onRemoveNode }: Dep
         <div key={n.nodeId} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--app-text)' }}>
           <span style={{ color: 'var(--sil-orange-dark)', display: 'inline-flex', flexShrink: 0 }}><WarnIcon size={15} /></span>
           <span style={{ flex: 1 }}>
-            <b>{n.name}</b> produces nothing now — every output was dropped, but the trigger key still fires.
+            <b>{n.name}</b> has no outputs left. Its trigger key will silently swallow the input, blocking the normal keystroke. Remove the rule too to restore default key behavior.
           </span>
           <button style={btnRemove} onClick={() => onRemoveNode(n.nodeId)}>
             Remove trigger key too

@@ -117,6 +117,51 @@ export function displayChar(ch: string): string {
   return isCombining(ch) ? '◌' + ch : ch;
 }
 
+const INVISIBLE_CHAR_LABELS: Record<string, string> = {
+  ' ': 'SPACE',
+  '​': 'ZERO WIDTH SPACE',
+  '‌': 'ZERO WIDTH NON-JOINER',
+  '‍': 'ZERO WIDTH JOINER',
+  '﻿': 'ZERO WIDTH NO-BREAK SPACE',
+  '­': 'SOFT HYPHEN',
+  '͏': 'COMBINING GRAPHEME JOINER',
+  '᠎': 'MONGOLIAN VOWEL SEPARATOR',
+  '̀': 'COMBINING GRAVE ACCENT',
+  '́': 'COMBINING ACUTE ACCENT',
+  '̂': 'COMBINING CIRCUMFLEX ACCENT',
+  '̃': 'COMBINING TILDE',
+  '̄': 'COMBINING MACRON',
+  '̅': 'COMBINING OVERLINE',
+  '̆': 'COMBINING BREVE',
+  '̇': 'COMBINING DOT ABOVE',
+  '̈': 'COMBINING DIAERESIS',
+  '̉': 'COMBINING HOOK ABOVE',
+  '̊': 'COMBINING RING ABOVE',
+  '̋': 'COMBINING DOUBLE ACUTE ACCENT',
+  '̌': 'COMBINING CARON',
+  '̍': 'COMBINING VERTICAL LINE ABOVE',
+  '̏': 'COMBINING DOUBLE GRAVE ACCENT',
+  '̣': 'COMBINING DOT BELOW',
+  '̤': 'COMBINING DIAERESIS BELOW',
+  '̥': 'COMBINING RING BELOW',
+  '̧': 'COMBINING CEDILLA',
+  '̨': 'COMBINING OGONEK',
+  '̰': 'COMBINING TILDE BELOW',
+  '̱': 'COMBINING MACRON BELOW',
+};
+
+/** Returns a short label if the character is invisible/non-printing, otherwise null. */
+export function invisibleCharLabel(ch: string): string | null {
+  const known = INVISIBLE_CHAR_LABELS[ch];
+  if (known) return known;
+  // Any Unicode combining mark not in the explicit map
+  if (/^\p{M}/u.test(ch)) {
+    const cp = ch.codePointAt(0)!;
+    return `COMBINING MARK (U+${cp.toString(16).toUpperCase().padStart(4, '0')})`;
+  }
+  return null;
+}
+
 // A glyph tile the user is hovering/focusing, plus its current removed state — used by the Info View.
 export interface HoverGlyph extends Pick<CarveGlyph, 'keys' | 'ch' | 'capability'> {
   off: boolean;
@@ -371,11 +416,89 @@ export function storeChars(store: { items: StoreItem[] }): string[] {
 // StoreUsage — how a store is referenced across the keyboard's rules
 // ---------------------------------------------------------------------------
 
+/** Structural description of a single rule's relationship to a store. */
+export interface StoreRuleDetail {
+  nodeId: string;
+  /** True when the store reference is the active keystroke (after the + separator); false when it matches already-buffered text. */
+  isKeystroke: boolean;
+  /** True when character context elements appear before the store reference — rule only fires after specific preceding characters. */
+  isContextSensitive: boolean;
+  /** Plain-English description of all character elements that must precede the store match (empty string when bare). */
+  precedingLabel: string;
+  /** True when the store's matched character appears in the output (the rule substitutes it); false when the store is used only as a context trigger with no matching output. */
+  producesOutput: boolean;
+  /** Platform restriction extracted from platform() guard, e.g. 'touch' or 'hardware'. Null for non-platform-specific rules. */
+  platformGuard: string | null;
+}
+
 export interface StoreUsage {
   ruleCount: number;      // total rules in any group that reference this store
   asSource: boolean;      // used in any()/notany() context elements
   asOutput: boolean;      // used in index()/outs() output/context elements
   groupNames: string[];   // names of groups containing referencing rules
+  /** Recognized patterns that own at least one rule referencing this store. */
+  patternRefs: { patternId: string; patternTitle: string; ruleCount: number; rules: StoreRuleDetail[] }[];
+  /** Groups whose unowned rules reference this store (parallel to patternRefs for non-pattern rules). */
+  groupRefs: { groupId: string; groupName: string; ruleCount: number; rules: StoreRuleDetail[] }[];
+}
+
+function precedingContextLabel(elements: ContextElement[]): string {
+  const parts: string[] = [];
+  for (const el of elements) {
+    switch (el.kind) {
+      case 'char':       parts.push(`"${el.value}"`); break;
+      case 'any':        parts.push(`any char from "${el.storeRef}"`); break;
+      case 'notany':     parts.push(`any char not in "${el.storeRef}"`); break;
+      case 'vkey':       parts.push(`[${el.name}]`); break;
+      case 'deadkey':    parts.push('a dead key'); break;
+      case 'index':      parts.push(`indexed char from "${el.storeRef}"`); break;
+      case 'context':    parts.push('context'); break;
+      case 'baselayout': parts.push('base layout char'); break;
+      case 'raw':
+        // Skip structural KMN syntax tokens ('+' separator) — they're codec artifacts, not meaningful context
+        if (el.text.trim() !== '+') parts.push('specific input');
+        break;
+    }
+  }
+  return parts.join(' + ');
+}
+
+const PLATFORM_GUARD_RE = /^\s*platform\s*\(\s*'(\w+)'\s*\)/i;
+
+function describeRuleForStore(rule: IRRule, storeName: string): StoreRuleDetail {
+  const ctxRefIdx = rule.context.findIndex((el) =>
+    ((el.kind === 'any' || el.kind === 'notany') && el.storeRef === storeName) ||
+    (el.kind === 'index' && el.storeRef === storeName),
+  );
+
+  // The raw('+') element marks the keystroke boundary — refs after it are the active keypress
+  const plusIdx = rule.context.findIndex((el) => el.kind === 'raw' && el.text.trim() === '+');
+  // ctxRefIdx === -1 means store is output-only (not a keystroke trigger)
+  const isKeystroke = ctxRefIdx !== -1 && (plusIdx === -1 || ctxRefIdx > plusIdx);
+
+  const preceding = ctxRefIdx > 0 ? rule.context.slice(0, ctxRefIdx) : [];
+
+  // Strip platform() guards from preceding — they're rule-level platform restrictions, not character context
+  let platformGuard: string | null = null;
+  const precedingFiltered = preceding.filter((el) => {
+    if (el.kind !== 'raw') return true;
+    const m = PLATFORM_GUARD_RE.exec(el.text);
+    if (m) { platformGuard = m[1] ?? null; return false; }
+    return true;
+  });
+
+  const outRefIdx = rule.output.findIndex(
+    (el) => (el.kind === 'index' || el.kind === 'outs') && el.storeRef === storeName,
+  );
+
+  return {
+    nodeId: rule.nodeId,
+    isKeystroke,
+    isContextSensitive: precedingFiltered.length > 0,
+    precedingLabel: precedingContextLabel(precedingFiltered),
+    producesOutput: outRefIdx !== -1,
+    platformGuard,
+  };
 }
 
 function analyzeStoreUsage(storeName: string, ir: KeyboardIR): StoreUsage {
@@ -406,7 +529,50 @@ function analyzeStoreUsage(storeName: string, ir: KeyboardIR): StoreUsage {
     }
   }
 
-  return { ruleCount, asSource, asOutput, groupNames: [...groupNameSet] };
+  // Which recognized patterns own rules that reference this store?
+  const patternRefs: { patternId: string; patternTitle: string; ruleCount: number; rules: StoreRuleDetail[] }[] = [];
+  for (const pattern of ir.recognizedPatterns) {
+    if (pattern.origin !== 'recognized') continue;
+    const ownedIds = new Set(pattern.ownedNodes?.map((n) => n.nodeId) ?? []);
+    if (ownedIds.size === 0) continue;
+    const pRules: StoreRuleDetail[] = [];
+    for (const group of ir.groups) {
+      for (const rule of group.rules) {
+        if (!ownedIds.has(rule.nodeId)) continue;
+        let used = false;
+        for (const el of rule.context) {
+          if ((el.kind === 'any' || el.kind === 'notany') && el.storeRef === storeName) used = true;
+          if (el.kind === 'index' && el.storeRef === storeName) used = true;
+        }
+        for (const el of rule.output) {
+          if ((el.kind === 'index' || el.kind === 'outs') && el.storeRef === storeName) used = true;
+        }
+        if (used) pRules.push(describeRuleForStore(rule, storeName));
+      }
+    }
+    if (pRules.length > 0) patternRefs.push({ patternId: pattern.id, patternTitle: pattern.title, ruleCount: pRules.length, rules: pRules });
+  }
+
+  // Which groups have unowned rules (not claimed by any pattern) that reference this store?
+  const groupRefs: { groupId: string; groupName: string; ruleCount: number; rules: StoreRuleDetail[] }[] = [];
+  for (const group of ir.groups) {
+    const gRules: StoreRuleDetail[] = [];
+    for (const rule of group.rules) {
+      if (rule.ownedByPattern !== undefined) continue; // skip — already counted in patternRefs
+      let used = false;
+      for (const el of rule.context) {
+        if ((el.kind === 'any' || el.kind === 'notany') && el.storeRef === storeName) used = true;
+        if (el.kind === 'index' && el.storeRef === storeName) used = true;
+      }
+      for (const el of rule.output) {
+        if ((el.kind === 'index' || el.kind === 'outs') && el.storeRef === storeName) used = true;
+      }
+      if (used) gRules.push(describeRuleForStore(rule, storeName));
+    }
+    if (gRules.length > 0) groupRefs.push({ groupId: group.nodeId, groupName: group.name, ruleCount: gRules.length, rules: gRules });
+  }
+
+  return { ruleCount, asSource, asOutput, groupNames: [...groupNameSet], patternRefs, groupRefs };
 }
 
 // ---------------------------------------------------------------------------

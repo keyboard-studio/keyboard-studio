@@ -12,9 +12,9 @@ export interface InfoContent {
 
 export function keyHint(off: boolean): string {
   if (off === false) {
-    return "Click to remove — these keys will no longer type this character.";
+    return "Click to remove. These keys will no longer type this character.";
   }
-  return "Click to restore — these keys will type this character again.";
+  return "Click to restore. These keys will type this character again.";
 }
 
 export function capabilityHint(capability: RemovalCapability): string {
@@ -43,14 +43,14 @@ export function infoFor(node: CarveNode | undefined): InfoContent {
   if (node.kind === 'pattern') {
     return {
       title: `Pattern: ${node.name}`,
-      body: "A pattern is a set of related rules the tool recognized and grouped together, like the rules for typing accented letters. Each tile below pairs the keys you press with the character they produce — remove the whole pattern, or click one tile to drop just that mapping.",
+      body: "A pattern is a set of related rules the tool recognized and grouped together, like the rules for typing accented letters. Each tile below pairs the keys you press with the character they produce. Remove the whole pattern, or click one tile to drop just that mapping.",
     };
   }
 
   if (node.kind === 'group') {
     return {
       title: `Rule group: ${node.name}`,
-      body: "A group is a batch of rules from the original keyboard that didn't match any recognized pattern. Each tile below pairs the keys you press with the character they produce — remove the whole group, or click one tile to drop just that mapping.",
+      body: "A group is a batch of rules from the original keyboard that didn't match any recognized pattern. Each tile below pairs the keys you press with the character they produce. Remove the whole group, or click one tile to drop just that mapping.",
     };
   }
 
@@ -59,19 +59,19 @@ export function infoFor(node: CarveNode | undefined): InfoContent {
     if (u !== undefined && u.asSource && u.asOutput) {
       return {
         title: `Store: ${node.name} (input + output)`,
-        body: "A set of characters that some rules depend on as you type and others use to produce output. Removing it affects rules on both sides — drop it only if your language needs neither.",
+        body: "A set of characters that some rules depend on as you type and others use to produce output. Removing it affects rules on both sides, so drop it only if your language needs neither.",
       };
     }
     if (u !== undefined && u.asSource) {
       return {
         title: `Store: ${node.name} (input)`,
-        body: "A set of characters that some of this keyboard's rules depend on as you type. Removing it stops those rules from working — safe to drop only if your language never uses these characters.",
+        body: "A set of characters that some of this keyboard's rules depend on as you type. Removing it stops those rules from working. Safe to drop only if your language never uses these characters.",
       };
     }
     if (u !== undefined && u.asOutput) {
       return {
         title: `Store: ${node.name} (output)`,
-        body: "A set of characters the keyboard can produce as output. Remove it and the rules that insert these characters stop producing them — safe to drop if your language doesn't need that output.",
+        body: "A set of characters the keyboard can produce as output. Remove it and the rules that insert these characters stop producing them. Safe to drop if your language doesn't need that output.",
       };
     }
     if (u !== undefined) {
@@ -96,7 +96,7 @@ export function infoFor(node: CarveNode | undefined): InfoContent {
   // kind === 'raw'
   return {
     title: `Advanced rule: ${node.name}`,
-    body: "A rule too complex for the editor to show or rewrite. These often look like junk but usually do real work — leave it unless you're certain this behaviour is unused by your language.",
+    body: "A rule too complex for the editor to show or rewrite. These often look like junk but usually do real work. Leave it unless you're certain this behaviour is unused by your language.",
   };
 }
 
@@ -131,7 +131,7 @@ export function InfoView() {
           <div style={{ font: '600 13.5px/1.3 var(--app-font)', color: 'var(--app-text)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, color: 'var(--app-text-subtle)', fontWeight: 400 }}>Key</span>
             <KeySeq keys={info.keys} />
-            <span style={{ color: 'var(--app-text-subtle)' }}>→</span>
+            <span style={{ color: 'var(--app-text-subtle)', fontSize: 11 }}>types</span>
             <span style={{ font: "400 18px/1 'Lora', Georgia, serif", color: 'var(--app-text)' }}>
               {displayChar(info.ch)}
             </span>
