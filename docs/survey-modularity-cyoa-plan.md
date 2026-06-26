@@ -59,6 +59,9 @@ single "question" can exist in up to four different forms. The end state:
 - **Deleting the legacy YAML loader.** #410 scopes out "replacing the YAML
   loader." Retiring `content/flows/*.yaml` + `parseFlow` is a follow-up *beyond*
   #410 (see Phase P3).
+- **Deleting unintegrated-but-vetted question modules.** Authored questions that
+  no flow manifest references are **NOT** deleted — they become the **question
+  library** (§3.8); only redundant *delivery forms* of a question are removed.
 
 ---
 
@@ -597,6 +600,38 @@ index**, reading `steps/manifest.ts`. It shows, per step:
   and inputs-satisfiability — flagging unreachable steps, off-spine dead-ends,
   cycles, and unsatisfiable `inputs`.
 
+### 3.8 Question library / reserve — preserve, don't delete (Decided 2026-06-26)
+
+Not every authored question is wired into the live flow, and **that is
+intentional.** Many Phase A / Phase B modules — **especially the non-Roman-script
+research** (scripts, input methods, IME / keymap considerations) — are vetted and
+useful but referenced by **no flow manifest today.** Unification must **preserve**
+them, never delete them.
+
+This falls out of the architecture for free. A question is "in the flow" **only
+if a flow manifest references its `definition.id`** (§3.4). A registered
+`QuestionModule` that no manifest references is therefore a **library / reserve**
+entry — present, type-checked, test-covered, browsable in the dashboard (§3.7),
+but **inert at runtime.** This is the **building-block catalog**: questions we can
+later promote into the CYOA spine or a side trail by adding a manifest reference,
+with **no code-rescue required.**
+
+**Invariants:**
+
+- **No-delete.** Migration (P3's legacy-YAML deletion especially) removes
+  redundant *delivery forms* of a question, **never the question's research /
+  content.** A module is deleted **only** when its content is provably duplicated
+  by a surviving module. **Non-Roman-script research is explicitly out of scope
+  for deletion.**
+- **Library modules still compile and test.** Reserve modules carry the same
+  per-question unit tests (§7) so they don't rot; they are excluded **only** from
+  flow integration / E2E (which run the manifest, not the full registry).
+- **Discoverable.** The dashboard (§3.7) surfaces reserve modules as a distinct
+  "library / not-in-flow" set so they are findable as building blocks rather than
+  buried.
+- **Promotable.** Moving a library module into the flow is a **manifest edit**
+  (add its id to a phase manifest), **not a rewrite.**
+
 ---
 
 ## 4. Target file tree (`packages/studio/src/`)
@@ -892,7 +927,9 @@ markers' `phase_a.modular.yaml` / `identity_lite.modular.yaml` names are
 aspirational — §2). Remove the TODO(#410) markers; land the two Playwright E2E
 lanes (AC#3). (b) **Follow-up beyond #410:** delete `survey/loadFlow.ts` and
 `content/flows/phase_*.yaml` / `identity_lite.yaml`. Keep (a) and (b) as separate
-commits/PRs so #410 can close on (a).
+commits/PRs so #410 can close on (a). **Deletion here strips redundant *delivery
+forms* only; research content (notably non-Roman-script questions) is preserved
+as library entries per §3.8.**
 - **AC:** A/F/identity-lite render identically via `loadModularFlow`; new
   `identity_lite.modular.yaml` exists and matches the legacy flow's question set;
   no remaining `TODO(#410)`; both E2E lanes pass.
