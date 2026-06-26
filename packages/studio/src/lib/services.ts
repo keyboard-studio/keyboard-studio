@@ -117,24 +117,38 @@ export async function getGitHubOutputService(): Promise<GitHubOutputService> {
 // When USE_REAL is false returns null (deterministic, no network) so tests
 // render the neutral "no data" note without real CLDR traffic.
 // When real, lazy-imports suggestMissingCharacters + createFetchCldrFullLoader
-// from the engine; caches the full loader across calls (one instance per session).
-let cldrFullLoaderCache: CldrFullLoader | null = null;
+// from the engine; caches the loader + engine fn together after first import so
+// subsequent calls skip the dynamic import entirely (mirrors getScaffolderService).
+type SuggestEngineCache = {
+  fn: (opts: { bcp47: string; baseIr: KeyboardIR; loader: CldrFullLoader; languageName?: string }) => Promise<MissingCharSuggestions | null>;
+  loader: CldrFullLoader;
+};
+let suggestEngineCache: SuggestEngineCache | null = null;
 export async function suggestMissingChars(
   bcp47: string,
   baseIr: KeyboardIR,
   languageName?: string,
 ): Promise<MissingCharSuggestions | null> {
   if (!USE_REAL) return null;
+  if (suggestEngineCache !== null) {
+    return suggestEngineCache.fn({
+      bcp47,
+      baseIr,
+      loader: suggestEngineCache.loader,
+      ...(languageName !== undefined ? { languageName } : {}),
+    });
+  }
   const { suggestMissingCharacters, createFetchCldrFullLoader } = await import(
     /* @vite-ignore */ "@keyboard-studio/engine"
   );
-  if (cldrFullLoaderCache === null) {
-    cldrFullLoaderCache = createFetchCldrFullLoader();
-  }
-  return suggestMissingCharacters({
+  suggestEngineCache = {
+    fn: suggestMissingCharacters,
+    loader: createFetchCldrFullLoader(),
+  };
+  return suggestEngineCache.fn({
     bcp47,
     baseIr,
-    loader: cldrFullLoaderCache,
+    loader: suggestEngineCache.loader,
     ...(languageName !== undefined ? { languageName } : {}),
   });
 }

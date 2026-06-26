@@ -353,7 +353,6 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
   // Fetch suggestions whenever bcp47 or baseIr changes.
   useEffect(() => {
     if (!bcp47 || baseIr === null) {
-      setLoadState({ status: "done", data: null });
       return;
     }
     let cancelled = false;

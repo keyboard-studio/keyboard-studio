@@ -163,12 +163,7 @@ describe("SuggestionPanel — null / no verified data", () => {
     // suggestMissingChars returns null (already set by beforeEach).
     await renderBuildListView({ bcp47_tag: "yo" });
     // Wait for the async effect to settle.
-    await waitFor(() => {
-      expect(
-        screen.queryByText(/No verified character list/i) !== null ||
-        screen.queryByText(/Checking for a verified character list/i) !== null,
-      ).toBe(true);
-    });
+    await waitFor(() => { expect(screen.getByText(/No verified character list/i)).toBeTruthy(); });
     // No suggestion chip group should be rendered.
     expect(
       screen.queryByRole("group", {

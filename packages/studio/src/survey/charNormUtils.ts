@@ -7,7 +7,7 @@
  * NFC-normalize each element of `incoming`, append to `base` skipping
  * anything already present (first-appearance order preserved).
  *
- * Empty strings (after normalize + trim) are silently dropped.
+ * Empty strings (after NFC normalization) are silently dropped.
  */
 export function nfcDedup(base: string[], incoming: string[]): string[] {
   const seen = new Set<string>(base);
