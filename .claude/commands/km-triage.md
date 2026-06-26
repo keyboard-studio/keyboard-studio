@@ -559,7 +559,7 @@ Other specialists (`km-domain`, `km-keyman`, `km-qc`, `km-verification`, `km-syn
 
 **Empty-crew interaction.** Pre-filter B's empty-crew guard runs after C. If C strips a specialist and B then strips the rest, the same ESCALATE-with-question fallback fires — the guard does not distinguish between scope-skipped and signed-off-skipped reasons. (For the current filter set this is unreachable, since `km-domain` and `km-keyman` are unfilterable and always populate CONTENT-flavored crews.)
 
-**Audit-log fields.** Add `scope_skipped: [<names>]` next to `signed_off_skipped`. When neither filter strips anyone, both fields are `[]`. Auditors comparing weight-pulling across specialists can read these fields directly to see who was dropped and why.
+**Audit-log fields.** `scope_skipped: [<names>]` sits next to `signed_off_skipped` and `triage_approved_skipped` in the Phase-7 audit schema. When no filter strips anyone, all three fields are `[]`. Auditors can read these fields together to see exactly who was dropped and why.
 
 **Adjusting the filter.** When a specialist's empirical signal/noise shifts (more APPROVEs for "didn't touch my domain"), add it to the table above with a tight glob set. Re-check the audit log after a few sweep cycles to confirm the filter didn't suppress real findings. The path globs are deliberately verbose-but-readable so future edits are obvious.
 
@@ -584,6 +584,30 @@ Procedure:
 - A name in the trailer that is not a recognized km-* specialist → print a warning to stdout (the run log) ("PR #N trailer names unknown specialist '<X>' — typo?") and skip the unknown name. Continue with the rest.
 - The PR has zero commits accessible (defensive) → assume `signed_off = {}`.
 
+### Pre-filter E: skip prior-approval specialists on incremental reviews
+
+The triage-level equivalent of Pre-filter B's cycle-level sign-off skip. Pre-filter B trusts the km-archivist's `KM-Reviewed:` trailer (set by the development crew). Pre-filter E trusts the triage's own verdict history: if a specialist returned APPROVE on the previous substantive-review sweep, and the current sweep is an incremental review (not a full re-review triggered by a force-push), there is no reason to dispatch them again for code they already blessed. Only the specialists who previously dissented — `REQUEST_CHANGES` or `ESCALATE` — need to re-examine the new commits to see if their findings were addressed.
+
+Procedure:
+
+1. **Full-review bypass.** If `review_range == "full"` (Pre-filter A), skip this entire filter. A full review means the whole diff has changed meaningfully (first sweep or post-force-push). All classified specialists run regardless of prior verdicts.
+
+2. **Incremental path.** For each specialist remaining in the dispatched crew after Pre-filter C and B have already removed their subsets:
+   a. Look in `last_audit_entry.verdicts` (cached in Pre-filter A — do not re-read the log) for an entry whose `specialist` field matches.
+   b. No prior verdict → dispatch them (they have never reviewed this PR; treat as new).
+   c. Prior verdict `APPROVE` → candidate for skipping (subject to the always-run guard below).
+   d. Prior verdict `REQUEST_CHANGES` or `ESCALATE` → dispatch them; they need to assess whether the new commits address their findings. The `PREVIOUS_REVIEW_CONTEXT_BLOCK` (see Phase 4's briefing section) gives them their prior findings as context.
+
+3. **Always-run guard.** Never skip via Pre-filter E: `km-domain`, `km-keyman`. Linguistic context and Keyman semantics can shift unexpectedly in any new commit; a fresh pass from these two is cheap insurance. (km-simplify is not a triage crew member and is not evaluated here.)
+
+4. Remove candidates (prior-APPROVE specialists not in the always-run guard) from the dispatch list. Record them in `triage_approved_skipped: [<names>]` in the Phase-7 audit log.
+
+**Interaction with Pre-filter B.** Pre-filter B runs before E. A specialist removed by B does not appear in E's input and does not appear in `triage_approved_skipped` (they go in `signed_off_skipped`). The two fields are disjoint.
+
+**Empty-crew interaction.** Pre-filter E runs before the empty-crew guard (same as Pre-filter B). If E strips additional specialists and the crew empties, the ESCALATE fallback fires with a question noting that all remaining specialists had prior APPROVE verdicts and no dissenters exist — confirm the prior approvals are still valid before merging.
+
+**Auto-fix invalidation.** If the last commit subject starts with `triage(auto-fix):`, the auto-fix push changed the diff under the previously-approving specialists. Treat prior APPROVE verdicts on auto-fix commits as stale: do not skip any specialist. (Pre-filter A sets `review_range = "incremental"` in this case since it's still the same branch, so this guard is the explicit safety catch — if the last-reviewed action was `auto_fix_only`, dispatch the full crew on the new head.)
+
 ### Crew compositions
 
 - **ENGINE crew**: `km-verification`, `km-qc`, `km-synthesis` — parallel.
@@ -601,7 +625,7 @@ Before composing the Agent calls, emit two progress events and create the `km-tr
 node utilities/km-triage-app/progress-emit.js \
   phase=pr-start pr=<NUM> title="<TITLE>" crew=<engine|content|both> team=<engine|content|shared|MISSING> || true
 
-# 2. Announce the specialist roster about to fire (post-Pre-filter-B filtering).
+# 2. Announce the specialist roster about to fire (post all Pre-filter steps).
 node utilities/km-triage-app/progress-emit.js \
   phase=dispatch pr=<NUM> "specialists=[<comma-separated names>]" || true
 
@@ -1206,7 +1230,7 @@ Record the completed check's `id` and `conclusion` in the Phase-7 audit log for 
 After every PR action (including skips), append exactly one JSON line to `.escalations/audit-log.jsonl`:
 
 ```json
-{"ts":"<ISO timestamp>","pr":<NUM>,"author":"<LOGIN>","directed_by":"<email|login|\"unknown\">","channel":"desktop|web|unknown","team":"<engine|content|shared|null>","crew":"engine|content|both|none","head_sha":"<NUM's last commit SHA before triage>","last_audited_sha":"<previous audit's head_sha or null>","review_range":"full|incremental","signed_off_skipped":["km-qc","..."],"trigger":"schedule|comment|manual_arg","triggering_comment_id":<comment_id_or_null>,"triggering_comment_author":"<login_or_null>","verdicts":[{"specialist":"<name>","status":"APPROVE|REQUEST_CHANGES|ESCALATE","confidence":"<X>","summary":"<...>"}],"action_taken":"approve_park|auto_fix_only|mention_only|fix_and_mention|escalate|auto_fix_attempt_failed|skipped|auth_failed|bypass","ci_status":"<rollup>","missing_team_label":<bool>,"reason":"<skip reason or null>","bypass_trigger":"process_title_prefix|triage_bypass_label|null","auto_fix":{"applied":<int>,"escalated":<int>,"commit_sha":"<sha or null>"},"mention_comment_url":"<url or null>","mention_resolution":"ok|self_dedup|lookup_failed|n_a","check_run":{"id":<check_run_id_or_null>,"conclusion":"success|action_required|null"}}
+{"ts":"<ISO timestamp>","pr":<NUM>,"author":"<LOGIN>","directed_by":"<email|login|\"unknown\">","channel":"desktop|web|unknown","team":"<engine|content|shared|null>","crew":"engine|content|both|none","head_sha":"<NUM's last commit SHA before triage>","last_audited_sha":"<previous audit's head_sha or null>","review_range":"full|incremental","signed_off_skipped":["km-qc","..."],"triage_approved_skipped":["km-synthesis","..."],"scope_skipped":["km-strategy","..."],"trigger":"schedule|comment|manual_arg","triggering_comment_id":<comment_id_or_null>,"triggering_comment_author":"<login_or_null>","verdicts":[{"specialist":"<name>","status":"APPROVE|REQUEST_CHANGES|ESCALATE","confidence":"<X>","summary":"<...>"}],"action_taken":"approve_park|auto_fix_only|mention_only|fix_and_mention|escalate|auto_fix_attempt_failed|skipped|auth_failed|bypass","ci_status":"<rollup>","missing_team_label":<bool>,"reason":"<skip reason or null>","bypass_trigger":"process_title_prefix|triage_bypass_label|null","auto_fix":{"applied":<int>,"escalated":<int>,"commit_sha":"<sha or null>"},"mention_comment_url":"<url or null>","mention_resolution":"ok|self_dedup|lookup_failed|n_a","check_run":{"id":<check_run_id_or_null>,"conclusion":"success|action_required|null"}}
 ```
 
 Field notes:
@@ -1216,7 +1240,9 @@ Field notes:
 - `head_sha` is the PR's last commit SHA **before** the triage ran (powers the Phase-2 idempotency gate and the Pre-filter-A incremental-range lookup). When Phase-6 auto-fix pushes a new commit, that new SHA goes in `auto_fix.commit_sha`, not in `head_sha` — the idempotency check should still see the *original* head as "what triage saw."
 - `last_audited_sha` is the `head_sha` of the previous audit-log entry for this PR (the SHA the last sweep saw), or `null` for first-sweep PRs and PRs that were force-pushed since the last sweep. Paired with `head_sha`, this defines the range `last_audited_sha..head_sha` — the diff this sweep actually reviewed.
 - `review_range` is `"full"` (full PR diff was reviewed: first sweep, or post-force-push) or `"incremental"` (only the `last_audited_sha..head_sha` range was reviewed).
-- `signed_off_skipped` lists the specialists the Pre-filter-B step skipped because they appeared in the last commit's `KM-Reviewed:` trailer.
+- `signed_off_skipped` lists the specialists Pre-filter B skipped because they appeared in the last commit's `KM-Reviewed:` trailer. `[]` when the trailer was absent or named only always-run specialists.
+- `triage_approved_skipped` lists the specialists Pre-filter E skipped because they returned APPROVE on the previous substantive-review sweep and the current `review_range` is `"incremental"`. `[]` on full reviews, on first-sweep PRs, or when all prior verdicts were non-APPROVE. Disjoint from `signed_off_skipped` — a specialist removed by B never appears in E.
+- `scope_skipped` lists the specialists Pre-filter C dropped because none of the changed file paths matched their review scope. `[]` when the filter was not triggered for any specialist.
 - `mention_resolution` records what happened when the triage tried to resolve the directing-human's GitHub @-handle for a MENTION_ONLY, FIX_AND_MENTION, or ESCALATE comment. Values:
   - `ok` — handle resolved (commit-author email → login lookup or `pr.author.login` worked), mention posted with both lead + directing-human tagged.
   - `self_dedup` — directing human resolved to the tech lead's own login; comment tags the lead once.
