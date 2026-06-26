@@ -1,15 +1,19 @@
-// Tests for useValidator — sync-exception surface fix (swallowed-catch bugfix).
+// useValidator — merged regression coverage for #494 and #606.
 //
-// Coverage:
-//   1. runAllChecks THROWS → findings is exactly [VALIDATOR_ERROR_FINDING], not [].
-//   2. runAllChecks returns [] → findings has no KM_WARN_VALIDATOR_ERROR code.
-//   3. runAllChecks returns a real finding → it passes through unchanged.
+// #494: The hook must call validateWithOracle (NOT the synchronous runAllChecks)
+// so that KM_WARN_ORACLE_UNAVAILABLE — emitted by the engine when the WASM oracle
+// is down — actually reaches the SPA. Before #494 the hook called runAllChecks,
+// so WASM-down degradation was silent at the UI.
 //
-// Debounce: useDebounce is mocked to be a pass-through so tests don't need fake
-// timers. The hook's synchronous try/catch is exercised directly.
+// #606: An unexpected rejection from validateWithOracle must surface as
+// [VALIDATOR_ERROR_FINDING] rather than silently clearing to [].
+//
+// useDebounce is mocked to an identity pass-through so tests do not need
+// fake timers. The engine is mocked to expose only validateWithOracle.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
+import type { LintFinding } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
 // Mock useDebounce — identity transform (removes the 300 ms delay)
@@ -17,106 +21,200 @@ import { renderHook, waitFor } from "@testing-library/react";
 
 vi.mock("./useDebounce.ts", () => ({
   DEBOUNCE_MS: 300,
-  useDebounce: <T>(value: T) => value,
+  useDebounce: <T,>(v: T) => v,
 }));
 
 // ---------------------------------------------------------------------------
-// Mock @keyboard-studio/engine — spy on runAllChecks
+// Mock @keyboard-studio/engine — expose only validateWithOracle
 // ---------------------------------------------------------------------------
 
-const runAllChecksSpy = vi.fn();
+const { validateWithOracleMock } = vi.hoisted(() => ({
+  validateWithOracleMock: vi.fn<(source: string) => Promise<LintFinding[]>>(),
+}));
 
-vi.mock("@keyboard-studio/engine", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@keyboard-studio/engine")>();
-  return { ...original, runAllChecks: runAllChecksSpy };
-});
+vi.mock("@keyboard-studio/engine", () => ({
+  validateWithOracle: validateWithOracleMock,
+}));
 
 // ---------------------------------------------------------------------------
 // Import after mocks are registered
 // ---------------------------------------------------------------------------
 
+import { useValidator } from "./useValidator.ts";
 import { VALIDATOR_ERROR_FINDING } from "../lint/validationErrorFindings.ts";
-import type { LintFinding } from "@keyboard-studio/contracts";
-
-beforeEach(() => {
-  vi.clearAllMocks();
-});
-
-afterEach(() => {
-  vi.clearAllMocks();
-});
 
 // ---------------------------------------------------------------------------
-// 1. runAllChecks THROWS → VALIDATOR_ERROR_FINDING injected, not []
+// Shared fixtures
 // ---------------------------------------------------------------------------
 
-describe("useValidator — error surface (AC#3.1)", () => {
-  it("injects VALIDATOR_ERROR_FINDING when runAllChecks throws", async () => {
-    runAllChecksSpy.mockImplementation(() => {
-      throw new Error("validator crashed");
+const ORACLE_DOWN: LintFinding = {
+  code: "KM_WARN_ORACLE_UNAVAILABLE",
+  severity: "warning",
+  layer: "A",
+  message: "WASM oracle unavailable — only TS-portable checks ran.",
+};
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("useValidator (merged #494 + #606)", () => {
+  beforeEach(() => {
+    validateWithOracleMock.mockReset();
+  });
+
+  it("surfaces KM_WARN_ORACLE_UNAVAILABLE when validateWithOracle resolves it", async () => {
+    validateWithOracleMock.mockResolvedValue([ORACLE_DOWN]);
+
+    const { result } = renderHook(() => useValidator("c kb\n"));
+
+    await waitFor(() => {
+      expect(result.current.findings.map((f) => f.code)).toContain(
+        "KM_WARN_ORACLE_UNAVAILABLE",
+      );
     });
+    // Confirms the hook routes through validateWithOracle, not runAllChecks.
+    expect(validateWithOracleMock).toHaveBeenCalledWith("c kb\n");
+  });
 
-    const { useValidator } = await import("./useValidator.ts");
-    const { result } = renderHook(() => useValidator("c test\n"));
+  it("returns no findings and does not call the oracle for a null source", async () => {
+    const { result } = renderHook(() => useValidator(null));
+
+    await waitFor(() => {
+      expect(result.current.findings).toEqual([]);
+    });
+    expect(validateWithOracleMock).not.toHaveBeenCalled();
+  });
+
+  it("clears stale findings when the source becomes null", async () => {
+    validateWithOracleMock.mockResolvedValue([ORACLE_DOWN]);
+    const { result, rerender } = renderHook(
+      ({ src }: { src: string | null }) => useValidator(src),
+      { initialProps: { src: "c kb\n" as string | null } },
+    );
 
     await waitFor(() => {
       expect(result.current.findings).toHaveLength(1);
     });
 
-    const injected = result.current.findings[0]!;
-    expect(injected.code).toBe("KM_WARN_VALIDATOR_ERROR");
-    expect(injected.severity).toBe("warning");
-    expect(injected.layer).toBe("A");
-    // Must be the exact constant, not just any finding with the right code.
-    expect(result.current.findings).toEqual([VALIDATOR_ERROR_FINDING]);
-    // running must be false after the catch
-    expect(result.current.running).toBe(false);
+    rerender({ src: null });
+    await waitFor(() => {
+      expect(result.current.findings).toEqual([]);
+    });
   });
 
-  it("does NOT inject VALIDATOR_ERROR_FINDING when runAllChecks returns []", async () => {
-    runAllChecksSpy.mockReturnValue([]);
+  it("injects VALIDATOR_ERROR_FINDING when validateWithOracle rejects (#606)", async () => {
+    validateWithOracleMock.mockRejectedValue(new Error("validator crashed"));
 
-    const { useValidator } = await import("./useValidator.ts");
     const { result } = renderHook(() => useValidator("c test\n"));
 
     await waitFor(() => {
-      // After the effect runs with runAllChecks returning [], findings should be []
-      // i.e. no KM_WARN_VALIDATOR_ERROR code present.
-      expect(result.current.findings.find((f) => f.code === "KM_WARN_VALIDATOR_ERROR")).toBeUndefined();
+      expect(result.current.findings).toEqual([VALIDATOR_ERROR_FINDING]);
     });
-
     expect(result.current.running).toBe(false);
   });
 
-  it("passes a real finding through unchanged when runAllChecks succeeds", async () => {
+  it("does NOT inject VALIDATOR_ERROR_FINDING when validateWithOracle resolves [] (#606)", async () => {
+    validateWithOracleMock.mockResolvedValue([]);
+
+    const { result } = renderHook(() => useValidator("c test\n"));
+
+    await waitFor(() => {
+      expect(result.current.findings.find((f) => f.code === "KM_WARN_VALIDATOR_ERROR")).toBeUndefined();
+    });
+    expect(result.current.running).toBe(false);
+  });
+
+  it("passes a real finding through unchanged when validateWithOracle resolves it (#606)", async () => {
     const realFinding: LintFinding = {
       code: "KM_LINT_INVENTORY_UNCOVERED",
       severity: "error",
       layer: "A",
       message: "character not covered",
     };
-    runAllChecksSpy.mockReturnValue([realFinding]);
+    validateWithOracleMock.mockResolvedValue([realFinding]);
 
-    const { useValidator } = await import("./useValidator.ts");
     const { result } = renderHook(() => useValidator("c test\n"));
 
     await waitFor(() => {
       expect(result.current.findings).toHaveLength(1);
     });
-
     expect(result.current.findings[0]).toEqual(realFinding);
     expect(result.current.running).toBe(false);
   });
 
-  it("returns [] findings and running=false when kmnSource is null", async () => {
-    const { useValidator } = await import("./useValidator.ts");
-    const { result } = renderHook(() => useValidator(null));
+  // P1: in-flight running guard — a regression that omits setRunning(true) would
+  // not be caught by any of the six cases above (they only assert the settled
+  // state). This case uses a manually-controlled deferred promise so the
+  // in-flight state is observable before the promise resolves.
+  it("sets running:true while validation is in flight, then false after it settles", async () => {
+    let resolveValidation!: (f: LintFinding[]) => void;
+    validateWithOracleMock.mockReturnValue(
+      new Promise<LintFinding[]>((r) => {
+        resolveValidation = r;
+      }),
+    );
 
-    await waitFor(() => {
-      expect(result.current.findings).toEqual([]);
-      expect(result.current.running).toBe(false);
-    });
+    const { result } = renderHook(() => useValidator("c kb\n"));
 
-    expect(runAllChecksSpy).not.toHaveBeenCalled();
+    // The effect fires synchronously after render (identity debounce), so
+    // setRunning(true) must have been called by now.
+    await waitFor(() => expect(result.current.running).toBe(true));
+
+    // Settle the promise — running must drop back to false.
+    resolveValidation([]);
+    await waitFor(() => expect(result.current.running).toBe(false));
+  });
+
+  // P2: superseded-cycle stale guard — the `cancelled` flag in `.then` and
+  // `.finally` must prevent a resolved-but-superseded cycle from overwriting
+  // the live cycle's state. The identity-debounce mock makes the rerender
+  // sequencing deterministic: the effect cleanup (cancelled=true for pA) runs
+  // synchronously before the new effect (setRunning(true) for pB) fires.
+  it("a superseded cycle's stale resolution neither overwrites findings nor clears running", async () => {
+    const findingA: LintFinding = {
+      code: "KM_WARN_ORACLE_UNAVAILABLE",
+      severity: "warning",
+      layer: "A",
+      message: "cycle A finding",
+    };
+    const findingB: LintFinding = {
+      code: "KM_LINT_INVENTORY_UNCOVERED",
+      severity: "error",
+      layer: "A",
+      message: "cycle B finding",
+    };
+
+    let resolveA!: (f: LintFinding[]) => void;
+    let resolveB!: (f: LintFinding[]) => void;
+    const promiseA = new Promise<LintFinding[]>((r) => { resolveA = r; });
+    const promiseB = new Promise<LintFinding[]>((r) => { resolveB = r; });
+
+    validateWithOracleMock.mockReturnValueOnce(promiseA);
+    validateWithOracleMock.mockReturnValueOnce(promiseB);
+
+    const { result, rerender } = renderHook(
+      ({ src }: { src: string }) => useValidator(src),
+      { initialProps: { src: "A" } },
+    );
+
+    // Cycle A is in flight.
+    await waitFor(() => expect(result.current.running).toBe(true));
+
+    // Start cycle B — cleanup cancels A, new effect fires for B.
+    rerender({ src: "B" });
+
+    // Resolve the stale cycle A AFTER B has started.
+    resolveA([findingA]);
+
+    // The stale resolution must not land: findings should not contain findingA,
+    // and running must still be true (B is still in flight).
+    await waitFor(() => expect(result.current.running).toBe(true));
+    expect(result.current.findings).not.toContainEqual(findingA);
+
+    // Now settle cycle B — findings become B's, running drops to false.
+    resolveB([findingB]);
+    await waitFor(() => expect(result.current.running).toBe(false));
+    expect(result.current.findings).toEqual([findingB]);
   });
 });

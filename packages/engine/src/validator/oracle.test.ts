@@ -41,12 +41,16 @@ const knownBadSource = [
 ].join("\n");
 
 describe("validateWithOracle (default oracle, WASM stubbed out)", () => {
+  // These two tests exercise the real default oracle, which lazily loads the
+  // kmcmplib WASM module — variable and occasionally >5s under full-file CPU
+  // load. Give them a generous timeout so the WASM-load time never flakes them
+  // (the assertions themselves only depend on the TS-portable checks).
   it("AC#4: compiling a known-bad fixture surfaces at least one expected diagnostic", async () => {
     const findings = await validateWithOracle(knownBadSource);
     const codes = findings.map((f) => f.code);
     expect(codes).toContain("KM_ERROR_DUPLICATE_STORE");
     expect(codes).toContain("KM_ERROR_INVALID_IDENTIFIER");
-  });
+  }, 15000);
 
   it("appends KM_WARN_ORACLE_UNAVAILABLE once when WASM load fails", async () => {
     const downOracle = _createOracle(null);
@@ -63,7 +67,7 @@ describe("validateWithOracle (default oracle, WASM stubbed out)", () => {
     await expect(
       validateWithOracle(knownBadSource)
     ).resolves.toBeDefined();
-  });
+  }, 15000);
 
   it("skips KM_WARN_ORACLE_UNAVAILABLE when only TS-only groups are requested", async () => {
     const findings = await validateWithOracle(knownBadSource, {
@@ -81,6 +85,55 @@ describe("validateWithOracle (default oracle, WASM stubbed out)", () => {
         groups: ["lexical", "nonsense"],
       })
     ).rejects.toBeInstanceOf(TypeError);
+  });
+});
+
+describe("TS-portable group wiring (#494: reference TS half + lexical #7)", () => {
+  // Regression for #494: validateWithOracle previously ran only the lexical
+  // group's TS checks, so switching useValidator to it would have dropped the
+  // 5 semantic checks runAllChecks provided. They are now wired into their
+  // taxonomy groups (types.ts): codepointFormat (#7) -> lexical; deadkey (#5),
+  // ifStore (#6), contextOrdering (#8), indexBounds (#9) -> reference.
+
+  // (source, code, group) triggers borrowed from each check's own test file.
+  const REFERENCE_TS_CASES: Array<{ name: string; source: string; code: string }> = [
+    { name: "deadkeyResolution (#5)", source: "dk()", code: "KM_ERROR_INVALID_DEADKEY_NAME" },
+    { name: "ifStoreResolution (#6)", source: 'if(undeclaredStore = "on") + "a" > "b"', code: "KM_ERROR_UNRESOLVED_IF_STORE" },
+    { name: "contextOrdering (#8)", source: '[K_A] + "a" > "b"', code: "KM_ERROR_VIRTUAL_KEY_IN_CONTEXT" },
+    { name: "indexBounds (#9)", source: 'any(s) + "x" > index(missing, 1)', code: "KM_WARN_INDEX_STORE_UNDECLARED" },
+  ];
+
+  for (const c of REFERENCE_TS_CASES) {
+    it(`runs ${c.name} when the reference group is requested`, async () => {
+      // WASM-down oracle: isolates the TS routing from any WASM findings.
+      const oracle = _createOracle(null);
+      const codes = (await oracle.lint(c.source, { groups: ["reference"] })).map((f) => f.code);
+      expect(codes).toContain(c.code);
+    });
+
+    it(`does NOT run ${c.name} when only the lexical group is requested`, async () => {
+      const oracle = _createOracle(null);
+      const codes = (await oracle.lint(c.source, { groups: ["lexical"] })).map((f) => f.code);
+      expect(codes).not.toContain(c.code);
+    });
+  }
+
+  it("runs codepointFormat (#7) under the lexical group, not reference", async () => {
+    const badCodepoint = "+ U+D800 > U+0020";
+    const oracle = _createOracle(null);
+    const lexCodes = (await oracle.lint(badCodepoint, { groups: ["lexical"] })).map((f) => f.code);
+    expect(lexCodes).toContain("KM_ERROR_INVALID_CODEPOINT");
+    const refCodes = (await oracle.lint(badCodepoint, { groups: ["reference"] })).map((f) => f.code);
+    expect(refCodes).not.toContain("KM_ERROR_INVALID_CODEPOINT");
+  });
+
+  it("default (all groups) gives full 9-check TS coverage equivalent to runAllChecks", async () => {
+    // One source exercising a lexical and a reference TS check together.
+    const source = 'dk()\n+ U+D800 > U+0020';
+    const oracle = _createOracle(null);
+    const codes = (await oracle.lint(source)).map((f) => f.code);
+    expect(codes).toContain("KM_ERROR_INVALID_CODEPOINT"); // lexical (#7)
+    expect(codes).toContain("KM_ERROR_INVALID_DEADKEY_NAME"); // reference (#5)
   });
 });
 

@@ -1,17 +1,22 @@
 // Layer A check-group taxonomy for the kmcmplib WASM oracle.
-// See spec.md §10 (validator layering) and the Issue #16 design cycles.
+// See spec.md §10 (validator layering) and the oracle design.
 //
 // The 14 Layer A checks split across 4 groups:
-//   lexical     — stateless token-level (checks #1, #4, #7)            TS-only
-//   reference   — symbol-table integrity (#2, #3, #5, #6, #8, #9, #13, #14)  mixed
+//   lexical     — stateless token-level (checks #1–#4, #7)             TS-only
+//   reference   — symbol-table integrity (#5, #6, #8, #9, #13, #14)    mixed
 //   behavior    — whole-program / cross-rule (#10, #11, #12)            WASM-only
 //   passthrough — unmapped KMCMP_* diagnostics                          WASM-only
 //
-// Issue #16 ships the lexical group fully (checks #1-#4 already implemented;
-// check #7 to follow under its own issue) plus the WASM oracle plumbing that
-// drives the behavior + passthrough groups. The reference-group TS-side
-// (checks #5, #6, #8, #9) is staged for follow-up issues; its WASM-side
-// members (#13, #14) flow through the oracle today.
+// Implementation status (authoritative: validator/index.ts):
+//   lexical TS-portable: fully implemented via runLexicalChecks
+//     (#1 identifiers, #2 duplicateGroups, #3 duplicateStores,
+//      #4 deprecatedStores, #7 codepointFormat).
+//     NOTE: spec §10 lists #2/#3 under `reference`; the code places them in
+//     `lexical` (stateless token scan). Reconcile with spec §10 before v1 lock.
+//   reference TS-portable: fully implemented via runReferenceChecks
+//     (#5 deadkeyResolution, #6 ifStoreResolution, #8 contextOrdering,
+//      #9 indexBounds). WASM-side (#13, #14) flows through the oracle.
+//   behavior + passthrough: WASM-only, flow through the kmcmplib oracle.
 
 export type GroupName = "lexical" | "reference" | "behavior" | "passthrough";
 

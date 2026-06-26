@@ -1,10 +1,13 @@
 // kmcmplib WASM oracle wrapper.
 //
 // validateWithOracle(source, options?) is the public entry point for
-// Issue #16. It runs the TS-portable checks (currently the `lexical`
-// group: checks #1-#4) and, when the WASM oracle is available, runs the
+// Issue #16. It runs the TS-portable checks — sourced from index.ts
+// (runLexicalChecks / runReferenceChecks) so the group->check mapping
+// lives in one place — and, when the WASM oracle is available, runs the
 // WASM-side checks (the WASM-half of `reference` + `behavior` +
-// `passthrough` groups) concurrently per spec.md §14 D3.
+// `passthrough` groups) concurrently per spec.md §14 D3. This is the
+// SPA's single validation entry point (useValidator), so a WASM-down
+// state surfaces KM_WARN_ORACLE_UNAVAILABLE.
 //
 // On WASM load failure: catches OracleLoadError exactly once at lazy
 // init, sets `_wasmDown`, and from then on returns only TS-portable
@@ -28,7 +31,7 @@ import {
   type WasmOracleHandle,
 } from "./wasmLoader.js";
 import { OracleLoadError } from "./OracleLoadError.js";
-import { runLexicalChecks } from "./index.js";
+import { runLexicalChecks, runReferenceChecks } from "./index.js";
 
 function severityRank(s: LintFinding["severity"]): number {
   switch (s) {
@@ -141,11 +144,17 @@ function makeOracle(load: LoadHandle): OracleInstance {
     const tsTask: Promise<LintFinding[]> = (async () => {
       if (!tsRequested) return [];
       const out: LintFinding[] = [];
+      // TS-portable checks grouped per the types.ts taxonomy. The group->check
+      // mapping lives in ./index.ts (runLexicalChecks / runReferenceChecks) so
+      // runAllChecks and the oracle never drift on a check's group membership.
       if (requested.includes("lexical")) {
-        out.push(...runLexicalChecks(source));
+        out.push(...runLexicalChecks(source)); // #1-#4 + #7 (codepoint format)
       }
-      // The TS half of `reference` (checks #5/#6/#8/#9) will plug in
-      // here as those issues land.
+      if (requested.includes("reference")) {
+        // TS half of `reference` (#5/#6/#8/#9). The WASM half (#13/#14) flows
+        // through wasmTask; the two sets emit disjoint codes, so no duplicates.
+        out.push(...runReferenceChecks(source));
+      }
       return out;
     })();
 
@@ -176,8 +185,21 @@ function makeOracle(load: LoadHandle): OracleInstance {
       }
     })();
 
+    // TODO(D3-suppression): spec §10 / Decision D3 states "A TS-check error
+    // suppresses the WASM call." Today tsTask and wasmTask always run as
+    // concurrent microtasks regardless of TS errors (the speed/authority
+    // trade-off in D3). Enforcing suppression means awaiting tsTask, inspecting
+    // for errors, then conditionally starting wasmTask — an architectural change
+    // deferred to its own issue (needs UX modelling + test coverage).
     const [tsFindings, wasmFindings] = await Promise.all([tsTask, wasmTask]);
 
+    // TODO(D3-supersession): spec §10 / D3 also states "a WASM diagnostic always
+    // supersedes a conflicting TS diagnostic." We currently concatenate both
+    // sets without deduplicating overlaps (e.g. a curated TS finding vs a
+    // passthrough KMCMP_* finding for the same defect). Curated codes are
+    // disjoint between the TS and WASM halves of `reference`, so no exact-code
+    // duplicates occur; semantic overlap via passthrough is deferred with the
+    // suppression work above.
     const merged: LintFinding[] = [...tsFindings, ...wasmFindings];
 
     if (wasmRequested && wasmDown) {
