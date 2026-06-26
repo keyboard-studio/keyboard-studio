@@ -200,9 +200,12 @@ maps to it.
   answer ultimately populates (one path algebra — there is no separate
   answer-key address space), so `inputs` and `writes` are directly comparable.
 - **FR-004**: The contract addition (`inputs`/`writes`/`IRPath` on `QuestionModule`)
-  MUST be released as a **MAJOR version bump of `@keyboard-studio/contracts`**
-  (spec §18 joint engine+content session, 2026-06-26; Constitution Article I),
-  not as a backward-compatible minor addition.
+  MUST be released as a **breaking version bump of `@keyboard-studio/contracts`** —
+  the spec §18 "major" change (joint engine+content session, 2026-06-26;
+  Constitution Article I), not a backward-compatible addition. Because the package
+  is pre-1.0 (currently 0.10.0), that breaking bump is **0.11.0** under 0ver
+  semantics (recommended); promoting to **1.0.0** is an open release call
+  (research R5). The numbering choice does not change the §18 obligation.
 - **FR-005**: `mutate()` MUST remain a documented stub; no IR-write execution is
   implemented in this feature (deferred to P5, gated on #5b/#232).
 - **FR-006**: All 93 existing question modules (Phase A = 30, Phase B = 55,

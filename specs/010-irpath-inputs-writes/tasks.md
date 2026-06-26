@@ -74,7 +74,7 @@
 - [ ] T011 [P] [US3] Move the 30 Phase A colocated tests `packages/studio/src/survey/questions/a/*.test.ts` → `packages/studio/tests/survey/questions/a/`, fixing relative import specifiers (keep explicit `.ts` extensions)
 - [ ] T012 [P] [US3] Move the 29 Phase B colocated tests `.../questions/b/*.test.ts` → `packages/studio/tests/survey/questions/b/` (fix import specifiers)
 - [ ] T013 [P] [US3] Move the 2 Phase F colocated tests `.../questions/f/*.test.ts` → `packages/studio/tests/survey/questions/f/` (fix import specifiers)
-- [ ] T014 [US3] Backfill missing per-question tests so all 93 modules have a mirrored test (~26 Phase B, ~6 Phase F; Phase A already complete) — minimal `validate`/`fixtures` specs under `packages/studio/tests/survey/questions/<phase>/`
+- [ ] T014 [US3] **Backfill (net-new authoring, NOT a move)** the missing per-question tests so all 93 modules have a mirrored test — **~26 Phase B + ~6 Phase F = ~32 net-new specs** (Phase A already complete) — minimal `validate`/`fixtures` specs under `packages/studio/tests/survey/questions/<phase>/`. **Scope note:** each spec needs real valid/invalid fixtures, so this is genuine authoring effort distinct from the mechanical moves in T011–T013; it is the work that makes SC-001 (93/93) and the FR-009 mirror gate (T015) pass, and should be sized accordingly when staffing the cycle.
 - [ ] T015 [US3] Add the missing-mirrored-test directory-diff check as a vitest spec under `packages/studio/tests/` mapping each `src/survey/questions/<phase>/<id>` → `tests/survey/questions/<phase>/<id>.test.ts` (FR-009)
 
 ### Populate declarations (FR-006, clarification Q2)
