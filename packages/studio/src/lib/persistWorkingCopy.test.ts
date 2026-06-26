@@ -5,7 +5,7 @@
 // of a Uint8Array produces `{"0":n,"1":n,...}`, a corrupt sparse object — Base64
 // is mandatory for binary entries.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createVirtualFS, mergePhaseResults } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import {
@@ -19,25 +19,10 @@ import {
 
 beforeEach(() => {
   sessionStorage.clear();
-  useWorkingCopyStore.setState(useWorkingCopyStore.getInitialState?.() ?? {
-    instantiationMode: null,
-    baseKeyboard: null,
-    baseVfs: null,
-    baseIr: null,
-    identity: null,
-    ir: null,
-    removalCapabilities: new Map(),
-    deletedNodeIds: new Set(),
-    deletedItemIds: new Set(),
-    undoStack: [],
-    phaseResults: [],
-    irAxes: {},
-    session: { axes: {}, patterns: [], strategyId: null, strategy: null },
-    desktopLocked: false,
-    touchLayoutJson: null,
-    touchDraft: null,
-    galleryIntrosSeen: { mechanism: false, touch: false },
-  });
+  // Use the store's own reset action for full isolation. (A bare setState is a
+  // partial merge — it would only patch the enumerated keys and leave any field
+  // a prior test left dirty, e.g. `ir` / `removalCapabilities`, uncleared.)
+  useWorkingCopyStore.getState().reset();
 });
 
 afterEach(() => {
@@ -295,9 +280,11 @@ describe("persistWorkingCopy", () => {
     useWorkingCopyStore.setState({
       instantiationMode: "new-from-base",
       baseVfs: vfs,
+      // At instantiation baseIr === ir (both seeded from the base). removalCapabilities
+      // derives from baseIr, so it must be set for the rehydrated map to populate.
+      baseIr: irWithRemovable,
       ir: irWithRemovable,
       baseKeyboard: null,
-      baseIr: null,
       identity: null,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
@@ -332,6 +319,73 @@ describe("persistWorkingCopy", () => {
     // P0 #2 — session must equal mergePhaseResults(irAxes, phaseResults), not the empty initial value.
     const expectedSession = mergePhaseResults(testIrAxes, testPhaseResults);
     expect(s.session).toEqual(expectedSession);
+  });
+
+  it("derives removalCapabilities from baseIr, not the carve working ir", () => {
+    // Regression: the store invariant is that removalCapabilities is computed
+    // once at instantiation from the BASE IR and never recomputed on carve
+    // edits. So rehydration must derive it from snapshot.baseIr — deriving from
+    // the carve working `ir` would diverge the moment `ir` is mutated before a
+    // redirect. Here baseIr holds the removable rule and `ir` is stripped of it;
+    // a map derived from `ir` would be empty, from `baseIr` it is populated.
+    const removableRule = {
+      nodeId: "rule-s01-1",
+      context: [{ kind: "vkey" as const, vkey: "K_A", modifiers: [] }],
+      output: [{ kind: "char" as const, char: "a" }],
+    };
+    const makeIr = (rules: unknown[]) =>
+      ({
+        origin: "scaffolded" as const,
+        header: {
+          keyboardId: "test",
+          name: "Test",
+          bcp47: [],
+          copyright: "",
+          version: "10.0",
+          targets: [],
+          storeDirectives: [],
+        },
+        stores: [],
+        groups: [
+          { nodeId: "group-main", name: "main", usingKeys: true, readonly: false, rules },
+        ],
+        comments: [],
+        raw: [],
+        recognizedPatterns: [],
+      }) as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+
+    const baseIr = makeIr([removableRule]); // base retains the removable rule
+    const carveIr = makeIr([]); // carve working IR has had it removed
+
+    const vfs = createVirtualFS([]);
+    useWorkingCopyStore.setState({
+      instantiationMode: "new-from-base",
+      baseVfs: vfs,
+      baseIr,
+      ir: carveIr,
+      baseKeyboard: null,
+      identity: null,
+      deletedNodeIds: new Set(),
+      deletedItemIds: new Set(),
+      undoStack: [],
+      phaseResults: [],
+      irAxes: {},
+      desktopLocked: false,
+      touchLayoutJson: null,
+      touchDraft: null,
+      galleryIntrosSeen: { mechanism: false, touch: false },
+    });
+
+    snapshotWorkingCopyToSession();
+    useWorkingCopyStore.getState().reset();
+
+    const result = rehydrateWorkingCopyFromSession();
+    expect(result).toBe(true);
+
+    const s = useWorkingCopyStore.getState();
+    // Derived from baseIr → the removable rule is present. (From carveIr it
+    // would be empty, since carveIr's group has no rules.)
+    expect(s.removalCapabilities.get("rule-s01-1")).toBe("removable:simple");
   });
 
   it("round-trips Set fields as Sets (not arrays) after rehydration", () => {

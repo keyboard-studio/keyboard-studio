@@ -17,8 +17,11 @@
 //
 // Derived-field policy — fields NOT stored; RE-DERIVED on rehydration:
 //   - removalCapabilities: Map<string, RemovalCapability> — re-derived from the
-//     restored `ir` via classifyRemovalCapabilities(ir) in rehydrateWorkingCopyFromSession.
-//     Source: ir. If ir is null, stays empty Map.
+//     restored `baseIr` via classifyRemovalCapabilities(baseIr) in
+//     rehydrateWorkingCopyFromSession. Source: baseIr (NOT the carve working
+//     `ir`) — this mirrors the store invariant that the capability map is
+//     computed once at instantiation from the base IR and never recomputed on
+//     carve edits. If baseIr is null, stays empty Map.
 //   - session: SurveySession — re-derived from the restored `irAxes` +
 //     `phaseResults` via mergePhaseResults(irAxes, phaseResults).
 //     Source: irAxes + phaseResults.
@@ -31,7 +34,7 @@ import type { VirtualFSEntry } from "@keyboard-studio/contracts";
 import { createVirtualFS, mergePhaseResults } from "@keyboard-studio/contracts";
 import { classifyRemovalCapabilities } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import type { WorkingCopyState } from "../stores/workingCopyStore.ts";
+import type { WorkingCopyData } from "../stores/workingCopyStore.ts";
 
 // ---------------------------------------------------------------------------
 // Key
@@ -51,24 +54,28 @@ interface SerializedEntry {
   isBinary: boolean;
 }
 
-/** Full serializable snapshot of working-copy data fields. */
-interface WorkingCopySnapshot {
-  instantiationMode: WorkingCopyState["instantiationMode"];
-  baseKeyboard: WorkingCopyState["baseKeyboard"];
+/**
+ * Full serializable snapshot of working-copy data fields.
+ *
+ * Derived from the store's `WorkingCopyData` so completeness is compiler-enforced:
+ * when a new data field lands on the store, it appears here automatically and the
+ * snapshot/rehydrate object literals fail to compile until they account for it —
+ * no silent omission that would rehydrate at a default after a redirect.
+ *
+ * The base type is narrowed by three serialization overrides:
+ *   - `baseVfs` (a VirtualFS instance) → `baseVfsEntries` (Base64-encoded plain array)
+ *   - `deletedNodeIds` / `deletedItemIds` (Set<string>) → `string[]`
+ * and two derived fields are dropped entirely (`removalCapabilities`, `session`)
+ * because they are re-derived on rehydration, never stored.
+ */
+type WorkingCopySnapshot = Omit<
+  WorkingCopyData,
+  "baseVfs" | "deletedNodeIds" | "deletedItemIds" | "removalCapabilities" | "session"
+> & {
   baseVfsEntries: SerializedEntry[];
-  baseIr: WorkingCopyState["baseIr"];
-  identity: WorkingCopyState["identity"];
-  ir: WorkingCopyState["ir"];
   deletedNodeIds: string[];
   deletedItemIds: string[];
-  undoStack: WorkingCopyState["undoStack"];
-  phaseResults: WorkingCopyState["phaseResults"];
-  irAxes: WorkingCopyState["irAxes"];
-  desktopLocked: WorkingCopyState["desktopLocked"];
-  touchLayoutJson: WorkingCopyState["touchLayoutJson"];
-  touchDraft: WorkingCopyState["touchDraft"];
-  galleryIntrosSeen: WorkingCopyState["galleryIntrosSeen"];
-}
+};
 
 function serializeEntry(entry: VirtualFSEntry): SerializedEntry {
   if (entry.isBinary) {
@@ -181,9 +188,14 @@ export function rehydrateWorkingCopyFromSession(): boolean {
   // Re-derive computed fields from their restored source fields.
   // Per the derived-field policy in the module header: these are NOT stored;
   // they are recomputed here so they can't drift from their inputs.
+  //
+  // removalCapabilities derives from baseIr — NOT the carve working `ir`. The
+  // store documents this map as "computed once at instantiation from the base
+  // IR … never recomputed on carve edits." Deriving it from `ir` here would
+  // diverge from that invariant the moment `ir` is mutated before the redirect.
   const removalCapabilities =
-    snapshot.ir !== null
-      ? classifyRemovalCapabilities(snapshot.ir)
+    snapshot.baseIr !== null
+      ? classifyRemovalCapabilities(snapshot.baseIr)
       : new Map<string, import("@keyboard-studio/contracts").RemovalCapability>();
 
   const session = mergePhaseResults(snapshot.irAxes, snapshot.phaseResults);
