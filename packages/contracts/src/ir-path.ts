@@ -22,14 +22,7 @@
 
 import type {
   KeyboardIR,
-  IRHeader,
-  IRStore,
-  IRGroup,
-  IRRule,
-  IRComment,
   RawKmnFragment,
-  TouchLayoutIR,
-  KvksIR,
   TouchKeyIR,
   StoreItem,
   ContextElement,
@@ -127,7 +120,7 @@ type BoundaryType = TouchKeyIR;
  *   touchLayout.platforms[].layers[].rows[].keys[]
  * Margin of 3 kept for future IR extensions without a constant change.
  */
-const MAX_PATH_DEPTH = 12;
+type MAX_PATH_DEPTH = 12;
 
 type PathsInto<
   T,
@@ -135,7 +128,7 @@ type PathsInto<
   Depth extends readonly unknown[] = [],
 > =
   // Depth guard — stop expanding if we have hit MAX_PATH_DEPTH steps
-  Depth["length"] extends typeof MAX_PATH_DEPTH
+  Depth["length"] extends MAX_PATH_DEPTH
     ? Acc
     : // Primitive leaves — terminate
       [T] extends [PrimitiveLike]
