@@ -1,14 +1,14 @@
 /**
- * Type-level tests for IRPath (T008).
+ * Runtime behaviour tests for IRPath (T008).
  *
- * Positive cases: valid paths must be assignable to IRPath.
- * Negative cases: invalid paths must NOT be assignable to IRPath — enforced via
- * @ts-expect-error annotations. If a negative case compiles WITHOUT the
- * annotation, TS reports an unused @ts-expect-error → typecheck fails → CI
- * catches the regression (Drift AC / G2 enforcement).
+ * This file covers the runtime behaviour of irPath() and formatIRPath().
  *
- * These tests also validate G3 (both surfaces covered) and G4 (traversal
- * bounded at TouchKeyIR — no sub-key paths).
+ * COMPILE-TIME type-level assertions (positive + negative, Design AC / G1,
+ * Drift AC / G2) live in ir-path.type-assertions.ts, NOT here. That file is
+ * compiled by `tsc --noEmit` (i.e. `pnpm typecheck`). Vitest only transpiles —
+ * it does NOT run tsc — so @ts-expect-error directives inside *.test.ts files
+ * are never verified by CI. Moving them to a compiled non-test file closes
+ * that enforcement gap.
  */
 
 import { describe, it, expect } from "vitest";
@@ -17,15 +17,7 @@ import {
   formatIRPath,
   ARRAY_INDEX,
   type IRPath,
-  type AssignableTo,
 } from "./ir-path.js";
-
-// ---------------------------------------------------------------------------
-// Helper: static type assertion
-// ---------------------------------------------------------------------------
-
-/** Asserts at compile time that T is exactly `true`. */
-type IsTrue<T extends true> = T;
 
 // ---------------------------------------------------------------------------
 // Positive cases (Design AC — valid paths must compile)
@@ -126,70 +118,6 @@ describe("IRPath — positive cases", () => {
     const p = irPath("groups", ARRAY_INDEX, "name");
     expect(p[2]).toBe("name");
   });
-
-  // Compile-time assignability: verify these are valid IRPath values.
-  type _PhysicalPath = IsTrue<
-    AssignableTo<
-      readonly ["groups", { kind: "[]" }, "rules", { kind: "[]" }, "output"],
-      IRPath
-    >
-  >;
-  type _TouchPath = IsTrue<
-    AssignableTo<
-      readonly [
-        "touchLayout",
-        "platforms",
-        { kind: "[]" },
-        "layers",
-        { kind: "[]" },
-        "rows",
-        { kind: "[]" },
-        "keys",
-        { kind: "[]" },
-      ],
-      IRPath
-    >
-  >;
-  type _StorePath = IsTrue<
-    AssignableTo<readonly ["stores", { kind: "[]" }], IRPath>
-  >;
-  type _HeaderPath = IsTrue<
-    AssignableTo<readonly ["header", "bcp47"], IRPath>
-  >;
-});
-
-// ---------------------------------------------------------------------------
-// Negative cases (Design AC — invalid paths must NOT compile)
-// Removing any @ts-expect-error below must make `pnpm typecheck` fail.
-// ---------------------------------------------------------------------------
-
-describe("IRPath — negative cases (Design AC / G1)", () => {
-  it("rejects a path with a field that does not exist on KeyboardIR", () => {
-    // @ts-expect-error "nonExistentTopLevel" is not a key of KeyboardIR
-    const _bad: IRPath = ["nonExistentTopLevel"] as const;
-    // This line is unreachable in valid code; the test passes by compiling.
-    expect(true).toBe(true);
-  });
-
-  it("rejects a path that names a valid top-level field but an invalid child", () => {
-    // @ts-expect-error "bogusChild" is not a key of IRHeader
-    const _bad: IRPath = ["header", "bogusChild"] as const;
-    expect(true).toBe(true);
-  });
-
-  it("rejects a path that skips the array-index sentinel", () => {
-    // groups is IRGroup[], so the next segment after "groups" must be an
-    // ArrayIndex, not "rules" directly.
-    // @ts-expect-error missing ArrayIndex between "groups" and "rules"
-    const _bad: IRPath = ["groups", "rules"] as const;
-    expect(true).toBe(true);
-  });
-
-  it("rejects a path with a mis-spelled IR field name", () => {
-    // @ts-expect-error "stors" is not a key of KeyboardIR (typo for "stores")
-    const _bad: IRPath = ["stors"] as const;
-    expect(true).toBe(true);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -250,5 +178,29 @@ describe("irPath builder", () => {
     const p1 = irPath("header", "name");
     const p2 = irPath("header", "name");
     expect(p1).toEqual(p2);
+  });
+
+  it("called with zero arguments returns the root path []", () => {
+    // irPath() with no args → empty tuple → root KeyboardIR itself.
+    const root = irPath();
+    expect(root).toEqual([]);
+    expect(root.length).toBe(0);
+    // formatIRPath on the root path must render as "(root)".
+    expect(formatIRPath(root)).toBe("(root)");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatIRPath edge cases
+// ---------------------------------------------------------------------------
+
+describe("formatIRPath — edge cases", () => {
+  it("handles a bare ARRAY_INDEX as the first segment (renders '[]')", () => {
+    // A path whose first element is an ArrayIndex (e.g. produced by a partial
+    // path slice). The bare-ArrayIndex branch in the while-loop renders "[]".
+    // This path is only reachable by casting because IRPath normally starts
+    // with a string key — the test exercises the graceful-fallback branch.
+    const pathWithLeadingIndex: IRPath = [ARRAY_INDEX] as unknown as IRPath;
+    expect(formatIRPath(pathWithLeadingIndex)).toBe("[]");
   });
 });

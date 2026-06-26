@@ -80,9 +80,13 @@ export const fixtures: QuestionModule["fixtures"] = {
   ],
 };
 
-// T010: representative module declaring inputs/writes per the P2 contract.
-// This question reads the header BCP47 tag (set by Phase A identity) and writes
-// the recognized script group into the stores array — declared now, executed in P5.
+// T010: inputs/writes VERIFIED for this specific question — not a template to copy.
+// pb_standard_letters reads the header BCP47 tag established by Phase A identity
+// questions, and will write the selected script group into the stores array in P5.
+// Rationale: header.bcp47 tells us the target language/script; stores[] is where
+// the script-group discriminator store lands at scaffold time.
+// Do NOT clone these declarations blindly into other question modules; each module
+// must declare its own actual IR dependencies (or explicit empty arrays).
 export const inputs = [
   irPath("header", "bcp47"),
 ] as const;

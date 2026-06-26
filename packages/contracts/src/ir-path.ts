@@ -78,12 +78,20 @@ type PrimitiveLike =
  * Discriminated union leaves: the element types whose members are not
  * further decomposable as IR path steps. These appear as array element
  * types inside stores, rules, etc.
+ *
+ * `RawKmnFragment` is listed here because opaque fragments are NOT
+ * survey-editable in v1 (out-of-scope rule, spec §16). `raw[ARRAY_INDEX]`
+ * is a valid IRPath endpoint (the list is addressable for `inputs`), but
+ * individual sub-fields (`sourceText`, `reason`, etc.) must not be write
+ * targets. Marking `RawKmnFragment` as AtomicLeaf enforces this at the type
+ * level — any path going deeper than `raw[]` is a compile error.
  */
 type AtomicLeaf =
   | StoreItem
   | ContextElement
   | OutputElement
-  | Pattern; // Pattern is a separate contract; don't recurse into it
+  | Pattern // Pattern is a separate contract; don't recurse into it
+  | RawKmnFragment; // opaque fragments are not survey-editable in v1 (spec §16)
 
 /**
  * TouchKeyIR is self-recursive via sk/flick/multitap. We stop here (G4).
@@ -112,14 +120,22 @@ type BoundaryType = TouchKeyIR;
  * The depth parameter is a tuple-length counter that prevents TS from hitting
  * its recursion limit on deeply nested structures. We cap at a safe depth.
  */
+
+/**
+ * Maximum path depth the recursive expander will explore.
+ * Current deepest real IR path is 9 segments:
+ *   touchLayout.platforms[].layers[].rows[].keys[]
+ * Margin of 3 kept for future IR extensions without a constant change.
+ */
+const MAX_PATH_DEPTH = 12;
+
 type PathsInto<
   T,
   Acc extends readonly PathSegment[],
   Depth extends readonly unknown[] = [],
 > =
-  // Depth guard — stop expanding if we have hit 12 steps (more than enough
-  // for the deepest real IR path: touchLayout.platforms[].layers[].rows[].keys[])
-  Depth["length"] extends 12
+  // Depth guard — stop expanding if we have hit MAX_PATH_DEPTH steps
+  Depth["length"] extends typeof MAX_PATH_DEPTH
     ? Acc
     : // Primitive leaves — terminate
       [T] extends [PrimitiveLike]
@@ -188,6 +204,10 @@ export type IRPath = PathsInto<KeyboardIR, readonly []>;
  *
  * Because the return type is `IRPath`, an invalid segment sequence is a
  * compile error.
+ *
+ * Called with zero arguments, `irPath()` returns the empty tuple `[]`, which
+ * represents the root `KeyboardIR` itself. This is a valid `IRPath` value
+ * (the empty tuple is included in the union by the `Acc` base case).
  */
 export function irPath<const T extends IRPath>(...segments: T): T {
   return segments;
@@ -235,12 +255,14 @@ export function formatIRPath(path: IRPath): string {
 }
 
 // ---------------------------------------------------------------------------
-// Type-test helpers (used in ir-path.test.ts; not exported from index)
+// Type-test helpers (used in ir-path.type-assertions.ts and ir-path.test.ts)
 // ---------------------------------------------------------------------------
 
 /**
  * Compile-time assignability check helper.
  * `AssignableTo<A, B>` is `true` if A extends B, else `false`.
- * Used in type-level tests to assert a path is (or is not) a valid IRPath.
+ * Used in type-level assertions to verify a path is (or is not) a valid IRPath.
+ *
+ * Re-exported from the package root via `index.ts` `export *`.
  */
 export type AssignableTo<A, B> = A extends B ? true : false;
