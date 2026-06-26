@@ -1,9 +1,12 @@
 # keyboard-studio — Spec
 
 **Repository:** https://github.com/keyboard-studio/keyboard-studio
-**Date:** 2026-06-15
-**Version:** 1.3.1
+**Date:** 2026-06-26
+**Version:** 2.0.0
 **Status:** Draft — pre-Day-1 sync
+
+> **Changelog.**
+> - **v2.0.0 (2026-06-26) — MAJOR.** Ratified at the §18 joint engine+content session (2026-06-26): contract additions that move `packages/contracts` to a new MAJOR version — the per-key touch provenance field on `TouchKeyIR` and the `IRPath` typed-path concept (§5a). This is a **gated/ratified major bump**, not an additive-minor revision. Same session ratified the §7.7 typed assignment-map contract (now built incrementally) and the functional phase labels + A–G crosswalk (Decision 15, §14). Decision 6 / §16 gained the touch-on-physical-substrate rationale.
 
 ---
 
@@ -197,7 +200,10 @@ keyboard-studio
 |                                         before the authoring engine sees the project.
 |
 +-- authoring engine           [engine/content]
-|   +-- survey                            Eight-phase branching questionnaire (A, B, C, C-prime, D, E, F, G — see §8); LLM maps answers to
+|   +-- survey                            Branching questionnaire over the functional phases Identity,
+|   |                                     Characters, Mechanisms, Reorder, Desktop-OSK, Touch, Help,
+|   |                                     Package (formerly the eight sequential phases A, B, C, C-prime,
+|   |                                     D, E, F, G — see the A–G crosswalk below and §8). LLM maps answers to
 |   |                                     slot values and to the seven discovery axes (Sec 7);
 |   |                                     plain-language throughout.
 |   +-- strategy selector       [engine/content]
@@ -231,6 +237,27 @@ keyboard-studio
 +-- output / submit            [engine]   Download .zip (no auth) OR GitHub OAuth fork+draft PR
                                           (PR body auto-generated from lint results).
 ```
+
+### Phase labels — functional names and the A–G crosswalk
+
+*Decided 2026-06-26 (Decision 15, §14): the sequential phase labels A, B, C, C′, D, E, F, G are **retired** in favour of **functional** names. The alphanumeric scheme had become misleading — the survey is reached in a hybrid order (§8), not A→B→…→G, and the A→B→…→F gaps (no surfaced Phase D/G survey screens) made the letters look like a linear pipeline they never were. References across this spec use the functional name, with the dual label "FunctionalName (formerly Phase X)" on first mention in each major section to preserve traceability.*
+
+The studio's **plan spine** is a 10-step functional sequence: **Identity → Characters → Carve → Mechanisms → Lock → Reorder → Desktop-OSK → Touch → Help → Package**. The spec's older model named **eight lettered phases** (A, B, C, C′, D, E, F, G). The two do **not** map 1:1: the spec's single Phase C ("special inputs" gallery) corresponds to the plan's **Mechanisms** step, while **Carve** (the carve gallery, §8 step 4, run *before* the Phase A survey) and **Lock** (the desktop-keyboard lock that gates Touch, §8) are spine steps that the lettered model never assigned a letter to. The crosswalk below maps each old letter to the functional name **as the §8 phase definitions actually describe it**:
+
+| Old label | Functional name | Notes (verified against §8 definitions) |
+|---|---|---|
+| Phase A | **Identity** | §8 step 5 "Identity + routing". |
+| Phase B | **Characters** | §8 step 6 "Character coverage + strategy axes". |
+| Phase C | **Mechanisms** | §8 step 7 "Special inputs" — the physical-grid gallery (modifiers, dead keys, combos, rotas). **FLAG:** the plan clusters this as **Carve + Mechanisms (+ Lock)**, but in §8 *Carve* is a distinct pre-survey step (step 4) and *Lock* is a gating action, **not** part of Phase C. The 1:1 letter↔function mapping here is Phase C = Mechanisms only; the Carve/Lock cluster boundary is left for Matthew (see flags). |
+| (no letter) | **Carve** | §8 step 4 "Carve gallery" — runs *before* Phase A; never had a phase letter. |
+| (no letter) | **Lock** | "Lock the desktop keyboard" (§8 gallery-instantiation note) — the desktop layout is fully locked before Touch; a gating action between the physical gallery and Touch, never a lettered phase. |
+| Phase C′ | **Reorder** | §8 step 8 "Reordering" (C-prime). |
+| Phase D | **Desktop-OSK** | §8 step 9 "OSK desktop". |
+| Phase E | **Touch** | §8 step 10 "Touch layout". |
+| Phase F | **Help** | §8 step 11 "Help docs". |
+| Phase G | **Package** | §8 step 12 "Package". |
+
+> **FLAG (ambiguous mapping — not resolved here).** Two spots require a structural decision and were **not** guessed: (1) how the plan's **Carve + Mechanisms + Lock** cluster splits across the spec's single Phase C — §8 treats Carve and Lock as separate non-lettered steps, so this spec maps Phase C = **Mechanisms** only and keeps Carve/Lock as their own spine steps; (2) exactly where **Lock** sits relative to Desktop-OSK and Reorder. Both are listed for Matthew to ratify before any phase-*model* restructure.
 
 ---
 
@@ -379,6 +406,17 @@ v1 ships single-source adaptation only — there is no path that combines IRs fr
 
 **Gallery ranking when recognizer and decision tree disagree.** When an imported keyboard's recognizer-lifted Patterns carry `strategyId` values that differ from the decision tree's primary, the gallery ranks recognized Patterns whose `strategyId` matches the tree's primary *first*; recognized Patterns whose `strategyId` differs from the primary are surfaced as secondaries if they appear in the primary's `combinesWith` list, or in a distinct "From your import" section otherwise. The recognizer's `strategyId` claim is a post-hoc attribution; the tree's primary remains the authoritative strategy.
 
+**Touch-key provenance (v2.0.0, ratified 2026-06-26).** Each `TouchKeyIR` carries a **provenance** field recording how its touch assignment was decided, so the studio can distinguish derived-from-desktop keys from author overrides and surface that in the gallery and lint. The value is one of:
+- `base-derived` — copied from a base keyboard's shipped touch layout (faithful-edit path, §8 Touch).
+- `physical-suggested` — produced by deriving touch from the locked physical/desktop layout (the modifier-to-layer mapping, deadkey→longpress seeding, etc.).
+- `hand-set` — an explicit author assignment from the Touch gallery (sk[], flick{}, multitap[]).
+
+A **producing-default tag** marks keys whose provenance is the studio's own default derivation (vs. a value the author has since confirmed or overridden), so a confirmed value is distinguishable from an untouched default. (Full field shape lives in `packages/contracts/src/keyboard-ir.ts` alongside `TouchKeyIR`.)
+
+**`IRPath` — typed path over the nested IR (v2.0.0, ratified 2026-06-26).** `IRPath` is a typed path that addresses a node inside the nested `KeyboardIR` — a typed cursor over the IR tree rather than a free-form string. It includes the **touch path** `touchLayout.platforms[].layers[].rows[].keys[]` (addressing an individual `TouchKeyIR`), and the analogous paths into stores, groups, and rules. `IRPath` is consumed by the studio-package `QuestionModule` (`packages/studio`) — its `inputs`/`writes` declarations are **studio-package code**, not contracts types, and are the **consumers** of `IRPath` — but the `IRPath` concept and the `TouchKeyIR` provenance field above are part of the **same ratified major bump** of `packages/contracts`.
+
+> **Major-version gate.** The `TouchKeyIR` provenance field and `IRPath` are **breaking contract additions** ratified at the §18 joint engine+content session (2026-06-26); they move `packages/contracts` to **v2.0.0**. Per §18 this is a **gated major bump** (joint session required), **not** an additive-minor revision — even though new fields/types "look" additive, they are part of the ratified major contract.
+
 ---
 
 ## 6. Worked example
@@ -499,7 +537,7 @@ Substitution is deterministic and reproducible: given the same answer map, the s
 > **Audience.** Primary: content curator (for the three-group taxonomy + authoring emphasis). Secondary: engine implementer (for the BCP47-subtag detection algorithm, Phase A detection gates, and CJK/Ethiopic exclusion enforcement).
 > A curator walks away knowing which gallery patterns to surface per group and how reorder priority cascades. An implementer walks away knowing how to detect the group from BCP47 + IR structural shape and how to enforce the CJK/Ethiopic stub. The opening table + reorder-priority list is curator-facing; the "Routing decision" / "No mobile-first routing" / "CJK and Ethiopic" paragraphs are implementer-facing.
 
-The survey branches at Phase A based on BCP47 tag, base-keyboard choice, and user confirmation. The three groups share the same phase structure but differ in authoring emphasis, reordering load, and `&CasedKeys` content.
+The survey branches at Identity (formerly Phase A; see the §4 A–G crosswalk) based on BCP47 tag, base-keyboard choice, and user confirmation. The three groups share the same phase structure but differ in authoring emphasis, reordering load, and `&CasedKeys` content. (Phase-letter references in the rest of this section resolve via the §4 crosswalk.)
 
 | Group | Typical bases | Primary challenges | CasedKeys default | Reorder posture |
 |---|---|---|---|---|
@@ -748,6 +786,7 @@ Rationale: Reorder patterns for CJK and Ethiopic require specialist curation tha
 **Decision 6 — Desktop-first authoring scope.**
 Decision: v1 supports desktop-first authoring only. The survey, strategy selector, and gallery are anchored to physical-keyboard KMN rules; the touch layout is scaffolded from the desktop OSK in Phase E (no reverse touch-to-desktop derivation in v1). Authors whose primary deployment is mobile are surfaced this posture at Phase A before they invest survey time and may continue with the desktop-first flow (still receiving a derived touch layout). Touch-first authoring is a v1.1 candidate.
 Rationale: The strategy framework (Sec 7) and the seven discovery axes (Sec 7.1) elicit physical-keyboard mental-model answers — key names like `K_QUOTE`, modifier-plane availability, base-layout collisions. Inverting the data flow to touch-first requires touch-first strategy variants that are not yet curated and would expand v1 scope materially. Mobile-first authoring is a known v1.1 work-item, not a silent gap.
+*Architectural rationale (added 2026-06-26):* Desktop-first is not only a scope convenience — it follows from how Keyman builds touch keyboards. A touch keyboard is inherently built **on top of** the physical layout files (`.kmn` + `.kvks`) plus context rules, which compile **into** the touch keyboard's JS; the physical layout is a **mandatory substrate**, not an optional sibling. A touch keyboard with **no physical layout defined breaks the moment a Bluetooth keyboard is attached** to a touch device: Keyman falls back to the physical layout files for hardware-keystroke input, and if those files are not defined it becomes impossible to use Keyman with a Bluetooth keyboard on that device. Authoring touch-first (or deriving physical from touch) would therefore risk shipping keyboards with a missing or under-specified physical substrate — so v1 locks the physical desktop layout first and derives touch from it, never the reverse.
 
 **Decision 7 — Functional equivalence, not byte-identity.**
 Decision: Round-trip is verified by *functional equivalence under `kmcmplib`*, not by byte-identity of the emitted `.kmn`. Two IRs are equivalent when every input in the bounded enumeration corpus (every virtual key x every modifier combination x deadkey paths up to depth 3) produces the same output character sequence under the WASM oracle. Order, whitespace, comment placement, and codepoint formatting differences are not defects.
@@ -786,6 +825,10 @@ Rationale: These five categories cover the long tail of `release/` keyboards tha
 Decision: `HISTORY.md` mandatory ("Adapted from `<sourcePath>`" bullet under the 1.0 entry); PR body informational (full block via `buildImportAttributionBlock()`); `LICENSE.md` only when the source licence requires it (e.g. CC-BY); `README.md` never.
 Rationale: Attribution must survive in the committed source tree independent of the PR body (which is editable post-merge). HISTORY.md is the canonical carrier; the PR body is for reviewer context only. Keeping README.md clean avoids polluting the user-facing package description.
 
+**Decision 15 — Functional phase labels (retire A–G). (Decided 2026-06-26.)**
+Decision: The sequential phase labels A, B, C, C′, D, E, F, G are retired in favour of **functional** names — the plan spine's **Identity → Characters → Carve → Mechanisms → Lock → Reorder → Desktop-OSK → Touch → Help → Package**. The A–G crosswalk (in §4 "Phase labels") records the verified old→new mapping; references use the functional name with a dual "FunctionalName (formerly Phase X)" label on first mention in each major section. This is a **labelling** change, not a restructure of the phase *model*: the §8 phase definitions are unchanged, and the spots where the plan's Carve/Mechanisms/Lock cluster does not map 1:1 onto the single Phase C are flagged in §4, not silently re-modelled.
+Rationale: The alphanumeric scheme was misleading. The survey is reached in a hybrid order (§8), not A→B→…→G; and the gaps (no surfaced Phase D/G survey screens, Carve and Lock never lettered) made the letters read as a linear pipeline that never existed. Functional names describe what each step does and match the plan spine the two teams build against.
+
 ---
 
 ## 15. Acceptance scenarios
@@ -798,7 +841,7 @@ Rationale: Attribution must survive in the committed source tree independent of 
 ### Scenario A: Latin QWERTY keyboard with a deadkey
 
 **Starting state:** Studio open, no authentication, US-English fallback selected as the source. The carve gallery renders a pass-through view (no recognized patterns to suppress).
-**User actions:** Phase A — enters language name "Tuvan", tag `tyv`, copyright holder "Researcher Name". Phase B — adapts the US-English base by adding characters `a e i o u` with acute accent variants. Phase C — selects the "tap then base letter" deadkey pattern; picks `K_QUOTE` as trigger key; lists base `aeiou` and accented `áéíóú`. Phase C' — NFD reorder auto-emitted. Phases D-G complete with defaults. Clicks "Download .zip".
+**User actions:** Identity (formerly Phase A; phase letters in these scenarios resolve via the §4 A–G crosswalk) — enters language name "Tuvan", tag `tyv`, copyright holder "Researcher Name". Characters (Phase B) — adapts the US-English base by adding characters `a e i o u` with acute accent variants. Mechanisms (Phase C) — selects the "tap then base letter" deadkey pattern; picks `K_QUOTE` as trigger key; lists base `aeiou` and accented `áéíóú`. Reorder (Phase C') — NFD reorder auto-emitted. Desktop-OSK through Package (Phases D–G) complete with defaults. Clicks "Download .zip".
 **Expected output:** `.zip` containing a virtual FS that builds with `kmc build` with zero errors and zero warnings. `HISTORY.md` has a single `1.0` entry. `LICENSE.md` reads `Copyright © 2026 Researcher Name`. `welcome.htm` has `<html lang="tyv">`. `&CasedKeys` store present with `[K_A]..[K_Z]`.
 **Pass criteria:** `kmc build` exit code 0, no diagnostics. Layer C green checks all pass. Typing `'a` in the live preview produces `a` with acute.
 
@@ -846,7 +889,7 @@ Rationale: Attribution must survive in the committed source tree independent of 
 - **Triage tool for traditional submissions** — a separate project that reuses `@keymanapp/kmn-validator` and `@keymanapp/keyboard-lint`; not part of keyboard-studio.
 - **LDML output** — deferred until the LDML-to-touch build path lands in the Keyman toolchain. Emission format is locked to KMN + `.keyman-touch-layout`.
 - **Mobile-app integration** — `oem/` updates, partner CSV updates, partner-organization bundle workflows.
-- **Touch-first authoring path** — v1 supports desktop-first authoring only (Decision 6, Sec 14). The survey, strategy selector, and gallery are anchored to physical-keyboard mental-model answers; the touch layout is scaffolded from the desktop OSK in Phase E with no reverse derivation. Mobile-primary authors are surfaced this at Phase A and may continue with the desktop-first flow (still receiving a derived touch layout). Touch-first authoring is a v1.1 candidate.
+- **Touch-first authoring path** — v1 supports desktop-first authoring only (Decision 6, Sec 14). The survey, strategy selector, and gallery are anchored to physical-keyboard mental-model answers; the touch layout is scaffolded from the desktop OSK in Touch (formerly Phase E) with no reverse derivation. Mobile-primary authors are surfaced this at Identity (formerly Phase A) and may continue with the desktop-first flow (still receiving a derived touch layout). Touch-first authoring is a v1.1 candidate. **Why no reverse touch→physical derivation:** the physical layout is a *mandatory substrate* a Keyman touch keyboard is built on — the physical `.kmn`/`.kvks` + context rules compile into the touch keyboard's JS, and a touch keyboard with no physical layout defined breaks the moment a Bluetooth keyboard is attached to a touch device (Keyman falls back to the physical layout files, and if they are undefined Keyman cannot be used with a Bluetooth keyboard on that device). See Decision 6 (Sec 14) for the full rationale.
 - **Hosting and deployment** — infrastructure is left to the operator; this project ships a static SPA.
 - **CJK, Ethiopic, and Hangul/jamo cluster-assembly in v1** — confirmed excluded; see Sec 14, decision 5. CJK (Han-based scripts) and Ethiopic are excluded due to incomplete specialist curation; Hangul is excluded because jamo-to-syllable cluster composition (Dubeolsik/Sebeolsik stateful composition) is a distinct complexity class with no jamo composition pattern in the library. Target: sprint 2 pattern-library work.
 - **Multi-language `welcome.htm` variants** — LLM-generated variants for multiple languages; post-v1.
@@ -874,6 +917,8 @@ Note: touch/mobile layouts and `.kmp`/`.kvks`/`.keyboard_info` generation are **
 **CasedKeys (`&CasedKeys`).** A Keyman system store declaring the set of virtual keys that participate in `CAPS`/`NCAPS` modifier logic. Scaffold inserts the appropriate set per script group; non-Roman scripts default to omitting it.
 
 **deadkey.** A KMN mechanism in which pressing a key emits no character immediately but sets a named state that modifies the next keystroke. Written as `deadkey(name)` in KMN context positions; `dk()` is a synonym.
+
+**functional phase labels.** The named steps that replace the retired sequential labels A–G (Decision 15, §14, decided 2026-06-26): **Identity, Characters, Carve, Mechanisms, Lock, Reorder, Desktop-OSK, Touch, Help, Package** (the plan spine). The old→new mapping is the A–G crosswalk in §4; on first mention in each major section a reference reads "FunctionalName (formerly Phase X)". The phase *model* in §8 is unchanged — this is a labelling change. Note the spec's single Phase C maps to **Mechanisms**, while **Carve** and **Lock** are spine steps that never had a phase letter (see the §4 flags).
 
 **decision tree.** The ordered rule set (Sec 7.2) that maps a keyboard's discovery-axis values to a primary output strategy (S-01..S-12) plus secondaries. The strategy selector runs it; its output drives which gallery patterns are shown.
 
@@ -916,6 +961,8 @@ Note: touch/mobile layouts and `.kmp`/`.kvks`/`.keyboard_info` generation are **
 This spec evolves via explicit revision requests tracked in the keyboard-studio issue tracker. Changes to prose sections (data flow, scenarios, out-of-scope list) may be made by the spec maintainer following a single-reviewer approval. Changes to the Pattern schema (Sec 5) require a joint engine+content session (the same threshold as the Day-1 contract lock); breaking field changes — renames, type changes, removals — require a major version bump of the `Pattern` interface and a corresponding update to `packages/contracts`. Changes to resolved decisions in Sec 14 require an explicit revision request citing the original decision and the new evidence; they may not be re-opened informally. The following items are tracked for a v1.1 revision cycle and are not in scope for v1: risk and dependencies section, performance targets table, and accessibility section.
 
 Changes to the KeyboardIR schema (§5a) — field renames, type changes, removals — follow the same policy as the Pattern schema: joint engine+content session required; breaking changes require a major version bump of `packages/contracts`. Adding new typed nodes for features currently held as `RawKmnFragment` (Decision 8, §14) is a minor revision, not a breaking change.
+
+**Joint session 2026-06-26 (`packages/contracts` v2.0.0).** A joint engine+content session ratified the contract additions that move `packages/contracts` to a new **MAJOR** version: the per-key touch provenance field on `TouchKeyIR` and the `IRPath` typed-path concept (§5a), together with the §7.7 typed assignment-map contract (now built incrementally; specs/007 §7). These were ratified through this section's joint-session gate; the bump is **major and gated**, recorded here and in the spec changelog (v2.0.0) — it is explicitly **not** an additive-minor revision.
 
 ---
 
