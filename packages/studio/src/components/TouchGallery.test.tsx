@@ -22,7 +22,7 @@ import type { Stage } from "../hooks/useKeyboardArtifact";
 // vi.hoisted() — refs shared across mock closures and test bodies.
 // ---------------------------------------------------------------------------
 
-const { capturedVfsTransformRef, buildTouchLayoutJsonSpy } = vi.hoisted(() => {
+const { capturedVfsTransformRef, buildTouchLayoutJsonSpy, touchLintResultRef } = vi.hoisted(() => {
   const capturedVfsTransformRef = {
     current: null as null | ((vfs: VirtualFS, kbId: string) => { warnings: string[] }),
   };
@@ -37,7 +37,12 @@ const { capturedVfsTransformRef, buildTouchLayoutJsonSpy } = vi.hoisted(() => {
       warnings: [] as string[],
     }),
   );
-  return { capturedVfsTransformRef, buildTouchLayoutJsonSpy };
+  // Configurable ref for useTouchLint mock — tests override .current to inject
+  // specific findings (e.g. LINT_ERROR_FINDING for AC#3 coverage).
+  const touchLintResultRef = {
+    current: { touchFindings: [] as Array<{ code: string; severity: string; layer: string; message: string }>, touchLintRunning: false },
+  };
+  return { capturedVfsTransformRef, buildTouchLayoutJsonSpy, touchLintResultRef };
 });
 
 // ---------------------------------------------------------------------------
@@ -82,7 +87,7 @@ vi.mock("@keyboard-studio/engine", async (importOriginal) => {
 // ---------------------------------------------------------------------------
 
 vi.mock("../hooks/useTouchLint.ts", () => ({
-  useTouchLint: () => ({ touchFindings: [], touchLintRunning: false }),
+  useTouchLint: () => touchLintResultRef.current,
 }));
 
 // ---------------------------------------------------------------------------
@@ -102,7 +107,16 @@ vi.mock("./OskModeToggle.tsx", () => ({
 }));
 
 vi.mock("../lint/LintSummary.tsx", () => ({
-  LintSummary: () => <div data-testid="lint-summary" />,
+  // Render finding codes as text so tests can assert on them.
+  LintSummary: ({ findings }: { findings: Array<{ code: string }> }) => (
+    <div data-testid="lint-summary">
+      {findings.map((f) => (
+        <span key={f.code} data-finding-code={f.code}>
+          {f.code}
+        </span>
+      ))}
+    </div>
+  ),
 }));
 
 // ---------------------------------------------------------------------------
@@ -148,10 +162,13 @@ afterEach(() => {
   useWorkingCopyStore.getState().reset();
   vi.clearAllMocks();
   capturedVfsTransformRef.current = null;
+  // Reset useTouchLint mock to the default empty state between tests.
+  touchLintResultRef.current = { touchFindings: [], touchLintRunning: false };
 });
 
 beforeEach(() => {
   useWorkingCopyStore.getState().reset();
+  touchLintResultRef.current = { touchFindings: [], touchLintRunning: false };
 });
 
 // ---------------------------------------------------------------------------
@@ -682,5 +699,46 @@ describe("TouchGallery — no suggestion goes straight to chooser", () => {
     expect(
       screen.queryAllByRole("button").some((b) => b.textContent?.trim() === "Apply method"),
     ).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// useTouchLint error surface — AC#3 (swallowed-catch bugfix)
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — lint error finding surfaces in LintSummary (AC#3)", () => {
+  it("renders KM_WARN_LINT_ERROR code in LintSummary when useTouchLint returns LINT_ERROR_FINDING", async () => {
+    // Import the constant here (dynamic import avoids hoisting issues).
+    const { LINT_ERROR_FINDING } = await import("../lint/validationErrorFindings.ts");
+
+    // Override the mock to return the error finding before rendering.
+    touchLintResultRef.current = {
+      touchFindings: [LINT_ERROR_FINDING],
+      touchLintRunning: false,
+    };
+
+    seedStore({ withInventory: ["ä"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // The LintSummary mock renders each finding's code as a [data-finding-code] span.
+    // Assert that KM_WARN_LINT_ERROR is rendered — it came through the findings prop.
+    const lintSummary = screen.getByTestId("lint-summary");
+    expect(lintSummary).toBeTruthy();
+    const codeSpan = lintSummary.querySelector("[data-finding-code='KM_WARN_LINT_ERROR']");
+    expect(codeSpan).not.toBeNull();
+    expect(codeSpan?.textContent).toBe("KM_WARN_LINT_ERROR");
+  });
+
+  it("renders no finding codes in LintSummary when useTouchLint returns [] (baseline check)", async () => {
+    // Default: touchLintResultRef.current = { touchFindings: [], ... } (reset in beforeEach).
+    seedStore({ withInventory: ["ä"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const lintSummary = screen.getByTestId("lint-summary");
+    expect(lintSummary.querySelectorAll("[data-finding-code]")).toHaveLength(0);
   });
 });

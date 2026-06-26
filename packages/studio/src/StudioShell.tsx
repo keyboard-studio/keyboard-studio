@@ -34,7 +34,8 @@ import { useValidator } from "./hooks/useValidator.ts";
 import { usePlacementPriors } from "./hooks/usePlacementPriors.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
 import { resolveBaseTouchJson } from "./lib/resolveBaseTouchJson.ts";
-import { buildFindingsByQuestionId } from "./lint/lintToQuestion.ts";
+import { buildFindingsByQuestionId, selectUnmappedFindings } from "./lint/lintToQuestion.ts";
+import { LintSummary } from "./lint/index.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
 import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
 import { FlowMapView } from "./flowmap/FlowMapView.tsx";
@@ -312,6 +313,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     () => buildFindingsByQuestionId(findings),
     [findings],
   );
+  const globalFindings = useMemo(() => selectUnmappedFindings(findings), [findings]);
 
   // Identity-lite is the hybrid flow's head: it captures the language + the
   // INDEPENDENT target script, deriving the routing/A2 prefill. Gated scripts
@@ -533,6 +535,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     >
       {/* Left pane: survey questions */}
       <section aria-label="Survey questions" style={questionsPaneStyle}>
+        {globalFindings.length > 0 && (
+          <LintSummary findings={globalFindings} />
+        )}
         {stage === "done" && donePaneContent}
         {stage === "identity" && (
           <IdentityLite
