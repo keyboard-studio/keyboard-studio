@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import type { LintFinding } from "@keyboard-studio/contracts";
 import { runAllChecks } from "@keyboard-studio/engine";
 import { useDebounce, DEBOUNCE_MS } from "./useDebounce.ts";
+import { VALIDATOR_ERROR_FINDING } from "../lint/validationErrorFindings.ts";
 
 export interface ValidatorResult {
   findings: LintFinding[];
@@ -25,7 +26,7 @@ export function useValidator(kmnSource: string | null): ValidatorResult {
       setFindings(runAllChecks(debouncedSource));
     } catch (err: unknown) {
       console.error('[useValidator] runAllChecks threw:', err);
-      setFindings([]);
+      setFindings([VALIDATOR_ERROR_FINDING]);
     } finally {
       setRunning(false);
     }

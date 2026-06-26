@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { KeyboardLintEngine } from "@keymanapp/keyboard-lint";
 import type { LintFinding, VirtualFS } from "@keyboard-studio/contracts";
 import { useDebounce, DEBOUNCE_MS } from "./useDebounce.ts";
+import { LINT_ERROR_FINDING } from "../lint/validationErrorFindings.ts";
 
 const engine = new KeyboardLintEngine();
 
@@ -23,7 +24,13 @@ export function useTouchLint(
     engine.lint(debouncedFs, keyboardId).then((findings: LintFinding[]) => {
       if (!cancelled) { setTouchFindings(findings); setTouchLintRunning(false); }
     }).catch((err: unknown) => {
-      if (!cancelled) { console.error("[useTouchLint]", err); setTouchFindings([]); setTouchLintRunning(false); }
+      // Guard: skip state injection after unmount/dep-change so we never set
+      // state on a torn-down effect.
+      if (!cancelled) {
+        console.error("[useTouchLint]", err);
+        setTouchFindings([LINT_ERROR_FINDING]);
+        setTouchLintRunning(false);
+      }
     });
     return () => { cancelled = true; };
   }, [debouncedFs, keyboardId]);

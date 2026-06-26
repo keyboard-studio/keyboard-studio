@@ -38,7 +38,7 @@ import { createVirtualFS, toUPlusNotation, isDecomposableAccented } from "@keybo
 import { buildTouchLayoutJson } from "../lib/buildTouchLayoutJson.ts";
 import { resolveBaseTouchJson } from "../lib/resolveBaseTouchJson.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { LintSummary } from "../lint/LintSummary.tsx";
+import { LintSummary } from "../lint/index.ts";
 import { useTouchLint } from "../hooks/useTouchLint.ts";
 import { useKeyboardArtifact } from "../hooks/useKeyboardArtifact.ts";
 import type { ScaffoldSpec, VfsTransform } from "../hooks/useKeyboardArtifact.ts";
