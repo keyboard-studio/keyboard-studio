@@ -4,6 +4,8 @@
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
 
+import { irPath } from "@keyboard-studio/contracts";
+
 export const definition = {
   id: "pa_copyright_holder",
   prompt: "Who holds the copyright for this keyboard?",
@@ -46,5 +48,8 @@ export const fixtures: QuestionModule["fixtures"] = {
   ],
 };
 
-const mod: QuestionModule = { definition, validate, fixtures };
+
+export const inputs = [] as const;
+export const writes = [irPath("header", "copyright")] as const;
+const mod: QuestionModule = { definition, validate, fixtures, inputs, writes };
 export default mod;

@@ -6,6 +6,8 @@
 
 import type { QuestionModule } from "../../types.ts";
 
+import { irPath } from "@keyboard-studio/contracts";
+
 export const definition = {
   id: "layout_family",
   prompt: "Which physical keyboard layout does your community use?",
@@ -43,5 +45,8 @@ export const fixtures: QuestionModule["fixtures"] = {
   invalid: [],
 };
 
-const mod: QuestionModule = { definition, fixtures };
+
+export const inputs = [irPath("header", "bcp47")] as const;
+export const writes = [] as const;
+const mod: QuestionModule = { definition, fixtures, inputs, writes };
 export default mod;

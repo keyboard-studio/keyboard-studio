@@ -4,6 +4,8 @@
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
 
+import { irPath } from "@keyboard-studio/contracts";
+
 const VALID_DIRECTIONS = new Set(["rtl", "ltr"]);
 
 export const definition = {
@@ -48,5 +50,8 @@ export const fixtures: QuestionModule["fixtures"] = {
   ],
 };
 
-const mod: QuestionModule = { definition, validate, fixtures };
+
+export const inputs = [irPath("header", "bcp47")] as const;
+export const writes = [] as const;
+const mod: QuestionModule = { definition, validate, fixtures, inputs, writes };
 export default mod;

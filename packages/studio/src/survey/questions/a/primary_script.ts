@@ -3,6 +3,8 @@
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
 
+import { irPath } from "@keyboard-studio/contracts";
+
 const VALID_SCRIPT_VALUES = new Set([
   "Latn", "Arab", "Hebr", "Deva", "Beng", "Taml", "Telu", "Knda", "Mlym",
   "Guru", "Gujr", "Orya", "Sinh", "Thai", "Khmr", "Mymr", "Laoo", "Ethi",
@@ -85,5 +87,8 @@ export const fixtures: QuestionModule["fixtures"] = {
   ],
 };
 
-const mod: QuestionModule = { definition, validate, fixtures };
+
+export const inputs = [] as const;
+export const writes = [irPath("header", "bcp47")] as const;
+const mod: QuestionModule = { definition, validate, fixtures, inputs, writes };
 export default mod;
