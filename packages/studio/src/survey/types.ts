@@ -74,6 +74,8 @@ export interface SurveyContext {
   detected_group?: string;
   script_family?: string;
   routing_group?: string;
+  /** BCP47 target tag derived from the identity-lite step (e.g. "yo-Latn", "ha"). */
+  bcp47_tag?: string;
   [key: string]: string | undefined;
 }
 

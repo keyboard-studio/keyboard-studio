@@ -61,10 +61,14 @@ vi.mock("../lib/services.ts", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Import-corpus mock.
-// basic_kbdus      → "clean"                (badge: "clean")
-// sil_euro_latin   → "clean-with-opaque"    (badge: "opaque")
-// sil_devanagari_phonetic → "round-trip-divergence" (badge: "diverged")
+// Import-corpus mock — covers all three badge variants deterministically.
+// basic_kbdus             → ImportStatus.Clean              (badge: "clean")
+// sil_euro_latin          → ImportStatus.CleanWithOpaque    (badge: "opaque")
+// sil_devanagari_phonetic → ImportStatus.RoundTripDivergence (badge: "diverged")
+//
+// _resetCorpusCacheForTesting() in afterEach flushes the module-level
+// _corpusCache so vi.mock("@docs/import-corpus.json") is re-resolved on every
+// test, making badge assertions independent of the real (volatile) corpus file.
 // ---------------------------------------------------------------------------
 
 vi.mock("@docs/import-corpus.json", () => ({
@@ -78,26 +82,31 @@ vi.mock("@docs/import-corpus.json", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Module-level cache in BaseKeyboardPicker.tsx must be reset between tests
-// because loadCorpus() caches its result at module level. We can't reach into
-// the module directly, so we reload it each time by calling cleanup and
-// remounting. The cache is set once on first mount of any test that resolves
-// the keyboard list; tests that need a fresh corpus state should rely on the
-// constant mock shape (which is fixed for all tests).
+// Module-level cache in BaseKeyboardPicker.tsx is reset via
+// _resetCorpusCacheForTesting() in afterEach (see above), ensuring each test
+// gets a fresh corpus load from the vi.mock rather than a stale real-file read.
 // ---------------------------------------------------------------------------
 
 afterEach(() => {
   cleanup();
   // Reset listAllImpl back to the default (succeeds with SOME_BASES).
   listAllImpl = () => Promise.resolve(SOME_BASES);
+  // Flush the module-level corpus cache so the next test's dynamic
+  // import("@docs/import-corpus.json") is intercepted by vi.mock and badge
+  // assertions reflect the mock data, not the real (volatile) corpus file.
+  _resetCorpusCacheForTesting();
   vi.clearAllMocks();
 });
 
 // ---------------------------------------------------------------------------
 // Import the component AFTER mocks are set up.
+// The _resetCorpusCacheForTesting export lets us flush the module-level
+// _corpusCache before each badge test so that vi.mock("@docs/import-corpus.json")
+// drives badge rendering deterministically (the dynamic import() inside
+// loadCorpus() is only intercepted by vi.mock on a cache-cold call).
 // ---------------------------------------------------------------------------
 
-import { BaseKeyboardPicker } from "./BaseKeyboardPicker";
+import { BaseKeyboardPicker, _resetCorpusCacheForTesting } from "./BaseKeyboardPicker";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -402,7 +411,11 @@ describe("BaseKeyboardPicker — import badge on option row (AC#2)", () => {
     ).toBeTruthy();
   });
 
-  it("sil_devanagari_phonetic option row shows a 'diverged' badge", async () => {
+  it("sil_devanagari_phonetic option row shows a 'diverged' badge (matches corpus mock)", async () => {
+    // The corpus mock sets sil_devanagari_phonetic → RoundTripDivergence → badge "diverged".
+    // _resetCorpusCacheForTesting() in afterEach ensures loadCorpus() re-runs the dynamic
+    // import on each test so vi.mock("@docs/import-corpus.json") drives this deterministically,
+    // independent of what the real corpus file contains for this keyboard.
     renderPicker();
     const input = await waitForCombobox();
     fireEvent.change(input, { target: { value: "sil_deva" } });
@@ -417,11 +430,9 @@ describe("BaseKeyboardPicker — import badge on option row (AC#2)", () => {
     ).toBeTruthy();
   });
 
-  it("sil_euro_latin option row shows an import badge (it is in the real corpus)", async () => {
-    // The dynamic import() for @docs/import-corpus.json uses the real file in this test
-    // environment (module-level cache populated before vi.mock intercepted). The real corpus
-    // has sil_euro_latin with status "round-trip-divergence" → badge label "diverged".
-    // We assert a badge IS present and matches the real corpus status.
+  it("sil_euro_latin option row shows an 'opaque' badge (matches corpus mock)", async () => {
+    // The corpus mock sets sil_euro_latin → CleanWithOpaque → badge "opaque".
+    // _resetCorpusCacheForTesting() in afterEach ensures vi.mock drives this deterministically.
     renderPicker();
     const input = await waitForCombobox();
     fireEvent.change(input, { target: { value: "sil_euro" } });
@@ -431,10 +442,9 @@ describe("BaseKeyboardPicker — import badge on option row (AC#2)", () => {
     const euroOption = options.find((o) => o.textContent?.includes("SIL Euro Latin"));
     expect(euroOption).toBeDefined();
 
-    // A badge must be present (sil_euro_latin is in the real corpus)
     expect(
-      within(euroOption!).queryByLabelText(/Import status/),
-    ).not.toBeNull();
+      within(euroOption!).getByLabelText("Import status: opaque"),
+    ).toBeTruthy();
   });
 });
 

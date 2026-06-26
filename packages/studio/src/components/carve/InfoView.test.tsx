@@ -365,11 +365,13 @@ describe('capabilityHint — not-removable:opaque', () => {
 });
 
 describe('capabilityHint — not-removable:context-sensitive', () => {
-  it('mentions surrounding context', () => {
-    expect(capabilityHint('not-removable:context-sensitive')).toMatch(/surrounding context/i);
+  it('explains the character only appears after certain keypresses', () => {
+    expect(capabilityHint('not-removable:context-sensitive')).toMatch(/after certain keys are pressed/i);
   });
-  it("mentions can't be removed individually", () => {
-    expect(capabilityHint('not-removable:context-sensitive')).toMatch(/individually/i);
+  it("explains removing on its own isn't supported yet", () => {
+    const hint = capabilityHint('not-removable:context-sensitive');
+    expect(hint).toMatch(/on its own/i);
+    expect(hint).toMatch(/isn't supported yet/i);
   });
 });
 

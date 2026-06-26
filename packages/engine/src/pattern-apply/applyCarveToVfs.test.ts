@@ -175,34 +175,61 @@ describe("applyCarveToVfs — deletes a store", () => {
   });
 });
 
-describe("applyCarveToVfs — safety gate: unsafe IR (has raw fragments)", () => {
-  it("skips re-emit and returns a warning when IR has opaque/raw fragments", () => {
+describe("applyCarveToVfs — fragment-bearing keyboards (gate-1 removed)", () => {
+  it("proceeds with re-emit when IR has opaque/raw fragments (gate-1 removed)", () => {
+    // Previously gate-1 would skip re-emit for fragment-bearing keyboards.
+    // With the faithful-emit fix, fragment-bearing keyboards are now supported.
     const originalContent = "c original\n";
     const vfs = makeVfs(originalContent);
+    // rule#0 uses K_A; rule#1 uses K_B — delete K_A only, K_B must survive.
+    const ruleA: IRRule = {
+      nodeId: "rule#0",
+      context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
+      output: [{ kind: "char", value: "a" }],
+    };
+    const ruleB: IRRule = {
+      nodeId: "rule#1",
+      context: [{ kind: "vkey", name: "K_B", modifiers: [] }],
+      output: [{ kind: "char", value: "b" }],
+    };
     const ir: KeyboardIR = {
-      ...makeIR([makeGroup("group#main", "main", [makeRule("rule#0")])]),
+      ...makeIR([makeGroup("group#main", "main", [ruleA, ruleB])]),
       raw: [
-        { nodeId: "raw#0", origin: "imported", sourceText: "c OPAQUE FRAGMENT", reason: "call/return" },
+        {
+          nodeId: "raw#0",
+          origin: "imported",
+          sourceText: "c OPAQUE FRAGMENT",
+          reason: "call/return",
+          groupNodeId: "group#main",
+        },
       ],
     };
     const setSpy = vi.spyOn(vfs, "set");
 
     const { warnings } = applyCarveToVfs(vfs, "test", ir, new Set(["rule#0"]));
 
-    // VFS must be unchanged.
-    expect(setSpy).not.toHaveBeenCalled();
-    expect(vfs.get("source/test.kmn")?.content).toBe(originalContent);
-    // A warning must be returned.
-    expect(warnings.length).toBeGreaterThan(0);
-    expect(warnings[0]).toMatch(/opaque\/raw fragment/i);
+    // VFS MUST have been written (the re-emit ran).
+    expect(setSpy).toHaveBeenCalledOnce();
+    // No gate-1 warning about opaque fragments.
+    expect(warnings.every((w) => !w.includes("opaque/raw fragment"))).toBe(true);
+    // K_A rule was deleted; K_B must survive.
+    const content = vfs.get("source/test.kmn")?.content as string;
+    expect(content).not.toContain("K_A");
+    expect(content).toContain("K_B");
   });
 
-  it("does not mutate baseIr when the safety gate fires", () => {
+  it("does not mutate baseIr when projecting a fragment-bearing keyboard", () => {
     const vfs = makeVfs();
     const ir: KeyboardIR = {
       ...makeIR([makeGroup("group#main", "main", [makeRule("rule#0")])]),
       raw: [
-        { nodeId: "raw#0", origin: "imported", sourceText: "c FRAG", reason: "call/return" },
+        {
+          nodeId: "raw#0",
+          origin: "imported",
+          sourceText: "c FRAG",
+          reason: "call/return",
+          groupNodeId: "group#main",
+        },
       ],
     };
 
@@ -210,6 +237,27 @@ describe("applyCarveToVfs — safety gate: unsafe IR (has raw fragments)", () =>
 
     // baseIr.raw is unchanged.
     expect(ir.raw.length).toBe(1);
+  });
+
+  it("fragment is removed from emitted .kmn when its nodeId is in deletedNodeIds", () => {
+    const vfs = makeVfs();
+    const ir: KeyboardIR = {
+      ...makeIR([makeGroup("group#main", "main", [makeRule("rule#0")])]),
+      raw: [
+        {
+          nodeId: "raw#frag",
+          origin: "imported",
+          sourceText: "save(opaqueFlag, 1)",
+          reason: "save/set/reset option-store",
+          groupNodeId: "group#main",
+        },
+      ],
+    };
+
+    applyCarveToVfs(vfs, "test", ir, new Set(["raw#frag"]));
+
+    const content = vfs.get("source/test.kmn")?.content as string;
+    expect(content).not.toContain("save(opaqueFlag");
   });
 });
 

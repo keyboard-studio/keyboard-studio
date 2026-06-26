@@ -22,6 +22,16 @@ interface CorpusEntry {
 
 let _corpusCache: Map<string, string> | null | "failed" = null;
 
+/**
+ * Resets the module-level corpus cache.
+ * Exported for test isolation only — do not call in production code.
+ * Allows test suites to force a fresh import("@docs/import-corpus.json") so
+ * vi.mock("@docs/import-corpus.json") drives badge rendering deterministically.
+ */
+export function _resetCorpusCacheForTesting(): void {
+  _corpusCache = null;
+}
+
 async function loadCorpus(): Promise<Map<string, string>> {
   if (_corpusCache !== null && _corpusCache !== "failed") return _corpusCache;
   try {

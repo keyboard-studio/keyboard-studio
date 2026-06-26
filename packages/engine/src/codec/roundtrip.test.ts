@@ -40,9 +40,10 @@ const KMN_PATH = resolve(
   "../../../../../keyboards/release/basic/basic_kbdfr/source/basic_kbdfr.kmn"
 );
 
-// normaliseForComparison (stores/raw sort + nodeId/comment stripping) lives in
-// ./normalise-ir.ts so the supportability scanner's I2 check shares one source
-// of truth. Caveats 1 & 2 above document why comments/store-order are normalised.
+// normaliseForComparison (stores/raw sort + nodeId/sourceLine/groupNodeId/comment
+// stripping) lives in ./normalise-ir.ts so the supportability scanner's I2 check
+// shares one source of truth. Caveats 1 & 2 above document why comments/store-order
+// are normalised.
 
 /** Count all typed IRRules across all groups. */
 function countRules(ir: KeyboardIR): number {

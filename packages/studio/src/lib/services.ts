@@ -11,7 +11,9 @@ import type {
   PatternLibraryService,
   ScaffolderService,
   VirtualFS,
+  KeyboardIR,
 } from "@keyboard-studio/contracts";
+import type { MissingCharSuggestions, CldrFullLoader } from "@keyboard-studio/engine";
 import { mockBaseBrowser, mockOutputService, mockScaffolder } from "@keyboard-studio/contracts/mocks";
 import { localBaseBrowser, LOCAL_PROXY_BASE } from "./localBaseBrowser.ts";
 import { getPatternLibraryService as getBrowserPatternLibraryService } from "./browserPatternLibrary.ts";
@@ -145,3 +147,46 @@ export function getManagedPRProxyEndpoint(): string {
   const base = import.meta.env.VITE_OAUTH_BACKEND_URL ?? "";
   return `${base}/submit/managed-pr`;
 }
+
+// suggestMissingChars — Phase B CLDR-grounded missing-character suggestions.
+// When USE_REAL is false returns null (deterministic, no network) so tests
+// render the neutral "no data" note without real CLDR traffic.
+// When real, lazy-imports suggestMissingCharacters + createFetchCldrFullLoader
+// from the engine; caches the loader + engine fn together after first import so
+// subsequent calls skip the dynamic import entirely (mirrors getScaffolderService).
+type SuggestEngineCache = {
+  fn: (opts: { bcp47: string; baseIr: KeyboardIR; loader: CldrFullLoader; languageName?: string }) => Promise<MissingCharSuggestions | null>;
+  loader: CldrFullLoader;
+};
+let suggestEngineCache: SuggestEngineCache | null = null;
+export async function suggestMissingChars(
+  bcp47: string,
+  baseIr: KeyboardIR,
+  languageName?: string,
+): Promise<MissingCharSuggestions | null> {
+  if (!USE_REAL) return null;
+  if (suggestEngineCache !== null) {
+    return suggestEngineCache.fn({
+      bcp47,
+      baseIr,
+      loader: suggestEngineCache.loader,
+      ...(languageName !== undefined ? { languageName } : {}),
+    });
+  }
+  const { suggestMissingCharacters, createFetchCldrFullLoader } = await import(
+    /* @vite-ignore */ "@keyboard-studio/engine"
+  );
+  suggestEngineCache = {
+    fn: suggestMissingCharacters,
+    loader: createFetchCldrFullLoader(),
+  };
+  return suggestEngineCache.fn({
+    bcp47,
+    baseIr,
+    loader: suggestEngineCache.loader,
+    ...(languageName !== undefined ? { languageName } : {}),
+  });
+}
+
+// Re-export the type so callers can use it without a direct engine import.
+export type { MissingCharSuggestions };

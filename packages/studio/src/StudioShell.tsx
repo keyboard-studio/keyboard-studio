@@ -176,6 +176,10 @@ function contextFromIdentity(identity: IdentityLiteResult): SurveyContext {
     language_name: identity.english || identity.autonym,
     routing_group: identity.prefill.routingGroup,
     script_family: identity.prefill.script,
+    // identity.bcp47 is the full BCP47 target tag (e.g. "yo-Latn", "ha-Latn").
+    // Empty string when the user left the language code blank; omit the field
+    // in that case so SuggestionPanel can gate on bcp47_tag being non-empty.
+    ...(identity.bcp47 !== "" ? { bcp47_tag: identity.bcp47 } : {}),
   };
 }
 

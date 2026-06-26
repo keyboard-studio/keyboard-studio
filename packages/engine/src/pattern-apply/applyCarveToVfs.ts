@@ -16,16 +16,17 @@
 // filtered arrays. Groups whose rules are all deleted are NOT auto-deleted
 // (the group header remains unless the group's own nodeId is in deletedNodeIds).
 //
-// Safety gate: emit() is lossy (~415 round-trip-divergence keyboards), so
-// re-emitting an IR with opaque/raw fragments can alter non-deleted rules.
-// Re-emit is therefore gated on:
-//   1. baseIr.raw.length === 0 (no opaque fragments that would be lossily
-//      serialised — the full text-splice fix is deferred to a follow-up).
-//   2. The set of deleted nodes must not remove the entry group — the first
-//      non-readonly group that emit() picks for `begin Unicode > use(...)`.
-//      Removing it would silently retarget the begin directive.
-// When either condition fails, the carve step is skipped and a warning is
-// returned; the VFS is left unchanged.
+// Safety gate: the set of deleted nodes must not remove the entry group — the
+// first non-readonly group that emit() picks for `begin Unicode > use(...)`.
+// Removing it would silently retarget the begin directive. When this condition
+// fails, the carve step is skipped and a warning is returned; the VFS is left
+// unchanged.
+//
+// Fragment-bearing keyboards (baseIr.raw.length > 0) are now fully supported:
+// emit() uses a position-faithful path for these keyboards that interleaves
+// stores, rules, and fragments in their original source order and preserves ALL
+// user stores (not just those referenced by typed rules). The prior gate that
+// skipped re-emit for fragment-bearing keyboards has been removed.
 
 import type { KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
 import { emit } from "../codec/emit.js";
@@ -37,7 +38,7 @@ import { emit } from "../codec/emit.js";
  *   `deletedNodeIds` is empty. Use this when a preceding transform (e.g.
  *   `applyStoreSlotRemovals`) has already modified `baseIr` and the updated IR
  *   must be written into the VFS regardless of whether any whole-node deletions
- *   are present. Both safety gates (raw-fragment, entry-group) still apply.
+ *   are present. The entry-group safety gate still applies.
  */
 export interface ApplyCarveToVfsOpts {
   forceEmit?: boolean;
@@ -50,13 +51,13 @@ export interface ApplyCarveToVfsOpts {
  * with the emit of a deletion-filtered copy of `baseIr`, then returns any
  * warnings produced.
  *
- * The re-emit is skipped (with a warning) when the IR is not safe to re-emit:
- * - The base IR contains opaque/raw fragments (`baseIr.raw.length > 0`). The
- *   codec's emit() is lossy for these keyboards; the proper text-splice fix is
- *   tracked separately. Gate: `baseIr.raw.length === 0` only (no importStatus
- *   field exists on KeyboardIR today — add here when one is introduced).
- * - The deletion set would remove the entry group (the first non-readonly
- *   group), which would silently retarget `begin Unicode > use(...)`.
+ * The re-emit is skipped (with a warning) only when the deletion set would
+ * remove the entry group (the first non-readonly group), which would silently
+ * retarget `begin Unicode > use(...)`.
+ *
+ * Fragment-bearing keyboards (`baseIr.raw.length > 0`) are fully supported:
+ * emit() uses a position-faithful path that interleaves stores, rules, and
+ * fragments in their original source order and preserves ALL user stores.
  *
  * @param vfs            In-memory virtual filesystem. Written in-place.
  * @param keyboardId     Keyboard identifier (determines the .kmn VFS path).
@@ -81,19 +82,7 @@ export function applyCarveToVfs(
     return { warnings };
   }
 
-  // Safety gate 1: opaque/raw fragments present — re-emit is lossy.
-  // The text-splice fix (which avoids re-emitting the whole file) is tracked
-  // separately. Until then, skip the carve projection for these keyboards.
-  if (baseIr.raw.length > 0) {
-    warnings.push(
-      "[carve-project] carve re-emit skipped: IR contains opaque/raw fragments " +
-        `(${baseIr.raw.length} fragment(s)); deletions are not projected to avoid ` +
-        "lossy round-trip. Text-splice fix is tracked separately.",
-    );
-    return { warnings };
-  }
-
-  // Safety gate 2: entry-group deletion guard.
+  // Safety gate: entry-group deletion guard.
   // emit() picks the first non-readonly group as the `begin Unicode > use(...)`
   // target. Deleting it would silently retarget the begin directive.
   const entryGroup = baseIr.groups.find((g) => !g.readonly);
@@ -124,8 +113,9 @@ export function applyCarveToVfs(
         if (filteredRules.length === g.rules.length) return g;
         return { ...g, rules: filteredRules };
       }),
-    // Raw fragments array is always empty here (gate 1 ensures raw.length === 0).
-    raw: [],
+    // Raw fragments: filter out any deleted fragment nodes; survivors are
+    // preserved so emit()'s position-faithful path can interleave them.
+    raw: baseIr.raw.filter((f) => !deletedNodeIds.has(f.nodeId)),
     // Comments are not individually deleteable via carve; pass through.
     comments: baseIr.comments,
   };
