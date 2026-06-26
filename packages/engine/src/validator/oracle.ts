@@ -1,12 +1,13 @@
 // kmcmplib WASM oracle wrapper.
 //
 // validateWithOracle(source, options?) is the public entry point for
-// Issue #16. It runs the TS-portable checks — the `lexical` group plus
-// the TS half of `reference` (checks #5/#6/#8/#9) — and, when the WASM
-// oracle is available, runs the WASM-side checks (the WASM-half of
-// `reference` + `behavior` + `passthrough` groups) concurrently per
-// spec.md §14 D3. This is the SPA's single validation entry point
-// (useValidator), so a WASM-down state surfaces KM_WARN_ORACLE_UNAVAILABLE.
+// Issue #16. It runs the TS-portable checks — sourced from index.ts
+// (runLexicalChecks / runReferenceChecks) so the group->check mapping
+// lives in one place — and, when the WASM oracle is available, runs the
+// WASM-side checks (the WASM-half of `reference` + `behavior` +
+// `passthrough` groups) concurrently per spec.md §14 D3. This is the
+// SPA's single validation entry point (useValidator), so a WASM-down
+// state surfaces KM_WARN_ORACLE_UNAVAILABLE.
 //
 // On WASM load failure: catches OracleLoadError exactly once at lazy
 // init, sets `_wasmDown`, and from then on returns only TS-portable
@@ -30,16 +31,7 @@ import {
   type WasmOracleHandle,
 } from "./wasmLoader.js";
 import { OracleLoadError } from "./OracleLoadError.js";
-import { runLexicalChecks } from "./index.js";
-// Individual reference-group + lexical-group TS checks, wired into their
-// groups below. The taxonomy (types.ts) places codepointFormat (#7) in
-// `lexical`; deadkeyResolution (#5), ifStoreResolution (#6),
-// contextOrdering (#8), and indexBounds (#9) in `reference`.
-import { checkCodepointFormat } from "./checks/codepointFormat.js";
-import { checkDeadkeyResolution } from "./checks/deadkeyResolution.js";
-import { checkIfStoreResolution } from "./checks/ifStoreResolution.js";
-import { checkContextOrdering } from "./checks/contextOrdering.js";
-import { checkIndexBounds } from "./checks/indexBounds.js";
+import { runLexicalChecks, runReferenceChecks } from "./index.js";
 
 function severityRank(s: LintFinding["severity"]): number {
   switch (s) {
@@ -152,20 +144,16 @@ function makeOracle(load: LoadHandle): OracleInstance {
     const tsTask: Promise<LintFinding[]> = (async () => {
       if (!tsRequested) return [];
       const out: LintFinding[] = [];
+      // TS-portable checks grouped per the types.ts taxonomy. The group->check
+      // mapping lives in ./index.ts (runLexicalChecks / runReferenceChecks) so
+      // runAllChecks and the oracle never drift on a check's group membership.
       if (requested.includes("lexical")) {
-        out.push(...runLexicalChecks(source));
-        // Check #7 (codepoint format) is a stateless token-level check —
-        // taxonomy (types.ts) assigns it to `lexical`, not `reference`.
-        out.push(...checkCodepointFormat(source));
+        out.push(...runLexicalChecks(source)); // #1-#4 + #7 (codepoint format)
       }
-      // TS half of `reference` (checks #5/#6/#8/#9). The WASM half (#13/#14)
-      // flows through wasmTask; the two sets emit disjoint codes, so no
-      // duplicate findings arise from running both.
       if (requested.includes("reference")) {
-        out.push(...checkDeadkeyResolution(source));
-        out.push(...checkIfStoreResolution(source));
-        out.push(...checkContextOrdering(source));
-        out.push(...checkIndexBounds(source));
+        // TS half of `reference` (#5/#6/#8/#9). The WASM half (#13/#14) flows
+        // through wasmTask; the two sets emit disjoint codes, so no duplicates.
+        out.push(...runReferenceChecks(source));
       }
       return out;
     })();
