@@ -51,6 +51,14 @@ module.exports = {
       to: { path: '^packages/(engine|studio|studio-poc|keyboard-lint|llm)/' },
     },
     {
+      name: 'ui-is-a-leaf',
+      comment:
+        'studio ui/ primitives are a dependency leaf: no imports from survey/, steps/, or stores/ (feature 011).',
+      severity: 'error',
+      from: { path: '^packages/studio/src/ui/' },
+      to:   { path: '^packages/studio/src/(survey|steps|stores)/' },
+    },
+    {
       name: 'no-deps-on-studio-poc',
       comment:
         'studio-poc is a throwaway prototype — do not build on it (CLAUDE.md). ' +
