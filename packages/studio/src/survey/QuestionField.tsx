@@ -12,9 +12,12 @@ import {
   RadioGroup,
   Notice,
   Label,
+  Autocomplete,
+  MultiSelect,
 } from "../ui/index.ts";
 import type { DropdownOption } from "../ui/Dropdown.tsx";
 import type { RadioOption } from "../ui/RadioGroup.tsx";
+import type { MultiSelectOption } from "../ui/MultiSelect.tsx";
 
 // ---------------------------------------------------------------------------
 // Style constants retained for elements the ui/ primitives cannot cover
@@ -32,36 +35,6 @@ const HELP_STYLE: React.CSSProperties = {
   whiteSpace: "pre-wrap",
 };
 
-// one-off: OPTION_ROW_STYLE / OPTION_LABEL_STYLE — kept for AutocompleteField
-// and MultiSelectField (see prop-gap notes on those functions).
-const OPTION_ROW_STYLE: React.CSSProperties = {
-  display: "flex",
-  alignItems: "flex-start",
-  gap: 8,
-  marginBottom: 8,
-  cursor: "pointer",
-};
-
-const OPTION_LABEL_STYLE: React.CSSProperties = {
-  fontSize: 13,
-  color: "#e6edf3",
-  lineHeight: 1.5,
-  cursor: "pointer",
-};
-
-// one-off: INPUT_STYLE retained only for AutocompleteField (prop-gap below).
-const INPUT_STYLE: React.CSSProperties = {
-  width: "100%",
-  padding: "8px 10px",
-  background: "#0d1117",
-  border: "1px solid #30363d",
-  borderRadius: 6,
-  color: "#e6edf3",
-  fontSize: 14,
-  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-  boxSizing: "border-box",
-  outline: "none",
-};
 
 interface FieldProps {
   question: FlowQuestion;
@@ -106,37 +79,23 @@ function TextFieldControl({ question, value, onChange }: FieldProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Autocomplete (text + datalist)
-// one-off: Autocomplete primitive takes options: string[] (value-only), but
-// AutocompleteField uses FlowOption[] which carries per-option labels displayed
-// in the datalist suggestion list. Switching to the primitive would silently
-// drop datalist labels (visible diff). Kept inline until the primitive grows
-// an {value, label}[] overload.
+// Autocomplete (text + datalist)  →  ui Autocomplete (object-form options)
 // ---------------------------------------------------------------------------
 
 function AutocompleteField({ question, value, onChange }: FieldProps) {
-  const listId = `datalist-${question.id}`;
   const strVal = stringValue(value);
+  const acOptions = (question.options ?? []).map((opt) => ({
+    value: opt.value,
+    label: opt.label,
+  }));
   return (
-    <>
-      <input
-        type="text"
-        id={question.id}
-        list={listId}
-        aria-required={question.required === true}
-        value={strVal}
-        onChange={(e) => onChange(e.target.value)}
-        style={INPUT_STYLE}
-        autoComplete="off"
-      />
-      <datalist id={listId}>
-        {(question.options ?? []).map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </datalist>
-    </>
+    <Autocomplete
+      id={question.id}
+      aria-required={question.required === true}
+      value={strVal}
+      onChange={(e) => onChange(e.target.value)}
+      options={acOptions}
+    />
   );
 }
 
@@ -162,10 +121,6 @@ function SelectField({ question, value, onChange }: FieldProps) {
 
 // ---------------------------------------------------------------------------
 // Radio group  →  ui RadioGroup (mode="list")
-// prop-gap: RadioGroup does not expose aria-labelledby on its wrapper <div>.
-// The original renders role="radiogroup" aria-labelledby="label-{id}".
-// RadioGroup renders role="radiogroup" without aria-labelledby.
-// Kept as RadioGroup primitive; aria-labelledby is a known prop gap.
 // ---------------------------------------------------------------------------
 
 function RadioField({ question, value, onChange }: FieldProps) {
@@ -182,13 +137,13 @@ function RadioField({ question, value, onChange }: FieldProps) {
       value={strVal === "" ? null : strVal}
       options={radioOptions}
       onChange={(v) => onChange(v)}
+      ariaLabelledby={`label-${question.id}`}
     />
   );
 }
 
 // ---------------------------------------------------------------------------
 // Boolean (Yes / No radio pair)  →  ui RadioGroup (mode="bool")
-// prop-gap: same aria-labelledby gap as RadioField above.
 // ---------------------------------------------------------------------------
 
 function BoolField({ question, value, onChange }: FieldProps) {
@@ -200,30 +155,17 @@ function BoolField({ question, value, onChange }: FieldProps) {
       value={strVal === "" ? null : strVal}
       options={[]}
       onChange={(v) => onChange(v)}
+      ariaLabelledby={`label-${question.id}`}
     />
   );
 }
 
 // ---------------------------------------------------------------------------
-// Multi-select (checkboxes)
-// one-off: MultiSelect primitive uses inputId = "multiselect-${opt.value}"
-// whereas the original uses "${question.id}-${opt.value}". The id prefix
-// change is a behavioral diff (element IDs differ). Kept inline until the
-// primitive exposes a groupId/name prop to control the prefix.
-// Also: MultiSelect's <div role="group"> does not expose aria-labelledby
-// (same prop-gap as RadioGroup).
+// Multi-select (checkboxes)  →  ui MultiSelect
 // ---------------------------------------------------------------------------
 
 function MultiSelectField({ question, value, onChange }: FieldProps) {
   const arrVal = arrayValue(value);
-
-  function toggle(optValue: string) {
-    const next = arrVal.includes(optValue)
-      ? arrVal.filter((v) => v !== optValue)
-      : [...arrVal, optValue];
-    onChange(next);
-  }
-
   const options = question.options ?? [];
 
   if (options.length === 0 && question.options_source !== undefined) {
@@ -234,25 +176,19 @@ function MultiSelectField({ question, value, onChange }: FieldProps) {
     );
   }
 
+  const msOptions: MultiSelectOption[] = options.map((opt) => ({
+    value: opt.value,
+    label: opt.label,
+  }));
+
   return (
-    <div role="group" aria-labelledby={`label-${question.id}`}>
-      {options.map((opt) => {
-        const inputId = `${question.id}-${opt.value}`;
-        const checked = arrVal.includes(opt.value);
-        return (
-          <label key={opt.value} htmlFor={inputId} style={OPTION_ROW_STYLE}>
-            <input
-              type="checkbox"
-              id={inputId}
-              checked={checked}
-              onChange={() => toggle(opt.value)}
-              style={{ marginTop: 2, flexShrink: 0, accentColor: "#6ea8fe" }}
-            />
-            <span style={OPTION_LABEL_STYLE}>{opt.label}</span>
-          </label>
-        );
-      })}
-    </div>
+    <MultiSelect
+      options={msOptions}
+      selected={arrVal}
+      onChange={(next) => onChange(next)}
+      idPrefix={`${question.id}-`}
+      ariaLabelledby={`label-${question.id}`}
+    />
   );
 }
 
@@ -296,33 +232,17 @@ export function QuestionField({
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       {question.type !== "notice" && (() => {
         const isGrouped = question.type === "radio" || question.type === "bool" || question.type === "multi_select";
-        const labelContent = (
-          <>
-            {labelText}
-            {question.required === true && (
-              <span aria-label="required" style={{ color: "#e74c3c", marginLeft: 4 }}>
-                *
-              </span>
-            )}
-          </>
-        );
-        // one-off: grouped fields (radio/bool/multi_select) use <span> not <label>
-        // because the Label primitive always renders <label>, which is not valid
-        // as a direct wrapper for radiogroup/group role elements. The id attribute
-        // is required so aria-labelledby="label-{id}" on the control group resolves.
+        // Grouped fields (radio/bool/multi_select) use Label as="span" so the
+        // element is a <span> (not <label>), valid as a sibling of role="radiogroup"
+        // / role="group". The id is required so aria-labelledby resolves.
         return isGrouped ? (
-          <span
+          <Label
+            as="span"
             id={`label-${question.id}`}
-            style={{
-              display: "block",
-              fontSize: 13,
-              color: "#e6edf3",
-              fontWeight: 600,
-              marginBottom: 6,
-            }}
+            required={question.required === true}
           >
-            {labelContent}
-          </span>
+            {labelText}
+          </Label>
         ) : (
           <Label id={`label-${question.id}`} htmlFor={question.id} required={question.required === true}>
             {labelText}

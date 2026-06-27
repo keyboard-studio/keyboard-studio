@@ -26,6 +26,13 @@ export interface RadioGroupProps {
   /** Override accent color. Defaults are mode-driven (#6ea8fe list / #3fb950 bool). */
   accent?: string;
   onChange: (value: string) => void;
+  /**
+   * Value for `aria-labelledby` on the `<div role="radiogroup">` wrapper.
+   * Required for screen readers when the group label is a sibling element
+   * (e.g. `<span id="label-{id}">`) rather than a wrapping `<fieldset>`.
+   * Omitting it preserves current behavior (no aria-labelledby attribute).
+   */
+  ariaLabelledby?: string;
 }
 
 const OPTION_ROW_STYLE: React.CSSProperties = {
@@ -108,6 +115,7 @@ export function RadioGroup({
   options,
   accent,
   onChange,
+  ariaLabelledby,
 }: RadioGroupProps): React.ReactElement {
   const resolvedAccent =
     accent ?? (mode === "bool" ? BOOL_ACCENT : LIST_ACCENT);
@@ -116,7 +124,7 @@ export function RadioGroup({
     const yesId = `${name}-yes`;
     const noId = `${name}-no`;
     return (
-      <div role="radiogroup">
+      <div role="radiogroup" aria-labelledby={ariaLabelledby}>
         <RadioItem
           inputId={yesId}
           name={name}
@@ -140,7 +148,7 @@ export function RadioGroup({
   }
 
   return (
-    <div role="radiogroup">
+    <div role="radiogroup" aria-labelledby={ariaLabelledby}>
       {options.map((opt) => {
         const inputId = `${name}-${opt.value}`;
         return (

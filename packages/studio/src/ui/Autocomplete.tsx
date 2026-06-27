@@ -19,16 +19,23 @@ import {
   FONT,
 } from "./theme.ts";
 
+/** Object form option with a separate display label for the datalist. */
+export interface AutocompleteOption {
+  value: string;
+  label: string;
+}
+
 export type AutocompleteProps = React.InputHTMLAttributes<HTMLInputElement> & {
   /**
-   * Option values to populate the datalist. These are rendered as plain
-   * `<option value={opt}>` elements (value-only, no separate label), matching
-   * the data-model spec for Autocomplete.
+   * Option values to populate the datalist.
    *
-   * For the survey's option-with-label variant (QuestionField.AutocompleteField),
-   * the call site renders the datalist itself and can pass `list` directly.
+   * - `string[]` — rendered as plain `<option value={opt}>` elements (value-only,
+   *   no separate label). Behavior identical to before this overload was added.
+   * - `AutocompleteOption[]` — rendered as `<option value={opt.value}>{opt.label}</option>`
+   *   so the datalist suggestion list shows a human-readable label alongside the
+   *   value. This is the shape QuestionField.AutocompleteField requires.
    */
-  options: string[];
+  options: string[] | AutocompleteOption[];
 };
 
 /**
@@ -76,9 +83,15 @@ export function Autocomplete({
         {...rest}
       />
       <datalist id={listId}>
-        {options.map((opt) => (
-          <option key={opt} value={opt} />
-        ))}
+        {options.map((opt) =>
+          typeof opt === "string" ? (
+            <option key={opt} value={opt} />
+          ) : (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ),
+        )}
       </datalist>
     </>
   );

@@ -180,4 +180,43 @@ describe("RadioGroup — bool mode", () => {
     expect(screen.getAllByRole("radio")).toHaveLength(2);
     expect(screen.queryByText("Should not appear")).toBeNull();
   });
+
+  it("ariaLabelledby is set on the radiogroup div in bool mode when provided", () => {
+    render(
+      <RadioGroup
+        mode="bool"
+        name="q1"
+        value={null}
+        options={[]}
+        onChange={() => undefined}
+        ariaLabelledby="label-q1"
+      />
+    );
+    const group = screen.getByRole("radiogroup") as HTMLElement;
+    expect(group.getAttribute("aria-labelledby")).toBe("label-q1");
+  });
+});
+
+describe("RadioGroup — ariaLabelledby", () => {
+  it("sets aria-labelledby on the radiogroup div in list mode when provided", () => {
+    render(
+      <RadioGroup
+        name="test"
+        value={null}
+        options={LIST_OPTIONS}
+        onChange={() => undefined}
+        ariaLabelledby="label-test"
+      />
+    );
+    const group = screen.getByRole("radiogroup") as HTMLElement;
+    expect(group.getAttribute("aria-labelledby")).toBe("label-test");
+  });
+
+  it("aria-labelledby is absent when not provided (default behavior preserved)", () => {
+    render(
+      <RadioGroup name="test" value={null} options={LIST_OPTIONS} onChange={() => undefined} />
+    );
+    const group = screen.getByRole("radiogroup") as HTMLElement;
+    expect(group.getAttribute("aria-labelledby")).toBeNull();
+  });
 });

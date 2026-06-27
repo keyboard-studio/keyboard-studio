@@ -13,6 +13,20 @@ export interface MultiSelectProps {
   options: MultiSelectOption[];
   selected: string[];
   onChange: (next: string[]) => void;
+  /**
+   * Prefix used when generating checkbox input ids.
+   * Each checkbox id is `${idPrefix}${opt.value}`.
+   * Default is `"multiselect-"` — preserves the original behavior.
+   * Pass `"${questionId}-"` to match the QuestionField id convention.
+   */
+  idPrefix?: string;
+  /**
+   * Value for `aria-labelledby` on the `<div role="group">` wrapper.
+   * Required for screen readers when the group label is a sibling element
+   * (e.g. `<span id="label-{id}">`) rather than a wrapping `<fieldset>`.
+   * Omitting it preserves current behavior (no aria-labelledby attribute).
+   */
+  ariaLabelledby?: string;
 }
 
 const OPTION_ROW_STYLE: React.CSSProperties = {
@@ -36,6 +50,8 @@ export function MultiSelect({
   options,
   selected,
   onChange,
+  idPrefix = "multiselect-",
+  ariaLabelledby,
 }: MultiSelectProps): React.ReactElement {
   function toggle(optValue: string): void {
     const next = selected.includes(optValue)
@@ -45,10 +61,10 @@ export function MultiSelect({
   }
 
   return (
-    <div role="group">
+    <div role="group" aria-labelledby={ariaLabelledby}>
       {options.map((opt) => {
         const checked = selected.includes(opt.value);
-        const inputId = `multiselect-${opt.value}`;
+        const inputId = `${idPrefix}${opt.value}`;
         return (
           <label key={opt.value} htmlFor={inputId} style={OPTION_ROW_STYLE}>
             <input

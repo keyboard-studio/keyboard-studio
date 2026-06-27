@@ -61,3 +61,49 @@ describe("Label", () => {
     expect(el.style.marginBottom).toBe("12px");
   });
 });
+
+describe("Label — as='span' variant", () => {
+  it("renders a <span> when as='span'", () => {
+    const { container } = render(<Label as="span">Group heading</Label>);
+    expect(container.querySelector("span")).not.toBeNull();
+    expect(container.querySelector("label")).toBeNull();
+  });
+
+  it("renders children in the span", () => {
+    render(<Label as="span">My heading</Label>);
+    expect(screen.getByText("My heading")).toBeDefined();
+  });
+
+  it("span carries the id prop", () => {
+    const { container } = render(
+      <Label as="span" id="label-q1">
+        Heading
+      </Label>
+    );
+    const el = container.querySelector("span") as HTMLElement;
+    expect(el.id).toBe("label-q1");
+  });
+
+  it("required=true renders asterisk marker inside span", () => {
+    render(
+      <Label as="span" required>
+        Required group
+      </Label>
+    );
+    const marker = screen.getByLabelText("required");
+    expect(marker.textContent).toBe("*");
+  });
+
+  it("span uses the same base styles as label (fontSize 13, fontWeight 600)", () => {
+    const { container } = render(<Label as="span">Styled</Label>);
+    const el = container.querySelector("span") as HTMLElement;
+    expect(el.style.fontSize).toBe("13px");
+    expect(el.style.fontWeight).toBe("600");
+  });
+
+  it("default as='label' still renders <label> element", () => {
+    const { container } = render(<Label>Default</Label>);
+    expect(container.querySelector("label")).not.toBeNull();
+    expect(container.querySelector("span")).toBeNull();
+  });
+});

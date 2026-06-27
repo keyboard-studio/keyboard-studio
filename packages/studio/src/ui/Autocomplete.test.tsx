@@ -103,3 +103,42 @@ describe("Autocomplete — style and className override", () => {
     expect(input.className).toBe("ac-class");
   });
 });
+
+describe("Autocomplete — object-form options (value + label)", () => {
+  it("renders each object option with the correct value attribute", () => {
+    const { container } = render(
+      <Autocomplete
+        id="obj"
+        options={[
+          { value: "en", label: "English" },
+          { value: "fr", label: "French" },
+        ]}
+      />
+    );
+    const opts = container.querySelectorAll("datalist option");
+    expect(opts.length).toBe(2);
+    expect((opts[0] as HTMLOptionElement).value).toBe("en");
+    expect((opts[1] as HTMLOptionElement).value).toBe("fr");
+  });
+
+  it("renders label text as datalist option text content", () => {
+    const { container } = render(
+      <Autocomplete
+        id="obj-label"
+        options={[{ value: "en", label: "English" }]}
+      />
+    );
+    const opt = container.querySelector("datalist option") as HTMLOptionElement;
+    expect(opt.textContent).toBe("English");
+  });
+
+  it("string[] path renders plain options with no text content (value-only)", () => {
+    const { container } = render(
+      <Autocomplete id="str" options={["en", "fr"]} />
+    );
+    const opts = container.querySelectorAll("datalist option");
+    // value-only options have no child text
+    expect((opts[0] as HTMLOptionElement).textContent).toBe("");
+    expect((opts[1] as HTMLOptionElement).textContent).toBe("");
+  });
+});

@@ -78,4 +78,44 @@ describe("MultiSelect", () => {
     fireEvent.click(screen.getByLabelText("English"));
     expect(onChange).toHaveBeenCalledWith(["en"]);
   });
+
+  it("default idPrefix is 'multiselect-' — checkbox id is multiselect-{value}", () => {
+    const { container } = render(
+      <MultiSelect options={OPTIONS} selected={[]} onChange={() => undefined} />
+    );
+    const first = container.querySelector("input[type=checkbox]") as HTMLInputElement;
+    expect(first.id).toBe("multiselect-en");
+  });
+
+  it("custom idPrefix changes the checkbox id prefix", () => {
+    const { container } = render(
+      <MultiSelect
+        options={OPTIONS}
+        selected={[]}
+        onChange={() => undefined}
+        idPrefix="q1-"
+      />
+    );
+    const first = container.querySelector("input[type=checkbox]") as HTMLInputElement;
+    expect(first.id).toBe("q1-en");
+  });
+
+  it("ariaLabelledby is set on the group div when provided", () => {
+    render(
+      <MultiSelect
+        options={OPTIONS}
+        selected={[]}
+        onChange={() => undefined}
+        ariaLabelledby="label-q1"
+      />
+    );
+    const group = screen.getByRole("group") as HTMLElement;
+    expect(group.getAttribute("aria-labelledby")).toBe("label-q1");
+  });
+
+  it("ariaLabelledby is absent when not provided (default behavior preserved)", () => {
+    render(<MultiSelect options={OPTIONS} selected={[]} onChange={() => undefined} />);
+    const group = screen.getByRole("group") as HTMLElement;
+    expect(group.getAttribute("aria-labelledby")).toBeNull();
+  });
 });
