@@ -37,6 +37,17 @@ function nodeRole(n: PositionedNode): {
   badge: string | null;
   badgeBg: string;
 } {
+  // Library-not-in-flow nodes (registered Phase B modules not in the live manifest)
+  // are rendered with a distinct muted purple palette and a "reserve" badge so it is
+  // immediately clear they do NOT run in the current survey.
+  if (n.kind === "library-not-in-flow") {
+    return { border: "#6e40c9", bg: "#1a1030", badge: "reserve", badgeBg: "#4a2a8a" };
+  }
+  // Stub nodes (galleries / wizard steps not yet in the question registry).
+  if (n.kind === "stub") {
+    return { border: "#58a6ff", bg: "#0d2035", badge: "stub", badgeBg: "#1c4a7a" };
+  }
+  // Live nodes — standard role-based styling.
   if (n.isEntry) return { border: "#6ea8fe", bg: "#11203a", badge: "entry", badgeBg: "#1f6feb" };
   if (n.isGate) return { border: "#d29922", bg: "#241c10", badge: "gate", badgeBg: "#9e6a03" };
   if (n.engineResolved)
