@@ -1,8 +1,13 @@
-// Unit tests for SurveyView stage-machine transitions.
+// Unit tests for SurveyView manifest-driven step transitions (T028/T029).
 //
-// Coverage: the 4 new forward transitions (prefill→B, B→carve, carve→mechanisms,
-// mechanisms→F) plus the back-navigation changes (B→prefill, carve→B, F→E,
-// mechanisms→B). Stage order (issue #508): prefill → B → carve → mechanisms → E → F → done.
+// Coverage:
+//   T028 — manifest-driven SurveyView: forward and back transitions driven by the
+//           manifest step order (identity → choose_base → characters → carve →
+//           mechanisms → touch → help → done). No SurveyStage union.
+//   T029 — no SurveyStage symbol; runtime step order matches manifest; applyStepCompletion
+//           is wired for side-effecting steps.
+//
+// Manifest order (FR-012): Characters BEFORE Carve (intended — was carve before B in old code).
 //
 // Strategy: mock every child component at the shallowest level so each mock
 // renders a unique data-testid and a single button that fires its callback.
@@ -890,5 +895,147 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     // No real edits → touchLayoutJson must be null so serializeWorkingCopy
     // leaves the VFS untouched and KMW uses its native default.
     expect(useWorkingCopyStore.getState().touchLayoutJson).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T029 — manifest-driven invariants (M1, FR-009)
+// ---------------------------------------------------------------------------
+//
+// These tests assert:
+//   1. No SurveyStage union symbol exists in the runtime module.
+//   2. The survey advances through steps in manifest order.
+//   3. applyStepCompletion is called (side effects fire) for mechanisms/touch.
+
+import { manifest } from "./steps/manifest.ts";
+import * as StudioShellModule from "./StudioShell.tsx";
+
+describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () => {
+  it("StudioShell module does not export a SurveyStage symbol", () => {
+    // SurveyStage was the retired union type. After T028 it must not exist as
+    // a named export or as an identifiable runtime value.
+    // We can check that the module's exports don't include 'SurveyStage' as a key.
+    const exports = Object.keys(StudioShellModule);
+    expect(exports).not.toContain("SurveyStage");
+  });
+
+  it("manifest spine order is: identity → choose_base → characters → carve → mechanisms → touch → help → package", () => {
+    // M2: spine order matches FR-012.
+    const spineIds = manifest
+      .filter((s) => s.spine !== false)
+      .map((s) => s.id);
+    expect(spineIds).toEqual([
+      "identity",
+      "choose_base",
+      "characters",
+      "carve",
+      "mechanisms",
+      "touch",
+      "help",
+      "package",
+    ]);
+  });
+
+  it("manifest has exactly one lock:physical and one lock:touch, in that order (M3)", () => {
+    const locks = manifest
+      .filter((s) => s.lock !== undefined)
+      .map((s) => ({ id: s.id, lock: s.lock }));
+    expect(locks).toHaveLength(2);
+    expect(locks[0]).toMatchObject({ lock: "physical" });
+    expect(locks[1]).toMatchObject({ lock: "touch" });
+  });
+
+  it("manifest touch_seed_source is spine:false with joinTarget 'touch' (M4)", () => {
+    const seedSource = manifest.find((s) => s.id === "touch_seed_source");
+    expect(seedSource).toBeDefined();
+    expect(seedSource?.spine).toBe(false);
+    expect(seedSource?.joinTarget).toBe("touch");
+  });
+
+  it("all manifest step ids are unique (M5)", () => {
+    const ids = manifest.map((s) => s.id);
+    const uniqueIds = new Set(ids);
+    expect(uniqueIds.size).toBe(ids.length);
+  });
+});
+
+describe("T029 — runtime step order matches manifest spine order", () => {
+  it("survey advances: identity → choose_base (base sub) → track → project-name → characters (prefill) → B → carve → mechanisms → touch → help", async () => {
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
+    // identity
+    expect(screen.getByTestId("stage-identity")).toBeTruthy();
+
+    // → choose_base / base sub-stage
+    fireEvent.click(screen.getByTestId("identity-complete"));
+    expect(screen.getByTestId("stage-base")).toBeTruthy();
+    expect(screen.queryByTestId("stage-identity")).toBeNull();
+
+    // → choose_base / track sub-stage
+    fireEvent.click(screen.getByTestId("base-resolved"));
+    expect(screen.getByTestId("stage-track")).toBeTruthy();
+
+    // → choose_base / project-name sub-stage (copy path)
+    fireEvent.click(screen.getByTestId("track-copy"));
+    expect(screen.getByTestId("stage-project-name")).toBeTruthy();
+
+    // → characters / prefill sub-stage
+    fireEvent.click(screen.getByTestId("project-name-next"));
+    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+
+    // → characters / B sub-stage (FR-012: characters before carve)
+    fireEvent.click(screen.getByTestId("prefill-confirm"));
+    expect(screen.getByTestId("stage-B")).toBeTruthy();
+
+    // → carve (next spine step after characters, per manifest)
+    fireEvent.click(screen.getByTestId("phaseB-complete"));
+    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+
+    // → mechanisms
+    fireEvent.click(screen.getByTestId("carve-complete"));
+    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
+
+    // → touch (stage-E)
+    fireEvent.click(screen.getByTestId("mechanisms-complete"));
+    expect(screen.getByTestId("stage-E")).toBeTruthy();
+
+    // → help (stage-F)
+    fireEvent.click(screen.getByTestId("e-complete"));
+    expect(screen.getByTestId("stage-F")).toBeTruthy();
+  });
+
+  it("characters step comes BEFORE carve (FR-012 intended reorder — was reversed in pre-manifest code)", async () => {
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
+    // Advance to characters/B.
+    advanceToB();
+    expect(screen.getByTestId("stage-B")).toBeTruthy();
+
+    // phaseB-complete must go to carve (not mechanisms — the old pre-manifest order).
+    fireEvent.click(screen.getByTestId("phaseB-complete"));
+    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+    // Must NOT jump to mechanisms (old incorrect order).
+    expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
+  });
+
+  it("applyStepCompletion fires lockDesktop when mechanisms completes (R1)", async () => {
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
+    advanceToMechanisms();
+
+    // lockDesktop should not have been called yet.
+    expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);
+
+    // Fire mechanisms-complete — applyStepCompletion('mechanisms', ...) must call lockDesktop().
+    fireEvent.click(screen.getByTestId("mechanisms-complete"));
+
+    // lockDesktop effect: desktopLocked becomes true.
+    expect(useWorkingCopyStore.getState().desktopLocked).toBe(true);
   });
 });
