@@ -85,9 +85,10 @@
 // Specs
 // ---------------------------------------------------------------------------
 
-// TODO(refs #410): Replace `describe.skip` with `test.describe` once
-// Playwright is installed and the SPA flows below are live.
-describe.skip("Track 1 (copy-edit) E2E", () => {
+// Playwright is installed (global CLI v1.61.1 + playwright.config.ts).
+// Lane 1 is active: identity-lite -> base picker -> Phase A/B -> emit.
+// Lane 2 (import-improve.spec.ts) remains skipped pending Track 2 liveness.
+describe("Track 1 (copy-edit) E2E", () => {
   // test.beforeEach(async ({ page }) => {
   //   await page.goto("/");
   // });

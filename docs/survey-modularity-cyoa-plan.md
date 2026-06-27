@@ -1,11 +1,17 @@
 # Survey Modularity + CYOA Refactor — Plan / RFC
 
-> **Status: PLAN / RFC — P2 implemented (branch `claude/survey-modularity-cyoa-plan-pcpg9a`); P0–P1, P3–P5 remain proposals.**
+> **Status: PLAN / RFC — P2 implemented (branch `claude/survey-modularity-cyoa-plan-pcpg9a`); P3(a) implemented (branch `km/modular-loader-cutover`); P0–P1, P3(b), P4–P5 remain proposals.**
 > P2 shipped: `IRPath` typed key-path algebra exported from `@keyboard-studio/contracts`
 > 0.11.0 (breaking bump, §18-ratified); `QuestionModule.inputs`/`writes` declared across
 > all 93 modules (8 non-empty, 85 explicit empty); three CI gates (coverage, orphan-input
 > lint, missing-mirror check); mirrored test tree at
 > `packages/studio/tests/survey/questions/`; `mutate()` remains a stub (deferred to P5).
+> P3(a) shipped: Phase A/F/identity-lite cut from legacy `parseFlow` to `loadModularFlow`;
+> 5 new `il_*` question modules authored and registered; `content/flows/identity_lite.modular.yaml`
+> created; module-count gate bumped 93->98; `flow-parity.test.ts` golden harness (21 tests,
+> 3 phases) added; 5 mirrored module tests added; all TODO(#410) markers removed;
+> `playwright.config.ts` added; E2E lane 1 (copy-edit) un-skipped. Part (b) deletion of
+> `loadFlow.ts` + 4 legacy YAMLs is a separate follow-up PR.
 > All other phases are still proposals; file inventories and target tree below remain
 > unimplemented. File inventories were verified against the live tree on the branch base
 > (`origin/main`); the *target* tree and migration table are proposals.

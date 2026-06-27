@@ -16,12 +16,12 @@ import type {
   LintFinding,
 } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
-import { parseFlow } from "./loadFlow.ts";
+import { loadModularFlow } from "./loadModularFlow.ts";
 import type { SurveyContext } from "./types.ts";
 
 // Vite ?raw import — YAML source as a plain string, no network request.
 // Typed via the `*.yaml?raw` module declaration in src/vite-env.d.ts.
-import phaseARaw from "../../../../content/flows/phase_a_identity.yaml?raw";
+import phaseARaw from "../../../../content/flows/phase_a_identity.modular.yaml?raw";
 
 // ---------------------------------------------------------------------------
 // Answer extraction helpers (exported for callers)
@@ -192,8 +192,7 @@ export interface PhaseAProps {
 }
 
 export function PhaseA({ context = {}, onComplete, onBack, findingsByQuestionId }: PhaseAProps) {
-  // TODO(#410): switch to loadModularFlow + phase_a.modular.yaml when fan-out cutover lands.
-  const flow = useMemo(() => parseFlow(phaseARaw as string), []);
+  const flow = useMemo(() => loadModularFlow(phaseARaw as string), []);
 
   function handleComplete(result: SurveyPhaseResult) {
     const identity = extractIdentity(result);

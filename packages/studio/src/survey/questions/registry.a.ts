@@ -38,6 +38,11 @@ import provenance_orthography_url from "./a/provenance_orthography_url.ts";
 import provenance_community_involvement from "./a/provenance_community_involvement.ts";
 import provenance_casing_notes from "./a/provenance_casing_notes.ts";
 import provenance_additional_notes from "./a/provenance_additional_notes.ts";
+import il_language_autonym from "./a/il_language_autonym.ts";
+import il_language_english from "./a/il_language_english.ts";
+import il_language_code from "./a/il_language_code.ts";
+import il_target_script from "./a/il_target_script.ts";
+import il_script_not_supported from "./a/il_script_not_supported.ts";
 
 /**
  * Synchronous Phase A question registry.
@@ -75,4 +80,9 @@ export const phaseARegistry: Readonly<Record<string, QuestionModule>> = {
   provenance_community_involvement,
   provenance_casing_notes,
   provenance_additional_notes,
+  il_language_autonym,
+  il_language_english,
+  il_language_code,
+  il_target_script,
+  il_script_not_supported,
 } as const;
