@@ -3,6 +3,8 @@
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
 
+import { irPath } from "@keyboard-studio/contracts";
+
 export const definition = {
   id: "language_name_english",
   prompt: "What is your language called in English?",
@@ -44,5 +46,12 @@ export const fixtures: QuestionModule["fixtures"] = {
   ],
 };
 
-const mod: QuestionModule = { definition, validate, fixtures };
+
+const mod: QuestionModule = {
+  definition,
+  validate,
+  fixtures,
+  inputs: [],
+  writes: [irPath("header", "name")],
+};
 export default mod;

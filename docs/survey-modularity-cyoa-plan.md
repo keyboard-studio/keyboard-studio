@@ -1,9 +1,13 @@
 # Survey Modularity + CYOA Refactor — Plan / RFC
 
-> **Status: PLAN / RFC — not yet implemented.** This document describes a target
-> architecture and a phased migration. No code in this branch implements it. It
-> is meant for review and amendment before any execution phase begins. File
-> inventories below were verified against the live tree on the branch base
+> **Status: PLAN / RFC — P2 implemented (branch `claude/survey-modularity-cyoa-plan-pcpg9a`); P0–P1, P3–P5 remain proposals.**
+> P2 shipped: `IRPath` typed key-path algebra exported from `@keyboard-studio/contracts`
+> 0.11.0 (breaking bump, §18-ratified); `QuestionModule.inputs`/`writes` declared across
+> all 93 modules (8 non-empty, 85 explicit empty); three CI gates (coverage, orphan-input
+> lint, missing-mirror check); mirrored test tree at
+> `packages/studio/tests/survey/questions/`; `mutate()` remains a stub (deferred to P5).
+> All other phases are still proposals; file inventories and target tree below remain
+> unimplemented. File inventories were verified against the live tree on the branch base
 > (`origin/main`); the *target* tree and migration table are proposals.
 
 ---
@@ -20,9 +24,9 @@ single "question" can exist in up to four different forms. The end state:
 - A shared **`ui/` primitive library** so form controls are not inline-duplicated.
 - Each question **declares its data dependencies (`inputs`) and the KeyboardIR it
   will populate (`writes`)** as static data, decoupling the editor/dashboard from
-  the (not-yet-built) engine mutation seam. These are typed against a **net-new
-  `IRPath` type** (§3.3) — a typed path algebra over the nested `KeyboardIR`
-  union, which does **not** exist today and must be designed (P2 deliverable).
+  the (not-yet-built) engine mutation seam. These are typed against the **`IRPath`
+  type** (§3.3) — a typed path algebra over the nested `KeyboardIR` union, shipped
+  in P2 and exported from `@keyboard-studio/contracts`.
 - A single **`steps/` model + `steps/manifest.ts`** that unifies questions,
   hand-built wizard steps, and galleries as ordered "steps." `StudioShell` and
   the flow map both read this manifest, so **map == runtime by construction**.
@@ -238,7 +242,7 @@ interface StepBase {
   /** Spine | side-trail membership and lock placement (see §3.5). */
   spine?: boolean;
   lock?: "physical" | "touch";
-  /** Declared dependency graph — see §3.3. `IRPath` is NET-NEW (designed in P2). */
+  /** Declared dependency graph — see §3.3. `IRPath` shipped in P2 (`@keyboard-studio/contracts`). */
   inputs: IRPath[];      // answers / IR state this step reads
   writes: IRPath[];      // KeyboardIR paths this step will populate
 }
@@ -329,16 +333,14 @@ the completeness checker, and the lock-staleness graph can all be built **before
 `mutate()` is ever callable. `mutate()` remains the deliberate stub described in
 `survey/types.ts` until the engine mutation surface exists.
 
-#### `IRPath` is NET-NEW — it must be designed (P2 deliverable)
+#### `IRPath` — designed and shipped in P2
 
-`IRPath` does **not** exist today and is **not** a simple import from
-`keyboard-ir.ts`. `packages/contracts/src/keyboard-ir.ts` is a **nested interface
-tree** (`KeyboardIR` → `groups[]`/`stores[]` for physical;
+`IRPath` ships in `packages/contracts/src/ir-path.ts`, re-exported from
+`@keyboard-studio/contracts`. `packages/contracts/src/keyboard-ir.ts` is a **nested
+interface tree** (`KeyboardIR` → `groups[]`/`stores[]` for physical;
 `touchLayout?.platforms[].layers[].rows[].keys[]` for touch — `TouchLayoutIR`
-ratified at #232), **not** a path algebra. There is no existing type that names a
-location inside that tree. So `IRPath` is a **to-be-designed** typed path over the
-nested `KeyboardIR` union, and designing it is an **explicit P2 deliverable** with
-its own acceptance criteria:
+ratified at #232); `IRPath` is the typed key-path algebra over that tree. The
+original acceptance criteria from P2 are recorded here for traceability:
 
 - **Design AC.** `IRPath` derives a typed path over the nested `KeyboardIR` union,
   covering both surfaces — including the deep touch path
@@ -676,7 +678,7 @@ packages/studio/src/
 
   steps/                       # (NEW) unified ordered step model
     types.ts                   # StepKind, QuestionStep, EditorStep, EditorStepProps,
-                               #   IRPath (NET-NEW typed path over KeyboardIR — §3.3)
+                               #   IRPath (typed path over KeyboardIR, shipped P2 — §3.3)
     manifest.ts                # single ordered list (spine/side-trail/lock)
     manifest.test.ts
     registerQuestionSteps.ts   # adapts QuestionModules -> question-step
@@ -907,7 +909,20 @@ today — see §8).
   depcruise assertion for the `ui/` leaf rule.
 - *Relation to #410:* none; net-new beyond #410.
 
-### P2 — `IRPath` design + folder-per-question opt-in + declared `inputs`/`writes`
+### P2 — `IRPath` design + folder-per-question opt-in + declared `inputs`/`writes` — IMPLEMENTED
+
+> **IMPLEMENTED** on branch `claude/survey-modularity-cyoa-plan-pcpg9a` (2026-06-26).
+> `IRPath` typed key-path algebra (`packages/contracts/src/ir-path.ts`, re-exported
+> from `@keyboard-studio/contracts` index) ships with `irPath()` and `formatIRPath()`.
+> Invalid paths are compile errors; stale paths fail typecheck. Path coverage is bounded
+> at `keys[]`; `RawKmnFragment` is terminal. `QuestionModule` (`packages/studio/src/survey/types.ts`)
+> gained `inputs?: readonly IRPath[]` / `writes?: readonly IRPath[]`; all 93 modules now
+> declare them (8 non-empty, 85 explicit empty). Three CI gates land: coverage (93/93),
+> manifest-scoped orphan-input lint, missing-mirror check. Mirrored test tree at
+> `packages/studio/tests/survey/questions/<phase>/<id>.test.ts` (all 93 mirrored).
+> Folder-per-question opt-in is structurally supported; no module currently uses it.
+> `mutate()` remains a stub (deferred to P5). `@keyboard-studio/contracts` bumped
+> 0.10.0 → 0.11.0 (§18 breaking change, user-confirmed 0.11.0 under 0ver semantics).
 
 **Design the net-new `IRPath` type** (§3.3) — a typed path over the nested
 `KeyboardIR` union (incl. `touchLayout.platforms[].layers[].rows[].keys[]`). Add
@@ -915,11 +930,10 @@ today — see §8).
 handful of modules with companion artifacts to the `<id>/index.ts` + `extras/`
 form. Registry keeps resolving by `definition.id`.
 
-> **Contract-versioning gate (§18, 2026-06-26).** Adding `inputs`/`writes`/`IRPath`
+> **Contract-versioning gate (§18, 2026-06-26) — resolved.** Adding `inputs`/`writes`/`IRPath`
 > to `QuestionModule` is a **MAJOR version bump to `packages/contracts`** ratified
-> at the §18 joint engine+content session — **not** an additive-minor change that
-> ships independently of that bump. P2 is gated on the major-version release of
-> `packages/contracts`; it does not land as a silently backward-compatible addition.
+> at the §18 joint engine+content session. P2 landed with the confirmed 0.11.0 bump
+> (not 1.0.0 — user-confirmed 0ver semantics); it does not land as a silently backward-compatible addition.
 - **AC:** `IRPath` makes an invalid path a compile error (Design AC, §3.3); a
   bogus `writes` path fails typecheck (Drift AC); the **unit test** asserting
   strategy-bearing questions' `writes` match their `Pattern.strategyId` write
@@ -1104,15 +1118,11 @@ files.
   `…/<id>/index.ts`. Automated codemods must preserve extensions.
 - **The `mutate` seam gates on #5b / #232.** `inputs`/`writes` are declared data
   whose *execution* (actual IR writes) waits for the engine seam — no IR is
-  written until #5b/#232 lands. But declaring them is **not** a free additive-minor
-  change: the contract addition is a **MAJOR version bump to `packages/contracts`**
-  ratified at the §18 joint engine+content session (2026-06-26), so P2 lands as/with
-  that major bump, not as something shippable independently of it. Risk: declaring
-  `writes` paths that later don't match the real
-  `keyboard-ir.ts` shape — mitigate by the **net-new `IRPath`** type (designed in
-  P2, §3.3) deriving a typed path **over** the nested `KeyboardIR` union so an
-  out-of-shape path is a compile error. `IRPath` is **not** an existing import; it
-  must be designed, which is why it is an explicit P2 deliverable with its own ACs.
+  written until #5b/#232 lands. The contract addition landed as **`packages/contracts`
+  0.11.0** (§18-ratified MAJOR bump, 2026-06-26). Risk: declaring `writes` paths that
+  later don't match the real `keyboard-ir.ts` shape — mitigated by `IRPath`
+  (shipped in P2, `packages/contracts/src/ir-path.ts`, §3.3), which derives a typed
+  path over the nested `KeyboardIR` union so an out-of-shape path is a compile error.
 - **Touch provenance correctness.** If provenance is added late (P5) rather than
   reserved in P4a, existing touch edits won't carry provenance and the first
   propagation could clobber them. Mitigate by reserving the per-key tag in P4a and

@@ -19,5 +19,7 @@ export default defineConfig({
     // them from vitest discovery so the default *.spec.ts glob doesn't pull
     // them in and fail with "describe is not defined".
     exclude: ["**/node_modules/**", "**/dist/**", "e2e/**"],
+    // Include both colocated src tests and the mirror tests/ tree (FR-009).
+    include: ["src/**/*.test.{ts,tsx}", "tests/**/*.test.{ts,tsx}"],
   },
 });

@@ -2,6 +2,7 @@
 // Ported verbatim from content/flows/phase_b_characters.yaml.
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
+import { irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 
 export const definition = {
   id: "pb_standard_letters",
@@ -79,5 +80,18 @@ export const fixtures: QuestionModule["fixtures"] = {
   ],
 };
 
-const mod: QuestionModule = { definition, validate, fixtures };
+// T010: inputs/writes VERIFIED for this specific question — not a template to copy.
+// pb_standard_letters reads the header BCP47 tag established by Phase A identity
+// questions, and will write the selected script group into the stores array in P5.
+// Rationale: header.bcp47 tells us the target language/script; stores[] is where
+// the script-group discriminator store lands at scaffold time.
+// Do NOT clone these declarations blindly into other question modules; each module
+// must declare its own actual IR dependencies (or explicit empty arrays).
+const mod: QuestionModule = {
+  definition,
+  validate,
+  fixtures,
+  inputs: [irPath("header", "bcp47")],
+  writes: [irPath("stores", ARRAY_INDEX)],
+};
 export default mod;

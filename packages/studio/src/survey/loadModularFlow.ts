@@ -26,7 +26,7 @@ import { VALID_PHASES } from "./constants.ts";
 // Thin YAML shape
 // ---------------------------------------------------------------------------
 
-interface ThinFlowYaml {
+export interface ThinFlowYaml {
   flow_id: string;
   phase: string;
   questions: string[];
@@ -36,8 +36,10 @@ interface ThinFlowYaml {
 /**
  * Parse a thin-YAML string into a ThinFlowYaml.
  * Throws descriptively on any structural violation.
+ * Exported so test gates can reuse the validated parser rather than rolling
+ * their own (T020 orphan-input lint uses this directly).
  */
-function parseThinYaml(raw: string): ThinFlowYaml {
+export function parseThinYaml(raw: string): ThinFlowYaml {
   const parsed = parse(raw) as unknown;
   if (parsed === null || typeof parsed !== "object") {
     throw new Error("loadModularFlow: YAML root must be an object");

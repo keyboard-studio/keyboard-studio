@@ -7,6 +7,8 @@
 
 import type { QuestionModule } from "../../types.ts";
 
+import { irPath } from "@keyboard-studio/contracts";
+
 export const definition = {
   id: "script_not_supported_stub",
   prompt: "This writing system is not supported yet",
@@ -34,5 +36,11 @@ export const fixtures: QuestionModule["fixtures"] = {
   invalid: [],
 };
 
-const mod: QuestionModule = { definition, fixtures };
+
+const mod: QuestionModule = {
+  definition,
+  fixtures,
+  inputs: [irPath("header", "bcp47")],
+  writes: [],
+};
 export default mod;

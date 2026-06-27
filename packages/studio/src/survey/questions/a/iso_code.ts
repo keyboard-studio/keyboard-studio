@@ -8,6 +8,8 @@
 
 import type { QuestionModule } from "../../types.ts";
 
+import { irPath } from "@keyboard-studio/contracts";
+
 export const definition = {
   id: "iso_code",
   prompt: "Does your language have a three-letter language code?",
@@ -33,5 +35,11 @@ export const fixtures: QuestionModule["fixtures"] = {
   invalid: [],
 };
 
-const mod: QuestionModule = { definition, fixtures };
+
+const mod: QuestionModule = {
+  definition,
+  fixtures,
+  inputs: [],
+  writes: [irPath("header", "bcp47")],
+};
 export default mod;

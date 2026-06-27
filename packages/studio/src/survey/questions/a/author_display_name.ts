@@ -44,5 +44,9 @@ export const fixtures: QuestionModule["fixtures"] = {
   ],
 };
 
-const mod: QuestionModule = { definition, validate, fixtures };
+
+// writes: [] — author/publisher name populates KeyboardIdentity/.kps package metadata,
+// which is outside KeyboardIR; it is not the keyboard's &NAME display name
+// (that is language_name_english, which writes header.name).
+const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [] };
 export default mod;

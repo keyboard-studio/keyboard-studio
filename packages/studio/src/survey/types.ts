@@ -2,6 +2,8 @@
 // These describe the static definition shape parsed from content/flows/*.yaml —
 // distinct from the runtime SurveyAnswer/SurveyPhaseResult types in @keyboard-studio/contracts.
 
+import type { IRPath } from "@keyboard-studio/contracts";
+
 /** Rendering-level question type as declared in the YAML flow. */
 export type FlowQuestionType =
   | "text"
@@ -105,9 +107,24 @@ export type ValidationResult =
  * Each question module exports:
  *   - definition  : the FlowQuestion node (id, type, prompt, next, …)
  *   - validate    : optional client-side validator (called in the 300 ms cycle)
+ *   - inputs      : (P2 contract) IR locations this question reads (IRPath[])
+ *   - writes      : (P2 contract) IR locations this question will populate (IRPath[])
  *   - mutate      : optional IR mutation hook — stub comment only for now;
  *                   KeyboardIR mutation surface is not yet a real contract.
  *   - fixtures    : test vectors consumed by colocated vitest specs
+ *
+ * Address-space rule: `inputs` and `writes` are both `IRPath[]` over the same
+ * `KeyboardIR` space (clarification Q1, spec §010). A survey-answer dependency
+ * is expressed as the IR location that answer ultimately populates — there is no
+ * separate answer-key space, so inputs and writes are directly comparable for
+ * the orphan-input lint.
+ *
+ * Coverage rule: every shipped module declares PRESENT `inputs`/`writes`
+ * fields; a question that reads/writes nothing MUST declare an explicit empty
+ * array (`inputs: []` / `writes: []`). CI fails only on an ABSENT field.
+ * The fields are optional on the interface (so library/reserve modules and
+ * a revert leave things structurally valid), but the coverage gate enforces
+ * presence on all shipped modules.
  */
 export interface QuestionModule {
   /** The static FlowQuestion definition, including routing in definition.next. */
@@ -121,9 +138,25 @@ export interface QuestionModule {
   validate?: (value: string | string[] | undefined) => ValidationResult;
 
   /**
+   * IR locations this question READS — declared as static data.
+   * Both `inputs` and `writes` address the same `IRPath` space over `KeyboardIR`
+   * (one path algebra; no separate answer-key space). Consumed by the P0 dashboard
+   * and the orphan-input lint without invoking `mutate()`.
+   * Explicit `[]` is required for questions that read nothing (G7 / FR-006).
+   */
+  inputs?: readonly IRPath[];
+
+  /**
+   * IR locations this question will POPULATE — declared now, executed in P5.
+   * Declared as static data; no IR-write execution happens here (G8 / FR-005).
+   * Explicit `[]` is required for questions that write nothing (G7 / FR-006).
+   */
+  writes?: readonly IRPath[];
+
+  /**
    * Optional IR mutation hook.
    * STUB: KeyboardIR mutation surface is not yet a real API.
-   * Signature reserved for fan-out cycle. Do not call.
+   * Signature reserved for fan-out cycle (P5, gated on #5b/#232). Do not call.
    */
   // mutate?: (value, ctx) => Partial<KeyboardIR>;
   // Eventual consumer: SurveyAnswer in packages/contracts/src/surveyPhaseResult.ts

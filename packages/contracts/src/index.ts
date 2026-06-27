@@ -54,6 +54,13 @@ export * from "./ir/producedSet";
 export * from "./keyboardIRRoundTrip";
 
 // ---------------------------------------------------------------------------
+// IRPath — typed key-path over KeyboardIR (P2 contract, FR-012).
+// Invalid paths are compile errors (G1); stale paths fail typecheck (G2).
+// Consumed by QuestionModule.inputs/writes and the P0 dashboard.
+// ---------------------------------------------------------------------------
+export * from "./ir-path";
+
+// ---------------------------------------------------------------------------
 // Utilities — shared pure helpers consumed across packages.
 // ---------------------------------------------------------------------------
 export * from "./utils/charUtils";

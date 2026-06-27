@@ -62,6 +62,5 @@ export const fixtures: QuestionModule["fixtures"] = {
   ],
 };
 
-/** Convenience re-export of the full module shape so registry can import one symbol. */
-const mod: QuestionModule = { definition, validate, fixtures };
+const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [] };
 export default mod;
