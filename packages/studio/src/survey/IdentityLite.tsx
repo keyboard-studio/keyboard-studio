@@ -7,7 +7,7 @@
 import { useMemo, useRef, useCallback } from "react";
 import type { SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
-import { parseFlow } from "./loadFlow.ts";
+import { loadModularFlow } from "./loadModularFlow.ts";
 import type { SurveyContext } from "./types.ts";
 import {
   deriveScriptPrefill,
@@ -15,7 +15,7 @@ import {
   type ScriptPrefill,
 } from "../lib/scriptAxes.ts";
 
-import identityLiteRaw from "../../../../content/flows/identity_lite.yaml?raw";
+import identityLiteRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
 
 // Scripts gated out of v1 (spec §9). When the target is one of these the flow
 // ends on the "not supported" notice and the slice should not proceed.
@@ -113,8 +113,7 @@ export function IdentityLite({
   onBack,
   findingsByQuestionId,
 }: IdentityLiteProps) {
-  // TODO(#410): switch to loadModularFlow + identity_lite.modular.yaml when fan-out cutover lands.
-  const flow = useMemo(() => parseFlow(identityLiteRaw as string), []);
+  const flow = useMemo(() => loadModularFlow(identityLiteRaw as string), []);
 
   // Track the latest committed autonym synchronously via a ref so that
   // getSeedValue can read it in the same tick as the onAnswerCommit call,

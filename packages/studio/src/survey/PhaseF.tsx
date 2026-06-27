@@ -7,11 +7,11 @@
 import { useMemo } from "react";
 import type { SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
-import { parseFlow } from "./loadFlow.ts";
+import { loadModularFlow } from "./loadModularFlow.ts";
 import type { SurveyContext } from "./types.ts";
 
 // Vite ?raw import — typed via the `*.yaml?raw` declaration in src/vite-env.d.ts.
-import phaseFRaw from "../../../../content/flows/phase_f_helpdocs.yaml?raw";
+import phaseFRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
 
 // ---------------------------------------------------------------------------
 // PhaseF component
@@ -25,8 +25,7 @@ export interface PhaseFProps {
 }
 
 export function PhaseF({ context = {}, onComplete, onBack, findingsByQuestionId }: PhaseFProps) {
-  // TODO(#410): switch to loadModularFlow + phase_f.modular.yaml when fan-out cutover lands.
-  const flow = useMemo(() => parseFlow(phaseFRaw as string), []);
+  const flow = useMemo(() => loadModularFlow(phaseFRaw as string), []);
 
   return (
     <div
