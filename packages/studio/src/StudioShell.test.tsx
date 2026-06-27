@@ -176,7 +176,7 @@ vi.mock("./survey/index.ts", () => {
   };
 });
 
-vi.mock("./components/BaseResolution.tsx", () => ({
+vi.mock("./editors/panels/BaseResolution.tsx", () => ({
   BaseResolution: ({ onResolved, onBack }: { onResolved: (base: unknown) => void; onBack?: () => void }) => {
     _mockBaseResolvedRef.current = onResolved;
     const fakeBase = {
@@ -202,7 +202,7 @@ vi.mock("./components/BaseResolution.tsx", () => ({
   },
 }));
 
-vi.mock("./components/CarveGallery.tsx", () => ({
+vi.mock("./editors/carve/CarveGallery.tsx", () => ({
   CarveGallery: ({ onComplete, onBack }: { onComplete: () => void; onBack?: () => void }) => {
     _mockCarveDoneRef.current = onComplete;
     _mockCarveBackRef.current = onBack ?? null;
@@ -221,7 +221,7 @@ vi.mock("./components/CarveGallery.tsx", () => ({
   },
 }));
 
-vi.mock("./components/MechanismGallery.tsx", () => ({
+vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => ({
   MechanismGallery: ({ onComplete, onBack }: { onComplete: () => void; onBack?: () => void }) => {
     _mockMechDoneRef.current = onComplete;
     _mockMechBackRef.current = onBack ?? null;
@@ -240,7 +240,7 @@ vi.mock("./components/MechanismGallery.tsx", () => ({
   },
 }));
 
-vi.mock("./components/TouchGallery", () => ({
+vi.mock("./editors/assignLoop/TouchGallery.tsx", () => ({
   TouchGallery: ({ onComplete, onBack }: { onComplete: (a: unknown[]) => void; onBack: () => void }) => {
     _mockTouchECompleteRef.current = onComplete;
     _mockTouchEBackRef.current = onBack;
@@ -271,7 +271,7 @@ vi.mock("./components/UnsupportedScriptStub.tsx", () => ({
   ),
 }));
 
-vi.mock("./components/TrackStep.tsx", () => ({
+vi.mock("./editors/panels/TrackStep.tsx", () => ({
   TrackStep: ({ onNext, onBack }: { onNext: (t: "copy" | "adapt") => void; onBack?: () => void }) => (
     <div data-testid="stage-track">
       <button type="button" data-testid="track-copy" onClick={() => onNext("copy")}>
@@ -289,7 +289,7 @@ vi.mock("./components/TrackStep.tsx", () => ({
   ),
 }));
 
-vi.mock("./components/ProjectNameStep.tsx", () => ({
+vi.mock("./editors/panels/ProjectNameStep.tsx", () => ({
   ProjectNameStep: ({
     onNext,
     onBack,
