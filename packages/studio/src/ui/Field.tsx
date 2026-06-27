@@ -31,7 +31,6 @@ const HELP_STYLE: React.CSSProperties = {
   lineHeight: 1.5,
   marginBottom: 10,
   whiteSpace: "pre-wrap",
-  margin: 0,
 };
 
 /** Replicates the error text style from ScaffoldForm.tsx. */
@@ -123,9 +122,13 @@ export function Field({
   return (
     <div style={containerStyle} className={className}>
       {label !== undefined && (
-        <Label htmlFor={fieldId} required={required}>
-          {label}
-        </Label>
+        typeof label === "string" ? (
+          <Label htmlFor={fieldId} required={required}>
+            {label}
+          </Label>
+        ) : (
+          label
+        )
       )}
 
       {help !== undefined && (

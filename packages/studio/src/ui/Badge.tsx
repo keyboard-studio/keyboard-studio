@@ -29,6 +29,10 @@ export type BadgeTone = "success" | "accent" | "warn" | "subtle" | "default";
 export type BadgeProps = {
   tone?: BadgeTone;
   children: React.ReactNode;
+  /** Optional inline style — merged AFTER tone styles so caller overrides win. */
+  style?: React.CSSProperties;
+  /** Optional className forwarded to the rendered <span>. */
+  className?: string;
 };
 
 const TONE_COLOR: Record<BadgeTone, string> = {
@@ -45,7 +49,7 @@ const TONE_COLOR: Record<BadgeTone, string> = {
  * The `tone` prop selects from the CSS-var token set; call-site style overrides
  * are honored via the native `style` prop if needed.
  */
-export function Badge({ tone = "default", children }: BadgeProps): React.ReactElement {
+export function Badge({ tone = "default", children, style, className }: BadgeProps): React.ReactElement {
   return (
     <span
       style={{
@@ -53,7 +57,9 @@ export function Badge({ tone = "default", children }: BadgeProps): React.ReactEl
         fontWeight: 600,
         color: TONE_COLOR[tone],
         whiteSpace: "nowrap",
+        ...style,
       }}
+      className={className}
     >
       {children}
     </span>

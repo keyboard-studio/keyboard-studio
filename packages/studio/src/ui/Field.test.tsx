@@ -116,14 +116,15 @@ describe("Field — label slot", () => {
     expect(container.querySelector("[aria-label='required']")).toBeNull();
   });
 
-  it("renders a ReactNode label (not just strings)", () => {
+  it("renders a ReactNode label as-is (no Label wrapper, avoids nested-<label>)", () => {
     const { container } = render(
       <Field label={<strong>Bold label</strong>} fieldId="x" />,
     );
-    expect(container.querySelector("label strong")).not.toBeNull();
-    expect(container.querySelector("label strong")?.textContent).toBe(
-      "Bold label",
-    );
+    // Non-string ReactNode is rendered directly — no extra <label> wrapper.
+    expect(container.querySelector("strong")).not.toBeNull();
+    expect(container.querySelector("strong")?.textContent).toBe("Bold label");
+    // No <label> element should be auto-generated for a non-string label.
+    expect(container.querySelector("label")).toBeNull();
   });
 
   it("does not render a <label> element when label prop is omitted", () => {

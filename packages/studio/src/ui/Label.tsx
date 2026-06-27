@@ -7,6 +7,7 @@
 // exactly (Decision 2).
 
 import React from "react";
+import { TEXT_MAIN } from "./theme.ts";
 
 export type LabelProps = React.HTMLAttributes<HTMLElement> & {
   /**
@@ -47,7 +48,7 @@ export function Label({
   const baseStyle: React.CSSProperties = {
     display: "block",
     fontSize: 13,
-    color: "#e6edf3",
+    color: TEXT_MAIN,
     fontWeight: 600,
     marginBottom: 6,
   };

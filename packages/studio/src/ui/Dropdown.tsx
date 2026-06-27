@@ -3,6 +3,12 @@
 // Style constants match INPUT_STYLE + { cursor: "pointer" } verbatim.
 
 import React from "react";
+import {
+  BG_PAGE,
+  BORDER,
+  TEXT_MAIN,
+  FONT,
+} from "./theme.ts";
 
 export interface DropdownOption {
   value: string;
@@ -28,12 +34,12 @@ export function Dropdown({
   const baseStyle: React.CSSProperties = {
     width: "100%",
     padding: "8px 10px",
-    background: "#0d1117",
-    border: "1px solid #30363d",
+    background: BG_PAGE,
+    border: `1px solid ${BORDER}`,
     borderRadius: 6,
-    color: "#e6edf3",
+    color: TEXT_MAIN,
     fontSize: 14,
-    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    fontFamily: FONT,
     boxSizing: "border-box",
     outline: "none",
     cursor: "pointer",

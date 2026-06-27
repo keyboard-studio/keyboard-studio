@@ -11,7 +11,7 @@
 // reference a unique datalist element — the listId is derived as
 // `datalist-${id}` to mirror the AutocompleteField convention exactly.
 
-import React from "react";
+import React, { useId } from "react";
 import {
   BG_PAGE,
   BORDER,
@@ -55,7 +55,8 @@ export function Autocomplete({
   style,
   ...rest
 }: AutocompleteProps): React.ReactElement {
-  const listId = id !== undefined ? `datalist-${id}` : "datalist-autocomplete";
+  const generatedId = useId();
+  const listId = id !== undefined ? `datalist-${id}` : `datalist-${generatedId}`;
 
   const baseStyle: React.CSSProperties = {
     width: "100%",

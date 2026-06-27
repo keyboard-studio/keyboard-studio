@@ -16,3 +16,9 @@ export { Notice } from "./Notice.tsx";
 export { Field } from "./Field.tsx";
 export { Badge } from "./Badge.tsx";
 export * as theme from "./theme.ts";
+
+// Type-only re-exports so call sites need not import from primitive source files.
+export type { BadgeTone } from "./Badge.tsx";
+export type { DropdownOption } from "./Dropdown.tsx";
+export type { RadioOption } from "./RadioGroup.tsx";
+export type { MultiSelectOption } from "./MultiSelect.tsx";

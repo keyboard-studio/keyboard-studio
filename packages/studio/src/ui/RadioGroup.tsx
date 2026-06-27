@@ -7,6 +7,11 @@
 //   bool mode: #3fb950  (BoolField accentColor)
 
 import React from "react";
+import {
+  TEXT_MAIN,
+  TEXT_DIM,
+  ACCENT,
+} from "./theme.ts";
 
 export interface RadioOption {
   value: string;
@@ -45,7 +50,7 @@ const OPTION_ROW_STYLE: React.CSSProperties = {
 
 const OPTION_LABEL_STYLE: React.CSSProperties = {
   fontSize: 13,
-  color: "#e6edf3",
+  color: TEXT_MAIN,
   lineHeight: 1.5,
   cursor: "pointer",
 };
@@ -53,12 +58,12 @@ const OPTION_LABEL_STYLE: React.CSSProperties = {
 const NOTE_STYLE: React.CSSProperties = {
   display: "block",
   fontSize: 11,
-  color: "#8b949e",
+  color: TEXT_DIM,
   marginTop: 2,
 };
 
 /** list-mode accent — matches RadioField verbatim */
-const LIST_ACCENT = "#6ea8fe";
+const LIST_ACCENT = ACCENT;
 /** bool-mode accent — matches BoolField verbatim */
 const BOOL_ACCENT = "#3fb950";
 

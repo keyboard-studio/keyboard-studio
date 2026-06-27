@@ -62,6 +62,31 @@ describe("Badge — tone colors (CSS vars preserved in jsdom)", () => {
   });
 });
 
+describe("Badge — style and className passthrough", () => {
+  it("merges caller style AFTER tone styles (override wins)", () => {
+    const { container } = render(
+      <Badge tone="accent" style={{ color: "red" }}>x</Badge>,
+    );
+    const el = container.querySelector("span") as HTMLElement;
+    // Caller override should win over tone color.
+    expect(el.style.color).toBe("red");
+  });
+
+  it("forwards className to the span", () => {
+    const { container } = render(
+      <Badge className="badge-custom">x</Badge>,
+    );
+    const el = container.querySelector("span") as HTMLElement;
+    expect(el.classList.contains("badge-custom")).toBe(true);
+  });
+
+  it("renders without style/className props (existing call sites unchanged)", () => {
+    const { container } = render(<Badge tone="success">ok</Badge>);
+    const el = container.querySelector("span") as HTMLElement;
+    expect(el.style.color).toBe("var(--sil-green)");
+  });
+});
+
 describe("Badge — base typographic styles", () => {
   it("applies fontSize 11px", () => {
     const { container } = render(<Badge>x</Badge>);
