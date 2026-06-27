@@ -14,6 +14,8 @@ import {
   type SuggestTarget,
 } from "../lib/suggestBase.ts";
 import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
+import { Badge, Button } from "../ui/index.ts";
+import type { BadgeTone } from "../ui/Badge.tsx";
 
 const REASON_LABEL: Record<SuggestReason, string> = {
   "language-match": "Already supports your language",
@@ -22,16 +24,16 @@ const REASON_LABEL: Record<SuggestReason, string> = {
   "us-qwerty-fallback": "Start blank (US QWERTY)",
 };
 
-// Token-mapped reason colors:
-//   language-match       → var(--sil-green)
-//   script-match         → var(--app-accent)
-//   language-cross-script→ var(--sil-orange-dark)
-//   us-qwerty-fallback   → var(--app-text-subtle)
-const REASON_COLOR: Record<SuggestReason, string> = {
-  "language-match": "var(--sil-green)",
-  "script-match": "var(--app-accent)",
-  "language-cross-script": "var(--sil-orange-dark)",
-  "us-qwerty-fallback": "var(--app-text-subtle)",
+// Token-mapped reason tones for Badge (exact CSS-var match verified):
+//   language-match       → Badge "success"  (var(--sil-green))
+//   script-match         → Badge "accent"   (var(--app-accent))
+//   language-cross-script→ Badge "warn"     (var(--sil-orange-dark))
+//   us-qwerty-fallback   → Badge "subtle"   (var(--app-text-subtle))
+const REASON_TONE: Record<SuggestReason, BadgeTone> = {
+  "language-match": "success",
+  "script-match": "accent",
+  "language-cross-script": "warn",
+  "us-qwerty-fallback": "subtle",
 };
 
 export interface BaseResolutionProps {
@@ -123,9 +125,9 @@ export function BaseResolution({
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
         {suggestions.map(({ base, reason }) => (
-          <button
+          <Button
             key={base.id}
-            type="button"
+            variant="secondary"
             onClick={() => onResolved(base)}
             style={{
               display: "flex",
@@ -147,25 +149,16 @@ export function BaseResolution({
               <strong>{base.displayName}</strong>{" "}
               <span style={{ color: "var(--app-text-muted)", fontSize: 12 }}>({base.id})</span>
             </span>
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: REASON_COLOR[reason],
-                whiteSpace: "nowrap",
-              }}
-            >
-              {REASON_LABEL[reason]}
-            </span>
-          </button>
+            <Badge tone={REASON_TONE[reason]}>{REASON_LABEL[reason]}</Badge>
+          </Button>
         ))}
       </div>
 
       <div style={{ borderTop: "1px solid var(--app-border)", paddingTop: 16 }}>
         <p style={{ ...subtle, marginBottom: 8 }}>Or pick any base keyboard:</p>
         <BaseKeyboardPicker value={picked} onChange={setPicked} target={target} />
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           disabled={picked === null}
           onClick={() => picked !== null && onResolved(picked)}
           style={{
@@ -181,12 +174,12 @@ export function BaseResolution({
           }}
         >
           Use this keyboard
-        </button>
+        </Button>
       </div>
 
       {onBack !== undefined && (
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           onClick={onBack}
           style={{
             marginTop: 20,
@@ -201,7 +194,7 @@ export function BaseResolution({
           }}
         >
           &larr; Back
-        </button>
+        </Button>
       )}
     </div>
   );

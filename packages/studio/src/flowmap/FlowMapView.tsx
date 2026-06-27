@@ -11,13 +11,19 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 
-// Same `?raw` flow sources the survey loads — keeps the map in lock-step.
+// Flow sources — each section loads the source that the runtime survey actually
+// uses.  Phase A / F / identity-lite still run through the legacy full-YAML
+// loader (parseFlow), so they import the legacy *.yaml.  Phase B runs through
+// the modular registry (loadModularFlow), so it imports the thin *.modular.yaml
+// manifest.  Switching a section to the wrong source would re-introduce ghost
+// nodes — the comment on each import is intentional.
 import identityLiteRaw from "../../../../content/flows/identity_lite.yaml?raw";
 import phaseARaw from "../../../../content/flows/phase_a_identity.yaml?raw";
-import phaseBRaw from "../../../../content/flows/phase_b_characters.yaml?raw";
+// Phase B: modular manifest — do NOT fall back to phase_b_characters.yaml here.
+import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modular.yaml?raw";
 import phaseFRaw from "../../../../content/flows/phase_f_helpdocs.yaml?raw";
 
-import { buildFlowGraph } from "./buildFlowGraph.ts";
+import { buildFlowGraph, buildModularFlowGraph } from "./buildFlowGraph.ts";
 import { FlowGraphView } from "./FlowGraphView.tsx";
 import { StrategyTreeView } from "./StrategyTreeView.tsx";
 import { ScriptRoutingView } from "./ScriptRoutingView.tsx";
@@ -25,17 +31,32 @@ import { MONO, SANS } from "./tokens.ts";
 
 type Section = "flow" | "routing" | "strategy";
 
-const FLOW_SOURCES: ReadonlyArray<{ raw: string; title: string }> = [
-  { raw: identityLiteRaw, title: "Identity-lite (Phase A head)" },
-  { raw: phaseARaw, title: "Phase A — identity" },
-  { raw: phaseBRaw, title: "Phase B — character discovery" },
-  { raw: phaseFRaw, title: "Phase F — help docs" },
+/** Loader type: "legacy" uses parseFlow (A/F/identity-lite); "modular" uses
+ *  loadModularFlow (Phase B).  Each section uses the loader that actually drives
+ *  its runtime — mixing them would introduce ghost or missing nodes.
+ */
+type FlowSourceEntry =
+  | { raw: string; title: string; loader: "legacy" }
+  | { raw: string; title: string; loader: "modular" };
+
+const FLOW_SOURCES: ReadonlyArray<FlowSourceEntry> = [
+  { raw: identityLiteRaw, title: "Identity-lite (Phase A head)", loader: "legacy" },
+  { raw: phaseARaw, title: "Phase A — identity", loader: "legacy" },
+  // Phase B: modular manifest drives runtime — must use the modular loader.
+  // On error, render nothing for this section; never fall back to the legacy YAML.
+  { raw: phaseBModularRaw, title: "Phase B — character discovery", loader: "modular" },
+  { raw: phaseFRaw, title: "Phase F — help docs", loader: "legacy" },
 ];
 
-function safeBuild(raw: string, title: string) {
+function safeBuild(entry: FlowSourceEntry) {
   try {
-    return { graph: buildFlowGraph(raw, title), error: null as string | null };
+    const graph =
+      entry.loader === "modular"
+        ? buildModularFlowGraph(entry.raw, entry.title)
+        : buildFlowGraph(entry.raw, entry.title);
+    return { graph, error: null as string | null };
   } catch (err) {
+    // FR-011: fail visibly; never fall back to the legacy YAML for a modular source.
     return { graph: null, error: err instanceof Error ? err.message : String(err) };
   }
 }
@@ -87,6 +108,8 @@ function FlowLegend() {
       <LegendItem swatch="#241c10" border="#d29922" label="gate (conditional next)" />
       <LegendItem swatch="#14181f" border="#6e7681" dashed label="engine-resolved (not shown)" />
       <LegendItem swatch="#0f2417" border="#3fb950" label="terminal" />
+      <LegendItem swatch="#1a1030" border="#6e40c9" label="reserve (not in live flow)" />
+      <LegendItem swatch="#0d2035" border="#58a6ff" label="stub (gallery / wizard step)" />
       <span style={{ width: 1, alignSelf: "stretch", background: "#21262d" }} />
       <EdgeLegendItem color="#d29922" label="conditional branch" />
       <EdgeLegendItem color="#6e7681" dashed label="default (else)" />
@@ -119,7 +142,7 @@ function SectionTab({ active, onClick, children }: { active: boolean; onClick: (
 
 export function FlowMapView() {
   const [section, setSection] = useState<Section>("flow");
-  const flows = useMemo(() => FLOW_SOURCES.map((f) => ({ ...safeBuild(f.raw, f.title), title: f.title })), []);
+  const flows = useMemo(() => FLOW_SOURCES.map((f) => ({ ...safeBuild(f), title: f.title })), []);
 
   return (
     <div

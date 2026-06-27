@@ -40,6 +40,15 @@ CLAUDE="${CLAUDE_BIN:-/home/lee2mr/.local/bin/claude}"
 # convention — see the Personal mode section in .claude/commands/km-triage.md.
 MODEL="${KM_TRIAGE_MODEL:-opus}"
 
+# pnpm (v9, matching the repo's packageManager pin) must be on PATH.
+# The auto-fix typecheck step runs `pnpm --filter ... typecheck`, and any
+# sanctioned manifest fix regenerates the lockfile via
+# `pnpm install --lockfile-only`. Without pnpm both steps fail silently.
+if ! command -v pnpm > /dev/null 2>&1; then
+  echo "[ERROR] pnpm not found on PATH. Install pnpm v9 (https://pnpm.io/installation) and ensure it is visible in the cron execution environment." >&2
+  exit 1
+fi
+
 STATE_DIR=".escalations"
 AUDIT_LOG="$STATE_DIR/audit-log.jsonl"
 MAX_ITERATIONS=3

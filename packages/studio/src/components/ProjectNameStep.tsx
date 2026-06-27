@@ -5,6 +5,7 @@
 
 import { useState, useMemo } from "react";
 import { slugifyKeyboardId, validateKeyboardId } from "@keyboard-studio/contracts";
+import { Button, TextField, Label } from "../ui/index.ts";
 
 export interface ProjectNameStepProps {
   /** Default display name — autonym from identity_lite (il_language_autonym). */
@@ -26,26 +27,8 @@ const SUBTLE: React.CSSProperties = {
   color: "#8b949e",
 };
 
-const LABEL_STYLE: React.CSSProperties = {
-  display: "block",
-  fontSize: 13,
-  color: "#8b949e",
-  marginBottom: 6,
-};
-
-const INPUT_STYLE: React.CSSProperties = {
-  width: "100%",
-  boxSizing: "border-box" as const,
-  padding: "8px 10px",
-  background: "#0d1117",
-  border: "1px solid #30363d",
-  borderRadius: 6,
-  color: "#e6edf3",
-  fontSize: 14,
-  fontFamily: "inherit",
-  outline: "none",
-};
-
+// SLUG_LINE_VALID: #8b949e + monospace — kept inline; color does not match any
+// ErrorText tone (hint = var(--app-text-muted) = #aebcd6).
 const SLUG_LINE_VALID: React.CSSProperties = {
   marginTop: 8,
   fontSize: 12,
@@ -53,43 +36,11 @@ const SLUG_LINE_VALID: React.CSSProperties = {
   fontFamily: "monospace",
 };
 
+// one-off: slug-validation color #f85149 (research Decision 1)
 const SLUG_LINE_ERROR: React.CSSProperties = {
-  ...SLUG_LINE_VALID,
+  marginTop: 8,
+  fontSize: 12,
   color: "#f85149",
-  fontFamily: "inherit",
-};
-
-const BACK_BTN: React.CSSProperties = {
-  marginTop: 20,
-  padding: "6px 14px",
-  background: "transparent",
-  border: "1px solid #30363d",
-  borderRadius: 6,
-  color: "#8b949e",
-  fontSize: 13,
-  cursor: "pointer",
-  fontFamily: "inherit",
-};
-
-const NEXT_BTN_DISABLED: React.CSSProperties = {
-  padding: "8px 18px",
-  background: "transparent",
-  border: "1px solid #30363d",
-  borderRadius: 6,
-  color: "#484f58",
-  fontSize: 13,
-  cursor: "not-allowed",
-  fontFamily: "inherit",
-};
-
-const NEXT_BTN_ENABLED: React.CSSProperties = {
-  padding: "8px 18px",
-  background: "#1f6feb",
-  border: "1px solid #1f6feb",
-  borderRadius: 6,
-  color: "#fff",
-  fontSize: 13,
-  cursor: "pointer",
   fontFamily: "inherit",
 };
 
@@ -116,15 +67,14 @@ export function ProjectNameStep({
       </p>
 
       <div style={{ marginBottom: 20 }}>
-        <label htmlFor="project-display-name" style={LABEL_STYLE}>
+        {/* Label base color is #e6edf3; LABEL_STYLE used #8b949e — pass through. */}
+        <Label htmlFor="project-display-name" style={{ color: "#8b949e", fontWeight: "normal" }}>
           Display name
-        </label>
-        <input
+        </Label>
+        <TextField
           id="project-display-name"
-          type="text"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
-          style={INPUT_STYLE}
           autoComplete="off"
           spellCheck={false}
           aria-describedby="project-id-hint"
@@ -142,20 +92,19 @@ export function ProjectNameStep({
       </div>
 
       <div style={{ display: "flex", gap: 10 }}>
-        <button
-          type="button"
+        <Button
+          variant="primary"
           disabled={!isValid}
           onClick={handleNext}
-          style={isValid ? NEXT_BTN_ENABLED : NEXT_BTN_DISABLED}
           aria-disabled={!isValid}
         >
           Next
-        </button>
+        </Button>
       </div>
 
-      <button type="button" onClick={onBack} style={BACK_BTN}>
+      <Button variant="back" onClick={onBack}>
         {"←"} Back
-      </button>
+      </Button>
     </div>
   );
 }

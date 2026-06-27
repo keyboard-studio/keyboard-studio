@@ -18,6 +18,14 @@
 // After this script finishes successfully it prints an install URL. Open it,
 // install the App on keyboard-studio/keyboard-studio, then run mint-token.js to
 // verify a token mints cleanly.
+//
+// Host prerequisites:
+//   node  >= 20  (this script)
+//   gh           (GitHub CLI — used by the sweep scripts and bot-gh.js)
+//   pnpm v9      (must be on PATH in the bot's execution environment; the
+//                 auto-fix typecheck step runs `pnpm --filter ... typecheck`
+//                 and any sanctioned manifest fix regenerates the lockfile via
+//                 `pnpm install --lockfile-only`)
 
 const http = require('http');
 const crypto = require('crypto');

@@ -36,6 +36,15 @@ $claude = if ($env:CLAUDE_BIN) { $env:CLAUDE_BIN }
 # see the Personal mode section in .claude/commands/km-triage.md.
 $model = if ($env:KM_TRIAGE_MODEL) { $env:KM_TRIAGE_MODEL } else { "opus" }
 
+# pnpm (v9, matching the repo's packageManager pin) must be on PATH.
+# The auto-fix typecheck step runs `pnpm --filter ... typecheck`, and any
+# sanctioned manifest fix regenerates the lockfile via
+# `pnpm install --lockfile-only`. Without pnpm both steps fail silently.
+if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
+  Write-Error "[ERROR] pnpm not found on PATH. Install pnpm v9 (https://pnpm.io/installation) and ensure it is visible in the Task Scheduler execution environment."
+  exit 1
+}
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 function Get-Ts { (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") }
