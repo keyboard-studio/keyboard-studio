@@ -73,11 +73,11 @@ vi.mock("./KmnEditor.tsx", () => ({
   KmnEditor: () => <div data-testid="kmn-editor">editor</div>,
 }));
 
-vi.mock("./ScaffoldForm.tsx", () => ({
+vi.mock("../editors/panels/ScaffoldForm.tsx", () => ({
   ScaffoldForm: () => <div data-testid="scaffold-form">scaffold</div>,
 }));
 
-vi.mock("./TrackOneIdentityPanel.tsx", () => ({
+vi.mock("../editors/panels/TrackOneIdentityPanel.tsx", () => ({
   TrackOneIdentityPanel: () => <div data-testid="identity-panel">identity</div>,
 }));
 

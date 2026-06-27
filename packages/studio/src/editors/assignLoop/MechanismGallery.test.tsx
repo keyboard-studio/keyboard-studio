@@ -18,14 +18,14 @@
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
-import { MechanismGallery, PATTERN_SEQUENCE, PATTERN_DEADKEY } from "./MechanismGallery";
-import { useWorkingCopyStore } from "../stores/workingCopyStore";
+import { MechanismGallery, PATTERN_SEQUENCE, PATTERN_DEADKEY } from "./MechanismGallery.tsx";
+import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import type { PatternLibraryService, VirtualFS } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { latinDeadkeyAcuteSingle } from "@keyboard-studio/contracts/fixtures";
 import type { PatternMatch } from "@keyboard-studio/contracts";
-import type { Stage } from "../hooks/useKeyboardArtifact";
+import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
@@ -79,7 +79,7 @@ const mockSvc: PatternLibraryService = {
   },
 };
 
-vi.mock("../lib/services.ts", () => ({
+vi.mock("../../lib/services.ts", () => ({
   getPatternLibraryService: () => mockSvc,
   USE_REAL: false,
 }));
@@ -96,7 +96,7 @@ let _lastVfsTransform:
   | null
   | undefined = undefined;
 
-vi.mock("../hooks/useKeyboardArtifact.ts", () => ({
+vi.mock("../../hooks/useKeyboardArtifact.ts", () => ({
   useKeyboardArtifact: (
     _baseKeyboard: unknown,
     _scaffoldSpec: unknown,
@@ -120,7 +120,7 @@ vi.mock("@keyboard-studio/engine", async (importOriginal) => {
 // Mock OSKFrame — no iframe / KMW environment needed.
 // ---------------------------------------------------------------------------
 
-vi.mock("./OSKFrame.tsx", () => ({
+vi.mock("../../components/OSKFrame.tsx", () => ({
   OSKFrame: ({ stage }: { stage: Stage }) => (
     <div data-testid="osk-frame" data-stage={stage.kind}>
       osk-frame-mock

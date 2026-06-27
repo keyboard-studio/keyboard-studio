@@ -13,7 +13,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { TrackOneIdentityPanel } from "./TrackOneIdentityPanel.tsx";

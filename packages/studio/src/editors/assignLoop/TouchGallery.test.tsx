@@ -11,12 +11,12 @@
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
-import { TouchGallery } from "./TouchGallery";
-import { useWorkingCopyStore } from "../stores/workingCopyStore";
+import { TouchGallery } from "./TouchGallery.tsx";
+import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import type { VirtualFS, MechanismAssignment } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
-import type { Stage } from "../hooks/useKeyboardArtifact";
+import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 
 // ---------------------------------------------------------------------------
 // vi.hoisted() — refs shared across mock closures and test bodies.
@@ -49,7 +49,7 @@ const { capturedVfsTransformRef, buildTouchLayoutJsonSpy, touchLintResultRef } =
 // Mock useKeyboardArtifact — capture the vfsTransform so we can invoke it.
 // ---------------------------------------------------------------------------
 
-vi.mock("../hooks/useKeyboardArtifact.ts", () => ({
+vi.mock("../../hooks/useKeyboardArtifact.ts", () => ({
   useKeyboardArtifact: (
     _baseKeyboard: unknown,
     _scaffoldSpec: unknown,
@@ -64,7 +64,7 @@ vi.mock("../hooks/useKeyboardArtifact.ts", () => ({
 // Mock buildTouchLayoutJson — deterministic, no real engine.
 // ---------------------------------------------------------------------------
 
-vi.mock("../lib/buildTouchLayoutJson.ts", () => ({
+vi.mock("../../lib/buildTouchLayoutJson.ts", () => ({
   buildTouchLayoutJson: buildTouchLayoutJsonSpy,
 }));
 
@@ -86,7 +86,7 @@ vi.mock("@keyboard-studio/engine", async (importOriginal) => {
 // Mock useTouchLint — no real lint engine needed.
 // ---------------------------------------------------------------------------
 
-vi.mock("../hooks/useTouchLint.ts", () => ({
+vi.mock("../../hooks/useTouchLint.ts", () => ({
   useTouchLint: () => touchLintResultRef.current,
 }));
 
@@ -94,7 +94,7 @@ vi.mock("../hooks/useTouchLint.ts", () => ({
 // Mock OSKFrame, OskModeToggle, LintSummary — no iframe / KMW environment.
 // ---------------------------------------------------------------------------
 
-vi.mock("./OSKFrame.tsx", () => ({
+vi.mock("../../components/OSKFrame.tsx", () => ({
   OSKFrame: ({ stage }: { stage: Stage }) => (
     <div data-testid="osk-frame" data-stage={stage.kind}>
       osk-frame-mock
@@ -102,11 +102,11 @@ vi.mock("./OSKFrame.tsx", () => ({
   ),
 }));
 
-vi.mock("./OskModeToggle.tsx", () => ({
+vi.mock("../../components/OskModeToggle.tsx", () => ({
   OskModeToggle: () => <div data-testid="osk-mode-toggle" />,
 }));
 
-vi.mock("../lint/LintSummary.tsx", () => ({
+vi.mock("../../lint/LintSummary.tsx", () => ({
   // Render finding codes as text so tests can assert on them.
   LintSummary: ({ findings }: { findings: Array<{ code: string }> }) => (
     <div data-testid="lint-summary">
@@ -709,7 +709,7 @@ describe("TouchGallery — no suggestion goes straight to chooser", () => {
 describe("TouchGallery — lint error finding surfaces in LintSummary (AC#3)", () => {
   it("renders KM_WARN_LINT_ERROR code in LintSummary when useTouchLint returns LINT_ERROR_FINDING", async () => {
     // Import the constant here (dynamic import avoids hoisting issues).
-    const { LINT_ERROR_FINDING } = await import("../lint/validationErrorFindings.ts");
+    const { LINT_ERROR_FINDING } = await import("../../lint/validationErrorFindings.ts");
 
     // Override the mock to return the error finding before rendering.
     touchLintResultRef.current = {

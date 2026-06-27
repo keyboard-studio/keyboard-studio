@@ -1,11 +1,12 @@
-// Unit tests for GalleryIntroSplash — the shared first-entry orientation splash
-// used by both the desktop Mechanism Gallery and the Touch Gallery. The gallery
-// suites cover the wired-up behaviour; these pin the component's own prop API
-// (content rendering, onStart/onBack callbacks, and the optional Back button).
+// Unit tests for IntroSplash (was GalleryIntroSplash) — the shared first-entry
+// orientation splash used by both the desktop Mechanism Gallery and the Touch
+// Gallery. The gallery suites cover the wired-up behaviour; these pin the
+// component's own prop API (content rendering, onStart/onBack callbacks, and
+// the optional Back button).
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import { GalleryIntroSplash } from "./GalleryIntroSplash";
+import { GalleryIntroSplash } from "./IntroSplash.tsx";
 
 afterEach(cleanup);
 
