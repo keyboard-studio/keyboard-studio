@@ -1,10 +1,11 @@
-// manifest.test.ts — T025 (P4b foundation).
+// manifest.test.ts — T025 (P4b foundation, updated for P4b review P0 fix).
 //
 // Asserts M2–M6 from the manifest-reducer contract:
-//   M2 — spine order matches FR-012 functional order.
+//   M2 — spine order matches FR-012 functional order (now includes track).
 //   M3 — exactly one lock:"physical" then one lock:"touch".
 //   M4 — touch_seed_source is spine:false with a joinTarget resolving to an
 //         existing spine:true step.
+//   M4b — project_name is spine:false with joinTarget:"characters" (CYOA fork).
 //   M5 — all ids unique.
 //   M6 — no A–G phase-letter vocabulary in ids or titles.
 //
@@ -44,18 +45,17 @@ describe("M5 — all step ids are unique", () => {
 // ---------------------------------------------------------------------------
 // M2 — spine order
 //
-// FR-012: Identity → choose base → Characters → Carve → Mechanisms →
-//         (lock:physical on mechanisms or adjacent) → touch carve+add →
-//         (lock:touch on touch) → Help → Package
+// FR-012: Identity → choose_base → track → Characters → Carve → Mechanisms →
+//         (lock:physical on mechanisms) → touch carve+add → (lock:touch) →
+//         Help → Package
 //
-// The functional step ids in the expected order. Lock gates are embedded in
-// their respective spine steps, so they do not change the positional order —
-// we assert on the id sequence of spine:true steps.
+// track is a real spine step (P0 fix). project_name is spine:false (CYOA fork).
 // ---------------------------------------------------------------------------
 
 const EXPECTED_SPINE_ORDER = [
   "identity",
   "choose_base",
+  "track",
   "characters",
   "carve",
   "mechanisms",
@@ -79,6 +79,18 @@ describe("M2 — spine order matches FR-012", () => {
     const spine = spineSteps(manifest);
     const last = spine[spine.length - 1];
     expect(last?.id).toBe("package");
+  });
+
+  it("'track' is a spine step between 'choose_base' and 'characters'", () => {
+    const spine = spineSteps(manifest);
+    const baseIdx = spine.findIndex((s) => s.id === "choose_base");
+    const trackIdx = spine.findIndex((s) => s.id === "track");
+    const charIdx = spine.findIndex((s) => s.id === "characters");
+    expect(baseIdx).toBeGreaterThanOrEqual(0);
+    expect(trackIdx).toBeGreaterThanOrEqual(0);
+    expect(charIdx).toBeGreaterThanOrEqual(0);
+    expect(baseIdx).toBeLessThan(trackIdx);
+    expect(trackIdx).toBeLessThan(charIdx);
   });
 
   it("'mechanisms' appears before 'touch' on the spine", () => {
@@ -116,6 +128,12 @@ describe("M2 — spine order matches FR-012", () => {
     expect(pkgIdx).toBeGreaterThanOrEqual(0);
     expect(helpIdx).toBeLessThan(pkgIdx);
   });
+
+  it("'project_name' is NOT a spine step (it is the copy-track CYOA fork)", () => {
+    const spine = spineSteps(manifest);
+    const found = spine.find((s) => s.id === "project_name");
+    expect(found).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -138,7 +156,7 @@ describe("M3 — exactly one lock:physical then one lock:touch", () => {
     expect(locked[1]?.lock).toBe("touch");
   });
 
-  it("lock:physical is on the 'mechanisms' step (positioned before the touch step)", () => {
+  it("lock:physical is on the 'mechanisms' step", () => {
     const physicalLockStep = manifest.find((s) => s.lock === "physical");
     expect(physicalLockStep?.id).toBe("mechanisms");
   });
@@ -166,9 +184,6 @@ describe("M3 — exactly one lock:physical then one lock:touch", () => {
 
 // ---------------------------------------------------------------------------
 // M4 — touch_seed_source fork
-//
-// A step id "touch_seed_source" must exist that is spine:false, has a
-// joinTarget resolving to an existing spine:true step in the manifest.
 // ---------------------------------------------------------------------------
 
 describe("M4 — touch_seed_source fork", () => {
@@ -211,32 +226,88 @@ describe("M4 — touch_seed_source fork", () => {
     expect(touchIdx).toBeGreaterThanOrEqual(0);
     expect(seedIdx).toBeLessThan(touchIdx);
   });
+});
 
-  it("there is exactly one off-spine step (touch_seed_source)", () => {
+// ---------------------------------------------------------------------------
+// M4b — project_name CYOA fork (copy-track only)
+//
+// project_name must be spine:false with joinTarget:"characters" — it is the
+// CYOA branch for the copy track. The adapt track skips it entirely.
+// ---------------------------------------------------------------------------
+
+describe("M4b — project_name CYOA fork (copy-track only)", () => {
+  it("a step with id 'project_name' exists in the manifest", () => {
+    const found = manifest.find((s) => s.id === "project_name");
+    expect(found).toBeDefined();
+  });
+
+  it("project_name has spine:false", () => {
+    const found = manifest.find((s) => s.id === "project_name");
+    expect(found?.spine).toBe(false);
+  });
+
+  it("project_name.joinTarget is 'characters'", () => {
+    const found = manifest.find((s) => s.id === "project_name");
+    expect(found?.joinTarget).toBe("characters");
+  });
+
+  it("project_name.joinTarget resolves to a spine:true step", () => {
+    const found = manifest.find((s) => s.id === "project_name");
+    const targetStep = manifest.find((s) => s.id === found?.joinTarget);
+    expect(targetStep?.spine).toBe(true);
+  });
+
+  it("project_name appears in the manifest between track and characters", () => {
+    const trackIdx = manifest.findIndex((s) => s.id === "track");
+    const projIdx = manifest.findIndex((s) => s.id === "project_name");
+    const charIdx = manifest.findIndex((s) => s.id === "characters");
+    expect(trackIdx).toBeGreaterThanOrEqual(0);
+    expect(projIdx).toBeGreaterThanOrEqual(0);
+    expect(charIdx).toBeGreaterThanOrEqual(0);
+    expect(trackIdx).toBeLessThan(projIdx);
+    expect(projIdx).toBeLessThan(charIdx);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Off-spine inventory — exactly two off-spine steps
+// ---------------------------------------------------------------------------
+
+describe("Off-spine step inventory", () => {
+  it("exactly two spine:false steps exist (project_name and touch_seed_source)", () => {
     const offSpine = offSpineSteps(manifest);
-    expect(offSpine).toHaveLength(1);
-    expect(offSpine[0]?.id).toBe("touch_seed_source");
+    expect(offSpine).toHaveLength(2);
+    const ids = offSpine.map((s) => s.id).sort();
+    expect(ids).toEqual(["project_name", "touch_seed_source"]);
+  });
+
+  it("all spine:false steps have a joinTarget declared", () => {
+    for (const step of offSpineSteps(manifest)) {
+      expect(step.joinTarget).toBeDefined();
+      expect(typeof step.joinTarget).toBe("string");
+    }
+  });
+
+  it("all spine:false joinTargets resolve to spine:true steps in the manifest", () => {
+    for (const step of offSpineSteps(manifest)) {
+      const target = manifest.find((s) => s.id === step.joinTarget);
+      expect(target?.spine).toBe(true);
+    }
   });
 });
 
 // ---------------------------------------------------------------------------
 // M6 — no A–G phase-letter vocabulary in ids or titles
-//
-// The retired sequential phase-letter vocabulary (phase A, phase B, phase C,
-// phase D, phase E, phase F, phase G as primary identifiers) must not appear
-// in step ids or titles. The characters step is "characters", not "phase_a".
 // ---------------------------------------------------------------------------
 
-// Phase-letter patterns that would indicate the retired vocabulary.
-// We check for standalone letters as step id prefixes and as "Phase X" titles.
 const RETIRED_ID_PATTERNS = [
   /^phase_[a-gA-G]$/,
   /^phase[A-G]$/,
-  /^[a-gA-G]$/,           // single-letter id (the original SurveyStage literals)
+  /^[a-gA-G]$/,
 ];
 
 const RETIRED_TITLE_PATTERNS = [
-  /^Phase\s+[A-G]\s*$/i,  // "Phase A", "Phase B", etc. as the full title
+  /^Phase\s+[A-G]\s*$/i,
 ];
 
 describe("M6 — no A–G phase-letter vocabulary in ids or titles", () => {

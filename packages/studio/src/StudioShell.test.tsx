@@ -2,12 +2,14 @@
 //
 // Coverage:
 //   T028 — manifest-driven SurveyView: forward and back transitions driven by the
-//           manifest step order (identity → choose_base → characters → carve →
-//           mechanisms → touch → help → done). No SurveyStage union.
+//           manifest step order (identity → choose_base → track → [project_name] →
+//           characters → carve → mechanisms → touch → help → done). No SurveyStage union.
 //   T029 — no SurveyStage symbol; runtime step order matches manifest; applyStepCompletion
 //           is wired for side-effecting steps.
 //
-// Manifest order (FR-012): Characters BEFORE Carve (intended — was carve before B in old code).
+// Manifest order (FR-012): Characters BEFORE Carve. The old SurveyStage code
+// already had this order (B → carve); the new manifest preserves it.
+// track and project_name are now real manifest steps (P0 fix from review).
 //
 // Strategy: mock every child component at the shallowest level so each mock
 // renders a unique data-testid and a single button that fires its callback.
@@ -914,19 +916,19 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
   it("StudioShell module does not export a SurveyStage symbol", () => {
     // SurveyStage was the retired union type. After T028 it must not exist as
     // a named export or as an identifiable runtime value.
-    // We can check that the module's exports don't include 'SurveyStage' as a key.
     const exports = Object.keys(StudioShellModule);
     expect(exports).not.toContain("SurveyStage");
   });
 
-  it("manifest spine order is: identity → choose_base → characters → carve → mechanisms → touch → help → package", () => {
-    // M2: spine order matches FR-012.
+  it("manifest spine order is: identity → choose_base → track → characters → carve → mechanisms → touch → help → package (M2, P0 fix)", () => {
+    // track is now a real manifest step (P0 fix); project_name is spine:false.
     const spineIds = manifest
       .filter((s) => s.spine !== false)
       .map((s) => s.id);
     expect(spineIds).toEqual([
       "identity",
       "choose_base",
+      "track",
       "characters",
       "carve",
       "mechanisms",
@@ -934,6 +936,13 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
       "help",
       "package",
     ]);
+  });
+
+  it("manifest project_name is spine:false with joinTarget 'characters' (M4b, P0 fix)", () => {
+    const projName = manifest.find((s) => s.id === "project_name");
+    expect(projName).toBeDefined();
+    expect(projName?.spine).toBe(false);
+    expect(projName?.joinTarget).toBe("characters");
   });
 
   it("manifest has exactly one lock:physical and one lock:touch, in that order (M3)", () => {
@@ -960,28 +969,30 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
 });
 
 describe("T029 — runtime step order matches manifest spine order", () => {
-  it("survey advances: identity → choose_base (base sub) → track → project-name → characters (prefill) → B → carve → mechanisms → touch → help", async () => {
+  it("survey advances: identity → choose_base → track (manifest step) → project_name (copy, spine:false) → characters (prefill) → B → carve → mechanisms → touch → help", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    // identity
+    // identity (manifest step)
     expect(screen.getByTestId("stage-identity")).toBeTruthy();
 
-    // → choose_base / base sub-stage
+    // → choose_base (manifest step: base picker only)
     fireEvent.click(screen.getByTestId("identity-complete"));
     expect(screen.getByTestId("stage-base")).toBeTruthy();
     expect(screen.queryByTestId("stage-identity")).toBeNull();
 
-    // → choose_base / track sub-stage
+    // → track (manifest step: copy vs adapt)
     fireEvent.click(screen.getByTestId("base-resolved"));
     expect(screen.getByTestId("stage-track")).toBeTruthy();
+    expect(screen.queryByTestId("stage-base")).toBeNull();
 
-    // → choose_base / project-name sub-stage (copy path)
+    // → project_name (manifest step: spine:false, copy-track CYOA fork)
     fireEvent.click(screen.getByTestId("track-copy"));
     expect(screen.getByTestId("stage-project-name")).toBeTruthy();
+    expect(screen.queryByTestId("stage-track")).toBeNull();
 
-    // → characters / prefill sub-stage
+    // → characters / prefill sub-stage (project_name joinTarget = "characters")
     fireEvent.click(screen.getByTestId("project-name-next"));
     expect(screen.getByTestId("stage-prefill")).toBeTruthy();
 
@@ -1006,19 +1017,33 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     expect(screen.getByTestId("stage-F")).toBeTruthy();
   });
 
-  it("characters step comes BEFORE carve (FR-012 intended reorder — was reversed in pre-manifest code)", async () => {
+  it("adapt-track skips project_name (spine:false) and lands directly on characters (P0 fix)", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    // Advance to characters/B.
+    advanceToTrack();
+    expect(screen.getByTestId("stage-track")).toBeTruthy();
+
+    // adapt-track: nextSpineStepAfter("track") skips project_name (spine:false).
+    fireEvent.click(screen.getByTestId("track-adapt"));
+
+    // Must land on prefill (characters step), not project-name.
+    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+    expect(screen.queryByTestId("stage-project-name")).toBeNull();
+  });
+
+  it("characters step comes BEFORE carve in the manifest (FR-012)", async () => {
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
     advanceToB();
     expect(screen.getByTestId("stage-B")).toBeTruthy();
 
-    // phaseB-complete must go to carve (not mechanisms — the old pre-manifest order).
+    // phaseB-complete must go to carve (next spine step after characters).
     fireEvent.click(screen.getByTestId("phaseB-complete"));
     expect(screen.getByTestId("stage-carve")).toBeTruthy();
-    // Must NOT jump to mechanisms (old incorrect order).
     expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
   });
 

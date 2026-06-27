@@ -1,9 +1,9 @@
 // Studio root — hash-based router + nav bar.
 //
 // Routes:
-//   #survey  (default)  — full authoring wizard: identity → base → prefill →
-//                         B (inventory) → carve (Phase D) →
-//                         mechanisms (Phase C) → E → help (Phase F) → done
+//   #survey  (default)  — full authoring wizard: identity → base → track →
+//                         [project_name (copy)] → characters (prefill/B) →
+//                         carve → mechanisms → touch → help → done
 //   #preview            — PreviewScreen: "try it" — OSK preview + diagnostics
 //                         (no Download button, no SignUpPanel)
 //   #output             — OutputScreen: "ship it" — Download .zip +
@@ -150,19 +150,33 @@ function NavBar({ active }: NavBarProps) {
 //
 // Step order, spine membership, lock placement, and branching all derive from
 // steps/manifest.ts. No SurveyStage union remains — the active step is tracked
-// as the manifest step id plus optional sub-stage state for steps that contain
-// an internal multi-screen flow (choose_base, characters).
+// as a manifest step id (ActiveStepId) with one sub-stage for the "characters"
+// step (which contains an internal prefill→B flow — intra-phase routing handled
+// by the SurveyRunner, legitimately not promoted to manifest steps).
 //
 // Manifest spine order (FR-012, M2):
-//   identity → choose_base → characters → carve → mechanisms[lock:physical] →
-//   touch_seed_source[spine:false] → touch[lock:touch] → help → package[reserved]
+//   identity → choose_base → track → characters → carve →
+//   mechanisms[lock:physical] → touch[lock:touch] → help → package[reserved]
 //
-// Complex-step internal flows:
-//   choose_base: base-picker → track → [project-name (copy)] → characters-entry
-//   characters:  prefill → B-questions
+// Off-spine (spine:false) steps in array order:
+//   project_name  — copy-track CYOA fork; joinTarget:"characters"
+//   touch_seed_source — touch-seed fork; joinTarget:"touch"
+//
+// Track/project_name routing:
+//   copy-track:  choose_base → track → project_name → characters
+//   adapt-track: choose_base → track → (skip project_name) → characters
+//
+// Characters internal flow (intra-phase — not manifest steps):
+//   prefill → B-questions
 //
 // Side effects on step completion are all dispatched through applyStepCompletion()
 // (steps/reducer.ts) — editors are pure (FR-011, R4).
+//
+// Double-instantiation guard (P1 fix):
+//   setScaffoldSpec() causes a second compile run whose onInstantiate callback
+//   would fire applyStepCompletion("choose_base", ...) a second time. An
+//   instantiatedRef flag prevents the R3 side effect from running more than once
+//   per session; it resets on start-over.
 // ---------------------------------------------------------------------------
 
 const SURVEY_DIVIDER_WIDTH = 6;
@@ -171,16 +185,19 @@ const SURVEY_LEFT_MAX_PCT = 65;
 const SURVEY_LEFT_INIT_PCT = 45;
 
 // ---------------------------------------------------------------------------
-// Manifest step ids — the set of ids we advance through (subset of manifest).
-// Unlisted manifest steps (touch_seed_source, package) are handled as part of
-// their adjacent spine step or are reserved/out-of-scope.
+// ActiveStepId — the set of manifest step ids the runtime advances through,
+// plus terminal states "done" and "unsupported" not present in the manifest.
+//
+// track and project_name are real manifest steps (P0 fix); they appear here.
+// touch_seed_source is spine:false and skipped by nextSpineStepAfter — not listed.
+// package is reserved and maps to "done" in nextSpineStepAfter — not listed.
 // ---------------------------------------------------------------------------
 
-// The running survey advances through these ids in manifest order.
-// "unsupported" and "done" are terminal states not present in the manifest.
 type ActiveStepId =
   | "identity"
   | "choose_base"
+  | "track"
+  | "project_name"
   | "characters"
   | "carve"
   | "mechanisms"
@@ -189,23 +206,72 @@ type ActiveStepId =
   | "done"
   | "unsupported";
 
-// Sub-stage within the choose_base manifest step (covers the old base/track/project-name stages).
-// The choose_base step completes when this sub-stage transitions to "complete".
-type ChooseBaseSubStage = "base" | "track" | "project-name";
-
-// Sub-stage within the characters manifest step (covers the old prefill/B stages).
-// The characters step completes when PhaseB reports done.
+// Sub-stage within the characters manifest step (intra-phase routing).
+// prefill→B is legitimately internal to the Phase A/B SurveyRunner;
+// synthesis confirmed these should NOT be promoted to manifest steps.
 type CharactersSubStage = "prefill" | "B";
 
 // ---------------------------------------------------------------------------
-// Derive the initial spine index from the manifest so future reorderings
-// in manifest.ts are automatically reflected in the runtime.
+// validateManifestShape — throw-on-mismatch structural guard (M2, M3, M4).
+// Called once at module load; a misshapen manifest is a hard error, not a
+// logged warning — fail fast so CI catches it before any render occurs.
 // ---------------------------------------------------------------------------
 
-/** Return the step id at a given manifest position, or undefined if out of range. */
-function manifestStepIdAt(idx: number): string | undefined {
-  return manifest[idx]?.id;
+function validateManifestShape(): void {
+  const ids = manifest.map((s) => s.id);
+  const spineIds = manifest.filter((s) => s.spine !== false).map((s) => s.id);
+
+  // M2 — spine order.
+  const expectedSpine = [
+    "identity", "choose_base", "track", "characters",
+    "carve", "mechanisms", "touch", "help", "package",
+  ];
+  for (let i = 0; i < expectedSpine.length; i++) {
+    const expected = expectedSpine[i];
+    if (expected === undefined) break;
+    const actual = spineIds[i];
+    if (actual !== expected) {
+      throw new Error(
+        `[SurveyView] manifest spine[${i}] expected "${expected}", got "${actual ?? "(none)"}"`,
+      );
+    }
+  }
+
+  // M3 — exactly one lock:physical and one lock:touch, in that order.
+  const locks = manifest.filter((s) => s.lock !== undefined).map((s) => s.lock);
+  if (locks[0] !== "physical" || locks[1] !== "touch" || locks.length !== 2) {
+    throw new Error(
+      `[SurveyView] manifest locks expected ["physical","touch"], got [${locks.join(",")}]`,
+    );
+  }
+
+  // M4 — touch_seed_source is spine:false with joinTarget "touch".
+  const seedSource = manifest.find((s) => s.id === "touch_seed_source");
+  if (seedSource === undefined || seedSource.spine !== false || seedSource.joinTarget !== "touch") {
+    throw new Error(`[SurveyView] manifest touch_seed_source missing or misconfigured`);
+  }
+
+  // M4b — project_name is spine:false with joinTarget "characters".
+  const projName = manifest.find((s) => s.id === "project_name");
+  if (projName === undefined || projName.spine !== false || projName.joinTarget !== "characters") {
+    throw new Error(`[SurveyView] manifest project_name missing or misconfigured (must be spine:false, joinTarget:"characters")`);
+  }
+
+  // M5 — unique ids.
+  const seen = new Set<string>();
+  for (const id of ids) {
+    if (seen.has(id)) {
+      throw new Error(`[SurveyView] manifest duplicate step id: "${id}"`);
+    }
+    seen.add(id);
+  }
 }
+
+validateManifestShape();
+
+// ---------------------------------------------------------------------------
+// manifestIndexOf / nextSpineStepAfter — manifest traversal helpers
+// ---------------------------------------------------------------------------
 
 /** Return the manifest index for a given step id, or -1 if not found. */
 function manifestIndexOf(id: string): number {
@@ -213,21 +279,23 @@ function manifestIndexOf(id: string): number {
 }
 
 /**
- * Advance to the next spine step in the manifest, skipping spine:false steps.
- * Returns the id of the next spine step, or "done" if none remain.
+ * Advance to the next spine step in the manifest after currentId, skipping
+ * spine:false side-trail steps. Returns the ActiveStepId of the next spine
+ * step, or "done" when the reserved "package" step or end-of-manifest is reached.
  */
 function nextSpineStepAfter(currentId: string): ActiveStepId {
   const currentIdx = manifestIndexOf(currentId);
   for (let i = currentIdx + 1; i < manifest.length; i++) {
     const step = manifest[i];
     if (step === undefined) break;
-    // Skip side-trail (spine:false) steps — they are not part of the linear spine.
+    // Skip side-trail (spine:false) steps — adapt-track skips project_name this way.
     if (step.spine === false) continue;
-    // Map manifest ids to ActiveStepId values we handle.
     const id = step.id;
     if (
       id === "identity" ||
       id === "choose_base" ||
+      id === "track" ||
+      id === "project_name" ||
       id === "characters" ||
       id === "carve" ||
       id === "mechanisms" ||
@@ -236,51 +304,11 @@ function nextSpineStepAfter(currentId: string): ActiveStepId {
     ) {
       return id;
     }
-    // "package" is reserved — skip to done.
-    if (id === "package") {
-      return "done";
-    }
+    // "package" is reserved — terminal, map to "done".
+    if (id === "package") return "done";
   }
   return "done";
 }
-
-// Validate manifest step assertions at module load time (M2, M3, M4).
-// These assertions fail loudly if the manifest diverges from expectations —
-// they are structural guards, not feature-flag switches.
-(function assertManifestShape() {
-  const ids = manifest.map((s) => s.id);
-  const spineIds = manifest.filter((s) => s.spine !== false).map((s) => s.id);
-
-  // M2 — spine order.
-  const expectedSpine = ["identity", "choose_base", "characters", "carve", "mechanisms", "touch", "help", "package"];
-  for (let i = 0; i < expectedSpine.length; i++) {
-    const expected = expectedSpine[i];
-    if (expected === undefined) break;
-    const actual = spineIds[i];
-    if (actual !== expected) {
-      console.error(`[SurveyView] manifest spine[${i}] expected "${expected}", got "${actual ?? "(none)"}"`);
-    }
-  }
-
-  // M3 — exactly one lock:physical and one lock:touch, in that order.
-  const locks = manifest.filter((s) => s.lock !== undefined).map((s) => s.lock);
-  if (locks[0] !== "physical" || locks[1] !== "touch" || locks.length !== 2) {
-    console.error(`[SurveyView] manifest locks expected ["physical","touch"], got`, locks);
-  }
-
-  // M4 — touch_seed_source is spine:false with joinTarget "touch".
-  const seedSource = manifest.find((s) => s.id === "touch_seed_source");
-  if (seedSource === undefined || seedSource.spine !== false || seedSource.joinTarget !== "touch") {
-    console.error(`[SurveyView] manifest touch_seed_source missing or misconfigured`);
-  }
-
-  // M5 — unique ids.
-  const seen = new Set<string>();
-  for (const id of ids) {
-    if (seen.has(id)) console.error(`[SurveyView] manifest duplicate step id: "${id}"`);
-    seen.add(id);
-  }
-})();
 
 /** Build the downstream SurveyContext from the identity-lite result. */
 function contextFromIdentity(identity: IdentityLiteResult): SurveyContext {
@@ -306,17 +334,13 @@ interface SurveyViewProps {
 
 export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // ---------------------------------------------------------------------------
-  // Manifest-driven step state (T028 — replaces SurveyStage union)
+  // Manifest-driven step state (T028 — no SurveyStage union)
   //
-  // activeStepId: current manifest step id (or "done"/"unsupported" terminal).
-  // The first spine step in the manifest is always "identity".
+  // activeStepId: current manifest step id (or terminal "done"/"unsupported").
   // ---------------------------------------------------------------------------
   const [activeStepId, setActiveStepId] = useState<ActiveStepId>("identity");
 
-  // Sub-stage state for the choose_base manifest step (internal flow).
-  const [chooseBaseSub, setChooseBaseSub] = useState<ChooseBaseSubStage>("base");
-
-  // Sub-stage state for the characters manifest step (internal flow).
+  // Sub-stage for the characters manifest step (intra-phase: prefill → B).
   const [charactersSub, setCharactersSub] = useState<CharactersSubStage>("prefill");
 
   const [identityResult, setIdentityResult] = useState<IdentityLiteResult | null>(null);
@@ -329,11 +353,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Null while loading or on error (gallery degrades gracefully without it).
   const corpusPlacementMap = usePlacementPriors();
 
-  // Track 1 (Copy) vs Track 2 (Adapt) — set within choose_base.
-  // Null until the user picks a track.
+  // Track 1 (Copy) vs Track 2 (Adapt) — set at the track manifest step.
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
 
-  // ScaffoldSpec for Track 1: populated after the project-name sub-step.
+  // ScaffoldSpec for Track 1: populated after the project_name step.
   // Null for Track 2 (adapt uses the base's existing id/name).
   const [scaffoldSpec, setScaffoldSpec] = useState<ScaffoldSpec | null>(null);
 
@@ -341,10 +364,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // This is separate from baseKeyboard (the store's instantiated base) so that:
   //   (a) the pipeline starts as soon as BaseResolution resolves, not after
   //       the store updates (which only happens after compile completes); and
-  //   (b) the OSK preview shows the base the user just picked, even while
-  //       the compile is in progress.
-  // Once onInstantiate fires (compile succeeds), the store's baseKeyboard
-  // becomes the authoritative source and both values will agree.
+  //   (b) the OSK preview shows the base the user just picked, while compile runs.
+  // Once onInstantiate fires (compile succeeds), both values will agree.
   const [localBase, setLocalBase] = useState<BaseKeyboard | null>(baseKeyboard);
 
   // Sync localBase when the store's baseKeyboard prop changes (e.g. after a
@@ -353,7 +374,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     setLocalBase(baseKeyboard);
   }, [baseKeyboard]);
 
-  // Working-copy store actions — captured once for use in ReducerDeps.
+  // Working-copy store actions.
   const recordPhase = useWorkingCopyStore((s) => s.recordPhase);
   const resetSurvey = useWorkingCopyStore((s) => s.reset);
   const setStoreIdentity = useWorkingCopyStore((s) => s.setIdentity);
@@ -373,9 +394,24 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   }, [selectedTrack]);
 
   // ---------------------------------------------------------------------------
+  // P1 fix: double-instantiation guard.
+  //
+  // For Track 1 (copy), setScaffoldSpec() causes a second compile run whose
+  // onInstantiate fires applyStepCompletion("choose_base")/instantiate a second
+  // time. The rebase-guard in instantiateFromBaseIfConfirmed may no-op the
+  // second call, but edit-state-dependent behavior is non-deterministic.
+  // Gate: the R3 side effect fires exactly once per session; reset on start-over.
+  // ---------------------------------------------------------------------------
+  const instantiatedRef = useRef<boolean>(false);
+
+  // ---------------------------------------------------------------------------
   // ReducerDeps — injected into applyStepCompletion (steps/reducer.ts).
-  // All store actions and lib helpers are injected here; the reducer itself
-  // has no static imports from stores/ or lib/ (boundary compliance).
+  // All store actions and lib helpers are injected here; the reducer itself has
+  // no static imports from stores/ or lib/ (boundary compliance).
+  //
+  // The wrapper lambdas delegate to stable module-level imports (buildTouchLayoutJson,
+  // resolveBaseTouchJson, instantiateFromBaseIfConfirmed) that are not React state,
+  // so they are intentionally omitted from the dependency array.
   // ---------------------------------------------------------------------------
   const reducerDeps: ReducerDeps = useMemo(
     () => ({
@@ -390,44 +426,42 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         instantiateFromBaseIfConfirmed(base, opts),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Wrapper lambdas delegate to stable module imports — excluded from deps intentionally.
     [lockDesktop, setTouchLayoutJson, instantiateFromBase, instantiateFromExisting],
   );
 
-  // ---------------------------------------------------------------------------
-  // onInstantiate — compile-pipeline callback (routes choose_base side effects).
-  //
-  // In the manifest-driven model, onInstantiate fires when the compile pipeline
-  // has produced an IR + VFS for the chosen base. It dispatches R3 via
-  // applyStepCompletion('choose_base', ...) — which routes Track 2 →
-  // instantiateFromExisting, Track 1/default → instantiateFromBaseIfConfirmed.
-  // This replaces the old inline routing in StudioShell.tsx:240-253.
-  // ---------------------------------------------------------------------------
+  // Keep reducerDepsRef current so the async onInstantiate callback always
+  // sees the latest deps without being re-created on every render.
   const reducerDepsRef = useRef<ReducerDeps>(reducerDeps);
   useEffect(() => {
     reducerDepsRef.current = reducerDeps;
   }, [reducerDeps]);
 
+  // ---------------------------------------------------------------------------
+  // onInstantiate — compile-pipeline callback (R3: choose_base side effect).
+  //
+  // Fires when the compile pipeline produces an IR + VFS for the chosen base.
+  // Dispatches applyStepCompletion("choose_base", ...) which routes Track 2 →
+  // instantiateFromExisting, Track 1/default → instantiateFromBaseIfConfirmed.
+  //
+  // instantiatedRef gates this to fire exactly once per session — a second
+  // compile triggered by setScaffoldSpec will not re-run the instantiate side
+  // effect (P1 fix).
+  // ---------------------------------------------------------------------------
   const onInstantiate = useCallback<OnInstantiateCallback>((base, { vfs, ir, removalCapabilities }) => {
+    if (instantiatedRef.current) return;
+    instantiatedRef.current = true;
+
     const track = selectedTrackRef.current;
     applyStepCompletion(
       "choose_base",
-      {
-        base,
-        vfs,
-        ir,
-        removalCapabilities,
-        track: track ?? null,
-      },
+      { base, vfs, ir, removalCapabilities, track: track ?? null },
       reducerDepsRef.current,
     );
   }, []);
 
   // Pattern map for the working-copy transform — needed from Phase F onwards so
-  // mechanism assignments (Phase C) are projected into the OSK preview. Loaded
-  // lazily once assignments exist in the store: by the time the user reaches
-  // Phase F the patterns were already fetched during Phase C (service caches
-  // them), so getById resolves in a single microtask tick and causes at most
-  // one extra recompile cycle.
+  // mechanism assignments are projected into the OSK preview.
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const sessionAssignments = useMemo(() => physicalAssignmentsOf(phaseResults), [phaseResults]);
   const [surveyPatternMap, setSurveyPatternMap] = useState<Map<string, Pattern>>(new Map());
@@ -449,20 +483,17 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   }, [sessionAssignments]);
 
   // Working-copy transform — projects carve + assignments + identity into the OSK.
-  // surveyPatternMap is empty until Phase C completes; useWorkingCopyTransform
-  // treats a null patternMap as "skip assignments" (safe — no assignments exist yet).
+  // surveyPatternMap is empty until Phase C completes; null patternMap → skip assignments.
   const workingCopyTransform = useWorkingCopyTransform({
     patternMap: surveyPatternMap.size > 0 ? surveyPatternMap : null,
   });
 
-  // Use localBase (immediately updated on selection) to drive the pipeline,
-  // not the store's baseKeyboard (updated only after compile completes).
+  // Use localBase (immediately updated on selection) to drive the pipeline.
   // Pass scaffoldSpec so Track 1 routes through scaffold() instead of fetchKeyboardSourceToVfs.
   const { stage: artifactStage, retry } = useKeyboardArtifact(localBase, scaffoldSpec, workingCopyTransform, onInstantiate);
   const rightPct = 100 - leftPct;
 
-  // Derive KMN source from the working copy's base VFS (the scaffolded snapshot)
-  // so the validator can produce findings while the survey is in progress.
+  // Derive KMN source from the working copy's base VFS for the validator.
   const kmnSource = useMemo(() => {
     if (!baseVfs) return null;
     const path = findKmnPath(baseVfs);
@@ -477,17 +508,12 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   );
   const globalFindings = useMemo(() => selectUnmappedFindings(findings), [findings]);
 
-  // ---------------------------------------------------------------------------
-  // The (language, script) target for base suggestion — keyed on the CHOSEN
-  // script (decoupled from the language; spec §8/§9).
-  // ---------------------------------------------------------------------------
+  // The (language, script) target for base suggestion — keyed on the CHOSEN script.
   const suggestTarget: SuggestTarget | null =
     identityResult !== null
       ? {
           script: identityResult.prefill.script,
-          ...(identityResult.bcp47 !== ""
-            ? { bcp47: identityResult.bcp47 }
-            : {}),
+          ...(identityResult.bcp47 !== "" ? { bcp47: identityResult.bcp47 } : {}),
         }
       : null;
 
@@ -496,60 +522,53 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // FR-011: editor components are pure; only these handlers call applyStepCompletion.
   // ---------------------------------------------------------------------------
 
-  /** Identity step completes — advance to choose_base OR unsupported. */
+  /** identity step completes → choose_base (or unsupported). */
   function handleIdentityComplete(result: SurveyPhaseResult, identity: IdentityLiteResult) {
     recordPhase(result);
     setIdentityResult(identity);
     setSurveyContext(contextFromIdentity(identity));
-    if (identity.supported) {
-      setActiveStepId("choose_base");
-      setChooseBaseSub("base");
-    } else {
-      setActiveStepId("unsupported");
-    }
+    setActiveStepId(identity.supported ? nextSpineStepAfter("identity") : "unsupported");
   }
 
-  // --- choose_base internal sub-stage handlers ---
-
-  /**
-   * Base picker resolved — start compile pipeline and advance to track sub-stage.
-   * The compile pipeline fires onInstantiate (→ applyStepCompletion choose_base) when done.
-   */
+  /** choose_base step completes — start pipeline, advance to track manifest step. */
   function handleBaseResolved(base: BaseKeyboard) {
     setLocalBase(base);
-    setChooseBaseSub("track");
+    setActiveStepId(nextSpineStepAfter("choose_base"));
   }
 
   /**
-   * Track selected — route to project-name (copy) or complete choose_base (adapt).
-   * Adapt completes choose_base immediately; copy needs a project name first.
+   * track step completes.
+   * copy-track → project_name (spine:false manifest step).
+   * adapt-track → skip project_name (spine:false) → characters (nextSpineStepAfter("track")).
    */
   function handleTrackSelected(track: Track) {
     setSelectedTrack(track);
     if (track === "copy") {
-      setChooseBaseSub("project-name");
+      // Copy-track takes the project_name side-trail.
+      setActiveStepId("project_name");
     } else {
-      // Track 2: no scaffoldSpec needed — adapt uses base's own id/displayName.
+      // Adapt-track: no scaffoldSpec needed — adapt uses base's own id/displayName.
       setScaffoldSpec(null);
-      // choose_base step complete — advance to characters (prefill sub-stage).
-      setActiveStepId("characters");
+      // Skip project_name (spine:false) — nextSpineStepAfter("track") jumps to characters.
+      setActiveStepId(nextSpineStepAfter("track"));
       setCharactersSub("prefill");
     }
   }
 
   /**
-   * Project name confirmed (Track 1 only) — set scaffold spec, push identity,
-   * complete choose_base, and advance to characters.
+   * project_name step completes (copy-track only).
+   * Sets scaffoldSpec so useKeyboardArtifact routes through scaffold(), pushes
+   * identity into the store, then advances to characters (project_name's joinTarget).
    */
   function handleProjectNameNext(displayName: string, keyboardId: string) {
     setScaffoldSpec({ keyboardId, displayName });
     setStoreIdentity({ keyboardId, displayName });
-    // choose_base step complete — advance to characters (prefill sub-stage).
+    // project_name.joinTarget is "characters" — advance there directly.
     setActiveStepId("characters");
     setCharactersSub("prefill");
   }
 
-  // --- characters internal sub-stage handlers ---
+  // --- characters internal sub-stage handlers (intra-phase routing) ---
 
   /** Prefill confirmed — advance to B (Phase B question battery). */
   function handlePrefillConfirm() {
@@ -557,43 +576,37 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   }
 
   /**
-   * Phase B (characters) completes — dispatch R5 (no side effect for question
-   * steps), record phase result, and advance to the next spine step (carve).
-   * FR-012 functional order: Characters BEFORE Carve (intended reorder — T028).
+   * Phase B (characters) completes — record phase result, dispatch R5 (no-op),
+   * advance to carve (FR-012: characters BEFORE carve).
    */
   function handlePhaseBComplete(result: SurveyPhaseResult) {
     recordPhase(result);
-    // characters step completes — no side effect (applyStepCompletion no-op for this id).
     applyStepCompletion("characters", result, reducerDeps);
-    // Advance to carve (next spine step after characters in the manifest).
     setActiveStepId(nextSpineStepAfter("characters"));
   }
 
   // --- Spine gallery/phase completion handlers ---
 
-  /** Carve step completes — advance to mechanisms. */
+  /** carve step completes → mechanisms. */
   function handleCarveComplete() {
     applyStepCompletion("carve", undefined, reducerDeps);
     setActiveStepId(nextSpineStepAfter("carve"));
   }
 
   /**
-   * Mechanisms step completes — applyStepCompletion fires lockDesktop (R1),
-   * then advance to touch (the next spine step after mechanisms).
+   * mechanisms step completes — applyStepCompletion fires lockDesktop (R1),
+   * then advance to touch.
    */
   function handleMechanismsComplete() {
-    // R1: lockDesktop() is fired inside applyStepCompletion for "mechanisms".
     applyStepCompletion("mechanisms", undefined, reducerDeps);
     setActiveStepId(nextSpineStepAfter("mechanisms"));
   }
 
   /**
-   * Touch (Phase E) step completes — applyStepCompletion fires the
-   * buildTouchLayoutJson block (R2), then advance to help.
+   * touch (Phase E) step completes — applyStepCompletion fires buildTouchLayoutJson (R2),
+   * then advance to help.
    */
   function handlePhaseEComplete(assignments: TouchAssignment[]) {
-    // R2: buildTouchLayoutJson + setTouchLayoutJson fired inside applyStepCompletion.
-    // assignments arriving here are already filtered to non-inherited by TouchGallery.
     applyStepCompletion(
       "touch",
       { assignments, baseIr, baseVfs },
@@ -602,10 +615,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     setActiveStepId(nextSpineStepAfter("touch"));
   }
 
-  /**
-   * Help (Phase F) step completes — record phase result, advance to done,
-   * and navigate to the output route.
-   */
+  /** help (Phase F) step completes → done, navigate to output. */
   function handlePhaseFComplete(result: SurveyPhaseResult) {
     recordPhase(result);
     applyStepCompletion("help", result, reducerDeps);
@@ -621,40 +631,38 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     setLocalBase(null);
     setSelectedTrack(null);
     setScaffoldSpec(null);
+    instantiatedRef.current = false;
     setActiveStepId("identity");
-    setChooseBaseSub("base");
     setCharactersSub("prefill");
   }
 
   // ---------------------------------------------------------------------------
-  // Back navigation handlers — all purely local (no side effects via reducer).
+  // Back navigation handlers — purely local (no side effects via reducer).
   // ---------------------------------------------------------------------------
 
-  /** Back from choose_base/base → identity. */
-  function handleBaseBack() {
-    setActiveStepId("identity");
-  }
+  /** Back from choose_base → identity. */
+  function handleBaseBack() { setActiveStepId("identity"); }
 
-  /** Back from choose_base/track → base picker. */
-  function handleTrackBack() {
-    setChooseBaseSub("base");
-  }
+  /** Back from track → choose_base. */
+  function handleTrackBack() { setActiveStepId("choose_base"); }
 
-  /** Back from choose_base/project-name → track. */
-  function handleProjectNameBack() {
-    setChooseBaseSub("track");
-  }
+  /**
+   * Back from project_name → track.
+   * (project_name is a manifest step with its own back affordance.)
+   */
+  function handleProjectNameBack() { setActiveStepId("track"); }
 
-  /** Back from characters/prefill → choose_base (project-name sub-stage for copy, track for adapt). */
+  /**
+   * Back from characters/prefill.
+   * copy-track: → project_name (its preceding manifest step).
+   * adapt-track: → track (project_name was skipped on the adapt path).
+   */
   function handlePrefillBack() {
-    setActiveStepId("choose_base");
-    setChooseBaseSub(selectedTrack === "copy" ? "project-name" : "track");
+    setActiveStepId(selectedTrack === "copy" ? "project_name" : "track");
   }
 
-  /** Back from characters/B → prefill (stays in characters step). */
-  function handlePhaseBBack() {
-    setCharactersSub("prefill");
-  }
+  /** Back from characters/B → prefill (stays in characters intra-phase). */
+  function handlePhaseBBack() { setCharactersSub("prefill"); }
 
   /** Back from carve → characters/B. */
   function handleCarveBack() {
@@ -663,19 +671,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   }
 
   /** Back from mechanisms → carve. */
-  function handleMechanismsBack() {
-    setActiveStepId("carve");
-  }
+  function handleMechanismsBack() { setActiveStepId("carve"); }
 
   /** Back from touch (E) → mechanisms. */
-  function handleTouchBack() {
-    setActiveStepId("mechanisms");
-  }
+  function handleTouchBack() { setActiveStepId("mechanisms"); }
 
   /** Back from help (F) → touch (E). */
-  function handleHelpBack() {
-    setActiveStepId("touch");
-  }
+  function handleHelpBack() { setActiveStepId("touch"); }
 
   // ---------------------------------------------------------------------------
   // Style constants
@@ -696,8 +698,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   };
 
   // ---------------------------------------------------------------------------
-  // Full-screen stages (carve, mechanisms, touch) — these render without the
-  // two-pane layout.
+  // Full-screen steps (carve, mechanisms, touch) — render without the two-pane layout.
   // ---------------------------------------------------------------------------
 
   if (activeStepId === "carve") {
@@ -781,6 +782,141 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Two-pane layout: questions (left) + OSK preview (right)
   // ---------------------------------------------------------------------------
 
+  // Steps rendered full-screen (not in the two-pane layout) — handled as early
+  // returns above. Only the remaining ids reach the two-pane pane renderer.
+  type TwoPaneStepId = Exclude<ActiveStepId, "carve" | "mechanisms" | "touch">;
+
+  /**
+   * Render the left-pane content for the current active step.
+   * Receives the activeStepId narrowed to TwoPaneStepId (carve/mechanisms/touch
+   * are returned early before this is called). Exhaustiveness guard at the bottom
+   * renders a visible error panel rather than a blank pane for an unhandled id.
+   */
+  function renderQuestionsPane(stepId: TwoPaneStepId): ReactNode {
+    if (stepId === "done") {
+      return donePaneContent;
+    }
+
+    if (stepId === "identity") {
+      return (
+        <IdentityLite
+          context={surveyContext}
+          onComplete={handleIdentityComplete}
+          findingsByQuestionId={findingsByQuestionId}
+        />
+      );
+    }
+
+    // §9 three-group routing — not yet supported stub (CJK/Ethiopic).
+    if (stepId === "unsupported") {
+      return identityResult !== null ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "flex-start" }}>
+          <UnsupportedScriptStub script={identityResult.targetScriptRaw} />
+          <button
+            type="button"
+            onClick={handleStartOver}
+            style={{
+              padding: "8px 18px",
+              background: "transparent",
+              border: "1px solid #30363d",
+              borderRadius: 6,
+              color: "#8b949e",
+              fontSize: 13,
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            Start over
+          </button>
+        </div>
+      ) : null;
+    }
+
+    // Manifest step: choose_base — base picker only.
+    if (stepId === "choose_base") {
+      return suggestTarget !== null ? (
+        <BaseResolution
+          target={suggestTarget}
+          onResolved={handleBaseResolved}
+          onBack={handleBaseBack}
+        />
+      ) : null;
+    }
+
+    // Manifest step: track — copy vs adapt choice.
+    if (stepId === "track") {
+      return localBase !== null ? (
+        <TrackStep
+          base={localBase}
+          onNext={handleTrackSelected}
+          onBack={handleTrackBack}
+        />
+      ) : null;
+    }
+
+    // Manifest step: project_name — copy-track CYOA fork (spine:false).
+    if (stepId === "project_name") {
+      return identityResult !== null ? (
+        <ProjectNameStep
+          defaultDisplayName={identityResult.autonym || identityResult.english}
+          onNext={handleProjectNameNext}
+          onBack={handleProjectNameBack}
+        />
+      ) : null;
+    }
+
+    // Manifest step: characters — intra-phase routing: prefill → B.
+    if (stepId === "characters") {
+      if (charactersSub === "prefill" && identityResult !== null && localBase !== null) {
+        return (
+          <Prefill
+            identity={identityResult}
+            base={localBase}
+            onConfirm={handlePrefillConfirm}
+            onBack={handlePrefillBack}
+          />
+        );
+      }
+      if (charactersSub === "B") {
+        // NOTE: placementMap is intentionally not supplied here in v1 (see D-INT-2).
+        return (
+          <PhaseB
+            context={surveyContext}
+            onComplete={handlePhaseBComplete}
+            onBack={handlePhaseBBack}
+            findingsByQuestionId={findingsByQuestionId}
+          />
+        );
+      }
+      return null;
+    }
+
+    // Manifest step: help (Phase F).
+    if (stepId === "help") {
+      return (
+        <PhaseF
+          context={surveyContext}
+          onComplete={handlePhaseFComplete}
+          onBack={handleHelpBack}
+          findingsByQuestionId={findingsByQuestionId}
+        />
+      );
+    }
+
+    // Exhaustiveness guard: unknown TwoPaneStepId — this step has no renderer yet.
+    // Renders a visible error panel rather than a silent blank pane.
+    // If you see this, wire the new manifest step into SurveyView.
+    const _exhaustive: never = stepId;
+    return (
+      <div
+        role="alert"
+        style={{ padding: 24, color: "#f85149", fontFamily: "monospace", fontSize: 13 }}
+      >
+        {`[SurveyView] unhandled step id: "${String(_exhaustive)}" — wire this manifest step into SurveyView`}
+      </div>
+    );
+  }
+
   return (
     <div
       ref={containerRef}
@@ -798,97 +934,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         {globalFindings.length > 0 && (
           <LintSummary findings={globalFindings} />
         )}
-
-        {/* Terminal: done */}
-        {activeStepId === "done" && donePaneContent}
-
-        {/* Manifest step: identity */}
-        {activeStepId === "identity" && (
-          <IdentityLite
-            context={surveyContext}
-            onComplete={handleIdentityComplete}
-            findingsByQuestionId={findingsByQuestionId}
-          />
-        )}
-
-        {/* Terminal: unsupported script (§9 three-group routing — not yet supported stub) */}
-        {activeStepId === "unsupported" && identityResult !== null && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "flex-start" }}>
-            <UnsupportedScriptStub script={identityResult.targetScriptRaw} />
-            <button
-              type="button"
-              onClick={handleStartOver}
-              style={{
-                padding: "8px 18px",
-                background: "transparent",
-                border: "1px solid #30363d",
-                borderRadius: 6,
-                color: "#8b949e",
-                fontSize: 13,
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              Start over
-            </button>
-          </div>
-        )}
-
-        {/* Manifest step: choose_base — internal sub-stages: base → track → [project-name] */}
-        {activeStepId === "choose_base" && chooseBaseSub === "base" && suggestTarget !== null && (
-          <BaseResolution
-            target={suggestTarget}
-            onResolved={handleBaseResolved}
-            onBack={handleBaseBack}
-          />
-        )}
-        {activeStepId === "choose_base" && chooseBaseSub === "track" && localBase !== null && (
-          <TrackStep
-            base={localBase}
-            onNext={handleTrackSelected}
-            onBack={handleTrackBack}
-          />
-        )}
-        {activeStepId === "choose_base" && chooseBaseSub === "project-name" && identityResult !== null && (
-          <ProjectNameStep
-            defaultDisplayName={identityResult.autonym || identityResult.english}
-            onNext={handleProjectNameNext}
-            onBack={handleProjectNameBack}
-          />
-        )}
-
-        {/* Manifest step: characters — internal sub-stages: prefill → B */}
-        {activeStepId === "characters" && charactersSub === "prefill" && identityResult !== null && localBase !== null && (
-          <Prefill
-            identity={identityResult}
-            base={localBase}
-            onConfirm={handlePrefillConfirm}
-            onBack={handlePrefillBack}
-          />
-        )}
-        {activeStepId === "characters" && charactersSub === "B" && (
-          // NOTE: `placementMap` is intentionally not supplied here in v1.
-          // Per decision D-INT-2 the seeder never runs inside the SPA; the real
-          // PlacementMap comes from a pinned placement-priors artifact produced
-          // offline and shipped as static data (tracked separately). The prop
-          // stays optional and unsupplied in production.
-          <PhaseB
-            context={surveyContext}
-            onComplete={handlePhaseBComplete}
-            onBack={handlePhaseBBack}
-            findingsByQuestionId={findingsByQuestionId}
-          />
-        )}
-
-        {/* Manifest step: help (Phase F) */}
-        {activeStepId === "help" && (
-          <PhaseF
-            context={surveyContext}
-            onComplete={handlePhaseFComplete}
-            onBack={handleHelpBack}
-            findingsByQuestionId={findingsByQuestionId}
-          />
-        )}
+        {renderQuestionsPane(activeStepId as TwoPaneStepId)}
       </section>
 
       {/* Drag handle */}
@@ -1017,7 +1063,3 @@ export function StudioShell() {
     </div>
   );
 }
-
-// Suppress unused-variable lint for manifestStepIdAt which serves as a
-// compile-time documentation anchor for the manifest ordering.
-void manifestStepIdAt;

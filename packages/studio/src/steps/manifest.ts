@@ -6,13 +6,13 @@
 // "map == runtime by construction" (FR-010).
 //
 // SPINE ORDER (FR-012, M2):
-//   Identity → choose base → Characters (Phase A/B questions) → Carve →
-//   Mechanisms → [lock: "physical"] → touch_seed_source (spine:false) →
-//   touch → [lock: "touch"] → Help → Package (reserved)
+//   Identity → choose base → Track → [project_name (spine:false)] →
+//   Characters (Phase A/B questions) → Carve → Mechanisms → [lock: "physical"] →
+//   touch_seed_source (spine:false) → touch → [lock: "touch"] → Help → Package (reserved)
 //
-// NOTE: This manifest is authored in P4b but NOT yet wired into the runtime
-// this cycle. The SurveyView rewrite (T028) is the next cycle and will
-// consume this export. Authoring it now changes NO runtime behavior.
+// Side-trail steps (spine:false) in position order:
+//   project_name — copy-track only; joinTarget: "characters"
+//   touch_seed_source — touch-seed fork; joinTarget: "touch"
 //
 // Boundary: steps/ -> editors/ and steps/ -> survey/ are allowed.
 // steps/ -> stores/, lib/, components/ are forbidden.
@@ -21,6 +21,8 @@ import type { Step } from "./types.ts";
 import {
   identityStep,
   chooseBaseStep,
+  trackStep,
+  projectNameStep,
   carveStep,
   mechanismsStep,
   touchSeedSourceStep,
@@ -32,13 +34,13 @@ import {
 // ---------------------------------------------------------------------------
 // "Characters" phase — the Phase A/B question battery.
 //
-// Represented as a single manifest placeholder for now. The actual question
-// ordering within Phase A/B is handled by the SurveyRunner (FlowDef routing)
-// rather than expanded step-by-step in the manifest (the SurveyRunner is the
+// Represented as a single manifest placeholder. The actual question ordering
+// within Phase A/B is handled by the SurveyRunner (FlowDef routing) rather
+// than expanded step-by-step in the manifest (the SurveyRunner is the
 // intra-phase router; the manifest is the inter-phase router).
 //
-// When T028 wires the manifest into SurveyView, the "characters" step will
-// delegate to the existing Phase A/B SurveyRunner for its internal routing.
+// SurveyView delegates to the existing Phase A/B SurveyRunner (prefill → B)
+// for its internal routing — these are legitimately intra-phase screens.
 // ---------------------------------------------------------------------------
 
 /** Spine placeholder for the Phase A/B character-inventory question battery. */
@@ -49,8 +51,7 @@ const charactersStep: Step = {
   spine: true,
   inputs: [],
   writes: [],
-  // Temporary stub component — T028 wires the real PhaseA/B runner here.
-  // Using the identity adapter type; the manifest author replaces this at wiring time.
+  // Temporary stub component — wired in T028 via SurveyView's internal runner.
   component: () => null,
 } as const;
 
@@ -58,20 +59,31 @@ const charactersStep: Step = {
 // Manifest: the ordered Step[] (FR-008, FR-012)
 //
 // Rules encoded here:
-//   M2 — spine order: Identity → choose base → Characters → Carve →
-//         Mechanisms → (lock physical) → touch seed source (spine:false) →
-//         touch → (lock touch) → Help → Package
+//   M2 — spine order: Identity → choose_base → track → Characters → Carve →
+//         Mechanisms → (lock physical) → touch → (lock touch) → Help → Package
 //   M3 — exactly one lock:"physical" and one lock:"touch", in that order.
-//   M4 — touch_seed_source is spine:false with joinTarget resolving to "touch"
-//         (the first spine:true touch step).
+//   M4 — touch_seed_source is spine:false with joinTarget resolving to "touch".
+//   M4b — project_name is spine:false with joinTarget:"characters" (copy-track fork).
 // ---------------------------------------------------------------------------
 
 export const manifest: readonly Step[] = [
   // --- Identity panel ---
   identityStep,
 
-  // --- Base selection ---
+  // --- Base selection (base picker only) ---
   chooseBaseStep,
+
+  // --- Track selection (copy vs adapt) ---
+  trackStep,
+
+  // --- Project name (off-spine, copy-track only; adapt-track skips to characters) ---
+  // spine:false — CYOA fork: copy-track takes this step, adapt-track bypasses it.
+  // joinTarget: "characters" — both branches reconverge at the characters spine step.
+  {
+    ...projectNameStep,
+    spine: false,
+    joinTarget: "characters",
+  } satisfies Step,
 
   // --- Character inventory (Phase A / Phase B question battery) ---
   charactersStep,
@@ -89,8 +101,7 @@ export const manifest: readonly Step[] = [
   // --- Touch seed source (off-spine fork, FR-013, M4) ---
   // spine:false — side trail that lets the author choose the touch seed.
   // joinTarget: "touch" — rejoins the spine at the touch carve+add step.
-  // Both branches converge on the same touch carve/add shell (fork the seed,
-  // not the UI). In P4b this fork is declared; the runtime routing is wired in T028.
+  // Both branches converge on the same touch carve/add shell.
   touchSeedSourceStep,
 
   // --- Touch carve+add (Phase E: touch key assignment) ---

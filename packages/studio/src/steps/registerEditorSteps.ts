@@ -13,6 +13,13 @@
 // assignments). The IRPath declarations here are the authoritative static
 // declarations for the completeness graph; the actual writes happen in the
 // store at runtime.
+//
+// Pool ↔ manifest reconciliation:
+//   - scaffoldStep was declared here but never placed in the manifest. The
+//     copy-track scaffold parameters (keyboardId, displayName) are collected
+//     by ProjectNameStepAdapter and passed through its onComplete result — they
+//     do not need a separate scaffold step. scaffoldStep is removed from this
+//     pool so the pool matches the manifest exactly.
 
 import type { EditorStep } from "./types.ts";
 import { CarveAdapter } from "../editors/adapters/carveAdapter.tsx";
@@ -21,7 +28,6 @@ import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
 import {
   TrackStepAdapter,
   ProjectNameStepAdapter,
-  ScaffoldFormAdapter,
   TrackOneIdentityPanelAdapter,
   BaseResolutionAdapter,
 } from "../editors/adapters/panelAdapters.tsx";
@@ -45,7 +51,8 @@ export const identityStep: EditorStep = {
 };
 
 /**
- * Choose-base step: BaseResolution (keyboard base picker).
+ * Choose-base step: BaseResolution (keyboard base picker ONLY).
+ * Track selection is a separate manifest step (trackStep).
  */
 export const chooseBaseStep: EditorStep = {
   kind: "editor-step",
@@ -59,6 +66,7 @@ export const chooseBaseStep: EditorStep = {
 
 /**
  * Track step: TrackStep (copy vs adapt choice).
+ * Spine:true — every author chooses a track.
  */
 export const trackStep: EditorStep = {
   kind: "editor-step",
@@ -71,7 +79,11 @@ export const trackStep: EditorStep = {
 };
 
 /**
- * Project name step: ProjectNameStep.
+ * Project name step: ProjectNameStep (copy-track only).
+ * Declared spine:true here (the pool default); the manifest overrides it to
+ * spine:false with joinTarget:"characters" to model the CYOA copy-only fork.
+ * ProjectNameStepAdapter collects both displayName and keyboardId (the scaffold
+ * params) — no separate scaffold step is needed.
  */
 export const projectNameStep: EditorStep = {
   kind: "editor-step",
@@ -79,20 +91,6 @@ export const projectNameStep: EditorStep = {
   title: "Project Name",
   spine: true,
   component: ProjectNameStepAdapter,
-  inputs: [],
-  writes: [],
-};
-
-/**
- * Scaffold step: ScaffoldForm.
- * No back affordance — entry-point panel.
- */
-export const scaffoldStep: EditorStep = {
-  kind: "editor-step",
-  id: "scaffold",
-  title: "Scaffold Keyboard",
-  spine: true,
-  component: ScaffoldFormAdapter,
   inputs: [],
   writes: [],
 };
@@ -198,6 +196,10 @@ export const packageStep: EditorStep = {
 
 // ---------------------------------------------------------------------------
 // Exported list (unordered pool — the manifest imposes the spine order)
+//
+// Pool ↔ manifest: every step here is referenced by the manifest, and every
+// manifest step (by id) has an entry here. scaffoldStep was removed because
+// scaffold params are collected by projectNameStep's adapter — no separate step.
 // ---------------------------------------------------------------------------
 
 /**
@@ -210,7 +212,6 @@ export const registeredEditorSteps: readonly EditorStep[] = [
   chooseBaseStep,
   trackStep,
   projectNameStep,
-  scaffoldStep,
   carveStep,
   mechanismsStep,
   touchSeedSourceStep,
