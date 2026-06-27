@@ -637,3 +637,64 @@ describe("workingCopyStore — cross-adapter isolation", () => {
     expect(useWorkingCopyStore.getState().ir).toBe(ir);
   });
 });
+
+// ---------------------------------------------------------------------------
+// T041 — staleness slice tests
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — staleness slice (T041)", () => {
+  it("default: staleSteps is empty (fresh session)", () => {
+    expect(useWorkingCopyStore.getState().staleSteps.size).toBe(0);
+  });
+
+  it("markStale: adds the reopened step to staleSteps", () => {
+    useWorkingCopyStore.getState().markStale("identity");
+    const stale = useWorkingCopyStore.getState().staleSteps;
+    expect(stale.has("identity")).toBe(true);
+  });
+
+  it("markStale: includes the reopened step in the transitive closure", () => {
+    // Re-opening any step includes it in the stale set.
+    useWorkingCopyStore.getState().markStale("choose_base");
+    const stale = useWorkingCopyStore.getState().staleSteps;
+    expect(stale.has("choose_base")).toBe(true);
+  });
+
+  it("clearStale: removes the step from staleSteps", () => {
+    useWorkingCopyStore.getState().markStale("identity");
+    expect(useWorkingCopyStore.getState().staleSteps.has("identity")).toBe(true);
+
+    useWorkingCopyStore.getState().clearStale("identity");
+    expect(useWorkingCopyStore.getState().staleSteps.has("identity")).toBe(false);
+  });
+
+  it("clearStale: staleSteps is empty after clearing the only stale step", () => {
+    useWorkingCopyStore.getState().markStale("track");
+    useWorkingCopyStore.getState().clearStale("track");
+    expect(useWorkingCopyStore.getState().staleSteps.size).toBe(0);
+  });
+
+  it("reset: clears staleSteps back to empty", () => {
+    useWorkingCopyStore.getState().markStale("identity");
+    expect(useWorkingCopyStore.getState().staleSteps.size).toBeGreaterThan(0);
+
+    useWorkingCopyStore.getState().reset();
+    expect(useWorkingCopyStore.getState().staleSteps.size).toBe(0);
+  });
+
+  it("multiple markStale calls accumulate (staleSteps grows)", () => {
+    useWorkingCopyStore.getState().markStale("identity");
+    useWorkingCopyStore.getState().markStale("track");
+    const stale = useWorkingCopyStore.getState().staleSteps;
+    expect(stale.has("identity")).toBe(true);
+    expect(stale.has("track")).toBe(true);
+  });
+
+  it("clearStale of a non-stale step is a no-op (no error)", () => {
+    // No stale steps to start with.
+    expect(useWorkingCopyStore.getState().staleSteps.size).toBe(0);
+    // Clearing a non-stale step should not throw and should keep the set empty.
+    useWorkingCopyStore.getState().clearStale("identity");
+    expect(useWorkingCopyStore.getState().staleSteps.size).toBe(0);
+  });
+});

@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
 import type { BaseKeyboard, Pattern, SurveyPhaseResult, TouchAssignment } from "@keyboard-studio/contracts";
 import { buildTouchLayoutJson } from "./lib/buildTouchLayoutJson.ts";
-import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
+import { useWorkingCopyStore, bindManifest } from "./stores/workingCopyStore.ts";
 import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
 import { IdentityLite, Prefill, PhaseB, PhaseF, type IdentityLiteResult } from "./survey/index.ts";
 import { BaseResolution } from "./editors/panels/BaseResolution.tsx";
@@ -39,11 +39,17 @@ import { LintSummary } from "./lint/index.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
 import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
 import { FlowMapView } from "./dashboard/DashboardView.tsx";
+import { runCompleteness } from "./dashboard/completeness.ts";
 import { PreviewScreen } from "./components/PreviewScreen.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
 import { navigateTo } from "./lib/navigate.ts";
 import { manifest } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
+
+// Bind the manifest into the store's staleness actions.
+// Called once at module load; avoids a circular static import in the store
+// (stores/ → steps/manifest.ts → steps/registerEditorSteps.ts → editors/ → stores/).
+bindManifest(manifest);
 
 // The Flow Map is a developer aid. It shows automatically in `vite dev`; in
 // hosted builds (Vercel previews, future production) it is gated by
@@ -1029,6 +1035,24 @@ export function StudioShell() {
 
   const selectedBaseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
 
+  // ---------------------------------------------------------------------------
+  // Completeness report — T042/US3.
+  // Computed here (where the store is reachable) and passed down to DashboardView
+  // as a prop. DashboardView has NO stores/ import (dashboard-layer boundary).
+  // ---------------------------------------------------------------------------
+  const desktopLocked = useWorkingCopyStore((s) => s.desktopLocked);
+  const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
+  const staleSteps = useWorkingCopyStore((s) => s.staleSteps);
+  const completenessReport = useMemo(
+    () =>
+      runCompleteness(
+        manifest,
+        { desktopLocked, touchLayoutJson },
+        staleSteps,
+      ),
+    [desktopLocked, touchLayoutJson, staleSteps],
+  );
+
   let content: ReactNode;
   switch (route) {
     case "survey":
@@ -1041,7 +1065,7 @@ export function StudioShell() {
       content = <OutputScreen />;
       break;
     case "flowmap":
-      content = <FlowMapView />;
+      content = <FlowMapView completeness={completenessReport} />;
       break;
   }
 

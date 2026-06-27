@@ -1,11 +1,15 @@
-// Developer "Flow Map" tab — a live, auto-generated map of the survey's
-// questions, their branching, and the strategy decision tree.
+// Developer "Flow Map" / Dashboard tab — a live, auto-generated map of the
+// survey's questions, their branching, and the strategy decision tree.
 //
-// Three sections, all derived from source (no hand-maintained diagram):
-//   • Survey flow   — one graph per content/flows/*.yaml (loaded via ?raw, the
-//                     same source the survey runner uses).
+// Four sections:
+//   • Survey flow    — one graph per content/flows/*.yaml.
 //   • Script routing — §9 target-script → qwerty-qwertz / non-roman / azerty.
 //   • Strategy tree  — §7.2 decision tree, from the engine's exported rule tables.
+//   • Completeness   — read-only CompletenessReport (US3, T042, FR-023).
+//
+// The CompletenessReport is received via props from StudioShell (which can
+// import both stores and dashboard). This component has NO stores/ import —
+// satisfying the dashboard-layer depcruise boundary.
 //
 // Rebuilding the studio after editing a flow or a selector rule updates this map.
 
@@ -28,8 +32,9 @@ import { FlowGraphView } from "./FlowGraphView.tsx";
 import { StrategyTreeView } from "./StrategyTreeView.tsx";
 import { ScriptRoutingView } from "./ScriptRoutingView.tsx";
 import { MONO, SANS } from "./tokens.ts";
+import type { CompletenessReport } from "./completeness.ts";
 
-type Section = "flow" | "routing" | "strategy";
+type Section = "flow" | "routing" | "strategy" | "completeness";
 
 /** Loader type: "legacy" uses parseFlow (A/F/identity-lite); "modular" uses
  *  loadModularFlow (Phase B).  Each section uses the loader that actually drives
@@ -140,7 +145,173 @@ function SectionTab({ active, onClick, children }: { active: boolean; onClick: (
   );
 }
 
-export function FlowMapView() {
+// ---------------------------------------------------------------------------
+// CompletenessView — read-only display of the CompletenessReport (T042/FR-023)
+// ---------------------------------------------------------------------------
+
+function CompletenessView({ report }: { report: CompletenessReport | undefined }) {
+  if (report === undefined) {
+    return (
+      <div style={{ color: "#8b949e", fontFamily: MONO, fontSize: 13, padding: "16px 0" }}>
+        No completeness report available. Open a keyboard to begin.
+      </div>
+    );
+  }
+
+  const hasIssues =
+    report.cycles.length > 0 ||
+    report.rejoinViolations.length > 0 ||
+    report.orphanInputs.length > 0 ||
+    report.unreachable.length > 0;
+
+  const SECTION_STYLE: React.CSSProperties = {
+    marginBottom: 20,
+    padding: "12px 16px",
+    border: "1px solid #21262d",
+    borderRadius: 8,
+    background: "#0b0f14",
+  };
+
+  const HEADING_STYLE: React.CSSProperties = {
+    margin: "0 0 8px",
+    fontSize: 13,
+    fontWeight: 600,
+    color: "#e6edf3",
+  };
+
+  const OK_STYLE: React.CSSProperties = { color: "#3fb950", fontFamily: MONO, fontSize: 12 };
+  const ERR_STYLE: React.CSSProperties = { color: "#ff9492", fontFamily: MONO, fontSize: 12 };
+  const WARN_STYLE: React.CSSProperties = { color: "#e3b341", fontFamily: MONO, fontSize: 12 };
+
+  return (
+    <div>
+      {/* Summary banner */}
+      <div
+        style={{
+          marginBottom: 20,
+          padding: "10px 16px",
+          borderRadius: 8,
+          border: `1px solid ${hasIssues ? "#9e6a03" : "#238636"}`,
+          background: hasIssues ? "#241c10" : "#0f2417",
+          color: hasIssues ? "#e3b341" : "#3fb950",
+          fontFamily: MONO,
+          fontSize: 13,
+        }}
+      >
+        {hasIssues ? "[WARN] Completeness violations detected" : "[OK] All completeness checks passed"}
+      </div>
+
+      {/* C1: Stale steps */}
+      <div style={SECTION_STYLE}>
+        <h3 style={HEADING_STYLE}>C1 — Stale steps (transitive closure)</h3>
+        {report.stale.size === 0 ? (
+          <span style={OK_STYLE}>No stale steps (nothing re-opened)</span>
+        ) : (
+          <ul style={{ margin: 0, padding: "0 0 0 16px", color: "#e3b341", fontFamily: MONO, fontSize: 12 }}>
+            {[...report.stale].map((id) => (
+              <li key={id}>{id}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* C2: Cycles */}
+      <div style={SECTION_STYLE}>
+        <h3 style={HEADING_STYLE}>C2 — Data-edge cycles (hard error if non-empty)</h3>
+        {report.cycles.length === 0 ? (
+          <span style={OK_STYLE}>No cycles — acyclic writes→inputs graph</span>
+        ) : (
+          <ul style={{ margin: 0, padding: "0 0 0 16px" }}>
+            {report.cycles.map((cycle, i) => (
+              <li key={i} style={ERR_STYLE}>
+                {cycle.join(" → ")}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* C3: Rejoin violations */}
+      <div style={SECTION_STYLE}>
+        <h3 style={HEADING_STYLE}>C3 — Side-trail rejoin</h3>
+        {report.rejoinViolations.length === 0 ? (
+          <span style={OK_STYLE}>All off-spine steps rejoin a spine step</span>
+        ) : (
+          <ul style={{ margin: 0, padding: "0 0 0 16px" }}>
+            {report.rejoinViolations.map((v) => (
+              <li key={v.stepId} style={WARN_STYLE}>
+                {v.stepId}: {v.reason}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* C4: Unshippable prefixes */}
+      <div style={SECTION_STYLE}>
+        <h3 style={HEADING_STYLE}>C4 — Spine-prefix shippability (structural proxy)</h3>
+        {report.unshippablePrefixes.length === 0 ? (
+          <span style={OK_STYLE}>All spine prefixes are lock-consistent</span>
+        ) : (
+          <div style={WARN_STYLE}>
+            Unshippable spine prefix indices: {report.unshippablePrefixes.join(", ")}
+            <div style={{ marginTop: 4, fontSize: 11, color: "#8b949e" }}>
+              (A prefix is unshippable when it includes a lock step whose gate has not been applied.)
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* C5: Orphan inputs */}
+      <div style={SECTION_STYLE}>
+        <h3 style={HEADING_STYLE}>C5 — Orphan inputs (no upstream writes)</h3>
+        {report.orphanInputs.length === 0 ? (
+          <span style={OK_STYLE}>All inputs are satisfied by upstream writes</span>
+        ) : (
+          <ul style={{ margin: 0, padding: "0 0 0 16px" }}>
+            {report.orphanInputs.map((o, i) => (
+              <li key={i} style={WARN_STYLE}>
+                {o.stepId}: {o.path}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* C7: Unreachable steps */}
+      <div style={SECTION_STYLE}>
+        <h3 style={HEADING_STYLE}>C7 — Unreachable steps</h3>
+        {report.unreachable.length === 0 ? (
+          <span style={OK_STYLE}>All steps are reachable from the spine entry</span>
+        ) : (
+          <ul style={{ margin: 0, padding: "0 0 0 16px" }}>
+            {report.unreachable.map((id) => (
+              <li key={id} style={WARN_STYLE}>
+                {id}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FlowMapView (renamed DashboardView; exported as FlowMapView for StudioShell compat)
+// ---------------------------------------------------------------------------
+
+export interface FlowMapViewProps {
+  /**
+   * Completeness report computed by StudioShell from the manifest + wc state.
+   * Passed in as a prop so DashboardView has NO stores/ import (dashboard-layer
+   * boundary). StudioShell reads useWorkingCopyStore and passes the result here.
+   * Optional: dashboard renders a placeholder when undefined.
+   */
+  completeness?: CompletenessReport;
+}
+
+export function FlowMapView({ completeness }: FlowMapViewProps) {
   const [section, setSection] = useState<Section>("flow");
   const flows = useMemo(() => FLOW_SOURCES.map((f) => ({ ...safeBuild(f), title: f.title })), []);
 
@@ -177,6 +348,9 @@ export function FlowMapView() {
         </SectionTab>
         <SectionTab active={section === "strategy"} onClick={() => setSection("strategy")}>
           Strategy tree (§7.2)
+        </SectionTab>
+        <SectionTab active={section === "completeness"} onClick={() => setSection("completeness")}>
+          Completeness (US3)
         </SectionTab>
       </div>
 
@@ -223,6 +397,8 @@ export function FlowMapView() {
       {section === "routing" && <ScriptRoutingView identityLiteRaw={identityLiteRaw} />}
 
       {section === "strategy" && <StrategyTreeView />}
+
+      {section === "completeness" && <CompletenessView report={completeness} />}
     </div>
   );
 }
