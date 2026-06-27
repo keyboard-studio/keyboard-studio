@@ -367,8 +367,8 @@ vi.mock("./components/OutputScreen.tsx", () => ({
   OutputScreen: () => <div data-testid="output-screen-root">output-screen</div>,
 }));
 
-// Shallow stub for FlowMapView — only rendered in dev/VITE_SHOW_FLOWMAP builds.
-vi.mock("./flowmap/FlowMapView.tsx", () => ({
+// Shallow stub for DashboardView — only rendered in dev/VITE_SHOW_FLOWMAP builds.
+vi.mock("./dashboard/DashboardView.tsx", () => ({
   FlowMapView: () => <div data-testid="flow-map-view">flow-map</div>,
 }));
 

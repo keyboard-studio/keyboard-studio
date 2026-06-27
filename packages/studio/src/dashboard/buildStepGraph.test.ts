@@ -6,11 +6,12 @@ import phaseBRaw from "../../../../content/flows/phase_b_characters.yaml?raw";
 import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modular.yaml?raw";
 import phaseFRaw from "../../../../content/flows/phase_f_helpdocs.yaml?raw";
 
-import { buildFlowGraph, buildModularFlowGraph, buildGraphFromQuestions } from "./buildFlowGraph.ts";
+import { buildFlowGraph, buildModularFlowGraph, buildGraphFromQuestions, buildManifestStepGraph } from "./buildStepGraph.ts";
 import { buildScriptRouting } from "./buildScriptRouting.ts";
 import { loadModularFlow } from "../survey/loadModularFlow.ts";
 import { phaseBRegistry } from "../survey/questions/registry.b.ts";
 import type { FlowDef } from "../survey/types.ts";
+import { manifest } from "../steps/manifest.ts";
 
 const ALL_FLOWS = [
   { raw: identityLiteRaw, title: "Identity-lite" },
@@ -223,6 +224,111 @@ describe("buildScriptRouting — §9 split", () => {
       const row = byValue(v);
       expect(row?.gated, `${v} should be gated`).toBe(true);
       expect(row?.routingGroup).toBeNull();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T032 — C8 / C9: buildManifestStepGraph reads steps/manifest.ts (FR-010)
+// ---------------------------------------------------------------------------
+
+describe("buildManifestStepGraph — C8/C9 (T032)", () => {
+  const graph = buildManifestStepGraph();
+
+  // C9: dashboard reads the SAME manifest.ts the runtime reads.
+  // The test imports manifest directly from steps/manifest.ts and compares ids —
+  // there is no second ordering source.
+  it("C9 — node ids equal manifest step ids in manifest order", () => {
+    const nodeIds = graph.nodes.map((n) => n.id);
+    const manifestIds = manifest.map((s) => s.id);
+    expect(nodeIds).toEqual(manifestIds);
+  });
+
+  // C8: exactly one node per manifest step — zero ghost, zero missing.
+  it("C8 — exactly one node per manifest step (no ghost, no missing)", () => {
+    const manifestIds = new Set(manifest.map((s) => s.id));
+    const nodeIds = new Set(graph.nodes.map((n) => n.id));
+
+    // Every node corresponds to a manifest step.
+    for (const id of nodeIds) {
+      expect(manifestIds.has(id), `ghost node: "${id}" is in the graph but not in the manifest`).toBe(true);
+    }
+    // Every manifest step has a node.
+    for (const id of manifestIds) {
+      expect(nodeIds.has(id), `missing node: manifest step "${id}" has no graph node`).toBe(true);
+    }
+    // Counts agree.
+    expect(graph.nodes.length).toBe(manifest.length);
+  });
+
+  it("C8 — no duplicate node ids", () => {
+    const ids = graph.nodes.map((n) => n.id);
+    const unique = new Set(ids);
+    expect(unique.size).toBe(ids.length);
+  });
+
+  it("spine steps carry spine:true; off-spine steps carry spine:false", () => {
+    for (const node of graph.nodes) {
+      const step = manifest.find((s) => s.id === node.id);
+      expect(step).toBeDefined();
+      expect(node.spine).toBe(step!.spine === true);
+    }
+  });
+
+  it("lock gates are preserved from the manifest", () => {
+    for (const node of graph.nodes) {
+      const step = manifest.find((s) => s.id === node.id);
+      expect(step).toBeDefined();
+      expect(node.lock).toBe(step!.lock);
+    }
+  });
+
+  it("joinTarget is preserved for off-spine steps", () => {
+    const offSpine = graph.nodes.filter((n) => !n.spine);
+    // There are at least two off-spine steps (project_name + touch_seed_source).
+    expect(offSpine.length).toBeGreaterThanOrEqual(2);
+    for (const node of offSpine) {
+      const step = manifest.find((s) => s.id === node.id);
+      expect(step).toBeDefined();
+      expect(node.joinTarget).toBe(step!.joinTarget);
+      // Every off-spine step must have a joinTarget.
+      expect(node.joinTarget, `off-spine step "${node.id}" missing joinTarget`).toBeDefined();
+    }
+  });
+
+  it("first and last steps are marked correctly", () => {
+    const first = graph.nodes[0];
+    const last = graph.nodes[graph.nodes.length - 1];
+    expect(first?.isEntry).toBe(true);
+    expect(first?.isTerminal).toBe(false);
+    expect(last?.isTerminal).toBe(true);
+    expect(last?.isEntry).toBe(false);
+  });
+
+  it("spine edges connect consecutive spine steps in manifest order", () => {
+    const spineIds = graph.nodes.filter((n) => n.spine).map((n) => n.id);
+    const spineEdges = graph.edges.filter((e) => e.kind === "spine");
+
+    // Each consecutive spine step pair has a spine edge.
+    for (let i = 0; i < spineIds.length - 1; i++) {
+      const from = spineIds[i]!;
+      const to = spineIds[i + 1]!;
+      const edge = spineEdges.find((e) => e.from === from && e.to === to);
+      expect(edge, `missing spine edge from "${from}" to "${to}"`).toBeDefined();
+    }
+    // Last spine step has no outgoing spine edge.
+    const lastSpine = spineIds[spineIds.length - 1]!;
+    expect(spineEdges.filter((e) => e.from === lastSpine).length).toBe(0);
+  });
+
+  it("join edges connect off-spine steps back to their joinTarget", () => {
+    const offSpine = graph.nodes.filter((n) => !n.spine);
+    for (const node of offSpine) {
+      if (node.joinTarget === undefined) continue;
+      const joinEdge = graph.edges.find(
+        (e) => e.from === node.id && e.to === node.joinTarget && e.kind === "join",
+      );
+      expect(joinEdge, `missing join edge from "${node.id}" to "${node.joinTarget}"`).toBeDefined();
     }
   });
 });

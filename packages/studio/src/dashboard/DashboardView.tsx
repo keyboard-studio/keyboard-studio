@@ -23,7 +23,7 @@ import phaseARaw from "../../../../content/flows/phase_a_identity.yaml?raw";
 import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modular.yaml?raw";
 import phaseFRaw from "../../../../content/flows/phase_f_helpdocs.yaml?raw";
 
-import { buildFlowGraph, buildModularFlowGraph } from "./buildFlowGraph.ts";
+import { buildFlowGraph, buildModularFlowGraph } from "./buildStepGraph.ts";
 import { FlowGraphView } from "./FlowGraphView.tsx";
 import { StrategyTreeView } from "./StrategyTreeView.tsx";
 import { ScriptRoutingView } from "./ScriptRoutingView.tsx";

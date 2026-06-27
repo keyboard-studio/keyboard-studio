@@ -1,4 +1,4 @@
-// Graph model for the developer Flow Map tab.
+// Graph model for the developer Dashboard tab.
 //
 // A FlowGraph is a normalized, render-ready view of a survey flow: questions
 // become nodes, the `next` field (linear id, terminal null, or conditional
@@ -17,8 +17,15 @@
 //   region="flow"             live nodes that belong to the ordered survey spine
 //   region="not-yet-ordered"  library-not-in-flow AND stub nodes — neither is part
 //                             of the ordered spine
+//
+// T031: StepGraph / StepGraphNode model for manifest-driven dashboard (C8/FR-010).
+//   One node per steps/manifest.ts entry; node set == runtime step set.
 
 import type { FlowQuestionType } from "../survey/types.ts";
+
+// ---------------------------------------------------------------------------
+// FlowGraph — survey-question-level graph (legacy + P3 modular path)
+// ---------------------------------------------------------------------------
 
 /** How an edge was produced from a question's `next`. */
 export type EdgeKind = "linear" | "conditional" | "default";
@@ -93,4 +100,61 @@ export interface FlowGraph {
   entryId: string | null;
   /** goto targets that reference an unknown question id (authoring defects). */
   danglingTargets: string[];
+}
+
+// ---------------------------------------------------------------------------
+// StepGraph — manifest-driven model (T031, C8/FR-010)
+//
+// One node per steps/manifest.ts entry; node set == runtime step set.
+// The dashboard reads this instead of constructing its own step ordering.
+// ---------------------------------------------------------------------------
+
+/** Node type for a step derived from steps/manifest.ts. */
+export type StepNodeType = "editor-step" | "question-step";
+
+/** A single step from the manifest, rendered as a dashboard node. */
+export interface StepGraphNode {
+  /** Step id (from manifest). */
+  id: string;
+  /** Human-readable title (from Step.title). */
+  label: string;
+  /** Step kind: "editor-step" (gallery/panel) or "question-step" (survey question). */
+  type: StepNodeType;
+  /** True when spine === true in the manifest. */
+  spine: boolean;
+  /** Lock gate placed after this step ("physical" | "touch" | undefined). */
+  lock?: "physical" | "touch";
+  /**
+   * For off-spine steps: the spine step id this side trail rejoins.
+   * Undefined for spine steps.
+   */
+  joinTarget?: string;
+  /** True for the first step in the manifest. */
+  isEntry: boolean;
+  /** True for the last step in the manifest. */
+  isTerminal: boolean;
+}
+
+/** A directed edge between two manifest steps. */
+export interface StepGraphEdge {
+  from: string;
+  to: string;
+  /**
+   * "spine" = linear spine progression;
+   * "fork"  = spine step branching to an off-spine step;
+   * "join"  = off-spine step rejoining the spine at joinTarget.
+   */
+  kind: "spine" | "fork" | "join";
+}
+
+/**
+ * A complete, normalized manifest step graph (T031, C8/FR-010).
+ * One node per manifest step; edges represent the spine order + fork/join
+ * edges for off-spine steps.
+ */
+export interface StepGraph {
+  /** All manifest steps as nodes, in manifest array order. */
+  nodes: readonly StepGraphNode[];
+  /** Directed edges: spine progression + fork/join side trails. */
+  edges: readonly StepGraphEdge[];
 }

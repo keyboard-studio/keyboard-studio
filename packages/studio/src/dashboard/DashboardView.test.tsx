@@ -1,13 +1,13 @@
-// Integration smoke test for the Flow Map tab: it must mount from real flow
+// Integration smoke test for the Dashboard tab: it must mount from real flow
 // YAML (?raw) + the engine's exported rule tables, and switch between sections.
 
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import { FlowMapView } from "./FlowMapView";
+import { FlowMapView } from "./DashboardView.tsx";
 
 afterEach(cleanup);
 
-describe("FlowMapView", () => {
+describe("FlowMapView (DashboardView)", () => {
   it("renders the survey-flow section with question ids from the real flows", () => {
     render(<FlowMapView />);
     expect(screen.getByText("Flow Map")).toBeTruthy();

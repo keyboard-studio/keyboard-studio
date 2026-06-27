@@ -38,7 +38,7 @@ import { buildFindingsByQuestionId, selectUnmappedFindings } from "./lint/lintTo
 import { LintSummary } from "./lint/index.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
 import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
-import { FlowMapView } from "./flowmap/FlowMapView.tsx";
+import { FlowMapView } from "./dashboard/DashboardView.tsx";
 import { PreviewScreen } from "./components/PreviewScreen.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
 import { navigateTo } from "./lib/navigate.ts";
