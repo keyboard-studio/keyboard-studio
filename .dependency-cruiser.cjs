@@ -59,6 +59,39 @@ module.exports = {
       to:   { path: '^packages/studio/src/(survey|steps|stores)/' },
     },
     {
+      name: 'editors-no-dashboard',
+      comment:
+        'editors/ may import stores/ and lib/ (galleries bind workingCopyStore, ' +
+        'irToCarveNodes, buildTouchLayoutJson — FR-007 / P4a boundaries.contract.md). ' +
+        'Forbidden: editors/ -> dashboard/ (editors are steps, not orchestrators).',
+      severity: 'error',
+      from: { path: '^packages/studio/src/editors/' },
+      to:   { path: '^packages/studio/src/dashboard/' },
+    },
+    {
+      name: 'steps-layer',
+      comment:
+        'steps/ orchestrates editor steps and question modules. It may depend on ' +
+        'survey/ (registry), editors/, contracts, and ui/. ' +
+        'Forbidden: steps/ -> dashboard/, stores/, lib/, components/ ' +
+        '(steps is a descriptor layer, not a UI consumer — P4a boundaries.contract.md).',
+      severity: 'error',
+      from: { path: '^packages/studio/src/steps/' },
+      to:   { path: '^packages/studio/src/(dashboard|stores|lib|components)/' },
+    },
+    {
+      name: 'dashboard-layer',
+      comment:
+        'dashboard/ reads the step manifest and survey/IR types. It may depend on ' +
+        'steps/, contracts, and ui/. ' +
+        'Forbidden: dashboard/ -> editors/ or stores/ directly ' +
+        '(dashboard orchestrates via steps, not by touching editor internals — ' +
+        'P4a boundaries.contract.md).',
+      severity: 'error',
+      from: { path: '^packages/studio/src/dashboard/' },
+      to:   { path: '^packages/studio/src/(editors|stores)/' },
+    },
+    {
       name: 'no-deps-on-studio-poc',
       comment:
         'studio-poc is a throwaway prototype — do not build on it (CLAUDE.md). ' +
