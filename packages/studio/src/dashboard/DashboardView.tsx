@@ -1,8 +1,10 @@
 // Developer "Flow Map" / Dashboard tab — a live, auto-generated map of the
 // survey's questions, their branching, and the strategy decision tree.
 //
-// Four sections:
-//   • Survey flow    — one graph per content/flows/*.yaml.
+// Four sections, all derived from source (no hand-maintained diagram):
+//   • Survey flow    — one graph per content/flows/*.modular.yaml (loaded via
+//                      ?raw, the same source the survey runner uses via the
+//                      modular loader).
 //   • Script routing — §9 target-script → qwerty-qwertz / non-roman / azerty.
 //   • Strategy tree  — §7.2 decision tree, from the engine's exported rule tables.
 //   • Completeness   — read-only CompletenessReport (US3, T042, FR-023).
@@ -15,19 +17,19 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 
-// Flow sources — each section loads the source that the runtime survey actually
-// uses.  Phase A / F / identity-lite still run through the legacy full-YAML
-// loader (parseFlow), so they import the legacy *.yaml.  Phase B runs through
-// the modular registry (loadModularFlow), so it imports the thin *.modular.yaml
-// manifest.  Switching a section to the wrong source would re-introduce ghost
-// nodes — the comment on each import is intentional.
-import identityLiteRaw from "../../../../content/flows/identity_lite.yaml?raw";
-import phaseARaw from "../../../../content/flows/phase_a_identity.yaml?raw";
-// Phase B: modular manifest — do NOT fall back to phase_b_characters.yaml here.
+// Flow sources — every section loads its *.modular.yaml manifest (the same
+// source the runtime survey uses via loadModularFlow).  Do NOT import the
+// legacy *.yaml files here — they are retired and will be deleted.
+import identityLiteModularRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
+import phaseAModularRaw from "../../../../content/flows/phase_a_identity.modular.yaml?raw";
 import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modular.yaml?raw";
-import phaseFRaw from "../../../../content/flows/phase_f_helpdocs.yaml?raw";
+import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
 
-import { buildFlowGraph, buildModularFlowGraph } from "./buildStepGraph.ts";
+import { buildModularFlowGraph } from "./buildStepGraph.ts";
+import { phaseARegistry } from "../survey/questions/registry.a.ts";
+import { phaseBRegistry } from "../survey/questions/registry.b.ts";
+import { phaseFRegistry } from "../survey/questions/registry.f.ts";
+import type { QuestionModule } from "../survey/types.ts";
 import { FlowGraphView } from "./FlowGraphView.tsx";
 import { StrategyTreeView } from "./StrategyTreeView.tsx";
 import { ScriptRoutingView } from "./ScriptRoutingView.tsx";
@@ -36,29 +38,24 @@ import type { CompletenessReport } from "./completeness.ts";
 
 type Section = "flow" | "routing" | "strategy" | "completeness";
 
-/** Loader type: "legacy" uses parseFlow (A/F/identity-lite); "modular" uses
- *  loadModularFlow (Phase B).  Each section uses the loader that actually drives
- *  its runtime — mixing them would introduce ghost or missing nodes.
- */
-type FlowSourceEntry =
-  | { raw: string; title: string; loader: "legacy" }
-  | { raw: string; title: string; loader: "modular" };
+/** Single shape for all flow source entries — all sections now use the modular loader. */
+interface FlowSourceEntry {
+  raw: string;
+  title: string;
+  registry: Readonly<Record<string, QuestionModule>>;
+}
 
 const FLOW_SOURCES: ReadonlyArray<FlowSourceEntry> = [
-  { raw: identityLiteRaw, title: "Identity-lite (Phase A head)", loader: "legacy" },
-  { raw: phaseARaw, title: "Phase A — identity", loader: "legacy" },
-  // Phase B: modular manifest drives runtime — must use the modular loader.
-  // On error, render nothing for this section; never fall back to the legacy YAML.
-  { raw: phaseBModularRaw, title: "Phase B — character discovery", loader: "modular" },
-  { raw: phaseFRaw, title: "Phase F — help docs", loader: "legacy" },
+  // Identity-lite uses the Phase A registry (il_* modules are registered there).
+  { raw: identityLiteModularRaw, title: "Identity-lite (Phase A head)", registry: phaseARegistry },
+  { raw: phaseAModularRaw, title: "Phase A — identity", registry: phaseARegistry },
+  { raw: phaseBModularRaw, title: "Phase B — character discovery", registry: phaseBRegistry },
+  { raw: phaseFModularRaw, title: "Phase F — help docs", registry: phaseFRegistry },
 ];
 
 function safeBuild(entry: FlowSourceEntry) {
   try {
-    const graph =
-      entry.loader === "modular"
-        ? buildModularFlowGraph(entry.raw, entry.title)
-        : buildFlowGraph(entry.raw, entry.title);
+    const graph = buildModularFlowGraph(entry.raw, entry.title, entry.registry);
     return { graph, error: null as string | null };
   } catch (err) {
     // FR-011: fail visibly; never fall back to the legacy YAML for a modular source.
@@ -330,7 +327,7 @@ export function FlowMapView({ completeness }: FlowMapViewProps) {
       <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 4 }}>
         <h1 style={{ margin: 0, fontSize: 20, color: "#e6edf3" }}>Flow Map</h1>
         <span style={{ fontSize: 12.5, color: "#6e7681" }}>
-          developer view · auto-generated from <code style={{ fontFamily: MONO }}>content/flows/*.yaml</code> +{" "}
+          developer view · auto-generated from <code style={{ fontFamily: MONO }}>content/flows/*.modular.yaml</code> +{" "}
           <code style={{ fontFamily: MONO }}>strategy-selector</code>
         </span>
       </div>
@@ -394,7 +391,7 @@ export function FlowMapView({ completeness }: FlowMapViewProps) {
         </>
       )}
 
-      {section === "routing" && <ScriptRoutingView identityLiteRaw={identityLiteRaw} />}
+      {section === "routing" && <ScriptRoutingView identityLiteRaw={identityLiteModularRaw} />}
 
       {section === "strategy" && <StrategyTreeView />}
 

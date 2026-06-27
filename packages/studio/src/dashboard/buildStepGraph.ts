@@ -1,15 +1,16 @@
 // Derive a FlowGraph or StepGraph from a survey flow source or the step manifest.
 //
-// Three entry points:
-//   buildFlowGraph(raw, title)         — legacy parseFlow path (Phase A / F /
-//                                        identity-lite); no behavior change.
-//   buildModularFlowGraph(raw, title)  — modular Phase B path; resolves through
-//                                        loadModularFlow + phaseBRegistry so the
-//                                        map matches the live runtime exactly.
-//   buildManifestStepGraph()           — T031/C8: one node per steps/manifest.ts
-//                                        entry; node set == runtime step set.
+// Two entry points:
+//   buildModularFlowGraph(raw, title, registry) — modular path; resolves through
+//                                                  loadModularFlow so the map
+//                                                  matches the live runtime exactly.
+//                                                  The caller supplies the registry
+//                                                  for computing reserve nodes.
+//   buildManifestStepGraph()                     — T031/C8: one node per
+//                                                  steps/manifest.ts entry; node
+//                                                  set == runtime step set.
 //
-// buildFlowGraph and buildModularFlowGraph delegate to the loader-agnostic core
+// buildModularFlowGraph delegates to the loader-agnostic core
 // buildGraphFromQuestions().
 //
 // Edge extraction mirrors SurveyRunner.resolveNext(): a `next` of a plain string
@@ -18,9 +19,7 @@
 // labelled "(else)"). A goto of `null` is a terminal branch and produces no edge.
 // A goto target absent from the known id set is flagged as dangling (not dropped).
 
-import { parseFlow } from "../survey/loadFlow.ts";
 import { loadModularFlow } from "../survey/loadModularFlow.ts";
-import { phaseBRegistry } from "../survey/questions/registry.b.ts";
 import type { FlowDef, FlowQuestion, QuestionModule } from "../survey/types.ts";
 import type { FlowGraph, GraphEdge, GraphNode, NodeKind, StepGraph, StepGraphEdge, StepGraphNode } from "./model.ts";
 import { ruleTarget } from "./flowUtils.ts";
@@ -144,27 +143,18 @@ export function buildGraphFromQuestions(
 }
 
 /**
- * Build a normalized FlowGraph from a `?raw` flow YAML string via the legacy
- * parseFlow loader. Used for Phase A / F / identity-lite — no behavior change.
- *
- * @param raw   the YAML source (Vite `?raw` import)
- * @param title friendly section title for the map
- */
-export function buildFlowGraph(raw: string, title: string): FlowGraph {
-  const flow = parseFlow(raw);
-  return buildGraphFromQuestions(flow, title);
-}
-
-/**
  * Compute reserve nodes: registry modules that are not referenced by the live
  * manifest. These carry kind "library-not-in-flow" and region "not-yet-ordered"
  * because they are NOT part of the ordered live spine.
  */
 function computeReserveNodes(
   flow: FlowDef,
-  registry: Record<string, QuestionModule>,
+  registry: Readonly<Record<string, QuestionModule>>,
 ): GraphNode[] {
-  const liveIds = new Set(flow.questions.map((q) => q.id));
+  const liveIds = new Set([
+    ...flow.questions.map((q) => q.id),
+    ...(flow.provenance_questions ?? []).map((q) => q.id),
+  ]);
   const reserveIds = Object.keys(registry).filter((id) => !liveIds.has(id));
   return reserveIds.flatMap((id) => {
     const mod = registry[id];
@@ -192,23 +182,28 @@ function computeReserveNodes(
 }
 
 /**
- * Build a normalized FlowGraph from a Phase B thin modular YAML string.
+ * Build a normalized FlowGraph from a thin modular YAML string.
  *
- * Resolves questions through loadModularFlow (which uses the live registry).
- * Reserve modules — registered in phaseBRegistry but absent from the manifest —
- * are appended as "library-not-in-flow" nodes so the reserve set is visible
- * without claiming to be live.
+ * Resolves questions through loadModularFlow (which uses the live consolidated
+ * registry). Reserve modules — registered in the supplied registry but absent
+ * from the manifest — are appended as "library-not-in-flow" nodes so the
+ * reserve set is visible without claiming to be live.
  *
  * Throws (propagates loadModularFlow's error) if the manifest is empty,
  * unparseable, or references an unknown id. The caller is responsible for
  * surfacing the error rather than falling back to the legacy YAML.
  *
- * @param raw   the thin modular YAML source (Vite `?raw` import)
- * @param title friendly section title for the map
+ * @param raw      the thin modular YAML source (Vite `?raw` import)
+ * @param title    friendly section title for the map
+ * @param registry the phase-appropriate registry for computing reserve nodes
  */
-export function buildModularFlowGraph(raw: string, title: string): FlowGraph {
+export function buildModularFlowGraph(
+  raw: string,
+  title: string,
+  registry: Readonly<Record<string, QuestionModule>>,
+): FlowGraph {
   const flow = loadModularFlow(raw);
-  const reserveNodes = computeReserveNodes(flow, phaseBRegistry);
+  const reserveNodes = computeReserveNodes(flow, registry);
   return buildGraphFromQuestions(flow, title, { extraNodes: reserveNodes });
 }
 
@@ -223,8 +218,8 @@ export function buildModularFlowGraph(raw: string, title: string): FlowGraph {
 // Boundary: this function imports manifest from ../steps/manifest.ts.
 // dashboard/ -> steps/ is allowed by the dashboard-layer depcruise rule.
 // dashboard/ -> survey/ is NOT imported here; survey data is accessed through
-// the existing buildFlowGraph/buildModularFlowGraph functions above (which
-// are preserved from P3 to continue rendering the flow-level question graph).
+// the existing buildModularFlowGraph function above (which is preserved from P3
+// to continue rendering the flow-level question graph).
 // ---------------------------------------------------------------------------
 
 /**
