@@ -15,8 +15,8 @@
 // Comparison key: formatIRPath(path) — stable dot-bracket display string.
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { fileURLToPath, URL } from "node:url";
+import { readFileSync, readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { formatIRPath, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 import { parseThinYaml } from "../../src/survey/loadModularFlow.ts";
@@ -32,8 +32,8 @@ const repoRoot = path.resolve(pkgRoot, "../..");
 const flowsDir = path.join(repoRoot, "content", "flows");
 
 // ---------------------------------------------------------------------------
-// Load the three modular manifests in phase order A -> B -> F
-// using the canonical validated parser from loadModularFlow.ts.
+// Discover all *.modular.yaml files in content/flows/ via readdirSync.
+// Load them using the canonical validated parser from loadModularFlow.ts.
 // ---------------------------------------------------------------------------
 
 function loadManifest(filename: string) {
@@ -41,9 +41,11 @@ function loadManifest(filename: string) {
   return parseThinYaml(raw);
 }
 
-const manifestA = loadManifest("phase_a_identity.modular.yaml");
-const manifestB = loadManifest("phase_b_characters.modular.yaml");
-const manifestF = loadManifest("phase_f_helpdocs.modular.yaml");
+// All .modular.yaml filenames found in the flows directory — automatically
+// includes any future additions without requiring a manual edit here.
+const allModularFilenames = readdirSync(flowsDir).filter((f) =>
+  f.endsWith(".modular.yaml"),
+);
 
 // All question IDs referenced by any manifest, in phase order.
 // provenance_questions are part of phase A flow and run after main questions.
@@ -55,11 +57,36 @@ function allIds(manifest: ReturnType<typeof parseThinYaml>): string[] {
   return ids;
 }
 
-const phaseOrder: Array<{ phase: string; ids: string[] }> = [
-  { phase: "A", ids: allIds(manifestA) },
-  { phase: "B", ids: allIds(manifestB) },
-  { phase: "F", ids: allIds(manifestF) },
+// Known phase-ordered manifests (A before B before F) — ordering matters for
+// the orphan analysis because a producer must precede its consumer.
+// Any .modular.yaml file not in this list is appended at the end with its
+// filename as the phase label, ensuring future additions are never silently
+// skipped by this lint.
+const KNOWN_PHASE_ORDER: Array<{ phase: string; filename: string }> = [
+  { phase: "A", filename: "phase_a_identity.modular.yaml" },
+  { phase: "B", filename: "phase_b_characters.modular.yaml" },
+  { phase: "F", filename: "phase_f_helpdocs.modular.yaml" },
+  // identity_lite is the short hybrid head (spec §8); its 5 il_* modules
+  // all declare empty inputs/writes so they trivially pass the orphan lint.
+  { phase: "A (identity-lite)", filename: "identity_lite.modular.yaml" },
 ];
+
+const knownFilenames = new Set(KNOWN_PHASE_ORDER.map((e) => e.filename));
+
+// Build the final ordered list: known phases first (in spec order), then any
+// newly discovered files appended alphabetically so they are linted and not
+// silently exempt.
+const orderedEntries: Array<{ phase: string; filename: string }> = [
+  ...KNOWN_PHASE_ORDER,
+  ...allModularFilenames
+    .filter((f) => !knownFilenames.has(f))
+    .sort()
+    .map((f) => ({ phase: f, filename: f })),
+];
+
+const phaseOrder: Array<{ phase: string; ids: string[] }> = orderedEntries.map(
+  ({ phase, filename }) => ({ phase, ids: allIds(loadManifest(filename)) }),
+);
 
 // Build the set of all manifested IDs for exemption check.
 const manifestedIds = new Set<string>(
@@ -138,9 +165,19 @@ function analyzeOrphans(
 
 describe("orphan-input lint — every manifested input has a prior producer", () => {
   it("manifests loaded successfully (sanity)", () => {
-    expect(manifestA.questions.length).toBeGreaterThan(0);
-    expect(manifestB.questions.length).toBeGreaterThan(0);
-    expect(manifestF.questions.length).toBeGreaterThan(0);
+    // Every discovered .modular.yaml must have at least one question.
+    // This catches empty or unloadable manifests early.
+    for (const { phase, ids } of phaseOrder) {
+      expect(
+        ids.length,
+        `Manifest for phase '${phase}' has no questions — empty or failed to load`,
+      ).toBeGreaterThan(0);
+    }
+    // Confirm all four currently-known manifests are present.
+    expect(
+      allModularFilenames,
+      "Expected at least 4 .modular.yaml files in content/flows/",
+    ).toSatisfy((files: string[]) => files.length >= 4);
   });
 
   it("questionRegistry covers all manifested questions (sanity)", () => {

@@ -1,0 +1,18 @@
+# Identity-lite modular flow descriptor.
+#
+# Thin manifest: question definitions live in
+#   packages/studio/src/survey/questions/a/il_*.ts
+# consumed by loadModularFlow.ts once all il_* modules are registered.
+#
+# Do NOT delete identity_lite.yaml until part (b) of the modular-loader cutover
+# (FR-013) — it remains the legacy comparison baseline during the fan-out period.
+
+flow_id: identity_lite
+phase: "A"
+
+questions:
+  - il_language_autonym
+  - il_language_english
+  - il_language_code
+  - il_target_script
+  - il_script_not_supported

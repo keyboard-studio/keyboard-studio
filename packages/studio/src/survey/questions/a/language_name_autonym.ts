@@ -14,7 +14,7 @@ export const definition = {
   prompt: "What is your language called in your own language?",
   help_text:
     "Type the name your community uses for the language, using your own " +
-    "spelling and characters. For example: Faʼ, Kiswahili, हिन्दी. " +
+    "spelling and characters. For example: Fà', Kiswahili, हिन्दी. " +
     "This name will appear on the keyboard package exactly as you write it.",
   type: "text" as const,
   required: true,
