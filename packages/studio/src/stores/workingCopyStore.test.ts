@@ -16,11 +16,12 @@
 // focuses on the Phase-2 / instantiation surface.
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { useWorkingCopyStore } from "./workingCopyStore.ts";
+import { useWorkingCopyStore, bindManifest } from "./workingCopyStore.ts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
-import { createVirtualFS } from "@keyboard-studio/contracts";
+import { createVirtualFS, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 import type { RemovalCapability, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { Step, EditorStep } from "../steps/types.ts";
 
 // ---------------------------------------------------------------------------
 // Reset helpers — clear all state between tests.
@@ -639,43 +640,99 @@ describe("workingCopyStore — cross-adapter isolation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// T041 — staleness slice tests
+// T041 — staleness slice tests (P0-3 review fix: bind a real manifest fixture,
+// exercise true transitive closure, prove clearStale clears downstream)
 // ---------------------------------------------------------------------------
 
+// Fixture manifest with writes→inputs chains:
+//   step_u writes PATH_GROUPS → step_d reads PATH_GROUPS (writes PATH_BCP47)
+//                             → step_dd reads PATH_BCP47
+// So: markStale("step_u") → stale = { step_u, step_d, step_dd } (2-edge closure).
+//     clearStale("step_u") → stale = {} (downstream also cleared).
+const PATH_GROUPS_FIXTURE = irPath("groups", ARRAY_INDEX);
+const PATH_BCP47_FIXTURE = irPath("header", "bcp47");
+
+function makeEditorStep(id: string, writes: typeof PATH_GROUPS_FIXTURE[], inputs: typeof PATH_GROUPS_FIXTURE[]): EditorStep {
+  return {
+    kind: "editor-step",
+    id,
+    title: id,
+    spine: true,
+    component: (() => null) as EditorStep["component"],
+    inputs,
+    writes,
+  };
+}
+
+const FIXTURE_MANIFEST: readonly Step[] = [
+  makeEditorStep("step_u", [PATH_GROUPS_FIXTURE], []),          // upstream: writes groups
+  makeEditorStep("step_d", [PATH_BCP47_FIXTURE], [PATH_GROUPS_FIXTURE]), // mid: reads groups, writes bcp47
+  makeEditorStep("step_dd", [], [PATH_BCP47_FIXTURE]),           // downstream: reads bcp47
+];
+
 describe("workingCopyStore — staleness slice (T041)", () => {
+  // Bind a real fixture manifest before each test so markStale exercises true
+  // transitive closure (not a vacuous echo of the seed set).
+  beforeEach(() => {
+    bindManifest(FIXTURE_MANIFEST);
+  });
+
   it("default: staleSteps is empty (fresh session)", () => {
     expect(useWorkingCopyStore.getState().staleSteps.size).toBe(0);
   });
 
   it("markStale: adds the reopened step to staleSteps", () => {
-    useWorkingCopyStore.getState().markStale("identity");
+    useWorkingCopyStore.getState().markStale("step_u");
+    expect(useWorkingCopyStore.getState().staleSteps.has("step_u")).toBe(true);
+  });
+
+  it("markStale: 2-edge transitive closure — step_dd goes stale when step_u is reopened", () => {
+    // This test exercises the REAL fixpoint, not the seed echo.
+    // With FIXTURE_MANIFEST: step_u → step_d → step_dd.
+    // Reopening step_u must propagate all the way to step_dd (2 hops).
+    useWorkingCopyStore.getState().markStale("step_u");
     const stale = useWorkingCopyStore.getState().staleSteps;
-    expect(stale.has("identity")).toBe(true);
+    expect(stale.has("step_u")).toBe(true);   // root
+    expect(stale.has("step_d")).toBe(true);   // 1 hop
+    expect(stale.has("step_dd")).toBe(true);  // 2 hops — fixpoint required
   });
 
-  it("markStale: includes the reopened step in the transitive closure", () => {
-    // Re-opening any step includes it in the stale set.
-    useWorkingCopyStore.getState().markStale("choose_base");
+  it("clearStale: clears root AND downstream — ghost-stale fix (P0-2)", () => {
+    // Reopen step_u → step_d and step_dd go stale.
+    useWorkingCopyStore.getState().markStale("step_u");
+    expect(useWorkingCopyStore.getState().staleSteps.has("step_dd")).toBe(true);
+
+    // Clear step_u → closure recomputed from empty roots → step_d and step_dd
+    // are no longer stale (they were only stale because of step_u).
+    useWorkingCopyStore.getState().clearStale("step_u");
     const stale = useWorkingCopyStore.getState().staleSteps;
-    expect(stale.has("choose_base")).toBe(true);
+    expect(stale.has("step_u")).toBe(false);   // cleared root
+    expect(stale.has("step_d")).toBe(false);   // downstream cleared too
+    expect(stale.has("step_dd")).toBe(false);  // 2-hop downstream cleared too
   });
 
-  it("clearStale: removes the step from staleSteps", () => {
-    useWorkingCopyStore.getState().markStale("identity");
-    expect(useWorkingCopyStore.getState().staleSteps.has("identity")).toBe(true);
+  it("clearStale: removing one root leaves the other root's closure intact", () => {
+    useWorkingCopyStore.getState().markStale("step_u");
+    useWorkingCopyStore.getState().markStale("step_d");
+    // Both step_u and step_d are roots; step_dd is downstream of both.
+    expect(useWorkingCopyStore.getState().staleSteps.has("step_dd")).toBe(true);
 
-    useWorkingCopyStore.getState().clearStale("identity");
-    expect(useWorkingCopyStore.getState().staleSteps.has("identity")).toBe(false);
+    // Clear step_u — but step_d is still a root, so step_dd stays stale.
+    useWorkingCopyStore.getState().clearStale("step_u");
+    const stale = useWorkingCopyStore.getState().staleSteps;
+    expect(stale.has("step_u")).toBe(false);  // root removed
+    expect(stale.has("step_d")).toBe(true);   // still a root
+    expect(stale.has("step_dd")).toBe(true);  // still downstream of step_d
   });
 
-  it("clearStale: staleSteps is empty after clearing the only stale step", () => {
-    useWorkingCopyStore.getState().markStale("track");
-    useWorkingCopyStore.getState().clearStale("track");
+  it("clearStale: staleSteps is empty after clearing the only stale root", () => {
+    useWorkingCopyStore.getState().markStale("step_u");
+    useWorkingCopyStore.getState().clearStale("step_u");
     expect(useWorkingCopyStore.getState().staleSteps.size).toBe(0);
   });
 
   it("reset: clears staleSteps back to empty", () => {
-    useWorkingCopyStore.getState().markStale("identity");
+    useWorkingCopyStore.getState().markStale("step_u");
     expect(useWorkingCopyStore.getState().staleSteps.size).toBeGreaterThan(0);
 
     useWorkingCopyStore.getState().reset();
@@ -683,18 +740,35 @@ describe("workingCopyStore — staleness slice (T041)", () => {
   });
 
   it("multiple markStale calls accumulate (staleSteps grows)", () => {
-    useWorkingCopyStore.getState().markStale("identity");
-    useWorkingCopyStore.getState().markStale("track");
+    useWorkingCopyStore.getState().markStale("step_u");
+    useWorkingCopyStore.getState().markStale("step_d");
     const stale = useWorkingCopyStore.getState().staleSteps;
-    expect(stale.has("identity")).toBe(true);
-    expect(stale.has("track")).toBe(true);
+    expect(stale.has("step_u")).toBe(true);
+    expect(stale.has("step_d")).toBe(true);
   });
 
   it("clearStale of a non-stale step is a no-op (no error)", () => {
-    // No stale steps to start with.
     expect(useWorkingCopyStore.getState().staleSteps.size).toBe(0);
-    // Clearing a non-stale step should not throw and should keep the set empty.
-    useWorkingCopyStore.getState().clearStale("identity");
+    // Clearing a non-stale step must not throw.
+    expect(() => useWorkingCopyStore.getState().clearStale("step_u")).not.toThrow();
     expect(useWorkingCopyStore.getState().staleSteps.size).toBe(0);
+  });
+
+  it("bind guard: markStale throws if manifest is empty (not yet bound)", () => {
+    // Temporarily bind an empty manifest to trip the guard.
+    bindManifest([]);
+    expect(() => useWorkingCopyStore.getState().markStale("step_u")).toThrow(
+      "[workingCopyStore] bindManifest() must be called before markStale",
+    );
+    // Restore fixture for subsequent tests (beforeEach will also restore).
+    bindManifest(FIXTURE_MANIFEST);
+  });
+
+  it("bind guard: clearStale throws if manifest is empty (not yet bound)", () => {
+    bindManifest([]);
+    expect(() => useWorkingCopyStore.getState().clearStale("step_u")).toThrow(
+      "[workingCopyStore] bindManifest() must be called before clearStale",
+    );
+    bindManifest(FIXTURE_MANIFEST);
   });
 });

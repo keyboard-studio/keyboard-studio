@@ -25,6 +25,7 @@ import type { FlowDef, FlowQuestion, QuestionModule } from "../survey/types.ts";
 import type { FlowGraph, GraphEdge, GraphNode, NodeKind, StepGraph, StepGraphEdge, StepGraphNode } from "./model.ts";
 import { ruleTarget } from "./flowUtils.ts";
 import { manifest } from "../steps/manifest.ts";
+import { formatIRPath } from "@keyboard-studio/contracts";
 
 /**
  * Permissive view of a goto rule as actually authored in the flow YAML. The
@@ -240,6 +241,8 @@ export function buildModularFlowGraph(raw: string, title: string): FlowGraph {
  */
 export function buildManifestStepGraph(): StepGraph {
   const nodes: StepGraphNode[] = manifest.map((step, idx) => {
+    const writePaths = step.writes.map(formatIRPath);
+    const inputPaths = step.inputs.map(formatIRPath);
     const node: StepGraphNode = {
       id: step.id,
       label: step.title,
@@ -247,6 +250,8 @@ export function buildManifestStepGraph(): StepGraph {
       spine: step.spine === true,
       isEntry: idx === 0,
       isTerminal: idx === manifest.length - 1,
+      writePaths,
+      inputPaths,
     };
     // exactOptionalPropertyTypes: only assign optional fields when they have a value.
     if (step.lock !== undefined) node.lock = step.lock;
@@ -292,5 +297,22 @@ export function buildManifestStepGraph(): StepGraph {
     }
   }
 
-  return { nodes, edges };
+  // Data edges: from producer → consumer where producer.writePaths ∩ consumer.inputPaths ≠ ∅.
+  // These power C1 (staleness fixpoint), C2 (cycle detection), C5 (orphan inputs).
+  const dataEdges: StepGraphEdge[] = [];
+  for (const producer of nodes) {
+    if (producer.writePaths.length === 0) continue;
+    const writeSet = new Set(producer.writePaths);
+    for (const consumer of nodes) {
+      if (consumer.id === producer.id) continue;
+      for (const inputPath of consumer.inputPaths) {
+        if (writeSet.has(inputPath)) {
+          dataEdges.push({ from: producer.id, to: consumer.id, kind: "spine" }); // kind reused; data edges have no order-kind
+          break; // one data edge per (producer, consumer) pair
+        }
+      }
+    }
+  }
+
+  return { nodes, edges, dataEdges };
 }

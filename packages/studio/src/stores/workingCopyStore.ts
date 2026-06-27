@@ -44,6 +44,17 @@ import type { Step } from "../steps/types.ts";
 let _manifest: readonly Step[] = [];
 
 /**
+ * @internal — the ROOTS of the re-opened set. Distinct from `staleSteps` (the derived
+ * closure). markStale adds to this set; clearStale removes from it; both then recompute
+ * the closure. This separation prevents ghost-stale: clearing a root correctly removes
+ * its downstream dependents from staleSteps (since the closure is recomputed from the
+ * remaining roots, not from the prior closure).
+ *
+ * Reset on reset() / instantiateFromBase() / instantiateFromExisting().
+ */
+let _reopenedRoots: Set<string> = new Set();
+
+/**
  * Bind the live manifest to the staleness actions in this store.
  *
  * Must be called once before `markStale` or `clearStale` is used.
@@ -545,7 +556,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       galleryIntrosSeen: { ...s.galleryIntrosSeen, [gallery]: true },
     })),
 
-  reset: () =>
+  reset: () => {
+    // Clear the module-level re-opened roots so clearStale after reset is correct.
+    _reopenedRoots = new Set();
     set({
       ...INITIAL_STATE,
       // Re-initialize mutable objects so mutations do not bleed across resets.
@@ -556,7 +569,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       staleSteps: new Set<string>(),
       // instantiationMode is null in INITIAL_STATE; explicit for clarity.
       instantiationMode: null,
-    }),
+    });
+  },
 
   // -- Instantiation actions (spec §8 v1.3.0) ----------------------------------
 
@@ -575,6 +589,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     }
 
     // Track 1: new keyboard from base — identity RESET, edit layers cleared.
+    _reopenedRoots = new Set(); // reset staleness roots for the new session
     set({
       instantiationMode: "new-from-base",
       baseKeyboard: base,
@@ -600,7 +615,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     });
   },
 
-  instantiateFromExisting: (keyboard, { vfs, ir, removalCapabilities }) =>
+  instantiateFromExisting: (keyboard, { vfs, ir, removalCapabilities }) => {
+    _reopenedRoots = new Set(); // reset staleness roots for the new session
     // Track 2: adapt existing keyboard — identity PRESERVED from loaded keyboard.
     set({
       instantiationMode: "adapt-existing",
@@ -630,7 +646,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       touchDraft: null,
       galleryIntrosSeen: { mechanism: false, touch: false },
       staleSteps: new Set<string>(),
-    }),
+    });
+  },
 
   setIdentity: (patch) =>
     set({ identity: patch }),
@@ -640,27 +657,29 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // -- Staleness actions (US3, T040) -------------------------------------------
 
   markStale: (reopenedId) => {
-    // Add the re-opened step to the re-opened set (persisted as staleSteps tracks
-    // the CURRENT closure, so we need to extract the prior re-opened set).
-    // We re-open this step + any already-stale steps, then recompute the closure.
-    // This ensures the closure is always the fixpoint over ALL re-opened steps.
-    const currentStale = get().staleSteps;
-    // The re-opened set is `currentStale` (prior closure) + the new step.
-    // We recompute as: new closure = fixpoint({ reopenedId } ∪ currentStale).
-    const reopened = new Set([...currentStale, reopenedId]);
-    const staleSteps = computeStalenessFromManifest(_manifest, reopened);
+    // Guard: fail loud if the manifest has not been bound yet.
+    if (_manifest.length === 0) {
+      throw new Error("[workingCopyStore] bindManifest() must be called before markStale");
+    }
+    // Add the reopened step to the ROOT set (NOT the derived closure).
+    // The root set is the seed; the closure is derived from it.
+    // Using the root set prevents ghost-stale: downstream steps that were
+    // only stale because of a root can be correctly cleared by clearStale.
+    _reopenedRoots = new Set([..._reopenedRoots, reopenedId]);
+    const staleSteps = computeStalenessFromManifest(_manifest, _reopenedRoots);
     set({ staleSteps });
   },
 
   clearStale: (stepId) => {
-    // Remove this step from the stale set and recompute the closure from the
-    // remaining stale steps. This correctly handles the case where a step is
-    // only stale because of the cleared step — its dependents may no longer be
-    // stale once the cleared step is removed.
-    const currentStale = get().staleSteps;
-    const remaining = new Set([...currentStale].filter((id) => id !== stepId));
-    // Recompute: the remaining set is the new "re-opened" seed for the closure.
-    const staleSteps = computeStalenessFromManifest(_manifest, remaining);
+    // Guard: fail loud if the manifest has not been bound yet.
+    if (_manifest.length === 0) {
+      throw new Error("[workingCopyStore] bindManifest() must be called before clearStale");
+    }
+    // Remove from the ROOT set, then recompute the closure from remaining roots.
+    // This correctly removes downstream-stale steps that were only stale because
+    // of the cleared root (ghost-stale fix — P0-2).
+    _reopenedRoots = new Set([..._reopenedRoots].filter((id) => id !== stepId));
+    const staleSteps = computeStalenessFromManifest(_manifest, _reopenedRoots);
     set({ staleSteps });
   },
 }));

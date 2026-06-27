@@ -11,7 +11,7 @@ dependency-cruiser rules are architectural contracts ("fitness functions") in th
 | `ui-is-a-leaf` *(exists, P1 — keep green)* | `studio/src/ui/` | `studio/src/(survey\|steps\|stores)/` | P1 leaf. |
 | `editors-no-dashboard` | `studio/src/editors/` | `studio/src/dashboard/` | Forbid `editors/ → dashboard/`. `editors/ → stores/` and `editors/ → lib/` are allowed (FR-007 — galleries bind `workingCopyStore`, `irToCarveNodes`, `buildTouchLayoutJson`). Name reflects what is forbidden, not what is allowed (the allow is implicit). |
 | `steps-layer` | `studio/src/steps/` | edges other than `survey/` (registry), `editors/`, `contracts`, `ui/` | `steps/` orchestrates; it may read the registry + editor components. |
-| `dashboard-layer` | `studio/src/dashboard/` | edges other than `steps/`, `contracts`, `ui/` | Dashboard reads the manifest + survey/IR types + chrome (§8 correction: contracts + ui, not steps alone). |
+| `dashboard-layer` | `studio/src/dashboard/` | `studio/src/editors/` and `studio/src/stores/` (forbidden). `steps/`, `survey/`, `contracts`, `ui/` are **allowed**. | Dashboard reads the manifest (`steps/`) and survey flow structures (`survey/` — for `buildFlowGraph`/`buildScriptRouting` in the FlowMap tab). `dashboard/ → editors/` and `dashboard/ → stores/` remain forbidden. |
 
 ## Guarantees (testable — `pnpm depcruise`)
 

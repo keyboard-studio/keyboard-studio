@@ -133,6 +133,16 @@ export interface StepGraphNode {
   isEntry: boolean;
   /** True for the last step in the manifest. */
   isTerminal: boolean;
+  /**
+   * Formatted IRPath strings this step writes (from Step.writes).
+   * Used by completeness checks (C1, C2, C5) operating on the StepGraph.
+   */
+  writePaths: readonly string[];
+  /**
+   * Formatted IRPath strings this step reads (from Step.inputs).
+   * Used by completeness checks (C1, C2, C5) operating on the StepGraph.
+   */
+  inputPaths: readonly string[];
 }
 
 /** A directed edge between two manifest steps. */
@@ -150,11 +160,17 @@ export interface StepGraphEdge {
 /**
  * A complete, normalized manifest step graph (T031, C8/FR-010).
  * One node per manifest step; edges represent the spine order + fork/join
- * edges for off-spine steps.
+ * edges for off-spine steps, plus data-dependency edges from writes→inputs.
  */
 export interface StepGraph {
   /** All manifest steps as nodes, in manifest array order. */
   nodes: readonly StepGraphNode[];
-  /** Directed edges: spine progression + fork/join side trails. */
+  /** Directed order edges: spine progression + fork/join side trails. */
   edges: readonly StepGraphEdge[];
+  /**
+   * Directed data edges: from producer step to consumer step, where producer.writes
+   * contains an IRPath matching an IRPath in consumer.inputs. Used by C1/C2/C5
+   * completeness checks (staleness fixpoint, cycle detection, orphan inputs).
+   */
+  dataEdges: readonly StepGraphEdge[];
 }

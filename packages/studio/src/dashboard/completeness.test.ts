@@ -14,6 +14,11 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  // CONTRACT-NAMED functions (complete, no stubs):
+  computeStaleness,
+  findCycles,
+  checkInputsSatisfiable,
+  // Internal helpers (exported for unit tests with crafted graphs):
   computeStalenessFromAdj,
   computeStalenessFromManifest,
   findCyclesFromAdj,
@@ -25,9 +30,11 @@ import {
   runCompleteness,
 } from "./completeness.ts";
 import type { WcForCompleteness } from "./completeness.ts";
+import { buildManifestStepGraph } from "./buildStepGraph.ts";
+import type { StepGraph } from "./model.ts";
 import { manifest } from "../steps/manifest.ts";
 import type { Step, EditorStep } from "../steps/types.ts";
-import { irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
+import { irPath, ARRAY_INDEX, formatIRPath } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -70,8 +77,45 @@ function makeOffSpineStep(id: string, joinTarget: string, writes: typeof PATH_GR
 /** A clean wc state (no locks applied). */
 const WC_CLEAN: WcForCompleteness = { desktopLocked: false, touchLayoutJson: null };
 
+/**
+ * Build a minimal StepGraph from a crafted Step[] for testing contract-named
+ * functions (computeStaleness, findCycles, checkInputsSatisfiable).
+ *
+ * Mirrors the logic in completeness.ts buildMinimalStepGraph — inline here so
+ * tests don't depend on a private function.
+ */
+function makeStepGraph(steps: readonly Step[]): StepGraph {
+  const nodes = steps.map((step, idx) => ({
+    id: step.id,
+    label: step.title,
+    type: step.kind as "editor-step" | "question-step",
+    spine: step.spine === true,
+    isEntry: idx === 0,
+    isTerminal: idx === steps.length - 1,
+    writePaths: step.writes.map(formatIRPath),
+    inputPaths: step.inputs.map(formatIRPath),
+    ...(step.lock !== undefined ? { lock: step.lock } : {}),
+    ...(step.joinTarget !== undefined ? { joinTarget: step.joinTarget } : {}),
+  }));
+  const dataEdges: StepGraph["dataEdges"] = [];
+  for (const producer of nodes) {
+    if (producer.writePaths.length === 0) continue;
+    const writeSet = new Set(producer.writePaths);
+    for (const consumer of nodes) {
+      if (consumer.id === producer.id) continue;
+      for (const inputPath of consumer.inputPaths) {
+        if (writeSet.has(inputPath)) {
+          dataEdges.push({ from: producer.id, to: consumer.id, kind: "spine" });
+          break;
+        }
+      }
+    }
+  }
+  return { nodes, edges: [], dataEdges };
+}
+
 /** A wc state with both locks applied. */
-const WC_BOTH_LOCKED: WcForCompleteness = { desktopLocked: true, touchLayoutJson: "{}}" };
+const WC_BOTH_LOCKED: WcForCompleteness = { desktopLocked: true, touchLayoutJson: "{}" };
 
 // ---------------------------------------------------------------------------
 // C1 — transitive staleness to a fixpoint
@@ -448,5 +492,102 @@ describe("C7 — findUnreachable: step not reachable from spine entry is surface
     ];
     const report = runCompleteness(mfest, WC_CLEAN);
     expect(report.unreachable).toContain("ghost");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Contract-named function tests — prove exported functions are NOT stubs
+// (coordinator review fix P0-1: every exported contract name must do real work)
+// ---------------------------------------------------------------------------
+
+describe("CONTRACT-NAMED: computeStaleness(graph, reopened) — real fixpoint, not stub", () => {
+  // 3-step chain: A writes PATH_GROUPS → B reads it (writes PATH_BCP47) → C reads PATH_BCP47
+  const mfest: readonly Step[] = [
+    makeSpineStep("A", [PATH_GROUPS], []),
+    makeSpineStep("B", [PATH_BCP47], [PATH_GROUPS]),
+    makeSpineStep("C", [], [PATH_BCP47]),
+  ];
+  const graph = makeStepGraph(mfest);
+
+  it("2-edge-distant step C is stale when A is reopened (real fixpoint)", () => {
+    const stale = computeStaleness(graph, new Set(["A"]));
+    expect(stale.has("A")).toBe(true);   // root
+    expect(stale.has("B")).toBe(true);   // 1 hop
+    expect(stale.has("C")).toBe(true);   // 2 hops — requires fixpoint
+  });
+
+  it("empty reopened → empty stale", () => {
+    const stale = computeStaleness(graph, new Set());
+    expect(stale.size).toBe(0);
+  });
+
+  it("reopening B propagates to C but not A", () => {
+    const stale = computeStaleness(graph, new Set(["B"]));
+    expect(stale.has("A")).toBe(false);
+    expect(stale.has("B")).toBe(true);
+    expect(stale.has("C")).toBe(true);
+  });
+
+  it("real manifest graph: computeStaleness with no reopened is empty", () => {
+    const realGraph = buildManifestStepGraph();
+    const stale = computeStaleness(realGraph, new Set());
+    expect(stale.size).toBe(0);
+  });
+});
+
+describe("CONTRACT-NAMED: findCycles(graph) — data-graph cycle detection, not stub", () => {
+  it("A→B→A data cycle is detected", () => {
+    const mfest: readonly Step[] = [
+      makeSpineStep("A", [PATH_GROUPS], [PATH_BCP47]),  // writes groups, reads bcp47
+      makeSpineStep("B", [PATH_BCP47], [PATH_GROUPS]),  // writes bcp47, reads groups → cycle
+    ];
+    const graph = makeStepGraph(mfest);
+    const cycles = findCycles(graph);
+    expect(cycles.length).toBeGreaterThan(0);
+    const flat = cycles.flat();
+    expect(flat).toContain("A");
+    expect(flat).toContain("B");
+  });
+
+  it("A→B linear (no cycle) returns empty", () => {
+    const mfest: readonly Step[] = [
+      makeSpineStep("A", [PATH_GROUPS], []),
+      makeSpineStep("B", [], [PATH_GROUPS]),
+    ];
+    const graph = makeStepGraph(mfest);
+    expect(findCycles(graph)).toEqual([]);
+  });
+
+  it("real manifest graph: findCycles returns empty (acyclic)", () => {
+    const realGraph = buildManifestStepGraph();
+    expect(findCycles(realGraph)).toEqual([]);
+  });
+});
+
+describe("CONTRACT-NAMED: checkInputsSatisfiable(graph) — orphan detection, not stub", () => {
+  it("orphan input (no upstream writer) is flagged", () => {
+    const mfest: readonly Step[] = [
+      makeSpineStep("producer", [], []),          // writes nothing
+      makeSpineStep("consumer", [], [PATH_GROUPS]), // reads PATH_GROUPS — orphan
+    ];
+    const graph = makeStepGraph(mfest);
+    const orphans = checkInputsSatisfiable(graph);
+    expect(orphans.some((o) => o.stepId === "consumer")).toBe(true);
+  });
+
+  it("satisfied input (upstream writer exists) is NOT flagged", () => {
+    const mfest: readonly Step[] = [
+      makeSpineStep("producer", [PATH_GROUPS], []),
+      makeSpineStep("consumer", [], [PATH_GROUPS]),
+    ];
+    const graph = makeStepGraph(mfest);
+    const orphans = checkInputsSatisfiable(graph);
+    expect(orphans.some((o) => o.stepId === "consumer")).toBe(false);
+  });
+
+  it("real manifest graph: checkInputsSatisfiable returns no orphans (all steps have empty inputs)", () => {
+    const realGraph = buildManifestStepGraph();
+    const orphans = checkInputsSatisfiable(realGraph);
+    expect(orphans).toEqual([]);
   });
 });
