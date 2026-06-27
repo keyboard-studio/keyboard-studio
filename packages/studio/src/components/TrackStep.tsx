@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import { Button, Card } from "../ui/index.ts";
 
 export type Track = "copy" | "adapt";
 
@@ -27,64 +28,6 @@ const SUBTLE: React.CSSProperties = {
   color: "#8b949e",
 };
 
-const CARD_BASE: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 6,
-  padding: "12px 16px",
-  background: "#161b22",
-  border: "1px solid #30363d",
-  borderRadius: 8,
-  color: "#e6edf3",
-  fontSize: 14,
-  cursor: "pointer",
-  textAlign: "left",
-  fontFamily: "inherit",
-  width: "100%",
-  boxSizing: "border-box" as const,
-  transition: "border-color 120ms ease, background 120ms ease",
-};
-
-const CARD_SELECTED: React.CSSProperties = {
-  ...CARD_BASE,
-  border: "1px solid #6ea8fe",
-  background: "#0d1f38",
-};
-
-const BACK_BTN: React.CSSProperties = {
-  marginTop: 20,
-  padding: "6px 14px",
-  background: "transparent",
-  border: "1px solid #30363d",
-  borderRadius: 6,
-  color: "#8b949e",
-  fontSize: 13,
-  cursor: "pointer",
-  fontFamily: "inherit",
-};
-
-const NEXT_BTN_DISABLED: React.CSSProperties = {
-  padding: "8px 18px",
-  background: "transparent",
-  border: "1px solid #30363d",
-  borderRadius: 6,
-  color: "#484f58",
-  fontSize: 13,
-  cursor: "not-allowed",
-  fontFamily: "inherit",
-};
-
-const NEXT_BTN_ENABLED: React.CSSProperties = {
-  padding: "8px 18px",
-  background: "#1f6feb",
-  border: "1px solid #1f6feb",
-  borderRadius: 6,
-  color: "#fff",
-  fontSize: 13,
-  cursor: "pointer",
-  fontFamily: "inherit",
-};
-
 export function TrackStep({ base, onNext, onBack }: TrackStepProps) {
   const [track, setTrack] = useState<Track | null>(null);
 
@@ -100,47 +43,44 @@ export function TrackStep({ base, onNext, onBack }: TrackStepProps) {
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
-        <button
-          type="button"
+        <Card
+          selected={track === "copy"}
           role="radio"
           aria-checked={track === "copy"}
           onClick={() => setTrack("copy")}
-          style={track === "copy" ? CARD_SELECTED : CARD_BASE}
         >
           <span style={{ fontWeight: 600, fontSize: 14 }}>Copy</span>
           <span style={{ fontSize: 12, color: "#8b949e" }}>
             Start a new keyboard based on this layout. You&apos;ll give it a new name and ID.
           </span>
-        </button>
+        </Card>
 
-        <button
-          type="button"
+        <Card
+          selected={track === "adapt"}
           role="radio"
           aria-checked={track === "adapt"}
           onClick={() => setTrack("adapt")}
-          style={track === "adapt" ? CARD_SELECTED : CARD_BASE}
         >
           <span style={{ fontWeight: 600, fontSize: 14 }}>Adapt</span>
           <span style={{ fontSize: 12, color: "#8b949e" }}>
             Modify this keyboard in place, keeping its name and ID.
           </span>
-        </button>
+        </Card>
       </div>
 
       <div style={{ display: "flex", gap: 10 }}>
-        <button
-          type="button"
+        <Button
+          variant="primary"
           disabled={track === null}
           onClick={handleNext}
-          style={track !== null ? NEXT_BTN_ENABLED : NEXT_BTN_DISABLED}
         >
           Next
-        </button>
+        </Button>
       </div>
 
-      <button type="button" onClick={onBack} style={BACK_BTN}>
+      <Button variant="back" onClick={onBack}>
         {"←"} Back
-      </button>
+      </Button>
     </div>
   );
 }
