@@ -179,3 +179,40 @@ describe("applyMutatePatch — M5 empty patch", () => {
     expect(result).toEqual(base);
   });
 });
+
+describe("applyMutatePatch — prototype-pollution hardening", () => {
+  it("ignores a __proto__ key smuggled in via JSON.parse (no prototype set, no containment trip)", () => {
+    const base = makeIR();
+    // JSON.parse produces an OWN-enumerable "__proto__" key (unlike a literal),
+    // so Object.keys sees it. The guard must skip it: no merge, no leaf collected.
+    const patch = JSON.parse('{"__proto__":{"polluted":true}}') as Partial<KeyboardIR>;
+    // Must not throw containment (the unsafe key is never path-collected).
+    const result = applyMutatePatch(base, patch, []);
+    expect(result).toEqual(base);
+    // Object.prototype was not polluted.
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    // The result's prototype is the normal object prototype.
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+  });
+
+  it("ignores constructor/prototype patch keys", () => {
+    const base = makeIR();
+    const patch = JSON.parse(
+      '{"constructor":{"x":1},"prototype":{"y":2}}',
+    ) as Partial<KeyboardIR>;
+    const result = applyMutatePatch(base, patch, []);
+    expect(result).toEqual(base);
+    expect((result as Record<string, unknown>).x).toBeUndefined();
+    expect((result as Record<string, unknown>).y).toBeUndefined();
+  });
+
+  it("still applies legitimate sibling keys in a patch that also carries an unsafe key", () => {
+    const base = makeIR();
+    const patch = JSON.parse(
+      '{"__proto__":{"polluted":true},"header":{"name":"New"}}',
+    ) as Partial<KeyboardIR>;
+    const result = applyMutatePatch(base, patch, [irPath("header", "name")]);
+    expect(result.header.name).toBe("New");
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+});

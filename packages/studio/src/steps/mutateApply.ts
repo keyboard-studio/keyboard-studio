@@ -107,12 +107,24 @@ function formatConcrete(leaf: readonly ConcreteSegment[]): string {
 }
 
 /**
+ * Prototype-pollution guard: keys that, if copied onto the result object as
+ * own-enumerable patch keys, could reach Object.prototype / the result's
+ * prototype chain. We never merge or path-collect these — a `mutate()` patch has
+ * no legitimate reason to carry them, and skipping them in BOTH the merge and the
+ * containment walk means a hostile/buggy patch can't set the result's prototype.
+ * (No in-scope module patch contains these keys, so this is behavior-preserving.)
+ */
+const UNSAFE_KEYS: ReadonlySet<string> = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
  * Walk `patch`, collecting every LEAF path it would write (a leaf is a
  * primitive, an array, or `undefined`/null — i.e. anything that is not a plain
  * object recursed into). Plain objects are recursed; their own existence is not
  * a leaf write (only the values placed under them are).
  *
  * An empty plain object `{}` produces no leaf paths (M5: it is a no-op).
+ * Prototype-polluting keys (UNSAFE_KEYS) are skipped — they are never written,
+ * so they are never path-collected (and never authorized as writes).
  */
 function collectLeafPaths(
   patch: Record<string, unknown>,
@@ -120,6 +132,7 @@ function collectLeafPaths(
   acc: ConcreteSegment[][],
 ): void {
   for (const key of Object.keys(patch)) {
+    if (UNSAFE_KEYS.has(key)) continue; // prototype-pollution guard
     const value = patch[key];
     const here: ConcreteSegment[] = [...prefix, key];
     if (isPlainObject(value)) {
@@ -152,6 +165,7 @@ function deepMerge<T>(base: T, patch: unknown): T {
     ? { ...(base as Record<string, unknown>) }
     : {};
   for (const key of Object.keys(patch)) {
+    if (UNSAFE_KEYS.has(key)) continue; // prototype-pollution guard (never merge these)
     const pv = patch[key];
     if (isPlainObject(pv)) {
       baseObj[key] = deepMerge(baseObj[key], pv);

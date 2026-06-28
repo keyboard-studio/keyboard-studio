@@ -102,11 +102,13 @@ function asScript(value: string | string[] | undefined): string {
  * Merge the chosen script subtag into the BCP-47 tag (`header.bcp47`) —
  * spec-014 FR-006b. Scoped to the declared `writes` path `header.bcp47`.
  *
- * Reads the existing language subtag from `ctx.ir` (set by `iso_code`) and
- * produces `<lang>-<Script>`. The "Other" catch-all carries no canonical
- * subtag, so it leaves the tag's language part alone (no script suffix). An
- * empty answer is a no-op (M5). When no language subtag exists yet, the script
- * alone is written so a later `iso_code` answer can prepend the language.
+ * Reads the existing tag from `ctx.ir` (set by `iso_code`) and merges the script
+ * subtag into BCP-47 position 2 (right after the language, before region/variant/
+ * extension): `<lang>-<Script>-<rest>`. Any region/variant/extension subtags
+ * already on the tag are PRESERVED, and an existing script subtag is replaced in
+ * place (not appended). The "Other" catch-all carries no canonical subtag, so it
+ * is a no-op. An empty answer is a no-op (M5). When no language subtag exists yet,
+ * the script alone is written so a later `iso_code` answer can prepend the language.
  */
 export function mutate(
   value: string | string[] | undefined,
@@ -116,11 +118,24 @@ export function mutate(
   if (script === "" || script === "Other") return {};
 
   const current = ctx.ir.header.bcp47[0];
-  const lang =
-    current !== undefined && current !== ""
-      ? current.split("-")[0] ?? ""
-      : "";
-  const tag = lang === "" ? script : `${lang}-${script}`;
+  const subtags =
+    current !== undefined && current !== "" ? current.split("-") : [];
+
+  const lang = subtags[0] ?? "";
+  if (lang === "") {
+    // No language yet — write the script alone (iso_code will prepend the lang).
+    return { header: { bcp47: [script] } as KeyboardIR["header"] };
+  }
+
+  // BCP-47: a script subtag is exactly 4 ASCII letters and, when present, sits
+  // at position 2 (right after the language). Replace it in place if present;
+  // otherwise insert ours there. Everything after the script position (region,
+  // variant, extension/private-use) is preserved in order.
+  const isScriptSubtag = (s: string | undefined): boolean =>
+    s !== undefined && /^[A-Za-z]{4}$/.test(s);
+  const tail = isScriptSubtag(subtags[1]) ? subtags.slice(2) : subtags.slice(1);
+
+  const tag = [lang, script, ...tail].join("-");
   return { header: { bcp47: [tag] } as KeyboardIR["header"] };
 }
 

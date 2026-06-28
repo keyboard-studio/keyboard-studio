@@ -27,6 +27,33 @@ describe("primary_script — mutate() writes header.bcp47 only", () => {
     expect(result.header.bcp47).toEqual(["hi-Arab"]);
   });
 
+  it("preserves variant/extension/private-use subtags beyond the script position", () => {
+    // BCP-47 order: language-Script-REGION-variant-extension. Changing the
+    // script must REPLACE the script subtag in place and keep everything after
+    // it. swa-Latn-x-foo + Cyrl → swa-Cyrl-x-foo.
+    const base = makeTestIR([]);
+    base.header.bcp47 = ["swa-Latn-x-foo"];
+    const result = applyMutatePatch(
+      base,
+      mutate("Cyrl", { ir: base, writes: mod.writes! }),
+      mod.writes!,
+    );
+    expect(result.header.bcp47).toEqual(["swa-Cyrl-x-foo"]);
+  });
+
+  it("inserts the script after the language when none was present, preserving the tail", () => {
+    // No existing script subtag (region/private-use only): insert at position 2.
+    // de-CH-1996 + Latn → de-Latn-CH-1996 (region + variant carried over).
+    const base = makeTestIR([]);
+    base.header.bcp47 = ["de-CH-1996"];
+    const result = applyMutatePatch(
+      base,
+      mutate("Latn", { ir: base, writes: mod.writes! }),
+      mod.writes!,
+    );
+    expect(result.header.bcp47).toEqual(["de-Latn-CH-1996"]);
+  });
+
   it("writes the script alone when no language subtag exists yet", () => {
     const base = makeTestIR([]); // bcp47 = []
     const result = applyMutatePatch(base, mutate("Latn", { ir: base, writes: mod.writes! }), mod.writes!);
