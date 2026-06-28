@@ -1,0 +1,353 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`flow-parity: phase_a_identity — questions[] > projected fields are stable (snapshot) > Phase A questions projected 1`] = `
+[
+  {
+    "help_text": undefined,
+    "id": "desktop_first_notice",
+    "next": "language_name_autonym",
+    "options": undefined,
+    "prompt": undefined,
+    "required": undefined,
+    "type": "notice",
+  },
+  {
+    "help_text": "Type the name your community uses for the language, using your own spelling and characters. For example: Fà', Kiswahili, हिन्दी. This name will appear on the keyboard package exactly as you write it.",
+    "id": "language_name_autonym",
+    "next": "language_name_english",
+    "options": undefined,
+    "prompt": "What is your language called in your own language?",
+    "required": true,
+    "type": "text",
+  },
+  {
+    "help_text": "The English name used in directories and official language lists, for example: Bafut, Swahili, Hindi. If your language does not have a widely-used English name, repeat the name you gave above.",
+    "id": "language_name_english",
+    "next": "iso_code",
+    "options": undefined,
+    "prompt": "What is your language called in English?",
+    "required": true,
+    "type": "text",
+  },
+  {
+    "help_text": "Language codes are short tags used by linguists to identify languages uniquely, for example: bfd for Bafut, swa for Swahili. Search the list to find yours. Leave blank if you are unsure.",
+    "id": "iso_code",
+    "next": "region",
+    "options": undefined,
+    "prompt": "Does your language have a three-letter language code?",
+    "required": false,
+    "type": "autocomplete",
+  },
+  {
+    "help_text": "Name the primary country or region where speakers of your language live, for example: Cameroon, Tanzania, Northwest India. You can list more than one if needed.",
+    "id": "region",
+    "next": "primary_script",
+    "options": undefined,
+    "prompt": "Which country or region is this keyboard mainly for?",
+    "required": true,
+    "type": "text",
+  },
+  {
+    "help_text": "Choose the alphabet or script your language is normally written in. If your language uses more than one script, pick the one this keyboard is for.",
+    "id": "primary_script",
+    "next": [
+      {
+        "condition": "value == 'Ethi' or value == 'Hang' or value == 'Hani'",
+        "goto": "script_not_supported_stub",
+      },
+      {
+        "condition": "value == 'Arab' or value == 'Hebr'",
+        "goto": "writing_direction",
+      },
+      {
+        "condition": "value == 'Latn' or value == 'Cyrl' or value == 'Grek' or value == 'Geor' or value == 'Armn'",
+        "goto": "layout_family",
+      },
+      {
+        "default": true,
+        "goto": "layout_family",
+      },
+    ],
+    "options": [
+      {
+        "label": "Latin (A, B, C, and accented letters like é, ñ, ŋ)",
+        "value": "Latn",
+      },
+      {
+        "label": "Arabic",
+        "value": "Arab",
+      },
+      {
+        "label": "Hebrew",
+        "value": "Hebr",
+      },
+      {
+        "label": "Devanagari (used for Hindi, Nepali, Marathi, and others)",
+        "value": "Deva",
+      },
+      {
+        "label": "Bengali",
+        "value": "Beng",
+      },
+      {
+        "label": "Tamil",
+        "value": "Taml",
+      },
+      {
+        "label": "Telugu",
+        "value": "Telu",
+      },
+      {
+        "label": "Kannada",
+        "value": "Knda",
+      },
+      {
+        "label": "Malayalam",
+        "value": "Mlym",
+      },
+      {
+        "label": "Gurmukhi (Punjabi)",
+        "value": "Guru",
+      },
+      {
+        "label": "Gujarati",
+        "value": "Gujr",
+      },
+      {
+        "label": "Odia",
+        "value": "Orya",
+      },
+      {
+        "label": "Sinhala",
+        "value": "Sinh",
+      },
+      {
+        "label": "Thai",
+        "value": "Thai",
+      },
+      {
+        "label": "Khmer",
+        "value": "Khmr",
+      },
+      {
+        "label": "Myanmar / Burmese",
+        "value": "Mymr",
+      },
+      {
+        "label": "Lao",
+        "value": "Laoo",
+      },
+      {
+        "label": "Ethiopic (Ge'ez, Amharic, Tigrinya, and others)",
+        "value": "Ethi",
+      },
+      {
+        "label": "Hangul (Korean)",
+        "value": "Hang",
+      },
+      {
+        "label": "Chinese, Japanese, or other Han-character script (Chinese Hanzi, Japanese Kanji/kana, and similar)",
+        "value": "Hani",
+      },
+      {
+        "label": "Georgian",
+        "value": "Geor",
+      },
+      {
+        "label": "Armenian",
+        "value": "Armn",
+      },
+      {
+        "label": "Cyrillic (Russian, Ukrainian, Serbian, and others)",
+        "value": "Cyrl",
+      },
+      {
+        "label": "Greek",
+        "value": "Grek",
+      },
+      {
+        "label": "Tibetan",
+        "value": "Tibt",
+      },
+      {
+        "label": "Canadian Aboriginal Syllabics",
+        "value": "Cans",
+      },
+      {
+        "label": "Cherokee",
+        "value": "Cher",
+      },
+      {
+        "label": "A different writing system not listed here",
+        "value": "Other",
+      },
+    ],
+    "prompt": "Which writing system does your language use?",
+    "required": true,
+    "type": "select",
+  },
+  {
+    "help_text": "Arabic and Hebrew are usually written right-to-left, but some communities use a left-to-right style for certain contexts. Choose the direction your community uses most.",
+    "id": "writing_direction",
+    "next": "layout_family",
+    "options": [
+      {
+        "label": "Right to left (the usual direction for Arabic and Hebrew)",
+        "value": "rtl",
+      },
+      {
+        "label": "Left to right",
+        "value": "ltr",
+      },
+    ],
+    "prompt": "Does your text run right-to-left or left-to-right?",
+    "required": true,
+    "type": "radio",
+  },
+  {
+    "help_text": "This version does not yet support Hangul keyboards — jamo-to-syllable cluster composition rules will be added in a future release. This version does not yet support Chinese, Japanese, or other Han-based scripts — these require an input-method composition layer not yet built. This version does not yet support Ethiopic scripts (Ge'ez, Amharic, Tigrinya, and others) — reorder-pattern curation for Ethiopic is still in progress and will be available in a future release. You can close this form for now — nothing you entered will be submitted.",
+    "id": "script_not_supported_stub",
+    "next": null,
+    "options": undefined,
+    "prompt": "This writing system is not supported yet",
+    "required": false,
+    "type": "notice",
+  },
+  {
+    "help_text": "This tells the studio which keyboard patterns to offer you in the next step. Most of the world uses QWERTY; choose QWERTZ or AZERTY only if your community actually uses one of those regional variants. For non-Roman scripts such as Devanagari or Arabic, choose the last option. If you are not sure, leave this blank and the studio will show QWERTY patterns.",
+    "id": "layout_family",
+    "next": [
+      {
+        "condition": "value == 'non-roman'",
+        "goto": "script_family",
+      },
+      {
+        "default": true,
+        "goto": "pa_primary_target",
+      },
+    ],
+    "options": [
+      {
+        "label": "QWERTY (used in most English-speaking countries, and many others)",
+        "value": "qwerty",
+      },
+      {
+        "label": "QWERTZ (used in Germany, Austria, Switzerland, and neighboring countries)",
+        "value": "qwertz",
+      },
+      {
+        "label": "AZERTY (used in France, Belgium, and parts of Africa)",
+        "value": "azerty",
+      },
+      {
+        "label": "A layout designed for a non-Roman script (e.g. Devanagari, Arabic, Thai)",
+        "value": "non-roman",
+      },
+    ],
+    "prompt": "Which physical keyboard layout does your community use?",
+    "required": false,
+    "type": "radio",
+  },
+  {
+    "help_text": "Different script families need different internal structures. Choose the group that best describes your writing system. If you are unsure, pick "Other" and the studio will ask follow-up questions later.",
+    "id": "script_family",
+    "next": "pa_primary_target",
+    "options": [
+      {
+        "label": "Indic (scripts from South Asia such as Devanagari, Bengali, Tamil)",
+        "value": "indic",
+      },
+      {
+        "label": "Southeast Asian (Thai, Khmer, Myanmar, Lao, and similar scripts)",
+        "value": "sea",
+      },
+      {
+        "label": "Right-to-left (Arabic, Hebrew, and similar scripts)",
+        "value": "rtl",
+      },
+      {
+        "label": "Syllabic (each glyph represents a syllable or syllable unit, e.g. Cherokee, Canadian Aboriginal Syllabics, Vai)",
+        "value": "syllabic",
+      },
+      {
+        "label": "Non-Latin alphabet (Coptic, Tifinagh, Adlam -- letters, not syllables or attached marks)",
+        "value": "alpha-nonlatin",
+      },
+      {
+        "label": "Other or I am not sure",
+        "value": "other",
+      },
+    ],
+    "prompt": "What type of non-Roman script does your keyboard use?",
+    "required": true,
+    "type": "radio",
+  },
+  {
+    "help_text": "Keyboard Studio v1 is anchored to physical-keyboard mental models. You can complete the full authoring flow and a touch layout will be produced, but the survey questions are designed for desktop-first thinking. (See spec Decision 6)",
+    "id": "pa_primary_target",
+    "next": "author_display_name",
+    "options": [
+      {
+        "label": "Desktop (physical keyboard)",
+        "value": "desktop",
+      },
+      {
+        "label": "Mobile (touchscreen)",
+        "value": "mobile",
+      },
+      {
+        "label": "Both desktop and mobile",
+        "value": "both",
+      },
+    ],
+    "prompt": "Is this keyboard primarily for mobile (touchscreen) or desktop (physical keyboard) use?",
+    "required": false,
+    "type": "radio",
+  },
+  {
+    "help_text": "This name will appear in the keyboard package and in the public keyboard repository. You can use a person's name, an organization name, or a committee name, for example: Bafut Language Committee.",
+    "id": "author_display_name",
+    "next": "author_contact_email",
+    "options": undefined,
+    "prompt": "Who should be listed as the author of this keyboard?",
+    "required": true,
+    "type": "text",
+  },
+  {
+    "help_text": "This address goes into the keyboard package so that users or maintainers can reach the right person if they have questions. Use an address that will remain active.",
+    "id": "author_contact_email",
+    "next": "pa_copyright_holder",
+    "options": undefined,
+    "prompt": "What email address can people use to contact the keyboard author?",
+    "required": true,
+    "type": "text",
+  },
+  {
+    "help_text": "Name of the person or organization that holds the copyright for this keyboard. This may be you, your employer, or a language organization. Example: 'Bafut Language Committee'",
+    "id": "pa_copyright_holder",
+    "next": "provenance_opt_in",
+    "options": undefined,
+    "prompt": "Who holds the copyright for this keyboard?",
+    "required": true,
+    "type": "short_text",
+  },
+  {
+    "help_text": "This optional section collects context about who is requesting the keyboard and the language community it serves. None of it is required, and none of it affects how the keyboard is built. It helps reviewers understand the project.",
+    "id": "provenance_opt_in",
+    "next": [
+      {
+        "condition": "value == 'true'",
+        "goto": "provenance_requester_name",
+      },
+      {
+        "default": true,
+        "goto": null,
+      },
+    ],
+    "options": undefined,
+    "prompt": "Would you like to provide additional background about your language community?",
+    "required": false,
+    "type": "bool",
+  },
+]
+`;

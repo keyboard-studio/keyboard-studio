@@ -13,9 +13,9 @@
 //   questions:            [id1, id2, ...]
 //   provenance_questions: [id1, id2, ...]   # optional
 //
-// loadModularFlow() is additive — it does NOT replace loadFlow.ts (which handles
-// the existing full-YAML phases during the fan-out period). Both loaders return
-// a FlowDef and can be consumed by SurveyRunner without modification.
+// loadModularFlow() is the sole flow loader — the legacy parseFlow / loadFlow.ts
+// has been retired. It returns a FlowDef that SurveyRunner can consume without
+// modification.
 
 import { parse } from "yaml";
 import type { FlowDef } from "./types.ts";
@@ -107,8 +107,8 @@ function resolveIds(ids: string[]): FlowDef["questions"] {
  * Load a thin-YAML string (from a Vite ?raw import or inline test string) into
  * a FlowDef that SurveyRunner can consume without modification.
  *
- * The returned FlowDef is structurally identical to what parseFlow() returns for
- * full-YAML phases — SurveyRunner sees no difference.
+ * The returned FlowDef is a standard FlowDef — SurveyRunner consumes it without
+ * modification.
  */
 export function loadModularFlow(raw: string): FlowDef {
   const thin = parseThinYaml(raw);

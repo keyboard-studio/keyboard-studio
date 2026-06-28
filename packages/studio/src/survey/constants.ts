@@ -1,6 +1,4 @@
-// Shared survey constants.
-// Both loadFlow.ts and loadModularFlow.ts import from here to prevent
-// phase-set drift during the fan-out period when both loaders coexist.
+// Shared survey constants consumed by loadModularFlow.ts.
 
 // Set<string> (not Set<"A"|"B"|...>) so .has(arbitraryString) typechecks at call
 // sites where the input is an untyped YAML field. The literal-tuple narrowing is
