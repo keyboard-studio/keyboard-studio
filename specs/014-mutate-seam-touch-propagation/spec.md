@@ -29,6 +29,14 @@ All eight clarifications below were pre-resolved and approved by Matthew Lee (re
 - Q7 — **Test strategy** → A: **Reuse existing IR fixtures** as `mutate` round-trip inputs; add a small set of **provenance-tagged touch-layout fixtures** for the no-clobber tests, in the established mirror test tree (`packages/studio/tests/survey/questions/<phase>/<id>.test.ts`). Per-question unit tests assert: applies `mutate` to a known IR fixture, writes exactly the declared `writes` paths and nothing else, idempotent, respects provenance.
 - Q8 — **Scope boundaries** → OUT: publishing paths, the flow-map editor (spec 009), touch-first / reverse touch→physical authoring (Constitution Art. VII), deleting library/reserve modules. **IN (resolving 012's deferral): wire the real per-spine-prefix validator** in P5 — 012 shipped only a structural proxy (its FR-017) and reserved real validation "for P5."
 
+### Session 2026-06-28 (`/speckit-clarify` pass — residual ambiguities)
+
+These three were surfaced by the `/speckit-clarify` taxonomy scan after the pre-resolved Q1–Q8 above and were resolved with recommended answers (approved by Matthew Lee). They tighten the patch-application, re-propagation-batching, and assertion-failure semantics the earlier set left implicit; none reopens Q1–Q8.
+
+- Q9 — **Patch merge semantics** → A: **Path-scoped deep merge at exactly the declared `writes` paths.** The reducer applies the `Partial<KeyboardIR>` patch by writing each value to its declared `IRPath` location only; it does **not** shallow-replace top-level branches, so siblings under a shared parent (e.g. other keys/layers under `touchLayout`) are preserved. (Rationale: a shallow top-level merge would clobber sibling nested IR and violate both FR-003 declared-`writes` containment and the US2 no-clobber rule; `IRPath` is already a per-path algebra.)
+- Q10 — **Re-propagation batching when multiple steps are stale** → A: **Single coalesced pass over the union of the staleness closure.** When one physical change makes several steps stale, re-propagation runs **once** over the unioned `staleSteps` closure rather than once per stale step, so no derived key is re-suggested more than once per change. (Rationale: matches §3.5 fixpoint-closure semantics and the Article IV single-validation-path stance; preserves the FR-004 idempotency / no-double-write guarantee.)
+- Q11 — **Assertion-failure behavior (flag on)** → A: **Fail-fast — reject the entire patch and surface the error; in all builds, not dev-only.** A `mutate()` patch that touches any path outside the module's declared `writes` is rejected whole (no partial apply), the failure is raised/surfaced (never swallowed), and the IR is left unchanged for that step. (Rationale: "rejected, not silently merged" + Constitution Art. II "never silently dropped"; a dev-only assert would let an out-of-shape write reach the working copy in production, the §8 risk this guards.)
+
 ## User Scenarios & Testing *(mandatory)*
 
 > The "users" here are the studio engineering and content teams (who gain one write surface instead of two forks) and the keyboard author running the survey (whose manual touch edits must never be silently overwritten when they revisit a physical decision). Each story is independently testable and independently valuable.
@@ -43,10 +51,10 @@ A developer (or the survey runtime) writes to the `KeyboardIR` through **exactly
 
 **Acceptance Scenarios**:
 
-1. **Given** the flag is on and an in-scope question module, **When** the survey reducer applies its result, **Then** the IR is updated **only** via that module's `mutate()` returning a `Partial<KeyboardIR>` patch the reducer merges — no in-scope surface writes the IR by any other route.
+1. **Given** the flag is on and an in-scope question module, **When** the survey reducer applies its result, **Then** the IR is updated **only** via that module's `mutate()` returning a `Partial<KeyboardIR>` patch the reducer applies as a **path-scoped deep merge at the declared `writes` paths** (siblings preserved) — no in-scope surface writes the IR by any other route.
 2. **Given** the carve/add shell (carve remove-mode + the add galleries), **When** the author makes an edit, **Then** that edit is expressed as a `mutate()` patch routed through the reducer, and the direct `workingCopyStore` gallery mutators it replaces (`deleteNode`/`restoreNode`/`deleteItem`/`restoreItem`/`restoreAll`/`keepAll` and the add-gallery's selected-pattern writes) are no longer the IR write path for in-scope surfaces.
 3. **Given** a display-only question (empty `writes`) or an answer-store-only / identity-metadata module, **When** it completes, **Then** it performs **no** IR `mutate()` (it stays a no-op) and is out of P5 scope.
-4. **Given** any in-scope `mutate()`, **When** it produces a patch that would touch a path **outside** the module's declared `writes`, **Then** a **runtime assertion fails** (the patch is rejected, not silently merged).
+4. **Given** any in-scope `mutate()`, **When** it produces a patch that would touch a path **outside** the module's declared `writes`, **Then** the **runtime assertion fails fast in all builds** — the **entire** patch is rejected (no partial apply), the IR is left unchanged for that step, and the failure is surfaced (not silently merged or swallowed).
 
 ---
 
@@ -119,12 +127,13 @@ The spine-prefix shippability check graduates from the structural proxy 012 ship
 ### Edge Cases
 
 - **`mutate()` applied twice** (same value, same IR): the second application MUST be a no-op on the IR (idempotency, FR-004) — re-answering or replaying a step never double-writes.
-- **A `writes`-declared path that does not match the ratified IR shape** (the §8 risk): caught at typecheck via `IRPath` (P2) and, at runtime, by the declared-`writes` containment assertion (FR-003). The spec MUST be re-validated against the ratified #5b/#232 contract before planning.
+- **A `writes`-declared path that does not match the ratified IR shape** (the §8 risk): caught at typecheck via `IRPath` (P2) and, at runtime, by the declared-`writes` containment assertion (FR-003) — which **fails fast and rejects the whole patch in all builds** (Q11), leaving the IR unchanged. The spec MUST be re-validated against the ratified #5b/#232 contract before planning.
 - **A dead-key output whose base isn't on the touch base layer** during re-propagation: the suggestion still resolves per the §3.6 `touchSuggest` policy (the popup hangs off wherever that base landed); provenance is assigned to the produced key.
 - **Breaking a physical lock with no derived touch dependents**: the staleness closure yields nothing to re-suggest; re-propagation is a no-op, not an error.
+- **One physical change marking several steps stale at once**: re-propagation runs as a **single coalesced pass over the union of the staleness closure** (FR-013, Q10), not once per stale step — each affected derived key is re-suggested at most once per change, preserving idempotency.
 - **A `hand-set` key on a base that a later physical change removes**: the `hand-set` key is **not** auto-overwritten (no-clobber wins); surfacing the now-orphaned hand-set key is a dashboard/completeness concern, not a silent deletion.
 - **Flag flipped mid-session**: out of scope — the flag is a build/deploy-time global; this spec does not require live in-session toggling.
-- **A patch from `mutate()` that is empty** (`{}`): valid — represents "this answer changes no IR" and merges to a no-op.
+- **A patch from `mutate()` that is empty** (`{}`): valid — represents "this answer changes no IR" and merges to a no-op (the path-scoped deep merge writes nothing and preserves all existing IR).
 - **Re-propagation over a key whose provenance is missing** (legacy/untagged): treated as `hand-set` by default (FR-009), so it is conservatively never auto-overwritten.
 
 ## Requirements *(mandatory)*
@@ -137,8 +146,8 @@ The spine-prefix shippability check graduates from the structural proxy 012 ship
 
 **The `mutate()` write surface**
 
-- **FR-002**: The system MUST implement `QuestionModule.mutate()` as a **pure** function that takes the question's value (and survey context) and **returns a `Partial<KeyboardIR>` patch**; the survey reducer (the §3.4 manifest-level `applyStepCompletion` reducer) applies the patch. `mutate()` MUST NOT mutate the IR in place or perform side effects.
-- **FR-003**: Every `mutate()` MUST **runtime-assert that its returned patch touches only the module's declared `writes` paths** (typed as `IRPath` per P2); a patch touching any undeclared path MUST be rejected (assertion failure), not silently merged.
+- **FR-002**: The system MUST implement `QuestionModule.mutate()` as a **pure** function that takes the question's value (and survey context) and **returns a `Partial<KeyboardIR>` patch**; the survey reducer (the §3.4 manifest-level `applyStepCompletion` reducer) applies the patch. `mutate()` MUST NOT mutate the IR in place or perform side effects. The reducer MUST apply the patch as a **path-scoped deep merge at exactly the declared `writes` paths** — writing each value to its declared `IRPath` location only and preserving all sibling nested IR under a shared parent — **not** a shallow top-level branch replacement (Q9).
+- **FR-003**: Every `mutate()` MUST **runtime-assert that its returned patch touches only the module's declared `writes` paths** (typed as `IRPath` per P2). A patch touching any undeclared path MUST be **rejected whole — fail-fast, in all builds (not a dev-only assert)**: the entire patch is rejected (no partial apply), the failure is raised/surfaced (never swallowed), and the IR is left unchanged for that step; it is never silently merged (Q11).
 - **FR-004**: `mutate()` MUST be **idempotent on re-apply** — applying the same value against the same IR a second time yields no further IR change.
 - **FR-005**: `mutate()` MUST become the **single IR write path** for all in-scope surfaces (US1); the answer-store-vs-direct-IR **state fork** (§1) is closed for those surfaces, unifying both into one write surface.
 
@@ -157,7 +166,7 @@ The spine-prefix shippability check graduates from the structural proxy 012 ship
 **Touch re-propagation (Q5=A + follow-up)**
 
 - **FR-012**: A physical change (physical-lock break / physical-step completion) MUST trigger **automatic** re-propagation that re-runs `touchSuggest` over **only** `base-derived` and `physical-suggested` keys, overwriting those, and **never** overwriting a `hand-set` key (the no-clobber rule).
-- **FR-013**: Re-propagation MUST be **driven by the P4b staleness slice** — the `staleSteps` root-set plus the completeness fixpoint (§3.5 transitive closure) — so only keys derived from the changed physical decision are re-suggested, not the whole touch layer.
+- **FR-013**: Re-propagation MUST be **driven by the P4b staleness slice** — the `staleSteps` root-set plus the completeness fixpoint (§3.5 transitive closure) — so only keys derived from the changed physical decision are re-suggested, not the whole touch layer. When a single physical change makes **multiple** steps stale, re-propagation MUST run as a **single coalesced pass over the union of the staleness closure** (not once per stale step), so no derived key is re-suggested more than once per change (Q10).
 - **FR-014**: A manual edit to a `physical-suggested` key MUST **promote it to `hand-set`**, so subsequent re-propagation will not clobber the author's edit.
 
 **Rollback flag (Q6=A)**
@@ -176,7 +185,7 @@ The spine-prefix shippability check graduates from the structural proxy 012 ship
 
 ### Key Entities *(include if feature involves data)*
 
-- **`mutate()` (question-module write surface)**: A pure function returning a `Partial<KeyboardIR>` patch the reducer applies; runtime-asserts declared-`writes` containment; idempotent. The single IR write path for in-scope surfaces.
+- **`mutate()` (question-module write surface)**: A pure function returning a `Partial<KeyboardIR>` patch the reducer applies as a **path-scoped deep merge at the declared `writes` paths** (siblings preserved); runtime-asserts declared-`writes` containment with **fail-fast whole-patch rejection** on violation; idempotent. The single IR write path for in-scope surfaces.
 - **Declared `writes` (`IRPath[]`)**: The P2-declared, typed paths a module is allowed to populate; the containment set the FR-003 runtime assertion checks the patch against.
 - **`TouchKeyIR` provenance field**: The per-key tag (`base-derived` / `physical-suggested` / `hand-set`) promoted onto the contract; defaults to `hand-set`; survives round-trip; single source the no-clobber rule reads. `editors/assignLoop/provenance.ts`'s `TouchKeyProvenance` becomes a re-export of it.
 - **`touchSuggest` generator**: The §3.6 physical→touch defaults-as-data adaptation policy; on re-propagation it re-derives only non-`hand-set` keys and tags each produced key with its provenance and producing-default.
@@ -190,7 +199,7 @@ The spine-prefix shippability check graduates from the structural proxy 012 ship
 ### Measurable Outcomes
 
 - **SC-001**: `mutate()` is the **single** IR write path for in-scope surfaces — a repo audit finds **zero** direct `workingCopyStore` IR mutations from the converted carve/add shell and **zero** other IR write routes for the 8 strategy-bearing modules when the flag is on.
-- **SC-002**: For every in-scope module, applying `mutate()` to a known `KeyboardIR` fixture changes the IR at **exactly** the module's declared `writes` paths and **nothing else** (per-question output test), and an attempt to write outside `writes` fails the runtime assertion.
+- **SC-002**: For every in-scope module, applying `mutate()` to a known `KeyboardIR` fixture changes the IR at **exactly** the module's declared `writes` paths and **nothing else** — sibling nested IR under a shared parent is byte-identical (the path-scoped deep merge, Q9) — and an attempt to write outside `writes` **fails fast, rejects the whole patch, and leaves the IR unchanged** (per-question output test, Q11).
 - **SC-003**: `mutate()` is **idempotent** — applying the same value twice produces a byte-identical IR to applying it once, across all in-scope modules.
 - **SC-004**: Round-tripping `mutate()` against the **reused existing IR fixtures** passes (no shape drift; patches merge cleanly and the result re-serializes).
 - **SC-005**: On the provenance-tagged touch-layout fixtures, a simulated physical change re-suggests **only** `base-derived` / `physical-suggested` keys and leaves **100%** of `hand-set` keys byte-identical (no-clobber holds).
