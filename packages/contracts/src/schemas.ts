@@ -20,7 +20,7 @@ import { z } from "zod";
 import type { Pattern, PatternQuestion, TestVector, DemoObject } from "./pattern";
 import type { Criterion } from "./criteria";
 import type { RemovalCapability } from "./removalCapability";
-import type { TouchKeyProvenance } from "./keyboard-ir";
+import type { TouchKeyProvenance, TouchKeyIR, TouchLayoutIR } from "./keyboard-ir";
 
 // ---------------------------------------------------------------------------
 // Leaf enums — mirror the string-literal unions in the contract types.
@@ -70,6 +70,104 @@ export const TouchKeyProvenanceSchema = z.enum([
 export const IRNodeRefSchema = z.object({
   kind: z.enum(["rule", "store", "group", "touchKey", "kvksKey", "comment", "raw"]),
   nodeId: z.string(),
+});
+
+// ---------------------------------------------------------------------------
+// Touch layout (spec-014 US3 — durable per-key provenance round-trip).
+//
+// These mirror `TouchKeyIR` / `TouchLayoutIR` (keyboard-ir.ts). The provenance
+// field is `.optional()` and, when absent, deserializes to the conservative
+// `"hand-set"` default (FR-009/SC-007) via the `defaultProvenance()` convention
+// — encoded here as a `.transform()` so a parsed key always carries a tag.
+//
+// `TouchKeyIRSchema` is self-recursive (`sk`/`flick`/`multitap`), so it is
+// declared with an explicit z.ZodType annotation + a `z.lazy()` getter.
+// ---------------------------------------------------------------------------
+
+/** The conservative default provenance for an untagged/legacy touch key (FR-009). */
+const DEFAULT_TOUCH_PROVENANCE: TouchKeyProvenance = "hand-set";
+
+/**
+ * Add `| undefined` to every optional (`?:`) property of `T`, recursively.
+ *
+ * `TouchKeyIR` is self-recursive, so `TouchKeyIRSchema` needs an explicit type
+ * annotation (a `z.lazy()` self-reference is otherwise inferred as `any`). But
+ * under `exactOptionalPropertyTypes`, zod's `.optional()` produces `T | undefined`
+ * on the OUTPUT, which the contract's bare `?:` fields reject as an annotation
+ * target. This helper bridges that single representational gap: the annotation
+ * is `z.ZodType<LooseOptional<TouchKeyIR>>`, which accepts the zod output yet is
+ * still structurally pinned to `TouchKeyIR` (a renamed/removed/retyped field
+ * fails the annotation → build error = the drift guard). The `_TouchKeyIRGuard`
+ * alias below additionally asserts the inferred output stays assignable to the
+ * exact contract via `DeepStripUndefined`.
+ */
+type LooseOptional<T> = T extends (infer U)[]
+  ? LooseOptional<U>[]
+  : T extends object
+    ? {
+        // Required keys stay exact; optional keys (detected via `{} extends
+        // Pick<T,K>`) gain `| undefined` to match zod `.optional()` output under
+        // exactOptionalPropertyTypes.
+        [K in keyof T]: {} extends Pick<T, K>
+          ? LooseOptional<T[K]> | undefined
+          : LooseOptional<T[K]>;
+      }
+    : T;
+
+// `TouchKeyIR` is self-recursive (`sk`/`flick`/`multitap`); `z.lazy()` carries
+// the self-reference and the `LooseOptional` annotation breaks the inference
+// cycle while staying pinned to the contract shape (see helper doc above).
+export const TouchKeyIRSchema: z.ZodType<LooseOptional<TouchKeyIR>> = z.lazy(() =>
+  z.object({
+    nodeId: z.string(),
+    id: z.string(),
+    text: z.string().optional(),
+    // Optional on the wire; absent ⇒ the conservative `hand-set` default on
+    // parse (FR-009). The transform makes the resolved value always present so
+    // the no-clobber rule (US2) reads a concrete tag.
+    provenance: TouchKeyProvenanceSchema.optional().transform(
+      (p) => p ?? DEFAULT_TOUCH_PROVENANCE,
+    ),
+    hint: z.string().optional(),
+    output: z.string().optional(),
+    nextlayer: z.string().optional(),
+    sk: z.array(TouchKeyIRSchema).optional(),
+    // Explicit per-direction shape (not Object.fromEntries) so the inferred
+    // output keeps the literal direction keys, matching the contract's
+    // `Partial<Record<"n"|"s"|..., TouchKeyIR>>` exactly (drift guard).
+    flick: z
+      .object({
+        n: TouchKeyIRSchema.optional(),
+        s: TouchKeyIRSchema.optional(),
+        e: TouchKeyIRSchema.optional(),
+        w: TouchKeyIRSchema.optional(),
+        ne: TouchKeyIRSchema.optional(),
+        nw: TouchKeyIRSchema.optional(),
+        se: TouchKeyIRSchema.optional(),
+        sw: TouchKeyIRSchema.optional(),
+      })
+      .optional(),
+    multitap: z.array(TouchKeyIRSchema).optional(),
+    sp: z.number().optional(),
+    width: z.number().optional(),
+    pad: z.number().optional(),
+  }),
+);
+
+export const TouchLayoutIRSchema = z.object({
+  platforms: z.array(
+    z.object({
+      id: z.enum(["phone", "tablet", "desktop"]),
+      font: z.string().optional(),
+      layers: z.array(
+        z.object({
+          id: z.string(),
+          rows: z.array(z.object({ keys: z.array(TouchKeyIRSchema) })),
+        }),
+      ),
+    }),
+  ),
+  nodeIds: z.array(z.tuple([z.string(), IRNodeRefSchema])),
 });
 
 // ---------------------------------------------------------------------------
@@ -135,6 +233,31 @@ export const PatternSchema = z.object({
   group_visibility: z.string().optional(),
   priority: z.number().optional(),
 });
+
+// ---------------------------------------------------------------------------
+// KeyboardIR — top-level runtime schema (spec-014 US3).
+//
+// The full IR carries many node types (header/stores/groups/comments/raw/
+// recognizedPatterns) that do not yet have hand-written zod mirrors; minting a
+// strict schema for all of them is out of scope for this cycle (and would risk
+// rejecting valid in-memory IRs the rest of the pipeline produces). This schema
+// therefore validates the touch surface PRECISELY — the spec-014 durability
+// target — via `TouchLayoutIRSchema`, and is permissive (`.passthrough()`) on
+// the remaining top-level fields so existing IRs round-trip unchanged. As those
+// other node types gain schemas they can be tightened here without a breaking
+// change to the touch contract.
+//
+// `touchLayout` is `.optional()` (additive — an IR with no touch layout is
+// valid); when present, every touch key's provenance is materialised to its
+// `hand-set` default if absent (FR-009).
+// ---------------------------------------------------------------------------
+
+export const KeyboardIRSchema = z
+  .object({
+    origin: z.enum(["scaffolded", "imported", "synthesized"]),
+    touchLayout: TouchLayoutIRSchema.optional(),
+  })
+  .passthrough();
 
 // ---------------------------------------------------------------------------
 // Criterion — the §11 four-band catalog (spec §14 Decision 4). Discriminated
@@ -269,4 +392,33 @@ type _RemovalCapabilityGuard = Expect<AssignableTo<z.infer<typeof RemovalCapabil
 // the optional `?:` form so the guard compares the underlying union only.
 type _TouchKeyProvenanceGuard = Expect<
   AssignableTo<z.infer<typeof TouchKeyProvenanceSchema>, NonNullable<TouchKeyProvenance>>
+>;
+// Touch IR schemas (spec-014 US3). `TouchKeyIRSchema` / `TouchLayoutIRSchema`
+// carry an explicit `z.ZodType<LooseOptional<...>>` annotation (required for the
+// self-recursive `z.lazy()`), so the PRIMARY drift guard is the annotation
+// itself: a renamed/removed/retyped field makes the `z.object({...})` literal
+// non-assignable to that ZodType and fails the build at the schema declaration
+// (you cannot widen the annotation without also widening `LooseOptional<TouchKeyIR>`,
+// which is pinned to the contract). These aliases pin the inferred OUTPUT back
+// to the contract as belt-and-braces.
+type _TouchKeyIRGuard = Expect<AssignableTo<z.infer<typeof TouchKeyIRSchema>, TouchKeyIR>>;
+// TouchLayoutIR is guarded on its `platforms` slice (the touch-key + provenance
+// payload — the spec-014 durability target). `nodeIds` is intentionally not run
+// through DeepStripUndefined: that helper rewrites the `[string, IRNodeRef]`
+// tuple as an array and broadens the element union, a representational artifact
+// unrelated to real drift. `nodeIds` is still validated structurally by
+// `z.tuple([z.string(), IRNodeRefSchema])` in the schema and at runtime by the
+// round-trip test.
+type _TouchLayoutPlatformsGuard = Expect<
+  AssignableTo<z.infer<typeof TouchLayoutIRSchema>["platforms"], TouchLayoutIR["platforms"]>
+>;
+// The KeyboardIR schema validates the touch surface precisely + passes the rest
+// through; its inferred `touchLayout` output must stay assignable to the
+// contract's `touchLayout` field (again on the platforms slice, same tuple
+// caveat as above).
+type _KeyboardIRTouchGuard = Expect<
+  AssignableTo<
+    NonNullable<z.infer<typeof KeyboardIRSchema>["touchLayout"]>["platforms"],
+    TouchLayoutIR["platforms"]
+  >
 >;
