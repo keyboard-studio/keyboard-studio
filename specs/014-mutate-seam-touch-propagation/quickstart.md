@@ -2,7 +2,7 @@
 
 **Feature**: 014-mutate-seam-touch-propagation
 
-> **DO NOT RUN YET — GATED on #5b/#232.** This feature is DESIGN-ONLY / BLOCKED (spec Q1=A, FR-001). The steps below are the validation plan to run **after** the engine mutation contract ratifies, the §18 joint session lands the `TouchKeyIR` MAJOR bump, and this plan is re-validated against the ratified shape ([plan.md](plan.md) gates G-I/G-II/G-VI). Until then, none of these commands will pass because `mutate()` is still the P2 stub.
+> **GATE CLEARED (2026-06-28).** The dependency gate (#5b/#232) cleared with **PR #822** (`@keyboard-studio/contracts` 0.12.0; §18 sign-off recorded in [docs/spec-signoff.md](../../docs/spec-signoff.md)); this plan was re-validated against the ratified shape on 2026-06-28 ([plan.md](plan.md) gates G-I/G-II/G-VI RESOLVED). The steps below are the validation plan for the P5 implementation. They will pass **as each implementation task lands** — at present the `mutate()` reducer apply path + per-module implementations are still front-end work to be built (the ratified surface is the *type-level* signature + the `TouchKeyIR.provenance?` field), so run each check after its corresponding task completes, not before.
 
 ## Prerequisites
 

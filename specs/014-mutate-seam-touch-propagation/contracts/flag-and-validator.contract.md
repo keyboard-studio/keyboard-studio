@@ -1,6 +1,8 @@
 # Contract: global rollback flag + real per-spine-prefix validator
 
-**Feature**: 014-mutate-seam-touch-propagation | **Status**: PROVISIONAL / GATED on #5b/#232
+**Feature**: 014-mutate-seam-touch-propagation | **Status**: UNGATED (gate cleared per PR #822, 2026-06-28) — front-end implementation work
+
+> The dependency gate (#5b/#232) cleared with **PR #822** (`@keyboard-studio/contracts` 0.12.0). Re-validated 2026-06-28 (T000). The global flag + real per-spine-prefix validator are front-end implementation work (tasks T007/T034), unblocked by #822.
 
 ## Global `mutate` flag — `flags/mutateFlag.ts` (NEW)
 

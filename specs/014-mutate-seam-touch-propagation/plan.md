@@ -4,14 +4,14 @@
 
 **Input**: Feature specification from `specs/014-mutate-seam-touch-propagation/spec.md`
 
-> ## ⚠️ PRECONDITION — THIS PLAN IS PROVISIONAL AND GATED (NOT READY-TO-IMPLEMENT)
+> ## ✅ PRECONDITION CLEARED — RE-VALIDATED AGAINST THE RATIFIED CONTRACT (2026-06-28)
 >
-> The feature spec is **DESIGN-ONLY / BLOCKED** on the engine mutation contract **#5b / #232** (spec Dependency Gate, FR-001, Q1=A). That contract has **NOT landed**. This `plan.md` (and the accompanying `tasks.md`) were generated **ahead of the gate, on explicit author direction (Matthew Lee)**, so the design is ready the moment the contract ratifies — **it does not authorize implementation.**
+> This plan was originally PROVISIONAL AND GATED on the engine mutation contract **#5b / #232**. **That gate is now CLEARED:** the contract ratified and merged to main in **PR #822** (`@keyboard-studio/contracts` 0.12.0; §18 sign-off recorded in [docs/spec-signoff.md](../../docs/spec-signoff.md)).
 >
-> Everything below is planned against the **proposed / anticipated** `mutate` contract shape described in the spec:
-> a **pure** `mutate(value, ctx): Partial<KeyboardIR>` that the reducer applies, runtime-asserting the patch touches only the module's declared `writes` paths, **idempotent** on re-apply, applied as a **path-scoped deep merge** at the declared `IRPath` locations.
+> The plan is planned against the now-**ratified** `mutate` contract shape:
+> a **pure** `mutate(value, ctx: MutateContext): Partial<KeyboardIR>` that the reducer applies, runtime-asserting the patch touches only the module's declared `writes` paths, **idempotent** on re-apply, applied as a **path-scoped deep merge** at the declared `IRPath` locations. This matches the activated `mutate?` signature + `MutateContext` in `packages/studio/src/survey/types.ts` and the `TouchKeyIR.provenance?` field in `packages/contracts/src/keyboard-ir.ts` exactly.
 >
-> **Before any task is executed, this plan MUST be re-validated against the *ratified* IR/contract shape from #5b/#232.** A `writes`/IR-shape mismatch is the §8-named risk this phase carries (spec Edge Cases, FR-003). The two Constitution gates that cannot be fully closed until that ratification — **Article I/§18 contracts MAJOR bump (needs the joint engine+content session)** and **Article II IR-shape finalization** — are recorded as **flagged-pending** in the Constitution Check below, not silently passed. Do **not** mark this feature ready-to-implement until those items resolve.
+> **T000 re-validation outcome (2026-06-28):** every `writes` `IRPath` in the 5 in-scope identity/header modules resolves cleanly to the ratified `KeyboardIR`/`IRHeader` shape (`header.bcp47`, `header.name`, `header.copyright`, `stores[*]`) — **no `writes`/IR-shape drift** (the §8 risk is mitigated; spec Edge Cases, FR-003). The two former flagged-pending Constitution gates — **Article I/§18 contracts bump** and **Article II IR-shape finalization** — are now **RESOLVED** by #822 (see the updated Constitution Check below). This plan is **ready-to-implement**; T003–T018 are ungated.
 
 ## Summary
 
@@ -43,7 +43,7 @@ Technical approach (against the anticipated #5b/#232 contract):
 **Performance Goals**: No new survey hot-path cost beyond a bounded patch merge per step completion. Re-propagation runs at most once per physical change over the bounded staleness closure (coalesced, Q10). The single 300 ms debounce cycle (D3) is untouched (Art. IV).
 
 **Constraints**:
-- **GATED on #5b/#232** — `mutate()` cannot ship until the engine mutation contract ratifies; plan must be re-validated against the ratified shape (FR-001).
+- **Gate CLEARED (#822, 2026-06-28)** — the engine mutation contract ratified (`@keyboard-studio/contracts` 0.12.0); the plan was re-validated against the ratified shape on 2026-06-28 (FR-001, T000), no `writes`/IR-shape drift.
 - Strict-TS explicit-extension imports — the provenance re-export and any moved code update specifiers including the extension.
 - Flag **off** ⇒ byte-identical to P4b; **zero** `mutate()` executes (FR-016, SC-008).
 - Fail-fast whole-patch rejection on undeclared-`writes`, in **all** builds (Q11) — not a dev-only assert.
@@ -57,22 +57,22 @@ Technical approach (against the anticipated #5b/#232 contract):
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-This feature is **design-only / BLOCKED**. The gate is evaluated against the **anticipated** #5b/#232 contract shape. Two articles **cannot be fully closed** until that contract ratifies and the §18 joint session runs; per author direction those are recorded as **FLAGGED-PENDING with a named resolution path** (not silently passed, and not used to block writing the plan).
+This feature was design-only / BLOCKED; the gate is now **CLEARED** by #822 (2026-06-28). The gate is evaluated against the **ratified** #5b/#232 contract shape (`@keyboard-studio/contracts` 0.12.0). The three formerly flagged-pending articles are now **RESOLVED** — the contract ratified and the §18 sign-off was recorded by Matthew Lee (contract authority) in [docs/spec-signoff.md](../../docs/spec-signoff.md).
 
 | Article | Gate | Verdict |
 |---|---|---|
-| **I. Pattern schema is a locked contract** | Does this rename/retype/remove a `Pattern` field or its zod mirror? Does it edit a locked `packages/contracts` surface? | **FLAGGED-PENDING (gate item G-I).** No `Pattern` field is renamed/retyped/removed (Assumptions confirm this). **But** this feature **adds a provenance field to the locked `TouchKeyIR` contract** and bumps `@keyboard-studio/contracts` **MAJOR** (FR-008/-011). Per Art. I / §18 that requires a **joint engine+content session**, which has **not** occurred. **Resolution path**: hold the contract edit until #5b/#232 ratifies the IR shape and the §18 joint session is convened and recorded; the zod mirror (`packages/contracts/src/schemas.ts`) MUST be updated in the same change as the type (Art. I drift guard). |
-| **II. KeyboardIR is the engine spine** | Does code operate on raw `.kmn` instead of IR, or drop opaque fragments? Is the IR write surface real? | **FLAGGED-PENDING (gate item G-II).** All writes go through the typed IR via `mutate()` → reducer patch-merge; nothing touches raw `.kmn`; opaque fragments are untouched. **But** the executable mutation surface is exactly what #5b/#232 ratifies — the anticipated pure-patch shape is **not yet final**, so `writes`/IR-shape conformance can only be *typecheck-asserted against the proposed shape today*. **Resolution path**: re-validate the `writes` `IRPath`s and patch shape against the ratified `KeyboardIR` before executing tasks (FR-001/-003; §8 risk). The FR-003 fail-fast containment assertion is the runtime guard once the shape is fixed. |
+| **I. Pattern schema is a locked contract** | Does this rename/retype/remove a `Pattern` field or its zod mirror? Does it edit a locked `packages/contracts` surface? | **RESOLVED (gate item G-I, was FLAGGED-PENDING).** No `Pattern` field is renamed/retyped/removed (Assumptions confirm this). The provenance field on the locked `TouchKeyIR` contract + the `@keyboard-studio/contracts` bump **landed in #822** (0.11.0 → 0.12.0; per the §18 sign-off this is the package's pre-1.0 0ver mapping of a spec-level MAJOR contract change to a minor bump, same convention as the #232 lock's 0.3.0 and the IRPath 0.11.0 bumps). The §18 joint engine+content session was convened and **recorded** in [docs/spec-signoff.md](../../docs/spec-signoff.md) (2026-06-28, reviewed by Matthew Lee). The zod mirror (`packages/contracts/src/schemas.ts` `TouchKeyProvenanceSchema` + drift guard) was updated in the same change as the type (Art. I drift guard holds). |
+| **II. KeyboardIR is the engine spine** | Does code operate on raw `.kmn` instead of IR, or drop opaque fragments? Is the IR write surface real? | **RESOLVED (gate item G-II, was FLAGGED-PENDING).** All writes go through the typed IR via `mutate()` → reducer patch-merge; nothing touches raw `.kmn`; opaque fragments are untouched. The executable mutation surface is now **ratified** by #822: `mutate?(value, ctx: MutateContext): Partial<KeyboardIR>` is the activated type-level signature in `survey/types.ts`. **Re-validated 2026-06-28 (T000):** all 5 in-scope modules' `writes` `IRPath`s resolve cleanly to the ratified `KeyboardIR`/`IRHeader` shape (`header.bcp47`, `header.name`, `header.copyright`, `stores[*]`) — no shape drift. The FR-003 fail-fast containment assertion is the runtime guard at apply time (T008/T014). |
 | **III. Single persistent working copy** | Does it add a second working copy or intermediate serialization? | **PASS.** `mutate()` returns a *patch* the existing reducer applies to the one working copy; no second copy, no intermediate serialization. Provenance rides on that copy and is serialized only at output. Re-propagation mutates the same copy in place via the reducer. |
 | **IV. Validator layering is fixed (one 300 ms debounce)** | Does it add a second debounce or a parallel validation path? | **PASS (with note).** The real per-spine-prefix validator (FR-017) runs **within** the existing single validation path / debounce cycle (D3); shippability stays **distinct from** inputs-satisfiability (FR-018) but introduces **no** second debounce timer and **no** parallel path. Tasks explicitly forbid a new timer. |
 | **V. VirtualFS only during authoring** | Does it write to host disk during authoring? | **PASS.** No new I/O; all state stays in-memory; output serialization unchanged. |
-| **VI. Team boundaries** | Which team owns this, and does it stay in bounds? | **FLAGGED-PENDING (gate item G-VI, same root as G-I).** Spans the **Engine** boundary (the `KeyboardIR`/`TouchKeyIR` contract + validator wiring) **and** the studio survey/editor surface. The contracts MAJOR bump touches a locked Engine surface and **requires the §18 joint engine+content session** before landing. **Resolution path**: convene + record the joint session as part of the MAJOR bump (FR-011); studio-side `mutate()` conversion and re-propagation stay within the front-end boundary. |
+| **VI. Team boundaries** | Which team owns this, and does it stay in bounds? | **RESOLVED (gate item G-VI, same root as G-I).** Spans the **Engine** boundary (the `KeyboardIR`/`TouchKeyIR` contract + validator wiring) **and** the studio survey/editor surface. The contracts bump that touches the locked Engine surface **landed in #822** with the §18 joint engine+content session **recorded** in [docs/spec-signoff.md](../../docs/spec-signoff.md) (FR-011, SC-010). Studio-side `mutate()` conversion and re-propagation stay within the front-end boundary. |
 | **VII. Out of scope for v1** | Does it implement any §16 forbidden item? | **PASS.** No CJK/Ethiopic reorder, no LDML, no touch-first / reverse touch→physical authoring (FR-019; re-propagation seeds touch from the locked physical layout, never the reverse), no multi-source merge, no publishing paths, no flow-map editor, no library/reserve deletion. |
 | **VIII. House conventions** | Console emoji? backticked file refs in user text? issue numbers in code? commit style? | **PASS.** No console emoji; provenance tags are typed string literals, not emoji; issue numbers (#5b/#232) are cross-linked in spec/plan/commit prose, **not** embedded in shipped code/comments (Art. VIII); commits follow `<prefix>(<area>): …`. |
 
-**Initial Constitution Check: PASS on Articles III, IV, V, VII, VIII; FLAGGED-PENDING on Articles I, II, VI (gate items G-I, G-II, G-VI).** The flagged items are the direct consequence of the spec's design-only/BLOCKED status (Q1=A) and resolve when #5b/#232 ratifies and the §18 joint session runs. They are tracked in **Complexity / Gate Tracking** below. The plan is intentionally written ready-but-gated; **it does not authorize implementation** while G-I/G-II/G-VI are open.
+**Constitution Check (re-validated 2026-06-28): PASS on all articles.** Articles III, IV, V, VII, VIII passed cleanly from the start; Articles I, II, VI (gate items G-I, G-II, G-VI) are now **RESOLVED** by #822 (contract ratified + §18 sign-off recorded) and the T000 `writes`-vs-ratified-IR re-validation (no drift). They are tracked as resolved in **Complexity / Gate Tracking** below. The plan is **ready-to-implement**; T003–T018 are ungated.
 
-*Post-Design re-check (after Phase 1):* unchanged — the design artifacts (data-model, contracts, quickstart) are all written against the *anticipated* shape and carry the same provisional caveat; no new violation introduced, the three gate items remain the only open gates.
+*Post-Design re-check (after Phase 1, re-validated 2026-06-28):* the design artifacts (data-model, contracts, quickstart) were written against the anticipated shape and have been re-validated against the **ratified** #822 contract — the anticipated and ratified shapes match (`mutate?(value, ctx): Partial<KeyboardIR>`, `TouchKeyIR.provenance?`); no new violation introduced and all three formerly-open gate items (G-I/G-II/G-VI) are now RESOLVED.
 
 ## Project Structure
 
@@ -92,14 +92,14 @@ specs/014-mutate-seam-touch-propagation/
 
 ### Source Code (repository root)
 
-**(EDIT)** marks existing files changed; **(NEW)** marks net-new; **[GATED on #5b/#232]** marks edits that cannot land until the contract ratifies.
+**(EDIT)** marks existing files changed; **(NEW)** marks net-new; **[LANDED in #822]** marks the contract edits that already landed when the gate cleared (2026-06-28).
 
 ```text
 packages/contracts/src/
-  keyboard-ir.ts                 # (EDIT) [GATED] add provenance field to TouchKeyIR (Q2/FR-008)
-  schemas.ts                     # (EDIT) [GATED] mirror the provenance field in the zod schema (Art. I drift guard)
-  index.ts                       # (EDIT) [GATED] export the provenance type for editor re-export
-  package.json                   # (EDIT) [GATED] MAJOR version bump (FR-011)
+  keyboard-ir.ts                 # (EDIT) [LANDED #822] provenance field on TouchKeyIR (Q2/FR-008)
+  schemas.ts                     # (EDIT) [LANDED #822] zod mirror of provenance (Art. I drift guard)
+  index.ts                       # (EDIT) [LANDED #822] provenance type exported for editor re-export
+  package.json                   # (EDIT) [LANDED #822] version bump 0.11.0 → 0.12.0 (FR-011)
 
 packages/studio/src/
   survey/
@@ -114,7 +114,7 @@ packages/studio/src/
     mutateFlag.ts                # (NEW) single global flag gating the mutate() write path (Q6)
   editors/
     assignLoop/
-      provenance.ts              # (EDIT) becomes a RE-EXPORT of the contracts provenance type (FR-008)
+      provenance.ts              # (EDIT) [LANDED #822] now a RE-EXPORT of the contracts provenance type (FR-008)
       touchBehavior.ts           # (EDIT) manual edit to physical-suggested key promotes to hand-set (FR-014)
     carve/
       CarveGallery.tsx           # (EDIT) route edits through mutate() patch, retire direct store mutators
@@ -135,16 +135,16 @@ packages/contracts/                                          # (NEW) provenance 
 .dependency-cruiser.cjs          # (EDIT) allow studio→contracts provenance edge; flags/ leaf rules
 ```
 
-**Structure Decision**: A cross-boundary change. The contract edit (provenance on `TouchKeyIR` + MAJOR bump) is confined to `packages/contracts/src/{keyboard-ir,schemas,index}.ts` + `package.json` and is **[GATED]**. The studio side adds `steps/mutateApply.ts`, `steps/repropagate.ts`, `flags/mutateFlag.ts`, edits `survey/types.ts`, `steps/reducer.ts`, the 5 non-empty-`writes` modules, the carve/add editors (which carry the strategy-bearing writes), `touchSuggest`, and `dashboard/completeness.ts`. Per-question tests stay in the mirrored `packages/studio/tests/survey/questions/<phase>/` tree (Q7); the provenance round-trip test lives in `packages/contracts`.
+**Structure Decision**: A cross-boundary change. The contract edit (provenance on `TouchKeyIR` + version bump) is confined to `packages/contracts/src/{keyboard-ir,schemas,index}.ts` + `package.json` and **[LANDED in #822]**. The studio side adds `steps/mutateApply.ts`, `steps/repropagate.ts`, `flags/mutateFlag.ts`, edits `survey/types.ts`, `steps/reducer.ts`, the 5 non-empty-`writes` modules, the carve/add editors (which carry the strategy-bearing writes), `touchSuggest`, and `dashboard/completeness.ts`. Per-question tests stay in the mirrored `packages/studio/tests/survey/questions/<phase>/` tree (Q7); the provenance round-trip test lives in `packages/contracts`.
 
 ## Complexity / Gate Tracking
 
-> Filled because the Constitution Check has **flagged-pending** gate items (consequence of the spec's BLOCKED status). These are **not** unjustified violations — they are gates that resolve on #5b/#232 ratification + the §18 joint session. The plan is written ready-but-gated by author direction.
+> Originally filled because the Constitution Check had flagged-pending gate items (consequence of the spec's BLOCKED status). **All three are now RESOLVED** by #822 (contract ratified + §18 sign-off recorded) and the T000 re-validation (2026-06-28).
 
-| Gate item | Article | Status | Why it cannot close now | Resolution path |
-|---|---|---|---|---|
-| **G-I — `TouchKeyIR` provenance field + contracts MAJOR bump** | I / §18 | FLAGGED-PENDING | Editing a locked `packages/contracts` surface + a MAJOR bump requires a **joint engine+content session** (Art. I / §18) that has not occurred; the IR shape isn't ratified. | Convene + record the §18 joint session as part of the MAJOR bump (FR-011); update the zod mirror in the same change (Art. I drift guard); land only after #5b/#232. |
-| **G-II — executable IR mutation shape not ratified** | II | FLAGGED-PENDING | `mutate()` is the §8 risk: declaring `writes`/patch shape that may not match the *real* IR. Only #5b/#232 confirms the shape; today it's typecheck-asserted against the *proposed* shape. | Re-validate `writes` `IRPath`s + patch shape against the ratified `KeyboardIR` before executing tasks (FR-001/-003). FR-003 fail-fast assertion guards at runtime once fixed. |
-| **G-VI — cross-boundary §18 coordination** | VI | FLAGGED-PENDING | The change spans Engine (contract + validator) and studio; the locked-surface edit needs the §18 joint engine+content session. | Same joint session as G-I; record the coordination note (FR-011, SC-010). Studio-side work stays in front-end boundary. |
+| Gate item | Article | Status | Resolution |
+|---|---|---|---|
+| **G-I — `TouchKeyIR` provenance field + contracts bump** | I / §18 | **RESOLVED (#822, 2026-06-28)** | The provenance field + bump (0.11.0 → 0.12.0; pre-1.0 0ver mapping of a spec-MAJOR contract change to a minor bump) **landed in #822**; the §18 joint engine+content session is **recorded** in [docs/spec-signoff.md](../../docs/spec-signoff.md) (reviewed by Matthew Lee); the zod mirror (`schemas.ts` `TouchKeyProvenanceSchema` + drift guard) was updated in the same change (Art. I drift guard holds). |
+| **G-II — executable IR mutation shape** | II | **RESOLVED (#822, 2026-06-28)** | The `mutate?(value, ctx: MutateContext): Partial<KeyboardIR>` shape is ratified in `survey/types.ts`. T000 re-validated all 5 in-scope modules' `writes` `IRPath`s against the ratified `KeyboardIR` — `header.bcp47`, `header.name`, `header.copyright`, `stores[*]` all resolve, **no shape drift**. FR-003 fail-fast assertion guards at runtime (T008/T014). |
+| **G-VI — cross-boundary §18 coordination** | VI | **RESOLVED (#822, 2026-06-28)** | The locked-surface edit landed in #822 with the §18 coordination note recorded (FR-011, SC-010); studio-side work stays in the front-end boundary. |
 
-These three gate items are the **only** open gates. Articles III/IV/V/VII/VIII pass cleanly. **Do not mark this feature ready-to-implement until G-I, G-II, and G-VI are resolved.**
+All three formerly-open gate items are **RESOLVED**. Articles III/IV/V/VII/VIII pass cleanly. **This feature is ready-to-implement; T003–T018 are ungated.**

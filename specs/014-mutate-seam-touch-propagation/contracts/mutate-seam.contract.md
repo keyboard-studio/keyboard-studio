@@ -1,8 +1,8 @@
 # Contract: `mutate()` write seam + reducer patch application
 
-**Feature**: 014-mutate-seam-touch-propagation | **Status**: PROVISIONAL / GATED on #5b/#232
+**Feature**: 014-mutate-seam-touch-propagation | **Status**: RATIFIED (gate cleared per PR #822, 2026-06-28)
 
-> Written against the **anticipated** engine mutation contract. Re-validate against the ratified `KeyboardIR`/mutation surface before implementation (plan gate G-II).
+> The `mutate?(value, ctx: MutateContext): Partial<KeyboardIR>` surface is **ratified** and landed at the type level in `survey/types.ts` by **PR #822** (`@keyboard-studio/contracts` 0.12.0). Re-validated against the ratified `KeyboardIR`/mutation surface on 2026-06-28 (T000) — no shape drift (plan gate G-II RESOLVED). The reducer apply path + per-module implementations remain front-end work (tasks T008/T014/T015).
 
 ## Surface
 

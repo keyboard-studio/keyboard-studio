@@ -2,7 +2,7 @@
 
 **Feature**: 014-mutate-seam-touch-propagation | **Date**: 2026-06-28
 
-> **PROVISIONAL / GATED.** This feature is DESIGN-ONLY / BLOCKED on the engine mutation contract **#5b/#232** (spec Q1=A, FR-001). Every decision below is taken against the **anticipated** contract shape and MUST be re-validated against the ratified `KeyboardIR`/mutation contract before any task executes. See [plan.md](plan.md) Constitution Check gate items G-I/G-II/G-VI.
+> **RE-VALIDATED — GATE CLEARED (2026-06-28).** This feature was DESIGN-ONLY / BLOCKED on the engine mutation contract **#5b/#232** (spec Q1=A, FR-001); that gate **cleared with PR #822** (`@keyboard-studio/contracts` 0.12.0; §18 sign-off recorded in [docs/spec-signoff.md](../../docs/spec-signoff.md)). Every decision below was taken against the anticipated contract shape and has been **re-validated against the ratified `KeyboardIR`/mutation contract on 2026-06-28 (T000)** — the anticipated and ratified shapes match; all 5 in-scope `writes` `IRPath`s resolve with no drift. Plan Constitution Check gate items G-I/G-II/G-VI are RESOLVED.
 
 No `[NEEDS CLARIFICATION]` markers remain — Q1–Q11 were all resolved in [spec.md](spec.md) → Clarifications (approved by Matthew Lee). This document records the design decisions that ground the plan, each derived from the current code (audited 2026-06-28) and the governing plan ([docs/survey-modularity-cyoa-plan.md](../../docs/survey-modularity-cyoa-plan.md) §3.3/§3.5/§3.6/§6/§8).
 

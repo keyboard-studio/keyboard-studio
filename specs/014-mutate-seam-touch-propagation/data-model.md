@@ -2,11 +2,11 @@
 
 **Feature**: 014-mutate-seam-touch-propagation | **Date**: 2026-06-28
 
-> **PROVISIONAL / GATED on #5b/#232.** The one `packages/contracts` change below (the `TouchKeyIR` provenance field) is a **locked-surface edit requiring a MAJOR bump + §18 joint session** ([plan.md](plan.md) gate G-I) and MUST be re-validated against the ratified `KeyboardIR` shape (gate G-II) before landing. Studio-side shapes live in the `@keyboard-studio/studio` package and reference, but do not otherwise modify, the locked contracts.
+> **RE-VALIDATED — GATE CLEARED (2026-06-28).** The one `packages/contracts` change below (the `TouchKeyIR` provenance field) **landed in PR #822** (`@keyboard-studio/contracts` 0.11.0 → 0.12.0; §18 joint session recorded in [docs/spec-signoff.md](../../docs/spec-signoff.md) — [plan.md](plan.md) gates G-I/G-VI RESOLVED) and was re-validated against the ratified `KeyboardIR` shape on 2026-06-28 (gate G-II RESOLVED). The field as landed (`TouchKeyIR.provenance?: TouchKeyProvenance`, optional/additive, absent ⇒ `"hand-set"`) matches the model below. Studio-side shapes live in the `@keyboard-studio/studio` package and reference, but do not otherwise modify, the locked contracts.
 
 ---
 
-## `TouchKeyIR.provenance` — `packages/contracts/src/keyboard-ir.ts` *(EDIT, [GATED])*
+## `TouchKeyIR.provenance` — `packages/contracts/src/keyboard-ir.ts` *(EDIT, [LANDED #822])*
 
 A new per-key field promoted from the inert editor-layer reservation onto the contract.
 

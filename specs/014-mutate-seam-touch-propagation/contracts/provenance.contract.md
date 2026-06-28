@@ -1,8 +1,8 @@
 # Contract: `TouchKeyIR` provenance field
 
-**Feature**: 014-mutate-seam-touch-propagation | **Status**: PROVISIONAL / GATED on #5b/#232
+**Feature**: 014-mutate-seam-touch-propagation | **Status**: RATIFIED (gate cleared per PR #822, 2026-06-28)
 
-> Locked-surface edit — requires contracts MAJOR bump + §18 joint engine+content session (plan gates G-I/G-VI). Re-validate against the ratified `KeyboardIR` shape (G-II).
+> Locked-surface edit **landed in PR #822** (`@keyboard-studio/contracts` 0.11.0 → 0.12.0; §18 joint engine+content session recorded in [docs/spec-signoff.md](../../../docs/spec-signoff.md), reviewed by Matthew Lee — plan gates G-I/G-VI RESOLVED). `TouchKeyIR.provenance?: TouchKeyProvenance` + the zod mirror are present in `packages/contracts`; the editor type is already a re-export. Re-validated against the ratified `KeyboardIR` shape on 2026-06-28 (T000, G-II RESOLVED). Remaining work: the round-trip / default-on-missing tests and re-propagation wiring (front-end tasks).
 
 ## Surface
 
