@@ -2,7 +2,7 @@
 
 > Status: **proposed** (plan for review — no code yet). Companion to [docs/github-integration.md](github-integration.md).
 >
-> **Addendum 2026-06-28:** updated §B.7/§B.8 to reflect `main` after the manifest-driven `SurveyView` refactor (`SurveyStage` union removed) and the expanded `workingCopyStore`. The serialization field list and the resume-phase mechanism below now track the current store/runtime, not the pre-refactor shape.
+> **Addendum 2026-06-28:** updated §B.7/§B.8 to reflect `main` after the manifest-driven `SurveyView` refactor (`SurveyStage` union removed) and the expanded `workingCopyStore`. The serialization field list and the resume-phase mechanism below now track the current store/runtime, not the pre-refactor shape. Also locks in **Option B (recompute on resume)** for `removalCapabilities`: it is **not** persisted but recomputed from the restored IR via `classifyRemovalCapabilities` (see §B.7).
 
 ## Context
 
@@ -61,10 +61,13 @@ The studio's identity flow is disjointed, and in-progress work is lost on reload
   - `phaseResults` (`SurveyPhaseResult[]`) and `irAxes` (`Partial<DiscoveryAxisVector>`) — the survey inputs (`session` is **re-derived** from these on load via `mergePhaseResults`, not stored).
   - `identity` (`IdentityPatch | null`), `instantiationMode` (`InstantiationMode`).
   - `desktopLocked` (`boolean`), `touchLayoutJson` (`string | null`), `touchDraft` (already-serializable: `{ charTouchEntries, skippedChars }` | null), `galleryIntrosSeen` (`{ mechanism, touch }`).
-  - **`removalCapabilities` (`Map<string, RemovalCapability>`) needs an explicit serialization decision.** It is **not** derivable from the persisted VFS — it is computed once at instantiation from the base IR by `classifyRemovalCapabilities` and never recomputed on carve edits. Options: (a) serialize it (Map→array of entries, rebuilt on load), or (b) recompute it from `baseIr` on rehydrate by re-running the classifier. Pick one and document it; do **not** silently drop it, or carve removal affordances will be wrong after a resume. (This branch **does** carry `removalCapabilities` — the earlier "no `removalCapabilities` on this branch" note was true of the pre-refactor store and is no longer accurate.)
-  - **Excluded — derived/non-persistable:** `session` (re-derived via `mergePhaseResults(irAxes, phaseResults)` on load), `staleSteps` (recomputed from the re-opened roots via `computeStalenessFromManifest`), `validatorFindings` (re-produced by the next `useValidator` cycle). Do not persist these.
+  - **Excluded — derived/recomputed on resume, NOT persisted:**
+    - `session` — re-derived via `mergePhaseResults(irAxes, phaseResults)` on load.
+    - `staleSteps` — recomputed from the re-opened roots via `computeStalenessFromManifest`.
+    - `validatorFindings` — re-produced by the next `useValidator` cycle.
+    - **`removalCapabilities` (`Map<string, RemovalCapability>`) — recomputed on resume (decided: Option B).** On rehydrate, re-run `classifyRemovalCapabilities` against the restored IR rather than serializing the Map. Rationale: the classifier is a pure function of the IR — it reads only `ir.raw`, `ir.groups`, `ir.stores`, and `ir.recognizedPatterns`; the IR is already persisted; recompute is cheap (~one linear tree walk); and a recomputed Map can't go stale and auto-adopts any future classifier fixes. The Map is advisory UI metadata for Carve tile badges and does **not** gate deletion, so there's no correctness risk in re-deriving it. **One precondition:** rehydrate must restore the *post-`recognizePatterns`* IR (with `ownedByPattern` set) **before** calling the classifier, because the classifier's S-02 ownership logic (Decision 2) depends on `ownedByPattern`. Since the recognized IR is the source of truth the Carve gallery reads, it is persisted regardless — so this precondition is effectively free.
   - `try/catch` quota guard (skip silently, as q7 does).
-- `loadWorkingCopyDraft()` — parse + deserialize into a store-shaped object (Sets rebuilt, VFS via `createVirtualFS`, `removalCapabilities` rebuilt per the chosen decision above, `session` re-derived); returns `null` if absent/corrupt.
+- `loadWorkingCopyDraft()` — parse + deserialize into a store-shaped object (Sets rebuilt, VFS via `createVirtualFS`, `session` re-derived, `removalCapabilities` recomputed by re-running `classifyRemovalCapabilities` over the restored IR per above); returns `null` if absent/corrupt.
 - `clearWorkingCopyDraft()`.
 - Sized for localStorage (~5MB) — keyboard sources are small; note IndexedDB as the fallback if a base ever exceeds quota.
 
