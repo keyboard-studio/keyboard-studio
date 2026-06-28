@@ -40,6 +40,8 @@ import { createVirtualFS, toUPlusNotation, isDecomposableAccented } from "@keybo
 import { buildTouchLayoutJson } from "../../lib/buildTouchLayoutJson.ts";
 import { resolveBaseTouchJson } from "../../lib/resolveBaseTouchJson.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { promoteOnManualEdit } from "./touchBehavior.ts";
+import { isMutateSeamEnabled } from "../../flags/mutateFlag.ts";
 import { LintSummary } from "../../lint/index.ts";
 import { useTouchLint } from "../../hooks/useTouchLint.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
@@ -873,6 +875,15 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     next.set(currentChar, assignment);
     setCharTouch(next);
     setAppliedForCurrentChar(true);
+    // spec-014 FR-014/R4: a manual edit to the host touch key PROMOTES it to
+    // `hand-set` in the working IR so subsequent re-propagation never clobbers
+    // the author's edit. Flag-gated — off ⇒ byte-identical to P4b (no IR write).
+    // Logic lives in touchBehavior.ts; this call site stays thin.
+    if (isMutateSeamEnabled() && hostKey !== "") {
+      const store = useWorkingCopyStore.getState();
+      const ir = store.ir;
+      if (ir !== null) store.setIR(promoteOnManualEdit(ir, hostKey));
+    }
     // Reset method inputs but stay on currentChar — user must click Next to advance.
     setMethod("longpress_alternates");
     setHostKey("");
