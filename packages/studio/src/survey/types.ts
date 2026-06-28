@@ -2,7 +2,7 @@
 // These describe the static definition shape parsed from content/flows/*.yaml —
 // distinct from the runtime SurveyAnswer/SurveyPhaseResult types in @keyboard-studio/contracts.
 
-import type { IRPath } from "@keyboard-studio/contracts";
+import type { IRPath, KeyboardIR } from "@keyboard-studio/contracts";
 
 /** Rendering-level question type as declared in the YAML flow. */
 export type FlowQuestionType =
@@ -102,6 +102,24 @@ export type ValidationResult =
   | { ok: false; code: string; message: string };
 
 /**
+ * Context passed to a module's `mutate()` (spec-014, mutate-seam.contract.md).
+ *
+ * The contract leaves the exact field set to the reducer apply site (gated task
+ * T014); kept deliberately minimal here — the read-only current `KeyboardIR`
+ * snapshot plus the module's own declared `writes` containment set, which the
+ * reducer asserts the returned patch stays within.
+ *
+ * TODO(P5): extend with whatever the reducer apply path (steps/mutateApply.ts)
+ * needs once T014 lands — do NOT over-build the shape ahead of that gate.
+ */
+export interface MutateContext {
+  /** Read-only snapshot of the working-copy IR at apply time. `mutate()` MUST NOT mutate it. */
+  readonly ir: KeyboardIR;
+  /** The module's declared `writes` paths — the only IR locations the returned patch may touch. */
+  readonly writes: readonly IRPath[];
+}
+
+/**
  * Per-question module shape (see packages/studio/src/survey/questions/).
  *
  * Each question module exports:
@@ -154,14 +172,29 @@ export interface QuestionModule {
   writes?: readonly IRPath[];
 
   /**
-   * Optional IR mutation hook.
-   * STUB: KeyboardIR mutation surface is not yet a real API.
-   * Signature reserved for fan-out cycle (P5, gated on #5b/#232). Do not call.
+   * Optional IR mutation hook — the question-module IR write seam (spec-014,
+   * mutate-seam.contract.md). RATIFIED SIGNATURE; the implementation in any
+   * module and the reducer apply path remain GATED (task T014) — modules keep
+   * their stubs and nothing calls this yet.
+   *
+   * Contract:
+   *  - PURE: returns a `Partial<KeyboardIR>` patch; MUST NOT mutate `ctx.ir`
+   *    in place or perform side effects (M1/FR-002).
+   *  - The reducer applies the patch as a path-scoped DEEP merge restricted to
+   *    the module's declared `writes` `IRPath`s; nested siblings under a shared
+   *    parent are preserved, not branch-replaced (M2/Q9).
+   *  - Writing outside the declared `writes` is a FAIL-FAST whole-patch
+   *    rejection in all builds — never a partial apply, never swallowed, IR
+   *    left unchanged (M3/Q11/FR-003).
+   *  - IDEMPOTENT: applying the same `value` against the same IR twice is
+   *    byte-identical to applying it once (M4/FR-004).
+   *  - An empty patch `{}` is valid and merges to a no-op (M5); display-only
+   *    (empty `writes`) modules leave `mutate` absent (FR-007).
+   *
+   * Reducer apply path: steps/reducer.ts `applyStepCompletion` →
+   * steps/mutateApply.ts — OUT of scope for the contract surface (gated T014).
    */
-  // mutate?: (value, ctx) => Partial<KeyboardIR>;
-  // Eventual consumer: SurveyAnswer in packages/contracts/src/surveyPhaseResult.ts
-  // → KeyboardIR mutation in packages/contracts/src/keyboard-ir.ts
-  // Currently surfaceless; do NOT implement until the engine has a real mutation seam.
+  mutate?: (value: string | string[] | undefined, ctx: MutateContext) => Partial<KeyboardIR>;
 
   /** Test vectors exercised by the colocated vitest spec. */
   fixtures: {

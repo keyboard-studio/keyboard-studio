@@ -20,6 +20,7 @@ import { z } from "zod";
 import type { Pattern, PatternQuestion, TestVector, DemoObject } from "./pattern";
 import type { Criterion } from "./criteria";
 import type { RemovalCapability } from "./removalCapability";
+import type { TouchKeyProvenance } from "./keyboard-ir";
 
 // ---------------------------------------------------------------------------
 // Leaf enums — mirror the string-literal unions in the contract types.
@@ -48,6 +49,22 @@ export const RemovalCapabilitySchema = z.enum([
   "not-removable:opaque",
   "not-removable:context-sensitive",
   "not-removable:unknown",
+]);
+
+/**
+ * Mirror of `TouchKeyIR.provenance` (keyboard-ir.ts) — the per-touch-key
+ * placement origin (spec-014 FR-008). Optional on the key (use
+ * `TouchKeyProvenanceSchema.optional()` where a TouchKeyIR is validated);
+ * an absent value deserializes to the conservative `"hand-set"` default.
+ *
+ * NOTE: distinct from the import-attribution `ProvenanceEntrySchema` in
+ * provenance.ts — this is per-touch-key placement provenance, not source
+ * attribution.
+ */
+export const TouchKeyProvenanceSchema = z.enum([
+  "base-derived",
+  "physical-suggested",
+  "hand-set",
 ]);
 
 export const IRNodeRefSchema = z.object({
@@ -247,3 +264,9 @@ type _TestVectorGuard = Expect<AssignableTo<z.infer<typeof TestVectorSchema>, Te
 type _DemoObjectGuard = Expect<AssignableTo<z.infer<typeof DemoObjectSchema>, DemoObject>>;
 type _CriterionGuard = Expect<AssignableTo<z.infer<typeof CriterionSchema>, Criterion>>;
 type _RemovalCapabilityGuard = Expect<AssignableTo<z.infer<typeof RemovalCapabilitySchema>, RemovalCapability>>;
+// The provenance enum schema and the TouchKeyProvenance contract union must
+// stay in lockstep (spec-014 FR-008, Art. I drift guard). NonNullable strips
+// the optional `?:` form so the guard compares the underlying union only.
+type _TouchKeyProvenanceGuard = Expect<
+  AssignableTo<z.infer<typeof TouchKeyProvenanceSchema>, NonNullable<TouchKeyProvenance>>
+>;
