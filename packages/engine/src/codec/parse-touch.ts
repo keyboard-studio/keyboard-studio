@@ -10,8 +10,48 @@
  * including the `sk` (subkey) array.
  */
 
-import type { TouchLayoutIR, TouchKeyIR, IRNodeRef } from "@keyboard-studio/contracts";
+import type {
+  TouchLayoutIR,
+  TouchKeyIR,
+  IRNodeRef,
+  TouchKeyProvenance,
+} from "@keyboard-studio/contracts";
 import { NodeIdMinter } from "../shared/node-ids.js";
+
+// ---------------------------------------------------------------------------
+// Provenance wire field (spec-014 US3 / T028, FR-010)
+// ---------------------------------------------------------------------------
+//
+// Per-key touch provenance (TouchKeyIR.provenance) must survive the codec
+// round-trip so the no-clobber re-propagation rule (US2) has a durable source.
+// The `.keyman-touch-layout` JSON key object does NOT reserve a `"p"` property
+// in the Keyman touch-layout schema, and kmcmplib's TouchLayoutFileReader
+// ignores properties it does not recognise (RawKey carries `[key: string]:
+// unknown`), so writing provenance under a short, non-colliding `"p"` key is a
+// NON-BREAKING addition: the standard Keyman parser tolerates and skips it.
+//
+// `convertKey` reads `p` back, validating it against the known provenance
+// vocabulary; an absent / legacy / out-of-vocabulary value defaults to
+// `"hand-set"` (FR-009 — conservative, never auto-clobbered).
+
+/** Wire-format property carrying per-key provenance in `.keyman-touch-layout`. */
+const PROVENANCE_WIRE_KEY = "p" as const;
+
+const PROVENANCE_VALUES: ReadonlySet<string> = new Set<TouchKeyProvenance>([
+  "base-derived",
+  "physical-suggested",
+  "hand-set",
+]);
+
+/**
+ * Coerce a raw wire value to a {@link TouchKeyProvenance}. Absent, legacy, or
+ * out-of-vocabulary values default to `"hand-set"` (FR-009).
+ */
+function readProvenance(raw: unknown): TouchKeyProvenance {
+  return typeof raw === "string" && PROVENANCE_VALUES.has(raw)
+    ? (raw as TouchKeyProvenance)
+    : "hand-set";
+}
 
 // ---------------------------------------------------------------------------
 // Raw JSON shapes (non-exhaustive — only the fields we care about)
@@ -31,6 +71,11 @@ interface RawKey {
   /** Wire format encodes pad as a JSON string (e.g. `"pad": "50"`); also accept a number for robustness. */
   pad?: string | number;
   hint?: string;
+  /**
+   * Per-key provenance (spec-014 FR-008/-010). Non-standard `.keyman-touch-layout`
+   * property; ignored by kmcmplib's reader. Absent/legacy ⇒ `"hand-set"`.
+   */
+  p?: string;
   [key: string]: unknown;
 }
 
@@ -61,6 +106,10 @@ function convertKey(raw: RawKey, minter: NodeIdMinter): TouchKeyIR {
   const key: TouchKeyIR = {
     nodeId,
     id: raw.id ?? "",
+    // Provenance is always materialised on deserialize: an absent/legacy/
+    // out-of-vocabulary wire value resolves to the conservative `"hand-set"`
+    // default (FR-009/T028), so the no-clobber rule always has a tag to read.
+    provenance: readProvenance(raw[PROVENANCE_WIRE_KEY]),
   };
   if (raw.text !== undefined) key.text = raw.text;
   if (raw.output !== undefined) key.output = raw.output;
@@ -163,6 +212,9 @@ type EmittedKey = Record<string, unknown>;
 
 function emitKey(key: TouchKeyIR): EmittedKey {
   const out: EmittedKey = { id: key.id };
+  // Provenance round-trip (FR-010): write the tag to the non-standard `"p"`
+  // wire property so it survives emit → re-parse. kmcmplib ignores it.
+  if (key.provenance !== undefined) out[PROVENANCE_WIRE_KEY] = key.provenance;
   if (key.text !== undefined) out["text"] = key.text;
   if (key.output !== undefined) out["output"] = key.output;
   if (key.hint !== undefined) out["hint"] = key.hint;
