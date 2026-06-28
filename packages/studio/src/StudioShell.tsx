@@ -44,7 +44,34 @@ import { PreviewScreen } from "./components/PreviewScreen.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
 import { navigateTo } from "./lib/navigate.ts";
 import { manifest } from "./steps/manifest.ts";
-import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
+import { applyStepCompletion, type ReducerDeps, type MutateRequest } from "./steps/reducer.ts";
+import { questionRegistry } from "./survey/questions/registry.ts";
+
+/**
+ * spec-014 US1 (T014/T015): route each in-scope question answer through its
+ * module's `mutate()` write seam via the reducer. The reducer gates execution
+ * on the global mutate flag (off ⇒ no-op, byte-identical to P4b), so this is
+ * safe to call unconditionally. A module without `mutate`/with empty `writes`
+ * is skipped (display-only / answer-store-only stays a no-op, FR-007).
+ */
+function routeAnswersThroughMutate(
+  result: SurveyPhaseResult,
+  deps: ReducerDeps,
+): void {
+  for (const answer of result.answers) {
+    const mod = questionRegistry[answer.questionId];
+    if (mod === undefined) continue;
+    if (mod.mutate === undefined || (mod.writes ?? []).length === 0) continue;
+    const value = answer.value as string | string[] | undefined;
+    const req: MutateRequest = {
+      kind: "mutate",
+      mutate: mod.mutate,
+      value,
+      writes: mod.writes!,
+    };
+    applyStepCompletion(answer.questionId, req, deps);
+  }
+}
 
 // Bind the manifest into the store's staleness actions.
 // Called once at module load; avoids a circular static import in the store
@@ -430,6 +457,11 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       resolveBaseTouchJson: (vfs) => resolveBaseTouchJson(vfs),
       instantiateFromBaseIfConfirmed: (base, opts) =>
         instantiateFromBaseIfConfirmed(base, opts),
+      // spec-014 mutate seam (T014): read/write the working-copy carve IR for
+      // the reducer's path-scoped mutate() apply. Read via getState() (stable,
+      // no re-render churn); write via the existing setIR action.
+      getWorkingIR: () => useWorkingCopyStore.getState().ir,
+      setWorkingIR: (next) => useWorkingCopyStore.getState().setIR(next),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     // Wrapper lambdas delegate to stable module imports — excluded from deps intentionally.
@@ -531,6 +563,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   /** identity step completes → choose_base (or unsupported). */
   function handleIdentityComplete(result: SurveyPhaseResult, identity: IdentityLiteResult) {
     recordPhase(result);
+    // spec-014 US1: route Phase A identity/header answers through mutate() (flag-gated).
+    routeAnswersThroughMutate(result, reducerDeps);
     setIdentityResult(identity);
     setSurveyContext(contextFromIdentity(identity));
     setActiveStepId(identity.supported ? nextSpineStepAfter("identity") : "unsupported");
@@ -587,6 +621,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
    */
   function handlePhaseBComplete(result: SurveyPhaseResult) {
     recordPhase(result);
+    // spec-014 US1: route Phase B in-scope answers (pb_standard_letters) through
+    // mutate() (flag-gated) before the characters step's R5 side effect.
+    routeAnswersThroughMutate(result, reducerDeps);
     applyStepCompletion("characters", result, reducerDeps);
     setActiveStepId(nextSpineStepAfter("characters"));
   }

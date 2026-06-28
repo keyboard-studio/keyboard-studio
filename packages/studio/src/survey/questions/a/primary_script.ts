@@ -1,7 +1,8 @@
 // Per-question module: primary_script (Phase A)
 // Ported verbatim from content/flows/phase_a_identity.yaml.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule, ValidationResult, MutateContext } from "../../types.ts";
+import type { KeyboardIR } from "@keyboard-studio/contracts";
 
 import { irPath } from "@keyboard-studio/contracts";
 
@@ -88,9 +89,45 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
+/** Normalize the answer to a single script subtag value. */
+function asScript(value: string | string[] | undefined): string {
+  return typeof value === "string"
+    ? value.trim()
+    : Array.isArray(value)
+      ? (value[0] ?? "").trim()
+      : "";
+}
+
+/**
+ * Merge the chosen script subtag into the BCP-47 tag (`header.bcp47`) —
+ * spec-014 FR-006b. Scoped to the declared `writes` path `header.bcp47`.
+ *
+ * Reads the existing language subtag from `ctx.ir` (set by `iso_code`) and
+ * produces `<lang>-<Script>`. The "Other" catch-all carries no canonical
+ * subtag, so it leaves the tag's language part alone (no script suffix). An
+ * empty answer is a no-op (M5). When no language subtag exists yet, the script
+ * alone is written so a later `iso_code` answer can prepend the language.
+ */
+export function mutate(
+  value: string | string[] | undefined,
+  ctx: MutateContext,
+): Partial<KeyboardIR> {
+  const script = asScript(value);
+  if (script === "" || script === "Other") return {};
+
+  const current = ctx.ir.header.bcp47[0];
+  const lang =
+    current !== undefined && current !== ""
+      ? current.split("-")[0] ?? ""
+      : "";
+  const tag = lang === "" ? script : `${lang}-${script}`;
+  return { header: { bcp47: [tag] } as KeyboardIR["header"] };
+}
+
 const mod: QuestionModule = {
   definition,
   validate,
+  mutate,
   fixtures,
   inputs: [],
   writes: [irPath("header", "bcp47")],

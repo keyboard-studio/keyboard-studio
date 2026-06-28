@@ -1,7 +1,8 @@
 // Per-question module: language_name_english (Phase A)
 // Ported verbatim from content/flows/phase_a_identity.yaml.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule, ValidationResult, MutateContext } from "../../types.ts";
+import type { KeyboardIR } from "@keyboard-studio/contracts";
 
 import { irPath } from "@keyboard-studio/contracts";
 
@@ -47,9 +48,33 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
+/** Normalize the answer to a single trimmed string (text inputs may arrive as string[]). */
+function asText(value: string | string[] | undefined): string {
+  return typeof value === "string"
+    ? value.trim()
+    : Array.isArray(value)
+      ? value.join("").trim()
+      : "";
+}
+
+/**
+ * Write the keyboard display name (the &NAME store) — spec-014 FR-006b.
+ * Scoped to the declared `writes` path `header.name`. An empty answer produces
+ * an empty patch (no-op), leaving the existing name untouched (M5).
+ */
+export function mutate(
+  value: string | string[] | undefined,
+  _ctx: MutateContext,
+): Partial<KeyboardIR> {
+  const name = asText(value);
+  if (name === "") return {};
+  return { header: { name } as KeyboardIR["header"] };
+}
+
 const mod: QuestionModule = {
   definition,
   validate,
+  mutate,
   fixtures,
   inputs: [],
   writes: [irPath("header", "name")],

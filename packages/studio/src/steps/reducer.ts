@@ -21,8 +21,11 @@
 // so this file remains boundary-clean. It captures exactly the store actions
 // and lib helpers the reducer needs — nothing more.
 
-import type { KeyboardIR, TouchAssignment, VirtualFS } from "@keyboard-studio/contracts";
+import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS } from "@keyboard-studio/contracts";
 import type { BaseKeyboard, RemovalCapability } from "@keyboard-studio/contracts";
+import type { MutateContext } from "../survey/types.ts";
+import { applyMutatePatch } from "./mutateApply.ts";
+import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 
 // ---------------------------------------------------------------------------
 // Step ids that carry side effects (keyed constants — never inline strings)
@@ -118,6 +121,50 @@ export interface ReducerDeps {
     base: BaseKeyboard,
     opts: { vfs: VirtualFS | null; ir: KeyboardIR | null; removalCapabilities?: Map<string, RemovalCapability> },
   ) => boolean;
+
+  // --- mutate seam (spec-014 T014) ---
+  /**
+   * Read the current working-copy carve IR, or null when not yet instantiated.
+   * Injected (steps/ may not import stores/). Used as the `base` for the
+   * path-scoped `mutate()` patch merge.
+   */
+  getWorkingIR?: () => KeyboardIR | null;
+  /**
+   * Write the merged IR back to the working copy (injected `setIR`). Called only
+   * when the mutate flag is on AND a mutate request actually changed the IR.
+   */
+  setWorkingIR?: (ir: KeyboardIR) => void;
+}
+
+// ---------------------------------------------------------------------------
+// Mutate request — the payload a question step passes to route its answer
+// through the `mutate()` write seam (spec-014 US1, FR-002/-005).
+// ---------------------------------------------------------------------------
+
+/**
+ * A request to apply a single question module's `mutate()` to the working-copy
+ * IR. Carried as the `result` payload of `applyStepCompletion` for in-scope
+ * question steps. The reducer applies it via `mutateApply` ONLY when the global
+ * mutate flag is on; flag-off leaves the P4b declared-only seam unchanged.
+ */
+export interface MutateRequest {
+  /** Discriminator so the reducer recognizes a mutate-routed completion. */
+  kind: "mutate";
+  /** The module's `mutate()` implementation (pure patch producer). */
+  mutate: (value: string | string[] | undefined, ctx: MutateContext) => Partial<KeyboardIR>;
+  /** The answer value to apply. */
+  value: string | string[] | undefined;
+  /** The module's declared `writes` — the containment set for the patch (M3). */
+  writes: readonly IRPath[];
+}
+
+function isMutateRequest(r: unknown): r is MutateRequest {
+  return (
+    typeof r === "object" &&
+    r !== null &&
+    (r as { kind?: unknown }).kind === "mutate" &&
+    typeof (r as { mutate?: unknown }).mutate === "function"
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -140,6 +187,22 @@ export function applyStepCompletion(
   result: unknown,
   deps: ReducerDeps,
 ): void {
+  // --- mutate seam (spec-014 T014): route an in-scope question answer through
+  // mutate() when the flag is on. Flag-off ⇒ no mutate() executes (F2/SC-008).
+  if (isMutateRequest(result)) {
+    if (!isMutateSeamEnabled()) return; // P4b declared-only seam — no IR write.
+    const base = deps.getWorkingIR?.() ?? null;
+    if (base === null) return; // no working copy yet — nothing to merge into.
+    const ctx: MutateContext = { ir: base, writes: result.writes };
+    // mutate() is pure; applyMutatePatch enforces containment (M3) and merges
+    // path-scoped (M2). A throw here is intentional — the failure must surface
+    // (M3), never be swallowed. The IR is left unchanged on rejection.
+    const patch = result.mutate(result.value, ctx);
+    const next = applyMutatePatch(base, patch, result.writes);
+    deps.setWorkingIR?.(next);
+    return;
+  }
+
   switch (stepId) {
     // R1 — lock gate: fire lockDesktop() after Mechanisms completes.
     case MECHANISMS_STEP_ID: {

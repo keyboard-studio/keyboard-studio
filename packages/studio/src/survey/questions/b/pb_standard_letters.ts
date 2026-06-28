@@ -1,7 +1,8 @@
 // Per-question module: pb_standard_letters (Phase B)
 // Ported verbatim from content/flows/phase_b_characters.yaml.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule, ValidationResult, MutateContext } from "../../types.ts";
+import type { KeyboardIR, IRStore } from "@keyboard-studio/contracts";
 import { irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 
 export const definition = {
@@ -87,9 +88,46 @@ export const fixtures: QuestionModule["fixtures"] = {
 // the script-group discriminator store lands at scaffold time.
 // Do NOT clone these declarations blindly into other question modules; each module
 // must declare its own actual IR dependencies (or explicit empty arrays).
+// Name of the discriminator store this question lands in `KeyboardIR.stores[]`.
+// Stable so re-answering REPLACES the prior entry rather than appending a
+// duplicate (idempotency, M4).
+const SCRIPT_GROUP_STORE_NAME = "kmStandardLetters";
+
+/**
+ * Write the standard-letters script-group discriminator into `stores[]` —
+ * spec-014 FR-006b. Scoped to the declared `writes` path `stores[]`.
+ *
+ * Because a `stores[]` patch replaces the whole array under the path-scoped
+ * merge, this rebuilds the array from `ctx.ir.stores`, replacing any existing
+ * entry named `kmStandardLetters` (so re-answering is idempotent — M4) and
+ * leaving every other store untouched. An invalid/empty answer is a no-op (M5).
+ */
+export function mutate(
+  value: string | string[] | undefined,
+  ctx: MutateContext,
+): Partial<KeyboardIR> {
+  const v = typeof value === "string" ? value : "";
+  if (!VALID_VALUES.has(v)) return {};
+
+  const existing = ctx.ir.stores;
+  const idx = existing.findIndex((s) => s.name === SCRIPT_GROUP_STORE_NAME);
+  const entry: IRStore = {
+    nodeId: existing[idx]?.nodeId ?? `store-${SCRIPT_GROUP_STORE_NAME}`,
+    name: SCRIPT_GROUP_STORE_NAME,
+    items: [{ kind: "raw", text: v }],
+    isSystem: false,
+  };
+  const next =
+    idx === -1
+      ? [...existing, entry]
+      : existing.map((s, i) => (i === idx ? entry : s));
+  return { stores: next };
+}
+
 const mod: QuestionModule = {
   definition,
   validate,
+  mutate,
   fixtures,
   inputs: [irPath("header", "bcp47")],
   writes: [irPath("stores", ARRAY_INDEX)],
