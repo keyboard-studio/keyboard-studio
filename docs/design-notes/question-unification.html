@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Note — Complete the Question Unification (keyboard-studio)</title>
+<style>
+  :root{
+    --ink:#1a2230; --muted:#5b6678; --line:#d8dee8; --bg:#fbfcfe;
+    --accent:#1f6feb; --accent2:#6e40c9; --warn:#9e6a03; --warnbg:#fff7e6;
+    --good:#1a7f37; --bad:#b42318; --code:#0d1117; --codeink:#e6edf3;
+    --chip:#eef2f8;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  .wrap{max-width:1080px; margin:0 auto; padding:48px 28px 96px}
+  header.title{border-bottom:2px solid var(--ink); padding-bottom:18px; margin-bottom:8px}
+  h1{font-size:30px; line-height:1.2; margin:0 0 6px}
+  .sub{color:var(--muted); font-size:15px}
+  .meta{color:var(--muted); font-size:13px; margin-top:10px}
+  code,kbd,.mono{font-family:"SF Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:0.86em}
+  code{background:var(--chip); padding:1px 5px; border-radius:4px; color:#243149}
+  cite{font-style:normal; color:var(--accent2); font-weight:600; white-space:nowrap}
+  h2{font-size:22px; margin:46px 0 10px; padding-top:8px; border-top:1px solid var(--line)}
+  h3{font-size:17px; margin:26px 0 8px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0 10px 4px; padding-left:22px}
+  li{margin:5px 0}
+  .lead{font-size:17px; color:#2a3548}
+  .callout{border-left:4px solid var(--accent); background:#eef4ff; padding:12px 16px; border-radius:0 8px 8px 0; margin:16px 0}
+  .callout.warn{border-color:var(--warn); background:var(--warnbg)}
+  .callout.bad{border-color:var(--bad); background:#fdeceb}
+  .callout.good{border-color:var(--good); background:#e9f6ec}
+  .callout b{font-weight:700}
+  table{border-collapse:collapse; width:100%; margin:18px 0; font-size:13px}
+  th,td{border:1px solid var(--line); padding:8px 10px; vertical-align:top; text-align:left}
+  th{background:#eef2f8; font-size:12px; text-transform:uppercase; letter-spacing:.03em; color:#36425a}
+  tbody tr:nth-child(even){background:#f5f8fc}
+  .tag{display:inline-block; font-size:11px; font-weight:700; padding:2px 7px; border-radius:99px; white-space:nowrap}
+  .t-spine{background:#e7f0ff; color:#1452c4}
+  .t-orphan{background:#fde7e6; color:#b42318}
+  .t-component{background:#fff1d6; color:#8a5a00}
+  .t-registry{background:#e9f6ec; color:#1a7f37}
+  .t-library{background:#efe7fb; color:#5a2fb0}
+  .t-mature{background:#e9f6ec; color:#1a7f37}
+  .t-less{background:#fff1d6; color:#8a5a00}
+  .toc{background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px 20px; margin:22px 0}
+  .toc h4{margin:0 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted)}
+  .toc ol{columns:2; column-gap:32px; margin:0; padding-left:20px}
+  .toc a{color:var(--accent); text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+  .seq{counter-reset:step; list-style:none; padding:0; margin:18px 0}
+  .seq>li{counter-increment:step; position:relative; padding:14px 16px 14px 56px; border:1px solid var(--line); border-radius:10px; margin:12px 0; background:#fff}
+  .seq>li::before{content:"P" counter(step); position:absolute; left:14px; top:14px; width:30px; height:30px; background:var(--accent); color:#fff; border-radius:50%; font-weight:700; font-size:13px; display:flex; align-items:center; justify-content:center}
+  .pill{font-size:11px; font-weight:700; color:#fff; background:var(--accent2); border-radius:6px; padding:2px 7px; margin-left:6px}
+  .risk{display:grid; grid-template-columns:140px 1fr; gap:0; border:1px solid var(--line); border-radius:10px; overflow:hidden; margin:12px 0}
+  .risk>div{padding:10px 14px; border-bottom:1px solid var(--line)}
+  .risk>div:nth-child(odd){background:#f5f8fc; font-weight:600}
+  footer{margin-top:60px; padding-top:18px; border-top:1px solid var(--line); color:var(--muted); font-size:13px}
+  .legend span{margin-right:14px; font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="title">
+  <h1>Complete the Question Unification</h1>
+  <div class="sub">Design note — making the flow map a true projection of the survey, and pulling the mature custom flows into the first-class modular spine on <code>mutate()</code>.</div>
+  <div class="meta">
+    keyboard-studio/keyboard-studio · verified against HEAD <code>ff0fe65</code> · design note for review only — no application source changes proposed here.
+    Contracts <code>@keyboard-studio/contracts</code> currently <code>0.13.0</code> (US1 #823, US2&ndash;US5 #825 merged).
+  </div>
+</header>
+
+<div class="toc">
+  <h4>Contents</h4>
+  <ol>
+    <li><a href="#a">A. The principle &amp; the inversion</a></li>
+    <li><a href="#b">B. Inventory matrix (exhaustive)</a></li>
+    <li><a href="#c">C. Map-as-projection</a></li>
+    <li><a href="#d"><code>mutate()</code> gap analysis</a></li>
+    <li><a href="#e">E. Spine-vs-library split</a></li>
+    <li><a href="#f">F. Migration sequencing</a></li>
+    <li><a href="#g">G. Test strategy &amp; parity proof</a></li>
+    <li><a href="#h">H. Open questions for Matt</a></li>
+  </ol>
+</div>
+
+<!-- ============================================================ A -->
+<h2 id="a">A. The principle — and why the current state inverts it</h2>
+
+<p class="lead">One survey structure renders the questions; the map is a read-only projection of that same structure; and every accessible question is a first-class modular question on the correct branch, executed through the single <code>mutate()</code> write seam.</p>
+
+<p>The intent is stated in the manifest header itself: &ldquo;<i>map == runtime by construction</i>&rdquo; &mdash; both the runtime and the dashboard read the same <code>manifest</code> array, so editing one file moves both <cite>steps/manifest.ts:1&ndash;6</cite>. That guarantee currently holds <b>only</b> at the inter-phase manifest level. It does <b>not</b> hold for the survey-flow section of the map, and it does not describe where the mature experiences actually live.</p>
+
+<div class="callout bad">
+<b>The inversion.</b> The unification refactor pulled the <i>less-mature</i> paths into the registry + map (the per-phase <code>*.modular.yaml</code> question batteries) while the <i>mature, canonical</i> experiences &mdash; the build-list character editor, the prefill confirmation, the track chooser, and the carve / mechanism / touch galleries &mdash; stayed as hand-built React components and were <b>left out of the unified data structure entirely</b>. The map therefore advertises the paths users mostly don&rsquo;t take and is silent about the paths they do.
+</div>
+
+<p>Three concrete symptoms confirm the inversion against current code:</p>
+<ol>
+  <li><b>The map never reads the manifest.</b> The survey-flow section is built only from the four per-phase modular YAMLs &mdash; <code>FLOW_SOURCES</code> <cite>DashboardView.tsx:48&ndash;54</cite> &mdash; via <code>buildModularFlowGraph()</code>. It <b>never</b> calls <code>buildManifestStepGraph()</code> <cite>buildStepGraph.ts:237</cite>; that function is exercised only by tests / <code>completeness.ts</code>. So the editor-step galleries (<code>carve</code>, <code>mechanisms</code>, <code>touch</code> in <cite>steps/manifest.ts:69&ndash;119</cite>) get <b>no node</b>, and the &ldquo;stub (gallery / wizard step)&rdquo; legend swatch <cite>DashboardView.tsx:114</cite> is dead &mdash; nothing ever emits that kind.</li>
+  <li><b>The default flow isn&rsquo;t in any data source.</b> Phase B has two parallel implementations in <cite>PhaseB.tsx</cite>: the hand-built <code>BuildListView</code> (the <b>default</b>, <cite>PhaseB.tsx:690, 535&ndash;629</cite>) and the &ldquo;Step by step&rdquo; manual variant that runs the <code>pb_*</code> registry modules from <code>phase_b_characters.modular.yaml</code> (<cite>PhaseB.tsx:712&ndash;740</cite>). The map shows <b>only</b> the manual variant&rsquo;s 55 <code>pb_*</code> nodes &mdash; i.e. the path most users never see.</li>
+  <li><b>Data and runtime are aligned in exactly one phase.</b> The full non-identity Phase A (<cite>PhaseA.tsx</cite> / <code>phase_a_identity.modular.yaml</code>) is shown in the map but <b>never rendered</b>: <cite>StudioShell.tsx:18</cite> imports <code>IdentityLite, Prefill, PhaseB, PhaseF</code> &mdash; not <code>PhaseA</code>. The app runs only the <code>identity_lite</code> head. Phase F is the only phase where the data structure and the runtime align.</li>
+</ol>
+
+<p>There is also vestigial machinery already in place for the right answer: <code>computeReserveNodes()</code> <cite>buildStepGraph.ts:150&ndash;182</cite> emits <code>library-not-in-flow</code> nodes (the &ldquo;reserve&rdquo; badge) for registry modules absent from the live flow &mdash; but it is currently <b>empty</b>, because every registered module is listed in its YAML. The concept (a library of inert-but-preserved questions) exists; it just isn&rsquo;t being used to hold the genuinely-reserve batteries.</p>
+
+<!-- ============================================================ B -->
+<h2 id="b">B. Inventory matrix</h2>
+
+<p>Every accessible flow / question / wizard, walked from the <code>StudioShell</code> render switch (<cite>StudioShell.tsx:856&ndash;979</cite>), <cite>steps/manifest.ts</cite>, the four <code>*.modular.yaml</code> files, and the component flows. <b>Render mode</b>: modular-question (registry + YAML), hand-built component, or manifest editor-step. <b>Data status</b>: in-registry-spine, orphaned, component-only, or library.</p>
+
+<div class="legend" style="margin:6px 0 14px">
+  <span><span class="tag t-registry">in-registry-spine</span> rendered from the registry &amp; on a data branch</span>
+  <span><span class="tag t-component">component-only</span> rendered, but not in any unified data source</span>
+  <span><span class="tag t-orphan">orphaned</span> in a data source but never rendered</span>
+  <span><span class="tag t-library">library</span> reserve / inert</span>
+</div>
+
+<table>
+<thead>
+<tr><th>Flow / question / wizard</th><th>Render mode (today)</th><th>Data status (today)</th><th>Maturity</th><th>Target</th></tr>
+</thead>
+<tbody>
+
+<tr>
+  <td><b>Identity-lite head</b><br><span class="mono">il_language_autonym … il_target_script</span> <cite>identity_lite.modular.yaml</cite></td>
+  <td>modular-question via <code>IdentityLite</code> <cite>StudioShell.tsx:861&ndash;869</cite></td>
+  <td><span class="tag t-registry">in-registry-spine</span> (Phase A reg.)</td>
+  <td><span class="tag t-mature">mature &amp; live</span></td>
+  <td>Keep: first-class spine, <code>identity</code> manifest step. Already routes through <code>mutate()</code> (<code>il_*</code> header writers).</td>
+</tr>
+
+<tr>
+  <td><b>Full Phase A — identity + provenance</b><br>15 questions + 15 <span class="mono">provenance_*</span> <cite>phase_a_identity.modular.yaml</cite></td>
+  <td><b>not rendered</b> — <code>PhaseA</code> not imported by <cite>StudioShell.tsx:18</cite></td>
+  <td><span class="tag t-orphan">orphaned</span> (shown in map, dead at runtime)</td>
+  <td><span class="tag t-less">data-only, untested at runtime</span></td>
+  <td><b>Demote to library</b> (reserve battery). The lite head is the canonical identity experience; the long battery stays inert-but-preserved (no-delete) until a product decision revives it.</td>
+</tr>
+
+<tr>
+  <td><b>Choose base</b> — <code>BaseResolution</code> <cite>StudioShell.tsx:897&ndash;905</cite></td>
+  <td>manifest editor-step <code>choose_base</code> <cite>registerEditorSteps.ts:57&ndash;65</cite></td>
+  <td><span class="tag t-component">component-only</span> (manifest node, no YAML question)</td>
+  <td><span class="tag t-mature">mature &amp; live</span></td>
+  <td>Stays an editor-step on the spine; surfaced in the map by the manifest projection (§C). Genuinely an editor surface, not a question.</td>
+</tr>
+
+<tr>
+  <td><b>&ldquo;How do you want to use this base?&rdquo;</b> — Track chooser <code>TrackStep</code> <cite>TrackStep.tsx:40</cite></td>
+  <td>manifest editor-step <code>track</code> <cite>registerEditorSteps.ts:71&ndash;79</cite></td>
+  <td><span class="tag t-component">component-only</span></td>
+  <td><span class="tag t-mature">mature &amp; live; <b>branch-defining</b></span></td>
+  <td><b>Promote to first-class modular question</b> (a <code>radio</code> gate: copy / adapt) on the spine after <code>choose_base</code>. Its branch (<code>project_name</code> on copy) becomes a YAML <code>next</code> rule, so the CYOA fork is data, not a hand-coded <code>if</code> <cite>StudioShell.tsx:602&ndash;614</cite>.</td>
+</tr>
+
+<tr>
+  <td><b>Project name</b> — <code>ProjectNameStep</code> (copy-track only)</td>
+  <td>manifest editor-step <code>project_name</code>, <code>spine:false</code>, <code>joinTarget:"characters"</code> <cite>steps/manifest.ts:82&ndash;86</cite></td>
+  <td><span class="tag t-component">component-only</span> (off-spine side-trail node exists in manifest)</td>
+  <td><span class="tag t-mature">mature &amp; live</span></td>
+  <td>Stays an editor-step side-trail; already correctly modelled in the manifest (rejoin C3 passes). Map projection (§C) renders it as a fork node.</td>
+</tr>
+
+<tr>
+  <td><b>&ldquo;Confirm the basics&rdquo;</b> — prefill confirmation <code>Prefill</code> <cite>Prefill.tsx:64</cite></td>
+  <td>hand-built, rendered inside the <code>characters</code> step as sub-stage <code>prefill</code> <cite>StudioShell.tsx:930&ndash;940</cite></td>
+  <td><span class="tag t-component">component-only</span> (no manifest node, no YAML)</td>
+  <td><span class="tag t-mature">mature &amp; live</span></td>
+  <td><b>Promote to first-class modular question</b> — a <code>notice</code>/confirm step that <b>reads</b> <code>header.bcp47</code> / script / routing (a prefill-read question) at the head of the characters branch. Surfaces as a real node; its confirm advances the flow.</td>
+</tr>
+
+<tr>
+  <td><b>Phase B — Build character list</b> (<b>default</b>) — <code>BuildListView</code> (CLDR suggestions + chip editor + grid) <cite>PhaseB.tsx:535&ndash;629, 690</cite></td>
+  <td>hand-built component; no entry in any data source</td>
+  <td><span class="tag t-component">component-only</span></td>
+  <td><span class="tag t-mature">most mature B experience; the one users take</span></td>
+  <td><b>Promote to first-class modular question(s)</b> — a <code>multi_select</code>/char-list module (e.g. <code>pb_build_list</code>) that reads CLDR suggestions and writes <code>confirmedInventory</code>&rarr;IR via <code>mutate()</code>. This becomes the <b>default</b> characters branch in <code>phase_b_characters.modular.yaml</code>.</td>
+</tr>
+
+<tr>
+  <td><b>Phase B — Step-by-step</b> battery — 55 <span class="mono">pb_*</span> modules <cite>phase_b_characters.modular.yaml:9&ndash;64</cite></td>
+  <td>modular-question via <code>SurveyRunner</code> (manual path only) <cite>PhaseB.tsx:712&ndash;740</cite></td>
+  <td><span class="tag t-registry">in-registry-spine</span> (but a non-default branch)</td>
+  <td><span class="tag t-less">comprehensive but rarely-taken</span></td>
+  <td><b>Keep accessible, demote off the default spine.</b> Reachable from a discovery-method gate question (the <code>IntroChooser</code> radio <cite>PhaseB.tsx:753&ndash;756</cite> becomes a real modular gate); the battery hangs off the &ldquo;step by step&rdquo; branch. Only <code>pb_standard_letters</code> currently has a real <code>mutate()</code> (<cite>questions/b/pb_standard_letters.ts:105&ndash;125</cite>); the rest are answer-store-only.</td>
+</tr>
+
+<tr>
+  <td><b>Phase F — help docs</b> — 8 <span class="mono">pf_*</span> modules <cite>phase_f_helpdocs.modular.yaml</cite></td>
+  <td>modular-question via <code>PhaseF</code> <cite>StudioShell.tsx:956&ndash;964</cite></td>
+  <td><span class="tag t-registry">in-registry-spine</span></td>
+  <td><span class="tag t-mature">data &amp; runtime aligned</span></td>
+  <td>Keep as-is &mdash; the reference shape for &ldquo;done right.&rdquo;</td>
+</tr>
+
+<tr>
+  <td><b>Carve</b> (remove base keys) — <code>CarveGallery</code> <cite>StudioShell.tsx:765&ndash;774</cite></td>
+  <td>manifest editor-step <code>carve</code> <cite>registerEditorSteps.ts:105&ndash;113</cite></td>
+  <td><span class="tag t-component">component-only</span> — writes via <b>direct store mutators</b> (<code>deleteNode</code>/<code>restoreNode</code>/<code>deleteItem</code>…) <cite>CarveGallery.tsx:28&ndash;72</cite>, <b>not</b> <code>mutate()</code></td>
+  <td><span class="tag t-mature">mature &amp; live; &ldquo;Form 4&rdquo; gallery</span></td>
+  <td><b>First-class spine editor-step that runs on <code>mutate()</code></b> (see §D). Declared <code>writes</code> populated; carve overlay applied through the reducer&rsquo;s overlay-preserving path. Map node via manifest projection.</td>
+</tr>
+
+<tr>
+  <td><b>Mechanisms</b> (physical key assignment) — <code>MechanismGallery</code> <cite>StudioShell.tsx:776&ndash;787</cite></td>
+  <td>manifest editor-step <code>mechanisms</code>, <code>lock:"physical"</code> <cite>steps/manifest.ts:96&ndash;99</cite></td>
+  <td><span class="tag t-component">component-only</span> — assignments land in <code>phaseResults</code> / store, not via <code>mutate()</code></td>
+  <td><span class="tag t-mature">mature &amp; live; &ldquo;Form 4&rdquo; gallery</span></td>
+  <td><b>First-class spine editor-step on <code>mutate()</code>.</b> Drives the physical-lock + touch re-propagation that already exists in the reducer <cite>reducer.ts:221&ndash;245</cite>.</td>
+</tr>
+
+<tr>
+  <td><b>Touch seed source</b> — <code>AddTouchAdapter</code> fork</td>
+  <td>manifest editor-step <code>touch_seed_source</code>, <code>spine:false</code>, <code>joinTarget:"touch"</code> <cite>registerEditorSteps.ts:135&ndash;145</cite></td>
+  <td><span class="tag t-component">component-only</span> (off-spine node in manifest)</td>
+  <td><span class="tag t-mature">mature &amp; live</span></td>
+  <td>Stays an editor-step side-trail; map projection renders the fork/join. Touch writes already first-class in <code>KeyboardIR.touchLayout</code> (US2&ndash;US5, #825).</td>
+</tr>
+
+<tr>
+  <td><b>Touch</b> (touch key assignment) — <code>TouchGallery</code> <cite>StudioShell.tsx:789&ndash;798</cite></td>
+  <td>manifest editor-step <code>touch</code>, <code>lock:"touch"</code> <cite>steps/manifest.ts:109&ndash;112</cite></td>
+  <td><span class="tag t-component">component-only</span> — already references <code>applyMutatePatch</code>/provenance path <cite>TouchGallery.tsx</cite></td>
+  <td><span class="tag t-mature">mature &amp; live; &ldquo;Form 4&rdquo; gallery</span></td>
+  <td><b>First-class spine editor-step on <code>mutate()</code></b>; furthest along since touch IR + provenance landed in #825.</td>
+</tr>
+
+<tr>
+  <td><b>Help / Package (reserved)</b> — placeholders <cite>registerEditorSteps.ts:172&ndash;195</cite></td>
+  <td>manifest editor-step <code>help</code> (runs <code>PhaseF</code>) &amp; <code>package</code> (stub, terminal)</td>
+  <td><span class="tag t-component">component-only</span> placeholders</td>
+  <td><span class="tag t-less">package out of scope for v1</span></td>
+  <td>Map projection shows <code>package</code> as a reserved/terminal node; no change.</td>
+</tr>
+
+<tr>
+  <td><b>Unsupported-script stub</b> <cite>StudioShell.tsx:872&ndash;893</cite></td>
+  <td>hand-built terminal panel (§9 CJK/Ethiopic)</td>
+  <td><span class="tag t-component">component-only</span></td>
+  <td><span class="tag t-mature">mature; terminal</span></td>
+  <td>Already modelled as the <code>il_script_not_supported</code> stub question in the YAML; ensure the projection links the identity gate&rsquo;s terminal branch to it.</td>
+</tr>
+
+</tbody>
+</table>
+
+<div class="callout">
+<b>Reading the matrix.</b> The mature, live experiences cluster in the two rightmost-needing columns: <i>component-only</i> (galleries, build-list, prefill, track) or <i>in-registry but non-default</i> (the <code>pb_*</code> battery). The one truly <i>orphaned</i> structure (full Phase A) is also the least mature at runtime. That is the inversion in tabular form.
+</div>
+
+<!-- ============================================================ C -->
+<h2 id="c">C. The map as a projection — &ldquo;can&rsquo;t drift by construction&rdquo;</h2>
+
+<p>Today the survey-flow section reads four YAML files (<code>FLOW_SOURCES</code> <cite>DashboardView.tsx:48&ndash;54</cite>) that are <i>parallel</i> to the runtime&rsquo;s ordering source (<code>manifest</code>). Two ordering sources &rArr; drift is possible. The fix is to make the flow section a <b>projection of the same structures the runtime renders</b>, at two levels:</p>
+
+<ol>
+  <li><b>Inter-phase level (the spine):</b> render the flow section from <code>buildManifestStepGraph()</code> <cite>buildStepGraph.ts:237</cite>, which already produces exactly one node per <code>manifest</code> entry (<cite>steps/manifest.ts:69</cite>) with spine / fork / join / data edges. This is the function the dashboard does not yet call. Adding the carve / mechanisms / touch editor-steps to the map is then automatic &mdash; they are already in the manifest.</li>
+  <li><b>Intra-phase level (drill-down):</b> for each <code>question-step</code> phase, render the per-phase question graph (<code>buildModularFlowGraph</code>) as a <b>drill-down under its manifest node</b>, keyed off the <i>same registry</i> the <code>SurveyRunner</code> resolves through (<code>questionRegistry</code> <cite>questions/registry.ts</cite>). The discovery-method gate (§B, B-build-list vs B-step-by-step) becomes a real branch node, so the default path is the one shown.</li>
+</ol>
+
+<h3>What &ldquo;can&rsquo;t drift by construction&rdquo; means concretely</h3>
+<ul>
+  <li><b>Single ordering source.</b> The map&rsquo;s node set for the spine <i>is</i> <code>manifest.map(...)</code>; the runtime advances through the same array (<code>nextSpineStepAfter</code> <cite>StudioShell.tsx:319&ndash;344</cite>). There is no second list to forget to update. This already satisfies C8 (&ldquo;node set == runtime step set; zero ghost/missing&rdquo;).</li>
+  <li><b>Single question source.</b> Drill-down nodes resolve through <code>questionRegistry</code> &mdash; the exact map the <code>SurveyRunner</code> uses. A new question lands in <code>questions/&lt;phase&gt;/&lt;id&gt;.ts</code> + its sub-registry + the phase YAML order; it then appears in both the runtime and the map with no map edit. The fan-out rule is already documented in <cite>questions/registry.ts</cite>.</li>
+  <li><b>No hand-maintained diagram.</b> Remove the <code>FLOW_SOURCES</code> array as the <i>primary</i> source; the modular graphs remain only as drill-downs derived from the registry. The dead &ldquo;stub (gallery / wizard step)&rdquo; legend <cite>DashboardView.tsx:114</cite> becomes live (editor-steps now emit nodes), and <code>computeReserveNodes</code> <cite>buildStepGraph.ts:150</cite> finally has content (the library batteries from §E) to render with the existing &ldquo;reserve&rdquo; badge.</li>
+  <li><b>Enforced by the completeness checks already shipped.</b> C1&ndash;C7 (<cite>completeness.ts</cite>) run over the same manifest graph; C3 rejoin, C5 orphan-inputs, and C7 unreachable will <i>fail visibly in the dashboard</i> if a promoted question declares an input no upstream step writes, or a branch dead-ends. Drift becomes a red banner, not a silent divergence.</li>
+</ul>
+
+<div class="callout good">
+<b>Net:</b> &ldquo;adding a question automatically appears on the map&rdquo; reduces to &ldquo;the map projects <code>manifest</code> + <code>questionRegistry</code>, and so does the runtime.&rdquo; The projection is read-only and derives 100% from the structures the runtime executes.
+</div>
+
+<!-- ============================================================ D -->
+<h2 id="d">D. <code>mutate()</code> gap analysis</h2>
+
+<p>The <code>mutate()</code> seam (flag <code>VITE_KM_MUTATE_SEAM</code>, default <b>off</b> <cite>flags/mutateFlag.ts</cite>) is a <b>single pure-patch write path</b>: a module returns <code>Partial&lt;KeyboardIR&gt;</code>, the reducer applies it as a path-scoped deep merge restricted to the module&rsquo;s declared <code>writes</code>, with fail-fast whole-patch rejection on any undeclared path (M1&ndash;M6, <cite>mutateApply.ts:189&ndash;213</cite>; contract <cite>contracts/mutate-seam.contract.md</cite>). What it supports <b>today</b>:</p>
+<ul>
+  <li><b>Single-value, single-step writes.</b> One answer &rarr; one patch &rarr; merge. The wired writers are the 5 identity/header modules (<code>header.bcp47</code> / <code>header.name</code> / <code>header.copyright</code>: <code>primary_script</code>, <code>iso_code</code>, <code>language_name_english</code>, <code>pa_copyright_holder</code>, plus the <code>il_*</code> lite variants) and one Phase B writer, <code>pb_standard_letters</code> &rarr; <code>stores[]</code> <cite>questions/b/pb_standard_letters.ts:105&ndash;125</cite>.</li>
+  <li><b>Idempotent re-answer</b> (M4) and <b>read snapshot</b> via <code>MutateContext.ir</code> <cite>survey/types.ts:115&ndash;120</cite>.</li>
+  <li><b>Touch re-propagation</b> off the staleness closure on physical-lock completion <cite>reducer.ts:228&ndash;243</cite>, and touch IR + per-key provenance first-class in <code>KeyboardIR.touchLayout</code> (US2&ndash;US5, #825).</li>
+</ul>
+
+<p>What the mature flows need that <code>mutate()</code> doesn&rsquo;t yet do:</p>
+
+<table>
+<thead><tr><th>Mature flow</th><th>What it needs beyond current <code>mutate()</code></th><th>Why current seam is insufficient</th></tr></thead>
+<tbody>
+<tr>
+  <td><b>Carve gallery</b></td>
+  <td>An <b>overlay/structural write</b> verb: carve is delete/restore over nodes &amp; items, not a leaf set. It currently uses dedicated store mutators (<code>deleteNode</code>/<code>restoreNode</code>/<code>deleteItem</code>/<code>restoreItem</code>/<code>restoreAll</code>/<code>keepAll</code>) <cite>CarveGallery.tsx:28&ndash;72</cite> that maintain a deletion overlay + undo stack.</td>
+  <td><code>mutate()</code> returns a value patch and the reducer&rsquo;s <code>setWorkingIR</code> is explicitly overlay-preserving <cite>StudioShell.tsx:462&ndash;468</cite> &mdash; but no carve module declares <code>writes</code> or produces such a patch yet. The plan&rsquo;s intent to convert the carve shell (<cite>plan.md:25, 122&ndash;126</cite>) is <b>not implemented</b>; the gallery still writes directly. <b>Gap:</b> a declared-writes contract for the deletion overlay (e.g. <code>writes: [layers[].rows[].keys[]]</code> or a dedicated carve-overlay IR location) plus a patch shape that expresses removal.</td>
+</tr>
+<tr>
+  <td><b>Mechanism gallery</b></td>
+  <td><b>Multi-key / multi-mechanism writes</b> in one step (a batch of physical assignments) with provenance tagging, feeding the physical lock.</td>
+  <td>Today assignments live in <code>phaseResults</code> and are projected by <code>physicalAssignmentsOf</code> <cite>StudioShell.tsx:511</cite>; they are not a declared-<code>writes</code> <code>mutate()</code> surface. <b>Gap:</b> a batch-patch contract (one <code>mutate()</code> returning many <code>layers[].rows[].keys[]</code> leaves) and confirmation that M3 containment authorizes array-index sub-paths (it does &mdash; <code>pathAuthorizes</code> handles <code>stores[]</code>&rarr;<code>stores[3].items</code> <cite>mutateApply.ts:90&ndash;96</cite>, so the same applies to layer/key arrays).</td>
+</tr>
+<tr>
+  <td><b>Build-list (Phase B default)</b></td>
+  <td><b>Prefill reads + accumulated multi-select write.</b> Reads CLDR suggestions (async service) + base IR to seed; writes a confirmed character inventory.</td>
+  <td><code>mutate()</code> is synchronous and pure; the async CLDR fetch (<code>suggestMissingChars</code> <cite>PhaseB.tsx:360</cite>) must stay in the component, with the <i>resolved</i> selection passed as the answer value. <code>confirmedInventory</code> currently rides on <code>SurveyPhaseResult</code> <cite>PhaseB.tsx:607&ndash;612</cite>, not the IR. <b>Gap:</b> a declared <code>writes</code> target for the inventory in <code>KeyboardIR</code> and a module that maps the selection &rarr; that path (analogous to <code>pb_standard_letters</code>&rarr;<code>stores[]</code>).</td>
+</tr>
+<tr>
+  <td><b>Prefill confirm</b></td>
+  <td><b>Read-only / display-derived</b> step that <i>reads</i> several header fields to render confirmations.</td>
+  <td>Cleanest fit: a display-only module with <code>writes: []</code> (no <code>mutate()</code>, per FR-007) whose <code>inputs</code> declare <code>header.bcp47</code> etc. so C5 proves the reads are satisfied upstream. <b>Gap:</b> none in the write seam &mdash; only the modular-question promotion (§B).</td>
+</tr>
+</tbody>
+</table>
+
+<h3>Contract / version implications</h3>
+<ul>
+  <li><b>If a new IR location is added</b> (a carve-overlay field, or a <code>confirmedInventory</code> field on <code>KeyboardIR</code>), that touches the Engine-owned locked <code>packages/contracts</code> surface &rArr; a <b>contracts bump + §18 joint engine+content sign-off</b>, exactly as the touch-provenance field required in #822/#825 (the pre-1.0 convention maps a spec-MAJOR contract change to a minor bump; <code>0.13.0 &rarr; 0.14.0</code>). <cite>plan.md:11&ndash;16, 66&ndash;71</cite></li>
+  <li><b>If existing IR locations suffice</b> (carve expressed over existing <code>layers[].rows[].keys[]</code>; inventory expressed over <code>stores[]</code> like <code>pb_standard_letters</code>), <b>no contract change</b> is needed &mdash; only new modules with declared <code>writes</code> + <code>mutate()</code>. This is the preferred path; pursue it first.</li>
+  <li><b>No <code>mutate()</code> signature change</b> is needed for batching: a single <code>mutate()</code> can return a patch touching many array indices, all authorized by one <code>writes: [layers[].rows[].keys[]]</code> declaration. The seam is already powerful enough for multi-leaf writes; the gap is <i>declaring</i> the surfaces and <i>routing</i> the galleries through the reducer instead of the direct store mutators.</li>
+</ul>
+
+<!-- ============================================================ E -->
+<h2 id="e">E. Spine-vs-library split</h2>
+
+<h3>Becomes first-class spine (the mature component flows)</h3>
+<ul>
+  <li><b>Build-list</b> &mdash; the default Phase B characters branch (modular question on <code>mutate()</code>).</li>
+  <li><b>Prefill confirm</b> &mdash; modular display/read question at the head of the characters branch.</li>
+  <li><b>Track chooser</b> &mdash; modular gate question driving the copy/adapt fork in data.</li>
+  <li><b>Carve / Mechanisms / Touch galleries</b> &mdash; remain editor-steps (genuinely editor surfaces, not questions) but become <b>first-class on <code>mutate()</code></b> and are surfaced by the manifest projection (§C). Touch is furthest along (#825).</li>
+</ul>
+
+<h3>Demoted to the vestigial library (inert-but-preserved)</h3>
+<ul>
+  <li><b>The <code>pb_*</code> step-by-step battery</b> (55 modules) &mdash; kept reachable via the discovery-method gate, but off the <i>default</i> spine; rendered as <code>library-not-in-flow</code> reserve nodes where not on the active branch <cite>buildStepGraph.ts:150&ndash;182</cite>.</li>
+  <li><b>The full non-identity Phase A battery</b> (the 15 identity + 15 <code>provenance_*</code> questions) &mdash; the orphaned structure; demoted to library since the <code>identity_lite</code> head is the canonical experience.</li>
+</ul>
+
+<div class="callout warn">
+<b>No-delete guardrail (plan §3.8).</b> Demotion is <b>not deletion</b>. Unreferenced modules stay registered in their sub-registries and on disk; they are simply absent from the active flow ordering, so they render as reserve/library nodes (the existing <code>computeReserveNodes</code> mechanism) and the runtime never reaches them. They remain test-covered and revivable by re-adding their id to a YAML branch. Article VII / the spec&rsquo;s &ldquo;no library/reserve deletion&rdquo; rule is honoured.
+</div>
+
+<!-- ============================================================ F -->
+<h2 id="f">F. Migration sequencing — small, independently-shippable, each landing green</h2>
+
+<p>Order chosen so the lowest-risk, highest-leverage change lands first and each step is behind the flag or read-only.</p>
+
+<ol class="seq">
+  <li>
+    <b>Map-as-projection (read-only, no flag).</b> <span class="pill">no behaviour change</span>
+    Switch the dashboard&rsquo;s flow section to render from <code>buildManifestStepGraph()</code> for the spine, with the per-phase modular graphs as registry-keyed drill-downs (§C). Purely additive to a developer-only view (gated by <code>VITE_SHOW_FLOWMAP</code> <cite>StudioShell.tsx:84</cite>); zero runtime/IR impact. Immediately makes the galleries visible and kills the dead stub legend. <b>Ship first.</b>
+  </li>
+  <li>
+    <b>Declare-only: galleries + build-list get real <code>inputs</code>/<code>writes</code>.</b> <span class="pill">declared, not executed</span>
+    Populate the currently-empty <code>inputs: []</code>/<code>writes: []</code> on the carve/mechanism/touch editor-steps <cite>registerEditorSteps.ts</cite> and add the new build-list / track / prefill modules with declared paths. No <code>mutate()</code> executes yet (flag off). This lights up C5/C7 in the map and proves the data graph is consistent <i>before</i> wiring writes.
+  </li>
+  <li>
+    <b>Per-flow modularization behind the flag.</b> <span class="pill">VITE_KM_MUTATE_SEAM</span>
+    One flow at a time, each its own PR: (a) track chooser &rarr; modular gate; (b) prefill &rarr; modular read question; (c) build-list &rarr; modular <code>mutate()</code> writer; (d) carve, (e) mechanisms routed through the reducer&rsquo;s overlay-preserving <code>setWorkingIR</code> instead of direct store mutators. With the flag off, each PR is byte-identical to today (the reducer no-ops <cite>reducer.ts:205&ndash;217</cite>). Each lands green independently.
+  </li>
+  <li>
+    <b>Parity-prove and flip the default.</b> <span class="pill">flag on</span>
+    Once flag-on equals flag-off for every converted flow (§G), flip <code>VITE_KM_MUTATE_SEAM</code> on in dev/preview, soak, then default-on. Rollback remains &ldquo;leave it off&rdquo; (F2). Only after this do the direct store carve mutators become dead and can be retired; the <code>pb_*</code> battery and full Phase A are demoted to library (§E) under the no-delete guardrail.
+  </li>
+</ol>
+
+<!-- ============================================================ G -->
+<h2 id="g">G. Test strategy &amp; parity proof (plan §7 two-tier)</h2>
+
+<h3>Tier 1 — per-question unit tests (mirrored tree)</h3>
+<p>Every promoted module gets a colocated spec in the existing mirrored tree <code>packages/studio/tests/survey/questions/&lt;phase&gt;/&lt;id&gt;.test.ts</code> (the tree already exists: <cite>tests/survey/questions/{a,b,f}/</cite>). Per the <code>mutate()</code> obligations (<cite>contracts/mutate-seam.contract.md</cite>, lines 26&ndash;32): applying <code>mutate()</code> to a known IR fixture (1) changes <b>exactly</b> the declared <code>writes</code> paths, siblings byte-identical (M2/SC-002); (2) an out-of-<code>writes</code> patch <b>fails fast, whole-patch rejected, IR unchanged</b> (M3) &mdash; exercised against <code>MutatePatchContainmentError</code> <cite>mutateApply.ts:35&ndash;51</cite>; (3) idempotent (M4); (4) round-trips against reused IR fixtures. New gallery write surfaces add batch-patch fixtures; prefill is a read-only module so its test asserts declared <code>inputs</code> satisfiability, not a patch.</p>
+
+<h3>Tier 2 — mirrored / structural test tree</h3>
+<p>Manifest-shape guards already exist and must stay green: <code>validateManifestShape()</code> (M2 spine order, M3 locks, M4/M4b side-trails, M5 unique ids) <cite>StudioShell.tsx:253&ndash;303</cite>, and the completeness checks C1&ndash;C7 <cite>completeness.ts</cite>. Promoting questions must keep C3 (rejoin), C5 (orphan inputs), C7 (unreachable) passing &mdash; these are the structural proof that a promoted question is on a real, reachable branch with satisfied reads.</p>
+
+<h3>Parity proof — flag-on/flag-off equivalence</h3>
+<ul>
+  <li><b>Baseline:</b> with <code>VITE_KM_MUTATE_SEAM</code> off, produced IR + observable survey behaviour are byte-identical to P4b (F2/SC-008) &mdash; the reducer&rsquo;s <code>isMutateRequest</code> guard returns before any write <cite>reducer.ts:205&ndash;206</cite>.</li>
+  <li><b>Equivalence test per converted flow</b> (the &ldquo;#832 50/50&rdquo; parity style): run the same answer sequence through the flow with the flag off and with the flag on, and assert the resulting <code>KeyboardIR</code> is equal. Off path writes via the legacy route (store mutators / <code>phaseResults</code>); on path writes via <code>mutate()</code>. They must converge to the same IR &mdash; that is the proof the seam doesn&rsquo;t change output, only the route. A converted flow does not flip its default until its 50/50 parity test is green.</li>
+  <li><b>Boundary &amp; round-trip:</b> <code>pnpm depcruise</code> (dashboard&rarr;stores forbidden; the projection change must keep the dashboard store-free, props-only <cite>DashboardView.tsx:11&ndash;14, 301&ndash;309</cite>); contracts round-trip tests if any new IR field is added (§D).</li>
+  <li><b>Full green gate</b> (mirrors plan T037): <code>pnpm typecheck</code>, studio + contracts vitest, <code>pnpm depcruise</code>, and flag-off output matching the recorded baseline &mdash; each migration PR must pass all of these.</li>
+</ul>
+
+<!-- ============================================================ H -->
+<h2 id="h">H. Open questions &amp; risks for Matt</h2>
+
+<div class="risk">
+  <div>Q1 — top question</div>
+  <div><b>New IR locations, or reuse existing?</b> Do carve-overlay and the build-list confirmed-inventory get <b>new <code>KeyboardIR</code> fields</b> (clean, but triggers a contracts bump + §18 sign-off, like #822/#825), or do we express them over <b>existing</b> locations (carve over <code>layers[].rows[].keys[]</code>; inventory over <code>stores[]</code> à la <code>pb_standard_letters</code>) and avoid a contract change? This decision gates §D and the whole sequence.</div>
+  <div>Q2</div>
+  <div><b>Is the track chooser a question or an editor-step?</b> Promoting it to a modular gate puts the CYOA fork in data (cleanest for the map); leaving it an editor-step keeps the fork in <code>handleTrackSelected</code> code <cite>StudioShell.tsx:602&ndash;614</cite>. Which does product prefer as the canonical model?</div>
+  <div>Q3</div>
+  <div><b>Fate of the full Phase A battery.</b> Confirm it is genuinely reserve (library, inert-but-preserved) and not a path we intend to revive soon. If revival is planned, it should not be demoted &mdash; it should be wired to render.</div>
+  <div>Q4</div>
+  <div><b>Async prefill reads.</b> The CLDR suggestion fetch must stay in the component (it&rsquo;s async; <code>mutate()</code> is sync/pure). Confirm the model where the component resolves suggestions and passes the <i>confirmed selection</i> as the answer value into a sync <code>mutate()</code> writer.</div>
+  <div>Risk R1</div>
+  <div><b>Carve overlay semantics.</b> The deletion overlay + undo stack is non-trivial; expressing removal as a declared-<code>writes</code> patch must preserve the overlay (the reducer already has an overlay-preserving <code>setWorkingIR</code> <cite>StudioShell.tsx:462&ndash;468</cite>, but the patch shape for &ldquo;remove&rdquo; vs &ldquo;set&rdquo; needs design). Highest-effort conversion; sequence it after the simpler writers.</div>
+  <div>Risk R2</div>
+  <div><b>Default-flip blast radius.</b> Flipping <code>VITE_KM_MUTATE_SEAM</code> on changes the live write route for all converted surfaces at once. Mitigated by the per-flow 50/50 parity gate (§G) and the &ldquo;leave it off&rdquo; rollback, but the flip itself is the riskiest single moment &mdash; soak in preview first.</div>
+</div>
+
+<footer>
+  Design note only &mdash; no application source files were modified and no PR is proposed. All citations verified against keyboard-studio/keyboard-studio HEAD <code>ff0fe65</code>. Prepared for review by Matt (product owner).
+</footer>
+
+</div>
+</body>
+</html>
