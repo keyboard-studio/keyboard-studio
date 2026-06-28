@@ -417,6 +417,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const instantiateFromExisting = useWorkingCopyStore((s) => s.instantiateFromExisting);
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
+  const setValidatorFindings = useWorkingCopyStore((s) => s.setValidatorFindings);
 
   // selectedTrack captured in a ref so the memoised onInstantiate callback
   // always sees the current value even when the async compile completes after
@@ -543,6 +544,17 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     return typeof raw === "string" ? raw : null;
   }, [baseVfs]);
   const { findings } = useValidator(kmnSource);
+  // spec-014 US5/T034 — publish the SINGLE debounced `useValidator` findings to
+  // the store so the sibling `StudioShell` can feed C4 spine-prefix shippability
+  // the REAL Layer-A findings WITHOUT a second `useValidator`/debounce (V3 /
+  // Article IV). This is a store-bridge publish, not a new validation source:
+  // `findings` only changes when the existing debounce cycle resolves, and the
+  // effect deps are `[findings, setValidatorFindings]` (both stable across
+  // renders that don't change the findings reference), so it never loops. The
+  // store setter is itself reference-equality guarded as a second line of defense.
+  useEffect(() => {
+    setValidatorFindings(findings);
+  }, [findings, setValidatorFindings]);
   const findingsByQuestionId = useMemo(
     () => buildFindingsByQuestionId(findings),
     [findings],
@@ -1089,25 +1101,28 @@ export function StudioShell() {
   // blocking finding (see dashboard/completeness.ts; V1/V2 proved in
   // completeness.test.ts, V3 in tests/dashboard/articleIVProbe.test.ts).
   //
-  // The LIVE wiring of those findings into THIS call is intentionally NOT made
-  // here: the single `useValidator` cycle lives in the sibling `SurveyView`
-  // component (line ~545), so its `findings` are NOT in `StudioShell`'s scope.
-  // Honoring V3 (Article IV — no SECOND debounce / parallel validation path)
-  // therefore requires bridging the existing debounced findings across the two
-  // components (e.g. publishing them into `useWorkingCopyStore` from SurveyView
-  // and reading them here) — a cross-component / store-boundary change beyond a
-  // local edit. Calling `useValidator` a second time HERE would add a second
-  // 300 ms debounce and VIOLATE V3, so it is deliberately avoided. Until the
-  // store bridge lands, `findings` defaults to none ⇒ the pure structural proxy
-  // (byte-identical to P4b / flag-off). Flagged to the lead (spec-014 US5).
+  // LIVE WIRING (T034): those findings now flow through. The single debounced
+  // `useValidator` cycle lives in the sibling `SurveyView` component (line ~545),
+  // which publishes its output into `useWorkingCopyStore.validatorFindings` via
+  // an effect. `StudioShell` reads that slice here and passes it into the single
+  // `runCompleteness` call, so a blocking Layer-A finding live-strands the
+  // lock-reaching spine prefixes. This honors V3 (Article IV — no SECOND
+  // debounce / parallel validation path): there is exactly ONE `useValidator`
+  // call site (in SurveyView) and exactly ONE `runCompleteness` call site (here),
+  // and the latter consumes the former's output via the store bridge — no second
+  // 300 ms timer. With the seam off (or before any validation cycle resolves),
+  // `validatorFindings` defaults to `[]` ⇒ the pure structural proxy, byte-
+  // identical to P4b / flag-off.
+  const validatorFindings = useWorkingCopyStore((s) => s.validatorFindings);
   const completenessReport = useMemo(
     () =>
       runCompleteness(
         manifest,
         { desktopLocked, touchLayoutJson },
         staleSteps,
+        validatorFindings,
       ),
-    [desktopLocked, touchLayoutJson, staleSteps],
+    [desktopLocked, touchLayoutJson, staleSteps, validatorFindings],
   );
 
   let content: ReactNode;

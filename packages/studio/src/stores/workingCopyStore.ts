@@ -18,7 +18,7 @@
 //   - Worker boundary upheld: WASM is not imported here.
 
 import { create } from "zustand";
-import type { BaseKeyboard, KeyboardIR, RemovalCapability, VirtualFS } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, KeyboardIR, LintFinding, RemovalCapability, VirtualFS } from "@keyboard-studio/contracts";
 import {
   mergePhaseResults,
   type DiscoveryAxisVector,
@@ -232,6 +232,19 @@ export interface WorkingCopyState {
    */
   staleSteps: Set<string>;
 
+  // -- Validator findings slice (US5, T034 live-wiring) --------------------------
+  /**
+   * The most recent Layer-A validator findings produced by the SINGLE debounced
+   * `useValidator` cycle in `SurveyView`. Published here via an effect so that
+   * `StudioShell` (a sibling component, where the single `runCompleteness` call
+   * site lives) can pass the REAL findings into C4 spine-prefix shippability
+   * WITHOUT spinning up a second `useValidator`/debounce — honoring Article IV /
+   * V3 (exactly one debounce timer). Default: empty (the pure structural proxy,
+   * byte-identical to flag-off / legacy behavior; findings only become non-empty
+   * through the normal validator cycle). Derived UI state — not persisted.
+   */
+  validatorFindings: LintFinding[];
+
   // -- Actions (irStore) -------------------------------------------------------
   /** Set the carve working IR, clearing carve deletion state. */
   setIR: (ir: KeyboardIR) => void;
@@ -379,6 +392,18 @@ export interface WorkingCopyState {
    * only stale because of the cleared step.
    */
   clearStale: (stepId: string) => void;
+
+  // -- Validator findings actions (US5, T034 live-wiring) ----------------------
+
+  /**
+   * Publish the latest Layer-A validator findings from the single debounced
+   * `useValidator` cycle in `SurveyView`. No-op (returns prior state reference)
+   * when the incoming findings are reference-equal to the stored ones, so an
+   * effect that re-fires with the same `findings` array does not trigger a
+   * spurious store update / re-render. The debounce already coalesces input
+   * changes; this setter never starts a timer or async work.
+   */
+  setValidatorFindings: (findings: LintFinding[]) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -412,6 +437,7 @@ const INITIAL_STATE: Omit<
   | "setTouchLayoutJson" | "setTouchDraft" | "markGalleryIntroSeen" | "reset"
   | "instantiateFromBase" | "instantiateFromExisting" | "setIdentity" | "isInstantiated"
   | "markStale" | "clearStale"
+  | "setValidatorFindings"
 > = {
   // instantiation mode
   instantiationMode: null,
@@ -434,6 +460,8 @@ const INITIAL_STATE: Omit<
   galleryIntrosSeen: { mechanism: false, touch: false },
   // staleness slice (US3) — default empty ("fresh", FR-019)
   staleSteps: new Set<string>(),
+  // validator findings slice (US5, T034) — default empty (structural proxy)
+  validatorFindings: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -682,4 +710,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     const staleSteps = computeStalenessFromManifest(_manifest, _reopenedRoots);
     set({ staleSteps });
   },
+
+  // -- Validator findings actions (US5, T034 live-wiring) ----------------------
+
+  setValidatorFindings: (findings) =>
+    set((s) => (s.validatorFindings === findings ? s : { validatorFindings: findings })),
 }));
