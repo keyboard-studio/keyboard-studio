@@ -149,11 +149,16 @@ export function applyCarveMutate(
  * `keys[]` array is the addressable endpoint (a path that resolves TO a
  * `TouchKeyIR` — IRPath traversal is bounded at `TouchKeyIR`, so per-key
  * `sk`/`flick`/`multitap` sub-trees are intentionally not separate write paths;
- * a key and its whole sub-tree are written as a unit, FR-008 G4).
+ * a key and its whole sub-tree are written as a unit, FR-008 G4). Declaring the
+ * path at `keys` authorizes both a whole-array replace (`keys`) and per-element
+ * writes (`keys[3]`, `keys[3].provenance`) under the prefix-containment rule.
  *
- * Declaring the path at `keys` (the array container) authorizes both a
- * whole-array replace (`keys`) and per-element writes (`keys[3]`,
- * `keys[3].provenance`) under `applyMutatePatch`'s prefix-containment rule.
+ * `touchLayout.nodeIds` is ALSO in the surface: re-suggesting touch keys
+ * re-derives the platform+layer+key → nodeId map alongside the keys, so a
+ * re-propagation patch legitimately rewrites both. It stays a SEPARATE declared
+ * path (not a coarse `touchLayout` grant) so the containment guard still rejects
+ * any patch that strays into `platforms[].id`/`font` or other non-key fields by
+ * accident — `header`/`stores`/`groups`/`comments`/`raw` remain out of bounds.
  *
  * NOTE: this cycle exports the containment set ONLY. The re-propagation logic
  * (reading the staleness slice, re-running `touchSuggest`, the no-clobber
@@ -171,6 +176,7 @@ export const TOUCH_WRITES: readonly IRPath[] = [
     "keys",
     ARRAY_INDEX,
   ),
+  irPath("touchLayout", "nodeIds", ARRAY_INDEX),
 ];
 
 // ---------------------------------------------------------------------------

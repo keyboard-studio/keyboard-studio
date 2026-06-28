@@ -402,3 +402,95 @@ describe("emitTouchLayout", () => {
     expect(parentKey?.sk?.[0]?.id).toBe("U_005B");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Per-key provenance round-trip (spec-014 US3 / T028, FR-009/FR-010)
+// ---------------------------------------------------------------------------
+
+describe("touch-key provenance round-trip (spec-014 T028)", () => {
+  const PROVENANCE_TAGGED = JSON.stringify({
+    tablet: {
+      layer: [{
+        id: "default",
+        row: [{
+          id: 1,
+          key: [
+            { id: "K_A", text: "a", p: "base-derived" },
+            { id: "K_B", text: "b", p: "physical-suggested" },
+            { id: "K_C", text: "c", p: "hand-set" },
+            // legacy/untagged key — no "p" property
+            { id: "K_D", text: "d" },
+          ],
+        }],
+      }],
+    },
+  });
+
+  it("parses each provenance wire value into the IR", () => {
+    const ir = parseTouchLayout(PROVENANCE_TAGGED);
+    const keys = ir.platforms[0]?.layers[0]?.rows[0]?.keys;
+    expect(keys?.[0]?.provenance).toBe("base-derived");
+    expect(keys?.[1]?.provenance).toBe("physical-suggested");
+    expect(keys?.[2]?.provenance).toBe("hand-set");
+  });
+
+  it("defaults an untagged/legacy key to hand-set on parse (FR-009)", () => {
+    const ir = parseTouchLayout(PROVENANCE_TAGGED);
+    const legacyKey = ir.platforms[0]?.layers[0]?.rows[0]?.keys[3];
+    expect(legacyKey?.id).toBe("K_D");
+    expect(legacyKey?.provenance).toBe("hand-set");
+  });
+
+  it("defaults an out-of-vocabulary provenance value to hand-set", () => {
+    const json = JSON.stringify({
+      tablet: { layer: [{ id: "default", row: [{ id: 1, key: [{ id: "K_X", p: "garbage" }] }] }] },
+    });
+    const ir = parseTouchLayout(json);
+    expect(ir.platforms[0]?.layers[0]?.rows[0]?.keys[0]?.provenance).toBe("hand-set");
+  });
+
+  it("emits provenance to the 'p' wire property", () => {
+    const ir = parseTouchLayout(PROVENANCE_TAGGED);
+    const emitted = emitTouchLayout(ir);
+    const reparsed = JSON.parse(emitted) as Record<string, { layer: Array<{ row: Array<{ key: Array<{ id: string; p?: string }> }> }> }>;
+    const wireKeys = reparsed["tablet"]?.layer[0]?.row[0]?.key;
+    expect(wireKeys?.[0]?.p).toBe("base-derived");
+    expect(wireKeys?.[1]?.p).toBe("physical-suggested");
+    expect(wireKeys?.[2]?.p).toBe("hand-set");
+    // legacy key materialised to hand-set on parse, so it is emitted as hand-set
+    expect(wireKeys?.[3]?.p).toBe("hand-set");
+  });
+
+  it("survives a full parse → emit → reparse cycle with every tag intact (FR-010)", () => {
+    const ir = parseTouchLayout(PROVENANCE_TAGGED);
+    const ir2 = parseTouchLayout(emitTouchLayout(ir));
+    const keys = ir2.platforms[0]?.layers[0]?.rows[0]?.keys;
+    expect(keys?.map((k) => k.provenance)).toEqual([
+      "base-derived",
+      "physical-suggested",
+      "hand-set",
+      "hand-set",
+    ]);
+  });
+
+  it("round-trips provenance on subkeys (sk) too", () => {
+    const json = JSON.stringify({
+      tablet: {
+        layer: [{
+          id: "symbol",
+          row: [{
+            id: 1,
+            key: [{
+              id: "U_0028", text: "(", p: "physical-suggested",
+              sk: [{ id: "U_005B", text: "[", p: "base-derived" }],
+            }],
+          }],
+        }],
+      },
+    });
+    const ir2 = parseTouchLayout(emitTouchLayout(parseTouchLayout(json)));
+    const parent = ir2.platforms[0]?.layers[0]?.rows[0]?.keys[0];
+    expect(parent?.provenance).toBe("physical-suggested");
+    expect(parent?.sk?.[0]?.provenance).toBe("base-derived");
+  });
+});
