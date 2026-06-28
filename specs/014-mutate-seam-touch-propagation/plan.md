@@ -20,7 +20,7 @@ Phase 5 (P5) of the Survey Modularity + CYOA Refactor ([docs/survey-modularity-c
 Technical approach (against the anticipated #5b/#232 contract):
 
 - **Activate `mutate()` as a pure patch producer.** Turn the P2 declared-but-stubbed `mutate?` (`packages/studio/src/survey/types.ts`) into an executed `mutate(value, ctx): Partial<KeyboardIR>`. The §3.4 manifest reducer (`steps/reducer.ts` `applyStepCompletion`) applies the returned patch as a **path-scoped deep merge at the module's declared `writes` `IRPath`s only** (Q9), runtime-asserts declared-`writes` containment with **fail-fast whole-patch rejection in all builds** (Q11, FR-003), and is **idempotent** (FR-004).
-- **Convert the in-scope write surfaces (Q4=B).** Route the **carve/add shell** (carve remove-mode + the add galleries in `editors/`) and **all 8 strategy-bearing question modules (non-empty `writes`)** through `mutate()`, retiring the direct `workingCopyStore` carve mutators (`deleteNode`/`restoreNode`/`deleteItem`/`restoreItem`/`restoreAll`/`keepAll`) and the add-gallery's direct selected-pattern IR writes. **Display-only (empty `writes`) stays no-op; answer-store-only / identity-metadata modules are out of scope** (FR-007).
+- **Convert the in-scope write surfaces (Q4=B).** Route the **carve/add shell** (carve remove-mode + the add galleries in `editors/` — the prong that carries the strategy-bearing carve/mechanism/touch IR writes) and **all 5 question modules with non-empty `writes` (the identity/header writers)** through `mutate()`, retiring the direct `workingCopyStore` carve mutators (`deleteNode`/`restoreNode`/`deleteItem`/`restoreItem`/`restoreAll`/`keepAll`) and the add-gallery's direct selected-pattern IR writes. **Display-only (empty `writes`) stays no-op; answer-store-only / identity-metadata modules are out of scope** (FR-007).
 - **Promote per-key provenance onto the contract (Q2=A).** Add a provenance field to `TouchKeyIR` in `packages/contracts` (`base-derived` / `physical-suggested` / `hand-set`), defaulting to `hand-set`; make the editor-layer `TouchKeyProvenance` (`editors/assignLoop/provenance.ts`) a **re-export** of the contracts type; ensure it **survives serialize/round-trip**. This is the **`packages/contracts` MAJOR bump** with a §18 joint engine+content session (FR-008/-010/-011).
 - **Wire automatic touch re-propagation (Q5=A + follow-up).** On physical-lock break / physical-step completion, re-run `touchSuggest` driven by the **P4b `staleSteps` slice** (root-set + completeness fixpoint) over **only** `base-derived` / `physical-suggested` keys, **never `hand-set`** (no-clobber, FR-012); a manual edit to a `physical-suggested` key **promotes it to `hand-set`** (FR-014); multiple stale steps coalesce into a **single re-propagation pass over the union of the staleness closure** (Q10, FR-013).
 - **Add the single global rollback flag (Q6=A).** One build/deploy-time global gates `mutate()`. Off ⇒ the P4b declared-only seam, output **byte-identical to P4b** (FR-015/-016).
@@ -51,7 +51,7 @@ Technical approach (against the anticipated #5b/#232 contract):
 - Article IV — no second debounce timer / parallel validation path when wiring the real validator (FR-018).
 - Article VII — touch is seeded from the locked physical layout; re-propagation is a propagation/merge over the physical-derived substrate, never touch-first authoring.
 
-**Scale/Scope**: 1 contract field added (`TouchKeyIR` provenance) → contracts MAJOR bump. `mutate?` stub → executed pure function. 8 strategy-bearing question modules + the carve/add shell converted (≈9 write-surface conversions). 6 retired direct `workingCopyStore` carve mutators + add-gallery direct writes. 1 reducer patch-apply path (path-scoped deep merge + containment assertion). 1 re-propagation driver off `staleSteps`. 1 global flag. 1 real per-spine-prefix validator replacing C4's proxy. New provenance-tagged fixtures + reuse of existing IR fixtures.
+**Scale/Scope**: 1 contract field added (`TouchKeyIR` provenance) → contracts MAJOR bump. `mutate?` stub → executed pure function. 5 non-empty-`writes` identity/header question modules + the carve/add shell (which carries the strategy-bearing writes) converted (≈6 write-surface conversions). 6 retired direct `workingCopyStore` carve mutators + add-gallery direct writes. 1 reducer patch-apply path (path-scoped deep merge + containment assertion). 1 re-propagation driver off `staleSteps`. 1 global flag. 1 real per-spine-prefix validator replacing C4's proxy. New provenance-tagged fixtures + reuse of existing IR fixtures.
 
 ## Constitution Check
 
@@ -123,7 +123,7 @@ packages/studio/src/
   stores/
     workingCopyStore.ts          # (EDIT) retire deleteNode/restoreNode/deleteItem/restoreItem/restoreAll/keepAll
                                  #        as the in-scope IR write path (flag-on); staleSteps slice reused as-is
-  survey/questions/<phase>/<id>.ts  # (EDIT) the 8 strategy-bearing modules: stub → executed mutate()
+  survey/questions/<phase>/<id>.ts  # (EDIT) the 5 non-empty-`writes` identity/header modules: stub → executed mutate()
   dashboard/
     completeness.ts              # (EDIT) C4 proxy → real per-spine-prefix validator wiring (FR-017)
 
@@ -135,7 +135,7 @@ packages/contracts/                                          # (NEW) provenance 
 .dependency-cruiser.cjs          # (EDIT) allow studio→contracts provenance edge; flags/ leaf rules
 ```
 
-**Structure Decision**: A cross-boundary change. The contract edit (provenance on `TouchKeyIR` + MAJOR bump) is confined to `packages/contracts/src/{keyboard-ir,schemas,index}.ts` + `package.json` and is **[GATED]**. The studio side adds `steps/mutateApply.ts`, `steps/repropagate.ts`, `flags/mutateFlag.ts`, edits `survey/types.ts`, `steps/reducer.ts`, the 8 modules, the carve/add editors, `touchSuggest`, and `dashboard/completeness.ts`. Per-question tests stay in the mirrored `packages/studio/tests/survey/questions/<phase>/` tree (Q7); the provenance round-trip test lives in `packages/contracts`.
+**Structure Decision**: A cross-boundary change. The contract edit (provenance on `TouchKeyIR` + MAJOR bump) is confined to `packages/contracts/src/{keyboard-ir,schemas,index}.ts` + `package.json` and is **[GATED]**. The studio side adds `steps/mutateApply.ts`, `steps/repropagate.ts`, `flags/mutateFlag.ts`, edits `survey/types.ts`, `steps/reducer.ts`, the 5 non-empty-`writes` modules, the carve/add editors (which carry the strategy-bearing writes), `touchSuggest`, and `dashboard/completeness.ts`. Per-question tests stay in the mirrored `packages/studio/tests/survey/questions/<phase>/` tree (Q7); the provenance round-trip test lives in `packages/contracts`.
 
 ## Complexity / Gate Tracking
 

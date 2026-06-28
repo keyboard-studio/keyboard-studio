@@ -28,6 +28,7 @@ description: "Task list for Phase 5 — KeyboardIR mutate seam + touch propagati
 **Purpose**: clear the dependency gate and capture the parity baseline before any code change.
 
 - [ ] T000 **[BLOCKED on #5b/#232]** Confirm the engine mutation contract #5b/#232 has ratified, the §18 joint engine+content session is scheduled/recorded, and re-validate [plan.md](plan.md) Technical Context + the `writes` `IRPath`s in `packages/studio/src/survey/questions/` against the ratified `KeyboardIR` shape (gates G-I/G-II/G-VI; research.md D4 module-count reconciliation). Record the reconciled in-scope module set in the PR description. NOTHING else may start until this clears.
+  - **[DONE] Module-count reconciliation (research.md D4):** the in-scope non-empty-`writes` set is **5** (`a/iso_code.ts`, `a/primary_script.ts`, `a/language_name_english.ts`, `a/pa_copyright_holder.ts`, `b/pb_standard_letters.ts`) — the earlier "8" was a stale P2-era snapshot, superseded by the P3 loader cutover + #781 legacy retirement. The strategy-bearing carve/mechanism/touch writes live in the `editors/` carve/add shell (FR-006a), not in question modules. Dependency gate cleared by **#822** (merged to main; contracts **0.12.0**). The remaining T000 prongs (the §18 joint-session record + full plan re-validation against the ratified shape) stay open.
 - [ ] T001 [P] Capture the green P4b baseline: run `pnpm typecheck`, `pnpm --filter @keyboard-studio/studio test`, `pnpm --filter @keyboard-studio/contracts test`, `pnpm depcruise`; record pass counts in the PR as the byte-identical-to-P4b reference (SC-008).
 - [ ] T002 [P] Create the new studio skeleton files (empty/`.gitkeep` placeholders): `packages/studio/src/flags/mutateFlag.ts`, `packages/studio/src/steps/mutateApply.ts`, `packages/studio/src/steps/repropagate.ts`, and `packages/studio/tests/fixtures/` for provenance-tagged layouts.
 
@@ -55,11 +56,11 @@ description: "Task list for Phase 5 — KeyboardIR mutate seam + touch propagati
 
 **Goal**: `mutate()` is the single executed IR write path for all in-scope surfaces; the answer-store-vs-direct-IR state fork is closed.
 
-**Independent Test**: take a strategy-bearing module + a known IR fixture, apply its `mutate()`, confirm the IR differs only at declared `writes`; confirm carve/add edits land through `mutate()`, not direct `workingCopyStore` mutators.
+**Independent Test**: take an in-scope non-empty-`writes` module (one of the 5 identity/header writers) + a known IR fixture, apply its `mutate()`, confirm the IR differs only at declared `writes`; confirm the carve/add edits (which carry the strategy-bearing carve/mechanism/touch writes) land through `mutate()`, not direct `workingCopyStore` mutators.
 
 ### Tests for User Story 1 ⚠️ (write first, ensure they FAIL)
 
-- [ ] T010 [P] [US1] **[BLOCKED on #5b/#232]** Per-question `mutate` output test for each in-scope strategy-bearing module in `packages/studio/tests/survey/questions/<phase>/<id>.test.ts` (the 8-module set reconciled in T000): applies to a known IR fixture, writes exactly declared `writes` (siblings byte-identical, SC-002), out-of-`writes` fails fast/whole-patch-rejected (SC-002), idempotent (SC-003), round-trips reused IR fixtures (SC-004). Per [contracts/mutate-seam.contract.md](contracts/mutate-seam.contract.md).
+- [ ] T010 [P] [US1] **[BLOCKED on #5b/#232]** Per-question `mutate` output test for each in-scope non-empty-`writes` module in `packages/studio/tests/survey/questions/<phase>/<id>.test.ts` (the 5-module identity/header set reconciled in T000): applies to a known IR fixture, writes exactly declared `writes` (siblings byte-identical, SC-002), out-of-`writes` fails fast/whole-patch-rejected (SC-002), idempotent (SC-003), round-trips reused IR fixtures (SC-004). Per [contracts/mutate-seam.contract.md](contracts/mutate-seam.contract.md).
 - [ ] T011 [P] [US1] **[BLOCKED on #5b/#232]** Carve/add-shell test in `packages/studio/tests/editors/carve/CarveGallery.test.tsx` (+ add-gallery equivalent): an author edit produces a `mutate()` patch routed through the reducer; the direct `workingCopyStore` carve mutators are no longer the IR write path (AC US1-2).
 - [ ] T012 [P] [US1] **[BLOCKED on #5b/#232]** Display-only / answer-store-only no-op test: a display-only (empty `writes`) module performs no `mutate()` IR change (AC US1-3, FR-007).
 
@@ -67,10 +68,10 @@ description: "Task list for Phase 5 — KeyboardIR mutate seam + touch propagati
 
 - [ ] T013 [US1] **[BLOCKED on #5b/#232]** Activate `mutate?(value, ctx): Partial<KeyboardIR>` in `packages/studio/src/survey/types.ts` (un-stub the P2 comment; pure signature) (FR-002).
 - [ ] T014 [US1] **[BLOCKED on #5b/#232]** Wire `applyStepCompletion` in `packages/studio/src/steps/reducer.ts` to call `mutateApply.ts` for in-scope step ids when the flag is on (path-scoped merge + containment assert + idempotent); gated by `mutateFlag` (FR-002/-005, M6).
-- [ ] T015 [P] [US1] **[BLOCKED on #5b/#232]** Implement `mutate()` in each of the 8 strategy-bearing modules under `packages/studio/src/survey/questions/<phase>/<id>.ts` (reconciled set from T000), returning a `Partial<KeyboardIR>` patch scoped to that module's declared `writes` (FR-006b).
+- [ ] T015 [P] [US1] **[BLOCKED on #5b/#232]** Implement `mutate()` in each of the 5 non-empty-`writes` identity/header modules under `packages/studio/src/survey/questions/<phase>/<id>.ts` (reconciled set from T000), returning a `Partial<KeyboardIR>` patch scoped to that module's declared `writes` (FR-006b).
 - [ ] T016 [US1] **[BLOCKED on #5b/#232]** Convert `packages/studio/src/editors/carve/CarveGallery.tsx` to express carve edits as a `mutate()` patch routed through the reducer; retire `deleteNode`/`restoreNode`/`deleteItem`/`restoreItem`/`restoreAll`/`keepAll` as the in-scope IR write path in `packages/studio/src/stores/workingCopyStore.ts` (FR-006a).
 - [ ] T017 [US1] **[BLOCKED on #5b/#232]** Convert the add galleries (`packages/studio/src/editors/assignLoop/`) to route their selected-pattern writes through `mutate()` instead of direct IR writes (FR-006a).
-- [ ] T018 [US1] **[BLOCKED on #5b/#232]** Repo audit + depcruise rule confirming zero direct `workingCopyStore` IR mutations from the converted carve/add shell and zero other IR write routes for the 8 modules when the flag is on (SC-001); update `.dependency-cruiser.cjs`.
+- [ ] T018 [US1] **[BLOCKED on #5b/#232]** Repo audit + depcruise rule confirming zero direct `workingCopyStore` IR mutations from the converted carve/add shell and zero other IR write routes for the 5 non-empty-`writes` modules when the flag is on (SC-001); update `.dependency-cruiser.cjs`.
 
 **Checkpoint**: `mutate()` is the single write path for in-scope surfaces; US1 independently testable.
 
@@ -204,7 +205,7 @@ Task: "Carve/add-shell routing test — T011"
 Task: "Display-only no-op test — T012"
 
 # Then per-module mutate() across different files:
-Task: "Implement mutate() in the 8 strategy-bearing modules — T015"
+Task: "Implement mutate() in the 5 non-empty-`writes` identity/header modules — T015"
 ```
 
 ---

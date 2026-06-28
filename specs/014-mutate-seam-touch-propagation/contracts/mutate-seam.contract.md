@@ -19,7 +19,7 @@
 
 ## Scope (Q4=B)
 
-- IN: carve/add shell (carve remove-mode + add galleries) + the 8 strategy-bearing modules (non-empty `writes`).
+- IN: carve/add shell (carve remove-mode + add galleries — the prong carrying the strategy-bearing carve/mechanism/touch writes) + the 5 question modules with non-empty `writes` (the identity/header writers).
 - NO-OP: display-only (empty `writes`).
 - OUT: answer-store-only / identity-metadata modules.
 

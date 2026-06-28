@@ -3,7 +3,7 @@
 > **Status: PLAN / RFC — P2 implemented (branch `claude/survey-modularity-cyoa-plan-pcpg9a`); P3(a) implemented (branch `km/modular-loader-cutover`); P4a and P4b implemented (branch `claude/survey-modularity-cyoa-phase-4-q9ey3o`, P4a merged via #778); P0–P1, P3(b), P5 remain proposals.**
 > P2 shipped: `IRPath` typed key-path algebra exported from `@keyboard-studio/contracts`
 > 0.11.0 (breaking bump, §18-ratified); `QuestionModule.inputs`/`writes` declared across
-> all 93 modules (8 non-empty, 85 explicit empty); three CI gates (coverage, orphan-input
+> all 93 modules (current ground truth: 5 non-empty `writes` — the identity/header writers — with the remaining modules declaring explicit empty `writes`; the original "8 non-empty" was the P2 snapshot, superseded by the P3 loader cutover + #781 legacy retirement); three CI gates (coverage, orphan-input
 > lint, missing-mirror check); mirrored test tree at
 > `packages/studio/tests/survey/questions/`; `mutate()` remains a stub (deferred to P5).
 > P3(a) shipped: Phase A/F/identity-lite cut from legacy `parseFlow` to `loadModularFlow`;
@@ -936,7 +936,10 @@ today — see §8).
 > Invalid paths are compile errors; stale paths fail typecheck. Path coverage is bounded
 > at `keys[]`; `RawKmnFragment` is terminal. `QuestionModule` (`packages/studio/src/survey/types.ts`)
 > gained `inputs?: readonly IRPath[]` / `writes?: readonly IRPath[]`; all 93 modules now
-> declare them (8 non-empty, 85 explicit empty). Three CI gates land: coverage (93/93),
+> declare them (8 non-empty, 85 explicit empty at the P2 snapshot; the current ground truth
+> is **5 non-empty `writes`** — the identity/header writers — with the remaining modules
+> declaring explicit empty `writes`, after the P3 loader cutover + #781 legacy retirement).
+> Three CI gates land: coverage (93/93),
 > manifest-scoped orphan-input lint, missing-mirror check. Mirrored test tree at
 > `packages/studio/tests/survey/questions/<phase>/<id>.test.ts` (all 93 mirrored).
 > Folder-per-question opt-in is structurally supported; no module currently uses it.

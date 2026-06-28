@@ -53,7 +53,7 @@ The question-module write surface. Today a commented stub; P5 activates it.
 
 ## Declared `writes` (`readonly IRPath[]`) — existing P2 field *(reused)*
 
-The typed paths a module is allowed to populate; the containment set the FR-003 assertion checks the patch against. Already typed on `QuestionModule` in `survey/types.ts` (`inputs?`/`writes?: readonly IRPath[]`). **In-scope set = the 8 strategy-bearing modules with non-empty `writes`** (reconcile against the ratified declarations — research.md D4).
+The typed paths a module is allowed to populate; the containment set the FR-003 assertion checks the patch against. Already typed on `QuestionModule` in `survey/types.ts` (`inputs?`/`writes?: readonly IRPath[]`). **In-scope set = the 5 question modules with non-empty `writes` (the identity/header writers)** plus the carve/add shell, which carries the genuinely strategy-bearing carve/mechanism/touch IR writes from `editors/` (reconciled to 5 — research.md D4).
 
 ---
 
