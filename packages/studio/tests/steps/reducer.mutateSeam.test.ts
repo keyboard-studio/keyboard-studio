@@ -8,7 +8,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
-import { irPath } from "@keyboard-studio/contracts";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { applyStepCompletion, type MutateRequest, type ReducerDeps } from "../../src/steps/reducer.ts";
 import langNameMod from "../../src/survey/questions/a/language_name_english.ts";
