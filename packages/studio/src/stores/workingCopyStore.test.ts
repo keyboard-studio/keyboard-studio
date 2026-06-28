@@ -22,6 +22,7 @@ import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 import type { RemovalCapability, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import type { Step, EditorStep } from "../steps/types.ts";
+import { promoteOnManualEdit } from "../editors/assignLoop/touchBehavior.ts";
 
 // ---------------------------------------------------------------------------
 // Reset helpers — clear all state between tests.
@@ -602,6 +603,79 @@ describe("workingCopyStore — removalCapabilities slot", () => {
     useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
     // Capabilities from the first call must still be intact.
     expect(useWorkingCopyStore.getState().removalCapabilities.get("rule#1")).toBe("removable:simple");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec-014 mutate-seam — setWorkingIR PRESERVES the carve-deletion overlay
+//
+// Regression for the Phase-5 MAJOR bug: the mutate-seam write path routed
+// incremental IR patches (US1 mutate-apply, US2 touch re-propagation, US2
+// touch promotion) through setIR, which RESETS deletedNodeIds/deletedItemIds/
+// undoStack. Those writes fire AFTER the carve step, so enabling
+// VITE_KM_MUTATE_SEAM=1 silently WIPED the live carve-deletion overlay that the
+// OSK preview and shipped output project from baseIr + the overlay. The fix
+// routes those writes through setWorkingIR, which updates `ir` ONLY.
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — setWorkingIR (mutate-seam overlay preservation)", () => {
+  it("setWorkingIR updates ir WITHOUT clearing deletedNodeIds/deletedItemIds/undoStack", () => {
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().setIR(ir);
+
+    // Seed a live carve-deletion overlay (node + item deletions).
+    useWorkingCopyStore.getState().deleteNode("n1");
+    useWorkingCopyStore.getState().deleteItem("n2#0");
+    const before = useWorkingCopyStore.getState();
+    expect(before.deletedNodeIds.has("n1")).toBe(true);
+    expect(before.deletedItemIds.has("n2#0")).toBe(true);
+    expect(before.undoStack).toHaveLength(2);
+
+    // Perform a mutate-seam incremental write (e.g. US1 mutate-apply / US2
+    // re-propagation) through the overlay-preserving setter.
+    const next = makeTestIR([]);
+    useWorkingCopyStore.getState().setWorkingIR(next);
+
+    const after = useWorkingCopyStore.getState();
+    // IR is updated...
+    expect(after.ir).toBe(next);
+    // ...but the carve-deletion overlay SURVIVES.
+    expect(after.deletedNodeIds.has("n1")).toBe(true);
+    expect(after.deletedItemIds.has("n2#0")).toBe(true);
+    expect(after.undoStack).toHaveLength(2);
+  });
+
+  it("setWorkingIR preserves the overlay across a touch-promotion write (US2)", () => {
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().setIR(ir);
+    useWorkingCopyStore.getState().deleteNode("carve-victim");
+    useWorkingCopyStore.getState().deleteItem("carve-victim#r0");
+
+    // Mirror TouchGallery.handleApply's promotion write: a hand-set promotion of
+    // the working IR routed through the overlay-preserving setter. promoteOnManualEdit
+    // returns the IR unchanged when no matching touch key exists, which is fine —
+    // the assertion is about the OVERLAY, not the promotion's IR delta.
+    const promoted = promoteOnManualEdit(useWorkingCopyStore.getState().ir!, "K_A");
+    useWorkingCopyStore.getState().setWorkingIR(promoted);
+
+    const after = useWorkingCopyStore.getState();
+    expect(after.deletedNodeIds.has("carve-victim")).toBe(true);
+    expect(after.deletedItemIds.has("carve-victim#r0")).toBe(true);
+    expect(after.undoStack).toHaveLength(2);
+  });
+
+  it("setIR (base/full replacement) STILL clears the overlay — distinct from setWorkingIR", () => {
+    // Guards the intentional contrast: setIR retains its reset behavior for
+    // base/full IR replacement; only setWorkingIR preserves the overlay.
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().setIR(ir);
+    useWorkingCopyStore.getState().deleteNode("n1");
+
+    useWorkingCopyStore.getState().setIR(makeTestIR([]));
+
+    const after = useWorkingCopyStore.getState();
+    expect(after.deletedNodeIds.size).toBe(0);
+    expect(after.undoStack).toHaveLength(0);
   });
 });
 

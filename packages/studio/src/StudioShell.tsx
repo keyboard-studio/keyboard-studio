@@ -460,9 +460,12 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         instantiateFromBaseIfConfirmed(base, opts),
       // spec-014 mutate seam (T014): read/write the working-copy carve IR for
       // the reducer's path-scoped mutate() apply. Read via getState() (stable,
-      // no re-render churn); write via the existing setIR action.
+      // no re-render churn); write via the OVERLAY-PRESERVING setWorkingIR action.
+      // These are INCREMENTAL patches to the working IR (mutate-apply US1 +
+      // touch re-propagation US2), not base replacements, so they must NOT clear
+      // the carve-deletion overlay (setIR would). See workingCopyStore.setWorkingIR.
       getWorkingIR: () => useWorkingCopyStore.getState().ir,
-      setWorkingIR: (next) => useWorkingCopyStore.getState().setIR(next),
+      setWorkingIR: (next) => useWorkingCopyStore.getState().setWorkingIR(next),
       // spec-014 US2 (T024): the staleness closure drives touch re-propagation
       // on physical-step completion. Read via getState() (no re-render churn).
       getStaleSteps: () => useWorkingCopyStore.getState().staleSteps,

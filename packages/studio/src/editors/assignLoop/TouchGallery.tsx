@@ -882,7 +882,10 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     if (isMutateSeamEnabled() && hostKey !== "") {
       const store = useWorkingCopyStore.getState();
       const ir = store.ir;
-      if (ir !== null) store.setIR(promoteOnManualEdit(ir, hostKey));
+      // INCREMENTAL patch (promote host key to hand-set) — use the
+      // overlay-preserving setter so carve deletions are not wiped. setIR would
+      // clear deletedNodeIds/deletedItemIds/undoStack. See workingCopyStore.
+      if (ir !== null) store.setWorkingIR(promoteOnManualEdit(ir, hostKey));
     }
     // Reset method inputs but stay on currentChar — user must click Next to advance.
     setMethod("longpress_alternates");

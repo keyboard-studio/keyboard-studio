@@ -246,8 +246,31 @@ export interface WorkingCopyState {
   validatorFindings: LintFinding[];
 
   // -- Actions (irStore) -------------------------------------------------------
-  /** Set the carve working IR, clearing carve deletion state. */
+  /**
+   * Set the carve working IR for a FULL/base replacement, clearing carve
+   * deletion state (deletedNodeIds, deletedItemIds, undoStack).
+   *
+   * Use this only when the working IR is being REPLACED wholesale (e.g. loading
+   * a different keyboard / re-seeding from a new base), where stale carve
+   * deletions correctly must not carry over. For INCREMENTAL patches to the
+   * working IR (the spec-014 mutate seam: question mutate-apply, touch
+   * re-propagation, touch promotion) use {@link setWorkingIR}, which preserves
+   * the live carve-deletion overlay.
+   */
   setIR: (ir: KeyboardIR) => void;
+  /**
+   * Update the carve working IR WITHOUT touching the carve-deletion overlay
+   * (deletedNodeIds, deletedItemIds, undoStack).
+   *
+   * This is the write path for spec-014 mutate-seam INCREMENTAL patches: the
+   * reducer's question mutate-apply (US1), touch re-propagation (US2), and the
+   * TouchGallery `hand-set` promotion (US2). Those writes happen AFTER the carve
+   * step and must preserve the live overlay that the OSK preview
+   * (`useWorkingCopyTransform`) and the shipped output (`serializeWorkingCopy` /
+   * `projectWorkingCopyForOutput`, which project from baseIr + the overlay)
+   * consume. Routing them through {@link setIR} silently wipes those deletions.
+   */
+  setWorkingIR: (ir: KeyboardIR) => void;
   /** Clear the carve working IR and reset carve deletion state. */
   clearIR: () => void;
   /** Mark a node as deleted and push to undo stack. */
@@ -430,7 +453,7 @@ const INITIAL_SURVEY = remerge({}, []);
 const INITIAL_STATE: Omit<
   WorkingCopyState,
   // actions are excluded from the initial state snapshot
-  | "setIR" | "clearIR" | "deleteNode" | "undoDelete" | "restoreNode"
+  | "setIR" | "setWorkingIR" | "clearIR" | "deleteNode" | "undoDelete" | "restoreNode"
   | "isDeleted" | "deleteItem" | "restoreItem" | "isItemDeleted" | "keepAll" | "restoreAll"
   | "recordPhase" | "recordAssignments"
   | "setIrAxes" | "lockDesktop" | "unlockDesktop"
@@ -475,6 +498,12 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
   setIR: (ir) =>
     set({ ir, deletedNodeIds: new Set(), deletedItemIds: new Set(), undoStack: [] }),
+
+  // Overlay-preserving write for spec-014 mutate-seam incremental patches.
+  // Deliberately writes ONLY `ir`, leaving deletedNodeIds/deletedItemIds/undoStack
+  // untouched so the carve-deletion overlay survives a mutate-seam write.
+  setWorkingIR: (ir) =>
+    set({ ir }),
 
   clearIR: () =>
     set({ ir: null, deletedNodeIds: new Set(), deletedItemIds: new Set(), undoStack: [] }),

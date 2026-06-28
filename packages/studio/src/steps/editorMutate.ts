@@ -156,9 +156,14 @@ export function applyCarveMutate(
  * `touchLayout.nodeIds` is ALSO in the surface: re-suggesting touch keys
  * re-derives the platform+layer+key → nodeId map alongside the keys, so a
  * re-propagation patch legitimately rewrites both. It stays a SEPARATE declared
- * path (not a coarse `touchLayout` grant) so the containment guard still rejects
- * any patch that strays into `platforms[].id`/`font` or other non-key fields by
- * accident — `header`/`stores`/`groups`/`comments`/`raw` remain out of bounds.
+ * path (not a coarse `touchLayout` grant) so the containment guard keeps
+ * unrelated touch-layout siblings — `header`/`stores`/`groups`/`comments`/`raw`
+ * — out of bounds. Note that `platforms[].id`/`font` are NOT protected by this
+ * path guard: the declared `keys[]`/`nodeIds[]` paths sit UNDER `platforms`, and
+ * the re-propagation patch carries each whole `platforms[]` element (mergeNoClobber
+ * spreads `...platform`), so `id`/`font` ride along inside an authorized subtree.
+ * Their byte-identity is guaranteed by mergeNoClobber copying them verbatim, NOT
+ * by the containment guard rejecting them.
  *
  * NOTE: this cycle exports the containment set ONLY. The re-propagation logic
  * (reading the staleness slice, re-running `touchSuggest`, the no-clobber

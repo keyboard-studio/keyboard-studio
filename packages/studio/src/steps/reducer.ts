@@ -131,8 +131,11 @@ export interface ReducerDeps {
    */
   getWorkingIR?: () => KeyboardIR | null;
   /**
-   * Write the merged IR back to the working copy (injected `setIR`). Called only
-   * when the mutate flag is on AND a mutate request actually changed the IR.
+   * Write the merged IR back to the working copy via the OVERLAY-PRESERVING
+   * store setter (`setWorkingIR`, NOT `setIR`). These are incremental patches to
+   * the working IR and must preserve the carve-deletion overlay
+   * (deletedNodeIds/deletedItemIds/undoStack). Called only when the mutate flag
+   * is on AND a mutate request actually changed the IR.
    */
   setWorkingIR?: (ir: KeyboardIR) => void;
 
