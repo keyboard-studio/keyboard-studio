@@ -83,6 +83,7 @@
     <li><a href="#b">B. Inventory matrix (exhaustive)</a></li>
     <li><a href="#c">C. Map-as-projection</a></li>
     <li><a href="#d"><code>mutate()</code> gap analysis</a></li>
+    <li><a href="#dloop">D2. Looping / iterative question-series</a></li>
     <li><a href="#e">E. Spine-vs-library split</a></li>
     <li><a href="#f">F. Migration sequencing</a></li>
     <li><a href="#g">G. Test strategy &amp; parity proof</a></li>
@@ -181,7 +182,7 @@
   <td>hand-built component; no entry in any data source</td>
   <td><span class="tag t-component">component-only</span></td>
   <td><span class="tag t-mature">most mature B experience; the one users take</span></td>
-  <td><b>Promote to first-class modular question(s)</b> — a <code>multi_select</code>/char-list module (e.g. <code>pb_build_list</code>) that reads CLDR suggestions and writes <code>confirmedInventory</code>&rarr;IR via <code>mutate()</code>. This becomes the <b>default</b> characters branch in <code>phase_b_characters.modular.yaml</code>.</td>
+  <td><b>Promote to first-class modular question(s)</b> — a <code>multi_select</code>/char-list module (e.g. <code>pb_build_list</code>) that reads CLDR suggestions and writes <code>confirmedInventory</code>&rarr;IR via <code>mutate()</code>. This becomes the <b>default</b> characters branch in <code>phase_b_characters.modular.yaml</code>. <b>Likely needs decomposition into a <i>looping</i> per-character sub-series</b> (see §D2) &mdash; flattening to a flat list would lose the iteration; promote it as a loop-capable construct.</td>
 </tr>
 
 <tr>
@@ -322,6 +323,38 @@
   <li><b>No <code>mutate()</code> signature change</b> is needed for batching: a single <code>mutate()</code> can return a patch touching many array indices, all authorized by one <code>writes: [layers[].rows[].keys[]]</code> declaration. The seam is already powerful enough for multi-leaf writes; the gap is <i>declaring</i> the surfaces and <i>routing</i> the galleries through the reducer instead of the direct store mutators.</li>
 </ul>
 
+<!-- ============================================================ D2 -->
+<h2 id="dloop">D2. Looping / iterative question-series — a gap the unification must close</h2>
+
+<div class="callout bad">
+<b>New requirement (Matt).</b> The mature character-placement / build-list flows may need to be decomposed into <b>separate and possibly looping</b> question series &mdash; e.g. an iterative branch &ldquo;<i>for each character, ask this sub-series</i>&rdquo; (per-character or per-key), not just a flat linear set. Flattening these into a linear question list would <b>lose the looping behaviour</b>. The modular question model does <b>not</b> support iteration today, so this is a first-class part of migrating the character flows.
+</div>
+
+<h3>(1) Does the current schema / <code>FlowGotoRule</code> / registry support loops or repeated sub-flows?</h3>
+<p><b>No &mdash; and the runtime actively forbids them.</b> Verified against current code:</p>
+<ul>
+  <li><b>The question schema has no iteration construct.</b> <code>FlowQuestion.next</code> is <code>string | null | FlowGotoRule[]</code> <cite>survey/types.ts:53</cite>; <code>FlowGotoRule</code> is <code>{condition?, goto, default?}</code> <cite>survey/types.ts:30&ndash;34</cite>. There is no loop-entry/exit marker, no per-iteration index, no &ldquo;repeat while&rdquo;, and no binding of a question to a collection. <code>FlowDef</code> <cite>survey/types.ts:61&ndash;67</cite> is a flat <code>questions[]</code> + an optional <code>provenance_questions[]</code> &mdash; no sub-flow / nested-flow type exists.</li>
+  <li><b>The runner treats revisiting a node as an error, not a loop.</b> <code>advanceThrough()</code> keeps a <code>Set&lt;string&gt; visited</code> guard whose <i>sole purpose</i> is to break out of cycles: &ldquo;a <code>visited</code> guard prevents an infinite loop if a YAML author creates a cycle (A&rarr;B&rarr;A)&rdquo; <cite>SurveyRunner.tsx:180&ndash;205</cite>. A back-edge logs <code>&quot;cycle detected&quot;</code> and terminates the flow. So even the &ldquo;loop back&rdquo; <code>goto</code> options that exist today (e.g. <code>pb_additional_methods</code> offering &ldquo;loop back for text sample / linguist / picker&rdquo; <cite>questions/b/pb_additional_methods.ts:38&ndash;40</cite>) are <b>routing back to an earlier question id</b>, not a bounded iteration with per-pass state &mdash; and they rely on the visited-guard not tripping.</li>
+  <li><b>Completeness treats cycles as a hard error.</b> C2 (<code>findCycles</code>) flags any cycle in the writes&rarr;inputs data graph as a <b>hard error</b> <cite>completeness.ts:182&ndash;185, 216&ndash;229</cite>. A naive &ldquo;loop a question back to itself&rdquo; would both terminate the runner and turn the dashboard banner red.</li>
+  <li><b>Collections are captured flat, not iterated.</b> The build-list pattern gathers a whole character set in <i>one</i> <code>multi_select</code>/char-list answer (<code>confirmedInventory</code>, <cite>PhaseB.tsx:55&ndash;71, 607&ndash;612</cite>) &mdash; there is no &ldquo;for each grapheme, run a sub-series&rdquo; mechanism anywhere in the survey layer.</li>
+</ul>
+
+<h3>(2) What a looping / iterative question-series primitive would need to look like</h3>
+<p>A first-class loop construct on the modular model (additive to <code>FlowQuestion</code>/<code>FlowDef</code>) would need:</p>
+<ul>
+  <li><b>Loop entry / exit + collection binding.</b> A new step kind (e.g. a <code>loop</code> / <code>for-each</code> node) that names the <b>collection</b> it iterates (e.g. the confirmed-inventory graphemes, or carved keys) and the <b>sub-series</b> (an ordered question id list / sub-flow) to run per element. Entry establishes the iteration set; exit is reached when the set is exhausted. This must be representable so the map projection (§C) can render it as a single &ldquo;loop&rdquo; node with the sub-series as a drill-down &mdash; not as N flattened copies.</li>
+  <li><b>Per-iteration state (the loop variable).</b> A bounded, named iteration context &mdash; <code>{ index, item }</code> &mdash; threaded into <code>SurveyContext</code> for the sub-series, so prompts can interpolate the current character/key and <code>validate()</code> can range-check against it. This is the structured replacement for the current cycle-is-an-error model: a loop is a <b>bounded</b> revisit driven by collection length, distinct from an unbounded <code>goto</code> back-edge, so <code>advanceThrough</code>&rsquo;s visited-guard <cite>SurveyRunner.tsx:189</cite> must learn to allow a loop re-entry while still rejecting genuine author-error cycles.</li>
+  <li><b>Per-iteration <code>mutate()</code> into an IR array.</b> Each pass writes one element of an IR collection &mdash; e.g. per-character/per-key into <code>stores[]</code> or <code>layers[].rows[].keys[]</code>. The existing seam already supports this shape: <code>pathAuthorizes</code> authorizes array-index sub-paths under an array <code>writes</code> declaration (<code>stores[]</code> &rarr; <code>stores[3].items</code>) <cite>mutateApply.ts:90&ndash;96</cite>, and <code>pb_standard_letters</code> already rebuilds a <code>stores[]</code> array idempotently by stable name <cite>questions/b/pb_standard_letters.ts:105&ndash;125</cite>. The loop primitive would carry the <b>iteration index/key</b> into <code>MutateContext</code> so the per-pass patch targets the right array slot idempotently (re-running pass <i>i</i> replaces slot <i>i</i>, preserving M4). No <code>mutate()</code> <i>signature</i> change is forced; what&rsquo;s missing is (a) the iteration context in <code>MutateContext</code> and (b) a deterministic per-element slot key.</li>
+  <li><b>Completeness-aware modelling.</b> The loop must be expressible in the manifest/data graph as a <b>bounded</b> construct so C2 does not flag it as an illegal cycle &mdash; i.e. a loop node is a first-class graph element with an iteration cardinality, not a self-referential data edge. C5 (orphan inputs) and C7 (reachable) must understand the sub-series&rsquo; inputs are satisfied by the loop&rsquo;s collection binding.</li>
+</ul>
+
+<h3>(3) Why this is first-class to the character-flow migration</h3>
+<p>The build-list / character-discovery experience is exactly the surface most likely to need &ldquo;for each character, ask this sub-series&rdquo; (e.g. placement, casing, or mark behaviour per grapheme). If the unification flattens it into a linear <code>multi_select</code> + linear questions, the per-element branching is lost &mdash; which is the opposite of the goal (&ldquo;don&rsquo;t dumb the flows down&rdquo;). Therefore the loop primitive is <b>part of the build-list promotion (§B / §F P3c)</b>, not a later nicety: the build-list module should be promoted <i>as</i> a loop-capable construct (or the loop primitive landed first, behind the flag), so the mature behaviour survives the move onto the modular spine.</p>
+
+<div class="callout warn">
+<b>Status:</b> the schema does <b>not</b> support loops today and the runner/completeness layer treats cycles as errors. This is a genuine gap the unification must close before (or as part of) migrating the character-placement flows. It is flagged as Q5 / Risk R3 in §H, and it likely requires a <code>survey/types.ts</code> schema extension plus a <code>MutateContext</code> addition (iteration index/key) &mdash; possibly a contracts touch if the iteration key must round-trip in the IR.
+</div>
+
 <!-- ============================================================ E -->
 <h2 id="e">E. Spine-vs-library split</h2>
 
@@ -359,7 +392,7 @@
   </li>
   <li>
     <b>Per-flow modularization behind the flag.</b> <span class="pill">VITE_KM_MUTATE_SEAM</span>
-    One flow at a time, each its own PR: (a) track chooser &rarr; modular gate; (b) prefill &rarr; modular read question; (c) build-list &rarr; modular <code>mutate()</code> writer; (d) carve, (e) mechanisms routed through the reducer&rsquo;s overlay-preserving <code>setWorkingIR</code> instead of direct store mutators. With the flag off, each PR is byte-identical to today (the reducer no-ops <cite>reducer.ts:205&ndash;217</cite>). Each lands green independently.
+    One flow at a time, each its own PR: (a) track chooser &rarr; modular gate; (b) prefill &rarr; modular read question; (c) build-list &rarr; modular <code>mutate()</code> writer (<b>as a loop-capable construct &mdash; see §D2</b>, landing or co-landing the loop primitive); (d) carve, (e) mechanisms routed through the reducer&rsquo;s overlay-preserving <code>setWorkingIR</code> instead of direct store mutators. With the flag off, each PR is byte-identical to today (the reducer no-ops <cite>reducer.ts:205&ndash;217</cite>). Each lands green independently.
   </li>
   <li>
     <b>Parity-prove and flip the default.</b> <span class="pill">flag on</span>
@@ -371,16 +404,16 @@
 <h2 id="g">G. Test strategy &amp; parity proof (plan §7 two-tier)</h2>
 
 <h3>Tier 1 — per-question unit tests (mirrored tree)</h3>
-<p>Every promoted module gets a colocated spec in the existing mirrored tree <code>packages/studio/tests/survey/questions/&lt;phase&gt;/&lt;id&gt;.test.ts</code> (the tree already exists: <cite>tests/survey/questions/{a,b,f}/</cite>). Per the <code>mutate()</code> obligations (<cite>contracts/mutate-seam.contract.md</cite>, lines 26&ndash;32): applying <code>mutate()</code> to a known IR fixture (1) changes <b>exactly</b> the declared <code>writes</code> paths, siblings byte-identical (M2/SC-002); (2) an out-of-<code>writes</code> patch <b>fails fast, whole-patch rejected, IR unchanged</b> (M3) &mdash; exercised against <code>MutatePatchContainmentError</code> <cite>mutateApply.ts:35&ndash;51</cite>; (3) idempotent (M4); (4) round-trips against reused IR fixtures. New gallery write surfaces add batch-patch fixtures; prefill is a read-only module so its test asserts declared <code>inputs</code> satisfiability, not a patch.</p>
+<p>Every promoted module gets a colocated spec in the existing mirrored tree <code>packages/studio/tests/survey/questions/&lt;phase&gt;/&lt;id&gt;.test.ts</code> (the tree already exists: <cite>tests/survey/questions/{a,b,f}/</cite>). Per the <code>mutate()</code> obligations (<cite>contracts/mutate-seam.contract.md</cite>, lines 26&ndash;32): applying <code>mutate()</code> to a known IR fixture (1) changes <b>exactly</b> the declared <code>writes</code> paths, siblings byte-identical (M2/SC-002); (2) an out-of-<code>writes</code> patch <b>fails fast, whole-patch rejected, IR unchanged</b> (M3) &mdash; exercised against <code>MutatePatchContainmentError</code> <cite>mutateApply.ts:35&ndash;51</cite>; (3) idempotent (M4); (4) round-trips against reused IR fixtures. New gallery write surfaces add batch-patch fixtures; prefill is a read-only module so its test asserts declared <code>inputs</code> satisfiability, not a patch. A <b>loop construct (§D2)</b> additionally needs per-iteration tests: pass <i>i</i> writes only slot <i>i</i>, re-running pass <i>i</i> is idempotent (M4), and the empty-collection case is a clean no-op.</p>
 
 <h3>Tier 2 — mirrored / structural test tree</h3>
-<p>Manifest-shape guards already exist and must stay green: <code>validateManifestShape()</code> (M2 spine order, M3 locks, M4/M4b side-trails, M5 unique ids) <cite>StudioShell.tsx:253&ndash;303</cite>, and the completeness checks C1&ndash;C7 <cite>completeness.ts</cite>. Promoting questions must keep C3 (rejoin), C5 (orphan inputs), C7 (unreachable) passing &mdash; these are the structural proof that a promoted question is on a real, reachable branch with satisfied reads.</p>
+<p>Manifest-shape guards already exist and must stay green: <code>validateManifestShape()</code> (M2 spine order, M3 locks, M4/M4b side-trails, M5 unique ids) <cite>StudioShell.tsx:253&ndash;303</cite>, and the completeness checks C1&ndash;C7 <cite>completeness.ts</cite>. Promoting questions must keep C3 (rejoin), C5 (orphan inputs), C7 (unreachable) passing &mdash; these are the structural proof that a promoted question is on a real, reachable branch with satisfied reads. A loop construct must keep <b>C2 green</b> (a bounded loop is not an illegal data cycle).</p>
 
 <h3>Parity proof — flag-on/flag-off equivalence</h3>
 <ul>
   <li><b>Baseline:</b> with <code>VITE_KM_MUTATE_SEAM</code> off, produced IR + observable survey behaviour are byte-identical to P4b (F2/SC-008) &mdash; the reducer&rsquo;s <code>isMutateRequest</code> guard returns before any write <cite>reducer.ts:205&ndash;206</cite>.</li>
-  <li><b>Equivalence test per converted flow</b> (the &ldquo;#832 50/50&rdquo; parity style): run the same answer sequence through the flow with the flag off and with the flag on, and assert the resulting <code>KeyboardIR</code> is equal. Off path writes via the legacy route (store mutators / <code>phaseResults</code>); on path writes via <code>mutate()</code>. They must converge to the same IR &mdash; that is the proof the seam doesn&rsquo;t change output, only the route. A converted flow does not flip its default until its 50/50 parity test is green.</li>
-  <li><b>Boundary &amp; round-trip:</b> <code>pnpm depcruise</code> (dashboard&rarr;stores forbidden; the projection change must keep the dashboard store-free, props-only <cite>DashboardView.tsx:11&ndash;14, 301&ndash;309</cite>); contracts round-trip tests if any new IR field is added (§D).</li>
+  <li><b>Equivalence test per converted flow</b> (the &ldquo;#832 50/50&rdquo; parity style): run the same answer sequence through the flow with the flag off and with the flag on, and assert the resulting <code>KeyboardIR</code> is equal. Off path writes via the legacy route (store mutators / <code>phaseResults</code>); on path writes via <code>mutate()</code>. They must converge to the same IR &mdash; that is the proof the seam doesn&rsquo;t change output, only the route. A converted flow does not flip its default until its 50/50 parity test is green. For the looping build-list, the parity sequence must include a multi-element collection so the per-iteration writes are exercised on both paths.</li>
+  <li><b>Boundary &amp; round-trip:</b> <code>pnpm depcruise</code> (dashboard&rarr;stores forbidden; the projection change must keep the dashboard store-free, props-only <cite>DashboardView.tsx:11&ndash;14, 301&ndash;309</cite>); contracts round-trip tests if any new IR field is added (§D / §D2).</li>
   <li><b>Full green gate</b> (mirrors plan T037): <code>pnpm typecheck</code>, studio + contracts vitest, <code>pnpm depcruise</code>, and flag-off output matching the recorded baseline &mdash; each migration PR must pass all of these.</li>
 </ul>
 
@@ -396,10 +429,14 @@
   <div><b>Fate of the full Phase A battery.</b> Confirm it is genuinely reserve (library, inert-but-preserved) and not a path we intend to revive soon. If revival is planned, it should not be demoted &mdash; it should be wired to render.</div>
   <div>Q4</div>
   <div><b>Async prefill reads.</b> The CLDR suggestion fetch must stay in the component (it&rsquo;s async; <code>mutate()</code> is sync/pure). Confirm the model where the component resolves suggestions and passes the <i>confirmed selection</i> as the answer value into a sync <code>mutate()</code> writer.</div>
+  <div>Q5 — looping</div>
+  <div><b>Looping / iterative question-series (§D2).</b> The schema supports <b>no</b> iteration today and the runner/completeness layer treats cycles as <i>errors</i> <cite>SurveyRunner.tsx:180&ndash;205</cite> <cite>completeness.ts:182&ndash;185</cite>. The mature character-placement flows likely need &ldquo;for each character, ask this sub-series.&rdquo; Decision: do we land a first-class <b>loop primitive</b> (schema extension on <code>FlowQuestion</code>/<code>FlowDef</code> + an iteration index/key in <code>MutateContext</code>) before/as part of the build-list promotion, and does the iteration key need to round-trip in the IR (a possible contracts touch)? Without it, the build-list cannot be modularized without flattening away its looping behaviour.</div>
   <div>Risk R1</div>
   <div><b>Carve overlay semantics.</b> The deletion overlay + undo stack is non-trivial; expressing removal as a declared-<code>writes</code> patch must preserve the overlay (the reducer already has an overlay-preserving <code>setWorkingIR</code> <cite>StudioShell.tsx:462&ndash;468</cite>, but the patch shape for &ldquo;remove&rdquo; vs &ldquo;set&rdquo; needs design). Highest-effort conversion; sequence it after the simpler writers.</div>
   <div>Risk R2</div>
   <div><b>Default-flip blast radius.</b> Flipping <code>VITE_KM_MUTATE_SEAM</code> on changes the live write route for all converted surfaces at once. Mitigated by the per-flow 50/50 parity gate (§G) and the &ldquo;leave it off&rdquo; rollback, but the flip itself is the riskiest single moment &mdash; soak in preview first.</div>
+  <div>Risk R3</div>
+  <div><b>Loop primitive is a schema change with broad reach.</b> Adding iteration touches the question schema, the <code>SurveyRunner</code> visited-guard, the map projection, and the completeness cycle check (C2 must distinguish a bounded loop from an illegal cycle). It is the most architecturally invasive piece of the unification &mdash; scope and sequence it deliberately (land the primitive behind the flag, with its own parity + completeness tests, before promoting the looping character flows).</div>
 </div>
 
 <footer>
