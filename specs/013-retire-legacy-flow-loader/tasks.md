@@ -29,9 +29,9 @@ description: "Task list for retiring the legacy full-YAML survey flow loader (Ph
 
 **Purpose**: Establish the branch and a baseline so research-preservation (INV-4) and parity (INV-1/INV-2) are verifiable after the change.
 
-- [ ] T001 Create the cycle branch `km/retire-legacy-flow-loader` off `main`.
-- [ ] T002 [P] Record the baseline question-module count: `find packages/studio/src/survey/questions -name '*.ts' ! -name '*.test.ts' | wc -l` and note it in the PR description (INV-4 / FR-007 guard).
-- [ ] T003 [P] Confirm starting state is green: run `pnpm --filter @keyboard-studio/studio test` and `pnpm typecheck` on the branch base; note any pre-existing failures so they are not attributed to this change.
+- [x] T001 Create the cycle branch `km/retire-legacy-flow-loader` off `main`.
+- [x] T002 [P] Record the baseline question-module count: `find packages/studio/src/survey/questions -name '*.ts' ! -name '*.test.ts' | wc -l` and note it in the PR description (INV-4 / FR-007 guard).
+- [x] T003 [P] Confirm starting state is green: run `pnpm --filter @keyboard-studio/studio test` and `pnpm typecheck` on the branch base; note any pre-existing failures so they are not attributed to this change.
 
 **Checkpoint**: Branch ready; baseline counts and green starting state captured.
 
@@ -55,16 +55,16 @@ description: "Task list for retiring the legacy full-YAML survey flow loader (Ph
 
 ### Implementation for User Story 1
 
-- [ ] T004 [US1] Generalize `buildModularFlowGraph` in `packages/studio/src/flowmap/buildFlowGraph.ts` to take a third param `registry: Readonly<Record<string, QuestionModule>>` and pass it to `computeReserveNodes(flow, registry)` (contract C1; was hardwired to `phaseBRegistry`).
-- [ ] T005 [US1] In the same file `packages/studio/src/flowmap/buildFlowGraph.ts`, remove the legacy `buildFlowGraph(raw, title)` function and delete `import { parseFlow } from "../survey/loadFlow.ts";` (preserve explicit `.ts` extension conventions on remaining imports). No `flowmap/` symbol may import `loadFlow.ts` after this.
-- [ ] T006 [US1] Repoint `packages/studio/src/flowmap/buildScriptRouting.ts`: swap `import { parseFlow } from "../survey/loadFlow.ts"` → `import { loadModularFlow } from "../survey/loadModularFlow.ts"` and `parseFlow(raw)` → `loadModularFlow(raw)`; no other logic change (contract C2 / D4).
-- [ ] T007 [US1] Rewire `packages/studio/src/flowmap/FlowMapView.tsx`: replace the three legacy `?raw` imports (`identity_lite.yaml`, `phase_a_identity.yaml`, `phase_f_helpdocs.yaml`) with their `*.modular.yaml` counterparts; collapse the `FlowSourceEntry` union so every entry is modular and carries its `registry` (Identity-lite→`phaseARegistry`, Phase A→`phaseARegistry`, Phase B→`phaseBRegistry`, Phase F→`phaseFRegistry`); simplify `safeBuild` to always call `buildModularFlowGraph(raw, title, registry)`; feed `ScriptRoutingView` the `identity_lite.modular.yaml` raw string (data-model + contract C1 call-site table).
-- [ ] T008 [US1] Update the header comment block in `FlowMapView.tsx` (lines describing "legacy full-YAML loader (parseFlow)" per-import) to reflect that all sections now use the modular loader — remove the now-false "legacy" narration.
-- [ ] T009 [US1] Verify `packages/studio/src/flowmap/ScriptRoutingView.tsx` needs no change (still receives an identity-lite raw string prop); if it carries any legacy reference, update it.
-- [ ] T010 [US1] Retarget `packages/studio/src/flowmap/buildFlowGraph.test.ts`: replace legacy `*.yaml?raw` fixture imports with `*.modular.yaml?raw`; update reserve-node expectations for A/F/identity-lite (D3 — reserve nodes now appear, consistent with Phase B); assert the live (`kind: "live"`) node set per phase equals the manifest's question ids (INV-1).
-- [ ] T011 [US1] Add/confirm a script-routing parity assertion (INV-2): `buildScriptRouting(identity_lite.modular.yaml)` yields the same rows the legacy YAML produced, with `Ethi`/`Hani`/`Hang` rows `gated: true`. (Place in `buildScriptRouting`'s test if one exists, else add a focused case to `buildFlowGraph.test.ts` or a new `buildScriptRouting.test.ts`.)
-- [ ] T012 [US1] Run gates: `pnpm typecheck`, `pnpm lint` (incl. `pnpm depcruise`), `pnpm --filter @keyboard-studio/studio test`. Confirm `tests/survey/flow-parity.test.ts` (Phase 3a) stays green. Fix any fallout before committing.
-- [ ] T013 [US1] Commit US1 as `refactor(studio): repoint flow map to modular loader` on the cycle branch.
+- [x] T004 [US1] Generalize `buildModularFlowGraph` in `packages/studio/src/flowmap/buildFlowGraph.ts` to take a third param `registry: Readonly<Record<string, QuestionModule>>` and pass it to `computeReserveNodes(flow, registry)` (contract C1; was hardwired to `phaseBRegistry`).
+- [x] T005 [US1] In the same file `packages/studio/src/flowmap/buildFlowGraph.ts`, remove the legacy `buildFlowGraph(raw, title)` function and delete `import { parseFlow } from "../survey/loadFlow.ts";` (preserve explicit `.ts` extension conventions on remaining imports). No `flowmap/` symbol may import `loadFlow.ts` after this.
+- [x] T006 [US1] Repoint `packages/studio/src/flowmap/buildScriptRouting.ts`: swap `import { parseFlow } from "../survey/loadFlow.ts"` → `import { loadModularFlow } from "../survey/loadModularFlow.ts"` and `parseFlow(raw)` → `loadModularFlow(raw)`; no other logic change (contract C2 / D4).
+- [x] T007 [US1] Rewire `packages/studio/src/flowmap/FlowMapView.tsx`: replace the three legacy `?raw` imports (`identity_lite.yaml`, `phase_a_identity.yaml`, `phase_f_helpdocs.yaml`) with their `*.modular.yaml` counterparts; collapse the `FlowSourceEntry` union so every entry is modular and carries its `registry` (Identity-lite→`phaseARegistry`, Phase A→`phaseARegistry`, Phase B→`phaseBRegistry`, Phase F→`phaseFRegistry`); simplify `safeBuild` to always call `buildModularFlowGraph(raw, title, registry)`; feed `ScriptRoutingView` the `identity_lite.modular.yaml` raw string (data-model + contract C1 call-site table).
+- [x] T008 [US1] Update the header comment block in `FlowMapView.tsx` (lines describing "legacy full-YAML loader (parseFlow)" per-import) to reflect that all sections now use the modular loader — remove the now-false "legacy" narration.
+- [x] T009 [US1] Verify `packages/studio/src/flowmap/ScriptRoutingView.tsx` needs no change (still receives an identity-lite raw string prop); if it carries any legacy reference, update it.
+- [x] T010 [US1] Retarget `packages/studio/src/flowmap/buildFlowGraph.test.ts`: replace legacy `*.yaml?raw` fixture imports with `*.modular.yaml?raw`; update reserve-node expectations for A/F/identity-lite (D3 — reserve nodes now appear, consistent with Phase B); assert the live (`kind: "live"`) node set per phase equals the manifest's question ids (INV-1).
+- [x] T011 [US1] Add/confirm a script-routing parity assertion (INV-2): `buildScriptRouting(identity_lite.modular.yaml)` yields the same rows the legacy YAML produced, with `Ethi`/`Hani`/`Hang` rows `gated: true`. (Place in `buildScriptRouting`'s test if one exists, else add a focused case to `buildFlowGraph.test.ts` or a new `buildScriptRouting.test.ts`.)
+- [x] T012 [US1] Run gates: `pnpm typecheck`, `pnpm lint` (incl. `pnpm depcruise`), `pnpm --filter @keyboard-studio/studio test`. Confirm `tests/survey/flow-parity.test.ts` (Phase 3a) stays green. Fix any fallout before committing.
+- [x] T013 [US1] Commit US1 as `refactor(studio): repoint flow map to modular loader` on the cycle branch.
 
 **Checkpoint**: All flow-map sections run on the modular loader; `flowmap/` has zero legacy references; the legacy loader + YAMLs are now dead code (no consumer). US1 is independently testable and revertible.
 
@@ -80,11 +80,11 @@ description: "Task list for retiring the legacy full-YAML survey flow loader (Ph
 
 ### Implementation for User Story 2
 
-- [ ] T014 [US2] Delete `packages/studio/src/survey/loadFlow.ts`.
-- [ ] T015 [US2] Delete `packages/studio/src/survey/loadFlow.test.ts`.
-- [ ] T016 [US2] Sweep for stragglers: `grep -rnE "parseFlow|loadFlow" packages/studio/src` must return nothing (FR-008, shipped code only). Resolve any remaining import.
-- [ ] T017 [US2] Run gates: `pnpm typecheck` + `pnpm --filter @keyboard-studio/studio test` (no unresolved-import errors).
-- [ ] T018 [US2] Commit US2 as `maint(studio): delete legacy parseFlow loader` (separate commit so it reverts independently).
+- [x] T014 [US2] Delete `packages/studio/src/survey/loadFlow.ts`.
+- [x] T015 [US2] Delete `packages/studio/src/survey/loadFlow.test.ts`.
+- [x] T016 [US2] Sweep for stragglers: `grep -rnE "parseFlow|loadFlow" packages/studio/src` must return nothing (FR-008, shipped code only). Resolve any remaining import.
+- [x] T017 [US2] Run gates: `pnpm typecheck` + `pnpm --filter @keyboard-studio/studio test` (no unresolved-import errors).
+- [x] T018 [US2] Commit US2 as `maint(studio): delete legacy parseFlow loader` (separate commit so it reverts independently).
 
 **Checkpoint**: Legacy loader gone; build still green. US2 reverts independently.
 
@@ -100,14 +100,14 @@ description: "Task list for retiring the legacy full-YAML survey flow loader (Ph
 
 ### Implementation for User Story 3
 
-- [ ] T019 [P] [US3] Delete `content/flows/phase_a_identity.yaml`.
-- [ ] T020 [P] [US3] Delete `content/flows/phase_b_characters.yaml`.
-- [ ] T021 [P] [US3] Delete `content/flows/phase_f_helpdocs.yaml`.
-- [ ] T022 [P] [US3] Delete `content/flows/identity_lite.yaml`.
-- [ ] T023 [US3] Confirm retained assets: `ls content/flows/*.modular.yaml` shows all four manifests; `ls content/flows/_examples` shows the example fixtures (FR-006).
-- [ ] T024 [US3] Confirm research preserved (FR-007/INV-4): re-run the T002 count over `survey/questions` — must equal the baseline; no `survey/questions/**` file deleted.
-- [ ] T025 [US3] Run full gates from a clean build: `pnpm build` (resolves Vite `?raw` assets — catches any dangling import), `pnpm typecheck`, `pnpm lint`, `pnpm --filter @keyboard-studio/studio test`.
-- [ ] T026 [US3] Commit US3 as `maint(studio): delete legacy full-flow YAMLs` (separate commit).
+- [x] T019 [P] [US3] Delete `content/flows/phase_a_identity.yaml`.
+- [x] T020 [P] [US3] Delete `content/flows/phase_b_characters.yaml`.
+- [x] T021 [P] [US3] Delete `content/flows/phase_f_helpdocs.yaml`.
+- [x] T022 [P] [US3] Delete `content/flows/identity_lite.yaml`.
+- [x] T023 [US3] Confirm retained assets: `ls content/flows/*.modular.yaml` shows all four manifests; `ls content/flows/_examples` shows the example fixtures (FR-006).
+- [x] T024 [US3] Confirm research preserved (FR-007/INV-4): re-run the T002 count over `survey/questions` — must equal the baseline; no `survey/questions/**` file deleted.
+- [x] T025 [US3] Run full gates from a clean build: `pnpm build` (resolves Vite `?raw` assets — catches any dangling import), `pnpm typecheck`, `pnpm lint`, `pnpm --filter @keyboard-studio/studio test`.
+- [x] T026 [US3] Commit US3 as `maint(studio): delete legacy full-flow YAMLs` (separate commit).
 
 **Checkpoint**: All six legacy files removed; modular manifests + examples + question research intact; whole suite green.
 
@@ -117,9 +117,9 @@ description: "Task list for retiring the legacy full-YAML survey flow loader (Ph
 
 **Purpose**: Final verification and optional doc hygiene.
 
-- [ ] T027 [P] Run the full [quickstart.md](./quickstart.md) verification end-to-end (US1/US2/US3 sections + whole-feature gates + research-preservation check).
-- [ ] T028 [P] (Optional doc hygiene — not required by an FR) Update `content/flows/README.md` if it describes the deleted legacy YAMLs as live sources; flag for `km-doc`. Do NOT rewrite historical `// Ported verbatim from …` source comments (out of scope, FR-008 / research Out-of-scope).
-- [ ] T029 Reconcile spec acceptance criteria against the diff for the closing PR (SC-001…SC-006); open the PR against `main` with `refs`/`closes` per the issue-closure policy. This feature is the explicit "beyond #410" follow-up, so it does not by itself close #410.
+- [x] T027 [P] Run the full [quickstart.md](./quickstart.md) verification end-to-end (US1/US2/US3 sections + whole-feature gates + research-preservation check).
+- [x] T028 [P] (Optional doc hygiene — not required by an FR) Update `content/flows/README.md` if it describes the deleted legacy YAMLs as live sources; flag for `km-doc`. Do NOT rewrite historical `// Ported verbatim from …` source comments (out of scope, FR-008 / research Out-of-scope).
+- [x] T029 Reconcile spec acceptance criteria against the diff for the closing PR (SC-001…SC-006); open the PR against `main` with `refs`/`closes` per the issue-closure policy. This feature is the explicit "beyond #410" follow-up, so it does not by itself close #410.
 
 ---
 
