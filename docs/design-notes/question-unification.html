@@ -211,10 +211,10 @@
 
 <tr>
   <td><b>Mechanisms</b> (physical key assignment) — <code>MechanismGallery</code> <cite>StudioShell.tsx:776&ndash;787</cite></td>
-  <td>manifest editor-step <code>mechanisms</code>, <code>lock:"physical"</code> <cite>steps/manifest.ts:96&ndash;99</cite></td>
-  <td><span class="tag t-component">component-only</span> — assignments land in <code>phaseResults</code> / store, not via <code>mutate()</code></td>
-  <td><span class="tag t-mature">mature &amp; live; &ldquo;Form 4&rdquo; gallery</span></td>
-  <td><b>First-class spine editor-step on <code>mutate()</code>.</b> Drives the physical-lock + touch re-propagation that already exists in the reducer <cite>reducer.ts:221&ndash;245</cite>.</td>
+  <td>manifest editor-step <code>mechanisms</code>, <code>lock:"physical"</code> <cite>steps/manifest.ts:96&ndash;99</cite>; write path R1 (<code>lockDesktop</code>) runs unconditionally <cite>reducer.ts:221&ndash;245</cite></td>
+  <td><span class="tag t-component">component-only</span> (Form-4 gallery UI; assignments land in <code>phaseResults</code> / store, not yet via <code>mutate()</code>)</td>
+  <td><span class="tag t-mature">mature &amp; live; <b>REFERENCE / known-good</b></span></td>
+  <td><b>Reference pattern &mdash; preserve as-is; don&rsquo;t regress.</b> First-class spine editor-step on <code>mutate()</code>, parity-proven byte-for-byte before flip. This is the known-good shape the other flows should match; convert it last so it is never destabilized to unblock another flow.</td>
 </tr>
 
 <tr>
@@ -227,10 +227,10 @@
 
 <tr>
   <td><b>Touch</b> (touch key assignment) — <code>TouchGallery</code> <cite>StudioShell.tsx:789&ndash;798</cite></td>
-  <td>manifest editor-step <code>touch</code>, <code>lock:"touch"</code> <cite>steps/manifest.ts:109&ndash;112</cite></td>
-  <td><span class="tag t-component">component-only</span> — already references <code>applyMutatePatch</code>/provenance path <cite>TouchGallery.tsx</cite></td>
-  <td><span class="tag t-mature">mature &amp; live; &ldquo;Form 4&rdquo; gallery</span></td>
-  <td><b>First-class spine editor-step on <code>mutate()</code></b>; furthest along since touch IR + provenance landed in #825.</td>
+  <td>manifest editor-step <code>touch</code>, <code>lock:"touch"</code> <cite>steps/manifest.ts:109&ndash;112</cite>; rendered &amp; manifest-wired identically to physical; write path R2 (<code>buildTouchLayoutJson</code>/<code>setTouchLayoutJson</code> &rarr; shipped <code>.keyman-touch-layout</code> side-car) runs <b>unconditionally</b> <cite>reducer.ts:249&ndash;277</cite>, mirroring physical&rsquo;s R1</td>
+  <td><span class="tag t-component">component-only</span> (Form-4 gallery UI, not yet a modular question)</td>
+  <td><span class="tag t-mature">mature &amp; live; <b>known-good (verified)</b></span></td>
+  <td><b>Reference / known-good &mdash; preserve as-is.</b> Touch modification works end-to-end and survived the transition (verified; touch IR + provenance #825, contracts <code>0.13.0</code>, #831 side-car wiring merged <code>c9f64ba</code>, all touch tests pass). Touch parity at the <code>mutate()</code>/side-car layer is <b>already achieved</b>; the only flag-gated piece is the optional physical&rarr;touch <i>re-propagation</i> enhancement <cite>reducer.ts:228&ndash;243</cite>, not the base flow. Its remaining gap is the <b>shared</b> one: a hand-built gallery, not yet a first-class modular node in the map/registry (closed by §C projection).</td>
 </tr>
 
 <tr>
@@ -253,7 +253,7 @@
 </table>
 
 <div class="callout">
-<b>Reading the matrix.</b> The mature, live experiences cluster in the two rightmost-needing columns: <i>component-only</i> (galleries, build-list, prefill, track) or <i>in-registry but non-default</i> (the <code>pb_*</code> battery). The one truly <i>orphaned</i> structure (full Phase A) is also the least mature at runtime. That is the inversion in tabular form.
+<b>Reading the matrix.</b> The mature, live experiences cluster in the two rightmost-needing columns: <i>component-only</i> (galleries, build-list, prefill, track) or <i>in-registry but non-default</i> (the <code>pb_*</code> battery). The one truly <i>orphaned</i> structure (full Phase A) is also the least mature at runtime. That is the inversion in tabular form. Note: physical <i>and</i> touch are both known-good, live reference flows &mdash; their only gap is the shared one (Form-4 gallery UI, not yet a modular node), not the write path.
 </div>
 
 <!-- ============================================================ C -->
@@ -288,7 +288,7 @@
   <li><b>Touch re-propagation</b> off the staleness closure on physical-lock completion <cite>reducer.ts:228&ndash;243</cite>, and touch IR + per-key provenance first-class in <code>KeyboardIR.touchLayout</code> (US2&ndash;US5, #825).</li>
 </ul>
 
-<p>What the mature flows need that <code>mutate()</code> doesn&rsquo;t yet do:</p>
+<p>Note: the <b>base</b> physical and touch write paths (R1 <code>lockDesktop</code> / R2 <code>buildTouchLayoutJson</code> &rarr; side-car) run <b>unconditionally</b> today and are known-good; the items below are about routing the gallery <i>UI choices</i> through the declared-<code>writes</code> <code>mutate()</code> seam, not about repairing those working flows.</p>
 
 <table>
 <thead><tr><th>Mature flow</th><th>What it needs beyond current <code>mutate()</code></th><th>Why current seam is insufficient</th></tr></thead>
@@ -299,9 +299,9 @@
   <td><code>mutate()</code> returns a value patch and the reducer&rsquo;s <code>setWorkingIR</code> is explicitly overlay-preserving <cite>StudioShell.tsx:462&ndash;468</cite> &mdash; but no carve module declares <code>writes</code> or produces such a patch yet. The plan&rsquo;s intent to convert the carve shell (<cite>plan.md:25, 122&ndash;126</cite>) is <b>not implemented</b>; the gallery still writes directly. <b>Gap:</b> a declared-writes contract for the deletion overlay (e.g. <code>writes: [layers[].rows[].keys[]]</code> or a dedicated carve-overlay IR location) plus a patch shape that expresses removal.</td>
 </tr>
 <tr>
-  <td><b>Mechanism gallery</b></td>
+  <td><b>Mechanism gallery (physical)</b></td>
   <td><b>Multi-key / multi-mechanism writes</b> in one step (a batch of physical assignments) with provenance tagging, feeding the physical lock.</td>
-  <td>Today assignments live in <code>phaseResults</code> and are projected by <code>physicalAssignmentsOf</code> <cite>StudioShell.tsx:511</cite>; they are not a declared-<code>writes</code> <code>mutate()</code> surface. <b>Gap:</b> a batch-patch contract (one <code>mutate()</code> returning many <code>layers[].rows[].keys[]</code> leaves) and confirmation that M3 containment authorizes array-index sub-paths (it does &mdash; <code>pathAuthorizes</code> handles <code>stores[]</code>&rarr;<code>stores[3].items</code> <cite>mutateApply.ts:90&ndash;96</cite>, so the same applies to layer/key arrays).</td>
+  <td>The base flow works (R1 lock runs unconditionally), but the gallery&rsquo;s assignments live in <code>phaseResults</code> and are projected by <code>physicalAssignmentsOf</code> <cite>StudioShell.tsx:511</cite>; they are not yet a declared-<code>writes</code> <code>mutate()</code> surface. <b>Gap:</b> a batch-patch contract (one <code>mutate()</code> returning many <code>layers[].rows[].keys[]</code> leaves) and confirmation that M3 containment authorizes array-index sub-paths (it does &mdash; <code>pathAuthorizes</code> handles <code>stores[]</code>&rarr;<code>stores[3].items</code> <cite>mutateApply.ts:90&ndash;96</cite>, so the same applies to layer/key arrays). This is the reference flow other conversions should match.</td>
 </tr>
 <tr>
   <td><b>Build-list (Phase B default)</b></td>
@@ -363,7 +363,7 @@
   <li><b>Build-list</b> &mdash; the default Phase B characters branch (modular question on <code>mutate()</code>).</li>
   <li><b>Prefill confirm</b> &mdash; modular display/read question at the head of the characters branch.</li>
   <li><b>Track chooser</b> &mdash; modular gate question driving the copy/adapt fork in data.</li>
-  <li><b>Carve / Mechanisms / Touch galleries</b> &mdash; remain editor-steps (genuinely editor surfaces, not questions) but become <b>first-class on <code>mutate()</code></b> and are surfaced by the manifest projection (§C). Touch is furthest along (#825).</li>
+  <li><b>Carve / Mechanisms / Touch galleries</b> &mdash; remain editor-steps (genuinely editor surfaces, not questions) but become <b>first-class on <code>mutate()</code></b> and are surfaced by the manifest projection (§C). <b>Mechanisms (physical) AND Touch are both reference / known-good patterns</b> &mdash; preserved as-is, parity-proven, not re-architected (both write paths run unconditionally today). Carve is the highest-effort overlay conversion (Risk R1).</li>
 </ul>
 
 <h3>Demoted to the vestigial library (inert-but-preserved)</h3>
@@ -376,10 +376,19 @@
 <b>No-delete guardrail (plan §3.8).</b> Demotion is <b>not deletion</b>. Unreferenced modules stay registered in their sub-registries and on disk; they are simply absent from the active flow ordering, so they render as reserve/library nodes (the existing <code>computeReserveNodes</code> mechanism) and the runtime never reaches them. They remain test-covered and revivable by re-adding their id to a YAML branch. Article VII / the spec&rsquo;s &ldquo;no library/reserve deletion&rdquo; rule is honoured.
 </div>
 
+<div class="callout warn">
+<b>No-break constraints (must hold through every step).</b>
+<ul style="margin:6px 0 0">
+  <li><b>Don&rsquo;t regress physical OR touch &mdash; both are known-good reference paths.</b> The <b>physical</b> flow (Mechanism gallery &rarr; physical lock R1 &rarr; <code>KeyboardIR</code>) and the <b>touch</b> flow (Touch gallery &rarr; R2 <code>buildTouchLayoutJson</code>/<code>setTouchLayoutJson</code> &rarr; shipped side-car) both work end-to-end today; touch&rsquo;s write path runs <b>unconditionally</b>, mirroring physical <cite>reducer.ts:221&ndash;277</cite>. Treat both as the target shape every other flow should match &mdash; not flows to re-architect. Each conversion to a declared-<code>writes</code> <code>mutate()</code> surface must be byte-for-byte parity-proven (§G); convert these <i>after</i> the others so they are never destabilized to unblock another flow.</li>
+  <li><b>Touch parity is already achieved at the mutate/side-car layer</b> (verified; #825 + #831 side-car wiring merged <code>c9f64ba</code>, all touch tests pass). Touch&rsquo;s only remaining gap is the <i>shared</i> one &mdash; its UI is a hand-built Form-4 gallery, not yet a first-class modular node &mdash; closed by the map projection (§C), not by repairing the write path.</li>
+  <li><b>Flag-off is always byte-identical to P4b</b> (F2) and existing tests stay green &mdash; the global invariant for every PR.</li>
+</ul>
+</div>
+
 <!-- ============================================================ F -->
 <h2 id="f">F. Migration sequencing — small, independently-shippable, each landing green</h2>
 
-<p>Order chosen so the lowest-risk, highest-leverage change lands first and each step is behind the flag or read-only.</p>
+<p>Order chosen so the lowest-risk, highest-leverage change lands first and each step is behind the flag or read-only. <b>Physical and touch are both known-good reference patterns</b> &mdash; converted last and never regressed.</p>
 
 <ol class="seq">
   <li>
@@ -392,7 +401,7 @@
   </li>
   <li>
     <b>Per-flow modularization behind the flag.</b> <span class="pill">VITE_KM_MUTATE_SEAM</span>
-    One flow at a time, each its own PR: (a) track chooser &rarr; modular gate; (b) prefill &rarr; modular read question; (c) build-list &rarr; modular <code>mutate()</code> writer (<b>as a loop-capable construct &mdash; see §D2</b>, landing or co-landing the loop primitive); (d) carve, (e) mechanisms routed through the reducer&rsquo;s overlay-preserving <code>setWorkingIR</code> instead of direct store mutators. With the flag off, each PR is byte-identical to today (the reducer no-ops <cite>reducer.ts:205&ndash;217</cite>). Each lands green independently.
+    One flow at a time, each its own PR: (a) track chooser &rarr; modular gate; (b) prefill &rarr; modular read question; (c) build-list &rarr; modular <code>mutate()</code> writer (<b>as a loop-capable construct &mdash; see §D2</b>, landing or co-landing the loop primitive); (d) carve routed through the reducer&rsquo;s overlay-preserving <code>setWorkingIR</code> instead of direct store mutators; (e) <b>mechanisms (physical) and touch last</b> &mdash; the two known-good reference flows, converted only once the others match them, each byte-for-byte parity-proven, so neither is destabilized to unblock another flow. With the flag off, each PR is byte-identical to today (the reducer no-ops <cite>reducer.ts:205&ndash;217</cite>). Each lands green independently.
   </li>
   <li>
     <b>Parity-prove and flip the default.</b> <span class="pill">flag on</span>
@@ -407,7 +416,7 @@
 <p>Every promoted module gets a colocated spec in the existing mirrored tree <code>packages/studio/tests/survey/questions/&lt;phase&gt;/&lt;id&gt;.test.ts</code> (the tree already exists: <cite>tests/survey/questions/{a,b,f}/</cite>). Per the <code>mutate()</code> obligations (<cite>contracts/mutate-seam.contract.md</cite>, lines 26&ndash;32): applying <code>mutate()</code> to a known IR fixture (1) changes <b>exactly</b> the declared <code>writes</code> paths, siblings byte-identical (M2/SC-002); (2) an out-of-<code>writes</code> patch <b>fails fast, whole-patch rejected, IR unchanged</b> (M3) &mdash; exercised against <code>MutatePatchContainmentError</code> <cite>mutateApply.ts:35&ndash;51</cite>; (3) idempotent (M4); (4) round-trips against reused IR fixtures. New gallery write surfaces add batch-patch fixtures; prefill is a read-only module so its test asserts declared <code>inputs</code> satisfiability, not a patch. A <b>loop construct (§D2)</b> additionally needs per-iteration tests: pass <i>i</i> writes only slot <i>i</i>, re-running pass <i>i</i> is idempotent (M4), and the empty-collection case is a clean no-op.</p>
 
 <h3>Tier 2 — mirrored / structural test tree</h3>
-<p>Manifest-shape guards already exist and must stay green: <code>validateManifestShape()</code> (M2 spine order, M3 locks, M4/M4b side-trails, M5 unique ids) <cite>StudioShell.tsx:253&ndash;303</cite>, and the completeness checks C1&ndash;C7 <cite>completeness.ts</cite>. Promoting questions must keep C3 (rejoin), C5 (orphan inputs), C7 (unreachable) passing &mdash; these are the structural proof that a promoted question is on a real, reachable branch with satisfied reads. A loop construct must keep <b>C2 green</b> (a bounded loop is not an illegal data cycle).</p>
+<p>Manifest-shape guards already exist and must stay green: <code>validateManifestShape()</code> (M2 spine order, M3 locks, M4/M4b side-trails, M5 unique ids) <cite>StudioShell.tsx:253&ndash;303</cite>, and the completeness checks C1&ndash;C7 <cite>completeness.ts</cite>. Promoting questions must keep C3 (rejoin), C5 (orphan inputs), C7 (unreachable) passing &mdash; these are the structural proof that a promoted question is on a real, reachable branch with satisfied reads. A loop construct must keep <b>C2 green</b> (a bounded loop is not an illegal data cycle). <b>Physical and touch each get a dedicated flag-on/flag-off IR-equality test</b> (the &ldquo;don&rsquo;t regress physical or touch&rdquo; guard): both are known-good today, so each test locks in the existing output and proves the <code>mutate()</code> conversion changes the route, not the result.</p>
 
 <h3>Parity proof — flag-on/flag-off equivalence</h3>
 <ul>
@@ -437,6 +446,8 @@
   <div><b>Default-flip blast radius.</b> Flipping <code>VITE_KM_MUTATE_SEAM</code> on changes the live write route for all converted surfaces at once. Mitigated by the per-flow 50/50 parity gate (§G) and the &ldquo;leave it off&rdquo; rollback, but the flip itself is the riskiest single moment &mdash; soak in preview first.</div>
   <div>Risk R3</div>
   <div><b>Loop primitive is a schema change with broad reach.</b> Adding iteration touches the question schema, the <code>SurveyRunner</code> visited-guard, the map projection, and the completeness cycle check (C2 must distinguish a bounded loop from an illegal cycle). It is the most architecturally invasive piece of the unification &mdash; scope and sequence it deliberately (land the primitive behind the flag, with its own parity + completeness tests, before promoting the looping character flows).</div>
+  <div>Note (resolved)</div>
+  <div><b>Touch is verified working &mdash; not a risk.</b> Earlier concern that touch may not have survived the transition is <b>closed</b>: touch modification works end-to-end, its R2 write path runs unconditionally like physical&rsquo;s R1 <cite>reducer.ts:249&ndash;277</cite>, the #831 side-car wiring is merged (<code>c9f64ba</code>), and all touch tests pass. The only flag-gated touch piece is the optional automatic physical&rarr;touch <b>re-propagation</b> enhancement <cite>repropagate.ts</cite> <cite>reducer.ts:228&ndash;243</cite> &mdash; an add-on over the working base flow, consistent with Article VII (touch is seeded from the locked physical layout, never the reverse). Treat touch, like physical, as a known-good reference to preserve.</div>
 </div>
 
 <footer>
