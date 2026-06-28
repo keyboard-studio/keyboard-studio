@@ -133,3 +133,64 @@ export function applyCarveMutate(
   const patch = buildCarvePatch(baseIr, deletedNodeIds, deletedItemIds);
   return applyMutatePatch(baseIr, patch, CARVE_WRITES);
 }
+
+// ---------------------------------------------------------------------------
+// Add galleries (mechanism assignment) — T017
+// ---------------------------------------------------------------------------
+
+/**
+ * The add-gallery write surface — the PHYSICAL assignment IR targets only.
+ *
+ * applyAssignmentsToVfs injects exactly two kinds of IR-bearing content into the
+ * .kmn:
+ *   - user `store(...)` declarations (non-&, hoisted before `begin`) → `stores[]`
+ *   - `group(<name>)` blocks and rules (merged by name / appended)    → `groups[]`
+ *
+ * System stores (&-prefixed `header` fields) are explicitly skipped by the
+ * injector, so `header` is NOT a write target. Keycap-label and touch-layout
+ * projection are DEFERRED to US2 and are therefore NOT in this surface.
+ */
+export const ADD_GALLERY_WRITES: readonly IRPath[] = [
+  irPath("groups", ARRAY_INDEX),
+  irPath("stores", ARRAY_INDEX),
+];
+
+/**
+ * Build the add-gallery patch: the physical-assignment IR arrays (`groups`,
+ * `stores`) taken from the assignment-injected IR.
+ *
+ * `assignedIr` is the IR parsed back from the .kmn AFTER applyAssignmentsToVfs
+ * has injected the selected patterns (i.e. the carved IR with mechanisms added).
+ * Only `groups` and `stores` are taken — the physical assignment targets.
+ */
+export function buildAddGalleryPatch(assignedIr: KeyboardIR): Partial<KeyboardIR> {
+  return {
+    groups: assignedIr.groups,
+    stores: assignedIr.stores,
+  };
+}
+
+/**
+ * Route the add-gallery (mechanism assignment) IR derivation through the single
+ * mutate() write path.
+ *
+ * The reference emit for the add path is text-based (applyAssignmentsToVfs writes
+ * the injected .kmn directly, byte-identical in both flag states). This helper is
+ * the IR-projection seam: given the carved `baseIr` and the assignment-injected
+ * `assignedIr` (parsed back from that .kmn), it routes the physical-assignment
+ * arrays through applyMutatePatch / {@link ADD_GALLERY_WRITES} so the mutate()
+ * path is the canonical IR producer (M6/SC-001) and the containment guard (M3)
+ * applies to the add write too — it never reaches `header`, comments, or the
+ * deferred keycap/touch targets.
+ *
+ * @param baseIr      The carved working IR the assignment was applied onto.
+ * @param assignedIr  The IR after mechanism injection (parsed from the .kmn).
+ * @returns A fresh IR whose groups/stores are the assignment-injected ones.
+ */
+export function applyAddGalleryMutate(
+  baseIr: KeyboardIR,
+  assignedIr: KeyboardIR,
+): KeyboardIR {
+  const patch = buildAddGalleryPatch(assignedIr);
+  return applyMutatePatch(baseIr, patch, ADD_GALLERY_WRITES);
+}

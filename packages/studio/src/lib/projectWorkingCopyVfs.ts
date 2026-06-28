@@ -42,7 +42,7 @@ import {
   renameFilesInVfs,
   parseSlotId,
 } from "@keyboard-studio/engine";
-import { applyCarveMutate } from "../steps/editorMutate.ts";
+import { applyCarveMutate, applyAddGalleryMutate } from "../steps/editorMutate.ts";
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 
 /** Shared empty deletion set for the seam-path emit (the seam already filtered). */
@@ -266,6 +266,35 @@ export function projectWorkingCopyVfs(
       getPattern,
     );
     warnings.push(...assignResult.warnings);
+
+    // spec-014 T017 — add-gallery IR projection via the single mutate() seam.
+    //
+    // The reference emit above is text-based (applyAssignmentsToVfs writes the
+    // injected .kmn directly, byte-identical in both flag states). When the flag
+    // is on we ALSO derive the canonical assignment IR through the mutate() write
+    // path: parse the just-written .kmn back to IR and route its physical-assignment
+    // arrays (groups[]/stores[]) through applyAddGalleryMutate (applyMutatePatch /
+    // ADD_GALLERY_WRITES). This makes mutate() the single IR write route for the
+    // add surface (M6/SC-001) and enforces declared-writes containment (M3) — the
+    // patch can never reach header, comments, or the deferred keycap/touch targets.
+    // The derived IR is intentionally NOT re-emitted: the text artifact stays
+    // byte-identical to the flag-off path. Keycap-label / touch-layout projection
+    // is deferred to US2.
+    if (isMutateSeamEnabled()) {
+      const entry = vfs.get(`source/${keyboardId}.kmn`);
+      if (entry !== undefined && typeof entry.content === "string") {
+        try {
+          const assignedIr = parseKmn(entry.content, keyboardId).ir;
+          // Route through the seam; a containment violation (M3) surfaces here.
+          applyAddGalleryMutate(carveIr, assignedIr);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          warnings.push(
+            `[project-working-copy] add-gallery mutate-seam derivation skipped: ${msg}`,
+          );
+        }
+      }
+    }
   }
 
   // Step 3: Identity projection — write &NAME (display name) into the .kmn.
