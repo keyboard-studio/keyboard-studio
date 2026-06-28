@@ -61,11 +61,37 @@ export interface KeyChord {
   modifiers: string[];
 }
 
+/**
+ * Origin of a touch-key placement — the single source the no-clobber
+ * re-propagation rule reads (spec-014 FR-008/-009, provenance.contract.md).
+ *
+ * - "base-derived"       — derived from the base keyboard's touch layout.
+ * - "physical-suggested" — proposed by the touchSuggest generator from a
+ *                          physical-key decision (S-01/S-02/S-03/S-08).
+ * - "hand-set"           — manually placed by the author; the conservative
+ *                          default for pre-existing / untagged keys.
+ *
+ * `base-derived` and `physical-suggested` are the auto-managed states that
+ * re-propagation may overwrite; `hand-set` (and any absent provenance, which
+ * deserializes as `hand-set`) is never auto-clobbered.
+ */
+export type TouchKeyProvenance =
+  | "base-derived"
+  | "physical-suggested"
+  | "hand-set";
+
 /** A single key node in a touch layout layer. */
 export interface TouchKeyIR {
   nodeId: string;
   id: string;
   text?: string;
+  /**
+   * Origin of this key's placement (spec-014 FR-008). Optional/additive: an
+   * absent or pre-existing-untagged key is treated as `"hand-set"` and is
+   * never auto-clobbered by re-propagation. `"base-derived"` and
+   * `"physical-suggested"` are the auto-managed states re-propagation owns.
+   */
+  provenance?: TouchKeyProvenance;
   /** Small label shown in the key corner to signal a longpress menu exists. */
   hint?: string;
   output?: string;

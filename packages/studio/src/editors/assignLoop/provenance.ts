@@ -1,13 +1,16 @@
-// TouchKeyProvenance — reserved type (P4a, T018).
+// TouchKeyProvenance — re-export of the contracts type (spec-014, P4a→P5).
 //
-// Tags the origin of a touch key placement. No propagation logic reads this
-// in P4a; it is declared here so the type exists for P5 to build on without
-// a breaking change to the editor/assignLoop package boundary.
+// Promoted from an editor-local reservation (P4a, T018) onto the
+// `@keyboard-studio/contracts` `TouchKeyIR.provenance` field. This module now
+// RE-EXPORTS the contracts type so there is a single source of truth
+// (provenance.contract.md P1/FR-008/SC-007); existing editor imports keep
+// working unchanged.
 //
-// Source of truth: specs/012-step-model-manifest/data-model.md § TouchKeyProvenance
+// Source of truth: packages/contracts/src/keyboard-ir.ts § TouchKeyProvenance
+// (originally specs/012-step-model-manifest/data-model.md § TouchKeyProvenance)
 
 // ---------------------------------------------------------------------------
-// Type
+// Type — re-exported from the contracts package (single definition).
 // ---------------------------------------------------------------------------
 
 /**
@@ -18,11 +21,11 @@
  *                          physical key decision (S-01/S-02/S-03/S-08).
  * - "hand-set"           — Manually edited by the author. Default for
  *                          pre-existing keys: never auto-overwritten (FR-020).
+ *
+ * @see packages/contracts/src/keyboard-ir.ts — canonical `TouchKeyProvenance`.
  */
-export type TouchKeyProvenance =
-  | "base-derived"
-  | "physical-suggested"
-  | "hand-set";
+import type { TouchKeyProvenance } from "@keyboard-studio/contracts";
+export type { TouchKeyProvenance } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
 // Default helper
