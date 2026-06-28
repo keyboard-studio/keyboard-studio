@@ -1,0 +1,42 @@
+
+store(dk_bases)  'aeiouAEIOU'
+store(dk_output) 'áéíóúÁÉÍÓÚ'
+begin Unicode > use(main)
+
+group(main) using keys
+c ---- S-02 Single deadkey stores -----------------------------------------------
+c Both stores MUST have the same element count; the scaffolder enforces this at
+c Layer A slot-fill validation (spec §10 Check #1).
+
+
+c ---- Trigger key arms the deadkey -------------------------------------------
+c Pressing K_QUOTE alone commits nothing; it arms a deadkey state.
++ [K_QUOTE] > deadkey(accent)
+
+
+store(dktX) 'À' nul 'Z'
+store(dkfX) 'abc'
++ [K_A] > U+0078
++ [K_B] > U+0079
++ dk(003b) any(dkfX) > index(dktX, 2)
+
+match > use(deadkeys)
+group(deadkeys) using keys
+
+c ---- Resolution: deadkey + base letter → accented form -----------------------
+c The deadkey followed by a character in dk_bases produces the precomposed output.
+c index() offset N=2: position 1 is the deadkey() context, position 2 is any(dk_bases).
+c Output is precomposed NFC (no combining sequences).
+deadkey(accent) + any(dk_bases) > index(dk_output, 2)
+
+c ---- Double-press: trigger key pressed twice --------------------------------
+c Pressing the trigger key twice produces the bare combining accent.
+c This rule must appear BEFORE the generic notany() fallback so it fires first.
+deadkey(accent) + [K_QUOTE] > '́'
+
+c ---- Fallback: unrecognized key after the trigger ----------------------------
+c notany() matches any key NOT in dk_bases. context(2) restores the unmatched key
+c after the trigger character, implementing the "restore on miss" pattern.
+c This allows the trigger character to fall through to normal output when followed
+c by any non-base letter.
+deadkey(accent) + notany(dk_bases) > '́' context(2)

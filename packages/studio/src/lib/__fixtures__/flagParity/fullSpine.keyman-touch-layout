@@ -1,0 +1,21 @@
+{
+  "phone": {
+    "font": "Tahoma",
+    "layer": [
+      {
+        "id": "default",
+        "row": [
+          {
+            "id": 1,
+            "key": [
+              {
+                "id": "K_A",
+                "text": "a"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
