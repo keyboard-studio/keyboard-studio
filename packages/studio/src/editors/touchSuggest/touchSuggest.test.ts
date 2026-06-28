@@ -1,10 +1,12 @@
-// Tests for T018/T019/T020 reserved touch-suggest seams (P4a, T021).
+// Tests for the touch-suggest seams (P4a scaffolds + spec-014 US2 T023 body).
 //
 // These tests pin:
 //   1. defaultProvenance() returns "hand-set" (provenance.ts, T018).
 //   2. DEFAULT_TOUCH_SUGGEST_POLICY has the expected field values (defaults.ts, T019).
 //   3. Policy fields are overridable individually without clobbering other fields.
-//   4. touchSuggest() returns an empty array in P4a (touchSuggest.ts, T020).
+//   4. touchSuggest() derives a provenance-stamped TouchLayoutIR from a
+//      KeyboardIR (spec-014 T023): never `hand-set`; `base-derived` for keys
+//      carried from the base layout, `physical-suggested` otherwise.
 //   5. touchSuggest() accepts and merges policyOverrides without throwing.
 
 import { describe, it, expect } from "vitest";
@@ -16,6 +18,36 @@ import {
 } from "./defaults.ts";
 import type { TouchSuggestPolicy } from "./defaults.ts";
 import { touchSuggest } from "./touchSuggest.ts";
+import type { KeyboardIR, TouchKeyIR, TouchLayoutIR } from "@keyboard-studio/contracts";
+
+// A minimal physical IR (Case A — no shipped touch layout). The exact
+// derivation is the engine's concern; the tests assert the provenance LAYER
+// touchSuggest adds on top.
+function physicalIR(): KeyboardIR {
+  return {
+    origin: "imported",
+    header: {
+      keyboardId: "ts",
+      name: "TS",
+      bcp47: ["en"],
+      copyright: "(c)",
+      version: "1.0",
+      targets: ["any"],
+      storeDirectives: [],
+    },
+    stores: [],
+    groups: [],
+    comments: [],
+    raw: [],
+    recognizedPatterns: [],
+  };
+}
+
+function allKeys(layout: TouchLayoutIR): TouchKeyIR[] {
+  const out: TouchKeyIR[] = [];
+  for (const p of layout.platforms) for (const l of p.layers) for (const r of l.rows) out.push(...r.keys);
+  return out;
+}
 
 // ---------------------------------------------------------------------------
 // T018 — TouchKeyProvenance default
@@ -107,26 +139,59 @@ describe("DEFAULT_TOUCH_SUGGEST_POLICY", () => {
 });
 
 // ---------------------------------------------------------------------------
-// T020 — touchSuggest generator stub
+// T023 — touchSuggest generator body (provenance-stamped TouchLayoutIR)
 // ---------------------------------------------------------------------------
 
-describe("touchSuggest (P4a stub)", () => {
-  it("returns an empty array with no IR input", () => {
-    const result = touchSuggest({ physicalIR: {} });
-    expect(result).toEqual([]);
+describe("touchSuggest (spec-014 T023 body)", () => {
+  it("derives a TouchLayoutIR with at least one platform", () => {
+    const layout = touchSuggest({ physicalIR: physicalIR() });
+    expect(layout.platforms.length).toBeGreaterThan(0);
+    expect(Array.isArray(layout.nodeIds)).toBe(true);
   });
 
-  it("returns an empty array even with a non-empty IR", () => {
-    const result = touchSuggest({
-      physicalIR: { someKey: "someValue" },
-    });
-    expect(result).toEqual([]);
+  it("stamps a provenance on every produced key, and NEVER hand-set", () => {
+    const layout = touchSuggest({ physicalIR: physicalIR() });
+    const keys = allKeys(layout);
+    expect(keys.length).toBeGreaterThan(0);
+    for (const k of keys) {
+      expect(k.provenance).toBeDefined();
+      expect(k.provenance).not.toBe("hand-set");
+      expect(["base-derived", "physical-suggested"]).toContain(k.provenance);
+    }
+  });
+
+  it("Case A (no shipped touch layout) stamps every key physical-suggested", () => {
+    const layout = touchSuggest({ physicalIR: physicalIR() });
+    for (const k of allKeys(layout)) {
+      expect(k.provenance).toBe("physical-suggested");
+    }
+  });
+
+  it("Case B keys carried from the base layout are tagged base-derived", () => {
+    // Seed an IR that already ships a touch layout; its key ids should come
+    // back tagged base-derived (carried through unchanged).
+    const ir = physicalIR();
+    const baseKey: TouchKeyIR = { nodeId: "nb", id: "K_SEED", text: "z" };
+    ir.touchLayout = {
+      platforms: [{ id: "phone", layers: [{ id: "default", rows: [{ keys: [baseKey] }] }] }],
+      nodeIds: [],
+    };
+    const layout = touchSuggest({ physicalIR: ir });
+    const seeded = allKeys(layout).find((k) => k.id === "K_SEED");
+    expect(seeded?.provenance).toBe("base-derived");
+  });
+
+  it("is pure — does not mutate the input IR", () => {
+    const ir = physicalIR();
+    const snapshot = JSON.stringify(ir);
+    touchSuggest({ physicalIR: ir });
+    expect(JSON.stringify(ir)).toBe(snapshot);
   });
 
   it("does not throw when policyOverrides is provided", () => {
     expect(() =>
       touchSuggest({
-        physicalIR: {},
+        physicalIR: physicalIR(),
         policyOverrides: { widthBudget: 11 },
       })
     ).not.toThrow();
@@ -141,12 +206,7 @@ describe("touchSuggest (P4a stub)", () => {
       defaultGesture: "long-press",
     };
     expect(() =>
-      touchSuggest({ physicalIR: {}, policyOverrides: fullOverride })
+      touchSuggest({ physicalIR: physicalIR(), policyOverrides: fullOverride })
     ).not.toThrow();
-  });
-
-  it("returns an array (not null or undefined)", () => {
-    const result = touchSuggest({ physicalIR: {} });
-    expect(Array.isArray(result)).toBe(true);
   });
 });

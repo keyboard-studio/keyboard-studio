@@ -1,45 +1,51 @@
-// touchSuggest — touch-layout suggestion generator scaffold (P4a, T020).
+// touchSuggest — touch-layout suggestion generator (P4a scaffold → P5 body).
 //
-// Reserved stub. The generator that maps physical-key decisions (S-01/S-02/
-// S-03/S-08) to touch-key placements does NOT run propagation in P4a; it is
-// scaffolded here so P5 can implement the body without a breaking change to
-// the editors/touchSuggest package boundary.
+// spec-014 US2 (T023). The generator maps the LOCKED physical-layer KeyboardIR
+// to a TouchLayoutIR, stamping each produced key with its provenance per the
+// §3.6 defaults-as-data policy and the spec state diagram (data-model.md):
 //
-// When implemented (P5):
-//   - Reads the working copy's physical-layer KeyboardIR.
-//   - Applies DEFAULT_TOUCH_SUGGEST_POLICY (merged with any per-project
-//     overrides, then per-key overrides — FR-021).
-//   - Produces a TouchAssignment[] with provenance="physical-suggested" for
-//     each key that has no existing "hand-set" placement (FR-020).
-//   - Returns the suggestions without committing them; the caller (editor
-//     step or store action) decides when to apply them.
+//   - "physical-suggested" — a key generated/changed from a physical decision
+//     (Case A whole-layout generation, or a net-new key in Case B augmentation).
+//   - "base-derived"       — a key carried UNCHANGED from the base keyboard's
+//     shipped touch layout (Case B: present in `ir.touchLayout` by id).
 //
-// Source of truth: specs/012-step-model-manifest/data-model.md § touchSuggest
+// It NEVER emits "hand-set": that provenance is owned by the author's manual
+// edits (touchBehavior.ts promotion, FR-014) and by the conservative default
+// for untagged keys. The no-clobber re-propagation gate (repropagate.ts, R2)
+// reads these tags to decide which keys it may overwrite.
+//
+// Derivation is WIRED to the existing engine scaffolder (scaffoldTouchLayout):
+// touchSuggest does not re-implement physical→touch mapping — it adds the
+// provenance layer on top of the engine's derivation. The function is pure.
+//
+// Source of truth:
+//   specs/014-mutate-seam-touch-propagation/data-model.md § touchSuggest produced key
+//   specs/014-mutate-seam-touch-propagation/contracts/repropagation.contract.md (R1/R2)
 
-import type { TouchAssignment } from "@keyboard-studio/contracts";
+import type { KeyboardIR, TouchKeyIR, TouchLayoutIR } from "@keyboard-studio/contracts";
+import { scaffoldTouchLayout } from "@keyboard-studio/engine";
 import type { TouchSuggestPolicy } from "./defaults.ts";
 import { DEFAULT_TOUCH_SUGGEST_POLICY } from "./defaults.ts";
 import type { TouchKeyProvenance } from "../assignLoop/provenance.ts";
 
 // ---------------------------------------------------------------------------
-// Input / output shapes
+// Input shape
 // ---------------------------------------------------------------------------
 
 /**
  * Input to the touch-suggestion generator.
  *
- * Reserved for P5. In P4a the generator is a no-op stub.
+ * The generator reads the locked physical-layer `KeyboardIR` (the substrate
+ * touch is seeded from — Constitution Art. VII / §3.6) and an optional policy
+ * override merged over {@link DEFAULT_TOUCH_SUGGEST_POLICY}.
  */
 export interface TouchSuggestInput {
   /**
-   * The physical keyboard IR serialised as the minimal representation the
-   * generator needs.
-   *
-   * TODO(P5): replace Record<string, unknown> with KeyboardIR once the mutate
-   * seam lands. This stub exists so the generator's call site is typed in P4a
-   * without pulling in the full engine types.
+   * The physical keyboard IR. Its physical layer (desktop rules) is what the
+   * touch layout is derived from; an existing `ir.touchLayout` is used as the
+   * base-derived substrate when present (Case B).
    */
-  readonly physicalIR: Readonly<Record<string, unknown>>;
+  readonly physicalIR: KeyboardIR;
 
   /**
    * Policy overrides to merge over {@link DEFAULT_TOUCH_SUGGEST_POLICY}.
@@ -48,42 +54,92 @@ export interface TouchSuggestInput {
   readonly policyOverrides?: Partial<TouchSuggestPolicy>;
 }
 
+// ---------------------------------------------------------------------------
+// Provenance stamping
+// ---------------------------------------------------------------------------
+
 /**
- * One suggested touch-key placement produced by the generator.
+ * Collect the set of touch-key ids present in the base IR's shipped touch
+ * layout. These are the keys a Case-B derivation carries through unchanged and
+ * therefore tags `base-derived`; any key NOT in this set is physically
+ * suggested (generated/changed from a physical decision).
  *
- * Extends the base {@link TouchAssignment} from contracts with the provenance
- * tag required by FR-020 and FR-021.
+ * Returns an empty set when the IR ships no touch layout (Case A — every
+ * produced key is `physical-suggested`).
  */
-export interface TouchSuggestion extends TouchAssignment {
-  /**
-   * Always "physical-suggested" for generator output.
-   * The caller may downgrade to "base-derived" or upgrade to "hand-set" when
-   * applying suggestions.
-   */
-  readonly provenance: TouchKeyProvenance;
+function baseLayoutKeyIds(ir: KeyboardIR): ReadonlySet<string> {
+  const ids = new Set<string>();
+  const base = ir.touchLayout;
+  if (base === undefined) return ids;
+  for (const platform of base.platforms) {
+    for (const layer of platform.layers) {
+      for (const row of layer.rows) {
+        for (const key of row.keys) {
+          ids.add(key.id);
+        }
+      }
+    }
+  }
+  return ids;
+}
+
+/**
+ * Return a structural clone of `key` with its provenance stamped per the A2
+ * discriminator: `base-derived` when the key id was present in the base
+ * layout, `physical-suggested` otherwise. Never produces `hand-set`.
+ */
+function stampKey(key: TouchKeyIR, baseIds: ReadonlySet<string>): TouchKeyIR {
+  const provenance: TouchKeyProvenance = baseIds.has(key.id)
+    ? "base-derived"
+    : "physical-suggested";
+  return { ...structuredClone(key), provenance };
 }
 
 // ---------------------------------------------------------------------------
-// Generator (stub)
+// Generator
 // ---------------------------------------------------------------------------
 
 /**
- * Generates touch-layout placement suggestions from physical-key decisions.
+ * Generate a provenance-stamped {@link TouchLayoutIR} from the physical IR.
  *
- * **Reserved — returns an empty array in P4a.** No propagation logic runs.
- * The full implementation lands in P5.
+ * Pure — does not mutate `input.physicalIR`. Delegates the physical→touch
+ * mapping to the engine's {@link scaffoldTouchLayout}, then stamps each
+ * produced key's `provenance` (A2): keys carried through from the base layout
+ * are `base-derived`; keys generated/changed from physical decisions are
+ * `physical-suggested`. The function never emits `hand-set`.
+ *
+ * The policy is merged for forward-compat; the engine scaffolder currently
+ * carries the canonical defaults, so `_policy` is reserved here for the
+ * per-project / per-key override layer (§3.6 defaults-as-data) without
+ * re-implementing the derivation.
  *
  * @param input - Physical IR + optional policy overrides.
- * @returns     - Array of suggestions (empty in P4a).
+ * @returns     - A TouchLayoutIR whose every key carries an auto-managed
+ *                provenance (`base-derived` | `physical-suggested`).
  */
-export function touchSuggest(input: TouchSuggestInput): TouchSuggestion[] {
-  // Merge policy (reserved — not yet consumed).
+export function touchSuggest(input: TouchSuggestInput): TouchLayoutIR {
   const _policy: TouchSuggestPolicy = {
     ...DEFAULT_TOUCH_SUGGEST_POLICY,
     ...input.policyOverrides,
   };
+  void _policy; // reserved for the override layer; engine carries the defaults.
 
-  // P4a: no propagation. Return empty; P5 will implement the body.
-  void _policy;
-  return [];
+  const baseIds = baseLayoutKeyIds(input.physicalIR);
+  const derived = scaffoldTouchLayout(input.physicalIR);
+
+  // Stamp provenance on every produced key (pure — fresh structures).
+  const platforms: TouchLayoutIR["platforms"] = derived.platforms.map((platform) => ({
+    ...platform,
+    layers: platform.layers.map((layer) => ({
+      ...layer,
+      rows: layer.rows.map((row) => ({
+        keys: row.keys.map((key) => stampKey(key, baseIds)),
+      })),
+    })),
+  }));
+
+  return {
+    platforms,
+    nodeIds: structuredClone(derived.nodeIds),
+  };
 }
