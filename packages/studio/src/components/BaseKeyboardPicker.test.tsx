@@ -19,7 +19,7 @@
 //   - Zero-match (type "zzzz" → role="status" "No keyboards match", Enter does NOT call onChange)
 //   - Controlled value (render with a value prop, list closed → input shows displayName)
 
-import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeAll, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-library/react";
 import React from "react";
 
@@ -61,52 +61,70 @@ vi.mock("../lib/services.ts", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Import-corpus mock — covers all three badge variants deterministically.
+// Import-corpus — covers all three badge variants deterministically.
 // basic_kbdus             → ImportStatus.Clean              (badge: "clean")
 // sil_euro_latin          → ImportStatus.CleanWithOpaque    (badge: "opaque")
 // sil_devanagari_phonetic → ImportStatus.RoundTripDivergence (badge: "diverged")
 //
-// _resetCorpusCacheForTesting() in afterEach flushes the module-level
-// _corpusCache so vi.mock("@docs/import-corpus.json") is re-resolved on every
-// test, making badge assertions independent of the real (volatile) corpus file.
+// CROSS-FILE ISOLATION (#829): the component reads the corpus via a dynamic
+// import("@docs/import-corpus.json") inside loadCorpus(). vitest runs several
+// test files per worker, and other files in this package also
+// `vi.mock("../lib/services.ts")`. When this file is co-scheduled with one of
+// them in the same worker, this file's dynamic-import mock registration for
+// "@docs/import-corpus.json" is intermittently dropped, so loadCorpus() falls
+// through to the REAL ~346 KB corpus file — which does not carry these fixture
+// statuses — and the "clean" / "diverged" badge assertions flake with
+// "Unable to find a label with the text of: Import status: …".
+//
+// Robust fix: do NOT depend on the (worker-fragile) dynamic-import mock at all.
+// We seed the module-level corpus cache directly via _setCorpusCacheForTesting()
+// in beforeEach, so loadCorpus() returns the seeded map immediately and never
+// performs the dynamic import. This makes the corpus fully deterministic
+// regardless of co-scheduling. The hoisted vi.mock below is kept purely as a
+// belt-and-suspenders fallback for any cache-cold path; the seed is the
+// load-bearing mechanism.
 // ---------------------------------------------------------------------------
+
+const CORPUS_STATUS_BY_ID: ReadonlyArray<readonly [string, string]> = [
+  [basicKbdus.id, ImportStatus.Clean],
+  [silEuroLatin.id, ImportStatus.CleanWithOpaque],
+  [silDevanagariPhonetic.id, ImportStatus.RoundTripDivergence],
+];
 
 vi.mock("@docs/import-corpus.json", () => ({
   default: {
-    keyboards: [
-      { keyboardId: basicKbdus.id, status: ImportStatus.Clean },
-      { keyboardId: silEuroLatin.id, status: ImportStatus.CleanWithOpaque },
-      { keyboardId: silDevanagariPhonetic.id, status: ImportStatus.RoundTripDivergence },
-    ],
+    keyboards: CORPUS_STATUS_BY_ID.map(([keyboardId, status]) => ({ keyboardId, status })),
   },
 }));
 
-// ---------------------------------------------------------------------------
-// Module-level cache in BaseKeyboardPicker.tsx is reset via
-// _resetCorpusCacheForTesting() in afterEach (see above), ensuring each test
-// gets a fresh corpus load from the vi.mock rather than a stale real-file read.
-// ---------------------------------------------------------------------------
+beforeEach(() => {
+  // Seed the module-level corpus cache directly so loadCorpus() resolves to
+  // these fixture statuses without performing (and without depending on the
+  // mock of) the dynamic import("@docs/import-corpus.json"). See #829 note above.
+  _setCorpusCacheForTesting(new Map(CORPUS_STATUS_BY_ID));
+});
 
 afterEach(() => {
   cleanup();
   // Reset listAllImpl back to the default (succeeds with SOME_BASES).
   listAllImpl = () => Promise.resolve(SOME_BASES);
-  // Flush the module-level corpus cache so the next test's dynamic
-  // import("@docs/import-corpus.json") is intercepted by vi.mock and badge
-  // assertions reflect the mock data, not the real (volatile) corpus file.
+  // Flush the module-level corpus cache so the next test re-seeds from scratch.
   _resetCorpusCacheForTesting();
   vi.clearAllMocks();
 });
 
 // ---------------------------------------------------------------------------
-// Import the component AFTER mocks are set up.
-// The _resetCorpusCacheForTesting export lets us flush the module-level
-// _corpusCache before each badge test so that vi.mock("@docs/import-corpus.json")
-// drives badge rendering deterministically (the dynamic import() inside
-// loadCorpus() is only intercepted by vi.mock on a cache-cold call).
+// Import the component AFTER mocks are set up. _setCorpusCacheForTesting /
+// _resetCorpusCacheForTesting let each test seed/flush the module-level
+// _corpusCache so badge rendering is driven deterministically by the seeded
+// map (see #829 note above), independent of the real (volatile) corpus file.
 // ---------------------------------------------------------------------------
 
-import { BaseKeyboardPicker, _resetCorpusCacheForTesting } from "./BaseKeyboardPicker";
+import {
+  BaseKeyboardPicker,
+  _resetCorpusCacheForTesting,
+  _setCorpusCacheForTesting,
+} from "./BaseKeyboardPicker";
 
 // ---------------------------------------------------------------------------
 // Helpers

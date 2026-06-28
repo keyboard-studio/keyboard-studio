@@ -32,6 +32,24 @@ export function _resetCorpusCacheForTesting(): void {
   _corpusCache = null;
 }
 
+/**
+ * Seeds the module-level corpus cache directly with a keyboardId→status map.
+ * Exported for test isolation only — do not call in production code.
+ *
+ * Why this exists (#829): loadCorpus() reads the corpus via a dynamic
+ * import("@docs/import-corpus.json"). Tests mock that specifier, but vitest
+ * runs several test files per worker and the dynamic-import mock registration
+ * is intermittently dropped when this file is co-scheduled with another file
+ * that also calls vi.mock(...). When that happens the dynamic import falls
+ * through to the real ~346 KB corpus and badge assertions flake. Seeding the
+ * cache here lets a test make the corpus fully deterministic without depending
+ * on the (worker-fragile) dynamic-import mock at all — loadCorpus() returns the
+ * seeded map immediately and never performs the import.
+ */
+export function _setCorpusCacheForTesting(map: Map<string, string>): void {
+  _corpusCache = map;
+}
+
 async function loadCorpus(): Promise<Map<string, string>> {
   if (_corpusCache !== null && _corpusCache !== "failed") return _corpusCache;
   try {
