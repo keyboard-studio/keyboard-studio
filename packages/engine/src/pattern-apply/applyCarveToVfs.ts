@@ -30,6 +30,7 @@
 
 import type { KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
 import { emit } from "../codec/emit.js";
+import { carveFilterIr } from "./carveFilterIr.js";
 
 /**
  * Options bag for {@link applyCarveToVfs}.
@@ -99,26 +100,10 @@ export function applyCarveToVfs(
   const kmnPath = `source/${keyboardId}.kmn`;
 
   // Build a new IR that excludes deleted nodes. Shallow copy at each level so
-  // baseIr is never mutated (D3: immutable working-copy layers).
-  const filteredIr: KeyboardIR = {
-    ...baseIr,
-    // Filter deleted stores.
-    stores: baseIr.stores.filter((s) => !deletedNodeIds.has(s.nodeId)),
-    // Filter deleted groups; within surviving groups, filter deleted rules.
-    groups: baseIr.groups
-      .filter((g) => !deletedNodeIds.has(g.nodeId))
-      .map((g) => {
-        const filteredRules = g.rules.filter((r) => !deletedNodeIds.has(r.nodeId));
-        // Only allocate a new group object when rules actually changed.
-        if (filteredRules.length === g.rules.length) return g;
-        return { ...g, rules: filteredRules };
-      }),
-    // Raw fragments: filter out any deleted fragment nodes; survivors are
-    // preserved so emit()'s position-faithful path can interleave them.
-    raw: baseIr.raw.filter((f) => !deletedNodeIds.has(f.nodeId)),
-    // Comments are not individually deleteable via carve; pass through.
-    comments: baseIr.comments,
-  };
+  // baseIr is never mutated (D3: immutable working-copy layers). The deletion
+  // filter is the shared pure producer carveFilterIr, so this VFS path and the
+  // spec-014 mutate() seam derive byte-identical filtered IRs.
+  const filteredIr: KeyboardIR = carveFilterIr(baseIr, deletedNodeIds);
 
   let emitted: string;
   try {

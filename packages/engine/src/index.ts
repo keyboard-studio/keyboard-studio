@@ -121,7 +121,7 @@ export { suggestMissingCharacters } from "./character-discovery/suggestMissing.j
 export type { MissingCharSuggestions } from "./character-discovery/suggestMissing.js";
 
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.
-export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, applyKeycapLabelsToVfs, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyStoreSlotRemovals, parseSlotId } from "./pattern-apply/index.js";
+export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyStoreSlotRemovals, parseSlotId } from "./pattern-apply/index.js";
 export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, ApplyCarveToVfsOpts, StoreSlotRemovalResult } from "./pattern-apply/index.js";
 
 // Inventory diff (spec §8): static extraction of a keyboard's produced glyph set.
