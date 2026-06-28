@@ -31,6 +31,7 @@
 //   specs/014-mutate-seam-touch-propagation/contracts/repropagation.contract.md
 
 import type { KeyboardIR, TouchKeyIR, TouchLayoutIR } from "@keyboard-studio/contracts";
+import { emitTouchLayout } from "@keyboard-studio/engine";
 import { touchSuggest } from "../editors/touchSuggest/touchSuggest.ts";
 import { applyMutatePatch } from "./mutateApply.ts";
 import { TOUCH_WRITES } from "./editorMutate.ts";
@@ -50,6 +51,22 @@ export interface RepropagateDeps {
   readonly getWorkingIR: () => KeyboardIR | null;
   /** Write the merged IR back to the working copy (the mutate() write path). */
   readonly setWorkingIR: (ir: KeyboardIR) => void;
+  /**
+   * OPTIONAL — persist the re-serialized `.keyman-touch-layout` side-car JSON
+   * (the `touchLayoutJson` store slot) so the SHIPPED artifact reflects
+   * re-propagation, not just the OSK preview (issue #831).
+   *
+   * When provided, re-propagation serializes the merged `touchLayout` IR via
+   * `emitTouchLayout` and writes the string here AFTER the working-IR write, so
+   * `serializeWorkingCopy` / `projectWorkingCopyForOutput` (which emit the
+   * downloaded artifact from this side-car) stay in lockstep with the preview.
+   *
+   * Absent ⇒ legacy behavior: re-propagation updates only the preview IR and the
+   * shipped side-car keeps the value set at the touch step (touch divergence is
+   * preview-only). The reducer injects it; tests may omit it to assert the
+   * pure IR merge in isolation.
+   */
+  readonly setTouchLayoutJson?: (json: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -159,9 +176,16 @@ export function buildRepropagationPatch(
  * still applied as a structural copy, but `setWorkingIR` is skipped when there
  * is nothing to write (no touch layout) to avoid churn.
  *
+ * Side-car serialization (issue #831): when `setTouchLayoutJson` is injected,
+ * the merged `touchLayout` IR is ALSO re-serialized via `emitTouchLayout` and
+ * persisted into the `touchLayoutJson` side-car, so the SHIPPED
+ * `.keyman-touch-layout` (emitted from that side-car by `serializeWorkingCopy`)
+ * reflects re-propagation — not just the OSK preview. Without this, flag-on
+ * touch re-propagation changed what the author SAW but not what they DOWNLOADED.
+ *
  * Idempotent: re-running against the merged result yields the same IR (the
  * suggestion is a pure function of the physical IR, and hand-set keys are
- * untouched).
+ * untouched), and the re-serialized side-car is therefore stable too.
  */
 export function repropagate(deps: RepropagateDeps): void {
   // R5 — empty closure ⇒ no-op.
@@ -180,4 +204,14 @@ export function repropagate(deps: RepropagateDeps): void {
   // containment + path-scoped deep merge (M2/M3) apply exactly as for carve/add.
   const next = applyMutatePatch(base, patch, TOUCH_WRITES);
   deps.setWorkingIR(next);
+
+  // Issue #831 — re-serialize the merged touch IR back into the shipped side-car
+  // so the downloaded `.keyman-touch-layout` reflects re-propagation, not just
+  // the preview. Emit from `next.touchLayout` (the freshly merged layout that was
+  // just written to the working IR) so the side-car and the preview IR are
+  // derived from the SAME source. Guarded on the optional dep + a defined layout
+  // (applyMutatePatch preserves it, but stay defensive against a no-op patch).
+  if (deps.setTouchLayoutJson !== undefined && next.touchLayout !== undefined) {
+    deps.setTouchLayoutJson(emitTouchLayout(next.touchLayout));
+  }
 }
