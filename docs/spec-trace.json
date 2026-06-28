@@ -1,6 +1,6 @@
 {
   "specVersion": "1.3.1",
-  "lastUpdated": "2026-06-25",
+  "lastUpdated": "2026-06-28",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -318,6 +318,14 @@
       "implements": [],
       "decisions": [],
       "notes": "Architecture / meta-flow composition layer — the system view spec-kit omits. An index over the spec architecture-core sections + the extracted feature specs; not code."
+    },
+    "specs/014-mutate-seam-touch-propagation": {
+      "title": "Feature Specification: KeyboardIR `mutate` seam + touch propagation",
+      "hash": "sha256:517e6db32b3b3c0d",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
     }
   }
 }

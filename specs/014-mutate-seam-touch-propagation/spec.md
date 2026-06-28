@@ -4,7 +4,9 @@
 
 **Created**: 2026-06-28
 
-**Status**: **Ready / gate cleared per PR #822** — the engine mutation contract (#5b/#232) ratified and merged to main on 2026-06-28 (`@keyboard-studio/contracts` 0.12.0; §18 sign-off recorded in [docs/spec-signoff.md](../../docs/spec-signoff.md)). The former DESIGN-ONLY / BLOCKED gate (below) is **CLEARED**; the spec was re-validated against the ratified `KeyboardIR`/`TouchKeyIR` shape on 2026-06-28 (T000). Implementation tasks T003–T018 are ungated.
+**Status**: **Implemented / shipped** — Phase 5 tasks T001–T037 delivered via PR #823 (US1) and PR #825 (US2–US5), merged to main 2026-06-28 (contracts 0.12.0→0.13.0, §18 sign-off in docs/spec-signoff.md). Prior "Ready / gate cleared per PR #822" state below is historical.
+
+**Status (historical — gate clearance)**: **Ready / gate cleared per PR #822** — the engine mutation contract (#5b/#232) ratified and merged to main on 2026-06-28 (`@keyboard-studio/contracts` 0.12.0; §18 sign-off recorded in [docs/spec-signoff.md](../../docs/spec-signoff.md)). The former DESIGN-ONLY / BLOCKED gate (below) is **CLEARED**; the spec was re-validated against the ratified `KeyboardIR`/`TouchKeyIR` shape on 2026-06-28 (T000). Implementation tasks T003–T018 are ungated.
 
 **Input**: User description: KeyboardIR `mutate` seam + touch propagation — **Phase 5 (P5)** of [docs/survey-modularity-cyoa-plan.md](../../docs/survey-modularity-cyoa-plan.md) (§6 P5, with the architecture in §3.3 `inputs`/`writes`/`IRPath`, §3.5 staleness/completeness invariants, §3.6 carve/add shell + per-key touch provenance + `touchSuggest` defaults-as-data policy, §8 risks). P5 implements the question-module `mutate()` write surface, routes the strategy-bearing question modules and the carve/add shell through it, promotes per-key touch provenance onto `TouchKeyIR`, and wires automatic touch re-propagation off the P4b staleness slice. **This is the phase that finally closes the four-forms STATE fork** (answer-store vs. direct-IR-mutation; §1) by unifying both into one write surface.
 

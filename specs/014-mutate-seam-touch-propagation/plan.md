@@ -4,6 +4,8 @@
 
 **Input**: Feature specification from `specs/014-mutate-seam-touch-propagation/spec.md`
 
+> ## ✅ IMPLEMENTED (2026-06-28) — Phase 5 shipped via PR #823 (US1) + #825 (US2–US5), merged to main.
+>
 > ## ✅ PRECONDITION CLEARED — RE-VALIDATED AGAINST THE RATIFIED CONTRACT (2026-06-28)
 >
 > This plan was originally PROVISIONAL AND GATED on the engine mutation contract **#5b / #232**. **That gate is now CLEARED:** the contract ratified and merged to main in **PR #822** (`@keyboard-studio/contracts` 0.12.0; §18 sign-off recorded in [docs/spec-signoff.md](../../docs/spec-signoff.md)).
