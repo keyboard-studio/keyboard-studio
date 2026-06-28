@@ -1,6 +1,8 @@
 # Proposal: Unified sign-up/sign-in, profile page, welcome gate, and resumable edits
 
 > Status: **proposed** (plan for review — no code yet). Companion to [docs/github-integration.md](github-integration.md).
+>
+> **Addendum 2026-06-28:** updated §B.7/§B.8 to reflect `main` after the manifest-driven `SurveyView` refactor (`SurveyStage` union removed) and the expanded `workingCopyStore`. The serialization field list and the resume-phase mechanism below now track the current store/runtime, not the pre-refactor shape.
 
 ## Context
 
@@ -23,10 +25,10 @@ The studio's identity flow is disjointed, and in-progress work is lost on reload
 - [packages/studio/src/components/SignUpPanel.tsx](../packages/studio/src/components/SignUpPanel.tsx) — the only sign-up UI; rendered by [OutputScreen.tsx](../packages/studio/src/components/OutputScreen.tsx). Inline `GitHubMark`/`GoogleMark` SVGs; 5 render branches.
 - [packages/studio/src/hooks/useGitHubAuth.ts](../packages/studio/src/hooks/useGitHubAuth.ts) / [useGoogleAuth.ts](../packages/studio/src/hooks/useGoogleAuth.ts) — per-provider hooks (`status`, `connect`, `disconnect`, identity/login, `error`); rehydrate from `sessionStorage` at mount.
 - [packages/studio/src/lib/identity.ts](../packages/studio/src/lib/identity.ts) — `IdentitySession` union.
-- [packages/studio/src/StudioShell.tsx](../packages/studio/src/StudioShell.tsx) — hash router (`useRoute`), `NavBar` (left tabs only, no account control), route switch; default/invalid hash → `survey`.
+- [packages/studio/src/StudioShell.tsx](../packages/studio/src/StudioShell.tsx) — hash router (`useRoute`), `NavBar` (left tabs only, no account control), route switch; default/invalid hash → `survey`. Hosts `SurveyView`, whose step progression is **manifest-driven**: a local `useState<ActiveStepId>("identity")` advances through [steps/manifest.ts](../packages/studio/src/steps/manifest.ts) via `nextSpineStepAfter` (validated at module load by `validateManifestShape`); the `characters` step carries a `CharactersSubStage` (`"prefill" | "B"`) intra-phase sub-state. There is **no `SurveyStage` union**.
 - [packages/studio/src/lib/navigate.ts](../packages/studio/src/lib/navigate.ts) — `RouteId` union + `navigateTo()`.
 - [packages/studio/src/main.tsx](../packages/studio/src/main.tsx) + [handleOAuthCallback.ts](../packages/studio/src/lib/handleOAuthCallback.ts) — boot runs the OAuth callback first; on success redirects to `/` (no hash) with the session already in `sessionStorage`, then mounts.
-- **Reference for serialization (q7 branch, not on `main`):** `persistWorkingCopy.ts` on `km/github-integration-q7` already worked out VirtualFS→Base64, `Set`→array, and the "re-derive computed fields (`session`) rather than store them" policy. **Reuse that design**, adapted to the current store shape (no `WorkingCopyData`/`removalCapabilities` on this branch). Coordinate to avoid duplicate divergent copies when those branches merge.
+- **Reference for serialization (q7 branch, not on `main`):** `persistWorkingCopy.ts` on `km/github-integration-q7` already worked out VirtualFS→Base64, `Set`→array, and the "re-derive computed fields (`session`) rather than store them" policy. **Reuse that design**, adapted to the current store shape (which now carries `removalCapabilities` and several other slots — see §B.7). Coordinate to avoid duplicate divergent copies when those branches merge.
 
 ## Implementation
 
@@ -50,13 +52,27 @@ The studio's identity flow is disjointed, and in-progress work is lost on reload
 
 ### B. Durable resume
 
-**7. `lib/persistWorkingCopy.ts` (new, adapted from q7 design)** — `localStorage` key `ks.working-copy.draft`:
-- `saveWorkingCopyDraft(state)` — serialize the store's *data* fields: `baseVfs`→Base64 entries, `deletedNodeIds`/`deletedItemIds` Sets→arrays, drop derived `session` (re-derived via `mergePhaseResults` on load). `try/catch` quota guard (skip silently, as q7 does).
-- `loadWorkingCopyDraft()` — parse + deserialize into a store-shaped object (Sets rebuilt, VFS via `createVirtualFS`, `session` re-derived); returns `null` if absent/corrupt.
+**7. `lib/persistWorkingCopy.ts` (new, adapted from q7 design)** — `localStorage` key `ks.working-copy.draft`. The field list is re-derived from the **current** `WorkingCopyState` ([workingCopyStore.ts](../packages/studio/src/stores/workingCopyStore.ts)); only *data* slots are persisted, derived/computed slots are excluded.
+- `saveWorkingCopyDraft(state)` — serialize the store's *data* fields:
+  - `baseVfs` (a `VirtualFS`) → Base64 entries (per q7's VirtualFS→Base64 scheme).
+  - `deletedNodeIds`, `deletedItemIds` (`Set<string>`) → arrays.
+  - `undoStack` (`UndoEntry[]`) — plain JSON.
+  - `ir`, `baseIr` (`KeyboardIR | null`) and `baseKeyboard` (`BaseKeyboard | null`) — the base/working IR + base keyboard descriptor.
+  - `phaseResults` (`SurveyPhaseResult[]`) and `irAxes` (`Partial<DiscoveryAxisVector>`) — the survey inputs (`session` is **re-derived** from these on load via `mergePhaseResults`, not stored).
+  - `identity` (`IdentityPatch | null`), `instantiationMode` (`InstantiationMode`).
+  - `desktopLocked` (`boolean`), `touchLayoutJson` (`string | null`), `touchDraft` (already-serializable: `{ charTouchEntries, skippedChars }` | null), `galleryIntrosSeen` (`{ mechanism, touch }`).
+  - **`removalCapabilities` (`Map<string, RemovalCapability>`) needs an explicit serialization decision.** It is **not** derivable from the persisted VFS — it is computed once at instantiation from the base IR by `classifyRemovalCapabilities` and never recomputed on carve edits. Options: (a) serialize it (Map→array of entries, rebuilt on load), or (b) recompute it from `baseIr` on rehydrate by re-running the classifier. Pick one and document it; do **not** silently drop it, or carve removal affordances will be wrong after a resume. (This branch **does** carry `removalCapabilities` — the earlier "no `removalCapabilities` on this branch" note was true of the pre-refactor store and is no longer accurate.)
+  - **Excluded — derived/non-persistable:** `session` (re-derived via `mergePhaseResults(irAxes, phaseResults)` on load), `staleSteps` (recomputed from the re-opened roots via `computeStalenessFromManifest`), `validatorFindings` (re-produced by the next `useValidator` cycle). Do not persist these.
+  - `try/catch` quota guard (skip silently, as q7 does).
+- `loadWorkingCopyDraft()` — parse + deserialize into a store-shaped object (Sets rebuilt, VFS via `createVirtualFS`, `removalCapabilities` rebuilt per the chosen decision above, `session` re-derived); returns `null` if absent/corrupt.
 - `clearWorkingCopyDraft()`.
 - Sized for localStorage (~5MB) — keyboard sources are small; note IndexedDB as the fallback if a base ever exceeds quota.
 
-**8. Auto-save + boot rehydrate** — subscribe to `useWorkingCopyStore` and debounce-write the draft on change (reuse the [useDebounce.ts](../packages/studio/src/hooks/useDebounce.ts) idiom; do **not** add a second 300 ms validator timer). Also persist a small UI-state record (`localStorage` `ks.ui-state`: top-level route + the SurveyView `stage`) so resume returns to the right phase — `SurveyView` currently hard-starts `stage` at `"identity"`; seed it from the persisted value when a draft is present ("preserve as much as possible" — working copy + route + stage; deeper sub-state is best-effort).
+**8. Auto-save + boot rehydrate** — subscribe to `useWorkingCopyStore` and debounce-write the draft on change (reuse the [useDebounce.ts](../packages/studio/src/hooks/useDebounce.ts) idiom; do **not** add a second 300 ms validator timer). Also persist a small UI-state record (`localStorage` `ks.ui-state`) so resume returns to the right phase. Survey progression is **manifest-driven**: `SurveyView` tracks the current step as a local `useState<ActiveStepId>` (initialized to `"identity"`) that advances through [steps/manifest.ts](../packages/studio/src/steps/manifest.ts) — there is **no `SurveyStage` union to seed/persist**. So the UI-state record persists:
+- the top-level `RouteId` (hash route), and
+- the active step id (`ActiveStepId`) plus the `characters` step's `CharactersSubStage` (`"prefill" | "B"`) when applicable.
+
+On boot, seed `SurveyView`'s `activeStepId` (and `charactersSub`) from the persisted value when a draft is present, instead of letting it hard-start at `"identity"` ("preserve as much as possible" — working copy + route + active step + sub-stage; deeper sub-state such as the in-flight `selectedTrack`/`scaffoldSpec` is best-effort). Note that some step renderers gate on transient local state (e.g. `identityResult`, `localBase`) that is *not* in the store; a resumed step earlier than where that state is established may need to re-derive it from the rehydrated store slots or fall back to its preceding step.
 
 **9. First-visit + resume gate** — durable `localStorage` flag `ks.visited`. Boot landing logic (after OAuth callback, in `StudioShell`/`useRoute`, synchronous reads):
 - Draft present → rehydrate store + route to saved phase (skip welcome).
@@ -68,7 +84,7 @@ The studio's identity flow is disjointed, and in-progress work is lost on reload
 
 **New:** `components/ProviderMarks.tsx`, `hooks/useIdentitySession.ts`, `components/WelcomeScreen.tsx`, `components/ProfileScreen.tsx`, `lib/persistWorkingCopy.ts` (+ co-located `.test.tsx`/`.test.ts` per existing conventions).
 
-**Edited:** `components/SignUpPanel.tsx` (+ test), `StudioShell.tsx` (NavBar account control, routes, welcome/resume gate, SurveyView stage seed), `lib/navigate.ts`, and a small auto-save wiring at boot (in `StudioShell` or `main.tsx`).
+**Edited:** `components/SignUpPanel.tsx` (+ test), `StudioShell.tsx` (NavBar account control, routes, welcome/resume gate, `SurveyView` active-step seed), `lib/navigate.ts`, and a small auto-save wiring at boot (in `StudioShell` or `main.tsx`).
 
 ## Coordination note
 
