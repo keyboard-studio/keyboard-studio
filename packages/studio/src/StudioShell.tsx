@@ -42,6 +42,9 @@ import { FlowMapView } from "./dashboard/DashboardView.tsx";
 import { runCompleteness } from "./dashboard/completeness.ts";
 import { PreviewScreen } from "./components/PreviewScreen.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
+import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
+import { ProfileScreen } from "./components/ProfileScreen.tsx";
+import { AccountControl } from "./components/AccountControl.tsx";
 import { navigateTo } from "./lib/navigate.ts";
 import { manifest } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps, type MutateRequest } from "./steps/reducer.ts";
@@ -85,7 +88,7 @@ const SHOW_FLOWMAP =
   import.meta.env.DEV || import.meta.env.VITE_SHOW_FLOWMAP === "1";
 
 const VALID_ROUTES = new Set<RouteId>(
-  (["survey", "preview", "output", "flowmap"] as const).filter(
+  (["welcome", "survey", "preview", "output", "flowmap", "profile"] as const).filter(
     (r) => r !== "flowmap" || SHOW_FLOWMAP,
   ),
 );
@@ -151,29 +154,35 @@ function NavBar({ active }: NavBarProps) {
         boxSizing: "border-box",
       }}
     >
-      {NAV_ITEMS.map(({ id, label }) => {
-        const isActive = id === active;
-        return (
-          <a
-            key={id}
-            href={`#${id}`}
-            aria-current={isActive ? "page" : undefined}
-            style={{
-              padding: "4px 12px",
-              fontSize: 14,
-              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-              textDecoration: "none",
-              color: isActive ? "#6ea8fe" : "#e6edf3",
-              borderBottom: isActive ? "2px solid #6ea8fe" : "2px solid transparent",
-              lineHeight: "40px",
-              whiteSpace: "nowrap",
-              transition: "color 120ms ease, border-bottom-color 120ms ease",
-            }}
-          >
-            {label}
-          </a>
-        );
-      })}
+      {/* Left group — tab links */}
+      <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
+        {NAV_ITEMS.map(({ id, label }) => {
+          const isActive = id === active;
+          return (
+            <a
+              key={id}
+              href={`#${id}`}
+              aria-current={isActive ? "page" : undefined}
+              style={{
+                padding: "4px 12px",
+                fontSize: 14,
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+                textDecoration: "none",
+                color: isActive ? "#6ea8fe" : "#e6edf3",
+                borderBottom: isActive ? "2px solid #6ea8fe" : "2px solid transparent",
+                lineHeight: "40px",
+                whiteSpace: "nowrap",
+                transition: "color 120ms ease, border-bottom-color 120ms ease",
+              }}
+            >
+              {label}
+            </a>
+          );
+        })}
+      </div>
+
+      {/* Right group — account control (hidden on the welcome route) */}
+      {active !== "welcome" && <AccountControl />}
     </nav>
   );
 }
@@ -1130,6 +1139,9 @@ export function StudioShell() {
 
   let content: ReactNode;
   switch (route) {
+    case "welcome":
+      content = <WelcomeScreen />;
+      break;
     case "survey":
       content = <SurveyView baseKeyboard={selectedBaseKeyboard} />;
       break;
@@ -1141,6 +1153,9 @@ export function StudioShell() {
       break;
     case "flowmap":
       content = <FlowMapView completeness={completenessReport} />;
+      break;
+    case "profile":
+      content = <ProfileScreen />;
       break;
   }
 
