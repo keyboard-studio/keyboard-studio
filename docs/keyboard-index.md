@@ -33,6 +33,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Balochi Scientific | `balochi_scientific` | `bal-Latn` | © 2017-2023 SIL International | `../keyboards/release/b/balochi_scientific` |
 | Balochi Urdu | `balochi_urdu` | `bal` | © SIL Global | `../keyboards/release/b/balochi_urdu` |
 | Bambara | `bambara` | `bm` | Sekou Goro | `../keyboards/release/b/bambara` |
+| Bamum | `bamum` | `bax` | Lorna Evans | `../keyboards/release/b/bamum` |
 | Canadian French Basic | `basic_kbdca` | `fr-CA` | (c) 2009-2019 SIL International | `../keyboards/release/basic/basic_kbdca` |
 | French Basic | `basic_kbdfr` | `fr` | (c) 2009-2019 SIL International | `../keyboards/release/basic/basic_kbdfr` |
 | Khmer (NIDA) Basic | `basic_kbdkni` | `km` | © SIL Global | `../keyboards/release/basic/basic_kbdkni` |

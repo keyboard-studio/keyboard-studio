@@ -10,6 +10,7 @@ import type {
   RemovalCapability,
   StoreItem,
 } from '@keyboard-studio/contracts';
+import { isParallelIndexFanOut } from '@keyboard-studio/engine';
 export type CardKind = 'pattern' | 'group' | 'store' | 'raw';
 
 // ---------------------------------------------------------------------------
@@ -236,22 +237,12 @@ export function outputToChar(output: OutputElement[]): string {
 }
 
 // ---------------------------------------------------------------------------
-// isParallelStoreDeadkeyRule — detect a parallel-store deadkey rule
-//
-// A rule matches when:
-//   - Its output is exactly one `index` element (the output store ref)
-//   - Its context contains at least one `deadkey` element
-//   - Its context contains at least one `any` element (the input store ref)
+// Parallel-store index fan-out detection lives in the engine
+// (isParallelIndexFanOut, imported above) — the deadkey-agnostic predicate
+// covering both the S-02 deadkey body and the Bamum bare-transliteration shape.
+// The studio is the consumer; the engine owns the predicate so the classifier
+// (which emits the removable:slot-fill alias) and the carve UI never drift.
 // ---------------------------------------------------------------------------
-
-function isParallelStoreDeadkeyRule(rule: IRRule): boolean {
-  if (rule.output.length !== 1) return false;
-  const out = rule.output[0];
-  if (!out || out.kind !== 'index') return false;
-  const hasDeadkey = rule.context.some((el) => el.kind === 'deadkey');
-  const hasAny = rule.context.some((el) => el.kind === 'any');
-  return hasDeadkey && hasAny;
-}
 
 // ---------------------------------------------------------------------------
 // expandParallelStoreRule — one CarveGlyph per char-slot in the output store
@@ -291,6 +282,7 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
 
   const modLayer = ruleModifier(rule);
   const modLabel = modifierLabel(rule);
+  const hasDeadkey = rule.context.some((el) => el.kind === 'deadkey');
 
   const glyphs: CarveGlyph[] = [];
   const seen = new Set<string>();
@@ -305,12 +297,21 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
 
     const ch = displayChar(outputItem.value);
 
-    // Build input-side key label for this slot
+    // Build input-side key label for this slot.
+    // Input store items may be char (deadkey variant — base letters) or
+    // vkey (bare transliteration — physical keys like K_BKQUOTE).
     const inputItem = inputStore ? inputStore.items[i] : undefined;
-    const inputLabel = (inputItem && inputItem.kind === 'char')
-      ? displayChar(inputItem.value)
-      : '?';
-    const keys = ['‹dk›', inputLabel];
+    let inputLabel: string;
+    if (inputItem && inputItem.kind === 'char') {
+      inputLabel = displayChar(inputItem.value);
+    } else if (inputItem && inputItem.kind === 'vkey') {
+      inputLabel = inputItem.name;
+    } else {
+      inputLabel = '?';
+    }
+    // Deadkey shape: show the deadkey marker before the input label.
+    // Bare shape (Bamum): physical key only, no deadkey marker.
+    const keys = hasDeadkey ? ['‹dk›', inputLabel] : [inputLabel];
 
     const gid = `${outputStore.nodeId}#${i}`;
     if (seen.has(gid)) continue;  // dedup: same store+index appearing in multiple rules
@@ -325,12 +326,13 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
 // ---------------------------------------------------------------------------
 // ruleToGlyphs — single IRRule → CarveGlyph[] (empty if not displayable)
 //
-// Parallel-store deadkey rules expand into one tile per output-store char slot.
+// Parallel-store index fan-out rules (deadkey-body and bare transliteration)
+// expand into one tile per output-store char slot.
 // All other rules produce at most one tile, with gid == rule.nodeId.
 // ---------------------------------------------------------------------------
 
 function ruleToGlyphs(rule: IRRule, ir: KeyboardIR, capabilities: Map<string, RemovalCapability>): CarveGlyph[] {
-  if (isParallelStoreDeadkeyRule(rule)) {
+  if (isParallelIndexFanOut(rule)) {
     return expandParallelStoreRule(rule, ir, capabilities);
   }
   // Standard single-output rule (original behavior)
@@ -356,7 +358,7 @@ function ruleToGlyphs(rule: IRRule, ir: KeyboardIR, capabilities: Map<string, Re
 // that pass only a group.  When absent, parallel-store expansion is a no-op
 // because the fallback path in expandParallelStoreRule still fires (store
 // lookup returns undefined → single '…' tile) — and for the simple vkey/char
-// rules that tests exercise, isParallelStoreDeadkeyRule returns false anyway.
+// rules that tests exercise, isParallelIndexFanOut returns false anyway.
 const EMPTY_IR: KeyboardIR = {
   origin: 'scaffolded',
   header: { keyboardId: '', name: '', bcp47: [], copyright: '', version: '', targets: [], storeDirectives: [] },

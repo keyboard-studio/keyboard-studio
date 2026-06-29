@@ -458,6 +458,7 @@ describe("applyStoreSlotRemovals — round-trip emit/re-parse", () => {
 // Cameroon canary — real keyboard from sibling ../keyboards checkout
 // ---------------------------------------------------------------------------
 
+import { classifyRemovalCapabilities } from "../recognizer/classifyRemovalCapabilities.js";
 import { existsSync, readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -486,6 +487,61 @@ describe("applyStoreSlotRemovals — Cameroon canary (real keyboard)", () => {
 
       // Parallel stores must have equal length for index() alignment to be valid
       expect(dkf!.items.length).toBe(dkt!.items.length);
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Bamum canary — bare-any fan-out round-trip
+// ---------------------------------------------------------------------------
+
+const BAMUM_KMN = resolve(
+  __dir,
+  "../../../../../keyboards/release/b/bamum/source/bamum.kmn",
+);
+const bamumExists = existsSync(BAMUM_KMN);
+
+describe("applyStoreSlotRemovals — Bamum canary (bare-any fan-out round-trip)", () => {
+  it.skipIf(!bamumExists)(
+    "removing one defaultU slot nul-fills that position, preserves all other slots, round-trips",
+    () => {
+      const kmnText = readFileSync(BAMUM_KMN, "utf-8");
+      const { ir } = parse(kmnText, "bamum");
+
+      // Locate the defaultU output store.
+      const defaultU = ir.stores.find((s) => s.name === "defaultU");
+      expect(defaultU).toBeDefined();
+      const originalLength = defaultU!.items.length;
+      expect(originalLength).toBeGreaterThan(1);
+
+      // Classify — defaultU must be aliased as removable:slot-fill.
+      const capMap = classifyRemovalCapabilities(ir);
+      expect(capMap.get(defaultU!.nodeId)).toBe("removable:slot-fill");
+
+      // Remove slot 0 (first character in the defaultU store).
+      const slotId = `${defaultU!.nodeId}#0`;
+      const { ir: nulledIr, appliedCount, warnings } = applyStoreSlotRemovals(
+        ir,
+        new Set([slotId]),
+      );
+      expect(warnings).toHaveLength(0);
+      expect(appliedCount).toBe(1);
+
+      // Slot 0 replaced with nul; all others preserved.
+      const nulledStore = nulledIr.stores.find((s) => s.name === "defaultU");
+      expect(nulledStore).toBeDefined();
+      expect(nulledStore!.items[0]).toEqual({ kind: "raw", text: "nul" });
+      expect(nulledStore!.items.length).toBe(originalLength);
+      // Slot 1 must be the original second item (unchanged).
+      expect(nulledStore!.items[1]).toEqual(defaultU!.items[1]);
+
+      // Emit and re-parse (round-trip).
+      const emitted = emit(nulledIr);
+      const { ir: reparsed } = parse(emitted, "bamum");
+      const reparsedStore = reparsed.stores.find((s) => s.name === "defaultU");
+      expect(reparsedStore).toBeDefined();
+      expect(reparsedStore!.items.length).toBe(originalLength);
+      expect(reparsedStore!.items[0]).toEqual({ kind: "raw", text: "nul" });
     },
   );
 });

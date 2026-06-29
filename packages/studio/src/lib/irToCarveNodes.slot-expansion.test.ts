@@ -1,4 +1,4 @@
-// Tests for parallel-store deadkey rule slot expansion in irToCarveNodes.ts (issue #530).
+// Tests for parallel-store index fan-out slot expansion in irToCarveNodes.ts.
 //
 // Coverage:
 //   1. toRailNodes / groupToGlyphs expands one glyph per char output-store item;
@@ -6,7 +6,7 @@
 //   2. A simple `+ [K_A] > 'x'` rule still produces exactly one glyph with
 //      gid === rule.nodeId (no `#`).
 //   3. glyphsTriState: deleting one of N parallel-store glyphs yields 'partial'.
-//   4. (issue #531) CarveGlyph.capability resolves for both gid forms; defaults to
+//   4. CarveGlyph.capability resolves for both gid forms; defaults to
 //      'not-removable:unknown' when the map lacks the key.
 
 import { describe, it, expect } from 'vitest';
@@ -30,6 +30,15 @@ function makeInputStore(nodeId: string, name: string, chars: string[]): IRStore 
   };
 }
 
+function makeVkeyInputStore(nodeId: string, name: string, vkeys: string[]): IRStore {
+  return {
+    nodeId,
+    name,
+    items: vkeys.map((k) => ({ kind: 'vkey' as const, name: k })),
+    isSystem: false,
+  };
+}
+
 function makeParallelRule(
   nodeId: string,
   dkId: number,
@@ -43,6 +52,20 @@ function makeParallelRule(
       { kind: 'any', storeRef: inputStoreName },
     ],
     output: [{ kind: 'index', storeRef: outputStoreName, offset: 2 }],
+  };
+}
+
+// Bare transliteration shape: + any(inputStore) > index(outputStore, 1)
+// Matches the Bamum pattern: no deadkey, offset === context.length (1).
+function makeBareParallelRule(
+  nodeId: string,
+  inputStoreName: string,
+  outputStoreName: string,
+): IRRule {
+  return {
+    nodeId,
+    context: [{ kind: 'any', storeRef: inputStoreName }],
+    output: [{ kind: 'index', storeRef: outputStoreName, offset: 1 }],
   };
 }
 
@@ -258,10 +281,10 @@ describe('irToCarveNodes — toRailNodes with parallel-store group', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. (issue #531) CarveGlyph.capability — both gid forms resolve correctly
+// 5. CarveGlyph.capability — both gid forms resolve correctly
 // ---------------------------------------------------------------------------
 
-describe('irToCarveNodes — CarveGlyph.capability resolution (issue #531)', () => {
+describe('irToCarveNodes — CarveGlyph.capability resolution', () => {
   it('standard rule tile resolves capability via rule.nodeId', () => {
     const ir = makeTestIR();
     const group = ir.groups[0]!;
@@ -343,5 +366,97 @@ describe('irToCarveNodes — CarveGlyph.capability resolution (issue #531)', () 
 
     const slotGlyph = groupNode!.glyphs!.find((g) => g.gid === 'store#dkt#0');
     expect(slotGlyph?.capability).toBe('removable:slot-fill');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6. Bare transliteration shape (Bamum): + any(defaultK) > index(defaultU,1)
+//    No deadkey — vkey input store — keys = [physicalKeyLabel] (no deadkey marker).
+// ---------------------------------------------------------------------------
+
+describe('irToCarveNodes — bare transliteration fan-out (Bamum shape)', () => {
+  // Build IR for: + any(defaultK) > index(defaultU, 1)
+  // Input store holds physical keys; output store holds Unicode chars.
+  function makeBamumIR() {
+    const outputStoreNodeId = 'store#bamumU';
+    const inputStoreNodeId = 'store#bamumK';
+
+    const outputItems: StoreItem[] = [
+      { kind: 'char', value: 'ꚠ' },   // index 0 — Bamum char
+      { kind: 'char', value: 'ꚡ' },   // index 1 — Bamum char
+      { kind: 'raw', text: 'nul' },    // index 2 — skipped
+    ];
+
+    const outputStore = makeOutputStore(outputStoreNodeId, 'defaultU', outputItems);
+    const inputStore = makeVkeyInputStore(inputStoreNodeId, 'defaultK', ['K_BKQUOTE', 'K_1', 'K_2']);
+
+    const rule = makeBareParallelRule('rule#bamum', 'defaultK', 'defaultU');
+    const group = makeGroup('group#bamum', 'bamum', [rule]);
+    return makeIR([group], [outputStore, inputStore]);
+  }
+
+  it('expands into one glyph per char output-store slot (nul skipped)', () => {
+    const ir = makeBamumIR();
+    const group = ir.groups[0]!;
+    const glyphs = groupToGlyphs(group, ir);
+
+    expect(glyphs).toHaveLength(2);
+    expect(glyphs[0]!.gid).toBe('store#bamumU#0');
+    expect(glyphs[0]!.ch).toBe('ꚠ');
+    expect(glyphs[1]!.gid).toBe('store#bamumU#1');
+    expect(glyphs[1]!.ch).toBe('ꚡ');
+  });
+
+  it('keys array has physical key name only — no deadkey marker (Bamum regression)', () => {
+    const ir = makeBamumIR();
+    const group = ir.groups[0]!;
+    const glyphs = groupToGlyphs(group, ir);
+
+    // No '‹dk›' marker — bare transliteration shape.
+    expect(glyphs[0]!.keys).toEqual(['K_BKQUOTE']);
+    expect(glyphs[1]!.keys).toEqual(['K_1']);
+    glyphs.forEach((g) => {
+      expect(g.keys).not.toContain('‹dk›');
+    });
+  });
+
+  it('capability resolves via output-store nodeId alias entry', () => {
+    const ir = makeBamumIR();
+    const group = ir.groups[0]!;
+    const caps = new Map<string, RemovalCapability>([
+      ['store#bamumU', 'removable:slot-fill'],
+    ]);
+    const glyphs = groupToGlyphs(group, ir, caps);
+
+    expect(glyphs.length).toBeGreaterThan(0);
+    glyphs.forEach((g) => {
+      expect(g.capability).toBe('removable:slot-fill');
+    });
+  });
+
+  it('defaults to not-removable:unknown when capability map is empty', () => {
+    const ir = makeBamumIR();
+    const group = ir.groups[0]!;
+    const glyphs = groupToGlyphs(group, ir, new Map());
+
+    glyphs.forEach((g) => {
+      expect(g.capability).toBe('not-removable:unknown');
+    });
+  });
+
+  // Regression: existing deadkey-variant tests must still produce ['‹dk›', inputChar].
+  it('REGRESSION — deadkey shape still emits the deadkey marker in keys[0]', () => {
+    const ir = makeTestIR();
+    const group = ir.groups[0]!;
+    const parallelOnlyGroup = {
+      ...group,
+      rules: group.rules.filter((r) => r.nodeId === 'rule#dk'),
+    };
+    const glyphs = groupToGlyphs(parallelOnlyGroup, ir);
+
+    expect(glyphs.length).toBeGreaterThan(0);
+    glyphs.forEach((g) => {
+      expect(g.keys[0]).toBe('‹dk›');
+    });
   });
 });

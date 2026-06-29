@@ -23,6 +23,7 @@ import type {
   KeyboardIR,
   IRGroup,
   IRRule,
+  IRStore,
   RawKmnFragment,
 } from "@keyboard-studio/contracts";
 import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
@@ -347,6 +348,11 @@ describe("classifyRemovalCapabilities — decision-order precedence", () => {
 // C. AC canaries — real keyboards (skipped when sibling checkout absent)
 // ---------------------------------------------------------------------------
 
+const KEYBOARDS_ROOT_B = path.resolve(
+  new URL(".", import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1"),
+  "../../../../../keyboards/release/b",
+);
+
 const KEYBOARDS_ROOT_SIL = path.resolve(
   new URL(".", import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1"),
   "../../../../../keyboards/release/sil",
@@ -368,6 +374,8 @@ const KEYBOARDS_ROOT_EL = path.resolve(
   "../../../../../keyboards/release/el",
 );
 
+const bamumPath = path.join(KEYBOARDS_ROOT_B, "bamum/source/bamum.kmn");
+
 const cameroonPath = path.join(
   KEYBOARDS_ROOT_SIL,
   "sil_cameroon_qwerty/source/sil_cameroon_qwerty.kmn",
@@ -382,6 +390,7 @@ const csPinyinPath = path.join(KEYBOARDS_ROOT_C, "cs_pinyin/source/cs_pinyin.kmn
 const silYoruba8Path = path.join(KEYBOARDS_ROOT_SIL, "sil_yoruba8/source/sil_yoruba8.kmn");
 const elPasifikaPath = path.join(KEYBOARDS_ROOT_EL, "el_pasifika/source/el_pasifika.kmn");
 
+const bamumExists = fs.existsSync(bamumPath);
 const cameroonExists = fs.existsSync(cameroonPath);
 const kbdfrExists = fs.existsSync(kbdfrPath);
 const kbdusExists = fs.existsSync(kbdusPath);
@@ -495,6 +504,52 @@ describe("classifyRemovalCapabilities — AC canaries (real keyboards)", () => {
     },
   );
 
+  it.skipIf(!bamumExists)(
+    "C4: Bamum fan-out rules (any(defaultK/shiftK)>index(defaultU/shiftU,1)) → removable:slot-fill + output-store alias; nul rule → not-removable:unknown",
+    () => {
+      const kmnText = fs.readFileSync(bamumPath, "utf-8");
+      const { ir } = parse(kmnText, "bamum");
+      recognizePatterns(ir);
+      const map = classifyRemovalCapabilities(ir);
+
+      // The two fan-out rules must be slot-fill.
+      const mainGroup = ir.groups.find((g) => g.name === "main");
+      expect(mainGroup).toBeDefined();
+
+      const fanOutRules = mainGroup!.rules.filter((rule) => {
+        const c0 = rule.context[0];
+        const out = rule.output[0];
+        return (
+          rule.context.length === 1 &&
+          c0?.kind === "any" &&
+          out?.kind === "index" &&
+          out.offset === 1
+        );
+      });
+      // Bamum has exactly two such rules: defaultK/defaultU and shiftK/shiftU.
+      expect(fanOutRules.length).toBe(2);
+      for (const rule of fanOutRules) {
+        expect(map.get(rule.nodeId)).toBe("removable:slot-fill");
+        // Output-store alias must be present.
+        const outEl = rule.output[0];
+        if (outEl !== undefined && outEl.kind === "index") {
+          const outStore = ir.stores.find((s) => s.name === outEl.storeRef);
+          expect(outStore).toBeDefined();
+          expect(map.get(outStore!.nodeId)).toBe("removable:slot-fill");
+        }
+      }
+
+      // The `+ any(nul) > nul` rule has a char output, not an index — must be unknown.
+      const nullRule = mainGroup!.rules.find((rule) => {
+        const c0 = rule.context[0];
+        const out = rule.output[0];
+        return c0?.kind === "any" && out?.kind !== "index";
+      });
+      expect(nullRule).toBeDefined();
+      expect(map.get(nullRule!.nodeId)).toBe("not-removable:unknown");
+    },
+  );
+
   it("C3: RawKmnFragment fixture → not-removable:opaque", () => {
     const frag = rawFrag("frag#opaque-1");
     const ir = withRaw(makeTestIR([]), [frag]);
@@ -591,28 +646,38 @@ describe("classifyRemovalCapabilities — §7.5 regression canaries", () => {
   );
 
   it.skipIf(!elPasifikaExists)(
-    "D5: el_pasifika S-02 bodies (from main group any+any>index) classify NOT removable:slot-fill AND S-10 beep/constraint rules are NOT slot-fill",
+    "D5: el_pasifika — bare-any rules classify removable:slot-fill; opaque fragments are opaque; no typed rule gets both slot-fill and context-sensitive",
     () => {
-      // el_pasifika uses any(vowelChars)+any(macronKeys)>index(macronChars,1) style rules
-      // in its main group — these are context.length===2 (two any() elements), so they
-      // are NOT S-02 body shape (which requires dk+any) and must NOT be slot-fill.
-      // The constraints group uses beep rules (any+any>context+beep) — also not slot-fill.
+      // el_pasifika uses bare-any fan-out rules like [any(coreKeys)]>index(coreChars,1).
+      // These have context.length===1 and offset===1 → isParallelIndexFanOut PASSES →
+      // removable:slot-fill (correct: whole-layout transliteration the studio can carve).
+      // The any(vowelChars)+any(macronKeys)>index(...) style rules in the source have
+      // any() as a context prefix — the codec cannot model this and emits them as
+      // RawKmnFragments (opaque).  Any typed rule with context.length > 1 must be
+      // context-sensitive (not slot-fill) because isParallelIndexFanOut requires
+      // all pre-terminal elements to be deadkey.
       const kmnText = fs.readFileSync(elPasifikaPath, "utf-8");
       const { ir } = parse(kmnText, "el_pasifika");
       recognizePatterns(ir);
       const map = classifyRemovalCapabilities(ir);
 
-      // Verify: no parsed rule in any group is labeled removable:slot-fill
-      // (el_pasifika has no dk(D)+any(S)>index(OUT,2) S-02 body shape).
+      // No typed rule must carry BOTH removable:slot-fill AND be multi-any
+      // (the predicate rejects pre-terminal any() elements).
       for (const group of ir.groups) {
         for (const rule of group.rules) {
-          const label = map.get(rule.nodeId);
-          expect(label).not.toBe("removable:slot-fill");
+          if (rule.context.length >= 2) {
+            const preterminals = rule.context.slice(0, -1);
+            const hasNonDeadkeyPreTerminal = preterminals.some((el) => el.kind !== "deadkey");
+            if (hasNonDeadkeyPreTerminal) {
+              // Must NOT be slot-fill — pre-terminal non-deadkey rejects isParallelIndexFanOut.
+              expect(map.get(rule.nodeId)).not.toBe("removable:slot-fill");
+            }
+          }
         }
       }
 
-      // At least one rule must be labeled not-removable:context-sensitive
-      // (the any()+any() context rules in main and constraints groups).
+      // At least one typed rule must be labeled not-removable:context-sensitive
+      // (el_pasifika has context-dependent rules in the constraints group).
       let contextSensitiveCount = 0;
       for (const group of ir.groups) {
         for (const rule of group.rules) {
@@ -623,10 +688,56 @@ describe("classifyRemovalCapabilities — §7.5 regression canaries", () => {
       }
       expect(contextSensitiveCount).toBeGreaterThan(0);
 
-      // RawKmnFragment entries (if(platform) rules, beep sequences, etc.) must be opaque.
+      // RawKmnFragment entries (if(platform) rules, etc.) must be opaque.
       for (const frag of ir.raw) {
         expect(map.get(frag.nodeId)).toBe("not-removable:opaque");
       }
     },
   );
+});
+
+// ---------------------------------------------------------------------------
+// E. Fan-out predicate regression — hand-built shapes
+// ---------------------------------------------------------------------------
+
+describe("classifyRemovalCapabilities — isParallelIndexFanOut regression", () => {
+  it("E1: context(N) any(S) > index(OUT, 2) (pre-terminal is context(), not deadkey) → not-removable:context-sensitive (NOT slot-fill)", () => {
+    // A rule whose pre-terminal element is context() fails isParallelIndexFanOut
+    // (pre-terminal must be deadkey). With context.length===2 it also triggers
+    // the context-sensitive branch (context.length > 1).  Regression guard: the
+    // introduction of Decision 3b must NOT promote this rule to slot-fill.
+    const rule: IRRule = {
+      nodeId: "rule#ctx-any",
+      context: [
+        { kind: "context", offset: 1 },
+        { kind: "any", storeRef: "someStore" },
+      ],
+      output: [{ kind: "index", storeRef: "outStore", offset: 2 }],
+    };
+    const group: IRGroup = {
+      nodeId: "group#main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [rule],
+    };
+    const ir = makeTestIR([group]);
+    const map = classifyRemovalCapabilities(ir);
+    expect(map.get("rule#ctx-any")).toBe("not-removable:context-sensitive");
+    expect(map.get("rule#ctx-any")).not.toBe("removable:slot-fill");
+  });
+
+  it("E2: bare-any rule [any(S)] > index(OUT, 1) → removable:slot-fill + output-store alias (Decision-3b, ungated)", () => {
+    const rule: IRRule = {
+      nodeId: "rule#bare-any",
+      context: [{ kind: "any", storeRef: "defaultU_in" }],
+      output: [{ kind: "index", storeRef: "defaultU", offset: 1 }],
+    };
+    const outputStore: IRStore = { nodeId: "store#defaultU", name: "defaultU", items: [], isSystem: false };
+    const group: IRGroup = { nodeId: "group#main", name: "main", usingKeys: true, readonly: false, rules: [rule] };
+    const ir = { ...makeTestIR([group]), stores: [outputStore] };
+    const map = classifyRemovalCapabilities(ir);
+    expect(map.get("rule#bare-any")).toBe("removable:slot-fill");
+    expect(map.get("store#defaultU")).toBe("removable:slot-fill");
+  });
 });

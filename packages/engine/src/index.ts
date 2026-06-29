@@ -75,6 +75,7 @@ export { bumpKeyboardVersion, stageAdaptHistory } from "./output/index.js";
 // Issue #234 — pattern recognizer public surface.
 export { recognizePatterns, classifyRemovalCapabilities } from "./recognizer/index.js";
 export type { RecognizerRule, MatchResult, RecognizeResult } from "./recognizer/index.js";
+export { isParallelIndexFanOut } from "./recognizer/rules/parallel-index-fanout.js";
 
 // Issue #19 — scaffolder (template-cleanup pipeline).
 export { createScaffolderService, renameFilesInVfs } from "./scaffolder/index.js";
