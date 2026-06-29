@@ -6,7 +6,7 @@
 
 import { type CSSProperties } from "react";
 import type { GraphEdge } from "./model.ts";
-import { layoutFlowGraph, NODE_W, NODE_H, type LaidOutGraph, type PositionedNode } from "./layout.ts";
+import { layoutFlowGraph, NODE_W, NODE_H, FLOW_GRAPH_MAX_HEIGHT, type LaidOutGraph, type PositionedNode } from "./layout.ts";
 import type { FlowGraph } from "./model.ts";
 import { MONO, SANS } from "./tokens.ts";
 
@@ -65,7 +65,7 @@ export function FlowGraphView({ graph }: FlowGraphViewProps) {
   const pos = new Map<string, PositionedNode>(laid.nodes.map((n) => [n.id, n]));
 
   return (
-    <div style={{ overflow: "auto", border: "1px solid #21262d", borderRadius: 8, background: "#0b0f14" }}>
+    <div style={{ overflow: "auto", maxHeight: FLOW_GRAPH_MAX_HEIGHT, border: "1px solid #21262d", borderRadius: 8, background: "#0b0f14" }}>
       <div style={{ position: "relative", width: laid.width, height: laid.height }}>
         {/* Edge canvas */}
         <svg

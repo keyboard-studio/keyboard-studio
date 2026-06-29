@@ -24,6 +24,8 @@ export const NODE_H = 68;
 const H_GAP = 36;
 const V_GAP = 52;
 const PAD = 24;
+// Cap each graph panel so a tall graph (e.g. Phase B, ~3,956px) scrolls within its box instead of pushing the next section down the page.
+export const FLOW_GRAPH_MAX_HEIGHT = 600;
 
 export interface PositionedNode extends GraphNode {
   x: number;

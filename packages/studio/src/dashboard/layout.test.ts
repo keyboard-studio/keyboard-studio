@@ -14,7 +14,7 @@
 //      canvas height compatible with the true graph depth.
 
 import { describe, it, expect } from "vitest";
-import { layoutFlowGraph } from "./layout.ts";
+import { layoutFlowGraph, FLOW_GRAPH_MAX_HEIGHT } from "./layout.ts";
 import type { FlowGraph } from "./model.ts";
 
 // ---------------------------------------------------------------------------
@@ -260,6 +260,23 @@ describe("layoutFlowGraph — empty graph", () => {
 // Test 5 (formerly 3): cycle-contains synthetic graph matching Phase B's loop-back topology
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Test 6: FlowGraphView maxHeight regression (Phase B crowding Phase F)
+//
+// Phase B (55 nodes, maxRank 32) produces a laid.height of ~3956 px.  Without a
+// maxHeight on the FlowGraphView outer div the entire 3956 px block appears in
+// the page flow, pushing Phase F thousands of pixels below the viewport — the
+// user "can't see Phase B all the way through" because Phase F is only reachable
+// after scrolling ~4 000 px.
+//
+// The fix (FlowGraphView.tsx line 68): maxHeight: 600 on the outer div.  This
+// makes each drill-down a self-contained scrollable panel.
+//
+// These assertions document the invariant: Phase B's laid.height EXCEEDS 600 px
+// (so maxHeight is load-bearing — without it Phase B overflows into Phase F), and
+// laid.height is computed correctly (all nodes fit inside it).
+// ---------------------------------------------------------------------------
+
 describe("layoutFlowGraph — Phase B loop-back topology (55-node synthetic)", () => {
   // Phase B has 55 live questions plus reserve nodes. The critical cycle is:
   //   pb_additional_methods (position 55) → pb_text_sample (position 4)
@@ -302,5 +319,44 @@ describe("layoutFlowGraph — Phase B loop-back topology (55-node synthetic)", (
     // B must not have been rank-inflated above its natural rank 1.
     const nodeB = laid.nodes.find((n) => n.id === "B");
     expect(nodeB!.y).toBe(24 + 1 * 120); // rank 1
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 6: Phase B crowding Phase F — FlowGraphView maxHeight regression
+// ---------------------------------------------------------------------------
+
+describe("layoutFlowGraph — Phase B height exceeds 600 px (maxHeight is load-bearing)", () => {
+  // Phase B (55 nodes, maxRank 32) produces a laid.height of ~3956 px.
+  // Without maxHeight:600 on the FlowGraphView outer div, Phase B's entire
+  // 3956 px block appears in the page flow, pushing Phase F ~4000 px below
+  // the viewport — the user cannot see Phase B all the way through because
+  // Phase F immediately follows the 3956 px block.
+  //
+  // We verify this using the same 55-node synthetic graph topology (a chain
+  // of 55 nodes), which produces laid.height ≥ 3956 px. The FlowGraphView
+  // fix (maxHeight: 600) makes Phase B a self-contained scrollable panel;
+  // this test documents that the fix is load-bearing (height > 600 px).
+  it("a 55-node chain (matching Phase B node count) produces height > 600 px", () => {
+    // Build a 55-node linear chain — same count as Phase B, topology sufficient
+    // to confirm the height exceeds the maxHeight:600 cap.
+    const ids = Array.from({ length: 55 }, (_, i) => `N${i}`);
+    const adjacency: Array<[string, string]> = ids.slice(0, -1).map((id, i) => [id, ids[i + 1]!]);
+    const g = makeGraph(ids, adjacency);
+    const laid = layoutFlowGraph(g);
+
+    // 55-node linear chain: maxRank = 54.
+    // height = (54+1)*68 + 54*52 + 2*24 = 3740 + 2808 + 48 = 6596 px.
+    // Even at Phase B's actual branched maxRank of 32:
+    // height = 33*68 + 32*52 + 48 = 2244 + 1664 + 48 = 3956 px.
+    // Either way, height >> 600 px — maxHeight:600 on FlowGraphView is load-bearing.
+    expect(laid.height).toBeGreaterThan(FLOW_GRAPH_MAX_HEIGHT);
+
+    // All 55 nodes must be positioned without overflow (content fits within height).
+    const PAD = 24;
+    const NODE_H = 68;
+    const maxNodeBottom = Math.max(...laid.nodes.map((n) => n.y + NODE_H));
+    // laid.height = maxNodeBottom + PAD (one PAD below the lowest node's bottom edge).
+    expect(laid.height).toBe(maxNodeBottom + PAD);
   });
 });
