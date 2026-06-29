@@ -23,6 +23,7 @@ import type {
   KeyboardIR,
   IRGroup,
   IRRule,
+  IRStore,
   RawKmnFragment,
 } from "@keyboard-studio/contracts";
 import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
@@ -724,5 +725,19 @@ describe("classifyRemovalCapabilities — isParallelIndexFanOut regression", () 
     const map = classifyRemovalCapabilities(ir);
     expect(map.get("rule#ctx-any")).toBe("not-removable:context-sensitive");
     expect(map.get("rule#ctx-any")).not.toBe("removable:slot-fill");
+  });
+
+  it("E2: bare-any rule [any(S)] > index(OUT, 1) → removable:slot-fill + output-store alias (Decision-3b, ungated)", () => {
+    const rule: IRRule = {
+      nodeId: "rule#bare-any",
+      context: [{ kind: "any", storeRef: "defaultU_in" }],
+      output: [{ kind: "index", storeRef: "defaultU", offset: 1 }],
+    };
+    const outputStore: IRStore = { nodeId: "store#defaultU", name: "defaultU", items: [], isSystem: false };
+    const group: IRGroup = { nodeId: "group#main", name: "main", usingKeys: true, readonly: false, rules: [rule] };
+    const ir = { ...makeTestIR([group]), stores: [outputStore] };
+    const map = classifyRemovalCapabilities(ir);
+    expect(map.get("rule#bare-any")).toBe("removable:slot-fill");
+    expect(map.get("store#defaultU")).toBe("removable:slot-fill");
   });
 });
