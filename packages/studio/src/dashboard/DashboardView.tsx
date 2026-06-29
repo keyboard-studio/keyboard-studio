@@ -26,6 +26,11 @@ import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modul
 import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
 
 import { buildModularFlowGraph } from "./buildStepGraph.ts";
+import {
+  buildManifestProjection,
+  attachDrillDowns,
+  CHARACTERS_STEP_ID,
+} from "./manifestProjection.ts";
 import { phaseARegistry } from "../survey/questions/registry.a.ts";
 import { phaseBRegistry } from "../survey/questions/registry.b.ts";
 import { phaseFRegistry } from "../survey/questions/registry.f.ts";
@@ -312,6 +317,19 @@ export function FlowMapView({ completeness }: FlowMapViewProps) {
   const [section, setSection] = useState<Section>("flow");
   const flows = useMemo(() => FLOW_SOURCES.map((f) => ({ ...safeBuild(f), title: f.title })), []);
 
+  // Spec 015 (DEC-001 = Variant A): project the manifest spine onto a FlowGraph
+  // via the StepGraph → FlowGraph/GraphNode adapter, reusing FlowGraphView /
+  // layoutFlowGraph unchanged. Each projected manifest editor-step carries
+  // kind:"stub" (lighting the dead legend swatch below). This block is reached
+  // only when FlowMapView mounts, which is gated by SHOW_FLOWMAP (StudioShell.tsx:84) —
+  // no new flag is introduced (DEC-002).
+  const manifestSpine = useMemo(() => buildManifestProjection(), []);
+  // Hang the four FLOW_SOURCES modular graphs as registry-keyed drill-downs under
+  // their manifest question-step node ("characters") — FR-004. Same graphs as
+  // today's four-section view, now reframed as drill-downs (no node dropped).
+  const drillDowns = useMemo(() => attachDrillDowns(flows), [flows]);
+  const charactersDrillDowns = drillDowns[CHARACTERS_STEP_ID] ?? [];
+
   return (
     <div
       style={{
@@ -354,15 +372,36 @@ export function FlowMapView({ completeness }: FlowMapViewProps) {
       {section === "flow" && (
         <>
           <FlowLegend />
-          {flows.map(({ graph, error, title }) => (
+
+          {/* Spec 015: the manifest spine, projected onto the map (kind:"stub" nodes). */}
+          <section style={{ marginBottom: 28 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
+              <h2 style={{ margin: 0, fontSize: 15, color: "#6ea8fe" }}>{manifestSpine.title}</h2>
+              <span style={{ fontSize: 11.5, color: "#6e7681", fontFamily: MONO }}>
+                {manifestSpine.flowId} · {manifestSpine.nodes.length} steps · {manifestSpine.edges.length} edges
+              </span>
+            </div>
+            <FlowGraphView graph={manifestSpine} />
+          </section>
+
+          {/* Spec 015 (FR-004): per-phase modular graphs as registry-keyed drill-downs
+              under the "characters" question-step node — the intra-phase expansion of
+              the manifest's Phase A/B/F question battery. Same graphs as before. */}
+          <h2 style={{ margin: "0 0 4px", fontSize: 15, color: "#6ea8fe" }}>
+            Drill-downs under <code style={{ fontFamily: MONO }}>{CHARACTERS_STEP_ID}</code>
+          </h2>
+          <p style={{ margin: "0 0 16px", fontSize: 12, color: "#6e7681", maxWidth: 920 }}>
+            Per-phase question batteries hung as registry-keyed drill-downs under the manifest
+            <code style={{ fontFamily: MONO }}> {CHARACTERS_STEP_ID}</code> step.
+          </p>
+          {charactersDrillDowns.map(({ graph, error, title, registryKey }) => (
             <section key={title} style={{ marginBottom: 28 }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
-                <h2 style={{ margin: 0, fontSize: 15, color: "#6ea8fe" }}>{title}</h2>
-                {graph !== null && (
-                  <span style={{ fontSize: 11.5, color: "#6e7681", fontFamily: MONO }}>
-                    {graph.flowId} · {graph.nodes.length} questions · {graph.edges.length} edges
-                  </span>
-                )}
+                <h3 style={{ margin: 0, fontSize: 14, color: "#adbac7" }}>{title}</h3>
+                <span style={{ fontSize: 11.5, color: "#6e7681", fontFamily: MONO }}>
+                  drill-down key: {registryKey}
+                  {graph !== null && ` · ${graph.flowId} · ${graph.nodes.length} questions · ${graph.edges.length} edges`}
+                </span>
               </div>
               {error !== null && (
                 <div style={{ color: "#ff9492", fontFamily: MONO, fontSize: 12, padding: 12, border: "1px solid #763a3a", borderRadius: 6 }}>
