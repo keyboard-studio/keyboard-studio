@@ -1,9 +1,15 @@
 // Spec 022 — orthographyUrl retention test (FR-008, SC-005).
 //
-// With the full Phase A demoted to the library, `orthographyUrl` capture is
-// retained on the canonical surface via captureOrthographyUrl(), reusing the
-// existing provenance.orthographyUrl field (no contracts bump). A default-path run
-// with no orthographyUrl is a clean no-op (the field stays unset, exactly as today).
+// The full non-identity Phase A is demoted to the library in spec 022, so its
+// runtime capture of `orthographyUrl` (PhaseA.tsx:163-164, a linguist-agent
+// grounding input) is gone. FR-008 retains that capture on the CANONICAL,
+// LIVE surface — extractIdentityLite (the real StudioShell→IdentityLite default
+// path) — reusing the existing answerString helper and the existing
+// `provenance.orthographyUrl` contract field (no contracts bump, no write routing).
+//
+// These tests assert the value survives a REAL default-path run through
+// extractIdentityLite (not a standalone helper's return value); a run with no
+// orthography answer is a clean no-op (the field stays unset, exactly as today).
 //
 // Test-only: no contracts bump, no write routing, no flag flip (FR-010/FR-011).
 
@@ -11,52 +17,56 @@ import { describe, it, expect } from "vitest";
 import type { SurveyPhaseResult, SurveyAnswer } from "@keyboard-studio/contracts";
 
 import {
-  captureOrthographyUrl,
+  extractIdentityLite,
   ORTHOGRAPHY_URL_QUESTION_ID,
-} from "./orthographyRetention.ts";
+} from "./IdentityLite.tsx";
 
-function textAnswer(questionId: string, value: string): SurveyAnswer {
-  return { questionId, answerType: "text", value };
+/** A minimal completed identity-lite phase result, plus any extra answers. */
+function identityResult(extra: SurveyAnswer[] = []): SurveyPhaseResult {
+  return {
+    phase: "A",
+    answers: [
+      { questionId: "il_language_autonym", answerType: "text", value: "Akan" },
+      { questionId: "il_language_english", answerType: "text", value: "Akan" },
+      { questionId: "il_language_code", answerType: "text", value: "ak" },
+      { questionId: "il_target_script", answerType: "select", value: "Latn" },
+      ...extra,
+    ],
+  };
 }
 
-function phaseResult(answers: SurveyAnswer[]): SurveyPhaseResult {
-  return { phase: "A", answers };
-}
-
-describe("spec 022 — orthographyUrl retention (FR-008)", () => {
-  it("FR-008: retains orthographyUrl when provided, reusing provenance.orthographyUrl (no contracts bump)", () => {
-    const result = phaseResult([
-      textAnswer(ORTHOGRAPHY_URL_QUESTION_ID, "https://example.org/orthography.pdf"),
-    ]);
-    const captured = captureOrthographyUrl(result);
-    expect(captured).toEqual({ orthographyUrl: "https://example.org/orthography.pdf" });
+describe("spec 022 — orthographyUrl retention on the canonical IdentityLite surface (FR-008)", () => {
+  it("FR-008: orthographyUrl SURVIVES a real default-path run through extractIdentityLite", () => {
+    const url = "https://example.org/orthography.pdf";
+    const r = extractIdentityLite(
+      identityResult([
+        { questionId: ORTHOGRAPHY_URL_QUESTION_ID, answerType: "text", value: url },
+      ]),
+    );
+    // It rides on the IdentityLiteResult (the live identity surface), reusing the
+    // existing provenance.orthographyUrl field shape — no contracts bump.
+    expect(r.orthographyUrl).toBe(url);
+    // The rest of the identity result is unchanged (byte-identical otherwise).
+    expect(r.bcp47).toBe("ak-Latn");
+    expect(r.targetScriptRaw).toBe("Latn");
   });
 
   it("SC-005: a default-path run with NO orthographyUrl is a clean no-op (field stays unset)", () => {
-    const result = phaseResult([
-      // Some unrelated answer — no orthography question answered.
-      textAnswer("language_name_english", "Akan"),
-    ]);
-    const captured = captureOrthographyUrl(result);
-    expect(captured).toEqual({});
-    expect("orthographyUrl" in captured).toBe(false);
+    const r = extractIdentityLite(identityResult());
+    expect(r.orthographyUrl).toBeUndefined();
+    expect("orthographyUrl" in r).toBe(false);
   });
 
   it("SC-005: an EMPTY orthographyUrl answer is also a clean no-op (not forced/fabricated)", () => {
-    const result = phaseResult([textAnswer(ORTHOGRAPHY_URL_QUESTION_ID, "")]);
-    expect(captureOrthographyUrl(result)).toEqual({});
+    const r = extractIdentityLite(
+      identityResult([
+        { questionId: ORTHOGRAPHY_URL_QUESTION_ID, answerType: "text", value: "" },
+      ]),
+    );
+    expect(r.orthographyUrl).toBeUndefined();
   });
 
-  it("the captured value merges cleanly into an existing provenance object (caller pattern)", () => {
-    const result = phaseResult([
-      textAnswer(ORTHOGRAPHY_URL_QUESTION_ID, "https://lang.example/ortho"),
-    ]);
-    const provenance = { localizedName: "Akan", ...captureOrthographyUrl(result) };
-    expect(provenance.orthographyUrl).toBe("https://lang.example/ortho");
-    expect(provenance.localizedName).toBe("Akan");
-  });
-
-  it("reuses the SAME questionRegistry id as the reference capture (PhaseA.tsx:163-164)", () => {
+  it("reuses the SAME questionRegistry id as the demoted Phase-A reference capture (PhaseA.tsx:163-164)", () => {
     expect(ORTHOGRAPHY_URL_QUESTION_ID).toBe("provenance_orthography_url");
   });
 });

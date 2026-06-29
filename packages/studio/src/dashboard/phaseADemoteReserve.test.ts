@@ -32,41 +32,9 @@ import { buildModularFlowGraph } from "./buildStepGraph.ts";
 import { loadModularFlow } from "../survey/loadModularFlow.ts";
 import { phaseARegistry } from "../survey/questions/registry.a.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
-
-const DEMOTED_PHASE_A = [
-  // 15 identity
-  "desktop_first_notice",
-  "language_name_autonym",
-  "language_name_english",
-  "iso_code",
-  "region",
-  "primary_script",
-  "writing_direction",
-  "script_not_supported_stub",
-  "layout_family",
-  "script_family",
-  "pa_primary_target",
-  "author_display_name",
-  "author_contact_email",
-  "pa_copyright_holder",
-  "provenance_opt_in",
-  // 15 provenance_*
-  "provenance_requester_name",
-  "provenance_requester_contact",
-  "provenance_requester_affiliation",
-  "provenance_requester_relation",
-  "provenance_community_rep_name",
-  "provenance_community_rep_role",
-  "provenance_community_rep_email",
-  "provenance_speaker_count",
-  "provenance_regions",
-  "provenance_language_status",
-  "provenance_existing_tools",
-  "provenance_orthography_url",
-  "provenance_community_involvement",
-  "provenance_casing_notes",
-  "provenance_additional_notes",
-] as const;
+// The demoted-Phase-A id list is derived ONCE from phase_a_identity.modular.yaml
+// (shared with noDeleteGuardrail.test.ts) — single source of truth.
+import { DEMOTED_PHASE_A } from "../survey/questions/demotedPhaseA.fixture.ts";
 
 describe("spec 022 — demoted Phase A renders as reserve nodes (FR-001/FR-003/SC-001)", () => {
   const graph = buildModularFlowGraph(

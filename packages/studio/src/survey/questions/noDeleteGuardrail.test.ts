@@ -32,58 +32,18 @@ import path from "node:path";
 
 import { questionRegistry } from "./registry.ts";
 import { phaseARegistry } from "./registry.a.ts";
+import {
+  DEMOTED_PHASE_A,
+  DEMOTED_PHASE_A_IDENTITY,
+  DEMOTED_PHASE_A_PROVENANCE,
+} from "./demotedPhaseA.fixture.ts";
 
-// ---------------------------------------------------------------------------
-// The demoted set: the full non-identity Phase A (15 identity + 15 provenance_*).
-// These are exactly the ids in content/flows/phase_a_identity.modular.yaml's
-// `questions` + `provenance_questions` lists. They are demoted to the inert
-// library (reserve); they MUST remain registered + on disk + test-covered.
-//
-// NOTE: the il_* identity-lite head (il_language_autonym, il_language_english,
-// il_language_code, il_target_script, il_script_not_supported) is the CANONICAL
-// identity experience and stays LIVE — it is NOT in the demoted set.
-// ---------------------------------------------------------------------------
-
-const DEMOTED_PHASE_A_IDENTITY = [
-  "desktop_first_notice",
-  "language_name_autonym",
-  "language_name_english",
-  "iso_code",
-  "region",
-  "primary_script",
-  "writing_direction",
-  "script_not_supported_stub",
-  "layout_family",
-  "script_family",
-  "pa_primary_target",
-  "author_display_name",
-  "author_contact_email",
-  "pa_copyright_holder",
-  "provenance_opt_in",
-] as const;
-
-const DEMOTED_PHASE_A_PROVENANCE = [
-  "provenance_requester_name",
-  "provenance_requester_contact",
-  "provenance_requester_affiliation",
-  "provenance_requester_relation",
-  "provenance_community_rep_name",
-  "provenance_community_rep_role",
-  "provenance_community_rep_email",
-  "provenance_speaker_count",
-  "provenance_regions",
-  "provenance_language_status",
-  "provenance_existing_tools",
-  "provenance_orthography_url",
-  "provenance_community_involvement",
-  "provenance_casing_notes",
-  "provenance_additional_notes",
-] as const;
-
-const DEMOTED_PHASE_A = [
-  ...DEMOTED_PHASE_A_IDENTITY,
-  ...DEMOTED_PHASE_A_PROVENANCE,
-] as const;
+// The demoted set: the full non-identity Phase A (15 identity + 15 provenance_*),
+// derived ONCE from content/flows/phase_a_identity.modular.yaml (demotedPhaseA.fixture.ts)
+// so this guardrail and the reserve-node assertion share a single source of truth.
+// They are demoted to the inert library (reserve); they MUST remain registered + on
+// disk + test-covered. NOTE: the il_* identity-lite head is the CANONICAL identity
+// experience and stays LIVE — it is NOT in the demoted set.
 
 // Resolve the on-disk module dir (./a/) and the mirrored test dir relative to
 // THIS file (packages/studio/src/survey/questions/noDeleteGuardrail.test.ts).

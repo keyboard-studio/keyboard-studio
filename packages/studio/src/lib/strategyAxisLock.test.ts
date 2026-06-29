@@ -24,7 +24,8 @@
 import { describe, it, expect } from "vitest";
 import { selectStrategy } from "@keyboard-studio/engine";
 import { mergePhaseResults } from "@keyboard-studio/contracts";
-import type { DiscoveryAxisVector, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { DiscoveryAxisVector, SurveyPhaseResult, BaseKeyboard } from "@keyboard-studio/contracts";
+import { getPatternLibraryService } from "./browserPatternLibrary.ts";
 
 // ---------------------------------------------------------------------------
 // §7.5 exemplar rows — the full-axis-vector inputs and their LOCKED selectStrategy
@@ -121,20 +122,56 @@ describe("spec 022 — default build-list path: the A1/A3/A4 gap is pre-existing
     expect(session.axes.scriptClass).toBe("alphabetic");
   });
 
-  it("the partial vector is NOT a complete DiscoveryAxisVector (filterFor falls back to appliesTo, not selectStrategy)", () => {
+  // The Latin base the gallery ranks against (mirrors browserPatternLibrary.test.ts).
+  const base: BaseKeyboard = {
+    id: "basic_kbdus",
+    path: "release/b/basic_kbdus",
+    script: "Latn",
+    targets: [] as never[],
+    displayName: "US English",
+    version: "1.0",
+  };
+
+  // The same completeness gate MechanismGallery.tsx:609-618 applies before calling
+  // filterFor: a complete DiscoveryAxisVector requires all 7 core axes present.
+  function asCompleteVectorOrUndefined(
+    axes: Partial<DiscoveryAxisVector>,
+  ): DiscoveryAxisVector | undefined {
+    return axes.scale !== undefined &&
+      axes.scriptClass !== undefined &&
+      axes.phoneticIntuition !== undefined &&
+      axes.diacriticBehavior !== undefined &&
+      axes.multiMode !== undefined &&
+      axes.constraintEnforcement !== undefined &&
+      axes.spareKeyAvailability !== undefined
+      ? (axes as DiscoveryAxisVector)
+      : undefined;
+  }
+
+  it("P1: through the REAL filterFor — the partial default-path vector triggers the appliesTo fallback (no strategy ranking)", async () => {
+    const svc = getPatternLibraryService();
     const session = mergePhaseResults(scriptClassPrior, [defaultPhaseB]);
-    const isComplete =
-      session.axes.scale !== undefined &&
-      session.axes.scriptClass !== undefined &&
-      session.axes.phoneticIntuition !== undefined &&
-      session.axes.diacriticBehavior !== undefined &&
-      session.axes.multiMode !== undefined &&
-      session.axes.constraintEnforcement !== undefined &&
-      session.axes.spareKeyAvailability !== undefined;
-    // The pre-existing gap: the default-path vector is incomplete, exactly as today.
-    // Demoting the orphaned Phase A (which never elicited A1/A3/A4 either) does not
-    // change this — it is byte-identical default-path behavior.
-    expect(isComplete).toBe(false);
+
+    // Default path: incomplete vector → gate yields undefined → filterFor uses the
+    // appliesTo fallback (NOT selectStrategy). Proven via the REAL service so a
+    // future default-fill change (e.g. completing the vector from the script-class
+    // prior) would flip these reasons and go RED here.
+    const defaultMatches = await svc.filterFor(base, asCompleteVectorOrUndefined(session.axes));
+    expect(defaultMatches.length).toBeGreaterThan(0);
+    expect(
+      defaultMatches.every((m) => m.reason === "appliesTo-match"),
+      "default-path matches must ALL be appliesTo-match (no primary/secondary strategy ranking)",
+    ).toBe(true);
+
+    // Contrast: a COMPLETE vector DOES drive selectStrategy — at least one match is
+    // strategy-ranked. This proves the appliesTo fallback above is the gap, not a
+    // catalog quirk.
+    const complete: DiscoveryAxisVector = A({ phoneticIntuition: "strong", scale: "medium" });
+    const rankedMatches = await svc.filterFor(base, complete);
+    expect(
+      rankedMatches.some((m) => m.reason === "primary-strategy" || m.reason === "secondary-strategy"),
+      "a complete vector must produce at least one strategy-ranked match",
+    ).toBe(true);
   });
 
   it("confirmedInventory (the only default-path output) is unchanged by axis gap", () => {

@@ -26,16 +26,23 @@
 > (FR-006/FR-007); the `orthographyUrl` retention (FR-008); and spec-015/016 guardrails
 > stay green **unmodified** (FR-009/FR-010).
 >
-> **Implementation note (open item I-2):** the Phase-A demotion mechanism is to drop
-> `phase_a_identity.modular.yaml` from the active flow-source set (`renderedNodeSet.ts`
-> `FLOW_SOURCES`) so its modules become registry-only reserve (they already render as
-> reserve in the identity-lite drill-down). This collides with spec-017's prefill
-> drill-down, whose `registryKey: "primary_script"` (`drillDownDeclarations.ts:90`) is a
-> live Phase-A identity module that spec-017 `prefill.test.ts` FR-014 §2.2(b) asserts
-> reachable via the survey `resolveNext` walk over `FLOW_SOURCES`. Resolving the
-> Phase-A→reserve move therefore requires a spec-017-touching decision (re-anchor prefill,
-> or amend that reachability assertion). This is flagged for the lead, not silently
-> resolved here.
+> **Implementation note (LANDED — was open item I-2, now resolved):** the Phase-A
+> demotion mechanism is to drop `phase_a_identity.modular.yaml` from the active
+> flow-source set (`renderedNodeSet.ts` `FLOW_SOURCES`) so its 30 modules become
+> registry-only reserve (`kind:"library-not-in-flow"`) via `computeReserveNodes` in the
+> identity-lite drill-down. This collided with spec-017's prefill drill-down, whose
+> `registryKey` was `primary_script` — itself a vestigial Phase-A module held in the
+> flow ONLY to satisfy 017's anchor. **Resolution (Matt-approved, landed):** re-anchor
+> 017's prefill drill-down to the **live** identity-lite equivalent `il_target_script`
+> (the script-capture question on the real StudioShell→IdentityLite path —
+> `questions/a/il_target_script.ts`; the live functional replacement for the demoted
+> `primary_script`), then drop `phase_a_identity` from `FLOW_SOURCES`. `prefill.test.ts`
+> FR-014 §2.2(b) is updated to assert the live `il_target_script` anchor is reachable
+> AND that `primary_script` is now unreachable (demotion proven). The header.bcp47 input
+> stays C5-satisfiable via the `charactersStep` subsumption write (DEC-D1), unchanged.
+> `orthographyUrl` retention (FR-008) is wired into the live `extractIdentityLite`
+> (`IdentityLite.tsx`), reusing the existing `answerString` helper and the existing
+> `provenance.orthographyUrl` field (no contracts bump). **FR-001 and FR-008 are MET.**
 
 **Feature Branch**: `speckit/question-unification-phase1-specs`
 
@@ -162,7 +169,7 @@ A studio engineer can ship this demotion with a **no-delete CI assertion** confi
 
 **The demotion to reserve/library (US1)**
 
-- **FR-001**: The full non-identity Phase A (15 identity + 15 `provenance_*`, `content/flows/phase_a_identity.modular.yaml`) MUST be demoted into the **inert library** — absent from the active default flow ordering and rendered as **reserve nodes** via `computeReserveNodes` (`dashboard/buildStepGraph.ts:150-182`) on the `buildModularFlowGraph` registry-vs-YAML diff path. `identity_lite` is the canonical identity experience (§6 decision 3, RESOLVED). This spec MUST NOT wire `PhaseA` back into `StudioShell` (`StudioShell.tsx:18`) — the revival alternative is rejected.
+- **FR-001 (MET):** The full non-identity Phase A (15 identity + 15 `provenance_*`, `content/flows/phase_a_identity.modular.yaml`) MUST be demoted into the **inert library** — absent from the active default flow ordering and rendered as **reserve nodes** via `computeReserveNodes` (`dashboard/buildStepGraph.ts:150-182`) on the `buildModularFlowGraph` registry-vs-YAML diff path. `identity_lite` is the canonical identity experience (§6 decision 3, RESOLVED). This spec MUST NOT wire `PhaseA` back into `StudioShell` (`StudioShell.tsx:18`) — the revival alternative is rejected. **Landed:** `renderedNodeSet.ts` drops the `phase_a_identity` `FLOW_SOURCES` entry, so the 30 modules render as `library-not-in-flow` reserve in the identity-lite drill-down and are no longer in `collectRenderedNodeIds` / the reachable set; spec-017's prefill anchor moved off `primary_script` to the live `il_target_script` to keep the 016/017 guardrails green.
 - **FR-002**: ~~The `pb_*` step-by-step battery MUST be demoted off the default spine while remaining reachable via the IntroChooser gate.~~ **STRUCK (Amendment 2026-06-29, approved Matt + km-verification + km-domain).** "Reachable via the gate" and "renders as reserve" are an internal contradiction against the landed 015/016 model (reserve = `registry − reachable`; `computeReserveNodes` reserveIds = `registryKeys − liveIds`, and gate-reachability == YAML `liveIds` membership == what the live `PhaseB.tsx makeManualOnlyFlow` reads). The `pb_*` battery therefore **stays a live, reachable, non-default branch** off the **mandatory** IntroChooser gate (NOT library content); the gate stays mandatory with no auto-default. Any "off the default spine" re-ordering of `pb_*` is **DEFERRED to the Phase-2 per-element loop** (FR-011, D1).
 - **FR-003**: Demoted modules — **the full non-identity Phase A only** (`pb_*` struck per the Amendment) — MUST render as reserve nodes through `computeReserveNodes` (`kind:"library-not-in-flow"`, `region:"not-yet-ordered"`, `isTerminal:true`) on the `buildModularFlowGraph` registry-vs-YAML diff path — the SAME mechanism the migration plan reserves for library content (§2.2(a): `computeReserveNodes` gets library content from the §2.3 YAML/registry demotions, NOT from the manifest projection). This spec is what first populates the reserve set with real library content (findings (a)).
 
@@ -178,7 +185,7 @@ A studio engineer can ship this demotion with a **no-delete CI assertion** confi
 
 **`orthographyUrl` retention — the Phase-A provenance caveat (§2.3, US3)**
 
-- **FR-008**: `orthographyUrl` capture (a linguist-agent grounding input) MUST be **retained** in `identity_lite` / the documentation stage when the full Phase A is demoted, so the grounding input is not lost. It MUST reuse the **existing** provenance surface (`provenance.orthographyUrl`, `packages/contracts/src/provenance.ts`; reference capture at `PhaseA.tsx:163-164`) — **no contracts bump**, no new field. When no `orthographyUrl` is provided, retention is a clean no-op (the field stays unset, exactly as today).
+- **FR-008 (MET):** `orthographyUrl` capture (a linguist-agent grounding input) MUST be **retained** in `identity_lite` / the documentation stage when the full Phase A is demoted, so the grounding input is not lost. It MUST reuse the **existing** provenance surface (`provenance.orthographyUrl`, `packages/contracts/src/provenance.ts`; reference capture at `PhaseA.tsx:163-164`) — **no contracts bump**, no new field. When no `orthographyUrl` is provided, retention is a clean no-op (the field stays unset, exactly as today). **Landed:** wired into the live `extractIdentityLite` (`IdentityLite.tsx`) — it reads the `provenance_orthography_url` answer via the existing `answerString` helper and surfaces it on `IdentityLiteResult.orthographyUrl` (the canonical identity surface on the real default path); a no-answer run is a clean no-op (field omitted). Verified by `orthographyRetention.test.ts` asserting the value survives a real `extractIdentityLite` run.
 
 **Guardrails & gate (US4)**
 

@@ -46,7 +46,28 @@ export interface IdentityLiteResult {
   supported: boolean;
   /** Routing/A2 prefill confirmations derived from the target script (spec §5). */
   prefill: ScriptPrefill;
+  /**
+   * Spec 022 (FR-008) — orthographyUrl retention on the canonical surface.
+   *
+   * A linguist-agent grounding input (the single most reliable orthography
+   * reference for CharacterDiscoveryService.synthesizeInventory; see
+   * KeyboardProvenance.orthographyUrl, provenance.ts:100-107). The full Phase A
+   * (which used to capture it at PhaseA.tsx:163-164 via `provenance_orthography_url`)
+   * is demoted to the library in spec 022, so the capture is retained here on the
+   * canonical identity-lite / documentation surface, reusing the existing
+   * `provenance.orthographyUrl` field shape (no contracts bump). Present (string)
+   * only when an orthography-URL answer was provided; `undefined` is the clean no-op
+   * (the field stays unset, exactly as today — retention never forces the value).
+   */
+  orthographyUrl?: string;
 }
+
+/**
+ * Spec 022 (FR-008): the questionRegistry id that carries the orthography-URL
+ * answer. Reused verbatim from the demoted Phase-A capture (PhaseA.tsx:163-164) so
+ * the documentation/identity-lite surface can supply it without a new contract.
+ */
+export const ORTHOGRAPHY_URL_QUESTION_ID = "provenance_orthography_url";
 
 /**
  * Build the full BCP47 target tag from an ISO 639 language subtag and a raw
@@ -89,6 +110,10 @@ function answerString(result: SurveyPhaseResult, questionId: string): string {
 export function extractIdentityLite(result: SurveyPhaseResult): IdentityLiteResult {
   const targetScriptRaw = answerString(result, "il_target_script");
   const languageSubtag = answerString(result, "il_language_code");
+  // Spec 022 (FR-008): retain the orthographyUrl grounding input on the canonical
+  // surface, reusing the existing answerString helper. A clean no-op when absent
+  // (empty answer → field omitted, exactly as today — never forced/fabricated).
+  const orthographyUrl = answerString(result, ORTHOGRAPHY_URL_QUESTION_ID);
   return {
     autonym: answerString(result, "il_language_autonym"),
     english: answerString(result, "il_language_english"),
@@ -97,6 +122,7 @@ export function extractIdentityLite(result: SurveyPhaseResult): IdentityLiteResu
     bcp47: buildTargetBcp47(languageSubtag, targetScriptRaw),
     supported: !UNSUPPORTED_SCRIPTS.has(targetScriptRaw),
     prefill: deriveScriptPrefill(targetScriptRaw),
+    ...(orthographyUrl !== "" ? { orthographyUrl } : {}),
   };
 }
 
