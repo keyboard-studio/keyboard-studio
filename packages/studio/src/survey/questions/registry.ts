@@ -27,3 +27,20 @@ export const questionRegistry: Readonly<Record<string, QuestionModule>> = {
   ...phaseBRegistry,
   ...phaseFRegistry,
 } as const;
+
+// ---------------------------------------------------------------------------
+// Spec 017 — registry-keyed drill-down declarations (prefill / pb_build_list).
+//
+// These are DECLARED-ONLY drill-down descriptors hung under the opaque
+// `characters` node — NOT questionRegistry entries and NOT modular-YAML flow
+// nodes (keeping the orphan-input-lint and the spec-016 bijection green). They
+// live in their own module; re-exported here so the drill-down declarations have
+// a home under the question registry, per spec 017 T004/T016/T017.
+// ---------------------------------------------------------------------------
+export {
+  drillDownDeclarations,
+  prefillDrillDown,
+  pbBuildListDrillDown,
+  CHARACTERS_NODE_ID,
+} from "./drillDownDeclarations.ts";
+export type { DrillDownDeclaration, DrillDownOutput } from "./drillDownDeclarations.ts";

@@ -21,7 +21,9 @@
 //     do not need a separate scaffold step. scaffoldStep is removed from this
 //     pool so the pool matches the manifest exactly.
 
+import { irPath } from "@keyboard-studio/contracts";
 import type { EditorStep } from "./types.ts";
+import { CARVE_WRITES, ADD_GALLERY_WRITES, TOUCH_WRITES } from "./editorMutate.ts";
 import { CarveAdapter } from "../editors/adapters/carveAdapter.tsx";
 import { AddPhysicalAdapter } from "../editors/adapters/addPhysicalAdapter.tsx";
 import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
@@ -74,7 +76,11 @@ export const trackStep: EditorStep = {
   title: "Authoring Track",
   spine: true,
   component: TrackStepAdapter,
-  inputs: [],
+  // track reads the session-derived header.bcp47 (array) + the resolved base
+  // display name (header.name) to frame the copy-vs-adapt choice.
+  inputs: [irPath("header", "bcp47"), irPath("header", "name")],
+  // DEC-D2 (Matt 2026-06-29): branch selection only (copy vs adapt) — no IR leaf
+  // in Phase 1, so writes is []. Empty writes orphans no input and never reds C5.
   writes: [],
 };
 
@@ -91,8 +97,13 @@ export const projectNameStep: EditorStep = {
   title: "Project Name",
   spine: true,
   component: ProjectNameStepAdapter,
-  inputs: [],
-  writes: [],
+  // project_name (copy-track fork) reads the session-derived header.bcp47 to
+  // pre-fill, and collects the scaffold params displayName + keyboardId —
+  // expressible as the existing header.name / header.keyboardId IR leaves.
+  // NB: irPath('header','script') is intentionally NOT declared (it does not
+  // exist in KeyboardIR — FR-004).
+  inputs: [irPath("header", "bcp47")],
+  writes: [irPath("header", "name"), irPath("header", "keyboardId")],
 };
 
 // ---------------------------------------------------------------------------
@@ -108,8 +119,16 @@ export const carveStep: EditorStep = {
   title: "Carve Keys",
   spine: true,
   component: CarveAdapter,
+  // Carve's deletion overlay reads and rewrites the same groups[]/stores[]/raw[]
+  // arrays (the surviving carve surface) — a self-read, not an upstream-producer
+  // dependency. Declaring those coarse paths as manifest-graph INPUTS would form a
+  // carve<->mechanisms<->touch C2 data cycle (all three read+write groups/stores
+  // at array granularity), so inputs stays [] in P1: the base layout has no
+  // distinct manifest producer to depend on, and C5 needs no producer for a path a
+  // step also writes. The load-bearing FR-002 contract is the `writes` set below.
   inputs: [],
-  writes: [],
+  // CARVE_WRITES (editorMutate.ts:42-46): groups[] / stores[] / raw[].
+  writes: [...CARVE_WRITES],
 };
 
 /**
@@ -123,8 +142,12 @@ export const mechanismsStep: EditorStep = {
   spine: true,
   component: AddPhysicalAdapter,
   surface: "physical",
+  // Mechanisms assigns onto the base layout groups[]/stores[] it also writes — a
+  // self-read. As with carve, declaring those coarse paths as inputs would form a
+  // C2 data cycle, so inputs stays [] in P1; the FR-002 contract is the `writes`
+  // set (ADD_GALLERY_WRITES, editorMutate.ts:203-206): groups[] / stores[].
   inputs: [],
-  writes: [],
+  writes: [...ADD_GALLERY_WRITES],
 };
 
 /**
@@ -155,8 +178,14 @@ export const touchStep: EditorStep = {
   spine: true,
   component: AddTouchAdapter,
   surface: "touch",
+  // Touch seeds from the locked physical layout (groups[]/stores[]) that
+  // carve/mechanisms produce; declaring those as inputs would form a C2 data
+  // cycle with carve/mechanisms (which read+write the same arrays), so inputs
+  // stays [] in P1. The FR-002 contract is the `writes` set below.
   inputs: [],
-  writes: [],
+  // TOUCH_WRITES (editorMutate.ts:172): touchLayout.platforms[].layers[].rows[].keys[]
+  // (+ touchLayout.nodeIds[]).
+  writes: [...TOUCH_WRITES],
 };
 
 // ---------------------------------------------------------------------------
