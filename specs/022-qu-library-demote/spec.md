@@ -23,8 +23,11 @@
 > FR-003/FR-009 are struck. **Kept in scope:** demote the already-orphaned **full
 > non-identity Phase A** (15 identity + 15 `provenance_*`) to library/reserve; the
 > no-delete CI guardrail (FR-005); the §7.5 strategy-axis regression lock
-> (FR-006/FR-007); the `orthographyUrl` retention (FR-008); and spec-015/016 guardrails
-> stay green **unmodified** (FR-009/FR-010).
+> (FR-006/FR-007); and spec-015/016 guardrails stay green **unmodified**
+> (FR-009/FR-010). **`orthographyUrl` retention (FR-008) is DEFERRED** — it was never
+> captured on the live IdentityLite path (only on the demoted Phase A), so the demotion
+> loses no live capture; capturing it live needs a new live question, out of scope here
+> (see FR-008 / FR-011 below).
 >
 > **Implementation note (LANDED — was open item I-2, now resolved):** the Phase-A
 > demotion mechanism is to drop `phase_a_identity.modular.yaml` from the active
@@ -40,9 +43,20 @@
 > FR-014 §2.2(b) is updated to assert the live `il_target_script` anchor is reachable
 > AND that `primary_script` is now unreachable (demotion proven). The header.bcp47 input
 > stays C5-satisfiable via the `charactersStep` subsumption write (DEC-D1), unchanged.
-> `orthographyUrl` retention (FR-008) is wired into the live `extractIdentityLite`
-> (`IdentityLite.tsx`), reusing the existing `answerString` helper and the existing
-> `provenance.orthographyUrl` field (no contracts bump). **FR-001 and FR-008 are MET.**
+> **FR-001 is MET.**
+>
+> **`orthographyUrl` retention (FR-008) — DEFERRED (Matt-approved follow-up, not
+> shipped).** Investigation (km-verification) established that `orthographyUrl`
+> (`provenance_orthography_url`) was only ever captured on the now-demoted **Phase A**
+> path (`PhaseA.tsx:163-164`); it is **NOT** on the live `identity_lite.modular.yaml`
+> flow (only the five `il_*` questions are), and `StudioShell.contextFromIdentity` never
+> consumed it. So demoting Phase A loses **no live capture** — there is nothing
+> user-facing to retain. Genuinely capturing it on the live survey would require adding
+> a **new live orthography-URL question** to the identity-lite / documentation flow,
+> which is out of scope for this demotion spec. FR-008 is therefore **deferred** to the
+> future question-revival work (Matt: "eventually we will want some of those
+> questions") — the same treatment as the `pb_*` battery. No inert capture code is
+> shipped. See FR-011 (non-goals).
 
 **Feature Branch**: `speckit/question-unification-phase1-specs`
 
@@ -120,7 +134,9 @@ A km-strategy maintainer wants `selectStrategy` output for the **default build-l
 
 ---
 
-### User Story 3 - `orthographyUrl` capture is retained when Phase A is demoted (Priority: P2)
+### User Story 3 - `orthographyUrl` capture (Priority: P2) — DEFERRED (see FR-008)
+
+> **DEFERRED (Matt-approved):** This story is **not shipped** by this spec. `orthographyUrl` (`provenance_orthography_url`) was only ever captured on the now-demoted **Phase A** path — it was **never** on the live `identity_lite.modular.yaml` flow nor consumed by `StudioShell.contextFromIdentity`. So demoting Phase A loses **no live capture**, and there is nothing user-facing to retain. Live capture would need a **new live orthography-URL question**, out of scope here; deferred to the future question-revival work. The acceptance text below is retained for historical context but is **superseded** by the FR-008 deferral. No inert capture code is shipped.
 
 A linguist-agent consumer wants `orthographyUrl` capture retained when the full Phase A is demoted, so the linguist-agent grounding input is **not lost** even though the `provenance_*` modules go to the inert library.
 
@@ -185,7 +201,7 @@ A studio engineer can ship this demotion with a **no-delete CI assertion** confi
 
 **`orthographyUrl` retention — the Phase-A provenance caveat (§2.3, US3)**
 
-- **FR-008 (MET):** `orthographyUrl` capture (a linguist-agent grounding input) MUST be **retained** in `identity_lite` / the documentation stage when the full Phase A is demoted, so the grounding input is not lost. It MUST reuse the **existing** provenance surface (`provenance.orthographyUrl`, `packages/contracts/src/provenance.ts`; reference capture at `PhaseA.tsx:163-164`) — **no contracts bump**, no new field. When no `orthographyUrl` is provided, retention is a clean no-op (the field stays unset, exactly as today). **Landed:** wired into the live `extractIdentityLite` (`IdentityLite.tsx`) — it reads the `provenance_orthography_url` answer via the existing `answerString` helper and surfaces it on `IdentityLiteResult.orthographyUrl` (the canonical identity surface on the real default path); a no-answer run is a clean no-op (field omitted). Verified by `orthographyRetention.test.ts` asserting the value survives a real `extractIdentityLite` run.
+- **FR-008 (DEFERRED — not shipped this spec):** ~~`orthographyUrl` capture MUST be retained in `identity_lite` / the documentation stage when the full Phase A is demoted.~~ **Deferred** to the future question-revival work, with the factual reason: `orthographyUrl` (`provenance_orthography_url`) was only ever captured on the now-demoted **Phase A** path (`PhaseA.tsx:163-164`). It is **NOT** present on the live `identity_lite.modular.yaml` flow (only the five `il_*` questions are) and was never consumed by `StudioShell.contextFromIdentity`, so the demotion **does not lose a live capture** — there is nothing user-facing to retain. Genuinely capturing it on the live survey requires adding a **new live orthography-URL question** to the identity-lite / documentation flow, which is **out of scope** for this demotion spec. The existing `provenance.orthographyUrl` contract field (`packages/contracts/src/provenance.ts`) stays available for that future work — no contracts bump, and **no inert capture code is shipped** here. (Cross-reference: the Phase-2 / question-revival follow-up — Matt: "eventually we will want some of those questions.")
 
 **Guardrails & gate (US4)**
 
@@ -194,7 +210,7 @@ A studio engineer can ship this demotion with a **no-delete CI assertion** confi
 
 **Out of scope (explicit non-goals)**
 
-- **FR-011**: This feature MUST NOT **delete** any module (no-delete guardrail §4) or unregister any id; MUST NOT demote, re-order, or take the `pb_*` step-by-step battery off the default spine — the `pb_*` battery stays a **live, reachable, non-default branch** off the mandatory IntroChooser gate, and any `pb_*` re-ordering is **DEFERRED to the Phase-2 per-element loop** (Amendment 2026-06-29); MUST NOT re-incorporate non-Latin script-specific mark/joining/order sub-series — the non-Latin default-flip precondition (the loop must subsume `pb_*` script semantics) is a **Phase-2 gate** (D1) and Phase 1 does **not** flip a non-Latin default to a path that drops those sub-series; MUST NOT build the per-element loop or re-elicit A1/A3/A4 inline (Phase 2); MUST NOT wire `PhaseA` back into `StudioShell` (the revival alternative is rejected; Matt resolved demote); and MUST NOT introduce new write routing, `mutate()`, or a contracts bump — behavior MUST be byte-identical on the default path.
+- **FR-011**: This feature MUST NOT **delete** any module (no-delete guardrail §4) or unregister any id; MUST NOT demote, re-order, or take the `pb_*` step-by-step battery off the default spine — the `pb_*` battery stays a **live, reachable, non-default branch** off the mandatory IntroChooser gate, and any `pb_*` re-ordering is **DEFERRED to the Phase-2 per-element loop** (Amendment 2026-06-29); MUST NOT add a new live `orthographyUrl` capture question to the identity-lite / documentation flow — `orthographyUrl` retention (FR-008) is **DEFERRED** (it was never on the live path, so the demotion loses no live capture; live capture needs a new question, out of scope here) and **no inert capture code is shipped**; MUST NOT re-incorporate non-Latin script-specific mark/joining/order sub-series — the non-Latin default-flip precondition (the loop must subsume `pb_*` script semantics) is a **Phase-2 gate** (D1) and Phase 1 does **not** flip a non-Latin default to a path that drops those sub-series; MUST NOT build the per-element loop or re-elicit A1/A3/A4 inline (Phase 2); MUST NOT wire `PhaseA` back into `StudioShell` (the revival alternative is rejected; Matt resolved demote); and MUST NOT introduce new write routing, `mutate()`, or a contracts bump — behavior MUST be byte-identical on the default path.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -220,7 +236,7 @@ A studio engineer can ship this demotion with a **no-delete CI assertion** confi
 - **SC-002**: The `pb_*` battery remains **reachable** via the mandatory IntroChooser discovery-method gate (the step-by-step branch); no auto-default skipping the gate is introduced; the `pb_*` battery is unreachable on the *default* spine only.
 - **SC-003**: A **no-delete CI assertion** confirms the demoted `pb_*` and Phase A ids stay **registered** (sub-registry key) + **on disk** + **test-covered**, and turns **RED** when a demoted module is deleted or unregistered (demonstrated against a local deletion/unregistration injection).
 - **SC-004**: `selectStrategy` output for the **default build-list path** is **byte-identical** before/after the demotion on every §7.5 exemplar row (axisFills-driven; A1/A3/A4 default-filled from the script-class prior) — the demotion is provably **not a regression** on the default path.
-- **SC-005**: `orthographyUrl` capture is **retained** in `identity_lite` / the documentation stage (reusing `provenance.orthographyUrl`, no contracts bump); a default-path run with no `orthographyUrl` is a clean no-op.
+- **SC-005 (DEFERRED):** ~~`orthographyUrl` capture is retained in `identity_lite` / the documentation stage.~~ **Deferred** (see FR-008): `orthographyUrl` was never captured on the live IdentityLite path (only on the demoted Phase A), so the demotion loses no live capture; live capture needs a new live question, out of scope here. No inert capture code is shipped.
 - **SC-006**: The spec-016 drift guardrail stays **green** — demoted-but-registered modules are **reserve** (rendered by `computeReserveNodes`), not **orphan**; the rendered ⟺ runtime bijection holds over the reachable set.
 - **SC-007**: `pnpm typecheck` + studio/contracts `vitest` (incl. the no-delete assertion + the §7.5 strategy-axis lock) + `pnpm depcruise` pass; a repo audit finds **zero** deleted/unregistered modules, **zero** new IR write route, **zero** contracts bump, and **zero** `PhaseA`-into-`StudioShell` wiring.
 

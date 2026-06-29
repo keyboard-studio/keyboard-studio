@@ -31,10 +31,18 @@ Phase-1 invariants in force for every task: **no new write routing / no `mutate(
 - [ ] **T014** Assert `selectStrategy` output (recommended primary + secondaries) is **identical** to the T005 pre-demotion baseline on **every** §7.5 exemplar row — the demotion removes only the *non-default* `pb_*` elicitation path the default path never traversed, so it is **not a regression** (FR-006/FR-007/SC-004).
 - [ ] **T015** Confirm the gap (A1/A3/A4 default-filled, `axisFills`-recorded) is the **same** gap that exists on today's default path — demotion neither introduces nor widens it; per-character re-elicitation (D2) is **deferred to Phase 2** and is NOT added here (FR-007).
 
-## E. `orthographyUrl` retention (§2.3 Phase-A provenance caveat, FR-008) — third artifact
+## E. `orthographyUrl` retention (§2.3 Phase-A provenance caveat, FR-008) — DEFERRED
 
-- [ ] **T016** Retain `orthographyUrl` capture in `identity_lite` / the documentation stage (reuse the existing `provenance.orthographyUrl` field, `packages/contracts/src/provenance.ts`; reference `PhaseA.tsx:163-164`). If the canonical surface already captures it, reduce this to a confirming test. **No new field; no contracts bump** (FR-008).
-- [ ] **T017** Add the retention test: with Phase A demoted, assert `orthographyUrl` is captured on the canonical surface (the grounding input is not lost); a default-path run with **no** `orthographyUrl` is a **clean no-op** (the field stays unset, exactly as today) (FR-008/SC-005).
+> **DEFERRED (Matt-approved):** `orthographyUrl` (`provenance_orthography_url`) was only
+> ever captured on the now-demoted **Phase A** path — it is NOT on the live
+> `identity_lite.modular.yaml` flow and was never consumed by
+> `StudioShell.contextFromIdentity`. Demoting Phase A therefore loses **no live capture**.
+> Genuinely capturing it on the live survey needs a **new live orthography-URL question**,
+> which is out of scope for this demotion spec. T016/T017 are **NOT done here** — no inert
+> capture code is shipped; deferred to the future question-revival work.
+
+- [ ] ~~**T016** Retain `orthographyUrl` capture on the canonical surface.~~ **DEFERRED** (FR-008) — was never on the live path; live capture needs a new live question, out of scope. No inert code shipped.
+- [ ] ~~**T017** Add the retention test.~~ **DEFERRED** (FR-008) — a meaningful test requires a live capture surface that does not exist yet; a synthetic-input test would be a false "real default-path" claim, so it is not added.
 
 ## F. Reserve-node + reachability confirmation (additive assertions — do NOT repurpose spec-015/016 tests)
 
@@ -53,7 +61,7 @@ Phase-1 invariants in force for every task: **no new write routing / no `mutate(
 - [ ] **T024** Run the spec-016 **drift guardrail**; confirm **green** — demoted-but-registered modules are **reserve** (rendered by `computeReserveNodes`), NOT **orphan**; the rendered ⟺ runtime bijection holds over the **reachable** set (a registered-but-unreachable reserve module is rendered by the separate reserve mechanism — 016 edge case) (FR-009/FR-010/SC-006).
 - [ ] **T025** Confirm the **no-delete CI assertion** (T010–T012) and the **§7.5 strategy-axis lock** (T013–T014) both stay **green** (FR-005/FR-006/FR-010/SC-003/SC-004).
 - [ ] **T026** `pnpm typecheck` — green (SC-007).
-- [ ] **T027** Studio + contracts `vitest` — green, including the no-delete assertion (T010–T012), the §7.5 strategy-axis lock (T013–T015), and the `orthographyUrl` retention test (T016–T017); the spec-015 map-projection and spec-016 drift-guardrail tests still pass (FR-010/SC-003/SC-004/SC-005/SC-006).
+- [ ] **T027** Studio + contracts `vitest` — green, including the no-delete assertion (T010–T012) and the §7.5 strategy-axis lock (T013–T015); the spec-015 map-projection, spec-016 drift-guardrail, and spec-017 prefill (re-anchored) tests still pass (FR-010/SC-003/SC-004/SC-006). (FR-008 `orthographyUrl` retention test is DEFERRED — not added; see §E.)
 - [ ] **T028** `pnpm depcruise` — green; assert **no new `dashboard → stores` or `dashboard → editors` edge** (FR-010/SC-007).
-- [ ] **T029** Flag-off / byte-identical check — with `SHOW_FLOWMAP` off (`StudioShell.tsx:84`), `FlowMapView` does not mount; the SPA still hand-places the live components and the default-path behavior (build-list inventory, `selectStrategy` output, `orthographyUrl` capture) is byte-identical to today; confirm the no-delete CI assertion is flag-independent and still runs (FR-010/SC-004/SC-005).
-- [ ] **T030** Manual dev-build smoke (flag on): open the Flow Map → Survey flow tab; confirm the full Phase A and the off-branch `pb_*` modules render as reserve nodes (`library-not-in-flow`) absent from the active default ordering; then in the SPA enter Phase B, confirm the IntroChooser renders (no auto-default) and the step-by-step branch still reaches the `pb_*` battery (reachable, not removed); confirm the default build-list path's strategy output and `orthographyUrl` capture are unchanged (SC-001/SC-002/SC-004/SC-005).
+- [ ] **T029** Flag-off / byte-identical check — with `SHOW_FLOWMAP` off (`StudioShell.tsx:84`), `FlowMapView` does not mount; the SPA still hand-places the live components and the default-path behavior (build-list inventory, `selectStrategy` output) is byte-identical to today; confirm the no-delete CI assertion is flag-independent and still runs (FR-010/SC-004). (No `orthographyUrl` live-capture exists to change — FR-008 deferred.)
+- [ ] **T030** Manual dev-build smoke (flag on): open the Flow Map → Survey flow tab; confirm the full Phase A renders as reserve nodes (`library-not-in-flow`) absent from the active default ordering, while the `pb_*` battery stays a live reachable non-default branch off the IntroChooser gate (pb_* NOT demoted — Amendment); confirm the default build-list path's strategy output is unchanged (SC-001/SC-002/SC-004).
