@@ -17,24 +17,19 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 
-// Flow sources — every section loads its *.modular.yaml manifest (the same
-// source the runtime survey uses via loadModularFlow).  Do NOT import the
-// legacy *.yaml files here — they are retired and will be deleted.
+// Identity-lite is read directly here for the Script-routing section (§9). The
+// flow drill-down sources (FLOW_SOURCES) and the rendered-node-id composition
+// live in the shared dashboard/renderedNodeSet.ts helper (spec 016, D2a), so
+// the Flow Map and the drift guardrail consume ONE composition. Do NOT import
+// the legacy *.yaml files here — they are retired and will be deleted.
 import identityLiteModularRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
-import phaseAModularRaw from "../../../../content/flows/phase_a_identity.modular.yaml?raw";
-import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modular.yaml?raw";
-import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
 
-import { buildModularFlowGraph } from "./buildStepGraph.ts";
 import {
   buildManifestProjection,
   attachDrillDowns,
   CHARACTERS_STEP_ID,
 } from "./manifestProjection.ts";
-import { phaseARegistry } from "../survey/questions/registry.a.ts";
-import { phaseBRegistry } from "../survey/questions/registry.b.ts";
-import { phaseFRegistry } from "../survey/questions/registry.f.ts";
-import type { QuestionModule } from "../survey/types.ts";
+import { FLOW_SOURCES, safeBuild } from "./renderedNodeSet.ts";
 import { FlowGraphView } from "./FlowGraphView.tsx";
 import { StrategyTreeView } from "./StrategyTreeView.tsx";
 import { ScriptRoutingView } from "./ScriptRoutingView.tsx";
@@ -42,31 +37,6 @@ import { MONO, SANS } from "./tokens.ts";
 import type { CompletenessReport } from "./completeness.ts";
 
 type Section = "flow" | "routing" | "strategy" | "completeness";
-
-/** Single shape for all flow source entries — all sections now use the modular loader. */
-interface FlowSourceEntry {
-  raw: string;
-  title: string;
-  registry: Readonly<Record<string, QuestionModule>>;
-}
-
-const FLOW_SOURCES: ReadonlyArray<FlowSourceEntry> = [
-  // Identity-lite uses the Phase A registry (il_* modules are registered there).
-  { raw: identityLiteModularRaw, title: "Identity-lite (Phase A head)", registry: phaseARegistry },
-  { raw: phaseAModularRaw, title: "Phase A — identity", registry: phaseARegistry },
-  { raw: phaseBModularRaw, title: "Phase B — character discovery", registry: phaseBRegistry },
-  { raw: phaseFModularRaw, title: "Phase F — help docs", registry: phaseFRegistry },
-];
-
-function safeBuild(entry: FlowSourceEntry) {
-  try {
-    const graph = buildModularFlowGraph(entry.raw, entry.title, entry.registry);
-    return { graph, error: null as string | null };
-  } catch (err) {
-    // FR-011: fail visibly; never fall back to the legacy YAML for a modular source.
-    return { graph: null, error: err instanceof Error ? err.message : String(err) };
-  }
-}
 
 function LegendItem({ swatch, border, dashed, label }: { swatch: string; border: string; dashed?: boolean; label: string }) {
   return (
@@ -315,7 +285,7 @@ export interface FlowMapViewProps {
 
 export function FlowMapView({ completeness }: FlowMapViewProps) {
   const [section, setSection] = useState<Section>("flow");
-  const flows = useMemo(() => FLOW_SOURCES.map((f) => ({ ...safeBuild(f), title: f.title })), []);
+  const flows = useMemo(() => FLOW_SOURCES.map(safeBuild), []);
 
   // Spec 015 (DEC-001 = Variant A): project the manifest spine onto a FlowGraph
   // via the StepGraph → FlowGraph/GraphNode adapter, reusing FlowGraphView /
