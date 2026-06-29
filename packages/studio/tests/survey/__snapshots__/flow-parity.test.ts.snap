@@ -172,7 +172,7 @@ exports[`flow-parity: phase_a_identity — questions[] > projected fields are st
         "goto": "script_not_supported_stub",
       },
       {
-        "condition": "value == 'Arab' or value == 'Hebr'",
+        "condition": "value == 'Arab' or value == 'Hebr' or value == 'Thaa' or value == 'Nkoo' or value == 'Adlm' or value == 'Syrc' or value == 'Mand' or value == 'Samr' or value == 'Rohg'",
         "goto": "writing_direction",
       },
       {
@@ -196,6 +196,34 @@ exports[`flow-parity: phase_a_identity — questions[] > projected fields are st
       {
         "label": "Hebrew",
         "value": "Hebr",
+      },
+      {
+        "label": "Thaana (Maldivian / Dhivehi)",
+        "value": "Thaa",
+      },
+      {
+        "label": "N'Ko (Manding languages of West Africa)",
+        "value": "Nkoo",
+      },
+      {
+        "label": "Adlam (Fulani / Pular)",
+        "value": "Adlm",
+      },
+      {
+        "label": "Syriac",
+        "value": "Syrc",
+      },
+      {
+        "label": "Mandaic",
+        "value": "Mand",
+      },
+      {
+        "label": "Samaritan",
+        "value": "Samr",
+      },
+      {
+        "label": "Hanifi Rohingya",
+        "value": "Rohg",
       },
       {
         "label": "Devanagari (used for Hindi, Nepali, Marathi, and others)",

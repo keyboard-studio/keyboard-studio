@@ -133,15 +133,7 @@ exports[`buildModularFlowGraph — Phase B honesty (FR-010) > FR-010 Part C — 
   {
     "dangling": false,
     "from": "pb_stacking_marks",
-    "kind": "conditional",
-    "label": "value == 'true'",
-    "to": "pb_mark_style",
-  },
-  {
-    "dangling": false,
-    "from": "pb_stacking_marks",
-    "kind": "default",
-    "label": "(else)",
+    "kind": "linear",
     "to": "pb_mark_style",
   },
   {
