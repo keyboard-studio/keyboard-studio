@@ -20,7 +20,7 @@ Wire `DashboardView`/`FlowMapView` to project the manifest spine onto the render
 
 ## Components / files to touch
 
-- **NEW** `packages/studio/src/dashboard/manifestProjection.ts` (working name) — the adapter. Exports something like `buildManifestProjection(): FlowGraph` (DEC-001 variant A) **or** a `StepGraph`-aware view helper (DEC-001 variant B). Imports `buildManifestStepGraph` from `./buildStepGraph.ts`, types from `./model.ts`, `questionRegistry` from `../survey/questions/registry.ts`. **Imports neither `stores/` nor `editors/`.**
+- **NEW** `packages/studio/src/dashboard/manifestProjection.ts` (working name) — the adapter. Exports `buildManifestProjection(): FlowGraph` (DEC-001 = Variant A, resolved). Imports `buildManifestStepGraph` from `./buildStepGraph.ts`, types from `./model.ts`, `questionRegistry` from `../survey/questions/registry.ts`. **Imports neither `stores/` nor `editors/`.**
 - **EDIT** `packages/studio/src/dashboard/DashboardView.tsx` — render the manifest projection in the Survey-flow section (the `section === "flow"` block, `DashboardView.tsx:354-392`), hanging the existing four `FLOW_SOURCES` modular graphs as registry-keyed drill-downs under their question-step nodes. The four `safeBuild(FLOW_SOURCES)` graphs are retained as the drill-down source; the new top-level ordering is the manifest projection.
 - **NEW** test `packages/studio/src/dashboard/manifestProjection.test.ts` (or co-located in `buildStepGraph.test.ts`) — the §2.5 map-projection test (FR-010).
 - **NO EDIT** to `buildManifestStepGraph`, `computeReserveNodes`, `FlowGraphView`/`layout.ts` model types, `StudioShell.tsx` gating (`SHOW_FLOWMAP` already gates the mount), any `stores/`, `editors/`, `steps/manifest.ts`, or `packages/contracts`.
@@ -33,17 +33,19 @@ Wire `DashboardView`/`FlowMapView` to project the manifest spine onto the render
    - `type` (the `GraphNode.type: FlowQuestionType`) — pick a benign default during planning (the manifest `StepNodeType` is `editor-step|question-step`, not a `FlowQuestionType`); the field is informational for stub nodes. `required`/`engineResolved`/`advisory` default false; `isGate` false; `optionCount` 0.
    - `flowId` — a stable synthetic id for the manifest spine section (e.g. `"manifest"`).
 2. **Edge mapping (`StepGraphEdge` → `GraphEdge`):** spine → `linear`; fork → a branch edge; join → a branch edge back to `joinTarget`. Preserve the manifest ordering (FR-003). `dangling:false` (manifest ids are all known).
-3. **Drill-down attachment (FR-004):** keep the four `buildModularFlowGraph()` graphs; attach each as a drill-down keyed by a `questionRegistry` id under the question-step node it belongs to (e.g. under the `characters` placeholder). In variant A this is a render-time association in `DashboardView`; in variant B the `StepGraph`-aware view nests them. Either way the key is a registry id so a registry/manifest divergence is observable (the seam spec 016's drift guardrail will assert against).
+3. **Drill-down attachment (FR-004):** keep the four `buildModularFlowGraph()` graphs; attach each as a drill-down keyed by a `questionRegistry` id under the question-step node it belongs to (e.g. under the `characters` placeholder). Per DEC-001 = Variant A, this is a render-time association in `DashboardView`. The key is a registry id so a registry/manifest divergence is observable (the seam spec 016's drift guardrail will assert against).
 4. **Flag gate (FR-005, DEC-002):** no change needed beyond confirming `SHOW_FLOWMAP` (`StudioShell.tsx:84`) already gates whether `FlowMapView` mounts. Confirm no finer sub-toggle is added.
 
-### DEC-001 — adapter shape (resolve in this plan before T-impl)
+### DEC-001 — adapter shape → **RESOLVED: Variant A** (Matthew Lee, 2026-06-29)
 
 - **Variant A — standalone adapter → `FlowGraph`, reuse `FlowGraphView`/`layoutFlowGraph`.** Lowest new surface; reuses the existing renderer and its stub palette unchanged. Risk: the manifest spine's fork/join semantics must be expressible as `GraphEdge` kinds.
-- **Variant B — `StepGraph`-aware layout+view variant.** A parallel render path that consumes `StepGraph` directly. More faithful to spine/lock semantics; larger new surface and a second renderer to keep green. **Recommendation: Variant A** unless the fork/join projection proves lossy. Marked `[NEEDS DECISION]` in the spec; lock it here at plan time.
+- **Variant B — `StepGraph`-aware layout+view variant.** A parallel render path that consumes `StepGraph` directly. More faithful to spine/lock semantics; larger new surface and a second renderer to keep green.
 
-### DEC-002 — dev-flag reuse
+**Decision: Variant A** — a standalone `StepGraph` → `FlowGraph`/`GraphNode` adapter consumed by the existing `FlowGraphView`/`layoutFlowGraph`, **no rendering fork**. *Rationale*: lowest new surface and reuses the existing renderer/stub palette unchanged; the manifest fork/join semantics map cleanly onto the existing `GraphEdge` kinds (spine→linear, fork→branch, join→branch-back), so Variant B's parallel render path is unnecessary. The "Components / files to touch" and "Adapter / wiring design" sections above already describe the Variant A implementation.
 
-Confirm `SHOW_FLOWMAP` is the gate and **no new flag** is added. The projection inherits the gate because it lives inside `FlowMapView`, which only mounts when `SHOW_FLOWMAP` is true (`StudioShell.tsx:84,131,1142`). Record the confirmation; do not introduce a sub-toggle.
+### DEC-002 — dev-flag reuse → **RESOLVED: reuse `SHOW_FLOWMAP`** (Matthew Lee, 2026-06-29)
+
+**Decision: reuse the existing `SHOW_FLOWMAP` flag; no new flag is introduced in Phase 1.** The projection inherits the gate because it lives inside `FlowMapView`, which only mounts when `SHOW_FLOWMAP` is true (`StudioShell.tsx:84,131`). No finer sub-toggle is added.
 
 ## Intra-spec sequencing (within spec 015)
 

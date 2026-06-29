@@ -24,10 +24,10 @@
 
 ### Session 2026-06-29
 
-Phase 1 scope was confirmed by Matt (2026-06-29, migration-plan §6): Phase 1 only specs converting the custom/bespoke flow stages into opaque "questions" with valid inputs and outputs. Two items remain genuinely open for this spec and are marked `[NEEDS DECISION]` rather than invented:
+Phase 1 scope was confirmed by Matt (2026-06-29, migration-plan §6): Phase 1 only specs converting the custom/bespoke flow stages into opaque "questions" with valid inputs and outputs. Two items were open for this spec; both are now **RESOLVED** (Matthew Lee, 2026-06-29):
 
-- **DEC-001 — Adapter shape** → `[NEEDS DECISION]` The plan (§2.2(a)) permits **either** a standalone `StepGraph` → `FlowGraph`/`GraphNode` adapter function consumed by the existing `FlowGraphView`/`layoutFlowGraph`, **or** a `StepGraph`-aware layout+view variant that consumes `StepGraph` directly. Pick during planning. Both must satisfy every FR below; the choice is an implementation tradeoff (reuse the existing renderer vs. add a parallel render path), to be resolved in plan.md.
-- **DEC-002 — Dev-flag reuse** → `[NEEDS DECISION]` The existing dev-only flowmap gate is `SHOW_FLOWMAP` in `StudioShell.tsx:84` (`import.meta.env.DEV || import.meta.env.VITE_SHOW_FLOWMAP === "1"`), which already gates whether `FlowMapView` mounts at all. Confirm during planning that the manifest projection is gated by **this same existing flag** and that **no new flag is introduced in Phase 1**. (Open only because the projection could in principle want a finer sub-toggle; the plan should confirm it does not.)
+- **DEC-001 — Adapter shape** → **RESOLVED: Variant A.** Add a standalone `StepGraph` → `FlowGraph`/`GraphNode` adapter function consumed by the existing `FlowGraphView`/`layoutFlowGraph` — no rendering fork. *Rationale*: lowest new surface, reuses the existing renderer and stub palette unchanged; the manifest fork/join semantics map cleanly onto existing `GraphEdge` kinds, so the parallel `StepGraph`-aware render path (Variant B) is unnecessary.
+- **DEC-002 — Dev-flag reuse** → **RESOLVED: reuse the existing `SHOW_FLOWMAP` flag** (`StudioShell.tsx:84`, `import.meta.env.DEV || import.meta.env.VITE_SHOW_FLOWMAP === "1"`), which already gates whether `FlowMapView` mounts. **No new flag is introduced in Phase 1.** *Rationale*: the projection lives inside `FlowMapView` and inherits that gate; no finer sub-toggle is warranted.
 
 No other `[NEEDS CLARIFICATION]` markers remain.
 
@@ -114,14 +114,14 @@ The dashboard maintainer can ship this foundation with **zero** runtime/IR impac
 
 **The adapter (the new projection surface)**
 
-- **FR-001**: The system MUST add a **`StepGraph` → `FlowGraph`/`GraphNode` adapter** (or, per DEC-001, a `StepGraph`-aware layout+view variant) that maps each `buildManifestStepGraph()` (`dashboard/buildStepGraph.ts:237`) node — both `type:'editor-step'` and `type:'question-step'` `StepGraphNode`s — to a renderable `GraphNode` (`dashboard/model.ts:49`). It MUST NOT be a one-line renderer switch: the renderer `FlowGraphView` (`FlowGraphView.tsx:60`) and the layout `layoutFlowGraph` (`layout.ts:60`) consume `FlowGraph`/`GraphNode` only, a different type from the `StepGraph` `buildManifestStepGraph` returns, so a real type adaptation is required.
+- **FR-001**: The system MUST add a **`StepGraph` → `FlowGraph`/`GraphNode` adapter** (per DEC-001 = Variant A: a standalone adapter consumed by the existing `FlowGraphView`/`layoutFlowGraph`, no rendering fork) that maps each `buildManifestStepGraph()` (`dashboard/buildStepGraph.ts:237`) node — both `type:'editor-step'` and `type:'question-step'` `StepGraphNode`s — to a renderable `GraphNode` (`dashboard/model.ts:49`). It MUST NOT be a one-line renderer switch: the renderer `FlowGraphView` (`FlowGraphView.tsx:60`) and the layout `layoutFlowGraph` (`layout.ts:60`) consume `FlowGraph`/`GraphNode` only, a different type from the `StepGraph` `buildManifestStepGraph` returns, so a real type adaptation is required.
 - **FR-002**: The adapter MUST assign **`kind:'stub'`** to each projected editor-step node (and `region:'not-yet-ordered'`, consistent with `model.ts:46`), so the existing "stub (gallery / wizard step)" legend swatch (`DashboardView.tsx:114`) renders against real nodes for the first time. Nothing emits `kind:'stub'` today; the adapter is the sole emitter.
 - **FR-003**: The adapter MUST preserve the manifest spine ordering and fork/join edge structure from `buildManifestStepGraph()` — spine edges between consecutive spine steps, fork edges to `spine:false` steps, join edges back to `joinTarget` — when projecting `StepGraphEdge`s onto the rendered graph's edges.
 - **FR-004**: The adapter MUST hang the per-phase `buildModularFlowGraph()` graphs (the four `FLOW_SOURCES`, `DashboardView.tsx:48-54`) as **registry-keyed drill-downs** under their question-step nodes, with the drill-down key being a `questionRegistry` id (`survey/questions/registry.ts`). The modular graphs MUST continue to render (no node currently shown is dropped).
 
 **Wiring**
 
-- **FR-005**: `DashboardView` (`FlowMapView`, `DashboardView.tsx:311`) MUST consume the adapter to render the Survey-flow section, so the manifest spine is projected onto the rendered map. The wiring MUST be gated by the existing dev-only flowmap flag (`SHOW_FLOWMAP`, `StudioShell.tsx:84`) — pending DEC-002, **no new flag is introduced**.
+- **FR-005**: `DashboardView` (`FlowMapView`, `DashboardView.tsx:311`) MUST consume the adapter to render the Survey-flow section, so the manifest spine is projected onto the rendered map. The wiring MUST be gated by the existing dev-only flowmap flag (`SHOW_FLOWMAP`, `StudioShell.tsx:84`) — per DEC-002 (resolved), **no new flag is introduced**.
 
 **Boundary & read-only invariants**
 

@@ -6,8 +6,8 @@ Phase-1 invariants in force for every task: **no new write routing**, **no contr
 
 ## A. Decisions (resolve before implementation)
 
-- [ ] **T001** Resolve **DEC-001 (adapter shape)**: pick Variant A (standalone `StepGraph` → `FlowGraph` adapter reusing `FlowGraphView`/`layoutFlowGraph`) vs Variant B (`StepGraph`-aware layout+view). Record the choice and rationale in plan.md. Default recommendation: Variant A.
-- [ ] **T002** Resolve **DEC-002 (dev-flag reuse)**: confirm `SHOW_FLOWMAP` (`StudioShell.tsx:84`) is the gate and that **no new flag** is introduced. Record confirmation in plan.md.
+- [x] **T001** Resolve **DEC-001 (adapter shape)**: **RESOLVED = Variant A** (Matthew Lee, 2026-06-29) — a standalone `StepGraph` → `FlowGraph`/`GraphNode` adapter reusing the existing `FlowGraphView`/`layoutFlowGraph`, **no rendering fork**. Recorded in plan.md (§"DEC-001") and spec.md (Clarifications, FR-001). Variant B (`StepGraph`-aware layout+view) is not pursued.
+- [x] **T002** Resolve **DEC-002 (dev-flag reuse)**: **RESOLVED = reuse `SHOW_FLOWMAP`** (`StudioShell.tsx:84`) (Matthew Lee, 2026-06-29) — it is the gate and **no new flag** is introduced in Phase 1. Recorded in plan.md (§"DEC-002") and spec.md (Clarifications, FR-005).
 
 ## B. Grounding (read-only verification of current state)
 
