@@ -331,7 +331,7 @@ exports[`flow-parity: phase_a_identity — questions[] > projected fields are st
     "type": "select",
   },
   {
-    "help_text": "Arabic and Hebrew are usually written right-to-left, but some communities use a left-to-right style for certain contexts. Choose the direction your community uses most.",
+    "help_text": "Right-to-left scripts such as Arabic, Hebrew, Syriac, Thaana, N'Ko, and Adlam are usually written right-to-left, but some communities use a left-to-right style for certain contexts. Choose the direction your community uses most.",
     "id": "writing_direction",
     "next": "layout_family",
     "options": [

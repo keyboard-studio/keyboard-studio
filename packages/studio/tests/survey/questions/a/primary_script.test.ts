@@ -101,9 +101,12 @@ describe("primary_script — validate() invalid fixtures", () => {
 });
 
 describe("primary_script — validate() edge cases", () => {
-  it("accepts all 28 valid option values", () => {
+  it("accepts all 35 valid option values", () => {
+    // 28 original + 7 RTL scripts added in PR #870:
+    // Thaa, Nkoo, Adlm, Syrc, Mand, Samr, Rohg
     const allValues = [
-      "Latn", "Arab", "Hebr", "Deva", "Beng", "Taml", "Telu", "Knda", "Mlym",
+      "Latn", "Arab", "Hebr", "Thaa", "Nkoo", "Adlm", "Syrc", "Mand", "Samr", "Rohg",
+      "Deva", "Beng", "Taml", "Telu", "Knda", "Mlym",
       "Guru", "Gujr", "Orya", "Sinh", "Thai", "Khmr", "Mymr", "Laoo", "Ethi",
       "Hang", "Hani", "Geor", "Armn", "Cyrl", "Grek", "Tibt", "Cans", "Cher",
       "Other",

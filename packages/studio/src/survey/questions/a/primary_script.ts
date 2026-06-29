@@ -88,6 +88,8 @@ export const fixtures: QuestionModule["fixtures"] = {
     { value: "Latn", note: "Latin script" },
     { value: "Arab", note: "Arabic script" },
     { value: "Deva", note: "Devanagari" },
+    { value: "Thaa", note: "Thaana (RTL alphabet, added in #870)" },
+    { value: "Adlm", note: "Adlam (RTL alphabet, added in #870)" },
     { value: "Other", note: "catch-all option" },
   ],
   invalid: [
