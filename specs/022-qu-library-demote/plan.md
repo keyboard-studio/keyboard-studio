@@ -1,4 +1,15 @@
-# Implementation Plan: Library demote — `pb_*` battery + full Phase A to reserve/library under the no-delete guardrail
+# Implementation Plan: Library demote — full non-identity Phase A to reserve/library under the no-delete guardrail
+
+> **Amendment (2026-06-29, approved Matt + km-verification + km-domain):** the `pb_*`
+> step-by-step battery is **removed from library-demotion scope** — "reachable via the
+> gate" ⊥ "renders as reserve" against the landed 015/016 model (reserve = `registry −
+> reachable`); it stays a **live, reachable, non-default branch** and any re-ordering is
+> deferred to the Phase-2 loop. Scope is now: demote the orphaned **full non-identity
+> Phase A** to reserve (drop `phase_a_identity.modular.yaml` from `renderedNodeSet.ts`
+> `FLOW_SOURCES`), the no-delete CI guardrail, the §7.5 strategy-axis lock, and the
+> `orthographyUrl` retention. **OPEN (I-2):** the Phase-A→reserve move collides with
+> spec-017's prefill anchor (`primary_script` reachability, `prefill.test.ts`) — needs a
+> spec-017 decision, flagged for the lead.
 
 **Spec**: [spec.md](./spec.md) · **Phase**: 1 (Question Unification) · **Spec #**: 8 of 8 · **Branch**: `speckit/question-unification-phase1-specs`
 

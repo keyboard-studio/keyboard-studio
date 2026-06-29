@@ -1,4 +1,41 @@
-# Feature Specification: Library demote — demote the `pb_*` battery and the full Phase A to reserve/library under the no-delete guardrail
+# Feature Specification: Library demote — demote the orphaned non-identity Phase A to reserve/library under the no-delete guardrail
+
+> ## Amendment (2026-06-29, approved by Matt; confirmed by km-verification + km-domain)
+>
+> **The `pb_*` step-by-step battery is REMOVED from library-demotion scope.** During
+> implementation (km-programmer) it was found — and two independent reviewers confirmed —
+> that the original FR-002 ("`pb_*` stays **reachable** via the mandatory IntroChooser
+> gate") is in **internal contradiction** with FR-003/FR-009 ("`pb_*` renders as a
+> **reserve** node") against the **landed** spec-015/016 model. In that model "reserve"
+> is defined as `registry − reachable` (`computeReserveNodes`: `reserveIds = registryKeys
+> − liveIds`, where `liveIds` is exactly a flow YAML's question membership, which is also
+> what makes a module gate-reachable and what the live `PhaseB.tsx` `makeManualOnlyFlow`
+> path reads). A module that is reachable via the gate is therefore **by definition NOT
+> reserve** — the two requirements cannot both hold. Empirically, removing the `pb_*`
+> battery from `phase_b_characters.modular.yaml` turns **both** the protected
+> `dashboard/buildStepGraph.test.ts` (`danglingTargets === []`) **and** the spec-016
+> `dashboard/driftGuardrail.test.ts` bijection **RED**, and breaks the live manual path.
+>
+> **Resolution (this amendment):** the `pb_*` battery stays a **live, reachable,
+> non-default branch** off the IntroChooser gate — it is **NOT library content** in
+> Phase 1. Any "off the default spine" re-ordering of `pb_*` is **DEFERRED to the Phase-2
+> per-element loop** (see non-goals / FR-011, D1). FR-002 is struck; the `pb_*` parts of
+> FR-003/FR-009 are struck. **Kept in scope:** demote the already-orphaned **full
+> non-identity Phase A** (15 identity + 15 `provenance_*`) to library/reserve; the
+> no-delete CI guardrail (FR-005); the §7.5 strategy-axis regression lock
+> (FR-006/FR-007); the `orthographyUrl` retention (FR-008); and spec-015/016 guardrails
+> stay green **unmodified** (FR-009/FR-010).
+>
+> **Implementation note (open item I-2):** the Phase-A demotion mechanism is to drop
+> `phase_a_identity.modular.yaml` from the active flow-source set (`renderedNodeSet.ts`
+> `FLOW_SOURCES`) so its modules become registry-only reserve (they already render as
+> reserve in the identity-lite drill-down). This collides with spec-017's prefill
+> drill-down, whose `registryKey: "primary_script"` (`drillDownDeclarations.ts:90`) is a
+> live Phase-A identity module that spec-017 `prefill.test.ts` FR-014 §2.2(b) asserts
+> reachable via the survey `resolveNext` walk over `FLOW_SOURCES`. Resolving the
+> Phase-A→reserve move therefore requires a spec-017-touching decision (re-anchor prefill,
+> or amend that reachability assertion). This is flagged for the lead, not silently
+> resolved here.
 
 **Feature Branch**: `speckit/question-unification-phase1-specs`
 
@@ -126,8 +163,8 @@ A studio engineer can ship this demotion with a **no-delete CI assertion** confi
 **The demotion to reserve/library (US1)**
 
 - **FR-001**: The full non-identity Phase A (15 identity + 15 `provenance_*`, `content/flows/phase_a_identity.modular.yaml`) MUST be demoted into the **inert library** — absent from the active default flow ordering and rendered as **reserve nodes** via `computeReserveNodes` (`dashboard/buildStepGraph.ts:150-182`) on the `buildModularFlowGraph` registry-vs-YAML diff path. `identity_lite` is the canonical identity experience (§6 decision 3, RESOLVED). This spec MUST NOT wire `PhaseA` back into `StudioShell` (`StudioShell.tsx:18`) — the revival alternative is rejected.
-- **FR-002**: The `pb_*` step-by-step battery (55 modules, `content/flows/phase_b_characters.modular.yaml`) MUST be demoted **off the default spine** — rendered as a reserve node **where it is not on the active branch** — while remaining **reachable** via the **mandatory** IntroChooser discovery-method gate (the step-by-step branch, off the same gate as the default build-list branch). This spec MUST NOT make the `pb_*` battery unreachable and MUST NOT introduce an auto-default that skips the gate.
-- **FR-003**: Demoted modules MUST render as reserve nodes through `computeReserveNodes` (`kind:"library-not-in-flow"`, `region:"not-yet-ordered"`, `isTerminal:true`) on the `buildModularFlowGraph` registry-vs-YAML diff path — the SAME mechanism the migration plan reserves for library content (§2.2(a): `computeReserveNodes` gets library content from the §2.3 YAML/registry demotions, NOT from the manifest projection). This spec is what first populates the currently-empty reserve set (findings (a)).
+- **FR-002**: ~~The `pb_*` step-by-step battery MUST be demoted off the default spine while remaining reachable via the IntroChooser gate.~~ **STRUCK (Amendment 2026-06-29, approved Matt + km-verification + km-domain).** "Reachable via the gate" and "renders as reserve" are an internal contradiction against the landed 015/016 model (reserve = `registry − reachable`; `computeReserveNodes` reserveIds = `registryKeys − liveIds`, and gate-reachability == YAML `liveIds` membership == what the live `PhaseB.tsx makeManualOnlyFlow` reads). The `pb_*` battery therefore **stays a live, reachable, non-default branch** off the **mandatory** IntroChooser gate (NOT library content); the gate stays mandatory with no auto-default. Any "off the default spine" re-ordering of `pb_*` is **DEFERRED to the Phase-2 per-element loop** (FR-011, D1).
+- **FR-003**: Demoted modules — **the full non-identity Phase A only** (`pb_*` struck per the Amendment) — MUST render as reserve nodes through `computeReserveNodes` (`kind:"library-not-in-flow"`, `region:"not-yet-ordered"`, `isTerminal:true`) on the `buildModularFlowGraph` registry-vs-YAML diff path — the SAME mechanism the migration plan reserves for library content (§2.2(a): `computeReserveNodes` gets library content from the §2.3 YAML/registry demotions, NOT from the manifest projection). This spec is what first populates the reserve set with real library content (findings (a)).
 
 **The no-delete guardrail (§4, US4)**
 
@@ -145,12 +182,12 @@ A studio engineer can ship this demotion with a **no-delete CI assertion** confi
 
 **Guardrails & gate (US4)**
 
-- **FR-009**: The spec-016 drift guardrail MUST stay **green**: demoted-but-registered modules MUST be modeled as **reserve** (rendered by `computeReserveNodes`), NOT **orphan**. The rendered ⟺ runtime bijection (016) is asserted over the **reachable** set; a registered-but-unreachable reserve module is rendered by the separate reserve mechanism (016 edge case). The demotion MUST keep demoted ids out of the *reachable* runtime set (off the default ordering), NOT out of the registry.
+- **FR-009**: The spec-016 drift guardrail MUST stay **green**: the demoted-but-registered **Phase A** modules (the `pb_*` clause is struck per the Amendment — `pb_*` stays reachable/live) MUST be modeled as **reserve** (rendered by `computeReserveNodes`), NOT **orphan**. The rendered ⟺ runtime bijection (016) is asserted over the **reachable** set; a registered-but-unreachable reserve module is rendered by the separate reserve mechanism (016 edge case). The demotion MUST keep the demoted Phase A ids out of the *reachable* runtime set, NOT out of the registry.
 - **FR-010**: The spec-016 drift guardrail (the rendered ⟺ runtime bijection) AND the FR-005 no-delete assertion MUST both stay green; default-path behavior MUST be **byte-identical**. `pnpm typecheck` + studio/contracts `vitest` + `pnpm depcruise` MUST be **green**, with no new `dashboard → stores` or `dashboard → editors` edge introduced.
 
 **Out of scope (explicit non-goals)**
 
-- **FR-011**: This feature MUST NOT **delete** any module (no-delete guardrail §4) or unregister any id; MUST NOT re-incorporate non-Latin script-specific mark/joining/order sub-series — the non-Latin default-flip precondition (the loop must subsume `pb_*` script semantics) is a **Phase-2 gate** (D1) and Phase 1 does **not** flip a non-Latin default to a path that drops those sub-series; MUST NOT build the per-element loop or re-elicit A1/A3/A4 inline (Phase 2); MUST NOT wire `PhaseA` back into `StudioShell` (the revival alternative is rejected; Matt resolved demote); and MUST NOT introduce new write routing, `mutate()`, or a contracts bump — behavior MUST be byte-identical on the default path.
+- **FR-011**: This feature MUST NOT **delete** any module (no-delete guardrail §4) or unregister any id; MUST NOT demote, re-order, or take the `pb_*` step-by-step battery off the default spine — the `pb_*` battery stays a **live, reachable, non-default branch** off the mandatory IntroChooser gate, and any `pb_*` re-ordering is **DEFERRED to the Phase-2 per-element loop** (Amendment 2026-06-29); MUST NOT re-incorporate non-Latin script-specific mark/joining/order sub-series — the non-Latin default-flip precondition (the loop must subsume `pb_*` script semantics) is a **Phase-2 gate** (D1) and Phase 1 does **not** flip a non-Latin default to a path that drops those sub-series; MUST NOT build the per-element loop or re-elicit A1/A3/A4 inline (Phase 2); MUST NOT wire `PhaseA` back into `StudioShell` (the revival alternative is rejected; Matt resolved demote); and MUST NOT introduce new write routing, `mutate()`, or a contracts bump — behavior MUST be byte-identical on the default path.
 
 ### Key Entities *(include if feature involves data)*
 
