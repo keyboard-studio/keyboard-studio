@@ -17,6 +17,7 @@
 // Boundary: steps/ -> editors/ and steps/ -> survey/ are allowed.
 // steps/ -> stores/, lib/, components/ are forbidden.
 
+import { irPath } from "@keyboard-studio/contracts";
 import type { Step } from "./types.ts";
 import {
   identityStep,
@@ -50,7 +51,16 @@ const charactersStep: Step = {
   title: "Characters",
   spine: true,
   inputs: [],
-  writes: [],
+  // DEC-D1 (subsumption, Matt 2026-06-29): the opaque charactersStep subsumes the
+  // Phase A/B questions, including iso_code (iso_code.ts:80) which writes
+  // header.bcp47. Declaring that write here makes the producer visible within the
+  // single manifest graph, so manifest-level C5 (checkInputsSatisfiable) finds a
+  // writer for prefill's session-derived header.bcp47 input and stays GREEN — no
+  // separate question-writer C5, no cross-graph exemption. This declared write is
+  // exactly what Phase 2 makes real when iso_code executes inside the decomposed
+  // step. (The session-level ScriptPrefill is a non-IR signal — not an irPath —
+  // so it carries no C5 obligation; irPath('header','script') does not exist.)
+  writes: [irPath("header", "bcp47")],
   // Temporary stub component — wired in T028 via SurveyView's internal runner.
   component: () => null,
 } as const;
