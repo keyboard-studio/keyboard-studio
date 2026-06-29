@@ -14,6 +14,7 @@ import type { QuestionModule } from "../types.ts";
 import { phaseARegistry } from "./registry.a.ts";
 import { phaseBRegistry } from "./registry.b.ts";
 import { phaseFRegistry } from "./registry.f.ts";
+import { phaseGRegistry } from "./registry.g.ts";
 
 /**
  * Synchronous registry: { [questionId]: QuestionModule }
@@ -26,6 +27,7 @@ export const questionRegistry: Readonly<Record<string, QuestionModule>> = {
   ...phaseARegistry,
   ...phaseBRegistry,
   ...phaseFRegistry,
+  ...phaseGRegistry,
 } as const;
 
 // ---------------------------------------------------------------------------

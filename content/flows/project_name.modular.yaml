@@ -1,0 +1,12 @@
+# Thin modular YAML for the project-name wizard step (Phase G, copy-track only).
+# Collects the display name and keyboard ID for a new copy-track keyboard.
+# project_keyboard_id is seeded from the project_display_name answer via
+# getSeedValue / slugifyKeyboardId in PhaseProjectName.tsx.
+# Each question's definition lives in packages/studio/src/survey/questions/g/<id>.ts.
+
+flow_id: project_name
+phase: "G"
+
+questions:
+  - project_display_name
+  - project_keyboard_id

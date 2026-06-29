@@ -1,0 +1,10 @@
+# Thin modular YAML for the track-selection wizard step (Phase G).
+# The single track_choice question's routing (copy vs adapt) is expressed
+# in the question module's definition.next and handled by PhaseTrack.tsx.
+# Each question's definition lives in packages/studio/src/survey/questions/g/<id>.ts.
+
+flow_id: track
+phase: "G"
+
+questions:
+  - track_choice

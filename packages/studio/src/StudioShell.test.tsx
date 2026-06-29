@@ -173,6 +173,51 @@ vi.mock("./survey/index.ts", () => {
         </div>
       );
     },
+    // PhaseTrack — replaces TrackStep in the manifest flow (modular question runner).
+    PhaseTrack: ({
+      onTrackSelected,
+      onBack,
+    }: {
+      onTrackSelected: (t: "copy" | "adapt") => void;
+      onBack?: () => void;
+    }) => (
+      <div data-testid="stage-track">
+        <button type="button" data-testid="track-copy" onClick={() => onTrackSelected("copy")}>
+          track-copy
+        </button>
+        <button type="button" data-testid="track-adapt" onClick={() => onTrackSelected("adapt")}>
+          track-adapt
+        </button>
+        {onBack !== undefined && (
+          <button type="button" data-testid="track-back" onClick={onBack}>
+            track-back
+          </button>
+        )}
+      </div>
+    ),
+    // PhaseProjectName — replaces ProjectNameStep in the manifest flow (modular question runner).
+    PhaseProjectName: ({
+      onProjectNameNext,
+      onBack,
+    }: {
+      onProjectNameNext: (displayName: string, keyboardId: string) => void;
+      onBack?: () => void;
+    }) => (
+      <div data-testid="stage-project-name">
+        <button
+          type="button"
+          data-testid="project-name-next"
+          onClick={() => onProjectNameNext("Test Keyboard", "test_keyboard")}
+        >
+          project-name-next
+        </button>
+        {onBack !== undefined && (
+          <button type="button" data-testid="project-name-back" onClick={onBack}>
+            project-name-back
+          </button>
+        )}
+      </div>
+    ),
     // PhaseA re-exported as a no-op (not used in the wizard path under test)
     PhaseA: () => <div data-testid="stage-A" />,
     SurveyRunner: () => <div data-testid="survey-runner" />,

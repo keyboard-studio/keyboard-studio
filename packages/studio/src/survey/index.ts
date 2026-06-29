@@ -14,5 +14,11 @@ export type { PhaseBProps } from "./PhaseB.tsx";
 export { PhaseF } from "./PhaseF.tsx";
 export type { PhaseFProps } from "./PhaseF.tsx";
 
+export { PhaseTrack } from "./PhaseTrack.tsx";
+export type { PhaseTrackProps } from "./PhaseTrack.tsx";
+
+export { PhaseProjectName } from "./PhaseProjectName.tsx";
+export type { PhaseProjectNameProps } from "./PhaseProjectName.tsx";
+
 export { SurveyRunner } from "./SurveyRunner.tsx";
 export type { SurveyRunnerProps } from "./SurveyRunner.tsx";

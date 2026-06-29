@@ -15,7 +15,7 @@ import type { BaseKeyboard, Pattern, SurveyPhaseResult, TouchAssignment } from "
 import { buildTouchLayoutJson } from "./lib/buildTouchLayoutJson.ts";
 import { useWorkingCopyStore, bindManifest } from "./stores/workingCopyStore.ts";
 import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
-import { IdentityLite, Prefill, PhaseB, PhaseF, type IdentityLiteResult } from "./survey/index.ts";
+import { IdentityLite, Prefill, PhaseB, PhaseF, PhaseTrack, PhaseProjectName, type IdentityLiteResult } from "./survey/index.ts";
 import { BaseResolution } from "./editors/panels/BaseResolution.tsx";
 import { UnsupportedScriptStub } from "./components/UnsupportedScriptStub.tsx";
 import type { SuggestTarget } from "./lib/suggestBase.ts";
@@ -28,8 +28,7 @@ import { useKeyboardArtifact, type OnInstantiateCallback, type ScaffoldSpec } fr
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { OSKFrame } from "./components/OSKFrame.tsx";
 import { OskModeToggle, type OskMode } from "./components/OskModeToggle.tsx";
-import { TrackStep, type Track } from "./editors/panels/TrackStep.tsx";
-import { ProjectNameStep } from "./editors/panels/ProjectNameStep.tsx";
+import type { Track } from "./editors/panels/TrackStep.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
 import { usePlacementPriors } from "./hooks/usePlacementPriors.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
@@ -913,23 +912,23 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       ) : null;
     }
 
-    // Manifest step: track — copy vs adapt choice.
+    // Manifest step: track — copy vs adapt choice (modular question flow).
     if (stepId === "track") {
       return localBase !== null ? (
-        <TrackStep
-          base={localBase}
-          onNext={handleTrackSelected}
+        <PhaseTrack
+          baseDisplayName={localBase.displayName}
+          onTrackSelected={handleTrackSelected}
           onBack={handleTrackBack}
         />
       ) : null;
     }
 
-    // Manifest step: project_name — copy-track CYOA fork (spine:false).
+    // Manifest step: project_name — copy-track CYOA fork (spine:false, modular question flow).
     if (stepId === "project_name") {
       return identityResult !== null ? (
-        <ProjectNameStep
+        <PhaseProjectName
           defaultDisplayName={identityResult.autonym || identityResult.english}
-          onNext={handleProjectNameNext}
+          onProjectNameNext={handleProjectNameNext}
           onBack={handleProjectNameBack}
         />
       ) : null;
