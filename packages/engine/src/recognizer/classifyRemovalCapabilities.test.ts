@@ -700,7 +700,7 @@ describe("classifyRemovalCapabilities — §7.5 regression canaries", () => {
 // ---------------------------------------------------------------------------
 
 describe("classifyRemovalCapabilities — isParallelIndexFanOut regression", () => {
-  it("E1: context(1) any(S) > index(OUT,2) (offset !== context.length) → not-removable:context-sensitive (NOT slot-fill)", () => {
+  it("E1: context(N) any(S) > index(OUT, 2) (pre-terminal is context(), not deadkey) → not-removable:context-sensitive (NOT slot-fill)", () => {
     // A rule whose pre-terminal element is context() fails isParallelIndexFanOut
     // (pre-terminal must be deadkey). With context.length===2 it also triggers
     // the context-sensitive branch (context.length > 1).  Regression guard: the

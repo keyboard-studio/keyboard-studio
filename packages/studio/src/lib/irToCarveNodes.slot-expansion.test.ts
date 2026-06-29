@@ -377,7 +377,7 @@ describe('irToCarveNodes — CarveGlyph.capability resolution', () => {
 describe('irToCarveNodes — bare transliteration fan-out (Bamum shape)', () => {
   // Build IR for: + any(defaultK) > index(defaultU, 1)
   // Input store holds physical keys; output store holds Unicode chars.
-  function makeBamusIR() {
+  function makeBamumIR() {
     const outputStoreNodeId = 'store#bamumU';
     const inputStoreNodeId = 'store#bamumK';
 
@@ -396,7 +396,7 @@ describe('irToCarveNodes — bare transliteration fan-out (Bamum shape)', () => 
   }
 
   it('expands into one glyph per char output-store slot (nul skipped)', () => {
-    const ir = makeBamusIR();
+    const ir = makeBamumIR();
     const group = ir.groups[0]!;
     const glyphs = groupToGlyphs(group, ir);
 
@@ -408,7 +408,7 @@ describe('irToCarveNodes — bare transliteration fan-out (Bamum shape)', () => 
   });
 
   it('keys array has physical key name only — no deadkey marker (Bamum regression)', () => {
-    const ir = makeBamusIR();
+    const ir = makeBamumIR();
     const group = ir.groups[0]!;
     const glyphs = groupToGlyphs(group, ir);
 
@@ -421,7 +421,7 @@ describe('irToCarveNodes — bare transliteration fan-out (Bamum shape)', () => 
   });
 
   it('capability resolves via output-store nodeId alias entry', () => {
-    const ir = makeBamusIR();
+    const ir = makeBamumIR();
     const group = ir.groups[0]!;
     const caps = new Map<string, RemovalCapability>([
       ['store#bamumU', 'removable:slot-fill'],
@@ -435,7 +435,7 @@ describe('irToCarveNodes — bare transliteration fan-out (Bamum shape)', () => 
   });
 
   it('defaults to not-removable:unknown when capability map is empty', () => {
-    const ir = makeBamusIR();
+    const ir = makeBamumIR();
     const group = ir.groups[0]!;
     const glyphs = groupToGlyphs(group, ir, new Map());
 
