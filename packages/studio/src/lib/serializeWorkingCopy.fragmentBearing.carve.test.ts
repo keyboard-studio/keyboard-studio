@@ -23,8 +23,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
-import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
+import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup, IRRule, IRStore } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
@@ -324,6 +323,7 @@ describe("fragment-bearing keyboard — carve removal surfaces through BOTH cons
 
     // ZIP path — same expectation via projectWorkingCopyForOutput.
     const outputResult = await projectWorkingCopyForOutput();
+    expect(outputResult, "zip: projectWorkingCopyForOutput must not return null (no-deletion test)").not.toBeNull();
     const zipKmn = outputResult!.vfs.get(`source/${keyboardId}.kmn`)?.content as string;
     expect(zipKmn, "zip: no-deletion pass must leave .kmn unchanged").toBe(baseContent);
   });
