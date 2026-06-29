@@ -15,6 +15,7 @@ import {
   type OAuthCallbackResult,
 } from "./handleOAuthCallback.ts";
 import { setOAuthScratch, getStoredToken } from "./githubOAuth.ts";
+import type { AuthFlow } from "./githubOAuth.ts";
 import {
   setGoogleOAuthScratch,
   getStoredGoogleIdentity,
@@ -65,18 +66,20 @@ describe("processOAuthCallback — state validation", () => {
 });
 
 describe("processOAuthCallback — happy path", () => {
+  function makeSuccessResponse() {
+    return new Response(
+      JSON.stringify({
+        access_token: "ghp_token",
+        token_type: "bearer",
+        scope: "public_repo",
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  }
+
   it("exchanges the code and stores the token when state matches", async () => {
     setOAuthScratch("verifier-1", "state-ok");
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          access_token: "ghp_token",
-          token_type: "bearer",
-          scope: "public_repo",
-        }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      ),
-    );
+    const fetchMock = vi.fn(async () => makeSuccessResponse());
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await processOAuthCallback("?code=goodcode&state=state-ok");
@@ -85,6 +88,48 @@ describe("processOAuthCallback — happy path", () => {
     const stored = getStoredToken();
     expect(stored?.accessToken).toBe("ghp_token");
     expect(stored?.scope).toBe("public_repo");
+  });
+
+  it("identity flow: sends client:'github_app' in the POST body", async () => {
+    setOAuthScratch("verifier-1", "state-ok", "identity" satisfies AuthFlow);
+    const fetchMock = vi.fn(async () => makeSuccessResponse());
+    vi.stubGlobal("fetch", fetchMock);
+
+    await processOAuthCallback("?code=goodcode&state=state-ok");
+
+    const [[, init]] = fetchMock.mock.calls as unknown as [[string, RequestInit]];
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body["client"]).toBe("github_app");
+    // stored token also carries the client field
+    expect(getStoredToken()?.client).toBe("github_app");
+  });
+
+  it("submit flow: sends client:'oauth_app' in the POST body", async () => {
+    setOAuthScratch("verifier-1", "state-ok", "submit" satisfies AuthFlow);
+    const fetchMock = vi.fn(async () => makeSuccessResponse());
+    vi.stubGlobal("fetch", fetchMock);
+
+    await processOAuthCallback("?code=goodcode&state=state-ok");
+
+    const [[, init]] = fetchMock.mock.calls as unknown as [[string, RequestInit]];
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body["client"]).toBe("oauth_app");
+    expect(getStoredToken()?.client).toBe("oauth_app");
+  });
+
+  it("no persisted flow defaults to identity (backward-compat): sends client:'github_app'", async () => {
+    // setOAuthScratch with only 2 args — the default flow param ("identity") is
+    // used, so the flow key IS written as "identity". processOAuthCallback reads
+    // "identity" and selects client:"github_app" (backward-compat path).
+    setOAuthScratch("verifier-1", "state-ok");
+    const fetchMock = vi.fn(async () => makeSuccessResponse());
+    vi.stubGlobal("fetch", fetchMock);
+
+    await processOAuthCallback("?code=goodcode&state=state-ok");
+
+    const [[, init]] = fetchMock.mock.calls as unknown as [[string, RequestInit]];
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body["client"]).toBe("github_app");
   });
 
   it("returns exchange-failed when the backend responds non-2xx", async () => {

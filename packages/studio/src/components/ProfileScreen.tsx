@@ -213,7 +213,7 @@ export function ProfileScreen() {
                 type="button"
                 style={linkValueStyle}
                 aria-label="Link GitHub"
-                onClick={() => { void github.connect(); }}
+                onClick={() => { void github.connect("identity"); }}
               >
                 link github
               </button>

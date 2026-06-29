@@ -17,6 +17,7 @@ import {
   clearStoredToken,
   getStoredToken,
   hasRequiredScope,
+  type AuthFlow,
   type StoredGitHubToken,
 } from "../lib/githubOAuth.ts";
 import { getGitHubOutputService } from "../lib/services.ts";
@@ -75,8 +76,8 @@ function consumeOAuthErrorParam(): string | null {
 export type GitHubAuthStatus =
   | "idle" // no token
   | "verifying" // token present, verifyToken in flight
-  | "connected" // token verified with required scope
-  | "needs-scope" // token verified but missing public_repo
+  | "connected" // token verified (identity established; for oauth_app: also has required scope)
+  | "needs-scope" // oauth_app token verified but missing public_repo
   | "error"; // verify failed (network / invalid token)
 
 export interface UseGitHubAuthResult {
@@ -87,18 +88,23 @@ export interface UseGitHubAuthResult {
   verify: VerifyTokenResult | null;
   /** GitHub login from verifyToken (the fork owner), or null. */
   login: string | null;
-  /** True when a valid token with `public_repo` is present (gates Submit PR). */
+  /**
+   * True when a valid `oauth_app` token with `public_repo` is present (gates
+   * Option A self-fork Submit PR). The Option B managed-PR panel is gated on
+   * `canDownload` in OutputScreen — that is separate and unaffected.
+   */
   canSubmit: boolean;
   /** Scopes still missing for fork+PR (e.g. ["public_repo"]). */
   missingScopes: readonly string[];
   /** Human-readable error from the verify step, or null. */
   error: string | null;
   /**
-   * Begin the OAuth PKCE flow — redirects the tab to GitHub. Defaults to the
-   * identity (sign-up) scope; pass {@link REQUIRED_SCOPE} only for the explicit
-   * self-fork submit opt-in (docs/github-integration.md §1a).
+   * Begin the OAuth PKCE flow — redirects the tab to GitHub.
+   *   - `"identity"` (default): GitHub App, no scope — the standard sign-up path.
+   *   - `"submit"`: OAuth App, `public_repo` — the explicit Option A self-fork opt-in.
+   * Pass `"identity"` for all sign-up / sign-in buttons.
    */
-  connect: (scope?: string) => Promise<void>;
+  connect: (flow?: AuthFlow) => Promise<void>;
   /** Clear the token + any OAuth scratch state. */
   disconnect: () => void;
 }
@@ -144,10 +150,29 @@ export function useGitHubAuth(): UseGitHubAuthResult {
         const result = await svc.verifyToken(token.accessToken);
         if (cancelled) return;
         setVerify(result);
-        if (result.ok && result.missingScopes.length === 0) {
-          setStatus("connected");
+
+        // Scope check applies only to oauth_app tokens (Option A submit flow).
+        // A github_app identity token reaching verify.ok is "connected" regardless
+        // of missingScopes — the App flow sends no scope, so missingScopes is
+        // always non-empty, but identity is sufficient for sign-in purposes.
+        if (token.client === "oauth_app") {
+          if (result.ok && result.missingScopes.length === 0) {
+            setStatus("connected");
+          } else {
+            setStatus("needs-scope");
+          }
         } else {
-          setStatus("needs-scope");
+          // github_app token: identity established if the token is recognised.
+          // A failed verify (revoked / expired / invalid) must be "error", NOT
+          // "needs-scope" — needs-scope is reserved for oauth_app tokens that
+          // authenticated successfully but are missing public_repo. Returning
+          // needs-scope here would cause SignUpPanel / AccountControl to treat
+          // a dead token as linked (they treat connected|needs-scope as linked).
+          if (result.ok) {
+            setStatus("connected");
+          } else {
+            setStatus("error");
+          }
         }
       } catch (err: unknown) {
         if (cancelled) return;
@@ -161,10 +186,10 @@ export function useGitHubAuth(): UseGitHubAuthResult {
     };
   }, [token]);
 
-  const connect = useCallback(async (scope?: string) => {
+  const connect = useCallback(async (flow: AuthFlow = "identity") => {
     setError(null);
     try {
-      const url = await beginAuthorize(scope);
+      const url = await beginAuthorize(flow);
       snapshotWorkingCopyToSession();
       window.location.assign(url);
     } catch (err: unknown) {
@@ -182,12 +207,15 @@ export function useGitHubAuth(): UseGitHubAuthResult {
     setError(null);
   }, []);
 
+  // canSubmit: only an oauth_app token with the required scope can fork+PR.
+  const canSubmit = token?.client === "oauth_app" && hasRequiredScope(verify);
+
   return {
     status,
     token,
     verify,
     login: verify?.login ?? null,
-    canSubmit: hasRequiredScope(verify),
+    canSubmit,
     missingScopes: verify?.missingScopes ?? [],
     error,
     connect,

@@ -590,7 +590,7 @@ describe("POST /oauth/google/exchange — CORS parity", () => {
 // POST /submit/managed-pr — Option B org-mediated submission
 // ---------------------------------------------------------------------------
 
-const ORG_TOKEN = "gho_ORG_TOKEN_SHOULD_NEVER_APPEAR";
+const INSTALLATION_TOKEN = "ghs_INSTALLATION_TOKEN_SHOULD_NEVER_APPEAR";
 const ORG_LOGIN = "keyboard-studio-bot";
 
 /** Build a minimal pipeline-compatible ok response. */
@@ -636,7 +636,7 @@ async function buildManagedServer(fetchFn: GitHubPipelineFetchFn = managedPipeli
     clientId: "ci-client-id",
     clientSecret: "ci-client-secret",
     googleOAuthEnabled: false,
-    orgToken: ORG_TOKEN,
+    getInstallationToken: () => Promise.resolve(INSTALLATION_TOKEN),
     orgLogin: ORG_LOGIN,
     allowedOrigins: [ALLOWED_ORIGIN],
     fetchFn,
@@ -746,7 +746,7 @@ describe("POST /submit/managed-pr — body validation", () => {
   });
 });
 
-describe("POST /submit/managed-pr — org token never leaks", () => {
+describe("POST /submit/managed-pr — installation token never leaks", () => {
   it("is absent from a success response body", async () => {
     const mApp = await buildManagedServer();
     const res = await mApp.inject({
@@ -755,7 +755,7 @@ describe("POST /submit/managed-pr — org token never leaks", () => {
       payload: validManagedBody(),
     });
     expect(res.statusCode).toBe(200);
-    expect(res.body).not.toContain(ORG_TOKEN);
+    expect(res.body).not.toContain(INSTALLATION_TOKEN);
     await mApp.close();
   });
 
@@ -775,7 +775,7 @@ describe("POST /submit/managed-pr — org token never leaks", () => {
       payload: validManagedBody(),
     });
     expect(res.statusCode).toBe(502);
-    expect(res.body).not.toContain(ORG_TOKEN);
+    expect(res.body).not.toContain(INSTALLATION_TOKEN);
     expect((JSON.parse(res.body) as { error: string }).error).toBe("submission_unavailable");
     await mApp.close();
   });
@@ -835,6 +835,105 @@ describe("POST /submit/managed-pr — CORS", () => {
     const acao = res.headers["access-control-allow-origin"] as string | undefined;
     expect(acao).not.toBe(DISALLOWED_ORIGIN);
     expect(acao).not.toBe("*");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /oauth/exchange — client discriminator (dual-credential routing)
+// ---------------------------------------------------------------------------
+
+describe("POST /oauth/exchange — client discriminator", () => {
+  it("uses github_app pair (default) when client field is absent", async () => {
+    const captured: { body?: string } = {};
+    const captureFetch: GitHubPipelineFetchFn = async (_url, init) => {
+      captured.body = init?.body;
+      return {
+        ok: true, status: 200, statusText: "OK",
+        headers: { get: () => null },
+        json: async () => ({ access_token: "gho_app", token_type: "bearer", scope: "" }),
+        text: async () => "{}",
+      };
+    };
+    const discriminatorApp = await buildServer({
+      clientId: "app-cid",
+      clientSecret: "app-csecret",
+      oauthClientId: "oauth-cid",
+      oauthClientSecret: "oauth-csecret",
+      googleOAuthEnabled: false,
+      allowedOrigins: [ALLOWED_ORIGIN],
+      fetchFn: captureFetch,
+    });
+    await discriminatorApp.ready();
+
+    const res = await discriminatorApp.inject({
+      method: "POST", url: "/oauth/exchange",
+      payload: { code: "some-code" },
+    });
+    expect(res.statusCode).toBe(200);
+    const sentPayload = JSON.parse(captured.body ?? "{}") as Record<string, unknown>;
+    expect(sentPayload["client_id"]).toBe("app-cid");
+    await discriminatorApp.close();
+  });
+
+  it("uses oauth_app pair when client='oauth_app'", async () => {
+    const captured: { body?: string } = {};
+    const captureFetch: GitHubPipelineFetchFn = async (_url, init) => {
+      captured.body = init?.body;
+      return {
+        ok: true, status: 200, statusText: "OK",
+        headers: { get: () => null },
+        json: async () => ({ access_token: "gho_oauth", token_type: "bearer", scope: "public_repo" }),
+        text: async () => "{}",
+      };
+    };
+    const discriminatorApp = await buildServer({
+      clientId: "app-cid",
+      clientSecret: "app-csecret",
+      oauthClientId: "oauth-cid",
+      oauthClientSecret: "oauth-csecret",
+      googleOAuthEnabled: false,
+      allowedOrigins: [ALLOWED_ORIGIN],
+      fetchFn: captureFetch,
+    });
+    await discriminatorApp.ready();
+
+    const res = await discriminatorApp.inject({
+      method: "POST", url: "/oauth/exchange",
+      payload: { code: "some-code", client: "oauth_app" },
+    });
+    expect(res.statusCode).toBe(200);
+    const sentPayload = JSON.parse(captured.body ?? "{}") as Record<string, unknown>;
+    expect(sentPayload["client_id"]).toBe("oauth-cid");
+    await discriminatorApp.close();
+  });
+
+  it("returns 500 server_misconfigured when oauth_app requested but pair not configured", async () => {
+    // Build server with NO oauthClientId/oauthClientSecret
+    const noOAuthApp = await buildServer({
+      clientId: "app-cid",
+      clientSecret: "app-csecret",
+      googleOAuthEnabled: false,
+      allowedOrigins: [ALLOWED_ORIGIN],
+      fetchFn: successFetch,
+    });
+    await noOAuthApp.ready();
+
+    const res = await noOAuthApp.inject({
+      method: "POST", url: "/oauth/exchange",
+      payload: { code: "some-code", client: "oauth_app" },
+    });
+    expect(res.statusCode).toBe(500);
+    expect((JSON.parse(res.body) as { error: string }).error).toBe("server_misconfigured");
+    await noOAuthApp.close();
+  });
+
+  it("returns 400 invalid_request when client has an unknown value", async () => {
+    const res = await app.inject({
+      method: "POST", url: "/oauth/exchange",
+      payload: { code: "some-code", client: "unknown_client" },
+    });
+    expect(res.statusCode).toBe(400);
+    expect((JSON.parse(res.body) as { error: string }).error).toBe("invalid_request");
   });
 });
 
