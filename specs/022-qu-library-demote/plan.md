@@ -6,11 +6,14 @@
 > reachable`); it stays a **live, reachable, non-default branch** and any re-ordering is
 > deferred to the Phase-2 loop. Scope is now: demote the orphaned **full non-identity
 > Phase A** to reserve (drop `phase_a_identity.modular.yaml` from `renderedNodeSet.ts`
-> `FLOW_SOURCES`), the no-delete CI guardrail, the §7.5 strategy-axis lock, and the
-> `orthographyUrl` retention. **I-2 RESOLVED (landed):** the Phase-A→reserve move
-> collided with spec-017's prefill anchor (`primary_script` reachability) — fixed by
-> re-anchoring 017's prefill drill-down to the live `il_target_script` and updating
-> `prefill.test.ts`. FR-001 and FR-008 are MET; pb_* narrowing stands.
+> `FLOW_SOURCES`), the no-delete CI guardrail, and the §7.5 strategy-axis lock.
+> **I-2 RESOLVED (landed):** the Phase-A→reserve move collided with spec-017's prefill
+> anchor (`primary_script` reachability) — fixed by re-anchoring 017's prefill drill-down
+> to the live `il_target_script` and updating `prefill.test.ts`. **FR-001 is MET.**
+> **FR-008 (`orthographyUrl` retention) is DEFERRED** — it was never on the live
+> IdentityLite path (only on the demoted Phase A), so the demotion loses no live capture;
+> live capture needs a new live question, out of scope here, and **no inert capture code
+> is shipped**. pb_* narrowing stands.
 
 **Spec**: [spec.md](./spec.md) · **Phase**: 1 (Question Unification) · **Spec #**: 8 of 8 · **Branch**: `speckit/question-unification-phase1-specs`
 
