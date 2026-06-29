@@ -39,7 +39,7 @@ Populate the empty `inputs: []` / `writes: []` on the **existing** `carve` / `me
 
 ### DEC-D2 — track's branch-selection write
 
-`track` selects a branch (copy/adapt; copy-track gates the `project_name` side-trail), not an IR leaf. **Recommendation: `writes: []`** (branch selection only, no IR leaf in P1), `inputs` = `header.bcp47` (array) + resolved base IR. Empty `writes` produces no input to orphan and never reds C5. Lock at plan time; marked [NEEDS DECISION: D2] in the spec.
+`track` selects a branch (copy/adapt; copy-track gates the `project_name` side-trail), not an IR leaf. **Resolved → `writes: []`** for the `track` step (branch selection only, no IR leaf in P1), by Matt 2026-06-29; `inputs` = `header.bcp47` (array) + resolved base IR. Empty `writes` produces no input to orphan and never reds C5. The rejected alternative (a declared branch marker) is not pursued — there is no IR leaf for a branch in P1.
 
 ## Intra-spec sequencing (writes-before-inputs — the load-bearing order)
 

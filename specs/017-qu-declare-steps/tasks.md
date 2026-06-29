@@ -8,7 +8,7 @@
 
 - [ ] **T001** Confirm specs `015-qu-map-projection` and `016-qu-drift-guardrail` are landed and stable: the `StepGraph`→`FlowGraph`/`GraphNode` adapter + wired `DashboardView` projection exist (015), and the rendered ⟺ manifest+`questionRegistry` drift bijection with per-graph reachability is green (016). (Dependencies.)
 - [ ] **T002** **[RESOLVED: D1]** — the cross-graph C5 mechanism for `prefill`'s session-derived inputs is resolved to **option (a) — subsumption** (Matt, 2026-06-29): the subsuming opaque `charactersStep` node declares the `iso_code`-equivalent write `header.bcp47` (+ the `ScriptPrefill` source) in its own `writes`, so the C5 invariant sees a writer and stays GREEN within the single manifest graph. Rationale: single unified bijection invariant (016); the declared write is exactly what Phase 2 makes real. Option B (cross-graph exemption + separate question-writer C5) is rejected. Apply in T009/T019.
-- [ ] **T003** Resolve **[NEEDS DECISION: D2]** — `track`'s branch-selection write: `writes: []` (branch selection only, no IR leaf in P1 — recommended) vs a declared marker. Lock the recommendation: `writes: []`, `inputs` = `header.bcp47` (array) + resolved base IR.
+- [ ] **T003** Apply **D2 (RESOLVED → `writes: []`, by Matt 2026-06-29)** — `track`'s branch-selection write is `writes: []` (branch selection only, no IR leaf in P1; the declared-marker alternative was rejected). Set `track`: `writes: []`, `inputs` = `header.bcp47` (array) + resolved base IR.
 - [ ] **T004** Confirm the registry home for the `prefill` / `pb_build_list` drill-down declarations (`survey/questions/registry.ts` + `a`/`b` sub-registries, or an adapter-side drill-down descriptor consumed by the 015 projection). Confirm they are **NOT** added to `steps/manifest.ts`. Verify against `pnpm depcruise`.
 
 ## Group B — Declare WRITES first (the load-bearing order)
@@ -56,5 +56,5 @@
 - [ ] **T028** Run `pnpm typecheck` — green. (SC-007)
 - [ ] **T029** Run `pnpm depcruise` — green; no new forbidden dependency boundary. (SC-007)
 - [ ] **T030** Confirm Phase-1 invariants: no `mutate()` executes, flag stays off, no contracts change, no new write routing; flag-off / runtime / render / emitted-bytes output byte-identical to pre-017 (only diff is the populated declaration arrays + new tests). (FR-015, FR-016, SC-007)
-- [ ] **T031** Confirm D1 (cross-graph C5 mechanism) is resolved-and-applied per option (a) (subsumption — the `charactersStep` `header.bcp47` write; Matt, 2026-06-29), and that the [NEEDS DECISION: D2] (track branch-selection write) marker is either resolved-and-applied or carried forward explicitly with its recommendation (D2 → `writes: []`). (FR-010, FR-016)
+- [ ] **T031** Confirm D1 (cross-graph C5 mechanism) is resolved-and-applied per option (a) (subsumption — the `charactersStep` `header.bcp47` write; Matt, 2026-06-29), and that D2 (track branch-selection write) is resolved-and-applied as `writes: []` (RESOLVED → `writes: []`, by Matt 2026-06-29). (FR-010, FR-016)
 </content>
