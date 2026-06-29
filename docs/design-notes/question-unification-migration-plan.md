@@ -580,7 +580,14 @@ Each sub-step maps to one speckit spec. Proposed slugs and one-line scopes:
 
 ## 6. Open decisions for Matt
 
-1. **Loop primitive scope — BUILD vs DEFER (Q-new, the headline open decision).** Is
+> **Phase 1 scope confirmed (Matt, 2026-06-29):** Phase 1 only specs the conversion of
+> the custom/bespoke flow stages into opaque "questions" with valid inputs and outputs.
+> The remaining loop-primitive and contracts decisions are deferred to a decision with
+> the developers after Phase 1.
+
+1. **[DEFERRED → post-Phase-1 decision with developers]** — the loop build-vs-defer call
+   is made with the developers after Phase 1 (it gates the other loop items below).
+   **Loop primitive scope — BUILD vs DEFER (Q-new, the headline open decision).** Is
    the Phase-2 looping primitive committed, or deferred? km-simplify argues it is a
    premature abstraction (the current flows are single-screen, and the per-inventory IR
    write is already solved by the `pb_standard_letters` rebuild-by-stable-name pattern);
@@ -589,7 +596,9 @@ Each sub-step maps to one speckit spec. Proposed slugs and one-line scopes:
    mark-behaviour per grapheme) — a roadmap decision the plan author cannot make. Spec #9
    is parked until this resolves. (Q1/Q5 below touch the loop's contract scope but not
    the build-vs-defer question.)
-2. **Per-character axis feedback (if the loop is built).** Should per-character
+2. **[DEFERRED → post-Phase-1 decision with developers]** — depends on the loop being
+   built; resolved with the developers after Phase 1.
+   **Per-character axis feedback (if the loop is built).** Should per-character
    build-list answers feed back into the §7 strategy axis vector mid-flow?
    Mark-behaviour-per-grapheme is the A4 signal and inventory size is the A1 signal; if
    loop answers contribute to `computedAxes`, the axis vector becomes a function of loop
@@ -599,22 +608,37 @@ Each sub-step maps to one speckit spec. Proposed slugs and one-line scopes:
    per-character is a product call. Related: S-13 (touch layer switch) applicability can
    change if the per-key touch loop alters the set of named touch layers — needs the
    S-13-stability assertion (§3.2 touch row) if the touch loop is built.
-3. **Orphaned full Phase A disposition (Q3).** Demote to library (plan's default,
+3. **[RESOLVED 2026-06-29 — Matt]** — DEMOTE to the inert library ("demote the orphaned
+   Phase A. We'll re-use some of that later"). Demote, not delete: modules stay
+   registered, on disk, and test-covered per the no-delete guardrail (§4), explicitly
+   flagged for later reuse. Retain `orthographyUrl` capture in `identity_lite` / the
+   documentation stage so the linguist-agent grounding input is not lost.
+   **Orphaned full Phase A disposition (Q3).** Demote to library (plan's default,
    `identity_lite` is canonical) **vs** wire `PhaseA` back into `StudioShell`
    (`StudioShell.tsx:18`) if revival is planned soon. Demote-unless-revival assumed.
    (If demoted, retain `orthographyUrl` capture in `identity_lite` / the documentation
    stage — §2.3 Phase-A provenance caveat.)
-4. **Per-component contracts choices (deferred to Phase 2, Q1).** For build-list
+4. **[DEFERRED → post-Phase-1 decision with developers]** — per-component contracts
+   choices are resolved with the developers after Phase 1.
+   **Per-component contracts choices (deferred to Phase 2, Q1).** For build-list
    inventory and the carve overlay: reuse existing IR locations (`stores[]` /
    `groups[]` / `raw[]`, **no bump** — preferred) **vs** new `KeyboardIR` fields
    (clean but contracts bump + §18 joint engine+content sign-off, à la #822/#825).
-5. **Loop iteration key round-trip (Q5/R3).** Does the iteration index/key need to
+5. **[DEFERRED → post-Phase-1 decision with developers]** — depends on the loop being
+   built; resolved with the developers after Phase 1.
+   **Loop iteration key round-trip (Q5/R3).** Does the iteration index/key need to
    round-trip in the IR (contracts touch) or stay transient in `MutateContext` (no
    bump)? Gates the loop-primitive spec's contract scope.
-6. **Track chooser model (Q2).** Canonical model: modular gate question (CYOA fork in
+6. **[RESOLVED 2026-06-29 — Matt]** — Option A, the modular gate question: the
+   copy/adapt fork becomes a YAML `next` rule (CYOA fork in data), not a hand-coded
+   `if`. No contracts bump. This sets the canonical model for spec #4 (wire) and spec #10
+   (move fork to YAML).
+   **Track chooser model (Q2).** Canonical model: modular gate question (CYOA fork in
    data — cleanest for the map) **vs** editor-step (fork stays in `handleTrackSelected`
    code). Affects specs 4 and 10.
-7. **Loop collection-binding element type (if the loop is built).** The binding MUST
+7. **[DEFERRED → post-Phase-1 decision with developers]** — depends on the loop being
+   built; resolved with the developers after Phase 1.
+   **Loop collection-binding element type (if the loop is built).** The binding MUST
    carry element TYPE (structured `LinguistInventory`). If a spec proposes binding a
    flat `confirmedInventory:string[]`, it must FIRST state how element class is recovered
    — which it cannot be from a flat list — so this is a blocker to resolve, not an
@@ -683,11 +707,20 @@ P1s (loop scope, foundation-(a) type story) are likewise addressed (loop deferre
 Matt with the no-loop write path documented; adapter scope corrected). No specialist's
 blocking issue is left unresolved.
 
-**Open decisions deferred to Matt** (see §6 for detail): (1) loop primitive BUILD vs
-DEFER; (2) per-character axis feedback into the §7 vector (and S-13 stability if the
-touch loop is built); (3) orphaned full Phase A disposition (demote vs revive; retain
-`orthographyUrl` if demoted); (4) per-component contracts choices (reuse existing IR vs
-new fields); (5) loop iteration-key round-trip (IR vs transient `MutateContext`);
-(6) track chooser model (modular gate question vs editor-step); (7) loop
-collection-binding element type (structured vs flat — a blocker if a spec proposes a
-flat list).
+**Decisions recorded (Matt, 2026-06-29) — Phase 1 scope confirmed** (see §6 for detail).
+Phase 1 only specs converting the custom/bespoke flow stages into opaque "questions"
+with valid inputs and outputs. Decision states:
+
+- **(3) Orphaned full Phase A disposition — RESOLVED:** demote to the inert library
+  ("we'll re-use some of that later"); not deletion (modules stay registered, on disk,
+  test-covered per the no-delete guardrail §4), flagged for later reuse; retain
+  `orthographyUrl` capture in `identity_lite` / the documentation stage.
+- **(6) Track chooser model — RESOLVED:** Option A, the modular gate question (copy/adapt
+  fork becomes a YAML `next` rule, not a hand-coded `if`); no contracts bump; sets the
+  canonical model for specs #4 and #10.
+- **(1) loop primitive BUILD vs DEFER; (2) per-character axis feedback into the §7 vector
+  (and S-13 stability if the touch loop is built); (4) per-component contracts choices
+  (reuse existing IR vs new fields); (5) loop iteration-key round-trip (IR vs transient
+  `MutateContext`); (7) loop collection-binding element type (structured vs flat) —
+  DEFERRED** to a decision made with the developers after Phase 1 is complete (several
+  depend on the loop build-vs-defer call, which is itself part of this deferred bucket).
