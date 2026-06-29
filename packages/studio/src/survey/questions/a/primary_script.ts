@@ -64,6 +64,7 @@ export const definition = {
     { condition: "value == 'Ethi' or value == 'Hang' or value == 'Hani'", goto: "script_not_supported_stub" },
     { condition: "value == 'Arab' or value == 'Hebr' or value == 'Thaa' or value == 'Nkoo' or value == 'Adlm' or value == 'Syrc' or value == 'Mand' or value == 'Samr' or value == 'Rohg'", goto: "writing_direction" },
     { condition: "value == 'Latn' or value == 'Cyrl' or value == 'Grek' or value == 'Geor' or value == 'Armn'", goto: "layout_family" },
+    // Remaining scripts (Indic abugidas, syllabics, Other) intentionally fall through to layout_family — no RTL/direction prompt needed.
     { default: true as const, goto: "layout_family" },
   ],
 } satisfies import("../../types.ts").FlowQuestion;

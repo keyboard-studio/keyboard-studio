@@ -266,6 +266,7 @@ describe("advanceThrough — terminal default rule (defect 6 regression)", () =>
       "SurveyRunner: unresolved goto target",
       expect.anything(),
     );
+    expect(errorSpy).not.toHaveBeenCalled();
 
     errorSpy.mockRestore();
   });
