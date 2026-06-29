@@ -19,10 +19,10 @@ Layer A' (#236) landed, and the checks runnable over a `release/` corpus are now
 | `I2 (structural)` | `parse → emit → parse`, deep-equal of the normalised IR (mirrors the codec's `roundtrip.test.ts`). | proxy for **I2** |
 | `layerAPrime.i1ParseComplete` | `checkParseCompleteness` — `false` if ≥1 source token has no IR node. | **I1** |
 | `layerAPrime.i3HeaderMissing` | `checkHeaderPreservation` — name / copyright / version fields absent/empty in the emitted `.kmn` (short labels recovered via layer-a-prime's lock-tested `headerFieldLabel` extractor). The check's **bcp47** dimension is excluded in this scan: language tags live in the `.kps` / `.keyboard_info`, not the `.kmn`, so it would false-positive on every keyboard. (bcp47 stays in scope on the import path, where package metadata populates it.) | **I3** |
-
-`layerAPrime` is **`null`** for a `ParseFailure` keyboard (the checks never ran) — distinct from `{ i1ParseComplete: true }` (ran and passed). The Markdown table renders `n/a` for those rows, and the I1/I3 summary counts are denominated over parsed keyboards only, so a parse-failure is never miscounted as I1-clean.
 | opaque inventory | the codec's `opaqueFeatures`; also the documented surface of `checkOpaqueFeatureInventory`. | **I4** |
 | `recognizedRatio` | the pattern recognizer ([#234](../../packages/engine/src/recognizer/index.ts)). | — |
+
+`layerAPrime` is **`null`** for a `ParseFailure` keyboard (the checks never ran) — distinct from `{ i1ParseComplete: true }` (ran and passed). The Markdown table renders `n/a` for those rows, and the I1/I3 summary counts are denominated over parsed keyboards only, so a parse-failure is never miscounted as I1-clean.
 
 **Why I2-functional and I5 are not wired.** The formal I2 (`checkRoundTrip`) is a **deferred stub**: it needs the Keyman Core keystroke runtime (this build ships kmcmplib, a *compiler*, not Core, a *runtime*), so it only generates a corpus and returns a "deferred" hint. The **structural** round-trip proxy therefore remains the only real `RoundTripDivergence` signal. I5 (`checkSidecarHash`) verifies a per-keyboard `.kmn.imported.sha256` sidecar that the studio writes **at import time** — upstream `release/` keyboards have none, so I5 is N/A for a corpus scan.
 
