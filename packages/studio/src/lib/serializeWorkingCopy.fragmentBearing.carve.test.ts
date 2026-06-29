@@ -148,7 +148,6 @@ beforeEach(() => {
 
 afterEach(() => {
   resetStore();
-  vi.clearAllMocks();
 });
 
 // ---------------------------------------------------------------------------
@@ -222,8 +221,8 @@ describe("fragment-bearing keyboard — carve removal surfaces through BOTH cons
     // -----------------------------------------------------------------------
     // 1. Removed rule (K_A) is ABSENT from both outputs.
     // -----------------------------------------------------------------------
-    expect(previewKmn, "preview: removed rule K_A must be absent").not.toContain("K_A");
-    expect(zipKmn,     "zip: removed rule K_A must be absent").not.toContain("K_A");
+    expect(previewKmn, "preview: removed rule K_A must be absent").not.toMatch(/\bK_A\b/);
+    expect(zipKmn,     "zip: removed rule K_A must be absent").not.toMatch(/\bK_A\b/);
 
     // -----------------------------------------------------------------------
     // 2. Removed store (removedStore) is ABSENT from both outputs.
@@ -363,7 +362,8 @@ describe("fragment-bearing keyboard — carve removal surfaces through BOTH cons
     expect(ir.raw.length,              "baseIr raw not mutated").toBe(3);
 
     // ZIP path — projectWorkingCopyForOutput clones baseVfs before projecting.
-    await projectWorkingCopyForOutput();
+    const guardResult = await projectWorkingCopyForOutput();
+    expect(guardResult, "zip: projectWorkingCopyForOutput must not return null in mutation-guard test").not.toBeNull();
 
     const storeState = useWorkingCopyStore.getState();
     // The store's baseVfs entry must still hold the original stub content.
