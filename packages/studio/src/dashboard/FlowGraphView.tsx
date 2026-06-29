@@ -10,6 +10,11 @@ import { layoutFlowGraph, NODE_W, NODE_H, type LaidOutGraph, type PositionedNode
 import type { FlowGraph } from "./model.ts";
 import { MONO, SANS } from "./tokens.ts";
 
+/** Truncate a path string to fit inside NODE_W with an ellipsis. */
+function truncatePath(path: string, maxLen = 28): string {
+  return path.length > maxLen ? path.slice(0, maxLen - 1) + "…" : path;
+}
+
 const EDGE_COLOR: Record<GraphEdge["kind"], string> = {
   linear: "#4d5b7c",
   conditional: "#d29922",
@@ -163,8 +168,23 @@ export function FlowGraphView({ graph }: FlowGraphViewProps) {
             gap: 2,
             overflow: "hidden",
           };
+
+          // Build the tooltip: id + label + writes + inputs + lock.
+          const tooltipLines: string[] = [`${n.id}\n${n.label}`];
+          if (n.writePaths !== undefined && n.writePaths.length > 0)
+            tooltipLines.push(`writes: ${n.writePaths.join(", ")}`);
+          if (n.inputPaths !== undefined && n.inputPaths.length > 0)
+            tooltipLines.push(`inputs: ${n.inputPaths.join(", ")}`);
+          if (n.lock !== undefined) tooltipLines.push(`lock: ${n.lock}`);
+
+          // Metadata lines to show inline — only on nodes that carry writePaths
+          // (projected manifest-step nodes). Empty arrays still show the line so
+          // the space is predictable; undefined means the node is a live question
+          // node and no extra line is rendered.
+          const hasMetadata = n.writePaths !== undefined;
+
           return (
-            <div key={n.id} style={cardStyle} title={`${n.id}\n${n.label}`}>
+            <div key={n.id} style={cardStyle} title={tooltipLines.join("\n")}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span
                   style={{
@@ -180,6 +200,23 @@ export function FlowGraphView({ graph }: FlowGraphViewProps) {
                 >
                   {n.id}
                 </span>
+                {n.lock !== undefined && (
+                  <span
+                    style={{
+                      fontFamily: SANS,
+                      fontSize: 9,
+                      lineHeight: "13px",
+                      color: "#e3b341",
+                      background: "#241c10",
+                      border: "1px solid #9e6a03",
+                      borderRadius: 3,
+                      padding: "0 4px",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {`lock·${n.lock}`}
+                  </span>
+                )}
                 {role.badge !== null && (
                   <span
                     style={{
@@ -209,9 +246,47 @@ export function FlowGraphView({ graph }: FlowGraphViewProps) {
                   overflow: "hidden",
                 }}
               >
-                <span style={{ color: "#586069" }}>{n.type}</span>
+                <span style={{ color: "#586069" }}>
+                  {hasMetadata ? (n.stepKind ?? n.type) : n.type}
+                </span>
                 {n.label !== n.id ? ` · ${n.label}` : ""}
               </div>
+              {hasMetadata && (
+                <div
+                  style={{
+                    fontFamily: MONO,
+                    fontSize: 9.5,
+                    color: "#6e7681",
+                    lineHeight: "13px",
+                    overflow: "hidden",
+                    whiteSpace: "nowrap",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  <span style={{ color: "#3fb950" }}>writes:</span>
+                  {" "}
+                  {n.writePaths !== undefined && n.writePaths.length > 0
+                    ? n.writePaths.map((p) => truncatePath(p)).join(", ")
+                    : "—"}
+                </div>
+              )}
+              {hasMetadata && n.inputPaths !== undefined && n.inputPaths.length > 0 && (
+                <div
+                  style={{
+                    fontFamily: MONO,
+                    fontSize: 9.5,
+                    color: "#6e7681",
+                    lineHeight: "13px",
+                    overflow: "hidden",
+                    whiteSpace: "nowrap",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  <span style={{ color: "#58a6ff" }}>inputs:</span>
+                  {" "}
+                  {n.inputPaths.map((p) => truncatePath(p)).join(", ")}
+                </div>
+              )}
             </div>
           );
         })}

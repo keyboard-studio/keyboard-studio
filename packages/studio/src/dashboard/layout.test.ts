@@ -79,26 +79,22 @@ describe("layoutFlowGraph — cycle-safe rank assignment", () => {
 
     // With 6 nodes the rank must not reach 6 (which is what |V| passes would
     // give for a cycle-pumped node). The acyclic depth is 5 (A=0..F=5).
-    const maxRankFromHeight = (laid.height - 24 * 2 + 52) / (68 + 52) - 1;
-    // maxRank derived: height = (maxRank+1)*68 + maxRank*52 + 48
-    //   => (height - 48 + 52) / 120 - 1 ≈ maxRank
+    const maxRankFromHeight = (laid.height - 24 * 2 + 52) / (94 + 52) - 1;
+    // maxRank derived: height = (maxRank+1)*94 + maxRank*52 + 48 (NODE_H=94)
+    //   => (height - 48 + 52) / 146 - 1 ≈ maxRank
     // More directly: maxRank ≤ nodeCount - 1 (5 for 6 nodes).
     expect(laid.nodes.length).toBe(6);
 
     // Every positioned node must have a y coordinate within a bounded canvas.
-    // Pre-fix: nodes in the cycle could be at y = PAD + rank*(68+52) where
-    // rank ≈ |V| ≈ 6, giving y ≈ 24 + 6*120 = 744 px — but with a 55-node
-    // graph the real bug caused rank ≈ 55, so y ≈ 6600 px.
+    // Pre-fix: nodes in the cycle could be at y = PAD + rank*(94+52) where
+    // rank ≈ |V| ≈ 6, giving y ≈ 24 + 6*146 = 900 px — but with a 55-node
+    // graph the real bug caused rank ≈ 55, so y would be much larger.
     // We assert maxRank ≤ 5 (= nodeCount - 1) for the 6-node cycle graph.
     const maxY = Math.max(...laid.nodes.map((n) => n.y));
-    // maxY = PAD + maxRank * (NODE_H + V_GAP) = 24 + maxRank * 120
-    // For maxRank = 5: maxY = 24 + 5*120 = 624.
-    // Pre-fix with cycle pumping |V|=6 passes: rank(B) grows each pass.
-    // After 6 passes rank(B)=6 => rank(F)=6+4=10 => ... well beyond 624.
-    // The cycle cap at |V|=6 passes: rank(B) gets set to 6, rank(F) to 10...
-    // actually rank pump stops at pass count, final rank(F) ≈ 10 for 6 passes.
-    // So asserting maxY ≤ 624 (i.e. maxRank ≤ 5) confirms the fix.
-    expect(maxY).toBeLessThanOrEqual(24 + 5 * (68 + 52)); // 624 px
+    // maxY = PAD + maxRank * (NODE_H + V_GAP) = 24 + maxRank * 146 (NODE_H=94)
+    // For maxRank = 5: maxY = 24 + 5*146 = 754.
+    // So asserting maxY ≤ 754 (i.e. maxRank ≤ 5) confirms the fix.
+    expect(maxY).toBeLessThanOrEqual(24 + 5 * (94 + 52)); // 754 px (NODE_H=94)
   });
 
   it("a self-loop (A→A) does not inflate the rank of A", () => {
@@ -108,7 +104,7 @@ describe("layoutFlowGraph — cycle-safe rank assignment", () => {
     const laid = layoutFlowGraph(g);
     expect(laid.nodes.length).toBe(1);
     expect(laid.nodes[0]!.y).toBe(24); // PAD only — rank 0
-    expect(laid.height).toBe(68 + 24 * 2); // (1 node, 0 gaps) + 2*PAD
+    expect(laid.height).toBe(94 + 24 * 2); // (1 node, 0 gaps) + 2*PAD (NODE_H=94)
   });
 
   it("a mutual cycle (A→B, B→A) assigns each node rank 0 or 1, not ≈ |V|", () => {
@@ -119,8 +115,8 @@ describe("layoutFlowGraph — cycle-safe rank assignment", () => {
     const laid = layoutFlowGraph(g);
     expect(laid.nodes.length).toBe(2);
     const maxY = Math.max(...laid.nodes.map((n) => n.y));
-    // maxRank = 1 => maxY = 24 + 1*120 = 144
-    expect(maxY).toBeLessThanOrEqual(24 + 1 * (68 + 52));
+    // maxRank = 1 => maxY = 24 + 1*(NODE_H+V_GAP) = 24 + 1*146 = 170 (NODE_H=94)
+    expect(maxY).toBeLessThanOrEqual(24 + 1 * (94 + 52));
   });
 });
 
@@ -136,11 +132,11 @@ describe("layoutFlowGraph — acyclic graph unchanged (golden case)", () => {
     );
     const laid = layoutFlowGraph(g);
     const byId = new Map(laid.nodes.map((n) => [n.id, n]));
-    // PAD + rank * (NODE_H + V_GAP)
-    expect(byId.get("A")!.y).toBe(24 + 0 * 120);
-    expect(byId.get("B")!.y).toBe(24 + 1 * 120);
-    expect(byId.get("C")!.y).toBe(24 + 2 * 120);
-    expect(byId.get("D")!.y).toBe(24 + 3 * 120);
+    // PAD + rank * (NODE_H + V_GAP); NODE_H=94, V_GAP=52 => step=146
+    expect(byId.get("A")!.y).toBe(24 + 0 * 146);
+    expect(byId.get("B")!.y).toBe(24 + 1 * 146);
+    expect(byId.get("C")!.y).toBe(24 + 2 * 146);
+    expect(byId.get("D")!.y).toBe(24 + 3 * 146);
   });
 
   it("a fork-then-rejoin (A→B, A→C, B→D, C→D) assigns rank 2 to D", () => {
@@ -151,7 +147,7 @@ describe("layoutFlowGraph — acyclic graph unchanged (golden case)", () => {
     );
     const laid = layoutFlowGraph(g);
     const d = laid.nodes.find((n) => n.id === "D");
-    expect(d!.y).toBe(24 + 2 * 120); // rank 2
+    expect(d!.y).toBe(24 + 2 * 146); // rank 2 (NODE_H=94, V_GAP=52 => step=146)
   });
 
   it("a skip-edge (A→B, A→C, B→C) assigns rank 1 to C via longest path", () => {
@@ -163,7 +159,7 @@ describe("layoutFlowGraph — acyclic graph unchanged (golden case)", () => {
     );
     const laid = layoutFlowGraph(g);
     const c = laid.nodes.find((n) => n.id === "C");
-    expect(c!.y).toBe(24 + 2 * 120); // rank 2 (A→B→C is the longest path)
+    expect(c!.y).toBe(24 + 2 * 146); // rank 2 (A→B→C is the longest path; NODE_H=94)
   });
 });
 
@@ -186,13 +182,13 @@ describe("layoutFlowGraph — disconnected graph", () => {
 
     const byId = new Map(laid.nodes.map((n) => [n.id, n]));
 
-    // Component 1 ranks.
-    expect(byId.get("A")!.y).toBe(24 + 0 * 120); // rank 0
-    expect(byId.get("B")!.y).toBe(24 + 1 * 120); // rank 1
+    // Component 1 ranks. (NODE_H=94, V_GAP=52 => step=146)
+    expect(byId.get("A")!.y).toBe(24 + 0 * 146); // rank 0
+    expect(byId.get("B")!.y).toBe(24 + 1 * 146); // rank 1
 
     // Component 2 ranks — C has no incoming edges so it also starts at rank 0.
-    expect(byId.get("C")!.y).toBe(24 + 0 * 120); // rank 0
-    expect(byId.get("D")!.y).toBe(24 + 1 * 120); // rank 1
+    expect(byId.get("C")!.y).toBe(24 + 0 * 146); // rank 0
+    expect(byId.get("D")!.y).toBe(24 + 1 * 146); // rank 1
 
     // Canvas dimensions must be finite and positive.
     expect(Number.isFinite(laid.width)).toBe(true);
@@ -212,9 +208,10 @@ describe("layoutFlowGraph — disconnected graph", () => {
     expect(laid.nodes.length).toBe(3);
 
     const byId = new Map(laid.nodes.map((n) => [n.id, n]));
-    expect(byId.get("A")!.y).toBe(24 + 0 * 120); // rank 0
-    expect(byId.get("B")!.y).toBe(24 + 1 * 120); // rank 1
-    expect(byId.get("C")!.y).toBe(24 + 0 * 120); // rank 0 (isolated)
+    // (NODE_H=94, V_GAP=52 => step=146)
+    expect(byId.get("A")!.y).toBe(24 + 0 * 146); // rank 0
+    expect(byId.get("B")!.y).toBe(24 + 1 * 146); // rank 1
+    expect(byId.get("C")!.y).toBe(24 + 0 * 146); // rank 0 (isolated)
   });
 });
 
@@ -248,8 +245,8 @@ describe("layoutFlowGraph — empty graph", () => {
     // width = 220 + 2*24 = 268.
     expect(laid!.width).toBe(220 + 24 * 2);
 
-    // Height: maxRank=0 (guard), height = 1*68 + 0*52 + 2*24 = 116.
-    expect(laid!.height).toBe(68 + 24 * 2);
+    // Height: maxRank=0 (guard), height = 1*NODE_H + 0*V_GAP + 2*PAD = 94 + 48 = 142 (NODE_H=94).
+    expect(laid!.height).toBe(94 + 24 * 2);
 
     // No nodes to position.
     expect(laid!.nodes.length).toBe(0);
@@ -296,11 +293,11 @@ describe("layoutFlowGraph — Phase B loop-back topology (55-node synthetic)", (
     // After |V|=10 passes the pump reaches about rank 10+9=19 for J.
     // Post-fix: B stays at rank 1, J stays at rank 9.
     const maxY = Math.max(...laid.nodes.map((n) => n.y));
-    // maxRank 9 => maxY = PAD + 9*(NODE_H+V_GAP) = 24 + 9*120 = 1104
-    expect(maxY).toBeLessThanOrEqual(24 + 9 * (68 + 52));
+    // maxRank 9 => maxY = PAD + 9*(NODE_H+V_GAP) = 24 + 9*146 = 1338 (NODE_H=94)
+    expect(maxY).toBeLessThanOrEqual(24 + 9 * (94 + 52));
 
     // B must not have been rank-inflated above its natural rank 1.
     const nodeB = laid.nodes.find((n) => n.id === "B");
-    expect(nodeB!.y).toBe(24 + 1 * 120); // rank 1
+    expect(nodeB!.y).toBe(24 + 1 * 146); // rank 1 (NODE_H=94, V_GAP=52 => step=146)
   });
 });

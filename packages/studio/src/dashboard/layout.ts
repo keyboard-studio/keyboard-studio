@@ -20,7 +20,11 @@
 import type { FlowGraph, GraphEdge, GraphNode } from "./model.ts";
 
 export const NODE_W = 220;
-export const NODE_H = 68;
+// NODE_H = 94: 68 baseline + 26 for the two metadata lines (writes/inputs) on
+// manifest-step stub nodes (spec 021 FR-004). Live question nodes leave the
+// extra space empty — overflow:hidden clips it, the cards just have more
+// bottom padding, which is acceptable given the map is a developer tool.
+export const NODE_H = 94;
 const H_GAP = 36;
 const V_GAP = 52;
 const PAD = 24;

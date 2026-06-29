@@ -103,7 +103,7 @@ function projectEdgeKind(kind: StepGraphEdge["kind"]): GraphEdge["kind"] {
 
 /** Project one StepGraphNode onto a render-ready GraphNode (kind:"stub"). */
 function projectNode(step: StepGraphNode): GraphNode {
-  return {
+  const node: GraphNode = {
     id: step.id,
     flowId: MANIFEST_FLOW_ID,
     label: step.label,
@@ -121,7 +121,15 @@ function projectNode(step: StepGraphNode): GraphNode {
     // Consistent with model.ts:46 — stub nodes are not part of the ordered spine
     // taxonomy region "flow"; they sit in "not-yet-ordered".
     region: "not-yet-ordered",
+    // FR-004 (spec 021): carry metadata from the StepGraphNode so FlowGraphView
+    // can render writes/inputs/lock as first-class information.
+    writePaths: step.writePaths,
+    inputPaths: step.inputPaths,
+    stepKind: step.type,
   };
+  // exactOptionalPropertyTypes: only assign lock when present.
+  if (step.lock !== undefined) node.lock = step.lock;
+  return node;
 }
 
 /** Project one StepGraphEdge onto a render-ready GraphEdge. */

@@ -76,6 +76,29 @@ export interface GraphNode {
    * is part of the ordered spine).
    */
   region: NodeRegion;
+  /**
+   * FR-004 (spec 021): IRPath strings this step writes, formatted via formatIRPath.
+   * Populated only on projected manifest-step nodes (kind:"stub"); absent on
+   * question nodes built by buildGraphFromQuestions.
+   */
+  writePaths?: readonly string[];
+  /**
+   * FR-004 (spec 021): IRPath strings this step reads, formatted via formatIRPath.
+   * Populated only on projected manifest-step nodes (kind:"stub"); absent on
+   * question nodes built by buildGraphFromQuestions.
+   */
+  inputPaths?: readonly string[];
+  /**
+   * FR-004 (spec 021): Lock gate placed after this step ("physical" | "touch").
+   * Populated only on projected manifest-step nodes that carry a lock gate;
+   * absent on question nodes and unlocked manifest steps.
+   */
+  lock?: "physical" | "touch";
+  /**
+   * FR-004 (spec 021): Step kind from StepNodeType ("editor-step" | "question-step").
+   * Populated only on projected manifest-step nodes; absent on question nodes.
+   */
+  stepKind?: "editor-step" | "question-step";
 }
 
 /** A directed transition between two questions. */
