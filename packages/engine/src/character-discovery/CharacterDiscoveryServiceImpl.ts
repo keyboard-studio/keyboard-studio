@@ -346,16 +346,33 @@ export class CharacterDiscoveryServiceImpl implements CharacterDiscoveryService 
     private readonly completer: LLMCompleter,
   ) {}
 
+  /**
+   * Harvest grapheme inventory from a pasted text sample.
+   *
+   * CONTRACT — NFC normalization:
+   * - The incoming `sample` is normalized to NFC at entry. All downstream
+   *   segmentation and extraction operate on the NFC form.
+   * - Callers MUST NOT re-normalize the returned chars to NFD.
+   * - For Indic, Hebrew, and Arabic scripts, combining marks remain DISCRETE
+   *   codepoints in NFC and are valid individual inventory entries; do NOT
+   *   suppress or merge them.
+   * - `normalize("NFC")` is idempotent for already-NFC input, so this guard
+   *   is safe for all callers regardless of their input encoding.
+   */
   async harvestFromText(
     sample: string,
     _base: BaseKeyboard
   ): Promise<InventoryChar[]> {
-    if (sample.length === 0 || /^[\s\p{Cc}]+$/u.test(sample)) {
+    // Normalize to NFC at entry: NFD input (common on macOS, e.g. "é" = U+0065
+    // U+0301) would otherwise yield NFD inventory chars from Intl.Segmenter.
+    const nfcSample = sample.normalize("NFC");
+
+    if (nfcSample.length === 0 || /^[\s\p{Cc}]+$/u.test(nfcSample)) {
       return [];
     }
 
     const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-    const segments = segmenter.segment(sample);
+    const segments = segmenter.segment(nfcSample);
 
     const counts = new Map<string, number>();
     for (const { segment } of segments) {

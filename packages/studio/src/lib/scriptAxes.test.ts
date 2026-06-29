@@ -38,6 +38,19 @@ describe("scriptClassOf (A2)", () => {
     expect(scriptClassOf("Syrc")).toBe("abjad");
     expect(scriptClassOf("Nkoo")).toBe("abjad");
   });
+  it("classifies Mandaic and Samaritan as abjads (added in RTL-script expansion)", () => {
+    // PR #870 added Mand and Samr to the ABJAD set alongside Syrc/Nkoo.
+    expect(scriptClassOf("Mand")).toBe("abjad");
+    expect(scriptClassOf("Samr")).toBe("abjad");
+  });
+  it("classifies Thaana, Adlam, and Hanifi Rohingya as alphabetic (RTL alphabets, not abjads)", () => {
+    // These are RTL scripts added to primary_script in PR #870.
+    // They are true alphabets (vowels written), so they fall through to the
+    // "alphabetic" default — NOT the ABJAD set.
+    expect(scriptClassOf("Thaa")).toBe("alphabetic");
+    expect(scriptClassOf("Adlm")).toBe("alphabetic");
+    expect(scriptClassOf("Rohg")).toBe("alphabetic");
+  });
   it("defaults unknown subtags to alphabetic", () => {
     expect(scriptClassOf("Zxxx")).toBe("alphabetic");
   });

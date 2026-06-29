@@ -1,6 +1,7 @@
 // Per-question module: writing_direction (Phase A)
 // Ported verbatim from content/flows/phase_a_identity.yaml.
-// Shown only for Arabic and Hebrew; Latin auto-sets LTR without asking.
+// Shown for right-to-left scripts (Arabic, Hebrew, Syriac, Thaana, N'Ko, Adlam,
+// Mandaic, Samaritan, Hanifi Rohingya); Latin auto-sets LTR without asking.
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
 
@@ -12,8 +13,9 @@ export const definition = {
   id: "writing_direction",
   prompt: "Does your text run right-to-left or left-to-right?",
   help_text:
-    "Arabic and Hebrew are usually written right-to-left, but some communities " +
-    "use a left-to-right style for certain contexts. Choose the direction your " +
+    "Right-to-left scripts such as Arabic, Hebrew, Syriac, Thaana, N'Ko, and " +
+    "Adlam are usually written right-to-left, but some communities use a " +
+    "left-to-right style for certain contexts. Choose the direction your " +
     "community uses most.",
   type: "radio" as const,
   required: true,

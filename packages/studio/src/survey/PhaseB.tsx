@@ -49,8 +49,14 @@ const CHAR_MULTI_SELECT_ID = "pb_picker_confirm";
 
 /**
  * Extract NFC graphemes from the character-bearing Phase B answers.
- * Text answers are whitespace-split; picker multi_select entries are taken as-is.
- * Empties and whitespace-only tokens are dropped. Deduplicated, first-appearance order.
+ * Text answers (CHAR_TEXT_IDS) are whitespace-split; picker multi_select entries
+ * (pb_picker_confirm) are taken as-is. Empties and whitespace-only tokens are
+ * dropped. Deduplicated, first-appearance order.
+ *
+ * NOTE: nfcDedup normalizes each token to NFC before deduplication, so all entries
+ * in the returned array are NFC-normalized. This function does NOT handle the pasted
+ * text sample (pb_text_sample) — that path is consumed by harvestFromText() in
+ * CharacterDiscoveryServiceImpl, which applies its own NFC guard at entry.
  */
 function extractInventory(answers: SurveyAnswer[]): string[] {
   let result: string[] = [];

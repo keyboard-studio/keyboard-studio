@@ -41,7 +41,10 @@ const ABUGIDA = new Set([
   "Orya", "Sinh", "Thai", "Khmr", "Mymr", "Laoo", "Tibt",
 ]);
 // Consonantal scripts. Syrc (Syriac) and Nkoo (N'Ko) are RTL abjads in active use.
-const ABJAD = new Set(["Arab", "Hebr", "Syrc", "Nkoo"]);
+// Mand (Mandaic) and Samr (Samaritan) are also abjads; added alongside the RTL
+// scripts that primary_script.ts exposes (Thaa/Adlm/Rohg are RTL alphabets and
+// correctly fall through to the "alphabetic" default).
+const ABJAD = new Set(["Arab", "Hebr", "Syrc", "Nkoo", "Mand", "Samr"]);
 // Cher (Cherokee) and Yiii (Yi) are true syllabaries, not alphabets.
 const SYLLABARY = new Set(["Cans", "Vaii", "Cher", "Yiii"]);
 const LOGOGRAPHIC = new Set(["Hani"]);
