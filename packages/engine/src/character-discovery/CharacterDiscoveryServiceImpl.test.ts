@@ -142,6 +142,33 @@ describe("CharacterDiscoveryServiceImpl.harvestFromText", () => {
     expect(result[0]?.char).toBe(combining);
   });
 
+  it("harvestFromText normalizes NFD input to NFC before extraction", async () => {
+    // Construct NFD explicitly via code units so the assertion does not depend
+    // on the source file's encoding.  "é" in NFD = U+0065 (LATIN SMALL LETTER E)
+    // followed by U+0301 (COMBINING ACUTE ACCENT) — two code units / codepoints.
+    const nfdEAcute = "é"; // NFD "é" — length 2
+    expect(nfdEAcute.length).toBe(2); // self-documenting: input IS two codepoints
+
+    const nfcEAcute = "é"; // NFC "é" — length 1
+    expect(nfcEAcute.length).toBe(1); // self-documenting: expected output IS one codepoint
+
+    const result = await service.harvestFromText(nfdEAcute, baseKb);
+
+    expect(result).toHaveLength(1);
+    // The stored char must be the NFC precomposed form, not the raw NFD input
+    expect(result[0]!.char).toBe(nfcEAcute);
+    expect(result[0]!.char.length).toBe(1);
+
+    // Hangul: NFD jamo sequence ᄀ (U+1100) + ᅡ (U+1161) should normalize to the
+    // NFC syllable 가 (U+AC00) — one entry, one code unit.
+    const nfdGa = "가"; // NFD jamo pair — length 2
+    const nfcGa = "가";       // NFC syllable 가 — length 1
+    const gaResult = await service.harvestFromText(nfdGa, baseKb);
+    expect(gaResult).toHaveLength(1);
+    expect(gaResult[0]!.char).toBe(nfcGa);
+    expect(gaResult[0]!.char.length).toBe(1);
+  });
+
   it("ASCII chars have inBaseOutput: true", async () => {
     const result = await service.harvestFromText("abc", baseKb);
     for (const item of result) {
