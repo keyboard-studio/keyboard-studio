@@ -10,7 +10,8 @@ export const definition = {
     "The longer the text, the better. Anything works: a story, a Bible " +
     "passage, a news article, or even a short sentence. We will find every " +
     "distinct character and build your character list from it. You can still " +
-    "review and edit the list after. Please paste at least one full sentence.",
+    "review and edit the list after. Please paste at least one full sentence. " +
+    "Paste a representative sample -- the studio normalizes it to standard Unicode form (NFC) before analysis.",
   type: "text" as const,
   required: true,
   next: "pb_text_sample_review",

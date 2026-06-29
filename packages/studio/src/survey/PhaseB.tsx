@@ -51,6 +51,11 @@ const CHAR_MULTI_SELECT_ID = "pb_picker_confirm";
  * Extract NFC graphemes from the character-bearing Phase B answers.
  * Text answers are whitespace-split; picker multi_select entries are taken as-is.
  * Empties and whitespace-only tokens are dropped. Deduplicated, first-appearance order.
+ *
+ * CONTRACT: all character data entering this function is NFC-guaranteed (nfcDedup
+ * normalizes each token to NFC before deduplication). Do NOT re-normalize to NFD
+ * downstream. For Indic, Hebrew, and Arabic: enumerate codepoints individually
+ * after NFC -- combining marks remain discrete in NFC and are valid inventory entries.
  */
 function extractInventory(answers: SurveyAnswer[]): string[] {
   let result: string[] = [];

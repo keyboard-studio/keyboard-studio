@@ -243,3 +243,30 @@ describe("advanceThrough — cycle detection", () => {
     errorSpy.mockRestore();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Defect 6 regression — terminal { default: true, goto: null } rule
+// ---------------------------------------------------------------------------
+
+describe("advanceThrough — terminal default rule (defect 6 regression)", () => {
+  it("resolves { default: true, goto: null } to null without logging 'unresolved goto target'", () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // A question whose only next rule is the terminal default: { default: true, goto: null }.
+    // This is the FlowGotoRule shape produced by converted dormant YAMLs (defect 6).
+    const terminal: FlowQuestion = {
+      id: "q_terminal",
+      type: "bool",
+      next: [{ default: true, goto: null }],
+    };
+    const result = advanceThrough(terminal, "true", {}, idx(terminal));
+
+    expect(result).toBeNull();
+    expect(errorSpy).not.toHaveBeenCalledWith(
+      "SurveyRunner: unresolved goto target",
+      expect.anything(),
+    );
+
+    errorSpy.mockRestore();
+  });
+});

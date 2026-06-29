@@ -7,7 +7,8 @@ import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { irPath } from "@keyboard-studio/contracts";
 
 const VALID_SCRIPT_VALUES = new Set([
-  "Latn", "Arab", "Hebr", "Deva", "Beng", "Taml", "Telu", "Knda", "Mlym",
+  "Latn", "Arab", "Hebr", "Thaa", "Nkoo", "Adlm", "Syrc", "Mand", "Samr", "Rohg",
+  "Deva", "Beng", "Taml", "Telu", "Knda", "Mlym",
   "Guru", "Gujr", "Orya", "Sinh", "Thai", "Khmr", "Mymr", "Laoo", "Ethi",
   "Hang", "Hani", "Geor", "Armn", "Cyrl", "Grek", "Tibt", "Cans", "Cher",
   "Other",
@@ -26,6 +27,13 @@ export const definition = {
     { value: "Latn", label: "Latin (A, B, C, and accented letters like é, ñ, ŋ)" },
     { value: "Arab", label: "Arabic" },
     { value: "Hebr", label: "Hebrew" },
+    { value: "Thaa", label: "Thaana (Maldivian / Dhivehi)" },
+    { value: "Nkoo", label: "N'Ko (Manding languages of West Africa)" },
+    { value: "Adlm", label: "Adlam (Fulani / Pular)" },
+    { value: "Syrc", label: "Syriac" },
+    { value: "Mand", label: "Mandaic" },
+    { value: "Samr", label: "Samaritan" },
+    { value: "Rohg", label: "Hanifi Rohingya" },
     { value: "Deva", label: "Devanagari (used for Hindi, Nepali, Marathi, and others)" },
     { value: "Beng", label: "Bengali" },
     { value: "Taml", label: "Tamil" },
@@ -54,7 +62,7 @@ export const definition = {
   ],
   next: [
     { condition: "value == 'Ethi' or value == 'Hang' or value == 'Hani'", goto: "script_not_supported_stub" },
-    { condition: "value == 'Arab' or value == 'Hebr'", goto: "writing_direction" },
+    { condition: "value == 'Arab' or value == 'Hebr' or value == 'Thaa' or value == 'Nkoo' or value == 'Adlm' or value == 'Syrc' or value == 'Mand' or value == 'Samr' or value == 'Rohg'", goto: "writing_direction" },
     { condition: "value == 'Latn' or value == 'Cyrl' or value == 'Grek' or value == 'Geor' or value == 'Armn'", goto: "layout_family" },
     { default: true as const, goto: "layout_family" },
   ],

@@ -90,7 +90,8 @@ next:
     goto: script_family
   - condition: "value == 'azerty'"
     goto: layout_family_confirm
-  - default: author_display_name
+  - default: true
+    goto: author_display_name
 ```
 
 The engine evaluates rules in order; the first matching rule's `goto` target is
@@ -114,7 +115,8 @@ Valid `ctx` keys carried from Phase A into Phase B:
 next:
   - condition: "ctx.routing_group == 'non-roman'"
     goto: pb_non_roman_branch
-  - default: pb_standard_letters
+  - default: true
+    goto: pb_standard_letters
 ```
 
 The bare `value == '...'` form remains valid and refers to the current
