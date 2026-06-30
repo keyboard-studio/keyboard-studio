@@ -21,13 +21,13 @@ exports[`flow-parity: identity_lite — questions[] > projected fields are stabl
     "type": "text",
   },
   {
-    "help_text": "Enter the two- or three-letter ISO 639 code for your language — the short code linguists and software systems use to identify it. Examples: "en" (English), "fr" (French), "ha" (Hausa), "hi" (Hindi), "sw" (Swahili), "bft" (Balti). Leave blank if you are unsure; you can add it later. Note: enter only the language subtag, not a full BCP47 tag with region or variant (those are added during the documentation stage).",
+    "help_text": "Search by language name, autonym, or ISO 639 code. Examples: "Hausa", "ha", "Hindi", "hi". If your language is not in the list, type its ISO 639 code directly (e.g. "bft" for Balti) and continue — free text is always accepted. Leave blank if you are unsure.",
     "id": "il_language_code",
     "next": "il_target_script",
     "options": undefined,
-    "prompt": "What is the ISO 639 language subtag for this language?",
+    "prompt": "What language is this keyboard for?",
     "required": false,
-    "type": "text",
+    "type": "autocomplete",
   },
   {
     "help_text": "Choose the writing system this keyboard produces. It can differ from the script your language normally uses: pick "Latin romanization" or "IPA" if you are building a romanized or phonetic keyboard. The script you choose here — not the language — decides the keyboard's layout family.",
