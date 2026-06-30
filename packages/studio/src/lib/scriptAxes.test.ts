@@ -72,19 +72,19 @@ describe("routingGroupOf (§9)", () => {
   });
 });
 
-// Regression guard for #872 (the #870 Mand/Samr misclassification could recur
-// silently). The survey's primary_script question and scriptAxes maintain two
-// INDEPENDENT script enumerations: VALID_SCRIPT_VALUES (what the user may pick)
-// and the explicit class sets (LATIN_ALPHABETIC/ABUGIDA/ABJAD/SYLLABARY/
-// LOGOGRAPHIC, unioned as EXPLICITLY_CLASSIFIED_SCRIPTS). Because scriptClassOf
-// DEFAULTS to "alphabetic", a brand-new selectable script that nobody classified
-// is silently treated as a Latin-style alphabet — exactly the #870 bug. A naive
+// Regression guard: the Mand/Samr misclassification could recur silently.
+// The survey's primary_script question and scriptAxes maintain two INDEPENDENT
+// script enumerations: VALID_SCRIPT_VALUES (what the user may pick) and the
+// explicit class sets (LATIN_ALPHABETIC/ABUGIDA/ABJAD/SYLLABARY/LOGOGRAPHIC,
+// unioned as EXPLICITLY_CLASSIFIED_SCRIPTS). Because scriptClassOf DEFAULTS to
+// "alphabetic", a brand-new selectable script that nobody classified is silently
+// treated as a Latin-style alphabet — exactly the prior Mand/Samr bug. A naive
 // "is it classified?" check can't catch that (everything "classifies" via the
 // default), so this guard instead asserts every selectable code is EITHER in an
 // explicit class set OR in an EXPLICIT allowlist of codes intentionally left to
 // the alphabetic default. Adding a code to VALID_SCRIPT_VALUES without doing one
 // of those two things FAILS this test loudly.
-describe("primary_script ↔ scriptAxes classification guard (#872)", () => {
+describe("primary_script ↔ scriptAxes classification guard", () => {
   // Codes intentionally NOT in any explicit class set — they ride the
   // "alphabetic" default in scriptClassOf on purpose. Each must be justified
   // here; do NOT add a code just to silence the test without understanding it.
@@ -97,7 +97,8 @@ describe("primary_script ↔ scriptAxes classification guard (#872)", () => {
     "Rohg", // Hanifi Rohingya
     // Phase A out-of-scope gate (D5): Ethiopic and Hangul are routed to the
     // script-not-supported stub before any A2 class matters, so they are left to
-    // the default. (The third gated script, Hani, IS explicitly LOGOGRAPHIC.)
+    // the alphabetic default. Han/Hani (the third gated script) IS explicitly
+    // LOGOGRAPHIC and is covered by EXPLICITLY_CLASSIFIED_SCRIPTS, not this allowlist.
     "Ethi", // Ethiopic
     "Hang", // Hangul (Korean)
     // The catch-all "A different writing system not listed here".

@@ -32,11 +32,11 @@ export function normalizeTargetScript(raw: string): {
 
 // Alphabetic scripts typed on a QWERTY-family physical layout (Latin plus the
 // non-Latin alphabets keyed on QWERTY hardware). NOT a "Latin-only" set.
-export const LATIN_ALPHABETIC = new Set(["Latn", "Cyrl", "Grek", "Geor", "Armn"]);
+const LATIN_ALPHABETIC = new Set(["Latn", "Cyrl", "Grek", "Geor", "Armn"]);
 // Brahmic + SE-Asian abugidas. NOTE: Tibt (Tibetan) is an abugida but uses
 // subjoined-consonant stacking (U+0F90–U+0FAD) unlike the others — a pattern
 // designed for Devanagari will not handle Tibetan stacking; A2 alone underspecifies it.
-export const ABUGIDA = new Set([
+const ABUGIDA = new Set([
   "Deva", "Beng", "Taml", "Telu", "Knda", "Mlym", "Guru", "Gujr",
   "Orya", "Sinh", "Thai", "Khmr", "Mymr", "Laoo", "Tibt",
 ]);
@@ -44,10 +44,10 @@ export const ABUGIDA = new Set([
 // Mand (Mandaic) and Samr (Samaritan) are also abjads; added alongside the RTL
 // scripts that primary_script.ts exposes (Thaa/Adlm/Rohg are RTL alphabets and
 // correctly fall through to the "alphabetic" default).
-export const ABJAD = new Set(["Arab", "Hebr", "Syrc", "Nkoo", "Mand", "Samr"]);
+const ABJAD = new Set(["Arab", "Hebr", "Syrc", "Nkoo", "Mand", "Samr"]);
 // Cher (Cherokee) and Yiii (Yi) are true syllabaries, not alphabets.
-export const SYLLABARY = new Set(["Cans", "Vaii", "Cher", "Yiii"]);
-export const LOGOGRAPHIC = new Set(["Hani"]);
+const SYLLABARY = new Set(["Cans", "Vaii", "Cher", "Yiii"]);
+const LOGOGRAPHIC = new Set(["Hani"]);
 
 /**
  * The union of every EXPLICIT script-class set above. A script in this set has
