@@ -29,6 +29,15 @@ const EDGE_COLOR: Record<GraphEdge["kind"], string> = {
   default: "#6e7681",
 };
 
+// Extra vertical room rendered below the last node row. Edges leaving the
+// bottom-most nodes (e.g. Phase B's pb_linguist_confirm / pb_picker_confirm)
+// bow below their node; without this pad the SVG clips them at the canvas edge
+// and the next drill-down section (e.g. Phase F) sits flush against them. The
+// pad un-clips those edges AND separates consecutive sections. layout.ts's
+// laid.height is unchanged (node positions / its tests are untouched) — this is
+// purely a render-time canvas extension.
+const CANVAS_BOTTOM_PAD = 80;
+
 interface Pt {
   x: number;
   y: number;
@@ -109,6 +118,9 @@ interface FlowGraphViewProps {
 export function FlowGraphView({ graph }: FlowGraphViewProps) {
   const laid: LaidOutGraph = layoutFlowGraph(graph);
   const pos = new Map<string, PositionedNode>(laid.nodes.map((n) => [n.id, n]));
+  // Render the canvas a little taller than the laid-out node extent so bottom-row
+  // edges aren't clipped and the next section isn't crowded (see CANVAS_BOTTOM_PAD).
+  const canvasH = laid.height + CANVAS_BOTTOM_PAD;
 
   // Every graph renders in full (page scrolls). Deep phases like Phase B must be
   // fully visible inline — no node-capping / "Show more" collapse.
@@ -125,13 +137,13 @@ export function FlowGraphView({ graph }: FlowGraphViewProps) {
         style={{
           position: "relative",
           width: laid.width,
-          height: laid.height,
+          height: canvasH,
         }}
       >
         {/* Edge canvas */}
         <svg
           width={laid.width}
-          height={laid.height}
+          height={canvasH}
           style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
         >
           <defs>
