@@ -11,7 +11,7 @@
 // scriptToTargetOption mapping and the SurveyRunner-exported logic that drives
 // the seed contract, keeping test cost low and avoiding jsdom component overhead.
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { scriptToTargetOption } from "../lib/langtagsDefaults.ts";
 import { buildTargetBcp47, extractIdentityLite } from "./IdentityLite.tsx";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
