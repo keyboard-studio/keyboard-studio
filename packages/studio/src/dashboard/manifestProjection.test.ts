@@ -26,27 +26,35 @@ import { questionRegistry } from "../survey/questions/registry.ts";
 import { phaseARegistry } from "../survey/questions/registry.a.ts";
 import { phaseBRegistry } from "../survey/questions/registry.b.ts";
 import { phaseFRegistry } from "../survey/questions/registry.f.ts";
+import { phaseTrackRegistry, phaseProjectRegistry } from "../survey/questions/registry.g.ts";
 
 import identityLiteModularRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
 import phaseAModularRaw from "../../../../content/flows/phase_a_identity.modular.yaml?raw";
 import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modular.yaml?raw";
 import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
+import trackModularRaw from "../../../../content/flows/track.modular.yaml?raw";
+import projectNameModularRaw from "../../../../content/flows/project_name.modular.yaml?raw";
 
 // Mirror DashboardView's FLOW_SOURCES so the drill-down assertions exercise the
-// same four modular graphs the dashboard renders today.
+// same modular graphs the dashboard renders today — including the Phase G wizard
+// flows (track / project_name), which hang under their OWN manifest step ids
+// (so the multi-key grouping path in attachDrillDowns is covered, not just the
+// characters bucket).
 const FLOW_SOURCES = [
-  { raw: identityLiteModularRaw, title: "Identity-lite (Phase A head)", registry: phaseARegistry },
-  { raw: phaseAModularRaw, title: "Phase A — identity", registry: phaseARegistry },
-  { raw: phaseBModularRaw, title: "Phase B — character discovery", registry: phaseBRegistry },
-  { raw: phaseFModularRaw, title: "Phase F — help docs", registry: phaseFRegistry },
+  { raw: identityLiteModularRaw, title: "Identity-lite (Phase A head)", registry: phaseARegistry, stepId: CHARACTERS_STEP_ID },
+  { raw: phaseAModularRaw, title: "Phase A — identity", registry: phaseARegistry, stepId: CHARACTERS_STEP_ID },
+  { raw: phaseBModularRaw, title: "Phase B — character discovery", registry: phaseBRegistry, stepId: CHARACTERS_STEP_ID },
+  { raw: phaseFModularRaw, title: "Phase F — help docs", registry: phaseFRegistry, stepId: CHARACTERS_STEP_ID },
+  { raw: trackModularRaw, title: "Phase G — track selection", registry: phaseTrackRegistry, stepId: "track" },
+  { raw: projectNameModularRaw, title: "Phase G — project name", registry: phaseProjectRegistry, stepId: "project_name" },
 ] as const;
 
 function buildFlows() {
   return FLOW_SOURCES.map((f) => {
     try {
-      return { graph: buildModularFlowGraph(f.raw, f.title, f.registry), error: null as string | null, title: f.title };
+      return { graph: buildModularFlowGraph(f.raw, f.title, f.registry), error: null as string | null, title: f.title, stepId: f.stepId };
     } catch (err) {
-      return { graph: null, error: err instanceof Error ? err.message : String(err), title: f.title };
+      return { graph: null, error: err instanceof Error ? err.message : String(err), title: f.title, stepId: f.stepId };
     }
   });
 }
@@ -130,21 +138,31 @@ describe("attachDrillDowns — registry-keyed drill-downs (FR-004 / SC-003)", ()
   const flows = buildFlows();
   const drillDowns = attachDrillDowns(flows);
 
-  it("FR-004 — every per-phase modular graph hangs under the 'characters' question-step node", () => {
-    expect(Object.keys(drillDowns)).toEqual([CHARACTERS_STEP_ID]);
-    const underCharacters = drillDowns[CHARACTERS_STEP_ID]!;
-    expect(underCharacters.length).toBe(flows.length);
+  it("FR-004 — modular graphs hang under their manifest step id (characters + Phase G track/project_name)", () => {
+    expect(Object.keys(drillDowns).sort()).toEqual(
+      [CHARACTERS_STEP_ID, "project_name", "track"].sort(),
+    );
+    // The four identity/A/B/F flows hang under characters; the two Phase G flows
+    // each hang under their own manifest step (the multi-key grouping path).
+    expect(drillDowns[CHARACTERS_STEP_ID]!.length).toBe(4);
+    expect(drillDowns["track"]!.length).toBe(1);
+    expect(drillDowns["project_name"]!.length).toBe(1);
+    // Every flow is accounted for across the buckets — none dropped.
+    const total = Object.values(drillDowns).reduce((n, list) => n + list.length, 0);
+    expect(total).toBe(flows.length);
   });
 
   it("FR-004 — each drill-down key is a questionRegistry id (divergence is observable)", () => {
-    for (const dd of drillDowns[CHARACTERS_STEP_ID]!) {
-      // Built (non-null) graphs key off a real registry id.
-      if (dd.graph !== null) {
-        expect(
-          Object.prototype.hasOwnProperty.call(questionRegistry, dd.registryKey),
-          `drill-down key "${dd.registryKey}" (${dd.title}) is not a questionRegistry id`,
-        ).toBe(true);
-        expect(registryKeyForFlow(dd.graph)).toBe(dd.registryKey);
+    for (const list of Object.values(drillDowns)) {
+      for (const dd of list) {
+        // Built (non-null) graphs key off a real registry id.
+        if (dd.graph !== null) {
+          expect(
+            Object.prototype.hasOwnProperty.call(questionRegistry, dd.registryKey),
+            `drill-down key "${dd.registryKey}" (${dd.title}) is not a questionRegistry id`,
+          ).toBe(true);
+          expect(registryKeyForFlow(dd.graph)).toBe(dd.registryKey);
+        }
       }
     }
   });
@@ -174,9 +192,11 @@ describe("attachDrillDowns — registry-keyed drill-downs (FR-004 / SC-003)", ()
     }
   });
 
-  it("SC-003 — all four modular graphs are retained (drop none)", () => {
-    const list = drillDowns[CHARACTERS_STEP_ID]!;
-    const titles = list.map((d) => d.title);
-    expect(titles).toEqual(flows.map((f) => f.title));
+  it("SC-003 — every modular graph is retained across the step buckets (drop none)", () => {
+    // Flows now spread across multiple manifest-step buckets (characters + the
+    // Phase G track/project_name steps); the union of all buckets must retain
+    // every flow title, in FLOW_SOURCES order.
+    const titles = Object.values(drillDowns).flatMap((list) => list.map((d) => d.title));
+    expect(titles.sort()).toEqual(flows.map((f) => f.title).sort());
   });
 });

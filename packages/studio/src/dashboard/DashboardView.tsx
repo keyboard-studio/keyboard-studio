@@ -307,12 +307,19 @@ export function FlowMapView({ completeness }: FlowMapViewProps) {
     const withDrillDowns = new Set(Object.keys(drillDowns));
     // Walk the manifest spine in its rendered order to get spine-ordered step ids.
     const ordered: string[] = [];
+    const seen = new Set<string>();
     for (const node of manifestSpine.nodes) {
-      if (withDrillDowns.has(node.id)) ordered.push(node.id);
+      if (withDrillDowns.has(node.id) && !seen.has(node.id)) {
+        ordered.push(node.id);
+        seen.add(node.id);
+      }
     }
     // Add any step ids not in the spine (defensive — should not happen in practice).
     for (const id of withDrillDowns) {
-      if (!ordered.includes(id)) ordered.push(id);
+      if (!seen.has(id)) {
+        ordered.push(id);
+        seen.add(id);
+      }
     }
     return ordered;
   }, [drillDowns, manifestSpine.nodes]);

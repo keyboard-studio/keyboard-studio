@@ -106,7 +106,7 @@ export function buildFlowSources(): BuiltFlowSource[] {
  *   • the manifest spine projection nodes (buildManifestProjection(), the 015
  *     StepGraph -> FlowGraph adapter over buildManifestStepGraph()), UNION
  *   • the node ids of each per-phase drill-down FlowGraph (buildModularFlowGraph
- *     over FLOW_SOURCES, attached under the "characters" step).
+ *     over FLOW_SOURCES, attached under their respective manifest step nodes).
  *
  * Reserve / library nodes (kind:"library-not-in-flow" — registered-but-unreachable
  * registry modules that computeReserveNodes appends so the reserve set stays

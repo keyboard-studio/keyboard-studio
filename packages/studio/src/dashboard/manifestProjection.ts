@@ -243,11 +243,16 @@ export function attachDrillDowns(
 }
 
 /**
- * buildManifestProjectionWithDrillDowns — the full projection used by the
- * dashboard: the spine FlowGraph + the registry-keyed drill-downs.
+ * buildManifestProjectionWithDrillDowns — the spine FlowGraph + the registry-keyed
+ * drill-downs grouped by manifest step id.
+ *
+ * NOTE: the live dashboard (DashboardView) calls buildManifestProjection() and
+ * attachDrillDowns() directly; this convenience wrapper is retained for the
+ * projection-layer tests. It accepts the optional `stepId` carried by
+ * BuiltFlowSource so the multi-step grouping path is exercised.
  */
 export function buildManifestProjectionWithDrillDowns(
-  flows: ReadonlyArray<{ graph: FlowGraph | null; error: string | null; title: string }>,
+  flows: ReadonlyArray<{ graph: FlowGraph | null; error: string | null; title: string; stepId?: string }>,
 ): ManifestProjection {
   return {
     spine: buildManifestProjection(),
