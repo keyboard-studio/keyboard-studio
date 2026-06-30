@@ -38,7 +38,13 @@ const url = urlTemplate.replace('{commit}', commit);
 console.log(`[OK] Downloading langtags @ ${commit.slice(0, 12)}...`);
 console.log(`     ${url}`);
 
-const buf = await download(url);
+let buf;
+try {
+  buf = await download(url);
+} catch (err) {
+  console.error(`[ERROR] Download failed: ${err.message}`);
+  process.exit(1);
+}
 const actual = createHash('sha256').update(buf).digest('hex');
 const expected = sha256.toLowerCase();
 
@@ -74,7 +80,6 @@ const sources = {
   sha256: actual,
   url,
   notice,
-  fetchedAt: new Date().toISOString(),
   bytes: buf.length,
   recordCount,
 };

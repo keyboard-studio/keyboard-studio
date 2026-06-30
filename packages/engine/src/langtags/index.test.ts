@@ -55,6 +55,22 @@ describe("getLanguageDefaults", () => {
     expect(() => getLanguageDefaults("zzz")).not.toThrow();
     expect(getLanguageDefaults("zzz")).toBeNull();
   });
+
+  it("C10 — iso639_3extra alias resolves to the bare-subtag record", () => {
+    // kmr is an iso639_3extra alias for ku (Kurdish); both must return the same record
+    const byBare = getLanguageDefaults("ku");
+    const byAlias = getLanguageDefaults("kmr");
+    expect(byAlias).not.toBeNull();
+    expect(byAlias!.code).toBe("ku");
+    expect(byAlias).toStrictEqual(byBare);
+
+    // ike is an iso639_3extra alias for iu (Inuktitut); both must return the same record
+    const byBareIu = getLanguageDefaults("iu");
+    const byAliasIke = getLanguageDefaults("ike");
+    expect(byAliasIke).not.toBeNull();
+    expect(byAliasIke!.code).toBe("iu");
+    expect(byAliasIke).toStrictEqual(byBareIu);
+  });
 });
 
 describe("listLanguages", () => {

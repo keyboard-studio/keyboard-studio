@@ -64,6 +64,11 @@ Build-time metadata, not a runtime type.
 - `packages/engine/data/langtags/SOURCES.json` — manifest: pinned commit, SHA-256, fetch metadata,
   record/language counts (mirrors kbgen's `SOURCES.json`).
 
+**Note:** Macrolanguages without a bare-subtag tagset in the upstream data (e.g. `zh`) are
+intentionally absent from the generated index. They are represented only via individual variety
+codes (e.g. `cmn`, `yue`) — the langtags upstream never emits a bare-`zh` tagset with `full`
+defaults.
+
 ## Relationships
 
 - `LanguageSummary.code` → key into the `LanguageDefaults` map.

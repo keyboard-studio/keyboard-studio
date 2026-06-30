@@ -80,6 +80,7 @@ const index = new Map();
 const languagesByTag = new Map();
 
 let skipped = 0;
+let aliasCollisions = 0;
 
 for (const entry of raw) {
   // Skip underscore-prefixed header records (_version, _globalvar, _phonvar, etc.)
@@ -88,7 +89,10 @@ for (const entry of raw) {
     continue;
   }
 
-  // Only process bare language subtags (no '-' in tag)
+  // Only process bare language subtags (no '-' in tag).
+  // Macrolanguages without a bare-subtag tagset (e.g. "zh") are intentionally
+  // absent from the generated index — they are represented upstream only via
+  // individual variety codes (e.g. "cmn", "yue"), never as a single bare entry.
   if (entry.tag.includes('-')) continue;
 
   const { full, iso639_3, iso639_3extra, localname, name, regions } = entry;
@@ -118,12 +122,26 @@ for (const entry of raw) {
   // Also index under iso639_3 and each iso639_3extra (lowercased)
   if (iso639_3) {
     const k = iso639_3.toLowerCase();
-    if (k !== tagKey) index.set(k, record);
+    if (k !== tagKey) {
+      if (index.has(k) && index.get(k).code !== record.code) {
+        console.warn(`[WARN] alias collision: "${k}" already maps to "${index.get(k).code}", skipping alias for "${record.code}"`);
+        aliasCollisions++;
+      } else {
+        index.set(k, record);
+      }
+    }
   }
   if (Array.isArray(iso639_3extra)) {
     for (const extra of iso639_3extra) {
       const k = extra.toLowerCase();
-      if (k !== tagKey) index.set(k, record);
+      if (k !== tagKey) {
+        if (index.has(k) && index.get(k).code !== record.code) {
+          console.warn(`[WARN] alias collision: "${k}" already maps to "${index.get(k).code}", skipping alias for "${record.code}"`);
+          aliasCollisions++;
+        } else {
+          index.set(k, record);
+        }
+      }
     }
   }
 
@@ -148,6 +166,11 @@ const languageCount = languagesByTag.size;
 const indexKeyCount = sortedIndexEntries.length;
 
 console.log(`[OK] ${languageCount} bare-subtag languages, ${indexKeyCount} index keys`);
+if (aliasCollisions === 0) {
+  console.log('[OK] 0 alias collisions');
+} else {
+  console.log(`[WARN] ${aliasCollisions} alias collision(s) detected (see above)`);
+}
 
 // ------------------------------------------------------------------ emit ----
 
