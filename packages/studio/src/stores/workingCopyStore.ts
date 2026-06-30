@@ -450,9 +450,16 @@ function remerge(
 
 const INITIAL_SURVEY = remerge({}, []);
 
-const INITIAL_STATE: Omit<
+/**
+ * The store's data fields only — actions excluded. This is the single source of
+ * truth for "what is the serializable shape of a working copy": `INITIAL_STATE`
+ * below, `reset()`, and the cross-redirect snapshot in `persistWorkingCopy.ts`
+ * all derive from it, so a new data field added to `WorkingCopyState` propagates
+ * here and forces every consumer to account for it (no silent omission).
+ */
+export type WorkingCopyData = Omit<
   WorkingCopyState,
-  // actions are excluded from the initial state snapshot
+  // actions are excluded from the data snapshot
   | "setIR" | "setWorkingIR" | "clearIR" | "deleteNode" | "undoDelete" | "restoreNode"
   | "isDeleted" | "deleteItem" | "restoreItem" | "isItemDeleted" | "keepAll" | "restoreAll"
   | "recordPhase" | "recordAssignments"
@@ -461,7 +468,9 @@ const INITIAL_STATE: Omit<
   | "instantiateFromBase" | "instantiateFromExisting" | "setIdentity" | "isInstantiated"
   | "markStale" | "clearStale"
   | "setValidatorFindings"
-> = {
+>;
+
+const INITIAL_STATE: WorkingCopyData = {
   // instantiation mode
   instantiationMode: null,
   // base slots

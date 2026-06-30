@@ -21,6 +21,7 @@ import {
 } from "../lib/githubOAuth.ts";
 import { getGitHubOutputService } from "../lib/services.ts";
 import type { OAuthCallbackFailureReason } from "../lib/handleOAuthCallback.ts";
+import { snapshotWorkingCopyToSession } from "../lib/persistWorkingCopy.ts";
 
 /**
  * Static, user-facing copy for each OAuth-callback failure reason. The boot-time
@@ -164,6 +165,7 @@ export function useGitHubAuth(): UseGitHubAuthResult {
     setError(null);
     try {
       const url = await beginAuthorize(scope);
+      snapshotWorkingCopyToSession();
       window.location.assign(url);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to start GitHub sign-in.");
