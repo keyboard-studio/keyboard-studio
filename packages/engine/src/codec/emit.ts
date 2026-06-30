@@ -100,6 +100,7 @@ function fmtOutputElement(el: OutputElement): string {
     case "beep":    return "beep";
     case "index":   return `index(${el.storeRef}, ${el.offset})`;
     case "outs":    return `outs(${el.storeRef})`;
+    case "useGroup": return `use(${el.groupName})`;
     case "raw":     return el.text;
   }
 }

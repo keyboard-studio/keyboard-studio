@@ -53,6 +53,11 @@ export type OutputElement =
   | { kind: "beep" }
   | { kind: "index"; storeRef: string; offset: number }
   | { kind: "outs"; storeRef: string }
+  /** `use(groupName)` group transition in output position — a control-flow
+   *  jump to another group, not a character. Additive member (#268): the codec
+   *  previously preserved this as an untyped `raw` blob; downstream consumers
+   *  (recognizer, carve gallery) can now see the transition explicitly. */
+  | { kind: "useGroup"; groupName: string }
   | { kind: "raw"; text: string };
 
 /** A virtual key + modifier combination (used in the I2 round-trip enumeration corpus). */

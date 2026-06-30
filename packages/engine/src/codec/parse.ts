@@ -464,10 +464,11 @@ function parseOutputElements(
       opaqueOut.reason = OPAQUE_REASONS.OUTS_EXPANSION;
       return null;
     }
-    // use(group) in output — treat as raw (group transition; typically only at rule level)
+    // use(group) in output — typed group-transition node (#268). Not opaque:
+    // the rule stays typed; emit.ts renders it back to use(groupName).
     const useRef = parseUse(tok);
     if (useRef !== null) {
-      elements.push({ kind: "raw", text: tok });
+      elements.push({ kind: "useGroup", groupName: useRef });
       continue;
     }
     // save/set/reset — opaque

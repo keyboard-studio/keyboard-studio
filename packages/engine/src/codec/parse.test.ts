@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parse } from "./parse.js";
+import { emit } from "./emit.js";
 
 const MINIMAL_KMN = `c keyboard header
 store(&VERSION) '10.0'
@@ -217,5 +218,47 @@ describe("parse — numeric store names (#412)", () => {
     const storeMixed = ir.stores.find(s => s.name === "1base");
     expect(storeMixed).toBeDefined();
     expect(storeMixed?.isSystem).toBe(false);
+  });
+});
+
+describe("use(group) in rule output (#268)", () => {
+  const KMN = `store(&VERSION) '10.0'
+store(&NAME) 'UseGroup Test'
+store(&TARGETS) 'any'
+store(&KEYBOARDVERSION) '1.0'
+
+begin Unicode > use(main)
+
+group(main) using keys
++ [K_A] > use(deadkeys)
+
+group(deadkeys)
++ [K_B] > U+0062
+`;
+
+  it("parses use(group) in output as a typed useGroup node (not raw, not opaque)", () => {
+    const { ir, opaqueFeatures } = parse(KMN, "ug");
+    const main = ir.groups.find((g) => g.name === "main");
+    const rule = main?.rules.find((r) =>
+      r.output.some((o) => o.kind === "useGroup"),
+    );
+    expect(rule).toBeDefined();
+    expect(rule!.output).toContainEqual({ kind: "useGroup", groupName: "deadkeys" });
+    // Not wrapped as raw, and the rule did NOT make the keyboard opaque.
+    expect(rule!.output.some((o) => o.kind === "raw")).toBe(false);
+    expect(ir.raw.length).toBe(0);
+    expect(opaqueFeatures.length).toBe(0);
+  });
+
+  it("emits useGroup back to use(groupName) and round-trips structurally", () => {
+    const { ir } = parse(KMN, "ug");
+    const emitted = emit(ir);
+    expect(emitted).toContain("use(deadkeys)");
+    // Re-parse the emitted text; the useGroup node survives identically.
+    const { ir: ir2 } = parse(emitted, "ug");
+    const out2 = ir2.groups
+      .find((g) => g.name === "main")
+      ?.rules.flatMap((r) => r.output);
+    expect(out2).toContainEqual({ kind: "useGroup", groupName: "deadkeys" });
   });
 });

@@ -177,6 +177,11 @@ export function buildProducedSet(
             flushRun(run, collector, includeSpace);
             break;
 
+          case "useGroup":
+            // Group transition — control flow, not a glyph. Flush buffered run.
+            flushRun(run, collector, includeSpace);
+            break;
+
           case "raw":
             // Opaque fragment — cannot statically determine content. Flush and skip.
             flushRun(run, collector, includeSpace);
