@@ -66,6 +66,7 @@ export function OutputScreen() {
   return (
     <div
       ref={containerRef}
+      data-testid="output-screen-root"
       style={{
         display: "flex",
         flexDirection: "row",
@@ -131,6 +132,7 @@ export function OutputScreen() {
           <>
             <button
               type="button"
+              data-testid="emit-download"
               disabled={!canDownload || downloading}
               onClick={() => { void handleDownload(); }}
               aria-label={

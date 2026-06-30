@@ -20,6 +20,7 @@
     "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,json,md}\""
   },
   "devDependencies": {
+    "@playwright/test": "1.61.1",
     "@types/node": "^22.0.0",
     "@typescript-eslint/eslint-plugin": "^8.60.1",
     "@typescript-eslint/parser": "^8.60.1",

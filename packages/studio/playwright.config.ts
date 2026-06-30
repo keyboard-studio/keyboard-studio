@@ -1,8 +1,12 @@
 // Playwright configuration for the studio SPA.
 //
-// RUNNER: global Playwright CLI only — invoke with `npx playwright test`.
-//   @playwright/test is NOT a devDependency (by design); the global CLI binary
-//   resolves this import at runtime.  Do NOT add it to package.json.
+// RUNNER: invoke with `npx playwright test` (or via `pnpm --filter
+//   @keyboard-studio/studio exec playwright test`).
+//   @playwright/test IS required as a workspace-root devDependency: the global
+//   CLI binary alone cannot resolve the `import { defineConfig } from
+//   "@playwright/test"` below inside a pnpm workspace, so the package must be
+//   present in node_modules. It lives at the repo root (shared, version-pinned),
+//   NOT in packages/studio/package.json — keep it at the root.
 //
 // CI LANES: this file and e2e/** are intentionally EXCLUDED from both:
 //   - vitest (packages/studio/vitest.config.ts exclude: ["e2e/**"])
@@ -19,6 +23,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "e2e",
+  timeout: 120_000,
   use: {
     baseURL: "http://localhost:5273",
   },

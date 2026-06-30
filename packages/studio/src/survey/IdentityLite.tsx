@@ -152,6 +152,7 @@ export function IdentityLite({
 
   return (
     <div
+      data-testid="identity-panel"
       style={{
         background: "#0d1117",
         color: "#e6edf3",

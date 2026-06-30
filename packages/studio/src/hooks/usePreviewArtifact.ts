@@ -52,7 +52,14 @@ export interface PreviewArtifact {
 }
 
 export function usePreviewArtifact(): PreviewArtifact {
-  const [baseKeyboard, setBaseKeyboard] = useState<BaseKeyboard | null>(null);
+  // Seed from the working-copy store at mount so that navigating to Output
+  // after completing the survey wizard (which populates the store) auto-loads
+  // the already-instantiated keyboard instead of showing a blank picker.
+  // getState() reads the snapshot at mount time without creating a reactive
+  // subscription — the local state owns subsequent changes via handleBaseKeyboardChange.
+  const [baseKeyboard, setBaseKeyboard] = useState<BaseKeyboard | null>(
+    () => useWorkingCopyStore.getState().baseKeyboard,
+  );
   const [pickerMode, setPickerMode] = useState<PickerMode>("open");
   const [scaffoldSpec, setScaffoldSpec] = useState<ScaffoldSpec | null>(null);
 

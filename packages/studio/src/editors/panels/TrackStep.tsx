@@ -47,6 +47,7 @@ export function TrackStep({ base, onNext, onBack }: TrackStepProps) {
           selected={track === "copy"}
           role="radio"
           aria-checked={track === "copy"}
+          data-testid="track-copy"
           onClick={() => setTrack("copy")}
         >
           <span style={{ fontWeight: 600, fontSize: 14 }}>Copy</span>
@@ -72,13 +73,14 @@ export function TrackStep({ base, onNext, onBack }: TrackStepProps) {
         <Button
           variant="primary"
           disabled={track === null}
+          data-testid="track-next"
           onClick={handleNext}
         >
           Next
         </Button>
       </div>
 
-      <Button variant="back" onClick={onBack}>
+      <Button variant="back" data-testid="track-back" onClick={onBack}>
         {"←"} Back
       </Button>
     </div>
