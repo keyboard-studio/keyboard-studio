@@ -16,7 +16,9 @@ Package manager is **pnpm 9** (Node ≥ 20). Run from the repo root unless noted
 | Architecture boundaries | `pnpm depcruise` (dependency-cruiser fitness functions — cross-package layering/team-split/dependency-root rules in [.dependency-cruiser.cjs](.dependency-cruiser.cjs); also run by `pnpm lint`) |
 | Run the studio SPA | `pnpm dev` (builds `engine`, then runs `engine` watch + `studio` Vite dev server) |
 
-**`prebuild` is not optional for a clean checkout.** `pnpm build` runs it automatically, but a bare `tsc -b` inside a package will fail without it. It does two codegen/fetch steps, both producing build artifacts you should regenerate rather than hand-edit:
+**`prebuild` is not optional for a clean checkout.** `pnpm build` runs it automatically, but a bare `tsc -b` inside a package will fail without it. It does three codegen/fetch steps, all producing build artifacts you should regenerate rather than hand-edit:
+- `fetch-langtags` downloads the pinned SIL `langtags.json` (MIT; SHA-256 pinned in [scripts/langtags-version.json](scripts/langtags-version.json); raw file gitignored under `packages/engine/data/langtags/`).
+- `codegen-langtags` derives the slim lookup index into `packages/engine/src/langtags/generated/` from the downloaded data.
 - `fetch-kmcmplib` downloads the pinned `kmcmplib.wasm` into `packages/compiler/wasm/` (SHA-256 pinned in `scripts/kmcmplib-version.json`). Set `KEYBOARD_STUDIO_KMCMPLIB_SOURCE=dev` to build it from a sibling `../keyman` checkout instead of downloading.
 - `compile-recognizer-rules` codegens `content/recognizer-rules/*.yaml` → `packages/engine/src/recognizer/rules/generated/*.ts`.
 
@@ -34,7 +36,7 @@ Package manager is **pnpm 9** (Node ≥ 20). Run from the repo root unless noted
 **Day-1 contract is locked and the engine + studio are now built out** (this supersedes the earlier "contracts only" status). Packages under `packages/*`:
 
 - **`@keyboard-studio/contracts`** — the locked Day-1 shared contract: TS types, the seven service interfaces + mocks, fixtures, the criteria catalog at `packages/contracts/data/criteria.json` (148 rows — 133 repo-hygiene + 12 §18 DISCUS design-heuristic at Day-1 lock, plus post-lock additions; see spec §11 and [docs/discus-principles-integration.md](docs/discus-principles-integration.md)), and the runtime **zod schemas** (`src/schemas.ts`) that mirror the locked `Pattern`/`Criterion` types. The dependency root — everything else builds to it.
-- **`@keyboard-studio/engine`** — the real engine. Subsystems under `packages/engine/src/`: `codec` (.kmn ↔ KeyboardIR), `scaffolder`, `output` (VirtualFS → zip), `validator`, `compiler` (kmcmplib wrapper), `simulator`, `recognizer` (+ generated rules), `pattern-apply`, `pattern-library`, `strategy-selector`, `character-discovery`, `inventory`, `loader`, `base-browser`, `stub-mutator`.
+- **`@keyboard-studio/engine`** — the real engine. Subsystems under `packages/engine/src/`: `codec` (.kmn ↔ KeyboardIR), `scaffolder`, `output` (VirtualFS → zip), `validator`, `compiler` (kmcmplib wrapper), `simulator`, `recognizer` (+ generated rules), `pattern-apply`, `pattern-library`, `strategy-selector`, `character-discovery`, `inventory`, `loader`, `base-browser`, `stub-mutator`, `langtags` (SIL langtags slim-index lookup; exposed as `@keyboard-studio/engine/langtags`).
 - **`@keymanapp/keyboard-lint`** — Layer C hygiene lint engine (`lintEngine.ts`, `checks/`, `parsers/`).
 - **`@keyboard-studio/llm`** — pluggable LLM client (`backends/`) for prompt-driven assistance.
 - **`@keyboard-studio/studio`** — the React + Vite SPA (three-pane gallery / editor / preview; working-copy spine).
