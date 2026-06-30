@@ -6,7 +6,7 @@ import type { KeyboardIR } from "@keyboard-studio/contracts";
 
 import { irPath } from "@keyboard-studio/contracts";
 
-const VALID_SCRIPT_VALUES = new Set([
+export const VALID_SCRIPT_VALUES: ReadonlySet<string> = new Set([
   "Latn", "Arab", "Hebr", "Thaa", "Nkoo", "Adlm", "Syrc", "Mand", "Samr", "Rohg",
   "Deva", "Beng", "Taml", "Telu", "Knda", "Mlym",
   "Guru", "Gujr", "Orya", "Sinh", "Thai", "Khmr", "Mymr", "Laoo", "Ethi",

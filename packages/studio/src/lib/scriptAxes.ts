@@ -50,6 +50,22 @@ const SYLLABARY = new Set(["Cans", "Vaii", "Cher", "Yiii"]);
 const LOGOGRAPHIC = new Set(["Hani"]);
 
 /**
+ * The union of every EXPLICIT script-class set above. A script in this set has
+ * been deliberately classified; a script NOT in it falls through to the
+ * `"alphabetic"` default in {@link scriptClassOf}. Exported so the
+ * primary_script ↔ scriptAxes guard test (#872) can tell "explicitly classified"
+ * apart from "defaulted to alphabetic" — `scriptClassOf` alone cannot, since it
+ * never reports a classification failure.
+ */
+export const EXPLICITLY_CLASSIFIED_SCRIPTS: ReadonlySet<string> = new Set([
+  ...LATIN_ALPHABETIC,
+  ...ABUGIDA,
+  ...ABJAD,
+  ...SYLLABARY,
+  ...LOGOGRAPHIC,
+]);
+
+/**
  * A2 script class (spec §7.1) for a BCP47 script subtag. Defaults to
  * `"alphabetic"` for unknown subtags — the safe, most-common assumption that the
  * survey then confirms. Pass a normalized subtag (see {@link normalizeTargetScript}).
