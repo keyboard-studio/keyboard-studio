@@ -32,7 +32,7 @@ import type { FlowGraph } from "./model.ts";
 import { phaseARegistry } from "../survey/questions/registry.a.ts";
 import { phaseBRegistry } from "../survey/questions/registry.b.ts";
 import { phaseFRegistry } from "../survey/questions/registry.f.ts";
-import { phaseGRegistry } from "../survey/questions/registry.g.ts";
+import { phaseTrackRegistry, phaseProjectRegistry } from "../survey/questions/registry.g.ts";
 import type { QuestionModule } from "../survey/types.ts";
 
 /** Single shape for all flow source entries — all sections use the modular loader. */
@@ -60,8 +60,10 @@ export const FLOW_SOURCES: ReadonlyArray<FlowSourceEntry> = [
   { raw: phaseBModularRaw, title: "Phase B — character discovery", registry: phaseBRegistry, stepId: CHARACTERS_STEP_ID },
   { raw: phaseFModularRaw, title: "Phase F — help docs", registry: phaseFRegistry, stepId: CHARACTERS_STEP_ID },
   // Phase G: track_choice and project_name hang under their own manifest steps.
-  { raw: trackModularRaw, title: "Phase G — track selection", registry: phaseGRegistry, stepId: "track" },
-  { raw: projectNameModularRaw, title: "Phase G — project name", registry: phaseGRegistry, stepId: "project_name" },
+  // Each uses its FLOW-SCOPED registry so the drill-down does not surface the
+  // sibling flow's questions as reserve/library nodes.
+  { raw: trackModularRaw, title: "Phase G — track selection", registry: phaseTrackRegistry, stepId: "track" },
+  { raw: projectNameModularRaw, title: "Phase G — project name", registry: phaseProjectRegistry, stepId: "project_name" },
 ];
 
 /**
