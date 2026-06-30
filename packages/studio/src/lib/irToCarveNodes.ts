@@ -689,6 +689,50 @@ function analyzeStoreUsage(storeName: string, ir: KeyboardIR): StoreUsage {
 }
 
 // ---------------------------------------------------------------------------
+// storeItemsAreKeys — detect key-code vs literal-character store items
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true when the store's items are predominantly virtual-key entries
+ * (kind === 'vkey') rather than literal characters (kind === 'char').
+ * Used to produce the correct input-store role line wording.
+ */
+export function storeItemsAreKeys(items: StoreItem[]): boolean {
+  return items.some((it) => it.kind === 'vkey');
+}
+
+// ---------------------------------------------------------------------------
+// computeStoreRoleLine — short top-of-panel role description for a store
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the short, prominent role line shown at the top of the StoreDetail
+ * panel (above the character chips). Generic about the trigger key — says
+ * "the trigger" / "when the rule fires", never a specific key name or partner.
+ *
+ * Returns undefined when the store has no determined role (unused / unknown).
+ */
+export function computeStoreRoleLine(
+  usage: StoreUsage | undefined,
+  items: StoreItem[],
+): string | undefined {
+  if (!usage) return undefined;
+  const { asSource, asOutput } = usage;
+  if (!asSource && !asOutput) return undefined;
+  if (asOutput && !asSource) {
+    return 'Output — the characters this rule produces when the trigger is pressed.';
+  }
+  if (asSource && !asOutput) {
+    if (storeItemsAreKeys(items)) {
+      return 'Input — the keys you press to produce the paired output character.';
+    }
+    return 'Input — characters that, once typed, get transformed when the trigger is pressed.';
+  }
+  // both asSource && asOutput
+  return 'Input + output — these characters are matched as input and also produced as output.';
+}
+
+// ---------------------------------------------------------------------------
 // CarveNode — unified rail node type for the Rail + Inspector layout
 // ---------------------------------------------------------------------------
 
@@ -705,6 +749,16 @@ export interface CarveNode {
   referencedByNodeId?: string | undefined; // store: which pattern owns it
   referencedByLabel?: string | undefined;  // store: that pattern's title
   storeUsage?: StoreUsage | undefined;     // store: how it is used in rules
+  /** store: nodeIds of peer stores linked via any()/index() pairing */
+  pairedStoreIds?: string[] | undefined;
+  /** store: display names of peer stores linked via any()/index() pairing */
+  pairedStoreNames?: string[] | undefined;
+  /** store: trigger key labels for each paired store (parallel to pairedStoreNames; undefined entry = unknown) */
+  pairedStoreTriggers?: (string | undefined)[] | undefined;
+  /** store: role of each paired store (parallel to pairedStoreNames; undefined entry = unknown) */
+  pairedStoreRoles?: ('input' | 'output' | 'input+output' | undefined)[] | undefined;
+  /** store: short top-of-panel role line ("Output — …" / "Input — …"); undefined when role is undetermined */
+  storeRoleLine?: string | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -734,6 +788,166 @@ export function nodeState(
     return glyphsTriState(node.glyphs, isItemDeleted);
   }
   return isDeleted(node.nodeId) ? 'off' : 'on';
+}
+
+// ---------------------------------------------------------------------------
+// vkeyLabel — human-readable label for a virtual key name
+// ---------------------------------------------------------------------------
+
+/**
+ * Maps a KMN virtual-key name (e.g. "K_BKSP") to a short human-readable label
+ * (e.g. "Backspace"). Special/control keys get named labels; ordinary letter/
+ * digit/symbol keys are derived by stripping the "K_" prefix.
+ * Returns undefined when the name is blank or unrecognisable.
+ */
+export function vkeyLabel(name: string): string | undefined {
+  if (!name) return undefined;
+  const upper = name.toUpperCase();
+  // Named special keys
+  const SPECIAL: Record<string, string> = {
+    K_BKSP:   'Backspace',
+    K_ENTER:  'Enter',
+    K_TAB:    'Tab',
+    K_ESC:    'Escape',
+    K_SPACE:  'Space',
+    K_DEL:    'Delete',
+    K_INS:    'Insert',
+    K_HOME:   'Home',
+    K_END:    'End',
+    K_PGUP:   'Page Up',
+    K_PGDN:   'Page Down',
+    K_LEFT:   'Left',
+    K_RIGHT:  'Right',
+    K_UP:     'Up',
+    K_DOWN:   'Down',
+    K_SHIFT:  'Shift',
+    K_CTRL:   'Ctrl',
+    K_ALT:    'Alt',
+    K_CAPS:   'Caps Lock',
+    K_LBRKT:  '[',
+    K_RBRKT:  ']',
+    K_BKQUOTE: '`',
+    K_COLON:  ';',
+    K_QUOTE:  "'",
+    K_SLASH:  '/',
+    K_BKSLASH: '\\',
+    K_COMMA:  ',',
+    K_PERIOD: '.',
+    K_HYPHEN: '-',
+    K_EQUAL:  '=',
+  };
+  if (upper in SPECIAL) return SPECIAL[upper];
+  // Function keys F1–F24
+  const fMatch = /^K_F(\d+)$/.exec(upper);
+  if (fMatch) return `F${fMatch[1]}`;
+  // Ordinary letter/digit: K_A → A, K_0 → 0, K_NP0 → Numpad 0
+  const npMatch = /^K_NP(\d+)$/.exec(upper);
+  if (npMatch) return `Numpad ${npMatch[1]}`;
+  const simpleMatch = /^K_([A-Z0-9])$/.exec(upper);
+  if (simpleMatch) return simpleMatch[1];
+  // Unknown: strip K_ prefix and return as-is in brackets
+  const stripped = upper.startsWith('K_') ? upper.slice(2) : upper;
+  return stripped || undefined;
+}
+
+// ---------------------------------------------------------------------------
+// triggerKeyLabel — extract the human-readable trigger from a rule's context
+// ---------------------------------------------------------------------------
+
+/**
+ * In a KMN rule, the trigger key is the element on the RIGHT of the `+`
+ * separator (the raw('+') codec token). For a rule like:
+ *   any(storeA) + [K_BKSP] > index(storeB, 1)
+ * the trigger is the vkey element after raw('+').
+ *
+ * Returns a human-readable string or undefined when no trigger is present.
+ */
+export function triggerKeyLabel(context: ContextElement[]): string | undefined {
+  const plusIdx = context.findIndex((el) => el.kind === 'raw' && el.text.trim() === '+');
+  if (plusIdx === -1) return undefined;
+  const triggerEl = context[plusIdx + 1];
+  if (!triggerEl) return undefined;
+  switch (triggerEl.kind) {
+    case 'vkey':    return vkeyLabel(triggerEl.name) ?? triggerEl.name;
+    case 'char':    return `"${triggerEl.value}"`;
+    case 'deadkey': return `deadkey ${triggerEl.id}`;
+    default:        return undefined;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// detectStorePairs — find any(storeA)/index(storeB) peer relationships
+// ---------------------------------------------------------------------------
+
+/** A single entry in the detectStorePairs result: a peer store plus the trigger key that fires the swap. */
+export interface StorePairEntry {
+  pairedName: string;
+  /** Human-readable trigger key label (e.g. "Backspace", "A"); undefined when not determinable. */
+  trigger: string | undefined;
+}
+
+/**
+ * For each rule that has both an any(storeA) element in its context AND an
+ * index(storeB, …) element in its output, record storeA → storeB and
+ * storeB → storeA as paired peers, capturing the trigger key for each pair.
+ *
+ * Returns a map of storeName → StorePairEntry[] (deduplicated by pairedName,
+ * trigger taken from the first matching rule). Sorted by pairedName.
+ * Only `any()`/`index()` pairing is in scope (no deadkey elements).
+ */
+export function detectStorePairs(ir: KeyboardIR): Map<string, StorePairEntry[]> {
+  // Inner map: storeName → Map<pairedName, trigger>
+  const pairsMap = new Map<string, Map<string, string | undefined>>();
+
+  const addPair = (a: string, b: string, trigger: string | undefined) => {
+    if (a === b) return;
+    if (!pairsMap.has(a)) pairsMap.set(a, new Map());
+    if (!pairsMap.has(b)) pairsMap.set(b, new Map());
+    // Only record trigger on first observation (first matching rule wins)
+    if (!pairsMap.get(a)!.has(b)) pairsMap.get(a)!.set(b, trigger);
+    if (!pairsMap.get(b)!.has(a)) pairsMap.get(b)!.set(a, trigger);
+  };
+
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      // Collect all any() store names from context
+      const anyStores: string[] = [];
+      for (const el of rule.context) {
+        if (el.kind === 'any' && el.storeRef !== undefined) {
+          anyStores.push(el.storeRef);
+        }
+      }
+      if (anyStores.length === 0) continue;
+
+      // Collect all index() store names from output
+      const indexStores: string[] = [];
+      for (const el of rule.output) {
+        if (el.kind === 'index' && el.storeRef !== undefined) {
+          indexStores.push(el.storeRef);
+        }
+      }
+      if (indexStores.length === 0) continue;
+
+      const trigger = triggerKeyLabel(rule.context);
+
+      // Cross-pair: every any() store is paired with every index() store in this rule
+      for (const a of anyStores) {
+        for (const b of indexStores) {
+          addPair(a, b, trigger);
+        }
+      }
+    }
+  }
+
+  // Convert to StorePairEntry[] sorted by pairedName
+  const result = new Map<string, StorePairEntry[]>();
+  for (const [name, peers] of pairsMap) {
+    const entries: StorePairEntry[] = [...peers.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([pairedName, trigger]) => ({ pairedName, trigger }));
+    result.set(name, entries);
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -769,12 +983,41 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
     });
   }
 
+  const storePairs = detectStorePairs(ir);
+
+  // Build a name→nodeId lookup for resolving paired store names to nodeIds
+  const storeNameToNodeId = new Map<string, string>(
+    ir.stores.filter((s) => !s.isSystem).map((s) => [s.name, s.nodeId]),
+  );
+
   for (const store of ir.stores) {
     if (store.isSystem) continue;
     const refPattern = recognized.find((p) =>
       p.ownedNodes?.some((n) => n.nodeId === store.nodeId),
     );
     const usage = analyzeStoreUsage(store.name, ir);
+
+    const pairedEntries = storePairs.get(store.name);
+    const hasPairs = pairedEntries !== undefined && pairedEntries.length > 0;
+    const pairedStoreNames = hasPairs ? pairedEntries.map((e) => e.pairedName) : undefined;
+    const pairedStoreIds = hasPairs
+      ? pairedEntries
+          .map((e) => storeNameToNodeId.get(e.pairedName))
+          .filter((id): id is string => id !== undefined)
+      : undefined;
+    const pairedStoreTriggers = hasPairs ? pairedEntries.map((e) => e.trigger) : undefined;
+    const pairedStoreRoles: ('input' | 'output' | 'input+output' | undefined)[] | undefined = hasPairs
+      ? pairedEntries.map((e) => {
+          const u = analyzeStoreUsage(e.pairedName, ir);
+          if (u.asSource && u.asOutput) return 'input+output';
+          if (u.asSource) return 'input';
+          if (u.asOutput) return 'output';
+          return undefined;
+        })
+      : undefined;
+
+    const roleLine = computeStoreRoleLine(usage.ruleCount > 0 ? usage : undefined, store.items);
+
     nodes.push({
       nodeId: store.nodeId,
       kind: 'store',
@@ -783,6 +1026,11 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
       loadBearing: refPattern !== undefined,
       storeUsage: usage.ruleCount > 0 ? usage : undefined,
       ...(refPattern !== undefined ? { referencedByNodeId: refPattern.id, referencedByLabel: refPattern.title } : {}),
+      ...(pairedStoreIds !== undefined ? { pairedStoreIds } : {}),
+      ...(pairedStoreNames !== undefined ? { pairedStoreNames } : {}),
+      ...(pairedStoreTriggers !== undefined ? { pairedStoreTriggers } : {}),
+      ...(pairedStoreRoles !== undefined ? { pairedStoreRoles } : {}),
+      ...(roleLine !== undefined ? { storeRoleLine: roleLine } : {}),
     });
   }
 
