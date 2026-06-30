@@ -58,7 +58,7 @@
     },
     "§5a": {
       "title": "5a. KeyboardIR (keyboard intermediate representation)",
-      "hash": "sha256:9ca9577cccfe0425",
+      "hash": "sha256:09e5ae3605a45969",
       "status": "partial",
       "implements": [
         "packages/contracts/src/baseKeyboard.ts",
@@ -116,13 +116,17 @@
     },
     "§9": {
       "title": "9. Three-group routing",
-      "hash": "sha256:c3458e711b6c278b",
-      "status": "unimplemented",
-      "implements": [],
+      "hash": "sha256:88cb800f27ad4590",
+      "status": "partial",
+      "implements": [
+        "packages/studio/src/lib/scriptAxes.ts",
+        "packages/studio/src/dashboard/buildScriptRouting.ts",
+        "packages/studio/src/survey/questions/a/script_family.ts"
+      ],
       "decisions": [
         "D5"
       ],
-      "notes": "Gallery routing (supported / CJK+Ethiopic stub / legacy) not yet built. D5 governs CJK/Ethiopic out-of-scope stub. v1.2.0 added language/script decoupling — routing follows the chosen target script (BCP47 subtag from identity-lite), not the language's default script. v1.3.0 added Phase A CJK/Ethiopic detection gate detail."
+      "notes": "Script-derived routing now exists: scriptAxes.routingGroupOf maps the chosen target script to a routing group, dashboard/buildScriptRouting builds the routing view, and the script-family question modules drive Phase A routing. Gallery wiring (supported / CJK+Ethiopic stub / legacy galleries) not yet fully built, so status is partial. D5 governs CJK/Ethiopic out-of-scope stub. v1.2.0 added language/script decoupling — routing follows the chosen target script (BCP47 subtag from identity-lite), not the language's default script. v1.3.0 added Phase A CJK/Ethiopic detection gate detail."
     },
     "§10": {
       "title": "10. Validator and lint engine",
@@ -199,7 +203,7 @@
     },
     "§15": {
       "title": "15. Acceptance scenarios",
-      "hash": "sha256:1d2bdc9b47a6b90d",
+      "hash": "sha256:5413c8950f782caf",
       "status": "unimplemented",
       "implements": [],
       "decisions": [],
@@ -287,7 +291,7 @@
     },
     "specs/007-strategy-selection": {
       "title": "Feature spec — Strategy selection (spec.md §7)",
-      "hash": "sha256:822706880f9434a7",
+      "hash": "sha256:c21eb2f489a857ca",
       "status": "partial",
       "implements": [
         "packages/contracts/src/strategy.ts",
@@ -300,7 +304,7 @@
     },
     "specs/008-data-flow": {
       "title": "Feature spec — Data flow (spec.md §8)",
-      "hash": "sha256:eff591baf04a9932",
+      "hash": "sha256:de6d579e40996345",
       "status": "partial",
       "implements": [
         "packages/contracts/src/surveySession.ts",
