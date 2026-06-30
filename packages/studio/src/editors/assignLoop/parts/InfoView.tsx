@@ -1,3 +1,4 @@
+import type React from 'react';
 import type { RemovalCapability } from '@keyboard-studio/contracts';
 import type { CarveNode } from '../../../lib/irToCarveNodes.ts';
 import { displayChar } from '../../../lib/irToCarveNodes.ts';
@@ -100,35 +101,67 @@ export function infoFor(node: CarveNode | undefined): InfoContent {
   };
 }
 
-const stripShell = {
+const panelShell: React.CSSProperties = {
   flexShrink: 0,
   borderTop: '1px solid var(--app-border)',
-  padding: '14px 24px',
-  background: 'var(--app-surface)',
-  color: 'var(--app-text)',
   display: 'flex',
-  gap: 12,
-  alignItems: 'flex-start',
-  minHeight: 56,
-} as const;
+  flexDirection: 'column',
+  height: 116,
+};
+
+const titleBar: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  padding: '0 16px',
+  height: 36,
+  flexShrink: 0,
+  background: 'color-mix(in srgb, var(--app-surface) 70%, var(--app-bg) 30%)',
+  borderBottom: '1px solid var(--app-border)',
+};
+
+const iconWrap: React.CSSProperties = {
+  flexShrink: 0,
+  color: 'var(--app-text-subtle)',
+  display: 'flex',
+  alignItems: 'center',
+};
+
+const bodyArea: React.CSSProperties = {
+  padding: '8px 16px 10px',
+  fontSize: 13,
+  lineHeight: 1.55,
+  color: 'var(--app-text-muted)',
+  overflowY: 'auto',
+  flex: 1,
+};
 
 // InfoView — no props. Sole subscriber of the hoverInfoStore `info` slice.
-// The shell is always mounted with a stable minHeight so the layout never shifts.
+// Fixed height so the layout never shifts regardless of content state.
 export function InfoView() {
   const info = useHoverInfoStore((s) => s.info);
 
   if (info == null) {
-    return <div role="note" aria-label="Item info" style={stripShell} />;
+    const c = infoFor(undefined);
+    return (
+      <div role="note" aria-label="Item info" style={panelShell}>
+        <div style={titleBar}>
+          <span style={iconWrap}><InfoIcon size={16} /></span>
+          <span style={{ font: '600 13px/1.3 var(--app-font)', color: 'var(--app-text)' }}>
+            {c.title}
+          </span>
+        </div>
+        <div style={bodyArea}>{c.body}</div>
+      </div>
+    );
   }
 
   if (info.kind === 'key') {
     return (
-      <div role="note" aria-label="Item info" style={stripShell}>
-        <span style={{ flexShrink: 0, marginTop: 2, color: 'var(--app-text-subtle)' }}>
-          <InfoIcon size={16} />
-        </span>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ font: '600 13.5px/1.3 var(--app-font)', color: 'var(--app-text)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <div role="note" aria-label="Item info" style={panelShell}>
+        <div style={titleBar}>
+          <span style={iconWrap}><InfoIcon size={16} /></span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', font: '600 13px/1.3 var(--app-font)', color: 'var(--app-text)' }}>
             <span style={{ fontSize: 11, color: 'var(--app-text-subtle)', fontWeight: 400 }}>Key</span>
             <KeySeq keys={info.keys} />
             <span style={{ color: 'var(--app-text-subtle)', fontSize: 11 }}>types</span>
@@ -136,10 +169,10 @@ export function InfoView() {
               {displayChar(info.ch)}
             </span>
           </div>
-          <div style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--app-text-muted)' }}>
-            {keyHint(info.off)}
-          </div>
-          <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
+        </div>
+        <div style={bodyArea}>
+          <div style={{ marginBottom: 3 }}>{keyHint(info.off)}</div>
+          <div style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
             {capabilityHint(info.capability)}
           </div>
         </div>
@@ -150,36 +183,28 @@ export function InfoView() {
   if (info.kind === 'node') {
     const c = infoFor(info.node);
     return (
-      <div role="note" aria-label="Item info" style={stripShell}>
-        <span style={{ flexShrink: 0, marginTop: 2, color: 'var(--app-text-subtle)' }}>
-          <InfoIcon size={16} />
-        </span>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ font: '600 13.5px/1.3 var(--app-font)', color: 'var(--app-text)', marginBottom: 4 }}>
+      <div role="note" aria-label="Item info" style={panelShell}>
+        <div style={titleBar}>
+          <span style={iconWrap}><InfoIcon size={16} /></span>
+          <span style={{ font: '600 13px/1.3 var(--app-font)', color: 'var(--app-text)' }}>
             {c.title}
-          </div>
-          <div style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--app-text-muted)' }}>
-            {c.body}
-          </div>
+          </span>
         </div>
+        <div style={bodyArea}>{c.body}</div>
       </div>
     );
   }
 
   // kind === 'text'
   return (
-    <div role="note" aria-label="Item info" style={stripShell}>
-      <span style={{ flexShrink: 0, marginTop: 2, color: 'var(--app-text-subtle)' }}>
-        <InfoIcon size={16} />
-      </span>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ font: '600 13.5px/1.3 var(--app-font)', color: 'var(--app-text)', marginBottom: 4 }}>
+    <div role="note" aria-label="Item info" style={panelShell}>
+      <div style={titleBar}>
+        <span style={iconWrap}><InfoIcon size={16} /></span>
+        <span style={{ font: '600 13px/1.3 var(--app-font)', color: 'var(--app-text)' }}>
           {info.title}
-        </div>
-        <div style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--app-text-muted)' }}>
-          {info.body}
-        </div>
+        </span>
       </div>
+      <div style={bodyArea}>{info.body}</div>
     </div>
   );
 }

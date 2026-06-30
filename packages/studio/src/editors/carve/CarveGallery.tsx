@@ -323,6 +323,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
             onSetManyGlyphs={handleSetManyGlyphs}
             isDeleted={isDeleted}
             onToggleNode={handleToggleNode}
+            onSelectNode={setSelectedId}
           />
           {infoOpen && <InfoView />}
         </div>

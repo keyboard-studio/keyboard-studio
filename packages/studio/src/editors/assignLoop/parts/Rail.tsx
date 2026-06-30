@@ -72,7 +72,7 @@ export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, on
   }, [nodes, isItemDeleted]);
 
   return (
-    <div style={{ width: 308, flex: '0 0 auto', borderRight: '1px solid var(--app-border)', background: 'var(--app-surface)', overflowY: 'auto' }}>
+    <div style={{ width: 308, flex: '0 0 auto', borderRight: '1px solid var(--app-border)', background: 'var(--app-surface)', overflowY: 'auto', scrollbarGutter: 'stable' }}>
       {SECTIONS.map((sec) => {
         const items = nodes.filter((n) => n.kind === sec.kind);
         if (items.length === 0) return null;

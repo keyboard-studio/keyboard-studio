@@ -7,6 +7,33 @@ import { KindBadge, KIND_COLOR } from './KindBadge.tsx';
 import { WarnIcon } from './carveShared.tsx';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
 
+/**
+ * Pure helper — returns the plain-English description for the linked-pair section
+ * of a store's Inspector panel.
+ *
+ * Describes the invariant that always holds for any()/index() store pairs —
+ * the position-for-position alignment — without referencing the trigger key.
+ * The trigger is shown separately in the "Triggered by:" line.
+ *
+ * @param asSource - true when the store is used on the any() (input) side
+ * @param asOutput - true when the store is used on the index() (output) side
+ * @param pairedNames - display names of the peer stores
+ */
+export function storePairDescription(
+  asSource: boolean,
+  asOutput: boolean,
+  pairedNames: string[],
+): string {
+  const pairedList = pairedNames.join(', ');
+  if (asSource && !asOutput) {
+    return `This is the input side of a paired-store rule. Its characters line up one-for-one with ${pairedList}. When one of these is matched and the rule fires, the keyboard outputs the character at the same position in ${pairedList}.`;
+  }
+  if (asOutput && !asSource) {
+    return `This is the output side of a paired-store rule. Each character lines up one-for-one with ${pairedList}; the rule picks the matching one based on what was input.`;
+  }
+  return `This list is paired with ${pairedList} in a rule: the two line up one-for-one, one providing the input characters and the other the output.`;
+}
+
 const btnGhost: React.CSSProperties = {
   font: '600 12.5px var(--app-font)', cursor: 'pointer',
   color: 'var(--app-accent-text)', background: 'var(--app-surface-2)',
@@ -126,6 +153,7 @@ interface StoreDetailProps {
   isDeleted: (nodeId: string) => boolean;
   isItemDeleted: (id: string) => boolean;
   onToggleNode: (nodeId: string, off: boolean) => void;
+  onSelectNode?: ((nodeId: string) => void) | undefined;
 }
 function storeRoleChip(node: CarveNode): React.ReactNode {
   const u = node.storeUsage;
@@ -202,7 +230,7 @@ function PlatformBadge({ platform }: { platform: string }) {
 
 const RULE_GROUP_THRESHOLD = 10;
 
-function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode }: StoreDetailProps) {
+function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSelectNode }: StoreDetailProps) {
   const off = isDeleted(node.nodeId);
   const setInfo = useHoverInfoStore((s) => s.setInfo);
   const clearInfo = useHoverInfoStore((s) => s.clearInfo);
@@ -251,6 +279,23 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode }: St
           </p>
         </div>
       </div>
+      {node.storeRoleLine !== undefined && (
+        <p style={{ margin: '12px 0 0', fontSize: 13, fontWeight: 600, color: 'var(--app-text-muted)', lineHeight: 1.45 }}>
+          {node.storeRoleLine}
+        </p>
+      )}
+      {(() => {
+        const triggers = node.pairedStoreTriggers;
+        if (!triggers || triggers.length === 0) return null;
+        const distinct = [...new Set(triggers.filter((t): t is string => t !== undefined))];
+        if (distinct.length === 0) return null;
+        return (
+          <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--app-text-muted)', lineHeight: 1.45 }}>
+            {'Triggered by: '}
+            <b style={{ fontFamily: 'var(--app-font-mono)' }}>{distinct.join(', ')}</b>
+          </p>
+        );
+      })()}
       {chars.length > 0 && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 18 }}>
           {chars.map((ch, i) => {
@@ -278,6 +323,77 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode }: St
           })}
         </div>
       )}
+      {node.pairedStoreNames !== undefined && node.pairedStoreNames.length > 0 && (() => {
+        const descriptionText = storePairDescription(
+          node.storeUsage?.asSource ?? false,
+          node.storeUsage?.asOutput ?? false,
+          node.pairedStoreNames,
+        );
+        // Store-purple token — same hex used by KIND_COLOR.store in KindBadge/Rail
+        const storeColor = KIND_COLOR.store;
+        return (
+          <div
+            style={{
+              marginTop: 18, padding: '12px 15px', borderRadius: 10,
+              background: `color-mix(in srgb, ${storeColor} 7%, var(--app-surface))`,
+              border: `1px solid color-mix(in srgb, ${storeColor} 30%, transparent)`,
+            }}
+          >
+            <div style={{ font: '600 10px/1 var(--app-font)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--app-text-subtle)', marginBottom: 8 }}>
+              Linked pair
+            </div>
+            {node.pairedStoreNames.map((pname, i) => {
+              const pairedId = node.pairedStoreIds?.[i];
+              const trigger = node.pairedStoreTriggers?.[i];
+              const role = node.pairedStoreRoles?.[i];
+              return (
+                <div key={pname} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+                  {/* Clickable store name — purple, matches KindBadge store color */}
+                  <button
+                    onClick={() => pairedId !== undefined && onSelectNode?.(pairedId)}
+                    disabled={pairedId === undefined || onSelectNode === undefined}
+                    aria-label={`Go to store ${pname}`}
+                    style={{
+                      font: '600 11px/1 var(--app-font-mono)', padding: '3px 8px', borderRadius: 5,
+                      background: `color-mix(in srgb, ${storeColor} 14%, transparent)`,
+                      border: `1px solid color-mix(in srgb, ${storeColor} 38%, transparent)`,
+                      color: storeColor,
+                      cursor: pairedId !== undefined && onSelectNode !== undefined ? 'pointer' : 'default',
+                      outline: 'none',
+                    }}
+                    onFocus={(e) => { (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 0 0 2px color-mix(in srgb, ${storeColor} 40%, transparent)`; }}
+                    onBlur={(e) => { (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none'; }}
+                  >
+                    {pname}
+                  </button>
+                  {/* Role chip — the paired store's own role (input/output/input+output) */}
+                  {role === 'input+output' && (
+                    <span style={{ font: '600 10px/1 var(--app-font)', padding: '3px 7px', borderRadius: 5, background: 'color-mix(in srgb, #b8a0d8 18%, var(--app-surface))', border: '1px solid color-mix(in srgb, #b8a0d8 50%, transparent)', color: '#c8b0e8' }}>in+out</span>
+                  )}
+                  {role === 'input' && (
+                    <span style={{ font: '600 10px/1 var(--app-font)', padding: '3px 7px', borderRadius: 5, background: 'var(--app-accent-subtle)', border: '1px solid var(--app-border)', color: 'var(--app-accent-text)' }}>input</span>
+                  )}
+                  {role === 'output' && (
+                    <span style={{ font: '600 10px/1 var(--app-font)', padding: '3px 7px', borderRadius: 5, background: 'color-mix(in srgb, #7dbf8e 15%, var(--app-surface))', border: '1px solid color-mix(in srgb, #7dbf8e 40%, transparent)', color: '#7dbf8e' }}>output</span>
+                  )}
+                  {/* Trigger key */}
+                  {trigger !== undefined && (
+                    <span style={{ font: '600 10px/1 var(--app-font)', color: 'var(--app-text-subtle)', whiteSpace: 'nowrap' }}>
+                      Triggered by: <b style={{ color: 'var(--app-text-muted)', fontFamily: 'var(--app-font-mono)' }}>{trigger}</b>
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+            <p style={{ margin: '4px 0 8px', fontSize: 12, color: 'var(--app-text-muted)', lineHeight: 1.55 }}>
+              {descriptionText}
+            </p>
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--app-text-subtle)', lineHeight: 1.55, fontStyle: 'italic' }}>
+              These two stores work as a pair. Removing one without the other will break the mechanism.
+            </p>
+          </div>
+        );
+      })()}
       {consumers.length > 0 && (
         <div
           style={{
@@ -387,9 +503,10 @@ interface InspectorProps {
   onSetManyGlyphs: (gids: string[], off: boolean) => void;
   isDeleted: (nodeId: string) => boolean;
   onToggleNode: (nodeId: string, off: boolean) => void;
+  onSelectNode?: ((nodeId: string) => void) | undefined;
 }
 
-export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetManyGlyphs, isDeleted, onToggleNode }: InspectorProps) {
+export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetManyGlyphs, isDeleted, onToggleNode, onSelectNode }: InspectorProps) {
   const [q, setQ] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   useEffect(() => { setQ(''); setCollapsed(new Set()); }, [node?.nodeId]);
@@ -405,7 +522,7 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
   }
 
   if (node.kind === 'raw') return <RawDetail node={node} isDeleted={isDeleted} onToggleNode={onToggleNode} />;
-  if (node.kind === 'store') return <StoreDetail key={node.nodeId} node={node} nodes={nodes} isDeleted={isDeleted} isItemDeleted={isItemDeleted} onToggleNode={onToggleNode} />;
+  if (node.kind === 'store') return <StoreDetail key={node.nodeId} node={node} nodes={nodes} isDeleted={isDeleted} isItemDeleted={isItemDeleted} onToggleNode={onToggleNode} onSelectNode={onSelectNode} />;
 
   const glyphs = node.glyphs ?? [];
   const st = nodeState(node, isItemDeleted, isDeleted);
