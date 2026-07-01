@@ -610,11 +610,17 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   cascadeDelete: (ruleNodeIds, storeSlotIds) => {
     if (ruleNodeIds.length === 0 && storeSlotIds.length === 0) return;
     set((s) => {
-      const nextNodes = new Set([...s.deletedNodeIds, ...ruleNodeIds]);
-      const nextItems = new Set([...s.deletedItemIds, ...storeSlotIds]);
-      const batchEntry: UndoEntry = { k: 'batch', nodeIds: ruleNodeIds, itemIds: storeSlotIds };
+      // Route BOTH whole-rule deletes and store-slot nul-fills through the ITEM
+      // channel (deletedItemIds). The chip grid and kept-counts reflect deletion
+      // via isItemDeleted(gid) — and for a simple-rule chip gid === rule.nodeId —
+      // so using the item channel dims every affected chip, matching the single-
+      // glyph delete path (deleteItem). projectWorkingCopyVfs folds bare node ids
+      // in deletedItemIds into whole-node deletions on emit, so the rules are
+      // still dropped from the compiled keyboard.
+      const allItems = [...ruleNodeIds, ...storeSlotIds];
+      const nextItems = new Set([...s.deletedItemIds, ...allItems]);
+      const batchEntry: UndoEntry = { k: 'batch', nodeIds: [], itemIds: allItems };
       return {
-        deletedNodeIds: nextNodes,
         deletedItemIds: nextItems,
         undoStack: [...s.undoStack, batchEntry],
       };

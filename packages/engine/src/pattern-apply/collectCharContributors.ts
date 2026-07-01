@@ -24,8 +24,6 @@
  */
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
-import { ruleProducedStrings } from "@keyboard-studio/contracts";
-import { isParallelIndexFanOut } from "../recognizer/rules/parallel-index-fanout.js";
 
 // ---------------------------------------------------------------------------
 // Public contract (shared with km-frontend — do not deviate)
@@ -117,82 +115,70 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
     }
   }
 
+  // Record where a contributing rule lives (its owning pattern, else its group)
+  // so the confirm dialog can name the place.
+  const addRuleLocation = (
+    r: { ownedByPattern?: string | undefined },
+    group: { name: string; nodeId: string },
+  ) => {
+    if (r.ownedByPattern !== undefined) {
+      addLocation('pattern', patternById.get(r.ownedByPattern) ?? r.ownedByPattern, r.ownedByPattern);
+    } else {
+      addLocation('group', group.name, group.nodeId);
+    }
+  };
+
   // --- 2. Walk all groups → all rules ---
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      // Skip S-02 trigger rules (output is exactly one deadkey element).
+      // Skip S-02 trigger rules (output is exactly one deadkey element) — deleting
+      // one would destroy the whole deadkey family, not this single character.
       if (isTriggerRule(rule)) continue;
 
-      // --- 2a. Parallel-index fan-out rules (S-02 body + bare-any/Bamum) ---
-      // For these, nul-fill the ONE matching slot in the output store.
-      if (isParallelIndexFanOut(rule)) {
-        const outEl = rule.output[0];
-        if (outEl === undefined || outEl.kind !== "index") continue;
-        const outputStore = ir.stores.find((s) => s.name === outEl.storeRef);
-        if (outputStore === undefined) continue;
+      const outEls = rule.output as { kind: string; value?: string; storeRef?: string }[];
 
-        // Find all matching slots in the output store.
-        let found = false;
-        for (let i = 0; i < outputStore.items.length; i++) {
-          const item = outputStore.items[i];
-          if (item === undefined) continue;
-          if (item.kind === "char" && item.value.normalize("NFC") === target) {
-            const slotId = `${outputStore.nodeId}#${i}`;
-            if (!seenStoreSlotIds.has(slotId)) {
-              seenStoreSlotIds.add(slotId);
-              storeSlotIds.push(slotId);
-              found = true;
+      // (a) Store-produced target — the character is emitted through an
+      //     index()/outs() over a store (base-layer alphabet fan-out OR a
+      //     deadkey fan-out). The surgical unit is the matching store SLOT
+      //     (nul-fill), NEVER the whole rule — the rule produces the entire
+      //     store's worth of characters, so deleting it would remove them all.
+      let storeMatched = false;
+      for (const el of outEls) {
+        if ((el.kind === 'index' || el.kind === 'outs') && el.storeRef !== undefined) {
+          const store = storeMap.get(el.storeRef);
+          if (store === undefined) continue;
+          for (let i = 0; i < store.items.length; i++) {
+            const item = store.items[i];
+            if (item !== undefined && item.kind === 'char' && item.value.normalize('NFC') === target) {
+              const slotId = `${store.nodeId}#${i}`;
+              if (!seenStoreSlotIds.has(slotId)) { seenStoreSlotIds.add(slotId); storeSlotIds.push(slotId); }
+              addLocation('store', store.name, store.nodeId);
+              storeMatched = true;
             }
           }
         }
-
-        if (found) {
-          // Add a store-kind location for the output store.
-          addLocation('store', outputStore.name, outputStore.nodeId);
-
-          // Also add a pattern location if the rule is owned by a pattern.
-          if (rule.ownedByPattern !== undefined) {
-            const patternTitle = patternById.get(rule.ownedByPattern) ?? rule.ownedByPattern;
-            addLocation('pattern', patternTitle, rule.ownedByPattern);
-          } else {
-            // Add a group location.
-            addLocation('group', group.name, group.nodeId);
-          }
-        }
-
-        // Skip remaining rule processing — fan-out rules always go to storeSlotIds.
+      }
+      if (storeMatched) {
+        addRuleLocation(rule, group);
         continue;
       }
 
-      // --- 2b. Standard rules ---
-      const produced = ruleProducedStrings(rule as Parameters<typeof ruleProducedStrings>[0], storeMap);
-      if (produced.length === 0) continue;
+      // (b) Literal target — the character is written out directly as one or
+      //     more `char` elements (base+combining runs NFC-compose to one glyph).
+      const charVals = outEls.filter((el) => el.kind === 'char').map((el) => el.value ?? '');
+      if (charVals.length === 0) continue;
+      const onlyCharOutput = charVals.length === outEls.length;
+      const wholeOutput = charVals.join('').normalize('NFC');
 
-      // Check if ANY produced string contains the target (works for BMP and
-      // surrogate-pair characters, since String.includes matches on code units).
-      const anyContains = produced.some((s) => s.includes(target));
-      if (!anyContains) continue;
-
-      // produced is non-empty here (guarded above), so `every` is meaningful.
-      const allEqual = produced.every((s) => s === target);
-
-      if (allEqual) {
-        // Entire output === targetChar (single-char producer): whole-rule delete.
-        if (!seenRuleNodeIds.has(rule.nodeId)) {
-          seenRuleNodeIds.add(rule.nodeId);
-          ruleNodeIds.push(rule.nodeId);
-        }
-        // Add location.
-        if (rule.ownedByPattern !== undefined) {
-          const patternTitle = patternById.get(rule.ownedByPattern) ?? rule.ownedByPattern;
-          addLocation('pattern', patternTitle, rule.ownedByPattern);
-        } else {
-          addLocation('group', group.name, group.nodeId);
-        }
-      } else {
-        // Multi-char producer: cannot whole-delete without over-sweep.
+      if (onlyCharOutput && wholeOutput === target) {
+        // The rule's entire output is exactly this character → whole-rule delete.
+        if (!seenRuleNodeIds.has(rule.nodeId)) { seenRuleNodeIds.add(rule.nodeId); ruleNodeIds.push(rule.nodeId); }
+        addRuleLocation(rule, group);
+      } else if (wholeOutput.includes(target)) {
+        // The character is only part of a longer literal output that can't be
+        // split surgically (rare) → genuinely blocked.
         blocked.push({
-          reason: `Rule produces "${produced.join(', ')}" which includes "${target}" among other characters; surgical removal is not safe`,
+          reason: `produces "${wholeOutput}" — "${target}" can't be removed without affecting the rest of that output`,
           label: `${group.name} / ${rule.nodeId}`,
         });
       }

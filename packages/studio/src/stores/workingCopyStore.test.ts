@@ -846,3 +846,34 @@ describe("workingCopyStore — staleness slice (T041)", () => {
     bindManifest(FIXTURE_MANIFEST);
   });
 });
+
+describe("workingCopyStore — cascadeDelete", () => {
+  beforeEach(() => useWorkingCopyStore.getState().reset());
+
+  it("routes both whole-rule ids and store-slot ids through the item channel so chips reflect deletion", () => {
+    const s = useWorkingCopyStore.getState();
+    s.cascadeDelete(["r-eps"], ["sid-dkt#2"]);
+    const after = useWorkingCopyStore.getState();
+    // Both are visible via isItemDeleted (what the chip grid + kept-counts read).
+    expect(after.isItemDeleted("r-eps")).toBe(true);
+    expect(after.isItemDeleted("sid-dkt#2")).toBe(true);
+    // Nothing leaks into the node channel (chips don't read it).
+    expect(after.deletedNodeIds.size).toBe(0);
+  });
+
+  it("reverses the entire cascade with a single undoDelete()", () => {
+    const s = useWorkingCopyStore.getState();
+    s.cascadeDelete(["r-eps"], ["sid-dkt#2"]);
+    useWorkingCopyStore.getState().undoDelete();
+    const after = useWorkingCopyStore.getState();
+    expect(after.isItemDeleted("r-eps")).toBe(false);
+    expect(after.isItemDeleted("sid-dkt#2")).toBe(false);
+    expect(after.deletedItemIds.size).toBe(0);
+  });
+
+  it("is a no-op when both arrays are empty (no undo entry pushed)", () => {
+    const s = useWorkingCopyStore.getState();
+    s.cascadeDelete([], []);
+    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
+  });
+});

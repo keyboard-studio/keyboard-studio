@@ -202,6 +202,30 @@ describe('collectCharContributors', () => {
     expect(result.blocked.length).toBeGreaterThan(0);
   });
 
+  it('index() over a large store yields the matching SLOT, never a blocked whole-rule (regression #886)', () => {
+    // A base-layer fan-out rule `+ any(keys) > index(alphabet, 1)` produces the
+    // WHOLE alphabet. Removing one char must target its store slot, not flag the
+    // rule as an un-removable multi-char producer (the original ghost-message bug).
+    const keys = makeStore('sid-keys', 'keys', [
+      { kind: 'char', value: 'a' }, { kind: 'char', value: 'e' }, { kind: 'char', value: 'z' },
+    ]);
+    const alphabet = makeStore('sid-alpha', 'alphabet', [
+      { kind: 'char', value: 'a' }, { kind: 'char', value: 'ɛ' }, { kind: 'char', value: 'z' },
+    ]);
+    const rule = makeRule('r-base',
+      [{ kind: 'any', storeRef: 'keys' }],
+      [{ kind: 'index', storeRef: 'alphabet', offset: 1 }],
+    );
+    const ir = makeIR({
+      stores: [keys, alphabet],
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    });
+    const result = collectCharContributors(ir, 'ɛ');
+    expect(result.storeSlotIds).toContain('sid-alpha#1');
+    expect(result.ruleNodeIds).toHaveLength(0);
+    expect(result.blocked).toHaveLength(0);
+  });
+
   it('opaque RawKmnFragment producing target char (output side of `>`) goes to blocked', () => {
     const ir = makeIR({
       raw: [{
