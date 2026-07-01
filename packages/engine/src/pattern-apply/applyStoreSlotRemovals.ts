@@ -223,7 +223,12 @@ export function classifyStoreSlotEdit(store: IRStore, ir: KeyboardIR): StoreSlot
   return { mode: "drop" };
 }
 
-/** Human-readable explanation appended to a blocked-store warning. */
+/**
+ * Human-readable explanation appended to a blocked-store warning (engine-side,
+ * warning-log audience). Sibling: `blockReasonToDisabledReason` in the studio's
+ * irToCarveNodes.ts switches over the same `StoreSlotBlockReason` union to produce
+ * author-facing UI copy — a new reason must be added to both switches.
+ */
 function blockReasonMessage(reason: StoreSlotBlockReason): string {
   switch (reason) {
     case "system-store":
@@ -378,14 +383,19 @@ export function applyStoreSlotRemovals(
     }
 
     const newItems = store.items.filter((_, i) => !dropIndices.has(i));
-    appliedCount += storeApplied;
-    replacedById.set(storeNodeId, { ...store, items: newItems });
 
     if (newItems.length === 0) {
+      // kmcmplib rejects a store(name) line with zero value tokens. Refuse
+      // the whole batch for this store rather than emit uncompilable .kmn —
+      // apply nothing for it and do not count it toward appliedCount.
       warnings.push(
-        `[store-slot] store "${store.name}" is now empty; rules that reference it will never match`,
+        `[store-slot] refusing to empty store "${store.name}" - a store needs at least one item to compile; remove the whole store instead`,
       );
+      continue;
     }
+
+    appliedCount += storeApplied;
+    replacedById.set(storeNodeId, { ...store, items: newItems });
   }
 
   if (replacedById.size === 0) {

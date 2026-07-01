@@ -118,6 +118,8 @@ describe('Inspector — StoreDetail chip toggle wiring', () => {
 
 describe('Inspector — StoreDetail AC6 "empties the store" warning banner', () => {
   const AC6_TEXT = 'This will empty the store — the mechanism depending on it will stop working';
+  const AC6_BUILDABLE_TEXT =
+    "To keep the keyboard buildable, the built keyboard keeps this store's characters until at least one stays active — remove the whole store instead if you no longer need it.";
 
   it('shows the banner when all toggleable chips are off, they cover every char item, and the store has rule dependents', () => {
     const chips: StoreCharChip[] = [
@@ -132,6 +134,9 @@ describe('Inspector — StoreDetail AC6 "empties the store" warning banner', () 
     render(<Inspector {...baseInspectorProps} node={node} nodes={[node]} isItemDeleted={isItemDeleted} />);
 
     expect(screen.getByText(AC6_TEXT)).toBeDefined();
+    // Second line: explains the engine's refusal-to-empty guard so authors
+    // understand why the store keeps one character until they delete it outright.
+    expect(screen.getByText(AC6_BUILDABLE_TEXT)).toBeDefined();
   });
 
   it('does NOT show the banner when some toggleable chips are still on (not fully off)', () => {
@@ -147,6 +152,7 @@ describe('Inspector — StoreDetail AC6 "empties the store" warning banner', () 
     render(<Inspector {...baseInspectorProps} node={node} nodes={[node]} isItemDeleted={isItemDeleted} />);
 
     expect(screen.queryByText(AC6_TEXT)).toBeNull();
+    expect(screen.queryByText(AC6_BUILDABLE_TEXT)).toBeNull();
   });
 
   it('does NOT show the banner when the store has no rule dependents (ruleCount 0 / storeUsage undefined)', () => {

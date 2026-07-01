@@ -562,7 +562,13 @@ export interface StoreCharChip {
   disabledReason?: string;
 }
 
-/** Map a classifyStoreSlotEdit block reason to an author-facing plain-language explanation. */
+/**
+ * Map a classifyStoreSlotEdit block reason to an author-facing plain-language
+ * explanation (studio-side, UI-copy audience). Sibling: `blockReasonMessage`
+ * in the engine's applyStoreSlotRemovals.ts switches over the same
+ * `StoreSlotBlockReason` union to produce warning-log text — a new reason
+ * must be added to both switches.
+ */
 function blockReasonToDisabledReason(reason: StoreSlotBlockReason): string {
   switch (reason) {
     case 'paired-input':

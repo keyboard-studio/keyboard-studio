@@ -310,8 +310,13 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onTo
               <span style={{ color: 'var(--sil-orange-dark)', flexShrink: 0, marginTop: 1 }}>
                 <WarnIcon size={15} />
               </span>
-              <span style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--app-text)' }}>
-                This will empty the store — the mechanism depending on it will stop working
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--app-text)' }}>
+                  This will empty the store — the mechanism depending on it will stop working
+                </span>
+                <span style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
+                  To keep the keyboard buildable, the built keyboard keeps this store's characters until at least one stays active — remove the whole store instead if you no longer need it.
+                </span>
               </span>
             </div>
           )}

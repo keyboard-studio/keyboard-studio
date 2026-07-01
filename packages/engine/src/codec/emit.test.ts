@@ -293,11 +293,13 @@ describe("emit — quoted store values", () => {
   });
 
   // Pinning test (not a spec of desired behavior): a store whose items[] has
-  // been emptied — e.g. by the pattern-apply "drop" edit class carving out
-  // every remaining slot — currently emits a bare `store(name) ` line with a
-  // trailing space and no value token. This is documented here as observed
-  // behavior; if it turns out to be syntactically invalid to kmcmplib, that is
-  // a separate fix, not something this test asserts should stay broken.
+  // been emptied still emits a bare `store(name) ` line with a trailing space
+  // and no value token — kmcmplib rejects this (a store needs >=1 value
+  // token to compile). The pattern-apply "drop" edit class (see
+  // applyStoreSlotRemovals) now refuses to produce an empty store via that
+  // path, so this transform-level guard is the reason IRStore.items should
+  // never actually reach emit() empty in practice. This test pins emit()'s
+  // own behavior in case some other caller ever does hand it an empty store.
   it("emits a bare `store(name) ` line (trailing space, no value) for an emptied store", () => {
     const out = emit(makeUserStoreIR("emptied", []));
     expect(out).toContain("store(emptied) \n");

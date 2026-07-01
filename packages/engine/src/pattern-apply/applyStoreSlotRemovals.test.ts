@@ -860,7 +860,7 @@ describe("applyStoreSlotRemovals — drop dispatch", () => {
     ]);
   });
 
-  it("dropping the last item in a store emits the empty-store warning", () => {
+  it("refuses to drop the last item in a store: IR unchanged, not counted, warns", () => {
     const store: IRStore = {
       nodeId: "s#last",
       name: "lastStore",
@@ -874,11 +874,140 @@ describe("applyStoreSlotRemovals — drop dispatch", () => {
       new Set(["s#last#0"]),
     );
 
-    expect(appliedCount).toBe(1);
+    expect(appliedCount).toBe(0);
     const resultStore = result.stores.find((s) => s.nodeId === "s#last");
-    expect(resultStore!.items).toEqual([]);
+    // Refused: same object reference (structural sharing), not a rebuilt copy.
+    expect(resultStore).toBe(store);
     expect(
-      warnings.some((w) => w.includes('store "lastStore" is now empty')),
+      warnings.some((w) =>
+        w.includes(
+          'refusing to empty store "lastStore" - a store needs at least one item to compile; remove the whole store instead',
+        ),
+      ),
     ).toBe(true);
+  });
+
+  it("dropping all-but-one char in a store still applies (only the empty-result batch is refused)", () => {
+    const store: IRStore = {
+      nodeId: "s#allbutone",
+      name: "allButOneStore",
+      items: [
+        { kind: "char", value: "a" },
+        { kind: "char", value: "b" },
+        { kind: "char", value: "c" },
+      ],
+      isSystem: false,
+    };
+    const ir = makeTestIR([], [store]);
+
+    const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
+      ir,
+      new Set(["s#allbutone#0", "s#allbutone#1"]),
+    );
+
+    expect(appliedCount).toBe(2);
+    const resultStore = result.stores.find((s) => s.nodeId === "s#allbutone");
+    expect(resultStore!.items).toEqual([{ kind: "char", value: "c" }]);
+    expect(warnings.some((w) => w.includes("refusing to empty store"))).toBe(
+      false,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 19. One call spanning three stores of different classes at once — proves
+//     per-store classification doesn't leak across iterations of the
+//     targetsByStore loop.
+// ---------------------------------------------------------------------------
+
+describe("applyStoreSlotRemovals — one call spanning three differently-classed stores", () => {
+  it("classifies and applies each store independently: nul-fill, drop, and blocked in the same batch", () => {
+    // Output store (nul-fill class): paired via index() output with an any() input store.
+    const outputStore: IRStore = {
+      nodeId: "s#output",
+      name: "outputStore",
+      items: [
+        { kind: "char", value: "À" },
+        { kind: "char", value: "â" },
+      ],
+      isSystem: false,
+    };
+    const inputStore: IRStore = {
+      nodeId: "s#input",
+      name: "inputStore",
+      items: [
+        { kind: "char", value: "a" },
+        { kind: "char", value: "b" },
+      ],
+      isSystem: false,
+    };
+    const parallelRule: IRRule = {
+      nodeId: "rule#parallel",
+      context: [{ kind: "deadkey", id: 1 }, { kind: "any", storeRef: "inputStore" }],
+      output: [{ kind: "index", storeRef: "outputStore", offset: 2 }],
+    };
+
+    // Unreferenced store (drop class): no rule touches it at all.
+    const orphanStore: IRStore = {
+      nodeId: "s#orphan",
+      name: "orphanStore",
+      items: [
+        { kind: "char", value: "x" },
+        { kind: "char", value: "y" },
+      ],
+      isSystem: false,
+    };
+
+    // notany() store (blocked class): dropping would widen matching.
+    const blockedStore: IRStore = {
+      nodeId: "s#blocked",
+      name: "blockedStore",
+      items: [{ kind: "char", value: "q" }, { kind: "char", value: "r" }],
+      isSystem: false,
+    };
+    const notAnyRule: IRRule = {
+      nodeId: "rule#notany",
+      context: [{ kind: "notany", storeRef: "blockedStore" }],
+      output: [{ kind: "char", value: "z" }],
+    };
+
+    const group: IRGroup = {
+      nodeId: "group#main",
+      name: "main",
+      usingKeys: true,
+      rules: [parallelRule, notAnyRule],
+      readonly: false,
+    };
+    const ir = makeTestIR([group], [outputStore, inputStore, orphanStore, blockedStore]);
+
+    const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
+      ir,
+      new Set(["s#output#0", "s#orphan#0", "s#blocked#0"]),
+    );
+
+    // Combined count: nul-fill (1) + drop (1) = 2; blocked store contributes 0.
+    expect(appliedCount).toBe(2);
+
+    const outputInResult = result.stores.find((s) => s.nodeId === "s#output");
+    expect(outputInResult!.items).toEqual([
+      { kind: "raw", text: "nul" },
+      { kind: "char", value: "â" },
+    ]);
+
+    const orphanInResult = result.stores.find((s) => s.nodeId === "s#orphan");
+    expect(orphanInResult!.items).toEqual([{ kind: "char", value: "y" }]);
+
+    const blockedInResult = result.stores.find((s) => s.nodeId === "s#blocked");
+    // Blocked: untouched, same object reference (structural sharing).
+    expect(blockedInResult).toBe(blockedStore);
+    expect(
+      warnings.some((w) =>
+        w.includes('store "blockedStore"') && w.includes("blocked from editing"),
+      ),
+    ).toBe(true);
+
+    // input store (not targeted at all) stays untouched by reference too.
+    const inputInResult = result.stores.find((s) => s.nodeId === "s#input");
+    expect(inputInResult).toBe(inputStore);
   });
 });

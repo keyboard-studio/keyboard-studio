@@ -858,6 +858,21 @@ describe('storeCharChips — chip id stability + TRUE itemsIndex', () => {
     const ir = makeChipIR([], [store]);
     expect(storeCharChips(store, ir)).toEqual([]);
   });
+
+  it('returns an empty array for a REFERENCED store whose items are all non-char (vkey + raw) — still renders as a binary store, no tri-state', () => {
+    const store = makeChipStore('store#nonchar', 'nonCharX', [
+      { kind: 'vkey', name: 'K_A' },
+      { kind: 'raw', text: 'nul' },
+    ]);
+    const rule: IRRule = {
+      nodeId: 'rule#1',
+      context: [{ kind: 'any', storeRef: 'nonCharX' }],
+      output: [{ kind: 'char', value: 'z' }],
+    };
+    const ir = makeChipIR([makeChipGroup('g1', [rule])], [store]);
+
+    expect(storeCharChips(store, ir)).toEqual([]);
+  });
 });
 
 describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dispatch)', () => {
