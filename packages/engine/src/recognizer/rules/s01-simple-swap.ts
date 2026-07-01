@@ -72,6 +72,11 @@ export const s01Recognizer: RecognizerRule = {
 
     for (const group of ir.groups) {
       const matchingRules = group.rules.filter((r) => {
+        // Skip rules an earlier recognizer in this pass already claimed, so we
+        // never double-claim a node into a second pattern (the #886 ghost
+        // chip). NB: this is an independent guard from the identical one in
+        // interpreter.ts (findS01Clusters, etc.) — that path serves the
+        // generated rules; neither guard implies the other is covered.
         if (r.ownedByPattern !== undefined) return false;
         return isS01(r, group.name);
       });

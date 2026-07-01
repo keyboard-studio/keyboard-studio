@@ -394,7 +394,14 @@ export function collectOwnedNodeIds(ir: KeyboardIR): Set<string> {
   const ids = new Set<string>();
   for (const p of ir.recognizedPatterns) {
     if (p.origin !== 'recognized') continue;
-    for (const n of p.ownedNodes ?? []) ids.add(n.nodeId);
+    for (const n of p.ownedNodes ?? []) {
+      // Rule refs only. Store nodeIds never collide with a rule.nodeId, so
+      // including them is currently harmless — but the sole consumer
+      // (groupToGlyphs) .has()-tests against IRRule.nodeId, so keep the set
+      // homogeneous and mirror assertOwnershipConsistency's kind:'rule' scope.
+      if (n.kind !== 'rule') continue;
+      ids.add(n.nodeId);
+    }
   }
   return ids;
 }

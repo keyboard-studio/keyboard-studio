@@ -75,6 +75,14 @@ export function recognizePatterns(
 // owned by two different patterns (or by a pattern that doesn't claim it),
 // so the group Inspector and pattern Inspector disagree about who owns it.
 // Always-on: O(rules), cheap relative to the recognition pass itself.
+//
+// Origin-blind by design: this runs at the tail of recognizePatterns(), which
+// is the only producer of ownedByPattern stamps, so ir.recognizedPatterns
+// holds only freshly-recognized patterns at this point — there are no authored
+// patterns to exclude. (Contrast collectOwnedNodeIds/toRailNodes in the studio,
+// which filter origin === 'recognized' because they run later, over an IR that
+// may also carry authored patterns.) If authored patterns ever reach this
+// function, revisit whether the invariant should filter by origin.
 function assertOwnershipConsistency(ir: KeyboardIR): void {
   const ruleById = new Map<string, IRRule>();
   for (const group of ir.groups) {
@@ -102,6 +110,8 @@ function assertOwnershipConsistency(ir: KeyboardIR): void {
   for (const group of ir.groups) {
     for (const rule of group.rules) {
       if (rule.ownedByPattern === undefined) continue;
+      // Small-N: patterns are single-digit-to-low-tens per keyboard, so this
+      // .find() inside the rule loop is not a hot path — no index needed.
       const pattern = ir.recognizedPatterns.find((p) => p.id === rule.ownedByPattern);
       const claimsRule = pattern?.ownedNodes?.some(
         (n) => n.kind === "rule" && n.nodeId === rule.nodeId,
