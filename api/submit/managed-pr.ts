@@ -21,6 +21,7 @@ import {
 import {
   ManagedPRBodySchema,
 } from "../../utilities/oauth-backend/src/managed-pr-schemas.js";
+import { jsonResponse } from "../oauth/_shared.js";
 
 // ---------------------------------------------------------------------------
 // Web-fetch adapter — the global Web `Response` already exposes `.ok`,
@@ -88,21 +89,6 @@ function envManagedPRConfig(
 }
 
 // ---------------------------------------------------------------------------
-// JSON response helper (mirrors _shared.ts)
-// ---------------------------------------------------------------------------
-
-function jsonResponse(
-  status: number,
-  body: unknown,
-  extraHeaders?: Record<string, string>,
-): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json", ...extraHeaders },
-  });
-}
-
-// ---------------------------------------------------------------------------
 // Core handler — exported for testability (configOverride pattern from _shared.ts)
 // ---------------------------------------------------------------------------
 
@@ -122,11 +108,15 @@ export async function runManagedPRHandler(
     return jsonResponse(405, { error: "method_not_allowed" }, { Allow: "POST" });
   }
 
-  // Resolve config: explicit override (including null = not-configured) beats env.
+  // Resolve config precedence: an explicit override wins over env. `undefined`
+  // means "no override — read env". An explicit `null` is the test seam for
+  // "not configured": it maps to `undefined` so the 503 branch below fires.
   const config: ManagedPRPipelineConfig | undefined =
-    configOverride !== undefined
-      ? (configOverride ?? undefined)
-      : envManagedPRConfig();
+    configOverride === undefined
+      ? envManagedPRConfig()
+      : configOverride === null
+        ? undefined
+        : configOverride;
 
   if (config === undefined) {
     // Org bot identity not yet provisioned — fail soft, not 500.

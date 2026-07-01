@@ -79,7 +79,7 @@ export function envConfig(fetchFn: OAuthFetchFn = webFetch): HandlerConfig {
   };
 }
 
-function jsonResponse(
+export function jsonResponse(
   status: number,
   body: unknown,
   extraHeaders?: Record<string, string>,

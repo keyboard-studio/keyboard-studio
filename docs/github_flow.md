@@ -177,10 +177,10 @@ exactly.
 |---|---|---|
 | Contract extension (`publishManagedPR`) | **Done** | `packages/contracts/src/outputService.ts` — `PublishManagedPR*` types + method |
 | Engine client (`createManagedPROutputService`) | **Done** | `packages/engine/src/output/managed-pr.ts` — filters VFS to source files (SS1, reuses `isSourceFile`), POSTs to the proxy, maps HTTP status → `PublishManagedPRError`; 13 vitest specs |
-| Backend pipeline + route (`POST /submit/managed-pr`) | **Done (code) / deploy pending** | `utilities/oauth-backend/` POST /submit/managed-pr + `github-pipeline.ts` (vendored); org token from env `KEYBOARD_STUDIO_ORG_TOKEN`/`GITHUB_ORG_TOKEN`, fork owner from env; 106 vitest specs; real org account + deploy still pending infra |
+| Backend pipeline + route (`POST /submit/managed-pr`) | **Done (code) / deploy pending** | `utilities/oauth-backend/` POST /submit/managed-pr + `github-pipeline.ts` (vendored), and the co-located Vercel function `api/submit/managed-pr.ts` reusing the same core; org access via a **GitHub App installation token** minted at request time (`installation-token.ts`, `@octokit/auth-app`) from `GITHUB_APP_ID`/`GITHUB_APP_PRIVATE_KEY`/`GITHUB_APP_INSTALLATION_ID`, fork owner from `GITHUB_ORG_LOGIN`; `GITHUB_ORG_TOKEN` retired; 135 vitest specs; real org account + deploy still pending infra |
 | Attribution (Co-authored-by) commit format | **Done** | `Co-authored-by` trailer + `[<keyboardId>]` PR title normalisation + PR-body provenance block naming the human author (name+email) for maintainer reachability — keymanapp upstream parity; `github-pipeline.ts` |
 | Branch-collision suffix (§5 Q1) | **Done** | `buildManagedBranchName()` — `add/<keyboardId>-<short7sha>`; content-unique, no `Date`/random |
-| Org bot identity + deploy (§5 Q3) | Not started | `KEYBOARD_STUDIO_ORG_TOKEN`/`GITHUB_ORG_TOKEN` unset → route returns `503`; org service-account + standing fork still to be provisioned (tracked with #550 deploy) |
+| Org bot identity + deploy (§5 Q3) | **Code done / provisioning pending** | Credential plumbing landed: the GitHub App installation-token minter + Vercel route are in code and unit-tested. Any of the four `GITHUB_APP_*`/`GITHUB_ORG_LOGIN` vars absent → route returns `503`. Remaining is provisioning: register the org's GitHub App, install it on the standing fork of `keymanapp/keyboards`, and set the four vars in the deploy target (tracked with #550 deploy) |
 | Studio UI — attribution form + submit | **Done** | `packages/studio/src/components/ManagedPRSubmitPanel.tsx` wired into `OutputScreen` as primary submit action; attribution form (displayName/email) + copyright-attestation gate + result/error states; prefill from `IdentitySession` |
 
 ### Summary
@@ -188,5 +188,5 @@ exactly.
 ```
 Option C  [====================]  100%  engine + studio UI done; full end-to-end zip download wired (#32)
 Option A  [===================-]   95%  engine + studio sign-up (identity) UI done; backend co-located on Vercel (#550); submit action deferred to Option B (§1a); OAuth App registration + deploy remaining (DEPLOY.md)
-Option B  [=================---]   85%  DEFAULT submit path (§1a); contract + engine client + backend pipeline/route + studio attribution-form UI done & tested; remaining: org bot identity + deploy only (§5 Q3)
+Option B  [==================--]   90%  DEFAULT submit path (§1a); contract + engine client + backend pipeline/route (Fastify + Vercel) + GitHub-App installation-token minter + studio attribution-form UI done & tested; remaining: provisioning + env config only — register/install the org GitHub App and set the four GITHUB_APP_*/GITHUB_ORG_LOGIN vars in the deploy target (§5 Q3)
 ```
