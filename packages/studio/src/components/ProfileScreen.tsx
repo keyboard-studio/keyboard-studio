@@ -255,7 +255,7 @@ export function ProfileScreen() {
               type="button"
               style={connectProviderStyle}
               aria-label="Link GitHub"
-              onClick={() => { void github.connect("identity"); }}
+              onClick={() => { void github.connect(); }}
             >
               <GitHubMark />
               <span>Link GitHub</span>
@@ -303,7 +303,6 @@ export function ProfileScreen() {
             type="button"
             style={myKeyboardsStyle}
             disabled
-            aria-disabled="true"
           >
             <span>My keyboards</span>
           </button>
