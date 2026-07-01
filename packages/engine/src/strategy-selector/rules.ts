@@ -10,10 +10,14 @@
 // suite pins the exact behavior these tables must reproduce.
 //
 // NOTE on rule "3a": spec §7.2 documents a rule 3a (A2=alphabetic AND A3=strong
-// AND A3a=postfix → S-03) that intercepts between rules 3 and 4. It is NOT yet
-// implemented in the selector (A3a is not elicited end-to-end), so it is
-// deliberately absent from PRIMARY_RULES below — the map reflects what the code
-// actually does, not the spec's intended-but-unbuilt rule. See spec.md §7.2.
+// AND A3a=postfix → S-03) that intercepts between rules 3 and 4. It IS
+// implemented below, firing between rules 3 and 4 whenever `markInputOrder`
+// (A3a) is `"postfix"` — routing the primary to S-03 (sequence replace) with
+// S-04 as a secondary, and intercepting before rules 5 and 7 would otherwise
+// pick S-05 or S-02 off the A3=strong heuristic alone. `markInputOrder` is
+// optional and elicited only when A2=alphabetic AND A3=strong (see
+// `contracts/src/axes.ts` for the elicitation gate); when it is `undefined`,
+// rule 3a's `when` is false and evaluation falls through to rule 4 as before.
 
 import type {
   DiscoveryAxisVector,
@@ -97,7 +101,10 @@ export interface SecondaryRuleDef {
   /** Human-readable predicate. */
   conditionText: string;
   /** Predicate; the S-11 wrapper also depends on which primary rule fired. */
-  when: (axes: DiscoveryAxisVector, triggeredRule: PrimaryRuleNumber) => boolean;
+  when: (
+    axes: DiscoveryAxisVector,
+    triggeredRule: PrimaryRuleNumber,
+  ) => boolean;
   /** Strategy appended when the predicate holds. */
   add: StrategyId;
 }
@@ -137,6 +144,16 @@ export const PRIMARY_RULES: readonly PrimaryRuleDef[] = [
     secondaries: [{ strategy: "S-04" }],
   },
   {
+    rule: "3a",
+    conditionText: "A2=alphabetic AND A3=strong AND A3a=postfix",
+    when: (a) =>
+      a.scriptClass === "alphabetic" &&
+      a.phoneticIntuition === "strong" &&
+      a.markInputOrder === "postfix",
+    primary: "S-03",
+    secondaries: [{ strategy: "S-04" }],
+  },
+  {
     rule: 4,
     conditionText: "A5=two-orthography",
     when: (a) => a.multiMode === "two-orthography",
@@ -171,7 +188,8 @@ export const PRIMARY_RULES: readonly PrimaryRuleDef[] = [
   {
     rule: 8,
     conditionText: "A2=alphabetic AND A7a=full-remap",
-    when: (a) => a.scriptClass === "alphabetic" && a.remapPosture === "full-remap",
+    when: (a) =>
+      a.scriptClass === "alphabetic" && a.remapPosture === "full-remap",
     primary: "S-06",
     secondaries: [{ strategy: "S-04" }, { strategy: "S-08" }],
   },

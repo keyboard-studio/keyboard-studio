@@ -14,7 +14,13 @@ import {
 import type { StrategyId } from "@keyboard-studio/contracts";
 import { MONO, SANS } from "./tokens.ts";
 
-function StrategyChip({ id, kind }: { id: StrategyId; kind: "primary" | "secondary" }) {
+function StrategyChip({
+  id,
+  kind,
+}: {
+  id: StrategyId;
+  kind: "primary" | "secondary";
+}) {
   const primary = kind === "primary";
   return (
     <span
@@ -41,7 +47,9 @@ function StrategyChip({ id, kind }: { id: StrategyId; kind: "primary" | "seconda
 function SecondaryChip({ sec }: { sec: ConditionalSecondary }) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-      <span style={{ color: "#6e7681", fontFamily: MONO, fontSize: 12 }}>+</span>
+      <span style={{ color: "#6e7681", fontFamily: MONO, fontSize: 12 }}>
+        +
+      </span>
       <StrategyChip id={sec.strategy} kind="secondary" />
       {sec.whenText !== undefined && (
         <span style={{ color: "#8b949e", fontSize: 11, fontFamily: MONO }}>
@@ -57,12 +65,23 @@ export function StrategyTreeView() {
     <div style={{ fontFamily: SANS, color: "#e6edf3", maxWidth: 920 }}>
       <p style={{ fontSize: 13, color: "#8b949e", margin: "0 0 16px" }}>
         The survey computes a seven-axis vector (A1–A7), then{" "}
-        <code style={{ fontFamily: MONO, color: "#adbac7" }}>selectStrategy()</code> runs this tree.
-        Primary rules are tried top-to-bottom; the first match fixes the primary strategy. The
-        secondary passes then always run, appending add-ons.
+        <code style={{ fontFamily: MONO, color: "#adbac7" }}>
+          selectStrategy()
+        </code>{" "}
+        runs this tree. Primary rules are tried top-to-bottom; the first match
+        fixes the primary strategy. The secondary passes then always run,
+        appending add-ons.
       </p>
 
-      <h3 style={{ fontSize: 13, color: "#6ea8fe", margin: "0 0 8px", textTransform: "uppercase", letterSpacing: 0.4 }}>
+      <h3
+        style={{
+          fontSize: 13,
+          color: "#6ea8fe",
+          margin: "0 0 8px",
+          textTransform: "uppercase",
+          letterSpacing: 0.4,
+        }}
+      >
         Primary pass — first match wins
       </h3>
       <div style={{ display: "flex", flexDirection: "column" }}>
@@ -95,7 +114,15 @@ export function StrategyTreeView() {
               >
                 Rule {r.rule}
               </span>
-              <code style={{ fontFamily: MONO, fontSize: 12.5, color: "#e3b341", flex: 1, minWidth: 220 }}>
+              <code
+                style={{
+                  fontFamily: MONO,
+                  fontSize: 12.5,
+                  color: "#e3b341",
+                  flex: 1,
+                  minWidth: 220,
+                }}
+              >
                 {r.conditionText}
               </code>
               <span style={{ color: "#6e7681" }}>→</span>
@@ -105,7 +132,15 @@ export function StrategyTreeView() {
               ))}
             </div>
             {i < PRIMARY_RULES.length - 1 && (
-              <div style={{ paddingLeft: 22, color: "#6e7681", fontSize: 11, fontFamily: MONO, lineHeight: "18px" }}>
+              <div
+                style={{
+                  paddingLeft: 22,
+                  color: "#6e7681",
+                  fontSize: 11,
+                  fontFamily: MONO,
+                  lineHeight: "18px",
+                }}
+              >
                 else ↓
               </div>
             )}
@@ -152,7 +187,15 @@ export function StrategyTreeView() {
             >
               {sr.id === "S-11-wrapper" ? "S-11 wrapper" : `Rule ${sr.id}`}
             </span>
-            <code style={{ fontFamily: MONO, fontSize: 12.5, color: "#e3b341", flex: 1, minWidth: 220 }}>
+            <code
+              style={{
+                fontFamily: MONO,
+                fontSize: 12.5,
+                color: "#e3b341",
+                flex: 1,
+                minWidth: 220,
+              }}
+            >
               {sr.conditionText}
             </code>
             <span style={{ color: "#6e7681" }}>→ add</span>
@@ -161,10 +204,19 @@ export function StrategyTreeView() {
         ))}
       </div>
 
-      <p style={{ fontSize: 11.5, color: "#6e7681", margin: "16px 0 0", fontFamily: SANS }}>
-        Note: spec §7.2 also documents rule 3a (postfix-preference intercept → S-03). It is not yet
-        wired end-to-end, so it is intentionally absent here — this map reflects what{" "}
-        <code style={{ fontFamily: MONO }}>selectStrategy()</code> actually does.
+      <p
+        style={{
+          fontSize: 11.5,
+          color: "#6e7681",
+          margin: "16px 0 0",
+          fontFamily: SANS,
+        }}
+      >
+        Rule 3a is gated on{" "}
+        <code style={{ fontFamily: MONO }}>markInputOrder</code> (A3a); it stays
+        dormant and falls through to the next matching rule whenever that axis
+        is unelicited or not <code style={{ fontFamily: MONO }}>"postfix"</code>
+        .
       </p>
     </div>
   );
