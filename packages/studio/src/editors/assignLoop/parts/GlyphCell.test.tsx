@@ -12,7 +12,7 @@
 // directly via useHoverInfoStore.getState() after firing the click.
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, cleanup, fireEvent } from '@testing-library/react';
+import { render, cleanup, fireEvent, screen } from '@testing-library/react';
 import { GlyphCell } from './GlyphCell.tsx';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
 
@@ -86,5 +86,74 @@ describe('GlyphCell — removable capability', () => {
     );
     const button = container.querySelector('button')!;
     expect(button.getAttribute('aria-disabled')).toBe('false');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #917 — GlyphOwner store tags: rendering, rail-jump click, propagation guard.
+//
+// Store owners render as role="button" spans with an accessible name of
+// "Go to store <label>"; clicking one must call onOwnerClick(nodeId) and
+// must NOT also fire the cell's own onToggle (stopPropagation). Pattern
+// owners are consumed only by InfoView (via setInfo) and must never render
+// a visible tag here.
+// ---------------------------------------------------------------------------
+
+describe('GlyphCell — #917 store owner tags', () => {
+  it('renders a tag with accessible name "Go to store vowels" and label text "vowels"', () => {
+    const owners = [{ kind: 'store' as const, nodeId: 's1', label: 'vowels' }];
+    render(
+      <GlyphCell {...baseProps} capability="removable:simple" onToggle={vi.fn()} owners={owners} />,
+    );
+    const tag = screen.getByRole('button', { name: 'Go to store vowels' });
+    expect(tag.textContent).toBe('vowels');
+  });
+
+  it('clicking the store tag calls onOwnerClick with the store nodeId and does NOT call onToggle', () => {
+    const onToggle = vi.fn();
+    const onOwnerClick = vi.fn();
+    const owners = [{ kind: 'store' as const, nodeId: 's1', label: 'vowels' }];
+    render(
+      <GlyphCell
+        {...baseProps}
+        capability="removable:simple"
+        onToggle={onToggle}
+        owners={owners}
+        onOwnerClick={onOwnerClick}
+      />,
+    );
+    const tag = screen.getByRole('button', { name: 'Go to store vowels' });
+    fireEvent.click(tag);
+    expect(onOwnerClick).toHaveBeenCalledTimes(1);
+    expect(onOwnerClick).toHaveBeenCalledWith('s1');
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it('Enter keydown on the store tag also fires onOwnerClick and does not toggle', () => {
+    const onToggle = vi.fn();
+    const onOwnerClick = vi.fn();
+    const owners = [{ kind: 'store' as const, nodeId: 's1', label: 'vowels' }];
+    render(
+      <GlyphCell
+        {...baseProps}
+        capability="removable:simple"
+        onToggle={onToggle}
+        owners={owners}
+        onOwnerClick={onOwnerClick}
+      />,
+    );
+    const tag = screen.getByRole('button', { name: 'Go to store vowels' });
+    fireEvent.keyDown(tag, { key: 'Enter' });
+    expect(onOwnerClick).toHaveBeenCalledWith('s1');
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it('a kind:"pattern" owner does not render a visible tag (store owners only)', () => {
+    const owners = [{ kind: 'pattern' as const, nodeId: 'p1', label: 'Diacritics' }];
+    render(
+      <GlyphCell {...baseProps} capability="removable:simple" onToggle={vi.fn()} owners={owners} />,
+    );
+    expect(screen.queryByText('Diacritics')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Go to store/ })).toBeNull();
   });
 });

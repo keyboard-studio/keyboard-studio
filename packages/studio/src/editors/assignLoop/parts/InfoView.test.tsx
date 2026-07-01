@@ -493,6 +493,78 @@ describe('<InfoView> kind:"key"', () => {
   });
 });
 
+describe('<InfoView> kind:"key" — #917 "Managed by" pattern-owner line', () => {
+  it('shows "Managed by the Diacritics pattern." AND the generic capability hint for a not-removable chip with a pattern owner', () => {
+    useHoverInfoStore.setState({
+      info: {
+        kind: 'key',
+        keys: ['K_A'],
+        ch: 'a',
+        off: false,
+        capability: 'not-removable:context-sensitive',
+        owners: [{ kind: 'pattern', nodeId: 'p1', label: 'Diacritics' }],
+      },
+    });
+    render(<InfoView />);
+
+    expect(document.body.textContent).toContain('Managed by the Diacritics pattern.');
+    expect(document.body.textContent).toContain(
+      capabilityHint('not-removable:context-sensitive').slice(0, 30),
+    );
+  });
+
+  it('does NOT show the "Managed by" line for a removable capability, even with a pattern owner', () => {
+    useHoverInfoStore.setState({
+      info: {
+        kind: 'key',
+        keys: ['K_A'],
+        ch: 'a',
+        off: false,
+        capability: 'removable:simple',
+        owners: [{ kind: 'pattern', nodeId: 'p1', label: 'Diacritics' }],
+      },
+    });
+    render(<InfoView />);
+
+    expect(document.body.textContent).not.toContain('Managed by');
+    expect(document.body.textContent).toContain(capabilityHint('removable:simple').slice(0, 30));
+  });
+
+  it('does NOT show the "Managed by" line for a not-removable chip with no pattern owner', () => {
+    useHoverInfoStore.setState({
+      info: {
+        kind: 'key',
+        keys: ['K_A'],
+        ch: 'a',
+        off: false,
+        capability: 'not-removable:context-sensitive',
+      },
+    });
+    render(<InfoView />);
+
+    expect(document.body.textContent).not.toContain('Managed by');
+    expect(document.body.textContent).toContain(
+      capabilityHint('not-removable:context-sensitive').slice(0, 30),
+    );
+  });
+
+  it('does NOT show the "Managed by" line for a not-removable chip whose owners has only a store owner (no pattern owner)', () => {
+    useHoverInfoStore.setState({
+      info: {
+        kind: 'key',
+        keys: ['K_A'],
+        ch: 'a',
+        off: false,
+        capability: 'not-removable:context-sensitive',
+        owners: [{ kind: 'store', nodeId: 's1', label: 'vowels' }],
+      },
+    });
+    render(<InfoView />);
+
+    expect(document.body.textContent).not.toContain('Managed by');
+  });
+});
+
 describe('<InfoView> kind:"node"', () => {
   it('renders the infoFor() title and body for a pattern CarveNode', () => {
     const node = patternNode('Basic Latin');
