@@ -1,22 +1,33 @@
-// Tests for applyStoreSlotRemovals — store-slot nul insertion for
-// parallel-store deadkey rule carving.
+// Tests for applyStoreSlotRemovals — per-store-class store-slot edit dispatch
+// (nul-fill, drop, blocked) for carving individual characters out of a store.
 //
-// Coverage (12 blocks):
+// Coverage (12 legacy nul-fill blocks, retained + updated, plus new classifier
+// and drop-dispatch blocks):
 //   1.  Single char slot replaced → items[i] === nul; others unchanged; appliedCount===1.
 //   2.  Multiple indices on one store → all replaced; items.length unchanged.
 //   3.  Slots across two distinct output stores → both rewritten; untouched store ref unchanged.
 //   4.  baseIr not mutated.
 //   5.  Items-vs-display index: target char after a non-char item.
-//   6.  Guard — input-only store → warning, appliedCount===0, returned ir===baseIr.
+//   6.  Guard — paired-input store (any() source paired with an output index()) → blocked.
 //   7.  Guard — missing store nodeId → warning, skip.
 //   8.  Out-of-range index alongside a valid index → warning for range, valid one applies.
 //   9.  Malformed id (no `#`, or `#abc`) → warning, skip.
 //   10. Existing nul slot stays unchanged when a different char slot is removed.
 //   11. Empty slotIds → returns baseIr by reference, appliedCount===0.
 //   12. Round-trip: emit nul-filled IR, re-parse, assert nul slot is `nul` at same index.
+//   13. classifyStoreSlotEdit unit cases — one per class in the decision table.
+//   14. Drop dispatch — any-only unpaired store, unreferenced store.
+//   15. Drop dispatch — true items[] index targeting with mixed vkey/char items;
+//       skipping a non-char index warns without dropping it.
+//   16. Drop dispatch — structural sharing (untouched stores keep the same reference).
+//   17. Drop dispatch — multiple drops in one store in one pass (descending-index safety).
+//   18. Drop dispatch — dropping the last item emits the empty-store warning.
 
 import { describe, it, expect } from "vitest";
-import { applyStoreSlotRemovals } from "./applyStoreSlotRemovals.js";
+import {
+  applyStoreSlotRemovals,
+  classifyStoreSlotEdit,
+} from "./applyStoreSlotRemovals.js";
 import { parse } from "../codec/parse.js";
 import { emit } from "../codec/emit.js";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
@@ -271,10 +282,11 @@ describe("applyStoreSlotRemovals — items-vs-display index", () => {
 // 6. Guard — input-only store
 // ---------------------------------------------------------------------------
 
-describe("applyStoreSlotRemovals — input-only store guard", () => {
-  it("emits warning, appliedCount===0, and returns baseIr by reference", () => {
+describe("applyStoreSlotRemovals — input-only store guard (paired-input)", () => {
+  it("emits a paired-input blocked warning, appliedCount===0, and returns baseIr by reference", () => {
     const ir = makeBaseIr();
-    // "store#dkf" is only referenced via any() in the context, never via index() in output
+    // "store#dkf" is an any() source in the same rule whose output carries an
+    // index() element (paired with dktX) — positional coupling makes drop unsafe.
     const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
       ir,
       new Set(["store#dkf#0"]),
@@ -282,7 +294,7 @@ describe("applyStoreSlotRemovals — input-only store guard", () => {
 
     expect(appliedCount).toBe(0);
     expect(warnings.length).toBeGreaterThan(0);
-    expect(warnings[0]).toMatch(/not referenced.*output target|only.*output.*stores/i);
+    expect(warnings[0]).toMatch(/blocked from editing.*any\(\).*index\(\)|paired.*alignment/i);
     // Returns the same reference when nothing was applied
     expect(result).toBe(ir);
   });
@@ -544,4 +556,329 @@ describe("applyStoreSlotRemovals — Bamum canary (bare-any fan-out round-trip)"
       expect(reparsedStore!.items[0]).toEqual({ kind: "raw", text: "nul" });
     },
   );
+});
+
+// ---------------------------------------------------------------------------
+// 13. classifyStoreSlotEdit — one unit case per class in the decision table
+// ---------------------------------------------------------------------------
+
+describe("classifyStoreSlotEdit — decision table", () => {
+  it("blocks a system store (isSystem: true) regardless of usage", () => {
+    const store: IRStore = { nodeId: "s#0", name: "NAME", items: [], isSystem: true };
+    const ir = makeTestIR([], [store]);
+    expect(classifyStoreSlotEdit(store, ir)).toEqual({
+      mode: "blocked",
+      reason: "system-store",
+    });
+  });
+
+  it("blocks a store referenced by notany() (dropping would widen matching)", () => {
+    const store: IRStore = {
+      nodeId: "s#word",
+      name: "word",
+      items: [{ kind: "char", value: "a" }],
+      isSystem: false,
+    };
+    const rule: IRRule = {
+      nodeId: "rule#0",
+      context: [{ kind: "notany", storeRef: "word" }],
+      output: [{ kind: "char", value: "x" }],
+    };
+    const group: IRGroup = { nodeId: "g#0", name: "main", usingKeys: true, rules: [rule], readonly: false };
+    const ir = makeTestIR([group], [store]);
+    expect(classifyStoreSlotEdit(store, ir)).toEqual({
+      mode: "blocked",
+      reason: "notany-widens",
+    });
+  });
+
+  it("blocks a store referenced by index() in a rule's context", () => {
+    const store: IRStore = {
+      nodeId: "s#ctx",
+      name: "ctxStore",
+      items: [{ kind: "char", value: "a" }],
+      isSystem: false,
+    };
+    const rule: IRRule = {
+      nodeId: "rule#0",
+      context: [{ kind: "index", storeRef: "ctxStore", offset: 1 }],
+      output: [{ kind: "char", value: "x" }],
+    };
+    const group: IRGroup = { nodeId: "g#0", name: "main", usingKeys: true, rules: [rule], readonly: false };
+    const ir = makeTestIR([group], [store]);
+    expect(classifyStoreSlotEdit(store, ir)).toEqual({
+      mode: "blocked",
+      reason: "context-index-aligned",
+    });
+  });
+
+  it("blocks a dual-use store (output target AND any() source, no pairing)", () => {
+    const store: IRStore = {
+      nodeId: "s#dual",
+      name: "dualStore",
+      items: [{ kind: "char", value: "a" }, { kind: "char", value: "b" }],
+      isSystem: false,
+    };
+    // Rule A emits dualStore via outs() in one rule (no any() here).
+    const ruleEmit: IRRule = {
+      nodeId: "rule#emit",
+      context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
+      output: [{ kind: "outs", storeRef: "dualStore" }],
+    };
+    // Rule B uses dualStore as an any() source, output has no index() (unpaired).
+    const ruleSource: IRRule = {
+      nodeId: "rule#source",
+      context: [{ kind: "any", storeRef: "dualStore" }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group: IRGroup = {
+      nodeId: "g#0",
+      name: "main",
+      usingKeys: true,
+      rules: [ruleEmit, ruleSource],
+      readonly: false,
+    };
+    const ir = makeTestIR([group], [store]);
+    expect(classifyStoreSlotEdit(store, ir)).toEqual({ mode: "blocked", reason: "dual-use" });
+  });
+
+  it("nul-fills a store referenced only as an output target (index()/outs())", () => {
+    const store: IRStore = {
+      nodeId: "s#out",
+      name: "outStore",
+      items: [{ kind: "char", value: "a" }],
+      isSystem: false,
+    };
+    const rule: IRRule = {
+      nodeId: "rule#0",
+      context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
+      output: [{ kind: "index", storeRef: "outStore", offset: 1 }],
+    };
+    const group: IRGroup = { nodeId: "g#0", name: "main", usingKeys: true, rules: [rule], readonly: false };
+    const ir = makeTestIR([group], [store]);
+    expect(classifyStoreSlotEdit(store, ir)).toEqual({ mode: "nul-fill" });
+  });
+
+  it("blocks a paired-input store (any() source in a rule whose output has index())", () => {
+    const store: IRStore = {
+      nodeId: "s#paired",
+      name: "pairedStore",
+      items: [{ kind: "char", value: "a" }],
+      isSystem: false,
+    };
+    const otherStore: IRStore = {
+      nodeId: "s#other",
+      name: "otherStore",
+      items: [{ kind: "char", value: "x" }],
+      isSystem: false,
+    };
+    const rule: IRRule = {
+      nodeId: "rule#0",
+      context: [{ kind: "any", storeRef: "pairedStore" }],
+      output: [{ kind: "index", storeRef: "otherStore", offset: 1 }],
+    };
+    const group: IRGroup = { nodeId: "g#0", name: "main", usingKeys: true, rules: [rule], readonly: false };
+    const ir = makeTestIR([group], [store, otherStore]);
+    expect(classifyStoreSlotEdit(store, ir)).toEqual({ mode: "blocked", reason: "paired-input" });
+  });
+
+  it("drops a store referenced only by an unpaired any() (no index() anywhere in that rule's output)", () => {
+    const store: IRStore = {
+      nodeId: "s#any",
+      name: "anyStore",
+      items: [{ kind: "char", value: "a" }],
+      isSystem: false,
+    };
+    const rule: IRRule = {
+      nodeId: "rule#0",
+      context: [{ kind: "any", storeRef: "anyStore" }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group: IRGroup = { nodeId: "g#0", name: "main", usingKeys: true, rules: [rule], readonly: false };
+    const ir = makeTestIR([group], [store]);
+    expect(classifyStoreSlotEdit(store, ir)).toEqual({ mode: "drop" });
+  });
+
+  it("drops a store unreferenced by any rule", () => {
+    const store: IRStore = {
+      nodeId: "s#orphan",
+      name: "orphanStore",
+      items: [{ kind: "char", value: "a" }],
+      isSystem: false,
+    };
+    const ir = makeTestIR([], [store]);
+    expect(classifyStoreSlotEdit(store, ir)).toEqual({ mode: "drop" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 14–18. Drop dispatch through applyStoreSlotRemovals
+// ---------------------------------------------------------------------------
+
+describe("applyStoreSlotRemovals — drop dispatch", () => {
+  it("drops a slot from an any-only unpaired store; items.length shrinks by one", () => {
+    const store: IRStore = {
+      nodeId: "s#any",
+      name: "anyStore",
+      items: [
+        { kind: "char", value: "a" },
+        { kind: "char", value: "b" },
+        { kind: "char", value: "c" },
+      ],
+      isSystem: false,
+    };
+    const rule: IRRule = {
+      nodeId: "rule#0",
+      context: [{ kind: "any", storeRef: "anyStore" }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group: IRGroup = { nodeId: "g#0", name: "main", usingKeys: true, rules: [rule], readonly: false };
+    const ir = makeTestIR([group], [store]);
+
+    const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
+      ir,
+      new Set(["s#any#1"]),
+    );
+
+    expect(warnings).toHaveLength(0);
+    expect(appliedCount).toBe(1);
+    const resultStore = result.stores.find((s) => s.nodeId === "s#any");
+    expect(resultStore!.items).toEqual([
+      { kind: "char", value: "a" },
+      { kind: "char", value: "c" },
+    ]);
+    expect(resultStore!.items.length).toBe(2);
+  });
+
+  it("drops a slot from an unreferenced (orphan) store", () => {
+    const store: IRStore = {
+      nodeId: "s#orphan",
+      name: "orphanStore",
+      items: [{ kind: "char", value: "a" }, { kind: "char", value: "b" }],
+      isSystem: false,
+    };
+    const ir = makeTestIR([], [store]);
+
+    const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
+      ir,
+      new Set(["s#orphan#0"]),
+    );
+
+    expect(warnings).toHaveLength(0);
+    expect(appliedCount).toBe(1);
+    const resultStore = result.stores.find((s) => s.nodeId === "s#orphan");
+    expect(resultStore!.items).toEqual([{ kind: "char", value: "b" }]);
+  });
+
+  it("targets the true items[] index with mixed vkey/char items; skipping a non-char index warns without dropping it", () => {
+    const store: IRStore = {
+      nodeId: "s#mixed",
+      name: "mixedStore",
+      items: [
+        { kind: "vkey", name: "K_A" }, // index 0 — non-char, not droppable
+        { kind: "char", value: "b" }, // index 1 — char
+        { kind: "char", value: "c" }, // index 2 — char
+      ],
+      isSystem: false,
+    };
+    const rule: IRRule = {
+      nodeId: "rule#0",
+      context: [{ kind: "any", storeRef: "mixedStore" }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group: IRGroup = { nodeId: "g#0", name: "main", usingKeys: true, rules: [rule], readonly: false };
+    const ir = makeTestIR([group], [store]);
+
+    // Target index 0 (vkey, not droppable) and index 1 (char, droppable).
+    const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
+      ir,
+      new Set(["s#mixed#0", "s#mixed#1"]),
+    );
+
+    expect(appliedCount).toBe(1);
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings.some((w) => w.includes("not a char item"))).toBe(true);
+
+    const resultStore = result.stores.find((s) => s.nodeId === "s#mixed");
+    // Only the char at index 1 was dropped; the vkey at (former) index 0 survives.
+    expect(resultStore!.items).toEqual([
+      { kind: "vkey", name: "K_A" },
+      { kind: "char", value: "c" },
+    ]);
+  });
+
+  it("structural sharing: an untouched store keeps the same object reference through a drop", () => {
+    const dropStore: IRStore = {
+      nodeId: "s#drop",
+      name: "dropStore",
+      items: [{ kind: "char", value: "a" }, { kind: "char", value: "b" }],
+      isSystem: false,
+    };
+    const untouchedStore: IRStore = {
+      nodeId: "s#untouched",
+      name: "untouchedStore",
+      items: [{ kind: "char", value: "x" }],
+      isSystem: false,
+    };
+    const ir = makeTestIR([], [dropStore, untouchedStore]);
+
+    const { ir: result } = applyStoreSlotRemovals(ir, new Set(["s#drop#0"]));
+
+    const untouchedInResult = result.stores.find((s) => s.nodeId === "s#untouched");
+    expect(untouchedInResult).toBe(untouchedStore);
+  });
+
+  it("multiple drops in one store in one pass (descending-index safety)", () => {
+    const store: IRStore = {
+      nodeId: "s#multi",
+      name: "multiStore",
+      items: [
+        { kind: "char", value: "a" }, // 0
+        { kind: "char", value: "b" }, // 1
+        { kind: "char", value: "c" }, // 2
+        { kind: "char", value: "d" }, // 3
+        { kind: "char", value: "e" }, // 4
+      ],
+      isSystem: false,
+    };
+    const ir = makeTestIR([], [store]);
+
+    // Target indices out of ascending order to prove the filter approach
+    // (not manual splicing) handles this correctly regardless of Set iteration order.
+    const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
+      ir,
+      new Set(["s#multi#3", "s#multi#0", "s#multi#2"]),
+    );
+
+    expect(warnings).toHaveLength(0);
+    expect(appliedCount).toBe(3);
+    const resultStore = result.stores.find((s) => s.nodeId === "s#multi");
+    // Indices 0, 2, 3 dropped; only 1 ('b') and 4 ('e') remain, in original relative order.
+    expect(resultStore!.items).toEqual([
+      { kind: "char", value: "b" },
+      { kind: "char", value: "e" },
+    ]);
+  });
+
+  it("dropping the last item in a store emits the empty-store warning", () => {
+    const store: IRStore = {
+      nodeId: "s#last",
+      name: "lastStore",
+      items: [{ kind: "char", value: "a" }],
+      isSystem: false,
+    };
+    const ir = makeTestIR([], [store]);
+
+    const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
+      ir,
+      new Set(["s#last#0"]),
+    );
+
+    expect(appliedCount).toBe(1);
+    const resultStore = result.stores.find((s) => s.nodeId === "s#last");
+    expect(resultStore!.items).toEqual([]);
+    expect(
+      warnings.some((w) => w.includes('store "lastStore" is now empty')),
+    ).toBe(true);
+  });
 });

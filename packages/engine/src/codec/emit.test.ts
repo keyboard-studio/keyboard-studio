@@ -291,6 +291,17 @@ describe("emit — quoted store values", () => {
     const out = emit(makeUserStoreIR("ctrl", ["a", "	", "b"]));
     expect(out).toContain("store(ctrl) 'a' U+0009 'b'");
   });
+
+  // Pinning test (not a spec of desired behavior): a store whose items[] has
+  // been emptied — e.g. by the pattern-apply "drop" edit class carving out
+  // every remaining slot — currently emits a bare `store(name) ` line with a
+  // trailing space and no value token. This is documented here as observed
+  // behavior; if it turns out to be syntactically invalid to kmcmplib, that is
+  // a separate fix, not something this test asserts should stay broken.
+  it("emits a bare `store(name) ` line (trailing space, no value) for an emptied store", () => {
+    const out = emit(makeUserStoreIR("emptied", []));
+    expect(out).toContain("store(emptied) \n");
+  });
 });
 
 // ---------------------------------------------------------------------------
