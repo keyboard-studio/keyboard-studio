@@ -89,6 +89,12 @@ describe('storePairDescription — both sides (asSource=true, asOutput=true)', (
     expect(text).not.toMatch(/^This is the output side/);
   });
 
+  it('conveys BOTH-sided use (match-and-reproduce), not a one-way input/output split', () => {
+    expect(text).toMatch(/both sides/i);
+    // The old wording wrongly implied one store is input and the other output.
+    expect(text).not.toMatch(/one providing the input/i);
+  });
+
   it('does NOT mention "backspace" (trigger-agnostic)', () => {
     expect(text).not.toMatch(/backspace/i);
   });
