@@ -415,6 +415,12 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
                 the keyboard consistent; removing it from just one place may leave
                 broken references.
               </p>
+              {pendingCascade.contributors.storeSlotIds.length > 0 && (
+                <p style={{ margin: '0 0 10px' }}>
+                  Note: the key or sequence that triggers this character will still
+                  exist, but will now produce nothing.
+                </p>
+              )}
               <ul
                 aria-label="Locations affected"
                 style={{ margin: '0 0 10px', paddingLeft: 18, fontSize: 13 }}
