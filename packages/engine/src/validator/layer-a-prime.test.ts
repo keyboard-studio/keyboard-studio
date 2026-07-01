@@ -545,6 +545,20 @@ describe("checkOwnershipConsistency (I6)", () => {
     expect(f[0]?.message).toContain('expected "P1"');
   });
 
+  it("errors (forward mismatch) when the owned rule has no ownedByPattern at all (unset)", () => {
+    // The most common real-world cause: the recognizer set Pattern.ownedNodes
+    // but never wrote back-references onto the rules. Distinct message sub-branch.
+    const ir = irWith(
+      [{ nodeId: "r1" }],
+      [{ id: "P1", ownedNodes: [{ kind: "rule", nodeId: "r1" }] }],
+    );
+    const f = checkOwnershipConsistency(ir);
+    expect(f).toHaveLength(1);
+    expect(f[0]?.code).toBe("KM_ERROR_OWNERSHIP_CONSISTENCY");
+    expect(f[0]?.message).toContain("unset");
+    expect(f[0]?.message).toContain('expected "P1"');
+  });
+
   it("errors when Pattern.ownedNodes points to a rule that no longer exists (stale pointer)", () => {
     const ir = irWith([], [{ id: "P1", ownedNodes: [{ kind: "rule", nodeId: "gone" }] }]);
     const f = checkOwnershipConsistency(ir);
