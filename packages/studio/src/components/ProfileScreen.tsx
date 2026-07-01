@@ -10,6 +10,7 @@ import { useIdentitySession } from "../hooks/useIdentitySession.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import {
   BG_PAGE,
+  BG_CARD,
   BORDER,
   ACCENT,
   TEXT_DIM,
@@ -94,7 +95,7 @@ const columnButtonStyle: React.CSSProperties = {
   fontWeight: 600,
   fontFamily: FONT,
   textAlign: "left",
-  background: "#1c2331",
+  background: BG_CARD,
   color: TEXT_MAIN,
   border: `1px solid ${BORDER}`,
   cursor: "pointer",
@@ -129,7 +130,6 @@ const providerValueStyle: React.CSSProperties = {
 // "My keyboards" — a disabled, non-functional entry with a coming-soon caption.
 const myKeyboardsStyle: React.CSSProperties = {
   ...columnButtonStyle,
-  cursor: "not-allowed",
   opacity: 0.6,
 };
 
