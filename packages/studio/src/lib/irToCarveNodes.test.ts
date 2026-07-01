@@ -544,4 +544,65 @@ describe('StoreUsage.patternRefs', () => {
     const store = nodes.find((n) => n.name === 'composed');
     expect(store?.storeUsage?.patternRefs[0]?.ruleCount).toBe(2);
   });
+
+  // #886 drift shape: ownedByPattern unset on the rule itself, but the rule's
+  // nodeId IS listed in a recognized pattern's ownedNodes. Before the fix,
+  // groupRefs only checked `rule.ownedByPattern !== undefined`, so this rule
+  // was double-counted — once under patternRefs (via ownedNodes) and again
+  // under groupRefs (because the per-rule stamp was missing). The fix adds
+  // the collectOwnedNodeIds(ir) fallback so it is excluded from groupRefs.
+  it('counts a rule in patternRefs only (not groupRefs) when ownedByPattern is unset but the rule is listed in a pattern\'s ownedNodes (#886 drift shape)', () => {
+    const ir = makeIR({
+      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false } as any],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule-1',
+          context: [{ kind: 'any', storeRef: 'composed' }],
+          output: [{ kind: 'char', value: 'á' }],
+          // no ownedByPattern stamp — this is the drift: ownership is only
+          // recorded via the pattern's ownedNodes, not the per-rule field.
+        }],
+      }],
+      recognizedPatterns: [{
+        id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
+        ownedNodes: [{ kind: 'rule', nodeId: 'rule-1' }],
+        description: '', category: 'substitution' as any, appliesTo: [],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+    const store = nodes.find((n) => n.name === 'composed');
+    expect(store?.storeUsage?.patternRefs).toEqual([
+      expect.objectContaining({ patternId: 'pattern-1', patternTitle: 'Dead Keys', ruleCount: 1 }),
+    ]);
+    expect(store?.storeUsage?.groupRefs).toEqual([]);
+  });
+
+  // Companion case: proves the fix does not over-exclude. A rule that is
+  // genuinely unowned — no ownedByPattern stamp AND not present in any
+  // pattern's ownedNodes — must still surface under groupRefs.
+  it('still counts a genuinely unowned rule (no ownedByPattern, not in any ownedNodes) under groupRefs', () => {
+    const ir = makeIR({
+      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false } as any],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule-unowned',
+          context: [{ kind: 'any', storeRef: 'composed' }],
+          output: [{ kind: 'char', value: 'á' }],
+        }],
+      }],
+      recognizedPatterns: [{
+        id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
+        ownedNodes: [{ kind: 'rule', nodeId: 'rule-1' }], // does not include rule-unowned
+        description: '', category: 'substitution' as any, appliesTo: [],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+    const store = nodes.find((n) => n.name === 'composed');
+    expect(store?.storeUsage?.groupRefs).toEqual([
+      expect.objectContaining({ groupId: 'g1', groupName: 'main', ruleCount: 1 }),
+    ]);
+    expect(store?.storeUsage?.patternRefs).toEqual([]);
+  });
 });

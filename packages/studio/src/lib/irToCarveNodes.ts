@@ -581,11 +581,17 @@ function analyzeStoreUsage(storeName: string, ir: KeyboardIR): StoreUsage {
   }
 
   // Which groups have unowned rules (not claimed by any pattern) that reference this store?
+  // Exclude rules claimed via EITHER ownership signal — ownedByPattern (the
+  // per-rule stamp) or a pattern's ownedNodes (via collectOwnedNodeIds) — so a
+  // rule in the #886 drift shape (ownedNodes-claimed but ownedByPattern unset)
+  // is not double-listed under both patternRefs and groupRefs. Mirrors the same
+  // fallback groupToGlyphs uses for the glyph-tile path.
+  const ownedNodeIds = collectOwnedNodeIds(ir);
   const groupRefs: { groupId: string; groupName: string; ruleCount: number; rules: StoreRuleDetail[] }[] = [];
   for (const group of ir.groups) {
     const gRules: StoreRuleDetail[] = [];
     for (const rule of group.rules) {
-      if (rule.ownedByPattern !== undefined) continue; // skip — already counted in patternRefs
+      if (rule.ownedByPattern !== undefined || ownedNodeIds.has(rule.nodeId)) continue; // skip — already counted in patternRefs
       let used = false;
       for (const el of rule.context) {
         if ((el.kind === 'any' || el.kind === 'notany') && el.storeRef === storeName) used = true;
