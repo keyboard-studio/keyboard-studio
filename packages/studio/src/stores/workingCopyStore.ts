@@ -18,7 +18,7 @@
 //   - Worker boundary upheld: WASM is not imported here.
 
 import { create } from "zustand";
-import type { BaseKeyboard, KeyboardIR, LintFinding, RemovalCapability, VirtualFS } from "@keyboard-studio/contracts";
+import type { AxisFill, BaseKeyboard, KeyboardIR, LintFinding, RemovalCapability, VirtualFS } from "@keyboard-studio/contracts";
 import {
   mergePhaseResults,
   type DiscoveryAxisVector,
@@ -245,6 +245,25 @@ export interface WorkingCopyState {
    */
   validatorFindings: LintFinding[];
 
+  // -- Default-fill provenance slice (#890) --------------------------------------
+  /**
+   * Provenance for phase-gated axis values that were filled by the §7.2
+   * script-class default-fill prior (`defaultFillAxes()`) rather than elicited
+   * from a survey phase, the most recent time a strategy-consuming call site
+   * (currently: `MechanismGallery`'s pattern-loading effect) ran the pre-fill
+   * step. `[]` before that first run, or whenever the prior had nothing left
+   * to fill (all phase-gated axes already elicited/IR-derived).
+   *
+   * This is a UI-visibility field only — it is NOT re-derived by `remerge()` /
+   * `mergePhaseResults()` (unlike `session`), so `recordPhase`/`setIrAxes` do
+   * not clear it; only `setAxisFills` and `reset`/`instantiateFrom*` do.
+   * Mirrored onto `SurveySession.axisFills` optionally by callers that persist
+   * a session snapshot; the store keeps its own copy here so the Flow Map
+   * (`StrategyTreeView`) can read it without depending on a particular
+   * survey-session persistence path.
+   */
+  axisFills: AxisFill[];
+
   // -- Actions (irStore) -------------------------------------------------------
   /**
    * Set the carve working IR for a FULL/base replacement, clearing carve
@@ -427,6 +446,16 @@ export interface WorkingCopyState {
    * changes; this setter never starts a timer or async work.
    */
   setValidatorFindings: (findings: LintFinding[]) => void;
+
+  // -- Default-fill provenance actions (#890) ----------------------------------
+
+  /**
+   * Publish the `axisFills` produced by the most recent `defaultFillAxes()`
+   * pre-fill run. No-op (returns prior state reference) when the incoming
+   * array is reference-equal to the stored one, mirroring
+   * {@link setValidatorFindings}'s re-render guard.
+   */
+  setAxisFills: (axisFills: AxisFill[]) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -468,6 +497,7 @@ export type WorkingCopyData = Omit<
   | "instantiateFromBase" | "instantiateFromExisting" | "setIdentity" | "isInstantiated"
   | "markStale" | "clearStale"
   | "setValidatorFindings"
+  | "setAxisFills"
 >;
 
 const INITIAL_STATE: WorkingCopyData = {
@@ -494,6 +524,8 @@ const INITIAL_STATE: WorkingCopyData = {
   staleSteps: new Set<string>(),
   // validator findings slice (US5, T034) — default empty (structural proxy)
   validatorFindings: [],
+  // default-fill provenance slice (#890) — default empty (no pre-fill run yet)
+  axisFills: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -678,6 +710,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       touchDraft: null,
       galleryIntrosSeen: { mechanism: false, touch: false },
       staleSteps: new Set<string>(),
+      // A new working copy has no default-fill provenance yet (#890) — the
+      // pattern-loading effect re-runs defaultFillAxes and republishes it.
+      axisFills: [],
     });
   },
 
@@ -712,6 +747,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       touchDraft: null,
       galleryIntrosSeen: { mechanism: false, touch: false },
       staleSteps: new Set<string>(),
+      // A new working copy has no default-fill provenance yet (#890) — the
+      // pattern-loading effect re-runs defaultFillAxes and republishes it.
+      axisFills: [],
     });
   },
 
@@ -753,4 +791,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
   setValidatorFindings: (findings) =>
     set((s) => (s.validatorFindings === findings ? s : { validatorFindings: findings })),
+
+  // -- Default-fill provenance actions (#890) ----------------------------------
+
+  setAxisFills: (axisFills) =>
+    set((s) => (s.axisFills === axisFills ? s : { axisFills })),
 }));

@@ -1,0 +1,147 @@
+{
+  "alphabetic": {
+    "tiny": {
+      "markInputOrder": "prefix",
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none",
+      "remapPosture": "addition"
+    },
+    "small": {
+      "markInputOrder": "prefix",
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none",
+      "remapPosture": "addition"
+    },
+    "medium": {
+      "markInputOrder": "prefix",
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none",
+      "remapPosture": "addition"
+    },
+    "large": {
+      "markInputOrder": "prefix",
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none",
+      "remapPosture": "addition"
+    },
+    "massive": {
+      "markInputOrder": "prefix",
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none",
+      "remapPosture": "addition"
+    }
+  },
+  "abugida": {
+    "tiny": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    },
+    "small": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    },
+    "medium": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    },
+    "large": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    },
+    "massive": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    }
+  },
+  "abjad": {
+    "tiny": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    },
+    "small": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    },
+    "medium": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    },
+    "large": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    },
+    "massive": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    }
+  },
+  "syllabary": {
+    "tiny": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    },
+    "small": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    },
+    "medium": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    },
+    "large": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    },
+    "massive": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    }
+  },
+  "logographic": {
+    "tiny": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    },
+    "small": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    },
+    "medium": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    },
+    "large": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    },
+    "massive": {
+      "diacriticBehavior": "none",
+      "multiMode": "single",
+      "constraintEnforcement": "none"
+    }
+  }
+}

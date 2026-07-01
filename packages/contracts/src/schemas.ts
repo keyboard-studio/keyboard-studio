@@ -21,6 +21,8 @@ import type { Pattern, PatternQuestion, TestVector, DemoObject } from "./pattern
 import type { Criterion } from "./criteria";
 import type { RemovalCapability } from "./removalCapability";
 import type { TouchKeyProvenance, TouchKeyIR, TouchLayoutIR } from "./keyboard-ir";
+import type { AxisFill, AxisFillSource } from "./axisFill";
+import type { Scale, ScriptClass } from "./axes";
 
 // ---------------------------------------------------------------------------
 // Leaf enums — mirror the string-literal unions in the contract types.
@@ -50,6 +52,58 @@ export const RemovalCapabilitySchema = z.enum([
   "not-removable:context-sensitive",
   "not-removable:unknown",
 ]);
+
+// ---------------------------------------------------------------------------
+// AxisFill (spec §7.2 script-class default-fill prior) — provenance primitive
+// plus the on-disk prior record it is derived from (axis-priors.json).
+// ---------------------------------------------------------------------------
+
+export const ScaleSchema = z.enum(["tiny", "small", "medium", "large", "massive"]);
+
+export const ScriptClassSchema = z.enum([
+  "alphabetic",
+  "abugida",
+  "abjad",
+  "syllabary",
+  "logographic",
+]);
+
+export const AxisFillSourceSchema = z.enum(["script-class-prior"]);
+
+/**
+ * Mirror of {@link AxisFill}. `axis`/`value` are loosely typed (`z.string()` /
+ * `z.unknown()`) here because the schema's job is validating the on-disk prior
+ * data (see {@link AxisPriorCellSchema}) and the `_AxisFillGuard` drift guard
+ * below, not re-deriving the full `DiscoveryAxisVector` key/value union.
+ */
+export const AxisFillSchema = z.object({
+  axis: z.string(),
+  value: z.unknown(),
+  source: AxisFillSourceSchema,
+});
+
+/**
+ * One scriptClass x scale cell of `axis-priors.json` — the phase-gated axes
+ * the script-class default-fill prior can supply. Every field is optional
+ * because A3a/A7a are alphabetic-only (§7.1); non-alphabetic cells omit them.
+ *
+ * LOAD-BEARING: `markInputOrder` must be `"prefix"` when present — the prior
+ * must never emit `"postfix"` (spec §7.2 rule 3a intercept invariant). This is
+ * enforced structurally by the literal below, not just by convention.
+ */
+export const AxisPriorCellSchema = z.object({
+  markInputOrder: z.literal("prefix").optional(),
+  diacriticBehavior: z.literal("none"),
+  multiMode: z.literal("single"),
+  constraintEnforcement: z.literal("none"),
+  remapPosture: z.literal("addition").optional(),
+});
+
+/** The full on-disk prior: scriptClass -> scale -> {@link AxisPriorCellSchema}. */
+export const AxisPriorTableSchema = z.record(
+  ScriptClassSchema,
+  z.record(ScaleSchema, AxisPriorCellSchema),
+);
 
 /**
  * Mirror of `TouchKeyIR.provenance` (keyboard-ir.ts) — the per-touch-key
@@ -388,6 +442,17 @@ type _TestVectorGuard = Expect<AssignableTo<z.infer<typeof TestVectorSchema>, Te
 type _DemoObjectGuard = Expect<AssignableTo<z.infer<typeof DemoObjectSchema>, DemoObject>>;
 type _CriterionGuard = Expect<AssignableTo<z.infer<typeof CriterionSchema>, Criterion>>;
 type _RemovalCapabilityGuard = Expect<AssignableTo<z.infer<typeof RemovalCapabilitySchema>, RemovalCapability>>;
+// AxisFill (spec §7.2). `axis`/`value` are validated loosely (see
+// AxisFillSchema doc) so the guard only pins `source`, which is where real
+// drift (a renamed/added fill-source literal) would occur.
+type _AxisFillSourceGuard = Expect<
+  AssignableTo<z.infer<typeof AxisFillSourceSchema>, AxisFillSource>
+>;
+type _AxisFillGuard = Expect<
+  AssignableTo<Omit<z.infer<typeof AxisFillSchema>, "axis" | "value">, Omit<AxisFill, "axis" | "value">>
+>;
+type _ScaleGuard = Expect<AssignableTo<z.infer<typeof ScaleSchema>, Scale>>;
+type _ScriptClassGuard = Expect<AssignableTo<z.infer<typeof ScriptClassSchema>, ScriptClass>>;
 // The provenance enum schema and the TouchKeyProvenance contract union must
 // stay in lockstep (spec-014 FR-008, Art. I drift guard). NonNullable strips
 // the optional `?:` form so the guard compares the underlying union only.

@@ -104,6 +104,9 @@ export type {
   SecondaryRuleId,
   ConditionalSecondary,
 } from "./strategy-selector/rules.js";
+// §7.2 script-class default-fill prior — pre-fill step run before selectStrategy().
+export { defaultFillAxes } from "./strategy-selector/default-fill.js";
+export type { DefaultFillResult } from "./strategy-selector/default-fill.js";
 
 // Issue #248 — Sprint-1 identity stub mutator (deleted at Sprint-2 start per #238).
 export { applyIdentityStubMutation } from "./stub-mutator/index.js";

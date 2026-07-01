@@ -49,6 +49,7 @@ import { toUPlusNotation, isDecomposableAccented } from "@keyboard-studio/contra
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { getPatternLibraryService } from "../../lib/services.ts";
 import type { DiscoveryAxisVector } from "@keyboard-studio/contracts";
+import { defaultFillAxes } from "@keyboard-studio/engine";
 import { useKeyboardArtifact, type ScaffoldSpec, type Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
 import { useInventoryDiff } from "../../hooks/useInventoryDiff.ts";
@@ -517,6 +518,7 @@ export function MechanismGallery({
   const axes = useWorkingCopyStore(
     useShallow((s) => s.session.axes as Partial<DiscoveryAxisVector>),
   );
+  const setAxisFills = useWorkingCopyStore((s) => s.setAxisFills);
 
   // One-time intro splash — read the seen flag on mount; mark it on "Get started".
   const mechIntroSeen = useWorkingCopyStore((s) => s.galleryIntrosSeen.mechanism);
@@ -606,15 +608,38 @@ export function MechanismGallery({
     setLoadError(null);
     const svc = getPatternLibraryService();
 
+    // #890 — pre-fill phase-gated axis GAPS (diacriticBehavior, multiMode,
+    // constraintEnforcement, + optional markInputOrder/remapPosture) from the
+    // §7.2 script-class default-fill prior before checking completeness.
+    // The prior only ever supplies the OFF-STATE value for an axis it fills
+    // (never a rule-triggering one — see default-fill.ts's load-bearing
+    // invariant), and it never overwrites an axis already present on `axes`
+    // (elicited-from-survey or IR-derived). So when `axes` was already
+    // complete, `filled` is reference-identical in content to `axes` and
+    // selectStrategy()'s recommendation is unchanged; the prior only ever
+    // turns an incomplete vector into a complete one, never changes an
+    // already-elicited value. `scale`/`scriptClass` are required inputs to
+    // defaultFillAxes — skip the pre-fill (fall back to the prior undefined-
+    // fullAxes behavior) when either is still unanswered.
+    const prefilled =
+      axes.scale !== undefined && axes.scriptClass !== undefined
+        ? defaultFillAxes(axes)
+        : null;
+    // Publish provenance for the current keyboard; clear any stale fills from a
+    // prior keyboard/run when scale/scriptClass aren't answered yet, so the
+    // Flow Map never shows provenance that doesn't belong to this selection.
+    setAxisFills(prefilled !== null ? prefilled.axisFills : []);
+    const candidateAxes = prefilled !== null ? prefilled.axes : axes;
+
     const fullAxes: DiscoveryAxisVector | undefined =
-      axes.scale !== undefined &&
-      axes.scriptClass !== undefined &&
-      axes.phoneticIntuition !== undefined &&
-      axes.diacriticBehavior !== undefined &&
-      axes.multiMode !== undefined &&
-      axes.constraintEnforcement !== undefined &&
-      axes.spareKeyAvailability !== undefined
-        ? (axes as DiscoveryAxisVector)
+      candidateAxes.scale !== undefined &&
+      candidateAxes.scriptClass !== undefined &&
+      candidateAxes.phoneticIntuition !== undefined &&
+      candidateAxes.diacriticBehavior !== undefined &&
+      candidateAxes.multiMode !== undefined &&
+      candidateAxes.constraintEnforcement !== undefined &&
+      candidateAxes.spareKeyAvailability !== undefined
+        ? (candidateAxes as DiscoveryAxisVector)
         : undefined;
 
     svc
@@ -651,7 +676,7 @@ export function MechanismGallery({
         setLoadError(msg);
         setLoading(false);
       });
-  }, [selectedBaseKeyboard, axes]);
+  }, [selectedBaseKeyboard, axes, setAxisFills]);
 
   // ---------------------------------------------------------------------------
   // Keyboard artifact pipeline — owns the single WASM compile for Phase C.
