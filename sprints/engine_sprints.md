@@ -140,6 +140,7 @@ AC #2–5 done; AC #1 (Tier 2 store/any/index + per-tuple BCP47/base-layout) def
 **#63** `feat(output): OAuth token-exchange backend for Option B` — v1.1, no backend required for v1
 **#65** `bug(tools): Hygiene backlog P2 follow-ups from Day-1 contract lock` — opportunistic
 **#188** `chore(process): Recurring simplification sweep` — ongoing background sweep, not sprint-bounded
+**#919** `maint(output): share the github_app/oauth_app client discriminator between SPA and OAuth backend` — *backlog*; #885 review follow-up (km-synthesis), no sprint milestone yet
 
 **Process / triage-bot issues — separate process backlog, not feature work:**
 **#199, #206, #215, #216, #230** `bug/feat(process): km-triage scheduler, workflow, severity enums, escalation, lockfile regen`
