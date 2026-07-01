@@ -504,9 +504,17 @@ interface InspectorProps {
   isDeleted: (nodeId: string) => boolean;
   onToggleNode: (nodeId: string, off: boolean) => void;
   onSelectNode?: ((nodeId: string) => void) | undefined;
+  /**
+   * Called when the user clicks a chip body whose glyph is cross-wired to
+   * other nodes (group rule + pattern + output store slot). CarveGallery
+   * resolves the contributors and opens the ConfirmDialog.
+   *
+   * When absent, chip clicks fall back to the plain onToggleGlyph path.
+   */
+  onCascadeDelete?: ((gid: string) => void) | undefined;
 }
 
-export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetManyGlyphs, isDeleted, onToggleNode, onSelectNode }: InspectorProps) {
+export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetManyGlyphs, isDeleted, onToggleNode, onSelectNode, onCascadeDelete }: InspectorProps) {
   const [q, setQ] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   useEffect(() => { setQ(''); setCollapsed(new Set()); }, [node?.nodeId]);
@@ -642,6 +650,11 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
                     onToggle={onToggleGlyph}
                     modifierLabel={x.modifierLabel}
                     capability={x.capability}
+                    ownerKind={x.ownerKind}
+                    ownerNodeId={x.ownerNodeId}
+                    ownerLabel={x.ownerLabel}
+                    onSelectNode={onSelectNode}
+                    onCascadeDelete={onCascadeDelete}
                   />
                 ))}
               </div>

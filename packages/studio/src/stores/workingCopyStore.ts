@@ -69,8 +69,18 @@ export function bindManifest(m: readonly Step[]): void {
 // Undo stack entry — discriminated union so node and item deletions share one stack.
 // ---------------------------------------------------------------------------
 
-/** One entry on the undo stack: 'n' = whole node deleted, 'i' = single item removed. */
-export type UndoEntry = { k: 'n'; id: string } | { k: 'i'; id: string };
+/**
+ * One entry on the undo stack.
+ *
+ * 'n'     — whole node deleted (single).
+ * 'i'     — single item removed (single).
+ * 'batch' — grouped cascade-delete (multiple nodes + items in one undo step).
+ *            A single undoDelete() call reverses the entire cascade atomically.
+ */
+export type UndoEntry =
+  | { k: 'n'; id: string }
+  | { k: 'i'; id: string }
+  | { k: 'batch'; nodeIds: string[]; itemIds: string[] };
 
 // ---------------------------------------------------------------------------
 // Instantiation mode — spec §8 v1.3.0, two authoring tracks.
@@ -291,6 +301,18 @@ export interface WorkingCopyState {
   keepAll: () => void;
   /** Clear all deletions (nodes + items) and the undo stack. Alias for keepAll with clearer name. */
   restoreAll: () => void;
+  /**
+   * Atomically delete a set of whole-rule nodes AND a set of output-store slot items
+   * as a single grouped cascade, pushing ONE batch undo entry so a single
+   * undoDelete() call reverses the entire cascade.
+   *
+   * - `ruleNodeIds`:  nodeIds to add to deletedNodeIds (whole-rule deletes).
+   * - `storeSlotIds`: itemIds (format "<storeNodeId>#<index>") to add to deletedItemIds.
+   *
+   * Either array may be empty; at least one must be non-empty for the action to push
+   * an undo entry. If both are empty this is a no-op.
+   */
+  cascadeDelete: (ruleNodeIds: string[], storeSlotIds: string[]) => void;
 
   // -- Actions (surveyResultsStore) --------------------------------------------
   /**
@@ -462,6 +484,7 @@ export type WorkingCopyData = Omit<
   // actions are excluded from the data snapshot
   | "setIR" | "setWorkingIR" | "clearIR" | "deleteNode" | "undoDelete" | "restoreNode"
   | "isDeleted" | "deleteItem" | "restoreItem" | "isItemDeleted" | "keepAll" | "restoreAll"
+  | "cascadeDelete"
   | "recordPhase" | "recordAssignments"
   | "setIrAxes" | "lockDesktop" | "unlockDesktop"
   | "setTouchLayoutJson" | "setTouchDraft" | "markGalleryIntroSeen" | "reset"
@@ -531,10 +554,21 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         const next = new Set(s.deletedNodeIds);
         next.delete(last.id);
         return { deletedNodeIds: next, undoStack: s.undoStack.slice(0, -1) };
-      } else {
+      } else if (last.k === 'i') {
         const next = new Set(s.deletedItemIds);
         next.delete(last.id);
         return { deletedItemIds: next, undoStack: s.undoStack.slice(0, -1) };
+      } else {
+        // Batch entry: reverse all node AND item deletions in this cascade atomically.
+        const nextNodes = new Set(s.deletedNodeIds);
+        for (const id of last.nodeIds) nextNodes.delete(id);
+        const nextItems = new Set(s.deletedItemIds);
+        for (const id of last.itemIds) nextItems.delete(id);
+        return {
+          deletedNodeIds: nextNodes,
+          deletedItemIds: nextItems,
+          undoStack: s.undoStack.slice(0, -1),
+        };
       }
     }),
 
@@ -572,6 +606,20 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     set({ deletedNodeIds: new Set(), deletedItemIds: new Set(), undoStack: [] }),
 
   restoreAll: () => get().keepAll(),
+
+  cascadeDelete: (ruleNodeIds, storeSlotIds) => {
+    if (ruleNodeIds.length === 0 && storeSlotIds.length === 0) return;
+    set((s) => {
+      const nextNodes = new Set([...s.deletedNodeIds, ...ruleNodeIds]);
+      const nextItems = new Set([...s.deletedItemIds, ...storeSlotIds]);
+      const batchEntry: UndoEntry = { k: 'batch', nodeIds: ruleNodeIds, itemIds: storeSlotIds };
+      return {
+        deletedNodeIds: nextNodes,
+        deletedItemIds: nextItems,
+        undoStack: [...s.undoStack, batchEntry],
+      };
+    });
+  },
 
   // -- surveyResultsStore actions --------------------------------------------
 

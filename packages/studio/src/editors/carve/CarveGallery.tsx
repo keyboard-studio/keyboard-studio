@@ -10,7 +10,17 @@ import { Rail } from '../assignLoop/parts/Rail.tsx';
 import { Inspector } from '../assignLoop/parts/Inspector.tsx';
 import { InfoView } from '../assignLoop/parts/InfoView.tsx';
 import { InfoIcon } from '../assignLoop/parts/carveShared.tsx';
+import { ConfirmDialog } from '../assignLoop/parts/ConfirmDialog.tsx';
 import { useHoverInfoStore } from '../../stores/hoverInfoStore.ts';
+import { collectCharContributors } from '@keyboard-studio/engine';
+import type { CharContributors } from '@keyboard-studio/engine';
+
+/** Pending cascade-delete state — set when the user clicks a cross-wired chip. */
+interface PendingCascade {
+  gid: string;
+  targetChar: string;
+  contributors: CharContributors;
+}
 
 interface CarveGalleryProps {
   onComplete: () => void;
@@ -31,6 +41,8 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   const restoreItem = useWorkingCopyStore((s) => s.restoreItem);
   const restoreAll = useWorkingCopyStore((s) => s.restoreAll);
   const keepAll = useWorkingCopyStore((s) => s.keepAll);
+
+  const cascadeDelete = useWorkingCopyStore((s) => s.cascadeDelete);
 
   const setInfo = useHoverInfoStore((s) => s.setInfo);
   const clearInfo = useHoverInfoStore((s) => s.clearInfo);
@@ -62,6 +74,9 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
     [nodes, selectedId],
   );
 
+  // -- Cascade-delete state ----------------------------------------------------
+  const [pendingCascade, setPendingCascade] = useState<PendingCascade | null>(null);
+
   // Handlers for Rail/Inspector callbacks
   const handleSetManyGlyphs = useCallback((gids: string[], off: boolean) => {
     gids.forEach((gid) => { if (off) { deleteItem(gid); } else { restoreItem(gid); } });
@@ -74,6 +89,64 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   const handleToggleGlyph = useCallback((gid: string) => {
     if (isItemDeleted(gid)) { restoreItem(gid); } else { deleteItem(gid); }
   }, [isItemDeleted, restoreItem, deleteItem]);
+
+  /**
+   * Cascade-delete handler — called when the user clicks a chip body.
+   *
+   * Asks the engine (collectCharContributors) for every place the chip's output
+   * character is produced, then:
+   *  - Only the clicked producer (single contributor, nothing blocked) → plain
+   *    item toggle, no dialog (matches the pre-existing single-glyph behavior).
+   *  - Produced in more than one place (cross-wired across group / pattern /
+   *    store slot) → open ConfirmDialog. Primary = cascadeDelete everywhere;
+   *    secondary = toggle only this gid.
+   */
+  const handleCascadeDelete = useCallback((gid: string) => {
+    // Resolve the output character for this gid from the current nodes list.
+    let targetChar: string | undefined;
+    for (const node of nodes) {
+      if (!node.glyphs) continue;
+      const glyph = node.glyphs.find((g) => g.gid === gid);
+      if (glyph) { targetChar = glyph.ch; break; }
+    }
+
+    // Glyph not found for this gid → do nothing rather than toggle an untracked
+    // id (which would write a deletion that no chip reflects and can't be undone).
+    if (targetChar === undefined) return;
+
+    // No IR to analyse → fall back to a plain single-glyph toggle.
+    if (ir == null) {
+      handleToggleGlyph(gid);
+      return;
+    }
+
+    const contributors: CharContributors = collectCharContributors(ir, targetChar);
+    const contributorCount = contributors.ruleNodeIds.length + contributors.storeSlotIds.length;
+
+    // Produced in only one place (or unresolved) → plain toggle, no dialog.
+    if (contributorCount <= 1 && contributors.blocked.length === 0) {
+      handleToggleGlyph(gid);
+      return;
+    }
+
+    // Cross-wired → confirm removing everywhere.
+    setPendingCascade({ gid, targetChar, contributors });
+  }, [nodes, ir, handleToggleGlyph]);
+
+  const handleCascadePrimary = useCallback(() => {
+    if (!pendingCascade) return;
+    cascadeDelete(pendingCascade.contributors.ruleNodeIds, pendingCascade.contributors.storeSlotIds);
+    setPendingCascade(null);
+  }, [pendingCascade, cascadeDelete]);
+
+  const handleCascadeCancel = useCallback(() => {
+    // Cancel — do nothing. Also the target for Escape / backdrop click, so a
+    // dismissed dialog never leaves a half-cut character behind. Removing the
+    // character from only one of its wired locations is intentionally NOT
+    // offered: it would leave the broken cross-references this cascade exists
+    // to prevent.
+    setPendingCascade(null);
+  }, []);
 
   // Kept / total counts
   const { kept, total } = useMemo(() => {
@@ -324,10 +397,64 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
             isDeleted={isDeleted}
             onToggleNode={handleToggleNode}
             onSelectNode={setSelectedId}
+            onCascadeDelete={handleCascadeDelete}
           />
           {infoOpen && <InfoView />}
         </div>
       </div>
+
+      {/* Cascade-delete confirmation dialog */}
+      {pendingCascade !== null && (
+        <ConfirmDialog
+          open={pendingCascade !== null}
+          title={`Remove "${pendingCascade.targetChar}" everywhere?`}
+          body={
+            <div>
+              <p style={{ margin: '0 0 10px' }}>
+                This character appears in multiple places. Removing it everywhere keeps
+                the keyboard consistent; removing it from just one place may leave
+                broken references.
+              </p>
+              <ul
+                aria-label="Locations affected"
+                style={{ margin: '0 0 10px', paddingLeft: 18, fontSize: 13 }}
+              >
+                {pendingCascade.contributors.locations.map((loc, i) => (
+                  <li key={i} style={{ marginBottom: 4 }}>
+                    <b style={{ textTransform: 'capitalize' }}>{loc.kind}</b>
+                    {': '}
+                    <span style={{ fontFamily: 'var(--app-font-mono)' }}>{loc.label}</span>
+                  </li>
+                ))}
+              </ul>
+              {pendingCascade.contributors.blocked.length > 0 && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    background: 'color-mix(in srgb, var(--sil-orange) 10%, var(--app-surface))',
+                    border: '1px solid color-mix(in srgb, var(--sil-orange) 40%, transparent)',
+                    fontSize: 12,
+                    color: 'var(--sil-orange-dark)',
+                  }}
+                >
+                  <b>Cannot be removed from:</b>{' '}
+                  {pendingCascade.contributors.blocked.map((b, i) => (
+                    <span key={i}>
+                      {b.label} ({b.reason}){i < pendingCascade.contributors.blocked.length - 1 ? ', ' : ''}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          }
+          primaryLabel="Yes, remove everywhere"
+          secondaryLabel="Cancel"
+          onPrimary={handleCascadePrimary}
+          onSecondary={handleCascadeCancel}
+        />
+      )}
     </div>
   );
 }
