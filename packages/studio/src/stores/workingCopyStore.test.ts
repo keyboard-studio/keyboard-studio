@@ -607,6 +607,39 @@ describe("workingCopyStore — removalCapabilities slot", () => {
 });
 
 // ---------------------------------------------------------------------------
+// #523 — deleteItem/restoreItem/isItemDeleted round-trip with a chip-format
+// id ("<storeNodeId>#<itemsIndex>"). deleteItem/restoreItem are id-agnostic
+// (any string works, including the store-slot id shape), so this is a
+// regression guard that the per-character store chip toggle path reuses the
+// SAME infra as glyph-level carving without any special-casing.
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — deleteItem/restoreItem round-trip with a chip-format id", () => {
+  it("deleteItem then restoreItem with a chip id clears isItemDeleted and pops the undo entry", () => {
+    const chipId = "store#dktX#1";
+
+    useWorkingCopyStore.getState().deleteItem(chipId);
+    expect(useWorkingCopyStore.getState().isItemDeleted(chipId)).toBe(true);
+    expect(useWorkingCopyStore.getState().undoStack).toEqual([{ k: "i", id: chipId }]);
+
+    useWorkingCopyStore.getState().restoreItem(chipId);
+    expect(useWorkingCopyStore.getState().isItemDeleted(chipId)).toBe(false);
+    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
+  });
+
+  it("undoDelete pops a chip-id deletion off the stack the same as any other item id", () => {
+    const chipId = "store#dktX#2";
+
+    useWorkingCopyStore.getState().deleteItem(chipId);
+    expect(useWorkingCopyStore.getState().isItemDeleted(chipId)).toBe(true);
+
+    useWorkingCopyStore.getState().undoDelete();
+    expect(useWorkingCopyStore.getState().isItemDeleted(chipId)).toBe(false);
+    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // spec-014 mutate-seam — setWorkingIR PRESERVES the carve-deletion overlay
 //
 // Regression for the Phase-5 MAJOR bug: the mutate-seam write path routed

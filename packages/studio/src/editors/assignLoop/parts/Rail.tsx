@@ -81,8 +81,18 @@ export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, on
         const renderNode = (node: CarveNode, chipLabel?: string, chipColor?: string) => {
           const st = nodeState(node, isItemDeleted, isDeleted);
           const active = node.nodeId === selectedId;
-          const total = node.glyphs?.length ?? null;
-          const keptN = total !== null ? (node.glyphs?.filter((g) => !isItemDeleted(g.gid)).length ?? 0) : null;
+          // Stores with at least one toggleable (non-disabled) chip report
+          // keptN/total over those chip ids, same as pattern/group glyph
+          // counts. Stores with no toggleable chips (all disabled, or no
+          // chips at all) keep the whole-node binary total === null path.
+          const toggleableChipIds = node.storeChips?.filter((c) => c.action !== 'disabled').map((c) => c.chipId) ?? [];
+          const usesChipCounts = node.kind === 'store' && toggleableChipIds.length > 0;
+          const total = node.glyphs?.length ?? (usesChipCounts ? toggleableChipIds.length : null);
+          const keptN = node.glyphs
+            ? node.glyphs.filter((g) => !isItemDeleted(g.gid)).length
+            : usesChipCounts
+              ? toggleableChipIds.filter((id) => !isItemDeleted(id)).length
+              : null;
 
           const modBreakdown = nodeBreakdownMap.get(node.nodeId) ?? [];
           const showBreakdown = modBreakdown.length > 1;
@@ -91,6 +101,8 @@ export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, on
             e.stopPropagation();
             if (node.glyphs && node.glyphs.length > 0) {
               onSetManyGlyphs(node.glyphs.map((g) => g.gid), st !== 'off');
+            } else if (usesChipCounts) {
+              onSetManyGlyphs(toggleableChipIds, st !== 'off');
             } else {
               onToggleNode(node.nodeId, st !== 'off');
             }
