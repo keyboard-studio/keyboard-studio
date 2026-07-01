@@ -357,6 +357,10 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
 // used by describeRuleForStore/analyzeStoreUsage (context: any/notany/index;
 // output: index/outs) so the "store tag" render layer and the store "Used
 // by" panel never drift on which elements count as a store reference.
+// Store resolution is by name (ir.stores.find(s => s.name === ...)), so if
+// two stores share a name the first one wins — a pre-existing, Keyman-legal
+// but rare ambiguity shared with describeRuleForStore/analyzeStoreUsage, not
+// introduced here.
 // ---------------------------------------------------------------------------
 
 function ruleStoreOwners(rule: IRRule, ir: KeyboardIR): GlyphOwner[] {
