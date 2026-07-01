@@ -638,8 +638,8 @@ export interface CarveNode {
   referencedByNodeId?: string | undefined; // store: which pattern owns it
   referencedByLabel?: string | undefined;  // store: that pattern's title
   storeUsage?: StoreUsage | undefined;     // store: how it is used in rules
-  /** store: nodeIds of peer stores linked via any()/index() pairing */
-  pairedStoreIds?: string[] | undefined;
+  /** store: nodeIds of peer stores linked via any()/index() pairing (parallel to pairedStoreNames; undefined entry = unresolved peer, e.g. system store) */
+  pairedStoreIds?: (string | undefined)[] | undefined;
   /** store: display names of peer stores linked via any()/index() pairing */
   pairedStoreNames?: string[] | undefined;
   /** store: trigger key labels for each paired store (parallel to pairedStoreNames; undefined entry = unknown) */
@@ -734,7 +734,7 @@ export function vkeyLabel(name: string): string | undefined {
   if (npMatch) return `Numpad ${npMatch[1]}`;
   const simpleMatch = /^K_([A-Z0-9])$/.exec(upper);
   if (simpleMatch) return simpleMatch[1];
-  // Unknown: strip K_ prefix and return as-is in brackets
+  // Unknown: strip the K_ prefix and return the bare name as-is
   const stripped = upper.startsWith('K_') ? upper.slice(2) : upper;
   return stripped || undefined;
 }
@@ -888,10 +888,12 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
     const pairedEntries = storePairs.get(store.name);
     const hasPairs = pairedEntries !== undefined && pairedEntries.length > 0;
     const pairedStoreNames = hasPairs ? pairedEntries.map((e) => e.pairedName) : undefined;
+    // Keep index-aligned with pairedStoreNames/Triggers/Roles: an unresolved
+    // peer (e.g. a system store, absent from storeNameToNodeId) stays as an
+    // undefined slot rather than being filtered out, which would shift every
+    // later pair's id/trigger/role by one. Inspector guards undefined per-slot.
     const pairedStoreIds = hasPairs
-      ? pairedEntries
-          .map((e) => storeNameToNodeId.get(e.pairedName))
-          .filter((id): id is string => id !== undefined)
+      ? pairedEntries.map((e) => storeNameToNodeId.get(e.pairedName))
       : undefined;
     const pairedStoreTriggers = hasPairs ? pairedEntries.map((e) => e.trigger) : undefined;
     const pairedStoreRoles: ('input' | 'output' | 'input+output' | undefined)[] | undefined = hasPairs
@@ -934,4 +936,3 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
 
   return nodes;
 }
-
