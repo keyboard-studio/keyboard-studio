@@ -11,7 +11,7 @@
 
 import { describe, it, expect } from 'vitest';
 import type { IRRule, IRGroup, IRStore, KeyboardIR, RemovalCapability, StoreItem } from '@keyboard-studio/contracts';
-import { groupToGlyphs, toRailNodes, glyphsTriState } from './irToCarveNodes.ts';
+import { groupToGlyphs, toRailNodes, glyphsTriState, storeCharChips } from './irToCarveNodes.ts';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -458,5 +458,42 @@ describe('irToCarveNodes — bare transliteration fan-out (Bamum shape)', () => 
     glyphs.forEach((g) => {
       expect(g.keys[0]).toBe('‹dk›');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. #523 — storeCharChips ids equal the S-02 fan-out glyph gids for the
+//    output store (locked gid contract — store chips and pattern/group
+//    tiles share toggle state by construction).
+// ---------------------------------------------------------------------------
+
+describe('irToCarveNodes — #523 storeCharChips chip ids equal fan-out glyph gids', () => {
+  it('output-store chip ids are identical to the parallel-fan-out glyph gids', () => {
+    const ir = makeTestIR();
+    const group = ir.groups[0]!;
+    const parallelOnlyGroup = {
+      ...group,
+      rules: group.rules.filter((r) => r.nodeId === 'rule#dk'),
+    };
+    const glyphs = groupToGlyphs(parallelOnlyGroup, ir);
+    const glyphGids = glyphs.map((g) => g.gid);
+
+    const outputStore = ir.stores.find((s) => s.name === 'dktX')!;
+    const chips = storeCharChips(outputStore, ir);
+    const chipIds = chips.map((c) => c.chipId);
+
+    expect(chipIds).toEqual(glyphGids);
+    // Non-vacuous: both cover the same 2 char slots (index 0 and 1; the nul
+    // and beep slots at index 2/3 are skipped by both).
+    expect(chipIds).toEqual(['store#dkt#0', 'store#dkt#1']);
+  });
+
+  it('the output store classifies as nul-fill for every chip (matches the #530 slot-fill capability)', () => {
+    const ir = makeTestIR();
+    const outputStore = ir.stores.find((s) => s.name === 'dktX')!;
+    const chips = storeCharChips(outputStore, ir);
+
+    expect(chips.length).toBeGreaterThan(0);
+    chips.forEach((c) => expect(c.action).toBe('nul-fill'));
   });
 });
