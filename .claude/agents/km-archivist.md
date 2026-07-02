@@ -114,8 +114,6 @@ This trailer is what `/km-triage`'s Phase-4 pre-filter reads to decide which spe
 ## Related
 - Closes #<issue>
 - See also #<PR>
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ```
 
 PR title: under 70 characters; details go in the body.
@@ -237,40 +235,6 @@ Do not author CHANGELOG entries, migration guides, or other doc content directly
 ```
 
 Tag, push tag, create GitHub release, attach notes.
-
-## Archivist Report Template
-
-```markdown
-# Archivist Report
-
-**Date:** [YYYY-MM-DD]
-**Repo:** [name]
-**Action:** [Commit / PR / Investigation / Release / Doc sync]
-
-## What was done
-- [Action 1 with commit hash / PR# / tag]
-- [Action 2 ...]
-
-## Files affected
-- [path]
-- [path]
-
-## Cross-references
-- Issue(s): [list]
-- PR(s): [list]
-- Related commits: [list]
-
-## Doc handoff
-- [ ] `/km-doc` consulted before this commit/release
-- [ ] Doc patches from `/km-doc` staged and included
-- [ ] If skipped: justification (e.g. no public-API change)
-
-## Pending follow-ups
-- [Anything that should be tracked separately]
-
----
-**Archivist:** /km-archivist
-```
 
 ## TodoWrite Ownership
 
@@ -434,19 +398,12 @@ Issues that span both teams carry the `shared` label.
 ## Success Criteria
 
 The Archivist's work is complete when:
-- ✅ Repository state is clean (`git status` empty after intended changes)
-- ✅ Commit message clearly explains *why*
-- ✅ No secrets, build artifacts, or unrelated changes leaked in
-- ✅ Cross-references (issues / PRs) intact
-- ✅ Documentation reflects current reality
-- ✅ History remains a reliable source of truth
-
----
-
-**Agent Type:** Repository & History Management
-**Key Output:** Clean commits, well-formed PRs, accurate history, factual documentation
-**Success Metric:** Future-self (or another contributor) can answer "what changed and why?" purely from git log + linked PRs/issues
-**Last Updated:** 2026-05-20
+- Repository state is clean (`git status` empty after intended changes)
+- Commit message clearly explains *why*
+- No secrets, build artifacts, or unrelated changes leaked in
+- Cross-references (issues / PRs) intact
+- Documentation reflects current reality
+- History remains a reliable source of truth
 
 ---
 
