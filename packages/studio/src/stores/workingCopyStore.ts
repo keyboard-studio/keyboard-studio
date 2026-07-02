@@ -643,13 +643,24 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   instantiateFromBase: (base, { vfs, ir, removalCapabilities }) => {
     // Three cases, in order:
     //
-    // 1. Redundant re-fire, SAME id (current.baseKeyboard !== null and matches
-    //    base.id) — FULL early-return no-op. Preserves EVERYTHING (removalCapabilities,
+    // 1. Redundant re-fire, SAME id AND SAME mode (current.baseKeyboard !== null,
+    //    matches base.id, AND current.instantiationMode === "new-from-base") —
+    //    FULL early-return no-op. Preserves EVERYTHING (removalCapabilities,
     //    deletedNodeIds, undoStack, carve overlays, phaseResults) exactly as
     //    they stood. This guards against setScaffoldSpec() triggering a second
     //    compile whose onInstantiate would otherwise re-apply this call's
     //    (possibly different/default) removalCapabilities and reset the carve
     //    overlay for no reason — see StudioShell's instantiatedRef comment.
+    //    The mode conjunct matters because a SAME-id call can also arrive from
+    //    a genuine Track switch: e.g. the working copy was instantiated via
+    //    Track 2 (instantiateFromExisting, mode "adapt-existing") for keyboard
+    //    X, and the user then independently re-selects keyboard X in the
+    //    Preview/Output screen's own base picker (usePreviewArtifact runs its
+    //    own decoupled pipeline, outside the main survey's instantiatedRef
+    //    gate — see confirmRebase.ts / instantiateFromBaseIfConfirmed), which
+    //    fires this action for the same id but Track 1. An id-only guard would
+    //    wrongly no-op and strand the working copy in the old track/identity
+    //    mode instead of honouring the user's explicit re-instantiation.
     // 2. First instantiate (current.baseKeyboard === null) — proceeds with the
     //    full set(...) below, but PRESERVES any phaseResults/irAxes already
     //    recorded. Root cause: onInstantiate fires from an async WASM compile
@@ -659,11 +670,22 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     //    "baseKeyboard.id already matches" can never catch this, because
     //    baseKeyboard is still null at this point. On a truly fresh session
     //    phaseResults/irAxes are already empty, so preserving is a no-op there.
-    // 3. Genuine base SWITCH (current.baseKeyboard !== null and differs from
-    //    base.id) — full reset, including clearing phaseResults/irAxes, exactly
-    //    as before.
+    //    This case is untouched by the mode conjunct above — it only applies
+    //    when baseKeyboard is already non-null.
+    // 3. Genuine base SWITCH OR same-id track switch (current.baseKeyboard !==
+    //    null and either the id differs, or the id matches but the mode
+    //    doesn't) — full reset, including clearing phaseResults/irAxes, exactly
+    //    as before. A same-id track switch is treated the same as a base
+    //    switch: Track 1 vs Track 2 identity handling is fundamentally
+    //    different (identity reset vs preserved), so carrying survey progress
+    //    across a track flip would be as unsound as carrying it across a base
+    //    change.
     const current = get();
-    if (current.baseKeyboard !== null && current.baseKeyboard.id === base.id) {
+    if (
+      current.baseKeyboard !== null &&
+      current.baseKeyboard.id === base.id &&
+      current.instantiationMode === "new-from-base"
+    ) {
       return;
     }
     const isGenuineSwitch = current.baseKeyboard !== null;
@@ -701,10 +723,18 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   instantiateFromExisting: (keyboard, { vfs, ir, removalCapabilities }) => {
     // Three cases, in order (mirrors instantiateFromBase above):
     //
-    // 1. Redundant re-fire, SAME id (current.baseKeyboard !== null and matches
-    //    keyboard.id) — FULL early-return no-op. Preserves EVERYTHING
+    // 1. Redundant re-fire, SAME id AND SAME mode (current.baseKeyboard !==
+    //    null, matches keyboard.id, AND current.instantiationMode ===
+    //    "adapt-existing") — FULL early-return no-op. Preserves EVERYTHING
     //    (removalCapabilities, deletedNodeIds, undoStack, carve overlays,
-    //    phaseResults) exactly as they stood.
+    //    phaseResults) exactly as they stood. The mode conjunct matters
+    //    because a SAME-id call can also arrive from a genuine Track switch —
+    //    e.g. the working copy was instantiated via Track 1
+    //    (instantiateFromBase, mode "new-from-base") for keyboard X, and this
+    //    action then fires for the same id via a different path (e.g. an
+    //    import/adapt re-entry) — in which case the id-only check would
+    //    wrongly no-op and strand the working copy in the old track/identity
+    //    mode instead of honouring the re-instantiation into Track 2.
     // 2. First instantiate (current.baseKeyboard === null) — proceeds with the
     //    full set(...) below, but PRESERVES any phaseResults/irAxes already
     //    recorded. Root cause: onInstantiate fires from an async WASM compile
@@ -714,11 +744,22 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     //    "baseKeyboard.id already matches" can never catch this, because
     //    baseKeyboard is still null at this point. On a truly fresh session
     //    phaseResults/irAxes are already empty, so preserving is a no-op there.
-    // 3. Genuine base SWITCH (current.baseKeyboard !== null and differs from
-    //    keyboard.id) — full reset, including clearing phaseResults/irAxes,
-    //    exactly as before.
+    //    This case is untouched by the mode conjunct above — it only applies
+    //    when baseKeyboard is already non-null.
+    // 3. Genuine base SWITCH OR same-id track switch (current.baseKeyboard !==
+    //    null and either the id differs, or the id matches but the mode
+    //    doesn't) — full reset, including clearing phaseResults/irAxes,
+    //    exactly as before. A same-id track switch is treated the same as a
+    //    base switch: Track 1 vs Track 2 identity handling is fundamentally
+    //    different (identity reset vs preserved), so carrying survey progress
+    //    across a track flip would be as unsound as carrying it across a base
+    //    change.
     const current = get();
-    if (current.baseKeyboard !== null && current.baseKeyboard.id === keyboard.id) {
+    if (
+      current.baseKeyboard !== null &&
+      current.baseKeyboard.id === keyboard.id &&
+      current.instantiationMode === "adapt-existing"
+    ) {
       return;
     }
     const isGenuineSwitch = current.baseKeyboard !== null;

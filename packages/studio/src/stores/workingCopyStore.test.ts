@@ -240,6 +240,43 @@ describe("workingCopyStore — instantiateFromBase idempotence", () => {
     expect(useWorkingCopyStore.getState().phaseResults[0]?.phase).toBe("A");
     expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe(basicKbdus.id);
   });
+
+  // Regression (km-triage pre-merge item on PR #934): the case-1 no-op guard
+  // must key on id AND mode, not id alone. A SAME-id call arriving while the
+  // store is in a DIFFERENT mode (e.g. the working copy was instantiated via
+  // Track 2 for this keyboard, and Track 1's instantiateFromBase then fires
+  // for the same id via the independent Preview/Output picker pipeline — see
+  // usePreviewArtifact.ts / confirmRebase.ts) is a genuine track switch, not a
+  // redundant re-fire, and must re-instantiate (mode flips, identity resets
+  // per Track 1 semantics) rather than silently no-op and strand the working
+  // copy in the old track.
+  it("re-instantiates (mode flips to new-from-base) on a SAME-id call while in a DIFFERENT mode", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    // Instantiate via Track 2 first — mode is "adapt-existing".
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+    expect(useWorkingCopyStore.getState().instantiationMode).toBe("adapt-existing");
+    expect(useWorkingCopyStore.getState().identity?.keyboardId).toBe(basicKbdus.id);
+
+    const phaseA: SurveyPhaseResult = {
+      phase: "A",
+      answers: [],
+      computedAxes: { scriptClass: "alphabetic" },
+    };
+    useWorkingCopyStore.getState().recordPhase(phaseA);
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
+
+    // Same keyboard id, but instantiateFromBase (Track 1) fires — a track
+    // switch, not a redundant re-fire. Must NOT no-op.
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+
+    expect(useWorkingCopyStore.getState().instantiationMode).toBe("new-from-base");
+    // Track 1 resets identity to null (fresh copy, no overlay until Phase A).
+    expect(useWorkingCopyStore.getState().identity).toBeNull();
+    // A track switch is treated like a genuine base switch: survey progress
+    // recorded under the old track does not carry over.
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -403,6 +440,40 @@ describe("workingCopyStore — instantiateFromExisting idempotence and base swit
 
     expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(0);
     expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe("different_keyboard_id");
+  });
+
+  // Regression (km-triage pre-merge item on PR #934) — Track 2 mirror of the
+  // instantiateFromBase track-switch test above. A SAME-id call arriving while
+  // the store is in a DIFFERENT mode (working copy instantiated via Track 1
+  // for this keyboard, then instantiateFromExisting fires for the same id) is
+  // a genuine track switch and must re-instantiate (mode flips, identity now
+  // PRESERVED per Track 2 semantics) rather than no-op.
+  it("re-instantiates (mode flips to adapt-existing) on a SAME-id call while in a DIFFERENT mode", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    // Instantiate via Track 1 first — mode is "new-from-base", identity null.
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    expect(useWorkingCopyStore.getState().instantiationMode).toBe("new-from-base");
+    expect(useWorkingCopyStore.getState().identity).toBeNull();
+
+    const phaseA: SurveyPhaseResult = {
+      phase: "A",
+      answers: [],
+      computedAxes: { scriptClass: "alphabetic" },
+    };
+    useWorkingCopyStore.getState().recordPhase(phaseA);
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
+
+    // Same keyboard id, but instantiateFromExisting (Track 2) fires — a track
+    // switch, not a redundant re-fire. Must NOT no-op.
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+
+    expect(useWorkingCopyStore.getState().instantiationMode).toBe("adapt-existing");
+    // Track 2 preserves identity from the loaded keyboard's metadata.
+    expect(useWorkingCopyStore.getState().identity?.keyboardId).toBe(basicKbdus.id);
+    // A track switch is treated like a genuine base switch: survey progress
+    // recorded under the old track does not carry over.
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(0);
   });
 });
 
