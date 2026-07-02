@@ -55,6 +55,18 @@ describe("parse — producedOutput sketch on rule-opaque fragments", () => {
     ]);
   });
 
+  it("codepoint literal above U+10FFFF is not a valid Unicode scalar: sketch breaks the char run with a raw placeholder instead of throwing", () => {
+    const { ir } = parseKmn(
+      `if(opt = '1') + [K_G] > U+1401 U+110000 U+1402`,
+    );
+    expect(ir.raw).toHaveLength(1);
+    expect(ir.raw[0]!.producedOutput).toEqual([
+      { kind: "char", value: "ᐁ" },
+      { kind: "raw", text: "U+110000" },
+      { kind: "char", value: "ᐂ" },
+    ]);
+  });
+
   it("quoted-string RHS expands per character", () => {
     const { ir } = parseKmn(`if(opt = '1') + [K_A] > 'abc'`);
     expect(ir.raw).toHaveLength(1);

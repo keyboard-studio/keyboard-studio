@@ -52,6 +52,10 @@ function parseCodepoint(tok: string): string | null {
   const m = /^U\+([0-9A-Fa-f]{4,6})$/.exec(tok);
   if (!m) return null;
   const cp = parseInt(m[1] ?? "0", 16);
+  // Above the Unicode range: not a valid codepoint. isSmpLiteral only
+  // intercepts these in strict mode, so lenient mode must guard here too
+  // (String.fromCodePoint throws RangeError above U+10FFFF).
+  if (cp > 0x10ffff) return null;
   return String.fromCodePoint(cp);
 }
 
