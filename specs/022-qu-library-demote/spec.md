@@ -1,4 +1,62 @@
-# Feature Specification: Library demote — demote the `pb_*` battery and the full Phase A to reserve/library under the no-delete guardrail
+# Feature Specification: Library demote — demote the orphaned non-identity Phase A to reserve/library under the no-delete guardrail
+
+> ## Amendment (2026-06-29, approved by Matt; confirmed by km-verification + km-domain)
+>
+> **The `pb_*` step-by-step battery is REMOVED from library-demotion scope.** During
+> implementation (km-programmer) it was found — and two independent reviewers confirmed —
+> that the original FR-002 ("`pb_*` stays **reachable** via the mandatory IntroChooser
+> gate") is in **internal contradiction** with FR-003/FR-009 ("`pb_*` renders as a
+> **reserve** node") against the **landed** spec-015/016 model. In that model "reserve"
+> is defined as `registry − reachable` (`computeReserveNodes`: `reserveIds = registryKeys
+> − liveIds`, where `liveIds` is exactly a flow YAML's question membership, which is also
+> what makes a module gate-reachable and what the live `PhaseB.tsx` `makeManualOnlyFlow`
+> path reads). A module that is reachable via the gate is therefore **by definition NOT
+> reserve** — the two requirements cannot both hold. Empirically, removing the `pb_*`
+> battery from `phase_b_characters.modular.yaml` turns **both** the protected
+> `dashboard/buildStepGraph.test.ts` (`danglingTargets === []`) **and** the spec-016
+> `dashboard/driftGuardrail.test.ts` bijection **RED**, and breaks the live manual path.
+>
+> **Resolution (this amendment):** the `pb_*` battery stays a **live, reachable,
+> non-default branch** off the IntroChooser gate — it is **NOT library content** in
+> Phase 1. Any "off the default spine" re-ordering of `pb_*` is **DEFERRED to the Phase-2
+> per-element loop** (see non-goals / FR-011, D1). FR-002 is struck; the `pb_*` parts of
+> FR-003/FR-009 are struck. **Kept in scope:** demote the already-orphaned **full
+> non-identity Phase A** (15 identity + 15 `provenance_*`) to library/reserve; the
+> no-delete CI guardrail (FR-005); the §7.5 strategy-axis regression lock
+> (FR-006/FR-007); and spec-015/016 guardrails stay green **unmodified**
+> (FR-009/FR-010). **`orthographyUrl` retention (FR-008) is DEFERRED** — it was never
+> captured on the live IdentityLite path (only on the demoted Phase A), so the demotion
+> loses no live capture; capturing it live needs a new live question, out of scope here
+> (see FR-008 / FR-011 below).
+>
+> **Implementation note (LANDED — was open item I-2, now resolved):** the Phase-A
+> demotion mechanism is to drop `phase_a_identity.modular.yaml` from the active
+> flow-source set (`renderedNodeSet.ts` `FLOW_SOURCES`) so its 30 modules become
+> registry-only reserve (`kind:"library-not-in-flow"`) via `computeReserveNodes` in the
+> identity-lite drill-down. This collided with spec-017's prefill drill-down, whose
+> `registryKey` was `primary_script` — itself a vestigial Phase-A module held in the
+> flow ONLY to satisfy 017's anchor. **Resolution (Matt-approved, landed):** re-anchor
+> 017's prefill drill-down to the **live** identity-lite equivalent `il_target_script`
+> (the script-capture question on the real StudioShell→IdentityLite path —
+> `questions/a/il_target_script.ts`; the live functional replacement for the demoted
+> `primary_script`), then drop `phase_a_identity` from `FLOW_SOURCES`. `prefill.test.ts`
+> FR-014 §2.2(b) is updated to assert the live `il_target_script` anchor is reachable
+> AND that `primary_script` is now unreachable (demotion proven). The header.bcp47 input
+> stays C5-satisfiable via the `charactersStep` subsumption write (DEC-D1), unchanged.
+> **FR-001 is MET.**
+>
+> **`orthographyUrl` retention (FR-008) — DEFERRED (Matt-approved follow-up, not
+> shipped).** Investigation (km-verification) established that `orthographyUrl`
+> (`provenance_orthography_url`) was only ever captured on the now-demoted **Phase A**
+> path (`PhaseA.tsx:163-164`); it is **NOT** on the live `identity_lite.modular.yaml`
+> flow (only the five `il_*` questions are), and `StudioShell.contextFromIdentity` never
+> consumed it. So demoting Phase A loses **no live capture** — there is nothing
+> user-facing to retain. Genuinely capturing it on the live survey would require adding
+> a **new live orthography-URL question** to the identity-lite / documentation flow,
+> which is out of scope for this demotion spec. FR-008 is therefore **deferred** to the
+> future question-revival work (Matt: "eventually we will want some of those
+> questions") — the same treatment as the `pb_*` battery. No inert capture code is
+> shipped. See FR-011 (non-goals).
 
 **Feature Branch**: `speckit/question-unification-phase1-specs`
 
@@ -76,7 +134,9 @@ A km-strategy maintainer wants `selectStrategy` output for the **default build-l
 
 ---
 
-### User Story 3 - `orthographyUrl` capture is retained when Phase A is demoted (Priority: P2)
+### User Story 3 - `orthographyUrl` capture (Priority: P2) — DEFERRED (see FR-008)
+
+> **DEFERRED (Matt-approved):** This story is **not shipped** by this spec. `orthographyUrl` (`provenance_orthography_url`) was only ever captured on the now-demoted **Phase A** path — it was **never** on the live `identity_lite.modular.yaml` flow nor consumed by `StudioShell.contextFromIdentity`. So demoting Phase A loses **no live capture**, and there is nothing user-facing to retain. Live capture would need a **new live orthography-URL question**, out of scope here; deferred to the future question-revival work. The acceptance text below is retained for historical context but is **superseded** by the FR-008 deferral. No inert capture code is shipped.
 
 A linguist-agent consumer wants `orthographyUrl` capture retained when the full Phase A is demoted, so the linguist-agent grounding input is **not lost** even though the `provenance_*` modules go to the inert library.
 
@@ -125,9 +185,9 @@ A studio engineer can ship this demotion with a **no-delete CI assertion** confi
 
 **The demotion to reserve/library (US1)**
 
-- **FR-001**: The full non-identity Phase A (15 identity + 15 `provenance_*`, `content/flows/phase_a_identity.modular.yaml`) MUST be demoted into the **inert library** — absent from the active default flow ordering and rendered as **reserve nodes** via `computeReserveNodes` (`dashboard/buildStepGraph.ts:150-182`) on the `buildModularFlowGraph` registry-vs-YAML diff path. `identity_lite` is the canonical identity experience (§6 decision 3, RESOLVED). This spec MUST NOT wire `PhaseA` back into `StudioShell` (`StudioShell.tsx:18`) — the revival alternative is rejected.
-- **FR-002**: The `pb_*` step-by-step battery (55 modules, `content/flows/phase_b_characters.modular.yaml`) MUST be demoted **off the default spine** — rendered as a reserve node **where it is not on the active branch** — while remaining **reachable** via the **mandatory** IntroChooser discovery-method gate (the step-by-step branch, off the same gate as the default build-list branch). This spec MUST NOT make the `pb_*` battery unreachable and MUST NOT introduce an auto-default that skips the gate.
-- **FR-003**: Demoted modules MUST render as reserve nodes through `computeReserveNodes` (`kind:"library-not-in-flow"`, `region:"not-yet-ordered"`, `isTerminal:true`) on the `buildModularFlowGraph` registry-vs-YAML diff path — the SAME mechanism the migration plan reserves for library content (§2.2(a): `computeReserveNodes` gets library content from the §2.3 YAML/registry demotions, NOT from the manifest projection). This spec is what first populates the currently-empty reserve set (findings (a)).
+- **FR-001 (MET):** The full non-identity Phase A (15 identity + 15 `provenance_*`, `content/flows/phase_a_identity.modular.yaml`) MUST be demoted into the **inert library** — absent from the active default flow ordering and rendered as **reserve nodes** via `computeReserveNodes` (`dashboard/buildStepGraph.ts:150-182`) on the `buildModularFlowGraph` registry-vs-YAML diff path. `identity_lite` is the canonical identity experience (§6 decision 3, RESOLVED). This spec MUST NOT wire `PhaseA` back into `StudioShell` (`StudioShell.tsx:18`) — the revival alternative is rejected. **Landed:** `renderedNodeSet.ts` drops the `phase_a_identity` `FLOW_SOURCES` entry, so the 30 modules render as `library-not-in-flow` reserve in the identity-lite drill-down and are no longer in `collectRenderedNodeIds` / the reachable set; spec-017's prefill anchor moved off `primary_script` to the live `il_target_script` to keep the 016/017 guardrails green.
+- **FR-002**: ~~The `pb_*` step-by-step battery MUST be demoted off the default spine while remaining reachable via the IntroChooser gate.~~ **STRUCK (Amendment 2026-06-29, approved Matt + km-verification + km-domain).** "Reachable via the gate" and "renders as reserve" are an internal contradiction against the landed 015/016 model (reserve = `registry − reachable`; `computeReserveNodes` reserveIds = `registryKeys − liveIds`, and gate-reachability == YAML `liveIds` membership == what the live `PhaseB.tsx makeManualOnlyFlow` reads). The `pb_*` battery therefore **stays a live, reachable, non-default branch** off the **mandatory** IntroChooser gate (NOT library content); the gate stays mandatory with no auto-default. Any "off the default spine" re-ordering of `pb_*` is **DEFERRED to the Phase-2 per-element loop** (FR-011, D1).
+- **FR-003**: Demoted modules — **the full non-identity Phase A only** (`pb_*` struck per the Amendment) — MUST render as reserve nodes through `computeReserveNodes` (`kind:"library-not-in-flow"`, `region:"not-yet-ordered"`, `isTerminal:true`) on the `buildModularFlowGraph` registry-vs-YAML diff path — the SAME mechanism the migration plan reserves for library content (§2.2(a): `computeReserveNodes` gets library content from the §2.3 YAML/registry demotions, NOT from the manifest projection). This spec is what first populates the reserve set with real library content (findings (a)).
 
 **The no-delete guardrail (§4, US4)**
 
@@ -141,16 +201,16 @@ A studio engineer can ship this demotion with a **no-delete CI assertion** confi
 
 **`orthographyUrl` retention — the Phase-A provenance caveat (§2.3, US3)**
 
-- **FR-008**: `orthographyUrl` capture (a linguist-agent grounding input) MUST be **retained** in `identity_lite` / the documentation stage when the full Phase A is demoted, so the grounding input is not lost. It MUST reuse the **existing** provenance surface (`provenance.orthographyUrl`, `packages/contracts/src/provenance.ts`; reference capture at `PhaseA.tsx:163-164`) — **no contracts bump**, no new field. When no `orthographyUrl` is provided, retention is a clean no-op (the field stays unset, exactly as today).
+- **FR-008 (DEFERRED — not shipped this spec):** ~~`orthographyUrl` capture MUST be retained in `identity_lite` / the documentation stage when the full Phase A is demoted.~~ **Deferred** to the future question-revival work, with the factual reason: `orthographyUrl` (`provenance_orthography_url`) was only ever captured on the now-demoted **Phase A** path (`PhaseA.tsx:163-164`). It is **NOT** present on the live `identity_lite.modular.yaml` flow (only the five `il_*` questions are) and was never consumed by `StudioShell.contextFromIdentity`, so the demotion **does not lose a live capture** — there is nothing user-facing to retain. Genuinely capturing it on the live survey requires adding a **new live orthography-URL question** to the identity-lite / documentation flow, which is **out of scope** for this demotion spec. The existing `provenance.orthographyUrl` contract field (`packages/contracts/src/provenance.ts`) stays available for that future work — no contracts bump, and **no inert capture code is shipped** here. (Cross-reference: the Phase-2 / question-revival follow-up — Matt: "eventually we will want some of those questions.")
 
 **Guardrails & gate (US4)**
 
-- **FR-009**: The spec-016 drift guardrail MUST stay **green**: demoted-but-registered modules MUST be modeled as **reserve** (rendered by `computeReserveNodes`), NOT **orphan**. The rendered ⟺ runtime bijection (016) is asserted over the **reachable** set; a registered-but-unreachable reserve module is rendered by the separate reserve mechanism (016 edge case). The demotion MUST keep demoted ids out of the *reachable* runtime set (off the default ordering), NOT out of the registry.
+- **FR-009**: The spec-016 drift guardrail MUST stay **green**: the demoted-but-registered **Phase A** modules (the `pb_*` clause is struck per the Amendment — `pb_*` stays reachable/live) MUST be modeled as **reserve** (rendered by `computeReserveNodes`), NOT **orphan**. The rendered ⟺ runtime bijection (016) is asserted over the **reachable** set; a registered-but-unreachable reserve module is rendered by the separate reserve mechanism (016 edge case). The demotion MUST keep the demoted Phase A ids out of the *reachable* runtime set, NOT out of the registry.
 - **FR-010**: The spec-016 drift guardrail (the rendered ⟺ runtime bijection) AND the FR-005 no-delete assertion MUST both stay green; default-path behavior MUST be **byte-identical**. `pnpm typecheck` + studio/contracts `vitest` + `pnpm depcruise` MUST be **green**, with no new `dashboard → stores` or `dashboard → editors` edge introduced.
 
 **Out of scope (explicit non-goals)**
 
-- **FR-011**: This feature MUST NOT **delete** any module (no-delete guardrail §4) or unregister any id; MUST NOT re-incorporate non-Latin script-specific mark/joining/order sub-series — the non-Latin default-flip precondition (the loop must subsume `pb_*` script semantics) is a **Phase-2 gate** (D1) and Phase 1 does **not** flip a non-Latin default to a path that drops those sub-series; MUST NOT build the per-element loop or re-elicit A1/A3/A4 inline (Phase 2); MUST NOT wire `PhaseA` back into `StudioShell` (the revival alternative is rejected; Matt resolved demote); and MUST NOT introduce new write routing, `mutate()`, or a contracts bump — behavior MUST be byte-identical on the default path.
+- **FR-011**: This feature MUST NOT **delete** any module (no-delete guardrail §4) or unregister any id; MUST NOT demote, re-order, or take the `pb_*` step-by-step battery off the default spine — the `pb_*` battery stays a **live, reachable, non-default branch** off the mandatory IntroChooser gate, and any `pb_*` re-ordering is **DEFERRED to the Phase-2 per-element loop** (Amendment 2026-06-29); MUST NOT add a new live `orthographyUrl` capture question to the identity-lite / documentation flow — `orthographyUrl` retention (FR-008) is **DEFERRED** (it was never on the live path, so the demotion loses no live capture; live capture needs a new question, out of scope here) and **no inert capture code is shipped**; MUST NOT re-incorporate non-Latin script-specific mark/joining/order sub-series — the non-Latin default-flip precondition (the loop must subsume `pb_*` script semantics) is a **Phase-2 gate** (D1) and Phase 1 does **not** flip a non-Latin default to a path that drops those sub-series; MUST NOT build the per-element loop or re-elicit A1/A3/A4 inline (Phase 2); MUST NOT wire `PhaseA` back into `StudioShell` (the revival alternative is rejected; Matt resolved demote); and MUST NOT introduce new write routing, `mutate()`, or a contracts bump — behavior MUST be byte-identical on the default path.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -176,7 +236,7 @@ A studio engineer can ship this demotion with a **no-delete CI assertion** confi
 - **SC-002**: The `pb_*` battery remains **reachable** via the mandatory IntroChooser discovery-method gate (the step-by-step branch); no auto-default skipping the gate is introduced; the `pb_*` battery is unreachable on the *default* spine only.
 - **SC-003**: A **no-delete CI assertion** confirms the demoted `pb_*` and Phase A ids stay **registered** (sub-registry key) + **on disk** + **test-covered**, and turns **RED** when a demoted module is deleted or unregistered (demonstrated against a local deletion/unregistration injection).
 - **SC-004**: `selectStrategy` output for the **default build-list path** is **byte-identical** before/after the demotion on every §7.5 exemplar row (axisFills-driven; A1/A3/A4 default-filled from the script-class prior) — the demotion is provably **not a regression** on the default path.
-- **SC-005**: `orthographyUrl` capture is **retained** in `identity_lite` / the documentation stage (reusing `provenance.orthographyUrl`, no contracts bump); a default-path run with no `orthographyUrl` is a clean no-op.
+- **SC-005 (DEFERRED):** ~~`orthographyUrl` capture is retained in `identity_lite` / the documentation stage.~~ **Deferred** (see FR-008): `orthographyUrl` was never captured on the live IdentityLite path (only on the demoted Phase A), so the demotion loses no live capture; live capture needs a new live question, out of scope here. No inert capture code is shipped.
 - **SC-006**: The spec-016 drift guardrail stays **green** — demoted-but-registered modules are **reserve** (rendered by `computeReserveNodes`), not **orphan**; the rendered ⟺ runtime bijection holds over the reachable set.
 - **SC-007**: `pnpm typecheck` + studio/contracts `vitest` (incl. the no-delete assertion + the §7.5 strategy-axis lock) + `pnpm depcruise` pass; a repo audit finds **zero** deleted/unregistered modules, **zero** new IR write route, **zero** contracts bump, and **zero** `PhaseA`-into-`StudioShell` wiring.
 
