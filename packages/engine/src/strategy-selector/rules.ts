@@ -11,13 +11,15 @@
 //
 // NOTE on rule "3a": spec §7.2 documents rule 3a (A2=alphabetic AND A3=strong
 // AND A3a=postfix → S-03) intercepting between rules 3 and 4. It IS implemented
-// below (in PRIMARY_RULES, between rules 3 and 4). What is NOT yet wired up is
-// production supply of A3a=postfix: no survey phase or import path elicits
-// markInputOrder end-to-end yet (that's a deferred follow-up), and the §7.2
-// script-class default-fill prior (default-fill.ts) deliberately never fills
-// A3a with "postfix" (it only ever fills the unmarked "prefix" state, per the
-// prior's load-bearing invariant). So today rule 3a fires only when a caller
-// (currently: tests) supplies markInputOrder="postfix" directly. See spec.md §7.2.
+// below (in PRIMARY_RULES, between rules 3 and 4). Production supply of
+// A3a=postfix has two sources: (1) the Track 2 import path's base-derived
+// detection (detectMarkInputOrderFromImport, import-mark-order.ts) finds
+// real postfix sequence-replace structure in an imported base's KeyboardIR; no
+// survey phase elicits markInputOrder end-to-end yet (that half remains
+// deferred). (2) the §7.2 script-class default-fill prior (default-fill.ts)
+// deliberately never fills A3a with "postfix" (it only ever fills the unmarked
+// "prefix" state, per the prior's load-bearing invariant) — it is not a valid
+// source for this value. See spec.md §7.2.
 
 import type {
   DiscoveryAxisVector,

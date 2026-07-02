@@ -219,9 +219,11 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
 
       <p style={{ fontSize: 11.5, color: "#6e7681", margin: "16px 0 0", fontFamily: SANS }}>
         Note: rule 3a (postfix-preference intercept → S-03, shown above between rules 3 and 4) is
-        implemented in <code style={{ fontFamily: MONO }}>selectStrategy()</code>, but no survey
-        phase or import path elicits <code style={{ fontFamily: MONO }}>markInputOrder=&quot;postfix&quot;</code>{" "}
-        end-to-end yet — it fires only when a caller supplies that value directly.
+        implemented in <code style={{ fontFamily: MONO }}>selectStrategy()</code>. The Track 2
+        import path detects real postfix sequence-replace structure in an imported base and fills{" "}
+        <code style={{ fontFamily: MONO }}>markInputOrder=&quot;postfix&quot;</code> from it
+        (<code style={{ fontFamily: MONO }}>source: &quot;import-derived&quot;</code> below); no
+        survey phase elicits it end-to-end yet — that half remains deferred.
       </p>
 
       <DefaultFillProvenance axisFills={axisFills} />
