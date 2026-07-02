@@ -20,6 +20,28 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { nfcDedup } from "./charNormUtils.ts";
 import { suggestMissingChars } from "../lib/services.ts";
 import type { MissingCharSuggestions } from "../lib/services.ts";
+import {
+  BG_PAGE,
+  BORDER,
+  ACCENT,
+  TEXT_DIM,
+  TEXT_MAIN,
+  FONT,
+  CHIP_GLYPH_ACCENT,
+  ERROR_RED,
+  phaseContainer,
+  phaseHeading,
+  phaseHeadingFlush,
+  mutedNote,
+  mutedParaFlush,
+  sectionHeading,
+  divider,
+  secondaryButton,
+  primaryButton,
+  charChip,
+  chipGlyph,
+  chipCodepoint,
+} from "./surveyStyles.ts";
 
 // Vite ?raw import — typed via the `*.yaml?raw` declaration in src/vite-env.d.ts.
 import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modular.yaml?raw";
@@ -189,12 +211,12 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
           aria-label="Character to add"
           style={{
             flex: 1,
-            background: "#0d1117",
-            border: "1px solid #30363d",
+            background: BG_PAGE,
+            border: `1px solid ${BORDER}`,
             borderRadius: 6,
-            color: "#e6edf3",
+            color: TEXT_MAIN,
             fontSize: 16,
-            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+            fontFamily: FONT,
             padding: "8px 12px",
             boxSizing: "border-box",
           }}
@@ -203,17 +225,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
           type="button"
           disabled={addDisabled}
           onClick={add}
-          style={{
-            padding: "8px 18px",
-            background: addDisabled ? "#21262d" : "#1f6feb",
-            border: "1px solid #30363d",
-            borderRadius: 6,
-            color: addDisabled ? "#8b949e" : "#e6edf3",
-            fontSize: 13,
-            cursor: addDisabled ? "not-allowed" : "pointer",
-            fontFamily: "inherit",
-            whiteSpace: "nowrap",
-          }}
+          style={{ ...primaryButton(addDisabled), whiteSpace: "nowrap" }}
         >
           + Add
         </button>
@@ -226,13 +238,13 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
             margin: "0 0 8px 0",
             fontSize: 13,
             fontWeight: 600,
-            color: "#e6edf3",
+            color: TEXT_MAIN,
           }}
         >
           Your alphabet ({chars.length})
         </p>
         {chars.length === 0 ? (
-          <p style={{ margin: 0, fontSize: 13, color: "#8b949e" }}>
+          <p style={mutedParaFlush}>
             No characters yet — add your first one above.
           </p>
         ) : (
@@ -247,39 +259,15 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
                 type="button"
                 onClick={() => onChange(chars.filter((x) => x !== c))}
                 aria-label={`Remove ${c} (${toUPlusNotation(c)})`}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  padding: "6px 10px",
-                  border: "1px solid #30363d",
-                  borderRadius: 8,
-                  background: "#161b22",
-                  cursor: "pointer",
-                  gap: 2,
-                  minWidth: 44,
-                }}
+                style={charChip(false)}
               >
-                <span
-                  style={{
-                    fontSize: 22,
-                    fontFamily: "system-ui, sans-serif",
-                    lineHeight: 1,
-                    color: "#58a6ff",
-                  }}
-                >
+                <span style={chipGlyph(true)}>
                   {c}
                 </span>
-                <span
-                  style={{
-                    fontSize: 9,
-                    color: "#8b949e",
-                    fontFamily: "monospace",
-                  }}
-                >
+                <span style={chipCodepoint}>
                   {toUPlusNotation(c)}
                 </span>
-                <span style={{ fontSize: 10, color: "#f85149" }}>x</span>
+                <span style={{ fontSize: 10, color: ERROR_RED }}>x</span>
               </button>
             ))}
           </div>
@@ -307,31 +295,13 @@ function SuggestionChip({ char, checked, onToggle }: SuggestionChipProps) {
       onClick={() => onToggle(char)}
       aria-label={`${checked ? "Remove" : "Add"} ${char} (${cp})`}
       aria-pressed={checked}
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        padding: "6px 10px",
-        border: `1px solid ${checked ? "#1f6feb" : "#30363d"}`,
-        borderRadius: 8,
-        background: checked ? "#0d2044" : "#161b22",
-        cursor: "pointer",
-        gap: 2,
-        minWidth: 44,
-      }}
+      style={charChip(checked)}
     >
-      <span
-        style={{
-          fontSize: 22,
-          fontFamily: "system-ui, sans-serif",
-          lineHeight: 1,
-          color: checked ? "#58a6ff" : "#8b949e",
-        }}
-      >
+      <span style={chipGlyph(checked)}>
         {char}
       </span>
-      <span style={{ fontSize: 9, color: "#8b949e", fontFamily: "monospace" }}>{cp}</span>
-      <span style={{ fontSize: 10, color: checked ? "#58a6ff" : "#8b949e" }}>
+      <span style={chipCodepoint}>{cp}</span>
+      <span style={{ fontSize: 10, color: checked ? CHIP_GLYPH_ACCENT : TEXT_DIM }}>
         {checked ? "[x]" : "+"}
       </span>
     </button>
@@ -389,7 +359,7 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
   // Neutral note when no BCP47 or no baseIr yet
   if (!bcp47 || baseIr === null) {
     return (
-      <div style={{ fontSize: 13, color: "#8b949e" }}>
+      <div style={mutedNote}>
         No verified character list for {displayName}. Add characters below.
       </div>
     );
@@ -397,7 +367,7 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
 
   if (loadState.status === "idle" || loadState.status === "loading") {
     return (
-      <div style={{ fontSize: 13, color: "#8b949e" }}>
+      <div style={mutedNote}>
         Checking for a verified character list…
       </div>
     );
@@ -405,7 +375,7 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
 
   if (loadState.status === "error") {
     return (
-      <div style={{ fontSize: 13, color: "#8b949e" }}>
+      <div style={mutedNote}>
         Could not load character suggestions. Add characters below.
       </div>
     );
@@ -416,7 +386,7 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
   // null = no CLDR data
   if (data === null) {
     return (
-      <div style={{ fontSize: 13, color: "#8b949e" }}>
+      <div style={mutedNote}>
         No verified character list for {displayName}. Add characters below.
       </div>
     );
@@ -425,7 +395,7 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
   // Empty main + auxiliary = base already covers the alphabet
   if (data.main.length === 0 && data.auxiliary.length === 0) {
     return (
-      <div style={{ fontSize: 13, color: "#8b949e" }}>
+      <div style={mutedNote}>
         Your base keyboard already covers this language's alphabet.
       </div>
     );
@@ -434,10 +404,10 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div>
-        <p style={{ margin: "0 0 4px 0", fontSize: 13, fontWeight: 600, color: "#e6edf3" }}>
+        <p style={{ margin: "0 0 4px 0", fontSize: 13, fontWeight: 600, color: TEXT_MAIN }}>
           Suggested for {data.languageName ?? displayName}
         </p>
-        <p style={{ margin: "0 0 10px 0", fontSize: 11, color: "#8b949e" }}>
+        <p style={{ margin: "0 0 10px 0", fontSize: 11, color: TEXT_DIM }}>
           from CLDR exemplars — tick to add
         </p>
         {data.main.length > 0 ? (
@@ -456,7 +426,7 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
             ))}
           </div>
         ) : (
-          <p style={{ margin: 0, fontSize: 13, color: "#8b949e" }}>
+          <p style={mutedParaFlush}>
             No additional main characters needed.
           </p>
         )}
@@ -471,7 +441,7 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
             style={{
               background: "transparent",
               border: "none",
-              color: "#8b949e",
+              color: TEXT_DIM,
               fontSize: 12,
               cursor: "pointer",
               padding: "4px 0",
@@ -515,12 +485,12 @@ function GridPlaceholder() {
     <div
       style={{
         padding: 16,
-        border: "1px solid #30363d",
+        border: `1px solid ${BORDER}`,
         borderRadius: 6,
-        color: "#8b949e",
+        color: TEXT_DIM,
       }}
     >
-      <strong style={{ color: "#e6edf3" }}>Browse a character grid</strong>
+      <strong style={{ color: TEXT_MAIN }}>Browse a character grid</strong>
       <p style={{ margin: "8px 0 0 0", fontSize: 13 }}>
         Visual character grid — coming soon.
       </p>
@@ -549,55 +519,45 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         flexDirection: "column",
         gap: 24,
         maxWidth: 640,
-        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-        color: "#e6edf3",
+        fontFamily: FONT,
+        color: TEXT_MAIN,
       }}
     >
       {/* Back */}
       <button
         type="button"
         onClick={onBack}
-        style={{
-          alignSelf: "flex-start",
-          padding: "8px 18px",
-          background: "transparent",
-          border: "1px solid #30363d",
-          borderRadius: 6,
-          color: "#8b949e",
-          fontSize: 13,
-          cursor: "pointer",
-          fontFamily: "inherit",
-        }}
+        style={{ alignSelf: "flex-start", ...secondaryButton }}
       >
         Back
       </button>
 
       {/* Heading */}
-      <h2 style={{ margin: 0, fontSize: "1.1rem", color: "#6ea8fe", fontWeight: 600 }}>
+      <h2 style={phaseHeadingFlush}>
         Phase B — Build your character list
       </h2>
 
       {/* Section 1: Suggestions from CLDR */}
       <section aria-label="Suggested characters from CLDR">
-        <h3 style={{ margin: "0 0 10px 0", fontSize: "0.95rem", color: "#e6edf3", fontWeight: 600 }}>
+        <h3 style={sectionHeading}>
           Suggested characters
         </h3>
         <SuggestionPanel context={context} chars={chars} onChange={setChars} />
       </section>
 
       {/* Divider */}
-      <hr style={{ border: "none", borderTop: "1px solid #21262d", margin: 0 }} />
+      <hr style={divider} />
 
       {/* Section 2: Type-in characters */}
       <section aria-label="Add characters by typing">
-        <h3 style={{ margin: "0 0 10px 0", fontSize: "0.95rem", color: "#e6edf3", fontWeight: 600 }}>
+        <h3 style={sectionHeading}>
           Add a character
         </h3>
         <CharChipEditor chars={chars} onChange={setChars} autoFocus={false} />
       </section>
 
       {/* Divider */}
-      <hr style={{ border: "none", borderTop: "1px solid #21262d", margin: 0 }} />
+      <hr style={divider} />
 
       {/* Section 3: Grid placeholder */}
       <section aria-label="Character grid (coming soon)">
@@ -616,16 +576,7 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
               confirmedInventory: chars,
             });
           }}
-          style={{
-            padding: "8px 18px",
-            background: doneDisabled ? "#21262d" : "#1f6feb",
-            border: "1px solid #30363d",
-            borderRadius: 6,
-            color: doneDisabled ? "#8b949e" : "#e6edf3",
-            fontSize: 13,
-            cursor: doneDisabled ? "not-allowed" : "pointer",
-            fontFamily: "inherit",
-          }}
+          style={primaryButton(doneDisabled)}
         >
           Done ({chars.length} character{chars.length === 1 ? "" : "s"})
         </button>
@@ -716,21 +667,8 @@ export function PhaseB({ context = {}, onComplete, onBack, findingsByQuestionId,
 
   // Manual path — use a patched flow that skips the intro question
   return (
-    <div
-      style={{
-        background: "#0d1117",
-        color: "#e6edf3",
-        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-      }}
-    >
-      <h2
-        style={{
-          margin: "0 0 20px 0",
-          fontSize: "1.1rem",
-          color: "#6ea8fe",
-          fontWeight: 600,
-        }}
-      >
+    <div style={phaseContainer}>
+      <h2 style={phaseHeading}>
         Phase B — Character inventory
       </h2>
       <SurveyRunner
@@ -772,17 +710,17 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
         display: "flex",
         flexDirection: "column",
         gap: 20,
-        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-        color: "#e6edf3",
+        fontFamily: FONT,
+        color: TEXT_MAIN,
       }}
     >
-      <h2 style={{ margin: 0, fontSize: "1.1rem", color: "#6ea8fe", fontWeight: 600 }}>
+      <h2 style={phaseHeadingFlush}>
         Phase B — Character discovery
       </h2>
-      <p style={{ margin: 0, fontSize: 13, color: "#8b949e" }}>
+      <p style={mutedParaFlush}>
         How would you like to tell us which characters {languageName} uses?
       </p>
-      <p style={{ margin: 0, fontSize: 12, color: "#8b949e", lineHeight: 1.5 }}>
+      <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, lineHeight: 1.5 }}>
         Both methods feed the same final character list.
         The Build method starts with verified suggestions and lets you type additional characters.
       </p>
@@ -801,7 +739,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
                 marginBottom: 10,
                 cursor: "pointer",
                 fontSize: 13,
-                color: "#e6edf3",
+                color: TEXT_MAIN,
               }}
             >
               <input
@@ -811,7 +749,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
                 value={value}
                 checked={selected === value}
                 onChange={() => setSelected(value)}
-                style={{ marginTop: 2, accentColor: "#6ea8fe" }}
+                style={{ marginTop: 2, accentColor: ACCENT }}
               />
               <span style={{ lineHeight: 1.5 }}>{label}</span>
             </label>
@@ -824,16 +762,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
           <button
             type="button"
             onClick={onBack}
-            style={{
-              padding: "8px 18px",
-              background: "transparent",
-              border: "1px solid #30363d",
-              borderRadius: 6,
-              color: "#8b949e",
-              fontSize: 13,
-              cursor: "pointer",
-              fontFamily: "inherit",
-            }}
+            style={secondaryButton}
           >
             Back
           </button>
@@ -841,16 +770,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
         <button
           type="button"
           onClick={() => onChoose(selected)}
-          style={{
-            padding: "8px 18px",
-            background: "#1f6feb",
-            border: "1px solid #30363d",
-            borderRadius: 6,
-            color: "#e6edf3",
-            fontSize: 13,
-            cursor: "pointer",
-            fontFamily: "inherit",
-          }}
+          style={primaryButton(false)}
         >
           Continue
         </button>

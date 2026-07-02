@@ -48,6 +48,16 @@ import { navigateTo } from "./lib/navigate.ts";
 import { manifest } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps, type MutateRequest } from "./steps/reducer.ts";
 import { questionRegistry } from "./survey/questions/registry.ts";
+import {
+  TEXT_MAIN,
+  ACCENT,
+  BORDER,
+  FONT,
+  ERROR_RED,
+  phaseHeadingFlush,
+  mutedParaFlush,
+  secondaryButton,
+} from "./survey/surveyStyles.ts";
 
 /**
  * spec-014 US1 (T014/T015): route each in-scope question answer through its
@@ -762,8 +772,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     overflowY: "auto",
     padding: 24,
     boxSizing: "border-box",
-    color: "#e6edf3",
-    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    color: TEXT_MAIN,
+    fontFamily: FONT,
   };
 
   // ---------------------------------------------------------------------------
@@ -813,7 +823,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     <div
       style={{
         padding: 24,
-        border: "1px solid #30363d",
+        border: `1px solid ${BORDER}`,
         borderRadius: 8,
         display: "flex",
         flexDirection: "column",
@@ -821,26 +831,17 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         alignItems: "flex-start",
       }}
     >
-      <h2 style={{ margin: 0, fontSize: "1.1rem", color: "#6ea8fe", fontWeight: 600 }}>
+      <h2 style={phaseHeadingFlush}>
         Survey complete
       </h2>
-      <p style={{ margin: 0, fontSize: 13, color: "#8b949e" }}>
+      <p style={mutedParaFlush}>
         All authoring steps have been completed. Head to Output to download or
         submit your keyboard.
       </p>
       <button
         type="button"
         onClick={handleStartOver}
-        style={{
-          padding: "8px 18px",
-          background: "transparent",
-          border: "1px solid #30363d",
-          borderRadius: 6,
-          color: "#8b949e",
-          fontSize: 13,
-          cursor: "pointer",
-          fontFamily: "inherit",
-        }}
+        style={secondaryButton}
       >
         Start over
       </button>
@@ -884,16 +885,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           <button
             type="button"
             onClick={handleStartOver}
-            style={{
-              padding: "8px 18px",
-              background: "transparent",
-              border: "1px solid #30363d",
-              borderRadius: 6,
-              color: "#8b949e",
-              fontSize: 13,
-              cursor: "pointer",
-              fontFamily: "inherit",
-            }}
+            style={secondaryButton}
           >
             Start over
           </button>
@@ -979,7 +971,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     return (
       <div
         role="alert"
-        style={{ padding: 24, color: "#f85149", fontFamily: "monospace", fontSize: 13 }}
+        style={{ padding: 24, color: ERROR_RED, fontFamily: "monospace", fontSize: 13 }}
       >
         {`[SurveyView] unhandled step id: "${String(_exhaustive)}" — wire this manifest step into SurveyView`}
       </div>
@@ -1038,8 +1030,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           overflow: "auto",
           padding: 24,
           boxSizing: "border-box",
-          color: "#e6edf3",
-          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+          color: TEXT_MAIN,
+          fontFamily: FONT,
         }}
       >
         {localBase === null ? (
@@ -1070,7 +1062,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
                 flexWrap: "wrap",
               }}
             >
-              <h2 style={{ margin: 0, fontSize: "1.1rem", color: "#6ea8fe" }}>
+              <h2 style={{ margin: 0, fontSize: "1.1rem", color: ACCENT }}>
                 {localBase.displayName}
               </h2>
               <OskModeToggle value={oskMode} onChange={setOskMode} />
