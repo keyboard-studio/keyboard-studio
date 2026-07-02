@@ -566,7 +566,7 @@ Procedure:
    a. Look in `last_audit_entry.verdicts` (cached in Pre-filter A — do not re-read the log) for an entry whose `specialist` field matches.
    b. No prior verdict → dispatch them (they have never reviewed this PR; treat as new).
    c. Prior verdict `APPROVE` → candidate for skipping (subject to the always-run guard below).
-   d. Prior verdict `REQUEST_CHANGES` or `NEEDS_HUMAN_INPUT` → dispatch them; they need to assess whether the new commits address their findings. (They re-derive those findings against the current incremental diff — prior findings are no longer injected as prompt context; see the retirement note under Phase 4.)
+   d. Prior verdict `REQUEST_CHANGES` or `NEEDS_HUMAN_INPUT` → dispatch them; they need to assess whether the new commits address their findings. (They re-derive those findings against the current incremental diff. The heavy per-specialist prior-review briefing block is NOT resurrected; the only prior-finding context they get is the lean `priorFindings` list — see "Carry forward prior findings" under Phase 4.)
 
 3. **Always-run guard.** Never skip via Pre-filter E: `km-domain`, `km-keyman`. Linguistic context and Keyman semantics can shift unexpectedly in any new commit; a fresh pass from these two is cheap insurance. (km-simplify is not a triage crew member and is not evaluated here.)
 
@@ -641,6 +641,14 @@ node utilities/km-triage-app/check-progress.js \
 
 The check_run id is now stored in `.escalations/runs/<sweep_id>-checks.json`; subsequent `check-progress.js` calls within the same sweep PATCH the same check rather than creating a new one.
 
+### Carry forward prior findings (incremental sweeps only)
+
+On a commit-driven **incremental** sweep (`review_range == "incremental"` from Pre-filter A), the crew sees only the `last_audited_sha..head` diff, so a still-unfixed prior finding on a line the new commits did not touch would be silently dropped. To prevent that, hand the workflow a lean `priorFindings` list of the previous sweep's still-open findings; the reviewer prompt re-lists any that the new commits did not address, tagged "(carried from prior review)".
+
+**Source.** The audit log's `verdicts` array records only per-specialist verdict summaries, not per-finding file/line/title, so it is NOT the source. The durable per-finding record is the **previous sweep's own PR comment** — the most recent `km-triage[bot]` MENTION_ONLY / FIX_AND_MENTION / ESCALATE comment on this PR, whose body enumerates the held/confirmed findings (the MENTION/FIX bodies list them as `<file>:<line> — <description>`; the ESCALATE body lists held change-requests as `{path}:{line} — {body}`). Parse that comment into `priorFindings = [{ file, line, title }]` — `title` is the one-line description, `file` / `line` come from the `file:line` prefix (omit both for a finding that had none). Fetch it with the same non-bot-filtered comment listing already used in Phase 2, but selecting the most recent comment authored **by** `km-triage[bot]` whose body is a MENTION/ESCALATE body. If the prior sweep posted no such comment (it was APPROVE-AND-PARK or AUTO_FIX_ONLY), there are no held findings to carry — omit the arg / pass `[]`.
+
+Populate `priorFindings` **only** when `review_range == "incremental"`; on a full review (first sweep or post-force-push) omit it entirely — the crew already sees the whole diff. This is distinct from `reviewContext` (which fires only on comment-triggered re-reviews); `priorFindings` covers commit-driven sweeps. Keep it lean (file/line/title only) — do NOT resurrect the retired heavy prior-review briefing block.
+
 ### Run the km-review workflow
 
 With the pre-filters resolved, build the args and make the single call. **This replaces the old inline briefing template, per-specialist dispatch, the fenced `verdict`-block contract, and the synthesis stage** — km-review owns all of that now, behind one schema-validated call. km-triage builds the args from its Phase 1–3 context:
@@ -656,6 +664,7 @@ With the pre-filters resolved, build the args and make the single call. **This r
 | `baseOid` | `<BASE_OID>` | Pre-filter A step 6 |
 | `headOid` | `<CURRENT_HEAD_SHA>` | Pre-filter A |
 | `reviewContext` (optional) | short "Prior context:" string, **only on a re-trigger** | Phase 2's triggering comment text + the prior audit entry's verdict summary — omit entirely on a first review or a commit-driven sweep |
+| `priorFindings` (optional) | array of `{file, line, title}` of still-open prior-sweep findings, **only on an incremental sweep** | Parsed from the previous sweep's MENTION/ESCALATE PR comment (see "Carry forward prior findings" above); omit on full reviews |
 
 Make the call (omit `reviewContext` unless this is a re-triggered review):
 
@@ -670,6 +679,7 @@ Workflow({ name: "km-review", args: {
   baseOid: "<BASE_OID>",
   headOid: "<CURRENT_HEAD_SHA>"
   // reviewContext: "<triggering comment text> | prior verdict: <summary>"  // ONLY on a re-trigger
+  // priorFindings: [ { file, line, title }, ... ]  // ONLY on an incremental sweep (see "Carry forward prior findings")
 }})
 ```
 
@@ -685,7 +695,7 @@ The workflow runs the selected primaries in parallel, has km-verification scruti
 }
 ```
 
-`synthesis.verdict` is one of `APPROVE` / `REQUEST_CHANGES` / `NEEDS_HUMAN_INPUT` — **the single verdict vocabulary** for the whole pipeline. `synthesis.autoFixable` and `synthesis.humanDecisionNeeded` are arrays of confirmed-finding **titles**; look each title up in `confirmed[].finding` to recover its `file` / `line` / `suggestedFix`. The workflow never posts to GitHub, pushes, or merges — every PR action stays here in km-triage (Phases 5.5–6).
+`synthesis.verdict` is one of `APPROVE` / `REQUEST_CHANGES` / `NEEDS_HUMAN_INPUT` — **the single verdict vocabulary** for the whole pipeline. `synthesis.autoFixable` is an array of confirmed-finding **titles**. `synthesis.humanDecisionNeeded` is an array of **objects** `{ title, question? }` — `title` is the confirmed finding's title and `question` (optional) is the escalating reviewer's exact question for the tech lead when they set one. In both cases look each `title` up in `confirmed[].finding` to recover its `file` / `line` / `suggestedFix`. The workflow never posts to GitHub, pushes, or merges — every PR action stays here in km-triage (Phases 5.5–6).
 
 The specialist verdict-block contract that used to be defined inline is gone; km-review.js's `FINDINGS_SCHEMA` / `VERDICT_SCHEMA` / `SYNTHESIS_SCHEMA` are now the only review output contracts. There is no per-comment `fixability` field any more — a finding's mechanical fixability is its `autoFixable` boolean, and the crew-wide auto-fix set is `synthesis.autoFixable`.
 
@@ -693,11 +703,11 @@ The specialist verdict-block contract that used to be defined inline is gone; km
 
 The old briefing template injected three kinds of context into each specialist's prompt — a per-specialist prior-review block, the lead's reply comments, and area-label hints. Those blocks lived **inside** the briefing template and are retired with it (#941): the km-review workflow reviews the cached (already incrementally-scoped) diff and does not take a context blob. The core behaviors those blocks supported are preserved by mechanisms that stay in the outer loop:
 
-- **Scope to new code** — Pre-filter A already caches only the incremental `last_audited_sha..head` diff, so the crew inherently reviews just the new commits; no "review only the new range" prompt text is needed.
+- **Scope to new code** — Pre-filter A already caches only the incremental `last_audited_sha..head` diff, so the crew inherently reviews just the new commits; no "review only the new range" prompt text is needed. (The lean `priorFindings` list — see "Carry forward prior findings" — is the deliberate exception: on an incremental sweep it re-surfaces still-open prior findings that fall outside the new range so they are not silently dropped. It is a bare file/line/title list, not the retired briefing block.)
 - **Don't re-dispatch prior-approvers** — Pre-filter E already skips specialists whose prior verdict was APPROVE (via `skipReviewers`); only dissenters re-run, and they re-derive their findings against the current incremental diff.
 - **Re-review after a human reply** — Phase 2's comment-override still *triggers* the re-review when a non-bot comment lands; the crew then re-reviews the current diff. On such a re-trigger, km-triage now passes a **lean** optional `reviewContext` string (the triggering comment text plus the prior verdict summary) so the crew sees *why* it was re-run — see the `reviewContext` row in the workflow-args table above.
 
-**What is deliberately NOT resurrected:** the heavy per-specialist prior-review briefing template, the full lead-reply thread, and area-label hints. The re-added `reviewContext` is intentionally minimal — a single advisory "Prior context:" line, not a scope expansion. A dissenting specialist still re-reviews the current diff fresh; `reviewContext` only tells it what conversation prompted the re-run. Populate it **only** on a comment-triggered re-review (never on a first review or a commit-driven sweep), and keep it short.
+**What is deliberately NOT resurrected:** the heavy per-specialist prior-review briefing template, the full lead-reply thread, and area-label hints. The re-added `reviewContext` is intentionally minimal — a single advisory "Prior context:" line, not a scope expansion. Likewise the re-added `priorFindings` (see "Carry forward prior findings") is a lean file/line/title list of still-open prior findings on incremental sweeps only — it exists to stop unfixed findings from being dropped when they fall outside the new commit range, NOT to reproduce the old briefing block's per-specialist prose. A dissenting specialist still re-reviews the current diff fresh; `reviewContext` only tells it what conversation prompted the re-run. Populate it **only** on a comment-triggered re-review (never on a first review or a commit-driven sweep), and keep it short.
 
 ## Phase 5 — Consume the km-review verdict
 
@@ -707,7 +717,7 @@ The workflow already synthesized and schema-validated the verdict — km-triage 
 2. **`NEEDS_HUMAN_INPUT`** → **ESCALATE**. A specialist (or the skeptic) could not grade the PR without a human answer.
 3. **`REQUEST_CHANGES`** → hand to Phase 5.5, which splits the confirmed findings into an auto-fix set (`synthesis.autoFixable`) and a needs-lead-input set (`synthesis.humanDecisionNeeded`) and chooses AUTO_FIX_ONLY / MENTION_ONLY / FIX_AND_MENTION.
 
-**Held findings on ESCALATE.** When `action = ESCALATE`, any confirmed change-requests are *held* — they don't drive a Phase-6 request-changes action until the human answers, but they **are** surfaced in the ESCALATE PR comment so the full picture is visible (nothing is kept in a private file). The held list is the `confirmed[]` findings whose title is **not** in `synthesis.humanDecisionNeeded` (i.e. the actionable-but-not-human-blocking ones); render it as "none" when empty.
+**Held findings on ESCALATE.** When `action = ESCALATE`, any confirmed change-requests are *held* — they don't drive a Phase-6 request-changes action until the human answers, but they **are** surfaced in the ESCALATE PR comment so the full picture is visible (nothing is kept in a private file). The held list is the `confirmed[]` findings whose title is **not** among `synthesis.humanDecisionNeeded[].title` (i.e. the actionable-but-not-human-blocking ones); render it as "none" when empty.
 
 **Defensive guards.**
 - **Workflow error / crash.** If the workflow throws, or any `verifyEnvelopes[].error` is set (a crashed reviewer slot → `reviewerVerdict: "ESCALATED_ON_ERROR"`), treat the PR as ESCALATE with question "km-review reviewer slot crashed — re-run" so a swallowed crash never masquerades as APPROVE. km-synthesis already folds `ESCALATED_ON_ERROR` slots into `NEEDS_HUMAN_INPUT`, so this is belt-and-suspenders.
@@ -757,7 +767,7 @@ If any `verifyEnvelopes[]` slot carried an `error` (a crashed reviewer, `reviewe
 This step only runs when `synthesis.verdict = REQUEST_CHANGES`. km-synthesis has already partitioned the confirmed findings; km-triage reads its output rather than re-inspecting per-comment fields:
 
 1. **auto-fix list** = the `confirmed[]` findings whose title is in `synthesis.autoFixable`. For each, recover `file` / `line` / `suggestedFix` from `confirmed[].finding` for the km-programmer briefing.
-2. **escalate-to-lead list** = the `confirmed[]` findings whose title is in `synthesis.humanDecisionNeeded`.
+2. **escalate-to-lead list** = the `confirmed[]` findings whose title is among `synthesis.humanDecisionNeeded[].title` (each item is now an object `{ title, question? }`).
 3. Decide the per-PR outcome shape:
    - **all auto** — `synthesis.humanDecisionNeeded` is empty (auto-fix list non-empty) → action is **AUTO_FIX_ONLY**.
    - **all needs_human_input** — `synthesis.autoFixable` is empty → action is **MENTION_ONLY**.
@@ -1021,6 +1031,10 @@ Capture the URL returned by that call (or extract it from `gh pr view <NUM> --js
 Needs a human decision:
 - **{reviewerKey}** (confidence: {confidence}): {finding.title} — {finding.rationale}
 
+Questions for the tech lead:
+- {question}
+  (or "none")
+
 Change requests held pending the answer above:
 - {path}:{line} — {body}
   (or "none")
@@ -1030,7 +1044,7 @@ re-review and route accordingly (auto-fix, request-changes, or
 approve-park). Any reply works — no special syntax needed.
 ```
 
-The "Needs a human decision" section is populated from `synthesis.humanDecisionNeeded` (each title looked up in `confirmed[].finding` for its rationale and originating `reviewerKey`); when that array is empty but the verdict is still `NEEDS_HUMAN_INPUT` (e.g. a crashed reviewer slot), render the item as the crash note plus `synthesis.summary`. The "Change requests held pending the answer above" section is the held list defined in Phase 5 (confirmed findings not in `humanDecisionNeeded`); render it as `none` when empty.
+The "Needs a human decision" section is populated from `synthesis.humanDecisionNeeded` (each item's `title` looked up in `confirmed[].finding` for its rationale and originating `reviewerKey`); when that array is empty but the verdict is still `NEEDS_HUMAN_INPUT` (e.g. a crashed reviewer slot), render the item as the crash note plus `synthesis.summary`. The "Questions for the tech lead" section is built from `synthesis.humanDecisionNeeded[].question` — one bullet per item that carries a non-empty `question` (the escalating reviewer's exact question for the lead); render the whole section as `none` when no item carries a question. The "Change requests held pending the answer above" section is the held list defined in Phase 5 (confirmed findings whose title is not among `synthesis.humanDecisionNeeded[].title`); render it as `none` when empty.
 
 **@-mention dedup rule** (mirrors MENTION_ONLY's rule under "Action: MENTION_ONLY" above):
 Apply this before rendering the template.

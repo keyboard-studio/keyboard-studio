@@ -3,7 +3,7 @@ export const meta = {
   description:
     "Four-primary-reviewer PR review pipeline (km-keyman, km-strategy, km-qc, km-domain); km-verification acts as universal skeptic and km-synthesis as final aggregator. Returns per-reviewer findings, km-verification verdicts on each finding, and a synthesis verdict. Does NOT merge, push, or post GitHub comments — those stay in the main session.",
   whenToUse:
-    "Invoke for any keyboard-studio PR that passes the km-triage Phase-2/3 gates and needs substantive crew review. Pass prNumber (required) and optionally depth ('thorough' or 'quick', default 'thorough') and crew ('ENGINE' | 'CONTENT' | 'BOTH', default 'BOTH') to select which specialist primaries run. km-triage additionally passes cached-diff args (diffPath, filesPath, baseOid, headOid), a skipReviewers list, and — only on a re-triggered review — an optional lean reviewContext string (the triggering comment text plus the prior verdict summary) that is prepended to each reviewer prompt as advisory 'Prior context'; all of these are optional and the workflow behaves as it always did when they are omitted.",
+    "Invoke for any keyboard-studio PR that passes the km-triage Phase-2/3 gates and needs substantive crew review. Pass prNumber (required) and optionally depth ('thorough' or 'quick', default 'thorough') and crew ('ENGINE' | 'CONTENT' | 'BOTH', default 'BOTH') to select which specialist primaries run. km-triage additionally passes cached-diff args (diffPath, filesPath, baseOid, headOid), a skipReviewers list, — only on a re-triggered review — an optional lean reviewContext string (the triggering comment text plus the prior verdict summary) that is prepended to each reviewer prompt as advisory 'Prior context', and — only on a commit-driven incremental sweep — an optional priorFindings array ({file, line, title}) of still-open findings from the previous sweep so reviewers can re-list any that the new commits did not address; all of these are optional and the workflow behaves as it always did when they are omitted.",
   phases: [
     {
       title: "Review",
@@ -61,6 +61,12 @@ const FINDINGS_SCHEMA = {
           rationale: { type: "string" },
           suggestedFix: { type: "string" },
           autoFixable: { type: "boolean" },
+          // v3 (#941 restore): when this finding needs the tech lead's judgment
+          // (it is NOT mechanically fixable and you are emitting
+          // NEEDS_HUMAN_INPUT for it), set `question` to the exact question you
+          // want the tech lead to answer. It surfaces on the PR for the human
+          // to decide. Optional — omit when the finding is mechanical.
+          question: { type: "string" },
           // km-synthesis output types (P0-2)
           findingKind: {
             type: "string",
@@ -127,8 +133,20 @@ const SYNTHESIS_SCHEMA = {
     },
     humanDecisionNeeded: {
       type: "array",
-      items: { type: "string" },
-      description: "Titles of confirmed findings that need a human judgment call.",
+      // v3 (#941 restore): each item now carries the escalating reviewer's
+      // exact question for the tech lead (copied from the finding's `question`
+      // field) alongside its title. `question` is OPTIONAL — omitted when the
+      // reviewer emitted no question — so this stays backward-compatible.
+      items: {
+        type: "object",
+        required: ["title"],
+        properties: {
+          title: { type: "string" },
+          question: { type: "string" },
+        },
+      },
+      description:
+        "Confirmed findings that need a human judgment call. Each item is { title, question? }: question is the escalating reviewer's exact question for the tech lead when present.",
     },
     summary: { type: "string" },
   },
@@ -192,8 +210,31 @@ const REVIEWERS = [
 // ---------------------------------------------------------------------------
 
 function reviewPrompt(reviewer, prNumber, depth, ctx = {}) {
-  const { diffPath, filesPath, baseOid, headOid, reviewContext } = ctx;
+  const { diffPath, filesPath, baseOid, headOid, reviewContext, priorFindings } = ctx;
   const headRef = headOid || "<current head sha>";
+
+  // Optional carried-forward prior findings (#941 restore). km-triage supplies
+  // these only on a commit-driven INCREMENTAL sweep; each entry is a lean
+  // {file, line, title}. Absent by default, so standalone callers and full
+  // reviews are unaffected. On an incremental diff the crew only sees the new
+  // commits, so a still-unfixed prior finding on an untouched line would be
+  // silently dropped without this list.
+  const priorFindingsBlock =
+    Array.isArray(priorFindings) && priorFindings.length
+      ? `Carried-forward prior findings (from the previous triage sweep — the incremental diff below may NOT cover the lines these sit on):
+${priorFindings
+          .map(
+            (p) =>
+              `  - ${p.title ?? "(untitled)"} [${p.file ?? "no-file"}:${p.line ?? "?"}]`
+          )
+          .join("\n")}
+
+`
+      : "";
+  const priorFindingsInstruction = priorFindingsBlock
+    ? `5. If you are reviewing an INCREMENTAL diff, the "Carried-forward prior findings" listed above are issues flagged in the previous sweep. For EACH, check whether it is still present at the current head (\`git show ${headRef}:<file>\`); if the new commits did NOT address it and it is still present, re-list it in \`findings\` with '(carried from prior review)' appended to \`rationale\` — even if it falls outside the incremental diff.
+`
+    : "";
 
   // Optional, lean re-trigger context (km-triage supplies it only on a
   // re-review — the triggering comment text plus the prior verdict summary).
@@ -236,8 +277,8 @@ ${diffSteps}
 2. Read any files in the diff that fall within your domain.
 3. Apply your normal review process per .claude/agents/${reviewer.agentType}.md.
 4. Return a structured findings object matching the schema you will be given.
-
-VERIFICATION COST LADDER — when a claim needs a probe to settle it, respect the
+${priorFindingsInstruction}
+${priorFindingsBlock}VERIFICATION COST LADDER — when a claim needs a probe to settle it, respect the
 L1/L2/L3 ladder defined canonically in .claude/agents/km-verification.md
 ("Verification cost ladder (L1 / L2 / L3)"): start at L1 (static / read-only —
 read, grep, reason, and typecheck/lint scoped to the changed files; no builds,
@@ -254,6 +295,7 @@ SCOPE DISCIPLINE — only review what THIS PR changes:
    - verdict: APPROVE if no actionable findings; REQUEST_CHANGES if specific issues exist; NEEDS_HUMAN_INPUT if a design call or spec ambiguity blocks you.
    - Every finding MUST include title, severity, and rationale. Include file/line when locatable. The 'file' field is OPTIONAL — omit it when a finding implicates a cross-section coherence issue, a linguistic premise, or a spec-level concern with no single source file.
    - Set autoFixable: true only when the fix is mechanical and unambiguous (rename, remove line, single codepoint swap).
+   - When a finding needs the tech lead's judgment (it is NOT mechanically fixable and you are emitting NEEDS_HUMAN_INPUT for it), set that finding's `question` field to the exact question you want the tech lead to answer. It surfaces on the PR for the human to decide, so make it specific and self-contained.
    - Schema-forced output: use the per-agent schema fields documented in your .claude/agents/${reviewer.agentType}.md under the "Schema-forced output mode" heading when that heading is present. Set findingKind on every finding when you are km-synthesis; use specReference/checkId for Layer-A citations when you are km-keyman; set linguisticCategory when you are km-domain; emit the pattern-audit gate finding with gateId: 'pattern-audit' when you are km-qc.
 
 Do NOT post GitHub comments, push, or merge. Return only the structured output.`;
@@ -324,10 +366,11 @@ Steps:
 2. Filter to confirmed findings (isReal === true) across all non-crashed envelopes.
 3. Use findingKind to categorize findings: 'integration' = fit/coherence, 'duplication' = redundant code (see existingFile), 'extraction' = factor-out opportunity (see proposedTarget), 'general' = catch-all.
 4. Determine the overall verdict:
-   - APPROVE if zero confirmed findings and no ESCALATED_ON_ERROR slots.
-   - NEEDS_HUMAN_INPUT if any confirmed finding is not autoFixable and requires a design/spec judgment, OR if any reviewer slot was ESCALATED_ON_ERROR.
+   - CONTRADICTORY-DISSENT GUARD (check this FIRST): if any non-crashed reviewer returned reviewerVerdict REQUEST_CHANGES or NEEDS_HUMAN_INPUT but contributed ZERO confirmed findings (isReal === true), that is a self-contradictory reviewer output — do NOT let it resolve to APPROVE. Escalate to NEEDS_HUMAN_INPUT and, for EACH such slot, add a humanDecisionNeeded entry { title: "Contradictory verdict from <reviewerKey>", question: "Reviewer <reviewerKey> returned <verdict> with no findings; needs a human to reconcile." }.
+   - APPROVE only if zero confirmed findings AND no ESCALATED_ON_ERROR slots AND the contradictory-dissent guard did not fire.
+   - NEEDS_HUMAN_INPUT if any confirmed finding is not autoFixable and requires a design/spec judgment, OR if any reviewer slot was ESCALATED_ON_ERROR, OR the contradictory-dissent guard fired.
    - REQUEST_CHANGES otherwise.
-5. Partition confirmed findings into autoFixable[] and humanDecisionNeeded[] by their autoFixable flag.
+5. Partition confirmed findings into autoFixable[] (an array of finding TITLE strings) and humanDecisionNeeded[] by their autoFixable flag. Each humanDecisionNeeded item is an object { title, question? }: copy the escalated finding's `question` field into `question` when the reviewer set one (the reviewer's exact question for the tech lead), and omit `question` when the finding has none. Contradictory-dissent guard entries from step 4 also go in humanDecisionNeeded with their generated question.
 6. Write a concise summary (<=200 words) suitable for the check_run output_text.
 7. Return the SYNTHESIS_SCHEMA object.
 
@@ -469,6 +512,7 @@ const {
   baseOid,
   headOid,
   reviewContext,
+  priorFindings,
 } = parsedArgs;
 if (!prNumber) {
   throw new Error(
@@ -497,7 +541,7 @@ const activeReviewers = REVIEWERS.filter(
 // Shared per-review context handed to every reviewer prompt (cached diff +
 // OIDs). Undefined fields simply omit the corresponding prompt sections, so
 // standalone callers that pass none fall back to `gh pr diff`.
-const reviewCtx = { diffPath, filesPath, baseOid, headOid, reviewContext };
+const reviewCtx = { diffPath, filesPath, baseOid, headOid, reviewContext, priorFindings };
 
 // Run the review + verify pipeline across the selected primary reviewers.
 // pipeline(items, stage1, stage2) — no barrier between stages per item;
