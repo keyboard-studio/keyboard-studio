@@ -292,14 +292,17 @@ describe("emit — quoted store values", () => {
     expect(out).toContain("store(ctrl) 'a' U+0009 'b'");
   });
 
-  // Pinning test (not a spec of desired behavior): a store whose items[] has
-  // been emptied still emits a bare `store(name) ` line with a trailing space
-  // and no value token — kmcmplib rejects this (a store needs >=1 value
-  // token to compile). The pattern-apply "drop" edit class (see
-  // applyStoreSlotRemovals) now refuses to produce an empty store via that
-  // path, so this transform-level guard is the reason IRStore.items should
-  // never actually reach emit() empty in practice. This test pins emit()'s
-  // own behavior in case some other caller ever does hand it an empty store.
+  // Pinning test: a store whose items[] has been emptied still emits a bare
+  // `store(name) ` line with a trailing space and no value token. Per the
+  // kmcmplib oracle (packages/engine/src/compiler/compile.test.ts), this
+  // shape is legal on its own — it compiles to a valid .kmx with no blocking
+  // diagnostics when the store is unreferenced. It only becomes a problem
+  // when a rule consumes the (now-empty) store via any() — that combination
+  // compiles with a warning-level "zero characters" diagnostic and produces
+  // NO .kmx artifact at all. The pattern-apply "drop" edit class (see
+  // applyStoreSlotRemovals) refuses to empty a store that is any()-referenced,
+  // but allows it for unreferenced stores, matching this evidence. This test
+  // pins emit()'s own behavior for any caller that hands it an empty store.
   it("emits a bare `store(name) ` line (trailing space, no value) for an emptied store", () => {
     const out = emit(makeUserStoreIR("emptied", []));
     expect(out).toContain("store(emptied) \n");

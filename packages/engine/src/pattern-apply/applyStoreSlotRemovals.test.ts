@@ -21,7 +21,13 @@
 //       skipping a non-char index warns without dropping it.
 //   16. Drop dispatch — structural sharing (untouched stores keep the same reference).
 //   17. Drop dispatch — multiple drops in one store in one pass (descending-index safety).
-//   18. Drop dispatch — dropping the last item emits the empty-store warning.
+//   18. Drop dispatch — would-empty an any()-referenced store is refused (oracle-based
+//       message); would-empty an UNREFERENCED store applies (emits with zero items);
+//       all-but-one still applies for both classes.
+//   19. End-to-end blocked-class dispatch — system-store, context-index-aligned,
+//       dual-use, each asserted through applyStoreSlotRemovals() (not just the
+//       classifyStoreSlotEdit unit level): warning text, appliedCount 0, IR
+//       unchanged by reference.
 
 import { describe, it, expect } from "vitest";
 import {
@@ -860,14 +866,20 @@ describe("applyStoreSlotRemovals — drop dispatch", () => {
     ]);
   });
 
-  it("refuses to drop the last item in a store: IR unchanged, not counted, warns", () => {
+  it("refuses to empty an any()-referenced store: IR unchanged, not counted, warns with the oracle-based message", () => {
     const store: IRStore = {
       nodeId: "s#last",
       name: "lastStore",
       items: [{ kind: "char", value: "a" }],
       isSystem: false,
     };
-    const ir = makeTestIR([], [store]);
+    const rule: IRRule = {
+      nodeId: "rule#0",
+      context: [{ kind: "any", storeRef: "lastStore" }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group: IRGroup = { nodeId: "g#0", name: "main", usingKeys: true, rules: [rule], readonly: false };
+    const ir = makeTestIR([group], [store]);
 
     const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
       ir,
@@ -881,13 +893,35 @@ describe("applyStoreSlotRemovals — drop dispatch", () => {
     expect(
       warnings.some((w) =>
         w.includes(
-          'refusing to empty store "lastStore" - a store needs at least one item to compile; remove the whole store instead',
+          'refusing to empty store "lastStore" - a store consumed by any() compiles to a keyboard that silently fails to build when empty; remove the whole store and its rules instead',
         ),
       ),
     ).toBe(true);
   });
 
-  it("dropping all-but-one char in a store still applies (only the empty-result batch is refused)", () => {
+  it("applies emptying an UNREFERENCED store: drop goes through, items[] ends up empty, no refusal warning", () => {
+    const store: IRStore = {
+      nodeId: "s#orphanlast",
+      name: "orphanLastStore",
+      items: [{ kind: "char", value: "a" }],
+      isSystem: false,
+    };
+    const ir = makeTestIR([], [store]);
+
+    const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
+      ir,
+      new Set(["s#orphanlast#0"]),
+    );
+
+    expect(appliedCount).toBe(1);
+    expect(warnings.some((w) => w.includes("refusing to empty store"))).toBe(
+      false,
+    );
+    const resultStore = result.stores.find((s) => s.nodeId === "s#orphanlast");
+    expect(resultStore!.items).toEqual([]);
+  });
+
+  it("dropping all-but-one char in an any()-referenced store still applies (only the empty-result batch is refused)", () => {
     const store: IRStore = {
       nodeId: "s#allbutone",
       name: "allButOneStore",
@@ -898,7 +932,13 @@ describe("applyStoreSlotRemovals — drop dispatch", () => {
       ],
       isSystem: false,
     };
-    const ir = makeTestIR([], [store]);
+    const rule: IRRule = {
+      nodeId: "rule#0",
+      context: [{ kind: "any", storeRef: "allButOneStore" }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group: IRGroup = { nodeId: "g#0", name: "main", usingKeys: true, rules: [rule], readonly: false };
+    const ir = makeTestIR([group], [store]);
 
     const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
       ir,
@@ -912,10 +952,155 @@ describe("applyStoreSlotRemovals — drop dispatch", () => {
       false,
     );
   });
+
+  it("dropping all-but-one char in an UNREFERENCED store still applies (all-but-one never triggers the empty check)", () => {
+    const store: IRStore = {
+      nodeId: "s#allbutoneorphan",
+      name: "allButOneOrphanStore",
+      items: [
+        { kind: "char", value: "a" },
+        { kind: "char", value: "b" },
+        { kind: "char", value: "c" },
+      ],
+      isSystem: false,
+    };
+    const ir = makeTestIR([], [store]);
+
+    const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
+      ir,
+      new Set(["s#allbutoneorphan#0", "s#allbutoneorphan#1"]),
+    );
+
+    expect(appliedCount).toBe(2);
+    const resultStore = result.stores.find((s) => s.nodeId === "s#allbutoneorphan");
+    expect(resultStore!.items).toEqual([{ kind: "char", value: "c" }]);
+    expect(warnings.some((w) => w.includes("refusing to empty store"))).toBe(
+      false,
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
-// 19. One call spanning three stores of different classes at once — proves
+// 19. End-to-end dispatch-warning coverage through applyStoreSlotRemovals for
+//     the block classes previously only covered at the classifyStoreSlotEdit
+//     unit level: system-store, context-index-aligned, dual-use.
+// ---------------------------------------------------------------------------
+
+describe("applyStoreSlotRemovals — end-to-end blocked-class dispatch", () => {
+  it("blocks a system store end-to-end: dispatched warning text, appliedCount 0, IR unchanged by reference", () => {
+    const store: IRStore = {
+      nodeId: "s#sys",
+      name: "&NAME",
+      items: [{ kind: "char", value: "a" }],
+      isSystem: true,
+    };
+    const ir = makeTestIR([], [store]);
+
+    const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
+      ir,
+      new Set(["s#sys#0"]),
+    );
+
+    expect(appliedCount).toBe(0);
+    expect(
+      warnings.some(
+        (w) =>
+          w.includes('store "&NAME"') &&
+          w.includes("blocked from editing") &&
+          w.includes("it is a system/compiler-directive store."),
+      ),
+    ).toBe(true);
+    expect(result).toBe(ir);
+    const resultStore = result.stores.find((s) => s.nodeId === "s#sys");
+    expect(resultStore).toBe(store);
+  });
+
+  it("blocks a context-index-aligned store end-to-end: dispatched warning text, appliedCount 0, IR unchanged by reference", () => {
+    const store: IRStore = {
+      nodeId: "s#ctx",
+      name: "ctxStore",
+      items: [{ kind: "char", value: "a" }],
+      isSystem: false,
+    };
+    const rule: IRRule = {
+      nodeId: "rule#0",
+      context: [{ kind: "index", storeRef: "ctxStore", offset: 1 }],
+      output: [{ kind: "char", value: "x" }],
+    };
+    const group: IRGroup = { nodeId: "g#0", name: "main", usingKeys: true, rules: [rule], readonly: false };
+    const ir = makeTestIR([group], [store]);
+
+    const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
+      ir,
+      new Set(["s#ctx#0"]),
+    );
+
+    expect(appliedCount).toBe(0);
+    expect(
+      warnings.some(
+        (w) =>
+          w.includes('store "ctxStore"') &&
+          w.includes("blocked from editing") &&
+          w.includes(
+            "it is referenced by index() in a rule's context; its positions are read by the matcher.",
+          ),
+      ),
+    ).toBe(true);
+    expect(result).toBe(ir);
+    const resultStore = result.stores.find((s) => s.nodeId === "s#ctx");
+    expect(resultStore).toBe(store);
+  });
+
+  it("blocks a dual-use store end-to-end: dispatched warning text, appliedCount 0, IR unchanged by reference", () => {
+    const store: IRStore = {
+      nodeId: "s#dual",
+      name: "dualStore",
+      items: [{ kind: "char", value: "a" }, { kind: "char", value: "b" }],
+      isSystem: false,
+    };
+    const ruleEmit: IRRule = {
+      nodeId: "rule#emit",
+      context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
+      output: [{ kind: "outs", storeRef: "dualStore" }],
+    };
+    const ruleSource: IRRule = {
+      nodeId: "rule#source",
+      context: [{ kind: "any", storeRef: "dualStore" }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group: IRGroup = {
+      nodeId: "g#0",
+      name: "main",
+      usingKeys: true,
+      rules: [ruleEmit, ruleSource],
+      readonly: false,
+    };
+    const ir = makeTestIR([group], [store]);
+
+    const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
+      ir,
+      new Set(["s#dual#0"]),
+    );
+
+    expect(appliedCount).toBe(0);
+    expect(
+      warnings.some(
+        (w) =>
+          w.includes('store "dualStore"') &&
+          w.includes("blocked from editing") &&
+          w.includes(
+            "it is both an output target and an input source (any()/notany()) across the rule set.",
+          ),
+      ),
+    ).toBe(true);
+    expect(result).toBe(ir);
+    const resultStore = result.stores.find((s) => s.nodeId === "s#dual");
+    expect(resultStore).toBe(store);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 20. One call spanning three stores of different classes at once — proves
 //     per-store classification doesn't leak across iterations of the
 //     targetsByStore loop.
 // ---------------------------------------------------------------------------

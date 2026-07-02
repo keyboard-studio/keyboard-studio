@@ -182,7 +182,7 @@ function computeStoreUsage(storeName: string, ir: KeyboardIR): StoreUsageFlags {
  *   1. `store.isSystem`                        → blocked "system-store"
  *   2. referenced by `notany()`                → blocked "notany-widens"
  *   3. referenced by `index()` in context       → blocked "context-index-aligned"
- *   4. output target AND (any-source OR notany) → blocked "dual-use"
+ *   4. output target AND any-source             → blocked "dual-use"
  *   5. output target (index()/outs())           → "nul-fill" (unchanged #530 path)
  *   6. any()-source paired with an output index() in some rule → blocked "paired-input"
  *   7. any()-source, unpaired                   → "drop"
@@ -206,7 +206,9 @@ export function classifyStoreSlotEdit(store: IRStore, ir: KeyboardIR): StoreSlot
     return { mode: "blocked", reason: "context-index-aligned" };
   }
 
-  if (usage.asEmitOutput && (usage.asAnySource || usage.asNotAny)) {
+  // usage.asNotAny is never true here — it returns "notany-widens" above —
+  // so only asAnySource can co-occur with asEmitOutput to trigger dual-use.
+  if (usage.asEmitOutput && usage.asAnySource) {
     return { mode: "blocked", reason: "dual-use" };
   }
 
@@ -385,13 +387,23 @@ export function applyStoreSlotRemovals(
     const newItems = store.items.filter((_, i) => !dropIndices.has(i));
 
     if (newItems.length === 0) {
-      // kmcmplib rejects a store(name) line with zero value tokens. Refuse
-      // the whole batch for this store rather than emit uncompilable .kmn —
-      // apply nothing for it and do not count it toward appliedCount.
-      warnings.push(
-        `[store-slot] refusing to empty store "${store.name}" - a store needs at least one item to compile; remove the whole store instead`,
-      );
-      continue;
+      // An empty store DECLARATION (`store(name) `, zero value tokens) is
+      // legal per the kmcmplib oracle — it compiles to a valid .kmx with no
+      // blocking diagnostics when unreferenced. But a store consumed by
+      // any() in a rule (`+ any(name) > ...`) compiles with only a
+      // warning-level "zero characters" diagnostic and produces NO .kmx
+      // artifact at all — a silent build failure. The drop class covers
+      // exactly any()-only (asAnySource) + entirely-unreferenced stores
+      // (see classifyStoreSlotEdit), so only the any()-referenced case
+      // needs refusing here.
+      if (computeStoreUsage(store.name, baseIr).asAnySource) {
+        warnings.push(
+          `[store-slot] refusing to empty store "${store.name}" - a store consumed by any() compiles to a keyboard that silently fails to build when empty; remove the whole store and its rules instead`,
+        );
+        continue;
+      }
+      // Unreferenced: emitting `store(name) ` (empty) is valid per the
+      // oracle evidence — apply the drop normally.
     }
 
     appliedCount += storeApplied;
