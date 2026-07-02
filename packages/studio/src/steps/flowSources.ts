@@ -78,6 +78,9 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
     id: "identity_lite",
     raw: identityLiteModularRaw,
     title: "Identity-lite (Phase A head)",
+    // NOTE: shares phaseARegistry with phase_a_identity below — do NOT clone it.
+    // Both flows draw modules from the same registry; the identity_lite flow lists
+    // only the il_* subset while phase_a_identity covers the full battery.
     registry: phaseARegistry,
     status: "live",
   },

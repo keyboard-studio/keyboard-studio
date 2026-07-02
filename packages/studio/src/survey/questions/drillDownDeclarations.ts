@@ -85,8 +85,9 @@ export interface DrillDownDeclaration {
  *
  * Spec 022 re-anchor: this drill-down anchored to `primary_script` (a vestigial
  * Phase-A module). Spec 022 demotes the full non-identity Phase A to the inert
- * library (renderedNodeSet.ts drops phase_a_identity from FLOW_SOURCES), so
- * `primary_script` is no longer reachable. The anchor moves to the LIVE, reachable
+ * library (steps/flowSources.ts carries phase_a_identity with status:"proposed",
+ * which excludes it from all live drill-downs; there is no FLOW_SOURCES list
+ * anymore), so `primary_script` is no longer reachable. The anchor moves to the LIVE, reachable
  * identity-lite equivalent `il_target_script` (questions/a/il_target_script.ts —
  * "Which script will THIS keyboard type?", the script-capture question on the real
  * StudioShell→IdentityLite runtime path that drives A2/routing/base-suggestion). The

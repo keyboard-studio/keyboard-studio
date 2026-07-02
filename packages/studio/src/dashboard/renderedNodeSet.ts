@@ -50,6 +50,11 @@ export interface BuiltFlowSource {
 /**
  * Build one flowSources entry into a FlowGraph, failing visibly.
  * Threads `stepId` through to BuiltFlowSource so attachDrillDowns groups correctly.
+ *
+ * NOTE: safeBuild's internal undefined-guard + status check are redundant with the
+ * checks buildFlowSources() already performs before calling it. Retained as a
+ * defensive seam for Stage 2 (proposed-flow graph building), where safeBuild will
+ * be called on proposed entries that bypass the status filter. Do NOT remove it.
  */
 function safeBuild(
   sourceId: string,
@@ -102,6 +107,12 @@ export function buildFlowSources(): BuiltFlowSource[] {
       const source = flowSources[ref];
       if (source === undefined) {
         // Unresolved ref — surface as an error entry so the map shows the gap.
+        // Also fail loud at dev time so a missing flowSources entry is caught early.
+        if (import.meta.env.DEV) {
+          console.error(
+            `[renderedNodeSet] unresolved flowRef "${ref}" on step "${step.id}" — add it to steps/flowSources.ts`,
+          );
+        }
         results.push({
           graph: null,
           error: `flowSources["${ref}"] not found — check steps/flowSources.ts`,

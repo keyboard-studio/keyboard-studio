@@ -1,4 +1,7 @@
-// tests/steps/flowSources.test.ts — D2 completeness checks (spec 024, Stage 1).
+// src/steps/flowSources.test.ts — D2 completeness checks (spec 024, Stage 1).
+//
+// Co-located with steps/flowSources.ts, steps/manifest.ts, etc. per the
+// project convention (F2: moved from tests/steps/flowSources.test.ts).
 //
 // Verifies the three-way consistency invariant between the manifest flowRefs
 // and the flowSources catalogue (steps/flowSources.ts):
@@ -11,8 +14,8 @@
 // step declarations; flowSources is the catalogue; the two must stay aligned.
 
 import { describe, it, expect } from "vitest";
-import { manifest } from "../../src/steps/manifest.ts";
-import { flowSources } from "../../src/steps/flowSources.ts";
+import { manifest } from "./manifest.ts";
+import { flowSources } from "./flowSources.ts";
 
 // ---------------------------------------------------------------------------
 // (a) Every flowRef on every manifest step resolves to a flowSources entry.
