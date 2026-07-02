@@ -68,7 +68,7 @@ export const ScriptClassSchema = z.enum([
   "logographic",
 ]);
 
-export const AxisFillSourceSchema = z.enum(["script-class-prior"]);
+export const AxisFillSourceSchema = z.enum(["script-class-prior", "import-derived"]);
 
 /**
  * Mirror of {@link AxisFill}. `axis`/`value` are loosely typed (`z.string()` /

@@ -5,11 +5,16 @@
 import type { DiscoveryAxisVector } from "./axes";
 
 /**
- * Source tags for {@link AxisFill}. Single member for now (the script-class
- * default-fill prior, spec §7.2); the union shape leaves room for future
- * fill sources (e.g. a corpus-frequency prior) without a breaking change.
+ * Source tags for {@link AxisFill}.
+ * - "script-class-prior" — the script-class default-fill prior (spec §7.2);
+ *   never emits a rule-triggering / marked axis value.
+ * - "import-derived" — real structural evidence found in an imported base's
+ *   `KeyboardIR` (e.g. postfix mark-input-order detection on the Track 2
+ *   import path, spec §7.2 rule 3a); MAY emit a marked value because it is
+ *   evidence, not a guess.
+ * The union shape leaves room for future fill sources without a breaking change.
  */
-export type AxisFillSource = "script-class-prior";
+export type AxisFillSource = "script-class-prior" | "import-derived";
 
 /**
  * Provenance record for one axis value that was filled by a default-fill
