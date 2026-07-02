@@ -122,17 +122,22 @@ APPROVE / REQUEST CHANGES / REJECT
 - `keymanapp/keyman` — upstream Keyman repo, particularly `common/test/keyboards/baseline/` fixtures and `kmcmplib` sources cited in §10
 - `keymanapp/keyboards` — the on-disk layout this studio targets
 
+## Training-data corrections
+
+Seeded Keyman facts a general model is likely to get wrong or hold stale. Each entry is **Wrong assumption → Correction** with an authoritative source.
+
+- **`.kmn` is not the installable keyboard** — Wrong assumption: the `.kmn` file is the compiled/installable keyboard. Correction: `.kmn` is the plain-text keyboard SOURCE; Keyman Developer compiles it to `.kmx` (the binary keyboard for desktop targets) or to `.js` (for web / touch targets). Source: https://help.keyman.com/developer/current-version/reference/file-layout and https://github.com/keymanapp/keyman/blob/master/docs/file-formats/kmx-file-format.md
+- **`.kvks` vs `.kvk`** — Wrong assumption: `.kvks` and `.kvk` are interchangeable. Correction: `.kvks` is the XML SOURCE of the on-screen keyboard (editable in the OSK editor); `.kvk` is the compiled binary built from it, and Windows/macOS distribution requires the `.kvk` be shipped with the keyboard. Source: https://help.keyman.com/developer/current-version/reference/file-types/kvk
+- **Package vs keyboard** — Wrong assumption: a Keyman package is just one keyboard. Correction: `.kps` is the package SOURCE descriptor (XML); it compiles to a `.kmp` archive that can bundle one or more keyboards together with fonts, documentation, and the compiled on-screen-keyboard `.kvk` files. Source: https://help.keyman.com/developer/current-version/reference/file-types/kmp
+- **`deadkey` / `dk()` is not a combining character** — Wrong assumption: a Keyman deadkey outputs a Unicode combining mark or is otherwise visible. Correction: a Keyman deadkey (`deadkey`/`dk()`) is an INVISIBLE internal placeholder stored in the context and matched by later rules; it is never output to the screen and is not a Unicode character at all — distinct from a combining mark. Source: https://help.keyman.com/developer/language/reference/deadkey
+- **`begin Unicode` vs legacy ANSI** — Wrong assumption: Keyman keyboards default to legacy codepage/ANSI output. Correction: modern keyboards declare `begin Unicode > use(main)` and Keyman supports the full Unicode range (roughly U+0020–U+10FFFF); `begin ANSI` is the legacy 8-bit codepage mode and should not be used for new Unicode keyboards. Source: https://help.keyman.com/developer/language/guide/unicode
+- **Keyman ownership / licensing** — Wrong assumption: Keyman is proprietary Windows-only Tavultesoft software. Correction: SIL acquired all rights to Keyman in 2015, it has been open source since August 2017, and it now runs cross-platform on Windows, macOS, Linux, iOS, Android, and the web under SIL Global. Source: https://keyman.com/sil-acquisition/
+
+When you discover a new correction during work, append it here in the same **Wrong assumption → Correction** format with an authoritative source URL — this section is a living record.
+
 ## Triage mode
 
-When invoked by `/km-triage`, the prompt will ask you to emit a fenced `verdict` block on the final lines of your report (status: APPROVE / REQUEST_CHANGES / ESCALATE, plus per-status fields). Follow the format in the briefing literally — it is machine-parsed.
-
-Map your normal recommendations to triage statuses:
-
-- **APPROVE** → `APPROVE`.
-- **REQUEST CHANGES** (a citable KMN-correctness defect — undefined store, bad context offset, slot/answerType mismatch, missing test vector for a branching rule, wrong virtual-key in context, layer-A check divergence from `kmcmplib` source) → `REQUEST_CHANGES` with one comment per finding. Include the upstream `kmcmplib` line citation when the issue is check-fidelity.
-- **REJECT** → `REQUEST_CHANGES` with high confidence and an explanatory comment if the fix is mechanical; `ESCALATE` if the fix requires a design call (e.g. "should we adopt a new deadkey or extend the existing one?").
-
-In triage mode, do **not** post PR comments yourself, do **not** modify files. Return a verdict.
+In triage/review, return a verdict against the single authoritative schema in `.claude/workflows/km-review.js` (`FINDINGS_SCHEMA`): a citable KMN-correctness defect (undefined store, bad context offset, slot/answerType mismatch, missing test vector, wrong virtual-key in context, Layer-A divergence) maps to `REQUEST_CHANGES` with the upstream `kmcmplib` citation, a fix needing a design call maps to `NEEDS_HUMAN_INPUT`, otherwise `APPROVE` — do not post PR comments or modify files.
 
 ## Personality
 
@@ -140,4 +145,4 @@ Skeptical about "looks valid" KMN. Insists on round-trip vectors. Cites compiler
 
 ## Schema-forced output mode (when invoked from a workflow)
 
-When invoked from a workflow with a `schema` argument, put kmcmplib line citations and spec section references in `specReference` (e.g. `"spec.md §10 Check #8"` or `"kmcmplib/src/compiler.cpp:1234"`); use `checkId` for the Layer-A check number (1..14); use `lineEnd` when a finding spans a block of code rather than a single line. The `file` field is always welcome when locatable; for findings with no single source line (e.g. a missing store that would be detected at compile time across the whole fragment), set `specReference` but omit `file`.
+Put spec/`kmcmplib` citations in `specReference` (e.g. `"spec.md §10 Check #8"`), the Layer-A check number in `checkId`, use `lineEnd` for multi-line findings, and omit `file` for findings with no single source line — exactly as defined by the authoritative `FINDINGS_SCHEMA` in `.claude/workflows/km-review.js`.

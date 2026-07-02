@@ -3,17 +3,17 @@ export const meta = {
   description:
     "Four-primary-reviewer PR review pipeline (km-keyman, km-strategy, km-qc, km-domain); km-verification acts as universal skeptic and km-synthesis as final aggregator. Returns per-reviewer findings, km-verification verdicts on each finding, and a synthesis verdict. Does NOT merge, push, or post GitHub comments — those stay in the main session.",
   whenToUse:
-    "Invoke for any keyboard-studio PR that passes the km-triage Phase-2/3 gates and needs substantive crew review. Pass prNumber (required) and depth ('thorough' or 'quick', default 'thorough').",
+    "Invoke for any keyboard-studio PR that passes the km-triage Phase-2/3 gates and needs substantive crew review. Pass prNumber (required) and optionally depth ('thorough' or 'quick', default 'thorough') and crew ('ENGINE' | 'CONTENT' | 'BOTH', default 'BOTH') to select which specialist primaries run. km-triage additionally passes cached-diff args (diffPath, filesPath, baseOid, headOid), a skipReviewers list, — only on a re-triggered review — an optional lean reviewContext string (the triggering comment text plus the prior verdict summary) that is prepended to each reviewer prompt as advisory 'Prior context', and — only on a commit-driven incremental sweep — an optional priorFindings array ({file, line, title}) of still-open findings from the previous sweep so reviewers can re-list any that the new commits did not address; all of these are optional and the workflow behaves as it always did when they are omitted.",
   phases: [
     {
       title: "Review",
       detail:
-        "Six specialists (km-keyman, km-verification, km-synthesis, km-strategy, km-qc, km-domain) read the PR diff in parallel and each return a structured findings object.",
+        "The primary reviewers selected by the `crew` arg (km-qc for ENGINE; km-keyman + km-strategy + km-domain for CONTENT; all four for BOTH — minus any in skipReviewers) read the PR diff in parallel and each return a structured findings object. km-verification (skeptic) and km-synthesis (aggregator) are never primaries; they wrap whichever primaries ran.",
     },
     {
       title: "Verify",
       detail:
-        "km-verification acts as universal skeptic: for every finding produced in the Review phase it returns an independent VERDICT_SCHEMA object (isReal, confidence, rationale, counterpoint, partiallyTrue, severityOverride, reproduceCommand, evidenceSummary).",
+        "km-verification acts as universal skeptic: for every finding produced in the Review phase it returns an independent VERDICT_SCHEMA object (isReal, confidence, rationale, counterpoint, partiallyTrue, severityOverride, reproduceCommand, evidenceSummary), working the L1/L2/L3 cost ladder defined in .claude/agents/km-verification.md.",
     },
     {
       title: "Synthesize",
@@ -61,6 +61,12 @@ const FINDINGS_SCHEMA = {
           rationale: { type: "string" },
           suggestedFix: { type: "string" },
           autoFixable: { type: "boolean" },
+          // v3 (#941 restore): when this finding needs the tech lead's judgment
+          // (it is NOT mechanically fixable and you are emitting
+          // NEEDS_HUMAN_INPUT for it), set `question` to the exact question you
+          // want the tech lead to answer. It surfaces on the PR for the human
+          // to decide. Optional — omit when the finding is mechanical.
+          question: { type: "string" },
           // km-synthesis output types (P0-2)
           findingKind: {
             type: "string",
@@ -127,8 +133,20 @@ const SYNTHESIS_SCHEMA = {
     },
     humanDecisionNeeded: {
       type: "array",
-      items: { type: "string" },
-      description: "Titles of confirmed findings that need a human judgment call.",
+      // v3 (#941 restore): each item now carries the escalating reviewer's
+      // exact question for the tech lead (copied from the finding's `question`
+      // field) alongside its title. `question` is OPTIONAL — omitted when the
+      // reviewer emitted no question — so this stays backward-compatible.
+      items: {
+        type: "object",
+        required: ["title"],
+        properties: {
+          title: { type: "string" },
+          question: { type: "string" },
+        },
+      },
+      description:
+        "Confirmed findings that need a human judgment call. Each item is { title, question? }: question is the escalating reviewer's exact question for the tech lead when present.",
     },
     summary: { type: "string" },
   },
@@ -138,35 +156,50 @@ const SYNTHESIS_SCHEMA = {
 // Reviewer roster
 // ---------------------------------------------------------------------------
 
-// Four primary reviewers. km-verification and km-synthesis are intentionally
-// omitted from this roster — they each have downstream roles (universal
-// skeptic on every finding; final aggregator) and reviewing as primaries
-// would let them self-review their own findings. Self-review was flagged as
-// a structural role-conflict in the v2 smoke-test self-audit on PR #197.
-// agentType values match the `name:` field in each .claude/agents/km-*.md
-// file — the registry the Agent tool uses (contract rule 4).
+// The four primary reviewers. km-verification and km-synthesis are
+// intentionally omitted from this roster — they each have downstream roles
+// (universal skeptic on every finding; final aggregator) and reviewing as
+// primaries would let them self-review their own findings. Self-review was
+// flagged as a structural role-conflict in the v2 smoke-test self-audit on
+// PR #197. agentType values match the `name:` field in each
+// .claude/agents/km-*.md file — the registry the Agent tool uses (contract
+// rule 4).
+//
+// `crews` maps each primary onto km-triage's team-label crews. km-triage
+// selects crew by team label: ENGINE = {km-verification, km-qc, km-synthesis},
+// CONTENT = {km-domain, km-keyman, km-strategy}, BOTH = all six. Since
+// km-verification and km-synthesis are ALWAYS the skeptic and aggregator (not
+// primaries), the reconciliation is: ENGINE contributes km-qc as its only
+// primary; CONTENT contributes km-keyman + km-strategy + km-domain; BOTH
+// contributes all four. The skeptic + aggregator stages wrap whichever
+// primaries ran. See km-triage.md "Crew shape → km-review crew arg" for the
+// full mapping table.
 const REVIEWERS = [
   {
     key: "keyman",
     agentType: "km-keyman",
+    crews: ["CONTENT", "BOTH"],
     lens:
       "Keyman / .kmn / kmcmplib semantics. Validate Pattern schema fields, Layer-A compiler checks, kmnFragment correctness, and keyboards/<id>/ output layout.",
   },
   {
     key: "strategy",
     agentType: "km-strategy",
+    crews: ["CONTENT", "BOTH"],
     lens:
       "Spec §7 strategy framework: A1-A7 axes, decision tree, S-01..S-12 catalog, §7.5 self-check. Validate Pattern.strategyId / combinesWith linkage.",
   },
   {
     key: "qc",
     agentType: "km-qc",
+    crews: ["ENGINE", "BOTH"],
     lens:
       "Code quality: style consistency, complexity, error handling, test coverage, and pattern-audit section for any shaped bug fixes.",
   },
   {
     key: "domain",
     agentType: "km-domain",
+    crews: ["CONTENT", "BOTH"],
     lens:
       "Linguistic correctness: script, layout, normalization, IME-design decisions against best practice for the targeted writing systems.",
   },
@@ -176,19 +209,83 @@ const REVIEWERS = [
 // Prompt builders
 // ---------------------------------------------------------------------------
 
-function reviewPrompt(reviewer, prNumber, depth) {
-  return `You are reviewing PR #${prNumber} in the keyboard-studio monorepo as the ${reviewer.agentType} specialist.
+function reviewPrompt(reviewer, prNumber, depth, ctx = {}) {
+  const { diffPath, filesPath, baseOid, headOid, reviewContext, priorFindings } = ctx;
+  const headRef = headOid || "<current head sha>";
+
+  // Optional carried-forward prior findings (#941 restore). km-triage supplies
+  // these only on a commit-driven INCREMENTAL sweep; each entry is a lean
+  // {file, line, title}. Absent by default, so standalone callers and full
+  // reviews are unaffected. On an incremental diff the crew only sees the new
+  // commits, so a still-unfixed prior finding on an untouched line would be
+  // silently dropped without this list.
+  const priorFindingsBlock =
+    Array.isArray(priorFindings) && priorFindings.length
+      ? `Carried-forward prior findings (from the previous triage sweep — the incremental diff below may NOT cover the lines these sit on):
+${priorFindings
+          .map(
+            (p) =>
+              `  - ${p.title ?? "(untitled)"} [${p.file ?? "no-file"}:${p.line ?? "?"}]`
+          )
+          .join("\n")}
+
+`
+      : "";
+  const priorFindingsInstruction = priorFindingsBlock
+    ? `5. If you are reviewing an INCREMENTAL diff, the "Carried-forward prior findings" listed above are issues flagged in the previous sweep. For EACH, check whether it is still present at the current head (\`git show ${headRef}:<file>\`); if the new commits did NOT address it and it is still present, re-list it in \`findings\` with '(carried from prior review)' appended to \`rationale\` — even if it falls outside the incremental diff.
+`
+    : "";
+
+  // Optional, lean re-trigger context (km-triage supplies it only on a
+  // re-review — the triggering comment text plus the prior verdict summary).
+  // Absent by default, so standalone callers and first-time reviews are
+  // unaffected. It is advisory background, not a scope expansion.
+  const priorContext = reviewContext
+    ? `Prior context (advisory — from the re-trigger that scheduled this review; still review only the diff below):
+${reviewContext}
+
+`
+    : "";
+
+  // When km-triage supplies a cached diff, read it instead of re-running
+  // `gh pr diff` (the crew would otherwise refetch the same data N times, and
+  // the cache is already scoped to the incremental review range). When no
+  // cached diff is supplied — standalone callers — fall back to gh pr diff.
+  const diffSteps = diffPath
+    ? `1. The PR diff has been fetched once for the whole crew and cached on disk. Read it from:
+     ${diffPath}
+   File list (paths only) for this review range:
+     ${filesPath || "(not provided)"}
+   The cached diff may be INCREMENTAL (only the new commits since the last
+   triage sweep) or the full PR diff — review exactly what the cache contains
+   and do NOT re-review code outside it. Do NOT re-run \`gh pr diff\` or
+   \`git diff\` yourself. Generated/oversized files may have their bodies
+   excluded from the cached diff (they still appear in the file list); to read
+   an excluded or full-context file use \`git show ${headRef}:<path>\` and cite
+   real file line numbers, never the cached diff's offsets for that file.`
+    : `1. Fetch the PR diff: gh pr diff ${prNumber}`;
+
+  return `${priorContext}You are reviewing PR #${prNumber} in the keyboard-studio monorepo as the ${reviewer.agentType} specialist.
 
 Depth: ${depth}
-
+${baseOid || headOid ? `Range: ${baseOid || "<base>"}..${headOid || "<head>"}\n` : ""}
 Your lens for this review:
 ${reviewer.lens}
 
 Steps:
-1. Fetch the PR diff: gh pr diff ${prNumber}
+${diffSteps}
 2. Read any files in the diff that fall within your domain.
 3. Apply your normal review process per .claude/agents/${reviewer.agentType}.md.
 4. Return a structured findings object matching the schema you will be given.
+${priorFindingsInstruction}
+${priorFindingsBlock}VERIFICATION COST LADDER — when a claim needs a probe to settle it, respect the
+L1/L2/L3 ladder defined canonically in .claude/agents/km-verification.md
+("Verification cost ladder (L1 / L2 / L3)"): start at L1 (static / read-only —
+read, grep, reason, and typecheck/lint scoped to the changed files; no builds,
+no test execution), escalate to L2 (build only the touched package(s) + run the
+specific unit tests that exercise the change) only when L1 cannot establish
+correctness, and to L3 (full suite / cross-package) only with an explicit,
+stated justification. Reach for the cheapest tier that answers the question.
 
 SCOPE DISCIPLINE — only review what THIS PR changes:
 - Review only files modified in the PR diff (\`gh pr diff ${prNumber}\` output).
@@ -198,6 +295,7 @@ SCOPE DISCIPLINE — only review what THIS PR changes:
    - verdict: APPROVE if no actionable findings; REQUEST_CHANGES if specific issues exist; NEEDS_HUMAN_INPUT if a design call or spec ambiguity blocks you.
    - Every finding MUST include title, severity, and rationale. Include file/line when locatable. The 'file' field is OPTIONAL — omit it when a finding implicates a cross-section coherence issue, a linguistic premise, or a spec-level concern with no single source file.
    - Set autoFixable: true only when the fix is mechanical and unambiguous (rename, remove line, single codepoint swap).
+   - When a finding needs the tech lead's judgment (it is NOT mechanically fixable and you are emitting NEEDS_HUMAN_INPUT for it), set that finding's `question` field to the exact question you want the tech lead to answer. It surfaces on the PR for the human to decide, so make it specific and self-contained.
    - Schema-forced output: use the per-agent schema fields documented in your .claude/agents/${reviewer.agentType}.md under the "Schema-forced output mode" heading when that heading is present. Set findingKind on every finding when you are km-synthesis; use specReference/checkId for Layer-A citations when you are km-keyman; set linguisticCategory when you are km-domain; emit the pattern-audit gate finding with gateId: 'pattern-audit' when you are km-qc.
 
 Do NOT post GitHub comments, push, or merge. Return only the structured output.`;
@@ -221,6 +319,15 @@ Steps:
 3. Return a VERDICT_SCHEMA object: isReal, confidence, rationale, counterpoint (if you disagree or see nuance).
    - Schema-forced output: if the finding is real but milder than claimed, set partiallyTrue: true and use severityOverride to indicate the appropriate severity. Place the repro command in reproduceCommand and a one-line outcome in evidenceSummary.
    - Aggregate pass counts for an APPROVE verdict go in the rationale field of your verdict.
+
+VERIFICATION COST LADDER: respect the L1/L2/L3 ladder defined canonically in
+.claude/agents/km-verification.md ("Verification cost ladder (L1 / L2 / L3)").
+Start at L1 (read / grep / reason, plus typecheck/lint scoped to the changed
+files); escalate to L2 (build the touched package(s) + run the specific unit
+tests that exercise the change) only when L1 cannot settle the claim; reach L3
+(full suite / cross-package) only with a stated justification. Name the tier
+you reached in evidenceSummary, and if you ran a probe put the command in
+reproduceCommand.
 
 Do NOT post GitHub comments, push, or merge.`;
 }
@@ -259,10 +366,11 @@ Steps:
 2. Filter to confirmed findings (isReal === true) across all non-crashed envelopes.
 3. Use findingKind to categorize findings: 'integration' = fit/coherence, 'duplication' = redundant code (see existingFile), 'extraction' = factor-out opportunity (see proposedTarget), 'general' = catch-all.
 4. Determine the overall verdict:
-   - APPROVE if zero confirmed findings and no ESCALATED_ON_ERROR slots.
-   - NEEDS_HUMAN_INPUT if any confirmed finding is not autoFixable and requires a design/spec judgment, OR if any reviewer slot was ESCALATED_ON_ERROR.
+   - CONTRADICTORY-DISSENT GUARD (check this FIRST): if any non-crashed reviewer returned reviewerVerdict REQUEST_CHANGES or NEEDS_HUMAN_INPUT but contributed ZERO confirmed findings (isReal === true), that is a self-contradictory reviewer output — do NOT let it resolve to APPROVE. Escalate to NEEDS_HUMAN_INPUT and, for EACH such slot, add a humanDecisionNeeded entry { title: "Contradictory verdict from <reviewerKey>", question: "Reviewer <reviewerKey> returned <verdict> with no findings; needs a human to reconcile." }.
+   - APPROVE only if zero confirmed findings AND no ESCALATED_ON_ERROR slots AND the contradictory-dissent guard did not fire.
+   - NEEDS_HUMAN_INPUT if any confirmed finding is not autoFixable and requires a design/spec judgment, OR if any reviewer slot was ESCALATED_ON_ERROR, OR the contradictory-dissent guard fired.
    - REQUEST_CHANGES otherwise.
-5. Partition confirmed findings into autoFixable[] and humanDecisionNeeded[] by their autoFixable flag.
+5. Partition confirmed findings into autoFixable[] (an array of finding TITLE strings) and humanDecisionNeeded[] by their autoFixable flag. Each humanDecisionNeeded item is an object { title, question? }: copy the escalated finding's `question` field into `question` when the reviewer set one (the reviewer's exact question for the tech lead), and omit `question` when the finding has none. Contradictory-dissent guard entries from step 4 also go in humanDecisionNeeded with their generated question.
 6. Write a concise summary (<=200 words) suitable for the check_run output_text.
 7. Return the SYNTHESIS_SCHEMA object.
 
@@ -282,11 +390,11 @@ Do NOT post GitHub comments, push, or merge.`;
 
 async function reviewStage(_, reviewer, _index) {
   // NOTE: opts.phase used here instead of phase() to avoid race across
-  // the four concurrent reviewer items (contract rule 7).
+  // the concurrent reviewer items (contract rule 7).
   // P0-4: wrap in try/catch so a thrown reviewer returns an error envelope
   // rather than null — synthesis can see WHY a slot is empty.
   try {
-    const result = await agent(reviewPrompt(reviewer, prNumber, depth), {
+    const result = await agent(reviewPrompt(reviewer, prNumber, depth, reviewCtx), {
       agentType: reviewer.agentType,
       label: `Review: ${reviewer.key}`,
       phase: "Review",
@@ -334,7 +442,7 @@ async function verifyStage(reviewerEnvelope, reviewer, _index) {
   }
 
   // NOTE: opts.phase used here too — these run concurrently per reviewer
-  // across all four primary reviewer lanes (contract rule 7).
+  // across all selected primary reviewer lanes (contract rule 7).
   // Rule 6: parallel() thunk failure resolves to null; filter before use.
   // P0-4: wrap each thunk in try/catch so a thrown verifier returns an error
   // envelope rather than null — distinct from a user-skipped null.
@@ -394,7 +502,18 @@ while (typeof parsedArgs === "string" && decodeRounds < 3) {
   decodeRounds++;
 }
 parsedArgs = parsedArgs ?? {};
-const { prNumber, depth = "thorough" } = parsedArgs;
+const {
+  prNumber,
+  depth = "thorough",
+  crew: crewArg,
+  skipReviewers = [],
+  diffPath,
+  filesPath,
+  baseOid,
+  headOid,
+  reviewContext,
+  priorFindings,
+} = parsedArgs;
 if (!prNumber) {
   throw new Error(
     `km-review requires args.prNumber. typeof args=${typeof args}, ` +
@@ -403,10 +522,31 @@ if (!prNumber) {
   );
 }
 
-// Run the review + verify pipeline across all four primary reviewers.
+// Crew selection (additive, backward-compatible): with no crew arg the default
+// is BOTH, i.e. all four primaries — exactly the pre-crew behavior, so existing
+// standalone callers are unaffected. An unrecognized crew value degrades to
+// BOTH with a log note rather than erroring. skipReviewers (agentType strings)
+// lets km-triage's per-specialist pre-filters (C/B/E) drop individual primaries
+// from within the selected crew; empty by default.
+const CREW = String(crewArg ?? "BOTH").toUpperCase();
+if (!["ENGINE", "CONTENT", "BOTH"].includes(CREW)) {
+  log(`km-review: unrecognized crew '${crewArg}', defaulting to BOTH`);
+}
+const crewKey = ["ENGINE", "CONTENT", "BOTH"].includes(CREW) ? CREW : "BOTH";
+const skip = new Set(skipReviewers);
+const activeReviewers = REVIEWERS.filter(
+  (r) => r.crews.includes(crewKey) && !skip.has(r.agentType)
+);
+
+// Shared per-review context handed to every reviewer prompt (cached diff +
+// OIDs). Undefined fields simply omit the corresponding prompt sections, so
+// standalone callers that pass none fall back to `gh pr diff`.
+const reviewCtx = { diffPath, filesPath, baseOid, headOid, reviewContext, priorFindings };
+
+// Run the review + verify pipeline across the selected primary reviewers.
 // pipeline(items, stage1, stage2) — no barrier between stages per item;
 // stage2 signature is (prevResult, originalItem, index) (contract rule 5).
-const perReviewerResults = await pipeline(REVIEWERS, reviewStage, verifyStage);
+const perReviewerResults = await pipeline(activeReviewers, reviewStage, verifyStage);
 
 // v2 (P0-3/P0-4): collect full verify envelopes, distinguishing:
 //   - null  → user-skipped lane (pipeline level null from verifyStage)
