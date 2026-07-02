@@ -110,9 +110,11 @@ export function OSKFrame({
         ref={iframeRef}
         src="/osk-frame.html"
         title="On-screen keyboard preview"
-        // allow-same-origin is required for the postMessage source check
-        // and for KMW's relative .js fetches in dev. Production will move
-        // KMW assets behind a stricter CSP.
+        // allow-same-origin is load-bearing for the frame's postMessage
+        // origin check (osk-frame.js compares event.origin against its own
+        // window.location.origin) and for KMW's relative .js fetches in dev.
+        // Removing it gives the frame an opaque origin, which fails that
+        // check closed (every command silently dropped) rather than open.
         sandbox="allow-scripts allow-same-origin"
         style={{
           width: "100%",
