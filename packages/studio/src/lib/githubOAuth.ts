@@ -1,5 +1,11 @@
 // githubOAuth — GitHub OAuth (web application flow with PKCE) helpers.
 //
+// The studio now has TWO GitHub credentials with distinct jobs:
+//   - GitHub App (VITE_GITHUB_CLIENT_ID, "Iv23…") = DEFAULT sign-in / identity.
+//     User-to-server OAuth, NO scope. Used by the "Sign up with GitHub" button.
+//   - OAuth App (VITE_GITHUB_OAUTH_CLIENT_ID, "Ov23…") = used ONLY for the
+//     Option A "fork & submit yourself" opt-in, which requests `public_repo`.
+//
 // Delivery "Option A" (spec §12 / docs/github_flow.md): the studio drives the
 // user through GitHub's OAuth authorize → callback → token-exchange handshake,
 // then uses the resulting token (with `public_repo` scope) to fork
@@ -39,17 +45,6 @@ export type { PkcePair } from "./pkce.ts";
 const GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize";
 
 /**
- * Scope for the **sign-up / identity** flow (docs/github-integration.md §1a).
- * Sign-up establishes *who the user is* and nothing more — `user:email` reads
- * the login and the verified primary email (used for commit attribution),
- * with **no** repository access. This is the default scope for {@link
- * beginAuthorize}; `public_repo` is requested separately and only when the user
- * opts into the self-fork submit path (Option A), per the §1a decoupling of
- * identity from submission (incremental authorization).
- */
-export const IDENTITY_SCOPE = "user:email";
-
-/**
  * Scope the fork+PR submit path needs (spec §12, Option A). Requested only on
  * the explicit "fork & submit yourself" opt-in — never at sign-up. `verifyToken`
  * (engine `github.ts`) gates the submit action on this scope being present.
@@ -61,13 +56,49 @@ const TOKEN_KEY = "ks.github.token";
 const VERIFIER_KEY = "ks.github.oauth.verifier";
 const STATE_KEY = "ks.github.oauth.state";
 
+/**
+ * sessionStorage key that persists which auth flow initiated the current
+ * OAuth round-trip. Read by processOAuthCallback so the token-exchange POST
+ * uses the correct client id + credential pair.
+ */
+const FLOW_KEY = "ks.github.oauth.flow";
+
+// ---------------------------------------------------------------------------
+// Flow type
+// ---------------------------------------------------------------------------
+
+/**
+ * Which GitHub OAuth flow is in progress:
+ *   - `"identity"` — GitHub App (default sign-in, NO scope).
+ *   - `"submit"`   — OAuth App (Option A fork+PR opt-in, `public_repo` scope).
+ */
+export type AuthFlow = "identity" | "submit";
+
+/**
+ * Which GitHub credential pair was used to obtain a token.
+ *   - `"github_app"` — default identity flow (no scope).
+ *   - `"oauth_app"`  — Option A fork+PR flow (`public_repo` scope).
+ */
+export type GitHubClient = "github_app" | "oauth_app";
+
 // ---------------------------------------------------------------------------
 // Config (read from import.meta.env, see vite-env.d.ts)
 // ---------------------------------------------------------------------------
 
-/** OAuth web-app client id (public; safe to ship in the browser). */
+/**
+ * GitHub App client id (public; safe to ship in the browser).
+ * Used for the default identity / sign-in flow (no scope).
+ */
 export function getClientId(): string {
   return import.meta.env.VITE_GITHUB_CLIENT_ID ?? "";
+}
+
+/**
+ * OAuth App client id (public; safe to ship in the browser).
+ * Used ONLY for the Option A "fork & submit yourself" opt-in (`public_repo`).
+ */
+export function getOAuthClientId(): string {
+  return import.meta.env.VITE_GITHUB_OAUTH_CLIENT_ID ?? "";
 }
 
 /**
@@ -98,6 +129,13 @@ export interface StoredGitHubToken {
   scope: string;
   /** Optional refresh token (only with GitHub Apps / expiring tokens). */
   refreshToken?: string;
+  /**
+   * Which credential pair was used to obtain this token.
+   * `"github_app"` = default identity flow (no scope).
+   * `"oauth_app"`  = Option A fork+PR flow (`public_repo`).
+   * Defaults to `"github_app"` when absent (backward-compat read tolerance).
+   */
+  client: GitHubClient;
 }
 
 
@@ -111,7 +149,12 @@ export interface BuildAuthorizeUrlInput {
   redirectUri: string;
   state: string;
   codeChallenge: string;
-  /** Defaults to {@link IDENTITY_SCOPE} (sign-up). Pass {@link REQUIRED_SCOPE} for the submit opt-in. */
+  /**
+   * OAuth scope string. When absent (undefined), the `scope` parameter is
+   * omitted entirely from the authorize URL — GitHub Apps identity flow sends
+   * no scope. Pass {@link REQUIRED_SCOPE} ("public_repo") for the Option A
+   * submit opt-in.
+   */
   scope?: string;
 }
 
@@ -120,27 +163,33 @@ export interface BuildAuthorizeUrlInput {
  *
  * Pure — does not redirect. The caller persists verifier+state, then assigns
  * the returned URL to window.location.
+ *
+ * When `scope` is undefined the `scope` parameter is omitted entirely
+ * (identity flow — GitHub App, no scope). When provided, it is included.
  */
 export function buildAuthorizeUrl(input: BuildAuthorizeUrlInput): string {
   const params = new URLSearchParams({
     client_id: input.clientId,
     redirect_uri: input.redirectUri,
-    scope: input.scope ?? IDENTITY_SCOPE,
     state: input.state,
     code_challenge: input.codeChallenge,
     code_challenge_method: "S256",
   });
+  if (input.scope !== undefined) {
+    params.set("scope", input.scope);
+  }
   return `${GITHUB_AUTHORIZE_URL}?${params.toString()}`;
 }
 
 // ---------------------------------------------------------------------------
-// OAuth scratch state (verifier + state) — sessionStorage, cleared after use
+// OAuth scratch state (verifier + state + flow) — sessionStorage, cleared after use
 // ---------------------------------------------------------------------------
 
-/** Persist the PKCE verifier + CSRF state across the GitHub redirect. */
-export function setOAuthScratch(verifier: string, state: string): void {
+/** Persist the PKCE verifier, CSRF state, and auth flow across the GitHub redirect. */
+export function setOAuthScratch(verifier: string, state: string, flow: AuthFlow = "identity"): void {
   sessionStorage.setItem(VERIFIER_KEY, verifier);
   sessionStorage.setItem(STATE_KEY, state);
+  sessionStorage.setItem(FLOW_KEY, flow);
 }
 
 /** Read the stored PKCE verifier (null if absent). */
@@ -153,10 +202,21 @@ export function getStoredState(): string | null {
   return sessionStorage.getItem(STATE_KEY);
 }
 
-/** Clear the PKCE verifier + CSRF state (call once consumed). */
+/**
+ * Read the stored auth flow (null if absent — callers should default to
+ * `"identity"` when null, for backward-compat with pre-flow scratch entries).
+ */
+export function getStoredFlow(): AuthFlow | null {
+  const raw = sessionStorage.getItem(FLOW_KEY);
+  if (raw === "identity" || raw === "submit") return raw;
+  return null;
+}
+
+/** Clear the PKCE verifier, CSRF state, and flow key (call once consumed). */
 export function clearOAuthScratch(): void {
   sessionStorage.removeItem(VERIFIER_KEY);
   sessionStorage.removeItem(STATE_KEY);
+  sessionStorage.removeItem(FLOW_KEY);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,6 +235,10 @@ export function getStoredToken(): StoredGitHubToken | null {
   try {
     const parsed = JSON.parse(raw) as Partial<StoredGitHubToken>;
     if (typeof parsed.accessToken !== "string") return null;
+    // Tolerate absent `client` field from tokens stored before the two-flow
+    // upgrade — default to "github_app" for backward compatibility.
+    const client: GitHubClient =
+      parsed.client === "oauth_app" ? "oauth_app" : "github_app";
     return {
       accessToken: parsed.accessToken,
       tokenType: typeof parsed.tokenType === "string" ? parsed.tokenType : "bearer",
@@ -182,6 +246,7 @@ export function getStoredToken(): StoredGitHubToken | null {
       ...(typeof parsed.refreshToken === "string"
         ? { refreshToken: parsed.refreshToken }
         : {}),
+      client,
     };
   } catch {
     return null;
@@ -198,32 +263,43 @@ export function clearStoredToken(): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Begin the OAuth flow: generate PKCE + state, persist the scratch state, and
- * return the GitHub authorize URL. The caller assigns it to window.location.
+ * Begin the OAuth flow: generate PKCE + state, persist the scratch state
+ * (including the flow), and return the GitHub authorize URL. The caller
+ * assigns it to window.location.
  *
- * @param scope - Defaults to {@link IDENTITY_SCOPE} ("user:email") for sign-up.
- *   Pass {@link REQUIRED_SCOPE} ("public_repo") only for the explicit self-fork
- *   submit opt-in (Option A) — sign-up must never request repository access
- *   (docs/github-integration.md §1a, incremental authorization).
+ * @param flow - `"identity"` (default) uses the GitHub App client id with no
+ *   scope — the standard "Sign up with GitHub" path. `"submit"` uses the
+ *   OAuth App client id with `public_repo` scope — the explicit Option A
+ *   "fork & submit yourself" opt-in. Per docs/github-integration.md §1a,
+ *   sign-up must never request repository access (incremental authorization).
  *
- * Throws if VITE_GITHUB_CLIENT_ID is not configured.
+ * Throws if the relevant client id env var is not configured.
  */
-export async function beginAuthorize(scope: string = IDENTITY_SCOPE): Promise<string> {
-  const clientId = getClientId();
+export async function beginAuthorize(flow: AuthFlow = "identity"): Promise<string> {
+  const isSubmit = flow === "submit";
+  const clientId = isSubmit ? getOAuthClientId() : getClientId();
+
   if (clientId === "") {
+    const varName = isSubmit
+      ? "VITE_GITHUB_OAUTH_CLIENT_ID"
+      : "VITE_GITHUB_CLIENT_ID";
     throw new Error(
-      "GitHub OAuth is not configured (VITE_GITHUB_CLIENT_ID is empty).",
+      `GitHub OAuth is not configured (${varName} is empty).`,
     );
   }
+
   const { verifier, challenge } = await generatePkce();
   const state = crypto.randomUUID();
-  setOAuthScratch(verifier, state);
+  setOAuthScratch(verifier, state, flow);
+
   return buildAuthorizeUrl({
     clientId,
     redirectUri: getRedirectUri(),
     state,
     codeChallenge: challenge,
-    scope,
+    // identity flow: omit scope entirely (GitHub App, no scope).
+    // submit flow: request public_repo.
+    ...(isSubmit ? { scope: REQUIRED_SCOPE } : {}),
   });
 }
 
@@ -253,18 +329,28 @@ export class OAuthExchangeError extends Error {
 /**
  * Exchange an authorization `code` for an access token via the OAuth backend.
  *
- * POSTs `{ code, code_verifier, redirect_uri }` to `${backend}/oauth/exchange`.
+ * POSTs `{ code, code_verifier, redirect_uri, client }` to
+ * `${backend}/oauth/exchange`. The `client` field tells the backend which
+ * credential pair to use:
+ *   - `"github_app"` (default identity flow, no scope)
+ *   - `"oauth_app"`  (Option A submit flow, `public_repo`)
+ *
  * On a non-2xx response, throws an {@link OAuthExchangeError} carrying the
  * backend's safe `error` code.
  *
  * @param code - The `code` query param GitHub appended to the callback URL.
  * @param codeVerifier - The PKCE verifier persisted before the redirect.
+ * @param flow - Which flow initiated this exchange (defaults to `"identity"`).
  */
 export async function exchangeCode(
   code: string,
   codeVerifier: string,
+  flow: AuthFlow = "identity",
 ): Promise<StoredGitHubToken> {
   const url = `${getBackendUrl()}/oauth/exchange`;
+  const client: GitHubClient =
+    flow === "submit" ? "oauth_app" : "github_app";
+
   let res: Response;
   try {
     res = await fetch(url, {
@@ -274,6 +360,7 @@ export async function exchangeCode(
         code,
         code_verifier: codeVerifier,
         redirect_uri: getRedirectUri(),
+        client,
       }),
     });
   } catch {
@@ -299,6 +386,7 @@ export async function exchangeCode(
     ...(typeof data.refresh_token === "string"
       ? { refreshToken: data.refresh_token }
       : {}),
+    client,
   };
 }
 

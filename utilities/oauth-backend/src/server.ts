@@ -9,10 +9,12 @@
  *   GET  /oauth/health           — liveness probe (no auth)
  *
  * Environment variables (see README.md for full reference):
- *   GITHUB_CLIENT_ID       required
- *   GITHUB_CLIENT_SECRET   required — never logged, never in responses
- *   GITHUB_ORG_TOKEN       optional — org service-account token for the managed-PR route; POST /submit/managed-pr returns 503 until set
- *   GITHUB_ORG_LOGIN       optional — org service-account login; must be set together with GITHUB_ORG_TOKEN
+ *   GITHUB_CLIENT_ID              required
+ *   GITHUB_CLIENT_SECRET          required — never logged, never in responses
+ *   GITHUB_APP_ID                 optional — GitHub App ID for the managed-PR route; POST /submit/managed-pr returns 503 until all three App vars are set
+ *   GITHUB_APP_PRIVATE_KEY        optional — base64-encoded PEM private key for the GitHub App; never logged
+ *   GITHUB_APP_INSTALLATION_ID    optional — installation ID of the GitHub App on the org
+ *   GITHUB_ORG_LOGIN              optional — org login that owns the standing fork; must be set together with the three GITHUB_APP_* vars
  *   GOOGLE_OAUTH_ENABLED   set to "true" to enable the Google identity flow (default off)
  *   GOOGLE_CLIENT_ID       required only when GOOGLE_OAUTH_ENABLED=true
  *   GOOGLE_CLIENT_SECRET   required only when GOOGLE_OAUTH_ENABLED=true — never logged, never in responses
@@ -44,6 +46,7 @@ import {
   type ManagedPRPipelineConfig,
   type GitHubPipelineFetchFn,
 } from "./github-pipeline.js";
+import { getInstallationToken } from "./installation-token.js";
 
 // ---------------------------------------------------------------------------
 // Startup validation — fail fast if secrets are absent
@@ -52,10 +55,12 @@ import {
 function loadConfig(): {
   clientId: string;
   clientSecret: string;
+  oauthClientId: string | undefined;
+  oauthClientSecret: string | undefined;
   googleOAuthEnabled: boolean;
   googleClientId: string;
   googleClientSecret: string;
-  orgToken: string;
+  appConfigured: boolean;
   orgLogin: string;
   allowedOrigins: string[];
   port: number;
@@ -68,6 +73,18 @@ function loadConfig(): {
       "[oauth-backend] FATAL: GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET must be set."
     );
     process.exit(1);
+  }
+
+  // OAuth App credentials for Option A (fork & submit yourself). Optional:
+  // the default github_app flow works without them. An oauth_app exchange
+  // with no pair configured yields 500 server_misconfigured at request time.
+  const oauthClientId = (process.env["GITHUB_OAUTH_CLIENT_ID"] ?? "").trim() || undefined;
+  const oauthClientSecret = (process.env["GITHUB_OAUTH_CLIENT_SECRET"] ?? "").trim() || undefined;
+  // Warn when only one of the pair is set — likely a misconfiguration.
+  if ((oauthClientId === undefined) !== (oauthClientSecret === undefined)) {
+    console.warn(
+      "[WARN] oauth_app credential pair is incomplete: GITHUB_OAUTH_CLIENT_ID and GITHUB_OAUTH_CLIENT_SECRET must both be set or both be absent."
+    );
   }
 
   // Google identity is opt-in: GitHub-only deployments leave GOOGLE_OAUTH_ENABLED
@@ -101,18 +118,23 @@ function loadConfig(): {
     new Set([...devOrigins, ...staticOrigins])
   );
 
-  // Org service-account credentials for Option B. Optional: the org bot
-  // identity is still being finalised (§5 Q3), so their absence is not fatal —
-  // the managed-PR route returns 503 until they are provisioned.
-  const orgToken = (process.env["GITHUB_ORG_TOKEN"] ?? "").trim();
+  // GitHub App credentials for Option B (org-mediated PR). Optional: the App
+  // identity may not yet be provisioned, so their absence is not fatal —
+  // the managed-PR route returns 503 until all four vars are set.
+  const appId = (process.env["GITHUB_APP_ID"] ?? "").trim();
+  const appPrivateKey = (process.env["GITHUB_APP_PRIVATE_KEY"] ?? "").trim();
+  const appInstallationId = (process.env["GITHUB_APP_INSTALLATION_ID"] ?? "").trim();
   const orgLogin = (process.env["GITHUB_ORG_LOGIN"] ?? "").trim();
 
-  // Exactly one of the pair being set is always a misconfiguration — both are
-  // required for the managed-PR route to be active. Warn so operators notice
+  // All three GITHUB_APP_* vars AND GITHUB_ORG_LOGIN must be set together.
+  // Any partial configuration is a misconfiguration — warn so operators notice
   // at startup rather than discovering it from a 503 in production.
-  if ((orgToken.length > 0) !== (orgLogin.length > 0)) {
+  const appConfigured = Boolean(appId && appPrivateKey && appInstallationId);
+  const allPresent = appConfigured && orgLogin.length > 0;
+  const nonePresent = !appId && !appPrivateKey && !appInstallationId && !orgLogin;
+  if (!allPresent && !nonePresent) {
     console.warn(
-      "[WARN] managed submission is disabled: GITHUB_ORG_TOKEN and GITHUB_ORG_LOGIN must both be set or both be absent — only one is present."
+      "[WARN] managed submission is disabled: GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_APP_INSTALLATION_ID, and GITHUB_ORG_LOGIN must all be set or all be absent — only some are present."
     );
   }
 
@@ -121,10 +143,12 @@ function loadConfig(): {
   return {
     clientId,
     clientSecret,
+    oauthClientId,
+    oauthClientSecret,
     googleOAuthEnabled,
     googleClientId,
     googleClientSecret,
-    orgToken,
+    appConfigured,
     orgLogin,
     allowedOrigins,
     port,
@@ -173,6 +197,14 @@ const MANAGED_PR_BODY_LIMIT = 64 * 1024 * 1024;
 export async function buildServer(opts: {
   clientId: string;
   clientSecret: string;
+  /**
+   * Classic OAuth App client ID (`Ov23…`). Optional — the default
+   * `github_app` flow works without it. An `oauth_app` exchange while this is
+   * absent returns 500 `server_misconfigured`.
+   */
+  oauthClientId?: string;
+  /** Never log, never include in responses. */
+  oauthClientSecret?: string;
   /** When true, register POST /oauth/google/exchange; when false, omit it entirely. */
   googleOAuthEnabled: boolean;
   /** Required only when googleOAuthEnabled is true. */
@@ -180,12 +212,12 @@ export async function buildServer(opts: {
   googleClientSecret?: string;
   allowedOrigins: string[];
   /**
-   * Org service-account token + login for the Option B managed-PR path.
-   * Optional: when absent, POST /submit/managed-pr returns 503 rather than
-   * blocking server boot (the org bot identity is still being finalised —
-   * docs/github-integration.md §5 Q3). Never logged.
+   * Provider callback that returns a GitHub App installation token on each request.
+   * Pass the `getInstallationToken` function from installation-token.ts so the
+   * @octokit/auth-app cache/refresh logic fires per-request rather than at startup
+   * (tokens expire after ~1 h). When absent, POST /submit/managed-pr returns 503.
    */
-  orgToken?: string;
+  getInstallationToken?: () => Promise<string>;
   orgLogin?: string;
   /**
    * Injected fetch implementation — defaults to globalThis.fetch.
@@ -264,13 +296,15 @@ export async function buildServer(opts: {
   const handlerConfig: HandlerConfig = {
     clientId: opts.clientId,
     clientSecret: opts.clientSecret,
+    ...(opts.oauthClientId !== undefined ? { oauthClientId: opts.oauthClientId } : {}),
+    ...(opts.oauthClientSecret !== undefined ? { oauthClientSecret: opts.oauthClientSecret } : {}),
     fetch: nodeFetch,
   };
 
-  // Managed-PR pipeline config is present only when org credentials are set.
+  // Managed-PR pipeline config is present only when App credentials are set.
   const managedPRConfig: ManagedPRPipelineConfig | undefined =
-    opts.orgToken && opts.orgLogin
-      ? { orgToken: opts.orgToken, orgLogin: opts.orgLogin, fetch: pipelineFetch }
+    opts.getInstallationToken && opts.orgLogin
+      ? { getInstallationToken: opts.getInstallationToken, orgLogin: opts.orgLogin, fetch: pipelineFetch }
       : undefined;
 
   // -------------------------------------------------------------------------
@@ -394,14 +428,36 @@ const isMain =
 
 if (isMain) {
   const config = loadConfig();
+
+  // Pass the getInstallationToken function (not a minted string) so the
+  // @octokit/auth-app cache/refresh fires per-request rather than once at
+  // startup. Installation tokens expire after ~1 h; passing the provider
+  // function means the route never returns 401 from a stale token.
+  // If the App is not configured, getInstallationToken is omitted and the
+  // managed-PR route stays disabled (503).
+  //
+  // The adapter narrows `string | undefined` → `string`: when appConfigured is
+  // true all three GITHUB_APP_* vars are set so `getInstallationToken()` never
+  // returns undefined, but the type of the imported function allows it. A throw
+  // here would be caught by submitManagedPR's outer try/catch → 502.
+  const tokenProvider: (() => Promise<string>) | undefined = config.appConfigured
+    ? async () => {
+        const t = await getInstallationToken();
+        if (t === undefined) throw new Error("installation token unexpectedly undefined");
+        return t;
+      }
+    : undefined;
+
   const app = await buildServer({
     clientId: config.clientId,
     clientSecret: config.clientSecret,
+    ...(config.oauthClientId !== undefined ? { oauthClientId: config.oauthClientId } : {}),
+    ...(config.oauthClientSecret !== undefined ? { oauthClientSecret: config.oauthClientSecret } : {}),
     googleOAuthEnabled: config.googleOAuthEnabled,
     googleClientId: config.googleClientId,
     googleClientSecret: config.googleClientSecret,
-    orgToken: config.orgToken,
-    orgLogin: config.orgLogin,
+    ...(tokenProvider !== undefined ? { getInstallationToken: tokenProvider } : {}),
+    ...(config.orgLogin ? { orgLogin: config.orgLogin } : {}),
     allowedOrigins: config.allowedOrigins,
   });
   const address = await app.listen({ port: config.port, host: "0.0.0.0" });

@@ -307,7 +307,7 @@ export function AccountControl() {
               type="button"
               style={githubProviderButtonStyle}
               onClick={() => {
-                void github.connect();
+                void github.connect("identity");
                 // connect() redirects; no need to close
               }}
             >

@@ -6,6 +6,7 @@
     { "source": "/oauth/exchange", "destination": "/api/oauth/exchange" },
     { "source": "/oauth/refresh", "destination": "/api/oauth/refresh" },
     { "source": "/oauth/health", "destination": "/api/oauth/health" },
+    { "source": "/submit/managed-pr", "destination": "/api/submit/managed-pr" },
     {
       "source": "/kbd-proxy/:path*",
       "destination": "https://raw.githubusercontent.com/keymanapp/keyboards/master/:path*"
