@@ -94,8 +94,8 @@ import type { RecognizerRuleYaml } from "../../yaml-schema.js";
 const RULE_DEF = ${ruleDef} satisfies RecognizerRuleYaml;
 
 export const rule: RecognizerRule = {
-  id: "${id}",
-  strategyId: "${strategyId}",
+  id: ${JSON.stringify(id)},
+  strategyId: ${JSON.stringify(strategyId)},
   match: (ir) => interpretPredicate(RULE_DEF, ir),
   lift: (m) => interpretLift(RULE_DEF, m),
 };
