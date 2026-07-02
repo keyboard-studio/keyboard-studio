@@ -175,6 +175,20 @@ export interface CarveGlyph {
   modifierLayer: ModifierLayer;
   modifierLabel: string;
   capability: RemovalCapability;
+  /**
+   * Set for glyphs that are NOT owned by a pattern (ownedByPattern===undefined)
+   * but whose backing store is referenced by at least one recognized pattern's
+   * analyzeStoreUsage.patternRefs.  Identifies the "primary owner" pattern for
+   * display and cascade-delete targeting.
+   *
+   * 'pattern' — the rule is tied to a recognized pattern via store usage.
+   * 'store'   — the rule is tied to a store that is directly owned by a pattern.
+   */
+  ownerKind?: 'pattern' | 'store';
+  /** nodeId of the owning pattern (or store). */
+  ownerNodeId?: string;
+  /** Human-readable label of the owning pattern (or store name). */
+  ownerLabel?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -254,7 +268,13 @@ export function outputToChar(output: OutputElement[]): string {
 // Falls back to a single '...' glyph when the output store cannot be resolved.
 // ---------------------------------------------------------------------------
 
-function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map<string, RemovalCapability>): CarveGlyph[] {
+function expandParallelStoreRule(
+  rule: IRRule,
+  ir: KeyboardIR,
+  capabilities: Map<string, RemovalCapability>,
+  ownedRuleIds: Set<string>,
+  storePrimaryOwners: Map<string, { patternId: string; patternTitle: string }>,
+): CarveGlyph[] {
   const outputEl = rule.output[0];
   if (!outputEl || outputEl.kind !== 'index') return [];
 
@@ -291,6 +311,11 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
   const slotCapability: RemovalCapability =
     capabilities.get(outputStore.nodeId) ?? 'not-removable:unknown';
 
+  // Determine owner fields for tied-but-not-owned glyphs (rule not in ownedRuleIds).
+  // A glyph is "tied" when its backing store is referenced by a recognized pattern.
+  const isTied = !ownedRuleIds.has(rule.nodeId);
+  const primaryOwner = isTied ? storePrimaryOwners.get(outputStore.name) : undefined;
+
   for (let i = 0; i < outputStore.items.length; i++) {
     const outputItem = outputStore.items[i];
     if (!outputItem || outputItem.kind !== 'char') continue;  // skip beep/nul/raw slots
@@ -317,7 +342,23 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
     if (seen.has(gid)) continue;  // dedup: same store+index appearing in multiple rules
     seen.add(gid);
 
-    glyphs.push({ gid, keys, ch, modifierLayer: modLayer, modifierLabel: modLabel, capability: slotCapability });
+    const glyph: CarveGlyph = {
+      gid,
+      keys,
+      ch,
+      modifierLayer: modLayer,
+      modifierLabel: modLabel,
+      capability: slotCapability,
+    };
+
+    // Populate owner fields for tied-but-not-owned glyphs.
+    if (primaryOwner !== undefined) {
+      glyph.ownerKind = 'pattern';
+      glyph.ownerNodeId = primaryOwner.patternId;
+      glyph.ownerLabel = primaryOwner.patternTitle;
+    }
+
+    glyphs.push(glyph);
   }
 
   return glyphs;
@@ -331,23 +372,49 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
 // All other rules produce at most one tile, with gid == rule.nodeId.
 // ---------------------------------------------------------------------------
 
-function ruleToGlyphs(rule: IRRule, ir: KeyboardIR, capabilities: Map<string, RemovalCapability>): CarveGlyph[] {
+function ruleToGlyphs(
+  rule: IRRule,
+  ir: KeyboardIR,
+  capabilities: Map<string, RemovalCapability>,
+  ownedRuleIds: Set<string> = new Set(),
+  storePrimaryOwners: Map<string, { patternId: string; patternTitle: string }> = new Map(),
+): CarveGlyph[] {
   if (isParallelIndexFanOut(rule)) {
-    return expandParallelStoreRule(rule, ir, capabilities);
+    return expandParallelStoreRule(rule, ir, capabilities, ownedRuleIds, storePrimaryOwners);
   }
   // Standard single-output rule (original behavior)
   const keys = contextToKeys(rule.context);
   if (keys.length === 0) return [];
   const ch = outputToChar(rule.output);
   if (ch === '?' || ch === '‹dk›') return [];
-  return [{
+
+  const glyph: CarveGlyph = {
     gid: rule.nodeId,
     keys,
     ch,
     modifierLayer: ruleModifier(rule),
     modifierLabel: modifierLabel(rule),
     capability: capabilities.get(rule.nodeId) ?? 'not-removable:unknown',
-  }];
+  };
+
+  // Populate owner fields for tied-but-not-owned standard rules.
+  // "Tied" = rule not in ownedRuleIds AND references a store owned by a pattern.
+  if (!ownedRuleIds.has(rule.nodeId)) {
+    // Check if any output element references a store that has a primary owner.
+    for (const el of rule.output) {
+      if ((el.kind === 'index' || el.kind === 'outs') && el.storeRef !== undefined) {
+        const primary = storePrimaryOwners.get(el.storeRef);
+        if (primary !== undefined) {
+          glyph.ownerKind = 'pattern';
+          glyph.ownerNodeId = primary.patternId;
+          glyph.ownerLabel = primary.patternTitle;
+          break;
+        }
+      }
+    }
+  }
+
+  return [glyph];
 }
 
 // ---------------------------------------------------------------------------
@@ -369,12 +436,110 @@ const EMPTY_IR: KeyboardIR = {
   recognizedPatterns: [],
 };
 
-export function groupToGlyphs(group: IRGroup, ir: KeyboardIR = EMPTY_IR, capabilities: Map<string, RemovalCapability> = new Map()): CarveGlyph[] {
+/**
+ * Build the unified set of rule nodeIds owned by any recognized pattern.
+ *
+ * This is the single source of truth for groupToGlyphs ownership filtering —
+ * replacing the drift-prone `rule.ownedByPattern !== undefined` check.
+ * Mutual exclusivity holds by construction: a rule is either in this set
+ * (pattern-owned) or it is not (group-owned), with no reliance on the
+ * ownedByPattern flag being correctly set on every rule.
+ */
+function buildOwnedRuleIds(ir: KeyboardIR): Set<string> {
+  const owned = new Set<string>();
+  for (const pattern of ir.recognizedPatterns) {
+    if (pattern.origin !== 'recognized') continue;
+    for (const node of pattern.ownedNodes ?? []) {
+      if (node.kind === 'rule') {
+        owned.add(node.nodeId);
+      }
+    }
+  }
+  return owned;
+}
+
+/**
+ * Build a map from store name → primary owner pattern info, used to populate
+ * ownerKind/ownerNodeId/ownerLabel on tied-but-not-owned glyphs.
+ *
+ * "Primary owner" tiebreak (for a store referenced by multiple patterns):
+ *   1. Pattern with the largest ownedNodes overlap count (i.e. most rules in the
+ *      same groups as the store's referencing rules).
+ *   2. Tie: first alphabetically by patternId.
+ *
+ * Only recognized patterns (origin === 'recognized') are considered.
+ */
+function buildStorePrimaryOwnerMap(
+  ir: KeyboardIR,
+): Map<string, { patternId: string; patternTitle: string }> {
+  const result = new Map<string, { patternId: string; patternTitle: string }>();
+
+  for (const store of ir.stores) {
+    if (store.isSystem) continue;
+
+    // Collect all recognized patterns that own rules referencing this store.
+    const candidates: Array<{ patternId: string; patternTitle: string; overlapCount: number }> = [];
+
+    for (const pattern of ir.recognizedPatterns) {
+      if (pattern.origin !== 'recognized') continue;
+      const ownedIds = new Set((pattern.ownedNodes ?? []).map((n) => n.nodeId));
+      if (ownedIds.size === 0) continue;
+
+      let refCount = 0;
+      for (const group of ir.groups) {
+        for (const rule of group.rules) {
+          if (!ownedIds.has(rule.nodeId)) continue;
+          let used = false;
+          for (const el of rule.context) {
+            if ((el.kind === 'any' || el.kind === 'notany') && el.storeRef === store.name) used = true;
+            if (el.kind === 'index' && el.storeRef === store.name) used = true;
+          }
+          for (const el of rule.output) {
+            if ((el.kind === 'index' || el.kind === 'outs') && el.storeRef === store.name) used = true;
+          }
+          if (used) refCount++;
+        }
+      }
+
+      if (refCount > 0) {
+        candidates.push({ patternId: pattern.id, patternTitle: pattern.title, overlapCount: refCount });
+      }
+    }
+
+    if (candidates.length === 0) continue;
+
+    // Tiebreak: largest overlap first, then first alphabetically by patternId.
+    candidates.sort((a, b) => {
+      if (b.overlapCount !== a.overlapCount) return b.overlapCount - a.overlapCount;
+      return a.patternId.localeCompare(b.patternId);
+    });
+
+    const primary = candidates[0]!;
+    result.set(store.name, { patternId: primary.patternId, patternTitle: primary.patternTitle });
+  }
+
+  return result;
+}
+
+export function groupToGlyphs(
+  group: IRGroup,
+  ir: KeyboardIR = EMPTY_IR,
+  capabilities: Map<string, RemovalCapability> = new Map(),
+  // Callers that already built these (e.g. toRailNodes) can pass them in to
+  // avoid recomputing per group. Defaults build them for standalone callers.
+  // A rule is excluded from the group view when EITHER it carries the
+  // `ownedByPattern` flag (the original ownership contract) OR its nodeId is in
+  // the union of recognized patterns' ownedNodes. OR-ing both sources fixes the
+  // ghost-chip drift (flag unset but listed in ownedNodes) without regressing
+  // the flag-only contract (flag set but not yet in any ownedNodes list).
+  ownedRuleIds: Set<string> = buildOwnedRuleIds(ir),
+  storePrimaryOwners: Map<string, { patternId: string; patternTitle: string }> = buildStorePrimaryOwnerMap(ir),
+): CarveGlyph[] {
   const glyphs: CarveGlyph[] = [];
   const seen = new Set<string>();
   group.rules.forEach((rule) => {
-    if (rule.ownedByPattern !== undefined) return;
-    for (const g of ruleToGlyphs(rule, ir, capabilities)) {
+    if (rule.ownedByPattern !== undefined || ownedRuleIds.has(rule.nodeId)) return;
+    for (const g of ruleToGlyphs(rule, ir, capabilities, ownedRuleIds, storePrimaryOwners)) {
       if (!seen.has(g.gid)) { seen.add(g.gid); glyphs.push(g); }
     }
   });
@@ -389,13 +554,19 @@ export function patternToGlyphs(pattern: Pattern, ir: KeyboardIR, capabilities: 
   if (!pattern.ownedNodes || pattern.ownedNodes.length === 0) return [];
 
   const ownedIds = new Set(pattern.ownedNodes.map((n) => n.nodeId));
+  // patternToGlyphs renders owned rules — all ownedRuleIds are in scope,
+  // so none are "tied-but-not-owned" here. Pass ownedIds as ownedRuleIds
+  // to prevent spurious owner-field population on pattern-owned glyphs.
+  const ownedRuleIds = new Set(
+    (pattern.ownedNodes ?? []).filter((n) => n.kind === 'rule').map((n) => n.nodeId),
+  );
   const glyphs: CarveGlyph[] = [];
   const seen = new Set<string>();
 
   for (const group of ir.groups) {
     group.rules.forEach((rule) => {
       if (!ownedIds.has(rule.nodeId)) return;
-      for (const g of ruleToGlyphs(rule, ir, capabilities)) {
+      for (const g of ruleToGlyphs(rule, ir, capabilities, ownedRuleIds)) {
         if (!seen.has(g.gid)) { seen.add(g.gid); glyphs.push(g); }
       }
     });
@@ -847,6 +1018,12 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
   const nodes: CarveNode[] = [];
   const recognized = ir.recognizedPatterns.filter((p) => p.origin === 'recognized');
 
+  // Build the canonical owned-rule set and store-owner map once; used to filter
+  // groups here and passed down into groupToGlyphs so it doesn't recompute them
+  // per group. Mutual exclusivity by construction.
+  const ownedRuleIds = buildOwnedRuleIds(ir);
+  const storePrimaryOwners = buildStorePrimaryOwnerMap(ir);
+
   for (const pattern of recognized) {
     const glyphs = patternToGlyphs(pattern, ir, capabilities);
     nodes.push({
@@ -860,8 +1037,11 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
   }
 
   for (const group of ir.groups) {
-    if (!group.rules.some((r) => r.ownedByPattern === undefined)) continue;
-    const glyphs = groupToGlyphs(group, ir, capabilities);
+    // Emit a group node only if it has at least one rule that is NOT owned by a
+    // pattern — owned meaning EITHER the ownedByPattern flag is set OR the rule
+    // is in the union of recognized patterns' ownedNodes (mirrors groupToGlyphs).
+    if (!group.rules.some((r) => r.ownedByPattern === undefined && !ownedRuleIds.has(r.nodeId))) continue;
+    const glyphs = groupToGlyphs(group, ir, capabilities, ownedRuleIds, storePrimaryOwners);
     nodes.push({
       nodeId: group.nodeId,
       kind: 'group',

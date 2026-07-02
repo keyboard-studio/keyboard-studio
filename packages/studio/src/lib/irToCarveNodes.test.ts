@@ -288,7 +288,7 @@ describe('StoreUsage.patternRefs', () => {
       recognizedPatterns: [{
         id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
         ownedNodes: [{ kind: 'rule', nodeId: 'rule-1' }],
-        description: '', category: 'substitution' as any, appliesTo: [],
+        description: '', category: 'substitute', appliesTo: [],
       }],
     });
     const nodes = toRailNodes(ir);
@@ -313,7 +313,7 @@ describe('StoreUsage.patternRefs', () => {
       recognizedPatterns: [{
         id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
         ownedNodes: [{ kind: 'rule', nodeId: 'rule-1' }],
-        description: '', category: 'substitution' as any, appliesTo: [],
+        description: '', category: 'substitute', appliesTo: [],
       }],
     });
     const nodes = toRailNodes(ir);
@@ -338,7 +338,7 @@ describe('StoreUsage.patternRefs', () => {
       recognizedPatterns: [{
         id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
         ownedNodes: [{ kind: 'rule', nodeId: 'rule-OTHER' }], // doesn't own rule-1
-        description: '', category: 'substitution' as any, appliesTo: [],
+        description: '', category: 'substitute', appliesTo: [],
       }],
     });
     const nodes = toRailNodes(ir);
@@ -389,7 +389,7 @@ describe('StoreUsage.patternRefs', () => {
       recognizedPatterns: [{
         id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
         ownedNodes: [{ kind: 'rule', nodeId: 'rule-1' }, { kind: 'rule', nodeId: 'rule-2' }],
-        description: '', category: 'substitution' as any, appliesTo: [],
+        description: '', category: 'substitute', appliesTo: [],
       }],
     });
     const nodes = toRailNodes(ir);
@@ -833,5 +833,135 @@ describe('toRailNodes storeRoleLine', () => {
     });
     const nodeX = toRailNodes(ir).find((n) => n.name === 'storeX');
     expect(nodeX?.storeRoleLine).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Predicate unification: owned rules never appear in group glyphs (ghost fix)
+// ---------------------------------------------------------------------------
+
+describe('groupToGlyphs predicate unification — owned rules excluded via ownedRuleIds', () => {
+  it('excludes an owned rule from group glyphs even when ownedByPattern flag is absent', () => {
+    // Simulates the ghost-chip scenario: a rule IS in pattern.ownedNodes (kind=rule)
+    // but rule.ownedByPattern is undefined (flag not set / drift). The unified predicate
+    // must still exclude it.
+    const ownedRule: IRRule = {
+      nodeId: 'n-owned',
+      context: [{ kind: 'vkey', name: 'K_E', modifiers: [] }],
+      output: [{ kind: 'char', value: 'ε' }],
+      // ownedByPattern intentionally absent to simulate drift
+    };
+    const ir = makeIR({
+      stores: [],
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [ownedRule] }],
+      recognizedPatterns: [{
+        id: 'p1', title: 'S-02 Greek', origin: 'recognized',
+        ownedNodes: [{ kind: 'rule', nodeId: 'n-owned' }],
+        description: '', category: 'substitute', appliesTo: [],
+      }],
+    });
+    const glyphs = groupToGlyphs(ir.groups[0]!, ir);
+    expect(glyphs.map((g) => g.gid)).not.toContain('n-owned');
+  });
+
+  it('excludes an owned rule even when ownedByPattern IS set (regression guard)', () => {
+    const ownedRule: IRRule = {
+      nodeId: 'n-owned2',
+      context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
+      output: [{ kind: 'char', value: 'a' }],
+      ownedByPattern: 'p2',
+    };
+    const ir = makeIR({
+      stores: [],
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [ownedRule] }],
+      recognizedPatterns: [{
+        id: 'p2', title: 'Simple', origin: 'recognized',
+        ownedNodes: [{ kind: 'rule', nodeId: 'n-owned2' }],
+        description: '', category: 'substitute', appliesTo: [],
+      }],
+    });
+    const glyphs = groupToGlyphs(ir.groups[0]!, ir);
+    expect(glyphs.map((g) => g.gid)).not.toContain('n-owned2');
+  });
+
+  it('keeps unowned rules visible in group glyphs', () => {
+    const unownedRule: IRRule = {
+      nodeId: 'n-free',
+      context: [{ kind: 'vkey', name: 'K_B', modifiers: [] }],
+      output: [{ kind: 'char', value: 'b' }],
+    };
+    const ir = makeIR({
+      stores: [],
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [unownedRule] }],
+      recognizedPatterns: [],
+    });
+    const glyphs = groupToGlyphs(ir.groups[0]!, ir);
+    expect(glyphs.map((g) => g.gid)).toContain('n-free');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// owner-field population on tied-but-not-owned glyphs
+// ---------------------------------------------------------------------------
+
+describe('CarveGlyph owner fields — tied-but-not-owned glyphs', () => {
+  it('populates ownerKind/ownerNodeId/ownerLabel on a standard rule whose output store is owned by a pattern', () => {
+    // A rule that is NOT in pattern.ownedNodes, but whose output store IS
+    // referenced by a recognized pattern. It is "tied" and should carry owner fields.
+    const tiedRule: IRRule = {
+      nodeId: 'r-tied',
+      context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
+      output: [{ kind: 'index', storeRef: 'outStore', offset: 1 }],
+      // not in ownedNodes of any pattern
+    };
+    const ownedRule: IRRule = {
+      nodeId: 'r-owned',
+      context: [{ kind: 'any', storeRef: 'inStore' }],
+      output: [{ kind: 'index', storeRef: 'outStore', offset: 1 }],
+      ownedByPattern: 'p1',
+    };
+    const ir = makeIR({
+      stores: [
+        { nodeId: 'sid-in', name: 'inStore', items: [{ kind: 'char', value: 'a' }], isSystem: false } as any,
+        { nodeId: 'sid-out', name: 'outStore', items: [{ kind: 'char', value: 'b' }], isSystem: false } as any,
+      ],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [tiedRule, ownedRule],
+      }],
+      recognizedPatterns: [{
+        id: 'p1', title: 'Owner Pattern', origin: 'recognized',
+        ownedNodes: [{ kind: 'rule', nodeId: 'r-owned' }],
+        description: '', category: 'substitute', appliesTo: [],
+      }],
+    });
+    // r-tied is not owned, but its outStore IS referenced by p1's owned rule.
+    // It should appear in group glyphs with owner fields.
+    const glyphs = groupToGlyphs(ir.groups[0]!, ir);
+    const tied = glyphs.find((g) => g.gid === 'r-tied');
+    expect(tied).toBeDefined();
+    // owner fields should be populated because outStore is pattern-tied
+    expect(tied?.ownerKind).toBe('pattern');
+    expect(tied?.ownerNodeId).toBe('p1');
+    expect(tied?.ownerLabel).toBe('Owner Pattern');
+  });
+
+  it('does not populate owner fields on a purely unowned rule with no tied store', () => {
+    const freeRule: IRRule = {
+      nodeId: 'r-free',
+      context: [{ kind: 'vkey', name: 'K_C', modifiers: [] }],
+      output: [{ kind: 'char', value: 'c' }],
+    };
+    const ir = makeIR({
+      stores: [],
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [freeRule] }],
+      recognizedPatterns: [],
+    });
+    const glyphs = groupToGlyphs(ir.groups[0]!, ir);
+    const free = glyphs.find((g) => g.gid === 'r-free');
+    expect(free).toBeDefined();
+    expect(free?.ownerKind).toBeUndefined();
+    expect(free?.ownerNodeId).toBeUndefined();
+    expect(free?.ownerLabel).toBeUndefined();
   });
 });
