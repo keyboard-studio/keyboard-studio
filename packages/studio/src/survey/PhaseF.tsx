@@ -9,6 +9,7 @@ import type { SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts"
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { loadModularFlow } from "./loadModularFlow.ts";
 import type { SurveyContext } from "./types.ts";
+import { phaseContainer, phaseHeading } from "./surveyStyles.ts";
 
 // Vite ?raw import — typed via the `*.yaml?raw` declaration in src/vite-env.d.ts.
 import phaseFRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
@@ -28,21 +29,8 @@ export function PhaseF({ context = {}, onComplete, onBack, findingsByQuestionId 
   const flow = useMemo(() => loadModularFlow(phaseFRaw as string), []);
 
   return (
-    <div
-      style={{
-        background: "#0d1117",
-        color: "#e6edf3",
-        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-      }}
-    >
-      <h2
-        style={{
-          margin: "0 0 20px 0",
-          fontSize: "1.1rem",
-          color: "#6ea8fe",
-          fontWeight: 600,
-        }}
-      >
+    <div style={phaseContainer}>
+      <h2 style={phaseHeading}>
         Phase F — Help documentation
       </h2>
       <SurveyRunner
