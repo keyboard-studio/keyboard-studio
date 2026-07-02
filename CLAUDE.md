@@ -12,8 +12,9 @@ Package manager is **pnpm 9** (Node ≥ 20). Run from the repo root unless noted
 | Build everything | `pnpm build` (runs `prebuild` first — see below) |
 | Typecheck | `pnpm typecheck` |
 | Test everything | `pnpm test` (`pnpm -r test` → each package's vitest) |
-| Lint / format | `pnpm lint` (ESLint over `packages/*/src`, then `pnpm depcruise`) · `pnpm format` (Prettier) |
+| Lint / format | `pnpm lint` (ESLint over `packages/*/src`, then `pnpm depcruise`, then `pnpm crew-lint`) · `pnpm format` (Prettier) |
 | Architecture boundaries | `pnpm depcruise` (dependency-cruiser fitness functions — cross-package layering/team-split/dependency-root rules in [.dependency-cruiser.cjs](.dependency-cruiser.cjs); also run by `pnpm lint`) |
+| Crew-file consistency | `pnpm crew-lint` ([utilities/crew-lint/crew-lint.mjs](utilities/crew-lint/crew-lint.mjs) — 7 machine-enforced checks over `.claude/agents|commands/km-*.md`: no python fences, no emoji, no phantom `packages/` paths, no line-number cross-refs in km-triage.md, agent/command rubric consistency, roster consistency, sentinel-name consistency; also run by `pnpm lint`) |
 | Run the studio SPA | `pnpm dev` (builds `engine`, then runs `engine` watch + `studio` Vite dev server) |
 
 **`prebuild` is not optional for a clean checkout.** `pnpm build` runs it automatically, but a bare `tsc -b` inside a package will fail without it. It does two codegen/fetch steps, both producing build artifacts you should regenerate rather than hand-edit:
@@ -77,7 +78,7 @@ The spec embeds external docs by reference (Sec 19): `docs/KM-Questionnaire.md`,
 - **Single 300 ms debounce cycle (decision D3).** In the studio, the TS-check and the WASM `kmcmplib` oracle run as concurrent microtasks within one debounce cycle. Do not introduce a second debounce timer.
 - **Virtual FS (spec §11).** All authoring happens in an in-memory FS mirroring the `keymanapp/keyboards` layout; serialized at output to a `.zip` (`engine/src/output`) or committed via GitHub OAuth fork+PR. The studio never writes to host disk during authoring.
 - **Two teams (spec §12).** Engine owns the SPA, scaffolder, compiler service, validator, output paths. Content owns the pattern library, survey text, gallery ordering, LLM prompts, and criteria triage. Respect the split when picking up work.
-- **Standalone utilities.** `utilities/*` (kbgen, supportability-scanner, smoke-artifact, spec-trace, km-triage-app, Template Cleanup) are deliberately kept out of `packages/*` so they don't trip `pnpm -r`; run them with `tsx` (see each tool's tsconfig). Do not treat them as built workspace packages.
+- **Standalone utilities.** `utilities/*` (kbgen, supportability-scanner, smoke-artifact, spec-trace, km-triage-app, crew-lint, Template Cleanup) are deliberately kept out of `packages/*` so they don't trip `pnpm -r`; run them with `tsx` or plain node (see each tool's tsconfig/header). Do not treat them as built workspace packages.
 
 ## Pattern schema is a contract
 
@@ -97,7 +98,7 @@ Spec Sec 16. CJK and Ethiopic reorder patterns, LDML output, mobile-app integrat
 
 ## KM crew
 
-The KM crew is a specialist pipeline coordinated by **`/km-lead`**. Agent definitions live in `.claude/agents/km-*.md`; slash-command entry points live in `.claude/commands/km-*.md`.
+The KM crew is a specialist pipeline coordinated by **`/km-lead`**. Agent definitions live in `.claude/agents/km-*.md`; slash-command entry points live in `.claude/commands/km-*.md`. **Crew-file edits are gated by `pnpm crew-lint`** (see the commands table) — run it after touching any `.claude/agents|commands/km-*` file; drift it catches (rubric forks, phantom paths, emoji, rotted refs) has shipped before.
 
 ### The one skill: `/km-lead`
 

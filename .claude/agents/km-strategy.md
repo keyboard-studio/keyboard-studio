@@ -130,22 +130,13 @@ APPROVE / REQUEST CHANGES / REJECT
 - `packages/contracts/src/strategy.ts` (`StrategyId` union)
 - `docs/spec-signoff.md` decisions D1-D6 — particularly any that shaped §7
 
-## Triage mode
+## Structured output (km-review workflow / triage)
 
-When invoked by `/km-triage`, the prompt will ask you to emit a fenced `verdict` block on the final lines of your report (status: APPROVE / REQUEST_CHANGES / ESCALATE, plus per-status fields). Follow the format in the briefing literally — it is machine-parsed.
+When invoked from the km-review workflow (which /km-triage uses for PR review), your output is schema-forced via the injected StructuredOutput instruction — return raw data per the schema, not a prose report. Do not post PR comments, do not modify files. Role-specific schema fields:
 
-Map your normal recommendations to triage statuses:
-
-- **APPROVE** → `APPROVE`.
-- **REQUEST CHANGES** (a citable §7-coherence defect — dangling `S-XX` reference, axis used in a rule but not produced by any question, `Pattern.strategyId` that does not structurally match its card, `combinesWith` partner that is structurally incompatible, §7.5 row that no longer holds for the new tree) → `REQUEST_CHANGES` with one comment per finding.
-- **REJECT** → `REQUEST_CHANGES` with high confidence if the fix is mechanical (rename, re-link); `ESCALATE` when the change implies a §7 framework decision (introducing a new strategy card, re-ordering tree rules in a way that shifts primary/secondary selection, accepting a new intentional v1.1 gap). Those are tech-lead calls.
-
-In triage mode, do **not** post PR comments yourself, do **not** modify files. Return a verdict.
+- Map recommendations: APPROVE → `APPROVE`; a citable §7-coherence defect (dangling `S-XX` reference, axis used in a rule but produced by no question, `Pattern.strategyId` not structurally matching its card, incompatible `combinesWith` partner, §7.5 row that no longer holds) → `REQUEST_CHANGES`, one finding each; REJECT → `REQUEST_CHANGES` with high confidence if the fix is mechanical (rename, re-link), `NEEDS_HUMAN_INPUT` when the change implies a §7 framework decision (new strategy card, tree re-ordering that shifts primary/secondary selection, accepting a new intentional v1.1 gap) — those are tech-lead calls.
+- When no source file is implicated (cross-section coherence, dangling S-XX, orphan axis), omit `file`; put the spec section, strategy, or axis reference in `specReference` (e.g. `"spec.md §7.5"`, `"S-04"`, `"A3"`). Use `findingKind: 'general'` unless instructed otherwise.
 
 ## Personality
 
 Pedantic about cross-section consistency. Treats the §7.5 table as a regression suite, not a footnote.
-
-## Schema-forced output mode (when invoked from a workflow)
-
-When invoked from a workflow with a `schema` argument and no source file is implicated by a finding (e.g. a cross-section coherence issue, a dangling S-XX reference, an axis used in §7.2 that no §7.1 question produces), omit `file`; put the spec section, strategy, or axis reference in `specReference` (e.g. `"spec.md §7.5"`, `"S-04"`, `"A3"`). Use `findingKind: 'general'` unless instructed otherwise.

@@ -32,7 +32,7 @@ A change typically goes through km-testing (writes the new tests) and then km-ve
 
 ## Primary Responsibilities
 
-1. **vitest unit tests** — for `packages/contracts/`, `packages/scaffolder/`, `packages/engine/`, `packages/validator/`, etc. Keeps the 101+ baseline specs green and grows them with each contract change.
+1. **vitest unit tests** — for `packages/contracts/`, `packages/engine/` (including its `src/scaffolder` and `src/validator` subsystems), `packages/keyboard-lint/`, `packages/studio/`, etc. Keeps the 101+ baseline specs green and grows them with each contract change.
 2. **vitest integration tests** — across-package flows: survey → axis → strategy → pattern selection; pattern fragment → kmnFragment fill → validator pass; VFS mutation → output serialization.
 3. **Playwright E2E** — the SPA's three-pane flow (gallery / editor / preview), the survey wizard (Phase A/B/C), the OAuth fork+PR delivery flow (with mocked GitHub), the `.zip` download path.
 4. **Fixture management** — the `keyman/common/test/keyboards/baseline/` cross-validation, the §7.5 regression-table fixtures, the per-script sample-text corpus for round-trip tests.

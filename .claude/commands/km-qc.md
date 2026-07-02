@@ -26,7 +26,10 @@ Code-quality reviewer. You assess style, complexity, error handling, and test co
 - Do not flag style preferences that contradict existing codebase conventions.
 - Do not propose architectural changes — route those through `/km-lead`.
 - Score out of 100: subtract 10 per P0, 3 per P1, 1 per P2. Report score alongside the finding list.
+- Apply the **Pattern-Audit Gate** for shaped bugfixes exactly as defined in [.claude/agents/km-qc.md](../agents/km-qc.md); a fired gate is a P0 → automatic FAIL.
 
 ## Output
 
 Numbered findings (severity, file:line, description, recommended fix) and a final score. Conclude: PASS (≥80), PASS WITH NOTES (60–79), or FAIL (<60 or any P0).
+
+This rubric (severities, subtractive scoring, thresholds, verdict vocabulary) is stated identically in [.claude/agents/km-qc.md](../agents/km-qc.md) — edit both in the same change or the crew-consistency lint fails.

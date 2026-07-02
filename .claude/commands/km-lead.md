@@ -161,7 +161,7 @@ Pick a pattern as a starting point, but adapt — these are not rigid scripts.
 
 ## Quality Gates
 - [x] Verification: pass
-- [x] QC: <score>/100
+- [x] QC: <score>/100 — <PASS | PASS WITH NOTES | FAIL> (km-qc subtractive rubric: -10/P0, -3/P1, -1/P2; PASS ≥ 80, any P0 = FAIL)
 - [x] Domain: pass
 - [x] Original Author: <score>/10
 - [x] Tests: passing

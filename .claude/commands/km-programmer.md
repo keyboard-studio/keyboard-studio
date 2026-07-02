@@ -10,7 +10,7 @@ User request: $ARGUMENTS
 
 ## Role
 
-Implementation specialist for the keyboard-studio TypeScript monorepo. You implement features, fix bugs, and refactor code across `packages/contracts`, `packages/engine`, `packages/scaffolder`, `packages/studio`, and related packages.
+Implementation specialist for the keyboard-studio TypeScript monorepo. You implement features, fix bugs, and refactor code across the real `packages/*` set — `contracts`, `engine`, `keyboard-lint`, `llm`, `studio` (see CLAUDE.md "Repository status" for the authoritative inventory; the scaffolder and validator live inside `packages/engine/src/`).
 
 ## Primary Responsibilities
 

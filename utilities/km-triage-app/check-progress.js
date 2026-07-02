@@ -12,7 +12,7 @@
 //     --pr <N> --head <SHA> --status in_progress|completed \
 //     [--conclusion success|action_required|...] \
 //     [--title "one-line"] \
-//     [--summary-file <path-to-markdown-body>]
+//     [--summary-file <path-to-markdown-body> | --summary-text "inline markdown (\n expands)"]
 //
 // Required env:
 //   KM_TRIAGE_SWEEP_ID - identifies the per-sweep sidecar; defaults to a fresh
@@ -83,6 +83,12 @@ function writeSidecar(sweepId, data) {
 function loadSummary(args) {
   if (args['summary-file']) {
     return fs.readFileSync(args['summary-file'], 'utf8');
+  }
+  // --summary-text takes the markdown body inline, so callers don't need a
+  // heredoc + temp file just to set a check summary. Literal "\n" sequences
+  // are expanded to newlines (shells make real newlines in args awkward).
+  if (typeof args['summary-text'] === 'string') {
+    return args['summary-text'].replace(/\\n/g, '\n');
   }
   return undefined;
 }

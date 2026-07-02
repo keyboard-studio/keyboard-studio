@@ -1,9 +1,27 @@
+// ---------------------------------------------------------------------------
+// Crew-shape decision (2026-07-02, converging km-triage Phases 4-5 onto this
+// workflow): the skeptic+aggregator shape defined here is CANONICAL, and the
+// old flat km-triage crews (ENGINE {km-verification, km-qc, km-synthesis} /
+// CONTENT {km-domain, km-keyman, km-strategy}) are retired. Rationale:
+//   - km-verification reviewing as a primary would let it self-review its own
+//     findings when it later acts as universal skeptic; same for km-synthesis
+//     as aggregator (structural role-conflict flagged in the v2 smoke-test
+//     self-audit on PR #197). The old ENGINE crew had exactly that conflict.
+//   - The schemas below are the ONE verdict/fixability vocabulary for both
+//     triage and interactive review: APPROVE / REQUEST_CHANGES /
+//     NEEDS_HUMAN_INPUT, and autoFixable: boolean (the old fenced-verdict
+//     `fixability: auto|needs_human_input` contract is retired with it).
+// All four primaries are eligible on every PR regardless of crew; the caller
+// passes `crew` as a lens-emphasis hint and `skipReviewers` (from km-triage's
+// pre-filters B/C/E) to drop individual primaries by name.
+// ---------------------------------------------------------------------------
+
 export const meta = {
   name: "km-review",
   description:
     "Four-primary-reviewer PR review pipeline (km-keyman, km-strategy, km-qc, km-domain); km-verification acts as universal skeptic and km-synthesis as final aggregator. Returns per-reviewer findings, km-verification verdicts on each finding, and a synthesis verdict. Does NOT merge, push, or post GitHub comments — those stay in the main session.",
   whenToUse:
-    "Invoke for any keyboard-studio PR that passes the km-triage Phase-2/3 gates and needs substantive crew review. Pass prNumber (required) and depth ('thorough' or 'quick', default 'thorough').",
+    "The review core for /km-triage Phases 4-5 and for any keyboard-studio PR that needs substantive crew review. Pass prNumber (required) and depth ('thorough' or 'quick', default 'thorough'); triage additionally passes crew, diffPath/filesPath, reviewRange, skipReviewers, previousReviewContext, and leadReplyContext.",
   phases: [
     {
       title: "Review",
@@ -176,22 +194,74 @@ const REVIEWERS = [
 // Prompt builders
 // ---------------------------------------------------------------------------
 
+function diffInstructions(prNumber) {
+  // Triage passes a diff cached to disk once for the whole crew (km-triage
+  // Pre-filter A); standalone invocations fall back to gh pr diff.
+  if (!diffPath) {
+    return `1. Fetch the PR diff: gh pr diff ${prNumber}`;
+  }
+  const lines = [
+    `1. Read the CACHED diff from disk: ${diffPath}`,
+    `   File list for this review range: ${filesPath ?? "(not provided)"}`,
+    `   Do NOT re-run \`gh pr diff\` or \`git diff\` yourself — the cache holds the same data.`,
+  ];
+  if (reviewRange === "incremental" && lastAuditedSha) {
+    lines.push(
+      `   This is an INCREMENTAL review: the cached diff covers only ${lastAuditedSha}..${headSha ?? "HEAD"}.`,
+      `   Do NOT re-review code outside this range — earlier sweeps already reviewed it.`
+    );
+  }
+  if (excludedFiles.length > 0) {
+    lines.push(
+      `   IMPORTANT — excluded diff bodies: the cached diff omits ${excludedFiles.join(", ")} (generated/oversized/binary).`,
+      `   Those files still appear in the file list; to review one, fetch it directly with \`git show ${headSha ?? "<head-sha>"}:<path>\` and cite real file line numbers. Never cite line numbers for an excluded file from the diff.`
+    );
+  }
+  if (headSha) {
+    lines.push(
+      `   If you need the current state of a whole file (the diff doesn't snapshot contents), use \`git show ${headSha}:<path>\`.`
+    );
+  }
+  return lines.join("\n");
+}
+
+function contextBlocks(reviewer) {
+  const blocks = [];
+  const prev = previousReviewContext[reviewer.key] ?? previousReviewContext[reviewer.agentType];
+  if (prev) {
+    blocks.push(`=== Previous review context ===
+${prev}
+=== End previous review context ===
+
+Your job is narrower on a re-review: assess the incremental diff in light of what you already flagged. A prior finding the new commits resolve is NOT re-listed; a prior finding still present at the current head IS re-listed with "(carried from prior review)" in its rationale; new issues are flagged normally. If everything is resolved and nothing new appears, verdict APPROVE.`);
+  }
+  if (leadReplyContext) {
+    blocks.push(`=== Human replies since the last triage action ===
+${leadReplyContext}
+=== End human replies ===
+
+Treat these replies as new context — they often answer questions the triage previously escalated. A reply that picks an option with a concrete mechanical fix -> finding with autoFixable: true and an exact suggestedFix. A freeform answer that still needs judgment -> keep the finding, autoFixable: false. A reply confirming the existing state is acceptable -> mark resolved (do not re-list). Conversational replies with no operational content are ignored for verdict purposes.`);
+  }
+  return blocks.length ? blocks.join("\n\n") + "\n\n" : "";
+}
+
 function reviewPrompt(reviewer, prNumber, depth) {
   return `You are reviewing PR #${prNumber} in the keyboard-studio monorepo as the ${reviewer.agentType} specialist.
 
 Depth: ${depth}
+Crew emphasis: ${crew} (route your attention accordingly; your lens still applies to the whole diff)
 
 Your lens for this review:
 ${reviewer.lens}
 
-Steps:
-1. Fetch the PR diff: gh pr diff ${prNumber}
+${contextBlocks(reviewer)}Steps:
+${diffInstructions(prNumber)}
 2. Read any files in the diff that fall within your domain.
 3. Apply your normal review process per .claude/agents/${reviewer.agentType}.md.
 4. Return a structured findings object matching the schema you will be given.
 
 SCOPE DISCIPLINE — only review what THIS PR changes:
-- Review only files modified in the PR diff (\`gh pr diff ${prNumber}\` output).
+- Review only files modified in the PR diff.
 - Do NOT follow links, references, or imports out of the diff into other files unless that other file is ALSO in the diff. If a docs change adds a link to file X and X is not in the diff, do not review X — flag it as out-of-scope context only.
 - Pre-existing defects in unchanged files are NOT this PR's responsibility. Mention them only as a single advisory finding ("pre-existing: ...", severity: nit) at most, and only if directly relevant to the diff.
 - Your job is to gate THIS PR, not to audit the codebase.
@@ -217,6 +287,9 @@ Finding (from ${reviewerKey}):
 
 Steps:
 1. Fetch the relevant file/line from the PR diff or repo to check whether the finding is accurate.
+   Apply the verification cost ladder from .claude/agents/km-verification.md: start at L1
+   (grep/Read the cited lines, targeted single-test probes) and escalate only if L1 cannot
+   answer; state in your rationale which tier you used and, if above L1, why.
 2. Determine whether the issue is real, a false positive, or partially correct.
 3. Return a VERDICT_SCHEMA object: isReal, confidence, rationale, counterpoint (if you disagree or see nuance).
    - Schema-forced output: if the finding is real but milder than claimed, set partiallyTrue: true and use severityOverride to indicate the appropriate severity. Place the repro command in reproduceCommand and a one-line outcome in evidenceSummary.
@@ -394,7 +467,21 @@ while (typeof parsedArgs === "string" && decodeRounds < 3) {
   decodeRounds++;
 }
 parsedArgs = parsedArgs ?? {};
-const { prNumber, depth = "thorough" } = parsedArgs;
+const {
+  prNumber,
+  depth = "thorough",
+  // Triage-integration args (all optional; standalone runs omit them):
+  crew = "both",                 // 'engine' | 'content' | 'both' — lens-emphasis hint only
+  diffPath = null,               // cached diff from km-triage Pre-filter A (cache-diff.js)
+  filesPath = null,              // cached file list (full, exclusions NOT applied)
+  headSha = null,                // current head SHA, for `git show <sha>:<path>`
+  reviewRange = "full",          // 'full' | 'incremental'
+  lastAuditedSha = null,         // start of the incremental range
+  excludedFiles = [],            // paths whose diff bodies were excluded from the cache
+  skipReviewers = [],            // reviewer keys or agentType names dropped by pre-filters B/C/E
+  previousReviewContext = {},    // { [reviewerKeyOrAgentType]: string } prior-verdict summaries
+  leadReplyContext = null,       // human comments since the last triage mention/escalation
+} = parsedArgs;
 if (!prNumber) {
   throw new Error(
     `km-review requires args.prNumber. typeof args=${typeof args}, ` +
@@ -403,10 +490,38 @@ if (!prNumber) {
   );
 }
 
-// Run the review + verify pipeline across all four primary reviewers.
+// Apply the caller's skip list (km-triage pre-filters B/C/E). Accept both
+// the short key ('qc') and the agentType ('km-qc'). km-verification and
+// km-synthesis are pipeline roles, not primaries — a skip request naming
+// them is ignored (log it so the audit shows the request was seen).
+const skipSet = new Set(skipReviewers);
+const activeReviewers = REVIEWERS.filter(
+  (r) => !skipSet.has(r.key) && !skipSet.has(r.agentType)
+);
+const skippedReviewers = REVIEWERS.filter(
+  (r) => skipSet.has(r.key) || skipSet.has(r.agentType)
+).map((r) => r.agentType);
+const unskippableRequested = skipReviewers.filter(
+  (s) => ["km-verification", "km-synthesis", "verification", "synthesis"].includes(s)
+);
+if (unskippableRequested.length > 0) {
+  log(
+    `skipReviewers named pipeline roles that cannot be skipped: ${unskippableRequested.join(", ")} (they are skeptic/aggregator, not primaries)`
+  );
+}
+if (skippedReviewers.length > 0) {
+  log(`primaries skipped by caller pre-filters: ${skippedReviewers.join(", ")}`);
+}
+if (activeReviewers.length === 0) {
+  throw new Error(
+    "km-review: skipReviewers removed every primary reviewer — the caller's empty-crew guard should have fired before invoking the workflow"
+  );
+}
+
+// Run the review + verify pipeline across the active primary reviewers.
 // pipeline(items, stage1, stage2) — no barrier between stages per item;
 // stage2 signature is (prevResult, originalItem, index) (contract rule 5).
-const perReviewerResults = await pipeline(REVIEWERS, reviewStage, verifyStage);
+const perReviewerResults = await pipeline(activeReviewers, reviewStage, verifyStage);
 
 // v2 (P0-3/P0-4): collect full verify envelopes, distinguishing:
 //   - null  → user-skipped lane (pipeline level null from verifyStage)
@@ -431,8 +546,13 @@ const synthesis = await agent(
 
 // Return value consumed by the main session for auto-fix decision,
 // check_run publish, and @-mention. Those steps stay in the main session.
+// km-triage's Phase-5 action mapping consumes synthesis.verdict, confirmed
+// (with per-finding autoFixable/suggestedFix), and verifyEnvelopes (one
+// audit-log verdicts[] entry per envelope).
 return {
   prNumber,
+  crew,
+  skippedReviewers,
   verifyEnvelopes,
   confirmed: allVerifiedFindings.filter((v) => v.verdict?.isReal),
   refuted: allVerifiedFindings.filter((v) => v.verdict && !v.verdict.isReal),

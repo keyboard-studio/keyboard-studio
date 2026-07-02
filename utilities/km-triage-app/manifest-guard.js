@@ -14,6 +14,12 @@
 // Usage (require):
 //   const { isManifestPath } = require('./manifest-guard');
 //   if (isManifestPath(filePath)) { /* needs human */ }
+//
+// Usage (CLI - the km-triage Phase-6 precondition invokes this instead of
+// re-applying the rule inline):
+//   node utilities/km-triage-app/manifest-guard.js <path> [<path> ...]
+// Prints each manifest path found (one per line). Exit code 1 if ANY given
+// path is a manifest (abort auto-fix, reroute to MENTION_ONLY), 0 if none.
 
 'use strict';
 
@@ -44,3 +50,16 @@ function isManifestPath(filePath) {
 }
 
 module.exports = { isManifestPath };
+
+if (require.main === module) {
+  const paths = process.argv.slice(2);
+  if (paths.length === 0) {
+    process.stderr.write(
+      'usage: manifest-guard.js <path> [<path> ...]  (exit 1 if any path is a dependency manifest/lockfile)\n'
+    );
+    process.exit(2);
+  }
+  const matches = paths.filter(isManifestPath);
+  for (const m of matches) process.stdout.write(m + '\n');
+  process.exit(matches.length > 0 ? 1 : 0);
+}

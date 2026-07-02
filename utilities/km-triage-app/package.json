@@ -2,12 +2,13 @@
   "name": "km-triage-app",
   "private": true,
   "version": "0.0.0",
-  "description": "One-time setup + installation-token mint for the km-triage GitHub App. Used by .claude/commands/km-triage.md so its reviews are attributed to km-triage[bot] (satisfying the main-branch ruleset's required-review count without colliding with the author self-approval block).",
+  "description": "Helpers for the km-triage GitHub App and sweep: one-time setup, installation-token mint, sweep bootstrap, diff caching, progress/check-run/audit emission. Used by .claude/commands/km-triage.md so PR-mutating actions are attributed to km-triage[bot] and so the required km-triage/review check-run (the actual merge gate on main) can be published.",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "setup": "node setup.js",
-    "mint": "node mint-token.js"
+    "mint": "node mint-token.js",
+    "test": "node --test"
   }
 }
