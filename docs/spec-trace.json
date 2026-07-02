@@ -445,7 +445,7 @@
     },
     "specs/022-qu-library-demote": {
       "title": "Feature Specification: Library demote — demote the `pb_*` battery and the full Phase A to reserve/library under the no-delete guardrail",
-      "hash": "sha256:3cd6cd6d53be4c86",
+      "hash": "sha256:ac9af55293e53c62",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
