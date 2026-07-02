@@ -295,7 +295,7 @@ SCOPE DISCIPLINE — only review what THIS PR changes:
    - verdict: APPROVE if no actionable findings; REQUEST_CHANGES if specific issues exist; NEEDS_HUMAN_INPUT if a design call or spec ambiguity blocks you.
    - Every finding MUST include title, severity, and rationale. Include file/line when locatable. The 'file' field is OPTIONAL — omit it when a finding implicates a cross-section coherence issue, a linguistic premise, or a spec-level concern with no single source file.
    - Set autoFixable: true only when the fix is mechanical and unambiguous (rename, remove line, single codepoint swap).
-   - When a finding needs the tech lead's judgment (it is NOT mechanically fixable and you are emitting NEEDS_HUMAN_INPUT for it), set that finding's `question` field to the exact question you want the tech lead to answer. It surfaces on the PR for the human to decide, so make it specific and self-contained.
+   - When a finding needs the tech lead's judgment (it is NOT mechanically fixable and you are emitting NEEDS_HUMAN_INPUT for it), set that finding's \`question\` field to the exact question you want the tech lead to answer. It surfaces on the PR for the human to decide, so make it specific and self-contained.
    - Schema-forced output: use the per-agent schema fields documented in your .claude/agents/${reviewer.agentType}.md under the "Schema-forced output mode" heading when that heading is present. Set findingKind on every finding when you are km-synthesis; use specReference/checkId for Layer-A citations when you are km-keyman; set linguisticCategory when you are km-domain; emit the pattern-audit gate finding with gateId: 'pattern-audit' when you are km-qc.
 
 Do NOT post GitHub comments, push, or merge. Return only the structured output.`;
@@ -370,7 +370,7 @@ Steps:
    - APPROVE only if zero confirmed findings AND no ESCALATED_ON_ERROR slots AND the contradictory-dissent guard did not fire.
    - NEEDS_HUMAN_INPUT if any confirmed finding is not autoFixable and requires a design/spec judgment, OR if any reviewer slot was ESCALATED_ON_ERROR, OR the contradictory-dissent guard fired.
    - REQUEST_CHANGES otherwise.
-5. Partition confirmed findings into autoFixable[] (an array of finding TITLE strings) and humanDecisionNeeded[] by their autoFixable flag. Each humanDecisionNeeded item is an object { title, question? }: copy the escalated finding's `question` field into `question` when the reviewer set one (the reviewer's exact question for the tech lead), and omit `question` when the finding has none. Contradictory-dissent guard entries from step 4 also go in humanDecisionNeeded with their generated question.
+5. Partition confirmed findings into autoFixable[] (an array of finding TITLE strings) and humanDecisionNeeded[] by their autoFixable flag. Each humanDecisionNeeded item is an object { title, question? }: copy the escalated finding's \`question\` field into \`question\` when the reviewer set one (the reviewer's exact question for the tech lead), and omit \`question\` when the finding has none. Contradictory-dissent guard entries from step 4 also go in humanDecisionNeeded with their generated question.
 6. Write a concise summary (<=200 words) suitable for the check_run output_text.
 7. Return the SYNTHESIS_SCHEMA object.
 
