@@ -96,7 +96,7 @@ Once the three flows have cut over (Stories 1–3) and the golden comparisons co
 - **FR-004**: All `TODO(#410)` markers in the three cut-over phase components MUST be removed once their respective cutovers land.
 - **FR-005**: The questions asked, their order, defaults/seeds, branching, and validation for Phase A, Phase F, and identity-lite MUST be identical before and after the cutover (verified by a golden comparison of modular-vs-legacy flow output per phase).
 - **FR-006**: A golden comparison of modular-vs-legacy output MUST pass for a phase **before** any of that phase's legacy YAML is deleted.
-- **FR-007**: The two Playwright E2E lanes (the remaining #410 AC#3) MUST be unblocked (no longer skipped) and MUST pass against the cut-over flows.
+- **FR-007**: Playwright E2E lane 1 (copy-edit, Track 1) MUST be unblocked (no longer skipped) and MUST pass against the cut-over flows. Lane 2 (import-improve, Track 2) MUST be unblocked and MUST pass **only once Track 2 import is confirmed live**; if Track 2 import is not yet live, lane 2 MUST remain `.skip`-ped with the blocked-on-Track-2 status documented (per T022) rather than stubbed green.
 - **FR-008**: After the cutover and passing comparisons, the legacy full-YAML loader (`survey/loadFlow.ts` and its test) MUST be deleted.
 - **FR-009**: After the cutover and passing comparisons, the four legacy full-flow files (`phase_a_identity.yaml`, `phase_b_characters.yaml`, `phase_f_helpdocs.yaml`, `identity_lite.yaml`) MUST be deleted.
 - **FR-010**: The thin modular manifests (`content/flows/*.modular.yaml`) and the flow examples (`content/flows/_examples/*`) MUST be retained.
@@ -120,7 +120,8 @@ Once the three flows have cut over (Stories 1–3) and the golden comparisons co
 - **SC-001**: 100% of survey flows (A, B, F, identity-lite) resolve through the single modular loader; zero flows depend on the legacy full-YAML loader after the deletion change.
 - **SC-002**: For each of Phase A, Phase F, and identity-lite, the post-cutover question set, order, defaults, branching, and validation match the pre-cutover flow with zero differences (golden comparison passes).
 - **SC-003**: Zero `TODO(#410)` markers remain in the survey source after the cutover.
-- **SC-004**: Both Playwright E2E lanes run unskipped and pass.
+- **SC-004a**: Playwright E2E lane 1 (copy-edit) runs unskipped and passes.
+- **SC-004b**: Playwright E2E lane 2 (import-improve) runs unskipped and passes **iff** Track 2 import is confirmed live; otherwise it is recorded as blocked-on-Track-2 (per T022), not counted as a failure.
 - **SC-005**: Zero questions lose their research/content: every question module that survives manifest-dereferencing still compiles and its unit tests still pass; no non-Roman-script research module is deleted.
 - **SC-006**: The legacy loader and the four legacy full-flow files are removed, and the deletion change can be reverted in isolation without disturbing the cutover.
 - **SC-007**: The codebase builds and typechecks with all import extensions intact (no resolution failures introduced by moves/edits).
