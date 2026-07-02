@@ -6,6 +6,10 @@
 //                            hoverInfoStore carrying the chip's disabledReason,
 //                            mirroring GlyphCell's not-removable pattern.
 //   - "nul-fill" / "drop"  → clicking DOES call onToggle(chipId).
+//
+// Hover/focus on a NON-disabled chip populates the hover panel with the
+// character + codepoint (mirroring GlyphCell's enabled-hover path), rather
+// than clearing it.
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
@@ -88,5 +92,30 @@ describe('StoreChip — toggleable actions (nul-fill / drop)', () => {
     const chip = makeChip({ ch: ' ' });
     const { getByText } = render(<StoreChip chip={chip} off={false} onToggle={vi.fn()} />);
     expect(getByText('SPACE')).toBeDefined();
+  });
+
+  it('hovering an enabled chip sets hover info with codepoint content, not clearInfo', () => {
+    const chip = makeChip({ ch: 'ɛ', action: 'drop' });
+    const { container } = render(<StoreChip chip={chip} off={false} onToggle={vi.fn()} />);
+    fireEvent.mouseEnter(container.querySelector('button')!);
+    const info = useHoverInfoStore.getState().info;
+    expect(info).toMatchObject({ kind: 'text', title: 'ɛ', body: 'U+025B' });
+  });
+
+  it('focusing an enabled chip sets hover info with codepoint content', () => {
+    const chip = makeChip({ ch: 'a', action: 'nul-fill' });
+    const { container } = render(<StoreChip chip={chip} off={false} onToggle={vi.fn()} />);
+    fireEvent.focus(container.querySelector('button')!);
+    const info = useHoverInfoStore.getState().info;
+    expect(info).toMatchObject({ kind: 'text', title: 'a', body: 'U+0061' });
+  });
+
+  it('mouse-leaving an enabled chip clears hover info', () => {
+    const chip = makeChip({ ch: 'a' });
+    const { container } = render(<StoreChip chip={chip} off={false} onToggle={vi.fn()} />);
+    const button = container.querySelector('button')!;
+    fireEvent.mouseEnter(button);
+    fireEvent.mouseLeave(button);
+    expect(useHoverInfoStore.getState().info).toBeNull();
   });
 });

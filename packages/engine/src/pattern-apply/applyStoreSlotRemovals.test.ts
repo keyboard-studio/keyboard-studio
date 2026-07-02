@@ -1089,7 +1089,7 @@ describe("applyStoreSlotRemovals — end-to-end blocked-class dispatch", () => {
           w.includes('store "dualStore"') &&
           w.includes("blocked from editing") &&
           w.includes(
-            "it is both an output target and an input source (any()/notany()) across the rule set.",
+            "it is both an output target and an input source (any()) across the rule set.",
           ),
       ),
     ).toBe(true);

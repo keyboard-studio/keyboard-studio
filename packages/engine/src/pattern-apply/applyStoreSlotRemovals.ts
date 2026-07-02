@@ -78,10 +78,13 @@ export interface StoreSlotRemovalResult {
  *                              this store's positions out of alignment with the
  *                              paired output store. Deferred to a follow-up.
  * - `dual-use`              — store is both an output target (index()/outs()) and
- *                              an input source (any()/notany()) somewhere in the
- *                              rule set. Previously such stores were nul-filled;
- *                              this is now deliberately blocked pending a decision
- *                              on which behavior is safe for the dual role.
+ *                              an input source (any()) somewhere in the rule set.
+ *                              (notany() sources are caught earlier by
+ *                              `notany-widens`, so dual-use can only ever pair
+ *                              with any().) Previously such stores were
+ *                              nul-filled; this is now deliberately blocked
+ *                              pending a decision on which behavior is safe
+ *                              for the dual role.
  */
 export type StoreSlotBlockReason =
   | "system-store"
@@ -176,8 +179,20 @@ function computeStoreUsage(storeName: string, ir: KeyboardIR): StoreUsageFlags {
 // ---------------------------------------------------------------------------
 
 /**
+ * Result of {@link classifyStoreSlotEditWithUsage}: the chosen edit mode plus
+ * the usage flags that produced it, so callers that already need `usage`
+ * (e.g. the would-empty guard's `asAnySource` check) don't have to re-scan
+ * the rule set via a second {@link computeStoreUsage} call.
+ */
+interface StoreSlotEditClassification {
+  mode: StoreSlotEditMode;
+  usage: StoreUsageFlags;
+}
+
+/**
  * Classify how slots in `store` may be edited, given its usage across every
- * rule in `ir`. Decision order (first match wins):
+ * rule in `ir`, and return the usage flags alongside the decision so callers
+ * can reuse them without re-scanning. Decision order (first match wins):
  *
  *   1. `store.isSystem`                        → blocked "system-store"
  *   2. referenced by `notany()`                → blocked "notany-widens"
@@ -191,38 +206,61 @@ function computeStoreUsage(storeName: string, ir: KeyboardIR): StoreUsageFlags {
  * @param store  The store whose slots are being targeted.
  * @param ir     The full IR (scanned for every rule's use of `store.name`).
  */
-export function classifyStoreSlotEdit(store: IRStore, ir: KeyboardIR): StoreSlotEditMode {
+function classifyStoreSlotEditWithUsage(store: IRStore, ir: KeyboardIR): StoreSlotEditClassification {
   if (store.isSystem) {
-    return { mode: "blocked", reason: "system-store" };
+    // No rule scan needed: system stores are blocked unconditionally. Usage
+    // flags are reported as all-false since they were never computed.
+    return {
+      mode: { mode: "blocked", reason: "system-store" },
+      usage: {
+        asEmitOutput: false,
+        asAnySource: false,
+        asNotAny: false,
+        asContextIndex: false,
+        pairedInput: false,
+      },
+    };
   }
 
   const usage = computeStoreUsage(store.name, ir);
 
   if (usage.asNotAny) {
-    return { mode: "blocked", reason: "notany-widens" };
+    return { mode: { mode: "blocked", reason: "notany-widens" }, usage };
   }
 
   if (usage.asContextIndex) {
-    return { mode: "blocked", reason: "context-index-aligned" };
+    return { mode: { mode: "blocked", reason: "context-index-aligned" }, usage };
   }
 
   // usage.asNotAny is never true here — it returns "notany-widens" above —
   // so only asAnySource can co-occur with asEmitOutput to trigger dual-use.
   if (usage.asEmitOutput && usage.asAnySource) {
-    return { mode: "blocked", reason: "dual-use" };
+    return { mode: { mode: "blocked", reason: "dual-use" }, usage };
   }
 
   if (usage.asEmitOutput) {
-    return { mode: "nul-fill" };
+    return { mode: { mode: "nul-fill" }, usage };
   }
 
   if (usage.pairedInput) {
-    return { mode: "blocked", reason: "paired-input" };
+    return { mode: { mode: "blocked", reason: "paired-input" }, usage };
   }
 
   // asAnySource (unpaired) or entirely unreferenced both drop safely: there is
   // no positional contract (index() alignment) to preserve in either case.
-  return { mode: "drop" };
+  return { mode: { mode: "drop" }, usage };
+}
+
+/**
+ * Classify how slots in `store` may be edited, given its usage across every
+ * rule in `ir`. Thin wrapper over {@link classifyStoreSlotEditWithUsage} for
+ * callers that only need the decision (e.g. the studio's chip classifier).
+ *
+ * @param store  The store whose slots are being targeted.
+ * @param ir     The full IR (scanned for every rule's use of `store.name`).
+ */
+export function classifyStoreSlotEdit(store: IRStore, ir: KeyboardIR): StoreSlotEditMode {
+  return classifyStoreSlotEditWithUsage(store, ir).mode;
 }
 
 /**
@@ -245,7 +283,7 @@ function blockReasonMessage(reason: StoreSlotBlockReason): string {
         "dropping would break positional alignment with the paired output store."
       );
     case "dual-use":
-      return "it is both an output target and an input source (any()/notany()) across the rule set.";
+      return "it is both an output target and an input source (any()) across the rule set.";
   }
 }
 
@@ -316,7 +354,7 @@ export function applyStoreSlotRemovals(
       continue;
     }
 
-    const editMode = classifyStoreSlotEdit(store, baseIr);
+    const { mode: editMode, usage } = classifyStoreSlotEditWithUsage(store, baseIr);
 
     if (editMode.mode === "blocked") {
       warnings.push(
@@ -395,8 +433,10 @@ export function applyStoreSlotRemovals(
       // artifact at all — a silent build failure. The drop class covers
       // exactly any()-only (asAnySource) + entirely-unreferenced stores
       // (see classifyStoreSlotEdit), so only the any()-referenced case
-      // needs refusing here.
-      if (computeStoreUsage(store.name, baseIr).asAnySource) {
+      // needs refusing here. `usage` was already computed by
+      // classifyStoreSlotEditWithUsage above — reuse it instead of
+      // re-scanning every rule in the IR a second time.
+      if (usage.asAnySource) {
         warnings.push(
           `[store-slot] refusing to empty store "${store.name}" - a store consumed by any() compiles to a keyboard that silently fails to build when empty; remove the whole store and its rules instead`,
         );
