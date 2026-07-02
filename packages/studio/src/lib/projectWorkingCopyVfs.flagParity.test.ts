@@ -136,6 +136,15 @@ const SCENARIOS: Array<{
     name: "bare rule item id (whole-node path)",
     overlay: { deletedItemIds: new Set(["rule#c"]) },
   },
+  {
+    // #523 — a drop-class store chip (store#extra/extraX is unreferenced by
+    // any rule, so classifyStoreSlotEdit returns "drop", not "nul-fill").
+    // Inline fixture only (no golden file), per the flagParity CRLF-golden
+    // caveat: this scenario is proved through the SCENARIOS loop, not a
+    // committed golden artifact.
+    name: "store-chip drop-class rewrite (unreferenced store)",
+    overlay: { deletedItemIds: new Set(["store#extra#0"]) },
+  },
 ];
 
 describe("projectWorkingCopyVfs — carve flag parity (flag-on === flag-off emit)", () => {
