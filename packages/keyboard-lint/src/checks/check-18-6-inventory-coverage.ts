@@ -14,6 +14,9 @@
 //   - Expands {kind:"outs"} and {kind:"index"} store references item-by-item (each
 //     item.value NFC-normalized individually; no cross-item run merging).
 //   - Ignores {kind:"deadkey"}, {kind:"beep"}, {kind:"raw"} elements.
+//   - Folds in RawKmnFragment.producedOutput sketches (output-side content of
+//     opaque rules, extracted by the codec). Irrelevant here: the scope guard
+//     below skips any IR with fragments before buildProducedSet is called.
 //   - Excludes control characters U+0000-U+001F, DEL U+007F, and U+0020 SPACE by default.
 //
 // For each LinguistInventory char NOT in the emittable set, emit one finding.

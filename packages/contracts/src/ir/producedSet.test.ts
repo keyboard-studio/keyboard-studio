@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildProducedSet } from "./producedSet.js";
 import { makeTestIR, charItems } from "../fixtures/keyboard-ir.js";
-import type { IRGroup, IRRule, IRStore } from "../keyboard-ir.js";
+import type { IRGroup, IRRule, IRStore, RawKmnFragment } from "../keyboard-ir.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -340,5 +340,128 @@ describe("buildProducedSet — empty and partial IR", () => {
       ]),
     ]);
     expect(buildProducedSet(ir).size).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. Opaque fragment producedOutput
+// ---------------------------------------------------------------------------
+
+function makeFragment(
+  producedOutput?: RawKmnFragment["producedOutput"],
+  sourceText = "if(opt = '') + [K_A] > index(C_efc,3)",
+): RawKmnFragment {
+  const frag: RawKmnFragment = {
+    nodeId: "raw#1",
+    origin: "imported",
+    sourceText,
+    reason: "if-option-store",
+  };
+  if (producedOutput !== undefined) frag.producedOutput = producedOutput;
+  return frag;
+}
+
+describe("buildProducedSet — opaque fragment producedOutput", () => {
+  it("index() ref in a fragment resolves against a typed store (bj_cree_woods regression shape)", () => {
+    const ir = makeTestIR(
+      [makeGroup([])],
+      [makeStore("C_efc", "ᐌᐐᐔ")],
+      [makeFragment([{ kind: "index", storeRef: "C_efc", offset: 3 }])],
+    );
+    const result = buildProducedSet(ir);
+    expect(result.has("ᐌ")).toBe(true);
+    expect(result.has("ᐐ")).toBe(true);
+    expect(result.has("ᐔ")).toBe(true);
+  });
+
+  it("SMP char element lands in the set as a single astral entry", () => {
+    const ir = makeTestIR(
+      [makeGroup([])],
+      [],
+      [makeFragment([{ kind: "char", value: "\u{10D24}" }])],
+    );
+    const result = buildProducedSet(ir);
+    expect(result.has("\u{10D24}")).toBe(true);
+    expect(result.size).toBe(1);
+  });
+
+  it("consecutive char elements in a fragment run-merge to NFC", () => {
+    const ir = makeTestIR(
+      [makeGroup([])],
+      [],
+      [
+        makeFragment([
+          { kind: "char", value: "e" },
+          { kind: "char", value: "́" },
+        ]),
+      ],
+    );
+    const result = buildProducedSet(ir);
+    expect(result.has("é")).toBe(true);
+    expect(result.has("e")).toBe(false);
+    expect(result.has("́")).toBe(false);
+  });
+
+  it("index() against a missing store does not throw and adds nothing", () => {
+    const ir = makeTestIR(
+      [makeGroup([])],
+      [],
+      [makeFragment([{ kind: "index", storeRef: "no_such_store", offset: 1 }])],
+    );
+    expect(buildProducedSet(ir).size).toBe(0);
+  });
+
+  it("fragment without producedOutput is skipped (prior behavior preserved)", () => {
+    const irWithout = makeTestIR(
+      [makeGroup([makeRule([{ kind: "char", value: "a" }])])],
+      [],
+      [makeFragment(undefined)],
+    );
+    const irNoFrag = makeTestIR([
+      makeGroup([makeRule([{ kind: "char", value: "a" }])]),
+    ]);
+    expect([...buildProducedSet(irWithout)].sort()).toEqual(
+      [...buildProducedSet(irNoFrag)].sort(),
+    );
+  });
+
+  it("a raw element between chars breaks the run (no cross-raw NFC merge)", () => {
+    const ir = makeTestIR(
+      [makeGroup([])],
+      [],
+      [
+        makeFragment([
+          { kind: "char", value: "e" },
+          { kind: "raw", text: "set(opt='x')" },
+          { kind: "char", value: "́" },
+        ]),
+      ],
+    );
+    const result = buildProducedSet(ir);
+    expect(result.has("e")).toBe(true);
+    expect(result.has("́")).toBe(true);
+    expect(result.has("é")).toBe(false);
+  });
+
+  it("outs() element in a fragment expands the referenced store", () => {
+    const ir = makeTestIR(
+      [makeGroup([])],
+      [makeStore("vowels", "aei")],
+      [makeFragment([{ kind: "outs", storeRef: "vowels" }])],
+    );
+    const result = buildProducedSet(ir);
+    expect(result.has("a")).toBe(true);
+    expect(result.has("e")).toBe(true);
+    expect(result.has("i")).toBe(true);
+  });
+
+  it("space filtering applies to fragment content (excluded by default, includeSpace retains)", () => {
+    const ir = makeTestIR(
+      [makeGroup([])],
+      [],
+      [makeFragment([{ kind: "char", value: " " }])],
+    );
+    expect(buildProducedSet(ir).has(" ")).toBe(false);
+    expect(buildProducedSet(ir, { includeSpace: true }).has(" ")).toBe(true);
   });
 });

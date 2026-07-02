@@ -415,10 +415,33 @@ function parseOutputElements(
   toks: string[],
   opaqueOut: { reason: string | null }
 ): OutputElement[] | null {
+  return parseOutputElementsCore(toks, "strict", opaqueOut);
+}
+
+/**
+ * Lenient variant of the output-element walk, used to build the best-effort
+ * `RawKmnFragment.producedOutput` sketch for rules the strict parser opaques.
+ * Never bails: constructs the strict mode rejects become typed elements where
+ * the OutputElement union can express them (SMP literal → char, outs → outs)
+ * and `{kind:"raw"}` placeholders otherwise, so unknown content still breaks
+ * a char run in the produced-set walker. Output-side tokens only — callers
+ * must pass RHS tokens, never context/guard content.
+ */
+function extractProducedOutput(toks: string[]): OutputElement[] {
+  // The lenient core never returns null; the fallback keeps the types honest.
+  return parseOutputElementsCore(toks, "lenient", { reason: null }) ?? [];
+}
+
+function parseOutputElementsCore(
+  toks: string[],
+  mode: "strict" | "lenient",
+  opaqueOut: { reason: string | null }
+): OutputElement[] | null {
   const elements: OutputElement[] = [];
   for (const tok of toks) {
-    // SMP literal
-    if (isSmpLiteral(tok)) {
+    // SMP literal — strict opaques the rule; lenient decodes it (parseCodepoint
+    // below accepts 4-6 hex digits).
+    if (mode === "strict" && isSmpLiteral(tok)) {
       opaqueOut.reason = OPAQUE_REASONS.SMP_LITERAL;
       return null;
     }
@@ -438,8 +461,12 @@ function parseOutputElements(
     }
     // dk(name) — named (non-hex) deadkey identifier: opaque
     if (isNamedDk(tok)) {
-      opaqueOut.reason = OPAQUE_REASONS.NAMED_DEADKEY;
-      return null;
+      if (mode === "strict") {
+        opaqueOut.reason = OPAQUE_REASONS.NAMED_DEADKEY;
+        return null;
+      }
+      elements.push({ kind: "raw", text: tok });
+      continue;
     }
     // dk(NNNN)
     const dkId = parseDk(tok);
@@ -458,11 +485,16 @@ function parseOutputElements(
       elements.push({ kind: "index", storeRef: idx.storeRef, offset: idx.offset });
       continue;
     }
-    // outs(store) — opaque
+    // outs(store) — opaque in strict mode (round-trip fidelity); the typed
+    // element is fine for the lenient produced-set sketch.
     const outsRef = parseOuts(tok);
     if (outsRef !== null) {
-      opaqueOut.reason = OPAQUE_REASONS.OUTS_EXPANSION;
-      return null;
+      if (mode === "strict") {
+        opaqueOut.reason = OPAQUE_REASONS.OUTS_EXPANSION;
+        return null;
+      }
+      elements.push({ kind: "outs", storeRef: outsRef });
+      continue;
     }
     // use(group) in output — typed group-transition node (#268). Not opaque:
     // the rule stays typed; emit.ts renders it back to use(groupName).
@@ -471,15 +503,24 @@ function parseOutputElements(
       elements.push({ kind: "useGroup", groupName: useRef });
       continue;
     }
-    // save/set/reset — opaque
+    // save/set/reset — opaque; not producible content (the quoted value stays
+    // inside the paren-group token, so it cannot leak as a char element).
     if (/^(?:save|set|reset)\s*\(/i.test(tok)) {
-      opaqueOut.reason = OPAQUE_REASONS.OPTION_STORE_DIRECTIVE;
-      return null;
+      if (mode === "strict") {
+        opaqueOut.reason = OPAQUE_REASONS.OPTION_STORE_DIRECTIVE;
+        return null;
+      }
+      elements.push({ kind: "raw", text: tok });
+      continue;
     }
-    // call/return — opaque
+    // call/return — opaque; not producible content
     if (/^call\s*\(/i.test(tok) || /^return$/i.test(tok)) {
-      opaqueOut.reason = OPAQUE_REASONS.CALL_RETURN;
-      return null;
+      if (mode === "strict") {
+        opaqueOut.reason = OPAQUE_REASONS.CALL_RETURN;
+        return null;
+      }
+      elements.push({ kind: "raw", text: tok });
+      continue;
     }
     // unknown — wrap as raw
     elements.push({ kind: "raw", text: tok });
@@ -853,6 +894,13 @@ export function parse(text: string, keyboardId: string): ParseResult {
             sourceLine: tok.line,
           };
           if (currentGroup !== null) frag.groupNodeId = currentGroup.nodeId;
+          // Best-effort produced-output sketch (RHS only), attached only when
+          // it carries statically producible content so the produced-set walk
+          // has something to resolve. Guard/context tokens are never scanned.
+          const sketch = extractProducedOutput(splitTokens(parsedLine.outputRaw));
+          if (sketch.some(e => e.kind === "char" || e.kind === "index" || e.kind === "outs")) {
+            frag.producedOutput = sketch;
+          }
           rawFragments.push(frag);
         } else {
           const rule: IRRule = parsedLine.trailingComment !== undefined
