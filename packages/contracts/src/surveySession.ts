@@ -2,6 +2,7 @@
 // selector consumes the merged vector). Companion to surveyPhaseResult.ts.
 
 import type { DiscoveryAxisVector } from "./axes";
+import type { AxisFill } from "./axisFill";
 import type { SurveyPhaseResult } from "./surveyPhaseResult";
 import type { MechanismAssignment } from "./assignmentMap";
 import { mergeAssignments } from "./assignmentMap";
@@ -52,6 +53,20 @@ export interface SurveySession {
    * `irAxes`. `undefined` on a field means that axis has not yet been elicited.
    */
   axes: Partial<DiscoveryAxisVector>;
+  /**
+   * Provenance for phase-gated axis values in {@link axes} that were filled by
+   * the script-class default-fill prior (spec §7.2) rather than elicited from
+   * a survey phase or derived from `irAxes`. Chosen as the home for this field
+   * (rather than `SurveyPhaseResult.computedAxes`) because `axes` is the
+   * single merged vector the §7.2 decision tree actually consumes — the prior
+   * runs as a pre-fill step over that merged vector, not per-phase. Optional
+   * and additive: `undefined`/absent for any session that has not run the
+   * default-fill step (e.g. before #890, or once axes are fully elicited).
+   *
+   * @see spec.md §7.2
+   * @see packages/engine/src/strategy-selector/default-fill.ts
+   */
+  axisFills?: AxisFill[];
   /**
    * Axis values pre-populated from recognized patterns in the working IR,
    * before any survey phase runs. Set to `{}` until KeyboardIR (#232) lands.

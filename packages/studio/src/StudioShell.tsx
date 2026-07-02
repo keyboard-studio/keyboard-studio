@@ -1125,6 +1125,11 @@ export function StudioShell() {
   // `validatorFindings` defaults to `[]` ⇒ the pure structural proxy, byte-
   // identical to P4b / flag-off.
   const validatorFindings = useWorkingCopyStore((s) => s.validatorFindings);
+  // #890 — default-fill provenance, published by MechanismGallery's
+  // pattern-loading effect. Passed down to FlowMapView -> StrategyTreeView as
+  // a prop for the same dashboard-layer boundary reason as completenessReport
+  // below (DashboardView/StrategyTreeView have NO stores/ import).
+  const axisFills = useWorkingCopyStore((s) => s.axisFills);
   const completenessReport = useMemo(
     () =>
       runCompleteness(
@@ -1151,7 +1156,7 @@ export function StudioShell() {
       content = <OutputScreen />;
       break;
     case "flowmap":
-      content = <FlowMapView completeness={completenessReport} />;
+      content = <FlowMapView completeness={completenessReport} axisFills={axisFills} />;
       break;
     case "profile":
       content = <ProfileScreen />;

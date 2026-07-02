@@ -291,7 +291,7 @@
     },
     "specs/007-strategy-selection": {
       "title": "Feature spec — Strategy selection (spec.md §7)",
-      "hash": "sha256:c21eb2f489a857ca",
+      "hash": "sha256:753ec1bea258fc49",
       "status": "partial",
       "implements": [
         "packages/contracts/src/strategy.ts",

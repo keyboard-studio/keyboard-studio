@@ -5,6 +5,7 @@
 // ---------------------------------------------------------------------------
 export * from "./assignmentMap";
 export * from "./axes";
+export * from "./axisFill";
 export * from "./baseKeyboard";
 export * from "./compileResult";
 export * from "./criteria";
@@ -69,5 +70,6 @@ export * from "./utils/charUtils";
 // Loader / data — modules that load checked-in data files (criteria.json) and
 // re-export as typed `readonly` arrays / records.
 // ---------------------------------------------------------------------------
+export * from "./axisPriors";
 export * from "./criteriaData";
 export * from "./fontEntry";

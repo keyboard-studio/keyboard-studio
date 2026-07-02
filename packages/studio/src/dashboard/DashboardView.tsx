@@ -34,6 +34,7 @@ import { StrategyTreeView } from "./StrategyTreeView.tsx";
 import { ScriptRoutingView } from "./ScriptRoutingView.tsx";
 import { MONO, SANS } from "./tokens.ts";
 import type { CompletenessReport } from "./completeness.ts";
+import type { AxisFill } from "@keyboard-studio/contracts";
 
 type Section = "flow" | "routing" | "strategy" | "completeness";
 
@@ -280,9 +281,15 @@ export interface FlowMapViewProps {
    * Optional: dashboard renders a placeholder when undefined.
    */
   completeness?: CompletenessReport;
+  /**
+   * Default-fill provenance (#890) — forwarded unchanged to StrategyTreeView.
+   * Same boundary rationale as `completeness`: StudioShell reads
+   * `useWorkingCopyStore((s) => s.axisFills)` and passes it in here.
+   */
+  axisFills?: AxisFill[];
 }
 
-export function FlowMapView({ completeness }: FlowMapViewProps) {
+export function FlowMapView({ completeness, axisFills }: FlowMapViewProps) {
   const [section, setSection] = useState<Section>("flow");
   const flows = useMemo(() => FLOW_SOURCES.map(safeBuild), []);
 
@@ -433,7 +440,9 @@ export function FlowMapView({ completeness }: FlowMapViewProps) {
 
       {section === "routing" && <ScriptRoutingView identityLiteRaw={identityLiteModularRaw} />}
 
-      {section === "strategy" && <StrategyTreeView />}
+      {section === "strategy" && (
+        <StrategyTreeView {...(axisFills !== undefined ? { axisFills } : {})} />
+      )}
 
       {section === "completeness" && <CompletenessView report={completeness} />}
     </div>
