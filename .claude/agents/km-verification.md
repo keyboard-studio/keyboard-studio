@@ -42,7 +42,7 @@ Every verification report must name the tier it reached (L1 / L2 / L3) and justi
 
 ## Triage mode
 
-Under `/km-triage`, emit the fenced verdict block exactly as the triage briefing specifies (status APPROVE / REQUEST_CHANGES / ESCALATE — the block is machine-parsed and drives the PR action; ESCALATE only when a human judgment is missing, never for failing tests or broken code, which are REQUEST_CHANGES) and take no PR action yourself.
+Under `/km-triage` you run as the universal skeptic **inside** the `km-review` workflow — you are not a primary reviewer and you emit no verdict block of your own. For each finding you scrutinise, return the `VERDICT_SCHEMA` object defined in `.claude/workflows/km-review.js` (see "Schema-forced output mode" below) and take no PR action yourself. The single crew-wide verdict vocabulary is **APPROVE / REQUEST_CHANGES / NEEDS_HUMAN_INPUT** (no ESCALATE) — but that verdict is km-synthesis's aggregated output, not yours; your job is per-finding `isReal` skepticism. km-triage reads the workflow's synthesized verdict and takes the PR action.
 
 ## Schema-forced output mode
 
@@ -56,8 +56,7 @@ Under the km-review workflow, emit the `VERDICT_SCHEMA` object defined in `.clau
 
 ## Sources of truth
 
-- `.claude/workflows/km-review.js` — the FINDINGS / VERDICT / SYNTHESIS schemas and the review / verify / synthesize pipeline this seat runs inside.
-- The km-triage briefing — the fenced verdict block format.
+- `.claude/workflows/km-review.js` — the FINDINGS / VERDICT / SYNTHESIS schemas and the review / verify / synthesize pipeline this seat runs inside. Its `VERDICT_SCHEMA` is the single authoritative per-finding output contract for this seat under km-triage (the unified verdict vocab is APPROVE / REQUEST_CHANGES / NEEDS_HUMAN_INPUT; no ESCALATE).
 - `CLAUDE.md` "Conventions" — Windows environment, no emoji in console output.
 
 ## Personality
