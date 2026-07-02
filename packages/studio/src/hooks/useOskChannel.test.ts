@@ -141,3 +141,27 @@ describe("useOskChannel — TEXT_UPDATED coexists with onKeyTap", () => {
     expect(onKeyTap).not.toHaveBeenCalled();
   });
 });
+
+describe("useOskChannel — send() targetOrigin", () => {
+  it("scopes postMessage to window.location.origin, never a wildcard", () => {
+    const { ref, frame } = makeIframeRef();
+    const frameWindow = frame.contentWindow;
+    if (!frameWindow) return;
+
+    const postMessageSpy = vi.spyOn(frameWindow, "postMessage");
+
+    const { result } = renderHook(() => useOskChannel(ref));
+
+    act(() => {
+      result.current.send({ type: "SET_OSK_MODE", mode: "touch" });
+    });
+
+    expect(postMessageSpy).toHaveBeenCalledTimes(1);
+    expect(postMessageSpy).toHaveBeenCalledWith(
+      { type: "SET_OSK_MODE", mode: "touch" },
+      window.location.origin
+    );
+    // Never a wildcard target — that was the pre-fix behavior.
+    expect(postMessageSpy).not.toHaveBeenCalledWith(expect.anything(), "*");
+  });
+});

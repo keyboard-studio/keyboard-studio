@@ -68,8 +68,9 @@ interface SerializedEntry {
  * and two derived fields are dropped entirely (`removalCapabilities`, `session`)
  * because they are re-derived on rehydration, never stored.
  *
- * `validatorFindings` (LintFinding[]) flows through unchanged — it is plain,
- * JSON-safe data, so it round-trips directly with no override.
+ * `validatorFindings` (LintFinding[]) and `axisFills` (AxisFill[], #890) flow
+ * through unchanged — both are plain, JSON-safe data, so they round-trip
+ * directly with no override.
  */
 type WorkingCopySnapshot = Omit<
   WorkingCopyData,
@@ -152,6 +153,7 @@ export function snapshotWorkingCopyToSession(): void {
     galleryIntrosSeen: s.galleryIntrosSeen,
     staleSteps: [...s.staleSteps],
     validatorFindings: s.validatorFindings,
+    axisFills: s.axisFills,
   };
 
   try {
@@ -238,6 +240,7 @@ export function rehydrateWorkingCopyFromSession(): boolean {
     galleryIntrosSeen: snapshot.galleryIntrosSeen,
     staleSteps: new Set(snapshot.staleSteps),
     validatorFindings: snapshot.validatorFindings,
+    axisFills: snapshot.axisFills,
   });
 
   return true;

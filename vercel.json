@@ -16,5 +16,14 @@
       "destination": "https://raw.githubusercontent.com/keymanapp/keyboards/master/:path*"
     },
     { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Content-Security-Policy", "value": "frame-ancestors 'self'" }
+      ]
+    }
   ]
 }

@@ -1,0 +1,10 @@
+{
+  "_comment": "Pinned SIL langtags acquisition config. fetch-langtags.mjs downloads and SHA-256-verifies the raw source/langtags.json at the pinned commit.",
+  "source": "https://github.com/silnrsi/langtags",
+  "commit": "99b856bbe8a7dfc1ef7f05d6087dc7501843eb04",
+  "path": "source/langtags.json",
+  "urlTemplate": "https://raw.githubusercontent.com/silnrsi/langtags/{commit}/source/langtags.json",
+  "sha256": "778fb37047c4d1202f407ccbd7b73e260a258315196e957986c1622a0fba7618",
+  "license": "MIT",
+  "notice": "Copyright (c) 2019-2025 SIL International (http://www.sil.org)"
+}

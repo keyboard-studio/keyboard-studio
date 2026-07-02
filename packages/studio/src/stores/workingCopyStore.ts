@@ -18,7 +18,7 @@
 //   - Worker boundary upheld: WASM is not imported here.
 
 import { create } from "zustand";
-import type { BaseKeyboard, KeyboardIR, LintFinding, RemovalCapability, VirtualFS } from "@keyboard-studio/contracts";
+import type { AxisFill, BaseKeyboard, KeyboardIR, LintFinding, RemovalCapability, VirtualFS } from "@keyboard-studio/contracts";
 import {
   mergePhaseResults,
   type DiscoveryAxisVector,
@@ -245,6 +245,25 @@ export interface WorkingCopyState {
    */
   validatorFindings: LintFinding[];
 
+  // -- Default-fill provenance slice (#890) --------------------------------------
+  /**
+   * Provenance for phase-gated axis values that were filled by the §7.2
+   * script-class default-fill prior (`defaultFillAxes()`) rather than elicited
+   * from a survey phase, the most recent time a strategy-consuming call site
+   * (currently: `MechanismGallery`'s pattern-loading effect) ran the pre-fill
+   * step. `[]` before that first run, or whenever the prior had nothing left
+   * to fill (all phase-gated axes already elicited/IR-derived).
+   *
+   * This is a UI-visibility field only — it is NOT re-derived by `remerge()` /
+   * `mergePhaseResults()` (unlike `session`), so `recordPhase`/`setIrAxes` do
+   * not clear it; only `setAxisFills` and `reset`/`instantiateFrom*` do.
+   * Mirrored onto `SurveySession.axisFills` optionally by callers that persist
+   * a session snapshot; the store keeps its own copy here so the Flow Map
+   * (`StrategyTreeView`) can read it without depending on a particular
+   * survey-session persistence path.
+   */
+  axisFills: AxisFill[];
+
   // -- Actions (irStore) -------------------------------------------------------
   /**
    * Set the carve working IR for a FULL/base replacement, clearing carve
@@ -427,6 +446,16 @@ export interface WorkingCopyState {
    * changes; this setter never starts a timer or async work.
    */
   setValidatorFindings: (findings: LintFinding[]) => void;
+
+  // -- Default-fill provenance actions (#890) ----------------------------------
+
+  /**
+   * Publish the `axisFills` produced by the most recent `defaultFillAxes()`
+   * pre-fill run. No-op (returns prior state reference) when the incoming
+   * array is reference-equal to the stored one, mirroring
+   * {@link setValidatorFindings}'s re-render guard.
+   */
+  setAxisFills: (axisFills: AxisFill[]) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -442,6 +471,73 @@ function remerge(
     irAxes,
     session: mergePhaseResults(irAxes, phaseResults),
   };
+}
+
+/**
+ * Shared three-case resolution for instantiateFromBase / instantiateFromExisting.
+ *
+ * Three cases, in order:
+ *
+ * 1. Redundant re-fire, SAME id AND SAME mode (current.baseKeyboard !== null,
+ *    matches incomingId, AND current.instantiationMode === mode) — FULL
+ *    early-return no-op (shouldNoop = true). Preserves EVERYTHING
+ *    (removalCapabilities, deletedNodeIds, undoStack, carve overlays,
+ *    phaseResults) exactly as they stood. This guards against setScaffoldSpec()
+ *    triggering a second compile whose onInstantiate would otherwise re-apply
+ *    this call's (possibly different/default) removalCapabilities and reset
+ *    the carve overlay for no reason — see StudioShell's instantiatedRef
+ *    comment. The mode conjunct matters because a SAME-id call can also arrive
+ *    from a genuine Track switch: e.g. the working copy was instantiated via
+ *    the OTHER track for keyboard X, and the user then independently
+ *    re-selects keyboard X via a different entry point (e.g. the
+ *    Preview/Output screen's own base picker — usePreviewArtifact runs its own
+ *    decoupled pipeline, outside the main survey's instantiatedRef gate — see
+ *    confirmRebase.ts / instantiateFromBaseIfConfirmed), which fires the
+ *    action for the same id but the OTHER mode. An id-only guard would wrongly
+ *    no-op and strand the working copy in the old track/identity mode instead
+ *    of honouring the user's explicit re-instantiation.
+ * 2. First instantiate (current.baseKeyboard === null) — the caller proceeds
+ *    with its full set(...), but PRESERVES any phaseResults/irAxes already
+ *    recorded. Root cause: onInstantiate fires from an async WASM compile
+ *    pipeline decoupled from the survey flow (see useKeyboardArtifact.ts) and
+ *    can settle LATE — after Phase A/B has already recorded phaseResults
+ *    against the pending base selection. A guard keyed only on "baseKeyboard.id
+ *    already matches" can never catch this, because baseKeyboard is still null
+ *    at this point. On a truly fresh session phaseResults/irAxes are already
+ *    empty, so preserving is a no-op there. This case is untouched by the mode
+ *    conjunct above — it only applies when baseKeyboard is already non-null.
+ * 3. Genuine base SWITCH OR same-id track switch (current.baseKeyboard !==
+ *    null and either the id differs, or the id matches but the mode doesn't)
+ *    — the caller does a full reset, including clearing phaseResults/irAxes,
+ *    exactly as before. A same-id track switch is treated the same as a base
+ *    switch: Track 1 vs Track 2 identity handling is fundamentally different
+ *    (identity reset vs preserved), so carrying survey progress across a
+ *    track flip would be as unsound as carrying it across a base change.
+ */
+function resolveInstantiationCase(
+  // Narrow slice of the store state — only the four fields the case logic reads,
+  // mirroring remerge's narrow-parameter convention immediately above.
+  current: Pick<WorkingCopyState, "baseKeyboard" | "instantiationMode" | "phaseResults" | "irAxes">,
+  incomingId: string,
+  mode: Exclude<InstantiationMode, null>,
+): {
+  shouldNoop: boolean;
+  preservedPhaseResults: SurveyPhaseResult[];
+  preservedIrAxes: Partial<DiscoveryAxisVector>;
+} {
+  if (
+    current.baseKeyboard !== null &&
+    current.baseKeyboard.id === incomingId &&
+    current.instantiationMode === mode
+  ) {
+    // shouldNoop === true: callers early-return, so preserved* are unused here.
+    // Returned as the live values (not empty) purely to satisfy the return shape.
+    return { shouldNoop: true, preservedPhaseResults: current.phaseResults, preservedIrAxes: current.irAxes };
+  }
+  const isGenuineSwitch = current.baseKeyboard !== null;
+  const preservedPhaseResults = isGenuineSwitch ? [] : current.phaseResults;
+  const preservedIrAxes = isGenuineSwitch ? {} : current.irAxes;
+  return { shouldNoop: false, preservedPhaseResults, preservedIrAxes };
 }
 
 // ---------------------------------------------------------------------------
@@ -468,6 +564,7 @@ export type WorkingCopyData = Omit<
   | "instantiateFromBase" | "instantiateFromExisting" | "setIdentity" | "isInstantiated"
   | "markStale" | "clearStale"
   | "setValidatorFindings"
+  | "setAxisFills"
 >;
 
 const INITIAL_STATE: WorkingCopyData = {
@@ -494,6 +591,8 @@ const INITIAL_STATE: WorkingCopyData = {
   staleSteps: new Set<string>(),
   // validator findings slice (US5, T034) — default empty (structural proxy)
   validatorFindings: [],
+  // default-fill provenance slice (#890) — default empty (no pre-fill run yet)
+  axisFills: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -641,56 +740,18 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // -- Instantiation actions (spec §8 v1.3.0) ----------------------------------
 
   instantiateFromBase: (base, { vfs, ir, removalCapabilities }) => {
-    // Three cases, in order:
-    //
-    // 1. Redundant re-fire, SAME id AND SAME mode (current.baseKeyboard !== null,
-    //    matches base.id, AND current.instantiationMode === "new-from-base") —
-    //    FULL early-return no-op. Preserves EVERYTHING (removalCapabilities,
-    //    deletedNodeIds, undoStack, carve overlays, phaseResults) exactly as
-    //    they stood. This guards against setScaffoldSpec() triggering a second
-    //    compile whose onInstantiate would otherwise re-apply this call's
-    //    (possibly different/default) removalCapabilities and reset the carve
-    //    overlay for no reason — see StudioShell's instantiatedRef comment.
-    //    The mode conjunct matters because a SAME-id call can also arrive from
-    //    a genuine Track switch: e.g. the working copy was instantiated via
-    //    Track 2 (instantiateFromExisting, mode "adapt-existing") for keyboard
-    //    X, and the user then independently re-selects keyboard X in the
-    //    Preview/Output screen's own base picker (usePreviewArtifact runs its
-    //    own decoupled pipeline, outside the main survey's instantiatedRef
-    //    gate — see confirmRebase.ts / instantiateFromBaseIfConfirmed), which
-    //    fires this action for the same id but Track 1. An id-only guard would
-    //    wrongly no-op and strand the working copy in the old track/identity
-    //    mode instead of honouring the user's explicit re-instantiation.
-    // 2. First instantiate (current.baseKeyboard === null) — proceeds with the
-    //    full set(...) below, but PRESERVES any phaseResults/irAxes already
-    //    recorded. Root cause: onInstantiate fires from an async WASM compile
-    //    pipeline decoupled from the survey flow (see useKeyboardArtifact.ts)
-    //    and can settle LATE — after Phase A/B has already recorded
-    //    phaseResults against the pending base selection. A guard keyed only on
-    //    "baseKeyboard.id already matches" can never catch this, because
-    //    baseKeyboard is still null at this point. On a truly fresh session
-    //    phaseResults/irAxes are already empty, so preserving is a no-op there.
-    //    This case is untouched by the mode conjunct above — it only applies
-    //    when baseKeyboard is already non-null.
-    // 3. Genuine base SWITCH OR same-id track switch (current.baseKeyboard !==
-    //    null and either the id differs, or the id matches but the mode
-    //    doesn't) — full reset, including clearing phaseResults/irAxes, exactly
-    //    as before. A same-id track switch is treated the same as a base
-    //    switch: Track 1 vs Track 2 identity handling is fundamentally
-    //    different (identity reset vs preserved), so carrying survey progress
-    //    across a track flip would be as unsound as carrying it across a base
-    //    change.
+    // Three-case resolution (redundant re-fire / first instantiate / genuine
+    // switch) is shared with instantiateFromExisting — see
+    // resolveInstantiationCase for the full explanation.
     const current = get();
-    if (
-      current.baseKeyboard !== null &&
-      current.baseKeyboard.id === base.id &&
-      current.instantiationMode === "new-from-base"
-    ) {
+    const { shouldNoop, preservedPhaseResults, preservedIrAxes } = resolveInstantiationCase(
+      current,
+      base.id,
+      "new-from-base",
+    );
+    if (shouldNoop) {
       return;
     }
-    const isGenuineSwitch = current.baseKeyboard !== null;
-    const preservedPhaseResults = isGenuineSwitch ? [] : current.phaseResults;
-    const preservedIrAxes = isGenuineSwitch ? {} : current.irAxes;
 
     // Track 1: new keyboard from base — identity RESET, edit layers cleared.
     _reopenedRoots = new Set(); // reset staleness roots for the new session
@@ -717,54 +778,25 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       touchDraft: null,
       galleryIntrosSeen: { mechanism: false, touch: false },
       staleSteps: new Set<string>(),
+      // A new working copy has no default-fill provenance yet (#890) — the
+      // pattern-loading effect re-runs defaultFillAxes and republishes it.
+      axisFills: [],
     });
   },
 
   instantiateFromExisting: (keyboard, { vfs, ir, removalCapabilities }) => {
-    // Three cases, in order (mirrors instantiateFromBase above):
-    //
-    // 1. Redundant re-fire, SAME id AND SAME mode (current.baseKeyboard !==
-    //    null, matches keyboard.id, AND current.instantiationMode ===
-    //    "adapt-existing") — FULL early-return no-op. Preserves EVERYTHING
-    //    (removalCapabilities, deletedNodeIds, undoStack, carve overlays,
-    //    phaseResults) exactly as they stood. The mode conjunct matters
-    //    because a SAME-id call can also arrive from a genuine Track switch —
-    //    e.g. the working copy was instantiated via Track 1
-    //    (instantiateFromBase, mode "new-from-base") for keyboard X, and this
-    //    action then fires for the same id via a different path (e.g. an
-    //    import/adapt re-entry) — in which case the id-only check would
-    //    wrongly no-op and strand the working copy in the old track/identity
-    //    mode instead of honouring the re-instantiation into Track 2.
-    // 2. First instantiate (current.baseKeyboard === null) — proceeds with the
-    //    full set(...) below, but PRESERVES any phaseResults/irAxes already
-    //    recorded. Root cause: onInstantiate fires from an async WASM compile
-    //    pipeline decoupled from the survey flow (see useKeyboardArtifact.ts)
-    //    and can settle LATE — after Phase A/B has already recorded
-    //    phaseResults against the pending base selection. A guard keyed only on
-    //    "baseKeyboard.id already matches" can never catch this, because
-    //    baseKeyboard is still null at this point. On a truly fresh session
-    //    phaseResults/irAxes are already empty, so preserving is a no-op there.
-    //    This case is untouched by the mode conjunct above — it only applies
-    //    when baseKeyboard is already non-null.
-    // 3. Genuine base SWITCH OR same-id track switch (current.baseKeyboard !==
-    //    null and either the id differs, or the id matches but the mode
-    //    doesn't) — full reset, including clearing phaseResults/irAxes,
-    //    exactly as before. A same-id track switch is treated the same as a
-    //    base switch: Track 1 vs Track 2 identity handling is fundamentally
-    //    different (identity reset vs preserved), so carrying survey progress
-    //    across a track flip would be as unsound as carrying it across a base
-    //    change.
+    // Three-case resolution (redundant re-fire / first instantiate / genuine
+    // switch) is shared with instantiateFromBase — see
+    // resolveInstantiationCase for the full explanation.
     const current = get();
-    if (
-      current.baseKeyboard !== null &&
-      current.baseKeyboard.id === keyboard.id &&
-      current.instantiationMode === "adapt-existing"
-    ) {
+    const { shouldNoop, preservedPhaseResults, preservedIrAxes } = resolveInstantiationCase(
+      current,
+      keyboard.id,
+      "adapt-existing",
+    );
+    if (shouldNoop) {
       return;
     }
-    const isGenuineSwitch = current.baseKeyboard !== null;
-    const preservedPhaseResults = isGenuineSwitch ? [] : current.phaseResults;
-    const preservedIrAxes = isGenuineSwitch ? {} : current.irAxes;
 
     _reopenedRoots = new Set(); // reset staleness roots for the new session
     // Track 2: adapt existing keyboard — identity PRESERVED from loaded keyboard.
@@ -798,6 +830,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       touchDraft: null,
       galleryIntrosSeen: { mechanism: false, touch: false },
       staleSteps: new Set<string>(),
+      // A new working copy has no default-fill provenance yet (#890) — the
+      // pattern-loading effect re-runs defaultFillAxes and republishes it.
+      axisFills: [],
     });
   },
 
@@ -839,4 +874,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
   setValidatorFindings: (findings) =>
     set((s) => (s.validatorFindings === findings ? s : { validatorFindings: findings })),
+
+  // -- Default-fill provenance actions (#890) ----------------------------------
+
+  setAxisFills: (axisFills) =>
+    set((s) => (s.axisFills === axisFills ? s : { axisFills })),
 }));

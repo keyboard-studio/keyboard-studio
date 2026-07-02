@@ -9,7 +9,6 @@ import type {
   KeyboardIR,
   Pattern,
   RemovalCapability,
-  StoreItem,
 } from '@keyboard-studio/contracts';
 import { isParallelIndexFanOut, classifyStoreSlotEdit } from '@keyboard-studio/engine';
 import type { StoreSlotBlockReason } from '@keyboard-studio/engine';

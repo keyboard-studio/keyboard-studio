@@ -116,7 +116,7 @@ export function BaseResolution({
     );
 
   return (
-    <div style={{ color: "var(--app-text)", fontFamily: "var(--app-font)" }}>
+    <div data-testid="base-picker" style={{ color: "var(--app-text)", fontFamily: "var(--app-font)" }}>
       <h2 style={heading}>Choose a starting keyboard</h2>
       <p style={subtle}>
         Based on your language and chosen script, here are the closest starting

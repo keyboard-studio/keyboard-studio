@@ -9,15 +9,15 @@
 // post-primary passes in SECONDARY_RULES order. The existing index.test.ts
 // suite pins the exact behavior these tables must reproduce.
 //
-// NOTE on rule "3a": spec §7.2 documents a rule 3a (A2=alphabetic AND A3=strong
-// AND A3a=postfix → S-03) that intercepts between rules 3 and 4. It IS
-// implemented below, firing between rules 3 and 4 whenever `markInputOrder`
-// (A3a) is `"postfix"` — routing the primary to S-03 (sequence replace) with
-// S-04 as a secondary, and intercepting before rules 5 and 7 would otherwise
-// pick S-05 or S-02 off the A3=strong heuristic alone. `markInputOrder` is
-// optional and elicited only when A2=alphabetic AND A3=strong (see
-// `contracts/src/axes.ts` for the elicitation gate); when it is `undefined`,
-// rule 3a's `when` is false and evaluation falls through to rule 4 as before.
+// NOTE on rule "3a": spec §7.2 documents rule 3a (A2=alphabetic AND A3=strong
+// AND A3a=postfix → S-03) intercepting between rules 3 and 4. It IS implemented
+// below (in PRIMARY_RULES, between rules 3 and 4). What is NOT yet wired up is
+// production supply of A3a=postfix: no survey phase or import path elicits
+// markInputOrder end-to-end yet (that's a deferred follow-up), and the §7.2
+// script-class default-fill prior (default-fill.ts) deliberately never fills
+// A3a with "postfix" (it only ever fills the unmarked "prefix" state, per the
+// prior's load-bearing invariant). So today rule 3a fires only when a caller
+// (currently: tests) supplies markInputOrder="postfix" directly. See spec.md §7.2.
 
 import type {
   DiscoveryAxisVector,

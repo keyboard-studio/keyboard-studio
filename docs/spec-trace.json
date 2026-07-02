@@ -270,7 +270,7 @@
     },
     "specs/002-defaults-engine": {
       "title": "Feature Specification: Defaults engine (propose-then-confirm proposers)",
-      "hash": "sha256:ae6c9d3989994003",
+      "hash": "sha256:297cf8deef75246c",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -291,7 +291,7 @@
     },
     "specs/007-strategy-selection": {
       "title": "Feature spec — Strategy selection (spec.md §7)",
-      "hash": "sha256:c21eb2f489a857ca",
+      "hash": "sha256:753ec1bea258fc49",
       "status": "partial",
       "implements": [
         "packages/contracts/src/strategy.ts",
@@ -454,6 +454,14 @@
     "specs/023-qu-decompose-wizard": {
       "title": "Feature Specification: Decompose wizard steps — track / project_name as modular SurveyRunner question flows with Flow Map drill-downs",
       "hash": "sha256:cc8acaf6b35c673a",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/023-langtags-defaults": {
+      "title": "Feature Specification: SIL langtags defaults at the front of the survey",
+      "hash": "sha256:7b1284585f5a120d",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

@@ -66,6 +66,7 @@ export function OutputScreen() {
   return (
     <div
       ref={containerRef}
+      data-testid="output-screen-root"
       style={{
         display: "flex",
         flexDirection: "row",
