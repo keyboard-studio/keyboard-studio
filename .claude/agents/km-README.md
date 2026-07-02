@@ -119,7 +119,7 @@ If you fork this crew into another project, the project-specific seats are the o
 
 ## Crew-consistency lint (`pnpm crew-lint`)
 
-These crew docs are guarded by a machine lint suite at `utilities/crew-lint/index.ts` (issue #948), run via `pnpm crew-lint` and wired into `pnpm lint` (after eslint + depcruise). It enforces 7 checks and **must stay green**:
+These crew docs are guarded by a machine lint suite at `utilities/crew-lint/index.js` (issue #948) — a dependency-free `node` script (no tsx / no build step), run via `pnpm crew-lint` and wired into `pnpm lint` (after eslint + depcruise). It enforces 7 checks and **must stay green**:
 
 1. No `python` / `py` fenced code blocks in `.claude/**/km-*.md`.
 2. No pictographic emoji in `.claude/**/km-*.md` (typographic punctuation like `→`, `§`, `×`, en/em-dashes, curly quotes, `≥`/`≤` is fine).

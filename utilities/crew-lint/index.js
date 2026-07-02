@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // crew-lint — crew-consistency lint suite (GitHub issue #948).
 //
 // The capstone that locks in the km-crew doc cleanups from the rest of the
@@ -6,8 +7,12 @@
 // offending FILE and LINE (and the matched text) so a human — or km-programmer
 // in fix mode — can jump straight to it.
 //
-// Run: `pnpm crew-lint`  (== `tsx utilities/crew-lint/index.ts`)
+// Run: `pnpm crew-lint`  (== `node utilities/crew-lint/index.js`)
 // Wired into `pnpm lint` after eslint + depcruise. Must stay GREEN.
+//
+// Dependency-free CommonJS (plain `node`, no tsx / no compiler) — matches the
+// utilities/km-triage-app/* helper pattern so CI's frozen-lockfile install
+// needs no extra devDependency.
 //
 // The 7 checks:
 //   1. No python fences        — no ```python / ```py blocks in .claude/**/km-*.md
@@ -23,43 +28,35 @@
 // string and MUST NOT fire on look-alike legitimate text. A regression that
 // neuters a detector turns the suite RED just like a real violation.
 
-import { readFileSync, readdirSync, existsSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+const { readFileSync, readdirSync, existsSync } = require("node:fs");
+const path = require("node:path");
 
-const thisDir = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(thisDir, "../..");
+const REPO_ROOT = path.resolve(__dirname, "../..");
 
 // ---------------------------------------------------------------------------
 // Small helpers
 // ---------------------------------------------------------------------------
+//
+// A Failure is { file, line, text }:
+//   file — repo-relative path
+//   line — 1-based; 0 == file-level (no single line)
+//   text — the matched text / description
+// A CheckResult is { id, title, failures: Failure[] }.
 
-interface Failure {
-  file: string; // repo-relative
-  line: number; // 1-based; 0 == file-level (no single line)
-  text: string; // the matched text / description
-}
+const rel = (abs) => path.relative(REPO_ROOT, abs);
 
-interface CheckResult {
-  id: string;
-  title: string;
-  failures: Failure[];
-}
-
-const rel = (abs: string) => path.relative(REPO_ROOT, abs);
-
-function read(abs: string): string {
+function read(abs) {
   return readFileSync(abs, "utf8");
 }
-function lines(abs: string): string[] {
+function lines(abs) {
   return read(abs).split("\n");
 }
 
 const BINARY_EXT = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".pdf"]);
 
 /** Recursively list files under `dir` (absolute), skipping obvious binaries. */
-function walk(dir: string): string[] {
-  const out: string[] = [];
+function walk(dir) {
+  const out = [];
   if (!existsSync(dir)) return out;
   for (const ent of readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
     a.name < b.name ? -1 : 1,
@@ -74,13 +71,13 @@ function walk(dir: string): string[] {
 const CLAUDE = path.join(REPO_ROOT, ".claude");
 
 // All km-*.md docs anywhere under .claude/ (agents + commands + elsewhere).
-function crewDocs(): string[] {
+function crewDocs() {
   return walk(CLAUDE).filter((f) => /^km-.*\.md$/.test(path.basename(f)));
 }
 
 /** Scan a file's lines with a global regex; one Failure per match. */
-function scanLines(abs: string, re: RegExp, label?: (m: RegExpMatchArray) => string): Failure[] {
-  const out: Failure[] = [];
+function scanLines(abs, re, label) {
+  const out = [];
   lines(abs).forEach((line, i) => {
     for (const m of line.matchAll(re)) {
       out.push({ file: rel(abs), line: i + 1, text: label ? label(m) : m[0] });
@@ -109,14 +106,14 @@ const EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/g
 // "line(s) ~<num>" is an approximate self-line-ref that rots the instant the
 // file is edited. Bare exact numbers ("line 13617") are left alone because
 // they appear inside worked examples describing OTHER files' diff offsets.
-const LINE_REF_PATTERNS: RegExp[] = [
+const LINE_REF_PATTERNS = [
   /\blines?\s+~\d+/gi, // "line ~758", "lines ~758"
   /\blines?\s+~?\d+\s*[-–—]\s*~?\d+/gi, // "lines ~758-760", "lines 100-200"
   /\bsee\s+lines?\s+~?\d+/gi, // "see line 42"
   /~\d+\s*[-–—]\s*\d+/gi, // bare "~758-760" soft range
 ];
-function lineRefMatches(s: string): string[] {
-  const out: string[] = [];
+function lineRefMatches(s) {
+  const out = [];
   for (const re of LINE_REF_PATTERNS) for (const m of s.matchAll(re)) out.push(m[0]);
   return out;
 }
@@ -124,8 +121,8 @@ function lineRefMatches(s: string): string[] {
 // ---------------------------------------------------------------------------
 // Check 1 — no python fences
 // ---------------------------------------------------------------------------
-function checkNoPythonFences(): CheckResult {
-  const failures: Failure[] = [];
+function checkNoPythonFences() {
+  const failures = [];
   const re = /```\s*(python|py)\b/gi;
   for (const f of crewDocs()) failures.push(...scanLines(f, re));
   return { id: "1", title: "No python fences in .claude/**/km-*.md", failures };
@@ -134,12 +131,12 @@ function checkNoPythonFences(): CheckResult {
 // ---------------------------------------------------------------------------
 // Check 2 — no emoji
 // ---------------------------------------------------------------------------
-function checkNoEmoji(): CheckResult {
-  const failures: Failure[] = [];
+function checkNoEmoji() {
+  const failures = [];
   for (const f of crewDocs()) {
     failures.push(
       ...scanLines(f, EMOJI, (m) => {
-        const cp = m[0].codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0");
+        const cp = m[0].codePointAt(0).toString(16).toUpperCase().padStart(4, "0");
         return `${m[0]} (U+${cp})`;
       }),
     );
@@ -150,8 +147,8 @@ function checkNoEmoji(): CheckResult {
 // ---------------------------------------------------------------------------
 // Check 3 — no phantom package paths (anywhere under .claude/**)
 // ---------------------------------------------------------------------------
-function checkNoPhantomPaths(): CheckResult {
-  const failures: Failure[] = [];
+function checkNoPhantomPaths() {
+  const failures = [];
   const re = /packages\/(scaffolder|validator)\b/g;
   for (const f of walk(CLAUDE)) {
     if (path.extname(f).toLowerCase() === ".md" || /\.(js|cjs|mjs|ts|json|txt)$/.test(f)) {
@@ -169,8 +166,8 @@ function checkNoPhantomPaths(): CheckResult {
 // ---------------------------------------------------------------------------
 // Check 4 — no hardcoded self line-number cross-refs in km-triage.md
 // ---------------------------------------------------------------------------
-function checkNoSelfLineRefs(): CheckResult {
-  const failures: Failure[] = [];
+function checkNoSelfLineRefs() {
+  const failures = [];
   const triage = path.join(CLAUDE, "commands", "km-triage.md");
   if (existsSync(triage)) {
     for (const re of LINE_REF_PATTERNS) failures.push(...scanLines(triage, re));
@@ -187,15 +184,15 @@ function checkNoSelfLineRefs(): CheckResult {
 // ---------------------------------------------------------------------------
 // Check 5 — km-qc rubric consistency across agent + command
 // ---------------------------------------------------------------------------
-function checkQcConsistency(): CheckResult {
-  const failures: Failure[] = [];
+function checkQcConsistency() {
+  const failures = [];
   const targets = [
     path.join(CLAUDE, "agents", "km-qc.md"),
     path.join(CLAUDE, "commands", "km-qc.md"),
   ];
 
   // Canonical tokens that MUST appear in both rubrics.
-  const required: { re: RegExp; desc: string }[] = [
+  const required = [
     { re: /Start (?:at )?100|out of 100/, desc: "subtractive base (start 100)" },
     { re: /10 per P0/, desc: "-10 per P0" },
     { re: /3 per P1/, desc: "-3 per P1" },
@@ -207,7 +204,7 @@ function checkQcConsistency(): CheckResult {
     { re: /\bFAIL\b/, desc: "FAIL verdict" },
   ];
   // Conflicting/stale schemes that must NOT appear in either rubric.
-  const forbidden: { re: RegExp; desc: string }[] = [
+  const forbidden = [
     { re: /≥\s*85/g, desc: "additive >= 85 gate" },
     { re: /85\s*\/\s*100/g, desc: "additive 85/100 gate" },
     { re: /FIX ISSUES/gi, desc: "stale 'FIX ISSUES' verdict" },
@@ -239,8 +236,8 @@ function checkQcConsistency(): CheckResult {
 // ---------------------------------------------------------------------------
 // Check 6 — roster consistency
 // ---------------------------------------------------------------------------
-function checkRosterConsistency(): CheckResult {
-  const failures: Failure[] = [];
+function checkRosterConsistency() {
+  const failures = [];
   const agentsDir = path.join(CLAUDE, "agents");
   const agentNames = new Set(
     walk(agentsDir)
@@ -293,8 +290,8 @@ function checkRosterConsistency(): CheckResult {
 // ---------------------------------------------------------------------------
 // Check 7 — sentinel single spelling (.escalations/.labels-created-v2)
 // ---------------------------------------------------------------------------
-function checkSentinelSpelling(): CheckResult {
-  const failures: Failure[] = [];
+function checkSentinelSpelling() {
+  const failures = [];
   // Match the stale form (no -v2 suffix). Negative lookahead keeps the correct
   // .labels-created-v2 spelling GREEN.
   const re = /\.escalations\/\.labels-created(?!-v2)/g;
@@ -316,8 +313,8 @@ function checkSentinelSpelling(): CheckResult {
 // These add a synthetic Failure to a dedicated result if the detector fails to
 // fire on known-bad text, or fires on known-good text.
 // ---------------------------------------------------------------------------
-function checkDetectorsProven(): CheckResult {
-  const failures: Failure[] = [];
+function checkDetectorsProven() {
+  const failures = [];
 
   // Emoji detector: MUST flag these, MUST NOT flag those.
   const mustFlag = ["✅", "❌", "⚠️", "🤖", "✂", "✔", "✖"];
@@ -349,8 +346,8 @@ function checkDetectorsProven(): CheckResult {
 // ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
-function main(): void {
-  const results: CheckResult[] = [
+function main() {
+  const results = [
     checkDetectorsProven(),
     checkNoPythonFences(),
     checkNoEmoji(),
