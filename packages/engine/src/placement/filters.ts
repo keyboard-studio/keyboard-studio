@@ -121,10 +121,18 @@ export function hasNonUSBase(ir: KeyboardIR, threshold = 3): boolean {
  * Shift).
  *
  * The FIRST occurrence per vkey wins: once a vkey has been recorded, later
- * matching rules for the same vkey are ignored.  This mirrors the
- * clobber-avoidance behaviour of the original inline map-building in
- * detectBaseLayoutFamily (e.g. so a later duplicate rule for the same slot
- * cannot overwrite an earlier, more specific one).
+ * matching rules for the same vkey are ignored, so the result has at most
+ * one entry per vkey regardless of how many qualifying rules target it.
+ * For detectBaseLayoutFamily (and hasInvertedNumberRow) this reproduces the
+ * clobber-avoidance behaviour of their original inline map-building, where
+ * only one value per key position is ever meaningful. For hasNonUSBase this
+ * is more than incidental clobber-avoidance: because deviations are tallied
+ * from this map, a vkey with several qualifying rules (e.g. a bare rule and
+ * an NCAPS rule both targeting K_A) contributes at most one deviation, not
+ * one per matching rule. That is the intended, more-correct semantic —
+ * "non-US base" counts differing key *positions*, not differing rules — and
+ * is a deliberate departure from hasNonUSBase's original per-rule tally, not
+ * a re-statement of it.
  *
  * @see spec.md §7.6 (base-layout / AZERTY-derived detection helpers)
  */

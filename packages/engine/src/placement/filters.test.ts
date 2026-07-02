@@ -149,6 +149,33 @@ describe("hasNonUSBase", () => {
     const { ir } = parse(kmn, "kb-ncaps-azerty");
     expect(hasNonUSBase(ir)).toBe(true);
   });
+
+  it("counts a duplicate rule pair on one vkey as ONE deviation, per-position not per-rule", () => {
+    // K_A carries TWO qualifying (isBaseLayer-accepted) rules — a bare rule
+    // and an NCAPS rule — that both deviate from the expected 'a'.
+    // collectVkeyChars is first-occurrence-wins, so hasNonUSBase's per-VKEY
+    // tally counts K_A once, alongside two other *distinct* deviating vkeys
+    // (K_B, K_C), for a total of 3 — exactly AT the default threshold, so
+    // hasNonUSBase reports false.
+    //
+    // Under the old per-RULE tally (pre-collectVkeyChars refactor), each
+    // qualifying rule incremented the counter independently, so the same
+    // fixture would have summed to 4 deviations (K_A's two rules + K_B + K_C)
+    // and exceeded the threshold, reporting true. That divergence is
+    // intentional: "non-US base" means how many key *positions* differ from
+    // US, so a duplicated rule on the same position must not be double-
+    // counted. Do not "fix" this back to per-rule counting.
+    const kmn = makeUnicodeKmn(
+      [
+        "+ [K_A] > 'q'",
+        "+ [NCAPS K_A] > 'q'",
+        "+ [K_B] > 'w'",
+        "+ [K_C] > 'e'",
+      ].join("\n"),
+    );
+    const { ir } = parse(kmn, "kb-dup-rule-per-vkey");
+    expect(hasNonUSBase(ir)).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
