@@ -33,6 +33,7 @@ function projectQuestion(q: FlowQuestion): {
   help_text: string | undefined;
   type: string;
   options: Array<{ value: string; label: string }> | undefined;
+  options_source: string | undefined;
   required: boolean | undefined;
   next: FlowQuestion["next"];
 } {
@@ -47,6 +48,7 @@ function projectQuestion(q: FlowQuestion): {
           label: o.label,
         }))
       : undefined,
+    options_source: q.options_source,
     required: q.required,
     next: q.next,
   };

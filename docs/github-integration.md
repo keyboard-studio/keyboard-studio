@@ -1,6 +1,6 @@
 # GitHub integration — architecture
 
-Status: **draft, not yet ratified into [spec.md](../spec.md).** Captures architecture decisions from the 2026-06-15 §3a/§3b user-skill conversation (which previously lived only in claude-mem, not in any PR or commit) and reconciles them with the Day-1 OAuth fork+PR pipeline already implemented in [packages/engine/src/output/github.ts](../packages/engine/src/output/github.ts) and the in-flight [oauth-backend PR #459](https://github.com/keyboard-studio/keyboard-studio/pull/459).
+Status: **draft, not yet ratified into [spec.md](../spec.md).** Captures architecture decisions from the 2026-06-15 §3a/§3b user-skill conversation (which previously lived only in claude-mem, not in any PR or commit) and reconciles them with the Day-1 OAuth fork+PR pipeline implemented in [packages/engine/src/output/github.ts](../packages/engine/src/output/github.ts) and the shipped oauth-backend ([utilities/oauth-backend/src/server.ts](../utilities/oauth-backend/src/server.ts)).
 
 This is the home for "how does the keyboard get into `keymanapp/keyboards`?" Cross-link from here when adding new delivery paths, not the other way around.
 
@@ -35,27 +35,27 @@ Two things §1's north star left implicit, resolved 2026-06-22:
 
 **Sign-up is guest-first and deferred.** The user moves through the entire keyboard-creation flow as a **guest** — no account is required to author. Sign-up is requested only at the *end*, at the point of submission. The exception is the ZIP path (Option C), which needs no account at all: a user who only wants a `.zip` never signs up.
 
-**Sign-up offers two identities; neither dictates the submission path.** At submission the studio presents **two buttons — "Sign up with GitHub" and "Sign up with Google" (Gmail)**. Both identity flows are now implemented: GitHub OAuth (PKCE) via [packages/studio/src/lib/githubOAuth.ts](../packages/studio/src/lib/githubOAuth.ts) and Google OAuth (PKCE, S256) via [packages/studio/src/lib/googleOAuth.ts](../packages/studio/src/lib/googleOAuth.ts), surfaced in [packages/studio/src/components/SignUpPanel.tsx](../packages/studio/src/components/SignUpPanel.tsx). This is an *identity / account-creation* choice only, deliberately decoupled from how the keyboard reaches `keymanapp/keyboards`. A user who signs up with Google never needs a GitHub account. Note: both identity flows route to Option B (org-mediated submission), which remains unbuilt — see §2.
+**Sign-up offers two identities; neither dictates the submission path.** At submission the studio presents **two buttons — "Sign up with GitHub" and "Sign up with Google" (Gmail)**. Both identity flows are now implemented: GitHub OAuth (PKCE) via [packages/studio/src/lib/githubOAuth.ts](../packages/studio/src/lib/githubOAuth.ts) and Google OAuth (PKCE, S256) via [packages/studio/src/lib/googleOAuth.ts](../packages/studio/src/lib/googleOAuth.ts), surfaced in [packages/studio/src/components/SignUpPanel.tsx](../packages/studio/src/components/SignUpPanel.tsx). This is an *identity / account-creation* choice only, deliberately decoupled from how the keyboard reaches `keymanapp/keyboards`. A user who signs up with Google never needs a GitHub account. Both identity flows route to Option B (org-mediated submission) by default; see §2 and §4a for the implementation status.
 
 **The default submission path is org-mediated (Option B), for everyone.** Regardless of which identity they signed up with, the studio submits on the user's behalf through a **studio-controlled GitHub organization** — the user is credited via commit metadata and never sees a fork, branch, or PR thread. This is the §1 north star taken to its conclusion: the org absorbs the entire Git workflow.
 
 **"Fork it yourself" is an explicit opt-in for power users.** For users who want to own the contribution end-to-end, the studio offers a button to **fork `keymanapp/keyboards` into their own account and open their own PR** (Option A). This requires a connected GitHub identity with `public_repo` scope, so it is only meaningful for GitHub sign-ups (a Google-only account is prompted to connect GitHub first). It is never the default and never required.
 
-Net effect on Options A/B/C (§2): **B is now the default for all signed-up users; A is an opt-in "more control" button; C is the no-sign-up / offline escape hatch.** This inverts the prior "A if signed in, C if not; B is a future contingency" picker — and it is the gap against shipped code (PR #505 implemented Option A as the submit path; Option B does not yet exist).
+Net effect on Options A/B/C (§2): **B is now the default for all signed-up users; A is an opt-in "more control" button; C is the no-sign-up / offline escape hatch.** This inverts the prior "A if signed in, C if not; B is a future contingency" picker. The Option B server-side pipeline is now implemented (§4a); the remaining gap is wiring the SPA submit screen to it and delivering a Vercel serverless route.
 
 ## 2. Three delivery paths (Options A / B / C)
 
 These are tracked operationally in [docs/github_flow.md](github_flow.md) (Status section). This doc owns the *why*; that one owns the *progress bar*.
 
 - **Option A — User-fork, studio-managed PR.** The studio holds an OAuth token for the signed-in user, forks `keymanapp/keyboards` into the user's account if needed, creates a branch, commits the VirtualFS contents, pushes, opens a PR against upstream `main`. Per §1a this is the **opt-in "fork & submit yourself" path** for users who want to own the contribution; it requires a GitHub identity with `public_repo` scope and is **not** the default. (Implemented in PR #505.)
-- **Option B — Org-mediated PR.** A studio-controlled GitHub App / bot account owns the fork and PR; the user is credited via commit metadata (`Co-Authored-By` or attribution sidecar). Per §1a this is now the **default path for all signed-up users**, including the broadest user (community activist with no software background), and for anyone who signs up with Google rather than GitHub. **Not yet implemented** — this is the critical path.
+- **Option B — Org-mediated PR.** A studio-controlled GitHub App installation owns the fork and PR; the user is credited via a `Co-Authored-By` commit trailer and a provenance block in the PR body. Per §1a this is now the **default path for all signed-up users**, including the broadest user (community activist with no software background), and for anyone who signs up with Google rather than GitHub. The server-side pipeline (`submitManagedPR` in [utilities/oauth-backend/src/github-pipeline.ts](../utilities/oauth-backend/src/github-pipeline.ts)) is **implemented** and wired into the standalone Fastify [utilities/oauth-backend/src/server.ts](../utilities/oauth-backend/src/server.ts) at `POST /submit/managed-pr`; it authenticates using a GitHub App installation token (see §4a). A Vercel `/api/submit/managed-pr` serverless function is a tracked follow-up — do not assume it is deployed to `/api` yet.
 - **Option C — ZIP download.** Final fallback. The studio emits a `.zip` of the VirtualFS conforming to the `keymanapp/keyboards/<id>/` layout; the user (or a helper) submits it some other way. This is the only path that works fully offline and is the universal escape hatch when OAuth is unavailable.
 
 The user is **not** asked to pick between A and B. Per §1a (2026-06-22), the default for every signed-up user is **Option B (org-mediated)**; **Option A** is an explicit opt-in "fork & submit yourself" button for power users; **Option C** is the no-sign-up / offline path for users who only want a `.zip`. (This supersedes the original "A if signed in, C if not; B is a future contingency" picker.)
 
 ## 3. Architecture in code (Day-1)
 
-The fork+PR pipeline already exists end-to-end on the SPA side; the missing piece is server-side token exchange, which Grace is landing as a sibling package.
+The fork+PR pipeline exists end-to-end: the SPA side drives the OAuth authorize/callback/exchange flow; the oauth-backend ([utilities/oauth-backend/](../utilities/oauth-backend/src/)) holds secrets server-side and provides both the token-exchange endpoints and the Option B managed-PR pipeline.
 
 ### 3.1 Google identity flow — `packages/studio/src/`
 
@@ -77,21 +77,22 @@ The Google OAuth PKCE flow ships across these files: [src/lib/googleOAuth.ts](..
 
 The studio talks to the `OutputService` interface, not to the engine implementation. That is the *only* abstraction barrier protecting §3a's "no GitHub workflow knowledge required" rule on the SPA side.
 
-## 4. Auth — integrating with PR #459 (`packages/oauth-backend/`)
+## 4. Auth — `utilities/oauth-backend/`
 
-[PR #459 (gboltono)](https://github.com/keyboard-studio/keyboard-studio/pull/459) is the server-side companion the existing `github.ts` pipeline has been waiting for. Treat it as the assumed shape going forward; do not reinvent the boundary on the engine side.
+The OAuth backend is a Fastify v5 service ([utilities/oauth-backend/src/server.ts](../utilities/oauth-backend/src/server.ts)) that holds client secrets server-side so the SPA can complete GitHub OAuth flows without exposing secrets to the browser. It handles both GitHub credential pairs (§4a) and the Option B managed-PR pipeline.
 
-**What it is.** A Fastify v5 service that holds `GITHUB_CLIENT_SECRET` server-side so the SPA can complete the GitHub web-app flow without exposing the secret to the browser.
+**What it is.** A Fastify v5 service that holds GitHub client secrets server-side and provides the managed-PR pipeline endpoint. It supports two GitHub credential pairs — the GitHub App pair (default sign-in) and the OAuth App pair (Option A) — selected per-request via the `client` discriminator field. See §4a for the full credential model.
 
 **Endpoints (stable surface):**
-- `POST /oauth/exchange` — authorization-code → access token
+- `POST /oauth/exchange` — authorization-code → access token (both credential pairs; `client` field selects which)
 - `POST /oauth/refresh` — token rotation
+- `POST /submit/managed-pr` — Option B org-mediated fork+PR (installation token; 503 when App vars absent)
 - `GET  /oauth/health` — liveness probe
 
 **Security invariants (do not break these on the consumer side either):**
 - Client secret is server-side only — never returned, logged, or forwarded.
 - **Stateless** — the backend does not persist tokens. The token lives in the SPA's session (memory or `sessionStorage`, not `localStorage`), and is sent on each `OutputService` call.
-- CORS is an explicit allowlist via `ALLOWED_ORIGINS`; wildcard origins are rejected at startup.
+- CORS is an explicit allowlist via `OAUTH_ALLOWED_ORIGINS`; wildcard origins are rejected at startup.
 
 **Integration contract (engine ↔ oauth-backend):**
 
@@ -114,32 +115,77 @@ SPA ──token──▶ createGitHubOutputService({ token }).publishPR(...)
 - The engine must not log the token at any level. If a debug log of a request is needed, redact `Authorization:` before emitting.
 - If/when the SPA gains a "submit again" path (later session), it must re-acquire a fresh token via the SPA flow — the engine does not cache tokens across sessions.
 
-## 4a. GitHub OAuth App — registration & scopes (sign-up identity)
+## 4a. Two GitHub credentials — registration, scopes, and env vars
 
-The credential behind the **"Sign up with GitHub"** button (§1a). **It is an OAuth App, not a GitHub App.** The shipped flow ([packages/studio/src/lib/githubOAuth.ts](../packages/studio/src/lib/githubOAuth.ts)) is the OAuth *web-application* flow — `github.com/login/oauth/authorize` with `client_id` + `client_secret` + **scopes** + PKCE, with the code→token exchange done by the `oauth-backend` (§4). A GitHub *App* (fine-grained permissions + installation tokens) is a different primitive and would not work against any of `beginAuthorize` / `exchangeCode` / `verifyToken`. (The org-mediated submission bot of §5 Q3 is a separate, still-undecided credential — do not conflate the two.)
+The studio uses **two distinct GitHub credentials** with separate jobs. Do not conflate them.
 
-**Registration fields** (GitHub → Settings → Developer settings → **OAuth Apps** → New):
-- **Authorization callback URL** — must exactly match [`getRedirectUri()`](../packages/studio/src/lib/githubOAuth.ts): `https://<host>/oauth/callback` (path-based, not hash). Register one OAuth App per environment (prod + a `http://localhost:<port>/oauth/callback` for dev).
-- **Client id** → SPA env `VITE_GITHUB_CLIENT_ID` (public, safe to ship).
-- **Client secret** → `oauth-backend` env `GITHUB_CLIENT_SECRET` only — never the browser (§4 invariant).
+### GitHub App — default sign-in AND Option B server-side delivery
+
+The **GitHub App** serves two roles:
+
+1. **Default identity / sign-in.** The "Sign up with GitHub" button initiates a **user-to-server OAuth flow** against the GitHub App (client id prefix `Iv23…`). This is the standard `github.com/login/oauth/authorize` → callback → `/oauth/exchange` round-trip, with PKCE, but **no scope** — the `scope` parameter is omitted entirely from the authorize URL. GitHub returns an identity-only token; `/user` returning 200 is the connected check. There is no `IDENTITY_SCOPE` constant in the shipped code; `beginAuthorize()` with no `flow` argument omits `scope` altogether.
+
+2. **Option B server-side PR delivery.** The same App's **installation** (the App installed on the org account that owns the standing fork of `keymanapp/keyboards`) is used server-side to mint a short-lived **installation access token** via `@octokit/auth-app`. The installation token drives the entire git pipeline in `submitManagedPR` — fork check, tree creation, commit, branch, PR — without any user token. Required App permissions: Repository → Contents (read/write), Pull requests (read/write), Metadata (read).
+
+**Registration** (GitHub → Settings → Developer settings → **GitHub Apps** → New):
+- **Authorization callback URL** — must exactly match [`getRedirectUri()`](../packages/studio/src/lib/githubOAuth.ts): `https://<host>/oauth/callback` (path-based, not hash). Register per environment.
+- **User-to-server client id** (`Iv23…`) → `GITHUB_CLIENT_ID` (backend) and `VITE_GITHUB_CLIENT_ID` (SPA). The client id is public; safe to ship in the browser.
+- **User-to-server client secret** → `GITHUB_CLIENT_SECRET` (backend only — never the browser, §4 invariant).
+- **App installation** on the org that owns the fork → yields `GITHUB_APP_INSTALLATION_ID`.
+- Device flow: **off**. Webhook: not required for this use.
+
+### OAuth App — Option A "fork & submit yourself" opt-in only
+
+The **OAuth App** (client id prefix `Ov23…`) is used **only** when the user explicitly chooses the "fork & submit yourself" path. This flow requests `public_repo` scope so the user's own token can fork `keymanapp/keyboards` and open a PR in their own name.
+
+**Registration** (GitHub → Settings → Developer settings → **OAuth Apps** → New):
+- **Authorization callback URL** — same `https://<host>/oauth/callback` as above.
+- **Client id** (`Ov23…`) → `GITHUB_OAUTH_CLIENT_ID` (backend) and `VITE_GITHUB_OAUTH_CLIENT_ID` (SPA).
+- **Client secret** → `GITHUB_OAUTH_CLIENT_SECRET` (backend only).
 - Device flow: **off**.
 
-**Scopes — incremental authorization (decided 2026-06-24).** OAuth Apps have no permission grid; access is the `scope` requested at authorize time. Per the §1a decoupling of identity from submission:
+### Scopes — incremental authorization
 
-| Flow | Scope | Constant |
-|---|---|---|
-| **Sign-up (identity)** — the default | **`user:email`** — login + verified primary email (for commit attribution); **no** repo access | `IDENTITY_SCOPE` |
-| **Self-fork submit (Option A opt-in)** — requested only when the user chooses "fork & submit yourself" | **`public_repo`** | `REQUIRED_SCOPE` |
+Per the §1a decoupling of identity from submission:
 
-The sign-up button must **never** request `public_repo` — that would show an "access your repositories" consent screen just to log in, contradicting the §1 north star. [`beginAuthorize(scope = IDENTITY_SCOPE)`](../packages/studio/src/lib/githubOAuth.ts) defaults to identity; the submit path passes `REQUIRED_SCOPE` explicitly. A user who signs up with `user:email` lands in the hook's `needs-scope` state, which `SignUpPanel` correctly treats as "signed up" — the missing-scope distinction matters only at submit.
+| Flow | App type | Scope sent | Shipped constant |
+|---|---|---|---|
+| **Sign-up / identity** — the default | GitHub App (user-to-server) | **none** — `scope` param omitted | (no constant; `beginAuthorize()` omits it) |
+| **Self-fork submit (Option A opt-in)** — only when user chooses "fork & submit yourself" | OAuth App | **`public_repo`** | `REQUIRED_SCOPE` |
+
+The sign-up flow must **never** request `public_repo` — that would show an "access your repositories" consent screen just to log in, contradicting the §1 north star. [`beginAuthorize()`](../packages/studio/src/lib/githubOAuth.ts) defaults to the identity flow and omits scope; the Option A submit path calls `beginAuthorize("submit")` which uses the OAuth App client id and adds `REQUIRED_SCOPE`. The SPA enforces the scope check only for `oauth_app` tokens; a `github_app` identity token has no scopes and is treated as "connected" once `/user` returns 200.
+
+### How the two flows share the same endpoints
+
+Both sign-in flows hit the same `/oauth/exchange` endpoint. The SPA sends a `client: "github_app" | "oauth_app"` field in the exchange body; the backend ([utilities/oauth-backend/src/handlers.ts](../utilities/oauth-backend/src/handlers.ts)) picks the matching credential pair from `resolveCredentials()`. The stored `StoredGitHubToken` carries the `client` field so the SPA knows which app minted it. The engine's `verifyToken` is intentionally unchanged; `missingScopes` in its result is interpreted per token type in the SPA.
+
+### Environment variables
+
+| Variable | Required | Value | Purpose |
+|---|---|---|---|
+| `GITHUB_CLIENT_ID` | yes | `Iv23…` (GitHub App user-to-server client id) | Default sign-in — backend credential |
+| `GITHUB_CLIENT_SECRET` | yes | (secret) | Default sign-in — backend only, never logged |
+| `VITE_GITHUB_CLIENT_ID` | yes (SPA) | same `Iv23…` | Default sign-in — authorize URL builder in browser |
+| `GITHUB_OAUTH_CLIENT_ID` | Option A only | `Ov23…` (OAuth App client id) | Option A "fork & submit yourself" — backend |
+| `GITHUB_OAUTH_CLIENT_SECRET` | Option A only | (secret) | Option A — backend only, never logged |
+| `VITE_GITHUB_OAUTH_CLIENT_ID` | Option A only | same `Ov23…` | Option A — authorize URL builder in browser |
+| `GITHUB_APP_ID` | Option B only | numeric app id | Installation-token minter — distinct from `GITHUB_CLIENT_ID` |
+| `GITHUB_APP_PRIVATE_KEY` | Option B only | base64-encoded PEM | Installation-token minter — decoded in memory, never logged |
+| `GITHUB_APP_INSTALLATION_ID` | Option B only | numeric installation id | Installation-token minter |
+| `GITHUB_ORG_LOGIN` | Option B only | org login | Org that owns the standing fork of `keymanapp/keyboards` |
+| `GITHUB_ORG_TOKEN` | **retired** | — | Replaced by the installation token; remove from any deployment |
+
+`GITHUB_APP_ID` (numeric App id) is **distinct** from `GITHUB_CLIENT_ID` (the App's `Iv23…` user-to-server client id). They refer to the same registered App but serve different purposes: the client id drives the OAuth authorize flow; the App id drives the installation-token mint via `@octokit/auth-app`.
+
+All four Option B vars (`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_INSTALLATION_ID`, `GITHUB_ORG_LOGIN`) must be set together or all absent. A partial set triggers a startup warning and leaves `POST /submit/managed-pr` returning 503.
 
 ## 5. Open questions (parked, surface before implementing)
 
 1. **Branch naming.** The convention is `add/<keyboardId>` — matching the shipped contract (`packages/contracts/src/outputService.ts` §12, `PublishPROptions.branchName` JSDoc) and the engine implementation (`packages/engine/src/output/github.ts`). Open question: whether to append a uniqueness suffix (e.g. `add/<keyboardId>-<shortHash>`, as Option B already does) to avoid collisions when the same keyboard is re-submitted while its prior branch is still open on the fork. Decide before second-submission UX lands.
 2. **Re-submission posture.** If the same user re-opens the same working copy after their first PR merged, do we open a *new* PR off latest upstream `main`, or push to the existing branch? Default proposal: **always a new branch.** Avoids reasoning about whether the prior branch was deleted, force-pushed, or had upstream changes since.
-3. **Option B (org-mediated) — now the default (§1a), still unbuilt.** Needs: the studio GitHub-org / bot identity, the commit-attribution shape (`Co-Authored-By` vs attribution sidecar), and how the user is told their submission goes via the org. This is now the critical path, not a contingency — and the gap against shipped code (PR #505 implemented Option A as the submit path; B does not yet exist).
-4. **Token storage in the SPA.** `sessionStorage` is the current assumption (cleared on tab close, not shared across tabs). Confirm with Grace before the OAuth-backend PR merges, since it constrains the SPA-side wrapper.
-5. **Google (Gmail) identity backend (§1a).** ~~Decide: does the studio gain its own account/identity store, or does Google sign-in mint a session that always routes through Option B?~~ **RESOLVED 2026-06-24:** Google sign-in mints a **stateless identity-only session** — no account or identity store is created, upholding the §4 "backend does not persist tokens" invariant. The backend's `POST /oauth/google/exchange` exchanges the authorization code at Google, validates the `id_token`'s `aud`/`iss`/`exp` cheaply (no JWKS dependency; token arrives directly from Google over TLS), and returns only decoded identity claims `{sub, email, email_verified, name, picture}` — never a token. The SPA stores this identity in `sessionStorage` (key `ks.google.identity`), never the Google access or id token. Submission for Google-identified users routes to the Option B (org-mediated) label. Option B itself remains unbuilt; see §2.
+3. **Option B (org-mediated) — server-side pipeline implemented; Vercel route is a follow-up.** `submitManagedPR` in [utilities/oauth-backend/src/github-pipeline.ts](../utilities/oauth-backend/src/github-pipeline.ts) is shipped: it uses a GitHub App installation token (§4a `GITHUB_APP_*` vars), commits with a `Co-Authored-By` trailer, and opens a draft PR. The route is wired into the standalone Fastify server. Open items: (a) wiring the SPA submit screen to `POST /submit/managed-pr` for non-Option-A users, (b) the Vercel `/api/submit/managed-pr` serverless function, and (c) the UX that tells the user their submission went via the org.
+4. **Token storage in the SPA.** `sessionStorage` is confirmed: the shipped backend is stateless and the SPA stores `StoredGitHubToken` under `ks.github.token` (tab-scoped, cleared on tab close, not shared across tabs). The Google identity claim is stored under `ks.google.identity` on the same basis.
+5. **Google (Gmail) identity backend (§1a).** ~~Decide: does the studio gain its own account/identity store, or does Google sign-in mint a session that always routes through Option B?~~ **RESOLVED 2026-06-24:** Google sign-in mints a **stateless identity-only session** — no account or identity store is created, upholding the §4 "backend does not persist tokens" invariant. The backend's `POST /oauth/google/exchange` exchanges the authorization code at Google, validates the `id_token`'s `aud`/`iss`/`exp` cheaply (no JWKS dependency; token arrives directly from Google over TLS), and returns only decoded identity claims `{sub, email, email_verified, name, picture}` — never a token. The SPA stores this identity in `sessionStorage` (key `ks.google.identity`), never the Google access or id token. Submission for Google-identified users routes to the Option B (org-mediated) path. The Option B server-side pipeline is implemented (§4a); the SPA wiring for Google-identified users submitting via Option B is a tracked follow-up.
 6. **Self-fork for non-GitHub identities (§1a).** ~~Decide the UX when a Google-only user clicks Option A — prompt to connect a GitHub account, or hide the button for Google sign-ups.~~ **RESOLVED 2026-06-24:** A Google-only user who clicks the Option A "fork it yourself" affordance is **prompted to connect a GitHub account**. The Option A button is **disabled (not hidden)** for sessions where `IdentitySession.provider === "google"` (see `src/lib/identity.ts`). Hiding it entirely would obscure the path's existence; disabling with a prompt preserves discoverability for power users who may later connect GitHub.
 7. **Guest → sign-up hand-off (§1a).** ~~Authoring happens as a guest with the working copy in memory; sign-up is deferred to submit time. Confirm the working copy survives the OAuth redirect round-trip (the redirect leaves and re-enters the SPA) so the guest's in-progress keyboard is not lost at the moment they sign up.~~ **RESOLVED 2026-06-25:** The working copy did **not** survive — this was a real defect. The working copy lives only in the in-memory Zustand store ([packages/studio/src/stores/workingCopyStore.ts](../packages/studio/src/stores/workingCopyStore.ts)); both OAuth flows use `window.location.assign` (full-page redirect), so the guest's in-progress keyboard was lost on sign-up.
 
@@ -154,5 +200,5 @@ The sign-up button must **never** request `public_repo` — that would show an "
 - [packages/engine/src/output/github.ts](../packages/engine/src/output/github.ts) — `publishPR()` 8-step pipeline
 - [packages/engine/src/output/index.ts](../packages/engine/src/output/index.ts) — `createOutputService` vs `createGitHubOutputService` split
 - [packages/contracts/src/outputService.ts](../packages/contracts/src/outputService.ts) — `OutputService`, `PublishPRError`
-- [PR #459](https://github.com/keyboard-studio/keyboard-studio/pull/459) — `packages/oauth-backend/` (Grace, closes #63)
+- [utilities/oauth-backend/src/server.ts](../utilities/oauth-backend/src/server.ts) — Fastify oauth-backend (shipped; originated as PR #459)
 - claude-mem observations: #3619 (north-star goal), #3618 (submission posture, MIT/author-gated), #2815 (publishPR pipeline), #2830 (OAuth Fork+PR implementation), #2820 (stub vs real service split), #2817 (`OutputService` contract shape)

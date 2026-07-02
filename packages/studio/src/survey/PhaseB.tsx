@@ -568,6 +568,7 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <button
           type="button"
+          data-testid="phase-b-done"
           disabled={doneDisabled}
           onClick={() => {
             onComplete({
@@ -769,6 +770,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
         )}
         <button
           type="button"
+          data-testid="phase-b-intro-next"
           onClick={() => onChoose(selected)}
           style={primaryButton(false)}
         >

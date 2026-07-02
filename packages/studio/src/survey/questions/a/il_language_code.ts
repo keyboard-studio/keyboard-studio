@@ -5,20 +5,23 @@
 // drives the bcp47 field in IdentityLiteResult.bcp47 (built by buildTargetBcp47
 // in IdentityLite.tsx). An empty subtag degrades suggestBases() to script-match
 // ranking (spec §8).
+//
+// Type is "autocomplete" with options_source "@langtags_iso639" so QuestionField
+// renders the langtags-backed searchable picker. Free-text entry is preserved via
+// the Autocomplete primitive (datalist approach allows arbitrary typed values).
 
 import type { QuestionModule } from "../../types.ts";
 
 export const definition = {
   id: "il_language_code",
-  prompt: "What is the ISO 639 language subtag for this language?",
+  prompt: "What language is this keyboard for?",
   help_text:
-    "Enter the two- or three-letter ISO 639 code for your language — the short " +
-    "code linguists and software systems use to identify it. Examples: \"en\" " +
-    "(English), \"fr\" (French), \"ha\" (Hausa), \"hi\" (Hindi), \"sw\" (Swahili), " +
-    "\"bft\" (Balti). Leave blank if you are unsure; you can add it later. " +
-    "Note: enter only the language subtag, not a full BCP47 tag with region " +
-    "or variant (those are added during the documentation stage).",
-  type: "text" as const,
+    "Search by language name, autonym, or ISO 639 code. Examples: \"Hausa\", " +
+    "\"ha\", \"Hindi\", \"hi\". If your language is not in the list, type its " +
+    "ISO 639 code directly (e.g. \"bft\" for Balti) and continue — free text " +
+    "is always accepted. Leave blank if you are unsure.",
+  type: "autocomplete" as const,
+  options_source: "@langtags_iso639" as const,
   required: false,
   next: "il_target_script",
 } satisfies import("../../types.ts").FlowQuestion;
@@ -27,8 +30,10 @@ export const definition = {
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [
-    { value: "ha", note: "ISO 639-1 code for Hausa" },
-    { value: "bft", note: "ISO 639-3 code for Balti" },
+    { value: "ha", note: "ISO 639-1 code for Hausa (known in langtags)" },
+    { value: "hau", note: "ISO 639-3 code for Hausa — resolves same record" },
+    { value: "bft", note: "ISO 639-3 code for Balti — free-text fallback" },
+    { value: "xyz-unknown", note: "free-text entry not in langtags — allowed" },
     { value: undefined, note: "blank is explicitly allowed (required: false)" },
     { value: "", note: "empty string is acceptable for optional question" },
   ],

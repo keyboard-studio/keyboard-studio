@@ -14,6 +14,7 @@
  */
 
 import type {
+  ClientDiscriminator,
   ExchangeBody,
   RefreshBody,
   TokenResponse,
@@ -75,10 +76,65 @@ export type HandlerResult = HandlerSuccess | HandlerError;
 // ---------------------------------------------------------------------------
 
 export interface HandlerConfig {
+  /** GitHub App user-to-server client ID (`Iv23…`). Used when `client === "github_app"` (default). */
   clientId: string;
   /** Never log, never include in responses. */
   clientSecret: string;
+  /**
+   * Classic OAuth App client ID (`Ov23…`). Used when `client === "oauth_app"`.
+   * Optional — if absent, any `oauth_app` exchange/refresh returns a 500
+   * `server_misconfigured` error. The default `github_app` flow continues to
+   * work normally when these are unset.
+   */
+  oauthClientId?: string;
+  /** Never log, never include in responses. */
+  oauthClientSecret?: string;
   fetch: OAuthFetchFn;
+}
+
+// ---------------------------------------------------------------------------
+// Private helper: resolve credential pair from config + discriminator
+// ---------------------------------------------------------------------------
+
+/**
+ * Return the `{ client_id, client_secret }` pair that corresponds to the
+ * requested `client` discriminator, or a `HandlerError` if the requested
+ * pair is not configured.
+ *
+ * The `github_app` pair is always required (startup validation ensures it).
+ * The `oauth_app` pair is optional — absent config yields 500
+ * `server_misconfigured` so the operator sees a clear signal on first use
+ * rather than a confusing GitHub error about bad credentials.
+ */
+function resolveCredentials(
+  client: ClientDiscriminator | undefined,
+  config: HandlerConfig
+): { client_id: string; client_secret: string } | HandlerError {
+  if ((client ?? "github_app") === "oauth_app") {
+    if (
+      config.oauthClientId === undefined ||
+      config.oauthClientId === "" ||
+      config.oauthClientSecret === undefined ||
+      config.oauthClientSecret === ""
+    ) {
+      // Operator has not configured the OAuth App credentials.
+      // Return a 500 — this is a server-side misconfiguration, not a client error.
+      return {
+        ok: false,
+        status: 500,
+        error: "server_misconfigured",
+      };
+    }
+    return {
+      client_id: config.oauthClientId,
+      client_secret: config.oauthClientSecret,
+    };
+  }
+  // Default: github_app
+  return {
+    client_id: config.clientId,
+    client_secret: config.clientSecret,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -175,9 +231,12 @@ export async function exchange(
   body: ExchangeBody,
   config: HandlerConfig
 ): Promise<HandlerResult> {
+  const credentials = resolveCredentials(body.client, config);
+  if ("error" in credentials) return credentials;
+
   const payload: Record<string, string> = {
-    client_id: config.clientId,
-    client_secret: config.clientSecret,
+    client_id: credentials.client_id,
+    client_secret: credentials.client_secret,
     code: body.code,
   };
   if (body.code_verifier !== undefined) payload["code_verifier"] = body.code_verifier;
@@ -204,9 +263,12 @@ export async function refresh(
   body: RefreshBody,
   config: HandlerConfig
 ): Promise<HandlerResult> {
+  const credentials = resolveCredentials(body.client, config);
+  if ("error" in credentials) return credentials;
+
   const payload: Record<string, string> = {
-    client_id: config.clientId,
-    client_secret: config.clientSecret,
+    client_id: credentials.client_id,
+    client_secret: credentials.client_secret,
     grant_type: "refresh_token",
     refresh_token: body.refresh_token,
   };

@@ -73,6 +73,7 @@ export function ProjectNameStep({
         </Label>
         <TextField
           id="project-display-name"
+          data-testid="project-name-input"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           autoComplete="off"
@@ -95,6 +96,7 @@ export function ProjectNameStep({
         <Button
           variant="primary"
           disabled={!isValid}
+          data-testid="project-name-next"
           onClick={handleNext}
           aria-disabled={!isValid}
         >
@@ -102,7 +104,7 @@ export function ProjectNameStep({
         </Button>
       </div>
 
-      <Button variant="back" onClick={onBack}>
+      <Button variant="back" data-testid="project-name-back" onClick={onBack}>
         {"←"} Back
       </Button>
     </div>

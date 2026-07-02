@@ -104,6 +104,9 @@ export type {
   SecondaryRuleId,
   ConditionalSecondary,
 } from "./strategy-selector/rules.js";
+// §7.2 script-class default-fill prior — pre-fill step run before selectStrategy().
+export { defaultFillAxes } from "./strategy-selector/default-fill.js";
+export type { DefaultFillResult } from "./strategy-selector/default-fill.js";
 
 // Issue #248 — Sprint-1 identity stub mutator (deleted at Sprint-2 start per #238).
 export { applyIdentityStubMutation } from "./stub-mutator/index.js";
@@ -122,8 +125,8 @@ export { suggestMissingCharacters } from "./character-discovery/suggestMissing.j
 export type { MissingCharSuggestions } from "./character-discovery/suggestMissing.js";
 
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.
-export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyStoreSlotRemovals, parseSlotId } from "./pattern-apply/index.js";
-export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, ApplyCarveToVfsOpts, StoreSlotRemovalResult } from "./pattern-apply/index.js";
+export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyStoreSlotRemovals, classifyStoreSlotEdit, parseSlotId } from "./pattern-apply/index.js";
+export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, ApplyCarveToVfsOpts, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason } from "./pattern-apply/index.js";
 
 // Inventory diff (spec §8): static extraction of a keyboard's produced glyph set.
 export { producedGlyphs, collectFromOutput } from "./inventory/producedGlyphs.js";

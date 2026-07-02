@@ -1,7 +1,7 @@
 // Tests for ruleModifier(), modifierLabel(), glyph-shape integration, and StoreUsage.patternRefs in irToCarveNodes.ts
 
 import { describe, it, expect } from 'vitest';
-import type { IRRule, IRGroup, IRStore, KeyboardIR, Pattern } from '@keyboard-studio/contracts';
+import type { IRRule, IRGroup, IRStore, KeyboardIR, Pattern, StoreItem } from '@keyboard-studio/contracts';
 import {
   ruleModifier,
   modifierLabel,
@@ -10,6 +10,8 @@ import {
   toRailNodes,
   collectOwnedNodeIds,
   patternToGlyphs,
+  storeCharChips,
+  nodeState,
 } from './irToCarveNodes.ts';
 
 // ---------------------------------------------------------------------------
@@ -801,5 +803,268 @@ describe('StoreUsage.patternRefs', () => {
       expect.objectContaining({ groupId: 'g1', groupName: 'main', ruleCount: 1 }),
     ]);
     expect(store?.storeUsage?.patternRefs).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// storeCharChips — per-character store toggle chips (#523)
+// ---------------------------------------------------------------------------
+
+function makeChipStore(nodeId: string, name: string, items: StoreItem[], overrides: Partial<IRStore> = {}): IRStore {
+  return { nodeId, name, items, isSystem: false, ...overrides };
+}
+
+function makeChipGroup(nodeId: string, rules: IRRule[]): IRGroup {
+  return { nodeId, name: 'main', usingKeys: true, rules, readonly: false };
+}
+
+function makeChipIR(groups: IRGroup[], stores: IRStore[]): KeyboardIR {
+  return {
+    origin: 'scaffolded',
+    header: { keyboardId: '', name: '', bcp47: [], copyright: '', version: '', targets: [], storeDirectives: [] },
+    stores,
+    groups,
+    comments: [],
+    raw: [],
+    recognizedPatterns: [],
+  };
+}
+
+describe('storeCharChips — chip id stability + TRUE itemsIndex', () => {
+  it('produces chip ids using the TRUE items index, skipping non-char items (char,vkey,char -> #0 and #2)', () => {
+    const store = makeChipStore('store#mixed', 'mixedX', [
+      { kind: 'char', value: 'a' },
+      { kind: 'vkey', name: 'K_A' },
+      { kind: 'char', value: 'b' },
+    ]);
+    const ir = makeChipIR([], [store]);
+
+    const chips = storeCharChips(store, ir);
+
+    expect(chips).toHaveLength(2);
+    expect(chips[0]!.chipId).toBe('store#mixed#0');
+    expect(chips[0]!.itemsIndex).toBe(0);
+    expect(chips[0]!.ch).toBe('a');
+    expect(chips[1]!.chipId).toBe('store#mixed#2');
+    expect(chips[1]!.itemsIndex).toBe(2);
+    expect(chips[1]!.ch).toBe('b');
+  });
+
+  it('returns an empty array for a store with no char items', () => {
+    const store = makeChipStore('store#empty', 'emptyX', [
+      { kind: 'raw', text: 'nul' },
+      { kind: 'deadkey', id: 1 },
+    ]);
+    const ir = makeChipIR([], [store]);
+    expect(storeCharChips(store, ir)).toEqual([]);
+  });
+
+  it('returns an empty array for a REFERENCED store whose items are all non-char (vkey + raw) — still renders as a binary store, no tri-state', () => {
+    const store = makeChipStore('store#nonchar', 'nonCharX', [
+      { kind: 'vkey', name: 'K_A' },
+      { kind: 'raw', text: 'nul' },
+    ]);
+    const rule: IRRule = {
+      nodeId: 'rule#1',
+      context: [{ kind: 'any', storeRef: 'nonCharX' }],
+      output: [{ kind: 'char', value: 'z' }],
+    };
+    const ir = makeChipIR([makeChipGroup('g1', [rule])], [store]);
+
+    expect(storeCharChips(store, ir)).toEqual([]);
+  });
+});
+
+describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dispatch)', () => {
+  it('nul-fill: an output-target store (index() in a rule output) maps every char chip to nul-fill', () => {
+    const outputStore = makeChipStore('store#out', 'outX', [
+      { kind: 'char', value: 'x' },
+      { kind: 'char', value: 'y' },
+    ]);
+    const rule: IRRule = {
+      nodeId: 'rule#1',
+      context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
+      output: [{ kind: 'index', storeRef: 'outX', offset: 0 }],
+    };
+    const ir = makeChipIR([makeChipGroup('g1', [rule])], [outputStore]);
+
+    const chips = storeCharChips(outputStore, ir);
+    expect(chips).toHaveLength(2);
+    chips.forEach((c) => {
+      expect(c.action).toBe('nul-fill');
+      expect(c.disabledReason).toBeUndefined();
+    });
+  });
+
+  it('drop: an unpaired any()-source store maps every char chip to drop', () => {
+    const inputStore = makeChipStore('store#in', 'inX', [
+      { kind: 'char', value: 'a' },
+      { kind: 'char', value: 'b' },
+    ]);
+    const rule: IRRule = {
+      nodeId: 'rule#1',
+      context: [{ kind: 'any', storeRef: 'inX' }],
+      output: [{ kind: 'char', value: 'z' }],
+    };
+    const ir = makeChipIR([makeChipGroup('g1', [rule])], [inputStore]);
+
+    const chips = storeCharChips(inputStore, ir);
+    expect(chips).toHaveLength(2);
+    chips.forEach((c) => {
+      expect(c.action).toBe('drop');
+      expect(c.disabledReason).toBeUndefined();
+    });
+  });
+
+  it('drop: a store entirely unreferenced by any rule maps every char chip to drop', () => {
+    const unusedStore = makeChipStore('store#unused', 'unusedX', [{ kind: 'char', value: 'q' }]);
+    const ir = makeChipIR([], [unusedStore]);
+
+    const chips = storeCharChips(unusedStore, ir);
+    expect(chips).toHaveLength(1);
+    expect(chips[0]!.action).toBe('drop');
+  });
+
+  it('disabled (system-store): an isSystem store maps every char chip to disabled with a plain-language reason', () => {
+    const systemStore = makeChipStore('store#sys', '&SYSTEM_STORE', [{ kind: 'char', value: 's' }], { isSystem: true });
+    const ir = makeChipIR([], [systemStore]);
+
+    const chips = storeCharChips(systemStore, ir);
+    expect(chips).toHaveLength(1);
+    expect(chips[0]!.action).toBe('disabled');
+    expect(chips[0]!.disabledReason).toMatch(/system store/i);
+  });
+
+  it('disabled (notany-widens): a store referenced by notany() maps every char chip to disabled with the widen-matching reason', () => {
+    const store = makeChipStore('store#notany', 'notanyX', [{ kind: 'char', value: 'n' }]);
+    const rule: IRRule = {
+      nodeId: 'rule#1',
+      context: [{ kind: 'notany', storeRef: 'notanyX' }],
+      output: [{ kind: 'char', value: 'z' }],
+    };
+    const ir = makeChipIR([makeChipGroup('g1', [rule])], [store]);
+
+    const chips = storeCharChips(store, ir);
+    expect(chips).toHaveLength(1);
+    expect(chips[0]!.action).toBe('disabled');
+    expect(chips[0]!.disabledReason).toMatch(/notany/i);
+  });
+
+  it('disabled (context-index-aligned): a store referenced by index() in a rule context maps to disabled with the alignment reason', () => {
+    const store = makeChipStore('store#ctxidx', 'ctxIdxX', [{ kind: 'char', value: 'c' }]);
+    const rule: IRRule = {
+      nodeId: 'rule#1',
+      context: [{ kind: 'index', storeRef: 'ctxIdxX', offset: 0 }],
+      output: [{ kind: 'char', value: 'z' }],
+    };
+    const ir = makeChipIR([makeChipGroup('g1', [rule])], [store]);
+
+    const chips = storeCharChips(store, ir);
+    expect(chips).toHaveLength(1);
+    expect(chips[0]!.action).toBe('disabled');
+    expect(chips[0]!.disabledReason).toMatch(/position/i);
+  });
+
+  it('disabled (paired-input): an any()-source store paired with an output index() maps to disabled with the pairing reason', () => {
+    const inputStore = makeChipStore('store#paired-in', 'pairedInX', [{ kind: 'char', value: 'p' }]);
+    const outputStore = makeChipStore('store#paired-out', 'pairedOutX', [{ kind: 'char', value: 'o' }]);
+    const rule: IRRule = {
+      nodeId: 'rule#1',
+      context: [{ kind: 'any', storeRef: 'pairedInX' }],
+      output: [{ kind: 'index', storeRef: 'pairedOutX', offset: 0 }],
+    };
+    const ir = makeChipIR([makeChipGroup('g1', [rule])], [inputStore, outputStore]);
+
+    const chips = storeCharChips(inputStore, ir);
+    expect(chips).toHaveLength(1);
+    expect(chips[0]!.action).toBe('disabled');
+    expect(chips[0]!.disabledReason).toMatch(/pairing/i);
+  });
+
+  it('disabled (dual-use): a store that is both an output target and an any() source maps to disabled with the dual-role reason', () => {
+    const store = makeChipStore('store#dual', 'dualX', [{ kind: 'char', value: 'd' }]);
+    const outRule: IRRule = {
+      nodeId: 'rule#out',
+      context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
+      output: [{ kind: 'index', storeRef: 'dualX', offset: 0 }],
+    };
+    const sourceRule: IRRule = {
+      nodeId: 'rule#src',
+      context: [{ kind: 'any', storeRef: 'dualX' }],
+      output: [{ kind: 'char', value: 'z' }],
+    };
+    const ir = makeChipIR([makeChipGroup('g1', [outRule, sourceRule])], [store]);
+
+    const chips = storeCharChips(store, ir);
+    expect(chips).toHaveLength(1);
+    expect(chips[0]!.action).toBe('disabled');
+    expect(chips[0]!.disabledReason).toMatch(/dual role/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// nodeState — store tri-state over toggleable chips (#523)
+// ---------------------------------------------------------------------------
+
+describe('nodeState — store tri-state over toggleable chips', () => {
+  function makeStoreNode(chips: ReturnType<typeof storeCharChips>) {
+    return { nodeId: 'store#s', kind: 'store' as const, name: 's', storeChips: chips };
+  }
+
+  it("returns 'on' when no chips are removed", () => {
+    const store = makeChipStore('store#s', 'sX', [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }]);
+    const ir = makeChipIR([], [store]);
+    const chips = storeCharChips(store, ir); // both drop (unreferenced)
+    const node = makeStoreNode(chips);
+
+    expect(nodeState(node, () => false, () => false)).toBe('on');
+  });
+
+  it("returns 'partial' when one of two toggleable chips is removed", () => {
+    const store = makeChipStore('store#s', 'sX', [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }]);
+    const ir = makeChipIR([], [store]);
+    const chips = storeCharChips(store, ir);
+    const node = makeStoreNode(chips);
+
+    const removed = new Set(['store#s#0']);
+    expect(nodeState(node, (id) => removed.has(id), () => false)).toBe('partial');
+  });
+
+  it("returns 'off' when all toggleable chips are removed", () => {
+    const store = makeChipStore('store#s', 'sX', [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }]);
+    const ir = makeChipIR([], [store]);
+    const chips = storeCharChips(store, ir);
+    const node = makeStoreNode(chips);
+
+    expect(nodeState(node, () => true, () => false)).toBe('off');
+  });
+
+  it("returns 'off' when the whole store node is deleted, regardless of individual chip state", () => {
+    const store = makeChipStore('store#s', 'sX', [{ kind: 'char', value: 'a' }]);
+    const ir = makeChipIR([], [store]);
+    const chips = storeCharChips(store, ir);
+    const node = makeStoreNode(chips);
+
+    expect(nodeState(node, () => false, () => true)).toBe('off');
+  });
+
+  it("falls back to the binary whole-node check ('on') when every chip is disabled (no toggleable chips)", () => {
+    const systemStore = makeChipStore('store#s', '&SYS', [{ kind: 'char', value: 'a' }], { isSystem: true });
+    const ir = makeChipIR([], [systemStore]);
+    const chips = storeCharChips(systemStore, ir); // all disabled
+    const node = makeStoreNode(chips);
+
+    // isItemDeleted would be irrelevant here since no chip is toggleable;
+    // isDeleted(nodeId) drives the binary fallback.
+    expect(nodeState(node, () => true, () => false)).toBe('on');
+  });
+
+  it("falls back to the binary whole-node check ('off') when every chip is disabled and the node itself is deleted", () => {
+    const systemStore = makeChipStore('store#s', '&SYS', [{ kind: 'char', value: 'a' }], { isSystem: true });
+    const ir = makeChipIR([], [systemStore]);
+    const chips = storeCharChips(systemStore, ir);
+    const node = makeStoreNode(chips);
+
+    expect(nodeState(node, () => false, () => true)).toBe('off');
   });
 });
