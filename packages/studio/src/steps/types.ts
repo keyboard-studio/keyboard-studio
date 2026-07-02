@@ -45,6 +45,20 @@ export interface StepBase {
   inputs: readonly IRPath[];
   /** IR locations this step will populate — declared now, executed in P5 (G5). */
   writes: readonly IRPath[];
+  /**
+   * Visual layout for this step in the studio shell.
+   * "pane"  — default; rendered inside the three-pane editor area.
+   * "full"  — full-screen editor unit (carve, mechanisms, touch galleries).
+   * Omitting this field is equivalent to "pane".
+   */
+  layout?: "full" | "pane";
+  /**
+   * ids into steps/flowSources.ts: survey flows that run inside / hang under
+   * this step on the Flow Map. Used by Stage 1 to derive drill-downs without
+   * a separate FLOW_SOURCES array (spec 024, ADR-0001).
+   */
+  flowRefs?: readonly string[];
+  // Reserved seam (spec §9 loop primitive, not built): iterates?: string
 }
 
 // ---------------------------------------------------------------------------

@@ -118,6 +118,7 @@ export const carveStep: EditorStep = {
   id: "carve",
   title: "Carve Keys",
   spine: true,
+  layout: "full",
   component: CarveAdapter,
   // Carve's deletion overlay reads and rewrites the same groups[]/stores[]/raw[]
   // arrays (the surviving carve surface) — a self-read, not an upstream-producer
@@ -140,6 +141,7 @@ export const mechanismsStep: EditorStep = {
   id: "mechanisms",
   title: "Assign Mechanisms",
   spine: true,
+  layout: "full",
   component: AddPhysicalAdapter,
   surface: "physical",
   // Mechanisms assigns onto the base layout groups[]/stores[] it also writes — a
@@ -176,6 +178,7 @@ export const touchStep: EditorStep = {
   id: "touch",
   title: "Touch Layout",
   spine: true,
+  layout: "full",
   component: AddTouchAdapter,
   surface: "touch",
   // Touch seeds from the locked physical layout (groups[]/stores[]) that

@@ -306,6 +306,28 @@ function validateManifestShape(): void {
     }
     seen.add(id);
   }
+
+  // Temporary guard (spec 024 Stage 0): EXACTLY {carve, mechanisms, touch} declare
+  // layout:"full"; all other steps must be "pane" or omit layout.
+  // Remove this guard when Stage 5 makes layout load-bearing.
+  const FULL_LAYOUT_IDS = new Set(["carve", "mechanisms", "touch"]);
+  for (const step of manifest) {
+    if (step.layout === "full") {
+      if (!FULL_LAYOUT_IDS.has(step.id)) {
+        throw new Error(
+          `[SurveyView] unexpected layout:"full" on step "${step.id}" — only carve/mechanisms/touch may be full-screen (spec 024 Stage 0)`,
+        );
+      }
+    }
+  }
+  for (const expectedId of FULL_LAYOUT_IDS) {
+    const step = manifest.find((s) => s.id === expectedId);
+    if (step?.layout !== "full") {
+      throw new Error(
+        `[SurveyView] step "${expectedId}" must declare layout:"full" (spec 024 Stage 0)`,
+      );
+    }
+  }
 }
 
 validateManifestShape();
