@@ -34,6 +34,13 @@ export default defineConfig({
   server: {
     port: 5273,
     strictPort: true,
+    // Mirrors the vercel.json prod framing headers so dev/preview/prod stay
+    // consistent. Deliberately no script-src here (site-wide, not scoped to
+    // osk-frame.html) — it would break Vite's HMR inline scripts.
+    headers: {
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "frame-ancestors 'self'",
+    },
     proxy: {
       // Proxy for keyboard source files — rewrites /kbd-proxy/<path> to
       // https://raw.githubusercontent.com/keymanapp/keyboards/master/<path>.

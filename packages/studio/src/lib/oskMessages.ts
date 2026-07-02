@@ -8,6 +8,7 @@
 
 export interface SetKeyboardCommand {
   type: "SET_KEYBOARD";
+  /** MUST be a blob: URL; the frame rejects anything else. */
   jsUrl: string;
   keyboardId: string;
   /** Blob URL for the OSK font file. Injected as @font-face before KMW loads the keyboard. */

@@ -74,8 +74,10 @@ export function useOskChannel(
   const send = useCallback((cmd: OskCommand): void => {
     const frame = iframeRefRef.current.current;
     if (!frame || !frame.contentWindow) return;
-    // [TEMP] targetOrigin is "*" for dev; tighten to app origin in production build.
-    frame.contentWindow.postMessage(cmd, "*");
+    // Scoped to our own origin — the frame is same-origin-relative
+    // (src="/osk-frame.html") in every deployment, so this never needs a
+    // hardcoded value.
+    frame.contentWindow.postMessage(cmd, window.location.origin);
   }, []);
 
   return { send, lastEvent, engineReady, engineError, textValue };
