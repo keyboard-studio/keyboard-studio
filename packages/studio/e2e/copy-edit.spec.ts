@@ -14,12 +14,14 @@
  *                     -> assert .kmn + .kps + .kvks + welcome.htm present and non-empty
  *
  * Playwright runs via the global CLI (`npx playwright test`).
- * @playwright/test is a workspace-root devDependency (root package.json). It is NOT in packages/studio/package.json.
+ * @playwright/test is NOT a devDependency; the global CLI resolves the runtime
+ * import. This spec (like carve.spec.ts) imports from "playwright/test".
  *
  * refs #410 AC §3
  */
 
-import { test, expect, type Page, type Download } from "@playwright/test";
+import { test, expect, type Page, type Download } from "playwright/test";
+import { unzipSync } from "fflate";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -44,46 +46,6 @@ const FIXTURE = {
 };
 
 // ---------------------------------------------------------------------------
-// Minimal ZIP entry scanner (no external dependency)
-//
-// Reads Local File Header entries from a raw ZIP buffer.
-// Each entry is: PK\x03\x04 + 26 bytes fixed header + filename + extra + data.
-// We extract filenames and the stored/compressed size so we can verify
-// non-emptiness without fully decompressing the data.
-// ---------------------------------------------------------------------------
-
-interface ZipEntry {
-  name: string;
-  compressedSize: number;
-  uncompressedSize: number;
-}
-
-function scanZipEntries(buf: Buffer): ZipEntry[] {
-  const entries: ZipEntry[] = [];
-  const LOCAL_SIG = 0x04034b50; // PK\x03\x04
-  let offset = 0;
-
-  while (offset + 30 <= buf.length) {
-    if (buf.readUInt32LE(offset) !== LOCAL_SIG) {
-      offset++;
-      continue;
-    }
-
-    const compressedSize = buf.readUInt32LE(offset + 18);
-    const uncompressedSize = buf.readUInt32LE(offset + 22);
-    const fileNameLen = buf.readUInt16LE(offset + 26);
-    const extraLen = buf.readUInt16LE(offset + 28);
-    const nameEnd = offset + 30 + fileNameLen;
-    if (nameEnd > buf.length) break;
-    const name = buf.subarray(offset + 30, nameEnd).toString("utf8");
-    entries.push({ name, compressedSize, uncompressedSize });
-    offset = nameEnd + extraLen + compressedSize;
-  }
-
-  return entries;
-}
-
-// ---------------------------------------------------------------------------
 // Page-object helpers
 // ---------------------------------------------------------------------------
 
@@ -97,25 +59,25 @@ async function fillIdentityLite(page: Page): Promise<void> {
 
   // Q1: autonym (textarea, id="il_language_autonym")
   await page.fill("#il_language_autonym", FIXTURE.autonym);
-  await page.click('[data-testid="survey-next"]');
+  await page.click('[data-testid="survey-advance"]');
 
   // Q2: English name (textarea, id="il_language_english") — seeded with autonym.
   // Clear the seed and type our value for determinism.
   await page.waitForSelector("#il_language_english");
   await page.fill("#il_language_english", FIXTURE.english);
-  await page.click('[data-testid="survey-next"]');
+  await page.click('[data-testid="survey-advance"]');
 
   // Q3: ISO language code (text, id="il_language_code") — optional, fill anyway.
   await page.waitForSelector("#il_language_code");
   await page.fill("#il_language_code", FIXTURE.languageCode);
-  await page.click('[data-testid="survey-next"]');
+  await page.click('[data-testid="survey-advance"]');
 
   // Q4: Target script (select, id="il_target_script") — choose Latin.
   await page.waitForSelector("#il_target_script");
   await page.selectOption("#il_target_script", FIXTURE.targetScript);
   // This is the last question in the identity-lite flow (for non-CJK scripts);
   // the button becomes "Finish".
-  await page.click('[data-testid="survey-finish"]');
+  await page.click('[data-testid="survey-advance"]');
 }
 
 /**
@@ -128,7 +90,7 @@ async function pickBaseKeyboard(page: Page): Promise<void> {
   await page.waitForSelector('[data-testid="base-picker"]', { timeout: 20_000 });
 
   // Click the basic_kbdfr suggestion button (if present).
-  const suggBtn = page.getByTestId(`base-suggestion-${FIXTURE.baseKeyboardId}`);
+  const suggBtn = page.getByTestId(`base-card-${FIXTURE.baseKeyboardId}`);
   const fallbackBtn = page.getByTestId("base-picker").locator("button").first();
 
   if (await suggBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
@@ -263,14 +225,15 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     const zipBuf = fs.readFileSync(dlPath!);
     expect(zipBuf.length).toBeGreaterThan(100);
 
-    // Verify the zip contains the expected keyboard source files.
-    const entries = scanZipEntries(zipBuf);
-    const entryNames = entries.map((e) => e.name);
+    // Verify the zip contains the expected keyboard source files. unzipSync
+    // returns a { path: Uint8Array } map of the fully decompressed entries, so
+    // each entry's byte length reflects real content size, not a header field.
+    const entries = Object.entries(unzipSync(new Uint8Array(zipBuf)));
 
     // At minimum the .kmn source file must be present.
-    const kmnEntry = entries.find((e) => e.name.endsWith(".kmn"));
-    expect(kmnEntry, "zip must contain a .kmn source file").toBeDefined();
-    expect(kmnEntry!.uncompressedSize, ".kmn must be non-empty").toBeGreaterThan(0);
+    const kmn = entries.find(([name]) => name.endsWith(".kmn"));
+    expect(kmn, "zip must contain a .kmn source file").toBeDefined();
+    expect(kmn![1].length, ".kmn must be non-empty").toBeGreaterThan(0);
 
   });
 
@@ -323,23 +286,25 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     const dlPath = await download.path();
     expect(dlPath).not.toBeNull();
     const zipBuf = fs.readFileSync(dlPath!);
-    const entries = scanZipEntries(zipBuf);
+    // unzipSync fully decompresses each entry into a Uint8Array; we assert on
+    // the decompressed body length so "non-empty" reflects real content.
+    const entries = Object.entries(unzipSync(new Uint8Array(zipBuf)));
 
     // Check for .kps
-    const kpsEntry = entries.find((e) => e.name.endsWith(".kps"));
-    expect(kpsEntry, "zip must contain a .kps package file").toBeDefined();
-    expect(kpsEntry!.uncompressedSize, ".kps must be non-empty").toBeGreaterThan(0);
+    const kps = entries.find(([name]) => name.endsWith(".kps"));
+    expect(kps, "zip must contain a .kps package file").toBeDefined();
+    expect(kps![1].length, ".kps must be non-empty").toBeGreaterThan(0);
 
     // Check for .kvks (visual keyboard source)
-    const kvksEntry = entries.find((e) => e.name.endsWith(".kvks"));
-    expect(kvksEntry, "zip must contain a .kvks visual keyboard file").toBeDefined();
-    expect(kvksEntry!.uncompressedSize, ".kvks must be non-empty").toBeGreaterThan(0);
+    const kvks = entries.find(([name]) => name.endsWith(".kvks"));
+    expect(kvks, "zip must contain a .kvks visual keyboard file").toBeDefined();
+    expect(kvks![1].length, ".kvks must be non-empty").toBeGreaterThan(0);
 
     // Check for welcome.htm
-    const welcomeEntry = entries.find((e) =>
-      path.basename(e.name).toLowerCase() === "welcome.htm",
+    const welcome = entries.find(
+      ([name]) => path.basename(name).toLowerCase() === "welcome.htm",
     );
-    expect(welcomeEntry, "zip must contain welcome.htm").toBeDefined();
-    expect(welcomeEntry!.uncompressedSize, "welcome.htm must be non-empty").toBeGreaterThan(0);
+    expect(welcome, "zip must contain welcome.htm").toBeDefined();
+    expect(welcome![1].length, "welcome.htm must be non-empty").toBeGreaterThan(0);
   });
 });

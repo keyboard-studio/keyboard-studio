@@ -15,12 +15,12 @@
     "dev": "pnpm --filter @keyboard-studio/engine build && pnpm --parallel --stream --filter @keyboard-studio/engine --filter @keyboard-studio/studio run dev",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "lint": "eslint \"packages/*/src/**/*.{ts,tsx}\" && pnpm run depcruise",
+    "lint": "eslint \"packages/*/src/**/*.{ts,tsx}\" && pnpm run depcruise && pnpm run crew-lint",
     "depcruise": "depcruise --config .dependency-cruiser.cjs packages/*/src",
+    "crew-lint": "node utilities/crew-lint/index.js",
     "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,json,md}\""
   },
   "devDependencies": {
-    "@playwright/test": "1.61.1",
     "@types/node": "^22.0.0",
     "@typescript-eslint/eslint-plugin": "^8.60.1",
     "@typescript-eslint/parser": "^8.60.1",

@@ -1,12 +1,10 @@
 // Playwright configuration for the studio SPA.
 //
-// RUNNER: invoke with `npx playwright test` (or via `pnpm --filter
-//   @keyboard-studio/studio exec playwright test`).
-//   @playwright/test IS required as a workspace-root devDependency: the global
-//   CLI binary alone cannot resolve the `import { defineConfig } from
-//   "@playwright/test"` below inside a pnpm workspace, so the package must be
-//   present in node_modules. It lives at the repo root (shared, version-pinned),
-//   NOT in packages/studio/package.json — keep it at the root.
+// RUNNER: global Playwright CLI only — invoke with `npx playwright test`.
+//   @playwright/test is NOT a devDependency (by design); the global CLI binary
+//   resolves the runtime import. Specs and this file import from "playwright/test"
+//   (the "@playwright/test" specifier does not resolve to the global CLI in this
+//   environment). Do NOT add @playwright/test to package.json.
 //
 // CI LANES: this file and e2e/** are intentionally EXCLUDED from both:
 //   - vitest (packages/studio/vitest.config.ts exclude: ["e2e/**"])
@@ -15,11 +13,11 @@
 //   Browser tests run in a separate manual/CD step, never in the unit CI lane.
 //
 // Browser binaries: run `npx playwright install` once before running E2E.
-// E2E specs live under packages/studio/e2e/ and are currently .skip-ped
-// pending Track 2 liveness confirmation. See each spec header for the unblock
-// recipe.
+// E2E specs live under packages/studio/e2e/. carve.spec.ts is LIVE (not skipped)
+// and passes against the global CLI; copy-edit.spec.ts and import-improve.spec.ts
+// remain .skip-ped pending their lanes. See each spec header for details.
 
-import { defineConfig } from "@playwright/test";
+import { defineConfig } from "playwright/test";
 
 export default defineConfig({
   testDir: "e2e",

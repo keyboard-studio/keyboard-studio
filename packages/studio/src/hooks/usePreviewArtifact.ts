@@ -52,11 +52,16 @@ export interface PreviewArtifact {
 }
 
 export function usePreviewArtifact(): PreviewArtifact {
-  // Seed from the working-copy store at mount so that navigating to Output
-  // after completing the survey wizard (which populates the store) auto-loads
-  // the already-instantiated keyboard instead of showing a blank picker.
-  // getState() reads the snapshot at mount time without creating a reactive
-  // subscription — the local state owns subsequent changes via handleBaseKeyboardChange.
+  // Lazy-init from the working-copy store's already-instantiated base (if any)
+  // rather than always starting null. The default flow can navigate straight
+  // to #output (e.g. handlePhaseFComplete) without ever visiting #preview, so
+  // this screen's independent pipeline instance would otherwise mount with
+  // baseKeyboard === null and never render the download affordance even
+  // though a base was already picked and instantiated earlier in the flow.
+  // Lazy-init (not a useEffect sync) reads the store exactly once at mount —
+  // it does not fight handleBaseKeyboardChange's subsequent picker updates on
+  // this screen, and it does not re-run when the store's baseKeyboard later
+  // changes (mirrors the read-once semantics of useState's initializer form).
   const [baseKeyboard, setBaseKeyboard] = useState<BaseKeyboard | null>(
     () => useWorkingCopyStore.getState().baseKeyboard,
   );

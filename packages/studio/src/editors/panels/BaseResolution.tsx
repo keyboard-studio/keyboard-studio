@@ -128,7 +128,7 @@ export function BaseResolution({
           <Button
             key={base.id}
             variant="secondary"
-            data-testid={`base-suggestion-${base.id}`}
+            data-testid={`base-card-${base.id}`}
             onClick={() => onResolved(base)}
             style={{
               display: "flex",
@@ -160,6 +160,7 @@ export function BaseResolution({
         <BaseKeyboardPicker value={picked} onChange={setPicked} target={target} />
         <Button
           variant="secondary"
+          data-testid="base-confirm"
           disabled={picked === null}
           onClick={() => picked !== null && onResolved(picked)}
           style={{

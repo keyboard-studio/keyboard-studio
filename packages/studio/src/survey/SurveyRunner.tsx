@@ -510,7 +510,7 @@ export function SurveyRunner({
         )}
         <button
           type="button"
-          data-testid={isLastQuestion ? "survey-finish" : "survey-next"}
+          data-testid="survey-advance"
           onClick={handleNext}
           disabled={!canAdvance}
           aria-describedby={progressDescId}
