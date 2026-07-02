@@ -13,12 +13,12 @@ import {
   buildAuthorizeUrl,
   getStoredVerifier,
   getStoredState,
+  getStoredFlow,
   setStoredToken,
   getStoredToken,
   clearStoredToken,
   hasRequiredScope,
   REQUIRED_SCOPE,
-  IDENTITY_SCOPE,
   type StoredGitHubToken,
 } from "./githubOAuth.ts";
 
@@ -75,7 +75,7 @@ describe("generatePkce", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildAuthorizeUrl", () => {
-  it("includes the PKCE + flow params with S256 method and defaults to the identity scope", () => {
+  it("omits the scope parameter entirely when no scope is given (identity / GitHub App flow)", () => {
     const url = buildAuthorizeUrl({
       clientId: "cid123",
       redirectUri: "https://app.example/oauth/callback",
@@ -90,15 +90,14 @@ describe("buildAuthorizeUrl", () => {
     expect(parsed.searchParams.get("redirect_uri")).toBe(
       "https://app.example/oauth/callback",
     );
-    // Sign-up default is identity-only — never public_repo (§1a).
-    expect(parsed.searchParams.get("scope")).toBe(IDENTITY_SCOPE);
-    expect(IDENTITY_SCOPE).toBe("user:email");
+    // Identity flow: NO scope param at all — GitHub App sends no scope.
+    expect(parsed.searchParams.has("scope")).toBe(false);
     expect(parsed.searchParams.get("state")).toBe("state-abc");
     expect(parsed.searchParams.get("code_challenge")).toBe("chal-xyz");
     expect(parsed.searchParams.get("code_challenge_method")).toBe("S256");
   });
 
-  it("honors an explicit submit scope for the self-fork opt-in (Option A)", () => {
+  it("includes the scope param when explicitly provided (submit / OAuth App flow)", () => {
     const url = buildAuthorizeUrl({
       clientId: "cid123",
       redirectUri: "https://app.example/oauth/callback",
@@ -122,15 +121,47 @@ describe("beginAuthorize", () => {
     vi.unstubAllEnvs();
   });
 
-  it("throws when the client id is not configured", async () => {
+  it("throws when the GitHub App client id is not configured (identity flow)", async () => {
     vi.stubEnv("VITE_GITHUB_CLIENT_ID", "");
-    await expect(beginAuthorize()).rejects.toThrow(/not configured/i);
+    await expect(beginAuthorize("identity")).rejects.toThrow(/VITE_GITHUB_CLIENT_ID/);
+  });
+
+  it("throws when the OAuth App client id is not configured (submit flow)", async () => {
+    vi.stubEnv("VITE_GITHUB_OAUTH_CLIENT_ID", "");
+    await expect(beginAuthorize("submit")).rejects.toThrow(/VITE_GITHUB_OAUTH_CLIENT_ID/);
+  });
+
+  it("identity flow: uses the GitHub App client id and sends NO scope", async () => {
+    vi.stubEnv("VITE_GITHUB_CLIENT_ID", "Iv23-github-app-client");
+    vi.stubEnv("VITE_GITHUB_OAUTH_CLIENT_ID", "Ov23-oauth-app-client");
+
+    const url = await beginAuthorize("identity");
+    const parsed = new URL(url);
+
+    expect(parsed.searchParams.get("client_id")).toBe("Iv23-github-app-client");
+    // No scope param at all for the identity/GitHub App flow.
+    expect(parsed.searchParams.has("scope")).toBe(false);
+    // Flow is persisted in scratch.
+    expect(getStoredFlow()).toBe("identity");
+  });
+
+  it("submit flow: uses the OAuth App client id and sends public_repo scope", async () => {
+    vi.stubEnv("VITE_GITHUB_CLIENT_ID", "Iv23-github-app-client");
+    vi.stubEnv("VITE_GITHUB_OAUTH_CLIENT_ID", "Ov23-oauth-app-client");
+
+    const url = await beginAuthorize("submit");
+    const parsed = new URL(url);
+
+    expect(parsed.searchParams.get("client_id")).toBe("Ov23-oauth-app-client");
+    expect(parsed.searchParams.get("scope")).toBe("public_repo");
+    // Flow is persisted in scratch.
+    expect(getStoredFlow()).toBe("submit");
   });
 
   it("persists the verifier+state and binds them into the authorize URL", async () => {
     vi.stubEnv("VITE_GITHUB_CLIENT_ID", "seeded-client-id");
 
-    const url = await beginAuthorize();
+    const url = await beginAuthorize("identity");
 
     // Scratch state is persisted for the post-redirect callback to validate.
     const verifier = getStoredVerifier();
@@ -153,16 +184,11 @@ describe("beginAuthorize", () => {
     );
   });
 
-  it("defaults to the identity scope (sign-up never requests public_repo)", async () => {
+  it("defaults to the identity flow when no argument is given (sign-up never requests public_repo)", async () => {
     vi.stubEnv("VITE_GITHUB_CLIENT_ID", "seeded-client-id");
     const url = await beginAuthorize();
-    expect(new URL(url).searchParams.get("scope")).toBe(IDENTITY_SCOPE);
-  });
-
-  it("forwards an explicit scope for the submit opt-in", async () => {
-    vi.stubEnv("VITE_GITHUB_CLIENT_ID", "seeded-client-id");
-    const url = await beginAuthorize(REQUIRED_SCOPE);
-    expect(new URL(url).searchParams.get("scope")).toBe(REQUIRED_SCOPE);
+    expect(new URL(url).searchParams.has("scope")).toBe(false);
+    expect(getStoredFlow()).toBe("identity");
   });
 
   it("uses a fresh state on each call (no state reuse across authorize attempts)", async () => {
@@ -190,12 +216,31 @@ describe("token store", () => {
     accessToken: "ghp_abc",
     tokenType: "bearer",
     scope: "public_repo",
+    client: "github_app",
   };
 
-  it("set / get round-trips via sessionStorage", () => {
+  it("set / get round-trips via sessionStorage (with client field)", () => {
     expect(getStoredToken()).toBeNull();
     setStoredToken(sample);
     expect(getStoredToken()).toEqual(sample);
+  });
+
+  it("round-trips an oauth_app token with client field intact", () => {
+    const oauthToken: StoredGitHubToken = {
+      accessToken: "ghp_oauth",
+      tokenType: "bearer",
+      scope: "public_repo",
+      client: "oauth_app",
+    };
+    setStoredToken(oauthToken);
+    expect(getStoredToken()?.client).toBe("oauth_app");
+  });
+
+  it("defaults client to github_app when reading a token stored without the client field", () => {
+    // Simulate a token persisted before the two-flow upgrade (no `client` field).
+    const legacy = { accessToken: "ghp_legacy", tokenType: "bearer", scope: "" };
+    sessionStorage.setItem("ks.github.token", JSON.stringify(legacy));
+    expect(getStoredToken()?.client).toBe("github_app");
   });
 
   it("clear removes the stored token", () => {

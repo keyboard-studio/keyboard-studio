@@ -139,14 +139,16 @@ bounded by the schema caps above, not by Fastify's 1 MiB default.
 | `GOOGLE_OAUTH_ENABLED` | no | `false` | Set to `true` to enable the Google identity flow (`/oauth/google/exchange`) |
 | `GOOGLE_CLIENT_ID` | only if Google enabled | — | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | only if Google enabled | — | Google OAuth client secret — never logged, never in responses |
-| `GITHUB_ORG_TOKEN` | no | — | Org service-account token for `POST /submit/managed-pr` — never logged, never in responses. Absent → that route returns `503` |
-| `GITHUB_ORG_LOGIN` | no | — | GitHub login owning the studio's standing fork of `keymanapp/keyboards`. Absent → `503` on the managed-PR route |
+| `GITHUB_APP_ID` | no | — | Numeric GitHub App ID for `POST /submit/managed-pr`. All three `GITHUB_APP_*` vars must be set together; any one absent → `503` |
+| `GITHUB_APP_PRIVATE_KEY` | no | — | Base64-encoded PEM private key for the GitHub App — never logged, never in responses |
+| `GITHUB_APP_INSTALLATION_ID` | no | — | Numeric installation ID of the GitHub App on the org |
+| `GITHUB_ORG_LOGIN` | no | — | GitHub login owning the studio's standing fork of `keymanapp/keyboards`. Must be set together with the three `GITHUB_APP_*` vars; absent → `503` on the managed-PR route |
 | `OAUTH_ALLOWED_ORIGINS` | no | _(none)_ | Comma-separated extra CORS origins e.g. `https://studio.example.com` |
 | `PORT` | no | `8787` | TCP port to listen on |
 
 `http://localhost:5173` (Vite default) is included in the CORS allowlist only when `NODE_ENV` is not `production`. In production, only the origins listed in `OAUTH_ALLOWED_ORIGINS` are accepted. Wildcard `*` is never used.
 
-The service exits at startup with a fatal error if `GITHUB_CLIENT_ID` or `GITHUB_CLIENT_SECRET` are absent. Google sign-in is opt-in: leave `GOOGLE_OAUTH_ENABLED` unset for a GitHub-only deployment and the `/oauth/google/exchange` route is not registered. When `GOOGLE_OAUTH_ENABLED=true`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` become required and a missing value is fatal at startup. `GITHUB_ORG_TOKEN` / `GITHUB_ORG_LOGIN` are **not** fatal when absent — the managed-PR route returns `503` until they are provisioned (the org bot identity is still being finalised).
+The service exits at startup with a fatal error if `GITHUB_CLIENT_ID` or `GITHUB_CLIENT_SECRET` are absent. Google sign-in is opt-in: leave `GOOGLE_OAUTH_ENABLED` unset for a GitHub-only deployment and the `/oauth/google/exchange` route is not registered. When `GOOGLE_OAUTH_ENABLED=true`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` become required and a missing value is fatal at startup. `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_INSTALLATION_ID`, and `GITHUB_ORG_LOGIN` are **not** fatal when absent — the managed-PR route returns `503` until all four are provisioned. All four must be set together; a partial configuration produces a startup warning.
 
 ## Running
 
