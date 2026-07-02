@@ -87,19 +87,21 @@ function RawDetail({ node, isDeleted, onToggleNode }: RawDetailProps) {
             These look like noise but are usually <b>load-bearing</b>. Remove only if you're certain this behaviour is unused by your language.
           </p>
           {off ? (
-            <button onClick={() => onToggleNode(node.nodeId, false)} style={{ ...btnGhost, marginTop: 14 }}>
+            <button data-testid="raw-restore" onClick={() => onToggleNode(node.nodeId, false)} style={{ ...btnGhost, marginTop: 14 }}>
               Restore
             </button>
           ) : confirming ? (
             <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12.5, color: 'var(--app-text-muted)', flex: '1 1 100%' }}>Remove this rule? It may be load-bearing.</span>
               <button
+                data-testid="raw-confirm-remove"
                 onClick={() => { onToggleNode(node.nodeId, true); setConfirming(false); }}
                 style={{ font: '600 12px var(--app-font)', cursor: 'pointer', color: 'var(--sil-orange-dark)', background: 'color-mix(in srgb, var(--sil-orange) 16%, transparent)', border: '1px solid color-mix(in srgb, var(--sil-orange) 55%, transparent)', borderRadius: 7, padding: '5px 12px', whiteSpace: 'nowrap' }}
               >
                 Yes, remove
               </button>
               <button
+                data-testid="raw-cancel-remove"
                 onClick={() => setConfirming(false)}
                 style={{ font: '600 12px var(--app-font)', cursor: 'pointer', color: 'var(--app-text-muted)', background: 'transparent', border: '1px solid var(--app-border)', borderRadius: 7, padding: '5px 12px', whiteSpace: 'nowrap' }}
               >
@@ -107,7 +109,7 @@ function RawDetail({ node, isDeleted, onToggleNode }: RawDetailProps) {
               </button>
             </div>
           ) : (
-            <button onClick={() => setConfirming(true)} style={{ ...btnGhost, marginTop: 14 }}>
+            <button data-testid="raw-remove-anyway" onClick={() => setConfirming(true)} style={{ ...btnGhost, marginTop: 14 }}>
               Remove anyway
             </button>
           )}

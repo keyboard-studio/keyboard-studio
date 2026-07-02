@@ -127,15 +127,14 @@ describe("workingCopyStore — instantiateFromBase (Track 1)", () => {
     expect(s.ir).toBe(newIr);
   });
 
-  it("clears prior phaseResults so a fresh session starts clean", () => {
-    const phaseA: SurveyPhaseResult = {
-      phase: "A",
-      answers: [],
-      computedAxes: { scriptClass: "alphabetic" },
-    };
-    useWorkingCopyStore.getState().recordPhase(phaseA);
-    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
-
+  // Was: "clears prior phaseResults so a fresh session starts clean" — that
+  // title encoded the race-condition bug (asserting a first, late instantiate
+  // must wipe pre-recorded phaseResults). Split into two precise assertions:
+  // a truly fresh session (no pre-recorded phaseResults) stays empty here, and
+  // the late-instantiate-preserves-progress case is covered in the
+  // "instantiateFromBase idempotence" describe block below (see "preserves
+  // phaseResults recorded BEFORE the first (late) instantiate call").
+  it("a truly fresh session (no prior phaseResults) stays empty after instantiateFromBase", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
     useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
@@ -211,6 +210,73 @@ describe("workingCopyStore — instantiateFromBase idempotence", () => {
     expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(0);
     expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe("different_keyboard_id");
   });
+
+  // Regression: the async compile pipeline (WASM kmcmplib oracle) that produces
+  // vfs/ir/removalCapabilities is decoupled from the survey flow and can settle
+  // LATE — after Phase A/B has already recorded phaseResults against the
+  // pending base selection. On that FIRST instantiate call, baseKeyboard is
+  // still null, so a guard keyed only on "baseKeyboard.id already matches"
+  // never triggers. This reproduces that exact ordering: record phaseResults
+  // BEFORE the one-and-only instantiateFromBase call lands.
+  it("preserves phaseResults recorded BEFORE the first (late) instantiate call for the same base", () => {
+    const phaseA: SurveyPhaseResult = {
+      phase: "A",
+      answers: [],
+      computedAxes: { scriptClass: "alphabetic" },
+    };
+    // Survey records progress while baseKeyboard is still null (compile has
+    // not settled yet) — mirrors Phase A/B completing before onInstantiate fires.
+    useWorkingCopyStore.getState().recordPhase(phaseA);
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
+    expect(useWorkingCopyStore.getState().baseKeyboard).toBeNull();
+
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    // The late-settling compile now fires the FIRST instantiate for this base.
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+
+    // phaseResults recorded before instantiation must survive.
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
+    expect(useWorkingCopyStore.getState().phaseResults[0]?.phase).toBe("A");
+    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe(basicKbdus.id);
+  });
+
+  // Regression (km-triage pre-merge item): the case-1 no-op guard
+  // must key on id AND mode, not id alone. A SAME-id call arriving while the
+  // store is in a DIFFERENT mode (e.g. the working copy was instantiated via
+  // Track 2 for this keyboard, and Track 1's instantiateFromBase then fires
+  // for the same id via the independent Preview/Output picker pipeline — see
+  // usePreviewArtifact.ts / confirmRebase.ts) is a genuine track switch, not a
+  // redundant re-fire, and must re-instantiate (mode flips, identity resets
+  // per Track 1 semantics) rather than silently no-op and strand the working
+  // copy in the old track.
+  it("re-instantiates (mode flips to new-from-base) on a SAME-id call while in a DIFFERENT mode", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    // Instantiate via Track 2 first — mode is "adapt-existing".
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+    expect(useWorkingCopyStore.getState().instantiationMode).toBe("adapt-existing");
+    expect(useWorkingCopyStore.getState().identity?.keyboardId).toBe(basicKbdus.id);
+
+    const phaseA: SurveyPhaseResult = {
+      phase: "A",
+      answers: [],
+      computedAxes: { scriptClass: "alphabetic" },
+    };
+    useWorkingCopyStore.getState().recordPhase(phaseA);
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
+
+    // Same keyboard id, but instantiateFromBase (Track 1) fires — a track
+    // switch, not a redundant re-fire. Must NOT no-op.
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+
+    expect(useWorkingCopyStore.getState().instantiationMode).toBe("new-from-base");
+    // Track 1 resets identity to null (fresh copy, no overlay until Phase A).
+    expect(useWorkingCopyStore.getState().identity).toBeNull();
+    // A track switch is treated like a genuine base switch: survey progress
+    // recorded under the old track does not carry over.
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -281,7 +347,18 @@ describe("workingCopyStore — instantiateFromExisting (Track 2)", () => {
     expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
   });
 
-  it("clears phaseResults so adapt session starts clean", () => {
+  // Regression (was: "clears phaseResults so adapt session starts clean").
+  // That title encoded the race-condition bug: the async compile pipeline
+  // (WASM kmcmplib oracle) that produces vfs/ir/removalCapabilities is
+  // decoupled from the survey flow and can settle LATE, after Phase A/B has
+  // already recorded phaseResults against the pending base selection. At the
+  // point recordPhase ran here, baseKeyboard was still null (compile not yet
+  // settled) — indistinguishable from a fresh session — so this is the FIRST
+  // instantiate for this base, not a redundant one, and must preserve the
+  // survey progress recorded while the compile was in flight rather than
+  // wiping it. A genuine base SWITCH (see the describe block below) still
+  // resets as before.
+  it("preserves phaseResults recorded BEFORE the first (late) instantiate for the same base", () => {
     const phaseA: SurveyPhaseResult = {
       phase: "A",
       answers: [],
@@ -289,12 +366,14 @@ describe("workingCopyStore — instantiateFromExisting (Track 2)", () => {
     };
     useWorkingCopyStore.getState().recordPhase(phaseA);
     expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
+    expect(useWorkingCopyStore.getState().baseKeyboard).toBeNull();
 
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
     useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
 
-    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(0);
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
+    expect(useWorkingCopyStore.getState().phaseResults[0]?.phase).toBe("A");
   });
 
   it("isInstantiated returns true after instantiateFromExisting", () => {
@@ -315,6 +394,86 @@ describe("workingCopyStore — instantiateFromExisting (Track 2)", () => {
 
     useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
     expect(useWorkingCopyStore.getState().instantiationMode).toBe("adapt-existing");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// instantiateFromExisting — idempotence / base-switch (Track 2)
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — instantiateFromExisting idempotence and base switch", () => {
+  it("is a no-op (preserves phaseResults) when called a second time with the SAME keyboard id", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+
+    const phaseA: SurveyPhaseResult = {
+      phase: "A",
+      answers: [],
+      computedAxes: { scriptClass: "alphabetic" },
+    };
+    useWorkingCopyStore.getState().recordPhase(phaseA);
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
+
+    // Second call with the SAME keyboard id (e.g. a redundant re-fire) — must
+    // NOT clear phaseResults.
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
+    expect(useWorkingCopyStore.getState().phaseResults[0]?.phase).toBe("A");
+  });
+
+  it("re-instantiates (clears phaseResults) on a genuine base SWITCH to a DIFFERENT keyboard id", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+
+    const phaseA: SurveyPhaseResult = {
+      phase: "A",
+      answers: [],
+      computedAxes: { scriptClass: "alphabetic" },
+    };
+    useWorkingCopyStore.getState().recordPhase(phaseA);
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
+
+    const differentKeyboard = { ...basicKbdus, id: "different_keyboard_id" };
+    useWorkingCopyStore.getState().instantiateFromExisting(differentKeyboard, { vfs, ir });
+
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(0);
+    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe("different_keyboard_id");
+  });
+
+  // Regression (km-triage pre-merge item) — Track 2 mirror of the
+  // instantiateFromBase track-switch test above. A SAME-id call arriving while
+  // the store is in a DIFFERENT mode (working copy instantiated via Track 1
+  // for this keyboard, then instantiateFromExisting fires for the same id) is
+  // a genuine track switch and must re-instantiate (mode flips, identity now
+  // PRESERVED per Track 2 semantics) rather than no-op.
+  it("re-instantiates (mode flips to adapt-existing) on a SAME-id call while in a DIFFERENT mode", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    // Instantiate via Track 1 first — mode is "new-from-base", identity null.
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    expect(useWorkingCopyStore.getState().instantiationMode).toBe("new-from-base");
+    expect(useWorkingCopyStore.getState().identity).toBeNull();
+
+    const phaseA: SurveyPhaseResult = {
+      phase: "A",
+      answers: [],
+      computedAxes: { scriptClass: "alphabetic" },
+    };
+    useWorkingCopyStore.getState().recordPhase(phaseA);
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
+
+    // Same keyboard id, but instantiateFromExisting (Track 2) fires — a track
+    // switch, not a redundant re-fire. Must NOT no-op.
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+
+    expect(useWorkingCopyStore.getState().instantiationMode).toBe("adapt-existing");
+    // Track 2 preserves identity from the loaded keyboard's metadata.
+    expect(useWorkingCopyStore.getState().identity?.keyboardId).toBe(basicKbdus.id);
+    // A track switch is treated like a genuine base switch: survey progress
+    // recorded under the old track does not carry over.
+    expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(0);
   });
 });
 

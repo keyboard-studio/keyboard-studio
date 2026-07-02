@@ -216,7 +216,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--app-bg)', color: 'var(--app-text)' }}>
+    <div data-testid="carve-gallery" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--app-bg)', color: 'var(--app-text)' }}>
       {/* Raw-fragment note — informational only; removals apply normally */}
       {hasRawFragments && (
         <div
@@ -276,6 +276,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
           Skip
         </button>
         <button
+          data-testid="carve-continue"
           onClick={onComplete}
           onMouseEnter={() => setInfo({ kind: 'text', title: 'Continue', body: 'Save your changes and move to the next step.' })}
           onFocus={() => setInfo({ kind: 'text', title: 'Continue', body: 'Save your changes and move to the next step.' })}

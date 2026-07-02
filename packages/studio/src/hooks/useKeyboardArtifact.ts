@@ -234,16 +234,9 @@ export function useKeyboardArtifact(
   // the keyboard source) on every assignment change, and also fire onInstantiate
   // again, which triggers the "switching base keyboards" confirmation dialog.
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log(`[DIAG:vfsTransform-fx] changed. fn=${vfsTransform != null ? "SET" : "null"}, hasFetched=${hasFetchedRef.current}`);
     vfsTransformRef.current = vfsTransform;
     if (hasFetchedRef.current) {
-      // eslint-disable-next-line no-console
-      console.log("[DIAG:vfsTransform-fx] bumping transformVersion");
       setTransformVersion((v) => v + 1);
-    } else {
-      // eslint-disable-next-line no-console
-      console.log("[DIAG:vfsTransform-fx] NOT bumping — hasFetched is false");
     }
   }, [vfsTransform]);
 
@@ -258,19 +251,13 @@ export function useKeyboardArtifact(
     warnings: string[] = [],
     isFullRun: boolean = false,
   ): Promise<void> => {
-    // eslint-disable-next-line no-console
-    console.log(`[DIAG:runCompile] called. kb=${kb.id}, thisRunId=${thisRunId}, currentRunId=${runId.current}, isFullRun=${isFullRun}`);
     const engine = engineRef.current;
     const vfs = vfsRef.current;
     if (engine === null || vfs === null) {
-      // eslint-disable-next-line no-console
-      console.log(`[DIAG:runCompile] ABORT: engine=${engine != null ? "set" : "null"}, vfs=${vfs != null ? "set" : "null"}`);
       return;
     }
 
     if (runId.current !== thisRunId) {
-      // eslint-disable-next-line no-console
-      console.log(`[DIAG:runCompile] CANCELLED: runId.current=${runId.current} !== thisRunId=${thisRunId}`);
       return;
     }
 
@@ -389,8 +376,6 @@ export function useKeyboardArtifact(
     }
 
     const jsArtifact = result.artifacts.find((a) => a.filename.endsWith(".js"));
-    // eslint-disable-next-line no-console
-    console.log(`[DIAG:runCompile] compile done. success=${result.success}, artifacts=${result.artifacts.length}, jsArtifact=${jsArtifact?.filename ?? "NONE"}, diags=${result.diagnostics.length}`);
 
     if (prevBlobUrl.current !== null) {
       URL.revokeObjectURL(prevBlobUrl.current);
@@ -404,8 +389,6 @@ export function useKeyboardArtifact(
         prevBlobUrl.current = jsBlobUrl;
       }
     } else if (!result.success && result.artifacts.length === 0) {
-      // eslint-disable-next-line no-console
-      console.log(`[DIAG:runCompile] NO ARTIFACTS — compile failed. diagnostics:`, result.diagnostics.map((d) => `${d.severity}: ${d.message}`));
       setStage({
         kind: "error",
         step: "compile",
@@ -432,20 +415,14 @@ export function useKeyboardArtifact(
     if (prevKeyboardCssBlobUrls.current.length > 0) {
       readyStage.keyboardCssUrls = prevKeyboardCssBlobUrls.current;
     }
-    // eslint-disable-next-line no-console
-    console.log(`[DIAG:runCompile] setting stage=ready. jsBlobUrl=${jsBlobUrl ? jsBlobUrl.slice(0, 50) + "…" : "(empty)"}`);
     setStage(readyStage);
   }, [scaffoldSpec?.keyboardId, onInstantiate]);
 
   const run = useCallback(async (kb: BaseKeyboard, thisRunId: number) => {
-    // eslint-disable-next-line no-console
-    console.log(`[DIAG:run] START. kb=${kb.id}, thisRunId=${thisRunId}`);
     // Reset so transform changes during this fetch do not trigger a premature
     // re-apply+recompile before the new VFS is ready. It is set back to true
     // after the transform is applied at the end of the fetch step.
     hasFetchedRef.current = false;
-    // eslint-disable-next-line no-console
-    console.log(`[DIAG:run] hasFetchedRef → false`);
 
     // Transition to fetching immediately so the preview pane shows a loading
     // state rather than blank/idle during the async engine + source load.
@@ -576,15 +553,11 @@ export function useKeyboardArtifact(
       baseVfsRef.current = createVirtualFS(vfsRef.current.entries());
     }
 
-    // eslint-disable-next-line no-console
-    console.log(`[DIAG:run] fetch complete. applying transform=${vfsTransformRef.current != null ? "YES" : "null/skip"}`);
     if (vfsTransformRef.current !== null && vfsTransformRef.current !== undefined && vfsRef.current !== null) {
       try {
         const keyboardId = scaffoldSpec?.keyboardId ?? kb.id;
         const transformResult = vfsTransformRef.current(vfsRef.current, keyboardId);
         scaffoldWarnings.push(...transformResult.warnings);
-        // eslint-disable-next-line no-console
-        console.log(`[DIAG:run] transform applied. warnings=${transformResult.warnings.length}`);
 
         // Rebuild the keyboard CSS blob URLs from the projected VFS so the OSK
         // frame's <style> tags carry the post-rename `.kmw-keyboard-<newId>`
@@ -618,8 +591,6 @@ export function useKeyboardArtifact(
     // Mark that the first full fetch cycle has completed. The vfsTransform
     // effect above uses this to skip triggering re-apply before the VFS exists.
     hasFetchedRef.current = true;
-    // eslint-disable-next-line no-console
-    console.log(`[DIAG:run] hasFetchedRef → true. about to runCompile (isFullRun=true)`);
 
     if (runId.current !== thisRunId) return;
 
@@ -629,8 +600,6 @@ export function useKeyboardArtifact(
   }, [scaffoldSpec, runCompile]);
 
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log(`[DIAG:baseKeyboard-fx] fired. baseKeyboard=${baseKeyboard?.id ?? "null"}`);
     if (baseKeyboard === null) {
       setStage({ kind: "idle" });
       vfsRef.current = null;
@@ -644,8 +613,6 @@ export function useKeyboardArtifact(
     // can survive into this keyboard's VFS via the transform-change effect.
     setTransformVersion(0);
     const thisRunId = ++runId.current;
-    // eslint-disable-next-line no-console
-    console.log(`[DIAG:baseKeyboard-fx] calling run. thisRunId=${thisRunId}`);
     void run(baseKeyboard, thisRunId);
   }, [baseKeyboard, scaffoldSpec, run]);
 
@@ -658,24 +625,16 @@ export function useKeyboardArtifact(
   // isFullRun=false: onInstantiate is NOT fired, so no "switching base
   // keyboards" confirmation dialog is triggered by assignment changes.
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log(`[DIAG:transformVersion-fx] fired. transformVersion=${transformVersion}, hasFetched=${hasFetchedRef.current}, kb=${baseKeyboard?.id ?? "null"}, vfsReady=${vfsRef.current !== null}`);
     if (transformVersion === 0) {
-      // eslint-disable-next-line no-console
-      console.log("[DIAG:transformVersion-fx] skip: transformVersion===0");
       return;
     }
     // hasFetchedRef is set to false synchronously inside run() before this
     // effect fires. If it is false, a new fetch is in progress and the VFS
     // is empty — skip recompile to avoid cancelling the in-flight run.
     if (!hasFetchedRef.current) {
-      // eslint-disable-next-line no-console
-      console.log("[DIAG:transformVersion-fx] skip: hasFetchedRef is false (fetch in progress)");
       return;
     }
     if (baseKeyboard === null || vfsRef.current === null) {
-      // eslint-disable-next-line no-console
-      console.log("[DIAG:transformVersion-fx] skip: baseKeyboard or vfsRef is null");
       return;
     }
 
@@ -686,21 +645,14 @@ export function useKeyboardArtifact(
       if (baseVfsRef.current !== null) {
         vfsRef.current = createVirtualFS(baseVfsRef.current.entries());
       }
-      // eslint-disable-next-line no-console
-      console.log(`[DIAG:transformVersion-fx] applying transform for keyboardId=${keyboardId}`);
       try {
         vfsTransformRef.current(vfsRef.current, keyboardId);
       } catch {
         // Transform errors surface as compile diagnostics; don't abort.
       }
-    } else {
-      // eslint-disable-next-line no-console
-      console.log("[DIAG:transformVersion-fx] vfsTransformRef is null/undefined — skipping transform apply");
     }
 
     const thisRunId = ++runId.current;
-    // eslint-disable-next-line no-console
-    console.log(`[DIAG:transformVersion-fx] PROCEEDING with recompile. runId bumped to ${thisRunId}`);
     void runCompile(baseKeyboard, thisRunId, [], false);
   }, [transformVersion, baseKeyboard, scaffoldSpec, runCompile]);
 

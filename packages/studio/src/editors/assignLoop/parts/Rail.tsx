@@ -99,6 +99,8 @@ export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, on
           return (
             <div
               key={node.nodeId}
+              data-testid={`carve-card-${node.nodeId}`}
+              data-kind={node.kind}
               onClick={() => onSelect(node.nodeId)}
               onMouseEnter={() => setInfo({ kind: 'node', node })}
               onFocus={() => setInfo({ kind: 'node', node })}

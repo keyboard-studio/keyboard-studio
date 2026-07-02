@@ -1136,6 +1136,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             </button>
             <button
               type="button"
+              data-testid="touch-continue"
               onClick={handleContinue}
               aria-label="Continue to next phase"
               style={{

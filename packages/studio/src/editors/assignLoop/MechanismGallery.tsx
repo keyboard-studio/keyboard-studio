@@ -1183,6 +1183,7 @@ export function MechanismGallery({
           {locked && onComplete !== undefined && (
             <button
               type="button"
+              data-testid="mechanisms-continue"
               onClick={onComplete}
               aria-label="Continue to touch layout (desktop layout locked)"
               style={{
@@ -1217,6 +1218,7 @@ export function MechanismGallery({
               </p>
               <button
                 type="button"
+                data-testid="mechanisms-continue"
                 onClick={onComplete}
                 style={{
                   padding: "10px 24px",
@@ -1243,6 +1245,7 @@ export function MechanismGallery({
               </p>
               <button
                 type="button"
+                data-testid="mechanisms-continue"
                 onClick={onComplete}
                 style={{
                   padding: "10px 24px",
