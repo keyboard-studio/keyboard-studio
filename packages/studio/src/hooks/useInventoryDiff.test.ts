@@ -9,6 +9,8 @@
 //   6. Memoization: same InventoryDiff reference when nothing changes.
 //   7. New reference when baseIr changes (mock a new produced set).
 //   8. New reference when inventory changes.
+//   9. Opaque fragment: a char produced only via a fragment's producedOutput
+//      sketch lands in alreadyProduced, not lettersToAdd.
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
@@ -16,7 +18,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
-import type { IRGroup } from "@keyboard-studio/contracts";
+import type { IRGroup, IRStore, RawKmnFragment } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -215,5 +217,39 @@ describe("useInventoryDiff — memoization", () => {
     });
 
     expect(result.current).not.toBe(first);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 9. Opaque fragment producedOutput — the bj_cree_woods over-prompt shape
+// ---------------------------------------------------------------------------
+
+describe("useInventoryDiff — opaque fragment producedOutput", () => {
+  it("a char produced only via an opaque rule's index() sketch counts as alreadyProduced", async () => {
+    const { useInventoryDiff } = await import("./useInventoryDiff.ts");
+    // Base: 'a' via a typed rule, 'ᐌ' only via an opaque if()-guarded rule
+    // whose codec-extracted sketch references the typed store C_efc.
+    const store: IRStore = {
+      nodeId: "store#C_efc",
+      name: "C_efc",
+      items: [{ kind: "char", value: "ᐌ" }],
+      isSystem: false,
+    };
+    const frag: RawKmnFragment = {
+      nodeId: "raw#93",
+      origin: "imported",
+      sourceText: "if(option_key = '') U+1427 any(C_ef) > index(C_efc,3)",
+      reason: "if-option-store",
+      producedOutput: [{ kind: "index", storeRef: "C_efc", offset: 3 }],
+    };
+    const ir = makeTestIR([makeGroupWithChars(["a"])], [store], [frag]);
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    setInventory(["a", "ᐌ", "ɓ"]);
+    const { result } = renderHook(() => useInventoryDiff());
+    expect(result.current.alreadyProduced).toEqual(["a", "ᐌ"]);
+    expect(result.current.lettersToAdd).toEqual(["ɓ"]);
   });
 });

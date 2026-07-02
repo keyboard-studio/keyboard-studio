@@ -4,6 +4,29 @@ All notable changes to the `@keyboard-studio/contracts` package are documented
 here. The package follows [0ver](https://0ver.org/) semantics while pre-1.0: a
 breaking change bumps the **minor** version.
 
+## [0.15.0] — 2026-07-02
+
+### Additive contract change (0ver minor bump, non-breaking)
+
+- `RawKmnFragment` (`keyboard-ir.ts`) gains an **optional, additive**
+  `producedOutput?: OutputElement[]` field: a best-effort, output-side-only
+  sketch of an opaque rule's RHS, extracted by the engine codec at parse time.
+  Guard/context content is never included; store references stay as refs and
+  resolve against `ir.stores` at analysis time; emit never consults it
+  (`sourceText` remains the round-trip source of truth). Absent field =
+  prior behavior, so older/persisted IRs degrade gracefully.
+- `buildProducedSet` (`ir/producedSet.ts`) now folds these sketches into the
+  produced-glyph set, so characters produced only via opaque rules (e.g.
+  `if()`-guarded ones) count as produced — fixing the §8 inventory-diff
+  over-prompt in the Mechanism Gallery. Run-merge NFC, store expansion, and
+  filtering semantics apply to fragment content identically to typed rules.
+- No zod mirror required: `KeyboardIRSchema` intentionally passes fragment
+  internals through, and no `RawKmnFragment` schema exists.
+- Test fixture `makeTestIR` (`fixtures/keyboard-ir.ts`) gains an optional third
+  `raw: RawKmnFragment[]` parameter.
+
+(Versions 0.13.0 and 0.14.0 shipped without CHANGELOG entries; see git history.)
+
 ## [0.12.0] — 2026-06-28
 
 ### Contract change (spec §3.6 "MAJOR" tier — 0ver minor bump)
