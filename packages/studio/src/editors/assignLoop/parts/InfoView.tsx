@@ -180,7 +180,6 @@ export function InfoView() {
             </div>
           )}
           <div style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
-
             {capabilityHint(info.capability)}
           </div>
         </div>
