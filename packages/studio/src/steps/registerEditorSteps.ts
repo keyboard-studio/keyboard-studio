@@ -50,6 +50,9 @@ export const identityStep: EditorStep = {
   component: TrackOneIdentityPanelAdapter,
   inputs: [],
   writes: [],
+  // identity_lite runs inside the identity step (spec 024, Stage 1 re-home:
+  // was mis-anchored under "characters" in FLOW_SOURCES; correct home is here).
+  flowRefs: ["identity_lite"],
 };
 
 /**
@@ -82,6 +85,7 @@ export const trackStep: EditorStep = {
   // DEC-D2 (Matt 2026-06-29): branch selection only (copy vs adapt) — no IR leaf
   // in Phase 1, so writes is []. Empty writes orphans no input and never reds C5.
   writes: [],
+  flowRefs: ["track"],
 };
 
 /**
@@ -104,6 +108,7 @@ export const projectNameStep: EditorStep = {
   // exist in KeyboardIR — FR-004).
   inputs: [irPath("header", "bcp47")],
   writes: [irPath("header", "name"), irPath("header", "keyboardId")],
+  flowRefs: ["project_name"],
 };
 
 // ---------------------------------------------------------------------------
@@ -118,6 +123,7 @@ export const carveStep: EditorStep = {
   id: "carve",
   title: "Carve Keys",
   spine: true,
+  layout: "full",
   component: CarveAdapter,
   // Carve's deletion overlay reads and rewrites the same groups[]/stores[]/raw[]
   // arrays (the surviving carve surface) — a self-read, not an upstream-producer
@@ -140,6 +146,7 @@ export const mechanismsStep: EditorStep = {
   id: "mechanisms",
   title: "Assign Mechanisms",
   spine: true,
+  layout: "full",
   component: AddPhysicalAdapter,
   surface: "physical",
   // Mechanisms assigns onto the base layout groups[]/stores[] it also writes — a
@@ -176,6 +183,7 @@ export const touchStep: EditorStep = {
   id: "touch",
   title: "Touch Layout",
   spine: true,
+  layout: "full",
   component: AddTouchAdapter,
   surface: "touch",
   // Touch seeds from the locked physical layout (groups[]/stores[]) that
@@ -206,6 +214,9 @@ export const helpStep: EditorStep = {
   component: TrackOneIdentityPanelAdapter, // placeholder — wired in T028
   inputs: [],
   writes: [],
+  // phase_f_helpdocs runs inside the help step (spec 024, Stage 1 re-home:
+  // was mis-anchored under "characters" in FLOW_SOURCES; correct home is here).
+  flowRefs: ["phase_f_helpdocs"],
 };
 
 /**

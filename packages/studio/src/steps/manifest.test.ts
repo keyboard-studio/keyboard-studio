@@ -297,6 +297,50 @@ describe("Off-spine step inventory", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Layout declarations (spec 024 Stage 0)
+//
+// Exactly {carve, mechanisms, touch} must declare layout:"full".
+// All other steps must have layout:"pane" or omit the field (implicit "pane").
+// ---------------------------------------------------------------------------
+
+const FULL_LAYOUT_IDS = ["carve", "mechanisms", "touch"] as const;
+
+describe("layout declarations (spec 024 Stage 0)", () => {
+  it("exactly three steps declare layout:'full'", () => {
+    const fullSteps = manifest.filter((s) => s.layout === "full");
+    const fullIds = fullSteps.map((s) => s.id).sort();
+    expect(fullIds).toEqual([...FULL_LAYOUT_IDS].sort());
+  });
+
+  it("carve declares layout:'full'", () => {
+    const carve = manifest.find((s) => s.id === "carve");
+    expect(carve?.layout).toBe("full");
+  });
+
+  it("mechanisms declares layout:'full'", () => {
+    const mechanisms = manifest.find((s) => s.id === "mechanisms");
+    expect(mechanisms?.layout).toBe("full");
+  });
+
+  it("touch declares layout:'full'", () => {
+    const touch = manifest.find((s) => s.id === "touch");
+    expect(touch?.layout).toBe("full");
+  });
+
+  it("all other steps have layout:'pane' or omit layout (implicit pane)", () => {
+    const fullSet = new Set<string>(FULL_LAYOUT_IDS);
+    for (const step of manifest) {
+      if (!fullSet.has(step.id)) {
+        expect(
+          step.layout === undefined || step.layout === "pane",
+          `Step "${step.id}" must not declare layout:"full"`,
+        ).toBe(true);
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // M6 — no A–G phase-letter vocabulary in ids or titles
 // ---------------------------------------------------------------------------
 
