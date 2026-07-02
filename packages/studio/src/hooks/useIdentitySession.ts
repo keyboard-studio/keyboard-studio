@@ -11,6 +11,7 @@
 import { useCallback } from "react";
 import { useGitHubAuth } from "./useGitHubAuth.ts";
 import { useGoogleAuth } from "./useGoogleAuth.ts";
+import type { AuthFlow } from "../lib/githubOAuth.ts";
 
 export interface IdentitySession {
   /** True when at least one provider has an established identity. */
@@ -36,7 +37,7 @@ export interface IdentitySession {
     linked: boolean;
     /** GitHub login name from the verified token, or null. */
     login: string | null;
-    connect: (scope?: string) => Promise<void>;
+    connect: (flow?: AuthFlow) => Promise<void>;
     disconnect: () => void;
     error: string | null;
   };

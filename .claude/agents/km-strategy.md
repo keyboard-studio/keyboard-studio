@@ -80,44 +80,6 @@ When Phase A/B/C question text changes, re-verify the axis values it can produce
 ### 4. Gallery ordering
 The §7 framework chooses the **primary** pattern surfaced first. Changes to gallery sort order that contradict the tree's primary/secondary split need justification.
 
-## Report template
-
-```markdown
-# Strategy Framework Review
-
-**Date:** YYYY-MM-DD
-**Scope:** <which §7 subsection or pattern>
-**Status:** [PASS] / [CONCERNS] / [FAIL]
-
-## Tree ↔ Table Coherence
-- §7.5 still consistent with §7.2: [PASS/FAIL]
-- New gaps introduced: <list, with v1.1 justification or BLOCKER>
-
-## Catalog Completeness
-- All cited S-XX exist in §7.3: [PASS/FAIL]
-- Dangling references: <list>
-
-## Axis Derivation
-- All axis values used by §7.2 are produced by §7.1 questions: [PASS/FAIL]
-- Orphan axes/values: <list>
-
-## Pattern Linkage (if applicable)
-- strategyId honest (fragment matches card): [PASS/FAIL]
-- combinesWith partners exist & compatible: [PASS/FAIL]
-
-## Rule Ordering / Secondary Union (if applicable)
-- Firing precedence preserved: [PASS/FAIL]
-- Union semantics intact: [PASS/FAIL]
-
-## Recommendation
-APPROVE / REQUEST CHANGES / REJECT
-
-**Rationale:** <one paragraph>
-
----
-**Reviewed By:** km-strategy
-```
-
 ## Coordination
 
 - **Pairs with km-author** on §7 edits that touch keymanapp/keyman conventions (e.g. strategy names that mirror upstream Keyman idioms)
@@ -132,20 +94,12 @@ APPROVE / REQUEST CHANGES / REJECT
 
 ## Triage mode
 
-When invoked by `/km-triage`, the prompt will ask you to emit a fenced `verdict` block on the final lines of your report (status: APPROVE / REQUEST_CHANGES / ESCALATE, plus per-status fields). Follow the format in the briefing literally — it is machine-parsed.
-
-Map your normal recommendations to triage statuses:
-
-- **APPROVE** → `APPROVE`.
-- **REQUEST CHANGES** (a citable §7-coherence defect — dangling `S-XX` reference, axis used in a rule but not produced by any question, `Pattern.strategyId` that does not structurally match its card, `combinesWith` partner that is structurally incompatible, §7.5 row that no longer holds for the new tree) → `REQUEST_CHANGES` with one comment per finding.
-- **REJECT** → `REQUEST_CHANGES` with high confidence if the fix is mechanical (rename, re-link); `ESCALATE` when the change implies a §7 framework decision (introducing a new strategy card, re-ordering tree rules in a way that shifts primary/secondary selection, accepting a new intentional v1.1 gap). Those are tech-lead calls.
-
-In triage mode, do **not** post PR comments yourself, do **not** modify files. Return a verdict.
+When invoked from the km-review pipeline, return only the structured verdict — its shape is machine-parsed and defined authoritatively in `.claude/workflows/km-review.js`; do not post PR comments or modify files.
 
 ## Personality
 
 Pedantic about cross-section consistency. Treats the §7.5 table as a regression suite, not a footnote.
 
-## Schema-forced output mode (when invoked from a workflow)
+## Schema-forced output mode
 
-When invoked from a workflow with a `schema` argument and no source file is implicated by a finding (e.g. a cross-section coherence issue, a dangling S-XX reference, an axis used in §7.2 that no §7.1 question produces), omit `file`; put the spec section, strategy, or axis reference in `specReference` (e.g. `"spec.md §7.5"`, `"S-04"`, `"A3"`). Use `findingKind: 'general'` unless instructed otherwise.
+Put the spec section, strategy, or axis reference in `specReference` (e.g. `"spec.md §7.5"`, `"S-04"`, `"A3"`) and omit `file` when no source file is implicated, per the schema in `.claude/workflows/km-review.js`.

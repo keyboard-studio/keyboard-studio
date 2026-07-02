@@ -32,6 +32,30 @@ const US_UNSHIFTED: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 /**
+ * Accept predicate for the unshifted base layer: real keyboards encode it
+ * with the NCAPS (caps-lock-off) modifier, so accept NCAPS-only alongside
+ * bare rules; reject SHIFT/CAPS/AltGr layers.
+ *
+ * Shared by hasNonUSBase, detectBaseLayoutFamily, and hasInvertedNumberRow's
+ * base-map read.
+ */
+const isBaseLayer = (_vkey: string, modifiers: string[]): boolean =>
+  !modifiers.some((m) => m !== "NCAPS");
+
+/**
+ * Accept predicate for the Shift layer: requires SHIFT, rejects CAPS, and
+ * allows NCAPS alongside SHIFT (real keyboards may encode the shifted state
+ * as `[SHIFT NCAPS K_x]`).
+ *
+ * Used by hasInvertedNumberRow's shift-map read.
+ */
+const isShiftLayer = (_vkey: string, modifiers: string[]): boolean => {
+  if (modifiers.includes("CAPS")) return false;
+  if (!modifiers.includes("SHIFT")) return false;
+  return !modifiers.some((m) => m !== "SHIFT" && m !== "NCAPS");
+};
+
+/**
  * Return true if this keyboard uses only the ANSI (positional) begin group and
  * has no Unicode begin group.  Mnemonic keyboards rely on the host OS's
  * character-map layer rather than Keyman rules, so placement extraction from
@@ -72,30 +96,16 @@ export function isMnemonicKeyboard(ir: KeyboardIR): boolean {
  * @see spec.md §7.6 (non-US-base exclusion filter)
  */
 export function hasNonUSBase(ir: KeyboardIR, threshold = 3): boolean {
+  // Only look at the unshifted base row (NCAPS-only or bare; rejects
+  // SHIFT/CAPS/AltGr layers). Mirrors detectBaseLayoutFamily.
+  const map = collectVkeyChars(ir, isBaseLayer);
   let deviations = 0;
-  for (const group of ir.groups) {
-    if (!group.usingKeys) continue;
-    for (const rule of group.rules) {
-      // Only look at the unshifted base row. Real keyboards encode it with the
-      // NCAPS (caps-lock-off) modifier, so accept NCAPS-only alongside bare
-      // rules; reject SHIFT/CAPS/AltGr layers. Mirrors detectBaseLayoutFamily.
-      if (rule.context.length !== 1) continue;
-      const ctx = rule.context[0];
-      if (!ctx || ctx.kind !== "vkey") continue;
-      if (ctx.modifiers.some((m) => m !== "NCAPS")) continue;
-      const expected = US_UNSHIFTED[ctx.name];
-      if (expected === undefined) continue;
-      // Output must be a single char.
-      if (rule.output.length !== 1) continue;
-      const out = rule.output[0];
-      if (!out || out.kind !== "char") continue;
-      if (out.value !== expected) {
-        deviations++;
-        if (deviations > threshold) return true;
-      }
-    }
+  for (const [vkey, char] of map) {
+    const expected = US_UNSHIFTED[vkey];
+    if (expected === undefined) continue;
+    if (char !== expected) deviations++;
   }
-  return false;
+  return deviations > threshold;
 }
 
 // ---------------------------------------------------------------------------
@@ -103,18 +113,33 @@ export function hasNonUSBase(ir: KeyboardIR, threshold = 3): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Detect the base layout family of a keyboard from its unshifted letter-key
- * layer.  Checks the three key positions (K_Q/K_A/K_Z) that distinguish the
- * three common European layouts.
+ * Walk `ir.groups[]` (skipping non-`usingKeys` groups) and collect a
+ * `vkey -> char` map for rules whose context is a single vkey and whose
+ * output is a single char element.  `accept(vkeyName, modifiers)` decides
+ * whether a given rule's modifiers qualify it for inclusion — callers use
+ * this to scope the walk to a particular layer (e.g. unshifted base, or
+ * Shift).
  *
- * Used by the supportability scanner to annotate each KeyboardPlacementReport
- * with its layout family before passing reports to aggregatePlacements().
+ * The FIRST occurrence per vkey wins: once a vkey has been recorded, later
+ * matching rules for the same vkey are ignored, so the result has at most
+ * one entry per vkey regardless of how many qualifying rules target it.
+ * For detectBaseLayoutFamily (and hasInvertedNumberRow) this reproduces the
+ * clobber-avoidance behaviour of their original inline map-building, where
+ * only one value per key position is ever meaningful. For hasNonUSBase this
+ * is more than incidental clobber-avoidance: because deviations are tallied
+ * from this map, a vkey with several qualifying rules (e.g. a bare rule and
+ * an NCAPS rule both targeting K_A) contributes at most one deviation, not
+ * one per matching rule. That is the intended, more-correct semantic —
+ * "non-US base" counts differing key *positions*, not differing rules — and
+ * is a deliberate departure from hasNonUSBase's original per-rule tally, not
+ * a re-statement of it.
  *
- * @see spec.md §7.6 (bucketing by base-layout family)
+ * @see spec.md §7.6 (base-layout / AZERTY-derived detection helpers)
  */
-export function detectBaseLayoutFamily(
+export function collectVkeyChars(
   ir: KeyboardIR,
-): "QWERTY" | "AZERTY" | "QWERTZ" | "other" {
+  accept: (vkey: string, modifiers: string[]) => boolean,
+): Map<string, string> {
   const map = new Map<string, string>();
   for (const group of ir.groups) {
     if (!group.usingKeys) continue;
@@ -122,25 +147,93 @@ export function detectBaseLayoutFamily(
       if (rule.context.length !== 1) continue;
       const ctx = rule.context[0];
       if (!ctx || ctx.kind !== "vkey") continue;
-      // Unshifted base layer only. Real keyboards encode the base letter row
-      // with the NCAPS (caps-lock-off) modifier, not an empty modifier list, so
-      // accept NCAPS-only alongside the bare form; reject anything carrying
-      // SHIFT/CAPS/CTRL/ALT etc. (those are the shifted/AltGr layers).
-      if (ctx.modifiers.some((m) => m !== "NCAPS")) continue;
+      if (!accept(ctx.name, ctx.modifiers)) continue;
       if (rule.output.length !== 1) continue;
       const out = rule.output[0];
       if (!out || out.kind !== "char") continue;
-      // Prefer the bare/NCAPS unshifted value; don't let a later layer clobber it.
       if (!map.has(ctx.name)) map.set(ctx.name, out.value);
     }
   }
+  return map;
+}
+
+/**
+ * Detect the base layout family of a keyboard from its unshifted letter-key
+ * layer.  Checks the three key positions (K_Q/K_A/K_Z) that distinguish the
+ * three common European layouts.
+ *
+ * When the letter-row check is inconclusive ("other"), falls back to the
+ * AZERTY-derived inverted-number-row signal (hasInvertedNumberRow): some
+ * keyboards remap the letter row away from stock AZERTY but retain the
+ * AZERTY-style inverted digit row, which is otherwise a reliable AZERTY
+ * fingerprint.
+ *
+ * Used by the supportability scanner to annotate each KeyboardPlacementReport
+ * with its layout family before passing reports to aggregatePlacements().
+ *
+ * @see spec.md §7.6 (bucketing by base-layout family; AZERTY-derived detection)
+ */
+export function detectBaseLayoutFamily(
+  ir: KeyboardIR,
+): "QWERTY" | "AZERTY" | "QWERTZ" | "other" {
+  // Unshifted base layer only (see isBaseLayer).
+  const map = collectVkeyChars(ir, isBaseLayer);
   const q = map.get("K_Q");
   const a = map.get("K_A");
   const z = map.get("K_Z");
   if (q === "q" && a === "a" && z === "z") return "QWERTY";
   if (q === "a" && a === "q" && z === "w") return "AZERTY";
   if (q === "q" && a === "a" && z === "y") return "QWERTZ";
+  if (hasInvertedNumberRow(ir)) return "AZERTY";
   return "other";
+}
+
+// ---------------------------------------------------------------------------
+// AZERTY-derived detection (inverted number row)
+// ---------------------------------------------------------------------------
+
+/** Digit vkeys in the standard number-row order, mapped to their digit char. */
+const DIGIT_VKEYS: Record<string, string> = {
+  K_1: "1", K_2: "2", K_3: "3", K_4: "4", K_5: "5",
+  K_6: "6", K_7: "7", K_8: "8", K_9: "9", K_0: "0",
+};
+
+/**
+ * Detect the AZERTY-style inverted number row: on the unshifted/base state,
+ * digit keys produce a symbol (not the digit), while the digit itself lives
+ * on Shift.  This survives letter-row remapping that defeats the primary
+ * K_Q/K_A/K_Z check, so it is used as a fallback signal for AZERTY-derived
+ * keyboards whose letter rows have been customised away from stock AZERTY.
+ *
+ * A digit vkey counts as "inverted" when:
+ *   - the base (NCAPS-only, or bare) layer defines an output for it, AND
+ *   - that base output is NOT the digit itself, AND
+ *   - the Shift layer (SHIFT, optionally combined with NCAPS, but never CAPS)
+ *     produces the digit.
+ *
+ * The base layer read is NCAPS-specific (not CAPS): with CapsLock on, real
+ * AZERTY keyboards flip the number row back to plain digits (e.g.
+ * `[CAPS K_1] > '1']`), which would look QWERTY-like if mistakenly read as
+ * the base state.  Reading NCAPS (rejecting any rule carrying CAPS) avoids
+ * that trap.
+ *
+ * @param threshold - minimum count of inverted digit keys (out of K_1..K_0)
+ *   required to report true. The check is inclusive (`>=`); the default of 5
+ *   requires at least half the number row to exhibit the inversion.
+ * @see spec.md §7.6 (AZERTY-derived detection via the inverted number row)
+ */
+export function hasInvertedNumberRow(ir: KeyboardIR, threshold = 5): boolean {
+  const baseMap = collectVkeyChars(ir, isBaseLayer);
+  const shiftMap = collectVkeyChars(ir, isShiftLayer);
+
+  let inverted = 0;
+  for (const [vkey, digit] of Object.entries(DIGIT_VKEYS)) {
+    const base = baseMap.get(vkey);
+    if (base === undefined) continue;
+    if (base === digit) continue;
+    if (shiftMap.get(vkey) === digit) inverted++;
+  }
+  return inverted >= threshold;
 }
 
 // ---------------------------------------------------------------------------

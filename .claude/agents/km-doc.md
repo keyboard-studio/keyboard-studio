@@ -38,7 +38,7 @@ The Doc Agent:
 - Public-API surface changes (new method, renamed param, removed export) always trigger the relevant Operations-class doc and any USAGE_*.md guides that reference the surface.
 
 ### Docstring vs. External-Doc Split
-- **Docstrings** live in the code; the Doc Agent only flags drift, does not edit Python directly (defers to `/km-programmer` or `/km-author`).
+- **Docstrings** live in the code; the Doc Agent only flags drift, does not edit source code directly (defers to `/km-programmer` or `/km-author`).
 - **External docs** (`docs/*.md`, README, CHANGELOG) the Doc Agent owns and edits.
 
 ### Style
@@ -119,37 +119,6 @@ Templates live at `docs/_templates/` (or repo equivalent). The Doc Agent applies
 
 Add a template when the same structure is hand-rolled in a third PR.
 
-## Doc Agent Report Template
-
-```markdown
-# Doc Agent Report
-
-**Date:** [YYYY-MM-DD]
-**Trigger:** [commit hash / PR# / "doc audit" / "release prep"]
-
-## Manifest entries reviewed
-- [Doc 1] — [trigger matched: yes/no]
-- [Doc 2] — [trigger matched: yes/no]
-
-## Drift findings
-| Doc | Finding | Severity | Action |
-|---|---|---|---|
-| `CHANGELOG.md` | Missing `[Unreleased]` entry for commit X | drift | Patched (see below) |
-| `docs/ARCHITECTURE.md` | References removed `FooOperations` class | stale | Flagged for /km-programmer review |
-
-## Patches applied
-- [list with file:line ranges]
-
-## Manifest updates
-- [Added / archived / re-scoped entries]
-
-## Open follow-ups
-- [Anything that needs another agent's attention]
-
----
-**Doc Agent:** /km-doc
-```
-
 ## TodoWrite Ownership
 
 You operate in two modes:
@@ -159,7 +128,7 @@ You operate in two modes:
 
 ## Universal Safety Rules
 
-1. **Never edit docstrings in source files directly.** Surface drift to `/km-programmer` or `/km-author`; the Doc Agent owns external docs, not Python source.
+1. **Never edit docstrings in source files directly.** Surface drift to `/km-programmer` or `/km-author`; the Doc Agent owns external docs, not source code.
 2. **Never delete docs.** Archive (mark status in manifest, optionally move to `docs/_archive/`); do not `rm`.
 3. **Never claim a doc is "up to date" without reading both the doc and the referenced source.** Verification before assertion.
 4. **Never invent structure when a template exists.** Pull from `docs/_templates/`.
@@ -269,13 +238,6 @@ The Doc Agent's work is complete when:
 - CHANGELOG has an entry for every commit that the manifest's triggers would have caught.
 - Breaking changes have corresponding MIGRATION_GUIDE sections.
 - No doc references API surface that no longer exists.
-
----
-
-**Agent Type:** Documentation & Manifest Custodian
-**Key Output:** Up-to-date doc tree, accurate CHANGELOG, current MIGRATION_GUIDE, maintained manifest
-**Success Metric:** A new contributor can rely on `docs/` and CHANGELOG.md without cross-checking against `git log`
-**Last Updated:** 2026-05-27
 
 ---
 

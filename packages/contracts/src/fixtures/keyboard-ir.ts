@@ -2,13 +2,17 @@
 // See spec.md §5a — used by engine recognizer tests and any future test suite
 // that needs to build a minimal in-memory IR without the full codec.
 
-import type { KeyboardIR, IRGroup, IRStore, StoreItem } from "../keyboard-ir.js";
+import type { KeyboardIR, IRGroup, IRStore, StoreItem, RawKmnFragment } from "../keyboard-ir.js";
 
 /**
- * Build a minimal KeyboardIR from groups and optional stores.
- * Header fields are set to safe test defaults.
+ * Build a minimal KeyboardIR from groups, optional stores, and optional opaque
+ * fragments. Header fields are set to safe test defaults.
  */
-export function makeTestIR(groups: IRGroup[], stores: IRStore[] = []): KeyboardIR {
+export function makeTestIR(
+  groups: IRGroup[],
+  stores: IRStore[] = [],
+  raw: RawKmnFragment[] = [],
+): KeyboardIR {
   return {
     origin: "imported",
     header: {
@@ -23,7 +27,7 @@ export function makeTestIR(groups: IRGroup[], stores: IRStore[] = []): KeyboardI
     stores,
     groups,
     comments: [],
-    raw: [],
+    raw,
     recognizedPatterns: [],
   };
 }

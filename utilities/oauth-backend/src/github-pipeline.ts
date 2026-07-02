@@ -3,8 +3,8 @@
  *
  * The SPA never holds a token in this path. It POSTs pre-filtered source files
  * plus author attribution to POST /submit/managed-pr; this module runs the
- * fork -> tree -> commit -> branch -> draft-PR pipeline using the org
- * service-account token, which lives server-side only.
+ * fork -> tree -> commit -> branch -> draft-PR pipeline using the GitHub App
+ * installation token, which lives server-side only.
  *
  * Vendored from packages/engine/src/output/github.ts -- keep in sync.
  *
@@ -14,13 +14,13 @@
  *   3. Commit carries a Co-authored-by trailer crediting the human author.
  *   4. PR title normalized to "[<keyboardId>] <desc>" (keymanapp convention).
  *   5. PR body prepends a provenance block naming the human author.
- *   6. Org-token 401/403 surfaces as upstream/unavailable, never as user auth/scope.
+ *   6. Installation-token 401/403 surfaces as upstream/unavailable, never as user auth/scope.
  *
  * SECURITY CONTRACT (parity with handlers.ts / google-handlers.ts):
- *  - The org token is never logged and never appears in any response body.
+ *  - The installation token is never logged and never appears in any response body.
  *  - On any GitHub auth/scope failure (401/403) the route returns a generic
- *    "submission_unavailable" -- a misconfigured org token is a server problem,
- *    never surfaced to the SPA as an actionable client error.
+ *    "submission_unavailable" -- a misconfigured installation token is a server
+ *    problem, never surfaced to the SPA as an actionable client error.
  */
 
 import type { ManagedPRBody } from "./managed-pr-schemas.js";
@@ -54,8 +54,13 @@ export type GitHubPipelineFetchFn = (
 // ---------------------------------------------------------------------------
 
 export interface ManagedPRPipelineConfig {
-  /** Org service-account OAuth token with public_repo scope. Never logged. */
-  orgToken: string;
+  /**
+   * Provider callback that returns a GitHub App installation token on each call.
+   * Called once per request so @octokit/auth-app's internal cache/refresh logic
+   * is exercised per-request rather than at server startup (tokens expire ~1 h).
+   * The returned token has contents:write + pull_requests:write scope. Never logged.
+   */
+  getInstallationToken: () => Promise<string>;
   /** GitHub login that owns the studio's standing fork of keymanapp/keyboards. */
   orgLogin: string;
   fetch: GitHubPipelineFetchFn;
@@ -176,20 +181,24 @@ export async function submitManagedPR(
   body: ManagedPRBody,
   config: ManagedPRPipelineConfig
 ): Promise<ManagedPRHandlerResult> {
-  const { orgToken, orgLogin, fetch: fetchFn } = config;
+  const { getInstallationToken, orgLogin, fetch: fetchFn } = config;
   const forkBase = `${API_BASE}/repos/${orgLogin}/${UPSTREAM_REPO}`;
   const upstreamBase = `${API_BASE}/repos/${UPSTREAM_OWNER}/${UPSTREAM_REPO}`;
+
+  // Mint (or retrieve from cache) the installation token once per request.
+  // If the provider throws, the outer try/catch maps it to 502 submission_unavailable.
+  const installationToken = await getInstallationToken();
 
   const call = (url: string, method = "GET", payload?: unknown) =>
     fetchFn(url, {
       method,
-      headers: buildHeaders(orgToken),
+      headers: buildHeaders(installationToken),
       ...(payload !== undefined ? { body: JSON.stringify(payload) } : {}),
     });
 
-  // Map a GitHub non-ok response to a safe handler error. 401/403 mean the org
-  // token is missing/insufficient -- a server-side misconfiguration, surfaced
-  // generically and never leaking that the *org* token is the problem.
+  // Map a GitHub non-ok response to a safe handler error. 401/403 mean the
+  // installation token is missing/insufficient -- a server-side misconfiguration,
+  // surfaced generically and never leaking that the installation token is the problem.
   const mapNonOk = (res: GitHubPipelineFetchResponse): ManagedPRHandlerResult => {
     if (res.status === 401 || res.status === 403) {
       return { ok: false, status: 502, error: "submission_unavailable" };

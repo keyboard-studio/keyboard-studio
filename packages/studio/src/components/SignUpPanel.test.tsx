@@ -62,11 +62,12 @@ describe("SignUpPanel", () => {
     expect(screen.getByRole("button", { name: "Sign up with GitHub" })).toBeTruthy();
   });
 
-  it("calls connect() when the GitHub button is clicked", () => {
+  it("calls connect('identity') when the GitHub button is clicked (identity flow, no scope)", () => {
     mockAuth({ status: "idle" });
     render(<SignUpPanel />);
     screen.getByRole("button", { name: "Sign up with GitHub" }).click();
     expect(connect).toHaveBeenCalledOnce();
+    expect(connect).toHaveBeenCalledWith("identity");
   });
 
   it("shows the Google sign-up button enabled (not a disabled placeholder)", () => {

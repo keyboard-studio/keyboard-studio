@@ -14,7 +14,7 @@
 
 The current behaviour is not what a reader of the UI would assume, and these facts shape every requirement below:
 
-- **The flow map does not read what runs.** Today `flowmap/FlowMapView.tsx` → `buildFlowGraph.ts` builds the graph from the legacy `content/flows/*.yaml` (via `parseFlow`), **not** from the live modular registry / `*.modular.yaml` manifests that actually drive the runtime survey. The map can therefore show steps that no longer run, and miss steps that do — it is **silently stale**.
+- **The flow map did not read what runs (pre-P0 baseline).** Before this feature, `flowmap/FlowMapView.tsx` → `buildFlowGraph.ts` built the graph from the legacy `content/flows/*.yaml` (via `parseFlow`), **not** from the live modular registry / `*.modular.yaml` manifests that actually drove the runtime survey. The map could therefore show steps that no longer ran, and miss steps that did — it was **silently stale**. (Post-P4b, this viewer is `dashboard/DashboardView.tsx` / `dashboard/buildStepGraph.ts`; see `docs/survey-modularity-cyoa-plan.md` P4b.)
 - **Runtime truth is split by phase, today.** **Phase B (characters) already runs on the modular registry** (`survey/questions/b/*` via `loadModularFlow`). **Phase A (identity), Phase F (help docs), and identity-lite still resolve through the legacy full-YAML loader** (`loadFlow`); their cutover to modular is a *later* phase (P3), out of scope here. "What runs" is therefore the modular registry for B and the legacy YAML for A/F/identity-lite — and an honest map must reflect that split as it stands.
 - **Two whole classes of step are invisible to the map.** Galleries (carve / mechanism / touch — the "Form 4" editors that mutate `KeyboardIR` directly) and the hand-built wizard-step components ("Form 3": track, project-name, scaffold, identity panel, base resolution) have **no `id` / `prompt` / `next`**, so the graph cannot see them at all. A user looking at the map has no idea these stages exist.
 - **This is a prerequisite, not a polish item.** P0 establishes **"map == runtime by construction"** — the honest baseline that **every later refactor phase (P1–P5) is verified against**. Without it, regressions in ordering or reachability introduced by later phases are invisible. P0 is a **hard prerequisite**, not an independent nice-to-have.
@@ -134,7 +134,7 @@ Because the map is now derived from the live runtime rather than a parallel YAML
 ## Dependencies
 
 - **Live Phase B modular registry / manifest** — `survey/questions/b/*` resolved via `loadModularFlow` and the `*.modular.yaml` manifest; the source the map's Phase B nodes are derived from.
-- **Existing flow-map viewer** — `flowmap/FlowMapView.tsx` and the graph-building path it renders; P0 repoints its data source (mechanism deferred to the plan).
+- **Existing flow-map viewer** — `flowmap/FlowMapView.tsx` / `buildFlowGraph.ts` at the time this feature was authored; P0 repointed its data source (mechanism deferred to the plan). Post-P4b these were renamed/rewritten to `dashboard/DashboardView.tsx` / `dashboard/buildStepGraph.ts` (`buildManifestStepGraph()` added) — see `docs/survey-modularity-cyoa-plan.md` P4b.
 - **Gallery and wizard-step components** — carve / mechanism / touch galleries and the five hand-built wizard steps; P0 needs only enough identity (a title / kind) to emit a stub node for each.
 
 ## Clarifications / Open Questions

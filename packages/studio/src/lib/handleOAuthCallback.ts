@@ -24,6 +24,7 @@
 import {
   clearOAuthScratch,
   exchangeCode,
+  getStoredFlow,
   getStoredState,
   getStoredVerifier,
   setStoredToken,
@@ -140,8 +141,12 @@ export async function processOAuthCallback(search: string): Promise<OAuthCallbac
     return { ok: false, reason: "missing-verifier", message: "Missing PKCE verifier." };
   }
 
+  // Read the persisted flow so the exchange uses the correct credential pair.
+  // Default to "identity" when absent (backward-compat with pre-flow scratch entries).
+  const flow = getStoredFlow() ?? "identity";
+
   try {
-    const token = await exchangeCode(code, verifier);
+    const token = await exchangeCode(code, verifier, flow);
     setStoredToken(token);
     clearOAuthScratch();
     return { ok: true };

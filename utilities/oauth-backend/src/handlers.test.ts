@@ -19,6 +19,16 @@ function makeConfig(fetchFn: OAuthFetchFn): HandlerConfig {
   };
 }
 
+function makeConfigWithOAuth(fetchFn: OAuthFetchFn): HandlerConfig {
+  return {
+    clientId: "app-client-id",
+    clientSecret: "app-client-secret-SHOULD-NEVER-LEAK",
+    oauthClientId: "oauth-client-id",
+    oauthClientSecret: "oauth-client-secret-SHOULD-NEVER-LEAK",
+    fetch: fetchFn,
+  };
+}
+
 function stubFetch(response: object, ok = true, status = 200): OAuthFetchFn {
   return async (_url, _init) => ({
     ok,
@@ -191,6 +201,86 @@ describe("exchange()", () => {
 });
 
 // ---------------------------------------------------------------------------
+// exchange() — client discriminator / dual-credential routing
+// ---------------------------------------------------------------------------
+
+describe("exchange() — client discriminator", () => {
+  it("uses github_app pair when client field is absent (default)", async () => {
+    const captured: { body?: string } = {};
+    const fetch: OAuthFetchFn = async (_url, init) => {
+      captured.body = init?.body;
+      return { ok: true, status: 200, json: async () => ({ access_token: "gho_app", token_type: "bearer", scope: "" }) };
+    };
+
+    await exchange({ code: "code-abc" }, makeConfigWithOAuth(fetch));
+
+    const parsed = JSON.parse(captured.body ?? "{}") as Record<string, unknown>;
+    expect(parsed["client_id"]).toBe("app-client-id");
+    expect(parsed["client_secret"]).toBe("app-client-secret-SHOULD-NEVER-LEAK");
+  });
+
+  it("uses github_app pair when client is explicitly 'github_app'", async () => {
+    const captured: { body?: string } = {};
+    const fetch: OAuthFetchFn = async (_url, init) => {
+      captured.body = init?.body;
+      return { ok: true, status: 200, json: async () => ({ access_token: "gho_app", token_type: "bearer", scope: "" }) };
+    };
+
+    await exchange({ code: "code-abc", client: "github_app" }, makeConfigWithOAuth(fetch));
+
+    const parsed = JSON.parse(captured.body ?? "{}") as Record<string, unknown>;
+    expect(parsed["client_id"]).toBe("app-client-id");
+    expect(parsed["client_secret"]).toBe("app-client-secret-SHOULD-NEVER-LEAK");
+  });
+
+  it("uses oauth_app pair when client is 'oauth_app'", async () => {
+    const captured: { body?: string } = {};
+    const fetch: OAuthFetchFn = async (_url, init) => {
+      captured.body = init?.body;
+      return { ok: true, status: 200, json: async () => ({ access_token: "gho_oauth", token_type: "bearer", scope: "public_repo" }) };
+    };
+
+    await exchange({ code: "code-abc", client: "oauth_app" }, makeConfigWithOAuth(fetch));
+
+    const parsed = JSON.parse(captured.body ?? "{}") as Record<string, unknown>;
+    expect(parsed["client_id"]).toBe("oauth-client-id");
+    expect(parsed["client_secret"]).toBe("oauth-client-secret-SHOULD-NEVER-LEAK");
+  });
+
+  it("oauth_app pair secret never appears in the success response", async () => {
+    const fetch = stubFetch({ access_token: "gho_oauth", token_type: "bearer", scope: "public_repo" });
+
+    const result = await exchange({ code: "code", client: "oauth_app" }, makeConfigWithOAuth(fetch));
+
+    const serialized = JSON.stringify(result);
+    expect(serialized).not.toContain("oauth-client-secret-SHOULD-NEVER-LEAK");
+  });
+
+  it("returns 500 server_misconfigured when oauth_app requested but pair not configured", async () => {
+    // Config has no oauthClientId/oauthClientSecret
+    const fetch = stubFetch({ access_token: "gho_app", token_type: "bearer", scope: "" });
+
+    const result = await exchange({ code: "code", client: "oauth_app" }, makeConfig(fetch));
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.status).toBe(500);
+    expect(result.error).toBe("server_misconfigured");
+  });
+
+  it("github_app default flow still works when oauth pair is absent", async () => {
+    const fetch = stubFetch({ access_token: "gho_app", token_type: "bearer", scope: "" });
+
+    // makeConfig has no oauthClientId/oauthClientSecret — github_app must still succeed
+    const result = await exchange({ code: "code" }, makeConfig(fetch));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.data.access_token).toBe("gho_app");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // refresh()
 // ---------------------------------------------------------------------------
 
@@ -292,5 +382,50 @@ describe("refresh()", () => {
 
     const serialized = JSON.stringify(result);
     expect(serialized).not.toContain("test-client-secret-SHOULD-NEVER-LEAK");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// refresh() — client discriminator / dual-credential routing
+// ---------------------------------------------------------------------------
+
+describe("refresh() — client discriminator", () => {
+  it("uses github_app pair when client field is absent (default)", async () => {
+    const captured: { body?: string } = {};
+    const fetch: OAuthFetchFn = async (_url, init) => {
+      captured.body = init?.body;
+      return { ok: true, status: 200, json: async () => ({ access_token: "gho_r", token_type: "bearer", scope: "" }) };
+    };
+
+    await refresh({ refresh_token: "ghr_rt" }, makeConfigWithOAuth(fetch));
+
+    const parsed = JSON.parse(captured.body ?? "{}") as Record<string, unknown>;
+    expect(parsed["client_id"]).toBe("app-client-id");
+    expect(parsed["client_secret"]).toBe("app-client-secret-SHOULD-NEVER-LEAK");
+  });
+
+  it("uses oauth_app pair when client is 'oauth_app'", async () => {
+    const captured: { body?: string } = {};
+    const fetch: OAuthFetchFn = async (_url, init) => {
+      captured.body = init?.body;
+      return { ok: true, status: 200, json: async () => ({ access_token: "gho_r", token_type: "bearer", scope: "" }) };
+    };
+
+    await refresh({ refresh_token: "ghr_rt", client: "oauth_app" }, makeConfigWithOAuth(fetch));
+
+    const parsed = JSON.parse(captured.body ?? "{}") as Record<string, unknown>;
+    expect(parsed["client_id"]).toBe("oauth-client-id");
+    expect(parsed["client_secret"]).toBe("oauth-client-secret-SHOULD-NEVER-LEAK");
+  });
+
+  it("returns 500 server_misconfigured when oauth_app requested but pair not configured", async () => {
+    const fetch = stubFetch({ access_token: "gho_r", token_type: "bearer", scope: "" });
+
+    const result = await refresh({ refresh_token: "ghr_rt", client: "oauth_app" }, makeConfig(fetch));
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.status).toBe(500);
+    expect(result.error).toBe("server_misconfigured");
   });
 });

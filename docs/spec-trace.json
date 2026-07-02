@@ -1,6 +1,6 @@
 {
   "specVersion": "1.3.1",
-  "lastUpdated": "2026-07-01",
+  "lastUpdated": "2026-07-02",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -304,7 +304,7 @@
     },
     "specs/008-data-flow": {
       "title": "Feature spec — Data flow (spec.md §8)",
-      "hash": "sha256:de6d579e40996345",
+      "hash": "sha256:622b8a83725b0127",
       "status": "partial",
       "implements": [
         "packages/contracts/src/surveySession.ts",
@@ -341,7 +341,7 @@
     },
     "specs/010-dashboard-honest-flow-map": {
       "title": "Feature Specification: Dashboard-honest flow map (P0)",
-      "hash": "sha256:b7476b9d01dead19",
+      "hash": "sha256:08f09b6b513b61b0",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -365,7 +365,7 @@
     },
     "specs/012-modular-loader-cutover": {
       "title": "Feature Specification: Modular-loader cutover + legacy YAML retirement",
-      "hash": "sha256:9c3cbfe9e4f33f99",
+      "hash": "sha256:76346b548f3861fa",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -437,7 +437,7 @@
     },
     "specs/021-qu-wire-galleries": {
       "title": "Feature Specification: Wire galleries — carve / mechanisms / touch resolve as first-class map nodes (existing write mechanisms preserved)",
-      "hash": "sha256:f2db81ebbbf903d8",
+      "hash": "sha256:c00c4577db82b692",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -445,7 +445,15 @@
     },
     "specs/022-qu-library-demote": {
       "title": "Feature Specification: Library demote — demote the `pb_*` battery and the full Phase A to reserve/library under the no-delete guardrail",
-      "hash": "sha256:3cd6cd6d53be4c86",
+      "hash": "sha256:ac9af55293e53c62",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/023-qu-decompose-wizard": {
+      "title": "Feature Specification: Decompose wizard steps — track / project_name as modular SurveyRunner question flows with Flow Map drill-downs",
+      "hash": "sha256:cc8acaf6b35c673a",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

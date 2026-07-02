@@ -71,8 +71,7 @@ report, then yields to verification.
 then fix any issues found.")
 
 - **Reuse** — duplicated logic that already exists as a utility, helper, or
-  pattern elsewhere in the codebase (`Shared/string_utils.py`, `BaseOperations`,
-  `wrapper_base.py`, etc.).
+  pattern elsewhere in the codebase (see "Reuse targets (keyboard-studio)" below).
 - **Quality** — overlong functions, unclear names, dead branches, comments that
   describe *what* instead of *why*, premature abstractions.
 - **Efficiency** — obvious O(n^2) where O(n) is trivial, repeated work that could
@@ -100,51 +99,6 @@ escalates — it does not refactor outside its scope.
    - The WASM-oracle bridge (`kmcmplib` integration)
    - The VirtualFS implementation (no host-disk writes during authoring; `spec.md` §11)
    - Anything in `spec.md` §7 wiring (axes → tree → catalog → §7.5 table)
-
-## Simplify Report Template
-
-```markdown
-# Simplify Report
-
-**Date:** [YYYY-MM-DD]
-**Scope:** [files/diff range simplified]
-**Status:** [DONE / PARTIAL / DEFERRED]
-
-## Scope Identified
-- Base commit: [sha]
-- Files in diff: [count]
-- Files modified by /simplify: [count]
-
-## Changes Applied
-| File | Type | Description |
-|------|------|-------------|
-| path/to/file.py | reuse | Replaced inline normalization with `normalize_text()` |
-| path/to/file.py | quality | Extracted 40-line block into `_resolve_owner()` |
-| path/to/file.py | efficiency | Cached repository lookup in tight loop |
-
-## Behavioral Impact Assessment
-- [ ] No public API changed
-- [ ] No method signatures changed
-- [ ] No exception types changed
-- [ ] No return-value shapes changed
-- [ ] All affected tests still exist and target the same behavior
-
-**Conclusion:** Refactor is behavior-preserving / NOT behavior-preserving (escalate).
-
-## Deferred / Escalated Observations
-Items `/simplify` flagged but did NOT change, because they exceed scope:
-- [Observation 1 — what, why deferred, who should handle]
-- [Observation 2 — ...]
-
-## Handoff
-**Next agent:** /km-verification
-**Reason:** Confirm refactor breaks no tests, API surface unchanged.
-**Specific things to re-check:**
-- [List of areas most likely to regress, e.g., "the cache in `LexEntryOperations.GetAll` now skips identity checks — verify Duplicate() tests"]
-
----
-**Simplified By:** Simplify Agent
-```
 
 ## Coordination
 
@@ -213,7 +167,7 @@ utility, the candidate hosts in this repo are:
 - `packages/contracts/src/` — shared types and small derivation helpers
 - `packages/contracts/src/fixtures/` — shared test fixtures (do not
   duplicate Pattern fixtures across packages)
-- `packages/scaffolder/src/util/`, `packages/engine/src/util/` — package-local
+- `packages/engine/src/scaffolder/`, `packages/engine/src/shared/` — package-local
   utilities that may belong in `contracts` if they become cross-package
 - `utilities/Template Cleanup/` — Python tooling for template prep (Python
   is local to that directory; do not reach into it from TS packages)
@@ -221,10 +175,3 @@ utility, the candidate hosts in this repo are:
 If a simplification reveals a utility that genuinely belongs in
 `contracts/` but currently lives in a package, escalate to `/km-lead` rather
 than promoting it inside this pass.
-
----
-
-**Agent Type:** Quality Assurance (Refactoring)
-**Key Output:** Simplify Report + behavior-preserving refactor diff
-**Success Metric:** Smaller, clearer code that still passes verification
-**Last Updated:** 2026-05-21

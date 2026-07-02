@@ -101,6 +101,13 @@ function RadioItem({
         onChange={() => onChange(optValue)}
         style={{ marginTop: 2, flexShrink: 0, accentColor }}
         aria-required={required}
+        // E2E hook: the live "adapt" option of the track_choice question
+        // (packages/studio/src/survey/questions/g/track_choice.ts) is the
+        // only wizard-critical radio target Playwright needs a stable,
+        // text-independent selector for. Keyed on the generated inputId
+        // (`${name}-${optValue}`) so this stays a single-option opt-in,
+        // not a blanket testid on every RadioGroup instance.
+        {...(inputId === "track_choice-adapt" ? { "data-testid": "track-adapt" } : {})}
       />
       <span style={OPTION_LABEL_STYLE}>
         {label}

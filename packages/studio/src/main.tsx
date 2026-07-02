@@ -9,6 +9,7 @@ import {
   type OAuthProvider,
 } from "./lib/handleOAuthCallback.ts";
 import { rehydrateWorkingCopyFromSession } from "./lib/persistWorkingCopy.ts";
+import { installE2eHook } from "./lib/e2eHook.ts";
 
 function requireRoot(): HTMLElement {
   const rootEl = document.getElementById("root");
@@ -20,6 +21,10 @@ function requireRoot(): HTMLElement {
 
 function mountApp(): void {
   const rootEl = requireRoot();
+
+  // Flag-gated E2E test hook (window.__ksE2E__) — no-op unless VITE_E2E=1 or
+  // ?e2e=1. See lib/e2eHook.ts.
+  installE2eHook();
 
   // Rehydrate the working copy from the pre-redirect snapshot (if present).
   // On a normal (non-OAuth-return) load this is a no-op: the key is absent.
