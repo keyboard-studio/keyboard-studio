@@ -10,6 +10,8 @@
 //   - Never imported by production code paths; used only by SurveyRunner when
 //     isDebugEnabled() is true.
 
+import { readEnvFlag } from "../lib/envFlag.ts";
+
 const STORAGE_KEY = "km-debug-pins";
 
 function readStorage(): Record<string, string | string[]> {
@@ -47,17 +49,7 @@ export interface DebugPinsStore {
 }
 
 function checkDebugEnabled(): boolean {
-  if (typeof window === "undefined") return false;
-  // Check VITE env var (set at build/dev time)
-  try {
-    if (import.meta.env.VITE_KM_DEBUG === "1") return true;
-  } catch { /* not in a Vite context */ }
-  // Check URL query param (runtime override)
-  try {
-    return new URLSearchParams(window.location.search).get("debug") === "1";
-  } catch {
-    return false;
-  }
+  return readEnvFlag("VITE_KM_DEBUG", "debug");
 }
 
 export const debugPinsStore: DebugPinsStore = {

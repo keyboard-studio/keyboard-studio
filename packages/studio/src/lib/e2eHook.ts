@@ -15,6 +15,7 @@
 //     the app bootstrap (main.tsx).
 
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { readEnvFlag } from "./envFlag.ts";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 
 export interface KsE2EHook {
@@ -31,17 +32,7 @@ declare global {
 }
 
 function isE2eEnabled(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    if (import.meta.env.VITE_E2E === "1") return true;
-  } catch {
-    // Not in a Vite context — fall through to the URL check.
-  }
-  try {
-    return new URLSearchParams(window.location.search).get("e2e") === "1";
-  } catch {
-    return false;
-  }
+  return readEnvFlag("VITE_E2E", "e2e");
 }
 
 /**
