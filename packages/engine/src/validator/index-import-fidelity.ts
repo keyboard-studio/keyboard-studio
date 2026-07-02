@@ -10,6 +10,7 @@
  *   runImportFidelityEmitChecks   — runs after emit(), with the emitted text in hand
  *     I2: round-trip stub (non-blocking)
  *     I3: header preservation
+ *     I6: ownership consistency (Pattern↔node back-reference)
  *
  * I5 (sidecar hash) fires at output time and is re-exported standalone so
  * callers can invoke it independently.
@@ -26,6 +27,7 @@ import {
   checkOpaqueFeatureInventory,
   checkRoundTrip,
   checkHeaderPreservation,
+  checkOwnershipConsistency,
 } from "./layer-a-prime.js";
 
 /**
@@ -43,7 +45,7 @@ export function runImportFidelityParseChecks(
 }
 
 /**
- * Run Layer A' emit-stage checks (I2 stub + I3).
+ * Run Layer A' emit-stage checks (I2 stub + I3 + I6).
  * Call after emit(), passing the emitted .kmn text.
  *
  * Returns a Promise so that when the Keyman Core runtime lands and I2 becomes
@@ -56,6 +58,7 @@ export async function runImportFidelityEmitChecks(
   return [
     ...checkRoundTrip(ir),
     ...checkHeaderPreservation(ir, emitted),
+    ...checkOwnershipConsistency(ir),
   ];
 }
 

@@ -53,6 +53,11 @@ export type OutputElement =
   | { kind: "beep" }
   | { kind: "index"; storeRef: string; offset: number }
   | { kind: "outs"; storeRef: string }
+  /** `use(groupName)` group transition in output position — a control-flow
+   *  jump to another group, not a character. Additive member (#268): the codec
+   *  previously preserved this as an untyped `raw` blob; downstream consumers
+   *  (recognizer, carve gallery) can now see the transition explicitly. */
+  | { kind: "useGroup"; groupName: string }
   | { kind: "raw"; text: string };
 
 /** A virtual key + modifier combination (used in the I2 round-trip enumeration corpus). */
@@ -277,6 +282,17 @@ export interface RawKmnFragment {
    * emit path to place fragments inside the correct group's output block.
    */
   groupNodeId?: string;
+  /**
+   * Best-effort typed sketch of this fragment's OUTPUT (RHS) side, extracted by
+   * the codec at parse time for static produced-set analysis (the §8 inventory
+   * diff). Output-side only — guard/context content is never included, so an
+   * `if(opt = 'x')` guard's 'x' cannot appear here. Store references are kept
+   * as refs and resolved against `ir.stores` at analysis time. Never consulted
+   * by emit (`sourceText` remains the round-trip source of truth). Absent for
+   * non-rule fragments (opaque store bodies, pre-begin lines), fragments from
+   * older parses, and rules whose RHS has no statically producible content.
+   */
+  producedOutput?: OutputElement[];
 }
 
 /**

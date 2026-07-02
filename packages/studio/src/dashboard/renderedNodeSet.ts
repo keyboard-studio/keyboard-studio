@@ -20,7 +20,8 @@
 // traversal lives in the depcruise-excluded guardrail test, not here.
 
 import identityLiteModularRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
-import phaseAModularRaw from "../../../../content/flows/phase_a_identity.modular.yaml?raw";
+// Spec 022: phase_a_identity.modular.yaml is intentionally NOT imported here — the
+// full non-identity Phase A is demoted to the inert library (see FLOW_SOURCES below).
 import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modular.yaml?raw";
 import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
 import trackModularRaw from "../../../../content/flows/track.modular.yaml?raw";
@@ -56,7 +57,18 @@ export interface FlowSourceEntry {
 export const FLOW_SOURCES: ReadonlyArray<FlowSourceEntry> = [
   // Identity-lite uses the Phase A registry (il_* modules are registered there).
   { raw: identityLiteModularRaw, title: "Identity-lite (Phase A head)", registry: phaseARegistry, stepId: CHARACTERS_STEP_ID },
-  { raw: phaseAModularRaw, title: "Phase A — identity", registry: phaseARegistry, stepId: CHARACTERS_STEP_ID },
+  // Spec 022 (library demote): the full non-identity Phase A
+  // (phase_a_identity.modular.yaml — 15 identity + 15 provenance_*) is DEMOTED to the
+  // inert library. It is the orphaned, vestigial battery — StudioShell renders
+  // IdentityLite, never PhaseA; identity_lite is the canonical identity experience.
+  // Removing it from the active flow-source set makes its 30 modules render as
+  // registry-only RESERVE nodes (kind:"library-not-in-flow") via computeReserveNodes
+  // in the identity-lite drill-down (reserveIds = phaseARegistry − live il_* ids):
+  // present on the map, off the runtime/reachable spine. NOT deletion — every module
+  // stays registered (phaseARegistry), on disk, and test-covered (no-delete guardrail,
+  // §4 / noDeleteGuardrail.test.ts); revivable by re-adding this entry. The spec-017
+  // prefill drill-down anchor moved off the demoted `primary_script` to the live
+  // `il_target_script` (drillDownDeclarations.ts) so the bijection stays green.
   { raw: phaseBModularRaw, title: "Phase B — character discovery", registry: phaseBRegistry, stepId: CHARACTERS_STEP_ID },
   { raw: phaseFModularRaw, title: "Phase F — help docs", registry: phaseFRegistry, stepId: CHARACTERS_STEP_ID },
   // Phase G: track_choice and project_name hang under their own manifest steps.

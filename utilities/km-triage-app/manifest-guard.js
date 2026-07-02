@@ -14,6 +14,12 @@
 // Usage (require):
 //   const { isManifestPath } = require('./manifest-guard');
 //   if (isManifestPath(filePath)) { /* needs human */ }
+//
+// Usage (CLI) — the Phase-6 precondition-5 gate:
+//   node manifest-guard.js <path> [<path> ...]
+//   Prints each manifest path (one per line) and exits 0 if ANY arg is a
+//   manifest (reroute the fix list to a human); exits 1 if none match; exits 2
+//   on a usage error (no args).
 
 'use strict';
 
@@ -41,6 +47,17 @@ function isManifestPath(filePath) {
   // same regardless of which OS the triage host runs on.
   const basename = path.posix.basename(filePath.replace(/\\/g, '/'));
   return MANIFEST_BASENAMES.has(basename);
+}
+
+if (require.main === module) {
+  const args = process.argv.slice(2).filter((a) => a !== '--');
+  if (args.length === 0) {
+    process.stderr.write('usage: node manifest-guard.js <path> [<path> ...]\n');
+    process.exit(2);
+  }
+  const matches = args.filter(isManifestPath);
+  for (const m of matches) process.stdout.write(m + '\n');
+  process.exit(matches.length > 0 ? 0 : 1);
 }
 
 module.exports = { isManifestPath };

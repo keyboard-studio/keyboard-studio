@@ -1,6 +1,6 @@
 # Survey Modularity + CYOA Refactor — Plan / RFC
 
-> **Status: PLAN / RFC — P2 implemented (branch `claude/survey-modularity-cyoa-plan-pcpg9a`); P3(a) implemented (branch `km/modular-loader-cutover`); P4a and P4b implemented (branch `claude/survey-modularity-cyoa-phase-4-q9ey3o`, P4a merged via #778); P0–P1, P3(b), P5 remain proposals.**
+> **Status: PLAN / RFC — P2 implemented (branch `claude/survey-modularity-cyoa-plan-pcpg9a`); P3(a) MERGED (branch `km/modular-loader-cutover`) — E2E lane 1 (copy-edit) unblocked via #906, lane 2 (import-improve) conditional on Track 2 import liveness; P4a and P4b implemented (branch `claude/survey-modularity-cyoa-phase-4-q9ey3o`, P4a merged via #778); P0–P1, P3(b), P5 remain proposals.**
 > P2 shipped: `IRPath` typed key-path algebra exported from `@keyboard-studio/contracts`
 > 0.11.0 (breaking bump, §18-ratified); `QuestionModule.inputs`/`writes` declared across
 > all 93 modules (current ground truth: 5 non-empty `writes` — the identity/header writers — with the remaining modules declaring explicit empty `writes`; the original "8 non-empty" was the P2 snapshot, superseded by the P3 loader cutover + #781 legacy retirement); three CI gates (coverage, orphan-input
@@ -897,7 +897,7 @@ dashboard every later phase is verified against), not an optional standalone
 improvement. The #410 relationship is called out per phase. (#410 is
 OPEN/reopened, "feat(studio): modular survey questions…": AC#1 per-question
 modules = done; AC#2 debug pin store = done — see `stores/debugPinsStore.ts`;
-AC#3 two Playwright E2E lanes = blocked/unchecked. #410 branches off PR #409 and
+AC#3 two Playwright E2E lanes = lane 1 (copy-edit) unblocked via #906; lane 2 (import-improve) conditional on Track 2 import UI liveness. #410 branches off PR #409 and
 rebases onto `main` when #409 merges.)
 
 Phases now run **P0, P1, P2, P3, P4a, P4b, P5.** Each carries an

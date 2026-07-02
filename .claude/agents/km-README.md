@@ -117,6 +117,20 @@ keyboard-studio-specific seats: `/km-frontend`, `/km-testing`, `/km-keyman`, `/k
 
 If you fork this crew into another project, the project-specific seats are the ones to re-aim or replace.
 
+## Crew-consistency lint (`pnpm crew-lint`)
+
+These crew docs are guarded by a machine lint suite at `utilities/crew-lint/index.js` (issue #948) — a dependency-free `node` script (no tsx / no build step), run via `pnpm crew-lint` and wired into `pnpm lint` (after eslint + depcruise). It enforces 7 checks and **must stay green**:
+
+1. No `python` / `py` fenced code blocks in `.claude/**/km-*.md`.
+2. No pictographic emoji in `.claude/**/km-*.md` (typographic punctuation like `→`, `§`, `×`, en/em-dashes, curly quotes, `≥`/`≤` is fine).
+3. No phantom package paths (`packages/{scaffolder,validator}`) anywhere under `.claude/**` — they actually live at `packages/engine/src/{scaffolder,validator}`.
+4. No hardcoded line-number self cross-refs in `km-triage.md` (soft `~<num>` line refs, `see line <num>`, `lines <num>-<num>`).
+5. The two `km-qc` rubrics (agent + command) agree on the subtractive scheme (start 100; -10 P0 / -3 P1 / -1 P2) and the verdict thresholds (PASS >= 80 / PASS WITH NOTES 60-79 / FAIL < 60 or any P0).
+6. Every specialist / `subagent_type` referenced in `km-lead.md`, `km-triage.md`, and the `km-review.js` REVIEWERS has a matching `.claude/agents/km-<name>.md` file.
+7. The escalation sentinel is spelled `.escalations/.labels-created-v2` everywhere across `.claude/**` and `utilities/km-triage-app/**` (never the stale `.labels-created`).
+
+Every failure names the offending file and line. When editing these docs, run `pnpm crew-lint` before committing.
+
 ## Status
 
 **Active project crew** for keyboard-studio (June 2026).

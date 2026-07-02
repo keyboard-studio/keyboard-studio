@@ -68,7 +68,7 @@ groups:
         description: <3-7 word task summary>
         prompt: |
           <self-contained briefing — see Step 3>
-        expected_artifact: <what comes back, e.g. "QC report with P0/P1 list">
+        expected_artifact: <what comes back, e.g. "QC report: P0/P1/P2 findings + PASS/PASS WITH NOTES/FAIL verdict">
 ```
 ````
 
@@ -161,7 +161,7 @@ Pick a pattern as a starting point, but adapt — these are not rigid scripts.
 
 ## Quality Gates
 - [x] Verification: pass
-- [x] QC: <score>/100
+- [x] QC: <verdict> (PASS ≥80 / PASS WITH NOTES 60–79 / FAIL <60 or any P0; score/100, −10 P0 / −3 P1 / −1 P2)
 - [x] Domain: pass
 - [x] Original Author: <score>/10
 - [x] Tests: passing

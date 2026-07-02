@@ -5,12 +5,13 @@ import type {
   OutputElement,
   IRRule,
   IRGroup,
+  IRStore,
   KeyboardIR,
   Pattern,
   RemovalCapability,
-  StoreItem,
 } from '@keyboard-studio/contracts';
-import { isParallelIndexFanOut } from '@keyboard-studio/engine';
+import { isParallelIndexFanOut, classifyStoreSlotEdit } from '@keyboard-studio/engine';
+import type { StoreSlotBlockReason } from '@keyboard-studio/engine';
 export type CardKind = 'pattern' | 'group' | 'store' | 'raw';
 
 // ---------------------------------------------------------------------------
@@ -164,8 +165,20 @@ export function invisibleCharLabel(ch: string): string | null {
 }
 
 // A glyph tile the user is hovering/focusing, plus its current removed state — used by the Info View.
-export interface HoverGlyph extends Pick<CarveGlyph, 'keys' | 'ch' | 'capability'> {
+export interface HoverGlyph extends Pick<CarveGlyph, 'keys' | 'ch' | 'capability' | 'owners'> {
   off: boolean;
+}
+
+/**
+ * A studio-only display tag identifying something a glyph's underlying rule
+ * is tied to — a named store it reads/writes, or (for pattern-inspector
+ * chips) the pattern that owns it. Render-layer only; not part of the
+ * KeyboardIR/Pattern contract (see #917).
+ */
+export interface GlyphOwner {
+  kind: 'pattern' | 'store';
+  nodeId: string;
+  label: string;
 }
 
 export interface CarveGlyph {
@@ -175,6 +188,7 @@ export interface CarveGlyph {
   modifierLayer: ModifierLayer;
   modifierLabel: string;
   capability: RemovalCapability;
+  owners?: GlyphOwner[];
 }
 
 // ---------------------------------------------------------------------------
@@ -229,6 +243,9 @@ export function outputToChar(output: OutputElement[]): string {
         return '…';
       case 'beep':
         return '🔔';
+      case 'useGroup':
+        // Control-flow jump to another group (#268) — not a glyph; no tile.
+        return '?';
       case 'raw':
         return '?';
     }
@@ -280,6 +297,18 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
     ? ir.stores.find((s) => s.name === inputStoreName)
     : undefined;
 
+  // Store owners for this rule — the output store plus the input store (when
+  // resolved), deduped by nodeId, skipping system stores. Attached to every
+  // slot glyph the rule expands to (they all share the same store pair).
+  const slotOwners: GlyphOwner[] = [];
+  const slotOwnerNodeIds = new Set<string>();
+  for (const s of [outputStore, inputStore]) {
+    if (!s || s.isSystem) continue;
+    if (slotOwnerNodeIds.has(s.nodeId)) continue;
+    slotOwnerNodeIds.add(s.nodeId);
+    slotOwners.push({ kind: 'store', nodeId: s.nodeId, label: s.name });
+  }
+
   const modLayer = ruleModifier(rule);
   const modLabel = modifierLabel(rule);
   const hasDeadkey = rule.context.some((el) => el.kind === 'deadkey');
@@ -317,10 +346,71 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
     if (seen.has(gid)) continue;  // dedup: same store+index appearing in multiple rules
     seen.add(gid);
 
-    glyphs.push({ gid, keys, ch, modifierLayer: modLayer, modifierLabel: modLabel, capability: slotCapability });
+    glyphs.push({
+      gid, keys, ch, modifierLayer: modLayer, modifierLabel: modLabel, capability: slotCapability,
+      ...(slotOwners.length > 0 ? { owners: slotOwners } : {}),
+    });
   }
 
   return glyphs;
+}
+
+// ---------------------------------------------------------------------------
+// storeRefsOf — single source of truth for "what counts as a store
+// reference in a rule, and its role." context any/notany -> asSource;
+// context index -> asOutput; output index/outs -> asOutput. Returns one
+// entry per DISTINCT store name (first-seen order), OR-ing roles across
+// multiple refs to the same store. Shared by ruleStoreOwners and
+// analyzeStoreUsage so the "store tag" render layer and the store "Used by"
+// panel never drift on which elements count as a store reference.
+// (Positional consumers like describeRuleForStore that need the element
+// index keep their own scan — see the comment on that function.)
+// ---------------------------------------------------------------------------
+
+function storeRefsOf(rule: IRRule): { storeName: string; asSource: boolean; asOutput: boolean }[] {
+  const byName = new Map<string, { storeName: string; asSource: boolean; asOutput: boolean }>();
+  const touch = (name: string, role: 'asSource' | 'asOutput') => {
+    let entry = byName.get(name);
+    if (!entry) {
+      entry = { storeName: name, asSource: false, asOutput: false };
+      byName.set(name, entry);
+    }
+    entry[role] = true;
+  };
+
+  for (const el of rule.context) {
+    if (el.kind === 'any' || el.kind === 'notany') touch(el.storeRef, 'asSource');
+    else if (el.kind === 'index') touch(el.storeRef, 'asOutput');
+  }
+  for (const el of rule.output) {
+    if (el.kind === 'index' || el.kind === 'outs') touch(el.storeRef, 'asOutput');
+  }
+
+  return [...byName.values()];
+}
+
+// ---------------------------------------------------------------------------
+// ruleStoreOwners — distinct named (non-system) stores a rule reads from or
+// writes to, as GlyphOwner tags. Shares storeRefsOf with
+// analyzeStoreUsage so the "store tag" render layer and the store "Used
+// by" panel never drift on which elements count as a store reference.
+// Store resolution is by name (ir.stores.find(s => s.name === ...)), so if
+// two stores share a name the first one wins — a pre-existing, Keyman-legal
+// but rare ambiguity shared with describeRuleForStore/analyzeStoreUsage, not
+// introduced here.
+// ---------------------------------------------------------------------------
+
+function ruleStoreOwners(rule: IRRule, ir: KeyboardIR): GlyphOwner[] {
+  const owners: GlyphOwner[] = [];
+  const seenNodeIds = new Set<string>();
+  for (const { storeName: name } of storeRefsOf(rule)) {
+    const store = ir.stores.find((s) => s.name === name);
+    if (!store || store.isSystem) continue;
+    if (seenNodeIds.has(store.nodeId)) continue;
+    seenNodeIds.add(store.nodeId);
+    owners.push({ kind: 'store', nodeId: store.nodeId, label: store.name });
+  }
+  return owners;
 }
 
 // ---------------------------------------------------------------------------
@@ -340,6 +430,7 @@ function ruleToGlyphs(rule: IRRule, ir: KeyboardIR, capabilities: Map<string, Re
   if (keys.length === 0) return [];
   const ch = outputToChar(rule.output);
   if (ch === '?' || ch === '‹dk›') return [];
+  const owners = ruleStoreOwners(rule, ir);
   return [{
     gid: rule.nodeId,
     keys,
@@ -347,6 +438,7 @@ function ruleToGlyphs(rule: IRRule, ir: KeyboardIR, capabilities: Map<string, Re
     modifierLayer: ruleModifier(rule),
     modifierLabel: modifierLabel(rule),
     capability: capabilities.get(rule.nodeId) ?? 'not-removable:unknown',
+    ...(owners.length > 0 ? { owners } : {}),
   }];
 }
 
@@ -369,16 +461,41 @@ const EMPTY_IR: KeyboardIR = {
   recognizedPatterns: [],
 };
 
-export function groupToGlyphs(group: IRGroup, ir: KeyboardIR = EMPTY_IR, capabilities: Map<string, RemovalCapability> = new Map()): CarveGlyph[] {
+export function groupToGlyphs(group: IRGroup, ir: KeyboardIR = EMPTY_IR, capabilities: Map<string, RemovalCapability> = new Map(), ownedNodeIds: Set<string> = new Set()): CarveGlyph[] {
   const glyphs: CarveGlyph[] = [];
   const seen = new Set<string>();
   group.rules.forEach((rule) => {
     if (rule.ownedByPattern !== undefined) return;
+    if (ownedNodeIds.has(rule.nodeId)) return;
     for (const g of ruleToGlyphs(rule, ir, capabilities)) {
       if (!seen.has(g.gid)) { seen.add(g.gid); glyphs.push(g); }
     }
   });
   return glyphs;
+}
+
+// ---------------------------------------------------------------------------
+// collectOwnedNodeIds — union of every nodeId claimed by any recognized
+// pattern's ownedNodes (the render-layer hardening for the ghost-chip bug:
+// even if ownedByPattern drifts from a pattern's ownedNodes, this set lets
+// the group-Inspector rendering fall back to the authoritative ownedNodes
+// list rather than trusting only the per-rule stamp).
+// ---------------------------------------------------------------------------
+
+export function collectOwnedNodeIds(ir: KeyboardIR): Set<string> {
+  const ids = new Set<string>();
+  for (const p of ir.recognizedPatterns) {
+    if (p.origin !== 'recognized') continue;
+    for (const n of p.ownedNodes ?? []) {
+      // Rule refs only. Store nodeIds never collide with a rule.nodeId, so
+      // including them is currently harmless — but the sole consumer
+      // (groupToGlyphs) .has()-tests against IRRule.nodeId, so keep the set
+      // homogeneous and mirror assertOwnershipConsistency's kind:'rule' scope.
+      if (n.kind !== 'rule') continue;
+      ids.add(n.nodeId);
+    }
+  }
+  return ids;
 }
 
 // ---------------------------------------------------------------------------
@@ -391,12 +508,21 @@ export function patternToGlyphs(pattern: Pattern, ir: KeyboardIR, capabilities: 
   const ownedIds = new Set(pattern.ownedNodes.map((n) => n.nodeId));
   const glyphs: CarveGlyph[] = [];
   const seen = new Set<string>();
+  // Owning-pattern tag prepended to every produced glyph's owners. Consumed
+  // only by the not-removable info message (InfoView "Managed by the
+  // [Pattern] pattern") — never rendered as a redundant tag in a
+  // pattern-inspector chip (that AC is intentionally not implemented; see
+  // #917 scope decision).
+  const patternOwner: GlyphOwner = { kind: 'pattern', nodeId: pattern.id, label: pattern.title };
 
   for (const group of ir.groups) {
     group.rules.forEach((rule) => {
       if (!ownedIds.has(rule.nodeId)) return;
       for (const g of ruleToGlyphs(rule, ir, capabilities)) {
-        if (!seen.has(g.gid)) { seen.add(g.gid); glyphs.push(g); }
+        if (!seen.has(g.gid)) {
+          seen.add(g.gid);
+          glyphs.push({ ...g, owners: [patternOwner, ...(g.owners ?? [])] });
+        }
       }
     });
   }
@@ -405,13 +531,78 @@ export function patternToGlyphs(pattern: Pattern, ir: KeyboardIR, capabilities: 
 }
 
 // ---------------------------------------------------------------------------
-// storeChars — extract displayable characters from a store's items
+// storeCharChips — per-character toggle chips for a store, one per char item
+// (skipping non-char items so display order matches the TRUE items index).
+//
+// chipId contract (locked, shared with the engine's applyStoreSlotRemovals):
+//   "<store.nodeId>#<itemsIndex>" where itemsIndex is the 0-based index into
+//   IRStore.items — the FULL items array, not the filtered char-only display
+//   list. For output stores this intentionally equals the S-02 fan-out glyph
+//   gid, so store chips and pattern/group tiles share toggle state by
+//   construction (see the gid-contract comment near expandParallelStoreRule).
+//
+// Action is derived once per store via classifyStoreSlotEdit (single
+// authority — never re-derived here):
+//   "nul-fill" — output-store slots; removing the char replaces it with a
+//                silent `nul` filler that preserves index() alignment.
+//   "drop"     — safe to splice out entirely (no positional contract).
+//   "disabled" — classifyStoreSlotEdit returned "blocked"; disabledReason
+//                carries an author-facing plain-language explanation.
 // ---------------------------------------------------------------------------
 
-export function storeChars(store: { items: StoreItem[] }): string[] {
-  return store.items
-    .filter((item) => item.kind === 'char')
-    .map((item) => (item as { kind: 'char'; value: string }).value);
+/** A single per-character toggle chip for a store, keyed by the locked slot-id contract. */
+export interface StoreCharChip {
+  /** `${store.nodeId}#${itemsIndex}` — locked slot-id contract (engine <-> studio seam). */
+  chipId: string;
+  ch: string;
+  /** TRUE 0-based index into IRStore.items (not the char-only display index). */
+  itemsIndex: number;
+  action: 'nul-fill' | 'drop' | 'disabled';
+  /** Author-facing plain-language explanation. Present only when action === 'disabled'. */
+  disabledReason?: string;
+}
+
+/**
+ * Map a classifyStoreSlotEdit block reason to an author-facing plain-language
+ * explanation (studio-side, UI-copy audience). Sibling: `blockReasonMessage`
+ * in the engine's applyStoreSlotRemovals.ts switches over the same
+ * `StoreSlotBlockReason` union to produce warning-log text — a new reason
+ * must be added to both switches.
+ */
+function blockReasonToDisabledReason(reason: StoreSlotBlockReason): string {
+  switch (reason) {
+    case 'paired-input':
+      return "This store feeds an any()/index() mechanism — removing characters here would break its pairing; per-character removal for paired stores is planned.";
+    case 'notany-widens':
+      return "This store is matched negatively (notany) — removing a character would make MORE keys match, not fewer.";
+    case 'context-index-aligned':
+      return "This store's positions are read directly by a rule's matcher (index() in its context) — removing a character would shift every position after it out of alignment.";
+    case 'dual-use':
+      return "This store is both read from and written to across your rules — removing a character here isn't safe until that dual role is resolved.";
+    case 'system-store':
+      return "This is a system store the compiler manages directly — it isn't meant to be edited here.";
+  }
+}
+
+/** Extract per-character toggle chips for a store, classified once via classifyStoreSlotEdit. */
+export function storeCharChips(store: IRStore, ir: KeyboardIR): StoreCharChip[] {
+  const editMode = classifyStoreSlotEdit(store, ir);
+  const chips: StoreCharChip[] = [];
+
+  store.items.forEach((item, itemsIndex) => {
+    if (item.kind !== 'char') return;
+    const chipId = `${store.nodeId}#${itemsIndex}`;
+    if (editMode.mode === 'blocked') {
+      chips.push({
+        chipId, ch: item.value, itemsIndex, action: 'disabled',
+        disabledReason: blockReasonToDisabledReason(editMode.reason),
+      });
+    } else {
+      chips.push({ chipId, ch: item.value, itemsIndex, action: editMode.mode });
+    }
+  });
+
+  return chips;
 }
 
 // ---------------------------------------------------------------------------
@@ -467,6 +658,10 @@ function precedingContextLabel(elements: ContextElement[]): string {
 
 const PLATFORM_GUARD_RE = /^\s*platform\s*\(\s*'(\w+)'\s*\)/i;
 
+// Stays bespoke rather than consuming storeRefsOf: it needs the element
+// INDEX of the store ref (ctxRefIdx/outRefIdx) to compute isKeystroke via
+// the '+'/raw separator and to slice the preceding context — a positional
+// need storeRefsOf's per-store roll-up can't serve.
 function describeRuleForStore(rule: IRRule, storeName: string): StoreRuleDetail {
   const ctxRefIdx = rule.context.findIndex((el) =>
     ((el.kind === 'any' || el.kind === 'notany') && el.storeRef === storeName) ||
@@ -511,20 +706,10 @@ function analyzeStoreUsage(storeName: string, ir: KeyboardIR): StoreUsage {
 
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      let used = false;
-      for (const el of rule.context) {
-        if ((el.kind === 'any' || el.kind === 'notany') && el.storeRef === storeName) {
-          used = true; asSource = true;
-        } else if (el.kind === 'index' && el.storeRef === storeName) {
-          used = true; asOutput = true;
-        }
-      }
-      for (const el of rule.output) {
-        if ((el.kind === 'index' || el.kind === 'outs') && el.storeRef === storeName) {
-          used = true; asOutput = true;
-        }
-      }
-      if (used) {
+      const ref = storeRefsOf(rule).find((r) => r.storeName === storeName);
+      if (ref) {
+        if (ref.asSource) asSource = true;
+        if (ref.asOutput) asOutput = true;
         ruleCount++;
         groupNameSet.add(group.name);
       }
@@ -541,14 +726,7 @@ function analyzeStoreUsage(storeName: string, ir: KeyboardIR): StoreUsage {
     for (const group of ir.groups) {
       for (const rule of group.rules) {
         if (!ownedIds.has(rule.nodeId)) continue;
-        let used = false;
-        for (const el of rule.context) {
-          if ((el.kind === 'any' || el.kind === 'notany') && el.storeRef === storeName) used = true;
-          if (el.kind === 'index' && el.storeRef === storeName) used = true;
-        }
-        for (const el of rule.output) {
-          if ((el.kind === 'index' || el.kind === 'outs') && el.storeRef === storeName) used = true;
-        }
+        const used = storeRefsOf(rule).some((r) => r.storeName === storeName);
         if (used) pRules.push(describeRuleForStore(rule, storeName));
       }
     }
@@ -556,19 +734,18 @@ function analyzeStoreUsage(storeName: string, ir: KeyboardIR): StoreUsage {
   }
 
   // Which groups have unowned rules (not claimed by any pattern) that reference this store?
+  // Exclude rules claimed via EITHER ownership signal — ownedByPattern (the
+  // per-rule stamp) or a pattern's ownedNodes (via collectOwnedNodeIds) — so a
+  // rule in the #886 drift shape (ownedNodes-claimed but ownedByPattern unset)
+  // is not double-listed under both patternRefs and groupRefs. Mirrors the same
+  // fallback groupToGlyphs uses for the glyph-tile path.
+  const ownedNodeIds = collectOwnedNodeIds(ir);
   const groupRefs: { groupId: string; groupName: string; ruleCount: number; rules: StoreRuleDetail[] }[] = [];
   for (const group of ir.groups) {
     const gRules: StoreRuleDetail[] = [];
     for (const rule of group.rules) {
-      if (rule.ownedByPattern !== undefined) continue; // skip — already counted in patternRefs
-      let used = false;
-      for (const el of rule.context) {
-        if ((el.kind === 'any' || el.kind === 'notany') && el.storeRef === storeName) used = true;
-        if (el.kind === 'index' && el.storeRef === storeName) used = true;
-      }
-      for (const el of rule.output) {
-        if ((el.kind === 'index' || el.kind === 'outs') && el.storeRef === storeName) used = true;
-      }
+      if (rule.ownedByPattern !== undefined || ownedNodeIds.has(rule.nodeId)) continue; // skip — already counted in patternRefs
+      const used = storeRefsOf(rule).some((r) => r.storeName === storeName);
       if (used) gRules.push(describeRuleForStore(rule, storeName));
     }
     if (gRules.length > 0) groupRefs.push({ groupId: group.nodeId, groupName: group.name, ruleCount: gRules.length, rules: gRules });
@@ -589,11 +766,29 @@ export interface CarveNode {
   strategy?: string | undefined;
   loadBearing?: boolean | undefined;
   glyphs?: CarveGlyph[] | undefined;       // patterns + groups
-  displayChars?: string[] | undefined;     // stores
+  storeChips?: StoreCharChip[] | undefined; // stores
   rawReason?: string | undefined;          // raw fragments
   referencedByNodeId?: string | undefined; // store: which pattern owns it
   referencedByLabel?: string | undefined;  // store: that pattern's title
   storeUsage?: StoreUsage | undefined;     // store: how it is used in rules
+}
+
+// ---------------------------------------------------------------------------
+// idsTriState — tri-state derived purely from a flat array of item ids.
+// Single source shared by glyphsTriState (CarveGlyph.gid) and nodeState's
+// store-chip branch (StoreCharChip.chipId) so both derive tri-state the
+// same way.
+// ---------------------------------------------------------------------------
+
+export function idsTriState(
+  ids: string[],
+  isItemDeleted: (id: string) => boolean,
+): 'on' | 'partial' | 'off' {
+  if (ids.length === 0) return 'on';
+  const off = ids.filter((id) => isItemDeleted(id)).length;
+  if (off === 0) return 'on';
+  if (off === ids.length) return 'off';
+  return 'partial';
 }
 
 // ---------------------------------------------------------------------------
@@ -604,14 +799,11 @@ export function glyphsTriState(
   glyphs: CarveGlyph[],
   isItemDeleted: (id: string) => boolean,
 ): 'on' | 'partial' | 'off' {
-  const off = glyphs.filter((g) => isItemDeleted(g.gid)).length;
-  if (off === 0) return 'on';
-  if (off === glyphs.length) return 'off';
-  return 'partial';
+  return idsTriState(glyphs.map((g) => g.gid), isItemDeleted);
 }
 
 // ---------------------------------------------------------------------------
-// nodeState — tri-state based on individual glyph or node deletion
+// nodeState — tri-state based on individual glyph, store-chip, or node deletion
 // ---------------------------------------------------------------------------
 
 export function nodeState(
@@ -621,6 +813,20 @@ export function nodeState(
 ): 'on' | 'partial' | 'off' {
   if (node.glyphs && node.glyphs.length > 0) {
     return glyphsTriState(node.glyphs, isItemDeleted);
+  }
+  // Stores with at least one toggleable (non-disabled) chip get tri-state
+  // over those chip ids. A whole-deleted store (isDeleted) always reports
+  // 'off' regardless of chip state — deleting the whole store node
+  // supersedes per-character toggling. Stores with no toggleable chips
+  // (all disabled, or no chips at all) fall through to the binary check.
+  if (node.storeChips && node.storeChips.length > 0) {
+    if (isDeleted(node.nodeId)) return 'off';
+    const toggleableIds = node.storeChips
+      .filter((c) => c.action !== 'disabled')
+      .map((c) => c.chipId);
+    if (toggleableIds.length > 0) {
+      return idsTriState(toggleableIds, isItemDeleted);
+    }
   }
   return isDeleted(node.nodeId) ? 'off' : 'on';
 }
@@ -632,6 +838,7 @@ export function nodeState(
 export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCapability> = new Map()): CarveNode[] {
   const nodes: CarveNode[] = [];
   const recognized = ir.recognizedPatterns.filter((p) => p.origin === 'recognized');
+  const ownedNodeIds = collectOwnedNodeIds(ir);
 
   for (const pattern of recognized) {
     const glyphs = patternToGlyphs(pattern, ir, capabilities);
@@ -646,8 +853,8 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
   }
 
   for (const group of ir.groups) {
-    if (!group.rules.some((r) => r.ownedByPattern === undefined)) continue;
-    const glyphs = groupToGlyphs(group, ir, capabilities);
+    if (!group.rules.some((r) => r.ownedByPattern === undefined && !ownedNodeIds.has(r.nodeId))) continue;
+    const glyphs = groupToGlyphs(group, ir, capabilities, ownedNodeIds);
     nodes.push({
       nodeId: group.nodeId,
       kind: 'group',
@@ -667,7 +874,7 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
       nodeId: store.nodeId,
       kind: 'store',
       name: store.name,
-      displayChars: storeChars(store),
+      storeChips: storeCharChips(store, ir),
       loadBearing: refPattern !== undefined,
       storeUsage: usage.ruleCount > 0 ? usage : undefined,
       ...(refPattern !== undefined ? { referencedByNodeId: refPattern.id, referencedByLabel: refPattern.title } : {}),

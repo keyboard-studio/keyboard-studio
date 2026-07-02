@@ -19,9 +19,10 @@
  *    group. The `stores` array is sorted by name before comparison so ordering
  *    differences do not cause false failures.
  *
- * 3. match/nomatch rules: these group-transition rules are stored as IRRule
- *    with a `raw` output element containing `use(<group>)`. They round-trip
- *    correctly at the structural level.
+ * 3. match/nomatch rules: these group-transition rules take a dedicated parse
+ *    branch that stores the whole RHS as a `raw` output element (with matchKind
+ *    preserved). They round-trip at the structural level. (#268 typed only the
+ *    ordinary-rule output path `+ [ctx] > use(group)`, not this match branch.)
  */
 
 import { describe, it, expect } from "vitest";

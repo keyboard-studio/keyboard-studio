@@ -82,12 +82,23 @@ export interface DrillDownDeclaration {
  * manifest graph). The session-level ScriptPrefill (script subtag / A2 class /
  * routing group, scriptAxes.ts) is a non-IR signal — declared as a sessionInput,
  * NOT an irPath(). irPath('header','script') is NOT declared (it does not exist).
+ *
+ * Spec 022 re-anchor: this drill-down anchored to `primary_script` (a vestigial
+ * Phase-A module). Spec 022 demotes the full non-identity Phase A to the inert
+ * library (renderedNodeSet.ts drops phase_a_identity from FLOW_SOURCES), so
+ * `primary_script` is no longer reachable. The anchor moves to the LIVE, reachable
+ * identity-lite equivalent `il_target_script` (questions/a/il_target_script.ts —
+ * "Which script will THIS keyboard type?", the script-capture question on the real
+ * StudioShell→IdentityLite runtime path that drives A2/routing/base-suggestion). The
+ * registryKey is the reachable registry BOUNDARY id for the script-prefill
+ * confirmation, not the bcp47 writer; the header.bcp47 input stays C5-satisfiable via
+ * the charactersStep subsumption write (DEC-D1), unchanged.
  */
 export const prefillDrillDown: DrillDownDeclaration = {
   id: "prefill",
   title: "Confirm the basics (prefill)",
   underNodeId: CHARACTERS_NODE_ID,
-  registryKey: "primary_script",
+  registryKey: "il_target_script",
   inputs: [irPath("header", "bcp47")],
   writes: [],
   sessionInputs: ["ScriptPrefill (script subtag / A2 class / routing group)"],

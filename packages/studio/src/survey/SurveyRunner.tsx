@@ -492,6 +492,7 @@ export function SurveyRunner({
         {canGoBack && (
           <button
             type="button"
+            data-testid="survey-back"
             onClick={handleBack}
             style={{
               padding: "8px 18px",
@@ -509,6 +510,7 @@ export function SurveyRunner({
         )}
         <button
           type="button"
+          data-testid="survey-advance"
           onClick={handleNext}
           disabled={!canAdvance}
           aria-describedby={progressDescId}

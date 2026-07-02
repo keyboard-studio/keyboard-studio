@@ -61,3 +61,7 @@ probe-*.log
 packages/studio/scripts/probe-ewondo-emit.mjs
 .gitignore
 notes.md
+
+# Playwright run artifacts (packages/studio/e2e)
+packages/studio/test-results/
+packages/studio/playwright-report/

@@ -52,6 +52,10 @@ fi
 STATE_DIR=".escalations"
 AUDIT_LOG="$STATE_DIR/audit-log.jsonl"
 MAX_ITERATIONS=3
+# Hard ceiling on claude spawns per cron tick (across all iterations + retry block).
+# Prevents runaway credit burn when many PRs resolve MERGEABLE in the same sweep.
+# Override via KM_TRIAGE_MAX_REVIEWS env var.
+MAX_REVIEWS_PER_SWEEP="${KM_TRIAGE_MAX_REVIEWS:-1}"
 SLEEP_BETWEEN_SEC=45
 LOOP_ON_ACTIONS="auto_fix_only fix_and_mention"
 
@@ -77,7 +81,7 @@ last_audit_entry() {
   jq -c --argjson num "$num" \
     'select(.pr == $num and (.action_taken | IN(
        "approve_park","auto_fix_only","mention_only",
-       "fix_and_mention","escalate","auto_fix_attempt_failed"
+       "fix_and_mention","escalate","auto_fix_attempt_failed","review_failed"
      )))' \
     "$AUDIT_LOG" 2>/dev/null | tail -1 || echo ""
 }
@@ -156,17 +160,22 @@ jit_is_draft() {
 }
 
 spawn_claude_for_pr() {
-  local pr_num="$1"
+  local pr_num="$1" head_sha="${2:-unknown}"
   set +e
   # stdin from /dev/null: claude -p reads stdin when it isn't a TTY. Inside the
   # per-PR while-read loop that would drain the jq stream of remaining PRs and
   # feed the wrong PR's JSON to this process. Keep it deaf to the loop's stdin.
-  CLAUDECODE="" "$CLAUDE" -p "/km-triage $pr_num" --dangerously-skip-permissions --output-format text \
+  CLAUDECODE="" "$CLAUDE" -p "/km-triage $pr_num" --model "$MODEL" --dangerously-skip-permissions --output-format text \
     < /dev/null >> "$LOG" 2>&1
   local exit_code=$?
   set -e
   if [[ "$exit_code" -ne 0 ]]; then
     echo "  [WARN] claude exited $exit_code for PR #$pr_num" | tee -a "$LOG"
+    # Write a substantive audit entry so Gate 9 skips this PR on the next sweep
+    # rather than re-spawning immediately. The PR won't be re-reviewed until a
+    # new commit or human comment provides a re-review signal.
+    printf '{"ts":"%s","pr":%s,"action_taken":"review_failed","reason":"claude_exit_%s","head_sha":"%s","sweep_id":"%s"}\n' \
+      "$(ts)" "$pr_num" "$exit_code" "$head_sha" "${KM_TRIAGE_SWEEP_ID:-unknown}" >> "$AUDIT_LOG"
   fi
 }
 
@@ -242,6 +251,10 @@ SWEEP_START_PORCELAIN="$(git status --porcelain=v1 --untracked-files=all)"
 SWEEP_START_HEAD="$(git rev-parse HEAD)"
 
 # ── Iteration loop ────────────────────────────────────────────────────────────
+# Total claude spawns across ALL iterations + retry blocks in this cron tick.
+# Capped at MAX_REVIEWS_PER_SWEEP so a burst of newly-MERGEABLE PRs can't blow
+# through credits in one tick. Deferred PRs pick up on the next cron cycle.
+total_reviews=0
 
 for i in $(seq 1 "$MAX_ITERATIONS"); do
   PRIOR_LINE_COUNT=0
@@ -451,9 +464,21 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     # live so a just-converted draft never spins up a claude process.
     if jit_is_draft "$NUM" "$HEAD_SHA"; then continue; fi
 
+    # Global per-sweep cap: stop spawning when MAX_REVIEWS_PER_SWEEP is reached.
+    # Remaining PRs are deferred to the next cron tick. Override via
+    # KM_TRIAGE_MAX_REVIEWS env var (e.g. export KM_TRIAGE_MAX_REVIEWS=3 for a
+    # catch-up run).
+    if [[ "$total_reviews" -ge "$MAX_REVIEWS_PER_SWEEP" ]]; then
+      echo "  skip: sweep_review_cap ($total_reviews/$MAX_REVIEWS_PER_SWEEP) — deferring to next sweep" | tee -a "$LOG"
+      audit_skip "$NUM" sweep_review_cap_reached "$HEAD_SHA"
+      n_skip=$((n_skip + 1))
+      continue
+    fi
+
     # Spawn a fresh, isolated Claude process for this PR
     echo "  -> spawning claude for PR #$NUM" | tee -a "$LOG"
     n_review=$((n_review + 1))
+    total_reviews=$((total_reviews + 1))
     set +e
     # stdin from /dev/null — see spawn_claude_for_pr: prevents claude from
     # draining the loop's PR stream (fd 3) and being fed the next PR's JSON.
@@ -463,6 +488,8 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     set -e
     if [[ "$CLAUDE_EXIT" -ne 0 ]]; then
       echo "  [WARN] claude exited $CLAUDE_EXIT for PR #$NUM" | tee -a "$LOG"
+      printf '{"ts":"%s","pr":%s,"action_taken":"review_failed","reason":"claude_exit_%s","head_sha":"%s","sweep_id":"%s"}\n' \
+        "$(ts)" "$NUM" "$CLAUDE_EXIT" "$HEAD_SHA" "$SWEEP_ID" >> "$AUDIT_LOG"
     fi
 
     # ── Worktree-isolation post-condition ─────────────────────────────────────
@@ -536,10 +563,18 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
         n_skip=$((n_skip + 1))
 
       else
-        # Resolved to MERGEABLE — spawn Claude for full review
+        # Resolved to MERGEABLE — check cap before spawning
+        if [[ "$total_reviews" -ge "$MAX_REVIEWS_PER_SWEEP" ]]; then
+          echo "  PR #$RETRY_NUM resolved $RETRY_MERGEABLE but sweep cap reached ($total_reviews/$MAX_REVIEWS_PER_SWEEP) — deferring" | tee -a "$LOG"
+          audit_skip "$RETRY_NUM" sweep_review_cap_reached "$RETRY_HEAD"
+          n_skip=$((n_skip + 1))
+          continue
+        fi
+        # Spawn Claude for full review
         echo "  PR #$RETRY_NUM resolved $RETRY_MERGEABLE — spawning claude" | tee -a "$LOG"
         n_review=$((n_review + 1))
-        spawn_claude_for_pr "$RETRY_NUM"
+        total_reviews=$((total_reviews + 1))
+        spawn_claude_for_pr "$RETRY_NUM" "$RETRY_HEAD"
       fi
     done
   fi

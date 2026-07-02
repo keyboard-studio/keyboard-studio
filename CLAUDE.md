@@ -27,7 +27,7 @@ Package manager is **pnpm 9** (Node ≥ 20). Run from the repo root unless noted
 - One test by name: append `-t "round-trips"`
 - **Never run bare `vitest` at the repo root** — the root `vitest.config.ts` intentionally has an empty `include`; tests only resolve through each package's own config.
 
-**E2E:** Playwright specs live under `packages/studio/e2e/`, but Playwright is not yet wired up — the specs are `.skip`-ped (each file carries the unblock recipe at the top).
+**E2E:** Playwright specs live under `packages/studio/e2e/`. One is live — [`carve.spec.ts`](packages/studio/e2e/carve.spec.ts) (imports `bj_cree_woods`, carves an opaque rule, asserts the IR and emitted `.kmn`) — run it against the global Playwright CLI: `cd packages/studio && npx playwright test carve.spec.ts`. It imports from `"playwright/test"`, not `@playwright/test` (the scoped package does not resolve to the global CLI in this environment). The remaining two specs (`copy-edit.spec.ts`, `import-improve.spec.ts`) are still `.skip`-ped (each carries its unblock recipe at the top). Studio code exposes a flag-gated `window.__ksE2E__` test hook ([`packages/studio/src/lib/e2eHook.ts`](packages/studio/src/lib/e2eHook.ts)), active only under `VITE_E2E=1` or `?e2e=1`.
 
 ## Repository status
 
