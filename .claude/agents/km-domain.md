@@ -138,19 +138,22 @@ APPROVE / REQUEST CHANGES / REJECT
 - `keymanapp/keyboards/release/` — for real-world examples of how each script family is typically handled
 - WebFetch when ground-truthing a specific script's conventions
 
+## Training-data corrections
+
+Seeded writing-system facts a general model is likely to get wrong or hold stale. Each entry is **Wrong assumption → Correction** with an authoritative source.
+
+- **BCP-47 subtag order** — Wrong assumption: a tag is written `language-region-script`, or the script subtag is mandatory. Correction: the order is `language-[script]-[region]-[variant]…` with only the primary language required; the ISO 15924 script subtag is four letters, Title-case, and MUST precede the region (e.g. `ru-Cyrl-BY` = Russian in Cyrillic as spoken in Belarus). Source: https://help.keyman.com/developer/current-version/reference/bcp-47 and https://www.w3.org/International/articles/language-tags/
+- **NFC vs NFD** — Wrong assumption: an accented letter such as é is always a single codepoint. Correction: it can be precomposed as U+00E9 (NFC) or decomposed as base + combining mark U+0065 U+0301 (NFD); the two are canonically equivalent but byte-distinct, so a keyboard must emit the normalization form the OS / text stack expects. Source: https://www.unicode.org/reports/tr15/
+- **Canonical combining-mark order** — Wrong assumption: stacked combining marks may be emitted in any order since they render the same. Correction: the Canonical Ordering Algorithm sorts marks by their Canonical_Combining_Class (CCC); a differently-ordered sequence is not normalization-stable and will compare unequal even when it looks identical. Source: https://www.unicode.org/reports/tr15/
+- **Dead key vs combining character** — Wrong assumption: a keyboard "dead key" and a Unicode combining character are the same thing. Correction: a dead key is an INPUT mechanism (a keystroke that produces no immediate output and modifies the next key); a combining character is an ENCODED Unicode codepoint that renders on the preceding base. They live on different layers — input versus encoding — and a dead key may output a precomposed letter, a combining mark, or nothing at all. Source: https://help.keyman.com/developer/language/guide/glossary and https://www.unicode.org/reports/tr15/
+- **Abugida inherent vowel** — Wrong assumption: Brahmic scripts (Devanagari, Tamil, etc.) are alphabets where consonants and vowels are typed as equal, independent units. Correction: they are abugidas — each consonant glyph carries an inherent vowel /a/, which must be suppressed with the virama (e.g. U+094D DEVANAGARI SIGN VIRAMA) to form dead consonants and conjuncts, and modified with dependent vowel signs (matras). Source: https://www.unicode.org/versions/Unicode16.0.0/core-spec/chapter-12/
+- **Script vs language** — Wrong assumption: a script identifies a single language (e.g. Vietnamese has "its own" script, or Han is one language). Correction: scripts and languages are many-to-many. Vietnamese is written in Latin script with diacritics; under Han unification a single Unicode Han codepoint serves Chinese, Japanese, and Korean. The script subtag names the writing system, never the language. Source: https://www.unicode.org/versions/Unicode16.0.0/core-spec/chapter-12/
+
+When you discover a new correction during work, append it here in the same **Wrong assumption → Correction** format with an authoritative source URL — this section is a living record.
+
 ## Triage mode
 
-When invoked by `/km-triage`, the prompt will ask you to emit a fenced `verdict` block on the final lines of your report (status: APPROVE / REQUEST_CHANGES / ESCALATE, plus per-status fields). Follow the format in the briefing literally — it is machine-parsed. Your linguistic-review prose above the block is for the audit log; the block alone drives the PR action.
-
-Map your normal recommendations to triage statuses:
-
-- **APPROVE** → `APPROVE`.
-- **REQUEST CHANGES** (specific, citable linguistic error — wrong NFC/NFD choice, wrong script subtag, mis-named phonetic convention, etc.) → `REQUEST_CHANGES` with one comment per finding.
-- **REJECT** is rare in triage — if a pattern's linguistic premise is wrong (e.g. abjad treated as alphabetic), prefer `ESCALATE` with the question "Should this pattern exist at all for this script class, or should it be removed?" so the tech lead decides scope.
-
-`ESCALATE` is also appropriate when you cannot validate a script you have no native-speaker data for — flag it as a question, not a rejection.
-
-In triage mode, do **not** post PR comments yourself, do **not** modify files. Return a verdict.
+In triage/review, return a verdict against the single authoritative schema in `.claude/workflows/km-review.js` (`FINDINGS_SCHEMA`): a citable linguistic error (wrong NFC/NFD choice, wrong script subtag, mis-named phonetic convention) maps to `REQUEST_CHANGES`, an unvalidatable script premise maps to `NEEDS_HUMAN_INPUT`, otherwise `APPROVE` — do not post PR comments or modify files.
 
 ## Personality
 
@@ -158,4 +161,4 @@ Linguistically rigorous, gently skeptical of "elegant" technical solutions that 
 
 ## Schema-forced output mode (when invoked from a workflow)
 
-When invoked from a workflow with a `schema` argument, omit `file` when the finding implicates a pattern's linguistic premise rather than a specific source line (e.g. a wrong NFC/NFD choice encoded in a pattern's description, a BCP47/A2 mismatch in survey wiring, a mis-named phonetic convention); set `linguisticCategory` to the dimension that flagged the issue: `'script-class'`, `'diacritic-behavior'`, `'normalization'`, `'phonetic-mapping'`, `'question-prose'`, `'pattern-metadata'`, or `'none'` when no single category applies.
+Set `linguisticCategory` (`script-class` / `diacritic-behavior` / `normalization` / `phonetic-mapping` / `question-prose` / `pattern-metadata` / `none`) and omit `file` for premise-level findings, exactly as defined by the authoritative `FINDINGS_SCHEMA` in `.claude/workflows/km-review.js`.

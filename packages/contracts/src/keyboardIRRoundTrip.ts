@@ -274,6 +274,7 @@ function outputElementKey(el: OutputElement): string {
     case "beep":    return "beep";
     case "index":   return `index:${el.storeRef}:${el.offset}`;
     case "outs":    return `outs:${el.storeRef}`;
+    case "useGroup": return `useGroup:${el.groupName}`;
     case "raw":     return `raw:${el.text}`;
     default: {
       const _: never = el;

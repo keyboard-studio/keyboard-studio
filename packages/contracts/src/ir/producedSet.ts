@@ -35,10 +35,18 @@
  *                   DEL U+007F.
  * Excluded by default: U+0020 SPACE. Pass `includeSpace: true` to retain it.
  *
+ * Opaque fragments
+ * ----------------
+ * `ir.raw` fragments carrying a codec-extracted `producedOutput` sketch (the
+ * output-side content of an opaque rule, e.g. one guarded by `if(...)`)
+ * contribute through the same element walk — run-merge, store resolution, and
+ * filtering all apply identically. Fragments without the field (non-rule
+ * fragments, older parses) are skipped, preserving the prior behavior.
+ *
  * Pure, browser-safe, no I/O.
  */
 
-import type { KeyboardIR, IRStore } from "../keyboard-ir.js";
+import type { KeyboardIR, IRStore, OutputElement } from "../keyboard-ir.js";
 
 // ---------------------------------------------------------------------------
 // Options
@@ -99,6 +107,82 @@ function expandStore(store: IRStore, collector: Set<string>, includeSpace: boole
   }
 }
 
+/**
+ * Walk one output-element sequence (a typed rule's output or an opaque
+ * fragment's producedOutput sketch), accumulating produced glyphs into the
+ * collector with run-merge NFC semantics and store resolution.
+ */
+function collectFromElements(
+  output: readonly OutputElement[],
+  storeMap: Map<string, IRStore>,
+  collector: Set<string>,
+  includeSpace: boolean,
+): void {
+  const run: string[] = [];
+
+  for (const elem of output) {
+    switch (elem.kind) {
+      case "char":
+        // Accumulate into run buffer; do not flush yet.
+        run.push(elem.value);
+        break;
+
+      case "index": {
+        // Flush buffered run before expanding store.
+        flushRun(run, collector, includeSpace);
+        const store = storeMap.get(elem.storeRef);
+        if (store !== undefined) {
+          expandStore(store, collector, includeSpace);
+        }
+        // Missing store → skip silently (resilience to partial IR)
+        break;
+      }
+
+      case "outs": {
+        // Flush buffered run before expanding store.
+        flushRun(run, collector, includeSpace);
+        const store = storeMap.get(elem.storeRef);
+        if (store !== undefined) {
+          expandStore(store, collector, includeSpace);
+        }
+        break;
+      }
+
+      case "deadkey":
+        // State token — not a visible glyph. Flush buffered run.
+        flushRun(run, collector, includeSpace);
+        break;
+
+      case "beep":
+        // Audio signal — not a glyph. Flush buffered run.
+        flushRun(run, collector, includeSpace);
+        break;
+
+      case "useGroup":
+        // Group transition — control flow, not a glyph. Flush buffered run.
+        flushRun(run, collector, includeSpace);
+        break;
+
+      case "raw":
+        // Opaque fragment — cannot statically determine content. Flush and skip.
+        flushRun(run, collector, includeSpace);
+        break;
+
+      default: {
+        // Exhaustiveness guard: TypeScript will error here if OutputElement
+        // gains a new member kind that is not handled above.
+        const _exhaustive: never = elem;
+        flushRun(run, collector, includeSpace);
+        void _exhaustive;
+        break;
+      }
+    }
+  }
+
+  // End of output sequence: flush any trailing char run.
+  flushRun(run, collector, includeSpace);
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -137,64 +221,16 @@ export function buildProducedSet(
 
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      const run: string[] = [];
+      collectFromElements(rule.output, storeMap, collector, includeSpace);
+    }
+  }
 
-      for (const elem of rule.output) {
-        switch (elem.kind) {
-          case "char":
-            // Accumulate into run buffer; do not flush yet.
-            run.push(elem.value);
-            break;
-
-          case "index": {
-            // Flush buffered run before expanding store.
-            flushRun(run, collector, includeSpace);
-            const store = storeMap.get(elem.storeRef);
-            if (store !== undefined) {
-              expandStore(store, collector, includeSpace);
-            }
-            // Missing store → skip silently (resilience to partial IR)
-            break;
-          }
-
-          case "outs": {
-            // Flush buffered run before expanding store.
-            flushRun(run, collector, includeSpace);
-            const store = storeMap.get(elem.storeRef);
-            if (store !== undefined) {
-              expandStore(store, collector, includeSpace);
-            }
-            break;
-          }
-
-          case "deadkey":
-            // State token — not a visible glyph. Flush buffered run.
-            flushRun(run, collector, includeSpace);
-            break;
-
-          case "beep":
-            // Audio signal — not a glyph. Flush buffered run.
-            flushRun(run, collector, includeSpace);
-            break;
-
-          case "raw":
-            // Opaque fragment — cannot statically determine content. Flush and skip.
-            flushRun(run, collector, includeSpace);
-            break;
-
-          default: {
-            // Exhaustiveness guard: TypeScript will error here if OutputElement
-            // gains a new member kind that is not handled above.
-            const _exhaustive: never = elem;
-            flushRun(run, collector, includeSpace);
-            void _exhaustive;
-            break;
-          }
-        }
-      }
-
-      // End of rule output: flush any trailing char run.
-      flushRun(run, collector, includeSpace);
+  // Opaque fragments: fold in the codec-extracted output-side sketch, when
+  // present. Store refs resolve against the same live store map, so a store
+  // referenced only by an opaque rule still expands to its current items.
+  for (const frag of ir.raw) {
+    if (frag.producedOutput !== undefined) {
+      collectFromElements(frag.producedOutput, storeMap, collector, includeSpace);
     }
   }
 

@@ -91,6 +91,11 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   const removedList = useMemo<RemovedItem[]>(() => {
     const list: RemovedItem[] = [];
     const fullOffIds = new Set<string>();
+    // Every item id already surfaced via a pattern/group glyph entry.
+    // Output-store chip ids intentionally equal the S-02 fan-out glyph gids
+    // (locked gid contract), so the store-chip pass below must skip these to
+    // avoid listing the same removed character twice.
+    const seenItemIds = new Set<string>();
 
     nodes.forEach((node) => {
       if (node.kind !== 'pattern' && node.kind !== 'group') return;
@@ -110,7 +115,22 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       if (fullOffIds.has(node.nodeId)) return;
       node.glyphs.forEach((glyph) => {
         if (!deletedItemIds.has(glyph.gid)) return;
+        seenItemIds.add(glyph.gid);
         list.push({ type: 'item', id: glyph.gid, ch: glyph.ch, keys: glyph.keys, nodeName: node.name });
+      });
+    });
+    // Store per-character chips — skips whole-deleted stores (already listed
+    // above as a 'node' entry) and dedupes against ids already emitted by
+    // the pattern/group glyph pass.
+    nodes.forEach((node) => {
+      if (node.kind !== 'store' || !node.storeChips) return;
+      if (isDeleted(node.nodeId)) return;
+      node.storeChips.forEach((chip) => {
+        if (chip.action === 'disabled') return;
+        if (!deletedItemIds.has(chip.chipId)) return;
+        if (seenItemIds.has(chip.chipId)) return;
+        seenItemIds.add(chip.chipId);
+        list.push({ type: 'item', id: chip.chipId, ch: chip.ch, keys: [], nodeName: node.name });
       });
     });
     return list;
@@ -216,7 +236,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--app-bg)', color: 'var(--app-text)' }}>
+    <div data-testid="carve-gallery" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--app-bg)', color: 'var(--app-text)' }}>
       {/* Raw-fragment note — informational only; removals apply normally */}
       {hasRawFragments && (
         <div
@@ -276,6 +296,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
           Skip
         </button>
         <button
+          data-testid="carve-continue"
           onClick={onComplete}
           onMouseEnter={() => setInfo({ kind: 'text', title: 'Continue', body: 'Save your changes and move to the next step.' })}
           onFocus={() => setInfo({ kind: 'text', title: 'Continue', body: 'Save your changes and move to the next step.' })}
@@ -323,6 +344,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
             onSetManyGlyphs={handleSetManyGlyphs}
             isDeleted={isDeleted}
             onToggleNode={handleToggleNode}
+            onOwnerClick={setSelectedId}
           />
           {infoOpen && <InfoView />}
         </div>

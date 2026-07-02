@@ -112,7 +112,7 @@ exactly.
 | Backend proxy required | No | Yes | No |
 | PR authorship | User's account | Org account + Co-authored-by | n/a |
 | User controls PR | Yes | No (view-only link) | n/a |
-| Studio controls commit | Yes (via user token) | Yes (via org token) | n/a |
+| Studio controls commit | Yes (via user token) | Yes (via GitHub App installation token — see #885) | n/a |
 | Offline capable | No | No | Yes |
 | `OutputService` method | `publishPR` | `publishManagedPR` (new) | `toZip` |
 
@@ -172,6 +172,8 @@ exactly.
 | Studio UI — sign-up vs. submit | **Decoupled (§1a)** | The coupled "Connect GitHub + Submit PR" panel (`GitHubSubmitPanel`) was **removed** from the Output screen and replaced by a decoupled sign-up identity panel (`components/SignUpPanel.tsx`, renamed from `GitHubSignUpPanel.tsx`; now surfaces both "Sign up with GitHub" and "Sign up with Google" buttons — identity only, no fork/branch/PR exposed (docs/github-integration.md §1a). Google OAuth (PKCE, S256) ships in `src/lib/googleOAuth.ts` + `hooks/useGoogleAuth.ts`; `IdentitySession` discriminated union (`provider:"github"\|"google"`) in `src/lib/identity.ts` is the routing key. The submit/publish *action* now defaults to **Option B** (org-mediated); `publishPR` engine code is retained for the opt-in self-fork path |
 
 ### Option B — Org-mediated, abstracted
+
+> **Note (2026-06-30 — in flight, see #885 and #550).** PR #885 is rearchitecting Option B's server-side credential from a static org service-account token (`GITHUB_ORG_TOKEN`) to a short-lived **GitHub App installation token** (minted via `@octokit/auth-app`), and makes a GitHub App the **default sign-in**. The OAuth App is retained for Option A only. The rows below describe the **pre-#885** implementation and will be rewritten when #885 merges; production deploy/provisioning of both apps is tracked in #550.
 
 | Step | Status | Notes |
 |---|---|---|

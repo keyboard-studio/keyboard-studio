@@ -18,10 +18,12 @@ import {
   checkSidecarHash,
   headerFieldLabel,
   HEADER_FIELD_MISSING_CODE,
+  checkOwnershipConsistency,
 } from "./layer-a-prime.js";
 import { parse } from "../codec/parse.js";
 import { computeSha256Hex } from "../codec/hash.js";
-import type { KeyboardIR } from "@keyboard-studio/contracts";
+import { makePattern } from "@keyboard-studio/contracts";
+import type { KeyboardIR, IRNodeRef } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -463,5 +465,119 @@ describe("checkSidecarHash (I5)", () => {
     const mutatedText = SIDECAR_TEXT.replace("10.0", "10.1");
     const findings = await checkSidecarHash("test-kb", mutatedText, originalHash);
     expect(findings[0]?.code).toBe("KM_ERROR_SIDECAR_HASH_MISMATCH");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// I6 -- Ownership consistency
+// ---------------------------------------------------------------------------
+
+describe("checkOwnershipConsistency (I6)", () => {
+  // Build an IR with one group holding `rules` plus `patterns` in recognizedPatterns.
+  function irWith(
+    rules: Array<{ nodeId: string; ownedByPattern?: string }>,
+    patterns: Array<{ id: string; ownedNodes?: IRNodeRef[] }>,
+  ): KeyboardIR {
+    return {
+      ...makeCleanIR(),
+      groups: [
+        {
+          nodeId: "g1",
+          name: "main",
+          usingKeys: true,
+          readonly: false,
+          rules: rules.map((r) => ({
+            nodeId: r.nodeId,
+            context: [{ kind: "vkey" as const, name: "K_A", modifiers: [] }],
+            output: [{ kind: "char" as const, value: "a" }],
+            ...(r.ownedByPattern !== undefined ? { ownedByPattern: r.ownedByPattern } : {}),
+          })),
+        },
+      ],
+      recognizedPatterns: patterns.map((p) =>
+        makePattern({
+          id: p.id,
+          title: "x",
+          description: "x",
+          category: "desktop",
+          appliesTo: [],
+          questions: [],
+          kmnFragment: "",
+          tests: [],
+          validatedForFamilies: [],
+          sourceKeyboards: [],
+          reviewedBy: "test",
+          reviewDate: "2026-06-02",
+          origin: "recognized",
+          ...(p.ownedNodes !== undefined ? { ownedNodes: p.ownedNodes } : {}),
+        }),
+      ),
+    };
+  }
+
+  it("passes when Pattern.ownedNodes and rule.ownedByPattern agree", () => {
+    const ir = irWith(
+      [{ nodeId: "r1", ownedByPattern: "P1" }],
+      [{ id: "P1", ownedNodes: [{ kind: "rule", nodeId: "r1" }] }],
+    );
+    expect(checkOwnershipConsistency(ir)).toHaveLength(0);
+  });
+
+  it("passes for a keyboard with no recognized patterns and no owned nodes", () => {
+    expect(checkOwnershipConsistency(irWith([{ nodeId: "r1" }], []))).toHaveLength(0);
+  });
+
+  it("errors (forward mismatch) when the owned rule's ownedByPattern names a different Pattern", () => {
+    // "OTHER" is a real Pattern here so the reverse orphan-check stays clean and
+    // this isolates the forward mismatch (P1 owns r1, but r1 says OTHER).
+    const ir = irWith(
+      [{ nodeId: "r1", ownedByPattern: "OTHER" }],
+      [
+        { id: "P1", ownedNodes: [{ kind: "rule", nodeId: "r1" }] },
+        { id: "OTHER" },
+      ],
+    );
+    const f = checkOwnershipConsistency(ir);
+    expect(f).toHaveLength(1);
+    expect(f[0]?.code).toBe("KM_ERROR_OWNERSHIP_CONSISTENCY");
+    expect(f[0]?.severity).toBe("error");
+    expect(f[0]?.layer).toBe("A-prime");
+    expect(f[0]?.message).toContain('expected "P1"');
+  });
+
+  it("errors (forward mismatch) when the owned rule has no ownedByPattern at all (unset)", () => {
+    // The most common real-world cause: the recognizer set Pattern.ownedNodes
+    // but never wrote back-references onto the rules. Distinct message sub-branch.
+    const ir = irWith(
+      [{ nodeId: "r1" }],
+      [{ id: "P1", ownedNodes: [{ kind: "rule", nodeId: "r1" }] }],
+    );
+    const f = checkOwnershipConsistency(ir);
+    expect(f).toHaveLength(1);
+    expect(f[0]?.code).toBe("KM_ERROR_OWNERSHIP_CONSISTENCY");
+    expect(f[0]?.message).toContain("unset");
+    expect(f[0]?.message).toContain('expected "P1"');
+  });
+
+  it("errors when Pattern.ownedNodes points to a rule that no longer exists (stale pointer)", () => {
+    const ir = irWith([], [{ id: "P1", ownedNodes: [{ kind: "rule", nodeId: "gone" }] }]);
+    const f = checkOwnershipConsistency(ir);
+    expect(f).toHaveLength(1);
+    expect(f[0]?.message).toContain("no such rule exists");
+  });
+
+  it("errors (orphaned node) when a rule is owned by a Pattern that was deleted", () => {
+    const ir = irWith([{ nodeId: "r1", ownedByPattern: "DELETED" }], []);
+    const f = checkOwnershipConsistency(ir);
+    expect(f).toHaveLength(1);
+    expect(f[0]?.message).toContain("orphaned node");
+  });
+
+  it("ignores non-rule ownedNodes refs (only rules carry ownedByPattern)", () => {
+    const ir = irWith(
+      [{ nodeId: "r1", ownedByPattern: "P1" }],
+      [{ id: "P1", ownedNodes: [{ kind: "rule", nodeId: "r1" }, { kind: "store", nodeId: "s1" }] }],
+    );
+    expect(checkOwnershipConsistency(ir)).toHaveLength(0);
   });
 });

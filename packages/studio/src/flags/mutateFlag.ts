@@ -13,9 +13,14 @@
 //        reducer apply site / re-propagation trigger, not via a live store.
 //
 // Mirrors the established studio env-flag convention (lib/services.ts
-// `VITE_USE_REAL_ENGINE`, stores/debugPinsStore.ts `VITE_KM_DEBUG`): a single
-// `import.meta.env` read, guarded so it is SSR/Node-CI safe. The flag is OFF
-// unless `VITE_KM_MUTATE_SEAM` is explicitly set to "1".
+// `VITE_USE_REAL_ENGINE`, stores/debugPinsStore.ts `VITE_KM_DEBUG`) via the
+// shared `readEnvFlag` helper (lib/envFlag.ts): a single `import.meta.env`
+// read, guarded so it is SSR/Node-CI safe. The flag is OFF unless
+// `VITE_KM_MUTATE_SEAM` is explicitly set to "1". Unlike the other two
+// call sites, this flag has no `?param` URL override — see readEnvFlag's
+// doc comment for why that means no `window` guard is needed here either.
+
+import { readEnvFlag } from "../lib/envFlag.ts";
 
 /**
  * Whether the spec-014 `mutate()` seam is the executed IR write path.
@@ -28,10 +33,5 @@
  * stories, the re-propagation trigger. Not a live in-session toggle (F3).
  */
 export function isMutateSeamEnabled(): boolean {
-  try {
-    return import.meta.env.VITE_KM_MUTATE_SEAM === "1";
-  } catch {
-    // Not in a Vite context (e.g. a bare Node import) — default OFF.
-    return false;
-  }
+  return readEnvFlag("VITE_KM_MUTATE_SEAM");
 }

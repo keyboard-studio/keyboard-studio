@@ -211,7 +211,12 @@ export function emitPlacementMap(ir: KeyboardIR): Map<string, PlacementCandidate
 }
 
 // Re-export filter helpers so the supportability scanner can use them directly.
-export { isMnemonicKeyboard, hasNonUSBase, detectBaseLayoutFamily } from "./filters.js";
+export {
+  isMnemonicKeyboard,
+  hasNonUSBase,
+  detectBaseLayoutFamily,
+  hasInvertedNumberRow,
+} from "./filters.js";
 
 // Re-export corpus loader so the studio can convert placement-priors.json
 // into a PlacementMap without importing engine internals directly.

@@ -105,6 +105,6 @@ Reverting only the Part (b) commit restores the legacy YAML and `loadFlow.ts` wi
 | §2 parity green for A/F/identity-lite | FR-005, SC-002 |
 | §1 gates green (98 modules, mirrors, orphan lint) | FR-003, FR-012 |
 | §3 no TODO(#410) | FR-004, SC-003 |
-| §5 E2E lane 1 (lane 2 conditional) | FR-007, SC-004 |
+| §5 E2E lane 1 (lane 2 conditional) | FR-007, SC-004a/SC-004b |
 | Part (b) §2 clean, §3 full suite green | FR-008..FR-012, SC-005/006 |
 | Part (b) §4 independent revert | FR-013, SC-006 |

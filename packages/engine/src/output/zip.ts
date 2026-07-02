@@ -33,6 +33,33 @@ Email the zip archive to keymanhelp@sil.org with the subject:
 `;
 
 /**
+ * Clamp a VirtualFS key to a safe, root-relative archive entry name.
+ *
+ * VFS keys are used verbatim as zip entry names, and a sibling-store path
+ * lifted out of a `.kmn` header (e.g. `store(&DISPLAYMAP) '..\..\..\x'`) can
+ * carry `..` / absolute / drive-letter segments. Writing those unmodified
+ * produces a zip-slip entry that escapes the extraction directory on naive
+ * extractors. Normalising POSIX-style — backslashes to slashes, resolving `.`
+ * and `..`, dropping any leading `/` or drive letter, and clamping `..` at the
+ * root so it can never rise above it — neutralises the traversal while leaving
+ * ordinary clean keys (the overwhelming common case) byte-identical.
+ */
+function safeEntryName(path: string): string {
+  const segments: string[] = [];
+  for (const part of path.replace(/\\/g, "/").split("/")) {
+    if (part === "" || part === ".") continue;
+    if (part === "..") {
+      if (segments.length > 0) segments.pop();
+      continue;
+    }
+    // Strip a Windows drive prefix on the first segment (e.g. "C:").
+    if (segments.length === 0 && /^[A-Za-z]:$/.test(part)) continue;
+    segments.push(part);
+  }
+  return segments.join("/");
+}
+
+/**
  * Serialize a {@link VirtualFS} snapshot to a `.zip` archive.
  *
  * Per spec §12:
@@ -51,7 +78,9 @@ export async function toZip(fs: VirtualFS): Promise<Uint8Array> {
       typeof entry.content === "string"
         ? enc.encode(entry.content)
         : entry.content;
-    files[entry.path] = entry.isBinary
+    const name = safeEntryName(entry.path);
+    if (name === "") continue; // path resolved to nothing outside the root — drop it
+    files[name] = entry.isBinary
       ? [bytes, { level: 0 }]
       : [bytes, { level: 6 }];
   }

@@ -8,7 +8,7 @@
  *   4. computeSha256Hex(kmnText)            → SHA-256 stored at source/<id>.kmn.imported.sha256
  *   5. emit(ir)                             → emitted .kmn text
  *   6. runImportFidelityParseChecks(...)    → I1 + I4 findings
- *   7. runImportFidelityEmitChecks(...)     → I2 stub + I3 findings
+ *   7. runImportFidelityEmitChecks(...)     → I2 stub + I3 + I6 findings
  *   8. buildImportReport(...)              → ImportReport
  */
 

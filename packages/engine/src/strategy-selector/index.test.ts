@@ -4,11 +4,15 @@ import type { DiscoveryAxisVector } from "@keyboard-studio/contracts";
 
 /**
  * Build a DiscoveryAxisVector from partial overrides, filling in safe defaults.
- * `clusterSensitivity` and `remapPosture` are optional — they are only included
- * when the caller provides them explicitly (satisfies exactOptionalPropertyTypes).
+ * `clusterSensitivity`, `remapPosture`, and `markInputOrder` are optional —
+ * they are only included when the caller provides them explicitly (satisfies
+ * exactOptionalPropertyTypes).
  */
 function axes(overrides: Partial<DiscoveryAxisVector>): DiscoveryAxisVector {
-  const defaults: Omit<DiscoveryAxisVector, "clusterSensitivity" | "remapPosture"> = {
+  const defaults: Omit<
+    DiscoveryAxisVector,
+    "clusterSensitivity" | "remapPosture"
+  > = {
     scale: "small",
     scriptClass: "alphabetic",
     phoneticIntuition: "weak",
@@ -28,15 +32,21 @@ function axes(overrides: Partial<DiscoveryAxisVector>): DiscoveryAxisVector {
     phoneticIntuition: overrides.phoneticIntuition ?? base.phoneticIntuition,
     diacriticBehavior: overrides.diacriticBehavior ?? base.diacriticBehavior,
     multiMode: overrides.multiMode ?? base.multiMode,
-    constraintEnforcement: overrides.constraintEnforcement ?? base.constraintEnforcement,
-    spareKeyAvailability: overrides.spareKeyAvailability ?? base.spareKeyAvailability,
+    constraintEnforcement:
+      overrides.constraintEnforcement ?? base.constraintEnforcement,
+    spareKeyAvailability:
+      overrides.spareKeyAvailability ?? base.spareKeyAvailability,
     ...("remapPosture" in overrides
       ? overrides.remapPosture !== undefined
         ? { remapPosture: overrides.remapPosture }
         : {}
       : { remapPosture: "addition" }),
-    ...("clusterSensitivity" in overrides && overrides.clusterSensitivity !== undefined
+    ...("clusterSensitivity" in overrides &&
+    overrides.clusterSensitivity !== undefined
       ? { clusterSensitivity: overrides.clusterSensitivity }
+      : {}),
+    ...("markInputOrder" in overrides && overrides.markInputOrder !== undefined
+      ? { markInputOrder: overrides.markInputOrder }
       : {}),
   };
 
@@ -49,7 +59,9 @@ function axes(overrides: Partial<DiscoveryAxisVector>): DiscoveryAxisVector {
 
 describe("selectStrategy — primary rules", () => {
   it("Rule 1: massive + logographic → S-12", () => {
-    const result = selectStrategy(axes({ scale: "massive", scriptClass: "logographic" }));
+    const result = selectStrategy(
+      axes({ scale: "massive", scriptClass: "logographic" }),
+    );
     expect(result.primary).toBe("S-12");
     expect(result.triggeredRule).toBe(1);
   });
@@ -63,7 +75,11 @@ describe("selectStrategy — primary rules", () => {
 
   it("Rule 2b (abugida+clusters+strong): abugida + clusterSensitivity + strong → S-09 with S-05", () => {
     const result = selectStrategy(
-      axes({ scriptClass: "abugida", clusterSensitivity: true, phoneticIntuition: "strong" }),
+      axes({
+        scriptClass: "abugida",
+        clusterSensitivity: true,
+        phoneticIntuition: "strong",
+      }),
     );
     expect(result.primary).toBe("S-09");
     expect(result.triggeredRule).toBe(2);
@@ -71,9 +87,38 @@ describe("selectStrategy — primary rules", () => {
   });
 
   it("Rule 3: diacriticBehavior=replacing-cycling → S-07 with S-04", () => {
-    const result = selectStrategy(axes({ diacriticBehavior: "replacing-cycling" }));
+    const result = selectStrategy(
+      axes({ diacriticBehavior: "replacing-cycling" }),
+    );
     expect(result.primary).toBe("S-07");
     expect(result.triggeredRule).toBe(3);
+    expect(result.secondaries).toEqual(["S-04"]);
+  });
+
+  it("Rule 3a: alphabetic + strong + postfix → S-03 with S-04", () => {
+    const result = selectStrategy(
+      axes({
+        scriptClass: "alphabetic",
+        phoneticIntuition: "strong",
+        markInputOrder: "postfix",
+      }),
+    );
+    expect(result.primary).toBe("S-03");
+    expect(result.triggeredRule).toBe("3a");
+    expect(result.secondaries).toEqual(["S-04"]);
+  });
+
+  it("Rule 3a dormant for prefix: alphabetic + strong + medium + prefix → falls through to rule 5 (S-05)", () => {
+    const result = selectStrategy(
+      axes({
+        scriptClass: "alphabetic",
+        phoneticIntuition: "strong",
+        scale: "medium",
+        markInputOrder: "prefix",
+      }),
+    );
+    expect(result.primary).toBe("S-05");
+    expect(result.triggeredRule).toBe(5);
     expect(result.secondaries).toEqual(["S-04"]);
   });
 
@@ -85,14 +130,18 @@ describe("selectStrategy — primary rules", () => {
   });
 
   it("Rule 5: phoneticIntuition=strong + scale=medium → S-05 with S-04", () => {
-    const result = selectStrategy(axes({ phoneticIntuition: "strong", scale: "medium" }));
+    const result = selectStrategy(
+      axes({ phoneticIntuition: "strong", scale: "medium" }),
+    );
     expect(result.primary).toBe("S-05");
     expect(result.triggeredRule).toBe(5);
     expect(result.secondaries).toEqual(["S-04"]);
   });
 
   it("Rule 6: diacriticBehavior=multi-family + scale=large → S-06 with S-04", () => {
-    const result = selectStrategy(axes({ diacriticBehavior: "multi-family", scale: "large" }));
+    const result = selectStrategy(
+      axes({ diacriticBehavior: "multi-family", scale: "large" }),
+    );
     expect(result.primary).toBe("S-06");
     expect(result.triggeredRule).toBe(6);
     expect(result.secondaries).toEqual(["S-04"]);
@@ -122,12 +171,16 @@ describe("selectStrategy — primary rules", () => {
   });
 
   it("Rule 10 (secondary): spareKeyAvailability=fully booked → secondaries includes S-08", () => {
-    const result = selectStrategy(axes({ spareKeyAvailability: "fully booked" }));
+    const result = selectStrategy(
+      axes({ spareKeyAvailability: "fully booked" }),
+    );
     expect(result.secondaries).toContain("S-08");
   });
 
   it("Rule 11: scale=tiny + phoneticIntuition=strong → S-01", () => {
-    const result = selectStrategy(axes({ scale: "tiny", phoneticIntuition: "strong" }));
+    const result = selectStrategy(
+      axes({ scale: "tiny", phoneticIntuition: "strong" }),
+    );
     expect(result.primary).toBe("S-01");
     expect(result.triggeredRule).toBe(11);
   });
@@ -212,10 +265,11 @@ describe("§7.5 seed fixtures", () => {
         constraintEnforcement: "none",
         spareKeyAvailability: "many",
         remapPosture: "addition",
+        markInputOrder: "postfix",
       }),
     );
-    expect(result.primary).toBe("S-05");
-    expect(result.triggeredRule).toBe(5);
+    expect(result.primary).toBe("S-03");
+    expect(result.triggeredRule).toBe("3a");
     expect(result.secondaries).toContain("S-04");
   });
 

@@ -111,6 +111,53 @@ describe("toZip", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Zip-slip / path-traversal hardening
+//
+// A sibling-store path lifted out of a malicious/adapted .kmn header (e.g.
+// `store(&DISPLAYMAP) '..\..\..\evil'`) reaches the VFS as a key that, if
+// written verbatim as a zip entry name, escapes the extraction directory on a
+// naive extractor. toZip must clamp every entry to the archive root while
+// leaving ordinary clean keys byte-identical.
+// ---------------------------------------------------------------------------
+
+describe("toZip — path-traversal (zip-slip) hardening", () => {
+  it("clamps a `..`-traversing entry so it cannot escape the archive root", async () => {
+    const fs = createVirtualFS([
+      { path: "source/../../../evil.txt", content: "pwn", isBinary: false },
+    ]);
+    const entries = unzipSync(await toZip(fs));
+    const paths = Object.keys(entries);
+    // No entry may contain a parent-dir segment or be absolute.
+    for (const p of paths) {
+      expect(p.split(/[\\/]/)).not.toContain("..");
+      expect(p.startsWith("/")).toBe(false);
+    }
+    // The content still lands, clamped into the root.
+    expect(paths).toContain("evil.txt");
+    expect(dec.decode(entries["evil.txt"])).toBe("pwn");
+  });
+
+  it("strips a leading slash and a Windows drive prefix", async () => {
+    const fs = createVirtualFS([
+      { path: "/etc/passwd", content: "a", isBinary: false },
+      { path: "C:\\Windows\\system32\\evil.dll", content: "b", isBinary: true },
+    ]);
+    const paths = Object.keys(unzipSync(await toZip(fs)));
+    expect(paths).toContain("etc/passwd");
+    expect(paths).toContain("Windows/system32/evil.dll");
+    expect(paths.some((p) => p.startsWith("/") || /^[A-Za-z]:/.test(p))).toBe(false);
+  });
+
+  it("leaves ordinary clean keys byte-identical (no-op for the common case)", async () => {
+    const bytes = await toZip(makeFixtureFS());
+    const paths = Object.keys(unzipSync(bytes));
+    expect(paths).toContain("source/test.kmn");
+    expect(paths).toContain("build/test.kmx");
+    expect(paths).toContain("README.md");
+  });
+});
+
 describe("serializeToZip", () => {
   it("is an alias for toZip producing identical output", async () => {
     const fs = makeFixtureFS();

@@ -131,6 +131,7 @@ export function OutputScreen() {
           <>
             <button
               type="button"
+              data-testid="emit-download"
               disabled={!canDownload || downloading}
               onClick={() => { void handleDownload(); }}
               aria-label={

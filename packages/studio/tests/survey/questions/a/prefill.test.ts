@@ -126,15 +126,29 @@ describe("spec 017 — prefill drill-down declaration (FR-005, FR-006)", () => {
   // FR-014 §2.2(b) — C7 per-graph reachability, SURVEY-QUESTION half. The
   // editor-step half (findUnreachable over the manifest) is asserted in
   // f/editorStepContracts.test.ts; this is the survey side. prefill is anchored
-  // to the questionRegistry id `primary_script` at its boundary, so the anchor
-  // must be reachable via the REAL survey resolveNext / FlowGotoRule routing —
-  // otherwise the drill-down hangs off a dead boundary node.
-  it("FR-014 §2.2(b): registry anchor `primary_script` is reachable via the survey resolveNext path", () => {
-    expect(prefillDrillDown.registryKey).toBe("primary_script");
+  // to a questionRegistry id at its boundary, so the anchor must be reachable via
+  // the REAL survey resolveNext / FlowGotoRule routing — otherwise the drill-down
+  // hangs off a dead boundary node.
+  //
+  // Spec 022 re-anchor: the anchor was `primary_script` (a Phase-A module). Spec 022
+  // demotes the full non-identity Phase A to the inert library (renderedNodeSet.ts
+  // drops phase_a_identity from FLOW_SOURCES), so `primary_script` is no longer
+  // reachable. The anchor moved to the LIVE identity-lite equivalent
+  // `il_target_script` (the script-capture question on the real StudioShell→
+  // IdentityLite path), which IS reachable via the identity-lite flow source. This
+  // assertion is kept (pointed at live, reachable content) — NOT deleted.
+  it("FR-014 §2.2(b): registry anchor `il_target_script` is reachable via the survey resolveNext path", () => {
+    expect(prefillDrillDown.registryKey).toBe("il_target_script");
     const surveyReach = computeSurveyReach();
     expect(
       surveyReach.has(prefillDrillDown.registryKey),
       `prefill anchor "${prefillDrillDown.registryKey}" is not reachable via the survey resolveNext walk`,
     ).toBe(true);
+    // And the demoted Phase-A module it replaced is NO LONGER reachable (proving the
+    // spec-022 demotion landed) — primary_script is now registry-only reserve.
+    expect(
+      surveyReach.has("primary_script"),
+      "primary_script must be demoted (unreachable) after spec 022",
+    ).toBe(false);
   });
 });

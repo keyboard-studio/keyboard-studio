@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import type { CarveNode, CarveGlyph, StoreRuleDetail } from '../../../lib/irToCarveNodes.ts';
-import { nodeState, displayChar, invisibleCharLabel, MOD_GROUP_DEFS, glyphsTriState } from '../../../lib/irToCarveNodes.ts';
+import { nodeState, MOD_GROUP_DEFS, glyphsTriState, idsTriState } from '../../../lib/irToCarveNodes.ts';
 import { ToggleBox } from './ToggleBox.tsx';
 import { GlyphCell } from './GlyphCell.tsx';
+import { StoreChip } from './StoreChip.tsx';
 import { KindBadge, KIND_COLOR } from './KindBadge.tsx';
 import { WarnIcon } from './carveShared.tsx';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
@@ -87,19 +88,21 @@ function RawDetail({ node, isDeleted, onToggleNode }: RawDetailProps) {
             These look like noise but are usually <b>load-bearing</b>. Remove only if you're certain this behaviour is unused by your language.
           </p>
           {off ? (
-            <button onClick={() => onToggleNode(node.nodeId, false)} style={{ ...btnGhost, marginTop: 14 }}>
+            <button data-testid="raw-restore" onClick={() => onToggleNode(node.nodeId, false)} style={{ ...btnGhost, marginTop: 14 }}>
               Restore
             </button>
           ) : confirming ? (
             <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12.5, color: 'var(--app-text-muted)', flex: '1 1 100%' }}>Remove this rule? It may be load-bearing.</span>
               <button
+                data-testid="raw-confirm-remove"
                 onClick={() => { onToggleNode(node.nodeId, true); setConfirming(false); }}
                 style={{ font: '600 12px var(--app-font)', cursor: 'pointer', color: 'var(--sil-orange-dark)', background: 'color-mix(in srgb, var(--sil-orange) 16%, transparent)', border: '1px solid color-mix(in srgb, var(--sil-orange) 55%, transparent)', borderRadius: 7, padding: '5px 12px', whiteSpace: 'nowrap' }}
               >
                 Yes, remove
               </button>
               <button
+                data-testid="raw-cancel-remove"
                 onClick={() => setConfirming(false)}
                 style={{ font: '600 12px var(--app-font)', cursor: 'pointer', color: 'var(--app-text-muted)', background: 'transparent', border: '1px solid var(--app-border)', borderRadius: 7, padding: '5px 12px', whiteSpace: 'nowrap' }}
               >
@@ -107,7 +110,7 @@ function RawDetail({ node, isDeleted, onToggleNode }: RawDetailProps) {
               </button>
             </div>
           ) : (
-            <button onClick={() => setConfirming(true)} style={{ ...btnGhost, marginTop: 14 }}>
+            <button data-testid="raw-remove-anyway" onClick={() => setConfirming(true)} style={{ ...btnGhost, marginTop: 14 }}>
               Remove anyway
             </button>
           )}
@@ -126,6 +129,8 @@ interface StoreDetailProps {
   isDeleted: (nodeId: string) => boolean;
   isItemDeleted: (id: string) => boolean;
   onToggleNode: (nodeId: string, off: boolean) => void;
+  onToggleGlyph: (gid: string) => void;
+  onSetManyGlyphs: (gids: string[], off: boolean) => void;
 }
 function storeRoleChip(node: CarveNode): React.ReactNode {
   const u = node.storeUsage;
@@ -202,7 +207,7 @@ function PlatformBadge({ platform }: { platform: string }) {
 
 const RULE_GROUP_THRESHOLD = 10;
 
-function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode }: StoreDetailProps) {
+function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onToggleGlyph, onSetManyGlyphs }: StoreDetailProps) {
   const off = isDeleted(node.nodeId);
   const setInfo = useHoverInfoStore((s) => s.setInfo);
   const clearInfo = useHoverInfoStore((s) => s.clearInfo);
@@ -216,7 +221,28 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode }: St
     ? nodes.find((n) => n.nodeId === node.referencedByNodeId)
     : undefined;
   const refAlive = refNode !== undefined && nodeState(refNode, isItemDeleted, isDeleted) !== 'off';
-  const chars = node.displayChars ?? [];
+  const chips = node.storeChips ?? [];
+  const toggleableChips = chips.filter((c) => c.action !== 'disabled');
+  const toggleableIds = toggleableChips.map((c) => c.chipId);
+  const chipsState = idsTriState(toggleableIds, isItemDeleted);
+  // AC6: every toggleable chip is off AND those chips cover every char item
+  // of the store (no disabled chip is hiding a still-on character) AND the
+  // store has real rule dependents AND the store itself isn't already
+  // whole-deleted (that case is covered by the "no longer referenced" /
+  // orphan banners, not this one).
+  const allCharsCovered = toggleableChips.length === chips.length && chips.length > 0;
+  const showEmptiesStoreWarning =
+    !off &&
+    allCharsCovered &&
+    chipsState === 'off' &&
+    (node.storeUsage?.ruleCount ?? 0) > 0;
+  // classifyStoreSlotEdit classifies once per store, so every toggleable
+  // chip in a store shares the same action — the first chip's action tells
+  // us which second-line copy applies. Only nul-fill and drop stores can
+  // ever have toggleable chips (blocked stores are all-disabled and never
+  // reach chipsState === 'off' via toggleable chips), so this is exhaustive
+  // for the banner's audience.
+  const banneredChipAction = toggleableChips[0]?.action;
 
   // Build combined consumer list from patternRefs + groupRefs for the dependency chain
   const consumers = [
@@ -251,32 +277,61 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode }: St
           </p>
         </div>
       </div>
-      {chars.length > 0 && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 18 }}>
-          {chars.map((ch, i) => {
-            const label = invisibleCharLabel(ch);
-            return (
-              <span key={i} style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                padding: label ? '9px 10px' : '9px 13px', borderRadius: 8, cursor: 'default',
-                border: '1px solid ' + (off ? 'var(--app-border)' : 'var(--app-border-strong)'),
-                borderTop: '3px solid ' + (off ? 'var(--app-border-strong)' : KIND_COLOR.store),
-                background: off ? 'var(--app-surface-2)' : 'var(--app-surface)',
-                opacity: off ? 0.6 : 1,
-              }}>
-                {label ? (
-                  <span style={{ font: '600 10px/1 var(--app-font-mono)', color: off ? 'var(--app-text-subtle)' : 'var(--app-text-muted)', letterSpacing: '0.04em' }} title={`U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`}>
-                    {label}
-                  </span>
-                ) : (
-                  <span style={{ font: "400 22px/1 'Lora', serif", color: off ? 'var(--app-text-subtle)' : 'var(--app-text)' }}>
-                    {displayChar(ch)}
-                  </span>
-                )}
+      {chips.length > 0 && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 18 }}>
+            <span style={{ font: '600 10.5px/1 var(--app-font)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--app-text-subtle)' }}>
+              Characters
+            </span>
+            {toggleableChips.length > 0 && (
+              <button
+                onClick={() => onSetManyGlyphs(toggleableIds, chipsState !== 'off')}
+                onMouseEnter={() => setInfo({ kind: 'text', title: chipsState === 'off' ? 'Keep all' : 'Remove all', body: chipsState === 'off' ? 'Restore every removable character in this store.' : 'Remove every removable character in this store. You can restore them later.' })}
+                onFocus={() => setInfo({ kind: 'text', title: chipsState === 'off' ? 'Keep all' : 'Remove all', body: chipsState === 'off' ? 'Restore every removable character in this store.' : 'Remove every removable character in this store. You can restore them later.' })}
+                onMouseLeave={clearInfo}
+                onBlur={clearInfo}
+                style={{ ...btnGhost, marginLeft: 'auto', fontSize: 11, padding: '5px 10px' }}
+              >
+                {chipsState === 'off' ? 'Keep all' : 'Remove all'}
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+            {chips.map((chip) => (
+              <StoreChip
+                key={chip.chipId}
+                chip={chip}
+                off={off || isItemDeleted(chip.chipId)}
+                onToggle={onToggleGlyph}
+              />
+            ))}
+          </div>
+          {showEmptiesStoreWarning && (
+            <div
+              role="alert"
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 12,
+                padding: '10px 14px', borderRadius: 9,
+                background: 'color-mix(in srgb, var(--sil-orange) 9%, var(--app-surface))',
+                border: '1px solid color-mix(in srgb, var(--sil-orange) 45%, transparent)',
+              }}
+            >
+              <span style={{ color: 'var(--sil-orange-dark)', flexShrink: 0, marginTop: 1 }}>
+                <WarnIcon size={15} />
               </span>
-            );
-          })}
-        </div>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--app-text)' }}>
+                  This will empty the store — the mechanism depending on it will stop working
+                </span>
+                <span style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
+                  {banneredChipAction === 'nul-fill'
+                    ? "Each removed character's slot outputs nothing (nul) in the built keyboard; the mechanism stays but produces no output."
+                    : "To keep the keyboard buildable, the built keyboard keeps this store's characters until at least one stays active — remove the whole store instead if you no longer need it."}
+                </span>
+              </span>
+            </div>
+          )}
+        </>
       )}
       {consumers.length > 0 && (
         <div
@@ -387,9 +442,10 @@ interface InspectorProps {
   onSetManyGlyphs: (gids: string[], off: boolean) => void;
   isDeleted: (nodeId: string) => boolean;
   onToggleNode: (nodeId: string, off: boolean) => void;
+  onOwnerClick?: (nodeId: string) => void;
 }
 
-export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetManyGlyphs, isDeleted, onToggleNode }: InspectorProps) {
+export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetManyGlyphs, isDeleted, onToggleNode, onOwnerClick }: InspectorProps) {
   const [q, setQ] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   useEffect(() => { setQ(''); setCollapsed(new Set()); }, [node?.nodeId]);
@@ -405,7 +461,7 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
   }
 
   if (node.kind === 'raw') return <RawDetail node={node} isDeleted={isDeleted} onToggleNode={onToggleNode} />;
-  if (node.kind === 'store') return <StoreDetail key={node.nodeId} node={node} nodes={nodes} isDeleted={isDeleted} isItemDeleted={isItemDeleted} onToggleNode={onToggleNode} />;
+  if (node.kind === 'store') return <StoreDetail key={node.nodeId} node={node} nodes={nodes} isDeleted={isDeleted} isItemDeleted={isItemDeleted} onToggleNode={onToggleNode} onToggleGlyph={onToggleGlyph} onSetManyGlyphs={onSetManyGlyphs} />;
 
   const glyphs = node.glyphs ?? [];
   const st = nodeState(node, isItemDeleted, isDeleted);
@@ -525,6 +581,8 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
                     onToggle={onToggleGlyph}
                     modifierLabel={x.modifierLabel}
                     capability={x.capability}
+                    {...(x.owners ? { owners: x.owners } : {})}
+                    {...(onOwnerClick ? { onOwnerClick } : {})}
                   />
                 ))}
               </div>

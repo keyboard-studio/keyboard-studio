@@ -1,5 +1,5 @@
 /**
- * Layer A' import-fidelity checks (I1–I5).
+ * Layer A' import-fidelity checks (I1–I6).
  *
  * Each exported function follows the one-function-per-check convention used
  * by packages/engine/src/validator/checks/*.ts: accepts relevant inputs,
@@ -13,7 +13,7 @@
  * packages/engine/src/validator/index.ts.
  */
 
-import type { LintFinding, KeyboardIR } from "@keyboard-studio/contracts";
+import type { LintFinding, KeyboardIR, IRRule } from "@keyboard-studio/contracts";
 import type { ParseResult } from "../codec/parse.js";
 import { tokenize } from "../codec/tokenize.js";
 import { computeSha256Hex } from "../codec/hash.js";
@@ -303,4 +303,87 @@ export async function checkSidecarHash(
     ];
   }
   return [];
+}
+
+// ---------------------------------------------------------------------------
+// I6 — Ownership consistency
+// ---------------------------------------------------------------------------
+
+/** Shared code for all I6 findings. (KM_ERROR_* matches the A' error-code
+ *  convention — I1's KM_ERROR_PARSE_INCOMPLETE, I5's KM_ERROR_SIDECAR_HASH_MISMATCH.
+ *  The issue suggested KM_LINT_OWNERSHIP_CONSISTENCY, but KM_LINT_* is the Layer C
+ *  hygiene namespace; a Layer A' error belongs under KM_ERROR_*.) */
+export const OWNERSHIP_CONSISTENCY_CODE = "KM_ERROR_OWNERSHIP_CONSISTENCY";
+
+/**
+ * I6: Ownership consistency between recognized Patterns and the IR nodes they
+ * own (spec §10, fires on emit). The Pattern↔node back-reference must agree in
+ * both directions, or the carve gallery mis-attributes / permanently suppresses
+ * nodes:
+ *
+ *   - Forward (spec's stated rule): for every rule-kind ref in
+ *     `Pattern.ownedNodes`, the referenced `IRRule` must exist and its
+ *     `ownedByPattern` must equal that Pattern's id.
+ *   - Reverse (the spec's stated impact): every `IRRule.ownedByPattern` must
+ *     point to a Pattern that still exists — a dangling pointer left by a
+ *     deleted Pattern orphans the node (permanent carve-gallery suppression).
+ *
+ * Only `IRRule` carries `ownedByPattern` (patterns are lifted from rule
+ * clusters), so non-rule `ownedNodes` refs have no back-reference to verify and
+ * are skipped. Severity `error`: a failing I6 means the IR cannot be trusted as
+ * the source of truth on emit (D9).
+ */
+export function checkOwnershipConsistency(ir: KeyboardIR): LintFinding[] {
+  const findings: LintFinding[] = [];
+
+  // Rules are the only nodes carrying ownedByPattern.
+  const ruleById = new Map<string, IRRule>();
+  for (const group of ir.groups) {
+    for (const rule of group.rules) ruleById.set(rule.nodeId, rule);
+  }
+  const patternIds = new Set(ir.recognizedPatterns.map((p) => p.id));
+
+  // Forward: each Pattern.ownedNodes rule-ref resolves to a rule this Pattern owns.
+  for (const pattern of ir.recognizedPatterns) {
+    for (const ref of pattern.ownedNodes ?? []) {
+      if (ref.kind !== "rule") continue; // only rules carry the back-reference
+      const rule = ruleById.get(ref.nodeId);
+      if (rule === undefined) {
+        findings.push({
+          code: OWNERSHIP_CONSISTENCY_CODE,
+          severity: "error",
+          layer: "A-prime",
+          message:
+            `Pattern "${pattern.id}" lists rule node "${ref.nodeId}" in ownedNodes, ` +
+            "but no such rule exists in the IR (stale ownedNodes pointer).",
+        });
+      } else if (rule.ownedByPattern !== pattern.id) {
+        findings.push({
+          code: OWNERSHIP_CONSISTENCY_CODE,
+          severity: "error",
+          layer: "A-prime",
+          message:
+            `Pattern "${pattern.id}" owns rule node "${ref.nodeId}", but that node's ` +
+            `ownedByPattern is ${rule.ownedByPattern === undefined ? "unset" : `"${rule.ownedByPattern}"`} ` +
+            `(expected "${pattern.id}").`,
+        });
+      }
+    }
+  }
+
+  // Reverse: each rule's ownedByPattern points to a Pattern that still exists.
+  for (const rule of ruleById.values()) {
+    if (rule.ownedByPattern !== undefined && !patternIds.has(rule.ownedByPattern)) {
+      findings.push({
+        code: OWNERSHIP_CONSISTENCY_CODE,
+        severity: "error",
+        layer: "A-prime",
+        message:
+          `Rule node "${rule.nodeId}" is owned by Pattern "${rule.ownedByPattern}", ` +
+          "but no such Pattern exists (orphaned node — its Pattern was deleted).",
+      });
+    }
+  }
+
+  return findings;
 }
