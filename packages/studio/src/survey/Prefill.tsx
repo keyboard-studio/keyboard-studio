@@ -106,6 +106,7 @@ export function Prefill({ identity, base, onConfirm, onBack }: PrefillProps) {
         {onBack !== undefined && (
           <button
             type="button"
+            data-testid="prefill-back"
             onClick={onBack}
             style={{
               padding: "8px 18px",
@@ -123,6 +124,7 @@ export function Prefill({ identity, base, onConfirm, onBack }: PrefillProps) {
         )}
         <button
           type="button"
+          data-testid="prefill-confirm"
           onClick={onConfirm}
           style={{
             padding: "8px 18px",
