@@ -18,7 +18,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 
 // Identity-lite is read directly here for the Script-routing section (§9). The
-// flow drill-down sources (FLOW_SOURCES) and the rendered-node-id composition
+// flow drill-down sources (derived from step flowRefs) and the rendered-node-id composition
 // live in the shared dashboard/renderedNodeSet.ts helper (spec 016, D2a), so
 // the Flow Map and the drift guardrail consume ONE composition. Do NOT import
 // the legacy *.yaml files here — they are retired and will be deleted.
@@ -28,7 +28,7 @@ import {
   buildManifestProjection,
   attachDrillDowns,
 } from "./manifestProjection.ts";
-import { FLOW_SOURCES, safeBuild } from "./renderedNodeSet.ts";
+import { buildFlowSources } from "./renderedNodeSet.ts";
 import { FlowGraphView } from "./FlowGraphView.tsx";
 import { StrategyTreeView } from "./StrategyTreeView.tsx";
 import { ScriptRoutingView } from "./ScriptRoutingView.tsx";
@@ -284,7 +284,7 @@ export interface FlowMapViewProps {
 
 export function FlowMapView({ completeness }: FlowMapViewProps) {
   const [section, setSection] = useState<Section>("flow");
-  const flows = useMemo(() => FLOW_SOURCES.map(safeBuild), []);
+  const flows = useMemo(() => buildFlowSources(), []);
 
   // Spec 015 (DEC-001 = Variant A): project the manifest spine onto a FlowGraph
   // via the StepGraph → FlowGraph/GraphNode adapter, reusing FlowGraphView /
@@ -293,9 +293,8 @@ export function FlowMapView({ completeness }: FlowMapViewProps) {
   // only when FlowMapView mounts, which is gated by SHOW_FLOWMAP (StudioShell.tsx:84) —
   // no new flag is introduced (DEC-002).
   const manifestSpine = useMemo(() => buildManifestProjection(), []);
-  // Hang all FLOW_SOURCES modular graphs as registry-keyed drill-downs under their
-  // manifest question-step nodes — FR-004. Phase A/B/F hang under "characters";
-  // Phase G flows hang under "track" and "project_name" respectively.
+  // Hang the derived modular graphs as registry-keyed drill-downs under their
+  // manifest question-step nodes — FR-004 (spec 024: derived from step flowRefs).
   const drillDowns = useMemo(() => attachDrillDowns(flows), [flows]);
 
   // Manifest-spine order: collect step ids that have drill-downs, preserving the

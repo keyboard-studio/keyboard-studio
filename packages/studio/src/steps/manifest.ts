@@ -63,6 +63,8 @@ const charactersStep: Step = {
   writes: [irPath("header", "bcp47")],
   // Temporary stub component — wired in T028 via SurveyView's internal runner.
   component: () => null,
+  // phase_b_characters runs inside the characters step (spec 024, Stage 1).
+  flowRefs: ["phase_b_characters"],
 } as const;
 
 // ---------------------------------------------------------------------------

@@ -50,6 +50,9 @@ export const identityStep: EditorStep = {
   component: TrackOneIdentityPanelAdapter,
   inputs: [],
   writes: [],
+  // identity_lite runs inside the identity step (spec 024, Stage 1 re-home:
+  // was mis-anchored under "characters" in FLOW_SOURCES; correct home is here).
+  flowRefs: ["identity_lite"],
 };
 
 /**
@@ -82,6 +85,7 @@ export const trackStep: EditorStep = {
   // DEC-D2 (Matt 2026-06-29): branch selection only (copy vs adapt) — no IR leaf
   // in Phase 1, so writes is []. Empty writes orphans no input and never reds C5.
   writes: [],
+  flowRefs: ["track"],
 };
 
 /**
@@ -104,6 +108,7 @@ export const projectNameStep: EditorStep = {
   // exist in KeyboardIR — FR-004).
   inputs: [irPath("header", "bcp47")],
   writes: [irPath("header", "name"), irPath("header", "keyboardId")],
+  flowRefs: ["project_name"],
 };
 
 // ---------------------------------------------------------------------------
@@ -209,6 +214,9 @@ export const helpStep: EditorStep = {
   component: TrackOneIdentityPanelAdapter, // placeholder — wired in T028
   inputs: [],
   writes: [],
+  // phase_f_helpdocs runs inside the help step (spec 024, Stage 1 re-home:
+  // was mis-anchored under "characters" in FLOW_SOURCES; correct home is here).
+  flowRefs: ["phase_f_helpdocs"],
 };
 
 /**
