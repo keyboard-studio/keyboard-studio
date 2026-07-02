@@ -28,10 +28,12 @@ jobs:
       - name: Checkout keyboard-studio
         uses: actions/checkout@v4
 
-      - name: Checkout keymanapp/keyboards (release/ only, shallow)
+      # TEMP: scanning the mattgyverlee fork's updated bases. Revert to
+      # keymanapp/keyboards once the fork is merged upstream.
+      - name: Checkout mattgyverlee/keyboards (release/ only, shallow)
         uses: actions/checkout@v4
         with:
-          repository: keymanapp/keyboards
+          repository: mattgyverlee/keyboards
           path: .keyboards
           fetch-depth: 1
           sparse-checkout: release

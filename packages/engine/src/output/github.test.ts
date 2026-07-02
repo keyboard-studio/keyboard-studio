@@ -70,7 +70,7 @@ function happyPathRoutes(): Map<string, ResponseSpec> {
     // create branch ref
     [`POST ${API}/repos/${FORK_OWNER}/keyboards/git/refs`, { ok: true, status: 201, body: { ref: `refs/heads/${BRANCH}` } }],
     // create draft PR
-    [`POST ${API}/repos/keymanapp/keyboards/pulls`, { ok: true, status: 201, body: { html_url: PR_URL } }],
+    [`POST ${API}/repos/mattgyverlee/keyboards/pulls`, { ok: true, status: 201, body: { html_url: PR_URL } }],
   ]);
 }
 
@@ -158,7 +158,7 @@ describe("publishPR", () => {
   it("creates fork when fork does not exist (404)", async () => {
     const routes = happyPathRoutes();
     routes.set(`GET ${API}/repos/${FORK_OWNER}/keyboards`, { ok: false, status: 404, body: {} });
-    routes.set(`POST ${API}/repos/keymanapp/keyboards/forks`, { ok: true, status: 202, body: { full_name: `${FORK_OWNER}/keyboards` } });
+    routes.set(`POST ${API}/repos/mattgyverlee/keyboards/forks`, { ok: true, status: 202, body: { full_name: `${FORK_OWNER}/keyboards` } });
     const fetch = buildMockFetch(routes);
     const result = await publishPR(makeSourceFS(), makeOpts(), fetch);
     expect(result.prUrl).toBe(PR_URL);
@@ -344,7 +344,7 @@ describe("publishPR", () => {
   it("emits fork-create (index 2) when the fork must be created (404)", async () => {
     const routes = happyPathRoutes();
     routes.set(`GET ${API}/repos/${FORK_OWNER}/keyboards`, { ok: false, status: 404, body: {} });
-    routes.set(`POST ${API}/repos/keymanapp/keyboards/forks`, { ok: true, status: 202, body: { full_name: `${FORK_OWNER}/keyboards` } });
+    routes.set(`POST ${API}/repos/mattgyverlee/keyboards/forks`, { ok: true, status: 202, body: { full_name: `${FORK_OWNER}/keyboards` } });
     const steps: PublishStep[] = [];
     const fetch = buildMockFetch(routes);
     await publishPR(makeSourceFS(), makeOpts({ onProgress: (s) => steps.push(s) }), fetch);

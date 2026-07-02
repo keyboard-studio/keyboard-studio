@@ -19,5 +19,6 @@ export const offlineKbdus: BaseKeyboard = makeBaseKeyboard({
   displayName: "US English (Basic)",
   version: "1.0",
   sourceUrl:
-    "https://github.com/keymanapp/keyboards/tree/master/release/b/basic_kbdus",
+    // TEMP: mattgyverlee fork — revert to keymanapp when merged upstream.
+    "https://github.com/mattgyverlee/keyboards/tree/master/release/b/basic_kbdus",
 });

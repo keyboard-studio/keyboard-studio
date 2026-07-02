@@ -18,7 +18,9 @@ import {
 import { parseKps } from "./kps-parser.js";
 import { offlineKbdus } from "./offline-bundle.js";
 
-const OWNER = "keymanapp";
+// TEMP: base-keyboard source pointed at mattgyverlee fork for updated bases.
+// Revert to "keymanapp" once the fork's KB changes are merged upstream.
+const OWNER = "mattgyverlee";
 const REPO = "keyboards";
 const REF = "master";
 const RAW_BASE = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${REF}`;

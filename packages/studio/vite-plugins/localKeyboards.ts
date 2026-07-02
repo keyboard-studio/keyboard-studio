@@ -114,7 +114,8 @@ function scan(keyboardsRepoRoot: string): BaseKeyboard[] {
         targets: ["windows", "macosx", "linux", "web"],
         displayName: meta.name !== "" ? meta.name : id,
         version: meta.version,
-        sourceUrl: `https://github.com/keymanapp/keyboards/tree/master/release/${vendor}/${id}`,
+        // TEMP: mattgyverlee fork — revert to keymanapp when merged upstream.
+        sourceUrl: `https://github.com/mattgyverlee/keyboards/tree/master/release/${vendor}/${id}`,
       };
       if (languages.length > 0) entry.languages = languages;
       out.push(entry);

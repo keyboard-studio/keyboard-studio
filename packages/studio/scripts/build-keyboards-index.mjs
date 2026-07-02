@@ -22,9 +22,12 @@ const STUDIO_DIR = path.resolve(SCRIPT_DIR, "..");
 const REPO_ROOT = path.resolve(STUDIO_DIR, "..", "..");
 const DEFAULT_CACHE = path.join(REPO_ROOT, ".cache", "keyboards");
 
+// TEMP: default base-keyboard source is the mattgyverlee fork (updated bases).
+// Revert to keymanapp/keyboards once the fork is merged upstream. Override with
+// KEYBOARDS_REPO_URL as before.
 const REPO_URL =
   process.env["KEYBOARDS_REPO_URL"] ??
-  "https://github.com/keymanapp/keyboards.git";
+  "https://github.com/mattgyverlee/keyboards.git";
 const REPO_BRANCH = process.env["KEYBOARDS_REPO_BRANCH"] ?? "master";
 
 const OUT_DIR = path.join(STUDIO_DIR, "dist", "local-kbd-api");

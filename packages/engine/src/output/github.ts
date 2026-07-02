@@ -56,7 +56,9 @@ export interface GitHubOutputConfig {
 // ---------------------------------------------------------------------------
 
 const API_BASE = "https://api.github.com";
-const UPSTREAM_OWNER = "keymanapp";
+// TEMP: PRs target the mattgyverlee fork while developing against updated bases.
+// Revert to "keymanapp" once the fork's KB changes are merged upstream.
+const UPSTREAM_OWNER = "mattgyverlee";
 const UPSTREAM_REPO = "keyboards";
 
 // Compiled artifacts excluded from the PR commit (spec §12, criteria SS1)
