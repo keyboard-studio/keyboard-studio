@@ -129,7 +129,7 @@ Every proposed default shows where it came from and is overridable in place; the
 ## Assumptions
 
 - The governing prose (`spec.md` §3a/§8/§5, v1.3.1) lands via PR #438 before implementation begins; this feature is gated on that merge.
-- `langtags.json` is already loaded in Phase A for the BCP47 lookup and exposes `localname`/`localnames`; CLDR locale display names are available as a pinned secondary source.
+- `langtags.json` is already loaded in Phase A for the BCP47 lookup and exposes `localname`/`localnames`; CLDR locale display names are available as a pinned secondary source. The fetch, pin, and codegen that make this true are implemented by [specs/023-langtags-defaults](../023-langtags-defaults/spec.md) (branch `km/langtags-defaults`), which feeds this feature and must land first.
 - An authenticated identity is available only on the GitHub-OAuth output path; the ZIP path has none, handled by the copyright edge case.
 - The working-copy spine, the discovery-axis computation (§7.1), and the §7.7 assignment map already exist and are reused; this feature adds proposers over them, it does not re-architect the survey.
 - A language-model backend may be unavailable; the help-body skeleton must stand alone without it.

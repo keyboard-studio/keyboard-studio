@@ -22,6 +22,10 @@
     "./placement": {
       "types": "./dist/placement/index.d.ts",
       "import": "./dist/placement/index.js"
+    },
+    "./langtags": {
+      "types": "./dist/langtags/index.d.ts",
+      "import": "./dist/langtags/index.js"
     }
   },
   "files": [

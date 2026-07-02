@@ -13,7 +13,7 @@
 
 import { useState, useId, useMemo, useRef } from "react";
 import type { FlowDef, FlowQuestion, FlowGotoRule, SurveyContext, AnswerStackEntry } from "./types.ts";
-import type { SurveyAnswer, SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts";
+import type { SurveyAnswer, SurveyPhaseResult, LintFinding, LangtagsProvenance } from "@keyboard-studio/contracts";
 import { QuestionField } from "./QuestionField.tsx";
 import { debugPinsStore } from "../stores/debugPinsStore.ts";
 
@@ -236,6 +236,16 @@ export interface SurveyRunnerProps {
    * the expected behavior — Back is an explicit discard.
    */
   getSeedValue?: (questionId: string) => string | string[] | undefined;
+  /**
+   * Called when rendering a question to retrieve its provenance label, if any.
+   * Returns a LangtagsProvenance when the question's current value was seeded
+   * from langtags, or undefined when no provenance applies.
+   *
+   * SurveyRunner renders the provenance caption beneath the field when a
+   * non-undefined provenance is returned (FR-007). The caption indicates the
+   * value is a suggestion — the author can edit it freely (FR-008).
+   */
+  getSeedProvenance?: (questionId: string) => LangtagsProvenance | undefined;
 }
 
 export function SurveyRunner({
@@ -246,6 +256,7 @@ export function SurveyRunner({
   findingsByQuestionId,
   onAnswerCommit,
   getSeedValue,
+  getSeedProvenance,
 }: SurveyRunnerProps) {
   // Single gate for all debug-mode behaviour — evaluated once per render so all
   // branches are driven by the same boolean, not scattered checks.
@@ -259,6 +270,8 @@ export function SurveyRunner({
   onAnswerCommitRef.current = onAnswerCommit;
   const getSeedValueRef = useRef(getSeedValue);
   getSeedValueRef.current = getSeedValue;
+  const getSeedProvenanceRef = useRef(getSeedProvenance);
+  getSeedProvenanceRef.current = getSeedProvenance;
 
   // Derive flow-level constants once per flow identity change.
   // context is intentionally excluded from the deps array: findFirstRenderable
@@ -486,6 +499,29 @@ export function SurveyRunner({
         onChange={(v) => setCurrentValue(v)}
         {...(findingsByQuestionId !== undefined ? { findingsByQuestionId } : {})}
       />
+
+      {/* Provenance caption — only rendered when the current question was seeded
+          from langtags (FR-007). The aria-live region announces the caption to
+          screen readers when it appears. The caption is purely informational;
+          it does not block or gate the input (FR-008). */}
+      {(() => {
+        const provenance = getSeedProvenanceRef.current?.(currentQId);
+        if (provenance === undefined) return null;
+        return (
+          <p
+            aria-live="polite"
+            style={{
+              margin: 0,
+              fontSize: 12,
+              color: "#8b949e",
+              fontStyle: "italic",
+              lineHeight: 1.5,
+            }}
+          >
+            {provenance.caption}
+          </p>
+        );
+      })()}
 
       {/* Navigation */}
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>

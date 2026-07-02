@@ -1,0 +1,4 @@
+# Raw langtags dataset — build input, ~5.4 MB, reproducibly fetched by scripts/fetch-langtags.mjs.
+# Run `pnpm run fetch-langtags` to download.
+# SOURCES.json and LICENSE are committed; the raw data file is not.
+langtags.json

@@ -73,3 +73,4 @@ export * from "./utils/charUtils";
 export * from "./axisPriors";
 export * from "./criteriaData";
 export * from "./fontEntry";
+export * from "./langtags";

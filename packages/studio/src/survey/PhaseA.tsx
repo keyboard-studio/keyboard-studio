@@ -8,16 +8,22 @@
 //   field populated from the key answers. The provenance data is carried in the
 //   answers array; the caller extracts it via PhaseA.extractProvenance() helper.
 
-import { useMemo } from "react";
+import { useMemo, useRef, useCallback, useEffect } from "react";
 import type {
   SurveyPhaseResult,
   KeyboardIdentity,
   KeyboardProvenance,
   LintFinding,
+  LangtagsProvenance,
 } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { loadModularFlow } from "./loadModularFlow.ts";
 import type { SurveyContext } from "./types.ts";
+import {
+  loadLangtags,
+  regionNameFor,
+} from "../lib/langtagsDefaults.ts";
+import { primarySubtag } from "../lib/suggestBase.ts";
 
 // Vite ?raw import — YAML source as a plain string, no network request.
 // Typed via the `*.yaml?raw` module declaration in src/vite-env.d.ts.
@@ -194,6 +200,90 @@ export interface PhaseAProps {
 export function PhaseA({ context = {}, onComplete, onBack, findingsByQuestionId }: PhaseAProps) {
   const flow = useMemo(() => loadModularFlow(phaseARaw as string), []);
 
+  // ---------------------------------------------------------------------------
+  // Langtags seeding for Phase A (T019 / T020 / US2)
+  //
+  // Phase A runs AFTER identity-lite so the language code is already known
+  // via context.bcp47_tag.  We extract the primary subtag from that tag and
+  // look up langtags defaults to pre-fill:
+  //   - language_name_autonym  (autonym / localname)
+  //   - language_name_english  (English name)
+  //   - region                 (defaultRegion → country name via iso3166Names)
+  //
+  // FR-008: the seed is only applied on FIRST arrival (SurveyRunner's
+  // "seed on first arrival" contract).  A committed/edited value is never
+  // overwritten — SurveyRunner restores the saved stack entry on Back,
+  // bypassing getSeedValue entirely.
+  // ---------------------------------------------------------------------------
+
+  // Seeds map: questionId → seed value.  Populated once per mount from the
+  // known language code.  A module-scoped ref is enough; no re-seeding is
+  // needed because the language code is fixed for the lifetime of Phase A.
+  const seedsRef = useRef<Map<string, string>>(new Map());
+  const provenanceRef = useRef<Map<string, LangtagsProvenance>>(new Map());
+
+  useEffect(() => {
+    const bcp47Tag = context.bcp47_tag ?? "";
+    const code = bcp47Tag !== "" ? primarySubtag(bcp47Tag) : "";
+    if (code === "") return;
+
+    void loadLangtags().then((mod) => {
+      const defaults = mod.getLanguageDefaults(code);
+      if (defaults === null) return;
+
+      const provenance: LangtagsProvenance = {
+        source: "langtags",
+        caption: "Suggested from langtags — edit if needed",
+      };
+
+      const seeds = new Map<string, string>();
+      const prov = new Map<string, LangtagsProvenance>();
+
+      if (defaults.autonym !== undefined && defaults.autonym !== "") {
+        seeds.set("language_name_autonym", defaults.autonym);
+        prov.set("language_name_autonym", provenance);
+      }
+
+      if (defaults.englishName !== undefined && defaults.englishName !== "") {
+        seeds.set("language_name_english", defaults.englishName);
+        prov.set("language_name_english", provenance);
+      }
+
+      // Resolve defaultRegion (alpha-2 code) → English country name (FR-006 / T020).
+      // regionNameFor() returns undefined for UN M.49 numeric codes and any code
+      // not in the static map — in that case we do NOT seed the field (FR-009).
+      const regionName = regionNameFor(defaults.defaultRegion);
+      if (regionName !== undefined) {
+        seeds.set("region", regionName);
+        prov.set("region", provenance);
+      }
+
+      seedsRef.current = seeds;
+      provenanceRef.current = prov;
+    }).catch(() => {
+      // Degrade silently on import failure — seeds stay empty, all Phase A
+      // fields remain free-text (FR-009). No unhandled rejection.
+    });
+    // Effect deps: only fire once per Phase A mount (the language code is fixed).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Return a seed value for the given questionId, if any.
+  const getSeedValue = useCallback(
+    (questionId: string): string | string[] | undefined => {
+      return seedsRef.current.get(questionId);
+    },
+    [],
+  );
+
+  // Return provenance for the given questionId, if any.
+  const getSeedProvenance = useCallback(
+    (questionId: string): LangtagsProvenance | undefined => {
+      return provenanceRef.current.get(questionId);
+    },
+    [],
+  );
+
   function handleComplete(result: SurveyPhaseResult) {
     const identity = extractIdentity(result);
     const provenance = extractProvenance(result);
@@ -228,6 +318,8 @@ export function PhaseA({ context = {}, onComplete, onBack, findingsByQuestionId 
         flow={flow}
         context={context}
         onComplete={handleComplete}
+        getSeedValue={getSeedValue}
+        getSeedProvenance={getSeedProvenance}
         {...(onBack !== undefined ? { onBack } : {})}
         {...(findingsByQuestionId !== undefined ? { findingsByQuestionId } : {})}
       />

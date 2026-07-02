@@ -1,5 +1,6 @@
 // Colocated vitest spec for il_language_code (identity-lite).
-// No validate() — optional free-text with no client-side gating.
+// No validate() — optional free-text / autocomplete with no client-side gating.
+// Type changed from "text" to "autocomplete" (T014 — langtags picker wiring).
 
 import { describe, it, expect } from "vitest";
 import mod, {
@@ -12,8 +13,12 @@ describe("il_language_code — definition", () => {
     expect(definition.id).toBe("il_language_code");
   });
 
-  it("type is text", () => {
-    expect(definition.type).toBe("text");
+  it("type is autocomplete (langtags-backed searchable picker; T014)", () => {
+    expect(definition.type).toBe("autocomplete");
+  });
+
+  it("options_source is @langtags_iso639", () => {
+    expect(definition.options_source).toBe("@langtags_iso639");
   });
 
   it("is optional (required: false)", () => {
