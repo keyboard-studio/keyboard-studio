@@ -71,7 +71,15 @@ export const s01Recognizer: RecognizerRule = {
     const results: MatchResult[] = [];
 
     for (const group of ir.groups) {
-      const matchingRules = group.rules.filter((r) => isS01(r, group.name));
+      const matchingRules = group.rules.filter((r) => {
+        // Skip rules an earlier recognizer in this pass already claimed, so we
+        // never double-claim a node into a second pattern (the #886 ghost
+        // chip). NB: this is an independent guard from the identical one in
+        // interpreter.ts (findS01Clusters, etc.) — that path serves the
+        // generated rules; neither guard implies the other is covered.
+        if (r.ownedByPattern !== undefined) return false;
+        return isS01(r, group.name);
+      });
       if (matchingRules.length === 0) continue;
 
       // Guard: spec §7.3 S-01 card says "1–5 extra characters" (≤5 inclusive); skip groups with more than 5 distinct base keys.

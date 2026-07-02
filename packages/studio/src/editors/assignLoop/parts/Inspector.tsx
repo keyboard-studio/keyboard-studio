@@ -387,9 +387,10 @@ interface InspectorProps {
   onSetManyGlyphs: (gids: string[], off: boolean) => void;
   isDeleted: (nodeId: string) => boolean;
   onToggleNode: (nodeId: string, off: boolean) => void;
+  onOwnerClick?: (nodeId: string) => void;
 }
 
-export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetManyGlyphs, isDeleted, onToggleNode }: InspectorProps) {
+export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetManyGlyphs, isDeleted, onToggleNode, onOwnerClick }: InspectorProps) {
   const [q, setQ] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   useEffect(() => { setQ(''); setCollapsed(new Set()); }, [node?.nodeId]);
@@ -525,6 +526,8 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
                     onToggle={onToggleGlyph}
                     modifierLabel={x.modifierLabel}
                     capability={x.capability}
+                    {...(x.owners ? { owners: x.owners } : {})}
+                    {...(onOwnerClick ? { onOwnerClick } : {})}
                   />
                 ))}
               </div>

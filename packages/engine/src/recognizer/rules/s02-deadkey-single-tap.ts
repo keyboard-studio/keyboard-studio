@@ -119,6 +119,7 @@ function buildTriggerIndex(ir: KeyboardIR): Map<number, IRRule[]> {
   for (const group of ir.groups) {
     if (group.name === "deadkeys") continue;
     for (const rule of group.rules) {
+      if (rule.ownedByPattern !== undefined) continue;
       if (!isTrigger(rule)) continue;
       const out = rule.output[0];
       if (out === undefined || out.kind !== "deadkey") continue;
@@ -134,6 +135,7 @@ function buildTriggerIndex(ir: KeyboardIR): Map<number, IRRule[]> {
 function buildBodyIndex(deadkeysGroup: IRGroup): Map<number, IRRule> {
   const bodyByDkId = new Map<number, IRRule>();
   for (const rule of deadkeysGroup.rules) {
+    if (rule.ownedByPattern !== undefined) continue;
     if (!isBody(rule)) continue;
     const c0 = rule.context[0];
     if (c0 === undefined || c0.kind !== "deadkey") continue;
@@ -149,7 +151,9 @@ function buildFallbackIndex(
 ): Map<number, IRRule[]> {
   const fallbacksByDkId = new Map<number, IRRule[]>();
   for (const dkId of bodyByDkId.keys()) {
-    const fallbacks = deadkeysGroup.rules.filter((r) => isFallback(r, dkId));
+    const fallbacks = deadkeysGroup.rules.filter(
+      (r) => r.ownedByPattern === undefined && isFallback(r, dkId),
+    );
     if (fallbacks.length > 0) fallbacksByDkId.set(dkId, fallbacks);
   }
   return fallbacksByDkId;

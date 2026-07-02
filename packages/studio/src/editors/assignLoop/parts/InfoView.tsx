@@ -122,6 +122,8 @@ export function InfoView() {
   }
 
   if (info.kind === 'key') {
+    const isNotRemovable = info.capability.startsWith('not-removable:');
+    const owningPattern = info.owners?.find((o) => o.kind === 'pattern');
     return (
       <div role="note" aria-label="Item info" style={stripShell}>
         <span style={{ flexShrink: 0, marginTop: 2, color: 'var(--app-text-subtle)' }}>
@@ -139,6 +141,11 @@ export function InfoView() {
           <div style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--app-text-muted)' }}>
             {keyHint(info.off)}
           </div>
+          {isNotRemovable && owningPattern !== undefined && (
+            <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
+              Managed by the {owningPattern.label} pattern.
+            </div>
+          )}
           <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
             {capabilityHint(info.capability)}
           </div>
