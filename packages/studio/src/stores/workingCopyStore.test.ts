@@ -241,7 +241,7 @@ describe("workingCopyStore — instantiateFromBase idempotence", () => {
     expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe(basicKbdus.id);
   });
 
-  // Regression (km-triage pre-merge item on PR #934): the case-1 no-op guard
+  // Regression (km-triage pre-merge item): the case-1 no-op guard
   // must key on id AND mode, not id alone. A SAME-id call arriving while the
   // store is in a DIFFERENT mode (e.g. the working copy was instantiated via
   // Track 2 for this keyboard, and Track 1's instantiateFromBase then fires
@@ -442,7 +442,7 @@ describe("workingCopyStore — instantiateFromExisting idempotence and base swit
     expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe("different_keyboard_id");
   });
 
-  // Regression (km-triage pre-merge item on PR #934) — Track 2 mirror of the
+  // Regression (km-triage pre-merge item) — Track 2 mirror of the
   // instantiateFromBase track-switch test above. A SAME-id call arriving while
   // the store is in a DIFFERENT mode (working copy instantiated via Track 1
   // for this keyboard, then instantiateFromExisting fires for the same id) is
