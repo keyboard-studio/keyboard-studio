@@ -24,7 +24,7 @@ import type { ManagedPRBody } from "./managed-pr-schemas.js";
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const ORG_TOKEN = "gho_ORG_SECRET_SHOULD_NEVER_LEAK";
+const INSTALLATION_TOKEN = "ghs_INSTALLATION_SECRET_SHOULD_NEVER_LEAK";
 const ORG_LOGIN = "keyboard-studio-bot";
 const NEW_COMMIT_SHA = "abc1234567890def00000000000000000000000";
 const PR_URL = "https://github.com/keymanapp/keyboards/pull/4242";
@@ -102,7 +102,7 @@ function makeStub(overrides: StepOverrides = {}): {
 }
 
 function makeConfig(fetchFn: GitHubPipelineFetchFn): ManagedPRPipelineConfig {
-  return { orgToken: ORG_TOKEN, orgLogin: ORG_LOGIN, fetch: fetchFn };
+  return { getInstallationToken: () => Promise.resolve(INSTALLATION_TOKEN), orgLogin: ORG_LOGIN, fetch: fetchFn };
 }
 
 // ---------------------------------------------------------------------------
@@ -366,11 +366,11 @@ describe("submitManagedPR() -- error mapping", () => {
 // submitManagedPR -- org token never leaks into any returned result
 // ---------------------------------------------------------------------------
 
-describe("submitManagedPR() -- org token never leaks", () => {
+describe("submitManagedPR() -- installation token never leaks", () => {
   it("is absent from a success result", async () => {
     const { fetch } = makeStub();
     const result = await submitManagedPR(VALID_BODY, makeConfig(fetch));
-    expect(JSON.stringify(result)).not.toContain(ORG_TOKEN);
+    expect(JSON.stringify(result)).not.toContain(INSTALLATION_TOKEN);
   });
 
   it("is absent from every error result", async () => {
@@ -383,17 +383,17 @@ describe("submitManagedPR() -- org token never leaks", () => {
     for (const ov of failures) {
       const { fetch } = makeStub(ov);
       const result = await submitManagedPR(VALID_BODY, makeConfig(fetch));
-      expect(JSON.stringify(result)).not.toContain(ORG_TOKEN);
+      expect(JSON.stringify(result)).not.toContain(INSTALLATION_TOKEN);
     }
   });
 
-  it("sends the org token in the Authorization header to GitHub (and only there)", async () => {
+  it("sends the installation token in the Authorization header to GitHub (and only there)", async () => {
     // The token must reach GitHub but never the result; assert it is used as a
     // Bearer credential on the request, not echoed back.
     let sawAuth = false;
     const fetch: GitHubPipelineFetchFn = async (url, init) => {
       const auth = init?.headers?.["Authorization"];
-      if (auth === `Bearer ${ORG_TOKEN}`) sawAuth = true;
+      if (auth === `Bearer ${INSTALLATION_TOKEN}`) sawAuth = true;
       // Delegate to the happy-path stub behaviour.
       const { fetch: inner } = makeStub();
       return inner(url, init);
@@ -408,13 +408,13 @@ describe("submitManagedPR() -- org token never leaks", () => {
 // ---------------------------------------------------------------------------
 
 describe("submitManagedPR() -- stateless / no token persistence", () => {
-  it("never places the org token in any request body -- only the header", async () => {
+  it("never places the installation token in any request body -- only the header", async () => {
     const { fetch, calls } = makeStub();
     await submitManagedPR(VALID_BODY, makeConfig(fetch));
     // The token may appear in Authorization headers (not captured here) but
     // must never be serialised into a request body the pipeline sends.
     for (const c of calls) {
-      expect(c.body ?? "").not.toContain(ORG_TOKEN);
+      expect(c.body ?? "").not.toContain(INSTALLATION_TOKEN);
     }
   });
 
@@ -433,13 +433,13 @@ describe("submitManagedPR() -- stateless / no token persistence", () => {
     };
     const OTHER_TOKEN = "gho_A_COMPLETELY_DIFFERENT_TOKEN";
     await submitManagedPR(VALID_BODY, {
-      orgToken: OTHER_TOKEN,
+      getInstallationToken: () => Promise.resolve(OTHER_TOKEN),
       orgLogin: ORG_LOGIN,
       fetch: probe,
     });
     // The second call must authenticate with its own config token, proving no
     // token from the first call was retained anywhere in module state.
     expect(observedToken).toBe(`Bearer ${OTHER_TOKEN}`);
-    expect(observedToken).not.toContain(ORG_TOKEN);
+    expect(observedToken).not.toContain(INSTALLATION_TOKEN);
   });
 });

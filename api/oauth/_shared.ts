@@ -40,9 +40,19 @@ const webFetch: OAuthFetchFn = async (url, init) => {
 };
 
 /**
- * Build a HandlerConfig from environment. The client secret lives only here
- * (server-side) and never reaches the SPA. Throws when either env var is unset
- * so a misconfigured deployment surfaces as a 500, not a silent bad exchange.
+ * Build a HandlerConfig from environment. The client secrets live only here
+ * (server-side) and never reach the SPA. Throws when the GitHub App pair
+ * (`GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`) is unset so a misconfigured
+ * deployment surfaces as a 500, not a silent bad exchange.
+ *
+ * The OAuth App pair (`GITHUB_OAUTH_CLIENT_ID`/`GITHUB_OAUTH_CLIENT_SECRET`)
+ * is optional — absent means the `github_app` default flow still works but an
+ * `oauth_app` exchange returns 500 `server_misconfigured` at request time.
+ * A partial OAuth pair (one var set, one missing) is not warned on here —
+ * unlike `server.ts:loadConfig`, serverless has no actionable startup-log
+ * context — so the misconfiguration surfaces at REQUEST time as a 500
+ * `server_misconfigured` via `resolveCredentials`; do not re-add a startup
+ * warning that would fire on every cold start.
  */
 export function envConfig(fetchFn: OAuthFetchFn = webFetch): HandlerConfig {
   const clientId = process.env["GITHUB_CLIENT_ID"];
@@ -55,10 +65,21 @@ export function envConfig(fetchFn: OAuthFetchFn = webFetch): HandlerConfig {
   ) {
     throw new Error("GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET must be set");
   }
-  return { clientId, clientSecret, fetch: fetchFn };
+
+  // OAuth App pair — optional; absent is not an error here.
+  const oauthClientId = (process.env["GITHUB_OAUTH_CLIENT_ID"] ?? "").trim() || undefined;
+  const oauthClientSecret = (process.env["GITHUB_OAUTH_CLIENT_SECRET"] ?? "").trim() || undefined;
+
+  return {
+    clientId,
+    clientSecret,
+    ...(oauthClientId !== undefined ? { oauthClientId } : {}),
+    ...(oauthClientSecret !== undefined ? { oauthClientSecret } : {}),
+    fetch: fetchFn,
+  };
 }
 
-function jsonResponse(
+export function jsonResponse(
   status: number,
   body: unknown,
   extraHeaders?: Record<string, string>,
