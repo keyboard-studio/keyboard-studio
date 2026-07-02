@@ -5,12 +5,14 @@ import type {
   OutputElement,
   IRRule,
   IRGroup,
+  IRStore,
   KeyboardIR,
   Pattern,
   RemovalCapability,
   StoreItem,
 } from '@keyboard-studio/contracts';
-import { isParallelIndexFanOut } from '@keyboard-studio/engine';
+import { isParallelIndexFanOut, classifyStoreSlotEdit } from '@keyboard-studio/engine';
+import type { StoreSlotBlockReason } from '@keyboard-studio/engine';
 export type CardKind = 'pattern' | 'group' | 'store' | 'raw';
 
 // ---------------------------------------------------------------------------
@@ -530,13 +532,78 @@ export function patternToGlyphs(pattern: Pattern, ir: KeyboardIR, capabilities: 
 }
 
 // ---------------------------------------------------------------------------
-// storeChars — extract displayable characters from a store's items
+// storeCharChips — per-character toggle chips for a store, one per char item
+// (skipping non-char items so display order matches the TRUE items index).
+//
+// chipId contract (locked, shared with the engine's applyStoreSlotRemovals):
+//   "<store.nodeId>#<itemsIndex>" where itemsIndex is the 0-based index into
+//   IRStore.items — the FULL items array, not the filtered char-only display
+//   list. For output stores this intentionally equals the S-02 fan-out glyph
+//   gid, so store chips and pattern/group tiles share toggle state by
+//   construction (see the gid-contract comment near expandParallelStoreRule).
+//
+// Action is derived once per store via classifyStoreSlotEdit (single
+// authority — never re-derived here):
+//   "nul-fill" — output-store slots; removing the char replaces it with a
+//                silent `nul` filler that preserves index() alignment.
+//   "drop"     — safe to splice out entirely (no positional contract).
+//   "disabled" — classifyStoreSlotEdit returned "blocked"; disabledReason
+//                carries an author-facing plain-language explanation.
 // ---------------------------------------------------------------------------
 
-export function storeChars(store: { items: StoreItem[] }): string[] {
-  return store.items
-    .filter((item) => item.kind === 'char')
-    .map((item) => (item as { kind: 'char'; value: string }).value);
+/** A single per-character toggle chip for a store, keyed by the locked slot-id contract. */
+export interface StoreCharChip {
+  /** `${store.nodeId}#${itemsIndex}` — locked slot-id contract (engine <-> studio seam). */
+  chipId: string;
+  ch: string;
+  /** TRUE 0-based index into IRStore.items (not the char-only display index). */
+  itemsIndex: number;
+  action: 'nul-fill' | 'drop' | 'disabled';
+  /** Author-facing plain-language explanation. Present only when action === 'disabled'. */
+  disabledReason?: string;
+}
+
+/**
+ * Map a classifyStoreSlotEdit block reason to an author-facing plain-language
+ * explanation (studio-side, UI-copy audience). Sibling: `blockReasonMessage`
+ * in the engine's applyStoreSlotRemovals.ts switches over the same
+ * `StoreSlotBlockReason` union to produce warning-log text — a new reason
+ * must be added to both switches.
+ */
+function blockReasonToDisabledReason(reason: StoreSlotBlockReason): string {
+  switch (reason) {
+    case 'paired-input':
+      return "This store feeds an any()/index() mechanism — removing characters here would break its pairing; per-character removal for paired stores is planned.";
+    case 'notany-widens':
+      return "This store is matched negatively (notany) — removing a character would make MORE keys match, not fewer.";
+    case 'context-index-aligned':
+      return "This store's positions are read directly by a rule's matcher (index() in its context) — removing a character would shift every position after it out of alignment.";
+    case 'dual-use':
+      return "This store is both read from and written to across your rules — removing a character here isn't safe until that dual role is resolved.";
+    case 'system-store':
+      return "This is a system store the compiler manages directly — it isn't meant to be edited here.";
+  }
+}
+
+/** Extract per-character toggle chips for a store, classified once via classifyStoreSlotEdit. */
+export function storeCharChips(store: IRStore, ir: KeyboardIR): StoreCharChip[] {
+  const editMode = classifyStoreSlotEdit(store, ir);
+  const chips: StoreCharChip[] = [];
+
+  store.items.forEach((item, itemsIndex) => {
+    if (item.kind !== 'char') return;
+    const chipId = `${store.nodeId}#${itemsIndex}`;
+    if (editMode.mode === 'blocked') {
+      chips.push({
+        chipId, ch: item.value, itemsIndex, action: 'disabled',
+        disabledReason: blockReasonToDisabledReason(editMode.reason),
+      });
+    } else {
+      chips.push({ chipId, ch: item.value, itemsIndex, action: editMode.mode });
+    }
+  });
+
+  return chips;
 }
 
 // ---------------------------------------------------------------------------
@@ -744,7 +811,7 @@ export interface CarveNode {
   strategy?: string | undefined;
   loadBearing?: boolean | undefined;
   glyphs?: CarveGlyph[] | undefined;       // patterns + groups
-  displayChars?: string[] | undefined;     // stores
+  storeChips?: StoreCharChip[] | undefined; // stores
   rawReason?: string | undefined;          // raw fragments
   referencedByNodeId?: string | undefined; // store: which pattern owns it
   referencedByLabel?: string | undefined;  // store: that pattern's title
@@ -762,6 +829,24 @@ export interface CarveNode {
 }
 
 // ---------------------------------------------------------------------------
+// idsTriState — tri-state derived purely from a flat array of item ids.
+// Single source shared by glyphsTriState (CarveGlyph.gid) and nodeState's
+// store-chip branch (StoreCharChip.chipId) so both derive tri-state the
+// same way.
+// ---------------------------------------------------------------------------
+
+export function idsTriState(
+  ids: string[],
+  isItemDeleted: (id: string) => boolean,
+): 'on' | 'partial' | 'off' {
+  if (ids.length === 0) return 'on';
+  const off = ids.filter((id) => isItemDeleted(id)).length;
+  if (off === 0) return 'on';
+  if (off === ids.length) return 'off';
+  return 'partial';
+}
+
+// ---------------------------------------------------------------------------
 // glyphsTriState — tri-state derived purely from a flat CarveGlyph array
 // ---------------------------------------------------------------------------
 
@@ -769,14 +854,11 @@ export function glyphsTriState(
   glyphs: CarveGlyph[],
   isItemDeleted: (id: string) => boolean,
 ): 'on' | 'partial' | 'off' {
-  const off = glyphs.filter((g) => isItemDeleted(g.gid)).length;
-  if (off === 0) return 'on';
-  if (off === glyphs.length) return 'off';
-  return 'partial';
+  return idsTriState(glyphs.map((g) => g.gid), isItemDeleted);
 }
 
 // ---------------------------------------------------------------------------
-// nodeState — tri-state based on individual glyph or node deletion
+// nodeState — tri-state based on individual glyph, store-chip, or node deletion
 // ---------------------------------------------------------------------------
 
 export function nodeState(
@@ -786,6 +868,20 @@ export function nodeState(
 ): 'on' | 'partial' | 'off' {
   if (node.glyphs && node.glyphs.length > 0) {
     return glyphsTriState(node.glyphs, isItemDeleted);
+  }
+  // Stores with at least one toggleable (non-disabled) chip get tri-state
+  // over those chip ids. A whole-deleted store (isDeleted) always reports
+  // 'off' regardless of chip state — deleting the whole store node
+  // supersedes per-character toggling. Stores with no toggleable chips
+  // (all disabled, or no chips at all) fall through to the binary check.
+  if (node.storeChips && node.storeChips.length > 0) {
+    if (isDeleted(node.nodeId)) return 'off';
+    const toggleableIds = node.storeChips
+      .filter((c) => c.action !== 'disabled')
+      .map((c) => c.chipId);
+    if (toggleableIds.length > 0) {
+      return idsTriState(toggleableIds, isItemDeleted);
+    }
   }
   return isDeleted(node.nodeId) ? 'off' : 'on';
 }
@@ -1024,7 +1120,7 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
       nodeId: store.nodeId,
       kind: 'store',
       name: store.name,
-      displayChars: storeChars(store),
+      storeChips: storeCharChips(store, ir),
       loadBearing: refPattern !== undefined,
       storeUsage: usage.ruleCount > 0 ? usage : undefined,
       ...(refPattern !== undefined ? { referencedByNodeId: refPattern.id, referencedByLabel: refPattern.title } : {}),

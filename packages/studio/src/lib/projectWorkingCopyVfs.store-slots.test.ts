@@ -264,4 +264,46 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
     }
     // The test must not throw — reaching here confirms no crash.
   });
+
+  // ---------------------------------------------------------------------------
+  // #523: drop-class chip id — an UNPAIRED any()-source store (no positional
+  // contract to preserve) splices the targeted char out of items[] entirely,
+  // rather than nul-filling it. This is distinct from AC#4's dkfX, which is
+  // PAIRED with an output index() in the same rule and is therefore blocked.
+  // ---------------------------------------------------------------------------
+
+  it("#523 drop-class: an unpaired any()-source store's chip id removal drops the char from the emitted store line", () => {
+    const inputOnlyStore = makeInputStore("store#unpaired", "unpairedX", ["p", "q", "r"]);
+    const simpleRule: IRRule = {
+      nodeId: "rule#unpaired",
+      context: [{ kind: "any", storeRef: "unpairedX" }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group = makeGroup("group#main", "main", [simpleRule]);
+    const ir = makeTestIR([group], [inputOnlyStore]);
+    const vfs = makeVfs("test_kb");
+
+    const { warnings } = projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: ir,
+      deletedNodeIds: new Set(),
+      deletedItemIds: new Set(["store#unpaired#1"]), // drop the "q"
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+
+    expect(warnings).toHaveLength(0);
+
+    const content = vfs.get("source/test_kb.kmn")?.content as string;
+    const storeLine = content.split("\n").find((l) => l.includes("store(unpairedX)"));
+    expect(storeLine).toBeDefined();
+
+    // The dropped char is gone entirely — no nul filler left in its place.
+    expect(storeLine).not.toContain("nul");
+    expect(storeLine).not.toContain("q");
+    // The other two chars survive, now adjacent (spliced, not nulled).
+    expect(storeLine).toMatch(/['"]pr['"]/);
+  });
 });
