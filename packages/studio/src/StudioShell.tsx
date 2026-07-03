@@ -14,6 +14,7 @@ import { useResizablePanes } from "./hooks/useResizablePanes.ts";
 import type { BaseKeyboard, Pattern, SurveyPhaseResult, TouchAssignment } from "@keyboard-studio/contracts";
 import { buildTouchLayoutJson } from "./lib/buildTouchLayoutJson.ts";
 import { useWorkingCopyStore, bindManifest } from "./stores/workingCopyStore.ts";
+import { useSurveySessionStore, type ActiveStepId } from "./stores/surveySessionStore.ts";
 import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
 import { IdentityLite, Prefill, PhaseB, PhaseF, PhaseTrack, PhaseProjectName, type IdentityLiteResult } from "./survey/index.ts";
 import { BaseResolution } from "./editors/panels/BaseResolution.tsx";
@@ -28,7 +29,7 @@ import { useKeyboardArtifact, type OnInstantiateCallback, type ScaffoldSpec } fr
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { OSKFrame } from "./components/OSKFrame.tsx";
 import { OskModeToggle, type OskMode } from "./components/OskModeToggle.tsx";
-import type { Track } from "./editors/panels/TrackStep.tsx";
+import type { Track } from "./survey/PhaseTrack.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
 import { usePlacementPriors } from "./hooks/usePlacementPriors.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
@@ -226,26 +227,9 @@ const SURVEY_LEFT_MAX_PCT = 65;
 const SURVEY_LEFT_INIT_PCT = 45;
 
 // ---------------------------------------------------------------------------
-// ActiveStepId — the set of manifest step ids the runtime advances through,
-// plus terminal states "done" and "unsupported" not present in the manifest.
-//
-// track and project_name are real manifest steps (P0 fix); they appear here.
-// touch_seed_source is spine:false and skipped by nextSpineStepAfter — not listed.
-// package is reserved and maps to "done" in nextSpineStepAfter — not listed.
+// ActiveStepId — imported from surveySessionStore (the traversal vocabulary
+// owner). See stores/surveySessionStore.ts (research D-R1).
 // ---------------------------------------------------------------------------
-
-type ActiveStepId =
-  | "identity"
-  | "choose_base"
-  | "track"
-  | "project_name"
-  | "characters"
-  | "carve"
-  | "mechanisms"
-  | "touch"
-  | "help"
-  | "done"
-  | "unsupported";
 
 // Sub-stage within the characters manifest step (intra-phase routing).
 // prefill→B is legitimately internal to the Phase A/B SurveyRunner;
@@ -397,17 +381,45 @@ interface SurveyViewProps {
 
 export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // ---------------------------------------------------------------------------
-  // Manifest-driven step state (T028 — no SurveyStage union)
+  // Traversal state — sourced from surveySessionStore (spec 026 Stage 3).
   //
   // activeStepId: current manifest step id (or terminal "done"/"unsupported").
+  // history: walked-step stack for back navigation.
+  // identityResult, surveyContext, selectedTrack, scaffoldSpec, localBase: value
+  // slots set across wizard steps.
   // ---------------------------------------------------------------------------
-  const [activeStepId, setActiveStepId] = useState<ActiveStepId>("identity");
+  const activeStepId = useSurveySessionStore((s) => s.activeStepId);
+  const identityResult = useSurveySessionStore((s) => s.identityResult);
+  const surveyContext = useSurveySessionStore((s) => s.surveyContext);
+  const selectedTrack = useSurveySessionStore((s) => s.selectedTrack);
+  const scaffoldSpec = useSurveySessionStore((s) => s.scaffoldSpec);
+  const localBase = useSurveySessionStore((s) => s.localBase);
+
+  // Store actions (stable references).
+  const sessionAdvance = useSurveySessionStore((s) => s.advance);
+  const sessionPopHistory = useSurveySessionStore((s) => s.popHistory);
+  const sessionReset = useSurveySessionStore((s) => s.reset);
+  const setIdentityResult = useSurveySessionStore((s) => s.setIdentityResult);
+  const setSurveyContext = useSurveySessionStore((s) => s.setSurveyContext);
+  const setSelectedTrack = useSurveySessionStore((s) => s.setSelectedTrack);
+  const setScaffoldSpec = useSurveySessionStore((s) => s.setScaffoldSpec);
+  const setLocalBase = useSurveySessionStore((s) => s.setLocalBase);
+
+  // Reset the session store on mount — the store is a module-level singleton that
+  // persists across React tree unmounts/remounts (e.g. navigating away from the
+  // survey route and back creates a new SurveyView mount = a new wizard session).
+  // Without this reset the singleton would resume from stale prior state rather
+  // than starting at "identity". Component-local useState used to give this
+  // mount-fresh reset for free; this call restores that invariant for the store.
+  useEffect(() => {
+    useSurveySessionStore.getState().reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally empty: runs exactly once on mount
+  }, []);
 
   // Sub-stage for the characters manifest step (intra-phase: prefill → B).
+  // Stays component-local per spec §4 (dies in Stage 4 / spec 027).
   const [charactersSub, setCharactersSub] = useState<CharactersSubStage>("prefill");
 
-  const [identityResult, setIdentityResult] = useState<IdentityLiteResult | null>(null);
-  const [surveyContext, setSurveyContext] = useState<SurveyContext>({});
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
   const { containerRef, leftPct, handleHovered, onPointerDown, setHandleHovered } =
     useResizablePanes({ minPct: SURVEY_LEFT_MIN_PCT, maxPct: SURVEY_LEFT_MAX_PCT, initPct: SURVEY_LEFT_INIT_PCT });
@@ -416,26 +428,12 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Null while loading or on error (gallery degrades gracefully without it).
   const corpusPlacementMap = usePlacementPriors();
 
-  // Track 1 (Copy) vs Track 2 (Adapt) — set at the track manifest step.
-  const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
-
-  // ScaffoldSpec for Track 1: populated after the project_name step.
-  // Null for Track 2 (adapt uses the base's existing id/name).
-  const [scaffoldSpec, setScaffoldSpec] = useState<ScaffoldSpec | null>(null);
-
-  // Local base selection that drives the compile pipeline immediately on pick.
-  // This is separate from baseKeyboard (the store's instantiated base) so that:
-  //   (a) the pipeline starts as soon as BaseResolution resolves, not after
-  //       the store updates (which only happens after compile completes); and
-  //   (b) the OSK preview shows the base the user just picked, while compile runs.
-  // Once onInstantiate fires (compile succeeds), both values will agree.
-  const [localBase, setLocalBase] = useState<BaseKeyboard | null>(baseKeyboard);
-
-  // Sync localBase when the store's baseKeyboard prop changes (e.g. after a
-  // start-over that sets a new base, the wizard sees it).
+  // Sync localBase when the prop changes (e.g. after a start-over that sets a new base).
+  // localBase lives in the session store; we update it when the working-copy's baseKeyboard
+  // prop changes so the wizard stays in sync with the pipeline-settled base.
   useEffect(() => {
     setLocalBase(baseKeyboard);
-  }, [baseKeyboard]);
+  }, [baseKeyboard, setLocalBase]);
 
   // Working-copy store actions.
   const recordPhase = useWorkingCopyStore((s) => s.recordPhase);
@@ -448,14 +446,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
   const setValidatorFindings = useWorkingCopyStore((s) => s.setValidatorFindings);
-
-  // selectedTrack captured in a ref so the memoised onInstantiate callback
-  // always sees the current value even when the async compile completes after
-  // selectedTrack changes.
-  const selectedTrackRef = useRef<Track | null>(null);
-  useEffect(() => {
-    selectedTrackRef.current = selectedTrack;
-  }, [selectedTrack]);
 
   // ---------------------------------------------------------------------------
   // P1 fix: double-instantiation guard.
@@ -527,7 +517,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     if (instantiatedRef.current) return;
     instantiatedRef.current = true;
 
-    const track = selectedTrackRef.current;
+    // Reads via getState() escape hatch (not a selector) to avoid a stale closure — the callback is memoised with empty deps.
+    const track = useSurveySessionStore.getState().selectedTrack;
     applyStepCompletion(
       "choose_base",
       { base, vfs, ir, removalCapabilities, track: track ?? null },
@@ -615,13 +606,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     routeAnswersThroughMutate(result, reducerDeps);
     setIdentityResult(identity);
     setSurveyContext(contextFromIdentity(identity));
-    setActiveStepId(identity.supported ? nextSpineStepAfter("identity") : "unsupported");
+    sessionAdvance(identity.supported ? nextSpineStepAfter("identity") : "unsupported");
   }
 
   /** choose_base step completes — start pipeline, advance to track manifest step. */
   function handleBaseResolved(base: BaseKeyboard) {
     setLocalBase(base);
-    setActiveStepId(nextSpineStepAfter("choose_base"));
+    sessionAdvance(nextSpineStepAfter("choose_base"));
   }
 
   /**
@@ -633,12 +624,12 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     setSelectedTrack(track);
     if (track === "copy") {
       // Copy-track takes the project_name side-trail.
-      setActiveStepId("project_name");
+      sessionAdvance("project_name");
     } else {
       // Adapt-track: no scaffoldSpec needed — adapt uses base's own id/displayName.
       setScaffoldSpec(null);
       // Skip project_name (spine:false) — nextSpineStepAfter("track") jumps to characters.
-      setActiveStepId(nextSpineStepAfter("track"));
+      sessionAdvance(nextSpineStepAfter("track"));
       setCharactersSub("prefill");
     }
   }
@@ -652,7 +643,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     setScaffoldSpec({ keyboardId, displayName });
     setStoreIdentity({ keyboardId, displayName });
     // project_name.joinTarget is "characters" — advance there directly.
-    setActiveStepId("characters");
+    sessionAdvance("characters");
     setCharactersSub("prefill");
   }
 
@@ -673,7 +664,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // mutate() (flag-gated) before the characters step's R5 side effect.
     routeAnswersThroughMutate(result, reducerDeps);
     applyStepCompletion("characters", result, reducerDeps);
-    setActiveStepId(nextSpineStepAfter("characters"));
+    sessionAdvance(nextSpineStepAfter("characters"));
   }
 
   // --- Spine gallery/phase completion handlers ---
@@ -681,7 +672,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   /** carve step completes → mechanisms. */
   function handleCarveComplete() {
     applyStepCompletion("carve", undefined, reducerDeps);
-    setActiveStepId(nextSpineStepAfter("carve"));
+    sessionAdvance(nextSpineStepAfter("carve"));
   }
 
   /**
@@ -690,7 +681,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
    */
   function handleMechanismsComplete() {
     applyStepCompletion("mechanisms", undefined, reducerDeps);
-    setActiveStepId(nextSpineStepAfter("mechanisms"));
+    sessionAdvance(nextSpineStepAfter("mechanisms"));
   }
 
   /**
@@ -703,72 +694,79 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       { assignments, baseIr, baseVfs },
       reducerDeps,
     );
-    setActiveStepId(nextSpineStepAfter("touch"));
+    sessionAdvance(nextSpineStepAfter("touch"));
   }
 
   /** help (Phase F) step completes → done, navigate to output. */
   function handlePhaseFComplete(result: SurveyPhaseResult) {
     recordPhase(result);
     applyStepCompletion("help", result, reducerDeps);
-    setActiveStepId("done");
+    sessionAdvance("done");
     navigateTo("output");
   }
 
-  /** Start over — reset all wizard state to initial. */
+  /**
+   * Start over — reset session store first (clears all traversal slots + history),
+   * then reset the working-copy store and local component state.
+   * Ordering: session.reset() before instantiatedRef.current = false so the
+   * guard is clear before any re-instantiation can fire (research D-R5).
+   */
   function handleStartOver() {
+    sessionReset();
     resetSurvey();
-    setIdentityResult(null);
-    setSurveyContext({});
-    setLocalBase(null);
-    setSelectedTrack(null);
-    setScaffoldSpec(null);
     instantiatedRef.current = false;
-    setActiveStepId("identity");
     setCharactersSub("prefill");
   }
 
   // ---------------------------------------------------------------------------
   // Back navigation handlers — purely local (no side effects via reducer).
+  // Use popHistory() wherever the walked history reproduces today's destination.
+  // Intra-step charactersSub adjustments remain component-local (spec §4).
   // ---------------------------------------------------------------------------
 
-  /** Back from choose_base → identity. */
-  function handleBaseBack() { setActiveStepId("identity"); }
+  /** Back from choose_base → identity (pop: identity was the walked predecessor). */
+  function handleBaseBack() { sessionPopHistory(); }
 
-  /** Back from track → choose_base. */
-  function handleTrackBack() { setActiveStepId("choose_base"); }
+  /** Back from track → choose_base (pop: choose_base was the walked predecessor). */
+  function handleTrackBack() { sessionPopHistory(); }
 
   /**
-   * Back from project_name → track.
+   * Back from project_name → track (pop: track was the walked predecessor).
    * (project_name is a manifest step with its own back affordance.)
    */
-  function handleProjectNameBack() { setActiveStepId("track"); }
+  function handleProjectNameBack() { sessionPopHistory(); }
 
   /**
    * Back from characters/prefill.
-   * copy-track: → project_name (its preceding manifest step).
-   * adapt-track: → track (project_name was skipped on the adapt path).
+   * copy-track: → project_name; adapt-track: → track.
+   * Both fall out of the walked history for free (D-R3).
    */
-  function handlePrefillBack() {
-    setActiveStepId(selectedTrack === "copy" ? "project_name" : "track");
-  }
+  function handlePrefillBack() { sessionPopHistory(); }
 
-  /** Back from characters/B → prefill (stays in characters intra-phase). */
+  /**
+   * Back from characters/B → prefill (stays in characters intra-phase).
+   * Pure intra-step: no history pop — SurveyRunner's internal answer stack
+   * owns this until it bottoms out to onBack (research D-R3).
+   */
   function handlePhaseBBack() { setCharactersSub("prefill"); }
 
-  /** Back from carve → characters/B. */
+  /**
+   * Back from carve → characters/B.
+   * Pop restores the step; local setter restores the sub-stage (research D-R3).
+   */
   function handleCarveBack() {
-    setActiveStepId("characters");
+    sessionPopHistory();
     setCharactersSub("B");
   }
 
-  /** Back from mechanisms → carve. */
-  function handleMechanismsBack() { setActiveStepId("carve"); }
+  /** Back from mechanisms → carve (pop: carve was the walked predecessor). */
+  function handleMechanismsBack() { sessionPopHistory(); }
 
-  /** Back from touch (E) → mechanisms. */
-  function handleTouchBack() { setActiveStepId("mechanisms"); }
+  /** Back from touch (E) → mechanisms (pop: mechanisms was the walked predecessor). */
+  function handleTouchBack() { sessionPopHistory(); }
 
-  /** Back from help (F) → touch (E). */
-  function handleHelpBack() { setActiveStepId("touch"); }
+  /** Back from help (F) → touch (E) (pop: touch was the walked predecessor). */
+  function handleHelpBack() { sessionPopHistory(); }
 
   // ---------------------------------------------------------------------------
   // Style constants

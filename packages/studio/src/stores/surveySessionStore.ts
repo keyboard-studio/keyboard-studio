@@ -1,0 +1,184 @@
+// surveySessionStore — single source of truth for survey wizard traversal state.
+//
+// Holds the traversal state that moves out of SurveyView: which step is active,
+// the walked-history stack for back navigation, and the five value slots set
+// across wizard steps. Does NOT hold pipeline state (instantiatedRef, oskMode,
+// charactersSub) — those remain component-local per spec §4.
+//
+// Architecture contract:
+//   - State lives HERE. SurveyView reads via selectors, writes via actions.
+//   - `advance(stepId)` pushes the current activeStepId onto history, then sets
+//     the new step. This is the one forward primitive; every forward transition
+//     routes through it so history is always the true walked path (D5).
+//   - `popHistory()` pops the last entry off history and sets it as activeStepId.
+//     No-op when history is empty (back disabled at the first step).
+//   - `reset()` clears every slot to initial (start-over).
+//   - Plain setters for the five value slots.
+//   - No host-disk writes. No persistence.
+//   - Worker boundary upheld: WASM is not imported here.
+//   - All survey/hooks imports are type-only (depcruise / bundle hygiene, D-R2).
+
+import { create } from "zustand";
+import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { IdentityLiteResult } from "../survey/index.ts";
+import type { SurveyContext } from "../survey/types.ts";
+import type { Track } from "../survey/PhaseTrack.tsx";
+import type { ScaffoldSpec } from "../hooks/useKeyboardArtifact.ts";
+
+// ---------------------------------------------------------------------------
+// ActiveStepId — the set of manifest step ids the runtime advances through,
+// plus terminal states "done" and "unsupported" not present in the manifest.
+//
+// Copied verbatim from StudioShell.tsx:237 (pre-migration). This module now
+// owns the traversal vocabulary (research D-R1).
+// ---------------------------------------------------------------------------
+
+export type ActiveStepId =
+  | "identity"
+  | "choose_base"
+  | "track"
+  | "project_name"
+  | "characters"
+  | "carve"
+  | "mechanisms"
+  | "touch"
+  | "help"
+  | "done"
+  | "unsupported";
+
+// ---------------------------------------------------------------------------
+// State interface
+// ---------------------------------------------------------------------------
+
+export interface SurveySessionState {
+  // --- traversal slots ---
+
+  /** Current manifest step id, incl. terminals "done" / "unsupported". */
+  activeStepId: ActiveStepId;
+
+  /**
+   * Walked-step stack — the back-nav source of truth (D5).
+   * Push on advance, pop on popHistory. Never contains intra-step sub-stages
+   * (charactersSub stays component-local).
+   */
+  history: readonly ActiveStepId[];
+
+  /** Identity-lite output from the identity step. Null until the step completes. */
+  identityResult: IdentityLiteResult | null;
+
+  /**
+   * Derived from identityResult via contextFromIdentity. Stored (not re-derived)
+   * to match today's useState semantics. Empty object until identity completes.
+   */
+  surveyContext: SurveyContext;
+
+  /** "copy" | "adapt" chosen at the track step. Null until that step completes. */
+  selectedTrack: Track | null;
+
+  /**
+   * Track-1 project metadata set at the project_name step.
+   * Null for Track 2 (adapt uses the base's existing id/name).
+   */
+  scaffoldSpec: ScaffoldSpec | null;
+
+  /**
+   * Local base selection that drives the compile pipeline immediately on pick.
+   * Separate from workingCopyStore.baseKeyboard — set as soon as BaseResolution
+   * resolves, before the compile cycle completes. Null until first base selection.
+   */
+  localBase: BaseKeyboard | null;
+
+  // --- actions ---
+
+  /**
+   * Forward transition primitive. Pushes the current activeStepId onto history,
+   * then sets activeStepId to stepId. Every forward transition routes through
+   * this so history is always the true walked path.
+   */
+  advance: (stepId: ActiveStepId) => void;
+
+  /**
+   * Generic back. Pops the last entry off history and sets it as activeStepId.
+   * No-op when history is empty (guards the identity/first step).
+   */
+  popHistory: () => void;
+
+  /** Reset every slot to initial (start-over). Includes clearing history. */
+  reset: () => void;
+
+  /** Plain setter — identity-lite output. */
+  setIdentityResult: (r: IdentityLiteResult | null) => void;
+
+  /** Plain setter — survey context derived from identity. */
+  setSurveyContext: (c: SurveyContext) => void;
+
+  /** Plain setter — chosen track. */
+  setSelectedTrack: (t: Track | null) => void;
+
+  /** Plain setter — Track-1 scaffold spec. */
+  setScaffoldSpec: (s: ScaffoldSpec | null) => void;
+
+  /** Plain setter — local base driving the compile pipeline. */
+  setLocalBase: (b: BaseKeyboard | null) => void;
+}
+
+// ---------------------------------------------------------------------------
+// Initial state (extracted so reset() and the initializer share one source)
+// ---------------------------------------------------------------------------
+
+const INITIAL_STATE = {
+  activeStepId: "identity" as ActiveStepId,
+  history: [] as readonly ActiveStepId[],
+  identityResult: null,
+  surveyContext: {} as SurveyContext,
+  selectedTrack: null,
+  scaffoldSpec: null,
+  localBase: null,
+} as const satisfies Omit<
+  SurveySessionState,
+  | "advance" | "popHistory" | "reset"
+  | "setIdentityResult" | "setSurveyContext" | "setSelectedTrack"
+  | "setScaffoldSpec" | "setLocalBase"
+>;
+
+// ---------------------------------------------------------------------------
+// Store
+// ---------------------------------------------------------------------------
+
+export const useSurveySessionStore = create<SurveySessionState>((set, get) => ({
+  ...INITIAL_STATE,
+
+  advance: (stepId) =>
+    set((s) => ({
+      history: [...s.history, s.activeStepId],
+      activeStepId: stepId,
+    })),
+
+  popHistory: () =>
+    set((s) => {
+      if (s.history.length === 0) return s;
+      // Non-null: length guard above proves this index exists.
+      const prev = s.history[s.history.length - 1]!;
+      return {
+        activeStepId: prev,
+        history: s.history.slice(0, -1),
+      };
+    }),
+
+  reset: () =>
+    set({
+      ...INITIAL_STATE,
+      // Re-initialize array so mutations do not bleed across resets.
+      history: [] as readonly ActiveStepId[],
+    }),
+
+  setIdentityResult: (r) => set({ identityResult: r }),
+  setSurveyContext: (c) => set({ surveyContext: c }),
+  setSelectedTrack: (t) => set({ selectedTrack: t }),
+  setScaffoldSpec: (s) => set({ scaffoldSpec: s }),
+  setLocalBase: (b) => set({ localBase: b }),
+}));
+
+// Ensure the store's getState() escape hatch is available for imperative reads
+// inside memoised callbacks (e.g. onInstantiate reads selectedTrack this way).
+// No extra export needed — zustand attaches getState() to the hook directly.
