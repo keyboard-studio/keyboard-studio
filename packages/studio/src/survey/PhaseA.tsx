@@ -27,7 +27,7 @@ import { primarySubtag } from "../lib/suggestBase.ts";
 
 // Vite ?raw import — YAML source as a plain string, no network request.
 // Typed via the `*.yaml?raw` module declaration in src/vite-env.d.ts.
-import phaseARaw from "../../../../content/flows/phase_a_identity.modular.yaml?raw";
+import phaseARaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
 
 // ---------------------------------------------------------------------------
 // Answer extraction helpers (exported for callers)

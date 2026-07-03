@@ -35,15 +35,20 @@ export type EdgeKind = "linear" | "conditional" | "default";
  *   "live"                — a step the runtime runs
  *   "library-not-in-flow" — a registered module the live manifest does not reference
  *   "stub"               — a gallery or hand-built wizard stage with no question metadata
+ *   "proposed"           — a question inside a proposed flow (spec 025, D6): rendered as
+ *                          an ordered graph in the Library section, NOT run by the runtime
+ *                          and excluded from the rendered<->runtime bijection.
  */
-export type NodeKind = "live" | "library-not-in-flow" | "stub";
+export type NodeKind = "live" | "library-not-in-flow" | "stub" | "proposed";
 
 /**
  * P0 region grouping: where on the map the node appears.
  *   "flow"             — belongs to the survey spine
  *   "not-yet-ordered"  — stage whose spine position is not yet derivable
+ *   "library"          — proposed-flow nodes (spec 025): a distinct Library section,
+ *                        separate from the live spine and from flat reserve.
  */
-export type NodeRegion = "flow" | "not-yet-ordered";
+export type NodeRegion = "flow" | "not-yet-ordered" | "library";
 
 /** A single question, flattened for rendering. */
 export interface GraphNode {
@@ -99,6 +104,12 @@ export interface GraphNode {
    * Populated only on projected manifest-step nodes; absent on question nodes.
    */
   stepKind?: "editor-step" | "question-step";
+  /**
+   * spec 025 (FR-005): true when this proposed-flow question also appears in a LIVE
+   * flow ("also live" dual-reference). Set only on kind:"proposed" nodes; a WARN
+   * signal (never a failure) surfaced as an "also live" badge in the Library graph.
+   */
+  alsoLive?: boolean;
 }
 
 /** A directed transition between two questions. */

@@ -28,7 +28,7 @@ import {
   buildManifestProjection,
   attachDrillDowns,
 } from "./manifestProjection.ts";
-import { buildFlowSources } from "./renderedNodeSet.ts";
+import { buildFlowSources, buildLibrarySection } from "./renderedNodeSet.ts";
 import { FlowGraphView } from "./FlowGraphView.tsx";
 import { StrategyTreeView } from "./StrategyTreeView.tsx";
 import { ScriptRoutingView } from "./ScriptRoutingView.tsx";
@@ -87,6 +87,7 @@ function FlowLegend() {
       <LegendItem swatch="#0f2417" border="#3fb950" label="terminal" />
       <LegendItem swatch="#1a1030" border="#6e40c9" label="reserve (not in live flow)" />
       <LegendItem swatch="#0d2035" border="#58a6ff" label="stub (gallery / wizard step)" />
+      <LegendItem swatch="#0c2a2e" border="#39c5cf" label="proposed (Library — not live)" />
       <span style={{ width: 1, alignSelf: "stretch", background: "#21262d" }} />
       <EdgeLegendItem color="#d29922" label="conditional branch" />
       <EdgeLegendItem color="#6e7681" dashed label="default (else)" />
@@ -292,6 +293,10 @@ export interface FlowMapViewProps {
 export function FlowMapView({ completeness, axisFills }: FlowMapViewProps) {
   const [section, setSection] = useState<Section>("flow");
   const flows = useMemo(() => buildFlowSources(), []);
+  // spec 025 (D6): the Library section — proposed-flow ordered graphs + flat
+  // reserve + "also live" dual-references. Derived from flowSources status:"proposed"
+  // entries; excluded from the live rendered<->runtime bijection.
+  const library = useMemo(() => buildLibrarySection(), []);
 
   // Spec 015 (DEC-001 = Variant A): project the manifest spine onto a FlowGraph
   // via the StepGraph → FlowGraph/GraphNode adapter, reusing FlowGraphView /
@@ -434,6 +439,95 @@ export function FlowMapView({ completeness, axisFills }: FlowMapViewProps) {
               </div>
             );
           })}
+
+          {/* spec 025 (D6): the Library section — proposed flows rendered as ordered
+              graphs, clearly separated from the live flow (ADR-0001). These do NOT
+              run in the live survey and are excluded from the rendered<->runtime
+              bijection. */}
+          <section style={{ marginTop: 36, borderTop: "1px solid #21262d", paddingTop: 24 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 4, flexWrap: "wrap" }}>
+              <h2 style={{ margin: 0, fontSize: 15, color: "#39c5cf" }}>Library — proposed flows</h2>
+              <span style={{ fontSize: 11.5, color: "#6e7681", fontFamily: MONO }}>
+                {library.proposed.length} proposed · not in the live survey
+              </span>
+            </div>
+            <p style={{ margin: "0 0 16px", fontSize: 12, color: "#6e7681", maxWidth: 920 }}>
+              Ordered graphs of flows registered as <code style={{ fontFamily: MONO }}>status:"proposed"</code> — browsable
+              and promotable, never run by the live survey. See{" "}
+              <code style={{ fontFamily: MONO }}>content/flows/README.md</code> for the promotion runbook.
+            </p>
+
+            {/* Dual-reference ("also live") WARN — never a failure. */}
+            {library.dualReferenced.length > 0 && (
+              <div
+                style={{
+                  color: "#e3b341",
+                  fontFamily: MONO,
+                  fontSize: 12,
+                  padding: "8px 12px",
+                  marginBottom: 16,
+                  border: "1px solid #9e6a03",
+                  borderRadius: 6,
+                  background: "#241c10",
+                }}
+              >
+                [WARN] also live — question(s) in both a live and a proposed flow:{" "}
+                {library.dualReferenced.join(", ")}
+              </div>
+            )}
+
+            {library.proposed.map(({ id, graph, error, title }) => (
+              <section key={id} style={{ marginBottom: 28 }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
+                  <h3 style={{ margin: 0, fontSize: 14, color: "#adbac7" }}>{title}</h3>
+                  <span style={{ fontSize: 11.5, color: "#6e7681", fontFamily: MONO }}>
+                    proposed flow: {id}
+                    {graph !== null && ` · ${graph.nodes.length} questions · ${graph.edges.length} edges`}
+                  </span>
+                </div>
+                {error !== null && (
+                  <div style={{ color: "#ff9492", fontFamily: MONO, fontSize: 12, padding: 12, border: "1px solid #763a3a", borderRadius: 6 }}>
+                    Failed to parse: {error}
+                  </div>
+                )}
+                {graph !== null && graph.danglingTargets.length > 0 && (
+                  <div
+                    style={{
+                      color: "#e3b341",
+                      fontFamily: MONO,
+                      fontSize: 12,
+                      padding: "8px 12px",
+                      marginBottom: 8,
+                      border: "1px solid #9e6a03",
+                      borderRadius: 6,
+                      background: "#241c10",
+                    }}
+                  >
+                    Dangling goto target(s): {graph.danglingTargets.join(", ")}
+                  </div>
+                )}
+                {graph !== null && <FlowGraphView graph={graph} />}
+              </section>
+            ))}
+
+            {/* Flat reserve — questions in NO flow at all (neither live nor proposed). */}
+            <div style={{ marginTop: 8 }}>
+              <h3 style={{ margin: "0 0 6px", fontSize: 13, color: "#adbac7" }}>
+                Reserve — questions in no flow
+              </h3>
+              {library.reserve.length === 0 ? (
+                <span style={{ color: "#3fb950", fontFamily: MONO, fontSize: 12 }}>
+                  [OK] Every registered question belongs to a live or proposed flow.
+                </span>
+              ) : (
+                <ul style={{ margin: 0, padding: "0 0 0 16px", color: "#8b949e", fontFamily: MONO, fontSize: 12 }}>
+                  {library.reserve.map((n) => (
+                    <li key={n.id}>{n.id}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
         </>
       )}
 

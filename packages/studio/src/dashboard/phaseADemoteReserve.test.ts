@@ -27,7 +27,7 @@
 import { describe, it, expect } from "vitest";
 
 import identityLiteModularRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
-import phaseAModularRaw from "../../../../content/flows/phase_a_identity.modular.yaml?raw";
+import phaseAModularRaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
 import { buildModularFlowGraph } from "./buildStepGraph.ts";
 import { loadModularFlow } from "../survey/loadModularFlow.ts";
 import { phaseARegistry } from "../survey/questions/registry.a.ts";
