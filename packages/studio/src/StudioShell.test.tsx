@@ -839,6 +839,45 @@ describe("SurveyView — Track 2 (adapt) routing", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Adapt-track SC-002 walk — mirrors the copy-track carve->B back-navigation test
+// ---------------------------------------------------------------------------
+//
+// SC-002 requires BOTH tracks walked through to carve, including back-from-carve
+// landing on PhaseB. This test proves the adapt-track path (which skips
+// project_name) converges on the same carve-back behavior as the copy-track path.
+
+describe("SurveyView — adapt-track carve → B back-navigation (SC-002 parity)", () => {
+  it("adapt-track: selects adapt → skips project_name → prefill-confirm → stage-B → phaseB-complete → carve → carve-back lands on stage-B (not prefill)", async () => {
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
+    // Drive to track stage, then select adapt (skips project_name).
+    advanceToTrack();
+    fireEvent.click(screen.getByTestId("track-adapt"));
+
+    // Adapt-track lands directly on prefill (no project-name).
+    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+    expect(screen.queryByTestId("stage-project-name")).toBeNull();
+
+    // Confirm prefill → PhaseB visible.
+    fireEvent.click(screen.getByTestId("prefill-confirm"));
+    expect(screen.getByTestId("stage-B")).toBeTruthy();
+
+    // Advance through PhaseB to carve.
+    fireEvent.click(screen.getByTestId("phaseB-complete"));
+    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+
+    // carve-back must re-enter PhaseB (not prefill).
+    fireEvent.click(screen.getByTestId("carve-back"));
+
+    expect(screen.getByTestId("stage-B")).toBeTruthy();
+    expect(screen.queryByTestId("stage-carve")).toBeNull();
+    expect(screen.queryByTestId("stage-prefill")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Defect B regression — handlePhaseEComplete applies assignments to output
 // ---------------------------------------------------------------------------
 //

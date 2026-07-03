@@ -19,6 +19,7 @@
 
 import { irPath } from "@keyboard-studio/contracts";
 import type { Step } from "./types.ts";
+import { CharactersStep } from "../survey/CharactersStep.tsx";
 import {
   identityStep,
   chooseBaseStep,
@@ -61,8 +62,9 @@ const charactersStep: Step = {
   // step. (The session-level ScriptPrefill is a non-IR signal — not an irPath —
   // so it carries no C5 obligation; irPath('header','script') does not exist.)
   writes: [irPath("header", "bcp47")],
-  // Temporary stub component — wired in T028 via SurveyView's internal runner.
-  component: () => null,
+  // CharactersStep component — self-contained prefill/PhaseB substage adapter
+  // (spec 027 Stage 4; first runtime use of step.component).
+  component: CharactersStep,
   // phase_b_characters runs inside the characters step (spec 024, Stage 1).
   flowRefs: ["phase_b_characters"],
 } as const;
