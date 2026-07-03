@@ -1,0 +1,122 @@
+[
+  {
+    "stepId": "identity",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "setIdentityResult",
+      "setSurveyContext",
+      "advance"
+    ],
+    "workingCopyMutations": [
+      "recordPhase"
+    ],
+    "navigateTo": []
+  },
+  {
+    "stepId": "choose_base",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "setLocalBase",
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "navigateTo": []
+  },
+  {
+    "stepId": "track",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "setSelectedTrack",
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "navigateTo": []
+  },
+  {
+    "stepId": "project_name",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "setScaffoldSpec",
+      "advance",
+      "setCharactersSubStage"
+    ],
+    "workingCopyMutations": [
+      "setIdentity"
+    ],
+    "navigateTo": []
+  },
+  {
+    "stepId": "characters/prefill",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "setCharactersSubStage"
+    ],
+    "workingCopyMutations": [],
+    "navigateTo": []
+  },
+  {
+    "stepId": "characters/B",
+    "applyStepCompletion": [
+      "characters"
+    ],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [
+      "recordPhase"
+    ],
+    "navigateTo": []
+  },
+  {
+    "stepId": "carve",
+    "applyStepCompletion": [
+      "carve"
+    ],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "navigateTo": []
+  },
+  {
+    "stepId": "mechanisms",
+    "applyStepCompletion": [
+      "mechanisms"
+    ],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [
+      "lockDesktop"
+    ],
+    "navigateTo": []
+  },
+  {
+    "stepId": "touch",
+    "applyStepCompletion": [
+      "touch"
+    ],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [
+      "setTouchLayoutJson"
+    ],
+    "navigateTo": []
+  },
+  {
+    "stepId": "help",
+    "applyStepCompletion": [
+      "help"
+    ],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [
+      "recordPhase"
+    ],
+    "navigateTo": [
+      "output"
+    ]
+  }
+]
