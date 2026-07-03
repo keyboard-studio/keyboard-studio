@@ -2,8 +2,10 @@
 //
 // Holds the traversal state that moves out of SurveyView: which step is active,
 // the walked-history stack for back navigation, and the five value slots set
-// across wizard steps. Does NOT hold pipeline state (instantiatedRef, oskMode,
-// charactersSub) — those remain component-local per spec §4.
+// across wizard steps. Also holds the characters step's internal substage
+// (CharactersSubStage, spec 027 Stage 4) so it survives component remounts.
+// Does NOT hold pipeline state (instantiatedRef, oskMode) — those remain
+// component-local per spec §4.
 //
 // Architecture contract:
 //   - State lives HERE. SurveyView reads via selectors, writes via actions.
@@ -24,6 +26,16 @@ import type { IdentityLiteResult } from "../survey/index.ts";
 import type { SurveyContext } from "../survey/types.ts";
 import type { Track } from "../survey/PhaseTrack.tsx";
 import type { ScaffoldSpec } from "../hooks/useKeyboardArtifact.ts";
+
+// ---------------------------------------------------------------------------
+// CharactersSubStage — internal substage for the characters manifest step.
+//
+// Relocated from StudioShell.tsx (spec 027 Stage 4). Persisted in the store so
+// back-from-carve re-enters CharactersStep at PhaseB rather than replaying
+// prefill (the substage survives the component remount caused by a history pop).
+// ---------------------------------------------------------------------------
+
+export type CharactersSubStage = "prefill" | "B";
 
 // ---------------------------------------------------------------------------
 // ActiveStepId — the set of manifest step ids the runtime advances through,
@@ -88,6 +100,14 @@ export interface SurveySessionState {
    */
   localBase: BaseKeyboard | null;
 
+  /**
+   * Internal substage for the characters manifest step (spec 027 Stage 4).
+   * Persisted here (not in CharactersStep component state) so back-from-carve
+   * re-enters at PhaseB after the component remounts. Initial value "prefill".
+   * Cleared to "prefill" by reset().
+   */
+  charactersSubStage: CharactersSubStage;
+
   // --- actions ---
 
   /**
@@ -120,6 +140,9 @@ export interface SurveySessionState {
 
   /** Plain setter — local base driving the compile pipeline. */
   setLocalBase: (b: BaseKeyboard | null) => void;
+
+  /** Plain setter — characters step internal substage (spec 027 Stage 4). */
+  setCharactersSubStage: (s: CharactersSubStage) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -134,11 +157,12 @@ const INITIAL_STATE = {
   selectedTrack: null,
   scaffoldSpec: null,
   localBase: null,
+  charactersSubStage: "prefill" as CharactersSubStage,
 } as const satisfies Omit<
   SurveySessionState,
   | "advance" | "popHistory" | "reset"
   | "setIdentityResult" | "setSurveyContext" | "setSelectedTrack"
-  | "setScaffoldSpec" | "setLocalBase"
+  | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
 >;
 
 // ---------------------------------------------------------------------------
@@ -177,6 +201,7 @@ export const useSurveySessionStore = create<SurveySessionState>((set, get) => ({
   setSelectedTrack: (t) => set({ selectedTrack: t }),
   setScaffoldSpec: (s) => set({ scaffoldSpec: s }),
   setLocalBase: (b) => set({ localBase: b }),
+  setCharactersSubStage: (s) => set({ charactersSubStage: s }),
 }));
 
 // Ensure the store's getState() escape hatch is available for imperative reads

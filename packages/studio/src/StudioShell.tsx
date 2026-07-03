@@ -15,8 +15,9 @@ import type { BaseKeyboard, Pattern, SurveyPhaseResult, TouchAssignment } from "
 import { buildTouchLayoutJson } from "./lib/buildTouchLayoutJson.ts";
 import { useWorkingCopyStore, bindManifest } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore, type ActiveStepId } from "./stores/surveySessionStore.ts";
+import { CharactersStep } from "./survey/CharactersStep.tsx";
 import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
-import { IdentityLite, Prefill, PhaseB, PhaseF, PhaseTrack, PhaseProjectName, type IdentityLiteResult } from "./survey/index.ts";
+import { IdentityLite, PhaseF, PhaseTrack, PhaseProjectName, type IdentityLiteResult } from "./survey/index.ts";
 import { BaseResolution } from "./editors/panels/BaseResolution.tsx";
 import { UnsupportedScriptStub } from "./components/UnsupportedScriptStub.tsx";
 import type { SuggestTarget } from "./lib/suggestBase.ts";
@@ -231,11 +232,6 @@ const SURVEY_LEFT_INIT_PCT = 45;
 // owner). See stores/surveySessionStore.ts (research D-R1).
 // ---------------------------------------------------------------------------
 
-// Sub-stage within the characters manifest step (intra-phase routing).
-// prefill→B is legitimately internal to the Phase A/B SurveyRunner;
-// synthesis confirmed these should NOT be promoted to manifest steps.
-type CharactersSubStage = "prefill" | "B";
-
 // ---------------------------------------------------------------------------
 // validateManifestShape — throw-on-mismatch structural guard (M2, M3, M4).
 // Called once at module load; a misshapen manifest is a hard error, not a
@@ -404,6 +400,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const setSelectedTrack = useSurveySessionStore((s) => s.setSelectedTrack);
   const setScaffoldSpec = useSurveySessionStore((s) => s.setScaffoldSpec);
   const setLocalBase = useSurveySessionStore((s) => s.setLocalBase);
+  const setCharactersSubStage = useSurveySessionStore((s) => s.setCharactersSubStage);
 
   // Reset the session store on mount — the store is a module-level singleton that
   // persists across React tree unmounts/remounts (e.g. navigating away from the
@@ -415,10 +412,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     useSurveySessionStore.getState().reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally empty: runs exactly once on mount
   }, []);
-
-  // Sub-stage for the characters manifest step (intra-phase: prefill → B).
-  // Stays component-local per spec §4 (dies in Stage 4 / spec 027).
-  const [charactersSub, setCharactersSub] = useState<CharactersSubStage>("prefill");
 
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
   const { containerRef, leftPct, handleHovered, onPointerDown, setHandleHovered } =
@@ -630,7 +623,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       setScaffoldSpec(null);
       // Skip project_name (spine:false) — nextSpineStepAfter("track") jumps to characters.
       sessionAdvance(nextSpineStepAfter("track"));
-      setCharactersSub("prefill");
+      // Ensure a fresh characters entry starts at prefill (store slot may hold
+      // "B" from a prior session if start-over was not called — belt-and-suspenders).
+      setCharactersSubStage("prefill");
     }
   }
 
@@ -644,27 +639,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     setStoreIdentity({ keyboardId, displayName });
     // project_name.joinTarget is "characters" — advance there directly.
     sessionAdvance("characters");
-    setCharactersSub("prefill");
-  }
-
-  // --- characters internal sub-stage handlers (intra-phase routing) ---
-
-  /** Prefill confirmed — advance to B (Phase B question battery). */
-  function handlePrefillConfirm() {
-    setCharactersSub("B");
-  }
-
-  /**
-   * Phase B (characters) completes — record phase result, dispatch R5 (no-op),
-   * advance to carve (FR-012: characters BEFORE carve).
-   */
-  function handlePhaseBComplete(result: SurveyPhaseResult) {
-    recordPhase(result);
-    // spec-014 US1: route Phase B in-scope answers (pb_standard_letters) through
-    // mutate() (flag-gated) before the characters step's R5 side effect.
-    routeAnswersThroughMutate(result, reducerDeps);
-    applyStepCompletion("characters", result, reducerDeps);
-    sessionAdvance(nextSpineStepAfter("characters"));
+    // Ensure a fresh characters entry starts at prefill (store slot may hold
+    // "B" from a prior session if start-over was not called — belt-and-suspenders).
+    setCharactersSubStage("prefill");
   }
 
   // --- Spine gallery/phase completion handlers ---
@@ -715,13 +692,14 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     sessionReset();
     resetSurvey();
     instantiatedRef.current = false;
-    setCharactersSub("prefill");
+    // sessionReset() calls reset() which already clears charactersSubStage to
+    // "prefill" (spec 027 Stage 4 — the store slot is the authoritative owner).
   }
 
   // ---------------------------------------------------------------------------
   // Back navigation handlers — purely local (no side effects via reducer).
   // Use popHistory() wherever the walked history reproduces today's destination.
-  // Intra-step charactersSub adjustments remain component-local (spec §4).
+  // Intra-step substage navigation is owned by CharactersStep (spec 027 Stage 4).
   // ---------------------------------------------------------------------------
 
   /** Back from choose_base → identity (pop: identity was the walked predecessor). */
@@ -737,26 +715,16 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   function handleProjectNameBack() { sessionPopHistory(); }
 
   /**
-   * Back from characters/prefill.
-   * copy-track: → project_name; adapt-track: → track.
-   * Both fall out of the walked history for free (D-R3).
-   */
-  function handlePrefillBack() { sessionPopHistory(); }
-
-  /**
-   * Back from characters/B → prefill (stays in characters intra-phase).
-   * Pure intra-step: no history pop — SurveyRunner's internal answer stack
-   * owns this until it bottoms out to onBack (research D-R3).
-   */
-  function handlePhaseBBack() { setCharactersSub("prefill"); }
-
-  /**
-   * Back from carve → characters/B.
-   * Pop restores the step; local setter restores the sub-stage (research D-R3).
+   * Back from carve → characters/B (re-entry at PhaseB).
+   * Pop restores the step; the store slot already holds "B" (CharactersStep set
+   * it when the user confirmed prefill, and it was not cleared on carve-advance).
+   * CharactersStep reads the slot on remount and renders PhaseB directly (spec
+   * 027 §4 re-entry table).
    */
   function handleCarveBack() {
     sessionPopHistory();
-    setCharactersSub("B");
+    // No setCharactersSubStage call — the slot still holds "B" from when the user
+    // moved from prefill to PhaseB. CharactersStep will remount at PhaseB.
   }
 
   /** Back from mechanisms → carve (pop: carve was the walked predecessor). */
@@ -954,30 +922,23 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       ) : null;
     }
 
-    // Manifest step: characters — intra-phase routing: prefill → B.
+    // Manifest step: characters — driven by CharactersStep adapter (spec 027
+    // Stage 4; first runtime use of step.component). The adapter owns the
+    // prefill -> PhaseB substage internally via the persisted store slot.
     if (stepId === "characters") {
-      if (charactersSub === "prefill" && identityResult !== null && localBase !== null) {
-        return (
-          <Prefill
-            identity={identityResult}
-            base={localBase}
-            onConfirm={handlePrefillConfirm}
-            onBack={handlePrefillBack}
-          />
-        );
-      }
-      if (charactersSub === "B") {
-        // NOTE: placementMap is intentionally not supplied here in v1 (see D-INT-2).
-        return (
-          <PhaseB
-            context={surveyContext}
-            onComplete={handlePhaseBComplete}
-            onBack={handlePhaseBBack}
-            findingsByQuestionId={findingsByQuestionId}
-          />
-        );
-      }
-      return null;
+      return (
+        <CharactersStep
+          onComplete={(result) => {
+            const r = result as SurveyPhaseResult;
+            recordPhase(r);
+            // spec-014 US1: route Phase B in-scope answers through mutate() (flag-gated).
+            routeAnswersThroughMutate(r, reducerDeps);
+            applyStepCompletion("characters", r, reducerDeps);
+            sessionAdvance(nextSpineStepAfter("characters"));
+          }}
+          onBack={() => sessionPopHistory()}
+        />
+      );
     }
 
     // Manifest step: help (Phase F).
