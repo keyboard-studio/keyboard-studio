@@ -215,3 +215,42 @@ output time (spec §12). It is never written into the `.kmn` source file.
 The `questionId` values in the example's `answers` array map 1:1 to the `id`
 fields in the template. The example also shows the `routing_group` and
 `script_family` values that the engine derives from the answers.
+
+---
+
+## Proposed flows (`proposed/`) and the Library section (spec 025, D6)
+
+A **proposed flow** is a flow that is *not* run by the live survey but is kept as a
+browsable, promotable ordered graph in the Flow Map's **Library** section. It is how
+demoted-but-not-deleted content (e.g. the full non-identity Phase A battery) keeps its
+intended sequence visible instead of collapsing to a flat reserve list.
+
+A proposed flow is declared in **two** places (belt-and-suspenders, per
+[ADR-0001](../../docs/adr/0001-flow-map-derived-from-one-source.md) — "no second list to
+drift"):
+
+1. **Location + header** — the YAML lives under `content/flows/proposed/` and carries a
+   `status: proposed` header field (read by `parseThinYaml`; absent means `"live"`).
+2. **Catalogue** — its `steps/flowSources.ts` entry carries `status: "proposed"`.
+
+A completeness test (`dashboard/proposedFlows.test.ts`) asserts these two agree for every
+entry, so they cannot diverge silently.
+
+Proposed-flow node ids are **excluded from the rendered↔runtime bijection** (like reserve).
+A question appearing in **both** a live and a proposed flow is flagged with an "also live"
+badge (a WARN, never a failure). A manifest `flowRef` that targets a `status:"proposed"`
+entry is a **hard failure** — promotion must be explicit.
+
+### Promotion runbook (proposed → live)
+
+1. `git mv content/flows/proposed/<flow>.modular.yaml content/flows/<flow>.modular.yaml`
+   and **delete the `status: proposed` line** from the YAML header. (Update its `?raw`
+   import path in `steps/flowSources.ts`.)
+2. Flip the `flowSources` entry's `status` from `"proposed"` to `"live"`.
+3. Add `flowRefs: ["<flow_id>"]` to a manifest step. For a **new** step, also give it a
+   component (custom React or `makeFlowStepComponent`).
+4. The completeness checks (`flowSources.test.ts` D2b/D2c) + the drift guardrail then
+   enforce it as live automatically.
+
+**Demotion** is the exact reverse. Either direction, the spec-022 no-delete guardrail keeps
+every module registered + on-disk + test-covered — demotion is never deletion.

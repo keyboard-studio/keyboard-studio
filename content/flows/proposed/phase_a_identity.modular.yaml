@@ -1,15 +1,25 @@
-# Phase A modular flow descriptor.
+# Phase A modular flow descriptor — PROPOSED flow (spec 025, D6).
 #
-# This file replaces the inline question definitions with ordered ID lists.
+# This file lists the demoted 30-question Phase A battery (15 identity + 15
+# provenance_*). It is a PROPOSED flow: it is NOT referenced by any manifest step
+# and does NOT run in the live survey. It renders as an ordered graph in the Flow
+# Map's Library section so its intended sequence stays visible for eventual
+# promotion. See docs/adr/0001-flow-map-derived-from-one-source.md.
+#
 # The actual question definitions live in:
 #   packages/studio/src/survey/questions/a/{questionId}.ts
+# Its modules remain registered (spec-022 no-delete guardrail).
 #
-# Do NOT delete phase_a_identity.yaml — it remains the source of truth for
-# legacy loadFlow.ts during the fan-out period. This file is consumed by
-# loadModularFlow.ts once all per-phase sub-registries are merged.
+# PROMOTION: to make this live, follow the runbook in content/flows/README.md
+# (git mv out of proposed/, delete the `status:` line below, flip the flowSources
+# entry to "live", add flowRefs to a manifest step).
 
 flow_id: phase_a_identity
 phase: "A"
+# spec 025 (D6): machine-truth marker that this is a proposed (not live) flow.
+# Bound to the steps/flowSources.ts status:"proposed" entry by a completeness
+# test (proposedFlows.test.ts). Delete this line when promoting to live.
+status: proposed
 
 questions:
   - desktop_first_notice

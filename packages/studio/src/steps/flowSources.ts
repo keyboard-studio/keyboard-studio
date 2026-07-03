@@ -13,11 +13,12 @@
 //   "live"     — referenced by at least one manifest step via flowRefs;
 //                appears as a live drill-down in the Flow Map.
 //   "proposed" — known to the registry but NOT referenced by any manifest step;
-//                excluded from live drill-downs; rendered only as a flat Library
-//                list (Stage 2 will add full ordered graphs for proposed entries).
+//                excluded from live drill-downs and from the rendered<->runtime
+//                bijection; rendered as an ordered graph in the Flow Map's Library
+//                section (spec 025, D6). Its YAML also carries `status: proposed`.
 
 import identityLiteModularRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
-import phaseAIdentityModularRaw from "../../../../content/flows/phase_a_identity.modular.yaml?raw";
+import phaseAIdentityModularRaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
 import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modular.yaml?raw";
 import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
 import trackModularRaw from "../../../../content/flows/track.modular.yaml?raw";
