@@ -17,6 +17,7 @@ export interface AdvanceContext {
 export interface AdvanceOutcome {
   readonly next: ActiveStepId;
   readonly navigate?: "output";
+  readonly setCharactersSubStage?: "prefill";
 }
 
 export function advance(
@@ -36,13 +37,19 @@ export function advance(
   returns `{ next: <same terminal> }`.
 - **Fork correctness** (the load-bearing cases):
   - `advance("track", _, { selectedTrack: "copy" })` → `{ next: "project_name" }`
-  - `advance("track", _, { selectedTrack: "adapt" })` → `{ next: "characters" }`
-  - `advance("project_name", _, _)` → `{ next: "characters" }`
+  - `advance("track", _, { selectedTrack: "adapt" })` → `{ next: "characters", setCharactersSubStage: "prefill" }`
+  - `advance("project_name", _, _)` → `{ next: "characters", setCharactersSubStage: "prefill" }`
   - `advance("identity", _, { identitySupported: false })` → `{ next: "unsupported" }`
   - `advance("identity", _, { identitySupported: true })` → `{ next: "choose_base" }`
   - `advance("help", _, _)` → `{ next: "done", navigate: "output" }`
   - spine hops (`choose_base→track`, `characters→carve`, `carve→mechanisms`,
     `mechanisms→touch`, `touch→help`) match `nextSpineStepAfter` exactly (skips `spine:false`).
+- **`setCharactersSubStage` semantics**: when present and equal to `"prefill"`, the host calls
+  `setCharactersSubStage("prefill")` on the store immediately after `session.advance(next)` and
+  before any `navigateTo` call. This is a belt-and-suspenders reset ensuring the characters step
+  always starts at the prefill sub-stage — matching the pre-Stage-5 handler ordering asserted by
+  the golden-walk oracle. The policy returns this as a declarative signal (pure); the host
+  performs the store mutation (same pattern as `navigate?: "output"`).
 
 ## 2. `components/StepHost.tsx` — generic host
 
@@ -68,8 +75,9 @@ export function StepHost(props: StepHostProps): ReactNode;
   - `onComplete(result)` → generic completion path:
     1. if `result` is `SurveyPhaseResult`-shaped: `recordPhase(result)` + `routeAnswersThroughMutate(result, deps)`;
     2. `applyStepCompletion(step.id, result, deps)`;
-    3. `const { next, navigate } = advance(step.id, result, { selectedTrack, identitySupported })`; `session.advance(next)`;
-    4. if `navigate === "output"`: `navigateTo("output")`.
+    3. `const { next, navigate, setCharactersSubStage } = advance(step.id, result, { selectedTrack, identitySupported })`; `session.advance(next)`;
+    4. if `setCharactersSubStage === "prefill"`: `session.setCharactersSubStage("prefill")`;
+    5. if `navigate === "output"`: `navigateTo("output")`.
   - `onBack()` → `session.popHistory()` (the component calls this only when its internal back
     stack bottoms out).
   - `ctx` → `props.ctx`.

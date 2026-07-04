@@ -23,6 +23,7 @@ A pure snapshot of the session values the advance policy branches on. Passed *in
 |-------|------|---------|
 | `next` | `ActiveStepId` | the next active step id (incl. `done`/`unsupported`) |
 | `navigate?` | `"output"` | set only when reaching `done`, so the host reproduces `navigateTo("output")` |
+| `setCharactersSubStage?` | `"prefill"` | set on the adapt-track (`track`→`characters`) and copy-track side-trail (`project_name`→`characters`) transitions; signals the host to call `session.setCharactersSubStage("prefill")` after `session.advance(next)` and before any `navigateTo`. Belt-and-suspenders reset ensuring characters always starts at the prefill sub-stage. |
 
 ### `advance` (steps/advance.ts)
 
@@ -68,7 +69,7 @@ Back navigation: walked-history pop (`popHistory`), delegated to intra-step back
 |---------|---------------------|
 | which component renders + chrome | `components/StepHost.tsx` (reads manifest + `layout`) |
 | next-step / fork / terminal decision | `steps/advance.ts` (pure) |
-| record / route / `applyStepCompletion` / advance | host completion path (generic) |
+| record / route / `applyStepCompletion` / advance / `setCharactersSubStage` signal | host completion path (generic) |
 | identity result → session store write | `IdentityLiteAdapter` (step-specific data) |
 | pane shell, OSK preview, `useValidator`, `oskMode`, `instantiatedRef` | survey component (`StudioShell.tsx`) |
 | `ReducerDeps` construction | survey component (passed to host) |
