@@ -99,6 +99,111 @@ const _mockTouchEBackRef = mockTouchEBackRef;
 // Mock child survey components — shallow stubs that record callbacks.
 // ---------------------------------------------------------------------------
 
+// Mock survey/FlowStepHost.tsx — used directly by factory components for
+// track, project_name, and phase_f_helpdocs (spec 029 convergence).
+// Branches on flow.flow_id to emit the same testids as the old wrapper stubs.
+vi.mock("./survey/FlowStepHost.tsx", () => {
+  const fakePhaseResult = { phase: "B" as const, answers: [], confirmedInventory: [] };
+
+  return {
+    FlowStepHost: ({
+      flow,
+      onComplete,
+      onBack,
+    }: {
+      flow: { flow_id: string };
+      onComplete: (result: unknown) => void;
+      onBack?: () => void;
+    }) => {
+      if (flow.flow_id === "track") {
+        return (
+          <div data-testid="stage-track">
+            <button
+              type="button"
+              data-testid="track-copy"
+              onClick={() =>
+                onComplete({
+                  phase: "G",
+                  answers: [{ questionId: "track_choice", answerType: "select", value: "copy" }],
+                  confirmedInventory: [],
+                })
+              }
+            >
+              track-copy
+            </button>
+            <button
+              type="button"
+              data-testid="track-adapt"
+              onClick={() =>
+                onComplete({
+                  phase: "G",
+                  answers: [{ questionId: "track_choice", answerType: "select", value: "adapt" }],
+                  confirmedInventory: [],
+                })
+              }
+            >
+              track-adapt
+            </button>
+            {onBack !== undefined && (
+              <button type="button" data-testid="track-back" onClick={onBack}>
+                track-back
+              </button>
+            )}
+          </div>
+        );
+      }
+      if (flow.flow_id === "project_name") {
+        return (
+          <div data-testid="stage-project-name">
+            <button
+              type="button"
+              data-testid="project-name-next"
+              onClick={() =>
+                onComplete({
+                  phase: "G",
+                  answers: [
+                    { questionId: "project_display_name", answerType: "text", value: "Test Keyboard" },
+                    { questionId: "project_keyboard_id", answerType: "text", value: "test_keyboard" },
+                  ],
+                  confirmedInventory: [],
+                })
+              }
+            >
+              project-name-next
+            </button>
+            {onBack !== undefined && (
+              <button type="button" data-testid="project-name-back" onClick={onBack}>
+                project-name-back
+              </button>
+            )}
+          </div>
+        );
+      }
+      if (flow.flow_id === "phase_f_helpdocs") {
+        _mockPhaseFDoneRef.current = onComplete;
+        _mockPhaseFBackRef.current = onBack ?? null;
+        return (
+          <div data-testid="stage-F">
+            <button
+              type="button"
+              data-testid="phaseF-complete"
+              onClick={() => onComplete(fakePhaseResult)}
+            >
+              phaseF-complete
+            </button>
+            {onBack !== undefined && (
+              <button type="button" data-testid="phaseF-back" onClick={onBack}>
+                phaseF-back
+              </button>
+            )}
+          </div>
+        );
+      }
+      return <div data-testid={`flow-stub-${flow.flow_id}`} />;
+    },
+  };
+});
+
 vi.mock("./survey/index.ts", () => {
   // Minimal fake IdentityLiteResult for the mock to emit.
   const fakeIdentity = {
@@ -157,67 +262,6 @@ vi.mock("./survey/index.ts", () => {
         </div>
       );
     },
-    PhaseF: ({ onComplete, onBack }: { onComplete: (r: unknown) => void; onBack?: () => void }) => {
-      _mockPhaseFDoneRef.current = onComplete;
-      _mockPhaseFBackRef.current = onBack ?? null;
-      return (
-        <div data-testid="stage-F">
-          <button type="button" data-testid="phaseF-complete" onClick={() => onComplete(fakePhaseResult)}>
-            phaseF-complete
-          </button>
-          {onBack !== undefined && (
-            <button type="button" data-testid="phaseF-back" onClick={onBack}>
-              phaseF-back
-            </button>
-          )}
-        </div>
-      );
-    },
-    // PhaseTrack — replaces TrackStep in the manifest flow (modular question runner).
-    PhaseTrack: ({
-      onTrackSelected,
-      onBack,
-    }: {
-      onTrackSelected: (t: "copy" | "adapt") => void;
-      onBack?: () => void;
-    }) => (
-      <div data-testid="stage-track">
-        <button type="button" data-testid="track-copy" onClick={() => onTrackSelected("copy")}>
-          track-copy
-        </button>
-        <button type="button" data-testid="track-adapt" onClick={() => onTrackSelected("adapt")}>
-          track-adapt
-        </button>
-        {onBack !== undefined && (
-          <button type="button" data-testid="track-back" onClick={onBack}>
-            track-back
-          </button>
-        )}
-      </div>
-    ),
-    // PhaseProjectName — replaces ProjectNameStep in the manifest flow (modular question runner).
-    PhaseProjectName: ({
-      onProjectNameNext,
-      onBack,
-    }: {
-      onProjectNameNext: (displayName: string, keyboardId: string) => void;
-      onBack?: () => void;
-    }) => (
-      <div data-testid="stage-project-name">
-        <button
-          type="button"
-          data-testid="project-name-next"
-          onClick={() => onProjectNameNext("Test Keyboard", "test_keyboard")}
-        >
-          project-name-next
-        </button>
-        {onBack !== undefined && (
-          <button type="button" data-testid="project-name-back" onClick={onBack}>
-            project-name-back
-          </button>
-        )}
-      </div>
-    ),
     // PhaseA re-exported as a no-op (not used in the wizard path under test)
     PhaseA: () => <div data-testid="stage-A" />,
     SurveyRunner: () => <div data-testid="survey-runner" />,
