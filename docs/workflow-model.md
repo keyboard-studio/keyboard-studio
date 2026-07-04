@@ -360,3 +360,41 @@ script family that silently gets a degraded strategy. Both need an explicit
    for Cyrillic/Greek/Armenian as a documented v1 gap?
 5. **Provenance placement:** part of Stage 3, or dropped into an optional
    side-panel?
+
+---
+
+## 6. Survey wrapper architecture (spec 029 Stage 6 — FlowStepHost convergence)
+
+**Ratified 2026-07-03 (spec 029).** The three bespoke survey wrappers
+(`PhaseTrack`, `PhaseProjectName`, `PhaseF`) are now thin wrappers over a single
+generic `FlowStepHost` component. The bespoke `.tsx` files are deleted; all three
+implementations live in `packages/studio/src/survey/phaseWrappers.tsx`.
+
+Key implementation invariants:
+
+- **`FlowStepHost`** (`packages/studio/src/survey/FlowStepHost.tsx`) is a pure host:
+  accepts `{ flow, title, context, onComplete, onBack?, getSeedValue?, onAnswerCommit?,
+  findingsByQuestionId? }` and delegates rendering to `SurveyRunner`. It does NOT
+  runtime-import `steps/flowSources`, `stores/`, `dashboard/`, or `lib/` — the R1
+  layering constraint prevents a `survey→steps→survey` cycle.
+
+- **`makeFlowStepComponent(options)`** (`packages/studio/src/editors/adapters/makeFlowStepComponent.tsx`)
+  is a factory for converting flow-source options into an `EditorStep`-compatible
+  `ComponentType<EditorStepProps>`. It imports `flowSources` (from `steps/`) and the
+  stores; the `track`, `project_name`, and `phase_f_helpdocs` option records live in
+  `packages/studio/src/editors/adapters/flowStepOptions.tsx`. This factory is the
+  extension mechanism for NEW flows; existing flows continue through `panelAdapters.tsx`
+  adapters (unchanged) to preserve the golden-walk mock seam.
+
+- **R7 ordering** — in `makeFlowStepComponent`, `extract(result)` runs first; if it
+  returns `undefined` the component stays on step. Otherwise `onCommit?.(extracted, deps)`
+  fires synchronously BEFORE `props.onComplete(extracted)`. Store writes (`setSelectedTrack`,
+  `setScaffoldSpec`) are the `onCommit` implementations, so they always precede host advance.
+
+- **Mock seam preserved** — `PhaseTrack`, `PhaseProjectName`, `PhaseF` remain named
+  exports of `survey/index.ts` (via `phaseWrappers.tsx`). The golden-walk test's
+  `vi.mock("../survey/index.ts")` intercepts them as before. The test is UNMODIFIED.
+
+- **`Track` type** is declared in `phaseWrappers.tsx` and re-exported from `survey/index.ts`.
+  `surveySessionStore.ts` now imports `Track` from `../survey/index.ts` (not the
+  deleted `PhaseTrack.tsx`).

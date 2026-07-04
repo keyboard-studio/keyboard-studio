@@ -1,4 +1,9 @@
 // Golden-walk parity oracle — spec 028 Stage 5, T002–T004.
+// Re-instrumented in spec 029 (full convergence, Option A): mock seam moved
+// from survey/index.ts (PhaseTrack/PhaseProjectName/PhaseF) to
+// survey/FlowStepHost.tsx (used directly by makeFlowStepComponent factory).
+// Fixtures copy.json and adapt.json are BYTE-IDENTICAL — the store-mutation
+// sequence is unchanged; only the test's mock wiring changes.
 //
 // SEAM CHOICE: This harness renders SurveyView with the same shallow mock
 // pattern used in StudioShell.test.tsx (all child survey/gallery/hook modules
@@ -20,7 +25,7 @@
 // CAPTURE POLICY — DIRECT vs IMPLIED-BY-REDUCER:
 //   - `recordPhase` and `setIdentity` are called DIRECTLY by SurveyView handlers
 //     (handleIdentityComplete, handleProjectNameNext, handlePhaseFComplete,
-//     characters onComplete).  These are the calls the Stage 5 refactor will move
+//     characters onComplete).  These are the calls the Stage 5 refactor moved
 //     into the centralized StepHost completion path (R7).  Captured DIRECTLY in
 //     `workingCopyMutations`.
 //   - `lockDesktop` and `setTouchLayoutJson` fire INSIDE `applyStepCompletion`
@@ -65,9 +70,6 @@
 //     workingCopyMutations: string[];    // working-copy mutator names (call order)
 //     navigateTo: string[];             // navigateTo arg[0] values
 //   }>
-//
-// This test must remain UNMODIFIED through Phase 3-5 of spec 028.
-// DO NOT modify production code from this file.
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
@@ -163,7 +165,128 @@ const fakeBase = {
 
 // ---------------------------------------------------------------------------
 // Mock child survey components — identical stubs to StudioShell.test.tsx
+// (spec 029 re-instrumentation: PhaseTrack/PhaseProjectName/PhaseF stubs removed
+// from survey/index.ts mock; those three flows now live through FlowStepHost
+// mocked below. All other stubs unchanged.)
 // ---------------------------------------------------------------------------
+
+// Mock survey/FlowStepHost.tsx — the new seam for the three converged flows.
+// The factory (makeFlowStepComponent) imports FlowStepHost from this direct path.
+// Branches on props.flow.flow_id (real flow loaded by factory via loadModularFlow;
+// flow_id comes from the YAML: "track", "project_name", "phase_f_helpdocs").
+//
+// track:
+//   Renders track-copy / track-adapt buttons that call props.onComplete with a
+//   SurveyPhaseResult carrying track_choice. The factory's extract→onCommit then
+//   fires setSelectedTrack (+setScaffoldSpec(null) on adapt) BEFORE the host
+//   advance — reproducing the recorded storeMutations.
+// project_name:
+//   Renders project-name-next button that calls props.onComplete with answers
+//   project_display_name="Test Keyboard" + project_keyboard_id="test_keyboard"
+//   so the factory extract yields {displayName,keyboardId} and onCommit fires
+//   setScaffoldSpec + setIdentity.
+// phase_f_helpdocs:
+//   Renders phaseF-complete button calling props.onComplete(fakePhaseResult).
+//   No factory onCommit — PhaseF had no pre-onComplete store writes.
+
+vi.mock("../survey/FlowStepHost.tsx", () => ({
+  FlowStepHost: ({
+    flow,
+    onComplete,
+    onBack,
+  }: {
+    flow: { flow_id: string };
+    onComplete: (result: unknown) => void;
+    onBack?: () => void;
+  }) => {
+    if (flow.flow_id === "track") {
+      return (
+        <div data-testid="stage-track">
+          <button
+            type="button"
+            data-testid="track-copy"
+            onClick={() =>
+              onComplete({
+                phase: "G",
+                answers: [{ questionId: "track_choice", answerType: "select", value: "copy" }],
+                confirmedInventory: [],
+              })
+            }
+          >
+            track-copy
+          </button>
+          <button
+            type="button"
+            data-testid="track-adapt"
+            onClick={() =>
+              onComplete({
+                phase: "G",
+                answers: [{ questionId: "track_choice", answerType: "select", value: "adapt" }],
+                confirmedInventory: [],
+              })
+            }
+          >
+            track-adapt
+          </button>
+          {onBack !== undefined && (
+            <button type="button" data-testid="track-back" onClick={onBack}>
+              track-back
+            </button>
+          )}
+        </div>
+      );
+    }
+    if (flow.flow_id === "project_name") {
+      return (
+        <div data-testid="stage-project-name">
+          <button
+            type="button"
+            data-testid="project-name-next"
+            onClick={() =>
+              onComplete({
+                phase: "G",
+                answers: [
+                  { questionId: "project_display_name", answerType: "text", value: "Test Keyboard" },
+                  { questionId: "project_keyboard_id", answerType: "text", value: "test_keyboard" },
+                ],
+                confirmedInventory: [],
+              })
+            }
+          >
+            project-name-next
+          </button>
+          {onBack !== undefined && (
+            <button type="button" data-testid="project-name-back" onClick={onBack}>
+              project-name-back
+            </button>
+          )}
+        </div>
+      );
+    }
+    if (flow.flow_id === "phase_f_helpdocs") {
+      return (
+        <div data-testid="stage-F">
+          <button
+            type="button"
+            data-testid="phaseF-complete"
+            onClick={() =>
+              onComplete({ phase: "B", answers: [], confirmedInventory: [] })
+            }
+          >
+            phaseF-complete
+          </button>
+          {onBack !== undefined && (
+            <button type="button" data-testid="phaseF-back" onClick={onBack}>
+              phaseF-back
+            </button>
+          )}
+        </div>
+      );
+    }
+    // Fallback for any other flow_id (should not occur in golden-walk walks).
+    return <div data-testid={`flow-stub-${flow.flow_id}`} />;
+  },
+}));
 
 vi.mock("../survey/index.ts", () => ({
   IdentityLite: ({ onComplete }: { onComplete: (result: unknown, identity: unknown) => void }) => {
@@ -208,65 +331,6 @@ vi.mock("../survey/index.ts", () => ({
       </div>
     );
   },
-  PhaseF: ({ onComplete, onBack }: { onComplete: (r: unknown) => void; onBack?: () => void }) => {
-    _mockPhaseFDoneRef.current = onComplete;
-    _mockPhaseFBackRef.current = onBack ?? null;
-    return (
-      <div data-testid="stage-F">
-        <button type="button" data-testid="phaseF-complete" onClick={() => onComplete(fakePhaseResult)}>
-          phaseF-complete
-        </button>
-        {onBack !== undefined && (
-          <button type="button" data-testid="phaseF-back" onClick={onBack}>
-            phaseF-back
-          </button>
-        )}
-      </div>
-    );
-  },
-  PhaseTrack: ({
-    onTrackSelected,
-    onBack,
-  }: {
-    onTrackSelected: (t: "copy" | "adapt") => void;
-    onBack?: () => void;
-  }) => (
-    <div data-testid="stage-track">
-      <button type="button" data-testid="track-copy" onClick={() => onTrackSelected("copy")}>
-        track-copy
-      </button>
-      <button type="button" data-testid="track-adapt" onClick={() => onTrackSelected("adapt")}>
-        track-adapt
-      </button>
-      {onBack !== undefined && (
-        <button type="button" data-testid="track-back" onClick={onBack}>
-          track-back
-        </button>
-      )}
-    </div>
-  ),
-  PhaseProjectName: ({
-    onProjectNameNext,
-    onBack,
-  }: {
-    onProjectNameNext: (displayName: string, keyboardId: string) => void;
-    onBack?: () => void;
-  }) => (
-    <div data-testid="stage-project-name">
-      <button
-        type="button"
-        data-testid="project-name-next"
-        onClick={() => onProjectNameNext("Test Keyboard", "test_keyboard")}
-      >
-        project-name-next
-      </button>
-      {onBack !== undefined && (
-        <button type="button" data-testid="project-name-back" onClick={onBack}>
-          project-name-back
-        </button>
-      )}
-    </div>
-  ),
   PhaseA: () => <div data-testid="stage-A" />,
   SurveyRunner: () => <div data-testid="survey-runner" />,
   extractIdentityLite: (r: unknown) => r,

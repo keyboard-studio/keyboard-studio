@@ -38,7 +38,7 @@ type ActiveStepId =
   | "done"
   | "unsupported";
 
-/** Mirror of survey/PhaseTrack.Track (kept local, boundary-clean). */
+/** Mirror of survey/index.ts Track (kept local, boundary-clean). */
 type Track = "copy" | "adapt";
 
 // ---------------------------------------------------------------------------
@@ -172,15 +172,15 @@ export function advance(
           setCharactersSubStage: "prefill",
         };
       } else {
-        // Invariant violation: selectedTrack is null here, but TrackStepAdapter
-        // always calls setSelectedTrack before invoking onComplete. A null at this
-        // point means something went wrong upstream. Log the violation and default
-        // to the copy path (project_name) — copy is the safer default because it
-        // does NOT skip a step. Do NOT silently route as adapt (which skips
-        // project_name and could confuse the user).
+        // Invariant violation: selectedTrack is null here, but
+        // makeFlowStepComponent(trackOptions).onCommit always calls setSelectedTrack
+        // before invoking onComplete. A null at this point means something went wrong
+        // upstream. Log the violation and default to the copy path (project_name) —
+        // copy is the safer default because it does NOT skip a step. Do NOT silently
+        // route as adapt (which skips project_name and could confuse the user).
         console.error(
           "[advance] invariant violation: selectedTrack is null at track step. " +
-          "TrackStepAdapter must set selectedTrack before calling onComplete. " +
+          "trackOptions.onCommit must set selectedTrack before calling onComplete. " +
           "Defaulting to copy path (project_name) to avoid silent wrong-fork routing."
         );
         return { next: "project_name" };

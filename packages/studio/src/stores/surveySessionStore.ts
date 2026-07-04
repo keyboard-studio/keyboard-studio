@@ -24,7 +24,7 @@ import { create } from "zustand";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import type { IdentityLiteResult } from "../survey/index.ts";
 import type { SurveyContext } from "../survey/types.ts";
-import type { Track } from "../survey/PhaseTrack.tsx";
+import type { Track } from "../survey/index.ts";
 import type { ScaffoldSpec } from "../hooks/useKeyboardArtifact.ts";
 
 // ---------------------------------------------------------------------------

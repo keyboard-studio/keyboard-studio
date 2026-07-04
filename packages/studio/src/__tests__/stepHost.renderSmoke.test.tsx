@@ -34,13 +34,19 @@ import type { ReducerDeps } from "../steps/reducer.ts";
 // Mock all heavy child components used by the manifest adapters
 // ---------------------------------------------------------------------------
 
+// Mock survey/FlowStepHost.tsx — used directly by the factory components for
+// track, project_name, and phase_f_helpdocs steps (spec 029 convergence).
+// Renders a per-flow testid stub so SC-005 can detect which factory component mounted.
+vi.mock("../survey/FlowStepHost.tsx", () => ({
+  FlowStepHost: ({ flow }: { flow: { flow_id: string } }) => (
+    <div data-testid={`stub-FlowStepHost-${flow.flow_id}`} />
+  ),
+}));
+
 vi.mock("../survey/index.ts", () => ({
   IdentityLite: () => <div data-testid="stub-IdentityLite" />,
   Prefill: () => <div data-testid="stub-Prefill" />,
   PhaseB: () => <div data-testid="stub-PhaseB" />,
-  PhaseF: () => <div data-testid="stub-PhaseF" />,
-  PhaseTrack: () => <div data-testid="stub-PhaseTrack" />,
-  PhaseProjectName: () => <div data-testid="stub-PhaseProjectName" />,
   PhaseA: () => <div data-testid="stub-PhaseA" />,
   SurveyRunner: () => <div data-testid="stub-SurveyRunner" />,
   CharactersStep: () => <div data-testid="stub-CharactersStep" />,
@@ -144,7 +150,7 @@ const noopReducerDeps: ReducerDeps = {
   instantiateFromBaseIfConfirmed: () => false,
 };
 
-// Fake base keyboard — satisfies the localBase guard in TrackStepAdapter.
+// Fake base keyboard — satisfies the localBase guard in TrackStepFactoryComponent.
 const fakeBase = {
   id: "basic_kbdus",
   path: "release/b/basic_kbdus",
@@ -252,29 +258,29 @@ const editorSteps = manifest.filter(
 // step.id to the data-testid we expect to find — this is the SC-005 contract:
 // the declared component is what actually renders.
 //
-// The mapping is derived from the adapter → child component chain:
-//   identityStep      → IdentityLiteAdapter   → IdentityLite stub
-//   chooseBaseStep    → BaseResolutionAdapter  → BaseResolution stub
-//   trackStep         → TrackStepAdapter       → PhaseTrack stub
-//   projectNameStep   → ProjectNameStepAdapter → PhaseProjectName stub
-//   charactersStep    → CharactersStep         → stub-CharactersStep
-//   carveStep         → CarveAdapter           → CarveGallery stub
-//   mechanismsStep    → AddPhysicalAdapter     → MechanismGallery stub
-//   touchSeedSourceStep → AddTouchAdapter      → TouchGallery stub
-//   touchStep         → AddTouchAdapter        → TouchGallery stub
-//   helpStep          → PhaseFAdapter          → PhaseF stub
-//   packageStep       → TrackOneIdentityPanelAdapter → TrackOneIdentityPanel stub
+// The mapping is derived from the adapter/factory → child component chain:
+//   identityStep      → IdentityLiteAdapter              → IdentityLite stub
+//   chooseBaseStep    → BaseResolutionAdapter             → BaseResolution stub
+//   trackStep         → TrackStepFactoryComponent         → FlowStepHost stub (flow_id=track)
+//   projectNameStep   → ProjectNameStepFactoryComponent   → FlowStepHost stub (flow_id=project_name)
+//   charactersStep    → CharactersStep                    → stub-CharactersStep
+//   carveStep         → CarveAdapter                      → CarveGallery stub
+//   mechanismsStep    → AddPhysicalAdapter                → MechanismGallery stub
+//   touchSeedSourceStep → AddTouchAdapter                 → TouchGallery stub
+//   touchStep         → AddTouchAdapter                   → TouchGallery stub
+//   helpStep          → PhaseFStepFactoryComponent        → FlowStepHost stub (flow_id=phase_f_helpdocs)
+//   packageStep       → TrackOneIdentityPanelAdapter      → TrackOneIdentityPanel stub
 const STEP_TO_EXPECTED_STUB: Record<string, string> = {
   identity: "stub-IdentityLite",
   choose_base: "stub-BaseResolution",
-  track: "stub-PhaseTrack",
-  project_name: "stub-PhaseProjectName",
+  track: "stub-FlowStepHost-track",
+  project_name: "stub-FlowStepHost-project_name",
   characters: "stub-CharactersStep",
   carve: "stub-CarveGallery",
   mechanisms: "stub-MechanismGallery",
   touch_seed_source: "stub-TouchGallery",
   touch: "stub-TouchGallery",
-  help: "stub-PhaseF",
+  help: "stub-FlowStepHost-phase_f_helpdocs",
   package: "stub-TrackOneIdentityPanel",
 };
 

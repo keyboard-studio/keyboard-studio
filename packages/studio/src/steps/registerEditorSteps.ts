@@ -17,9 +17,8 @@
 // Pool ↔ manifest reconciliation:
 //   - scaffoldStep was declared here but never placed in the manifest. The
 //     copy-track scaffold parameters (keyboardId, displayName) are collected
-//     by ProjectNameStepAdapter and passed through its onComplete result — they
-//     do not need a separate scaffold step. scaffoldStep is removed from this
-//     pool so the pool matches the manifest exactly.
+//     by ProjectNameStepFactoryComponent and passed through its onComplete result —
+//     no separate scaffold step needed. scaffoldStep removed from the pool.
 
 import { irPath } from "@keyboard-studio/contracts";
 import type { EditorStep } from "./types.ts";
@@ -28,13 +27,15 @@ import { CarveAdapter } from "../editors/adapters/carveAdapter.tsx";
 import { AddPhysicalAdapter } from "../editors/adapters/addPhysicalAdapter.tsx";
 import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
 import {
-  TrackStepAdapter,
-  ProjectNameStepAdapter,
   TrackOneIdentityPanelAdapter,
   BaseResolutionAdapter,
   IdentityLiteAdapter,
-  PhaseFAdapter,
 } from "../editors/adapters/panelAdapters.tsx";
+import {
+  TrackStepFactoryComponent,
+  ProjectNameStepFactoryComponent,
+  PhaseFStepFactoryComponent,
+} from "../editors/adapters/flowStepOptions.tsx";
 
 // ---------------------------------------------------------------------------
 // Panel steps (wizard panels — non-gallery)
@@ -83,7 +84,7 @@ export const trackStep: EditorStep = {
   id: "track",
   title: "Authoring Track",
   spine: true,
-  component: TrackStepAdapter,
+  component: TrackStepFactoryComponent,
   // track reads the session-derived header.bcp47 (array) + the resolved base
   // display name (header.name) to frame the copy-vs-adapt choice.
   inputs: [irPath("header", "bcp47"), irPath("header", "name")],
@@ -105,7 +106,7 @@ export const projectNameStep: EditorStep = {
   id: "project_name",
   title: "Project Name",
   spine: true,
-  component: ProjectNameStepAdapter,
+  component: ProjectNameStepFactoryComponent,
   // project_name (copy-track fork) reads the session-derived header.bcp47 to
   // pre-fill, and collects the scaffold params displayName + keyboardId —
   // expressible as the existing header.name / header.keyboardId IR leaves.
@@ -216,10 +217,9 @@ export const helpStep: EditorStep = {
   id: "help",
   title: "Help & Tips",
   spine: true,
-  // T011 (spec 028 Stage 5): real PhaseFAdapter replaces the
-  // TrackOneIdentityPanelAdapter placeholder. Declared component now matches
-  // the mounted component (SC-005, FR-006).
-  component: PhaseFAdapter,
+  // spec 029 convergence: PhaseFStepFactoryComponent (factory output) replaces
+  // PhaseFAdapter. Declared component now matches the mounted component (SC-005).
+  component: PhaseFStepFactoryComponent,
   inputs: [],
   writes: [],
   // phase_f_helpdocs runs inside the help step (spec 024, Stage 1 re-home:
