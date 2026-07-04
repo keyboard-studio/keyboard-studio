@@ -5,20 +5,18 @@
 //
 // Store reads:
 //   surveySessionStore: identityResult, localBase, surveyContext, charactersSubStage
-//   workingCopyStore:   validatorFindings (-> buildFindingsByQuestionId)
+//   workingCopyStore:   validatorFindings (via useValidatorFindings hook)
 //
 // No survey-level side effects (Article IV / G2): the component reports
 // completion and back via props; the host (SurveyView) runs the reducer path.
 //
 // placementMap is intentionally omitted from PhaseB props (D-INT-2, v1).
 
-import { useMemo } from "react";
 import type { ComponentType } from "react";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import type { EditorStepProps } from "../steps/types.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { buildFindingsByQuestionId } from "../lint/lintToQuestion.ts";
+import { useValidatorFindings } from "../hooks/useValidatorFindings.ts";
 import { Prefill, PhaseB } from "./index.ts";
 
 /**
@@ -39,11 +37,7 @@ const CharactersStep: ComponentType<EditorStepProps> = ({
   const charactersSubStage = useSurveySessionStore((s) => s.charactersSubStage);
   const setCharactersSubStage = useSurveySessionStore((s) => s.setCharactersSubStage);
 
-  const validatorFindings = useWorkingCopyStore((s) => s.validatorFindings);
-  const findingsByQuestionId = useMemo(
-    () => buildFindingsByQuestionId(validatorFindings),
-    [validatorFindings],
-  );
+  const findingsByQuestionId = useValidatorFindings();
 
   // Guard: prefill requires both identity and base (unreachable once the step
   // is properly entered, but matches today's null fallback).

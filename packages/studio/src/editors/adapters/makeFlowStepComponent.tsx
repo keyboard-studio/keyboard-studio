@@ -26,7 +26,7 @@ import { loadModularFlow } from "../../survey/loadModularFlow.ts";
 import { flowSources } from "../../steps/flowSources.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { buildFindingsByQuestionId } from "../../lint/lintToQuestion.ts";
+import { useValidatorFindings } from "../../hooks/useValidatorFindings.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import type { SurveyContext } from "../../survey/types.ts";
 
@@ -135,15 +135,12 @@ export function makeFlowStepComponent<Extracted>(
     const setSelectedTrack = useSurveySessionStore((s) => s.setSelectedTrack);
     const setScaffoldSpec = useSurveySessionStore((s) => s.setScaffoldSpec);
     const setStoreIdentity = useWorkingCopyStore((s) => s.setIdentity);
-    const validatorFindings = useWorkingCopyStore((s) => s.validatorFindings);
 
-    const findingsByQuestionId = useMemo(
-      () => options.usesFindings ? buildFindingsByQuestionId(validatorFindings) : {},
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      // Stable-length array: null sentinel when usesFindings is false so the
-      // deps array length never varies (options.usesFindings is fixed per component).
-      options.usesFindings ? [validatorFindings] : [null],
-    );
+    // Unconditional hook call (hooks must not be conditional). When the flow
+    // does not use findings, the derived record is computed but ignored below.
+    // This retires the FIX-2 conditional-deps-array workaround.
+    const allFindings = useValidatorFindings();
+    const findingsByQuestionId = options.usesFindings ? allFindings : {};
 
     // Per-mount display-name ref: allocated here (useRef) so each mount starts
     // with "" and re-entry resets correctly. Threaded through depsRef so

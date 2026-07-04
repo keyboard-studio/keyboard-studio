@@ -28,7 +28,7 @@
 
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
-import { buildFindingsByQuestionId } from "../../lint/lintToQuestion.ts";
+import { useValidatorFindings } from "../../hooks/useValidatorFindings.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { ScaffoldForm } from "../panels/ScaffoldForm.tsx";
 import type { ScaffoldSpec } from "../../hooks/useKeyboardArtifact.ts";
@@ -42,7 +42,6 @@ import {
 import type { SurveyContext } from "../../survey/types.ts";
 import type { IdentityLiteResult } from "../../survey/IdentityLite.tsx";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
-import { useMemo } from "react";
 
 // ---------------------------------------------------------------------------
 // contextFromIdentity — derive SurveyContext from IdentityLiteResult.
@@ -73,13 +72,8 @@ function contextFromIdentity(identity: IdentityLiteResult): SurveyContext {
 export function IdentityLiteAdapter({ onComplete }: EditorStepProps) {
   // Read surveyContext for the live context prop (identity panel needs it).
   const surveyContext = useSurveySessionStore((s) => s.surveyContext);
-  // Read validator findings from the store bridge (spec-014 V3, single useValidator
-  // in SurveyView publishes here; identity adapter derives per-question findings).
-  const validatorFindings = useWorkingCopyStore((s) => s.validatorFindings);
-  const findingsByQuestionId = useMemo(
-    () => buildFindingsByQuestionId(validatorFindings),
-    [validatorFindings],
-  );
+  // Derive per-question findings from the V3 store bridge (spec-014).
+  const findingsByQuestionId = useValidatorFindings();
 
   // Step-specific session-store writers (R7 — written before onComplete so the
   // golden-walk ordering is setIdentityResult → setSurveyContext → advance).
