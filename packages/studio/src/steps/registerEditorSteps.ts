@@ -32,6 +32,8 @@ import {
   ProjectNameStepAdapter,
   TrackOneIdentityPanelAdapter,
   BaseResolutionAdapter,
+  IdentityLiteAdapter,
+  PhaseFAdapter,
 } from "../editors/adapters/panelAdapters.tsx";
 
 // ---------------------------------------------------------------------------
@@ -47,7 +49,10 @@ export const identityStep: EditorStep = {
   id: "identity",
   title: "Keyboard Identity",
   spine: true,
-  component: TrackOneIdentityPanelAdapter,
+  // T011 (spec 028 Stage 5): real IdentityLiteAdapter replaces the
+  // TrackOneIdentityPanelAdapter placeholder. Declared component now matches
+  // the mounted component (SC-005, FR-006).
+  component: IdentityLiteAdapter,
   inputs: [],
   writes: [],
   // identity_lite runs inside the identity step (spec 024, Stage 1 re-home:
@@ -211,7 +216,10 @@ export const helpStep: EditorStep = {
   id: "help",
   title: "Help & Tips",
   spine: true,
-  component: TrackOneIdentityPanelAdapter, // placeholder — wired in T028
+  // T011 (spec 028 Stage 5): real PhaseFAdapter replaces the
+  // TrackOneIdentityPanelAdapter placeholder. Declared component now matches
+  // the mounted component (SC-005, FR-006).
+  component: PhaseFAdapter,
   inputs: [],
   writes: [],
   // phase_f_helpdocs runs inside the help step (spec 024, Stage 1 re-home:
