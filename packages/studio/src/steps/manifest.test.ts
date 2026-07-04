@@ -382,3 +382,45 @@ describe("M6 — no A–G phase-letter vocabulary in ids or titles", () => {
     expect(charStep).toBeDefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// SC-004 — SurveyView no longer contains per-step render branches or
+//           completion handlers (spec 028 Stage 5 contract).
+//
+// These private strings were deleted by the Stage 5 refactor; their absence
+// is the guard. Reading the StudioShell.tsx source at test-time ensures the
+// guard stays in sync with the file rather than with a stale snapshot.
+// ---------------------------------------------------------------------------
+
+import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const STUDIO_SHELL_PATH = join(__dirname, "..", "StudioShell.tsx");
+
+describe("SC-004 — StudioShell.tsx has no per-step render branches or completion handlers", () => {
+  let src: string;
+
+  // Read the source once for all assertions in this suite.
+  // If the file moves, the readFileSync will throw — that is intentional (the
+  // guard itself needs updating, which is better than silently passing).
+  src = readFileSync(STUDIO_SHELL_PATH, "utf-8");
+
+  it('"renderQuestionsPane" is absent from StudioShell.tsx (deleted by Stage 5)', () => {
+    expect(src).not.toContain("renderQuestionsPane");
+  });
+
+  it('"handlePhaseEComplete" is absent from StudioShell.tsx (deleted by Stage 5)', () => {
+    expect(src).not.toContain("handlePhaseEComplete");
+  });
+
+  it('"handleTrackSelected" is absent from StudioShell.tsx (deleted by Stage 5)', () => {
+    expect(src).not.toContain("handleTrackSelected");
+  });
+
+  it('"handleProjectNameNext" is absent from StudioShell.tsx (deleted by Stage 5)', () => {
+    expect(src).not.toContain("handleProjectNameNext");
+  });
+});
