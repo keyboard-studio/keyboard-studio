@@ -5,32 +5,69 @@ import { displayChar } from '../../../lib/irToCarveNodes.ts';
 import { KeySeq } from './KeySeq.tsx';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
 
+// Ownership tag kinds — pattern or store, matching GlyphOwner.kind.
+export type OwnerKind = 'pattern' | 'store';
+
 interface GlyphCellProps {
   gid: string;
   ch: string;
   keys: string[];
   off: boolean;
   color: string;
+  /** Called when the user clicks the chip BODY (plain toggle fallback). */
   onToggle: (gid: string) => void;
   modifierLabel: string;
   capability: RemovalCapability;
+  /** Every store/pattern this glyph's rule is tied to — rendered as clickable tags. */
   owners?: GlyphOwner[];
+  /** Called when an ownership tag is clicked — navigates to that card in the Rail. */
   onOwnerClick?: (nodeId: string) => void;
+  /**
+   * Called when the chip BODY is clicked. When provided it replaces the plain
+   * toggle as the removal initiator: the cascade flow decides whether to delete
+   * just here, remove the character everywhere it is produced, or explain why
+   * it cannot be removed. Falls back to `onToggle` when absent.
+   */
+  onCascadeDelete?: (gid: string) => void;
 }
 
-export const GlyphCell = memo(function GlyphCell({ gid, ch, keys, off, color, onToggle, modifierLabel, capability, owners, onOwnerClick }: GlyphCellProps) {
+// Per-kind tag colors — pattern vs store, distinct from the amber `!` and the accent `N⨯`.
+const OWNER_TAG_STYLE: Record<OwnerKind, { color: string; bg: string; border: string }> = {
+  pattern: {
+    color: '#6fbbd4',
+    bg: 'color-mix(in srgb, #6fbbd4 15%, transparent)',
+    border: 'color-mix(in srgb, #6fbbd4 40%, transparent)',
+  },
+  store: {
+    color: '#8b5cc4',
+    bg: 'color-mix(in srgb, #8b5cc4 15%, transparent)',
+    border: 'color-mix(in srgb, #8b5cc4 40%, transparent)',
+  },
+};
+
+export const GlyphCell = memo(function GlyphCell({
+  gid, ch, keys, off, color, onToggle, modifierLabel, capability, owners, onOwnerClick, onCascadeDelete,
+}: GlyphCellProps) {
   const setInfo = useHoverInfoStore((s) => s.setInfo);
   const clearInfo = useHoverInfoStore((s) => s.clearInfo);
   const display = displayChar(ch);
   const isNotRemovable = capability.startsWith('not-removable:');
-  const storeOwners = owners?.filter((o) => o.kind === 'store') ?? [];
-  const handleClick = () => {
-    if (isNotRemovable) {
-      setInfo({ kind: 'key', keys, ch, off, capability, ...(owners ? { owners } : {}) });
-      return;
-    }
+  const tagOwners = owners ?? [];
+
+  const hoverInfo = { kind: 'key' as const, keys, ch, off, capability, ...(owners ? { owners } : {}) };
+
+  // Chip-body activation. When a cascade handler is wired (the carve gallery), it
+  // owns the remove decision (delete-here / remove-everywhere / explain-why). When
+  // absent, fall back to the plain behaviour: a not-removable chip is info-only.
+  const handleBodyActivate = () => {
+    if (onCascadeDelete) { onCascadeDelete(gid); return; }
+    if (isNotRemovable) { setInfo(hoverInfo); return; }
     onToggle(gid);
   };
+
+  // The chip body and the ownership tags are SIBLINGS inside this div (the tags
+  // are their own <button>s, never nested inside the body <button>) so both are
+  // independently clickable without violating interactive-nesting rules.
   return (
     <div
       style={{
@@ -40,19 +77,21 @@ export const GlyphCell = memo(function GlyphCell({ gid, ch, keys, off, color, on
         borderTop: '3px solid ' + (off ? 'var(--app-border-strong)' : color),
         background: off ? 'var(--app-surface-2)' : 'var(--app-surface)',
         opacity: off ? 0.6 : 1,
+        userSelect: 'none',
       }}
     >
       <button
-        onClick={handleClick}
-        onMouseEnter={() => setInfo({ kind: 'key', keys, ch, off, capability, ...(owners ? { owners } : {}) })}
+        onClick={handleBodyActivate}
+        onMouseEnter={() => setInfo(hoverInfo)}
         onMouseLeave={clearInfo}
-        onFocus={() => setInfo({ kind: 'key', keys, ch, off, capability, ...(owners ? { owners } : {}) })}
+        onFocus={() => setInfo(hoverInfo)}
         onBlur={clearInfo}
-        aria-disabled={isNotRemovable}
+        aria-label={`${display} — ${keys.join(' ')}`}
+        aria-pressed={off}
         style={{
           position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center',
           justifyContent: 'center', gap: 8, flex: 1,
-          width: '100%', padding: '10px 4px 12px', cursor: isNotRemovable ? 'not-allowed' : 'pointer',
+          width: '100%', padding: '10px 4px 12px', cursor: 'pointer',
           border: 'none', borderRadius: 0, background: 'transparent',
         }}
       >
@@ -63,9 +102,7 @@ export const GlyphCell = memo(function GlyphCell({ gid, ch, keys, off, color, on
               position: 'absolute', top: 4, left: 5,
               font: '600 8px/1 var(--app-font-mono)', letterSpacing: '.04em',
               padding: '1px 4px', borderRadius: 999,
-              color: 'var(--amber-text)',
-              background: 'var(--amber-bg)',
-              border: '1px solid var(--amber-border)',
+              color: 'var(--amber-text)', background: 'var(--amber-bg)', border: '1px solid var(--amber-border)',
             }}
           >
             !
@@ -81,25 +118,27 @@ export const GlyphCell = memo(function GlyphCell({ gid, ch, keys, off, color, on
         </span>
         <KeySeq keys={keys} prefix={modifierLabel} dim={off} />
       </button>
-      {storeOwners.length > 0 && (
+      {tagOwners.length > 0 && (
         <span style={{ display: 'flex', flexWrap: 'wrap', gap: 3, justifyContent: 'center', padding: '0 4px 8px' }}>
-          {storeOwners.map((o) => (
-            <button
-              key={o.nodeId}
-              type="button"
-              aria-label={`Go to store ${o.label}`}
-              onClick={() => onOwnerClick?.(o.nodeId)}
-              style={{
-                font: '600 9px/1 var(--app-font-mono)', letterSpacing: '.02em',
-                padding: '2px 6px', borderRadius: 6, cursor: 'pointer',
-                color: 'var(--app-accent-text)',
-                background: 'var(--app-accent-subtle)',
-                border: '1px solid var(--app-border)',
-              }}
-            >
-              {o.label}
-            </button>
-          ))}
+          {tagOwners.map((o) => {
+            const s = OWNER_TAG_STYLE[o.kind];
+            return (
+              <button
+                key={o.kind + ':' + o.nodeId}
+                type="button"
+                aria-label={`Go to ${o.kind} ${o.label}`}
+                onClick={() => onOwnerClick?.(o.nodeId)}
+                style={{
+                  font: '600 9px/1 var(--app-font-mono)', letterSpacing: '.02em',
+                  padding: '2px 6px', borderRadius: 6, cursor: onOwnerClick ? 'pointer' : 'default',
+                  color: s.color, background: s.bg, border: `1px solid ${s.border}`,
+                  maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}
+              >
+                {o.label}
+              </button>
+            );
+          })}
         </span>
       )}
     </div>

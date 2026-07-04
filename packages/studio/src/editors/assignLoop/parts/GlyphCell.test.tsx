@@ -66,12 +66,16 @@ describe('GlyphCell — not-removable capability', () => {
     });
   });
 
-  it('marks the button aria-disabled', () => {
+  it('shows the not-removable badge and stays interactive (cascade explains why)', () => {
+    // #886: not-removable chips are no longer aria-disabled — clicking them runs
+    // the cascade flow, which surfaces the reason it can't be removed. The amber
+    // "!" badge is the visual not-removable marker.
     const { container } = render(
       <GlyphCell {...baseProps} capability="not-removable:unknown" onToggle={vi.fn()} />,
     );
     const button = container.querySelector('button')!;
-    expect(button.getAttribute('aria-disabled')).toBe('true');
+    expect(button.getAttribute('aria-disabled')).not.toBe('true');
+    expect(container.querySelector('[aria-label^="not removable"]')).not.toBeNull();
   });
 });
 
@@ -92,7 +96,8 @@ describe('GlyphCell — removable capability', () => {
       <GlyphCell {...baseProps} capability="removable:slot-fill" onToggle={vi.fn()} />,
     );
     const button = container.querySelector('button')!;
-    expect(button.getAttribute('aria-disabled')).toBe('false');
+    // GlyphCell no longer sets aria-disabled at all (chips are interactive).
+    expect(button.getAttribute('aria-disabled')).toBeNull();
   });
 });
 
@@ -201,12 +206,16 @@ describe('GlyphCell — #917 store owner tags', () => {
     expect(onToggle).not.toHaveBeenCalled();
   });
 
-  it('a kind:"pattern" owner does not render a visible tag (store owners only)', () => {
+  it('a kind:"pattern" owner renders a clickable tag (#886: patterns AND stores)', () => {
+    // #886 intent: glyph cards show tags for every associated store AND pattern.
     const owners = [{ kind: 'pattern' as const, nodeId: 'p1', label: 'Diacritics' }];
+    const onOwnerClick = vi.fn();
     render(
-      <GlyphCell {...baseProps} capability="removable:simple" onToggle={vi.fn()} owners={owners} />,
+      <GlyphCell {...baseProps} capability="removable:simple" onToggle={vi.fn()} owners={owners} onOwnerClick={onOwnerClick} />,
     );
-    expect(screen.queryByText('Diacritics')).toBeNull();
-    expect(screen.queryByRole('button', { name: /Go to store/ })).toBeNull();
+    const tag = screen.getByRole('button', { name: /Go to pattern Diacritics/ });
+    expect(tag).not.toBeNull();
+    fireEvent.click(tag);
+    expect(onOwnerClick).toHaveBeenCalledWith('p1');
   });
 });

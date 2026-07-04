@@ -462,7 +462,10 @@ const EMPTY_IR: KeyboardIR = {
   recognizedPatterns: [],
 };
 
-export function groupToGlyphs(group: IRGroup, ir: KeyboardIR = EMPTY_IR, capabilities: Map<string, RemovalCapability> = new Map(), ownedNodeIds: Set<string> = new Set()): CarveGlyph[] {
+// `ownedNodeIds` defaults to the full pattern-owned set (not an empty set) so
+// EVERY caller is ghost-proof by default — a bare groupToGlyphs(group, ir) can't
+// silently reintroduce the ghost chip by forgetting to pass the owned-set. (#886)
+export function groupToGlyphs(group: IRGroup, ir: KeyboardIR = EMPTY_IR, capabilities: Map<string, RemovalCapability> = new Map(), ownedNodeIds: Set<string> = collectOwnedNodeIds(ir)): CarveGlyph[] {
   const glyphs: CarveGlyph[] = [];
   const seen = new Set<string>();
   group.rules.forEach((rule) => {

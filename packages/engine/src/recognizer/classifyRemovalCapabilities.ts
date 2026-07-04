@@ -71,6 +71,11 @@ import { isParallelIndexFanOut } from "./rules/parallel-index-fanout.js";
 function capabilityForStrategy(strategyId: string | undefined): RemovalCapability {
   if (strategyId === "S-01") return "removable:simple";
   if (strategyId === "S-02") return "removable:slot-fill";
+  // S-08 (full remap / RAlt-plane direct-char rules) — each rule is an
+  // individual direct-char mapping and is removable the same way as S-01.
+  // Display-only fix: the cascade is capability-agnostic, but the chip
+  // showed "not-removable" on an RAlt duplicate that clearly can be deleted.
+  if (strategyId === "S-08") return "removable:simple";
   // Other recognized strategies are not yet removable in v1.
   return "not-removable:unknown";
 }

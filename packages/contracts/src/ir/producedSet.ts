@@ -188,6 +188,79 @@ function collectFromElements(
 // ---------------------------------------------------------------------------
 
 /**
+ * Extract the set of NFC strings a single rule produces.
+ *
+ * Applies the same run-merge (NFD→NFC consecutive char accumulation) and
+ * store-expansion (index()/outs()) logic that buildProducedSet uses across
+ * the whole IR, but scoped to a single rule. Returns the raw NFC strings
+ * (not individual codepoints), because the caller (collectCharContributors)
+ * needs to compare whole-rule output against a target character.
+ *
+ * - Consecutive `{kind:"char"}` elements are accumulated, then NFC-joined on flush.
+ * - `index(storeRef)` and `outs(storeRef)` expand every char item in the store
+ *   individually (no cross-item run-merge — a store is a lookup table, not a
+ *   linear output sequence). Each item's NFC value is returned as a separate string.
+ * - `deadkey`, `beep`, `raw` flush any pending char run and contribute nothing.
+ * - Missing stores are skipped without throwing (resilience to partial IR).
+ * - The returned array may contain duplicates; dedup is the caller's responsibility.
+ *
+ * @param rule      - The IR rule to inspect.
+ * @param storeMap  - Name-keyed map of all stores in the IR (pre-built for efficiency).
+ * @returns Array of NFC strings this rule can produce (may be empty).
+ */
+export function ruleProducedStrings(
+  rule: { output: { kind: string; value?: string; storeRef?: string }[] },
+  storeMap: Map<string, IRStore>,
+): string[] {
+  const results: string[] = [];
+  const run: string[] = [];
+
+  const flushRunLocal = () => {
+    if (run.length === 0) return;
+    results.push(run.join("").normalize("NFC"));
+    run.length = 0;
+  };
+
+  for (const elem of rule.output) {
+    switch (elem.kind) {
+      case "char":
+        run.push((elem as { kind: "char"; value: string }).value);
+        break;
+
+      case "index":
+      case "outs": {
+        flushRunLocal();
+        const storeRef = (elem as { kind: string; storeRef?: string }).storeRef;
+        if (storeRef !== undefined) {
+          const store = storeMap.get(storeRef);
+          if (store !== undefined) {
+            for (const item of store.items) {
+              if (item.kind === "char") {
+                results.push(item.value.normalize("NFC"));
+              }
+            }
+          }
+        }
+        break;
+      }
+
+      case "deadkey":
+      case "beep":
+      case "raw":
+        flushRunLocal();
+        break;
+
+      default:
+        flushRunLocal();
+        break;
+    }
+  }
+
+  flushRunLocal();
+  return results;
+}
+
+/**
  * Extract the distinct set of glyphs the keyboard can statically produce.
  *
  * Consecutive `{kind:"char"}` elements in a single rule output are accumulated
