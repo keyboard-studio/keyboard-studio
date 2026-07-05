@@ -1,0 +1,4697 @@
+{
+  "generatedAt": "2026-07-05T21:54:35.479Z",
+  "scope": "full",
+  "exportInventory": [
+    {
+      "module": "api/oauth/_shared.ts",
+      "package": "api",
+      "exports": [
+        "ExchangeBodySchema",
+        "RefreshBodySchema",
+        "envConfig",
+        "exchangeCore",
+        "jsonResponse",
+        "refreshCore",
+        "runTokenHandler"
+      ]
+    },
+    {
+      "module": "api/oauth/exchange.ts",
+      "package": "api",
+      "exports": []
+    },
+    {
+      "module": "api/oauth/health.ts",
+      "package": "api",
+      "exports": []
+    },
+    {
+      "module": "api/oauth/refresh.ts",
+      "package": "api",
+      "exports": []
+    },
+    {
+      "module": "api/submit/managed-pr.ts",
+      "package": "api",
+      "exports": [
+        "runManagedPRHandler"
+      ]
+    },
+    {
+      "module": "api/vitest.config.ts",
+      "package": "api",
+      "exports": []
+    },
+    {
+      "module": "packages/contracts/src/assignmentMap.ts",
+      "package": "contracts",
+      "exports": [
+        "AssignmentScope",
+        "AssignmentSource",
+        "MechanismAssignment",
+        "MechanismRef",
+        "Modality",
+        "TouchAssignment",
+        "effectiveMechanisms",
+        "mergeAssignments",
+        "uncoveredTargets"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/axes.ts",
+      "package": "contracts",
+      "exports": [
+        "ConstraintEnforcement",
+        "DiacriticBehavior",
+        "DiscoveryAxisVector",
+        "MarkInputOrder",
+        "MultiMode",
+        "PhoneticIntuition",
+        "RemapPosture",
+        "Scale",
+        "ScriptClass",
+        "SpareKeyAvailability"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/axisFill.ts",
+      "package": "contracts",
+      "exports": [
+        "AxisFill",
+        "AxisFillSource"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/axisPriors.ts",
+      "package": "contracts",
+      "exports": [
+        "AXIS_PRIORS",
+        "AxisPriorCell",
+        "AxisPriorTable"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/baseBrowser.ts",
+      "package": "contracts",
+      "exports": [
+        "BaseBrowserService"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/baseKeyboard.ts",
+      "package": "contracts",
+      "exports": [
+        "BaseKeyboard",
+        "BaseKeyboardInit",
+        "KeymanPlatformTarget",
+        "makeBaseKeyboard"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/characterDiscovery.ts",
+      "package": "contracts",
+      "exports": [
+        "CharacterDiscoveryService",
+        "DiscoveryMethod",
+        "InventoryChar"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/compileResult.ts",
+      "package": "contracts",
+      "exports": [
+        "CompileArtifact",
+        "CompileResult",
+        "CompileResultInit",
+        "CompilerDiagnostic",
+        "makeCompileResult"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/compiler.ts",
+      "package": "contracts",
+      "exports": [
+        "CompilerLoadError",
+        "CompilerService"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/criteria.ts",
+      "package": "contracts",
+      "exports": [
+        "CriteriaBand",
+        "Criterion",
+        "DiscusPrinciple",
+        "LayerCEnforceCriterion",
+        "RedChecklistCriterion",
+        "ScaffolderBakeCriterion",
+        "YellowSurveyCriterion"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/criteriaData.ts",
+      "package": "contracts",
+      "exports": [
+        "ALL_CRITERIA",
+        "CRITERIA_BY_BAND"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/fixtures/baseKeyboards.ts",
+      "package": "contracts",
+      "exports": [
+        "basicKbdus",
+        "sampleBaseKeyboards",
+        "silDevanagariPhonetic",
+        "silEuroLatin"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/fixtures/compileResults.ts",
+      "package": "contracts",
+      "exports": [
+        "cleanCompileResult",
+        "coldStartCompileResult",
+        "mixedDiagnosticsResult",
+        "parseFatalCompileResult"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/fixtures/index.ts",
+      "package": "contracts",
+      "exports": []
+    },
+    {
+      "module": "packages/contracts/src/fixtures/keyboard-ir.ts",
+      "package": "contracts",
+      "exports": [
+        "charItems",
+        "makeCharStore",
+        "makeTestIR"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/fixtures/linguistInventories.ts",
+      "package": "contracts",
+      "exports": [
+        "creeWithSyllabicFinals",
+        "hausaWithDigraphs",
+        "hebrewRtlCoverageOnly",
+        "hindiWithNukta"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/fixtures/lintFindings.ts",
+      "package": "contracts",
+      "exports": [
+        "fatalFindings",
+        "layerAFindings",
+        "layerBFindings",
+        "layerCFindings",
+        "validatorFindings"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/fixtures/patterns.ts",
+      "package": "contracts",
+      "exports": [
+        "latinDeadkeyAcuteSingle",
+        "longpressAlternates",
+        "nfdNormalization",
+        "samplePatterns"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/fixtures/placementMaps.ts",
+      "package": "contracts",
+      "exports": [
+        "collisionCase",
+        "corpusBackedQwerty",
+        "phoneticAnchorHausa"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/fixtures/provenance.ts",
+      "package": "contracts",
+      "exports": [
+        "emptyProvenance",
+        "fullProvenance",
+        "minimalProvenance"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/fixtures/surveySessions.ts",
+      "package": "contracts",
+      "exports": [
+        "assignmentSession",
+        "emptySession",
+        "fullSession",
+        "irSeedSession",
+        "phaseABSession",
+        "phaseASession"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/fontEntry.ts",
+      "package": "contracts",
+      "exports": [
+        "KpsFontEntry",
+        "KpsStylesheetEntry"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/index.ts",
+      "package": "contracts",
+      "exports": []
+    },
+    {
+      "module": "packages/contracts/src/ir-path.ts",
+      "package": "contracts",
+      "exports": [
+        "ARRAY_INDEX",
+        "ArrayIndex",
+        "AssignableTo",
+        "IRPath",
+        "PathSegment",
+        "formatIRPath",
+        "irPath"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/ir-path.type-assertions.ts",
+      "package": "contracts",
+      "exports": []
+    },
+    {
+      "module": "packages/contracts/src/ir/producedSet.ts",
+      "package": "contracts",
+      "exports": [
+        "BuildProducedSetOptions",
+        "buildProducedSet"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/keyboard-ir.ts",
+      "package": "contracts",
+      "exports": [
+        "ContextElement",
+        "IRComment",
+        "IRGroup",
+        "IRHeader",
+        "IRNodeRef",
+        "IROrigin",
+        "IRRule",
+        "IRStore",
+        "ImportReport",
+        "ImportStatus",
+        "KeyChord",
+        "KeyboardIR",
+        "KvksIR",
+        "OutputElement",
+        "RawKmnFragment",
+        "RoundTripDiff",
+        "StoreItem",
+        "TargetSelector",
+        "TouchKeyIR",
+        "TouchKeyProvenance",
+        "TouchLayoutIR"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/keyboardIRRoundTrip.ts",
+      "package": "contracts",
+      "exports": [
+        "SemanticDifference",
+        "SemanticEquivalenceResult",
+        "assertSemanticEquivalence"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/keyboardId.ts",
+      "package": "contracts",
+      "exports": [
+        "KeyboardIdValidation",
+        "slugifyKeyboardId",
+        "validateKeyboardId"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/keyboardIdentity.ts",
+      "package": "contracts",
+      "exports": [
+        "KeyboardIdentity",
+        "KeyboardIdentityInit",
+        "ScriptFamily",
+        "makeKeyboardIdentity"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/langtags.ts",
+      "package": "contracts",
+      "exports": [
+        "LangtagsProvenance",
+        "LanguageDefaults",
+        "LanguageSummary"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/linguistInventory.ts",
+      "package": "contracts",
+      "exports": [
+        "AuxiliaryLetters",
+        "CasedLetters",
+        "InventoryFlag",
+        "InventoryFlagIssue",
+        "InventorySource",
+        "LinguistInventory",
+        "LinguistInventoryInit",
+        "linguistInventoryChars",
+        "makeLinguistInventory"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/lintEngine.ts",
+      "package": "contracts",
+      "exports": [
+        "LintEngineService"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/lintFinding.ts",
+      "package": "contracts",
+      "exports": [
+        "LintCode",
+        "LintFinding",
+        "LintFindingOrigin",
+        "LintLayer",
+        "LintSeverity",
+        "LintSeverityNumeric",
+        "SourceLocation"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/mocks/index.ts",
+      "package": "contracts",
+      "exports": [
+        "makeMockVirtualFS",
+        "mockBaseBrowser",
+        "mockCompiler",
+        "mockLintEngine",
+        "mockOutputService",
+        "mockPatternLibrary",
+        "mockScaffolder",
+        "mockValidator",
+        "scaffoldedFS"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/mocks/mockBaseBrowser.ts",
+      "package": "contracts",
+      "exports": [
+        "mockBaseBrowser"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/mocks/mockCompiler.ts",
+      "package": "contracts",
+      "exports": [
+        "mockCompiler"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/mocks/mockLintEngine.ts",
+      "package": "contracts",
+      "exports": [
+        "mockLintEngine"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/mocks/mockOutputService.ts",
+      "package": "contracts",
+      "exports": [
+        "mockOutputService"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/mocks/mockPatternLibrary.ts",
+      "package": "contracts",
+      "exports": [
+        "mockPatternLibrary"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/mocks/mockScaffolder.ts",
+      "package": "contracts",
+      "exports": [
+        "mockScaffolder"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/mocks/mockValidator.ts",
+      "package": "contracts",
+      "exports": [
+        "mockValidator"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/mocks/mockVirtualFS.ts",
+      "package": "contracts",
+      "exports": [
+        "makeMockVirtualFS",
+        "scaffoldedFS"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/outputService.ts",
+      "package": "contracts",
+      "exports": [
+        "ManagedPRAttribution",
+        "OutputService",
+        "PublishManagedPRError",
+        "PublishManagedPROptions",
+        "PublishManagedPRResult",
+        "PublishPRError",
+        "PublishPROptions",
+        "PublishPRResult",
+        "PublishStep",
+        "PublishStepName",
+        "VerifyTokenResult"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/pattern.ts",
+      "package": "contracts",
+      "exports": [
+        "AnswerType",
+        "DemoObject",
+        "Pattern",
+        "PatternCategory",
+        "PatternInit",
+        "PatternQuestion",
+        "TestVector",
+        "makePattern"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/patternLibrary.ts",
+      "package": "contracts",
+      "exports": [
+        "PatternLibraryService"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/patternMatch.ts",
+      "package": "contracts",
+      "exports": [
+        "PatternMatch",
+        "PatternMatchReason",
+        "toPatternMatch"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/placementMap.ts",
+      "package": "contracts",
+      "exports": [
+        "PlacementCandidate",
+        "PlacementEntry",
+        "PlacementMap",
+        "PlacementMapInit",
+        "PlacementMechanism",
+        "PriorSource",
+        "collisions",
+        "makePlacementMap",
+        "topCandidate"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/placementStrategy.ts",
+      "package": "contracts",
+      "exports": [
+        "strategyForCandidate"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/provenance.ts",
+      "package": "contracts",
+      "exports": [
+        "CommunityRepresentative",
+        "KeyboardProvenance",
+        "KeyboardProvenanceInit",
+        "RequesterInfo",
+        "makeKeyboardProvenance"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/removalCapability.ts",
+      "package": "contracts",
+      "exports": [
+        "RemovalCapability"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/scaffolder.ts",
+      "package": "contracts",
+      "exports": [
+        "KEYBOARD_ID_INVALID_CHARS",
+        "RoutingGroup",
+        "ScaffoldOptions",
+        "ScaffoldResult",
+        "ScaffolderService",
+        "validateScaffolderKeyboardId"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/schemas.ts",
+      "package": "contracts",
+      "exports": [
+        "AnswerTypeSchema",
+        "AxisFillSchema",
+        "AxisFillSourceSchema",
+        "AxisPriorCellSchema",
+        "AxisPriorTableSchema",
+        "CriterionSchema",
+        "DemoObjectSchema",
+        "DiscusPrincipleSchema",
+        "IRNodeRefSchema",
+        "KeyboardIRSchema",
+        "PatternCategorySchema",
+        "PatternQuestionSchema",
+        "PatternSchema",
+        "RawPattern",
+        "RawPatternSchema",
+        "RemovalCapabilitySchema",
+        "ScaleSchema",
+        "ScriptClassSchema",
+        "StrategyIdSchema",
+        "TestVectorSchema",
+        "TouchKeyIRSchema",
+        "TouchKeyProvenanceSchema",
+        "TouchLayoutIRSchema"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/simulation.ts",
+      "package": "contracts",
+      "exports": [
+        "DeadkeySnapshot",
+        "PatternTestResult",
+        "SimKeyInput",
+        "SimulationResult",
+        "SimulationStep",
+        "TestVectorResult"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/strategy.ts",
+      "package": "contracts",
+      "exports": [
+        "ALL_STRATEGY_IDS",
+        "PrimaryRuleNumber",
+        "StrategyId",
+        "StrategyRecommendation"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/surveyPhaseResult.ts",
+      "package": "contracts",
+      "exports": [
+        "SurveyAnswer",
+        "SurveyPhase",
+        "SurveyPhaseResult"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/surveySession.ts",
+      "package": "contracts",
+      "exports": [
+        "SurveySession",
+        "mergePhaseResults",
+        "updateIrAxes"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/utils/charUtils.ts",
+      "package": "contracts",
+      "exports": [
+        "isDecomposableAccented",
+        "parseUPlusNotation",
+        "toUPlusNotation"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/validator.ts",
+      "package": "contracts",
+      "exports": [
+        "FragmentValidationContext",
+        "ValidatorService"
+      ]
+    },
+    {
+      "module": "packages/contracts/src/virtualFS.ts",
+      "package": "contracts",
+      "exports": [
+        "VirtualFS",
+        "VirtualFSEntry",
+        "createVirtualFS"
+      ]
+    },
+    {
+      "module": "packages/engine/src/base-browser/base-browser.ts",
+      "package": "engine",
+      "exports": [
+        "BaseBrowserConfig",
+        "createBaseBrowser"
+      ]
+    },
+    {
+      "module": "packages/engine/src/base-browser/github-api.ts",
+      "package": "engine",
+      "exports": [
+        "FetchFn",
+        "GitTree",
+        "GitTreeItem",
+        "GithubClientOptions",
+        "fetchRawText",
+        "fetchRecursiveTree",
+        "fetchTree"
+      ]
+    },
+    {
+      "module": "packages/engine/src/base-browser/index.ts",
+      "package": "engine",
+      "exports": [
+        "createBaseBrowser"
+      ]
+    },
+    {
+      "module": "packages/engine/src/base-browser/kps-parser.ts",
+      "package": "engine",
+      "exports": [
+        "KpsFontRefs",
+        "KpsMetadata",
+        "parseKps",
+        "parseKpsFontRefs"
+      ]
+    },
+    {
+      "module": "packages/engine/src/base-browser/offline-bundle.ts",
+      "package": "engine",
+      "exports": [
+        "offlineKbdus"
+      ]
+    },
+    {
+      "module": "packages/engine/src/character-discovery/CharacterDiscoveryServiceImpl.ts",
+      "package": "engine",
+      "exports": [
+        "CharacterDiscoveryServiceImpl",
+        "LLMCompleter",
+        "buildLinguistPrompt",
+        "cldrCrossCheck",
+        "createCharacterDiscoveryService",
+        "parseLinguistJson"
+      ]
+    },
+    {
+      "module": "packages/engine/src/character-discovery/cldr.ts",
+      "package": "engine",
+      "exports": [
+        "CldrFullLoader",
+        "CldrLoader",
+        "ExemplarResult",
+        "ParsedUnicodeSet",
+        "SCRIPT_BLOCKS",
+        "createFetchCldrFullLoader",
+        "createFetchCldrLoader",
+        "loadExemplars",
+        "loadExemplarsFromFull",
+        "parseUnicodeSet",
+        "scriptBlockChars"
+      ]
+    },
+    {
+      "module": "packages/engine/src/character-discovery/suggestMissing.ts",
+      "package": "engine",
+      "exports": [
+        "MissingCharSuggestions",
+        "suggestMissingCharacters"
+      ]
+    },
+    {
+      "module": "packages/engine/src/codec/emit.ts",
+      "package": "engine",
+      "exports": [
+        "emit"
+      ]
+    },
+    {
+      "module": "packages/engine/src/codec/hash.ts",
+      "package": "engine",
+      "exports": [
+        "computeSha256Hex"
+      ]
+    },
+    {
+      "module": "packages/engine/src/codec/import-keyboard.ts",
+      "package": "engine",
+      "exports": [
+        "BuildImportReportParams",
+        "ImportKeyboardResult",
+        "buildImportReport",
+        "importKeyboard"
+      ]
+    },
+    {
+      "module": "packages/engine/src/codec/index.ts",
+      "package": "engine",
+      "exports": [
+        "OPAQUE_REASONS",
+        "computeSha256Hex",
+        "emit",
+        "emitTouchLayout",
+        "normaliseForComparison",
+        "parse",
+        "parseKvks",
+        "parseTouchLayout"
+      ]
+    },
+    {
+      "module": "packages/engine/src/codec/normalise-ir.ts",
+      "package": "engine",
+      "exports": [
+        "normaliseForComparison"
+      ]
+    },
+    {
+      "module": "packages/engine/src/codec/opaque-reasons.ts",
+      "package": "engine",
+      "exports": [
+        "OPAQUE_REASONS",
+        "OpaqueReason"
+      ]
+    },
+    {
+      "module": "packages/engine/src/codec/parse-kvks.ts",
+      "package": "engine",
+      "exports": [
+        "parseKvks"
+      ]
+    },
+    {
+      "module": "packages/engine/src/codec/parse-touch.ts",
+      "package": "engine",
+      "exports": [
+        "emitTouchLayout",
+        "parseTouchLayout"
+      ]
+    },
+    {
+      "module": "packages/engine/src/codec/parse.ts",
+      "package": "engine",
+      "exports": [
+        "ParseResult",
+        "parse"
+      ]
+    },
+    {
+      "module": "packages/engine/src/codec/tokenize.ts",
+      "package": "engine",
+      "exports": [
+        "TargetSelector",
+        "Token",
+        "TokenKind",
+        "tokenize"
+      ]
+    },
+    {
+      "module": "packages/engine/src/compiler/index.ts",
+      "package": "engine",
+      "exports": [
+        "KmnCompilerLike",
+        "compile",
+        "compilerService",
+        "getKmnCompilerCtor",
+        "init",
+        "isReady",
+        "stripDanglingAssetStores"
+      ]
+    },
+    {
+      "module": "packages/engine/src/compiler/parseKmnHeaderStores.ts",
+      "package": "engine",
+      "exports": [
+        "KmnHeaderStore",
+        "parseKmnHeaderStores"
+      ]
+    },
+    {
+      "module": "packages/engine/src/compiler/parseKpjFlags.ts",
+      "package": "engine",
+      "exports": [
+        "CompilerOptions",
+        "parseKpjFlags"
+      ]
+    },
+    {
+      "module": "packages/engine/src/compiler/pathUtils.ts",
+      "package": "engine",
+      "exports": [
+        "pathUtils"
+      ]
+    },
+    {
+      "module": "packages/engine/src/compiler/stripDanglingAssetStores.ts",
+      "package": "engine",
+      "exports": [
+        "stripDanglingAssetStores"
+      ]
+    },
+    {
+      "module": "packages/engine/src/index.ts",
+      "package": "engine",
+      "exports": [
+        "ALL_GROUPS",
+        "CODE_MAP",
+        "OPAQUE_REASONS",
+        "OracleLoadError",
+        "PRIMARY_RULES",
+        "SECONDARY_RULES",
+        "STRATEGY_LABELS",
+        "TS_GROUPS",
+        "WASM_GROUPS",
+        "_createOracle",
+        "addSidecar",
+        "applyAssignments",
+        "applyAssignmentsToVfs",
+        "applyCarveToVfs",
+        "applyIdentityStubMutation",
+        "applyKeycapLabelsToVfs",
+        "applyStoreSlotRemovals",
+        "applyTouchAssignments",
+        "applyTouchAssignmentsToRawJson",
+        "buildImportAttributionBlock",
+        "buildMinimalPhoneTouchLayout",
+        "bumpKeyboardVersion",
+        "carveFilterIr",
+        "classifyRemovalCapabilities",
+        "classifyStoreSlotEdit",
+        "collectFromOutput",
+        "compile",
+        "compilerService",
+        "createBaseBrowser",
+        "createCharacterDiscoveryService",
+        "createFetchCldrFullLoader",
+        "createFetchCldrLoader",
+        "createGitHubOutputService",
+        "createManagedPROutputService",
+        "createOutputService",
+        "createScaffolderService",
+        "defaultFillAxes",
+        "emitKmn",
+        "emitTouchLayout",
+        "fetchKeyboardSourceToVfs",
+        "filterFor",
+        "getById",
+        "getPatterns",
+        "init",
+        "isParallelIndexFanOut",
+        "isReady",
+        "isSidecarPath",
+        "loadPatterns",
+        "loadWasmOracle",
+        "oracle",
+        "parseKmn",
+        "parseKmnHeaderStores",
+        "parseKpjFlags",
+        "parseKvks",
+        "parseSlotId",
+        "parseTouchLayout",
+        "producedGlyphs",
+        "recognizePatterns",
+        "renameFilesInVfs",
+        "resetIdentity",
+        "resolveRenderableMechanisms",
+        "runAllChecks",
+        "runLexicalChecks",
+        "runReferenceChecks",
+        "scaffoldIR",
+        "scaffoldTouchLayout",
+        "selectStrategy",
+        "serializeToZip",
+        "stageAdaptHistory",
+        "stripDanglingAssetStores",
+        "substituteSlots",
+        "suggestMissingCharacters",
+        "toZip",
+        "translatePassthrough",
+        "translateWasmFinding",
+        "validateWithOracle"
+      ]
+    },
+    {
+      "module": "packages/engine/src/inventory/producedGlyphs.ts",
+      "package": "engine",
+      "exports": [
+        "ProducedGlyphsOptions",
+        "collectFromOutput",
+        "producedGlyphs"
+      ]
+    },
+    {
+      "module": "packages/engine/src/langtags/index.ts",
+      "package": "engine",
+      "exports": [
+        "getLanguageDefaults",
+        "listLanguages",
+        "lookupByName"
+      ]
+    },
+    {
+      "module": "packages/engine/src/loader/fetchKeyboardSourceToVfs.ts",
+      "package": "engine",
+      "exports": [
+        "FetchFn",
+        "FetchKeyboardSourceOptions",
+        "FetchKeyboardSourceResult",
+        "fetchKeyboardSourceToVfs",
+        "resolveKpsFontPath"
+      ]
+    },
+    {
+      "module": "packages/engine/src/output/adapt-staging.ts",
+      "package": "engine",
+      "exports": [
+        "bumpKeyboardVersion",
+        "stageAdaptHistory"
+      ]
+    },
+    {
+      "module": "packages/engine/src/output/github.ts",
+      "package": "engine",
+      "exports": [
+        "GitHubFetchFn",
+        "GitHubFetchResponse",
+        "GitHubOutputConfig",
+        "createGitHubOutputService",
+        "isSourceFile",
+        "publishPR",
+        "verifyToken"
+      ]
+    },
+    {
+      "module": "packages/engine/src/output/import-attribution.ts",
+      "package": "engine",
+      "exports": [
+        "ImportAttributionInput",
+        "buildImportAttributionBlock"
+      ]
+    },
+    {
+      "module": "packages/engine/src/output/index.ts",
+      "package": "engine",
+      "exports": [
+        "addSidecar",
+        "buildImportAttributionBlock",
+        "bumpKeyboardVersion",
+        "createGitHubOutputService",
+        "createManagedPROutputService",
+        "createOutputService",
+        "isSidecarPath",
+        "isSourceFile",
+        "serializeToZip",
+        "stageAdaptHistory",
+        "toZip"
+      ]
+    },
+    {
+      "module": "packages/engine/src/output/managed-pr.ts",
+      "package": "engine",
+      "exports": [
+        "ManagedPRFetchFn",
+        "ManagedPRFetchResponse",
+        "ManagedPROutputConfig",
+        "createManagedPROutputService",
+        "publishManagedPR"
+      ]
+    },
+    {
+      "module": "packages/engine/src/output/sidecar.ts",
+      "package": "engine",
+      "exports": [
+        "SIDECAR_HASH_SUFFIX",
+        "SIDECAR_SUFFIX",
+        "addSidecar",
+        "isSidecarPath"
+      ]
+    },
+    {
+      "module": "packages/engine/src/output/zip.ts",
+      "package": "engine",
+      "exports": [
+        "serializeToZip",
+        "toZip"
+      ]
+    },
+    {
+      "module": "packages/engine/src/pattern-apply/applyAssignments.ts",
+      "package": "engine",
+      "exports": [
+        "ApplyAssignmentsResult",
+        "applyAssignments",
+        "resolveRenderableMechanisms"
+      ]
+    },
+    {
+      "module": "packages/engine/src/pattern-apply/applyAssignmentsToVfs.ts",
+      "package": "engine",
+      "exports": [
+        "applyAssignmentsToVfs"
+      ]
+    },
+    {
+      "module": "packages/engine/src/pattern-apply/applyCarveToVfs.ts",
+      "package": "engine",
+      "exports": [
+        "ApplyCarveToVfsOpts",
+        "applyCarveToVfs"
+      ]
+    },
+    {
+      "module": "packages/engine/src/pattern-apply/applyKeycapLabelsToVfs.ts",
+      "package": "engine",
+      "exports": [
+        "applyKeycapLabelsToVfs"
+      ]
+    },
+    {
+      "module": "packages/engine/src/pattern-apply/applyStoreSlotRemovals.ts",
+      "package": "engine",
+      "exports": [
+        "StoreSlotBlockReason",
+        "StoreSlotEditMode",
+        "StoreSlotRemovalResult",
+        "applyStoreSlotRemovals",
+        "classifyStoreSlotEdit"
+      ]
+    },
+    {
+      "module": "packages/engine/src/pattern-apply/applyTouchAssignments.ts",
+      "package": "engine",
+      "exports": [
+        "ApplyTouchAssignmentsResult",
+        "applyTouchAssignments"
+      ]
+    },
+    {
+      "module": "packages/engine/src/pattern-apply/applyTouchAssignmentsToRawJson.ts",
+      "package": "engine",
+      "exports": [
+        "ApplyTouchAssignmentsToRawJsonResult",
+        "applyTouchAssignmentsToRawJson"
+      ]
+    },
+    {
+      "module": "packages/engine/src/pattern-apply/carveFilterIr.ts",
+      "package": "engine",
+      "exports": [
+        "carveFilterIr"
+      ]
+    },
+    {
+      "module": "packages/engine/src/pattern-apply/index.ts",
+      "package": "engine",
+      "exports": [
+        "applyAssignments",
+        "applyAssignmentsToVfs",
+        "applyCarveToVfs",
+        "applyKeycapLabelsToVfs",
+        "applyStoreSlotRemovals",
+        "applyTouchAssignments",
+        "applyTouchAssignmentsToRawJson",
+        "carveFilterIr",
+        "classifyStoreSlotEdit",
+        "parseSlotId",
+        "resolveRenderableMechanisms",
+        "substituteSlots"
+      ]
+    },
+    {
+      "module": "packages/engine/src/pattern-apply/slotId.ts",
+      "package": "engine",
+      "exports": [
+        "parseSlotId"
+      ]
+    },
+    {
+      "module": "packages/engine/src/pattern-apply/substitute.ts",
+      "package": "engine",
+      "exports": [
+        "SubstituteResult",
+        "substituteSlots"
+      ]
+    },
+    {
+      "module": "packages/engine/src/pattern-apply/touch-mechanism-shared.ts",
+      "package": "engine",
+      "exports": [
+        "isTouchSubKeyDuplicate"
+      ]
+    },
+    {
+      "module": "packages/engine/src/pattern-library/filterFor.ts",
+      "package": "engine",
+      "exports": [
+        "filterFor"
+      ]
+    },
+    {
+      "module": "packages/engine/src/pattern-library/index.ts",
+      "package": "engine",
+      "exports": [
+        "filterFor",
+        "getById",
+        "getPatterns",
+        "loadPatterns"
+      ]
+    },
+    {
+      "module": "packages/engine/src/pattern-library/loader.ts",
+      "package": "engine",
+      "exports": [
+        "getById",
+        "getPatterns",
+        "loadPatterns"
+      ]
+    },
+    {
+      "module": "packages/engine/src/pattern-library/patternSchema.ts",
+      "package": "engine",
+      "exports": [
+        "PatternSchema"
+      ]
+    },
+    {
+      "module": "packages/engine/src/pattern-library/types.ts",
+      "package": "engine",
+      "exports": [
+        "LoadReport",
+        "PatternFilter"
+      ]
+    },
+    {
+      "module": "packages/engine/src/placement/aggregate.ts",
+      "package": "engine",
+      "exports": [
+        "aggregatePlacements",
+        "computeFingerprintFromCandidates"
+      ]
+    },
+    {
+      "module": "packages/engine/src/placement/corpus-loader.ts",
+      "package": "engine",
+      "exports": [
+        "corpusPriorsToPlacementMap"
+      ]
+    },
+    {
+      "module": "packages/engine/src/placement/filters.ts",
+      "package": "engine",
+      "exports": [
+        "collectVkeyChars",
+        "dedupCapsNcaps",
+        "detectBaseLayoutFamily",
+        "hasInvertedNumberRow",
+        "hasNonUSBase",
+        "isMnemonicKeyboard"
+      ]
+    },
+    {
+      "module": "packages/engine/src/placement/index.ts",
+      "package": "engine",
+      "exports": [
+        "corpusPriorsToPlacementMap",
+        "detectBaseLayoutFamily",
+        "emitPlacementMap",
+        "hasInvertedNumberRow",
+        "hasNonUSBase",
+        "isMnemonicKeyboard"
+      ]
+    },
+    {
+      "module": "packages/engine/src/placement/model.ts",
+      "package": "engine",
+      "exports": [
+        "AggregatedEntry",
+        "KeyboardPlacementReport",
+        "PlacementPriorsJSON"
+      ]
+    },
+    {
+      "module": "packages/engine/src/recognizer/classifyRemovalCapabilities.ts",
+      "package": "engine",
+      "exports": [
+        "classifyRemovalCapabilities"
+      ]
+    },
+    {
+      "module": "packages/engine/src/recognizer/index.ts",
+      "package": "engine",
+      "exports": [
+        "classifyRemovalCapabilities",
+        "recognizePatterns"
+      ]
+    },
+    {
+      "module": "packages/engine/src/recognizer/interpreter.ts",
+      "package": "engine",
+      "exports": [
+        "interpretLift",
+        "interpretPredicate"
+      ]
+    },
+    {
+      "module": "packages/engine/src/recognizer/node-refs.ts",
+      "package": "engine",
+      "exports": [
+        "ruleRef",
+        "storeRef"
+      ]
+    },
+    {
+      "module": "packages/engine/src/recognizer/rules/parallel-index-fanout.ts",
+      "package": "engine",
+      "exports": [
+        "isParallelIndexFanOut"
+      ]
+    },
+    {
+      "module": "packages/engine/src/recognizer/rules/s01-simple-swap.ts",
+      "package": "engine",
+      "exports": [
+        "isS01",
+        "s01Recognizer"
+      ]
+    },
+    {
+      "module": "packages/engine/src/recognizer/rules/s02-deadkey-single-tap.ts",
+      "package": "engine",
+      "exports": [
+        "isBody",
+        "s02Recognizer"
+      ]
+    },
+    {
+      "module": "packages/engine/src/recognizer/types.ts",
+      "package": "engine",
+      "exports": [
+        "MatchResult",
+        "RecognizeResult",
+        "RecognizerRule"
+      ]
+    },
+    {
+      "module": "packages/engine/src/recognizer/utils.ts",
+      "package": "engine",
+      "exports": [
+        "formatDkName",
+        "formatVKeyModifiers",
+        "storeItemsToCharString",
+        "toUPlus"
+      ]
+    },
+    {
+      "module": "packages/engine/src/recognizer/yaml-schema.ts",
+      "package": "engine",
+      "exports": [
+        "CombinedWithCondition",
+        "CombinedWithEntry",
+        "ContextConstraints",
+        "ContextPatternEntry",
+        "CorpusEvidence",
+        "GroupConstraints",
+        "LiftsTo",
+        "OutputConstraints",
+        "OutputPatternEntry",
+        "PredicateBlock",
+        "RecognizerRuleYaml",
+        "RoleType",
+        "RuleEntry",
+        "SlotEntry",
+        "SlotMapping",
+        "StoreConstraint"
+      ]
+    },
+    {
+      "module": "packages/engine/src/scaffolder/index.ts",
+      "package": "engine",
+      "exports": [
+        "ScaffolderServiceOptions",
+        "buildMinimalPhoneTouchLayout",
+        "createScaffolderService",
+        "renameFilesInVfs",
+        "resetIdentity",
+        "scaffoldIR",
+        "scaffoldTouchLayout"
+      ]
+    },
+    {
+      "module": "packages/engine/src/scaffolder/scaffold-ir.ts",
+      "package": "engine",
+      "exports": [
+        "ScaffoldIRIdentity",
+        "ScaffoldIROptions",
+        "ensureCasedKeysStore",
+        "removeCapsContextElements",
+        "resetIdentity",
+        "scaffoldIR",
+        "stripCapsRules"
+      ]
+    },
+    {
+      "module": "packages/engine/src/scaffolder/scaffoldTouchLayout.ts",
+      "package": "engine",
+      "exports": [
+        "buildMinimalPhoneTouchLayout",
+        "scaffoldTouchLayout"
+      ]
+    },
+    {
+      "module": "packages/engine/src/shared/node-ids.ts",
+      "package": "engine",
+      "exports": [
+        "NodeIdMinter"
+      ]
+    },
+    {
+      "module": "packages/engine/src/shared/touch-ids.ts",
+      "package": "engine",
+      "exports": [
+        "charToUnicodeKeyId"
+      ]
+    },
+    {
+      "module": "packages/engine/src/simulator/index.ts",
+      "package": "engine",
+      "exports": [
+        "runPatternTests",
+        "simulate"
+      ]
+    },
+    {
+      "module": "packages/engine/src/simulator/nodeKeyboardLoader.ts",
+      "package": "engine",
+      "exports": [
+        "loadKeyboardInterface"
+      ]
+    },
+    {
+      "module": "packages/engine/src/strategy-selector/default-fill.ts",
+      "package": "engine",
+      "exports": [
+        "DefaultFillResult",
+        "defaultFillAxes"
+      ]
+    },
+    {
+      "module": "packages/engine/src/strategy-selector/index.ts",
+      "package": "engine",
+      "exports": [
+        "selectStrategy"
+      ]
+    },
+    {
+      "module": "packages/engine/src/strategy-selector/rules.ts",
+      "package": "engine",
+      "exports": [
+        "ConditionalSecondary",
+        "PRIMARY_RULES",
+        "PrimaryRuleDef",
+        "SECONDARY_RULES",
+        "STRATEGY_LABELS",
+        "SecondaryRuleDef",
+        "SecondaryRuleId"
+      ]
+    },
+    {
+      "module": "packages/engine/src/stub-mutator/index.ts",
+      "package": "engine",
+      "exports": [
+        "applyIdentityStubMutation"
+      ]
+    },
+    {
+      "module": "packages/engine/src/validator/OracleLoadError.ts",
+      "package": "engine",
+      "exports": [
+        "OracleLoadError",
+        "OracleLoadReason"
+      ]
+    },
+    {
+      "module": "packages/engine/src/validator/checks/_shared.ts",
+      "package": "engine",
+      "exports": [
+        "INVALID_CHAR_RE",
+        "STORE_DECL_RE",
+        "StoreInfo",
+        "checkForDuplicateDeclarations",
+        "collectDeclaredStores"
+      ]
+    },
+    {
+      "module": "packages/engine/src/validator/checks/codepointFormat.ts",
+      "package": "engine",
+      "exports": [
+        "checkCodepointFormat"
+      ]
+    },
+    {
+      "module": "packages/engine/src/validator/checks/contextOrdering.ts",
+      "package": "engine",
+      "exports": [
+        "checkContextOrdering"
+      ]
+    },
+    {
+      "module": "packages/engine/src/validator/checks/deadkeyResolution.ts",
+      "package": "engine",
+      "exports": [
+        "checkDeadkeyResolution"
+      ]
+    },
+    {
+      "module": "packages/engine/src/validator/checks/deprecatedStores.ts",
+      "package": "engine",
+      "exports": [
+        "checkDeprecatedStores"
+      ]
+    },
+    {
+      "module": "packages/engine/src/validator/checks/duplicateGroups.ts",
+      "package": "engine",
+      "exports": [
+        "checkDuplicateGroups"
+      ]
+    },
+    {
+      "module": "packages/engine/src/validator/checks/duplicateStores.ts",
+      "package": "engine",
+      "exports": [
+        "checkDuplicateStores"
+      ]
+    },
+    {
+      "module": "packages/engine/src/validator/checks/identifiers.ts",
+      "package": "engine",
+      "exports": [
+        "checkIdentifiers"
+      ]
+    },
+    {
+      "module": "packages/engine/src/validator/checks/ifStoreResolution.ts",
+      "package": "engine",
+      "exports": [
+        "checkIfStoreResolution"
+      ]
+    },
+    {
+      "module": "packages/engine/src/validator/checks/indexBounds.ts",
+      "package": "engine",
+      "exports": [
+        "checkIndexBounds"
+      ]
+    },
+    {
+      "module": "packages/engine/src/validator/codeMap.ts",
+      "package": "engine",
+      "exports": [
+        "CODE_MAP",
+        "CodeMapEntry",
+        "translatePassthrough",
+        "translateWasmFinding"
+      ]
+    },
+    {
+      "module": "packages/engine/src/validator/corpus.ts",
+      "package": "engine",
+      "exports": [
+        "CorpusResult",
+        "CorpusSpec",
+        "D7_DEADKEY_DEPTH",
+        "D7_MODIFIER_SETS",
+        "generateCorpus"
+      ]
+    },
+    {
+      "module": "packages/engine/src/validator/index-import-fidelity.ts",
+      "package": "engine",
+      "exports": [
+        "checkSidecarHash",
+        "runImportFidelityEmitChecks",
+        "runImportFidelityParseChecks"
+      ]
+    },
+    {
+      "module": "packages/engine/src/validator/index.ts",
+      "package": "engine",
+      "exports": [
+        "runAllChecks",
+        "runLexicalChecks",
+        "runReferenceChecks"
+      ]
+    },
+    {
+      "module": "packages/engine/src/validator/layer-a-prime.ts",
+      "package": "engine",
+      "exports": [
+        "HEADER_FIELD_MISSING_CODE",
+        "OWNERSHIP_CONSISTENCY_CODE",
+        "checkHeaderPreservation",
+        "checkOpaqueFeatureInventory",
+        "checkOwnershipConsistency",
+        "checkParseCompleteness",
+        "checkRoundTrip",
+        "checkSidecarHash",
+        "headerFieldLabel"
+      ]
+    },
+    {
+      "module": "packages/engine/src/validator/oracle.ts",
+      "package": "engine",
+      "exports": [
+        "_createOracle",
+        "_createOracleWithLoader",
+        "oracle",
+        "validateWithOracle"
+      ]
+    },
+    {
+      "module": "packages/engine/src/validator/types.ts",
+      "package": "engine",
+      "exports": [
+        "ALL_GROUPS",
+        "GroupName",
+        "LintOptions",
+        "TS_GROUPS",
+        "WASM_GROUPS"
+      ]
+    },
+    {
+      "module": "packages/engine/src/validator/wasmLoader.ts",
+      "package": "engine",
+      "exports": [
+        "RawWasmFinding",
+        "WasmOracleHandle",
+        "loadWasmOracle"
+      ]
+    },
+    {
+      "module": "packages/keyboard-lint/src/checks/check-18-1-longpress.ts",
+      "package": "keyboard-lint",
+      "exports": [
+        "checkLongpress"
+      ]
+    },
+    {
+      "module": "packages/keyboard-lint/src/checks/check-18-2-touch-rows.ts",
+      "package": "keyboard-lint",
+      "exports": [
+        "checkTouchRows"
+      ]
+    },
+    {
+      "module": "packages/keyboard-lint/src/checks/check-18-3-keys-per-row.ts",
+      "package": "keyboard-lint",
+      "exports": [
+        "checkKeysPerRow"
+      ]
+    },
+    {
+      "module": "packages/keyboard-lint/src/checks/check-18-4-control-key-drift.ts",
+      "package": "keyboard-lint",
+      "exports": [
+        "checkControlKeyDrift"
+      ]
+    },
+    {
+      "module": "packages/keyboard-lint/src/checks/check-18-5-layer-switch-return.ts",
+      "package": "keyboard-lint",
+      "exports": [
+        "checkLayerSwitchReturn"
+      ]
+    },
+    {
+      "module": "packages/keyboard-lint/src/checks/check-18-6-inventory-coverage.ts",
+      "package": "keyboard-lint",
+      "exports": [
+        "checkInventoryCoverage"
+      ]
+    },
+    {
+      "module": "packages/keyboard-lint/src/index.ts",
+      "package": "keyboard-lint",
+      "exports": [
+        "KeyboardLintEngine",
+        "checkControlKeyDrift",
+        "checkInventoryCoverage",
+        "checkKeysPerRow",
+        "checkLayerSwitchReturn",
+        "checkLongpress",
+        "checkTouchRows",
+        "lintWithContext",
+        "parseTouchLayout"
+      ]
+    },
+    {
+      "module": "packages/keyboard-lint/src/lintContext.ts",
+      "package": "keyboard-lint",
+      "exports": [
+        "LintContext",
+        "lintWithContext"
+      ]
+    },
+    {
+      "module": "packages/keyboard-lint/src/lintEngine.ts",
+      "package": "keyboard-lint",
+      "exports": [
+        "KeyboardLintEngine"
+      ]
+    },
+    {
+      "module": "packages/keyboard-lint/src/parsers/parseTouchLayout.ts",
+      "package": "keyboard-lint",
+      "exports": [
+        "parseTouchLayout",
+        "touchLayoutPath"
+      ]
+    },
+    {
+      "module": "packages/llm/src/backends/anthropic-api.ts",
+      "package": "llm",
+      "exports": [
+        "AnthropicApiBackend"
+      ]
+    },
+    {
+      "module": "packages/llm/src/backends/base.ts",
+      "package": "llm",
+      "exports": [
+        "AnthropicBase",
+        "DEFAULT_MAX_TOKENS",
+        "DEFAULT_MODEL"
+      ]
+    },
+    {
+      "module": "packages/llm/src/backends/claude-subscription.ts",
+      "package": "llm",
+      "exports": [
+        "ClaudeSubscriptionBackend"
+      ]
+    },
+    {
+      "module": "packages/llm/src/client.ts",
+      "package": "llm",
+      "exports": [
+        "createLLMClient"
+      ]
+    },
+    {
+      "module": "packages/llm/src/index.ts",
+      "package": "llm",
+      "exports": [
+        "createLLMClient"
+      ]
+    },
+    {
+      "module": "packages/llm/src/types.ts",
+      "package": "llm",
+      "exports": [
+        "CompleteOptions",
+        "LLMClient",
+        "LLMClientConfig",
+        "LLMMode",
+        "Message"
+      ]
+    },
+    {
+      "module": "packages/studio/src/StudioShell.tsx",
+      "package": "studio",
+      "exports": [
+        "StudioShell",
+        "SurveyView"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/AccountControl.tsx",
+      "package": "studio",
+      "exports": [
+        "AccountControl"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/BaseKeyboardPicker.tsx",
+      "package": "studio",
+      "exports": [
+        "BaseKeyboardPicker",
+        "BaseKeyboardPickerProps",
+        "_resetCorpusCacheForTesting",
+        "_setCorpusCacheForTesting"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/DiagnosticsPanel.tsx",
+      "package": "studio",
+      "exports": [
+        "DiagnosticsPanel",
+        "SEVERITY_COLOR"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/KmnEditor.tsx",
+      "package": "studio",
+      "exports": [
+        "KmnEditor",
+        "KmnEditorProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/ManagedPRSubmitPanel.tsx",
+      "package": "studio",
+      "exports": [
+        "ManagedPRSubmitPanel",
+        "ManagedPRSubmitPanelProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/MetadataCard.tsx",
+      "package": "studio",
+      "exports": [
+        "MetadataCard"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/OAuthCallbackScreen.tsx",
+      "package": "studio",
+      "exports": [
+        "OAuthCallbackScreen"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/OSKFrame.tsx",
+      "package": "studio",
+      "exports": [
+        "OSKFrame",
+        "OSKFrameProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/OskModeToggle.tsx",
+      "package": "studio",
+      "exports": [
+        "OskMode",
+        "OskModeToggle",
+        "OskModeToggleProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/OutputScreen.tsx",
+      "package": "studio",
+      "exports": [
+        "OutputScreen"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/PickerPane.tsx",
+      "package": "studio",
+      "exports": [
+        "PickerPane"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/PreviewPaneOverlay.tsx",
+      "package": "studio",
+      "exports": [
+        "PreviewPaneOverlay",
+        "PreviewPaneOverlayProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/PreviewScreen.tsx",
+      "package": "studio",
+      "exports": [
+        "PreviewScreen"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/PreviewShell.tsx",
+      "package": "studio",
+      "exports": [
+        "PreviewShell"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/ProfileScreen.tsx",
+      "package": "studio",
+      "exports": [
+        "ProfileScreen"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/ProviderMarks.tsx",
+      "package": "studio",
+      "exports": [
+        "GitHubMark",
+        "GoogleMark"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/ResizeHandle.tsx",
+      "package": "studio",
+      "exports": [
+        "ResizeHandle"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/SignUpPanel.tsx",
+      "package": "studio",
+      "exports": [
+        "SignUpPanel"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/StepHost.tsx",
+      "package": "studio",
+      "exports": [
+        "StepHost",
+        "StepHostProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/UnsupportedScriptStub.tsx",
+      "package": "studio",
+      "exports": [
+        "UnsupportedScriptStub",
+        "UnsupportedScriptStubProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/WelcomeScreen.tsx",
+      "package": "studio",
+      "exports": [
+        "WelcomeScreen"
+      ]
+    },
+    {
+      "module": "packages/studio/src/components/previewOutputLayout.ts",
+      "package": "studio",
+      "exports": [
+        "DIVIDER_WIDTH",
+        "LEFT_INIT_PCT",
+        "LEFT_MAX_PCT",
+        "LEFT_MIN_PCT"
+      ]
+    },
+    {
+      "module": "packages/studio/src/dashboard/DashboardView.tsx",
+      "package": "studio",
+      "exports": [
+        "FlowMapView",
+        "FlowMapViewProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/dashboard/FlowGraphView.tsx",
+      "package": "studio",
+      "exports": [
+        "FlowGraphView"
+      ]
+    },
+    {
+      "module": "packages/studio/src/dashboard/ScriptRoutingView.tsx",
+      "package": "studio",
+      "exports": [
+        "ScriptRoutingView"
+      ]
+    },
+    {
+      "module": "packages/studio/src/dashboard/StrategyTreeView.tsx",
+      "package": "studio",
+      "exports": [
+        "StrategyTreeView",
+        "StrategyTreeViewProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/dashboard/buildScriptRouting.ts",
+      "package": "studio",
+      "exports": [
+        "ScriptRoutingRow",
+        "buildScriptRouting"
+      ]
+    },
+    {
+      "module": "packages/studio/src/dashboard/buildStepGraph.ts",
+      "package": "studio",
+      "exports": [
+        "BuildGraphOptions",
+        "buildGraphFromQuestions",
+        "buildLibraryReserveNodes",
+        "buildManifestStepGraph",
+        "buildModularFlowGraph",
+        "buildProposedFlowGraph",
+        "buildProposedFlowGraphFromFlow"
+      ]
+    },
+    {
+      "module": "packages/studio/src/dashboard/completeness.ts",
+      "package": "studio",
+      "exports": [
+        "CompletenessReport",
+        "OrphanInput",
+        "RejoinViolation",
+        "WcForCompleteness",
+        "checkInputsSatisfiable",
+        "checkInputsSatisfiableFromManifest",
+        "checkRejoin",
+        "checkSpinePrefixShippability",
+        "computeStaleness",
+        "computeStalenessFromAdj",
+        "computeStalenessFromManifest",
+        "findCycles",
+        "findCyclesFromAdj",
+        "findCyclesFromManifest",
+        "findUnreachable",
+        "runCompleteness"
+      ]
+    },
+    {
+      "module": "packages/studio/src/dashboard/flowUtils.ts",
+      "package": "studio",
+      "exports": [
+        "ruleTarget"
+      ]
+    },
+    {
+      "module": "packages/studio/src/dashboard/layout.ts",
+      "package": "studio",
+      "exports": [
+        "LaidOutGraph",
+        "NODE_H",
+        "NODE_W",
+        "PositionedNode",
+        "layoutFlowGraph"
+      ]
+    },
+    {
+      "module": "packages/studio/src/dashboard/manifestProjection.ts",
+      "package": "studio",
+      "exports": [
+        "CHARACTERS_STEP_ID",
+        "MANIFEST_FLOW_ID",
+        "MANIFEST_FLOW_TITLE",
+        "MANIFEST_NODE_TYPE",
+        "ManifestDrillDown",
+        "ManifestProjection",
+        "attachDrillDowns",
+        "buildManifestProjection",
+        "buildManifestProjectionWithDrillDowns",
+        "registryKeyForFlow"
+      ]
+    },
+    {
+      "module": "packages/studio/src/dashboard/model.ts",
+      "package": "studio",
+      "exports": [
+        "EdgeKind",
+        "FlowGraph",
+        "GraphEdge",
+        "GraphNode",
+        "NodeKind",
+        "NodeRegion",
+        "StepGraph",
+        "StepGraphEdge",
+        "StepGraphNode",
+        "StepNodeType"
+      ]
+    },
+    {
+      "module": "packages/studio/src/dashboard/renderedNodeSet.ts",
+      "package": "studio",
+      "exports": [
+        "BuiltFlowSource",
+        "BuiltProposedFlow",
+        "CHARACTERS_STEP_ID",
+        "LibrarySection",
+        "buildFlowSources",
+        "buildLibrarySection",
+        "collectRenderedNodeIds"
+      ]
+    },
+    {
+      "module": "packages/studio/src/dashboard/tokens.ts",
+      "package": "studio",
+      "exports": [
+        "MONO",
+        "SANS"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/adapters/addPhysicalAdapter.tsx",
+      "package": "studio",
+      "exports": [
+        "AddPhysicalAdapter"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/adapters/addTouchAdapter.tsx",
+      "package": "studio",
+      "exports": [
+        "AddTouchAdapter"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/adapters/carveAdapter.tsx",
+      "package": "studio",
+      "exports": [
+        "CarveAdapter"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/adapters/flowStepOptions.tsx",
+      "package": "studio",
+      "exports": [
+        "PhaseFPayload",
+        "PhaseFStepFactoryComponent",
+        "ProjectNamePayload",
+        "ProjectNameStepFactoryComponent",
+        "TrackPayload",
+        "TrackStepFactoryComponent",
+        "phaseFOptions",
+        "projectNameOptions",
+        "trackOptions"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/adapters/makeFlowStepComponent.tsx",
+      "package": "studio",
+      "exports": [
+        "FlowStepDeps",
+        "FlowStepOptions",
+        "makeFlowStepComponent"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/adapters/panelAdapters.tsx",
+      "package": "studio",
+      "exports": [
+        "BaseResolutionAdapter",
+        "IdentityLiteAdapter",
+        "ScaffoldFormAdapter",
+        "TrackOneIdentityPanelAdapter",
+        "extractIdentityLite"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/assignLoop/IntroSplash.tsx",
+      "package": "studio",
+      "exports": [
+        "GalleryIntroSplash",
+        "GalleryIntroSplashProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/assignLoop/MechanismGallery.tsx",
+      "package": "studio",
+      "exports": [
+        "MechanismGallery",
+        "MechanismGalleryProps",
+        "PATTERN_DEADKEY",
+        "PATTERN_RALT",
+        "PATTERN_SEQUENCE",
+        "PATTERN_SWAP"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/assignLoop/PreviewPane.tsx",
+      "package": "studio",
+      "exports": [
+        "GalleryPreviewPane",
+        "GalleryPreviewPaneProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/assignLoop/TouchGallery.tsx",
+      "package": "studio",
+      "exports": [
+        "TouchGallery",
+        "TouchGalleryProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/assignLoop/parts/DepBanner.tsx",
+      "package": "studio",
+      "exports": [
+        "DepBanner",
+        "DepNode"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/assignLoop/parts/GlyphCell.tsx",
+      "package": "studio",
+      "exports": [
+        "GlyphCell"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/assignLoop/parts/InfoView.tsx",
+      "package": "studio",
+      "exports": [
+        "InfoContent",
+        "InfoView",
+        "capabilityHint",
+        "infoFor",
+        "keyHint"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/assignLoop/parts/Inspector.tsx",
+      "package": "studio",
+      "exports": [
+        "Inspector",
+        "storePairDescription"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/assignLoop/parts/KeyCap.tsx",
+      "package": "studio",
+      "exports": [
+        "KeyCap"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/assignLoop/parts/KeySeq.tsx",
+      "package": "studio",
+      "exports": [
+        "KeySeq"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/assignLoop/parts/KindBadge.tsx",
+      "package": "studio",
+      "exports": [
+        "KIND_COLOR",
+        "KindBadge"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/assignLoop/parts/Rail.tsx",
+      "package": "studio",
+      "exports": [
+        "Rail"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/assignLoop/parts/StatusBar.tsx",
+      "package": "studio",
+      "exports": [
+        "RemovedItem",
+        "StatusBar"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/assignLoop/parts/StoreChip.tsx",
+      "package": "studio",
+      "exports": [
+        "StoreChip"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/assignLoop/parts/ToggleBox.tsx",
+      "package": "studio",
+      "exports": [
+        "ToggleBox"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/assignLoop/parts/carveShared.tsx",
+      "package": "studio",
+      "exports": [
+        "CheckIcon",
+        "ChevronIcon",
+        "InfoIcon",
+        "UndoIcon",
+        "WarnIcon"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/assignLoop/provenance.ts",
+      "package": "studio",
+      "exports": [
+        "defaultProvenance"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/assignLoop/touchBehavior.ts",
+      "package": "studio",
+      "exports": [
+        "promoteKeyToHandSet",
+        "promoteOnManualEdit"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/carve/CarveGallery.tsx",
+      "package": "studio",
+      "exports": [
+        "CarveGallery"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/panels/BaseResolution.tsx",
+      "package": "studio",
+      "exports": [
+        "BaseResolution",
+        "BaseResolutionProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/panels/ProjectNameStep.tsx",
+      "package": "studio",
+      "exports": [
+        "ProjectNameStep",
+        "ProjectNameStepProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/panels/ScaffoldForm.tsx",
+      "package": "studio",
+      "exports": [
+        "ScaffoldForm",
+        "ScaffoldFormProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/panels/TrackOneIdentityPanel.tsx",
+      "package": "studio",
+      "exports": [
+        "TrackOneIdentityPanel"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/panels/TrackStep.tsx",
+      "package": "studio",
+      "exports": [
+        "Track",
+        "TrackStep",
+        "TrackStepProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/touchSuggest/defaults.ts",
+      "package": "studio",
+      "exports": [
+        "DEFAULT_TOUCH_SUGGEST_POLICY",
+        "DeadKeyHost",
+        "DefaultGesture",
+        "ModifierPolicy",
+        "NumberRowTarget",
+        "TouchSuggestPolicy"
+      ]
+    },
+    {
+      "module": "packages/studio/src/editors/touchSuggest/touchSuggest.ts",
+      "package": "studio",
+      "exports": [
+        "TouchSuggestInput",
+        "touchSuggest"
+      ]
+    },
+    {
+      "module": "packages/studio/src/flags/mutateFlag.ts",
+      "package": "studio",
+      "exports": [
+        "isMutateSeamEnabled"
+      ]
+    },
+    {
+      "module": "packages/studio/src/hooks/useDebounce.ts",
+      "package": "studio",
+      "exports": [
+        "DEBOUNCE_MS",
+        "useDebounce"
+      ]
+    },
+    {
+      "module": "packages/studio/src/hooks/useGitHubAuth.ts",
+      "package": "studio",
+      "exports": [
+        "GitHubAuthStatus",
+        "UseGitHubAuthResult",
+        "useGitHubAuth"
+      ]
+    },
+    {
+      "module": "packages/studio/src/hooks/useGoogleAuth.ts",
+      "package": "studio",
+      "exports": [
+        "GoogleAuthStatus",
+        "UseGoogleAuthResult",
+        "useGoogleAuth"
+      ]
+    },
+    {
+      "module": "packages/studio/src/hooks/useIdentitySession.ts",
+      "package": "studio",
+      "exports": [
+        "IdentitySession",
+        "useIdentitySession"
+      ]
+    },
+    {
+      "module": "packages/studio/src/hooks/useInventoryDiff.ts",
+      "package": "studio",
+      "exports": [
+        "InventoryDiff",
+        "useInventoryDiff"
+      ]
+    },
+    {
+      "module": "packages/studio/src/hooks/useKeyboardArtifact.ts",
+      "package": "studio",
+      "exports": [
+        "KeyboardArtifactResult",
+        "LOCAL_PROXY_BASE",
+        "OnInstantiateCallback",
+        "ScaffoldSpec",
+        "Stage",
+        "VfsTransform",
+        "useKeyboardArtifact"
+      ]
+    },
+    {
+      "module": "packages/studio/src/hooks/useOskChannel.ts",
+      "package": "studio",
+      "exports": [
+        "OskChannelResult",
+        "useOskChannel"
+      ]
+    },
+    {
+      "module": "packages/studio/src/hooks/usePlacementPriors.ts",
+      "package": "studio",
+      "exports": [
+        "usePlacementPriors"
+      ]
+    },
+    {
+      "module": "packages/studio/src/hooks/usePreviewArtifact.ts",
+      "package": "studio",
+      "exports": [
+        "PickerMode",
+        "PreviewArtifact",
+        "usePreviewArtifact"
+      ]
+    },
+    {
+      "module": "packages/studio/src/hooks/useResizablePanes.ts",
+      "package": "studio",
+      "exports": [
+        "ResizablePanesOptions",
+        "ResizablePanesResult",
+        "useResizablePanes"
+      ]
+    },
+    {
+      "module": "packages/studio/src/hooks/useTouchLint.ts",
+      "package": "studio",
+      "exports": [
+        "useTouchLint"
+      ]
+    },
+    {
+      "module": "packages/studio/src/hooks/useValidator.ts",
+      "package": "studio",
+      "exports": [
+        "ValidatorResult",
+        "useValidator"
+      ]
+    },
+    {
+      "module": "packages/studio/src/hooks/useValidatorFindings.ts",
+      "package": "studio",
+      "exports": [
+        "useValidatorFindings"
+      ]
+    },
+    {
+      "module": "packages/studio/src/hooks/useWorkingCopyTransform.ts",
+      "package": "studio",
+      "exports": [
+        "UseWorkingCopyTransformOptions",
+        "useWorkingCopyTransform"
+      ]
+    },
+    {
+      "module": "packages/studio/src/index.ts",
+      "package": "studio",
+      "exports": []
+    },
+    {
+      "module": "packages/studio/src/lib/browserPatternLibrary.ts",
+      "package": "studio",
+      "exports": [
+        "getPatternLibraryService"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/buildTouchLayoutJson.ts",
+      "package": "studio",
+      "exports": [
+        "BuildTouchLayoutJsonResult",
+        "buildTouchLayoutJson"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/confirmRebase.ts",
+      "package": "studio",
+      "exports": [
+        "confirmRebaseIfEdited",
+        "instantiateFromBaseIfConfirmed"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/e2eHook.ts",
+      "package": "studio",
+      "exports": [
+        "KsE2EHook",
+        "installE2eHook"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/envFlag.ts",
+      "package": "studio",
+      "exports": [
+        "readEnvFlag"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/excludedScriptFamilies.ts",
+      "package": "studio",
+      "exports": [
+        "EXCLUDED_SCRIPT_FAMILIES",
+        "isExcludedScript"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/findKmnPath.ts",
+      "package": "studio",
+      "exports": [
+        "findKmnPath"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/findTouchLayoutPath.ts",
+      "package": "studio",
+      "exports": [
+        "findTouchLayoutPath"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/galleryTheme.ts",
+      "package": "studio",
+      "exports": [
+        "ACCENT",
+        "BG_CARD",
+        "BG_PAGE",
+        "BLUE_ACTION",
+        "BORDER",
+        "FONT",
+        "TEXT_DIM",
+        "TEXT_MAIN"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/githubOAuth.ts",
+      "package": "studio",
+      "exports": [
+        "AuthFlow",
+        "BuildAuthorizeUrlInput",
+        "GitHubClient",
+        "OAuthExchangeError",
+        "REQUIRED_SCOPE",
+        "StoredGitHubToken",
+        "beginAuthorize",
+        "buildAuthorizeUrl",
+        "clearOAuthScratch",
+        "clearStoredToken",
+        "computeS256Challenge",
+        "exchangeCode",
+        "generatePkce",
+        "getBackendUrl",
+        "getClientId",
+        "getOAuthClientId",
+        "getRedirectUri",
+        "getStoredFlow",
+        "getStoredState",
+        "getStoredToken",
+        "getStoredVerifier",
+        "hasRequiredScope",
+        "setOAuthScratch",
+        "setStoredToken"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/googleOAuth.ts",
+      "package": "studio",
+      "exports": [
+        "BuildGoogleAuthorizeUrlInput",
+        "GoogleOAuthExchangeError",
+        "StoredGoogleIdentity",
+        "beginGoogleAuthorize",
+        "buildGoogleAuthorizeUrl",
+        "clearGoogleOAuthScratch",
+        "clearStoredGoogleIdentity",
+        "exchangeGoogleCode",
+        "getGoogleClientId",
+        "getGoogleRedirectUri",
+        "getGoogleStoredState",
+        "getGoogleStoredVerifier",
+        "getStoredGoogleIdentity",
+        "setGoogleOAuthScratch",
+        "setStoredGoogleIdentity",
+        "toGoogleIdentitySession"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/handleOAuthCallback.ts",
+      "package": "studio",
+      "exports": [
+        "GOOGLE_OAUTH_CALLBACK_PATH",
+        "OAUTH_CALLBACK_PATH",
+        "OAuthCallbackFailureReason",
+        "OAuthCallbackResult",
+        "OAuthProvider",
+        "detectOAuthCallback",
+        "processGoogleOAuthCallback",
+        "processOAuthCallback",
+        "processOAuthCallbackForProvider",
+        "redirectTargetForResult",
+        "runOAuthCallbackIfPresent"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/identity.ts",
+      "package": "studio",
+      "exports": [
+        "GitHubIdentitySession",
+        "GoogleIdentitySession",
+        "IdentitySession"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/irToCarveNodes.ts",
+      "package": "studio",
+      "exports": [
+        "CardKind",
+        "CarveGlyph",
+        "CarveNode",
+        "GlyphOwner",
+        "HoverGlyph",
+        "MOD_GROUP_DEFS",
+        "ModGroupDef",
+        "ModifierLayer",
+        "StoreCharChip",
+        "StorePairEntry",
+        "StoreRuleDetail",
+        "StoreUsage",
+        "collectOwnedNodeIds",
+        "computeStoreRoleLine",
+        "contextToKeys",
+        "detectStorePairs",
+        "displayChar",
+        "glyphsTriState",
+        "groupToGlyphs",
+        "idsTriState",
+        "invisibleCharLabel",
+        "isCombining",
+        "modifierLabel",
+        "nodeState",
+        "outputToChar",
+        "patternToGlyphs",
+        "ruleModifier",
+        "storeCharChips",
+        "storeItemsAreKeys",
+        "toRailNodes",
+        "triggerKeyLabel",
+        "vkeyLabel"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/iso3166Names.ts",
+      "package": "studio",
+      "exports": [
+        "regionCodeToName"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/keyOptions.ts",
+      "package": "studio",
+      "exports": [
+        "ALL_PICKABLE_KEYS",
+        "KEY_OPTIONS",
+        "VALID_HOST_KEYS"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/langtagsDefaults.ts",
+      "package": "studio",
+      "exports": [
+        "defaultsFor",
+        "loadLangtags",
+        "regionNameFor",
+        "scriptToTargetOption",
+        "searchLanguages"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/localBaseBrowser.ts",
+      "package": "studio",
+      "exports": [
+        "LOCAL_PROXY_BASE",
+        "localBaseBrowser"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/navigate.ts",
+      "package": "studio",
+      "exports": [
+        "RouteId",
+        "navigateTo"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/oskMessages.ts",
+      "package": "studio",
+      "exports": [
+        "EngineErrorEvent",
+        "EngineReadyEvent",
+        "KeyTappedEvent",
+        "OskCommand",
+        "OskEvent",
+        "SetKeyboardCommand",
+        "SetOskModeCommand",
+        "TextUpdatedEvent",
+        "isOskEvent"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/pathShim.ts",
+      "package": "studio",
+      "exports": [
+        "basename",
+        "dirname",
+        "extname",
+        "join",
+        "normalize",
+        "relative",
+        "resolve"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/persistWorkingCopy.ts",
+      "package": "studio",
+      "exports": [
+        "rehydrateWorkingCopyFromSession",
+        "snapshotWorkingCopyToSession"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/physicalAssignments.ts",
+      "package": "studio",
+      "exports": [
+        "physicalAssignmentsOf"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/pkce.ts",
+      "package": "studio",
+      "exports": [
+        "PkcePair",
+        "computeS256Challenge",
+        "generatePkce"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/projectWorkingCopyVfs.ts",
+      "package": "studio",
+      "exports": [
+        "IdentityOverlay",
+        "ProjectWorkingCopyVfsInput",
+        "ProjectWorkingCopyVfsResult",
+        "projectWorkingCopyVfs"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/publishManagedPRErrorMessage.ts",
+      "package": "studio",
+      "exports": [
+        "isPublishManagedPRError",
+        "publishManagedPRErrorMessage"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/publishPRErrorMessage.ts",
+      "package": "studio",
+      "exports": [
+        "isPublishPRError",
+        "publishPRErrorMessage"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/rankBases.ts",
+      "package": "studio",
+      "exports": [
+        "RankedBase",
+        "rankBases"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/resolveBaseTouchJson.ts",
+      "package": "studio",
+      "exports": [
+        "resolveBaseTouchJson"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/scriptAxes.ts",
+      "package": "studio",
+      "exports": [
+        "EXPLICITLY_CLASSIFIED_SCRIPTS",
+        "RoutingGroup",
+        "ScriptPrefill",
+        "ScriptRoutingGroup",
+        "deriveScriptPrefill",
+        "normalizeTargetScript",
+        "routingGroupOf",
+        "scriptClassOf"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/serializeWorkingCopy.ts",
+      "package": "studio",
+      "exports": [
+        "ProjectWorkingCopyForOutputResult",
+        "SerializeWorkingCopyResult",
+        "projectWorkingCopyForOutput",
+        "serializeWorkingCopy"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/services.ts",
+      "package": "studio",
+      "exports": [
+        "LOCAL_PROXY_BASE",
+        "USE_REAL",
+        "getBaseBrowserService",
+        "getCharacterDiscoveryService",
+        "getGitHubOutputService",
+        "getManagedPROutputService",
+        "getManagedPRProxyEndpoint",
+        "getPatternLibraryService",
+        "getScaffolderService",
+        "getToZip",
+        "suggestMissingChars"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lib/suggestBase.ts",
+      "package": "studio",
+      "exports": [
+        "BaseSuggestion",
+        "SuggestOptions",
+        "SuggestReason",
+        "SuggestTarget",
+        "hasExplicitScriptSubtag",
+        "primarySubtag",
+        "suggestBases"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lint/LintChip.tsx",
+      "package": "studio",
+      "exports": [
+        "LintChip",
+        "LintChipProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lint/LintDemo.tsx",
+      "package": "studio",
+      "exports": [
+        "LintDemo"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lint/LintSummary.tsx",
+      "package": "studio",
+      "exports": [
+        "LintSummary",
+        "LintSummaryProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lint/colors.ts",
+      "package": "studio",
+      "exports": [
+        "SEVERITY_COLORS",
+        "SEVERITY_ORDER"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lint/events.ts",
+      "package": "studio",
+      "exports": [
+        "ApplyLintFixDetail",
+        "NavigateToLocationDetail",
+        "dispatchNavigateTo"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lint/index.ts",
+      "package": "studio",
+      "exports": [
+        "LintChip",
+        "LintDemo",
+        "LintSummary"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lint/lintToQuestion.ts",
+      "package": "studio",
+      "exports": [
+        "buildFindingsByQuestionId",
+        "selectUnmappedFindings"
+      ]
+    },
+    {
+      "module": "packages/studio/src/lint/validationErrorFindings.ts",
+      "package": "studio",
+      "exports": [
+        "LINT_ERROR_FINDING",
+        "VALIDATOR_ERROR_FINDING"
+      ]
+    },
+    {
+      "module": "packages/studio/src/main.tsx",
+      "package": "studio",
+      "exports": []
+    },
+    {
+      "module": "packages/studio/src/steps/advance.ts",
+      "package": "studio",
+      "exports": [
+        "AdvanceContext",
+        "AdvanceOutcome",
+        "STEPS_WITH_APPLY_COMPLETION",
+        "advance",
+        "manifestIndexOf",
+        "nextSpineStepAfter"
+      ]
+    },
+    {
+      "module": "packages/studio/src/steps/editorMutate.ts",
+      "package": "studio",
+      "exports": [
+        "ADD_GALLERY_WRITES",
+        "CARVE_WRITES",
+        "TOUCH_WRITES",
+        "applyAddGalleryMutate",
+        "applyCarveMutate",
+        "buildAddGalleryPatch",
+        "buildCarvePatch"
+      ]
+    },
+    {
+      "module": "packages/studio/src/steps/flowSources.ts",
+      "package": "studio",
+      "exports": [
+        "FlowSource",
+        "flowSources"
+      ]
+    },
+    {
+      "module": "packages/studio/src/steps/manifest.ts",
+      "package": "studio",
+      "exports": [
+        "manifest"
+      ]
+    },
+    {
+      "module": "packages/studio/src/steps/mutateApply.ts",
+      "package": "studio",
+      "exports": [
+        "MutatePatchContainmentError",
+        "applyMutatePatch"
+      ]
+    },
+    {
+      "module": "packages/studio/src/steps/reducer.ts",
+      "package": "studio",
+      "exports": [
+        "CHOOSE_BASE_STEP_ID",
+        "InstantiateResult",
+        "MECHANISMS_STEP_ID",
+        "MutateRequest",
+        "ReducerDeps",
+        "TOUCH_STEP_ID",
+        "TouchCompleteResult",
+        "applyStepCompletion",
+        "routeAnswersThroughMutate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/steps/registerEditorSteps.ts",
+      "package": "studio",
+      "exports": [
+        "carveStep",
+        "chooseBaseStep",
+        "helpStep",
+        "identityStep",
+        "mechanismsStep",
+        "packageStep",
+        "projectNameStep",
+        "registeredEditorSteps",
+        "touchSeedSourceStep",
+        "touchStep",
+        "trackStep"
+      ]
+    },
+    {
+      "module": "packages/studio/src/steps/registerQuestionSteps.ts",
+      "package": "studio",
+      "exports": [
+        "findQuestionStep",
+        "registeredQuestionSteps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/steps/repropagate.ts",
+      "package": "studio",
+      "exports": [
+        "RepropagateDeps",
+        "buildRepropagationPatch",
+        "isOverwritable",
+        "mergeNoClobber",
+        "repropagate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/steps/types.ts",
+      "package": "studio",
+      "exports": [
+        "EditorStep",
+        "EditorStepProps",
+        "QuestionStep",
+        "Step",
+        "StepBase",
+        "StepKind"
+      ]
+    },
+    {
+      "module": "packages/studio/src/stores/debugPinsStore.ts",
+      "package": "studio",
+      "exports": [
+        "DebugPinsStore",
+        "debugPinsStore"
+      ]
+    },
+    {
+      "module": "packages/studio/src/stores/hoverInfoStore.ts",
+      "package": "studio",
+      "exports": [
+        "HoverInfo",
+        "useHoverInfoStore"
+      ]
+    },
+    {
+      "module": "packages/studio/src/stores/surveySessionStore.ts",
+      "package": "studio",
+      "exports": [
+        "ActiveStepId",
+        "CharactersSubStage",
+        "SurveySessionState",
+        "useSurveySessionStore"
+      ]
+    },
+    {
+      "module": "packages/studio/src/stores/workingCopyStore.ts",
+      "package": "studio",
+      "exports": [
+        "IdentityPatch",
+        "InstantiationMode",
+        "UndoEntry",
+        "WorkingCopyData",
+        "WorkingCopyState",
+        "bindManifest",
+        "useWorkingCopyStore"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/CharactersStep.tsx",
+      "package": "studio",
+      "exports": [
+        "CharactersStep"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/FlowStepHost.tsx",
+      "package": "studio",
+      "exports": [
+        "FlowStepHost",
+        "FlowStepHostProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/IdentityLite.tsx",
+      "package": "studio",
+      "exports": [
+        "IdentityLite",
+        "IdentityLiteProps",
+        "IdentityLiteResult",
+        "buildTargetBcp47",
+        "extractIdentityLite"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/PhaseA.tsx",
+      "package": "studio",
+      "exports": [
+        "PhaseA",
+        "PhaseAProps",
+        "extractIdentity",
+        "extractProvenance"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/PhaseB.tsx",
+      "package": "studio",
+      "exports": [
+        "PhaseB",
+        "PhaseBProps",
+        "parseSpacedChars"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/Prefill.tsx",
+      "package": "studio",
+      "exports": [
+        "Prefill",
+        "PrefillProps",
+        "PrefillRow",
+        "buildPrefillRows"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/QuestionField.tsx",
+      "package": "studio",
+      "exports": [
+        "QuestionField",
+        "QuestionFieldProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/SurveyRunner.tsx",
+      "package": "studio",
+      "exports": [
+        "SurveyRunner",
+        "SurveyRunnerProps",
+        "advanceThrough",
+        "evalCondition",
+        "resolveNext"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/charNormUtils.ts",
+      "package": "studio",
+      "exports": [
+        "nfcDedup"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/constants.ts",
+      "package": "studio",
+      "exports": [
+        "VALID_PHASES"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/index.ts",
+      "package": "studio",
+      "exports": [
+        "FlowStepHost",
+        "IdentityLite",
+        "PhaseA",
+        "PhaseB",
+        "Prefill",
+        "SurveyRunner",
+        "Track",
+        "buildPrefillRows",
+        "extractIdentity",
+        "extractIdentityLite",
+        "extractProvenance"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/loadModularFlow.ts",
+      "package": "studio",
+      "exports": [
+        "FlowStatus",
+        "ThinFlowYaml",
+        "loadModularFlow",
+        "parseThinYaml"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/placementSeeds.ts",
+      "package": "studio",
+      "exports": [
+        "PLACEMENT_SEED_CONFIDENCE_THRESHOLD",
+        "PlacementSeedEntry",
+        "buildPlacementSeeds",
+        "extractSeedEntries",
+        "getSuggestionForChar"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/author_contact_email.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/author_display_name.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/desktop_first_notice.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/il_language_autonym.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/il_language_code.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/il_language_english.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/il_script_not_supported.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/il_target_script.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/iso_code.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "mutate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/language_name_autonym.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "mutate",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/language_name_english.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "mutate",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/layout_family.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/pa_copyright_holder.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "mutate",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/pa_primary_target.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/primary_script.ts",
+      "package": "studio",
+      "exports": [
+        "VALID_SCRIPT_VALUES",
+        "definition",
+        "fixtures",
+        "mutate",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/provenance_additional_notes.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/provenance_casing_notes.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/provenance_community_involvement.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/provenance_community_rep_email.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/provenance_community_rep_name.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/provenance_community_rep_role.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/provenance_existing_tools.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/provenance_language_status.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/provenance_opt_in.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/provenance_orthography_url.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/provenance_regions.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/provenance_requester_affiliation.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/provenance_requester_contact.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/provenance_requester_name.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/provenance_requester_relation.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/provenance_speaker_count.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/region.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/script_family.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/script_not_supported_stub.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/a/writing_direction.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_accent_marks_gate.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_additional_methods.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_azerty_qz_swap.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_capitals_marks.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_char_count.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_co_installed_keyboards.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_contact_language.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_diacritic_select.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_digit_set.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_discovery_intro.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_existing_keyboards.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_indic_conjuncts.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_indic_nukta_detail.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_indic_nukta_gate.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_indic_pre_base_vowels.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_indic_virama.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_indic_vowels_onset.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_indic_vowels_onset_list.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_indic_vowels_separate.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_latin_azerty_branch.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_latin_digraphs_gate.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_latin_digraphs_list.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_latin_qwerty_branch.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_legacy_encoding.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_linguist_confirm.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_mark_input_order.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_mark_style.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_non_roman_branch.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_other_free_entry.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_picker_confirm.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_punctuation_gate.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_punctuation_list.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_routing_branch.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_rtl_direction_confirm.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_rtl_direction_marks.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_rtl_direction_marks_detail.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_rtl_short_vowels.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_rtl_special_letters.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_sea_medials.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_sea_stacked_consonants.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_spare_keys_azerty.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_spare_keys_qwerty.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_special_letters.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_special_letters_list.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_special_letters_notes.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_stacking_marks.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_standard_letters.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "mutate",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_syllabic_finals_detail.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_syllabic_finals_gate.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_syllabic_grid.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_syllabic_note.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_text_sample.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_text_sample_review.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_typing_approach.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/b/pb_use_case.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/demotedPhaseA.fixture.ts",
+      "package": "studio",
+      "exports": [
+        "DEMOTED_PHASE_A",
+        "DEMOTED_PHASE_A_IDENTITY",
+        "DEMOTED_PHASE_A_PROVENANCE"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/drillDownDeclarations.ts",
+      "package": "studio",
+      "exports": [
+        "CHARACTERS_NODE_ID",
+        "DrillDownDeclaration",
+        "DrillDownOutput",
+        "drillDownDeclarations",
+        "pbBuildListDrillDown",
+        "prefillDrillDown"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/f/pf_contact_info.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/f/pf_credits.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/f/pf_usage_tip_1.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/f/pf_usage_tip_2.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/f/pf_usage_tip_3.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/f/pf_usage_tip_4.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/f/pf_usage_tip_5.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/f/pf_welcome_paragraph.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/g/project_display_name.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/g/project_keyboard_id.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/g/track_choice.ts",
+      "package": "studio",
+      "exports": [
+        "definition",
+        "fixtures",
+        "validate"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/registry.a.ts",
+      "package": "studio",
+      "exports": [
+        "phaseARegistry"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/registry.b.ts",
+      "package": "studio",
+      "exports": [
+        "phaseBRegistry"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/registry.f.ts",
+      "package": "studio",
+      "exports": [
+        "phaseFRegistry"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/registry.g.ts",
+      "package": "studio",
+      "exports": [
+        "phaseGRegistry",
+        "phaseProjectRegistry",
+        "phaseTrackRegistry"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/questions/registry.ts",
+      "package": "studio",
+      "exports": [
+        "CHARACTERS_NODE_ID",
+        "drillDownDeclarations",
+        "pbBuildListDrillDown",
+        "prefillDrillDown",
+        "questionRegistry"
+      ]
+    },
+    {
+      "module": "packages/studio/src/survey/types.ts",
+      "package": "studio",
+      "exports": [
+        "AnswerStackEntry",
+        "FlowDef",
+        "FlowGotoRule",
+        "FlowOption",
+        "FlowQuestion",
+        "FlowQuestionType",
+        "MutateContext",
+        "QuestionModule",
+        "SurveyContext",
+        "ValidationResult"
+      ]
+    },
+    {
+      "module": "packages/studio/src/test-setup.ts",
+      "package": "studio",
+      "exports": []
+    },
+    {
+      "module": "packages/studio/src/ui/Autocomplete.tsx",
+      "package": "studio",
+      "exports": [
+        "Autocomplete",
+        "AutocompleteOption",
+        "AutocompleteProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/ui/Badge.tsx",
+      "package": "studio",
+      "exports": [
+        "Badge",
+        "BadgeProps",
+        "BadgeTone"
+      ]
+    },
+    {
+      "module": "packages/studio/src/ui/Button.tsx",
+      "package": "studio",
+      "exports": [
+        "Button",
+        "ButtonProps",
+        "ButtonVariant"
+      ]
+    },
+    {
+      "module": "packages/studio/src/ui/Card.tsx",
+      "package": "studio",
+      "exports": [
+        "Card",
+        "CardProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/ui/Checkbox.tsx",
+      "package": "studio",
+      "exports": [
+        "Checkbox",
+        "CheckboxProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/ui/Dropdown.tsx",
+      "package": "studio",
+      "exports": [
+        "Dropdown",
+        "DropdownOption",
+        "DropdownProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/ui/ErrorText.tsx",
+      "package": "studio",
+      "exports": [
+        "ErrorText",
+        "ErrorTextProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/ui/Field.tsx",
+      "package": "studio",
+      "exports": [
+        "Field",
+        "FieldProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/ui/Label.tsx",
+      "package": "studio",
+      "exports": [
+        "Label",
+        "LabelProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/ui/MultiSelect.tsx",
+      "package": "studio",
+      "exports": [
+        "MultiSelect",
+        "MultiSelectOption",
+        "MultiSelectProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/ui/Notice.tsx",
+      "package": "studio",
+      "exports": [
+        "Notice",
+        "NoticeProps",
+        "NoticeTone"
+      ]
+    },
+    {
+      "module": "packages/studio/src/ui/RadioGroup.tsx",
+      "package": "studio",
+      "exports": [
+        "RadioGroup",
+        "RadioGroupProps",
+        "RadioOption"
+      ]
+    },
+    {
+      "module": "packages/studio/src/ui/TextField.tsx",
+      "package": "studio",
+      "exports": [
+        "TextField",
+        "TextFieldProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/ui/Textarea.tsx",
+      "package": "studio",
+      "exports": [
+        "Textarea",
+        "TextareaProps"
+      ]
+    },
+    {
+      "module": "packages/studio/src/ui/index.ts",
+      "package": "studio",
+      "exports": [
+        "Autocomplete",
+        "Badge",
+        "Button",
+        "Card",
+        "Checkbox",
+        "Dropdown",
+        "ErrorText",
+        "Field",
+        "Label",
+        "MultiSelect",
+        "Notice",
+        "RadioGroup",
+        "TextField",
+        "Textarea"
+      ]
+    },
+    {
+      "module": "packages/studio/src/ui/theme.ts",
+      "package": "studio",
+      "exports": [
+        "ACCENT",
+        "BG_CARD",
+        "BG_PAGE",
+        "BLUE_ACTION",
+        "BORDER",
+        "CSS_ACCENT",
+        "CSS_ACCENT_HOVER",
+        "CSS_ACCENT_SUBTLE",
+        "CSS_ACCENT_TEXT",
+        "CSS_BG",
+        "CSS_BORDER",
+        "CSS_BORDER_STRONG",
+        "CSS_FONT",
+        "CSS_FONT_MONO",
+        "CSS_SIL_GREEN",
+        "CSS_SIL_ORANGE",
+        "CSS_SIL_ORANGE_DARK",
+        "CSS_SURFACE",
+        "CSS_SURFACE_2",
+        "CSS_TEXT",
+        "CSS_TEXT_MUTED",
+        "CSS_TEXT_SUBTLE",
+        "ERROR_BORDER",
+        "ERROR_TEXT",
+        "FONT",
+        "SUCCESS_ACCENT",
+        "TEXT_DIM",
+        "TEXT_MAIN",
+        "WARNING"
+      ]
+    },
+    {
+      "module": "utilities/oauth-backend/src/github-pipeline.ts",
+      "package": "oauth-backend",
+      "exports": [
+        "GitHubPipelineFetchFn",
+        "GitHubPipelineFetchResponse",
+        "ManagedPRHandlerResult",
+        "ManagedPRPipelineConfig",
+        "buildCommitMessage",
+        "buildManagedBranchName",
+        "buildPrBody",
+        "normalizePrTitle",
+        "submitManagedPR"
+      ]
+    },
+    {
+      "module": "utilities/oauth-backend/src/google-handlers.ts",
+      "package": "oauth-backend",
+      "exports": [
+        "GoogleHandlerConfig",
+        "GoogleHandlerError",
+        "GoogleHandlerResult",
+        "GoogleHandlerSuccess",
+        "decodeIdTokenPayload",
+        "googleExchange",
+        "validateIdTokenClaims"
+      ]
+    },
+    {
+      "module": "utilities/oauth-backend/src/google-schemas.ts",
+      "package": "oauth-backend",
+      "exports": [
+        "GoogleExchangeBody",
+        "GoogleExchangeBodySchema",
+        "GoogleIdTokenPayload",
+        "GoogleIdentity",
+        "GoogleTokenResponseShape"
+      ]
+    },
+    {
+      "module": "utilities/oauth-backend/src/handlers.ts",
+      "package": "oauth-backend",
+      "exports": [
+        "HandlerConfig",
+        "HandlerError",
+        "HandlerResult",
+        "HandlerSuccess",
+        "OAuthFetchFn",
+        "OAuthFetchResponse",
+        "exchange",
+        "refresh"
+      ]
+    },
+    {
+      "module": "utilities/oauth-backend/src/installation-token.ts",
+      "package": "oauth-backend",
+      "exports": [
+        "_resetAuthCache",
+        "getInstallationToken"
+      ]
+    },
+    {
+      "module": "utilities/oauth-backend/src/managed-pr-schemas.ts",
+      "package": "oauth-backend",
+      "exports": [
+        "ManagedPRBody",
+        "ManagedPRBodySchema",
+        "ManagedPRResponse",
+        "ManagedPRResponseSchema"
+      ]
+    },
+    {
+      "module": "utilities/oauth-backend/src/schemas.ts",
+      "package": "oauth-backend",
+      "exports": [
+        "ClientDiscriminator",
+        "ExchangeBody",
+        "ExchangeBodySchema",
+        "GitHubTokenResponseShape",
+        "RefreshBody",
+        "RefreshBodySchema",
+        "TokenResponse"
+      ]
+    },
+    {
+      "module": "utilities/oauth-backend/src/server.ts",
+      "package": "oauth-backend",
+      "exports": [
+        "buildServer"
+      ]
+    }
+  ],
+  "importGraph": {
+    "source": "regex-fallback",
+    "edges": [
+      "api/oauth/_shared.ts -> utilities/oauth-backend/src/handlers.ts",
+      "api/oauth/_shared.ts -> utilities/oauth-backend/src/schemas.ts",
+      "api/oauth/exchange.ts -> api/oauth/_shared.ts",
+      "api/oauth/refresh.ts -> api/oauth/_shared.ts",
+      "api/submit/managed-pr.ts -> api/oauth/_shared.ts",
+      "api/submit/managed-pr.ts -> utilities/oauth-backend/src/github-pipeline.ts",
+      "api/submit/managed-pr.ts -> utilities/oauth-backend/src/installation-token.ts",
+      "api/submit/managed-pr.ts -> utilities/oauth-backend/src/managed-pr-schemas.ts",
+      "packages/contracts/src/assignmentMap.ts -> packages/contracts/src/strategy.ts",
+      "packages/contracts/src/axisFill.ts -> packages/contracts/src/axes.ts",
+      "packages/contracts/src/axisPriors.ts -> packages/contracts/src/axes.ts",
+      "packages/contracts/src/axisPriors.ts -> packages/contracts/src/schemas.ts",
+      "packages/contracts/src/baseBrowser.ts -> packages/contracts/src/baseKeyboard.ts",
+      "packages/contracts/src/characterDiscovery.ts -> packages/contracts/src/baseKeyboard.ts",
+      "packages/contracts/src/characterDiscovery.ts -> packages/contracts/src/linguistInventory.ts",
+      "packages/contracts/src/compileResult.ts -> packages/contracts/src/lintFinding.ts",
+      "packages/contracts/src/compiler.ts -> packages/contracts/src/compileResult.ts",
+      "packages/contracts/src/compiler.ts -> packages/contracts/src/virtualFS.ts",
+      "packages/contracts/src/criteriaData.ts -> packages/contracts/src/criteria.ts",
+      "packages/contracts/src/criteriaData.ts -> packages/contracts/src/schemas.ts",
+      "packages/contracts/src/fixtures/baseKeyboards.ts -> packages/contracts/src/baseKeyboard.ts",
+      "packages/contracts/src/fixtures/compileResults.ts -> packages/contracts/src/compileResult.ts",
+      "packages/contracts/src/fixtures/compileResults.ts -> packages/contracts/src/fixtures/lintFindings.ts",
+      "packages/contracts/src/fixtures/keyboard-ir.ts -> packages/contracts/src/keyboard-ir.ts",
+      "packages/contracts/src/fixtures/linguistInventories.ts -> packages/contracts/src/linguistInventory.ts",
+      "packages/contracts/src/fixtures/lintFindings.ts -> packages/contracts/src/lintFinding.ts",
+      "packages/contracts/src/fixtures/patterns.ts -> packages/contracts/src/pattern.ts",
+      "packages/contracts/src/fixtures/placementMaps.ts -> packages/contracts/src/placementMap.ts",
+      "packages/contracts/src/fixtures/provenance.ts -> packages/contracts/src/provenance.ts",
+      "packages/contracts/src/fixtures/surveySessions.ts -> packages/contracts/src/surveyPhaseResult.ts",
+      "packages/contracts/src/fixtures/surveySessions.ts -> packages/contracts/src/surveySession.ts",
+      "packages/contracts/src/index.ts -> packages/contracts/src/ir/producedSet.ts",
+      "packages/contracts/src/ir-path.ts -> packages/contracts/src/keyboard-ir.ts",
+      "packages/contracts/src/ir-path.ts -> packages/contracts/src/pattern.ts",
+      "packages/contracts/src/ir-path.type-assertions.ts -> packages/contracts/src/ir-path.ts",
+      "packages/contracts/src/ir/producedSet.ts -> packages/contracts/src/keyboard-ir.ts",
+      "packages/contracts/src/keyboard-ir.ts -> packages/contracts/src/pattern.ts",
+      "packages/contracts/src/keyboard-ir.ts -> packages/contracts/src/removalCapability.ts",
+      "packages/contracts/src/keyboardIRRoundTrip.ts -> packages/contracts/src/keyboard-ir.ts",
+      "packages/contracts/src/keyboardIRRoundTrip.ts -> packages/contracts/src/pattern.ts",
+      "packages/contracts/src/keyboardIdentity.ts -> packages/contracts/src/scaffolder.ts",
+      "packages/contracts/src/lintEngine.ts -> packages/contracts/src/lintFinding.ts",
+      "packages/contracts/src/lintEngine.ts -> packages/contracts/src/virtualFS.ts",
+      "packages/contracts/src/mocks/mockBaseBrowser.ts -> packages/contracts/src/baseBrowser.ts",
+      "packages/contracts/src/mocks/mockBaseBrowser.ts -> packages/contracts/src/baseKeyboard.ts",
+      "packages/contracts/src/mocks/mockBaseBrowser.ts -> packages/contracts/src/fixtures/index.ts",
+      "packages/contracts/src/mocks/mockCompiler.ts -> packages/contracts/src/compileResult.ts",
+      "packages/contracts/src/mocks/mockCompiler.ts -> packages/contracts/src/compiler.ts",
+      "packages/contracts/src/mocks/mockCompiler.ts -> packages/contracts/src/fixtures/index.ts",
+      "packages/contracts/src/mocks/mockCompiler.ts -> packages/contracts/src/virtualFS.ts",
+      "packages/contracts/src/mocks/mockLintEngine.ts -> packages/contracts/src/fixtures/index.ts",
+      "packages/contracts/src/mocks/mockLintEngine.ts -> packages/contracts/src/lintEngine.ts",
+      "packages/contracts/src/mocks/mockLintEngine.ts -> packages/contracts/src/lintFinding.ts",
+      "packages/contracts/src/mocks/mockLintEngine.ts -> packages/contracts/src/virtualFS.ts",
+      "packages/contracts/src/mocks/mockOutputService.ts -> packages/contracts/src/outputService.ts",
+      "packages/contracts/src/mocks/mockOutputService.ts -> packages/contracts/src/virtualFS.ts",
+      "packages/contracts/src/mocks/mockPatternLibrary.ts -> packages/contracts/src/axes.ts",
+      "packages/contracts/src/mocks/mockPatternLibrary.ts -> packages/contracts/src/baseKeyboard.ts",
+      "packages/contracts/src/mocks/mockPatternLibrary.ts -> packages/contracts/src/fixtures/index.ts",
+      "packages/contracts/src/mocks/mockPatternLibrary.ts -> packages/contracts/src/pattern.ts",
+      "packages/contracts/src/mocks/mockPatternLibrary.ts -> packages/contracts/src/patternLibrary.ts",
+      "packages/contracts/src/mocks/mockPatternLibrary.ts -> packages/contracts/src/patternMatch.ts",
+      "packages/contracts/src/mocks/mockScaffolder.ts -> packages/contracts/src/baseKeyboard.ts",
+      "packages/contracts/src/mocks/mockScaffolder.ts -> packages/contracts/src/mocks/mockVirtualFS.ts",
+      "packages/contracts/src/mocks/mockScaffolder.ts -> packages/contracts/src/scaffolder.ts",
+      "packages/contracts/src/mocks/mockValidator.ts -> packages/contracts/src/fixtures/index.ts",
+      "packages/contracts/src/mocks/mockValidator.ts -> packages/contracts/src/lintFinding.ts",
+      "packages/contracts/src/mocks/mockValidator.ts -> packages/contracts/src/validator.ts",
+      "packages/contracts/src/mocks/mockVirtualFS.ts -> packages/contracts/src/virtualFS.ts",
+      "packages/contracts/src/outputService.ts -> packages/contracts/src/virtualFS.ts",
+      "packages/contracts/src/pattern.ts -> packages/contracts/src/keyboard-ir.ts",
+      "packages/contracts/src/pattern.ts -> packages/contracts/src/strategy.ts",
+      "packages/contracts/src/patternLibrary.ts -> packages/contracts/src/axes.ts",
+      "packages/contracts/src/patternLibrary.ts -> packages/contracts/src/baseKeyboard.ts",
+      "packages/contracts/src/patternLibrary.ts -> packages/contracts/src/pattern.ts",
+      "packages/contracts/src/patternLibrary.ts -> packages/contracts/src/patternMatch.ts",
+      "packages/contracts/src/patternMatch.ts -> packages/contracts/src/pattern.ts",
+      "packages/contracts/src/patternMatch.ts -> packages/contracts/src/strategy.ts",
+      "packages/contracts/src/placementStrategy.ts -> packages/contracts/src/placementMap.ts",
+      "packages/contracts/src/placementStrategy.ts -> packages/contracts/src/strategy.ts",
+      "packages/contracts/src/scaffolder.ts -> packages/contracts/src/baseKeyboard.ts",
+      "packages/contracts/src/scaffolder.ts -> packages/contracts/src/fontEntry.ts",
+      "packages/contracts/src/scaffolder.ts -> packages/contracts/src/keyboard-ir.ts",
+      "packages/contracts/src/scaffolder.ts -> packages/contracts/src/virtualFS.ts",
+      "packages/contracts/src/schemas.ts -> packages/contracts/src/axes.ts",
+      "packages/contracts/src/schemas.ts -> packages/contracts/src/axisFill.ts",
+      "packages/contracts/src/schemas.ts -> packages/contracts/src/criteria.ts",
+      "packages/contracts/src/schemas.ts -> packages/contracts/src/keyboard-ir.ts",
+      "packages/contracts/src/schemas.ts -> packages/contracts/src/pattern.ts",
+      "packages/contracts/src/schemas.ts -> packages/contracts/src/removalCapability.ts",
+      "packages/contracts/src/surveyPhaseResult.ts -> packages/contracts/src/assignmentMap.ts",
+      "packages/contracts/src/surveyPhaseResult.ts -> packages/contracts/src/axes.ts",
+      "packages/contracts/src/surveyPhaseResult.ts -> packages/contracts/src/keyboardIdentity.ts",
+      "packages/contracts/src/surveyPhaseResult.ts -> packages/contracts/src/pattern.ts",
+      "packages/contracts/src/surveySession.ts -> packages/contracts/src/assignmentMap.ts",
+      "packages/contracts/src/surveySession.ts -> packages/contracts/src/axes.ts",
+      "packages/contracts/src/surveySession.ts -> packages/contracts/src/axisFill.ts",
+      "packages/contracts/src/surveySession.ts -> packages/contracts/src/surveyPhaseResult.ts",
+      "packages/contracts/src/validator.ts -> packages/contracts/src/lintFinding.ts",
+      "packages/engine/src/base-browser/base-browser.ts -> packages/engine/src/base-browser/github-api.ts",
+      "packages/engine/src/base-browser/base-browser.ts -> packages/engine/src/base-browser/kps-parser.ts",
+      "packages/engine/src/base-browser/base-browser.ts -> packages/engine/src/base-browser/offline-bundle.ts",
+      "packages/engine/src/character-discovery/CharacterDiscoveryServiceImpl.ts -> packages/engine/src/character-discovery/cldr.ts",
+      "packages/engine/src/character-discovery/suggestMissing.ts -> packages/engine/src/character-discovery/cldr.ts",
+      "packages/engine/src/codec/import-keyboard.ts -> packages/engine/src/codec/emit.ts",
+      "packages/engine/src/codec/import-keyboard.ts -> packages/engine/src/codec/hash.ts",
+      "packages/engine/src/codec/import-keyboard.ts -> packages/engine/src/codec/parse.ts",
+      "packages/engine/src/codec/import-keyboard.ts -> packages/engine/src/output/sidecar.ts",
+      "packages/engine/src/codec/import-keyboard.ts -> packages/engine/src/recognizer/index.ts",
+      "packages/engine/src/codec/import-keyboard.ts -> packages/engine/src/validator/index-import-fidelity.ts",
+      "packages/engine/src/codec/parse-kvks.ts -> packages/engine/src/shared/node-ids.ts",
+      "packages/engine/src/codec/parse-touch.ts -> packages/engine/src/shared/node-ids.ts",
+      "packages/engine/src/codec/parse.ts -> packages/engine/src/codec/opaque-reasons.ts",
+      "packages/engine/src/codec/parse.ts -> packages/engine/src/codec/tokenize.ts",
+      "packages/engine/src/codec/parse.ts -> packages/engine/src/shared/node-ids.ts",
+      "packages/engine/src/compiler/index.ts -> packages/engine/src/compiler/parseKpjFlags.ts",
+      "packages/engine/src/compiler/index.ts -> packages/engine/src/compiler/pathUtils.ts",
+      "packages/engine/src/compiler/stripDanglingAssetStores.ts -> packages/engine/src/compiler/parseKmnHeaderStores.ts",
+      "packages/engine/src/index.ts -> packages/engine/src/character-discovery/CharacterDiscoveryServiceImpl.ts",
+      "packages/engine/src/index.ts -> packages/engine/src/recognizer/index.ts",
+      "packages/engine/src/langtags/index.ts -> packages/engine/src/langtags/generated/index.ts",
+      "packages/engine/src/loader/fetchKeyboardSourceToVfs.ts -> packages/engine/src/base-browser/kps-parser.ts",
+      "packages/engine/src/loader/fetchKeyboardSourceToVfs.ts -> packages/engine/src/codec/parse-kvks.ts",
+      "packages/engine/src/loader/fetchKeyboardSourceToVfs.ts -> packages/engine/src/compiler/parseKmnHeaderStores.ts",
+      "packages/engine/src/loader/fetchKeyboardSourceToVfs.ts -> packages/engine/src/compiler/parseKpjFlags.ts",
+      "packages/engine/src/loader/fetchKeyboardSourceToVfs.ts -> packages/engine/src/compiler/pathUtils.ts",
+      "packages/engine/src/output/github.ts -> packages/engine/src/output/sidecar.ts",
+      "packages/engine/src/output/index.ts -> packages/engine/src/output/zip.ts",
+      "packages/engine/src/output/managed-pr.ts -> packages/engine/src/output/github.ts",
+      "packages/engine/src/pattern-apply/applyAssignments.ts -> packages/engine/src/pattern-apply/substitute.ts",
+      "packages/engine/src/pattern-apply/applyAssignmentsToVfs.ts -> packages/engine/src/pattern-apply/applyAssignments.ts",
+      "packages/engine/src/pattern-apply/applyCarveToVfs.ts -> packages/engine/src/codec/emit.ts",
+      "packages/engine/src/pattern-apply/applyCarveToVfs.ts -> packages/engine/src/pattern-apply/carveFilterIr.ts",
+      "packages/engine/src/pattern-apply/applyKeycapLabelsToVfs.ts -> packages/engine/src/compiler/parseKmnHeaderStores.ts",
+      "packages/engine/src/pattern-apply/applyStoreSlotRemovals.ts -> packages/engine/src/pattern-apply/slotId.ts",
+      "packages/engine/src/pattern-apply/applyTouchAssignments.ts -> packages/engine/src/pattern-apply/touch-mechanism-shared.ts",
+      "packages/engine/src/pattern-apply/applyTouchAssignments.ts -> packages/engine/src/shared/node-ids.ts",
+      "packages/engine/src/pattern-apply/applyTouchAssignments.ts -> packages/engine/src/shared/touch-ids.ts",
+      "packages/engine/src/pattern-apply/applyTouchAssignmentsToRawJson.ts -> packages/engine/src/pattern-apply/touch-mechanism-shared.ts",
+      "packages/engine/src/pattern-apply/applyTouchAssignmentsToRawJson.ts -> packages/engine/src/shared/touch-ids.ts",
+      "packages/engine/src/pattern-apply/touch-mechanism-shared.ts -> packages/engine/src/shared/touch-ids.ts",
+      "packages/engine/src/pattern-library/filterFor.ts -> packages/engine/src/pattern-library/loader.ts",
+      "packages/engine/src/pattern-library/filterFor.ts -> packages/engine/src/strategy-selector/index.ts",
+      "packages/engine/src/pattern-library/loader.ts -> packages/engine/src/pattern-library/patternSchema.ts",
+      "packages/engine/src/pattern-library/loader.ts -> packages/engine/src/pattern-library/types.ts",
+      "packages/engine/src/pattern-library/loader.ts -> packages/engine/src/validator/index.ts",
+      "packages/engine/src/placement/aggregate.ts -> packages/engine/src/placement/model.ts",
+      "packages/engine/src/placement/corpus-loader.ts -> packages/engine/src/placement/model.ts",
+      "packages/engine/src/placement/index.ts -> packages/engine/src/placement/filters.ts",
+      "packages/engine/src/recognizer/classifyRemovalCapabilities.ts -> packages/engine/src/recognizer/rules/parallel-index-fanout.ts",
+      "packages/engine/src/recognizer/classifyRemovalCapabilities.ts -> packages/engine/src/recognizer/rules/s01-simple-swap.ts",
+      "packages/engine/src/recognizer/classifyRemovalCapabilities.ts -> packages/engine/src/recognizer/rules/s02-deadkey-single-tap.ts",
+      "packages/engine/src/recognizer/index.ts -> packages/engine/src/recognizer/rules/generated/index.ts",
+      "packages/engine/src/recognizer/index.ts -> packages/engine/src/recognizer/rules/s01-simple-swap.ts",
+      "packages/engine/src/recognizer/index.ts -> packages/engine/src/recognizer/rules/s02-deadkey-single-tap.ts",
+      "packages/engine/src/recognizer/index.ts -> packages/engine/src/recognizer/types.ts",
+      "packages/engine/src/recognizer/interpreter.ts -> packages/engine/src/recognizer/node-refs.ts",
+      "packages/engine/src/recognizer/interpreter.ts -> packages/engine/src/recognizer/types.ts",
+      "packages/engine/src/recognizer/interpreter.ts -> packages/engine/src/recognizer/utils.ts",
+      "packages/engine/src/recognizer/interpreter.ts -> packages/engine/src/recognizer/yaml-schema.ts",
+      "packages/engine/src/recognizer/rules/s01-simple-swap.ts -> packages/engine/src/recognizer/node-refs.ts",
+      "packages/engine/src/recognizer/rules/s01-simple-swap.ts -> packages/engine/src/recognizer/types.ts",
+      "packages/engine/src/recognizer/rules/s01-simple-swap.ts -> packages/engine/src/recognizer/utils.ts",
+      "packages/engine/src/recognizer/rules/s02-deadkey-single-tap.ts -> packages/engine/src/recognizer/node-refs.ts",
+      "packages/engine/src/recognizer/rules/s02-deadkey-single-tap.ts -> packages/engine/src/recognizer/types.ts",
+      "packages/engine/src/recognizer/rules/s02-deadkey-single-tap.ts -> packages/engine/src/recognizer/utils.ts",
+      "packages/engine/src/scaffolder/index.ts -> packages/engine/src/codec/emit.ts",
+      "packages/engine/src/scaffolder/index.ts -> packages/engine/src/codec/parse.ts",
+      "packages/engine/src/scaffolder/index.ts -> packages/engine/src/loader/fetchKeyboardSourceToVfs.ts",
+      "packages/engine/src/scaffolder/index.ts -> packages/engine/src/placement/filters.ts",
+      "packages/engine/src/scaffolder/index.ts -> packages/engine/src/scaffolder/scaffold-ir.ts",
+      "packages/engine/src/scaffolder/scaffoldTouchLayout.ts -> packages/engine/src/shared/node-ids.ts",
+      "packages/engine/src/scaffolder/scaffoldTouchLayout.ts -> packages/engine/src/shared/touch-ids.ts",
+      "packages/engine/src/simulator/index.ts -> packages/engine/src/simulator/nodeKeyboardLoader.ts",
+      "packages/engine/src/simulator/index.ts -> packages/engine/src/simulator/vendor/keyman/common/types/main.ts",
+      "packages/engine/src/simulator/index.ts -> packages/engine/src/simulator/vendor/keyman/common/web-utils/deviceSpec.ts",
+      "packages/engine/src/simulator/index.ts -> packages/engine/src/simulator/vendor/keyman/engine/js-processor/jsKeyboardProcessor.ts",
+      "packages/engine/src/simulator/index.ts -> packages/engine/src/simulator/vendor/keyman/engine/keyboard/codes.ts",
+      "packages/engine/src/simulator/index.ts -> packages/engine/src/simulator/vendor/keyman/engine/keyboard/defaultOutputRules.ts",
+      "packages/engine/src/simulator/index.ts -> packages/engine/src/simulator/vendor/keyman/engine/keyboard/keyEvent.ts",
+      "packages/engine/src/simulator/index.ts -> packages/engine/src/simulator/vendor/keyman/engine/keyboard/syntheticTextStore.ts",
+      "packages/engine/src/simulator/nodeKeyboardLoader.ts -> packages/engine/src/simulator/vendor/keyman/common/web-utils/globalObject.ts",
+      "packages/engine/src/simulator/nodeKeyboardLoader.ts -> packages/engine/src/simulator/vendor/keyman/common/web-utils/index.ts",
+      "packages/engine/src/simulator/nodeKeyboardLoader.ts -> packages/engine/src/simulator/vendor/keyman/engine/js-processor/jsKeyboardInterface.ts",
+      "packages/engine/src/simulator/nodeKeyboardLoader.ts -> packages/engine/src/simulator/vendor/keyman/engine/keyboard/keyboards/keyboard.ts",
+      "packages/engine/src/simulator/nodeKeyboardLoader.ts -> packages/engine/src/simulator/vendor/keyman/engine/keyboard/keyboards/keyboardHarness.ts",
+      "packages/engine/src/simulator/nodeKeyboardLoader.ts -> packages/engine/src/simulator/vendor/keyman/engine/keyboard/variableStore.ts",
+      "packages/engine/src/strategy-selector/index.ts -> packages/engine/src/strategy-selector/rules.ts",
+      "packages/engine/src/validator/checks/deadkeyResolution.ts -> packages/engine/src/validator/checks/_shared.ts",
+      "packages/engine/src/validator/checks/duplicateGroups.ts -> packages/engine/src/validator/checks/_shared.ts",
+      "packages/engine/src/validator/checks/duplicateStores.ts -> packages/engine/src/validator/checks/_shared.ts",
+      "packages/engine/src/validator/checks/identifiers.ts -> packages/engine/src/validator/checks/_shared.ts",
+      "packages/engine/src/validator/checks/ifStoreResolution.ts -> packages/engine/src/validator/checks/_shared.ts",
+      "packages/engine/src/validator/checks/indexBounds.ts -> packages/engine/src/validator/checks/_shared.ts",
+      "packages/engine/src/validator/codeMap.ts -> packages/engine/src/validator/types.ts",
+      "packages/engine/src/validator/codeMap.ts -> packages/engine/src/validator/wasmLoader.ts",
+      "packages/engine/src/validator/index-import-fidelity.ts -> packages/engine/src/codec/parse.ts",
+      "packages/engine/src/validator/index-import-fidelity.ts -> packages/engine/src/validator/layer-a-prime.ts",
+      "packages/engine/src/validator/index.ts -> packages/engine/src/validator/checks/codepointFormat.ts",
+      "packages/engine/src/validator/index.ts -> packages/engine/src/validator/checks/contextOrdering.ts",
+      "packages/engine/src/validator/index.ts -> packages/engine/src/validator/checks/deadkeyResolution.ts",
+      "packages/engine/src/validator/index.ts -> packages/engine/src/validator/checks/deprecatedStores.ts",
+      "packages/engine/src/validator/index.ts -> packages/engine/src/validator/checks/duplicateGroups.ts",
+      "packages/engine/src/validator/index.ts -> packages/engine/src/validator/checks/duplicateStores.ts",
+      "packages/engine/src/validator/index.ts -> packages/engine/src/validator/checks/identifiers.ts",
+      "packages/engine/src/validator/index.ts -> packages/engine/src/validator/checks/ifStoreResolution.ts",
+      "packages/engine/src/validator/index.ts -> packages/engine/src/validator/checks/indexBounds.ts",
+      "packages/engine/src/validator/layer-a-prime.ts -> packages/engine/src/codec/hash.ts",
+      "packages/engine/src/validator/layer-a-prime.ts -> packages/engine/src/codec/parse.ts",
+      "packages/engine/src/validator/layer-a-prime.ts -> packages/engine/src/codec/tokenize.ts",
+      "packages/engine/src/validator/layer-a-prime.ts -> packages/engine/src/validator/corpus.ts",
+      "packages/engine/src/validator/oracle.ts -> packages/engine/src/validator/OracleLoadError.ts",
+      "packages/engine/src/validator/oracle.ts -> packages/engine/src/validator/codeMap.ts",
+      "packages/engine/src/validator/oracle.ts -> packages/engine/src/validator/index.ts",
+      "packages/engine/src/validator/oracle.ts -> packages/engine/src/validator/types.ts",
+      "packages/engine/src/validator/oracle.ts -> packages/engine/src/validator/wasmLoader.ts",
+      "packages/engine/src/validator/wasmLoader.ts -> packages/engine/src/compiler/index.ts",
+      "packages/engine/src/validator/wasmLoader.ts -> packages/engine/src/compiler/pathUtils.ts",
+      "packages/engine/src/validator/wasmLoader.ts -> packages/engine/src/validator/OracleLoadError.ts",
+      "packages/engine/src/validator/wasmLoader.ts -> packages/engine/src/validator/types.ts",
+      "packages/keyboard-lint/src/lintContext.ts -> packages/keyboard-lint/src/checks/check-18-1-longpress.ts",
+      "packages/keyboard-lint/src/lintContext.ts -> packages/keyboard-lint/src/checks/check-18-2-touch-rows.ts",
+      "packages/keyboard-lint/src/lintContext.ts -> packages/keyboard-lint/src/checks/check-18-3-keys-per-row.ts",
+      "packages/keyboard-lint/src/lintContext.ts -> packages/keyboard-lint/src/checks/check-18-4-control-key-drift.ts",
+      "packages/keyboard-lint/src/lintContext.ts -> packages/keyboard-lint/src/checks/check-18-5-layer-switch-return.ts",
+      "packages/keyboard-lint/src/lintContext.ts -> packages/keyboard-lint/src/checks/check-18-6-inventory-coverage.ts",
+      "packages/keyboard-lint/src/lintContext.ts -> packages/keyboard-lint/src/parsers/parseTouchLayout.ts",
+      "packages/keyboard-lint/src/lintEngine.ts -> packages/keyboard-lint/src/lintContext.ts",
+      "packages/llm/src/backends/anthropic-api.ts -> packages/llm/src/backends/base.ts",
+      "packages/llm/src/backends/anthropic-api.ts -> packages/llm/src/types.ts",
+      "packages/llm/src/backends/base.ts -> packages/llm/src/types.ts",
+      "packages/llm/src/backends/claude-subscription.ts -> packages/llm/src/backends/base.ts",
+      "packages/llm/src/backends/claude-subscription.ts -> packages/llm/src/types.ts",
+      "packages/llm/src/client.ts -> packages/llm/src/backends/anthropic-api.ts",
+      "packages/llm/src/client.ts -> packages/llm/src/backends/claude-subscription.ts",
+      "packages/llm/src/client.ts -> packages/llm/src/types.ts",
+      "packages/studio/src/hooks/useOskChannel.ts -> packages/studio/src/lib/oskMessages.ts",
+      "packages/studio/src/hooks/useTouchLint.ts -> package:keyboard-lint",
+      "packages/studio/src/lib/resolveBaseTouchJson.ts -> packages/studio/src/lib/findTouchLayoutPath.ts",
+      "packages/studio/src/lint/LintChip.tsx -> packages/studio/src/lint/colors.ts",
+      "packages/studio/src/lint/LintChip.tsx -> packages/studio/src/lint/events.ts",
+      "packages/studio/src/lint/LintDemo.tsx -> packages/studio/src/lint/LintChip.tsx",
+      "packages/studio/src/lint/LintDemo.tsx -> packages/studio/src/lint/LintSummary.tsx",
+      "packages/studio/src/lint/LintSummary.tsx -> packages/studio/src/lint/LintChip.tsx",
+      "packages/studio/src/lint/LintSummary.tsx -> packages/studio/src/lint/colors.ts",
+      "utilities/oauth-backend/src/github-pipeline.ts -> utilities/oauth-backend/src/managed-pr-schemas.ts",
+      "utilities/oauth-backend/src/google-handlers.ts -> utilities/oauth-backend/src/google-schemas.ts",
+      "utilities/oauth-backend/src/google-handlers.ts -> utilities/oauth-backend/src/handlers.ts",
+      "utilities/oauth-backend/src/handlers.ts -> utilities/oauth-backend/src/schemas.ts",
+      "utilities/oauth-backend/src/server.ts -> utilities/oauth-backend/src/github-pipeline.ts",
+      "utilities/oauth-backend/src/server.ts -> utilities/oauth-backend/src/google-handlers.ts",
+      "utilities/oauth-backend/src/server.ts -> utilities/oauth-backend/src/google-schemas.ts",
+      "utilities/oauth-backend/src/server.ts -> utilities/oauth-backend/src/handlers.ts",
+      "utilities/oauth-backend/src/server.ts -> utilities/oauth-backend/src/installation-token.ts",
+      "utilities/oauth-backend/src/server.ts -> utilities/oauth-backend/src/managed-pr-schemas.ts",
+      "utilities/oauth-backend/src/server.ts -> utilities/oauth-backend/src/schemas.ts"
+    ]
+  },
+  "boundaryRules": [
+    {
+      "name": "no-circular",
+      "comment": "No runtime circular dependencies — they defeat the layered design. Type-only cycles are allowed: TypeScript erases them (e.g. the Pattern <-> KeyboardIR type cross-reference in contracts)."
+    },
+    {
+      "name": "lint-not-to-engine",
+      "comment": "Layer C (@keymanapp/keyboard-lint) must not import the engine (CLAUDE.md / spec §10). Lint is a standalone hygiene layer."
+    },
+    {
+      "name": "engine-not-to-studio",
+      "comment": "Engine must not import the studio SPA — the engine is upstream of the UI (spec §12/§13 team boundaries). Dependencies flow studio -> engine."
+    },
+    {
+      "name": "contracts-is-the-dependency-root",
+      "comment": "contracts is the dependency root — everything builds to it, so it must not import any other workspace package (CLAUDE.md)."
+    },
+    {
+      "name": "ui-is-a-leaf",
+      "comment": "studio ui/ primitives are a dependency leaf: no imports from survey/, steps/, or stores/ (feature 011)."
+    },
+    {
+      "name": "editors-no-dashboard",
+      "comment": "editors/ may import stores/ and lib/ (galleries bind workingCopyStore, irToCarveNodes, buildTouchLayoutJson — FR-007 / P4a boundaries.contract.md). Forbidden: editors/ -> dashboard/ (editors are steps, not orchestrators)."
+    },
+    {
+      "name": "steps-layer",
+      "comment": "steps/ orchestrates editor steps and question modules. It may depend on survey/ (registry), editors/, contracts, and ui/. Forbidden: steps/ -> dashboard/, stores/, lib/, components/ (steps is a descriptor layer, not a UI consumer — P4a boundaries.contract.md)."
+    },
+    {
+      "name": "dashboard-layer",
+      "comment": "dashboard/ reads the step manifest and survey/IR types. It may depend on steps/, contracts, and ui/. Forbidden: dashboard/ -> editors/ or stores/ directly (dashboard orchestrates via steps, not by touching editor internals — P4a boundaries.contract.md)."
+    },
+    {
+      "name": "question-modules-no-bypass-mutate-seam",
+      "comment": "survey/questions/ modules must be PURE descriptors: they declare inputs/writes and a pure mutate(value, ctx) that returns a Partial<KeyboardIR> patch (spec-014 mutate-seam, FR-002/-005). They MUST NOT write the working copy directly — no imports of stores/, editors/, or lib/. The single executed IR write path is mutate() applied by the reducer (steps/reducer.ts -> steps/mutateApply.ts). Importing the store or an editor from a question module would re-open the answer-store-vs-IR state fork P5 closes (SC-001)."
+    },
+    {
+      "name": "no-deps-on-studio-poc",
+      "comment": "studio-poc is a throwaway prototype — do not build on it (CLAUDE.md). Nothing outside studio-poc may import it."
+    }
+  ]
+}
