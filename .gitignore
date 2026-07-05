@@ -53,13 +53,15 @@ utilities/kbgen/data/cldr/
 .claude/scheduled_tasks.lock
 .claude/worktrees/
 
+# Local security-review scratch (per-machine; not a committed artifact)
+SECURITY-REVIEW.md
+
 # Diagnostic probe output (Playwright screenshots, ad-hoc dumps)
 # Probes write to tmp/ by convention; never commit captures.
 tmp/
 probe-*.png
 probe-*.log
 packages/studio/scripts/probe-ewondo-emit.mjs
-.gitignore
 notes.md
 
 # Playwright run artifacts (packages/studio/e2e)
