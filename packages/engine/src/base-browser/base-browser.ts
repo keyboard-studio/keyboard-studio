@@ -18,7 +18,7 @@ import {
 import { parseKps } from "./kps-parser.js";
 import { offlineKbdus } from "./offline-bundle.js";
 
-const OWNER = "keymanapp";
+const OWNER = "mattgyverlee";
 const REPO = "keyboards";
 const REF = "master";
 const RAW_BASE = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${REF}`;
