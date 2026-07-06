@@ -106,8 +106,11 @@ Liveness probe. No authentication required. Used by container healthcheck.
 
 Option B (org-mediated) submission. The SPA POSTs the pre-filtered source tree
 plus author attribution; the backend runs the full GitHub Git Data API pipeline
-(fork → tree → commit → branch → draft PR) using the org service-account token,
-which never leaves the server. The user holds no GitHub token in this path.
+(fork → tree → commit → branch → draft PR) using a short-lived **GitHub App
+installation token** minted per request, which never leaves the server. The
+user holds no GitHub token in this path. The draft PR is opened against the
+studio's staging repo `keyboard-studio/keyboards` (a same-repo PR — an
+installation token cannot open PRs on repos the App is not installed on).
 
 **Request body (JSON)** — validated by `ManagedPRBodySchema`:
 
