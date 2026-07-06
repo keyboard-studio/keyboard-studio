@@ -14,7 +14,7 @@ export const SIDECAR_HASH_SUFFIX = ".kmn.imported.sha256";
  *
  * Sidecars travel in the VFS for zip and local working-tree presence.
  * publishPR filters them out via isSourceFile() using this predicate,
- * keeping them out of the keymanapp/keyboards PR commit tree.
+ * keeping them out of the mattgyverlee/keyboards PR commit tree.
  *
  * Also matches the `.kmn.imported.sha256` companion (written at import time
  * by importKeyboard to pin the hash of the original source for I5 verification).

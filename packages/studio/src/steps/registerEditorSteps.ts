@@ -17,9 +17,8 @@
 // Pool ↔ manifest reconciliation:
 //   - scaffoldStep was declared here but never placed in the manifest. The
 //     copy-track scaffold parameters (keyboardId, displayName) are collected
-//     by ProjectNameStepAdapter and passed through its onComplete result — they
-//     do not need a separate scaffold step. scaffoldStep is removed from this
-//     pool so the pool matches the manifest exactly.
+//     by ProjectNameStepFactoryComponent and passed through its onComplete result —
+//     no separate scaffold step needed. scaffoldStep removed from the pool.
 
 import { irPath } from "@keyboard-studio/contracts";
 import type { EditorStep } from "./types.ts";
@@ -28,11 +27,15 @@ import { CarveAdapter } from "../editors/adapters/carveAdapter.tsx";
 import { AddPhysicalAdapter } from "../editors/adapters/addPhysicalAdapter.tsx";
 import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
 import {
-  TrackStepAdapter,
-  ProjectNameStepAdapter,
   TrackOneIdentityPanelAdapter,
   BaseResolutionAdapter,
+  IdentityLiteAdapter,
 } from "../editors/adapters/panelAdapters.tsx";
+import {
+  TrackStepFactoryComponent,
+  ProjectNameStepFactoryComponent,
+  PhaseFStepFactoryComponent,
+} from "../editors/adapters/flowStepOptions.tsx";
 
 // ---------------------------------------------------------------------------
 // Panel steps (wizard panels — non-gallery)
@@ -47,9 +50,15 @@ export const identityStep: EditorStep = {
   id: "identity",
   title: "Keyboard Identity",
   spine: true,
-  component: TrackOneIdentityPanelAdapter,
+  // T011 (spec 028 Stage 5): real IdentityLiteAdapter replaces the
+  // TrackOneIdentityPanelAdapter placeholder. Declared component now matches
+  // the mounted component (SC-005, FR-006).
+  component: IdentityLiteAdapter,
   inputs: [],
   writes: [],
+  // identity_lite runs inside the identity step (spec 024, Stage 1 re-home:
+  // was mis-anchored under "characters" in FLOW_SOURCES; correct home is here).
+  flowRefs: ["identity_lite"],
 };
 
 /**
@@ -75,13 +84,14 @@ export const trackStep: EditorStep = {
   id: "track",
   title: "Authoring Track",
   spine: true,
-  component: TrackStepAdapter,
+  component: TrackStepFactoryComponent,
   // track reads the session-derived header.bcp47 (array) + the resolved base
   // display name (header.name) to frame the copy-vs-adapt choice.
   inputs: [irPath("header", "bcp47"), irPath("header", "name")],
   // DEC-D2 (Matt 2026-06-29): branch selection only (copy vs adapt) — no IR leaf
   // in Phase 1, so writes is []. Empty writes orphans no input and never reds C5.
   writes: [],
+  flowRefs: ["track"],
 };
 
 /**
@@ -96,7 +106,7 @@ export const projectNameStep: EditorStep = {
   id: "project_name",
   title: "Project Name",
   spine: true,
-  component: ProjectNameStepAdapter,
+  component: ProjectNameStepFactoryComponent,
   // project_name (copy-track fork) reads the session-derived header.bcp47 to
   // pre-fill, and collects the scaffold params displayName + keyboardId —
   // expressible as the existing header.name / header.keyboardId IR leaves.
@@ -104,6 +114,7 @@ export const projectNameStep: EditorStep = {
   // exist in KeyboardIR — FR-004).
   inputs: [irPath("header", "bcp47")],
   writes: [irPath("header", "name"), irPath("header", "keyboardId")],
+  flowRefs: ["project_name"],
 };
 
 // ---------------------------------------------------------------------------
@@ -118,6 +129,7 @@ export const carveStep: EditorStep = {
   id: "carve",
   title: "Carve Keys",
   spine: true,
+  layout: "full",
   component: CarveAdapter,
   // Carve's deletion overlay reads and rewrites the same groups[]/stores[]/raw[]
   // arrays (the surviving carve surface) — a self-read, not an upstream-producer
@@ -140,6 +152,7 @@ export const mechanismsStep: EditorStep = {
   id: "mechanisms",
   title: "Assign Mechanisms",
   spine: true,
+  layout: "full",
   component: AddPhysicalAdapter,
   surface: "physical",
   // Mechanisms assigns onto the base layout groups[]/stores[] it also writes — a
@@ -176,6 +189,7 @@ export const touchStep: EditorStep = {
   id: "touch",
   title: "Touch Layout",
   spine: true,
+  layout: "full",
   component: AddTouchAdapter,
   surface: "touch",
   // Touch seeds from the locked physical layout (groups[]/stores[]) that
@@ -203,9 +217,14 @@ export const helpStep: EditorStep = {
   id: "help",
   title: "Help & Tips",
   spine: true,
-  component: TrackOneIdentityPanelAdapter, // placeholder — wired in T028
+  // spec 029 convergence: PhaseFStepFactoryComponent (factory output) replaces
+  // PhaseFAdapter. Declared component now matches the mounted component (SC-005).
+  component: PhaseFStepFactoryComponent,
   inputs: [],
   writes: [],
+  // phase_f_helpdocs runs inside the help step (spec 024, Stage 1 re-home:
+  // was mis-anchored under "characters" in FLOW_SOURCES; correct home is here).
+  flowRefs: ["phase_f_helpdocs"],
 };
 
 /**

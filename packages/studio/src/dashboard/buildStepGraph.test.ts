@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import identityLiteModularRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
-import phaseAModularRaw from "../../../../content/flows/phase_a_identity.modular.yaml?raw";
+import phaseAModularRaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
 import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modular.yaml?raw";
 import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
 

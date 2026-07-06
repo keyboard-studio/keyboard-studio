@@ -17,7 +17,7 @@ import type { FlowQuestion, FlowOption } from "../../src/survey/types.ts";
 // ?raw YAML imports (Vite handles these; typed via src/vite-env.d.ts)
 // ---------------------------------------------------------------------------
 
-import phaseAModularRaw from "../../../../content/flows/phase_a_identity.modular.yaml?raw";
+import phaseAModularRaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
 import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
 import identityLiteModularRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
 import trackModularRaw from "../../../../content/flows/track.modular.yaml?raw";

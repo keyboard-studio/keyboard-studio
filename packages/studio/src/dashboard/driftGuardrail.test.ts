@@ -30,10 +30,10 @@
 import { describe, it, expect } from "vitest";
 
 import {
-  FLOW_SOURCES,
   buildFlowSources,
   collectRenderedNodeIds,
 } from "./renderedNodeSet.ts";
+import { flowSources } from "../steps/flowSources.ts";
 // Direct import of the manifest-spine builder (D1) — the C8/C9 contrast at
 // buildStepGraph.test.ts:323-356 asserts identity against THIS; we assert the
 // rendered<->runtime bijection instead.
@@ -118,14 +118,22 @@ function structuralTargets(q: FlowQuestion): string[] {
 }
 
 /**
- * Survey-question reach (T006, FR-007): for each FLOW_SOURCES flow, BFS from the
- * flow entry following the structural edge set (resolveNext / buildGraphFromQuestions
- * over next / FlowGotoRule[]), collecting the questionRegistry ids visited. Does
- * NOT reuse findUnreachable.
+ * Survey-question reach (T006, FR-007): for each status:"live" flow in
+ * flowSources, BFS from the flow entry following the structural edge set
+ * (resolveNext / buildGraphFromQuestions over next / FlowGotoRule[]),
+ * collecting the questionRegistry ids visited. Does NOT reuse findUnreachable.
+ *
+ * Spec 024 / ADR-0001: derives from flowSources (status:"live" entries only),
+ * which is the same set buildFlowSources() uses. Proposed entries (e.g.
+ * phase_a_identity) are excluded from both sides of the bijection — their
+ * modules are registered-but-unreachable (reserve nodes) and are not part of
+ * the reachable rendered set.
  */
 function computeSurveyReach(): Set<string> {
   const reach = new Set<string>();
-  for (const source of FLOW_SOURCES) {
+  // Iterate only status:"live" entries — same filter as buildFlowSources().
+  const liveSources = Object.values(flowSources).filter((s) => s.status === "live");
+  for (const source of liveSources) {
     let flow;
     try {
       flow = loadModularFlow(source.raw);

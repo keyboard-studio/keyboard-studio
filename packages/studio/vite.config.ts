@@ -49,7 +49,7 @@ export default defineConfig({
         target: "https://raw.githubusercontent.com",
         changeOrigin: true,
         rewrite: (path) =>
-          path.replace(/^\/kbd-proxy/, "/keymanapp/keyboards/master"),
+          path.replace(/^\/kbd-proxy/, "/mattgyverlee/keyboards/master"),
       },
     },
   },

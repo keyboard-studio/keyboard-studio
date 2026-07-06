@@ -56,7 +56,7 @@ export interface GitHubOutputConfig {
 // ---------------------------------------------------------------------------
 
 const API_BASE = "https://api.github.com";
-const UPSTREAM_OWNER = "keymanapp";
+const UPSTREAM_OWNER = "mattgyverlee";
 const UPSTREAM_REPO = "keyboards";
 
 // Compiled artifacts excluded from the PR commit (spec §12, criteria SS1)
@@ -163,7 +163,7 @@ export async function verifyToken(
 // ---------------------------------------------------------------------------
 
 /**
- * Fork `keymanapp/keyboards`, push the virtual FS source tree to a new
+ * Fork `mattgyverlee/keyboards`, push the virtual FS source tree to a new
  * branch on the fork, and open a draft PR.
  *
  * Implements {@link OutputService.publishPR}.

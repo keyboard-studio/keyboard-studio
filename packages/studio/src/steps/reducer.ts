@@ -21,12 +21,13 @@
 // so this file remains boundary-clean. It captures exactly the store actions
 // and lib helpers the reducer needs — nothing more.
 
-import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS } from "@keyboard-studio/contracts";
+import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import type { BaseKeyboard, RemovalCapability } from "@keyboard-studio/contracts";
 import type { MutateContext } from "../survey/types.ts";
 import { applyMutatePatch } from "./mutateApply.ts";
 import { repropagate } from "./repropagate.ts";
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
+import { questionRegistry } from "../survey/questions/registry.ts";
 
 // ---------------------------------------------------------------------------
 // Step ids that carry side effects (keyed constants — never inline strings)
@@ -317,5 +318,39 @@ export function applyStepCompletion(
     // R5 — unknown step id is a no-op (most question-steps have no side effect).
     default:
       break;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// routeAnswersThroughMutate — route in-scope question answers through mutate().
+//
+// Moved from StudioShell.tsx (was private) and exported here so StepHost can
+// call it in the centralized completion path without duplicating the logic.
+// Only question modules with both `mutate` and non-empty `writes` are routed
+// (flag-gated via applyStepCompletion → isMutateSeamEnabled). Answer modules
+// that are display-only or answer-store-only are skipped (no `mutate`/`writes`).
+//
+// spec-014 US1 (T014/T015): route each in-scope question answer through its
+// module's `mutate()` write seam. The reducer gates execution on the global
+// mutate flag (off ⇒ no-op, byte-identical to P4b), so this is safe to call
+// unconditionally. A module without `mutate`/with empty `writes` is skipped.
+// ---------------------------------------------------------------------------
+
+export function routeAnswersThroughMutate(
+  result: SurveyPhaseResult,
+  deps: ReducerDeps,
+): void {
+  for (const answer of result.answers) {
+    const mod = questionRegistry[answer.questionId];
+    if (mod === undefined) continue;
+    if (mod.mutate === undefined || (mod.writes ?? []).length === 0) continue;
+    const value = answer.value as string | string[] | undefined;
+    const req: MutateRequest = {
+      kind: "mutate",
+      mutate: mod.mutate,
+      value,
+      writes: mod.writes!,
+    };
+    applyStepCompletion(answer.questionId, req, deps);
   }
 }

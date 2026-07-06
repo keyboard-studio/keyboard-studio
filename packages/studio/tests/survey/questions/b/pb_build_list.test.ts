@@ -20,7 +20,7 @@ import {
 } from "../../../../src/survey/questions/drillDownDeclarations.ts";
 import { questionRegistry } from "../../../../src/survey/questions/registry.ts";
 import { manifest } from "../../../../src/steps/manifest.ts";
-import { FLOW_SOURCES } from "../../../../src/dashboard/renderedNodeSet.ts";
+import { flowSources } from "../../../../src/steps/flowSources.ts";
 import { ruleTarget } from "../../../../src/dashboard/flowUtils.ts";
 import { resolveNext } from "../../../../src/survey/SurveyRunner.tsx";
 import { loadModularFlow } from "../../../../src/survey/loadModularFlow.ts";
@@ -31,7 +31,7 @@ import type { FlowQuestion } from "../../../../src/survey/types.ts";
 // (FR-014 §2.2(b), survey-question half of C7 — mirrors the per-graph survey
 // reach the spec-016 drift guardrail computes; uses the production resolveNext +
 // ruleTarget edge extractors, NOT findUnreachable, which is blind to FlowGotoRule
-// routing). BFS from each FLOW_SOURCES flow entry, collecting visited registry ids.
+// routing). BFS from each status:"live" flowSources entry, collecting visited ids.
 // ---------------------------------------------------------------------------
 
 function structuralTargets(q: FlowQuestion): string[] {
@@ -53,7 +53,8 @@ function structuralTargets(q: FlowQuestion): string[] {
 
 function computeSurveyReach(): Set<string> {
   const reach = new Set<string>();
-  for (const source of FLOW_SOURCES) {
+  const liveSources = Object.values(flowSources).filter((s) => s.status === "live");
+  for (const source of liveSources) {
     let flow;
     try {
       flow = loadModularFlow(source.raw);

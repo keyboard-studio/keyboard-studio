@@ -15,19 +15,19 @@
 //   • it is absent from the identity-lite flow's LIVE ordering (FR-001 / SC-001);
 //   • it is registered (no-delete) so it is reserve, NOT orphan (FR-009).
 //
-// Open item (I-2, flagged to the lead): the FULL demotion also requires dropping
-// the redundant LIVE `phase_a_identity` flow-source entry from renderedNodeSet.ts
-// FLOW_SOURCES, which collides with spec-017's prefill anchor (`primary_script`
-// reachability). That FLOW_SOURCES edit is NOT applied here pending that decision;
-// this test asserts the reserve RENDERING itself, which is already true today via
-// the identity-lite drill-down.
+// Resolved (Stage 1, spec 024 / ADR-0001): the FULL demotion is now realized.
+// FLOW_SOURCES has been retired from renderedNodeSet.ts; phase_a_identity carries
+// status:"proposed" in steps/flowSources.ts, which excludes it from all live
+// drill-downs. There is no separate FLOW_SOURCES list to drift. The reserve
+// RENDERING asserted below remains correct — identity-lite's drill-down still
+// emits all Phase A modules as library-not-in-flow reserve nodes.
 //
 // Test-only: no contracts bump, no write routing, no flag flip (FR-010/FR-011).
 
 import { describe, it, expect } from "vitest";
 
 import identityLiteModularRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
-import phaseAModularRaw from "../../../../content/flows/phase_a_identity.modular.yaml?raw";
+import phaseAModularRaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
 import { buildModularFlowGraph } from "./buildStepGraph.ts";
 import { loadModularFlow } from "../survey/loadModularFlow.ts";
 import { phaseARegistry } from "../survey/questions/registry.a.ts";

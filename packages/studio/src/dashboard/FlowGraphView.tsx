@@ -95,6 +95,16 @@ function nodeRole(n: PositionedNode): {
       badgeBg: "#1c4a7a",
     };
   }
+  // Proposed-flow nodes (spec 025): a distinct teal palette + "proposed" badge so
+  // it is immediately clear they render only in the Library section and do NOT run.
+  if (n.kind === "proposed") {
+    return {
+      border: "#39c5cf",
+      bg: "#0c2a2e",
+      badge: "proposed",
+      badgeBg: "#1b6b73",
+    };
+  }
   // Live nodes — standard role-based styling.
   if (n.isEntry)
     return {
@@ -315,6 +325,26 @@ export function FlowGraphView({ graph }: FlowGraphViewProps) {
                     }}
                   >
                     {role.badge}
+                  </span>
+                )}
+                {/* spec 025 (FR-005): dual-reference WARN — this proposed question also
+                    appears in a live flow. Amber "also live" badge, never a failure. */}
+                {n.alsoLive === true && (
+                  <span
+                    style={{
+                      fontFamily: SANS,
+                      fontSize: 9,
+                      lineHeight: "14px",
+                      color: "#e3b341",
+                      background: "#241c10",
+                      border: "1px solid #9e6a03",
+                      borderRadius: 3,
+                      padding: "0 4px",
+                      whiteSpace: "nowrap",
+                    }}
+                    title="This question also appears in a live flow (also live)."
+                  >
+                    also live
                   </span>
                 )}
               </div>

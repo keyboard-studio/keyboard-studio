@@ -297,6 +297,50 @@ describe("Off-spine step inventory", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Layout declarations (spec 024 Stage 0)
+//
+// Exactly {carve, mechanisms, touch} must declare layout:"full".
+// All other steps must have layout:"pane" or omit the field (implicit "pane").
+// ---------------------------------------------------------------------------
+
+const FULL_LAYOUT_IDS = ["carve", "mechanisms", "touch"] as const;
+
+describe("layout declarations (spec 024 Stage 0)", () => {
+  it("exactly three steps declare layout:'full'", () => {
+    const fullSteps = manifest.filter((s) => s.layout === "full");
+    const fullIds = fullSteps.map((s) => s.id).sort();
+    expect(fullIds).toEqual([...FULL_LAYOUT_IDS].sort());
+  });
+
+  it("carve declares layout:'full'", () => {
+    const carve = manifest.find((s) => s.id === "carve");
+    expect(carve?.layout).toBe("full");
+  });
+
+  it("mechanisms declares layout:'full'", () => {
+    const mechanisms = manifest.find((s) => s.id === "mechanisms");
+    expect(mechanisms?.layout).toBe("full");
+  });
+
+  it("touch declares layout:'full'", () => {
+    const touch = manifest.find((s) => s.id === "touch");
+    expect(touch?.layout).toBe("full");
+  });
+
+  it("all other steps have layout:'pane' or omit layout (implicit pane)", () => {
+    const fullSet = new Set<string>(FULL_LAYOUT_IDS);
+    for (const step of manifest) {
+      if (!fullSet.has(step.id)) {
+        expect(
+          step.layout === undefined || step.layout === "pane",
+          `Step "${step.id}" must not declare layout:"full"`,
+        ).toBe(true);
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // M6 — no A–G phase-letter vocabulary in ids or titles
 // ---------------------------------------------------------------------------
 
@@ -336,5 +380,47 @@ describe("M6 — no A–G phase-letter vocabulary in ids or titles", () => {
   it("the characters-inventory step uses id 'characters', not 'phase_a' or similar", () => {
     const charStep = manifest.find((s) => s.id === "characters");
     expect(charStep).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SC-004 — SurveyView no longer contains per-step render branches or
+//           completion handlers (spec 028 Stage 5 contract).
+//
+// These private strings were deleted by the Stage 5 refactor; their absence
+// is the guard. Reading the StudioShell.tsx source at test-time ensures the
+// guard stays in sync with the file rather than with a stale snapshot.
+// ---------------------------------------------------------------------------
+
+import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const STUDIO_SHELL_PATH = join(__dirname, "..", "StudioShell.tsx");
+
+describe("SC-004 — StudioShell.tsx has no per-step render branches or completion handlers", () => {
+  let src: string;
+
+  // Read the source once for all assertions in this suite.
+  // If the file moves, the readFileSync will throw — that is intentional (the
+  // guard itself needs updating, which is better than silently passing).
+  src = readFileSync(STUDIO_SHELL_PATH, "utf-8");
+
+  it('"renderQuestionsPane" is absent from StudioShell.tsx (deleted by Stage 5)', () => {
+    expect(src).not.toContain("renderQuestionsPane");
+  });
+
+  it('"handlePhaseEComplete" is absent from StudioShell.tsx (deleted by Stage 5)', () => {
+    expect(src).not.toContain("handlePhaseEComplete");
+  });
+
+  it('"handleTrackSelected" is absent from StudioShell.tsx (deleted by Stage 5)', () => {
+    expect(src).not.toContain("handleTrackSelected");
+  });
+
+  it('"handleProjectNameNext" is absent from StudioShell.tsx (deleted by Stage 5)', () => {
+    expect(src).not.toContain("handleProjectNameNext");
   });
 });

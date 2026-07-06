@@ -1,86 +1,99 @@
-// panelAdapters — EditorStep adapters for the five wizard panels (P4a, T013).
+// panelAdapters — EditorStep adapters for the wizard panel steps.
 //
 // Each adapter satisfies React.ComponentType<EditorStepProps> (the single
-// contract for all editor steps). Panels have divergent existing prop shapes,
-// so each adapter threads the relevant data from the store or ctx to the panel.
+// contract for all editor steps). Adapters self-source inputs from stores/hooks
+// (FR-007) rather than receiving them as props from the host.
 //
-// The panels currently have inline survey-level side effects (onNext, onSubmit,
-// onResolved) that also live in StudioShell. Those transitions are LEFT IN
-// StudioShell for P4a and reserved for P4b (plan.md §"Out of scope for P4a").
-// These adapters forward the results through onComplete so the manifest (P4b)
-// can consume them.
+// spec 029 full convergence (Option A):
+//   TrackStepAdapter, ProjectNameStepAdapter, and PhaseFAdapter have been DELETED.
+//   Those three flows are now live via factory components (flowStepOptions.tsx →
+//   makeFlowStepComponent → FlowStepHost). Retained adapters:
+//     - IdentityLiteAdapter (identityStep): writes setIdentityResult + setSurveyContext
+//       before onComplete (R7 ordering).
+//     - BaseResolutionAdapter (chooseBaseStep): writes setLocalBase before onComplete.
+//     - ScaffoldFormAdapter: retained (legacy; not in manifest).
+//     - TrackOneIdentityPanelAdapter: stub for the reserved "package" step.
 //
-// Declared but NOT yet wired into StudioShell. T014 repoints the imports;
-// P4b introduces the manifest that actually uses these adapters.
+// STEP-SPECIFIC EFFECT PLACEMENT (research R7):
+//   The host's generic onComplete path is:
+//     [recordPhase + routeAnswersThroughMutate if SurveyPhaseResult]
+//     [applyStepCompletion if step in STEPS_WITH_APPLY_COMPLETION]
+//     advance → session.advance(next)
+//     [setCharactersSubStage if advanceOutcome carries it]
+//   For steps whose handlers call store mutators BEFORE advance
+//   (setIdentityResult, setSurveyContext, setLocalBase), those writes are placed
+//   in the ADAPTER so they fire before onComplete triggers the host's advance call.
+//
+// Boundary: editors/adapters/ → stores/ and hooks/ is allowed by depcruise.
 
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useValidatorFindings } from "../../hooks/useValidatorFindings.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
-import { TrackStep } from "../panels/TrackStep.tsx";
-import type { Track } from "../panels/TrackStep.tsx";
-import { ProjectNameStep } from "../panels/ProjectNameStep.tsx";
 import { ScaffoldForm } from "../panels/ScaffoldForm.tsx";
 import type { ScaffoldSpec } from "../../hooks/useKeyboardArtifact.ts";
 import { TrackOneIdentityPanel } from "../panels/TrackOneIdentityPanel.tsx";
 import { BaseResolution } from "../panels/BaseResolution.tsx";
 import type { SuggestTarget } from "../../lib/suggestBase.ts";
+import {
+  IdentityLite,
+  extractIdentityLite,
+} from "../../survey/index.ts";
+import type { SurveyContext } from "../../survey/types.ts";
+import type { IdentityLiteResult } from "../../survey/IdentityLite.tsx";
+import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
-// TrackStepAdapter
+// contextFromIdentity — derive SurveyContext from IdentityLiteResult.
+// Moved from StudioShell.tsx (was private) to here, where the identity adapter
+// needs it. Same logic, same output.
 // ---------------------------------------------------------------------------
 
-/**
- * Adapter for TrackStep. Reads the base keyboard from the store; passes track
- * choice as the step result.
- */
-export function TrackStepAdapter({ onComplete, onBack }: EditorStepProps) {
-  const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
-
-  if (baseKeyboard === null) {
-    // Guard: base must be set before this step is shown.
-    return null;
-  }
-
-  function handleNext(track: Track) {
-    onComplete({ track });
-  }
-
-  // TrackStep requires onBack — the manifest must supply it for this step.
-  // Fall back to a no-op if absent (misconfigured manifest).
-  return (
-    <TrackStep
-      base={baseKeyboard}
-      onNext={handleNext}
-      onBack={onBack ?? (() => undefined)}
-    />
-  );
+function contextFromIdentity(identity: IdentityLiteResult): SurveyContext {
+  return {
+    language_name: identity.english || identity.autonym,
+    routing_group: identity.prefill.routingGroup,
+    script_family: identity.prefill.script,
+    ...(identity.bcp47 !== "" ? { bcp47_tag: identity.bcp47 } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------
-// ProjectNameStepAdapter
+// IdentityLiteAdapter (T008)
+//
+// Real adapter for identityStep — replaces TrackOneIdentityPanelAdapter
+// placeholder. Reads surveyContext + findingsByQuestionId from the store
+// bridge; on completion writes setIdentityResult + setSurveyContext (the
+// identity-specific session-store effects per research R7) BEFORE calling
+// onComplete so the golden-walk mutation order is preserved:
+//   setIdentityResult → setSurveyContext → onComplete → (host) advance
 // ---------------------------------------------------------------------------
 
-/**
- * Adapter for ProjectNameStep. Derives default display name from the working
- * copy's identity (if already set) or the base keyboard display name.
- */
-export function ProjectNameStepAdapter({ onComplete, onBack }: EditorStepProps) {
-  const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
-  const identity = useWorkingCopyStore((s) => s.identity);
+export function IdentityLiteAdapter({ onComplete }: EditorStepProps) {
+  // Read surveyContext for the live context prop (identity panel needs it).
+  const surveyContext = useSurveySessionStore((s) => s.surveyContext);
+  // Derive per-question findings from the V3 store bridge (spec-014).
+  const findingsByQuestionId = useValidatorFindings();
 
-  const defaultDisplayName =
-    identity?.displayName ?? baseKeyboard?.displayName ?? "";
+  // Step-specific session-store writers (R7 — written before onComplete so the
+  // golden-walk ordering is setIdentityResult → setSurveyContext → advance).
+  const setIdentityResult = useSurveySessionStore((s) => s.setIdentityResult);
+  const setSurveyContext = useSurveySessionStore((s) => s.setSurveyContext);
 
-  function handleNext(displayName: string, keyboardId: string) {
-    onComplete({ displayName, keyboardId });
+  function handleComplete(result: SurveyPhaseResult, identity: IdentityLiteResult) {
+    // R7: identity-specific writes fire here, before onComplete → host → advance.
+    setIdentityResult(identity);
+    setSurveyContext(contextFromIdentity(identity));
+    // Forward the phase result; host guards on SurveyPhaseResult shape and calls
+    // recordPhase + routeAnswersThroughMutate.
+    onComplete(result);
   }
 
-  // ProjectNameStep requires onBack — the manifest must supply it for this step.
-  // Fall back to a no-op if absent (misconfigured manifest).
   return (
-    <ProjectNameStep
-      defaultDisplayName={defaultDisplayName}
-      onNext={handleNext}
-      onBack={onBack ?? (() => undefined)}
+    <IdentityLite
+      context={surveyContext}
+      onComplete={handleComplete}
+      findingsByQuestionId={findingsByQuestionId}
     />
   );
 }
@@ -102,39 +115,36 @@ export function ScaffoldFormAdapter({ onComplete }: EditorStepProps) {
 }
 
 // ---------------------------------------------------------------------------
-// TrackOneIdentityPanelAdapter
+// TrackOneIdentityPanelAdapter (retained for package step stub)
 // ---------------------------------------------------------------------------
 
 /**
- * Adapter for TrackOneIdentityPanel. The panel reads/writes the store
- * directly (keyboard ID, display name) and has no intrinsic completion signal —
- * it is a continuous editing surface, not a "submit and advance" form.
- *
- * In P4a, advancement is still driven by SurveyStage in StudioShell, not by
- * this adapter's onComplete. onComplete is declared on the interface but is
- * intentionally not called here.
- *
- * TODO(P4b): step advancement for the continuous identity panel is decided by
- * the manifest/reducer, not the component. Wire when the manifest lands.
+ * Adapter for TrackOneIdentityPanel. Retained as the stub component for
+ * the reserved "package" step (out of scope for v1). Does not call onComplete
+ * (the package step has no completion in v1).
  */
 export function TrackOneIdentityPanelAdapter(_props: EditorStepProps) {
   return <TrackOneIdentityPanel />;
 }
 
 // ---------------------------------------------------------------------------
-// BaseResolutionAdapter
+// BaseResolutionAdapter (updated for Stage 5)
+//
+// Writes setLocalBase to surveySessionStore BEFORE calling onComplete so the
+// golden-walk mutation ordering is: setLocalBase → onComplete → (host) advance.
 // ---------------------------------------------------------------------------
 
 /**
  * Adapter for BaseResolution. Reads the suggest target from the working-copy
- * store (identity_lite language + script selection) and passes the resolved
- * BaseKeyboard as the step result.
+ * store and passes the resolved BaseKeyboard as the step result.
+ *
+ * T-Stage5: calls setLocalBase (surveySessionStore) before onComplete to
+ * reproduce the pre-Stage-5 handleBaseResolved mutation ordering.
  */
 export function BaseResolutionAdapter({ onComplete, onBack }: EditorStepProps) {
   const identity = useWorkingCopyStore((s) => s.identity);
+  const setLocalBase = useSurveySessionStore((s) => s.setLocalBase);
 
-  // Derive suggest target from identity. Falls back to Latn if neither
-  // is set yet — the guard in BaseResolution handles the no-bases case gracefully.
   const target: SuggestTarget = {
     script: identity?.targetScript ?? "Latn",
     ...(identity?.bcp47 !== undefined ? { bcp47: identity.bcp47 } : {}),
@@ -143,8 +153,15 @@ export function BaseResolutionAdapter({ onComplete, onBack }: EditorStepProps) {
   return (
     <BaseResolution
       target={target}
-      onResolved={(base) => onComplete({ base })}
+      onResolved={(base) => {
+        // R7: setLocalBase fires before onComplete → host → advance.
+        setLocalBase(base);
+        onComplete({ base });
+      }}
       {...(onBack !== undefined ? { onBack } : {})}
     />
   );
 }
+
+// Re-export extractIdentityLite for consumers that need it.
+export { extractIdentityLite };

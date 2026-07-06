@@ -61,7 +61,7 @@ export interface ManagedPRPipelineConfig {
    * The returned token has contents:write + pull_requests:write scope. Never logged.
    */
   getInstallationToken: () => Promise<string>;
-  /** GitHub login that owns the studio's standing fork of keymanapp/keyboards. */
+  /** GitHub login that owns the studio's standing fork of mattgyverlee/keyboards. */
   orgLogin: string;
   fetch: GitHubPipelineFetchFn;
 }
@@ -88,7 +88,7 @@ export type ManagedPRHandlerResult =
 // ---------------------------------------------------------------------------
 
 const API_BASE = "https://api.github.com";
-const UPSTREAM_OWNER = "keymanapp";
+const UPSTREAM_OWNER = "mattgyverlee";
 const UPSTREAM_REPO = "keyboards";
 
 // ---------------------------------------------------------------------------
@@ -96,9 +96,9 @@ const UPSTREAM_REPO = "keyboards";
 // ---------------------------------------------------------------------------
 
 /**
- * Normalize a PR title to the keymanapp/keyboards convention.
+ * Normalize a PR title to the mattgyverlee/keyboards convention.
  *
- * All keyboard PRs in keymanapp/keyboards are titled "[<id>] <desc>". If the
+ * All keyboard PRs in mattgyverlee/keyboards are titled "[<id>] <desc>". If the
  * SPA-supplied title already starts with "[" it is returned unchanged (to
  * avoid double-wrapping a title the caller already formatted). Otherwise the
  * keyboard ID bracket prefix is prepended.
@@ -121,7 +121,7 @@ export function buildCommitMessage(
 
 /**
  * Build the PR body, prepending a provenance block that names the human author
- * so keymanapp/keyboards maintainers have a reachability channel. The
+ * so mattgyverlee/keyboards maintainers have a reachability channel. The
  * importAttribution section (when present) is appended after prBody.
  *
  * Divergence 5 from the Option A origin: Option A uses the PR body verbatim;

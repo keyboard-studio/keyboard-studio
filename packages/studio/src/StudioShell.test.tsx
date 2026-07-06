@@ -99,6 +99,111 @@ const _mockTouchEBackRef = mockTouchEBackRef;
 // Mock child survey components — shallow stubs that record callbacks.
 // ---------------------------------------------------------------------------
 
+// Mock survey/FlowStepHost.tsx — used directly by factory components for
+// track, project_name, and phase_f_helpdocs (spec 029 convergence).
+// Branches on flow.flow_id to emit the same testids as the old wrapper stubs.
+vi.mock("./survey/FlowStepHost.tsx", () => {
+  const fakePhaseResult = { phase: "B" as const, answers: [], confirmedInventory: [] };
+
+  return {
+    FlowStepHost: ({
+      flow,
+      onComplete,
+      onBack,
+    }: {
+      flow: { flow_id: string };
+      onComplete: (result: unknown) => void;
+      onBack?: () => void;
+    }) => {
+      if (flow.flow_id === "track") {
+        return (
+          <div data-testid="stage-track">
+            <button
+              type="button"
+              data-testid="track-copy"
+              onClick={() =>
+                onComplete({
+                  phase: "G",
+                  answers: [{ questionId: "track_choice", answerType: "select", value: "copy" }],
+                  confirmedInventory: [],
+                })
+              }
+            >
+              track-copy
+            </button>
+            <button
+              type="button"
+              data-testid="track-adapt"
+              onClick={() =>
+                onComplete({
+                  phase: "G",
+                  answers: [{ questionId: "track_choice", answerType: "select", value: "adapt" }],
+                  confirmedInventory: [],
+                })
+              }
+            >
+              track-adapt
+            </button>
+            {onBack !== undefined && (
+              <button type="button" data-testid="track-back" onClick={onBack}>
+                track-back
+              </button>
+            )}
+          </div>
+        );
+      }
+      if (flow.flow_id === "project_name") {
+        return (
+          <div data-testid="stage-project-name">
+            <button
+              type="button"
+              data-testid="project-name-next"
+              onClick={() =>
+                onComplete({
+                  phase: "G",
+                  answers: [
+                    { questionId: "project_display_name", answerType: "text", value: "Test Keyboard" },
+                    { questionId: "project_keyboard_id", answerType: "text", value: "test_keyboard" },
+                  ],
+                  confirmedInventory: [],
+                })
+              }
+            >
+              project-name-next
+            </button>
+            {onBack !== undefined && (
+              <button type="button" data-testid="project-name-back" onClick={onBack}>
+                project-name-back
+              </button>
+            )}
+          </div>
+        );
+      }
+      if (flow.flow_id === "phase_f_helpdocs") {
+        _mockPhaseFDoneRef.current = onComplete;
+        _mockPhaseFBackRef.current = onBack ?? null;
+        return (
+          <div data-testid="stage-F">
+            <button
+              type="button"
+              data-testid="phaseF-complete"
+              onClick={() => onComplete(fakePhaseResult)}
+            >
+              phaseF-complete
+            </button>
+            {onBack !== undefined && (
+              <button type="button" data-testid="phaseF-back" onClick={onBack}>
+                phaseF-back
+              </button>
+            )}
+          </div>
+        );
+      }
+      return <div data-testid={`flow-stub-${flow.flow_id}`} />;
+    },
+  };
+});
+
 vi.mock("./survey/index.ts", () => {
   // Minimal fake IdentityLiteResult for the mock to emit.
   const fakeIdentity = {
@@ -157,67 +262,6 @@ vi.mock("./survey/index.ts", () => {
         </div>
       );
     },
-    PhaseF: ({ onComplete, onBack }: { onComplete: (r: unknown) => void; onBack?: () => void }) => {
-      _mockPhaseFDoneRef.current = onComplete;
-      _mockPhaseFBackRef.current = onBack ?? null;
-      return (
-        <div data-testid="stage-F">
-          <button type="button" data-testid="phaseF-complete" onClick={() => onComplete(fakePhaseResult)}>
-            phaseF-complete
-          </button>
-          {onBack !== undefined && (
-            <button type="button" data-testid="phaseF-back" onClick={onBack}>
-              phaseF-back
-            </button>
-          )}
-        </div>
-      );
-    },
-    // PhaseTrack — replaces TrackStep in the manifest flow (modular question runner).
-    PhaseTrack: ({
-      onTrackSelected,
-      onBack,
-    }: {
-      onTrackSelected: (t: "copy" | "adapt") => void;
-      onBack?: () => void;
-    }) => (
-      <div data-testid="stage-track">
-        <button type="button" data-testid="track-copy" onClick={() => onTrackSelected("copy")}>
-          track-copy
-        </button>
-        <button type="button" data-testid="track-adapt" onClick={() => onTrackSelected("adapt")}>
-          track-adapt
-        </button>
-        {onBack !== undefined && (
-          <button type="button" data-testid="track-back" onClick={onBack}>
-            track-back
-          </button>
-        )}
-      </div>
-    ),
-    // PhaseProjectName — replaces ProjectNameStep in the manifest flow (modular question runner).
-    PhaseProjectName: ({
-      onProjectNameNext,
-      onBack,
-    }: {
-      onProjectNameNext: (displayName: string, keyboardId: string) => void;
-      onBack?: () => void;
-    }) => (
-      <div data-testid="stage-project-name">
-        <button
-          type="button"
-          data-testid="project-name-next"
-          onClick={() => onProjectNameNext("Test Keyboard", "test_keyboard")}
-        >
-          project-name-next
-        </button>
-        {onBack !== undefined && (
-          <button type="button" data-testid="project-name-back" onClick={onBack}>
-            project-name-back
-          </button>
-        )}
-      </div>
-    ),
     // PhaseA re-exported as a no-op (not used in the wizard path under test)
     PhaseA: () => <div data-testid="stage-A" />,
     SurveyRunner: () => <div data-testid="survey-runner" />,
@@ -835,6 +879,45 @@ describe("SurveyView — Track 2 (adapt) routing", () => {
     fireEvent.click(screen.getByTestId("project-name-next"));
     expect(screen.getByTestId("stage-prefill")).toBeTruthy();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Adapt-track SC-002 walk — mirrors the copy-track carve->B back-navigation test
+// ---------------------------------------------------------------------------
+//
+// SC-002 requires BOTH tracks walked through to carve, including back-from-carve
+// landing on PhaseB. This test proves the adapt-track path (which skips
+// project_name) converges on the same carve-back behavior as the copy-track path.
+
+describe("SurveyView — adapt-track carve → B back-navigation (SC-002 parity)", () => {
+  it("adapt-track: selects adapt → skips project_name → prefill-confirm → stage-B → phaseB-complete → carve → carve-back lands on stage-B (not prefill)", async () => {
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
+    // Drive to track stage, then select adapt (skips project_name).
+    advanceToTrack();
+    fireEvent.click(screen.getByTestId("track-adapt"));
+
+    // Adapt-track lands directly on prefill (no project-name).
+    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+    expect(screen.queryByTestId("stage-project-name")).toBeNull();
+
+    // Confirm prefill → PhaseB visible.
+    fireEvent.click(screen.getByTestId("prefill-confirm"));
+    expect(screen.getByTestId("stage-B")).toBeTruthy();
+
+    // Advance through PhaseB to carve.
+    fireEvent.click(screen.getByTestId("phaseB-complete"));
+    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+
+    // carve-back must re-enter PhaseB (not prefill).
+    fireEvent.click(screen.getByTestId("carve-back"));
+
+    expect(screen.getByTestId("stage-B")).toBeTruthy();
+    expect(screen.queryByTestId("stage-carve")).toBeNull();
+    expect(screen.queryByTestId("stage-prefill")).toBeNull();
   });
 });
 
