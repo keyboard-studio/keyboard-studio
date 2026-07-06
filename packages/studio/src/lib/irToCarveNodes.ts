@@ -1053,6 +1053,48 @@ export function detectStorePairs(ir: KeyboardIR): Map<string, StorePairEntry[]> 
 // toRailNodes — build the full node list for the Rail from a KeyboardIR
 // ---------------------------------------------------------------------------
 
+/**
+ * One node in a character's cross-reference "web" — a group, pattern, or store
+ * where that character also appears. Render-layer only (not a contract type).
+ */
+export interface CharLocation {
+  kind: CardKind; // 'group' | 'pattern' | 'store'
+  nodeId: string;
+  label: string;
+}
+
+/**
+ * Build the character → locations web ONCE from the already-assembled rail nodes.
+ *
+ * Keys are the exact glyph `ch` values on screen, so a card's lookup can never
+ * mismatch the character it displays. Cost is O(total glyphs), NOT O(chips ×
+ * rules) — do not rebuild this per glyph (that path hangs on huge keyboards).
+ * The Inspector filters out the currently-viewed card per glyph before display.
+ */
+export function buildCharWeb(nodes: CarveNode[]): Map<string, CharLocation[]> {
+  const web = new Map<string, CharLocation[]>();
+  const seen = new Map<string, Set<string>>(); // ch → nodeIds already recorded
+
+  const add = (ch: string, loc: CharLocation) => {
+    if (!ch) return;
+    let ids = seen.get(ch);
+    if (ids === undefined) { ids = new Set(); seen.set(ch, ids); }
+    if (ids.has(loc.nodeId)) return;
+    ids.add(loc.nodeId);
+    const arr = web.get(ch);
+    if (arr) arr.push(loc); else web.set(ch, [loc]);
+  };
+
+  for (const node of nodes) {
+    if (node.kind === 'group' || node.kind === 'pattern') {
+      for (const g of node.glyphs ?? []) add(g.ch, { kind: node.kind, nodeId: node.nodeId, label: node.name });
+    } else if (node.kind === 'store') {
+      for (const c of node.storeChips ?? []) add(c.ch, { kind: 'store', nodeId: node.nodeId, label: node.name });
+    }
+  }
+  return web;
+}
+
 export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCapability> = new Map()): CarveNode[] {
   const nodes: CarveNode[] = [];
   const recognized = ir.recognizedPatterns.filter((p) => p.origin === 'recognized');

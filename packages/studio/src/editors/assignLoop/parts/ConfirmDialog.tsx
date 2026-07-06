@@ -21,11 +21,11 @@ export interface ConfirmDialogProps {
   body: React.ReactNode;
   /** Label for the prominent "yes" action. */
   primaryLabel: string;
-  /** Label for the muted "cancel / just here" action. */
-  secondaryLabel: string;
+  /** Label for the muted "cancel / just here" action. Omit for a single-button (info) dialog. */
+  secondaryLabel?: string;
   onPrimary: () => void;
-  /** Called when the user clicks the secondary button, presses Escape, or clicks the backdrop. */
-  onSecondary: () => void;
+  /** Clicking the secondary button, Escape, or the backdrop. Falls back to onPrimary when omitted. */
+  onSecondary?: () => void;
 }
 
 export function ConfirmDialog({
@@ -38,6 +38,9 @@ export function ConfirmDialog({
   onSecondary,
 }: ConfirmDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  // Dismiss route (Escape / backdrop / secondary button). Single-button dialogs
+  // that omit onSecondary dismiss via the primary action instead.
+  const dismiss = onSecondary ?? onPrimary;
 
   // Open / close the native <dialog> in sync with the `open` prop.
   useEffect(() => {
@@ -56,16 +59,16 @@ export function ConfirmDialog({
     if (!el) return;
     const onCancel = (e: Event) => {
       e.preventDefault(); // prevent native close — we manage it via state
-      onSecondary();
+      dismiss();
     };
     el.addEventListener('cancel', onCancel);
     return () => el.removeEventListener('cancel', onCancel);
-  }, [onSecondary]);
+  }, [dismiss]);
 
   // Backdrop click = cancel (clicks on the <dialog> element itself, outside the inner panel).
   function handleDialogClick(e: React.MouseEvent<HTMLDialogElement>) {
     if (e.target === dialogRef.current) {
-      onSecondary();
+      dismiss();
     }
   }
 
@@ -119,22 +122,24 @@ export function ConfirmDialog({
             flexWrap: 'wrap',
           }}
         >
-          {/* Secondary (muted) — "Cancel" / "Just here" */}
-          <button
-            onClick={onSecondary}
-            style={{
-              font: '600 13px var(--app-font)',
-              cursor: 'pointer',
-              color: 'var(--app-text-muted)',
-              background: 'transparent',
-              border: '1px solid var(--app-border-strong)',
-              borderRadius: 8,
-              padding: '9px 16px',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {secondaryLabel}
-          </button>
+          {/* Secondary (muted) — "Cancel" / "Just here". Omitted for info dialogs. */}
+          {secondaryLabel !== undefined && (
+            <button
+              onClick={dismiss}
+              style={{
+                font: '600 13px var(--app-font)',
+                cursor: 'pointer',
+                color: 'var(--app-text-muted)',
+                background: 'transparent',
+                border: '1px solid var(--app-border-strong)',
+                borderRadius: 8,
+                padding: '9px 16px',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {secondaryLabel}
+            </button>
+          )}
           {/* Primary (accent / filled) — "Yes, remove everywhere" */}
           <button
             autoFocus

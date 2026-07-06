@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { CarveNode, CarveGlyph, StoreRuleDetail } from '../../../lib/irToCarveNodes.ts';
+import type { CarveNode, CarveGlyph, StoreRuleDetail, CharLocation } from '../../../lib/irToCarveNodes.ts';
 import { nodeState, MOD_GROUP_DEFS, glyphsTriState, idsTriState } from '../../../lib/irToCarveNodes.ts';
 import { ToggleBox } from './ToggleBox.tsx';
 import { GlyphCell } from './GlyphCell.tsx';
@@ -576,9 +576,13 @@ interface InspectorProps {
    * When absent, chip clicks fall back to the plain onToggleGlyph path.
    */
   onCascadeDelete?: ((gid: string) => void) | undefined;
+  /** character → all its locations (built once by CarveGallery); powers the cross-reference tags. */
+  charWeb?: Map<string, CharLocation[]> | undefined;
+  /** Clicking a cross-reference tag — CarveGallery navigates (1 location) or opens the web popup (>1). */
+  onWebTag?: ((ch: string, locations: CharLocation[]) => void) | undefined;
 }
 
-export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetManyGlyphs, isDeleted, onToggleNode, onSelectNode, onCascadeDelete }: InspectorProps) {
+export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetManyGlyphs, isDeleted, onToggleNode, onSelectNode, onCascadeDelete, charWeb, onWebTag }: InspectorProps) {
   const [q, setQ] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   useEffect(() => { setQ(''); setCollapsed(new Set()); }, [node?.nodeId]);
@@ -702,7 +706,8 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
             </div>
             {/* Per-group glyph subgrid */}
             {!isCollapsed && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gridAutoRows: rowHeight + 'px', gap: 8 }}>
+              // Rows grow to fit the cross-reference tags (min rowHeight, then auto).
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gridAutoRows: `minmax(${rowHeight}px, auto)`, gap: 8 }}>
                 {grp.glyphs.map((x: CarveGlyph) => (
                   <GlyphCell
                     key={x.gid}
@@ -715,7 +720,8 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
                     modifierLabel={x.modifierLabel}
                     capability={x.capability}
                     {...(x.owners ? { owners: x.owners } : {})}
-                    {...(onSelectNode ? { onOwnerClick: onSelectNode } : {})}
+                    webLocations={(charWeb?.get(x.ch) ?? []).filter((l) => l.nodeId !== node.nodeId)}
+                    {...(onWebTag ? { onWebTag } : {})}
                     {...(onCascadeDelete ? { onCascadeDelete } : {})}
                   />
                 ))}

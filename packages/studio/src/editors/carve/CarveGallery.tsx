@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
-import { toRailNodes, nodeState } from '../../lib/irToCarveNodes.ts';
-import type { CarveNode } from '../../lib/irToCarveNodes.ts';
+import { toRailNodes, nodeState, buildCharWeb } from '../../lib/irToCarveNodes.ts';
+import type { CarveNode, CharLocation } from '../../lib/irToCarveNodes.ts';
+import { KIND_COLOR } from '../assignLoop/parts/KindBadge.tsx';
 import { StatusBar } from '../assignLoop/parts/StatusBar.tsx';
 import type { RemovedItem } from '../assignLoop/parts/StatusBar.tsx';
 import { DepBanner } from '../assignLoop/parts/DepBanner.tsx';
@@ -19,6 +20,9 @@ import type { CharContributors } from '@keyboard-studio/engine';
 interface PendingCascade {
   gid: string;
   targetChar: string;
+  /** How many contributors will actually be removed (removable rules + store slots). */
+  removableCount: number;
+  /** contributors.ruleNodeIds is the REMOVABLE set only; blocked carries the warnings. */
   contributors: CharContributors;
 }
 
@@ -52,6 +56,10 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
   const nodes = useMemo(() => (ir ? toRailNodes(ir, removalCapabilities) : []), [ir, removalCapabilities]);
 
+  // Cross-reference web: character → all the group/pattern/store cards it lives in.
+  // Built ONCE per node set (not per glyph). Powers the summary tags on each card.
+  const charWeb = useMemo(() => buildCharWeb(nodes), [nodes]);
+
   // Gate: show the "all clear" screen only when ALL of the following hold:
   //   1. Track 1 (adapting a base) — Track 2 authors know their own keyboard and want to review it.
   //   2. No recognised patterns, user stores, or raw fragments — nothing complex to carve.
@@ -76,6 +84,16 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
   // -- Cascade-delete state ----------------------------------------------------
   const [pendingCascade, setPendingCascade] = useState<PendingCascade | null>(null);
+
+  // -- Cross-reference "web" popup (a character's other locations) --------------
+  const [webPopup, setWebPopup] = useState<{ ch: string; locations: CharLocation[] } | null>(null);
+
+  // Clicking a summary tag: exactly one other location → jump straight there;
+  // more than one → open the popup list so the user can pick.
+  const handleWebTag = useCallback((ch: string, locations: CharLocation[]) => {
+    if (locations.length === 1) { setSelectedId(locations[0]!.nodeId); return; }
+    if (locations.length > 1) { setWebPopup({ ch, locations }); }
+  }, []);
 
   // Handlers for Rail/Inspector callbacks
   const handleSetManyGlyphs = useCallback((gids: string[], off: boolean) => {
@@ -102,12 +120,13 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
    *    secondary = toggle only this gid.
    */
   const handleCascadeDelete = useCallback((gid: string) => {
-    // Resolve the output character for this gid from the current nodes list.
+    // Resolve the clicked glyph — its output character AND its removal capability.
     let targetChar: string | undefined;
+    let clickedCapability = '';
     for (const node of nodes) {
       if (!node.glyphs) continue;
       const glyph = node.glyphs.find((g) => g.gid === gid);
-      if (glyph) { targetChar = glyph.ch; break; }
+      if (glyph) { targetChar = glyph.ch; clickedCapability = glyph.capability; break; }
     }
 
     // Glyph not found for this gid → do nothing rather than toggle an untracked
@@ -120,18 +139,48 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       return;
     }
 
-    const contributors: CharContributors = collectCharContributors(ir, targetChar);
-    const contributorCount = contributors.ruleNodeIds.length + contributors.storeSlotIds.length;
+    const found: CharContributors = collectCharContributors(ir, targetChar);
 
-    // Produced in only one place (or unresolved) → plain toggle, no dialog.
-    if (contributorCount <= 1 && contributors.blocked.length === 0) {
+    // collectCharContributors is deliberately capability-agnostic, so a
+    // not-removable rule (e.g. context-sensitive, opaque) can land in ruleNodeIds.
+    // Never sweep those silently — split them out and surface them as a warning so
+    // the user understands the "!" pieces stay put while the rest are removed.
+    const isNotRemovable = (id: string) => (removalCapabilities.get(id) ?? '').startsWith('not-removable:');
+    const removableRuleIds = found.ruleNodeIds.filter((id) => !isNotRemovable(id));
+    const blockedRuleIds = found.ruleNodeIds.filter(isNotRemovable);
+
+    const ruleLabel = (id: string): string => {
+      for (const node of nodes) if (node.glyphs?.some((g) => g.gid === id)) return node.name;
+      return 'an advanced rule';
+    };
+    const blockedReason = (cap: string): string => {
+      if (cap === 'not-removable:opaque') return "uses advanced syntax the editor can't rewrite";
+      if (cap === 'not-removable:context-sensitive') return "only fires after certain keys, so it can't be removed on its own";
+      return "the editor can't confirm it's safe to remove";
+    };
+    const blocked = [
+      ...found.blocked,
+      ...blockedRuleIds.map((id) => ({ label: ruleLabel(id), reason: blockedReason(removalCapabilities.get(id) ?? '') })),
+    ];
+
+    const removableCount = removableRuleIds.length + found.storeSlotIds.length;
+    const clickedIsNotRemovable = clickedCapability.startsWith('not-removable:');
+
+    // Plain toggle (no dialog) ONLY for a removable chip that is its char's sole
+    // producer with nothing blocked. A not-removable chip ALWAYS opens the dialog
+    // so the user is warned instead of silently affected.
+    if (!clickedIsNotRemovable && removableCount <= 1 && blocked.length === 0) {
       handleToggleGlyph(gid);
       return;
     }
 
-    // Cross-wired → confirm removing everywhere.
-    setPendingCascade({ gid, targetChar, contributors });
-  }, [nodes, ir, handleToggleGlyph]);
+    setPendingCascade({
+      gid,
+      targetChar,
+      removableCount,
+      contributors: { ...found, ruleNodeIds: removableRuleIds, blocked },
+    });
+  }, [nodes, ir, handleToggleGlyph, removalCapabilities]);
 
   const handleCascadePrimary = useCallback(() => {
     if (!pendingCascade) return;
@@ -419,6 +468,8 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
             onToggleNode={handleToggleNode}
             onSelectNode={setSelectedId}
             onCascadeDelete={handleCascadeDelete}
+            charWeb={charWeb}
+            onWebTag={handleWebTag}
           />
           {infoOpen && <InfoView />}
         </div>
@@ -428,13 +479,15 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       {pendingCascade !== null && (
         <ConfirmDialog
           open={pendingCascade !== null}
-          title={`Remove "${pendingCascade.targetChar}" everywhere?`}
+          title={pendingCascade.removableCount > 0
+            ? `Remove "${pendingCascade.targetChar}" everywhere?`
+            : `"${pendingCascade.targetChar}" can't be fully removed`}
           body={
             <div>
               <p style={{ margin: '0 0 10px' }}>
-                This character appears in multiple places. Removing it everywhere keeps
-                the keyboard consistent; removing it from just one place may leave
-                broken references.
+                {pendingCascade.removableCount > 0
+                  ? 'This character appears in multiple places. Removing it everywhere keeps the keyboard consistent; removing it from just one place may leave broken references.'
+                  : 'This character is produced by advanced rules that can’t be removed automatically — see below.'}
               </p>
               {pendingCascade.contributors.storeSlotIds.length > 0 && (
                 <p style={{ margin: '0 0 10px' }}>
@@ -466,7 +519,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
                     color: 'var(--sil-orange-dark)',
                   }}
                 >
-                  <b>Cannot be removed from:</b>{' '}
+                  <b>⚠ Marked not-removable — these will stay:</b>{' '}
                   {pendingCascade.contributors.blocked.map((b, i) => (
                     <span key={i}>
                       {b.label} ({b.reason}){i < pendingCascade.contributors.blocked.length - 1 ? ', ' : ''}
@@ -476,10 +529,56 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
               )}
             </div>
           }
-          primaryLabel="Yes, remove everywhere"
+          primaryLabel={pendingCascade.removableCount > 0 ? 'Yes, remove everywhere' : 'OK'}
           secondaryLabel="Cancel"
-          onPrimary={handleCascadePrimary}
+          onPrimary={pendingCascade.removableCount > 0 ? handleCascadePrimary : handleCascadeCancel}
           onSecondary={handleCascadeCancel}
+        />
+      )}
+
+      {/* Cross-reference web popup — the character's OTHER locations, each a link. */}
+      {webPopup !== null && (
+        <ConfirmDialog
+          open={webPopup !== null}
+          title={`Where "${webPopup.ch}" also appears`}
+          body={
+            <div>
+              <p style={{ margin: '0 0 12px' }}>
+                This character also lives in these places — click one to jump to it in the rail.
+              </p>
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {webPopup.locations.map((loc) => (
+                  <li key={loc.kind + ':' + loc.nodeId}>
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedId(loc.nodeId); setWebPopup(null); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+                        padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                        background: 'var(--app-surface-2)', border: '1px solid var(--app-border)',
+                        color: 'var(--app-text)', font: '500 13px var(--app-font)',
+                      }}
+                    >
+                      <span style={{
+                        font: '600 9px/1 var(--app-font-mono)', letterSpacing: '.04em', textTransform: 'uppercase',
+                        padding: '2px 6px', borderRadius: 6, whiteSpace: 'nowrap',
+                        color: KIND_COLOR[loc.kind],
+                        background: `color-mix(in srgb, ${KIND_COLOR[loc.kind]} 15%, transparent)`,
+                        border: `1px solid color-mix(in srgb, ${KIND_COLOR[loc.kind]} 40%, transparent)`,
+                      }}>
+                        {loc.kind}
+                      </span>
+                      <span style={{ fontFamily: 'var(--app-font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {loc.label}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          }
+          primaryLabel="Close"
+          onPrimary={() => setWebPopup(null)}
         />
       )}
     </div>
