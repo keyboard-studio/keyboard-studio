@@ -80,7 +80,7 @@ The spec embeds external docs by reference (Sec 19): `docs/KM-Questionnaire.md`,
 - **Single 300 ms debounce cycle (decision D3).** In the studio, the TS-check and the WASM `kmcmplib` oracle run as concurrent microtasks within one debounce cycle. Do not introduce a second debounce timer.
 - **Virtual FS (spec §11).** All authoring happens in an in-memory FS mirroring the `keymanapp/keyboards` layout; serialized at output to a `.zip` (`engine/src/output`) or committed via GitHub OAuth fork+PR. The studio never writes to host disk during authoring.
 - **Two teams (spec §12).** Engine owns the SPA, scaffolder, compiler service, validator, output paths. Content owns the pattern library, survey text, gallery ordering, LLM prompts, and criteria triage. Respect the split when picking up work.
-- **Standalone utilities.** `utilities/*` (kbgen, supportability-scanner, smoke-artifact, spec-trace, km-triage-app, Template Cleanup) are deliberately kept out of `packages/*` so they don't trip `pnpm -r`; run them with `tsx` (see each tool's tsconfig). Do not treat them as built workspace packages.
+- **Standalone utilities.** `utilities/*` (kbgen, supportability-scanner, smoke-artifact, spec-trace, km-triage-app, hermes, Template Cleanup) are deliberately kept out of `packages/*` so they don't trip `pnpm -r`; run them with `tsx` (see each tool's tsconfig). Do not treat them as built workspace packages.
 
 ## Pattern schema is a contract
 
