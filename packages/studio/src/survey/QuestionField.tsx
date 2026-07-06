@@ -20,22 +20,7 @@ import {
 import type { DropdownOption } from "../ui/Dropdown.tsx";
 import type { RadioOption } from "../ui/RadioGroup.tsx";
 import type { MultiSelectOption } from "../ui/MultiSelect.tsx";
-
-// ---------------------------------------------------------------------------
-// Style constants retained for elements the ui/ primitives cannot cover
-// (documented one-offs below).
-// ---------------------------------------------------------------------------
-
-// one-off: HELP_STYLE — Field.tsx exposes a help slot but restructuring the
-// outer container to use Field would conflict with the grouped-label <span>
-// pattern; kept inline to preserve zero diff.
-const HELP_STYLE: React.CSSProperties = {
-  fontSize: 12,
-  color: "#8b949e",
-  lineHeight: 1.5,
-  marginBottom: 10,
-  whiteSpace: "pre-wrap",
-};
+import { helpText, TEXT_DIM } from "./surveyStyles.ts";
 
 
 interface FieldProps {
@@ -287,7 +272,7 @@ function MultiSelectField({ question, value, onChange }: FieldProps) {
 
   if (options.length === 0 && question.options_source !== undefined) {
     return (
-      <p style={{ fontSize: 13, color: "#8b949e", fontStyle: "italic" }}>
+      <p style={{ fontSize: 13, color: TEXT_DIM, fontStyle: "italic" }}>
         Dynamic options ({question.options_source}) not loaded in this build.
       </p>
     );
@@ -368,7 +353,7 @@ export function QuestionField({
       })()}
 
       {question.help_text !== undefined && question.type !== "notice" && (
-        <p style={HELP_STYLE}>{question.help_text}</p>
+        <p style={helpText}>{question.help_text}</p>
       )}
 
       {question.type === "text" || question.type === "short_text" ? (

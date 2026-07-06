@@ -19,6 +19,7 @@ import type {
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { loadModularFlow } from "./loadModularFlow.ts";
 import type { SurveyContext } from "./types.ts";
+import { phaseContainer, phaseHeading } from "./surveyStyles.ts";
 import {
   loadLangtags,
   regionNameFor,
@@ -296,21 +297,8 @@ export function PhaseA({ context = {}, onComplete, onBack, findingsByQuestionId 
   }
 
   return (
-    <div
-      style={{
-        background: "#0d1117",
-        color: "#e6edf3",
-        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-      }}
-    >
-      <h2
-        style={{
-          margin: "0 0 20px 0",
-          fontSize: "1.1rem",
-          color: "#6ea8fe",
-          fontWeight: 600,
-        }}
-      >
+    <div style={phaseContainer}>
+      <h2 style={phaseHeading}>
         Phase A — Language identity
       </h2>
       <SurveyRunner

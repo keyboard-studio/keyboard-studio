@@ -39,6 +39,7 @@ import { navigateTo } from "./lib/navigate.ts";
 import { manifest } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { StepHost } from "./components/StepHost.tsx";
+import { TEXT_MAIN, FONT } from "./survey/surveyStyles.ts";
 
 // Bind the manifest into the store's staleness actions.
 // Called once at module load; avoids a circular static import in the store
@@ -500,8 +501,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     overflowY: "auto",
     padding: 24,
     boxSizing: "border-box",
-    color: "#e6edf3",
-    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    color: TEXT_MAIN,
+    fontFamily: FONT,
   };
 
   // ---------------------------------------------------------------------------
@@ -587,8 +588,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           overflow: "auto",
           padding: 24,
           boxSizing: "border-box",
-          color: "#e6edf3",
-          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+          color: TEXT_MAIN,
+          fontFamily: FONT,
         }}
       >
         {localBase === null ? (
