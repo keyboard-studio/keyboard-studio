@@ -1,0 +1,47 @@
+# orth.mark-composition-posture — pb_mark_style currently asks the author to
+# CHOOSE precomposed vs combining, but for most of the inventory this is a
+# Unicode fact, not a preference: either an NFC precomposed form exists for a
+# base+mark pair or it does not. Compute the posture per pair; ask only about
+# the genuinely ambiguous residue (pairs where both forms are viable).
+
+id: orth.mark-composition-posture
+family: orth
+title: Mark-composition posture
+description: >
+  For each base+mark combination in the inventory: does a precomposed NFC
+  form exist, is combining-sequence the only option, or are both viable?
+  Aggregates to a keyboard-level posture (all-precomposed / all-combining /
+  mixed) that prefills pb_mark_style and drives the deadkey-vs-direct
+  mechanism proposal. Aligns with the nfd-latin pattern's outputForm question,
+  whose default rationale (pan-African characters without precomposed forms)
+  is exactly this facet computed by hand.
+valueType: enum
+values: [precomposed, combining, mixed]
+
+modality: both
+
+derivations:
+  - kind: computed
+    source: "planned:nfc-posture-of-inventory"
+    sourceStatus: planned
+    notes: Per-pair NFC existence check over orth.inventory-delta's output; small pure function.
+  - kind: asked
+    source: "question:pb_mark_style"
+    sourceStatus: available
+    notes: Retained only for the mixed case, scoped to the ambiguous pairs.
+
+consumers:
+  prefills:
+    - pb_mark_style
+  proposes:
+    - "mechanism-gallery:deadkey-vs-direct"
+    - "pattern:nfd-latin:outputForm"
+
+relatedAxes: [A4]
+provenanceLabel: "Unicode composition data for your characters"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed

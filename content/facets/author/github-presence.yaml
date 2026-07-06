@@ -1,0 +1,38 @@
+# author.github-presence — the strongest single predictor of the right delivery
+# option (A user-fork PR / B org-mediated / C ZIP). Computed at OAuth time,
+# never asked as "do you have a GitHub account?" up front — delivery is decided
+# at the END of the flow, when the fact is already known or knowable.
+
+id: author.github-presence
+family: author
+title: GitHub presence
+description: >
+  Whether the author has a GitHub identity available to the studio: none,
+  personal account, or member of a relevant org. Determines which delivery
+  options are proposed first and whether the OAuth step is offered at all.
+valueType: enum
+values: [none, personal, org-member]
+
+modality: both
+
+derivations:
+  - kind: computed
+    source: "oauth:identity"
+    sourceStatus: available
+    notes: The OAuth flow (githubOAuth.ts) yields identity when the user connects; absence is also a value.
+  - kind: computed
+    source: "session:oauth-declined"
+    sourceStatus: planned
+
+consumers:
+  prefills: []
+  proposes:
+    - "delivery:option-proposal"
+
+provenanceLabel: "your GitHub sign-in"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed

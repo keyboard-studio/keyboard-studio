@@ -1,0 +1,43 @@
+# lineage.siblings — keyboards that already exist for THIS language or its
+# close relatives. pb_existing_keyboards is blank free text today, yet the
+# corpus knows the answer authoritatively for anything already in
+# keymanapp/keyboards. Also the collision warning: "a keyboard named X for
+# this language already exists — adapt it instead?"
+
+id: lineage.siblings
+family: lineage
+title: Sibling keyboards
+description: >
+  Existing corpus keyboards declaring the same BCP47 language (or a close
+  macro-language relative). Prefills the "already have keyboards?" questions,
+  proposes Track 2 (adapt) over Track 1 (from base) when a strong sibling
+  exists, and warns about id/name collisions before Phase G.
+valueType: set
+
+modality: both
+
+derivations:
+  - kind: corpus
+    source: "corpus:same-language-keyboards"
+    sourceStatus: available
+    notes: BaseKeyboard.languages from the .kps parse already supports this lookup via the base-browser.
+  - kind: confirmed
+    source: "question:pb_existing_keyboards"
+    sourceStatus: available
+    notes: Retained for keyboards outside the corpus (MSKLC files, phone apps).
+
+consumers:
+  prefills:
+    - pb_existing_keyboards
+    - pb_legacy_encoding
+  proposes:
+    - "track:adapt-vs-new-proposal"
+    - "identity:collision-warning"
+
+provenanceLabel: "keyboards already published for your language"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: corpus

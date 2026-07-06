@@ -1,0 +1,38 @@
+# dest.delivery-channel — Option A (user-fork PR) / B (org-mediated) / C (ZIP)
+# should be proposed from what the studio already knows (GitHub presence,
+# connectivity), not presented as an unexplained three-way choice at the end.
+
+id: dest.delivery-channel
+family: dest
+title: Delivery channel
+description: >
+  Where the finished keyboard goes: a PR into keymanapp/keyboards via the
+  author's fork (A), via the org bot (B), or a ZIP the author submits
+  manually (C). Proposed from author.github-presence and env.connectivity;
+  also sets which Layer C hygiene bands are enforced strictly (a public PR
+  earns stricter hygiene than a private ZIP).
+valueType: enum
+values: [fork-pr, org-pr, zip]
+
+modality: both
+
+derivations:
+  - kind: computed
+    source: "planned:derive-from-github-presence-and-connectivity"
+    sourceStatus: planned
+    notes: Pure function over two other facets; the first worked example of facet composition.
+
+consumers:
+  prefills: []
+  proposes:
+    - "delivery:option-proposal"
+    - "validator:layer-c-strictness"
+    - "output:next-steps-content"
+
+provenanceLabel: "your GitHub access and connection"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed

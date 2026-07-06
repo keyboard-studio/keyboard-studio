@@ -1,0 +1,44 @@
+# env.form-factor — ANSI vs ISO vs ABNT vs JIS changes the physical key count,
+# which changes the spare-key arithmetic. Today pb_spare_keys_* is blank free
+# text the author must answer from memory; with this facet plus
+# orth.inventory-delta the spare-key set is computed and shown for confirmation.
+
+id: env.form-factor
+family: env
+title: Physical form factor
+description: >
+  The hardware shape of the community's keyboards: ANSI 104 (no extra key),
+  ISO 105 (the extra key next to left Shift), ABNT2 (Brazilian extra keys),
+  JIS. Determines which physical keys even exist before any spare-key or
+  placement proposal is made. Elicited with pictures of the lower-left corner
+  of a keyboard, never with the standard names.
+valueType: enum
+values: [ansi, iso, abnt2, jis, unknown]
+
+modality: physical
+modalityNotes: Touch keyboards have no form factor; this facet is not consulted for touch proposals.
+
+derivations:
+  - kind: corpus
+    source: "corpus:region-dominant-form-factor"
+    sourceStatus: planned
+    notes: Region (BCP47 / provenance answers) predicts form factor well; corpus + market data seed the default.
+  - kind: confirmed
+    source: "planned:form-factor-picture-chooser"
+    sourceStatus: planned
+
+consumers:
+  prefills:
+    - pb_spare_keys_qwerty
+    - pb_spare_keys_azerty
+  proposes:
+    - "placement:spare-key-set"
+
+relatedAxes: [A7]
+provenanceLabel: "typical keyboards in your region"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: corpus

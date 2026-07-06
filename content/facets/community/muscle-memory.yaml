@@ -1,0 +1,47 @@
+# community.muscle-memory — what the TYPISTS already type on, which may differ
+# from the author's own machine (env.base-layout-affinity). A francophone-Africa
+# community carries AZERTY habits regardless of what layout the visiting
+# linguist uses. Placement proposals must not move keys the community relies on.
+
+id: community.muscle-memory
+family: community
+title: Community muscle memory
+description: >
+  The layouts and input systems the typing community already has in its
+  fingers: the co-installed national layout, phone keyboards, prior custom
+  keyboards. On physical hardware this means key positions; on touch it means
+  platform longpress/gesture conventions (Gboard, iOS). Feeds a "do not
+  disturb" constraint on placement proposals and the base-keyboard ranking.
+valueType: set
+
+modality: both
+modalityNotes: >
+  Physical value: layout families the community types (qwerty/azerty/national).
+  Touch value: platform-keyboard conventions the community expects (longpress
+  accents, flick input). Same facet, per-modality interpretation.
+
+derivations:
+  - kind: corpus
+    source: "corpus:region-layout-distribution"
+    sourceStatus: planned
+  - kind: confirmed
+    source: "question:pb_co_installed_keyboards"
+    sourceStatus: available
+    notes: Currently blank free text; becomes a confirmation seeded from region + corpus.
+
+consumers:
+  prefills:
+    - pb_co_installed_keyboards
+    - pb_existing_keyboards
+  proposes:
+    - "gallery:base-ranking"
+    - "placement:do-not-disturb-constraint"
+
+relatedAxes: [A7, A7a]
+provenanceLabel: "keyboards commonly used in your region"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: corpus
