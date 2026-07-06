@@ -26,7 +26,7 @@ type, or public shape, do not report it.
 
 REFUSE LIST (never propose an edit to these; if you spot something, mark it needs-human and say
 "REFUSE"):
-- packages/contracts/src/pattern.ts, strategy.ts, validator.ts, linter.ts
+- packages/contracts/src/pattern.ts, strategy.ts, validator.ts, lintEngine.ts
 - the 300ms debounce (decision D3)
 - the WASM-oracle bridge (kmcmplib)
 - the VirtualFS (spec §11)

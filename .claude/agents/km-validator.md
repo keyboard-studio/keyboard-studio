@@ -132,7 +132,7 @@ APPROVE / REQUEST CHANGES / REJECT
 ## Sources of truth
 
 - `spec.md` §10 (Validator and lint engine), §14 D3 (single-cycle decision), §11 (criteria.md compliance)
-- `packages/contracts/src/validator.ts`, `linter.ts` (TS contracts)
+- `packages/contracts/src/validator.ts`, `lintEngine.ts` (TS contracts)
 - `keymanapp/keyman` — kmcmplib sources cited in §10; `common/test/keyboards/baseline/` fixtures
 - `kmn-compiler-messages.ts` — the typed message catalog
 

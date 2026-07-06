@@ -17,7 +17,7 @@ Two of the three things we want — **code reuse** and **cross-linking** — are
 That drops 91.3k → ~64.5k simplifiable LOC.
 
 ## Never-touch (hard stop — bake into every prompt as a REFUSE list)
-From `.claude/agents/km-simplify.md`: `packages/contracts/src/pattern.ts`, `strategy.ts`, `validator.ts`, `linter.ts`; the 300ms debounce (decision D3); the WASM-oracle bridge (`kmcmplib`); the VirtualFS (spec §11); §7 wiring. The model must **never** rename public APIs, change signatures / return shapes / exception types, or relocate modules.
+From `.claude/agents/km-simplify.md`: `packages/contracts/src/pattern.ts`, `strategy.ts`, `validator.ts`, `lintEngine.ts`; the 300ms debounce (decision D3); the WASM-oracle bridge (`kmcmplib`); the VirtualFS (spec §11); §7 wiring. The model must **never** rename public APIs, change signatures / return shapes / exception types, or relocate modules.
 
 ## Phase 0 — Build the repo map (once, on your machine, no LLM)
 Produce one compact artifact (target < 8k tokens) the small model can hold alongside a shard. Three parts:

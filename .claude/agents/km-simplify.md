@@ -94,7 +94,7 @@ escalates — it does not refactor outside its scope.
 4. **Stop and ask** if the simplification would touch:
    - `packages/contracts/src/pattern.ts` — the locked Day-1 contract (`spec.md` §5)
    - `packages/contracts/src/strategy.ts` — the `StrategyId` union and §7 wiring
-   - `packages/contracts/src/validator.ts` / `linter.ts` — the Layer A/B/C contracts
+   - `packages/contracts/src/validator.ts` / `lintEngine.ts` — the Layer A/B/C contracts
    - The 300 ms debounce cycle implementation (decision D3, single timer)
    - The WASM-oracle bridge (`kmcmplib` integration)
    - The VirtualFS implementation (no host-disk writes during authoring; `spec.md` §11)

@@ -37,7 +37,7 @@ const SCAN_ROOTS = [
 
 // Path fragments to skip entirely.
 const EXCLUDE_RE =
-  /(\.test\.[tj]sx?$|\.d\.ts$|[/\\]__tests__[/\\]|[/\\]__fixtures__[/\\]|[/\\]generated[/\\]|[/\\]simulator[/\\]vendor[/\\]|[/\\]dist[/\\]|[/\\]node_modules[/\\])/;
+  /(\.test\.[tj]sx?$|\.d\.ts$|vitest\.config\.[tj]s$|[/\\]__tests__[/\\]|[/\\]__fixtures__[/\\]|[/\\]generated[/\\]|[/\\]simulator[/\\]vendor[/\\]|[/\\]dist[/\\]|[/\\]node_modules[/\\])/;
 
 // --- file walk -------------------------------------------------------------
 function walk(dir, out = []) {
@@ -165,12 +165,37 @@ for (const rel of files) {
 let importGraph = { source: 'regex-fallback', edges: [...fallbackEdges].sort() };
 let depcruiseWarning = null;
 
+// Resolve `packages/*/src` ourselves instead of relying on shell glob expansion —
+// Windows cmd.exe doesn't expand `*`, so the glob would otherwise reach depcruise
+// as a literal, unmatched string.
+function resolvePackageSrcDirs() {
+  const packagesRoot = join(ROOT, 'packages');
+  if (!existsSync(packagesRoot)) return [];
+  const dirs = [];
+  for (const name of readdirSync(packagesRoot)) {
+    const pkgDir = join(packagesRoot, name);
+    const srcDir = join(pkgDir, 'src');
+    if (statSync(pkgDir).isDirectory() && existsSync(srcDir)) {
+      dirs.push(relative(ROOT, srcDir).split(sep).join('/'));
+    }
+  }
+  return dirs;
+}
+
 try {
-  // Resolve depcruise deps-first; capture JSON.
-  const raw = execSync(
-    'pnpm depcruise --output-type json packages/*/src 2>/dev/null',
-    { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }
-  );
+  const srcDirs = resolvePackageSrcDirs();
+  if (srcDirs.length === 0) throw new Error('no packages/*/src directories found');
+  // Resolve depcruise deps-first; capture JSON. stderr is suppressed via the `stdio`
+  // option (not a POSIX `2>/dev/null` shell redirect), so this also works under
+  // Windows cmd.exe.
+  const quotedDirs = srcDirs.map((d) => JSON.stringify(d)).join(' ');
+  const raw = execSync(`pnpm depcruise --output-type json ${quotedDirs}`, {
+    cwd: ROOT,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'ignore'],
+    windowsHide: true,
+  });
   const parsed = JSON.parse(raw);
   const modules = parsed.modules || [];
   const edges = new Set();
