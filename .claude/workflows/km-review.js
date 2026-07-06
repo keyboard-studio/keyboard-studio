@@ -23,6 +23,10 @@ export const meta = {
   ],
 };
 
+// This file must stay LF-only: CR characters make the Workflow tool reject
+// the script at the approval-dialog check. Pinned via .gitattributes and
+// healed at bot startup by scripts/triage-windows.ps1.
+
 // ---------------------------------------------------------------------------
 // Schemas
 // ---------------------------------------------------------------------------
