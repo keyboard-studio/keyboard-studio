@@ -16,13 +16,17 @@ import { useHoverInfoStore } from '../../stores/hoverInfoStore.ts';
 import { collectCharContributors } from '@keyboard-studio/engine';
 import type { CharContributors } from '@keyboard-studio/engine';
 
-/** Pending cascade-delete state — set when the user clicks a cross-wired chip. */
+/** Pending cascade state — set when the user clicks a cross-wired chip. */
 interface PendingCascade {
   gid: string;
   targetChar: string;
-  /** How many contributors will actually be removed (removable rules + store slots). */
-  removableCount: number;
-  /** contributors.ruleNodeIds is the REMOVABLE set only; blocked carries the warnings. */
+  /** 'remove' when clicking a live chip; 'restore' when clicking an already-removed one. */
+  mode: 'remove' | 'restore';
+  /** How many contributors will actually change (removable to remove, or restorable to restore). */
+  actionCount: number;
+  /** restore mode: the item-channel ids to un-delete. */
+  restoreIds: string[];
+  /** contributors.ruleNodeIds is the REMOVABLE set only; blocked carries the warnings (remove mode). */
   contributors: CharContributors;
 }
 
@@ -47,6 +51,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   const keepAll = useWorkingCopyStore((s) => s.keepAll);
 
   const cascadeDelete = useWorkingCopyStore((s) => s.cascadeDelete);
+  const cascadeRestore = useWorkingCopyStore((s) => s.cascadeRestore);
 
   const setInfo = useHoverInfoStore((s) => s.setInfo);
   const clearInfo = useHoverInfoStore((s) => s.clearInfo);
@@ -109,46 +114,49 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   }, [isItemDeleted, restoreItem, deleteItem]);
 
   /**
-   * Cascade-delete handler — called when the user clicks a chip body.
-   *
-   * Asks the engine (collectCharContributors) for every place the chip's output
-   * character is produced, then:
-   *  - Only the clicked producer (single contributor, nothing blocked) → plain
-   *    item toggle, no dialog (matches the pre-existing single-glyph behavior).
-   *  - Produced in more than one place (cross-wired across group / pattern /
-   *    store slot) → open ConfirmDialog. Primary = cascadeDelete everywhere;
-   *    secondary = toggle only this gid.
+   * Chip-body click → cascade TOGGLE. Resolves every place the character is
+   * produced (collectCharContributors), then branches on the clicked chip's state:
+   *  - LIVE chip → remove. Sole removable producer with nothing blocked toggles
+   *    plainly; otherwise a "remove everywhere" dialog opens. Not-removable ("!")
+   *    pieces are split out of the delete set and shown as a warning, never swept.
+   *  - Already-REMOVED chip → restore. Sole restorable producer toggles plainly;
+   *    otherwise a "restore everywhere" dialog un-deletes every place it was cut.
    */
   const handleCascadeDelete = useCallback((gid: string) => {
-    // Resolve the clicked glyph — its output character AND its removal capability.
+    // Resolve the clicked glyph — output char, removal capability, and its card.
     let targetChar: string | undefined;
     let clickedCapability = '';
+    let clickedLabel = 'this key';
     for (const node of nodes) {
       if (!node.glyphs) continue;
       const glyph = node.glyphs.find((g) => g.gid === gid);
-      if (glyph) { targetChar = glyph.ch; clickedCapability = glyph.capability; break; }
+      if (glyph) { targetChar = glyph.ch; clickedCapability = glyph.capability; clickedLabel = node.name; break; }
     }
 
-    // Glyph not found for this gid → do nothing rather than toggle an untracked
-    // id (which would write a deletion that no chip reflects and can't be undone).
+    // Glyph not found → do nothing rather than toggle an untracked id.
     if (targetChar === undefined) return;
+    // No IR to analyse → plain single-glyph toggle.
+    if (ir == null) { handleToggleGlyph(gid); return; }
 
-    // No IR to analyse → fall back to a plain single-glyph toggle.
-    if (ir == null) {
-      handleToggleGlyph(gid);
+    const found: CharContributors = collectCharContributors(ir, targetChar);
+    const isNotRemovable = (id: string) => (removalCapabilities.get(id) ?? '').startsWith('not-removable:');
+    const clickedIsNotRemovable = clickedCapability.startsWith('not-removable:');
+
+    // --- RESTORE: the clicked chip is currently removed ---
+    if (isItemDeleted(gid)) {
+      const restoreIds = [...found.ruleNodeIds, ...found.storeSlotIds].filter((id) => isItemDeleted(id));
+      if (!restoreIds.includes(gid)) restoreIds.push(gid);
+      if (restoreIds.length <= 1) { handleToggleGlyph(gid); return; }
+      setPendingCascade({
+        gid, targetChar, mode: 'restore', actionCount: restoreIds.length, restoreIds,
+        contributors: { ...found, blocked: [] },
+      });
       return;
     }
 
-    const found: CharContributors = collectCharContributors(ir, targetChar);
-
-    // collectCharContributors is deliberately capability-agnostic, so a
-    // not-removable rule (e.g. context-sensitive, opaque) can land in ruleNodeIds.
-    // Never sweep those silently — split them out and surface them as a warning so
-    // the user understands the "!" pieces stay put while the rest are removed.
-    const isNotRemovable = (id: string) => (removalCapabilities.get(id) ?? '').startsWith('not-removable:');
+    // --- REMOVE: the clicked chip is live ---
     const removableRuleIds = found.ruleNodeIds.filter((id) => !isNotRemovable(id));
     const blockedRuleIds = found.ruleNodeIds.filter(isNotRemovable);
-
     const ruleLabel = (id: string): string => {
       for (const node of nodes) if (node.glyphs?.some((g) => g.gid === id)) return node.name;
       return 'an advanced rule';
@@ -162,31 +170,36 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       ...found.blocked,
       ...blockedRuleIds.map((id) => ({ label: ruleLabel(id), reason: blockedReason(removalCapabilities.get(id) ?? '') })),
     ];
+    // The clicked "!" chip is often NOT a plain single-char producer, so it never
+    // lands in found.ruleNodeIds/blockedRuleIds — add it explicitly so the warning
+    // box always names the not-removable chip the user actually clicked.
+    if (clickedIsNotRemovable && !blockedRuleIds.includes(gid)) {
+      blocked.push({ label: clickedLabel, reason: blockedReason(clickedCapability) });
+    }
 
     const removableCount = removableRuleIds.length + found.storeSlotIds.length;
-    const clickedIsNotRemovable = clickedCapability.startsWith('not-removable:');
 
     // Plain toggle (no dialog) ONLY for a removable chip that is its char's sole
-    // producer with nothing blocked. A not-removable chip ALWAYS opens the dialog
-    // so the user is warned instead of silently affected.
+    // producer with nothing blocked. A not-removable chip ALWAYS opens the dialog.
     if (!clickedIsNotRemovable && removableCount <= 1 && blocked.length === 0) {
       handleToggleGlyph(gid);
       return;
     }
-
     setPendingCascade({
-      gid,
-      targetChar,
-      removableCount,
+      gid, targetChar, mode: 'remove', actionCount: removableCount, restoreIds: [],
       contributors: { ...found, ruleNodeIds: removableRuleIds, blocked },
     });
-  }, [nodes, ir, handleToggleGlyph, removalCapabilities]);
+  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities]);
 
   const handleCascadePrimary = useCallback(() => {
     if (!pendingCascade) return;
-    cascadeDelete(pendingCascade.contributors.ruleNodeIds, pendingCascade.contributors.storeSlotIds);
+    if (pendingCascade.mode === 'restore') {
+      cascadeRestore(pendingCascade.restoreIds);
+    } else {
+      cascadeDelete(pendingCascade.contributors.ruleNodeIds, pendingCascade.contributors.storeSlotIds);
+    }
     setPendingCascade(null);
-  }, [pendingCascade, cascadeDelete]);
+  }, [pendingCascade, cascadeDelete, cascadeRestore]);
 
   const handleCascadeCancel = useCallback(() => {
     // Cancel — do nothing. Also the target for Escape / backdrop click, so a
@@ -479,17 +492,21 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       {pendingCascade !== null && (
         <ConfirmDialog
           open={pendingCascade !== null}
-          title={pendingCascade.removableCount > 0
-            ? `Remove "${pendingCascade.targetChar}" everywhere?`
-            : `"${pendingCascade.targetChar}" can't be fully removed`}
+          title={pendingCascade.mode === 'restore'
+            ? `Restore "${pendingCascade.targetChar}" everywhere?`
+            : pendingCascade.actionCount > 0
+              ? `Remove "${pendingCascade.targetChar}" everywhere?`
+              : `"${pendingCascade.targetChar}" can't be fully removed`}
           body={
             <div>
               <p style={{ margin: '0 0 10px' }}>
-                {pendingCascade.removableCount > 0
-                  ? 'This character appears in multiple places. Removing it everywhere keeps the keyboard consistent; removing it from just one place may leave broken references.'
-                  : 'This character is produced by advanced rules that can’t be removed automatically — see below.'}
+                {pendingCascade.mode === 'restore'
+                  ? 'This character was removed from several places. Restore it everywhere it was removed?'
+                  : pendingCascade.actionCount > 0
+                    ? 'This character appears in multiple places. Removing it everywhere keeps the keyboard consistent; removing it from just one place may leave broken references.'
+                    : 'This character is produced by advanced rules that can’t be removed automatically — see below.'}
               </p>
-              {pendingCascade.contributors.storeSlotIds.length > 0 && (
+              {pendingCascade.mode === 'remove' && pendingCascade.contributors.storeSlotIds.length > 0 && (
                 <p style={{ margin: '0 0 10px' }}>
                   Note: the key or sequence that triggers this character will still
                   exist, but will now produce nothing.
@@ -499,13 +516,21 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
                 aria-label="Locations affected"
                 style={{ margin: '0 0 10px', paddingLeft: 18, fontSize: 13 }}
               >
-                {pendingCascade.contributors.locations.map((loc, i) => (
-                  <li key={i} style={{ marginBottom: 4 }}>
-                    <b style={{ textTransform: 'capitalize' }}>{loc.kind}</b>
-                    {': '}
-                    <span style={{ fontFamily: 'var(--app-font-mono)' }}>{loc.label}</span>
-                  </li>
-                ))}
+                {(['group', 'pattern', 'store'] as const).map((kind) => {
+                  const labels = pendingCascade.contributors.locations
+                    .filter((l) => l.kind === kind)
+                    .map((l) => l.label);
+                  if (labels.length === 0) return null;
+                  // Pluralize the kind label only when it has more than one entry.
+                  const kindLabel = labels.length > 1 ? `${kind}s` : kind;
+                  return (
+                    <li key={kind} style={{ marginBottom: 4 }}>
+                      <b style={{ textTransform: 'capitalize' }}>{kindLabel}</b>
+                      {': '}
+                      <span style={{ fontFamily: 'var(--app-font-mono)' }}>{labels.join(', ')}</span>
+                    </li>
+                  );
+                })}
               </ul>
               {pendingCascade.contributors.blocked.length > 0 && (
                 <div
@@ -529,9 +554,11 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
               )}
             </div>
           }
-          primaryLabel={pendingCascade.removableCount > 0 ? 'Yes, remove everywhere' : 'OK'}
+          primaryLabel={pendingCascade.mode === 'restore'
+            ? 'Yes, restore everywhere'
+            : pendingCascade.actionCount > 0 ? 'Yes, remove everywhere' : 'OK'}
           secondaryLabel="Cancel"
-          onPrimary={pendingCascade.removableCount > 0 ? handleCascadePrimary : handleCascadeCancel}
+          onPrimary={(pendingCascade.mode === 'remove' && pendingCascade.actionCount === 0) ? handleCascadeCancel : handleCascadePrimary}
           onSecondary={handleCascadeCancel}
         />
       )}

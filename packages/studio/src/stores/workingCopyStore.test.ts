@@ -1069,3 +1069,23 @@ describe("workingCopyStore — cascadeDelete", () => {
     expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
   });
 });
+
+describe("workingCopyStore — cascadeRestore", () => {
+  beforeEach(() => useWorkingCopyStore.getState().reset());
+
+  it("un-deletes every id it is given (clicking a removed chip restores everywhere)", () => {
+    useWorkingCopyStore.getState().cascadeDelete(["r-eps"], ["sid-dkt#2"]);
+    expect(useWorkingCopyStore.getState().isItemDeleted("r-eps")).toBe(true);
+    useWorkingCopyStore.getState().cascadeRestore(["r-eps", "sid-dkt#2"]);
+    const after = useWorkingCopyStore.getState();
+    expect(after.isItemDeleted("r-eps")).toBe(false);
+    expect(after.isItemDeleted("sid-dkt#2")).toBe(false);
+    expect(after.deletedItemIds.size).toBe(0);
+  });
+
+  it("is a no-op for an empty list", () => {
+    const before = useWorkingCopyStore.getState().deletedItemIds.size;
+    useWorkingCopyStore.getState().cascadeRestore([]);
+    expect(useWorkingCopyStore.getState().deletedItemIds.size).toBe(before);
+  });
+});

@@ -332,6 +332,8 @@ export interface WorkingCopyState {
    * an undo entry. If both are empty this is a no-op.
    */
   cascadeDelete: (ruleNodeIds: string[], storeSlotIds: string[]) => void;
+  /** Restore a set of item-channel ids (whole-rule + slot) that cascadeDelete removed. */
+  cascadeRestore: (ids: string[]) => void;
 
   // -- Actions (surveyResultsStore) --------------------------------------------
   /**
@@ -581,6 +583,7 @@ export type WorkingCopyData = Omit<
   | "setIR" | "setWorkingIR" | "clearIR" | "deleteNode" | "undoDelete" | "restoreNode"
   | "isDeleted" | "deleteItem" | "restoreItem" | "isItemDeleted" | "keepAll" | "restoreAll"
   | "cascadeDelete"
+  | "cascadeRestore"
   | "recordPhase" | "recordAssignments"
   | "setIrAxes" | "lockDesktop" | "unlockDesktop"
   | "setTouchLayoutJson" | "setTouchDraft" | "markGalleryIntroSeen" | "reset"
@@ -723,6 +726,15 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         deletedItemIds: nextItems,
         undoStack: [...s.undoStack, batchEntry],
       };
+    });
+  },
+
+  cascadeRestore: (ids) => {
+    if (ids.length === 0) return;
+    set((s) => {
+      const nextItems = new Set(s.deletedItemIds);
+      for (const id of ids) nextItems.delete(id);
+      return { deletedItemIds: nextItems };
     });
   },
 
