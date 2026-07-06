@@ -1,6 +1,6 @@
 {
   "specVersion": "1.3.1",
-  "lastUpdated": "2026-07-02",
+  "lastUpdated": "2026-07-06",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -462,6 +462,46 @@
     "specs/023-langtags-defaults": {
       "title": "Feature Specification: SIL langtags defaults at the front of the survey",
       "hash": "sha256:7b1284585f5a120d",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/025-qu-proposed-flows-library": {
+      "title": "Feature Specification: Proposed-flow Library section on the Flow Map",
+      "hash": "sha256:caa5f5b8b899ec7c",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/026-qu-survey-session-store": {
+      "title": "Feature Specification: surveySessionStore — wizard-traversal state migration",
+      "hash": "sha256:c16cf1cf5d9580fc",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/027-qu-characters-step": {
+      "title": "Feature Specification: CharactersStep — self-contained characters step; `charactersSub` dies",
+      "hash": "sha256:c4a8de24fd8979f0",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/028-qu-generic-step-host": {
+      "title": "Feature Specification: Generic StepHost — SurveyView hand-placement dies",
+      "hash": "sha256:5c7ca283733a5081",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/029-qu-flowstephost-convergence": {
+      "title": "Feature Specification: FlowStepHost Convergence",
+      "hash": "sha256:c61f48b7b3fddebd",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
