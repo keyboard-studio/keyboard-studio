@@ -146,8 +146,8 @@ export const SUCCESS_ACCENT = "#7ee787";
 export const CHIP_GLYPH_ACCENT = "#58a6ff";
 
 /**
- * Error / danger red — the survey chip remove-x glyph and the SurveyView
- * error-alert text. No canonical counterpart; preserved exactly.
+ * Error / danger red — the survey character-chip remove-x glyph. No canonical
+ * counterpart; preserved exactly.
  */
 export const ERROR_RED = "#f85149";
 

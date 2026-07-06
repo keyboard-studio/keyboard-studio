@@ -68,7 +68,7 @@ export const phaseHeading: CSSProperties = {
 /**
  * The flush (`margin: 0`) heading variant — used where the heading is the
  * first element in a flex column that already supplies its own gap
- * (BuildListView, IntroChooser, StudioShell donePaneContent).
+ * (PhaseB's BuildListView and IntroChooser).
  */
 export const phaseHeadingFlush: CSSProperties = {
   margin: 0,
