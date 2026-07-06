@@ -135,6 +135,20 @@ if ($dirty) { git stash push --include-untracked --quiet }
 git pull --ff-only --quiet
 if ($dirty) { git stash pop --quiet }
 
+# Heal CRLF smudge on workflow scripts: the Workflow tool rejects scripts
+# containing CR ("control characters hidden in the approval dialog"), and an
+# autocrlf=true checkout smudges LF blobs to CRLF. .gitattributes pins these
+# LF for fresh checkouts; this heals a checkout smudged before that rule
+# landed. LF-rewriting never dirties `git status` (the clean filter maps
+# CRLF back to LF), so the isolation baseline below is unaffected.
+foreach ($wf in @(Get-ChildItem ".claude\workflows" -Filter "*.js" -ErrorAction SilentlyContinue)) {
+  $raw = [System.IO.File]::ReadAllText($wf.FullName)
+  if ($raw.IndexOf("`r") -ge 0) {
+    [System.IO.File]::WriteAllText($wf.FullName, (($raw -replace "`r`n", "`n") -replace "`r", "`n"))
+    "[km-triage] normalized CRLF -> LF in $($wf.Name)" | Write-Host
+  }
+}
+
 # Worktree-isolation baseline: snapshot main tree state ONCE per sweep, before
 # any iteration touches a PR. git pull --ff-only ran above (once, outside the
 # loop), so HEAD does not legitimately move between iterations and the main tree
