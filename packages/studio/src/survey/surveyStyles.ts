@@ -1,16 +1,14 @@
 // Shared style constants for the survey phase components (PhaseA/B/F,
 // QuestionField, and the StudioShell SurveyView pane).
 //
-// Colors are re-exported/aliased from `../ui/theme.ts` — that module already
-// owns the exact hex literals for the dark survey palette (BG_PAGE, BG_CARD,
-// BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION) and its header
-// comment locks those values (FR-005 zero-diff). This module does NOT
-// re-declare them; it only composes them into the repeated shapes that were
+// All colors come from `../ui/theme.ts` — the shared dark palette (BG_PAGE,
+// BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION) plus the
+// survey-specific tokens (CHIP_GLYPH_ACCENT, ERROR_RED, CHECKED_CHIP_BG,
+// DISABLED_DIVIDER) that live in theme.ts §3 "Divergent / preserved tokens"
+// alongside the other component-specific colors (ERROR_TEXT, WARNING, …).
+// This module does NOT declare any hex; it re-exports the tokens for
+// call-site convenience and composes them into the repeated shapes that were
 // previously duplicated as inline style literals.
-//
-// A handful of survey-only colors have no counterpart in theme.ts (which is
-// a gallery-compat layer); they are named here instead of scattered as raw
-// hex across the phase components.
 //
 // ZERO VISUAL REGRESSION: every exported value/object below was extracted
 // verbatim (including key order, which affects the emitted `style` attribute
@@ -28,26 +26,26 @@ import {
   TEXT_MAIN,
   FONT,
   BLUE_ACTION,
+  CHIP_GLYPH_ACCENT,
+  ERROR_RED,
+  CHECKED_CHIP_BG,
+  DISABLED_DIVIDER,
 } from "../ui/theme.ts";
 
-export { BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION };
-
-// ---------------------------------------------------------------------------
-// Survey-only colors — no counterpart in ui/theme.ts (do not add them there;
-// theme.ts is a locked-value gallery-compat layer).
-// ---------------------------------------------------------------------------
-
-/** Chip glyph accent — the confirmed/checked character glyph color. */
-export const CHIP_GLYPH_ACCENT = "#58a6ff";
-
-/** Error / danger red — the chip remove-x glyph and error-text color. */
-export const ERROR_RED = "#f85149";
-
-/** Checked chip background (SuggestionChip, ticked state). */
-export const CHECKED_CHIP_BG = "#0d2044";
-
-/** Disabled-control background / divider line color (same value, dual use). */
-export const DISABLED_DIVIDER = "#21262d";
+export {
+  BG_PAGE,
+  BG_CARD,
+  BORDER,
+  ACCENT,
+  TEXT_DIM,
+  TEXT_MAIN,
+  FONT,
+  BLUE_ACTION,
+  CHIP_GLYPH_ACCENT,
+  ERROR_RED,
+  CHECKED_CHIP_BG,
+  DISABLED_DIVIDER,
+};
 
 // ---------------------------------------------------------------------------
 // Phase wrapper — identical across PhaseA, PhaseB (manual path), PhaseF.

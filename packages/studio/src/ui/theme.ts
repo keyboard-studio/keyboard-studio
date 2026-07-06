@@ -137,3 +137,29 @@ export const WARNING = "#d29922";
  * is a post-P1 decision.
  */
 export const SUCCESS_ACCENT = "#7ee787";
+
+/**
+ * Survey chip glyph accent — the confirmed/checked character-glyph color in
+ * the Phase B chip pickers. No canonical counterpart; preserved exactly
+ * (post-P1 normalization candidate).
+ */
+export const CHIP_GLYPH_ACCENT = "#58a6ff";
+
+/**
+ * Error / danger red — the survey chip remove-x glyph and the SurveyView
+ * error-alert text. No canonical counterpart; preserved exactly.
+ */
+export const ERROR_RED = "#f85149";
+
+/**
+ * Checked survey-chip background (SuggestionChip, ticked state). No canonical
+ * counterpart; preserved exactly.
+ */
+export const CHECKED_CHIP_BG = "#0d2044";
+
+/**
+ * Disabled-control background / divider line color used by the survey panes
+ * (same value, dual use). Near canonical surface tokens but intentionally
+ * distinct; preserved as-is (post-P1 normalization candidate).
+ */
+export const DISABLED_DIVIDER = "#21262d";

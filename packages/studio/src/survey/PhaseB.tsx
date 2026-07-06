@@ -254,6 +254,10 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
             style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}
           >
             {chars.map((c) => (
+              // This delete chip is always in one visual state, not a toggle.
+              // The charChip/chipGlyph booleans below are FIXED literals chosen
+              // to reproduce the original inline hex (unchecked shell + accent
+              // glyph), not real checked state — do not wire them to a value.
               <button
                 key={c}
                 type="button"
