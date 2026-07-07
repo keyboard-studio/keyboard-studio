@@ -4,6 +4,8 @@
  * Pipeline (in order):
  *   1. parse(kmnText, keyboardId)           → ParseResult
  *   2. recognizePatterns(ir)                → RecognizeResult (recognizedRatio)
+ *   2b. classifyRemovalCapabilities(ir)     → removal-capability entries
+ *   2c. detectMarkInputOrderFromImport(ir)  → AxisFill (A3a=postfix, spec §7.2 rule 3a)
  *   3. addSidecar(vfs, kmnText, keyboardId) → VFS mutation (original .kmn preserved)
  *   4. computeSha256Hex(kmnText)            → SHA-256 stored at source/<id>.kmn.imported.sha256
  *   5. emit(ir)                             → emitted .kmn text
@@ -12,13 +14,20 @@
  *   8. buildImportReport(...)              → ImportReport
  */
 
-import type { VirtualFS, ImportReport, ImportStatus, RemovalCapability } from "@keyboard-studio/contracts";
+import type {
+  AxisFill,
+  VirtualFS,
+  ImportReport,
+  ImportStatus,
+  RemovalCapability,
+} from "@keyboard-studio/contracts";
 import { ImportStatus as IS } from "@keyboard-studio/contracts";
 import { parse } from "./parse.js";
 import { emit } from "./emit.js";
 import { addSidecar, SIDECAR_HASH_SUFFIX } from "../output/sidecar.js";
 import { computeSha256Hex } from "./hash.js";
 import { recognizePatterns, classifyRemovalCapabilities } from "../recognizer/index.js";
+import { detectMarkInputOrderFromImport } from "../strategy-selector/import-mark-order.js";
 import {
   runImportFidelityParseChecks,
   runImportFidelityEmitChecks,
@@ -95,6 +104,14 @@ export interface ImportKeyboardResult {
   report: ImportReport;
   /** All Layer A' findings from I1–I4 (I5 fires separately at output time). */
   findings: Array<import("@keyboard-studio/contracts").LintFinding>;
+  /**
+   * Axis-fill provenance derived from structural evidence in the imported IR
+   * (spec §7.2), e.g. `markInputOrder="postfix"` when the base already uses
+   * letter-then-mark sequence-replace rules. Empty when no such evidence is
+   * found — callers must not assume a fill happened. Distinct from the
+   * script-class default-fill prior's "script-class-prior" source tag.
+   */
+  axisFills: AxisFill[];
 }
 
 /**
@@ -133,6 +150,7 @@ export async function importKeyboard(
           message: parseError,
         },
       ],
+      axisFills: [],
     };
   }
 
@@ -143,6 +161,10 @@ export async function importKeyboard(
 
   // --- Step 2b: Classify removal capabilities ---
   const removalCapabilities = [...classifyRemovalCapabilities(ir).entries()];
+
+  // --- Step 2c: Base-derived axis-fill detection (spec §7.2 rule 3a) ---
+  const importMarkOrderFill = detectMarkInputOrderFromImport(ir);
+  const axisFills: AxisFill[] = importMarkOrderFill !== undefined ? [importMarkOrderFill] : [];
 
   // --- Step 3: Add sidecar (.kmn.imported) ---
   addSidecar(vfs, kmnText, keyboardId);
@@ -173,5 +195,5 @@ export async function importKeyboard(
     removalCapabilities,
   });
 
-  return { report, findings: allFindings };
+  return { report, findings: allFindings, axisFills };
 }
