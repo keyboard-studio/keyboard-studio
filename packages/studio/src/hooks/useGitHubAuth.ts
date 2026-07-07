@@ -152,9 +152,11 @@ export function useGitHubAuth(): UseGitHubAuthResult {
         setVerify(result);
 
         // Scope check applies only to oauth_app tokens (Option A submit flow).
-        // A github_app identity token reaching verify.ok is "connected" regardless
-        // of missingScopes — the App flow sends no scope, so missingScopes is
-        // always non-empty, but identity is sufficient for sign-in purposes.
+        // A github_app identity token is "connected" as soon as GitHub recognises
+        // it — the App flow sends no scope, so verify.ok (the fork+PR scope gate,
+        // per the VerifyTokenResult contract) is ALWAYS false for it and must not
+        // be consulted. `login` is only present when /user returned 200, so its
+        // presence is the identity check.
         if (token.client === "oauth_app") {
           if (result.ok && result.missingScopes.length === 0) {
             setStatus("connected");
@@ -162,13 +164,14 @@ export function useGitHubAuth(): UseGitHubAuthResult {
             setStatus("needs-scope");
           }
         } else {
-          // github_app token: identity established if the token is recognised.
-          // A failed verify (revoked / expired / invalid) must be "error", NOT
-          // "needs-scope" — needs-scope is reserved for oauth_app tokens that
-          // authenticated successfully but are missing public_repo. Returning
-          // needs-scope here would cause SignUpPanel / AccountControl to treat
-          // a dead token as linked (they treat connected|needs-scope as linked).
-          if (result.ok) {
+          // github_app token: identity established if the token is recognised
+          // (login present). A failed verify (revoked / expired / invalid —
+          // /user non-200, so no login) must be "error", NOT "needs-scope" —
+          // needs-scope is reserved for oauth_app tokens that authenticated
+          // successfully but are missing public_repo. Returning needs-scope
+          // here would cause SignUpPanel / AccountControl to treat a dead
+          // token as linked (they treat connected|needs-scope as linked).
+          if (result.login !== undefined) {
             setStatus("connected");
           } else {
             setStatus("error");
