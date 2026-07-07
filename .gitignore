@@ -67,3 +67,7 @@ notes.md
 # Playwright run artifacts (packages/studio/e2e)
 packages/studio/test-results/
 packages/studio/playwright-report/
+
+# repo-map artifact (utilities/hermes/build-repo-map.mjs; written to repo root)
+repo-map.json
+repo-map*.json
