@@ -4,7 +4,8 @@
  * Pipeline (in order):
  *   1. parse(kmnText, keyboardId)           → ParseResult
  *   2. recognizePatterns(ir)                → RecognizeResult (recognizedRatio)
- *   2b. detectMarkInputOrderFromImport(ir)  → AxisFill (A3a=postfix, spec §7.2 rule 3a)
+ *   2b. classifyRemovalCapabilities(ir)     → removal-capability entries
+ *   2c. detectMarkInputOrderFromImport(ir)  → AxisFill (A3a=postfix, spec §7.2 rule 3a)
  *   3. addSidecar(vfs, kmnText, keyboardId) → VFS mutation (original .kmn preserved)
  *   4. computeSha256Hex(kmnText)            → SHA-256 stored at source/<id>.kmn.imported.sha256
  *   5. emit(ir)                             → emitted .kmn text

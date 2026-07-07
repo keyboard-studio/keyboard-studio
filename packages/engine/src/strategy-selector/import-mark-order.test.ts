@@ -151,6 +151,100 @@ if(option_key = '') any(equalD) + "=" > index(equalU,2)
     expect(detectMarkInputOrderFromImport(ir)).toBeUndefined();
   });
 
+  it("does NOT match a rule whose context has other than exactly two structural elements (real.length !== 2)", () => {
+    // Three structural context elements (not the leading-any()+trigger pair) —
+    // the shape guard rejects before it ever inspects base/trigger kinds.
+    const mainGroup: IRGroup = {
+      nodeId: "group#main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [
+        {
+          nodeId: "rule#too-many-elements",
+          context: [
+            { kind: "any", storeRef: "equalD" },
+            { kind: "char", value: "=" },
+            { kind: "char", value: "y" },
+          ],
+          output: [{ kind: "index", storeRef: "equalU", offset: 1 }],
+        },
+      ],
+    };
+    const ir = makeTestIR([mainGroup]);
+
+    expect(detectMarkInputOrderFromImport(ir)).toBeUndefined();
+  });
+
+  it("does NOT match a rule whose trailing context element is not a char() trigger (e.g. two any()s)", () => {
+    const mainGroup: IRGroup = {
+      nodeId: "group#main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [
+        {
+          nodeId: "rule#not-char-trigger",
+          context: [
+            { kind: "any", storeRef: "equalD" },
+            { kind: "any", storeRef: "otherStore" },
+          ],
+          output: [{ kind: "index", storeRef: "equalU", offset: 1 }],
+        },
+      ],
+    };
+    const ir = makeTestIR([mainGroup]);
+
+    expect(detectMarkInputOrderFromImport(ir)).toBeUndefined();
+  });
+
+  it("does NOT match a rule whose output has other than exactly one element (output.length !== 1)", () => {
+    const mainGroup: IRGroup = {
+      nodeId: "group#main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [
+        {
+          nodeId: "rule#multi-output",
+          context: [
+            { kind: "any", storeRef: "equalD" },
+            { kind: "char", value: "=" },
+          ],
+          output: [
+            { kind: "index", storeRef: "equalU", offset: 1 },
+            { kind: "char", value: "x" },
+          ],
+        },
+      ],
+    };
+    const ir = makeTestIR([mainGroup]);
+
+    expect(detectMarkInputOrderFromImport(ir)).toBeUndefined();
+  });
+
+  it("does NOT match a rule whose single output element is not index() (e.g. a literal char output)", () => {
+    const mainGroup: IRGroup = {
+      nodeId: "group#main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [
+        {
+          nodeId: "rule#char-output",
+          context: [
+            { kind: "any", storeRef: "equalD" },
+            { kind: "char", value: "=" },
+          ],
+          output: [{ kind: "char", value: "x" }],
+        },
+      ],
+    };
+    const ir = makeTestIR([mainGroup]);
+
+    expect(detectMarkInputOrderFromImport(ir)).toBeUndefined();
+  });
+
   it("returns undefined for an IR with no rules", () => {
     const ir: KeyboardIR = makeTestIR([]);
     expect(detectMarkInputOrderFromImport(ir)).toBeUndefined();
