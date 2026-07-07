@@ -24,6 +24,7 @@
  */
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
+import { isDeadkeyOnlyOutput } from "../shared/rule-shape.js";
 
 // ---------------------------------------------------------------------------
 // Public contract (shared with km-frontend — do not deviate)
@@ -51,9 +52,7 @@ export interface CharContributors {
  * Such rules must NEVER be added to the contributor set — removing them destroys the
  * whole deadkey family.
  */
-function isTriggerRule(rule: { output: { kind: string }[] }): boolean {
-  return rule.output.length === 1 && rule.output[0]?.kind === "deadkey";
-}
+const isTriggerRule = isDeadkeyOnlyOutput;
 
 // ---------------------------------------------------------------------------
 // Main export
@@ -75,7 +74,7 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
   const locations: CharContributors['locations'] = [];
   const blocked: CharContributors['blocked'] = [];
 
-  // Pre-build store map (name → store) for ruleProducedStrings.
+  // Pre-build store map (name → store) for store-output expansion.
   const storeMap = new Map(ir.stores.map((s) => [s.name, s]));
 
   // Build a set of recognized-pattern IDs to patternTitle, for location labels.

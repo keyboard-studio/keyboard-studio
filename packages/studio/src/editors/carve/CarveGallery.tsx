@@ -9,12 +9,13 @@ import { DepBanner } from '../assignLoop/parts/DepBanner.tsx';
 import type { DepNode } from '../assignLoop/parts/DepBanner.tsx';
 import { Rail } from '../assignLoop/parts/Rail.tsx';
 import { Inspector } from '../assignLoop/parts/Inspector.tsx';
-import { InfoView } from '../assignLoop/parts/InfoView.tsx';
+import { InfoView, capabilityHint } from '../assignLoop/parts/InfoView.tsx';
 import { InfoIcon } from '../assignLoop/parts/carveShared.tsx';
 import { ConfirmDialog } from '../assignLoop/parts/ConfirmDialog.tsx';
 import { useHoverInfoStore } from '../../stores/hoverInfoStore.ts';
 import { collectCharContributors } from '@keyboard-studio/engine';
 import type { CharContributors } from '@keyboard-studio/engine';
+import type { RemovalCapability } from '@keyboard-studio/contracts';
 
 /** Pending cascade state — set when the user clicks a cross-wired chip. */
 interface PendingCascade {
@@ -125,7 +126,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   const handleCascadeDelete = useCallback((gid: string) => {
     // Resolve the clicked glyph — output char, removal capability, and its card.
     let targetChar: string | undefined;
-    let clickedCapability = '';
+    let clickedCapability: RemovalCapability | '' = '';
     let clickedLabel = 'this key';
     for (const node of nodes) {
       if (!node.glyphs) continue;
@@ -161,20 +162,15 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       for (const node of nodes) if (node.glyphs?.some((g) => g.gid === id)) return node.name;
       return 'an advanced rule';
     };
-    const blockedReason = (cap: string): string => {
-      if (cap === 'not-removable:opaque') return "uses advanced syntax the editor can't rewrite";
-      if (cap === 'not-removable:context-sensitive') return "only fires after certain keys, so it can't be removed on its own";
-      return "the editor can't confirm it's safe to remove";
-    };
     const blocked = [
       ...found.blocked,
-      ...blockedRuleIds.map((id) => ({ label: ruleLabel(id), reason: blockedReason(removalCapabilities.get(id) ?? '') })),
+      ...blockedRuleIds.map((id) => ({ label: ruleLabel(id), reason: capabilityHint(removalCapabilities.get(id) ?? 'not-removable:unknown') })),
     ];
     // The clicked "!" chip is often NOT a plain single-char producer, so it never
     // lands in found.ruleNodeIds/blockedRuleIds — add it explicitly so the warning
     // box always names the not-removable chip the user actually clicked.
-    if (clickedIsNotRemovable && !blockedRuleIds.includes(gid)) {
-      blocked.push({ label: clickedLabel, reason: blockedReason(clickedCapability) });
+    if (clickedIsNotRemovable && clickedCapability !== '' && !blockedRuleIds.includes(gid)) {
+      blocked.push({ label: clickedLabel, reason: capabilityHint(clickedCapability) });
     }
 
     const removableCount = removableRuleIds.length + found.storeSlotIds.length;
@@ -557,9 +553,10 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
           primaryLabel={pendingCascade.mode === 'restore'
             ? 'Yes, restore everywhere'
             : pendingCascade.actionCount > 0 ? 'Yes, remove everywhere' : 'OK'}
-          secondaryLabel="Cancel"
           onPrimary={(pendingCascade.mode === 'remove' && pendingCascade.actionCount === 0) ? handleCascadeCancel : handleCascadePrimary}
-          onSecondary={handleCascadeCancel}
+          {...(pendingCascade.mode === 'remove' && pendingCascade.actionCount === 0
+            ? {}
+            : { secondaryLabel: 'Cancel', onSecondary: handleCascadeCancel })}
         />
       )}
 

@@ -1088,4 +1088,17 @@ describe("workingCopyStore — cascadeRestore", () => {
     useWorkingCopyStore.getState().cascadeRestore([]);
     expect(useWorkingCopyStore.getState().deletedItemIds.size).toBe(before);
   });
+
+  it("clears the batch undo entry once every one of its items is restored", () => {
+    useWorkingCopyStore.getState().cascadeDelete(["r-eps"], ["sid-dkt#2"]);
+    expect(useWorkingCopyStore.getState().undoStack).toEqual([
+      { k: "batch", nodeIds: [], itemIds: ["r-eps", "sid-dkt#2"] },
+    ]);
+
+    useWorkingCopyStore.getState().cascadeRestore(["r-eps", "sid-dkt#2"]);
+    const after = useWorkingCopyStore.getState();
+    expect(after.undoStack).toHaveLength(0);
+    expect(after.isItemDeleted("r-eps")).toBe(false);
+    expect(after.isItemDeleted("sid-dkt#2")).toBe(false);
+  });
 });

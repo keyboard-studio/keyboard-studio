@@ -734,7 +734,13 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     set((s) => {
       const nextItems = new Set(s.deletedItemIds);
       for (const id of ids) nextItems.delete(id);
-      return { deletedItemIds: nextItems };
+      // Mirror restoreNode/restoreItem: drop any batch undo entry whose items
+      // are now fully restored (none remain in the post-restore deletedItemIds),
+      // so a fully-undone cascade doesn't leave a stale undo entry behind.
+      const nextUndoStack = s.undoStack.filter(
+        (e) => !(e.k === 'batch' && e.itemIds.every((id) => !nextItems.has(id))),
+      );
+      return { deletedItemIds: nextItems, undoStack: nextUndoStack };
     });
   },
 

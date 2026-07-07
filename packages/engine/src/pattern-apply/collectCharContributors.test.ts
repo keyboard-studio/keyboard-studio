@@ -1,8 +1,7 @@
-// Tests for collectCharContributors and ruleProducedStrings (cascade-delete contributor discovery, issue #886)
+// Tests for collectCharContributors (cascade-delete contributor discovery, issue #886)
 
 import { describe, it, expect } from 'vitest';
 import type { KeyboardIR, IRRule, IRStore } from '@keyboard-studio/contracts';
-import { ruleProducedStrings } from '@keyboard-studio/contracts';
 import { collectCharContributors } from './collectCharContributors.js';
 
 // ---------------------------------------------------------------------------
@@ -31,68 +30,6 @@ function makeRule(nodeId: string, context: IRRule['context'], output: IRRule['ou
   if (ownedByPattern !== undefined) r.ownedByPattern = ownedByPattern;
   return r;
 }
-
-// ---------------------------------------------------------------------------
-// ruleProducedStrings (unit)
-// ---------------------------------------------------------------------------
-
-describe('ruleProducedStrings', () => {
-  it('returns empty array for an empty output', () => {
-    const rule = makeRule('r1', [], []);
-    expect(ruleProducedStrings(rule, new Map())).toEqual([]);
-  });
-
-  it('returns the NFC char for a single char output', () => {
-    const rule = makeRule('r1', [], [{ kind: 'char', value: 'a' }]);
-    expect(ruleProducedStrings(rule, new Map())).toEqual(['a']);
-  });
-
-  it('merges consecutive chars into an NFC run', () => {
-    // 'e' + U+0301 (combining acute) → 'é' (NFC)
-    const rule = makeRule('r1', [], [
-      { kind: 'char', value: 'e' },
-      { kind: 'char', value: '́' },
-    ]);
-    const result = ruleProducedStrings(rule, new Map());
-    expect(result).toEqual(['é']); // é
-  });
-
-  it('expands index() store items individually', () => {
-    const store = makeStore('sid', 'outStore', [
-      { kind: 'char', value: 'a' },
-      { kind: 'char', value: 'b' },
-    ]);
-    const rule = makeRule('r1', [], [{ kind: 'index', storeRef: 'outStore', offset: 1 }]);
-    const result = ruleProducedStrings(rule, new Map([['outStore', store]]));
-    expect(result).toEqual(['a', 'b']);
-  });
-
-  it('expands outs() store items individually', () => {
-    const store = makeStore('sid', 'outStore', [{ kind: 'char', value: 'x' }]);
-    const rule = makeRule('r1', [], [{ kind: 'outs', storeRef: 'outStore' }]);
-    const result = ruleProducedStrings(rule, new Map([['outStore', store]]));
-    expect(result).toEqual(['x']);
-  });
-
-  it('skips deadkey, beep, and raw elements', () => {
-    const rule = makeRule('r1', [], [
-      { kind: 'deadkey', id: 1 },
-      { kind: 'beep' },
-      { kind: 'raw', text: 'nul' },
-    ]);
-    expect(ruleProducedStrings(rule, new Map())).toEqual([]);
-  });
-
-  it('skips non-char store items (vkey, deadkey)', () => {
-    const store = makeStore('sid', 'S', [
-      { kind: 'char', value: 'a' },
-      { kind: 'vkey', name: 'K_A' },
-    ]);
-    const rule = makeRule('r1', [], [{ kind: 'index', storeRef: 'S', offset: 1 }]);
-    const result = ruleProducedStrings(rule, new Map([['S', store]]));
-    expect(result).toEqual(['a']); // vkey skipped
-  });
-});
 
 // ---------------------------------------------------------------------------
 // Cameroon-shaped fixture (S-02 deadkey + any/index pair)
