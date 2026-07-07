@@ -1,11 +1,12 @@
 // Unit tests for StoreChip.tsx (#523 per-character store toggle chips).
 //
 // StoreChip's click handler branches on the chip's action:
-//   - "disabled"           → clicking must NOT call onToggle; it must instead
-//                            push a HoverInfo (kind: 'text') into the shared
-//                            hoverInfoStore carrying the chip's disabledReason,
-//                            mirroring GlyphCell's not-removable pattern.
-//   - "nul-fill" / "drop"  → clicking DOES call onToggle(chipId).
+//   - "disabled" → clicking must NOT call onToggle; it must instead
+//                  push a HoverInfo (kind: 'text') into the shared
+//                  hoverInfoStore carrying the chip's disabledReason,
+//                  mirroring GlyphCell's not-removable pattern.
+//   - "drop"     → clicking DOES call onToggle(chipId) (a plain drop, or a
+//                  coordinated drop when chip.coordinatedWith is set).
 //
 // Hover/focus on a NON-disabled chip populates the hover panel with the
 // character + codepoint (mirroring GlyphCell's enabled-hover path), rather
@@ -58,7 +59,7 @@ describe('StoreChip — disabled action', () => {
   });
 });
 
-describe('StoreChip — toggleable actions (nul-fill / drop)', () => {
+describe('StoreChip — toggleable actions (drop)', () => {
   it('clicking a drop-action chip calls onToggle(chipId)', () => {
     const onToggle = vi.fn();
     const chip = makeChip({ action: 'drop', chipId: 'store#s#3' });
@@ -68,9 +69,9 @@ describe('StoreChip — toggleable actions (nul-fill / drop)', () => {
     expect(onToggle).toHaveBeenCalledWith('store#s#3');
   });
 
-  it('clicking a nul-fill-action chip calls onToggle(chipId)', () => {
+  it('clicking a coordinated drop-action chip calls onToggle(chipId)', () => {
     const onToggle = vi.fn();
-    const chip = makeChip({ action: 'nul-fill', chipId: 'store#out#1' });
+    const chip = makeChip({ action: 'drop', chipId: 'store#out#1', coordinatedWith: ['dkf003b'] });
     const { container } = render(<StoreChip chip={chip} off={false} onToggle={onToggle} />);
     fireEvent.click(container.querySelector('button')!);
     expect(onToggle).toHaveBeenCalledWith('store#out#1');
@@ -103,7 +104,7 @@ describe('StoreChip — toggleable actions (nul-fill / drop)', () => {
   });
 
   it('focusing an enabled chip sets hover info with codepoint content', () => {
-    const chip = makeChip({ ch: 'a', action: 'nul-fill' });
+    const chip = makeChip({ ch: 'a', action: 'drop' });
     const { container } = render(<StoreChip chip={chip} off={false} onToggle={vi.fn()} />);
     fireEvent.focus(container.querySelector('button')!);
     const info = useHoverInfoStore.getState().info;
@@ -117,5 +118,46 @@ describe('StoreChip — toggleable actions (nul-fill / drop)', () => {
     fireEvent.mouseEnter(button);
     fireEvent.mouseLeave(button);
     expect(useHoverInfoStore.getState().info).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// coordinatedRemovedBy — "effectively removed via coordination" visual state
+// ---------------------------------------------------------------------------
+describe('StoreChip — coordinatedRemovedBy (partner-slot state visible, off=false)', () => {
+  it('marks the button data-coordinated-removed when off=false and coordinatedRemovedBy is set', () => {
+    const chip = makeChip({ action: 'drop', coordinatedWith: ['dkf003b'] });
+    const { container } = render(<StoreChip chip={chip} off={false} onToggle={vi.fn()} coordinatedRemovedBy="dkf003b" />);
+    expect(container.querySelector('button')!.getAttribute('data-coordinated-removed')).toBe('true');
+  });
+
+  it('does NOT mark data-coordinated-removed when off=true (directly deleted takes precedence)', () => {
+    const chip = makeChip({ action: 'drop', coordinatedWith: ['dkf003b'] });
+    const { container } = render(<StoreChip chip={chip} off={true} onToggle={vi.fn()} coordinatedRemovedBy="dkf003b" />);
+    expect(container.querySelector('button')!.getAttribute('data-coordinated-removed')).toBeNull();
+  });
+
+  it('does NOT mark data-coordinated-removed when coordinatedRemovedBy is absent', () => {
+    const chip = makeChip({ action: 'drop' });
+    const { container } = render(<StoreChip chip={chip} off={false} onToggle={vi.fn()} />);
+    expect(container.querySelector('button')!.getAttribute('data-coordinated-removed')).toBeNull();
+  });
+
+  it('hovering a coordinated-removed chip surfaces the partner store name, not the plain codepoint info', () => {
+    const chip = makeChip({ action: 'drop', coordinatedWith: ['dkf003b'] });
+    const { container } = render(<StoreChip chip={chip} off={false} onToggle={vi.fn()} coordinatedRemovedBy="dkf003b" />);
+    fireEvent.mouseEnter(container.querySelector('button')!);
+    const info = useHoverInfoStore.getState().info;
+    expect(info).toMatchObject({ kind: 'text', title: 'Removed together' });
+    expect((info as { body: string }).body).toContain('dkf003b');
+  });
+
+  it('clicking a coordinated-removed chip still calls onToggle(chipId) — this chip\'s own toggle, unaffected by the coordinated-visual cue', () => {
+    const onToggle = vi.fn();
+    const chip = makeChip({ action: 'drop', chipId: 'store#out#1', coordinatedWith: ['dkf003b'] });
+    const { container } = render(<StoreChip chip={chip} off={false} onToggle={onToggle} coordinatedRemovedBy="dkf003b" />);
+    fireEvent.click(container.querySelector('button')!);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(onToggle).toHaveBeenCalledWith('store#out#1');
   });
 });

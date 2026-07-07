@@ -712,7 +712,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   cascadeDelete: (ruleNodeIds, storeSlotIds) => {
     if (ruleNodeIds.length === 0 && storeSlotIds.length === 0) return;
     set((s) => {
-      // Route BOTH whole-rule deletes and store-slot nul-fills through the ITEM
+      // Route BOTH whole-rule deletes and store-slot drops through the ITEM
       // channel (deletedItemIds). The chip grid and kept-counts reflect deletion
       // via isItemDeleted(gid) — and for a simple-rule chip gid === rule.nodeId —
       // so using the item channel dims every affected chip, matching the single-

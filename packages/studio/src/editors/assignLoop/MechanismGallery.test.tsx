@@ -734,6 +734,7 @@ describe("MechanismGallery — preview ready state", () => {
     jsBlobUrl: "",
     vfs: createVirtualFS(),
     scaffoldWarnings: [],
+    scaffoldNotices: [],
   };
 
   it("renders the OSKFrame mock when stage is ready", async () => {
@@ -767,6 +768,50 @@ describe("MechanismGallery — preview ready state", () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
     expect(screen.queryByText(/Apply warnings/i)).toBeNull();
+  });
+
+  it("shows an informational notice from scaffoldNotices in a NEUTRAL block, separate from Apply warnings", async () => {
+    const stageWithNotices: Stage = {
+      ...readyStage,
+      scaffoldNotices: [
+        '[store-slot] coordinated removal across paired stores "dkfX", "dktX": dropped 1 position(s) from each to preserve index() alignment.',
+      ],
+    };
+    setMockStage(stageWithNotices);
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expect(screen.getByText(/coordinated removal across paired stores/i)).toBeTruthy();
+    // Must NOT render under the "Apply warnings" alert banner label.
+    expect(screen.queryByText(/Apply warnings/i)).toBeNull();
+  });
+
+  it("renders scaffoldWarnings in an alert-role banner and scaffoldNotices in a status-role (non-alert) banner, distinctly", async () => {
+    const stageWithBoth: Stage = {
+      ...readyStage,
+      scaffoldWarnings: ["[carve] a real problem"],
+      scaffoldNotices: ["[store-slot] coordinated removal: a success notice"],
+    };
+    setMockStage(stageWithBoth);
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    const alertBanner = screen.getByRole("alert");
+    const statusBanners = screen.getAllByRole("status");
+    expect(alertBanner.textContent).toMatch(/a real problem/i);
+    expect(alertBanner.textContent).not.toMatch(/coordinated removal/i);
+    expect(statusBanners.some((el) => /coordinated removal/i.test(el.textContent ?? ""))).toBe(true);
+  });
+
+  it("does NOT show a notices block when scaffoldNotices is empty", async () => {
+    setMockStage(readyStage);
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expect(screen.queryByText(/Notices/i)).toBeNull();
   });
 });
 
@@ -905,6 +950,7 @@ describe("MechanismGallery — vfsTransform passed to useKeyboardArtifact", () =
       jsBlobUrl: "",
       vfs: createVirtualFS(),
       scaffoldWarnings: [],
+      scaffoldNotices: [],
     });
     // Seed a working copy: useWorkingCopyTransform returns null when baseIr is null,
     // so instantiateFromBase must be called before patterns load.

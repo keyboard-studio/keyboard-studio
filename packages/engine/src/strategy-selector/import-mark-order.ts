@@ -25,6 +25,7 @@
 // rule wherever one exists.
 
 import type { AxisFill, IRRule, KeyboardIR } from "@keyboard-studio/contracts";
+import { isPlusSeparator } from "../shared/rule-shape.js";
 
 /**
  * True iff `rule` has the postfix sequence-replace shape described above:
@@ -39,7 +40,7 @@ import type { AxisFill, IRRule, KeyboardIR } from "@keyboard-studio/contracts";
  * `[any(equalD), raw("+"), char("=")]`. Strip it before inspecting shape.
  */
 function isPostfixMarkSequence(rule: IRRule): boolean {
-  const real = rule.context.filter((el) => !(el.kind === "raw" && el.text.trim() === "+"));
+  const real = rule.context.filter((el) => !isPlusSeparator(el));
   if (real.length !== 2) return false;
   const base = real[0];
   const trigger = real[1];

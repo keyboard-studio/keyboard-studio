@@ -210,6 +210,49 @@ describe('<Inspector> StoreDetail — linked-pair section absent when no pairedS
   });
 });
 
+describe('<Inspector> StoreDetail — self-paired panel (storePairingKind: "self", no partner store)', () => {
+  const node = storeNode({
+    storeUsage: { asSource: true, asOutput: true, ruleCount: 2, groupNames: ['main'], patternRefs: [], groupRefs: [] },
+    storePairingKind: 'self',
+  });
+
+  it('does not render "Linked pair" (no partner store to name)', () => {
+    render(
+      <Inspector node={node} nodes={[node]} isItemDeleted={noDelete} onToggleGlyph={noToggle} onSetManyGlyphs={noSetMany} isDeleted={noDelete} onToggleNode={noToggle} />,
+    );
+    expect(document.body.textContent).not.toMatch(/linked pair/i);
+  });
+
+  it('renders "Self-paired" explaining input+output of the same mechanism', () => {
+    render(
+      <Inspector node={node} nodes={[node]} isItemDeleted={noDelete} onToggleGlyph={noToggle} onSetManyGlyphs={noSetMany} isDeleted={noDelete} onToggleNode={noToggle} />,
+    );
+    expect(document.body.textContent).toMatch(/self-paired/i);
+    expect(document.body.textContent).toMatch(/input and the output side of the same mechanism/i);
+  });
+});
+
+describe('<Inspector> StoreDetail — unresolved/blocked pairing panel (storePairingKind: "unresolved")', () => {
+  const node = storeNode({
+    storeUsage: { asSource: false, asOutput: true, ruleCount: 1, groupNames: ['main'], patternRefs: [], groupRefs: [] },
+    storePairingKind: 'unresolved',
+  });
+
+  it('does not render "Linked pair" (no confirmed partner)', () => {
+    render(
+      <Inspector node={node} nodes={[node]} isItemDeleted={noDelete} onToggleGlyph={noToggle} onSetManyGlyphs={noSetMany} isDeleted={noDelete} onToggleNode={noToggle} />,
+    );
+    expect(document.body.textContent).not.toMatch(/linked pair/i);
+  });
+
+  it('renders a "Pairing not confirmed" warning', () => {
+    render(
+      <Inspector node={node} nodes={[node]} isItemDeleted={noDelete} onToggleGlyph={noToggle} onSetManyGlyphs={noSetMany} isDeleted={noDelete} onToggleNode={noToggle} />,
+    );
+    expect(document.body.textContent).toMatch(/pairing not confirmed/i);
+  });
+});
+
 describe('<Inspector> StoreDetail — linked-pair section, input side with Backspace trigger', () => {
   const node = storeNode({
     storeUsage: { asSource: true, asOutput: false, ruleCount: 3, groupNames: ['main'], patternRefs: [], groupRefs: [] },
@@ -782,6 +825,61 @@ describe('Inspector — StoreDetail chip toggle wiring', () => {
   });
 });
 
+describe('Inspector — StoreDetail coordinated-partner visualization (coordinatedRemovedBy)', () => {
+  // Store A ("sA") has a chip at itemsIndex 0 coordinated with store B
+  // ("sB"). isItemDeleted flags B's SAME-position chip ("store#b#0") as
+  // directly deleted, while A's own chip ("store#a#0") is NOT. The partner
+  // store's removal must be visible on A's rendered chip without A's own
+  // id ever being added to deletedItemIds.
+  const chipA = { chipId: 'store#a#0', ch: 'a', itemsIndex: 0, action: 'drop' as const, coordinatedWith: ['sB'] };
+  const nodeA = makeStoreNode({ nodeId: 'store#a', name: 'sA', storeChips: [chipA] });
+  const nodeB = makeStoreNode({ nodeId: 'store#b', name: 'sB' });
+
+  it('marks the partner-coordinated chip data-coordinated-removed when the OTHER store\'s same-position chip is deleted', () => {
+    const isItemDeleted = (id: string) => id === 'store#b#0';
+    render(
+      <Inspector {...baseInspectorProps} node={nodeA} nodes={[nodeA, nodeB]} isItemDeleted={isItemDeleted} />,
+    );
+    const chipButton = screen.getByText('a').closest('button')!;
+    expect(chipButton.getAttribute('data-coordinated-removed')).toBe('true');
+    expect(chipButton.getAttribute('aria-disabled')).toBe('false');
+  });
+
+  it('does NOT mark data-coordinated-removed when the partner is not deleted', () => {
+    const isItemDeleted = () => false;
+    render(<Inspector {...baseInspectorProps} node={nodeA} nodes={[nodeA, nodeB]} isItemDeleted={isItemDeleted} />);
+    const chipButton = screen.getByText('a').closest('button')!;
+    expect(chipButton.getAttribute('data-coordinated-removed')).toBeNull();
+  });
+
+  it('does NOT double-count: A\'s own chip is never added to deletedItemIds by the coordinated-visual cue (restore/undo stays symmetric)', () => {
+    const onToggleGlyph = vi.fn();
+    const isItemDeleted = (id: string) => id === 'store#b#0';
+    render(
+      <Inspector {...baseInspectorProps} node={nodeA} nodes={[nodeA, nodeB]} isItemDeleted={isItemDeleted} onToggleGlyph={onToggleGlyph} />,
+    );
+    // A's chip renders coordinated (dimmed) but clicking it fires the SAME
+    // single toggle it always would — no extra calls, no id but its own.
+    fireEvent.click(screen.getByText('a'));
+    expect(onToggleGlyph).toHaveBeenCalledTimes(1);
+    expect(onToggleGlyph).toHaveBeenCalledWith('store#a#0');
+  });
+
+  it('is purely reactive to isItemDeleted — restoring the partner (B) removes the coordinated cue on A on the next render', () => {
+    const deletedIds = new Set(['store#b#0']);
+    const isItemDeleted = (id: string) => deletedIds.has(id);
+    const { rerender } = render(
+      <Inspector {...baseInspectorProps} node={nodeA} nodes={[nodeA, nodeB]} isItemDeleted={isItemDeleted} />,
+    );
+    expect(screen.getByText('a').closest('button')!.getAttribute('data-coordinated-removed')).toBe('true');
+
+    // Simulate restoring B — the SAME derivation, re-evaluated, symmetric undo.
+    deletedIds.delete('store#b#0');
+    rerender(<Inspector {...baseInspectorProps} node={nodeA} nodes={[nodeA, nodeB]} isItemDeleted={isItemDeleted} />);
+    expect(screen.getByText('a').closest('button')!.getAttribute('data-coordinated-removed')).toBeNull();
+  });
+});
+
 describe('Inspector — StoreDetail AC6 "empties the store" warning banner', () => {
   const AC6_TEXT = 'This will empty the store — the mechanism depending on it will stop working';
   // Drop-class stores are the only class that can still show this banner:
@@ -790,10 +888,6 @@ describe('Inspector — StoreDetail AC6 "empties the store" warning banner', () 
   // any()-referenced sub-case — matching this second line.
   const AC6_DROP_TEXT =
     "To keep the keyboard buildable, the built keyboard keeps this store's characters until at least one stays active — remove the whole store instead if you no longer need it.";
-  // Nul-fill class stores never actually shrink items[] — the second line
-  // reflects that the mechanism keeps working, just producing no output.
-  const AC6_NUL_FILL_TEXT =
-    "Each removed character's slot outputs nothing (nul) in the built keyboard; the mechanism stays but produces no output.";
 
   it('shows the drop-class second line when all toggleable chips are off, they cover every char item, and the store has rule dependents', () => {
     const chips: StoreCharChip[] = [
@@ -811,24 +905,22 @@ describe('Inspector — StoreDetail AC6 "empties the store" warning banner', () 
     // Second line: explains the engine's refusal-to-empty guard so authors
     // understand why the store keeps one character until they delete it outright.
     expect(screen.getByText(AC6_DROP_TEXT)).toBeDefined();
-    expect(screen.queryByText(AC6_NUL_FILL_TEXT)).toBeNull();
   });
 
-  it('shows the nul-fill-class second line when all toggleable chips are off on a nul-fill store', () => {
+  it('shows the same drop-class second line for a coordinated-drop store (paired via the pairing graph)', () => {
     const chips: StoreCharChip[] = [
-      { chipId: 'store#s#0', ch: 'a', itemsIndex: 0, action: 'nul-fill' },
-      { chipId: 'store#s#1', ch: 'b', itemsIndex: 1, action: 'nul-fill' },
+      { chipId: 'store#s#0', ch: 'a', itemsIndex: 0, action: 'drop', coordinatedWith: ['dktX'] },
+      { chipId: 'store#s#1', ch: 'b', itemsIndex: 1, action: 'drop', coordinatedWith: ['dktX'] },
     ];
     const node = makeStoreNode({
       storeChips: chips,
-      storeUsage: { ruleCount: 2, asSource: false, asOutput: true, groupNames: ['main'], patternRefs: [], groupRefs: [] },
+      storeUsage: { ruleCount: 2, asSource: true, asOutput: false, groupNames: ['main'], patternRefs: [], groupRefs: [] },
     });
     const isItemDeleted = () => true; // all chips off
     render(<Inspector {...baseInspectorProps} node={node} nodes={[node]} isItemDeleted={isItemDeleted} />);
 
     expect(screen.getByText(AC6_TEXT)).toBeDefined();
-    expect(screen.getByText(AC6_NUL_FILL_TEXT)).toBeDefined();
-    expect(screen.queryByText(AC6_DROP_TEXT)).toBeNull();
+    expect(screen.getByText(AC6_DROP_TEXT)).toBeDefined();
   });
 
   it('does NOT show the banner when some toggleable chips are still on (not fully off)', () => {

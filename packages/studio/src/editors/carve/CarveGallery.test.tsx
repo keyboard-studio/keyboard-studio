@@ -12,6 +12,11 @@
 // regardless of the real contributor-discovery algorithm. The rest of the
 // stack (toRailNodes, buildCharWeb, the real workingCopyStore, Rail,
 // Inspector, ConfirmDialog) runs for real — this is a render-based test.
+//
+// useKeyboardArtifact and OSKFrame are mocked (same convention as
+// MechanismGallery.test.tsx / TouchGallery.test.tsx) so CarveGallery's own
+// warm-preview pipeline never touches WASM, network fetches, or a real
+// iframe here.
 
 import { describe, it, expect, beforeEach, beforeAll, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen, within } from '@testing-library/react';
@@ -21,6 +26,33 @@ import { basicKbdus } from '@keyboard-studio/contracts/fixtures';
 import { CarveGallery } from './CarveGallery.tsx';
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
 import type { CharContributors } from '@keyboard-studio/engine';
+import type { Stage } from '../../hooks/useKeyboardArtifact.ts';
+
+// Mutable mock stage — same convention as MechanismGallery.test.tsx /
+// TouchGallery.test.tsx, so individual tests can drive CarveGallery's own
+// useKeyboardArtifact instance through fetching/compiling/ready/error and
+// assert the "Live preview" pane (GalleryPreviewPane) actually reflects it,
+// rather than always mocking a fixed idle stage.
+let _mockStage: Stage = { kind: 'idle' };
+const _mockRetry = vi.fn();
+
+function setMockStage(s: Stage) {
+  _mockStage = s;
+}
+
+vi.mock('../../hooks/useKeyboardArtifact.ts', () => ({
+  useKeyboardArtifact: () => ({
+    stage: _mockStage,
+    retry: _mockRetry,
+    recompile: vi.fn(),
+  }),
+}));
+
+vi.mock('../../components/OSKFrame.tsx', () => ({
+  OSKFrame: ({ stage }: { stage: Stage }) => (
+    <div data-testid="osk-frame-mock" data-stage={stage.kind} />
+  ),
+}));
 
 // jsdom does not implement HTMLDialogElement.showModal()/close() — see the
 // same shim + rationale in ConfirmDialog.test.tsx.
@@ -52,6 +84,8 @@ vi.mock('@keyboard-studio/engine', async () => {
 afterEach(() => {
   cleanup();
   collectCharContributorsMock.mockReset();
+  _mockStage = { kind: 'idle' };
+  _mockRetry.mockReset();
 });
 
 beforeEach(() => {
@@ -96,6 +130,21 @@ function makeIR(groups: IRGroup[], stores: IRStore[] = []): KeyboardIR {
 
 function emptyContributors(targetChar: string): CharContributors {
   return { targetChar, ruleNodeIds: [], storeSlotIds: [], locations: [], blocked: [] };
+}
+
+/**
+ * The Inspector's node heading, disambiguated from the two other <h2>s that
+ * can appear alongside it: a ConfirmDialog's title (excluded via closest('dialog'))
+ * and the live-preview pane's "Live preview" heading (excluded by text — the
+ * warm OSK preview mounted alongside Rail/Inspector, see the CarveGallery
+ * pipeline comment).
+ */
+function getInspectorHeading(): HTMLElement {
+  const heading = screen
+    .getAllByRole('heading', { level: 2 })
+    .find((h) => h.closest('dialog') === null && h.textContent !== 'Live preview');
+  if (heading === undefined) throw new Error('Inspector heading not found');
+  return heading;
 }
 
 /** Instantiate the working copy (Track 2 — bypasses the "all clear" gate screen
@@ -289,11 +338,11 @@ describe('CarveGallery — web-tag navigation', () => {
 
     renderGallery(ir, caps);
     // Default selection is nodes[0] — the "main" group — so its heading shows first.
-    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('main');
+    expect(getInspectorHeading().textContent).toBe('main');
 
     fireEvent.click(screen.getByRole('button', { name: /^group/ }));
 
-    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('second');
+    expect(getInspectorHeading().textContent).toBe('second');
     expect(screen.queryByText('Where "g" also appears')).toBeNull();
   });
 
@@ -316,17 +365,78 @@ describe('CarveGallery — web-tag navigation', () => {
     const popup = screen.getByRole('alertdialog');
     expect(popup.textContent).toContain('Where "h" also appears');
     // Still on "main" — the popup lists choices rather than auto-navigating.
-    // (The dialog itself also renders an <h2> title, so disambiguate by
-    // excluding headings inside the <dialog>.)
-    const inspectorHeadingBeforePick = screen
-      .getAllByRole('heading', { level: 2 })
-      .find((h) => h.closest('dialog') === null)!;
-    expect(inspectorHeadingBeforePick.textContent).toBe('main');
+    expect(getInspectorHeading().textContent).toBe('main');
 
     // Locate the popup row for "second" by its label text, then click its
     // enclosing <button> (the accessible name of that button concatenates
     // the kind + label spans, so matching by inner text is more robust).
     fireEvent.click(within(popup).getByText('second').closest('button')!);
-    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('second');
+    expect(getInspectorHeading().textContent).toBe('second');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 8. Live preview pane — CarveGallery's own useKeyboardArtifact pipeline
+//    (the actual fix under review: previously CarveGallery mounted NO live
+//    OSK preview at all). Asserts the pane renders and reflects the mocked
+//    artifact stage, mirroring the MechanismGallery.test.tsx "preview wiring"
+//    conventions (setMockStage + osk-frame data-stage assertions).
+// ---------------------------------------------------------------------------
+
+describe('CarveGallery — live preview pane', () => {
+  it('renders the "Live preview" heading and preview region alongside the Inspector', () => {
+    const ir = makeIR([makeGroup('g-main', 'main', [makeSimpleRule('r-a', 'K_A', 'a')])]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => emptyContributors(ch));
+
+    renderGallery(ir);
+
+    // The Inspector's own heading is still present and distinct from the preview's.
+    expect(getInspectorHeading().textContent).toBe('main');
+    expect(screen.getByRole('heading', { level: 2, name: 'Live preview' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Live preview keyboard preview' })).toBeTruthy();
+  });
+
+  it('shows a loading indicator in the preview pane while the artifact stage is fetching', () => {
+    setMockStage({ kind: 'fetching' });
+    const ir = makeIR([makeGroup('g-main', 'main', [makeSimpleRule('r-a', 'K_A', 'a')])]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => emptyContributors(ch));
+
+    renderGallery(ir);
+
+    expect(screen.getByText(/Fetching keyboard source/i)).toBeTruthy();
+    // The mock OSKFrame is always mounted (real OSKFrame drives its own
+    // stage-dependent rendering); what matters here is that the loading
+    // status reflects the "fetching" stage on the shared preview pane.
+    expect(screen.getByTestId('osk-frame-mock').getAttribute('data-stage')).toBe('fetching');
+  });
+
+  it('renders the OSKFrame once the artifact stage is ready', () => {
+    setMockStage({
+      kind: 'ready',
+      compileResult: { success: true, artifacts: [], diagnostics: [] },
+      jsBlobUrl: '',
+      vfs: createVirtualFS(),
+      scaffoldWarnings: [],
+      scaffoldNotices: [],
+      keyboardId: 'test',
+    });
+    const ir = makeIR([makeGroup('g-main', 'main', [makeSimpleRule('r-a', 'K_A', 'a')])]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => emptyContributors(ch));
+
+    renderGallery(ir);
+
+    expect(screen.getByTestId('osk-frame-mock').getAttribute('data-stage')).toBe('ready');
+  });
+
+  it('surfaces a Retry button in the preview pane when the artifact stage errors', () => {
+    setMockStage({ kind: 'error', step: 'compile', message: 'WASM crash' });
+    const ir = makeIR([makeGroup('g-main', 'main', [makeSimpleRule('r-a', 'K_A', 'a')])]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => emptyContributors(ch));
+
+    renderGallery(ir);
+
+    expect(screen.getByText(/Preview failed/i)).toBeTruthy();
+    expect(screen.getByText(/WASM crash/i)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy();
   });
 });

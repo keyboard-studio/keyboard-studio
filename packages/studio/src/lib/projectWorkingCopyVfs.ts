@@ -127,8 +127,17 @@ export type IdentityOverlay = {
 };
 
 export interface ProjectWorkingCopyVfsResult {
-  /** Warnings from any of the three projection steps (empty when all is well). */
+  /** Warnings from any of the projection steps — REAL problems only (empty when all is well). */
   warnings: string[];
+  /**
+   * Informational notices from any of the projection steps — successful,
+   * expected behavior that is NOT a problem (currently only
+   * applyStoreSlotRemovals's "dropped from every member of a pair-set"
+   * confirmation). Kept separate from `warnings` so a caller rendering
+   * `warnings` in an alert-severity banner never shows a success notice as
+   * if it were a problem (empty array when nothing noteworthy happened).
+   */
+  notices: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -163,6 +172,7 @@ export function projectWorkingCopyVfs(
   } = input;
 
   const warnings: string[] = [];
+  const notices: string[] = [];
 
   // Step 0: Touch layout injection — write the Phase E touch layout JSON into
   // `source/<keyboardId>.keyman-touch-layout` before any other projection step.
@@ -178,8 +188,8 @@ export function projectWorkingCopyVfs(
   // Step 1: Carve projection — re-emit IR with deleted nodes filtered out.
   //
   // deletedItemIds can carry two kinds of entries:
-  //   a) Slot ids: "<storeNodeId>#<itemsIndex>" — parallel-store deadkey slots to
-  //      replace with `nul` fillers (alignment-preserving; see applyStoreSlotRemovals).
+  //   a) Slot ids: "<storeNodeId>#<itemsIndex>" — store slots to drop, coordinated
+  //      across every store the pairing graph ties to it (see applyStoreSlotRemovals).
   //   b) Whole-node item ids: bare rule/store nodeIds from glyph-level carving.
   //
   // Partition them so the two mechanisms receive the correct inputs.
@@ -202,12 +212,13 @@ export function projectWorkingCopyVfs(
     }
   }
 
-  // 1a: Replace output-store slots with nul fillers (store-slot deletion path).
+  // 1a: Coordinated store-slot drop across pairing-graph-linked stores.
   const removalResult = applyStoreSlotRemovals(baseIr, slotIds);
   warnings.push(...removalResult.warnings);
+  notices.push(...removalResult.notices);
 
   // 1b: Whole-node deletions + VFS re-emit.
-  //     forceEmit: true when any slots were targeted — the nul-modified IR must
+  //     forceEmit: true when any slots were targeted — the drop-modified IR must
   //     be written into the VFS even if no whole-node deletions are present.
   //     When all slot ids are rejected by the transform's guards, forceEmit still
   //     triggers a (harmless, idempotent) re-emit of the unmodified IR.
@@ -367,5 +378,5 @@ export function projectWorkingCopyVfs(
     renameFilesInVfs(vfs, keyboardId, targetKeyboardId);
   }
 
-  return { warnings };
+  return { warnings, notices };
 }

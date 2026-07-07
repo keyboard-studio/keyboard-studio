@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { CarveNode, CarveGlyph, StoreRuleDetail, CharLocation } from '../../../lib/irToCarveNodes.ts';
+import type { CarveNode, CarveGlyph, StoreRuleDetail, CharLocation, StoreCharChip } from '../../../lib/irToCarveNodes.ts';
 import { nodeState, MOD_GROUP_DEFS, glyphsTriState, idsTriState } from '../../../lib/irToCarveNodes.ts';
 import { ToggleBox } from './ToggleBox.tsx';
 import { GlyphCell } from './GlyphCell.tsx';
@@ -40,6 +40,33 @@ export function storePairDescription(
   }
   // Role undetermined (defensive) — assert only the invariant that always holds.
   return `This list is paired with ${pairedList} by position — the lists line up one-for-one.`;
+}
+
+/**
+ * For a chip whose position is coordinated with one or more peer stores
+ * (chip.coordinatedWith, store NAMES), returns the display name(s) of any
+ * peer whose SAME-position chip is currently directly deleted — i.e. this
+ * chip's character will be spliced out at commit (the engine's coordinated
+ * drop) even though ITS OWN id isn't in deletedItemIds. Returns undefined
+ * when no peer is in that state (or the chip has no coordinated partners).
+ *
+ * Purely a per-render derivation — never adds an id to deletedItemIds
+ * itself, so restore/undo of the ORIGINAL chip that triggered the
+ * coordinated drop stays symmetric: this chip's displayed state always
+ * tracks the partner's live deletion state, never a separately-stored one.
+ */
+export function coordinatedRemovalLabel(
+  chip: StoreCharChip,
+  nodes: CarveNode[],
+  isItemDeleted: (id: string) => boolean,
+): string | undefined {
+  if (chip.coordinatedWith === undefined || chip.coordinatedWith.length === 0) return undefined;
+  const removedPeers = chip.coordinatedWith.filter((peerName) => {
+    const peerNode = nodes.find((n) => n.kind === 'store' && n.name === peerName);
+    if (peerNode === undefined) return false;
+    return isItemDeleted(`${peerNode.nodeId}#${chip.itemsIndex}`);
+  });
+  return removedPeers.length > 0 ? removedPeers.join(', ') : undefined;
 }
 
 const btnGhost: React.CSSProperties = {
@@ -271,14 +298,6 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
     allCharsCovered &&
     chipsState === 'off' &&
     (node.storeUsage?.ruleCount ?? 0) > 0;
-  // classifyStoreSlotEdit classifies once per store, so every toggleable
-  // chip in a store shares the same action — the first chip's action tells
-  // us which second-line copy applies. Only nul-fill and drop stores can
-  // ever have toggleable chips (blocked stores are all-disabled and never
-  // reach chipsState === 'off' via toggleable chips), so this is exhaustive
-  // for the banner's audience.
-  const banneredChipAction = toggleableChips[0]?.action;
-
   // Build combined consumer list from patternRefs + groupRefs for the dependency chain
   const consumers = [
     ...(node.storeUsage?.patternRefs ?? []).map((r) => ({
@@ -349,14 +368,21 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
             )}
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-            {chips.map((chip) => (
-              <StoreChip
-                key={chip.chipId}
-                chip={chip}
-                off={off || isItemDeleted(chip.chipId)}
-                onToggle={onToggleGlyph}
-              />
-            ))}
+            {chips.map((chip) => {
+              const chipOff = off || isItemDeleted(chip.chipId);
+              const coordinatedRemovedBy = chipOff
+                ? undefined
+                : coordinatedRemovalLabel(chip, nodes, isItemDeleted);
+              return (
+                <StoreChip
+                  key={chip.chipId}
+                  chip={chip}
+                  off={chipOff}
+                  onToggle={onToggleGlyph}
+                  {...(coordinatedRemovedBy !== undefined ? { coordinatedRemovedBy } : {})}
+                />
+              );
+            })}
           </div>
           {showEmptiesStoreWarning && (
             <div
@@ -376,9 +402,8 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
                   This will empty the store — the mechanism depending on it will stop working
                 </span>
                 <span style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
-                  {banneredChipAction === 'nul-fill'
-                    ? "Each removed character's slot outputs nothing (nul) in the built keyboard; the mechanism stays but produces no output."
-                    : "To keep the keyboard buildable, the built keyboard keeps this store's characters until at least one stays active — remove the whole store instead if you no longer need it."}
+                  To keep the keyboard buildable, the built keyboard keeps this store's characters until at
+                  least one stays active — remove the whole store instead if you no longer need it.
                 </span>
               </span>
             </div>
@@ -452,8 +477,52 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
             </p>
             <p style={{ margin: 0, fontSize: 12, color: 'var(--app-text-subtle)', lineHeight: 1.55, fontStyle: 'italic' }}>
               {node.pairedStoreNames.length === 1
-                ? 'These two stores work as a pair. Removing one without the other will break the mechanism.'
-                : 'These stores work together as a set. Removing one without the others will break the mechanism.'}
+                ? 'These two stores work as a pair. Removing a character drops the SAME position from both — including the input trigger key it takes to type that position, if this store is the input side. Removing one store without the other will break the mechanism.'
+                : 'These stores work together as a set. Removing a character drops the SAME position from every store in the set — including any input trigger key it takes to type that position. Removing one without the others will break the mechanism.'}
+            </p>
+          </div>
+        );
+      })()}
+      {(node.pairedStoreNames === undefined || node.pairedStoreNames.length === 0) &&
+        node.storePairingKind === 'self' && (() => {
+        const storeColor = KIND_COLOR.store;
+        return (
+          <div
+            style={{
+              marginTop: 18, padding: '12px 15px', borderRadius: 10,
+              background: `color-mix(in srgb, ${storeColor} 7%, var(--app-surface))`,
+              border: `1px solid color-mix(in srgb, ${storeColor} 30%, transparent)`,
+            }}
+          >
+            <div style={{ font: '600 10px/1 var(--app-font)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--app-text-subtle)', marginBottom: 8 }}>
+              Self-paired
+            </div>
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--app-text-muted)', lineHeight: 1.55 }}>
+              This store is both the input and the output side of the same mechanism — there's no
+              separate partner store. Removing a character removes it from both roles at once, at the
+              same position; there's nothing else to keep in sync.
+            </p>
+          </div>
+        );
+      })()}
+      {(node.pairedStoreNames === undefined || node.pairedStoreNames.length === 0) &&
+        node.storePairingKind === 'unresolved' && (() => {
+        return (
+          <div
+            role="alert"
+            style={{
+              marginTop: 18, padding: '12px 15px', borderRadius: 10,
+              background: 'color-mix(in srgb, var(--sil-orange) 9%, var(--app-surface))',
+              border: '1px solid color-mix(in srgb, var(--sil-orange) 45%, transparent)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, font: '600 10px/1 var(--app-font)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--sil-orange-dark)', marginBottom: 8 }}>
+              <WarnIcon size={13} /> Pairing not confirmed
+            </div>
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--app-text-muted)', lineHeight: 1.55 }}>
+              This store feeds a mechanism the tool can't fully verify — either its position isn't tied
+              to a matching input store it can confirm, or it's copied wholesale into another rule via
+              outs(). Per-character removal is disabled here until that's resolved.
             </p>
           </div>
         );

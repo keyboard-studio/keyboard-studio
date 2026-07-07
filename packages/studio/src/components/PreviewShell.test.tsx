@@ -28,7 +28,7 @@ const { mockSerializeResult, mockStage } = vi.hoisted(() => {
   return {
     mockSerializeResult: {
       current: null as
-        | { bytes: Uint8Array; warnings: string[]; keyboardId: string; version: string }
+        | { bytes: Uint8Array; warnings: string[]; notices: string[]; keyboardId: string; version: string }
         | null,
     },
     mockStage: {
@@ -132,6 +132,7 @@ const readyStage: Stage = {
   jsBlobUrl: "",
   vfs: createVirtualFS(),
   scaffoldWarnings: [],
+  scaffoldNotices: [],
   keyboardId: "basic_kbdus",
 };
 
@@ -186,6 +187,7 @@ describe("OutputScreen — route-split AC", () => {
     mockSerializeResult.current = {
       bytes: new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
       warnings: [],
+      notices: [],
       keyboardId: "basic_kbdus",
       version: "1.0",
     };
@@ -217,6 +219,7 @@ describe("OutputScreen — projection warnings", () => {
     mockSerializeResult.current = {
       bytes: new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
       warnings: [],
+      notices: [],
       keyboardId: "basic_kbdus",
       version: "1.0",
     };
@@ -244,6 +247,7 @@ describe("OutputScreen — projection warnings", () => {
         "[serialize] zip named ha_sil.zip but internal source paths still reference basic_kbdus",
         "[carve] opaque IR skipped",
       ],
+      notices: [],
       keyboardId: "ha_sil",
       version: "1.0",
     };
@@ -267,6 +271,7 @@ describe("OutputScreen — projection warnings", () => {
     mockSerializeResult.current = {
       bytes: new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
       warnings: ["[serialize] something"],
+      notices: [],
       keyboardId: "basic_kbdus",
       version: "1.0",
     };
@@ -289,6 +294,7 @@ describe("OutputScreen — projection warnings", () => {
     mockSerializeResult.current = {
       bytes: new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
       warnings: ["[serialize] first warning"],
+      notices: [],
       keyboardId: "basic_kbdus",
       version: "1.0",
     };
@@ -306,6 +312,7 @@ describe("OutputScreen — projection warnings", () => {
     mockSerializeResult.current = {
       bytes: new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
       warnings: [],
+      notices: [],
       keyboardId: "basic_kbdus",
       version: "1.0",
     };
@@ -392,6 +399,7 @@ describe("OutputScreen — download filename", () => {
     mockSerializeResult.current = {
       bytes: new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
       warnings: [],
+      notices: [],
       keyboardId: "basic_kbdus",
       version: "2.5",
     };

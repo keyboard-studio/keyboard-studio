@@ -17,7 +17,7 @@ import { useWorkingCopyStore, bindManifest } from "./stores/workingCopyStore.ts"
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
 import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
 import { type RouteId } from "./lib/navigate.ts";
-import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
+import { useKeyboardArtifact, type OnInstantiateCallback, type VfsTransform } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { OSKFrame } from "./components/OSKFrame.tsx";
 import { OskModeToggle, type OskMode } from "./components/OskModeToggle.tsx";
@@ -451,9 +451,54 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     patternMap: surveyPatternMap.size > 0 ? surveyPatternMap : null,
   });
 
+  // ---------------------------------------------------------------------------
+  // Redundant-compile gate (full-screen steps own their own warm pipeline).
+  //
+  // carve/mechanisms/touch (FULL_LAYOUT_IDS) each mount their OWN
+  // useKeyboardArtifact instance for the live preview they actually render
+  // (CarveGallery, MechanismGallery, TouchGallery). SurveyView's pipeline
+  // below stays mounted throughout — its OSK preview is simply not rendered
+  // while activeStepIsFullScreen (see the early return below) — but every
+  // carve/assignment toggle still produces a NEW workingCopyTransform
+  // reference (deletedKey/assignmentsKey change), and useKeyboardArtifact
+  // treats a new vfsTransform reference as "recompile now" (see the
+  // transformVersion effect in useKeyboardArtifact.ts). Without this gate
+  // that recompile fires on every toggle, concurrently with the full-screen
+  // gallery's own real compile, for a result nobody looks at.
+  //
+  // Fix: freeze the transform reference fed to THIS hook while a full-screen
+  // step is active — frozenTransformRef only updates while NOT full-screen,
+  // so useKeyboardArtifact keeps seeing the SAME reference (no-op) for the
+  // duration of the full-screen step. Returning to a non-full-screen step
+  // thaws it: the ref is refreshed to the live (final) transform, which is
+  // a new reference relative to the frozen one, so exactly ONE recompile
+  // fires reflecting everything that changed while full-screen — cheap (no
+  // re-fetch; recompile() only) and keeps the "warm return" behavior intact.
+  // Does not touch baseKeyboard/localBase, so the fetch→compile pipeline
+  // itself, and its "ready" stage, survive full-screen untouched.
+  // ---------------------------------------------------------------------------
+  const frozenTransformRef = useRef<VfsTransform | null>(null);
+  // Sync in an effect (post-commit), not the render body — mutating a ref
+  // during render is unsafe (a discarded/re-run render pass, e.g. under
+  // StrictMode double-invocation, would mutate the ref without a matching
+  // commit). Behaviorally equivalent to the render-body version: while NOT
+  // full-screen, `gatedWorkingCopyTransform` below reads `workingCopyTransform`
+  // directly (never the ref), so this effect's job is purely to keep the ref
+  // primed with the latest live value for the render(s) that DO read it (once
+  // `activeStepIsFullScreen` flips true) — by the time that flip renders, the
+  // effect for the preceding non-full-screen render has already committed.
+  useEffect(() => {
+    if (!activeStepIsFullScreen) {
+      frozenTransformRef.current = workingCopyTransform;
+    }
+  }, [activeStepIsFullScreen, workingCopyTransform]);
+  const gatedWorkingCopyTransform = activeStepIsFullScreen
+    ? frozenTransformRef.current
+    : workingCopyTransform;
+
   // Use localBase (immediately updated on selection) to drive the pipeline.
   // Pass scaffoldSpec so Track 1 routes through scaffold() instead of fetchKeyboardSourceToVfs.
-  const { stage: artifactStage, retry } = useKeyboardArtifact(localBase, scaffoldSpec, workingCopyTransform, onInstantiate);
+  const { stage: artifactStage, retry } = useKeyboardArtifact(localBase, scaffoldSpec, gatedWorkingCopyTransform, onInstantiate);
 
   // Derive KMN source from the working copy's base VFS for the validator.
   const kmnSource = useMemo(() => {

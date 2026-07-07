@@ -11,7 +11,7 @@ import type {
   RemovalCapability,
   StoreItem,
 } from '@keyboard-studio/contracts';
-import { isParallelIndexFanOut, classifyStoreSlotEdit } from '@keyboard-studio/engine';
+import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing } from '@keyboard-studio/engine';
 import type { StoreSlotBlockReason } from '@keyboard-studio/engine';
 export type CardKind = 'pattern' | 'group' | 'store' | 'raw';
 
@@ -547,9 +547,12 @@ export function patternToGlyphs(pattern: Pattern, ir: KeyboardIR, capabilities: 
 //
 // Action is derived once per store via classifyStoreSlotEdit (single
 // authority — never re-derived here):
-//   "nul-fill" — output-store slots; removing the char replaces it with a
-//                silent `nul` filler that preserves index() alignment.
-//   "drop"     — safe to splice out entirely (no positional contract).
+//   "drop"     — safe to splice out entirely (no positional contract to
+//                preserve via filler). When `coordinatedWith` is non-empty,
+//                removing this char also splices the SAME item index out of
+//                every named peer store (the pairing-graph fix) — the peer
+//                may hold a non-char filler at that position; the coordinated
+//                partner is spliced regardless of its kind.
 //   "disabled" — classifyStoreSlotEdit returned "blocked"; disabledReason
 //                carries an author-facing plain-language explanation.
 // ---------------------------------------------------------------------------
@@ -561,7 +564,9 @@ export interface StoreCharChip {
   ch: string;
   /** TRUE 0-based index into IRStore.items (not the char-only display index). */
   itemsIndex: number;
-  action: 'nul-fill' | 'drop' | 'disabled';
+  action: 'drop' | 'disabled';
+  /** Peer store names (sorted) whose item at the SAME index is spliced alongside this one. Present only when non-empty. */
+  coordinatedWith?: string[];
   /** Author-facing plain-language explanation. Present only when action === 'disabled'. */
   disabledReason?: string;
 }
@@ -575,14 +580,14 @@ export interface StoreCharChip {
  */
 function blockReasonToDisabledReason(reason: StoreSlotBlockReason): string {
   switch (reason) {
-    case 'paired-input':
-      return "This store feeds an any()/index() mechanism — removing characters here would break its pairing; per-character removal for paired stores is planned.";
     case 'notany-widens':
       return "This store is matched negatively (notany) — removing a character would make MORE keys match, not fewer.";
     case 'context-index-aligned':
       return "This store's positions are read directly by a rule's matcher (index() in its context) — removing a character would shift every position after it out of alignment.";
-    case 'dual-use':
-      return "This store is both read from and written to across your rules — removing a character here isn't safe until that dual role is resolved.";
+    case 'unresolved-index-pairing':
+      return "This store (or one it's positionally paired with) feeds an index() mechanism whose pairing couldn't be confirmed — removing a character here isn't safe until that's resolved.";
+    case 'outs-reference-unanalyzed':
+      return "This store (or one it's positionally paired with) is copied wholesale into another rule via outs() — the tool can't confirm there's no hidden mechanism depending on its character positions, so it isn't safe to edit here.";
     case 'system-store':
       return "This is a system store the compiler manages directly — it isn't meant to be edited here.";
   }
@@ -602,7 +607,10 @@ export function storeCharChips(store: IRStore, ir: KeyboardIR): StoreCharChip[] 
         disabledReason: blockReasonToDisabledReason(editMode.reason),
       });
     } else {
-      chips.push({ chipId, ch: item.value, itemsIndex, action: editMode.mode });
+      chips.push({
+        chipId, ch: item.value, itemsIndex, action: 'drop',
+        ...(editMode.coordinatedWith.length > 0 ? { coordinatedWith: editMode.coordinatedWith } : {}),
+      });
     }
   });
 
@@ -819,6 +827,15 @@ export interface CarveNode {
   referencedByNodeId?: string | undefined; // store: which pattern owns it
   referencedByLabel?: string | undefined;  // store: that pattern's title
   storeUsage?: StoreUsage | undefined;     // store: how it is used in rules
+  /**
+   * store: which pairing-graph relationship this store has (from the
+   * engine's `describeStorePairing`, the single source of truth — see
+   * `StorePairingDescription`) — absent when the store has no pairing
+   * relationship at all ("none"). "cross" is ALSO reflected in
+   * `pairedStoreNames` (non-empty); "self" and "unresolved" leave
+   * `pairedStoreNames` absent/empty (no partner store to name).
+   */
+  storePairingKind?: 'self' | 'cross' | 'unresolved' | undefined;
   /** store: nodeIds of peer stores linked via any()/index() pairing (parallel to pairedStoreNames; undefined entry = unresolved peer, e.g. system store) */
   pairedStoreIds?: (string | undefined)[] | undefined;
   /** store: display names of peer stores linked via any()/index() pairing */
@@ -975,78 +992,37 @@ export function triggerKeyLabel(context: ContextElement[]): string | undefined {
 }
 
 // ---------------------------------------------------------------------------
-// detectStorePairs — find any(storeA)/index(storeB) peer relationships
+// findPairingWitnessRule — locate a rule that establishes a given pairing
+// edge, for trigger-key display only
 // ---------------------------------------------------------------------------
 
-/** A single entry in the detectStorePairs result: a peer store plus the trigger key that fires the swap. */
-export interface StorePairEntry {
-  pairedName: string;
-  /** Human-readable trigger key label (e.g. "Backspace", "A"); undefined when not determinable. */
-  trigger: string | undefined;
-}
-
 /**
- * For each rule that has both an any(storeA) element in its context AND an
- * index(storeB, …) element in its output, record storeA → storeB and
- * storeB → storeA as paired peers, capturing the trigger key for each pair.
+ * Find one rule that resolves a positional pairing edge between `a` and `b`
+ * (`a === b` for a self-pair) via an `index()`-output element whose offset
+ * resolves back to an `any()` context element for the OTHER name — the
+ * SAME offset arithmetic (post-`+`-exclusion) as the engine's pairing graph
+ * in `applyStoreSlotRemovals.ts`.
  *
- * Returns a map of storeName → StorePairEntry[] (deduplicated by pairedName,
- * trigger taken from the first matching rule). Sorted by pairedName.
- * Only `any()`/`index()` pairing is in scope (no deadkey elements).
+ * Display-only: `describeStorePairing` (the engine's `@keyboard-studio/engine`
+ * export) is the single source of truth for WHICH stores are paired; this
+ * helper only answers "which rule can I show as this edge's trigger key",
+ * so it never needs to be re-checked against the engine's block/pair-set
+ * decisions.
  */
-export function detectStorePairs(ir: KeyboardIR): Map<string, StorePairEntry[]> {
-  // Inner map: storeName → Map<pairedName, trigger>
-  const pairsMap = new Map<string, Map<string, string | undefined>>();
-
-  const addPair = (a: string, b: string, trigger: string | undefined) => {
-    if (a === b) return;
-    if (!pairsMap.has(a)) pairsMap.set(a, new Map());
-    if (!pairsMap.has(b)) pairsMap.set(b, new Map());
-    // Only record trigger on first observation (first matching rule wins)
-    if (!pairsMap.get(a)!.has(b)) pairsMap.get(a)!.set(b, trigger);
-    if (!pairsMap.get(b)!.has(a)) pairsMap.get(b)!.set(a, trigger);
-  };
-
+function findPairingWitnessRule(ir: KeyboardIR, a: string, b: string): IRRule | undefined {
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      // Collect all any() store names from context
-      const anyStores: string[] = [];
-      for (const el of rule.context) {
-        if (el.kind === 'any' && el.storeRef !== undefined) {
-          anyStores.push(el.storeRef);
-        }
-      }
-      if (anyStores.length === 0) continue;
-
-      // Collect all index() store names from output
-      const indexStores: string[] = [];
+      const effectiveContext = rule.context.filter((el) => !(el.kind === 'raw' && el.text.trim() === '+'));
       for (const el of rule.output) {
-        if (el.kind === 'index' && el.storeRef !== undefined) {
-          indexStores.push(el.storeRef);
-        }
-      }
-      if (indexStores.length === 0) continue;
-
-      const trigger = triggerKeyLabel(rule.context);
-
-      // Cross-pair: every any() store is paired with every index() store in this rule
-      for (const a of anyStores) {
-        for (const b of indexStores) {
-          addPair(a, b, trigger);
-        }
+        if (el.kind !== 'index') continue;
+        const target = effectiveContext[el.offset - 1];
+        if (!target || target.kind !== 'any') continue;
+        const edge = [el.storeRef, target.storeRef].sort().join('\x00');
+        if (edge === [a, b].sort().join('\x00')) return rule;
       }
     }
   }
-
-  // Convert to StorePairEntry[] sorted by pairedName
-  const result = new Map<string, StorePairEntry[]>();
-  for (const [name, peers] of pairsMap) {
-    const entries: StorePairEntry[] = [...peers.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([pairedName, trigger]) => ({ pairedName, trigger }));
-    result.set(name, entries);
-  }
-  return result;
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -1124,8 +1100,6 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
     });
   }
 
-  const storePairs = detectStorePairs(ir);
-
   // Build a name→nodeId lookup for resolving paired store names to nodeIds
   const storeNameToNodeId = new Map<string, string>(
     ir.stores.filter((s) => !s.isSystem).map((s) => [s.name, s.nodeId]),
@@ -1138,26 +1112,31 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
     );
     const usage = analyzeStoreUsage(store.name, ir);
 
-    const pairedEntries = storePairs.get(store.name);
-    const hasPairs = pairedEntries !== undefined && pairedEntries.length > 0;
-    const pairedStoreNames = hasPairs ? pairedEntries.map((e) => e.pairedName) : undefined;
+    // Single source of truth for pairing display: the engine's pairing
+    // graph (describeStorePairing), never a local cross-product heuristic —
+    // see the applyStoreSlotRemovals.ts canonical-failure regression test
+    // for why (2-any()/2-index() rules produce independent SELF-pairs, not
+    // a cross-pair, and a positionally-blind cross-product gets that wrong).
+    const pairing = describeStorePairing(store, ir);
+    const storePairingKind = pairing.kind !== 'none' ? pairing.kind : undefined;
+    const pairedStoreNames = pairing.kind === 'cross' ? pairing.partners : undefined;
     // Keep index-aligned with pairedStoreNames/Triggers/Roles: an unresolved
     // peer (e.g. a system store, absent from storeNameToNodeId) stays as an
     // undefined slot rather than being filtered out, which would shift every
     // later pair's id/trigger/role by one. Inspector guards undefined per-slot.
-    const pairedStoreIds = hasPairs
-      ? pairedEntries.map((e) => storeNameToNodeId.get(e.pairedName))
-      : undefined;
-    const pairedStoreTriggers = hasPairs ? pairedEntries.map((e) => e.trigger) : undefined;
-    const pairedStoreRoles: ('input' | 'output' | 'input+output' | undefined)[] | undefined = hasPairs
-      ? pairedEntries.map((e) => {
-          const u = analyzeStoreUsage(e.pairedName, ir);
-          if (u.asSource && u.asOutput) return 'input+output';
-          if (u.asSource) return 'input';
-          if (u.asOutput) return 'output';
-          return undefined;
-        })
-      : undefined;
+    const pairedStoreIds = pairedStoreNames?.map((name) => storeNameToNodeId.get(name));
+    const pairedStoreTriggers = pairedStoreNames?.map((name) => {
+      const witness = findPairingWitnessRule(ir, store.name, name);
+      return witness ? triggerKeyLabel(witness.context) : undefined;
+    });
+    const pairedStoreRoles: ('input' | 'output' | 'input+output' | undefined)[] | undefined =
+      pairedStoreNames?.map((name) => {
+        const u = analyzeStoreUsage(name, ir);
+        if (u.asSource && u.asOutput) return 'input+output';
+        if (u.asSource) return 'input';
+        if (u.asOutput) return 'output';
+        return undefined;
+      });
 
     const roleLine = computeStoreRoleLine(usage.ruleCount > 0 ? usage : undefined, store.items);
 
@@ -1169,6 +1148,7 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
       loadBearing: refPattern !== undefined,
       storeUsage: usage.ruleCount > 0 ? usage : undefined,
       ...(refPattern !== undefined ? { referencedByNodeId: refPattern.id, referencedByLabel: refPattern.title } : {}),
+      ...(storePairingKind !== undefined ? { storePairingKind } : {}),
       ...(pairedStoreIds !== undefined ? { pairedStoreIds } : {}),
       ...(pairedStoreNames !== undefined ? { pairedStoreNames } : {}),
       ...(pairedStoreTriggers !== undefined ? { pairedStoreTriggers } : {}),
