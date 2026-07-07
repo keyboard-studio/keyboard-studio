@@ -147,7 +147,9 @@ export function BaseResolutionAdapter({ onComplete, onBack }: EditorStepProps) {
   const setLocalBase = useSurveySessionStore((s) => s.setLocalBase);
 
   const target: SuggestTarget = {
-    script: identityResult?.prefill.script ?? "Latn",
+    // `||` not `??`: prefill.script can be "" (no script selected for an
+    // unrecognized language), which must also fall back.
+    script: identityResult?.prefill.script || "Latn",
     ...(identityResult !== null && identityResult.bcp47 !== ""
       ? { bcp47: identityResult.bcp47 }
       : {}),

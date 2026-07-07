@@ -7,6 +7,8 @@
 //   2. identityResult === null -> falls back to script "Latn", no crash,
 //      no language-match badge.
 //   3. identityResult.bcp47 === "" -> same fallback behaviour as (2).
+//   4. identityResult.prefill.script === "" (unrecognized language) -> script
+//      falls back to "Latn" instead of failing every script comparison.
 
 import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
 import { render, screen, cleanup, waitFor } from "@testing-library/react";
@@ -95,6 +97,22 @@ describe("BaseResolutionAdapter — suggest target sourced from surveySessionSto
   it("identityResult.bcp47 === '' falls back to script-only target without crashing", async () => {
     useSurveySessionStore.getState().setIdentityResult(
       makeIdentityResult({ bcp47: "" }),
+    );
+
+    render(<BaseResolutionAdapter onComplete={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Matches your script")).toBeDefined();
+    });
+    expect(screen.queryByText("Already supports your language")).toBeNull();
+  });
+
+  it("prefill.script === '' falls back to 'Latn' so script matching still works", async () => {
+    useSurveySessionStore.getState().setIdentityResult(
+      makeIdentityResult({
+        bcp47: "",
+        prefill: { script: "", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
+      }),
     );
 
     render(<BaseResolutionAdapter onComplete={() => {}} />);
