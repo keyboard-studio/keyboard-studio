@@ -85,7 +85,7 @@ A user has the App installed with **"only select repositories"** selected. The s
 
 ### User Story 4 — Google-only user opts into Option A (Priority: P3)
 
-A user who signed up with Google clicks "Fork & submit yourself". Per §1a §6 the button is disabled with a "connect a GitHub account" prompt. Connecting runs the GitHub App user-to-server flow (not the OAuth App), after which Story 1 applies.
+A user who signed up with Google clicks "Fork & submit yourself". Per [github-integration.md §5 Q6](../../docs/github-integration.md) (Self-fork for non-GitHub identities) the button is disabled with a "connect a GitHub account" prompt. Connecting runs the GitHub App user-to-server flow (not the OAuth App), after which Story 1 applies.
 
 **Why this priority**: Preserves the existing §1a behaviour, but the "connect GitHub" action must now mint a **GitHub App** user token, not an OAuth App token.
 
@@ -93,7 +93,7 @@ A user who signed up with Google clicks "Fork & submit yourself". Per §1a §6 t
 
 **Acceptance Scenarios**:
 
-1. **Given** an `IdentitySession.provider === "google"`, **When** the user clicks Option A, **Then** the button is disabled with a connect-GitHub prompt (unchanged from §1a §6).
+1. **Given** an `IdentitySession.provider === "google"`, **When** the user clicks Option A, **Then** the button is disabled with a connect-GitHub prompt (unchanged from [github-integration.md §5 Q6](../../docs/github-integration.md)).
 2. **Given** the connect-GitHub action, **When** it completes, **Then** the resulting token is a **GitHub App** user-to-server token (no OAuth App / `public_repo` involved).
 
 ---
@@ -105,7 +105,7 @@ A user who signed up with Google clicks "Fork & submit yourself". Per §1a §6 t
 - **Fork already exists from a prior submission.** → Reuse it; do not error. Branch naming follows §5 Q1 (`add/<keyboardId>`, uniqueness suffix TBD).
 - **User revokes the App between sign-in and submit.** → Treated as `APP_NOT_INSTALLED`; re-prompt install.
 - **Working copy must survive the install/authorize round trip.** Installing the App and authorizing a repo both leave and re-enter the SPA. → Reuse the existing snapshot-to-`sessionStorage` mechanism (`ks.working-copy.draft`, [github-integration.md §5 Q7](../../docs/github-integration.md)) so the in-progress keyboard is not lost.
-- **PR against upstream when the App is not installed on `keymanapp/keyboards`.** The App is installed on the *user's* account (for the fork/push), not upstream. → Confirm a user-to-server token can open a cross-fork PR against a public upstream the App is not installed on; if not, fall back to opening the PR via the user's permissions. (See NEEDS CLARIFICATION in Requirements.)
+- **PR against upstream when the App is not installed on `keymanapp/keyboards`.** The App is installed on the *user's* account (for the fork/push), not upstream. → **Confirmed (FR-015): it cannot.** The base repo (`keymanapp/keyboards`) must itself have the App installed with `pull_requests:write`; a user-to-server token does not inherit the user's ambient `public_repo` reach. This requires an upstream App installation (keymanapp governance) or retaining the OAuth App for the PR step — see FR-015 for the decision.
 
 ---
 
@@ -124,13 +124,19 @@ A user who signed up with Google clicks "Fork & submit yourself". Per §1a §6 t
 - **FR-009**: The fork+PR pipeline (`publishPR()` in [packages/engine/src/output/github.ts](../../packages/engine/src/output/github.ts)) MUST be reused unchanged in structure — only the auth-resolution step changes to yield a GitHub App user token. Fork → branch → commit → push → PR-against-upstream-`main` semantics are preserved.
 - **FR-010**: The PR MUST be authored by the **user** (their fork, their identity), preserving Option A's "own your contribution" property; commit attribution uses the user's verified primary email.
 - **FR-011**: Once FR-001…FR-010 are in place, the system MUST retire the OAuth App: remove the `oauth_app` client discriminator and `REQUIRED_SCOPE`/`public_repo` submit path from [githubOAuth.ts](../../packages/studio/src/lib/githubOAuth.ts), remove `resolveCredentials()`'s OAuth-App branch and the `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` / `VITE_GITHUB_OAUTH_CLIENT_ID` environment variables ([oauth-backend](../../utilities/oauth-backend/src/handlers.ts)), and update [github-integration.md §4a](../../docs/github-integration.md) to describe a single-App topology.
-- **FR-012**: A Google-only identity clicking Option A MUST be prompted to connect GitHub via the **GitHub App** user-to-server flow (not the OAuth App); the disabled-button-with-prompt behaviour of §1a §6 is otherwise unchanged.
-- **FR-013**: The GitHub App MUST be configured with the repository permissions Option A requires — at minimum **Contents: write** and **Pull requests: write** (and whatever permission is required to create a fork on the user's behalf) — and only the App's **public `client_id`** is embedded in the SPA.
+- **FR-012**: A Google-only identity clicking Option A MUST be prompted to connect GitHub via the **GitHub App** user-to-server flow (not the OAuth App); the disabled-button-with-prompt behaviour of [github-integration.md §5 Q6](../../docs/github-integration.md) is otherwise unchanged.
+- **FR-013**: The GitHub App MUST be configured with the repository permissions Option A requires, confirmed against GitHub's permission reference ([permissions-required-for-github-apps](https://docs.github.com/en/rest/authentication/permissions-required-for-github-apps)): **Administration: write** + **Contents: read** to create the fork (`POST /repos/{owner}/{repo}/forks`), **Contents: write** to push the commit and branch to the fork, and **Pull requests: write** to open the PR (`POST /repos/{owner}/{repo}/pulls`). Only the App's **public `client_id`** is embedded in the SPA. These permissions must hold on the repository each call targets (see FR-015): the fork-creation and push permissions on the source/user fork, the **Pull requests: write** permission on the base repo `keymanapp/keyboards` — which the App can only have if it is installed there.
 - **FR-014**: No token (user access or refresh) may be logged at any level; `Authorization:` headers MUST be redacted in any debug logging (existing §4 invariant, restated because the credential type changes).
 
-*Unclear requirements to resolve before/at planning:*
+- **FR-015 (RESOLVED 2026-07-06 — answer: NO)**: A GitHub App token **cannot** open a pull request whose *base* is a repository the App is not installed on, even when the token has write to the head fork. Confirmed two ways:
+  - **Empirical** (local run of the Option B installation-token path against the real App, `app_id 4144632` / installation `143577650`): `POST /repos/mattgyverlee/keyboards/pulls` (App absent on that owner) → **403 "Resource not accessible by integration"**; the identical call against `keyboard-studio/keyboards` (App installed) → **201**. Proven in both directions.
+  - **Docs** ([permissions-required-for-github-apps](https://docs.github.com/en/rest/authentication/permissions-required-for-github-apps)): opening a PR needs **Pull requests: write** *on the base repo*; a user-to-server token carries only the **intersection** of the user's access and the App's *installed* permissions, so it does **not** inherit the user's ambient `public_repo` reach and cannot act on `keymanapp/keyboards` unless the App is installed there. (The finding was observed on the installation-token path; the same installation-scoping governs the user-to-server token Option A uses.)
 
-- **FR-015**: The system MUST open the cross-fork PR against `keymanapp/keyboards` [NEEDS CLARIFICATION: can a GitHub App user-to-server token create a PR whose *base* is an upstream repo the App is **not** installed on, given the token has write to the head fork? Confirm against GitHub's API before committing to the App-only topology; if it cannot, define the fallback (e.g. the user opens the PR via their own permissions, or the org proxies it).]
+  **Consequence — DECISION REQUIRED, blocks SC-001/SC-004:** delivering Option A to the real upstream requires the studio's GitHub App to be **installed on `keymanapp/keyboards`** with `pull_requests:write` (plus the fork step's `administration:write`/`contents:read` if the fork is created via the App). That is a **keymanapp governance decision** the studio cannot satisfy alone. Two paths:
+  - **(a)** keymanapp installs the App on `keymanapp/keyboards` → App-only Option A is achievable and the OAuth App can be retired as this spec intends.
+  - **(b)** keymanapp will **not** install the App → Option A's upstream fork+PR must keep the OAuth App (user `public_repo` scope). Then **SC-004 is not met** and the "retire the OAuth App" thesis does not hold for Option A; the App-only claim reduces to sign-in + Option B.
+
+  Interim proof-of-flow targets `keyboard-studio/keyboards` (App installed), which completes end-to-end today; it does not by itself prove SC-001 against the real upstream.
 - **FR-016**: The connect/authorize entry point MUST use [NEEDS CLARIFICATION: web authorization-code flow is assumed (FR-002). Device flow — azt's mechanism — is explicitly out of scope unless the web flow proves unworkable in the SPA context. Confirm no requirement forces device flow.]
 
 ### Key Entities
@@ -146,10 +152,10 @@ A user who signed up with Google clicks "Fork & submit yourself". Per §1a §6 t
 
 ### Measurable Outcomes
 
-- **SC-001**: With the OAuth App environment variables entirely unset, a signed-in user completes Option A end-to-end and a PR appears on `keymanapp/keyboards` authored by that user. (The definitive proof the OAuth App is retired.)
+- **SC-001**: With the OAuth App environment variables entirely unset, a signed-in user completes Option A end-to-end and a PR appears on `keymanapp/keyboards` authored by that user. (The definitive proof the OAuth App is retired.) **Contingent on the FR-015 decision (a): achievable only once the studio's App is installed on `keymanapp/keyboards`. Provable today only against `keyboard-studio/keyboards`, where the App is installed.**
 - **SC-002**: Every App-installation failure mode (`APP_NOT_INSTALLED`, `REPO_NOT_AUTHORIZED`, `APP_SUSPENDED`) surfaces a plain-language prompt with a working remediation link — zero raw 403/404s reach the user.
 - **SC-003**: After a user completes an install/authorize round trip, their in-progress working copy is intact and the submission resumes without re-authoring (0% working-copy loss across the round trip).
-- **SC-004**: The codebase contains no remaining reference to a second (OAuth App) credential: no `oauth_app` discriminator, no `public_repo` / `REQUIRED_SCOPE`, no `GITHUB_OAUTH_CLIENT_*` env. A single GitHub App serves sign-in, Option A, and Option B.
+- **SC-004**: The codebase contains no remaining reference to a second (OAuth App) credential: no `oauth_app` discriminator, no `public_repo` / `REQUIRED_SCOPE`, no `GITHUB_OAUTH_CLIENT_*` env. A single GitHub App serves sign-in, Option A, and Option B. **Achievable only under FR-015 path (a); under path (b) the OAuth App is retained for Option A's upstream PR and this criterion cannot be met.**
 - **SC-005**: A "select repositories" installation whose set excludes the fork produces exactly one `REPO_NOT_AUTHORIZED` remediation (not a silent failure or a loop), and an "all repositories" installation produces zero return trips.
 
 ---
@@ -161,7 +167,7 @@ A user who signed up with Google clicks "Fork & submit yourself". Per §1a §6 t
 - **Web authorization-code + PKCE is the flow.** Device flow (azt's mechanism) is out of scope for the SPA; we adopt azt's *token model and installation-lifecycle handling*, not its device-flow UX.
 - **The existing `publishPR()` pipeline and `oauth-backend` seam are reused.** Only auth resolution and error mapping change; the fork/branch/commit/push/PR steps and the SPA↔engine `OutputService` boundary are unchanged.
 - **`sessionStorage` working-copy snapshotting already exists** ([github-integration.md §5 Q7](../../docs/github-integration.md)) and is reused for the install/authorize round trips.
-- **Retiring the OAuth App is the accepted end state** (product decision recorded during the azt investigation). This spec assumes that decision; it does not re-litigate whether to keep Option A.
+- **Retiring the OAuth App is the accepted end state** (product decision recorded during the azt investigation). This spec assumes that decision; it does not re-litigate whether to keep Option A. **Caveat (FR-015):** full retirement is achievable only if keymanapp installs the studio's GitHub App on `keymanapp/keyboards`; absent that, Option A's upstream PR must keep the OAuth App and the end state is not reached. This assumption is therefore contingent, not settled.
 
 ---
 
