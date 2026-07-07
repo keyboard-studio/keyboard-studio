@@ -782,6 +782,60 @@ describe('Inspector — StoreDetail chip toggle wiring', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// #523 — onStoreCascade threading. StoreDetail must call onStoreCascade with
+// (chipId, ch) when the prop is present, and fall back to the plain
+// onToggleGlyph path (unchanged) when it's absent.
+// ---------------------------------------------------------------------------
+
+describe('Inspector — StoreDetail onStoreCascade wiring', () => {
+  it('calls onStoreCascade(chipId, ch) instead of onToggleGlyph when the prop is present', () => {
+    const onToggleGlyph = vi.fn();
+    const onStoreCascade = vi.fn();
+    const chips: StoreCharChip[] = [
+      { chipId: 'store#s#0', ch: 'a', itemsIndex: 0, action: 'drop' },
+    ];
+    const node = makeStoreNode({ storeChips: chips });
+    render(
+      <Inspector
+        {...baseInspectorProps}
+        node={node}
+        nodes={[node]}
+        onToggleGlyph={onToggleGlyph}
+        onStoreCascade={onStoreCascade}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('a'));
+    expect(onStoreCascade).toHaveBeenCalledWith('store#s#0', 'a');
+    expect(onToggleGlyph).not.toHaveBeenCalled();
+  });
+
+  it('falls back to onToggleGlyph when onStoreCascade is absent', () => {
+    const onToggleGlyph = vi.fn();
+    const chips: StoreCharChip[] = [
+      { chipId: 'store#s#0', ch: 'a', itemsIndex: 0, action: 'drop' },
+    ];
+    const node = makeStoreNode({ storeChips: chips });
+    render(<Inspector {...baseInspectorProps} node={node} nodes={[node]} onToggleGlyph={onToggleGlyph} />);
+
+    fireEvent.click(screen.getByText('a'));
+    expect(onToggleGlyph).toHaveBeenCalledWith('store#s#0');
+  });
+
+  it('a disabled chip never calls onStoreCascade, even when the prop is present', () => {
+    const onStoreCascade = vi.fn();
+    const chips: StoreCharChip[] = [
+      { chipId: 'store#s#0', ch: 'a', itemsIndex: 0, action: 'disabled', disabledReason: 'blocked: reason text' },
+    ];
+    const node = makeStoreNode({ storeChips: chips });
+    render(<Inspector {...baseInspectorProps} node={node} nodes={[node]} onStoreCascade={onStoreCascade} />);
+
+    fireEvent.click(screen.getByText('a'));
+    expect(onStoreCascade).not.toHaveBeenCalled();
+  });
+});
+
 describe('Inspector — StoreDetail AC6 "empties the store" warning banner', () => {
   const AC6_TEXT = 'This will empty the store — the mechanism depending on it will stop working';
   // Drop-class stores are the only class that can still show this banner:
