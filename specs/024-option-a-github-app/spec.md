@@ -2,7 +2,7 @@
 
 **Feature Branch**: `024-option-a-github-app`
 
-**Created**: 2026-07-06
+**Created**: 2026-07-06 · **Updated**: 2026-07-07 (FR-015/FR-016 decisions)
 
 **Status**: Draft
 
@@ -135,7 +135,7 @@ A user who signed up with Google clicks "Fork & submit yourself". Per [github-in
   **DECISION (2026-07-07):** Option A targets **`keyboard-studio/keyboards`** — the studio org's fork of `keymanapp/keyboards`, on which the studio's GitHub App **is** installed — as both the fork source and the PR base. Because the App is installed there, it holds `administration:write`/`contents:read` (fork), `contents:write` (push to the user's fork), and `pull_requests:write` (PR) where each call lands, so the entire fork → push → PR flow runs on the GitHub App **user-to-server token alone**. This unblocks **SC-001** and **SC-004** and makes retiring the OAuth App achievable. The studio does **not** need `keymanapp` to install the App.
 
   Onward promotion of accepted PRs from `keyboard-studio/keyboards` to the real `keymanapp/keyboards` upstream is a **separate step, out of scope** for this spec (not user-facing; handled by the org, not the studio App). Opening a PR whose base is `keymanapp/keyboards` directly remains impossible under the App token (403) and is not attempted.
-- **FR-016**: The connect/authorize entry point MUST use [NEEDS CLARIFICATION: web authorization-code flow is assumed (FR-002). Device flow — azt's mechanism — is explicitly out of scope unless the web flow proves unworkable in the SPA context. Confirm no requirement forces device flow.]
+- **FR-016 (RESOLVED 2026-07-07)**: The connect/authorize entry point MUST use the **web authorization-code flow with PKCE** already shipped for sign-in (FR-002) — not device flow. **Decision:** no requirement forces device flow; the SPA can redirect, so it reuses the existing web flow. Device flow (azt's mechanism) stays out of scope unless the web flow proves unworkable in the SPA context, in which case it is the documented fallback (see Assumptions and Out of scope). This closes the last open marker in this spec.
 
 ### Key Entities
 
