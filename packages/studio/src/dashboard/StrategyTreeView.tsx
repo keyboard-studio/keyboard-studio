@@ -267,7 +267,7 @@ function DefaultFillProvenance({ axisFills }: { axisFills: AxisFill[] | undefine
       <p style={{ fontSize: 11.5, color: "#8b949e", margin: "0 0 8px", fontFamily: SANS }}>
         These phase-gated axes were not elicited by the survey. Each was supplied either by the §7.2
         script-class prior (the unmarked/off-state value, never rule-triggering) or derived from
-        structural evidence in the imported base (which <em>can</em> be rule-triggering, e.g.{" "}
+        structural evidence in the base keyboard (which <em>can</em> be rule-triggering, e.g.{" "}
         <code style={{ fontFamily: MONO, color: "#adbac7" }}>markInputOrder=&quot;postfix&quot;</code>{" "}
         → rule 3a) — the source is shown on each row. Filled before{" "}
         <code style={{ fontFamily: MONO, color: "#adbac7" }}>selectStrategy()</code> ran.

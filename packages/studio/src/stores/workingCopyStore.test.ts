@@ -1183,4 +1183,16 @@ describe("workingCopyStore — base-derived A3a seeding (spec §7.2 rule 3a, #92
     expect(result.primary).toBe("S-03");
     expect(result.secondaries).toContain("S-04");
   });
+
+  it("never overwrites an already-present markInputOrder (guard: base seeding defers to a prior value)", () => {
+    // irAxes recorded before the (late) first instantiate — e.g. a future
+    // survey-elicited A3a — must win over base-derived seeding. Case-2
+    // carry-forward preserves irAxes into instantiation, so seedIrAxesFromBaseIr
+    // sees markInputOrder already set and leaves it alone, even though the
+    // postfix base would otherwise seed "postfix".
+    useWorkingCopyStore.getState().setIrAxes({ markInputOrder: "prefix" });
+    const vfs = createVirtualFS([]);
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: postfixBaseIr() });
+    expect(useWorkingCopyStore.getState().session.axes.markInputOrder).toBe("prefix");
+  });
 });
