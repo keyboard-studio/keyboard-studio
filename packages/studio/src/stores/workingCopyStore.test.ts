@@ -17,10 +17,18 @@
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { useWorkingCopyStore, bindManifest } from "./workingCopyStore.ts";
-import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
-import type { RemovalCapability, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import { defaultFillAxes, selectStrategy } from "@keyboard-studio/engine";
+import type {
+  DiscoveryAxisVector,
+  IRGroup,
+  IRStore,
+  KeyboardIR,
+  RemovalCapability,
+  SurveyPhaseResult,
+} from "@keyboard-studio/contracts";
 import type { Step, EditorStep } from "../steps/types.ts";
 import { promoteOnManualEdit } from "../editors/assignLoop/touchBehavior.ts";
 
@@ -1100,5 +1108,79 @@ describe("workingCopyStore — cascadeRestore", () => {
     expect(after.undoStack).toHaveLength(0);
     expect(after.isItemDeleted("r-eps")).toBe(false);
     expect(after.isItemDeleted("sid-dkt#2")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Base-derived A3a (mark-input order) seeding at instantiation (spec §7.2 3a, #926)
+// ---------------------------------------------------------------------------
+
+/** A base IR carrying the unconditional postfix sequence-replace shape:
+ *  `any(equalD) + "=" > index(equalU,1)` — the guard-free §7.5 IPA shape. */
+function postfixBaseIr(): KeyboardIR {
+  const group: IRGroup = {
+    nodeId: "group#main",
+    name: "main",
+    usingKeys: true,
+    readonly: false,
+    rules: [
+      {
+        nodeId: "rule#acute",
+        context: [
+          { kind: "any", storeRef: "equalD" },
+          { kind: "char", value: "=" },
+        ],
+        output: [{ kind: "index", storeRef: "equalU", offset: 1 }],
+      },
+    ],
+  };
+  const stores: IRStore[] = [
+    makeCharStore("store#equalD", "equalD", "aeiou"),
+    makeCharStore("store#equalU", "equalU", "áéíóú"),
+  ];
+  return makeTestIR([group], stores);
+}
+
+describe("workingCopyStore — base-derived A3a seeding (spec §7.2 rule 3a, #926)", () => {
+  it("instantiateFromExisting seeds markInputOrder='postfix' onto irAxes/session.axes from a postfix base", () => {
+    const vfs = createVirtualFS([]);
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: postfixBaseIr() });
+    const s = useWorkingCopyStore.getState();
+    expect(s.irAxes.markInputOrder).toBe("postfix");
+    expect(s.session.axes.markInputOrder).toBe("postfix");
+  });
+
+  it("instantiateFromBase also seeds it (base-derived, symmetric across tracks)", () => {
+    const vfs = createVirtualFS([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: postfixBaseIr() });
+    expect(useWorkingCopyStore.getState().session.axes.markInputOrder).toBe("postfix");
+  });
+
+  it("does NOT seed markInputOrder from a base with no postfix structure", () => {
+    const vfs = createVirtualFS([]);
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: makeTestIR([]) });
+    expect(useWorkingCopyStore.getState().session.axes.markInputOrder).toBeUndefined();
+  });
+
+  it("the seeded value survives defaultFillAxes and fires rule 3a -> S-03 (+S-04) in selectStrategy", () => {
+    // The production path: instantiation seeds irAxes.markInputOrder, which
+    // MechanismGallery folds into the vector it feeds through defaultFillAxes
+    // -> selectStrategy. This asserts that end-to-end from session.axes.
+    const vfs = createVirtualFS([]);
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: postfixBaseIr() });
+    const seeded = useWorkingCopyStore.getState().session.axes as Partial<DiscoveryAxisVector>;
+    // Simulate the rest of an elicited alphabetic/strong vector (scale+scriptClass
+    // are required inputs to the prior) with the import-seeded postfix present.
+    const { axes } = defaultFillAxes({
+      ...seeded,
+      scale: "medium",
+      scriptClass: "alphabetic",
+      phoneticIntuition: "strong",
+    });
+    expect(axes.markInputOrder).toBe("postfix");
+    const result = selectStrategy(axes);
+    expect(result.triggeredRule).toBe("3a");
+    expect(result.primary).toBe("S-03");
+    expect(result.secondaries).toContain("S-04");
   });
 });

@@ -48,7 +48,7 @@ import type {
 import { toUPlusNotation, isDecomposableAccented } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { getPatternLibraryService } from "../../lib/services.ts";
-import type { DiscoveryAxisVector } from "@keyboard-studio/contracts";
+import type { AxisFill, DiscoveryAxisVector } from "@keyboard-studio/contracts";
 import { defaultFillAxes } from "@keyboard-studio/engine";
 import { useKeyboardArtifact, type ScaffoldSpec, type Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
@@ -625,10 +625,22 @@ export function MechanismGallery({
       axes.scale !== undefined && axes.scriptClass !== undefined
         ? defaultFillAxes(axes)
         : null;
+    // markInputOrder="postfix" reaching `axes` can only be base-derived: the
+    // script-class prior structurally never emits it (default-fill.ts's
+    // load-bearing invariant) and the survey doesn't elicit it yet — it is
+    // seeded onto irAxes at instantiation by seedIrAxesFromBaseIr (spec §7.2
+    // rule 3a, #926). defaultFillAxes() correctly leaves an already-present axis
+    // out of its own axisFills, so reconstruct the import-derived provenance
+    // here (rather than threading a separate store slot) to keep it visible on
+    // the Flow Map.
+    const importDerivedFills: AxisFill[] =
+      axes.markInputOrder === "postfix"
+        ? [{ axis: "markInputOrder", value: "postfix", source: "import-derived" }]
+        : [];
     // Publish provenance for the current keyboard; clear any stale fills from a
     // prior keyboard/run when scale/scriptClass aren't answered yet, so the
     // Flow Map never shows provenance that doesn't belong to this selection.
-    setAxisFills(prefilled !== null ? prefilled.axisFills : []);
+    setAxisFills([...importDerivedFills, ...(prefilled !== null ? prefilled.axisFills : [])]);
     const candidateAxes = prefilled !== null ? prefilled.axes : axes;
 
     const fullAxes: DiscoveryAxisVector | undefined =

@@ -219,12 +219,14 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
 
       <p style={{ fontSize: 11.5, color: "#6e7681", margin: "16px 0 0", fontFamily: SANS }}>
         Note: rule 3a (postfix-preference intercept → S-03, shown above between rules 3 and 4) is
-        implemented in <code style={{ fontFamily: MONO }}>selectStrategy()</code>. The Track 2
-        import path detects the unconditional postfix sequence-replace shape in an imported base and
-        fills{" "}
-        <code style={{ fontFamily: MONO }}>markInputOrder=&quot;postfix&quot;</code> from it
-        (<code style={{ fontFamily: MONO }}>source: &quot;import-derived&quot;</code> below) — though{" "}
-        <code style={{ fontFamily: MONO }}>if()</code>-guarded rules are opaque today, so no shipping{" "}
+        implemented in <code style={{ fontFamily: MONO }}>selectStrategy()</code>. When a base is
+        instantiated (either track), its IR is scanned for the unconditional postfix
+        sequence-replace shape and{" "}
+        <code style={{ fontFamily: MONO }}>markInputOrder=&quot;postfix&quot;</code> is seeded onto{" "}
+        <code style={{ fontFamily: MONO }}>irAxes</code>{" "}
+        (<code style={{ fontFamily: MONO }}>source: &quot;import-derived&quot;</code> below), so rule
+        3a now fires live for such a base — though{" "}
+        <code style={{ fontFamily: MONO }}>if()</code>-guarded rules are still opaque, so no shipping{" "}
         <code style={{ fontFamily: MONO }}>sil_ipa</code> rule reaches it yet. No survey phase elicits
         it end-to-end yet — that half remains deferred.
       </p>
@@ -260,11 +262,14 @@ function DefaultFillProvenance({ axisFills }: { axisFills: AxisFill[] | undefine
           letterSpacing: 0.4,
         }}
       >
-        Default-filled axes (script-class prior)
+        Pre-filled axes (not survey-elicited)
       </h3>
       <p style={{ fontSize: 11.5, color: "#8b949e", margin: "0 0 8px", fontFamily: SANS }}>
-        These phase-gated axes were not elicited by the survey — the §7.2 script-class prior
-        filled them with the unmarked/off-state value (never a rule-triggering one) before{" "}
+        These phase-gated axes were not elicited by the survey. Each was supplied either by the §7.2
+        script-class prior (the unmarked/off-state value, never rule-triggering) or derived from
+        structural evidence in the imported base (which <em>can</em> be rule-triggering, e.g.{" "}
+        <code style={{ fontFamily: MONO, color: "#adbac7" }}>markInputOrder=&quot;postfix&quot;</code>{" "}
+        → rule 3a) — the source is shown on each row. Filled before{" "}
         <code style={{ fontFamily: MONO, color: "#adbac7" }}>selectStrategy()</code> ran.
         Read-only for now; confirm/override UI is a follow-up.
       </p>
