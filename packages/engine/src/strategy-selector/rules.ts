@@ -11,15 +11,16 @@
 //
 // NOTE on rule "3a": spec §7.2 documents rule 3a (A2=alphabetic AND A3=strong
 // AND A3a=postfix → S-03) intercepting between rules 3 and 4. It IS implemented
-// below (in PRIMARY_RULES, between rules 3 and 4). Production supply of
-// A3a=postfix has two sources: (1) the Track 2 import path's base-derived
-// detection (detectMarkInputOrderFromImport, import-mark-order.ts) finds
-// real postfix sequence-replace structure in an imported base's KeyboardIR; no
-// survey phase elicits markInputOrder end-to-end yet (that half remains
-// deferred). (2) the §7.2 script-class default-fill prior (default-fill.ts)
-// deliberately never fills A3a with "postfix" (it only ever fills the unmarked
-// "prefix" state, per the prior's load-bearing invariant) — it is not a valid
-// source for this value. See spec.md §7.2.
+// below (in PRIMARY_RULES, between rules 3 and 4). The one production supply of
+// A3a=postfix is the Track 2 import path's base-derived detection
+// (detectMarkInputOrderFromImport, import-mark-order.ts), which finds the
+// unconditional postfix sequence-replace shape in an imported base's KeyboardIR
+// — with the caveat that `if(…)`-guarded rules are opaque at parse time, so the
+// live sil_ipa rules aren't reachable yet (see that module's header). No survey
+// phase elicits markInputOrder end-to-end yet (that half remains deferred). The
+// §7.2 script-class default-fill prior (default-fill.ts) is NOT a source for
+// this value: it deliberately never fills A3a with "postfix" (only the unmarked
+// "prefix" state, per the prior's load-bearing invariant). See spec.md §7.2.
 
 import type {
   DiscoveryAxisVector,

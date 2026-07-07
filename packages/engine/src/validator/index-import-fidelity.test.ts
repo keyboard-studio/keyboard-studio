@@ -20,9 +20,9 @@ import {
   runImportFidelityEmitChecks,
   checkSidecarHash,
 } from "./index-import-fidelity.js";
-import { buildImportReport } from "../codec/import-keyboard.js";
+import { buildImportReport, importKeyboard } from "../codec/import-keyboard.js";
 import { parse } from "../codec/parse.js";
-import { ImportStatus } from "@keyboard-studio/contracts";
+import { ImportStatus, createVirtualFS } from "@keyboard-studio/contracts";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
@@ -384,5 +384,57 @@ describe("buildImportReport", () => {
     });
     expect(report.removalCapabilities).toBeDefined();
     expect(report.removalCapabilities).toEqual(entries);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// importKeyboard() step 2c — base-derived axis-fill detection (spec §7.2 3a)
+// ---------------------------------------------------------------------------
+
+describe("importKeyboard() — axisFills (step 2c, spec §7.2 rule 3a)", () => {
+  const HEADER = `store(&VERSION) '10.0'
+store(&NAME) 'axis-fill test'
+store(&TARGETS) 'any'
+store(&COPYRIGHT) '(c) SIL'
+store(&KEYBOARDVERSION) '1.0'
+
+store(equalD) "b" "d" "g"
+store(equalU) U+0253 U+0257 U+0260
+
+begin Unicode > use(Unicode)
+
+group(Unicode) using keys
+`;
+
+  it("surfaces markInputOrder='postfix' (import-derived) when the base has an unconditional postfix rule", async () => {
+    const kmn = `${HEADER}\nany(equalD) + "=" > index(equalU,1)\n`;
+    const vfs = createVirtualFS([]);
+    const { axisFills } = await importKeyboard(kmn, "postfix-kb", vfs);
+    expect(axisFills).toEqual([
+      { axis: "markInputOrder", value: "postfix", source: "import-derived" },
+    ]);
+  });
+
+  it("returns no axisFills for an if()-guarded postfix rule (opaque at parse — documented boundary)", async () => {
+    // The guard makes the whole rule opaque (IF_OPTION_STORE), so it never
+    // reaches group.rules; matches the live sil_ipa shape. Locks the scope
+    // boundary at the pipeline level, not just the detector unit.
+    const kmn = `${HEADER}\nif(option_key = '') any(equalD) + "=" > index(equalU,2)\n`;
+    const vfs = createVirtualFS([]);
+    const { axisFills } = await importKeyboard(kmn, "guarded-kb", vfs);
+    expect(axisFills).toEqual([]);
+  });
+
+  it("returns no axisFills for a base with no postfix structure", async () => {
+    const kmn = `${HEADER}\n+ [K_A] > U+0061\n`;
+    const vfs = createVirtualFS([]);
+    const { axisFills } = await importKeyboard(kmn, "plain-kb", vfs);
+    expect(axisFills).toEqual([]);
+  });
+
+  it("returns no axisFills on a parse failure", async () => {
+    const vfs = createVirtualFS([]);
+    const { axisFills } = await importKeyboard("this is not valid kmn {{{", "broken-kb", vfs);
+    expect(axisFills).toEqual([]);
   });
 });
