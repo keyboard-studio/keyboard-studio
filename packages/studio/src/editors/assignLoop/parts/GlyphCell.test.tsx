@@ -66,12 +66,16 @@ describe('GlyphCell — not-removable capability', () => {
     });
   });
 
-  it('marks the button aria-disabled', () => {
+  it('shows the not-removable badge and stays interactive (cascade explains why)', () => {
+    // #886: not-removable chips are no longer aria-disabled — clicking them runs
+    // the cascade flow, which surfaces the reason it can't be removed. The amber
+    // "!" badge is the visual not-removable marker.
     const { container } = render(
       <GlyphCell {...baseProps} capability="not-removable:unknown" onToggle={vi.fn()} />,
     );
     const button = container.querySelector('button')!;
-    expect(button.getAttribute('aria-disabled')).toBe('true');
+    expect(button.getAttribute('aria-disabled')).not.toBe('true');
+    expect(container.querySelector('[aria-label^="not removable"]')).not.toBeNull();
   });
 });
 
@@ -92,121 +96,64 @@ describe('GlyphCell — removable capability', () => {
       <GlyphCell {...baseProps} capability="removable:slot-fill" onToggle={vi.fn()} />,
     );
     const button = container.querySelector('button')!;
-    expect(button.getAttribute('aria-disabled')).toBe('false');
+    // GlyphCell no longer sets aria-disabled at all (chips are interactive).
+    expect(button.getAttribute('aria-disabled')).toBeNull();
   });
 });
 
 // ---------------------------------------------------------------------------
-// #917 — GlyphOwner store tags: rendering, rail-jump click, no nested
-// interactive elements.
-//
-// Store owners render as native <button type="button"> tags with an
-// accessible name of "Go to store <label>", as SIBLINGS of the cell's
-// toggle button (not nested inside it — nesting interactive elements
-// inside a <button> is invalid HTML). Because the tag buttons are
-// siblings, clicking one calls onOwnerClick(nodeId) and never reaches the
-// toggle's onClick — no manual stopPropagation is needed, and native
-// buttons give both Enter and Space activation for free. Pattern owners
-// are consumed only by InfoView (via setInfo) and must never render a
-// visible tag here.
+// #886 cross-reference "web" tags: one summary tag per KIND (group / pattern /
+// store) of OTHER location the character appears in. Tags are native <button>
+// SIBLINGS of the cell's toggle button (never nested — that's invalid HTML).
+// Clicking a tag calls onWebTag(ch, locations); the parent decides whether to
+// navigate (1 location) or open the popup (>1).
 // ---------------------------------------------------------------------------
 
-describe('GlyphCell — #917 store owner tags', () => {
-  it('renders a tag with accessible name "Go to store vowels" and label text "vowels"', () => {
-    const owners = [{ kind: 'store' as const, nodeId: 's1', label: 'vowels' }];
-    render(
-      <GlyphCell {...baseProps} capability="removable:simple" onToggle={vi.fn()} owners={owners} />,
-    );
-    const tag = screen.getByRole('button', { name: 'Go to store vowels' });
-    expect(tag.textContent).toBe('vowels');
+describe('GlyphCell — cross-reference web tags', () => {
+  const storeLoc = { kind: 'store' as const, nodeId: 's1', label: 'vowels' };
+  const patternLoc = { kind: 'pattern' as const, nodeId: 'p1', label: 'Diacritics' };
+  const groupLoc = { kind: 'group' as const, nodeId: 'g1', label: 'main' };
+
+  it('renders a "store" summary tag when the character also lives in a store', () => {
+    render(<GlyphCell {...baseProps} capability="removable:simple" onToggle={vi.fn()} webLocations={[storeLoc]} onWebTag={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /^store/ }).textContent).toBe('store');
   });
 
-  it('the store tag is not nested inside another button (no invalid HTML)', () => {
-    const owners = [{ kind: 'store' as const, nodeId: 's1', label: 'vowels' }];
-    render(
-      <GlyphCell {...baseProps} capability="removable:simple" onToggle={vi.fn()} owners={owners} />,
-    );
-    const tag = screen.getByRole('button', { name: 'Go to store vowels' });
+  it('renders a "pattern" tag for a pattern location (patterns AND stores, #886)', () => {
+    render(<GlyphCell {...baseProps} capability="removable:simple" onToggle={vi.fn()} webLocations={[patternLoc]} onWebTag={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /^pattern/ }).textContent).toBe('pattern');
+  });
+
+  it('renders a "group" tag for a group location (pattern card → group web link)', () => {
+    render(<GlyphCell {...baseProps} capability="removable:simple" onToggle={vi.fn()} webLocations={[groupLoc]} onWebTag={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /^group/ }).textContent).toBe('group');
+  });
+
+  it('renders ONE tag per kind even when a kind has multiple locations', () => {
+    const locs = [storeLoc, { kind: 'store' as const, nodeId: 's2', label: 'tones' }, patternLoc];
+    render(<GlyphCell {...baseProps} capability="removable:simple" onToggle={vi.fn()} webLocations={locs} onWebTag={vi.fn()} />);
+    expect(screen.getAllByRole('button', { name: /^store/ })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^pattern/ })).toHaveLength(1);
+  });
+
+  it('a tag is a sibling button, not nested inside the chip-body button (valid HTML)', () => {
+    render(<GlyphCell {...baseProps} capability="removable:simple" onToggle={vi.fn()} webLocations={[storeLoc]} onWebTag={vi.fn()} />);
+    const tag = screen.getByRole('button', { name: /^store/ });
     expect(tag.closest('button')).toBe(tag);
   });
 
-  it('clicking the store tag calls onOwnerClick with the store nodeId and does NOT call onToggle', () => {
+  it('clicking a tag calls onWebTag(ch, locations) and does NOT toggle', () => {
     const onToggle = vi.fn();
-    const onOwnerClick = vi.fn();
-    const owners = [{ kind: 'store' as const, nodeId: 's1', label: 'vowels' }];
-    render(
-      <GlyphCell
-        {...baseProps}
-        capability="removable:simple"
-        onToggle={onToggle}
-        owners={owners}
-        onOwnerClick={onOwnerClick}
-      />,
-    );
-    const tag = screen.getByRole('button', { name: 'Go to store vowels' });
-    fireEvent.click(tag);
-    expect(onOwnerClick).toHaveBeenCalledTimes(1);
-    expect(onOwnerClick).toHaveBeenCalledWith('s1');
+    const onWebTag = vi.fn();
+    const locs = [storeLoc, patternLoc];
+    render(<GlyphCell {...baseProps} capability="removable:simple" onToggle={onToggle} webLocations={locs} onWebTag={onWebTag} />);
+    fireEvent.click(screen.getByRole('button', { name: /^store/ }));
+    expect(onWebTag).toHaveBeenCalledWith(baseProps.ch, locs);
     expect(onToggle).not.toHaveBeenCalled();
   });
 
-  // jsdom does not implement the browser's native "Enter/Space on a focused
-  // <button> synthesizes a click" behavior, so these two tests simulate the
-  // resulting click event directly (`detail: 0` marks it as keyboard-
-  // originated per Testing Library convention) — the point under test is
-  // that the tag's own click handler fires onOwnerClick and, being a
-  // sibling of the toggle button rather than nested inside it, the event
-  // never reaches onToggle. A real browser wires the keypress to that same
-  // click for a native <button>, which is the whole reason Fix 1 switched
-  // the tag from a role="button" span to a native button in the first
-  // place.
-  it('Enter keydown on the store tag also fires onOwnerClick and does not toggle', () => {
-    const onToggle = vi.fn();
-    const onOwnerClick = vi.fn();
-    const owners = [{ kind: 'store' as const, nodeId: 's1', label: 'vowels' }];
-    render(
-      <GlyphCell
-        {...baseProps}
-        capability="removable:simple"
-        onToggle={onToggle}
-        owners={owners}
-        onOwnerClick={onOwnerClick}
-      />,
-    );
-    const tag = screen.getByRole('button', { name: 'Go to store vowels' });
-    fireEvent.click(tag, { detail: 0 });
-    expect(onOwnerClick).toHaveBeenCalledWith('s1');
-    expect(onToggle).not.toHaveBeenCalled();
-  });
-
-  it('Space keypress on the store tag fires onOwnerClick (native <button> Space activation) and does not toggle', () => {
-    const onToggle = vi.fn();
-    const onOwnerClick = vi.fn();
-    const owners = [{ kind: 'store' as const, nodeId: 's1', label: 'vowels' }];
-    render(
-      <GlyphCell
-        {...baseProps}
-        capability="removable:simple"
-        onToggle={onToggle}
-        owners={owners}
-        onOwnerClick={onOwnerClick}
-      />,
-    );
-    const tag = screen.getByRole('button', { name: 'Go to store vowels' });
-    tag.focus();
-    fireEvent.keyDown(tag, { key: ' ' });
-    fireEvent.keyUp(tag, { key: ' ' });
-    fireEvent.click(tag, { detail: 0 });
-    expect(onOwnerClick).toHaveBeenCalledWith('s1');
-    expect(onToggle).not.toHaveBeenCalled();
-  });
-
-  it('a kind:"pattern" owner does not render a visible tag (store owners only)', () => {
-    const owners = [{ kind: 'pattern' as const, nodeId: 'p1', label: 'Diacritics' }];
-    render(
-      <GlyphCell {...baseProps} capability="removable:simple" onToggle={vi.fn()} owners={owners} />,
-    );
-    expect(screen.queryByText('Diacritics')).toBeNull();
-    expect(screen.queryByRole('button', { name: /Go to store/ })).toBeNull();
+  it('renders no web tags when the character has no other locations', () => {
+    render(<GlyphCell {...baseProps} capability="removable:simple" onToggle={vi.fn()} webLocations={[]} onWebTag={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: /^(store|pattern|group)/ })).toBeNull();
   });
 });

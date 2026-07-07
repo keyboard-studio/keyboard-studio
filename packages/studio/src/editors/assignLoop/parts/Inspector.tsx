@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { CarveNode, CarveGlyph, StoreRuleDetail } from '../../../lib/irToCarveNodes.ts';
+import type { CarveNode, CarveGlyph, StoreRuleDetail, CharLocation } from '../../../lib/irToCarveNodes.ts';
 import { nodeState, MOD_GROUP_DEFS, glyphsTriState, idsTriState } from '../../../lib/irToCarveNodes.ts';
 import { ToggleBox } from './ToggleBox.tsx';
 import { GlyphCell } from './GlyphCell.tsx';
@@ -26,13 +26,20 @@ export function storePairDescription(
   pairedNames: string[],
 ): string {
   const pairedList = pairedNames.join(', ');
+  // Both roles: this store is matched AND re-emitted (a match-and-reproduce),
+  // not a one-way input→output swap. Checked first so the in+out case is never
+  // mislabelled as "one provides input, the other output".
+  if (asSource && asOutput) {
+    return `This list sits on both sides of a paired-store rule with ${pairedList}: each character is matched as input and re-emitted as output at the same position — a match-and-reproduce, not a one-way input→output swap. The lists still line up one-for-one by position.`;
+  }
   if (asSource && !asOutput) {
     return `This is the input side of a paired-store rule. Its characters line up one-for-one with ${pairedList}. When one of these is matched and the rule fires, the keyboard outputs the character at the same position in ${pairedList}.`;
   }
   if (asOutput && !asSource) {
     return `This is the output side of a paired-store rule. Each character lines up one-for-one with ${pairedList}; the rule picks the matching one based on what was input.`;
   }
-  return `This list is paired with ${pairedList} in a rule: the two line up one-for-one, one providing the input characters and the other the output.`;
+  // Role undetermined (defensive) — assert only the invariant that always holds.
+  return `This list is paired with ${pairedList} by position — the lists line up one-for-one.`;
 }
 
 const btnGhost: React.CSSProperties = {
@@ -444,7 +451,9 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
               {descriptionText}
             </p>
             <p style={{ margin: 0, fontSize: 12, color: 'var(--app-text-subtle)', lineHeight: 1.55, fontStyle: 'italic' }}>
-              These two stores work as a pair. Removing one without the other will break the mechanism.
+              {node.pairedStoreNames.length === 1
+                ? 'These two stores work as a pair. Removing one without the other will break the mechanism.'
+                : 'These stores work together as a set. Removing one without the others will break the mechanism.'}
             </p>
           </div>
         );
@@ -559,9 +568,21 @@ interface InspectorProps {
   isDeleted: (nodeId: string) => boolean;
   onToggleNode: (nodeId: string, off: boolean) => void;
   onSelectNode?: ((nodeId: string) => void) | undefined;
+  /**
+   * Called when the user clicks a chip body whose glyph is cross-wired to
+   * other nodes (group rule + pattern + output store slot). CarveGallery
+   * resolves the contributors and opens the ConfirmDialog.
+   *
+   * When absent, chip clicks fall back to the plain onToggleGlyph path.
+   */
+  onCascadeDelete?: ((gid: string) => void) | undefined;
+  /** character → all its locations (built once by CarveGallery); powers the cross-reference tags. */
+  charWeb?: Map<string, CharLocation[]> | undefined;
+  /** Clicking a cross-reference tag — CarveGallery navigates (1 location) or opens the web popup (>1). */
+  onWebTag?: ((ch: string, locations: CharLocation[]) => void) | undefined;
 }
 
-export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetManyGlyphs, isDeleted, onToggleNode, onSelectNode }: InspectorProps) {
+export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetManyGlyphs, isDeleted, onToggleNode, onSelectNode, onCascadeDelete, charWeb, onWebTag }: InspectorProps) {
   const [q, setQ] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   useEffect(() => { setQ(''); setCollapsed(new Set()); }, [node?.nodeId]);
@@ -685,7 +706,8 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
             </div>
             {/* Per-group glyph subgrid */}
             {!isCollapsed && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gridAutoRows: rowHeight + 'px', gap: 8 }}>
+              // Rows grow to fit the cross-reference tags (min rowHeight, then auto).
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gridAutoRows: `minmax(${rowHeight}px, auto)`, gap: 8 }}>
                 {grp.glyphs.map((x: CarveGlyph) => (
                   <GlyphCell
                     key={x.gid}
@@ -698,7 +720,9 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
                     modifierLabel={x.modifierLabel}
                     capability={x.capability}
                     {...(x.owners ? { owners: x.owners } : {})}
-                    {...(onSelectNode ? { onOwnerClick: onSelectNode } : {})}
+                    webLocations={(charWeb?.get(x.ch) ?? []).filter((l) => l.nodeId !== node.nodeId)}
+                    {...(onWebTag ? { onWebTag } : {})}
+                    {...(onCascadeDelete ? { onCascadeDelete } : {})}
                   />
                 ))}
               </div>

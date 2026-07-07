@@ -8,13 +8,12 @@ import { makePattern } from "@keyboard-studio/contracts";
 import type { MatchResult, RecognizerRule } from "../types.js";
 import { ruleRef, storeRef } from "../node-refs.js";
 import { storeItemsToCharString, formatVKeyModifiers, formatDkName } from "../utils.js";
+import { isDeadkeyOnlyOutput } from "../../shared/rule-shape.js";
 
 // A trigger is a rule whose output is a single deadkey.
 // Context may be a single vkey OR a single char (sil_euro_latin uses char triggers).
 function isTrigger(rule: IRRule): boolean {
-  if (rule.output.length !== 1) return false;
-  const out = rule.output[0];
-  if (out === undefined || out.kind !== "deadkey") return false;
+  if (!isDeadkeyOnlyOutput(rule)) return false;
   if (rule.context.length !== 1) return false;
   const ctx = rule.context[0];
   if (ctx === undefined) return false;

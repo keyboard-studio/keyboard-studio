@@ -31,3 +31,6 @@ export type { ApplyTouchAssignmentsResult } from "./applyTouchAssignments.js";
 export { applyTouchAssignmentsToRawJson } from "./applyTouchAssignmentsToRawJson.js";
 export type { ApplyTouchAssignmentsToRawJsonResult } from "./applyTouchAssignmentsToRawJson.js";
 
+export { collectCharContributors } from "./collectCharContributors.js";
+export type { CharContributors } from "./collectCharContributors.js";
+
