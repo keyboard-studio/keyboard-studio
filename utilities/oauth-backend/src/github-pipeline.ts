@@ -3,7 +3,7 @@
  *
  * The SPA never holds a token in this path. It POSTs pre-filtered source files
  * plus author attribution to POST /submit/managed-pr; this module runs the
- * fork -> tree -> commit -> branch -> draft-PR pipeline using the GitHub App
+ * tree -> commit -> branch -> draft-PR pipeline using the GitHub App
  * installation token, which lives server-side only.
  *
  * Vendored from packages/engine/src/output/github.ts -- keep in sync.
@@ -232,27 +232,24 @@ export async function submitManagedPR(
   const normalizedTitle = normalizePrTitle(body.keyboardId, body.prTitle);
 
   try {
-    // 1. Ensure the org fork exists.
-    const forkCheck = await call(forkBase);
-    if (!forkCheck.ok) {
-      if (forkCheck.status !== 404) return mapNonOk(forkCheck);
-      const created = await call(`${upstreamBase}/forks`, "POST", {});
-      if (!created.ok) return mapNonOk(created);
-    }
+    // (No "ensure the fork exists" step: under the same-repo model
+    // (orgLogin === UPSTREAM_OWNER) there is no distinct upstream to fork
+    // from, so a missing staging repo is a provisioning error the pipeline
+    // cannot repair -- the ref read below surfaces it as upstream_error.)
 
-    // 2. Read the fork's master HEAD commit SHA.
+    // 1. Read the staging repo's master HEAD commit SHA.
     const masterRef = await call(`${forkBase}/git/ref/heads/master`);
     if (!masterRef.ok) return mapNonOk(masterRef);
     const refData = (await masterRef.json()) as { object: { sha: string } };
     const masterCommitSha = refData.object.sha;
 
-    // 3. Read the base tree SHA from the parent commit.
+    // 2. Read the base tree SHA from the parent commit.
     const parentCommit = await call(`${forkBase}/git/commits/${masterCommitSha}`);
     if (!parentCommit.ok) return mapNonOk(parentCommit);
     const parentData = (await parentCommit.json()) as { tree: { sha: string } };
     const baseTreeSha = parentData.tree.sha;
 
-    // 4. Build the tree from the SPA-filtered source files (text content only).
+    // 3. Build the tree from the SPA-filtered source files (text content only).
     const treeEntries = body.sourceFiles.map((f) => ({
       path: f.path,
       mode: "100644",
@@ -260,7 +257,7 @@ export async function submitManagedPR(
       content: f.content,
     }));
 
-    // 5. Create the tree.
+    // 4. Create the tree.
     const newTree = await call(`${forkBase}/git/trees`, "POST", {
       base_tree: baseTreeSha,
       tree: treeEntries,
@@ -268,7 +265,7 @@ export async function submitManagedPR(
     if (!newTree.ok) return mapNonOk(newTree);
     const newTreeSha = ((await newTree.json()) as { sha: string }).sha;
 
-    // 6. Create the commit (org committer + Co-authored-by human trailer).
+    // 5. Create the commit (org committer + Co-authored-by human trailer).
     const newCommit = await call(`${forkBase}/git/commits`, "POST", {
       message: buildCommitMessage(normalizedTitle, body.attribution),
       tree: newTreeSha,
@@ -277,7 +274,7 @@ export async function submitManagedPR(
     if (!newCommit.ok) return mapNonOk(newCommit);
     const newCommitSha = ((await newCommit.json()) as { sha: string }).sha;
 
-    // 7. Create the branch ref (content-unique short-SHA suffix).
+    // 6. Create the branch ref (content-unique short-SHA suffix).
     const branchName = buildManagedBranchName(body.keyboardId, newCommitSha);
     const branchRef = await call(`${forkBase}/git/refs`, "POST", {
       ref: `refs/heads/${branchName}`,
@@ -290,7 +287,7 @@ export async function submitManagedPR(
       return mapNonOk(branchRef);
     }
 
-    // 8. Open the draft PR upstream (divergences 4 and 5 from Option A).
+    // 7. Open the draft PR upstream (divergences 4 and 5 from Option A).
     const pr = await call(`${upstreamBase}/pulls`, "POST", {
       title: normalizedTitle,
       body: buildPrBody(body),
