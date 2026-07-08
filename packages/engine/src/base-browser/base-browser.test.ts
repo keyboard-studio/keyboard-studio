@@ -71,9 +71,9 @@ const KPS_SIL_DEVANAGARI = `<?xml version="1.0" encoding="UTF-8"?>
 // ---------------------------------------------------------------------------
 
 const TREE_URL =
-  "https://api.github.com/repos/mattgyverlee/keyboards/git/trees/master?recursive=1";
+  "https://api.github.com/repos/keyboard-studio/keyboards/git/trees/master?recursive=1";
 const RAW_BASE =
-  "https://raw.githubusercontent.com/mattgyverlee/keyboards/master";
+  "https://raw.githubusercontent.com/keyboard-studio/keyboards/master";
 
 const KPS_RESPONSES: Record<string, string> = {
   "release/b/basic_kbdus/basic_kbdus.kps": KPS_BASIC_KBDUS,
@@ -123,7 +123,7 @@ function createFixtureFetch(): FetchFn {
 // Subtree paths are RELATIVE to the subfolder root (no release/<letter>/ prefix).
 // ---------------------------------------------------------------------------
 
-const TREES_BASE = "https://api.github.com/repos/mattgyverlee/keyboards/git/trees";
+const TREES_BASE = "https://api.github.com/repos/keyboard-studio/keyboards/git/trees";
 
 function treeItem(path: string, type: "blob" | "tree", sha: string) {
   return { path, mode: type === "tree" ? "040000" : "100644", type, sha, url: "" };
@@ -223,7 +223,7 @@ describe("createBaseBrowser", () => {
     const kb = keyboards.find((k) => k.id === "sil_euro_latin");
     expect(kb?.path).toBe("release/s/sil_euro_latin");
     expect(kb?.sourceUrl).toBe(
-      "https://github.com/mattgyverlee/keyboards/tree/master/release/s/sil_euro_latin"
+      "https://github.com/keyboard-studio/keyboards/tree/master/release/s/sil_euro_latin"
     );
   });
 

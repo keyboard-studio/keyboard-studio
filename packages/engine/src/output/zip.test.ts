@@ -58,11 +58,11 @@ describe("toZip", () => {
     expect(Object.keys(entries)).toContain("NEXT_STEPS.md");
   });
 
-  it("NEXT_STEPS.md content references mattgyverlee/keyboards", async () => {
+  it("NEXT_STEPS.md content references keyboard-studio/keyboards", async () => {
     const bytes = await toZip(makeFixtureFS());
     const entries = unzipSync(bytes);
     const content = dec.decode(entries["NEXT_STEPS.md"]);
-    expect(content).toContain("mattgyverlee/keyboards");
+    expect(content).toContain("keyboard-studio/keyboards");
   });
 
   it("preserves text file content exactly", async () => {
@@ -107,7 +107,7 @@ describe("toZip", () => {
     const entries = unzipSync(bytes);
     const content = dec.decode(entries["NEXT_STEPS.md"]);
     expect(content).not.toBe("old content");
-    expect(content).toContain("mattgyverlee/keyboards");
+    expect(content).toContain("keyboard-studio/keyboards");
   });
 });
 
