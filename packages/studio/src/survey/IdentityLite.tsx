@@ -136,6 +136,24 @@ export interface IdentityLiteProps {
   onComplete: (result: SurveyPhaseResult, identity: IdentityLiteResult) => void;
   onBack?: () => void;
   findingsByQuestionId?: Record<string, LintFinding[]>;
+  /**
+   * Phase result of a previously completed run of this flow. When provided,
+   * SurveyRunner replays the flow from these answers and mounts on the LAST
+   * question — used when back-navigation re-enters the identity step so the
+   * author does not restart from question 1.
+   */
+  resume?: SurveyPhaseResult;
+}
+
+/** Flatten a completed phase result into SurveyRunner's resumeAnswers shape. */
+function toResumeAnswers(
+  result: SurveyPhaseResult,
+): Readonly<Record<string, string | string[]>> {
+  const map: Record<string, string | string[]> = {};
+  for (const a of result.answers) {
+    map[a.questionId] = a.answerType === "char-list" ? [...a.value] : String(a.value);
+  }
+  return map;
 }
 
 export function IdentityLite({
@@ -143,12 +161,24 @@ export function IdentityLite({
   onComplete,
   onBack,
   findingsByQuestionId,
+  resume,
 }: IdentityLiteProps) {
   const flow = useMemo(() => loadModularFlow(identityLiteRaw as string), []);
 
+  const resumeAnswers = useMemo(
+    () => (resume !== undefined ? toResumeAnswers(resume) : undefined),
+    [resume],
+  );
+
+  // Initialised from the resumed answers so seeding stays coherent after a
+  // history-pop resume (mount lands on the last question with values restored).
+  const resumedLanguageCode = resumeAnswers?.["il_language_code"];
+
   // Track the latest committed language code (from il_language_code — now the
   // FIRST question), used to look up langtags defaults for the downstream seeds.
-  const languageCodeRef = useRef<string>("");
+  const languageCodeRef = useRef<string>(
+    typeof resumedLanguageCode === "string" ? resumedLanguageCode : "",
+  );
 
   // Autonym seed from the resolved langtags entry (spec 030). Seeds
   // il_language_autonym. Read synchronously by getSeedValue in the same tick as
@@ -427,6 +457,7 @@ export function IdentityLite({
         getNextOverride={getNextOverride}
         {...(onBack !== undefined ? { onBack } : {})}
         {...(findingsByQuestionId !== undefined ? { findingsByQuestionId } : {})}
+        {...(resumeAnswers !== undefined ? { resumeAnswers } : {})}
       />
     </div>
   );

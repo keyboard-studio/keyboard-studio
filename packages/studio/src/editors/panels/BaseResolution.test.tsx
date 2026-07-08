@@ -74,6 +74,24 @@ describe("BaseResolution — search bar at the top", () => {
     expect(screen.getByTestId("search-scope-suggested").getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByTestId("search-scope-all").getAttribute("aria-pressed")).toBe("false");
   });
+
+  it("renders the Back button at the top, BEFORE the search combobox", async () => {
+    const onBack = vi.fn();
+    render(<BaseResolution target={TARGET} onResolved={vi.fn()} onBack={onBack} />);
+    const input = await waitForCombobox();
+    const back = screen.getByTestId("base-back");
+    expect(
+      back.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    fireEvent.click(back);
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders no Back button when onBack is not provided", async () => {
+    renderStep();
+    await waitForCombobox();
+    expect(screen.queryByTestId("base-back")).toBeNull();
+  });
 });
 
 describe("BaseResolution — suggested scope vs all keyboards", () => {

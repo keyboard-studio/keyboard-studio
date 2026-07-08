@@ -125,6 +125,17 @@ export function BaseResolution({
 
   return (
     <div data-testid="base-picker" style={{ color: "var(--app-text)", fontFamily: "var(--app-font)" }}>
+      {/* Back — at the top with the search bar, not below the suggestion cards. */}
+      {onBack !== undefined && (
+        <Button
+          variant="back"
+          data-testid="base-back"
+          onClick={onBack}
+          style={{ marginBottom: 12 }}
+        >
+          &larr; Back
+        </Button>
+      )}
       <h2 style={heading}>Choose a starting keyboard</h2>
       <p style={subtle}>
         Based on your language and chosen script, here are the closest starting
@@ -231,25 +242,6 @@ export function BaseResolution({
         </div>
       </div>
 
-      {onBack !== undefined && (
-        <Button
-          variant="secondary"
-          onClick={onBack}
-          style={{
-            marginTop: 20,
-            padding: "6px 14px",
-            background: "transparent",
-            border: "1px solid var(--app-border)",
-            borderRadius: 6,
-            color: "var(--app-text-muted)",
-            fontSize: 13,
-            cursor: "pointer",
-            fontFamily: "var(--app-font)",
-          }}
-        >
-          &larr; Back
-        </Button>
-      )}
     </div>
   );
 }
