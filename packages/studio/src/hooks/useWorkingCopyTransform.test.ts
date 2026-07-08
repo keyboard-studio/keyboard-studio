@@ -25,16 +25,23 @@ import type { Pattern } from "@keyboard-studio/contracts";
 // Spies on the three projection functions
 // ---------------------------------------------------------------------------
 
-const applyCarveToVfsSpy = vi.fn((_vfs: unknown, _id: string, _ir: unknown, _ids: unknown, _opts?: unknown) => ({
-  warnings: [] as string[],
+// Hoisted so they are initialized before the (hoisted) vi.mock factory runs.
+// workingCopyStore now imports @keyboard-studio/engine at module top level, so
+// importing the store forces this mock's factory to evaluate eagerly — before
+// plain top-level `const` spies would have initialized (TDZ). vi.hoisted runs
+// ahead of all imports and mock factories, so the spies exist when needed.
+const { applyCarveToVfsSpy, applyAssignmentsToVfsSpy, applyIdentityStubMutationSpy } = vi.hoisted(() => ({
+  applyCarveToVfsSpy: vi.fn((_vfs: unknown, _id: string, _ir: unknown, _ids: unknown, _opts?: unknown) => ({
+    warnings: [] as string[],
+  })),
+  applyAssignmentsToVfsSpy: vi.fn((_vfs: unknown, _id: string, _a: unknown, _fn: unknown) => ({
+    kmn: "c mock",
+    warnings: [] as string[],
+  })),
+  applyIdentityStubMutationSpy: vi.fn((_vfs: unknown, _id: string, _identity: unknown) => {
+    /* no-op */
+  }),
 }));
-const applyAssignmentsToVfsSpy = vi.fn((_vfs: unknown, _id: string, _a: unknown, _fn: unknown) => ({
-  kmn: "c mock",
-  warnings: [] as string[],
-}));
-const applyIdentityStubMutationSpy = vi.fn((_vfs: unknown, _id: string, _identity: unknown) => {
-  /* no-op */
-});
 
 vi.mock("@keyboard-studio/engine", async (importOriginal) => {
   const original = await importOriginal<typeof import("@keyboard-studio/engine")>();

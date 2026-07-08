@@ -19,9 +19,11 @@
 
 import { create } from "zustand";
 import type { AxisFill, BaseKeyboard, KeyboardIR, LintFinding, RemovalCapability, VirtualFS } from "@keyboard-studio/contracts";
+import { detectMarkInputOrderFromImport } from "@keyboard-studio/engine";
 import {
   mergePhaseResults,
   type DiscoveryAxisVector,
+  type MarkInputOrder,
   type MechanismAssignment,
   type SurveyPhaseResult,
   type SurveySession,
@@ -498,6 +500,34 @@ function remerge(
 }
 
 /**
+ * Seed base-derived axes onto `irAxes` at instantiation time (spec §7.2 rule
+ * 3a). This is the "irAxes re-derives from the new IR after recognition"
+ * derivation the instantiate actions promise: it runs the base IR through the
+ * engine's structural detectors and folds any detected axis value into irAxes,
+ * from where it flows through `session.axes` into MechanismGallery's
+ * `defaultFillAxes()` pre-fill (which preserves an already-present axis) and on
+ * into `selectStrategy()`. Without this, an imported IPA-shaped base never
+ * supplied A3a=postfix to the live pipeline and rule 3a stayed unreachable in
+ * production (#926). Never overwrites a value already present on `preservedIrAxes`.
+ */
+function seedIrAxesFromBaseIr(
+  ir: KeyboardIR,
+  preservedIrAxes: Partial<DiscoveryAxisVector>,
+): Partial<DiscoveryAxisVector> {
+  if (preservedIrAxes.markInputOrder !== undefined) {
+    return preservedIrAxes;
+  }
+  const markOrder = detectMarkInputOrderFromImport(ir);
+  if (markOrder === undefined) {
+    return preservedIrAxes;
+  }
+  // detectMarkInputOrderFromImport only ever returns the markInputOrder axis
+  // with value "postfix"; AxisFill.value is the broad cross-axis union, so
+  // narrow it back to MarkInputOrder here.
+  return { ...preservedIrAxes, markInputOrder: markOrder.value as MarkInputOrder };
+}
+
+/**
  * Shared three-case resolution for instantiateFromBase / instantiateFromExisting.
  *
  * Three cases, in order:
@@ -844,7 +874,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // forward any phaseResults/irAxes recorded while this instantiate was
       // still in flight. irAxes re-derives from the new IR after recognition
       // runs when there is nothing to preserve.
-      ...remerge(preservedIrAxes, preservedPhaseResults),
+      ...remerge(seedIrAxesFromBaseIr(ir, preservedIrAxes), preservedPhaseResults),
       desktopLocked: false,
       touchLayoutJson: null,
       touchDraft: null,
@@ -896,7 +926,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // Edit layers start clean only on a genuine base switch; otherwise carry
       // forward any phaseResults/irAxes recorded while this instantiate was
       // still in flight.
-      ...remerge(preservedIrAxes, preservedPhaseResults),
+      ...remerge(seedIrAxesFromBaseIr(ir, preservedIrAxes), preservedPhaseResults),
       desktopLocked: false,
       touchLayoutJson: null,
       touchDraft: null,

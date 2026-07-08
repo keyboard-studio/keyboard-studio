@@ -1,5 +1,10 @@
-// see spec.md §7.2 rule 3a — base-derived A3a (mark-input order) detection on
-// the Track 2 import path.
+// see spec.md §7.2 rule 3a — base-derived A3a (mark-input order) detection.
+//
+// Consumed by the live studio pipeline: at instantiation (either track)
+// seedIrAxesFromBaseIr (studio workingCopyStore.ts) runs this over the base IR
+// and seeds markInputOrder="postfix" onto irAxes, which flows through
+// defaultFillAxes into selectStrategy — so rule 3a fires in production, not just
+// in tests. (The engine's own importKeyboard() also surfaces it via axisFills.)
 //
 // Complements the script-class default-fill prior (default-fill.ts), which
 // deliberately never fills markInputOrder="postfix" (that prior can only ever
