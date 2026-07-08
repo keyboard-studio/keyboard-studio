@@ -298,6 +298,50 @@ describe("useWorkingCopyTransform — touch layout injection (step 0)", () => {
   });
 });
 
+describe("useWorkingCopyTransform — effectiveKeyboardId (Track 1 identity rename)", () => {
+  // Regression coverage for the adapt-a-base bug where a Track 1 (no
+  // scaffoldSpec) id rename left the compile step reading the stale base id.
+  // The transform must surface the renamed id so useKeyboardArtifact's
+  // runCompile can pick it up.
+  it("returns effectiveKeyboardId when identity.keyboardId differs from the base id", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedBase();
+    useWorkingCopyStore.getState().setIdentity({ keyboardId: "ha_sil" });
+    const { result } = renderHook(() => useWorkingCopyTransform());
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    const { effectiveKeyboardId } = result.current!(vfs, "basic_kbdus");
+    expect(effectiveKeyboardId).toBe("ha_sil");
+    // And the VFS is really renamed underneath — this is what compile() reads.
+    expect(vfs.get("source/ha_sil.kmn")).toBeDefined();
+    expect(vfs.get("source/basic_kbdus.kmn")).toBeUndefined();
+  });
+
+  it("does NOT return effectiveKeyboardId when identity.keyboardId is unset", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedBase();
+    const { result } = renderHook(() => useWorkingCopyTransform());
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    const { effectiveKeyboardId } = result.current!(vfs, "basic_kbdus");
+    expect(effectiveKeyboardId).toBeUndefined();
+  });
+
+  it("does NOT return effectiveKeyboardId when identity.keyboardId equals the base id", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedBase();
+    useWorkingCopyStore.getState().setIdentity({ keyboardId: "basic_kbdus" });
+    const { result } = renderHook(() => useWorkingCopyTransform());
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    const { effectiveKeyboardId } = result.current!(vfs, "basic_kbdus");
+    expect(effectiveKeyboardId).toBeUndefined();
+  });
+});
+
 describe("useWorkingCopyTransform — assignment-warning when patternMap is null", () => {
   it("adds a warning when assignments exist but patternMap is null", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
