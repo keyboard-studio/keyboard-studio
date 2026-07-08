@@ -619,3 +619,66 @@ describe("BaseKeyboardPicker — controlled value prop", () => {
     expect((input as HTMLInputElement).value).toBe(silEuroLatin.displayName);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 16. Scoped search: scopeIds restricts results; onSearchAll offers the way out
+// ---------------------------------------------------------------------------
+
+describe("BaseKeyboardPicker — scoped search (scopeIds)", () => {
+  it("scopeIds restricts option rows to keyboards in the set", async () => {
+    renderPicker({ scopeIds: new Set([silEuroLatin.id]) });
+    const input = await waitForCombobox();
+    fireEvent.change(input, { target: { value: "sil" } });
+    await waitFor(() => {
+      const options = screen.getAllByRole("option");
+      expect(options).toHaveLength(1);
+    });
+    const optionTexts = screen.getAllByRole("option").map((o) => o.textContent);
+    expect(optionTexts.some((t) => t?.includes("SIL Euro Latin"))).toBe(true);
+    expect(optionTexts.some((t) => t?.includes("SIL Devanagari"))).toBe(false);
+  });
+
+  it("zero-match in scope renders a 'Search all keyboards' action that fires onSearchAll", async () => {
+    const onSearchAll = vi.fn();
+    renderPicker({ scopeIds: new Set([silEuroLatin.id]), onSearchAll });
+    const input = await waitForCombobox();
+    // basic_kbdus exists in the catalog but is outside the scope
+    fireEvent.change(input, { target: { value: "basic" } });
+    const searchAllBtn = await waitFor(() =>
+      screen.getByRole("button", { name: /search all keyboards/i }),
+    );
+    fireEvent.click(searchAllBtn);
+    expect(onSearchAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("Enter on an empty scoped result list fires onSearchAll", async () => {
+    const onSearchAll = vi.fn();
+    const { onChange } = renderPicker({ scopeIds: new Set([silEuroLatin.id]), onSearchAll });
+    const input = await waitForCombobox();
+    fireEvent.change(input, { target: { value: "basic" } });
+    await waitFor(() =>
+      screen.getByRole("button", { name: /search all keyboards/i }),
+    );
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onSearchAll).toHaveBeenCalledTimes(1);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("without onSearchAll the zero-match state shows no action button", async () => {
+    renderPicker({ scopeIds: new Set([silEuroLatin.id]) });
+    const input = await waitForCombobox();
+    fireEvent.change(input, { target: { value: "basic" } });
+    await waitFor(() => {
+      const listbox = screen.getByRole("listbox");
+      expect(within(listbox).getByRole("status").textContent).toMatch(/No keyboards match/i);
+    });
+    expect(screen.queryByRole("button", { name: /search all keyboards/i })).toBeNull();
+  });
+
+  it("custom label prop replaces the default 'Base keyboard' label", async () => {
+    renderPicker({ label: "Search keyboards" });
+    await waitForCombobox();
+    expect(screen.getByText("Search keyboards")).toBeTruthy();
+    expect(screen.queryByText("Base keyboard")).toBeNull();
+  });
+});
