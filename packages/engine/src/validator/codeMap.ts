@@ -73,6 +73,50 @@ export const CODE_MAP: Readonly<Record<string, CodeMapEntry>> = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Oracle-inapplicable diagnostics.
+//
+// The oracle feeds kmcmplib a single in-memory source; its loadFile() /
+// existsSync() callbacks deny every other path (wasmLoader.ts). File-existence
+// diagnostics therefore fire for EVERY keyboard whose header names a packaging
+// asset (nearly all real bases reference a &BITMAP .ico) and carry zero signal
+// in the text-only lint context. Asset presence is the artifact pipeline's
+// concern — the preview compile strips dangling references against a real VFS
+// (compiler/stripDanglingAssetStores.ts) and the output path packages the
+// fetched files.
+//
+// Wire format: kmc-kmn reports message.code as the full NUMERIC value
+// (severity | namespace | base), e.g. ERROR_CannotReadBitmapFile =
+// Error(0x500000) | KmnCompiler(0x2000) | 0x031 = 0x502031. Matching strips
+// the severity bits so an upstream severity re-tag cannot resurrect the noise;
+// the symbolic form is also matched in case a future WASM side resolves names.
+// ---------------------------------------------------------------------------
+
+/** Strips CompilerErrorSeverity (bits >= 0x100000), keeping namespace | base. */
+const KMCMP_BASECODE_MASK = 0xfffff;
+
+/** namespace|base values of file-read diagnostics meaningless in the oracle. */
+const ORACLE_INAPPLICABLE_BASE_CODES: ReadonlySet<number> = new Set([
+  0x2031, // ERROR_CannotReadBitmapFile — "Cannot open the bitmap or icon file for reading"
+]);
+
+/** Symbolic aliases of the same diagnostics (future-proofing the wire format). */
+const ORACLE_INAPPLICABLE_SYMBOLS: ReadonlySet<string> = new Set([
+  "ERROR_CannotReadBitmapFile",
+]);
+
+/**
+ * True when a raw kmcmplib code denotes a file-existence diagnostic that the
+ * text-only oracle can never satisfy (see block comment above). The oracle
+ * drops these findings before translation.
+ */
+export function isOracleInapplicable(kmcmpCode: string): boolean {
+  if (ORACLE_INAPPLICABLE_SYMBOLS.has(kmcmpCode)) return true;
+  const numeric = Number(kmcmpCode);
+  if (!Number.isInteger(numeric)) return false;
+  return ORACLE_INAPPLICABLE_BASE_CODES.has(numeric & KMCMP_BASECODE_MASK);
+}
+
 /** Sanitize a kmcmplib code suffix into a SCREAMING_SNAKE_CASE LintCode tail. */
 function normalizeSuffix(raw: string): string {
   return raw
