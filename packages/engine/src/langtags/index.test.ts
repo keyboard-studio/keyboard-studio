@@ -152,4 +152,25 @@ describe("langtags extended fields (spec 030)", () => {
     expect(ha!.defaultScript).toBe("Latn");
     expect(ha!.localNames).toEqual(["Hausa"]);
   });
+
+  it("attaches regionVariants (distinct regions, each with region/regionName) for a region-ambiguous language", () => {
+    const aa = getLanguageDefaults("aa"); // Afar — spoken in ET + DJ
+    expect(aa?.regionVariants).toBeDefined();
+    expect(aa!.regionVariants!.length).toBeGreaterThan(1);
+    const regions = aa!.regionVariants!.map((v) => v.region);
+    expect(new Set(regions).size).toBe(regions.length); // regions are distinct
+    expect(aa!.regionVariants!.every((v) => typeof v.region === "string")).toBe(true);
+    expect(aa!.regionVariants!.some((v) => v.regionName === "Djibouti")).toBe(true);
+  });
+
+  it("omits regionVariants for a single-region language", () => {
+    const hi = getLanguageDefaults("hi"); // Hindi — single dominant region
+    expect(hi).not.toBeNull();
+    expect(hi!.regionVariants).toBeUndefined();
+  });
+
+  it("lookupByName sets hasRegionVariants iff the subtag has >1 region variant", () => {
+    expect(lookupByName("aa")[0]?.hasRegionVariants).toBe(true);
+    expect(lookupByName("hi")[0]?.hasRegionVariants).toBeUndefined();
+  });
 });
