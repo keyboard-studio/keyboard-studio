@@ -668,10 +668,16 @@ describe("BaseKeyboardPicker — scoped search (scopeIds)", () => {
     renderPicker({ scopeIds: new Set([silEuroLatin.id]) });
     const input = await waitForCombobox();
     fireEvent.change(input, { target: { value: "basic" } });
+    // The zero-match popup is a status panel, NOT a listbox: an interactive
+    // control may not live inside role="listbox" (children must be options),
+    // so no listbox renders while there are no matches.
     await waitFor(() => {
-      const listbox = screen.getByRole("listbox");
-      expect(within(listbox).getByRole("status").textContent).toMatch(/No keyboards match/i);
+      const statuses = screen.getAllByRole("status");
+      expect(
+        statuses.some((s) => /No keyboards match/i.test(s.textContent ?? "")),
+      ).toBe(true);
     });
+    expect(screen.queryByRole("listbox")).toBeNull();
     expect(screen.queryByRole("button", { name: /search all keyboards/i })).toBeNull();
   });
 

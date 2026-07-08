@@ -4,6 +4,7 @@
 // CJK/Ethiopic guard lives in OSKFrame, not here.
 
 import { useEffect, useState, useDeferredValue, useMemo, useRef, useId } from "react";
+import type { CSSProperties } from "react";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { ImportStatus } from "@keyboard-studio/contracts";
 import { getBaseBrowserService } from "../lib/services.ts";
@@ -165,6 +166,21 @@ export interface BaseKeyboardPickerProps {
 // Render/screen-reader-noise cap — not a hard data limit; the full ranked list is
 // retained in state and filtering continues as the user types.
 const MAX_VISIBLE = 100;
+
+// Shared visual shell for the combobox popup — used by both the option
+// listbox and the zero-match status panel so they occupy the same space.
+const POPUP_STYLE: CSSProperties = {
+  position: "absolute",
+  top: "100%",
+  left: 0,
+  right: 0,
+  zIndex: 50,
+  margin: "2px 0 0",
+  background: "var(--app-surface)",
+  border: "1px solid var(--app-border-strong)",
+  borderRadius: 8,
+  boxShadow: "0 8px 24px color-mix(in srgb, var(--app-bg) 22%, transparent)",
+};
 
 export function BaseKeyboardPicker({
   value,
@@ -523,65 +539,63 @@ export function BaseKeyboardPicker({
             }}
           />
 
-          {/* Listbox popup */}
-          {open && (
+          {/* Zero-match popup — a plain status panel, NOT a listbox: an
+              interactive button may not live inside role="listbox" (whose
+              children must be options), so the empty state renders as its own
+              popup element. It takes over the listboxId so the combobox's
+              aria-controls always points at the visible popup. */}
+          {open && ranked.length === 0 && (
+            <div
+              id={listboxId}
+              role="status"
+              style={{
+                ...POPUP_STYLE,
+                padding: "10px 12px",
+                fontSize: 13,
+                color: "var(--app-text-muted)",
+                fontFamily: "var(--app-font)",
+              }}
+            >
+              No keyboards match &ldquo;{query}&rdquo;.
+              {scopeIds !== undefined && onSearchAll !== undefined && (
+                <button
+                  type="button"
+                  // onMouseDown prevents blur-close before click fires.
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={onSearchAll}
+                  style={{
+                    display: "block",
+                    marginTop: 6,
+                    padding: "4px 10px",
+                    background: "transparent",
+                    border: "1px solid var(--app-border-strong)",
+                    borderRadius: 6,
+                    color: "var(--app-accent)",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    fontFamily: "var(--app-font)",
+                  }}
+                >
+                  Search all keyboards instead (or press Enter)
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Listbox popup — options only (role="option" children) */}
+          {open && ranked.length > 0 && (
             <ul
               id={listboxId}
               role="listbox"
               aria-label="Base keyboard options"
               style={{
-                position: "absolute",
-                top: "100%",
-                left: 0,
-                right: 0,
-                zIndex: 50,
-                margin: "2px 0 0",
+                ...POPUP_STYLE,
                 padding: 0,
                 listStyle: "none",
-                background: "var(--app-surface)",
-                border: "1px solid var(--app-border-strong)",
-                borderRadius: 8,
-                boxShadow: "0 8px 24px color-mix(in srgb, var(--app-bg) 22%, transparent)",
                 maxHeight: 260,
                 overflowY: "auto",
               }}
             >
-              {ranked.length === 0 && (
-                <li
-                  role="status"
-                  style={{
-                    padding: "10px 12px",
-                    fontSize: 13,
-                    color: "var(--app-text-muted)",
-                    fontFamily: "var(--app-font)",
-                  }}
-                >
-                  No keyboards match &ldquo;{query}&rdquo;.
-                  {scopeIds !== undefined && onSearchAll !== undefined && (
-                    <button
-                      type="button"
-                      // onMouseDown prevents blur-close before click fires.
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={onSearchAll}
-                      style={{
-                        display: "block",
-                        marginTop: 6,
-                        padding: "4px 10px",
-                        background: "transparent",
-                        border: "1px solid var(--app-border-strong)",
-                        borderRadius: 6,
-                        color: "var(--app-accent)",
-                        fontSize: 12,
-                        cursor: "pointer",
-                        fontFamily: "var(--app-font)",
-                      }}
-                    >
-                      Search all keyboards instead (or press Enter)
-                    </button>
-                  )}
-                </li>
-              )}
-
               {(optionRefs.current = [], visibleRanked).map((rb: RankedBase, i: number) => {
                 const kb = rb.base;
                 const isActive = i === safeActiveIndex;
