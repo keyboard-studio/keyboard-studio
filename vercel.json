@@ -9,11 +9,11 @@
     { "source": "/submit/managed-pr", "destination": "/api/submit/managed-pr" },
     {
       "source": "/kbd-proxy/:path*",
-      "destination": "https://raw.githubusercontent.com/mattgyverlee/keyboards/master/:path*"
+      "destination": "https://raw.githubusercontent.com/keyboard-studio/keyboards/master/:path*"
     },
     {
       "source": "/local-kbd-proxy/:path*",
-      "destination": "https://raw.githubusercontent.com/mattgyverlee/keyboards/master/:path*"
+      "destination": "https://raw.githubusercontent.com/keyboard-studio/keyboards/master/:path*"
     },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
