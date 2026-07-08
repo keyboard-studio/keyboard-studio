@@ -1,7 +1,8 @@
 // Phase B survey wrapper — Character inventory discovery (spec §8 step 4).
 //
 // Two discovery methods are offered:
-//   build-list  — unified: tick CLDR suggestions, type characters, see grid placeholder (DEFAULT)
+//   build-list  — unified "add your whole alphabet": tick CLDR suggestions, type
+//                 the rest of the alphabet, see grid placeholder (DEFAULT)
 //   manual      — step-by-step questions via SurveyRunner
 //
 // On completion, extractInventory() scans the Phase B answers for the question
@@ -207,7 +208,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
               add();
             }
           }}
-          placeholder="Type characters (space-separated)…"
+          placeholder="Type your alphabet with a space between each character (a b c …)"
           aria-label="Character to add"
           style={{
             flex: 1,
@@ -245,7 +246,8 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
         </p>
         {chars.length === 0 ? (
           <p style={mutedParaFlush}>
-            No characters yet — add your first one above.
+            No characters yet — type your whole alphabet above, with a space
+            between each character.
           </p>
         ) : (
           <div
@@ -538,8 +540,30 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
 
       {/* Heading */}
       <h2 style={phaseHeadingFlush}>
-        Phase B — Build your character list
+        Phase B — Add your whole alphabet
       </h2>
+
+      {/* Instructions */}
+      <div
+        style={{
+          padding: "12px 16px",
+          border: `1px solid ${BORDER}`,
+          borderLeft: `3px solid ${ACCENT}`,
+          borderRadius: 6,
+          fontSize: 14,
+          lineHeight: 1.6,
+        }}
+      >
+        <p style={{ margin: 0 }}>
+          Add <strong>your whole alphabet</strong> on this page — every
+          character your language uses, not just the special ones. Tick the
+          suggested characters below, then type any that are missing{" "}
+          <strong>with a space between each character</strong>, like this:
+        </p>
+        <p style={{ margin: "8px 0 0 0", fontFamily: "monospace", fontSize: 15 }}>
+          a b c d e ɛ ŋ ɔ …
+        </p>
+      </div>
 
       {/* Section 1: Suggestions from CLDR */}
       <section aria-label="Suggested characters from CLDR">
@@ -553,10 +577,14 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
       <hr style={divider} />
 
       {/* Section 2: Type-in characters */}
-      <section aria-label="Add characters by typing">
+      <section aria-label="Type your alphabet">
         <h3 style={sectionHeading}>
-          Add a character
+          Type your alphabet
         </h3>
+        <p style={{ ...mutedParaFlush, margin: "0 0 12px 0" }}>
+          Type the rest of your alphabet here, putting a space between each
+          character (for example: a b c ŋ ɛ), then press Enter or + Add.
+        </p>
         <CharChipEditor chars={chars} onChange={setChars} autoFocus={false} />
       </section>
 
@@ -700,7 +728,7 @@ interface IntroChooserProps {
 }
 
 const METHODS: Array<{ value: Exclude<DiscoveryMethod, null>; label: string }> = [
-  { value: "build-list", label: "Build my character list — type what you know and add suggested characters" },
+  { value: "build-list", label: "Add your whole alphabet — type every character your language uses and tick suggested ones" },
   { value: "manual", label: "Step by step — I will answer the questions below" },
 ];
 
@@ -723,11 +751,11 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
         Phase B — Character discovery
       </h2>
       <p style={mutedParaFlush}>
-        How would you like to tell us which characters {languageName} uses?
+        How would you like to add the alphabet {languageName} uses?
       </p>
       <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, lineHeight: 1.5 }}>
-        Both methods feed the same final character list.
-        The Build method starts with verified suggestions and lets you type additional characters.
+        Both methods feed the same final alphabet.
+        The first method starts with verified suggestions and lets you type the rest of your alphabet yourself.
       </p>
 
       <div role="radiogroup" aria-label="Discovery method">

@@ -130,11 +130,11 @@ async function confirmPrefill(page: Page): Promise<void> {
 }
 
 /**
- * Complete Phase B using the "Build my character list" method:
+ * Complete Phase B using the "Add your whole alphabet" method:
  * select the method, type one character, click Add, then click Done.
  */
 async function completePhaseB(page: Page): Promise<void> {
-  // Phase B IntroChooser is shown first. "Build my character list" is the
+  // Phase B IntroChooser is shown first. "Add your whole alphabet" is the
   // default selection — just click Continue.
   await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 15_000 });
   await page.click('[data-testid="phase-b-intro-next"]');
