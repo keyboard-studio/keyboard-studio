@@ -208,10 +208,12 @@ describe("flow-parity: identity_lite — questions[]", () => {
   });
 
   it("question IDs in order", () => {
+    // spec 030: langtags picker (il_language_code) first; english + autonym
+    // become confirmations seeded from the resolved entry.
     expect(modular.questions.map((q) => q.id)).toEqual([
-      "il_language_autonym",
-      "il_language_english",
       "il_language_code",
+      "il_language_english",
+      "il_language_autonym",
       "il_target_script",
       "il_script_not_supported",
     ]);

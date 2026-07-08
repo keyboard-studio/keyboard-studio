@@ -2,63 +2,65 @@
 
 **Owner**: Content (survey text/order/flow) with an Engine dependency (langtags API above). **Files**: `content/flows/identity_lite.modular.yaml`, `content/flows/proposed/phase_a_identity.modular.yaml`, `packages/studio/src/survey/questions/a/*`, `packages/studio/src/survey/IdentityLite.tsx`, `packages/studio/src/survey/questions/registry.a.ts`.
 
-## US1 structural decision — option A (single picker), 2026-07-08
+## US1 structural decision — option 1 "mechanism-clean" (as shipped), 2026-07-08
 
-Resolved during implementation recon (mechanism finding): the langtags
-autocomplete field (`LangtagsAutocompleteField`, `options_source:
-"@langtags_iso639"`) **commits the language CODE** as the answer
-(QuestionField.tsx: "the datalist value is the language code"), and resolves to
+Mechanism finding: the langtags autocomplete field (`LangtagsAutocompleteField`,
+`options_source: "@langtags_iso639"`) **commits the language CODE** as the answer
+(QuestionField.tsx: "the datalist value is the language code") and resolves to
 exactly one unambiguous langtags entry. Committing the *name* instead would
-reintroduce homonym ambiguity (T008: "Ainu" → aib/ain), so the picker MUST stay
-code-committing.
+reintroduce homonym ambiguity (T008: "Ainu" → aib/ain). Making the picker's field
+show/commit the name (faithful "option A") fights that unambiguity, so the chosen
+realization keeps the picker **code-committing** and derives the display fields as
+*seeded confirmations* — this is what shipped:
 
-Therefore (option A, chosen by the operator):
+- **Q1 = the langtags picker `il_language_code`** (already `type: autocomplete`,
+  `options_source: "@langtags_iso639"`), promoted to FIRST and reworded to lead
+  with the English name. The author types the English name, picks a suggestion,
+  and the committed **code** resolves the entry.
+- **Q2 `il_language_english`** and **Q3 `il_language_autonym`** stay as `text`
+  fields but are **PRE-FILLED (seeded)** from the resolved entry's `englishName`
+  / `autonym` (editable confirmations). Q3 becomes a multi-choice picker over
+  `localNames` in US2; a single-value seed for now.
+- **No separate code-confirmation step and NO `extractIdentityLite` inversion.**
+  Because english/autonym remain stored `text` answers (just pre-filled),
+  `extractIdentityLite` is **UNCHANGED** — `english` ← `il_language_english`,
+  `autonym` ← `il_language_autonym`, `languageSubtag` ← `il_language_code`. This
+  is why the shipped change is a low-risk reorder+seed rather than the delicate
+  extraction inversion the earlier "option A" sketch implied.
 
-- **Q1 = one langtags picker** (`il_language_english` becomes `type:
-  autocomplete`, `options_source: "@langtags_iso639"`). The author types the
-  **English name**; suggestions render as "EnglishName (code)" (+ region, to
-  distinguish homonyms — T008); picking commits the **code** and resolves the
-  entry. No separate free-text English-name field.
-- **English name, autonym, script, local names all DERIVE** from the resolved
-  entry — they are not independently-typed answers.
-- **Q3 `il_language_code` becomes an auto-filled confirmation** of the resolved
-  code (US4 folds into this structure — the two are entangled under option A).
+Seeding wiring (`IdentityLite.tsx`): the `il_language_code` commit resolves the
+entry (async `loadLangtags`) and sets `englishNameSeedRef` / `autonymSeedRef` /
+`scriptSeedRef` + provenance; `getSeedValue` returns those for
+`il_language_english` / `il_language_autonym` / `il_target_script`. The old
+autonym→English seed and `autonymRef` are removed. SurveyRunner's
+"seed-on-first-arrival, never overwrite" contract preserves author edits.
 
-**Key implementation consequence — `extractIdentityLite` must invert:**
-today it reads `il_language_english` as the English *name* and
-`il_language_code` as the code. After option A, `il_language_english`'s answer
-is a **code** (the picker value), so:
-- `languageSubtag` = the picker's committed code (from `il_language_english`,
-  and/or the `il_language_code` confirmation).
-- `english` = **derived** via `getLanguageDefaults(code).englishName` (NOT read
-  from the `il_language_english` answer, which now holds a code).
-- `autonym` = `il_language_autonym` (seeded from the resolved entry; US2 makes it
-  a multi-choice, US1 gives it a single primary-autonym seed).
-- Resolution must be available synchronously at extraction time (langtags is
-  loaded by the mount effect; cache the resolved entry in a ref alongside
-  `autonymRef`/`languageCodeRef`).
-
-This is the delicate part of US1 and the reason it is more than a reorder.
+(The `regionVariants`/region-disambiguation and multi-choice localNames land in
+US3/US2 — the picker-first order shipped in US1 is the platform for them.)
 
 ## Question order (post-change)
 
-**Live IdentityLite (`il_*`)** — membership list in `identity_lite.modular.yaml` AND `next` pointers must agree:
+**Live IdentityLite (`il_*`)** — SHIPPED (US1); membership list in `identity_lite.modular.yaml` AND `next` pointers agree:
 
-1. `il_language_english` — English-name autocomplete (`type: autocomplete`, `options_source: @langtags_iso639`, `required: true`). Free-text accepted (FR-013). `next` → region if `hasRegionVariants`, else `il_language_autonym`.
-2. `il_language_region` *(new, conditional)* — region choice from resolved entry's `regionVariants[].regionName` (`required: false`). Only reached when ambiguous. `next` → `il_language_autonym`.
-3. `il_language_autonym` — own-script name; options = selected variant's `localNames[]`, free-text override (`required: true`). `next` → `il_language_code`.
-4. `il_language_code` — auto-filled confirmation of the resolved subtag (`type: autocomplete`, `required: false`, free-text/blank allowed). `next` → `il_target_script`.
-5. `il_target_script`, `il_script_not_supported` — unchanged tail.
+1. `il_language_code` — the langtags picker, FIRST (`type: autocomplete`, `options_source: @langtags_iso639`, `required: false`). Author types the English name and picks a suggestion; the committed **code** resolves the entry. Free-text/blank accepted (FR-003/FR-013). `next` → `il_language_english`. *(US3 will route here to `il_language_region` first when `hasRegionVariants`.)*
+2. `il_language_english` — English-name confirmation (`type: text`, `required: true`), PRE-FILLED from the resolved entry's `englishName`; editable. `next` → `il_language_autonym`.
+3. `il_language_autonym` — own-script name (`type: text`, `required: true`), PRE-FILLED from the resolved entry's `autonym`; editable. `next` → `il_target_script`. *(US2 turns this into a multi-choice over `localNames[]` + free-text override.)*
+4. `il_target_script`, `il_script_not_supported` — unchanged tail. *(US3 inserts a conditional `il_language_region` between the picker and `il_language_english`, shown only when the resolved subtag has >1 region variant.)*
 
 **Proposed Phase A (`language_name_*`)** — mirror the same reordering in `phase_a_identity.modular.yaml` + the `language_name_*` modules + `desktop_first_notice.next` (per FR-015). This flow is non-live (Flow Map Library graph only); its `next` chain must stay internally consistent.
 
 ## Seeding contract (IdentityLite.tsx)
 
-- `handleAnswerCommit("il_language_english", value)` → resolve the langtags entry into `resolvedEntryRef`; set `selectedVariantRef` to the primary variant; if `regionVariants.length <= 1`, the region step is skipped.
-- `handleAnswerCommit("il_language_region", value)` → set `selectedVariantRef` to the chosen variant.
-- `getSeedValue("il_language_autonym")` → `selectedVariantRef.localNames` (choices); pre-fill primary when present.
-- `getSeedValue("il_language_code")` → `resolvedEntryRef.subtag`.
-- `getSeedValue("il_target_script")` → `selectedVariantRef.script` (existing behavior, now sourced from the resolved variant).
+SHIPPED (US1):
+- `handleAnswerCommit("il_language_code", code)` → resolve the entry (async `loadLangtags` → `getLanguageDefaults`); reset then set `englishNameSeedRef` (`englishName`), `autonymSeedRef` (`autonym`), `scriptSeedRef` (mapped script), and provenance for the fields actually seeded.
+- `getSeedValue("il_language_english")` → `englishNameSeedRef` (undefined when unmatched → author types it).
+- `getSeedValue("il_language_autonym")` → `autonymSeedRef` (frequently undefined — ~60% of languages have no local name → free text).
+- `getSeedValue("il_target_script")` → `scriptSeedRef` (unchanged mapping).
+- `extractIdentityLite` is UNCHANGED: `english` ← `il_language_english`, `autonym` ← `il_language_autonym`, `languageSubtag` ← `il_language_code`. The old autonym→English seed and `autonymRef` are removed. SurveyRunner's "seed on first arrival, never overwrite" preserves author edits.
+
+DEFERRED (US2/US3):
+- US2: `getSeedValue("il_language_autonym")` returns the resolved entry's `localNames` as multi-choice options (still free-text override).
+- US3: `handleAnswerCommit("il_language_region", …)` + a `selectedVariantRef`; region routing shown only when `regionVariants.length > 1`; script/localNames then sourced from the selected variant.
 - **Invariant**: seed on first arrival only; never overwrite an author-edited value (existing SurveyRunner contract — SC-005). Editing Q1/region via Back re-resolves and re-seeds downstream, without clobbering values the author already customized.
 - **Free-text/no match**: `resolvedEntryRef = null` → no seeds; Q2 is a single free-text field, Q3 free-text/blank; every step completable (FR-003).
 

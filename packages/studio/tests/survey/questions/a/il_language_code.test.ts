@@ -25,8 +25,8 @@ describe("il_language_code — definition", () => {
     expect(definition.required).toBe(false);
   });
 
-  it("routes to il_target_script", () => {
-    expect(definition.next).toBe("il_target_script");
+  it("routes to il_language_english", () => {
+    expect(definition.next).toBe("il_language_english");
   });
 });
 

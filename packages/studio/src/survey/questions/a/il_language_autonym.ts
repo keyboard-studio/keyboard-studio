@@ -1,10 +1,12 @@
 // Per-question module: il_language_autonym (identity-lite)
-// Ported verbatim from content/flows/identity_lite.yaml.
 //
-// This is the opening question of the identity-lite mini-flow (spec §8
-// "Workflow ordering"). It captures the language name in the community's own
-// script and spelling. The autonym is later seeded into il_language_english
-// by IdentityLite.tsx getSeedValue — that seeding logic stays in the component.
+// THIRD question (spec 030): the language name in the community's own script.
+// PRE-FILLED from the langtags entry resolved by il_language_code (getSeedValue
+// in IdentityLite.tsx seeds it from the resolved entry's autonym); the author
+// confirms or edits it. Only ~40% of langtags languages carry a local name, so
+// this frequently arrives empty and the author types it (spec 030 T008 / FR-005).
+// US2 will turn this into a multi-choice picker over the entry's localNames;
+// for now it is a single-value pre-filled text field.
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
 
@@ -12,11 +14,12 @@ export const definition = {
   id: "il_language_autonym",
   prompt: "What is your language called in your own language?",
   help_text:
-    "Type the name your community uses for the language, using your own spelling " +
-    "and characters. For example: Fà', Kiswahili, हिन्दी.",
+    "The name your community uses for the language, in your own spelling and " +
+    "characters. For example: Fà', Kiswahili, हिन्दी. Pre-filled from your " +
+    "selection above when available — edit it to match your spelling.",
   type: "text" as const,
   required: true,
-  next: "il_language_english",
+  next: "il_target_script",
 } satisfies import("../../types.ts").FlowQuestion;
 
 export function validate(

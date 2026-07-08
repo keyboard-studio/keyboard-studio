@@ -122,14 +122,16 @@ export function IdentityLite({
 }: IdentityLiteProps) {
   const flow = useMemo(() => loadModularFlow(identityLiteRaw as string), []);
 
-  // Track the latest committed autonym synchronously via a ref so that
-  // getSeedValue can read it in the same tick as the onAnswerCommit call,
-  // without waiting for a React state update cycle.
-  const autonymRef = useRef<string>("");
-
-  // Track the latest committed language code (from il_language_code), used to
-  // look up langtags defaults when il_target_script is reached.
+  // Track the latest committed language code (from il_language_code — now the
+  // FIRST question), used to look up langtags defaults for the downstream seeds.
   const languageCodeRef = useRef<string>("");
+
+  // Autonym seed from the resolved langtags entry (spec 030). Seeds
+  // il_language_autonym. Read synchronously by getSeedValue in the same tick as
+  // onAnswerCommit. SurveyRunner enforces "seed on first arrival, never overwrite
+  // a user value", so Back-and-change re-seeds correctly. Frequently undefined —
+  // only ~40% of languages carry a local name (T008).
+  const autonymSeedRef = useRef<string | undefined>(undefined);
 
   // Track the proposed script seed from langtags (derived from the language
   // code), and whether it has been seeded already. The seeded flag prevents
@@ -142,9 +144,9 @@ export function IdentityLite({
   // seed fires again on re-arrival — which is correct behavior (spec §8).
   const scriptSeedRef = useRef<string | undefined>(undefined);
 
-  // English-name seed from langtags (nice-to-have within US1). Only seeds when
-  // blank; never overwrites a user value — enforced by SurveyRunner's "seed on
-  // first arrival" contract.
+  // English-name seed from the resolved langtags entry (spec 030): seeds the
+  // il_language_english confirmation. Only seeds when blank; never overwrites a
+  // user value — enforced by SurveyRunner's "seed on first arrival" contract.
   const englishNameSeedRef = useRef<string | undefined>(undefined);
 
   // Provenance map: questionId → LangtagsProvenance, for seeded fields.
@@ -161,23 +163,19 @@ export function IdentityLite({
 
   const handleAnswerCommit = useCallback(
     (questionId: string, value: string | string[] | undefined) => {
-      if (questionId === "il_language_autonym") {
-        autonymRef.current = typeof value === "string" ? value : "";
-      }
-
       if (questionId === "il_language_code") {
         const code = typeof value === "string" ? value.trim() : "";
         languageCodeRef.current = code;
-        // Reset prior seeds so arriving at il_target_script next time reflects
-        // the newly selected language.
+        // Reset prior seeds so re-selecting the language re-derives them.
         scriptSeedRef.current = undefined;
         englishNameSeedRef.current = undefined;
+        autonymSeedRef.current = undefined;
         provenanceRef.current = new Map();
 
         if (code !== "") {
-          // Resolve the langtags defaults asynchronously. By the time the user
-          // reaches il_target_script (at least one Next click away) the promise
-          // will have resolved. The module is already loaded from the mount effect.
+          // Resolve langtags defaults asynchronously. The module is already
+          // loaded from the mount effect; by the time the user reaches the
+          // downstream confirmations (english/autonym/script) it has resolved.
           void loadLangtags().then((mod) => {
             const defaults = mod.getLanguageDefaults(code);
             if (defaults !== null) {
@@ -186,13 +184,17 @@ export function IdentityLite({
               // null means no mapping — seeding "other" would be misleading.
               scriptSeedRef.current = scriptOption ?? undefined;
 
-              // Seed English name when langtags provides one (nice-to-have).
+              // Seed the English-name and autonym confirmations from the resolved
+              // entry. autonym is frequently absent (~60% of languages) — then the
+              // seed stays undefined and the author types it (FR-003/FR-005).
               if (defaults.englishName !== undefined && defaults.englishName !== "") {
                 englishNameSeedRef.current = defaults.englishName;
               }
+              if (defaults.autonym !== undefined && defaults.autonym !== "") {
+                autonymSeedRef.current = defaults.autonym;
+              }
 
-              // Record provenance for seeded fields. Only include il_target_script
-              // in the provenance map when we actually have a seed for it.
+              // Record provenance only for fields we actually seeded.
               const provenance: LangtagsProvenance = {
                 source: "langtags",
                 caption: "Suggested from langtags — edit if needed",
@@ -203,6 +205,9 @@ export function IdentityLite({
                   : []),
                 ...(englishNameSeedRef.current !== undefined
                   ? [["il_language_english", provenance] as [string, LangtagsProvenance]]
+                  : []),
+                ...(autonymSeedRef.current !== undefined
+                  ? [["il_language_autonym", provenance] as [string, LangtagsProvenance]]
                   : []),
               ]);
             }
@@ -216,7 +221,8 @@ export function IdentityLite({
     [],
   );
 
-  // Pre-fill fields from langtags defaults + autonym.
+  // Pre-fill the english / autonym / script confirmations from the langtags
+  // entry resolved by il_language_code (spec 030).
   //
   // "Default once, then user owns it" contract is upheld by SurveyRunner:
   // the seed only fires on forward push; Back discards unsaved edits (stack pop),
@@ -230,11 +236,15 @@ export function IdentityLite({
   const getSeedValue = useCallback(
     (questionId: string): string | string[] | undefined => {
       if (questionId === "il_language_english") {
-        // Priority: autonym-derived seed (existing behavior) OR langtags English name.
-        const autonym = autonymRef.current;
-        if (autonym !== "") return autonym;
-        // Langtags English name as fallback when no autonym has been entered yet.
+        // English-name confirmation, seeded from the langtags entry resolved by
+        // il_language_code (spec 030). Undefined when the language was blank /
+        // unmatched — the author types it.
         return englishNameSeedRef.current;
+      }
+      if (questionId === "il_language_autonym") {
+        // Own-script name, seeded from the resolved entry's autonym; frequently
+        // undefined (~60% of languages have no local name) — then free text.
+        return autonymSeedRef.current;
       }
       if (questionId === "il_target_script") {
         return scriptSeedRef.current;

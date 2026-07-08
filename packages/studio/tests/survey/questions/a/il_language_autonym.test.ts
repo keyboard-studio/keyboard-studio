@@ -20,8 +20,8 @@ describe("il_language_autonym — definition", () => {
     expect(definition.required).toBe(true);
   });
 
-  it("routes to il_language_english", () => {
-    expect(definition.next).toBe("il_language_english");
+  it("routes to il_target_script", () => {
+    expect(definition.next).toBe("il_target_script");
   });
 });
 

@@ -1,9 +1,17 @@
 // Per-question module: il_language_code (identity-lite)
-// Ported verbatim from content/flows/identity_lite.yaml.
 //
-// optional (required: false) — the author may leave blank. The language subtag
-// drives the bcp47 field in IdentityLiteResult.bcp47 (built by buildTargetBcp47
-// in IdentityLite.tsx). An empty subtag degrades suggestBases() to script-match
+// FIRST question of the identity-lite flow (spec 030): the langtags-backed
+// picker is the primary language selector. The author starts typing their
+// language's ENGLISH name and picks it from the list; selecting resolves one
+// unambiguous langtags entry whose CODE becomes this answer (the datalist value
+// is the code — see QuestionField's LangtagsAutocompleteField). That resolved
+// entry seeds the downstream English-name (il_language_english) and autonym
+// (il_language_autonym) confirmations in IdentityLite.tsx.
+//
+// optional (required: false) — the author may leave blank or type a free-text
+// ISO code for a language absent from langtags (graceful degradation, spec 030
+// FR-003). The language subtag drives IdentityLiteResult.bcp47 (buildTargetBcp47
+// in IdentityLite.tsx); an empty subtag degrades suggestBases() to script-match
 // ranking (spec §8).
 //
 // Type is "autocomplete" with options_source "@langtags_iso639" so QuestionField
@@ -16,14 +24,15 @@ export const definition = {
   id: "il_language_code",
   prompt: "What language is this keyboard for?",
   help_text:
-    "Search by language name, autonym, or ISO 639 code. Examples: \"Hausa\", " +
-    "\"ha\", \"Hindi\", \"hi\". If your language is not in the list, type its " +
-    "ISO 639 code directly (e.g. \"bft\" for Balti) and continue — free text " +
-    "is always accepted. Leave blank if you are unsure.",
+    "Start typing your language's English name and pick it from the list — you " +
+    "can also search by autonym or ISO 639 code (e.g. \"Hausa\", \"Hindi\", " +
+    "\"ha\", \"hi\"). If your language is not listed, type its ISO 639 code " +
+    "directly (e.g. \"bft\" for Balti) and continue — free text is always " +
+    "accepted. Leave blank if you are unsure.",
   type: "autocomplete" as const,
   options_source: "@langtags_iso639" as const,
   required: false,
-  next: "il_target_script",
+  next: "il_language_english",
 } satisfies import("../../types.ts").FlowQuestion;
 
 // No validate() — optional free-text; no client-side gating implied by the YAML.
