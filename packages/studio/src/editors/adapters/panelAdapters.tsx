@@ -26,7 +26,6 @@
 //
 // Boundary: editors/adapters/ → stores/ and hooks/ is allowed by depcruise.
 
-import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useValidatorFindings } from "../../hooks/useValidatorFindings.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
@@ -135,19 +134,25 @@ export function TrackOneIdentityPanelAdapter(_props: EditorStepProps) {
 // ---------------------------------------------------------------------------
 
 /**
- * Adapter for BaseResolution. Reads the suggest target from the working-copy
- * store and passes the resolved BaseKeyboard as the step result.
+ * Adapter for BaseResolution. Reads the suggest target from the
+ * surveySessionStore's identityResult (written by IdentityLiteAdapter's
+ * setIdentityResult before this step is reached) and passes the resolved
+ * BaseKeyboard as the step result.
  *
  * T-Stage5: calls setLocalBase (surveySessionStore) before onComplete to
  * reproduce the pre-Stage-5 handleBaseResolved mutation ordering.
  */
 export function BaseResolutionAdapter({ onComplete, onBack }: EditorStepProps) {
-  const identity = useWorkingCopyStore((s) => s.identity);
+  const identityResult = useSurveySessionStore((s) => s.identityResult);
   const setLocalBase = useSurveySessionStore((s) => s.setLocalBase);
 
   const target: SuggestTarget = {
-    script: identity?.targetScript ?? "Latn",
-    ...(identity?.bcp47 !== undefined ? { bcp47: identity.bcp47 } : {}),
+    // `||` not `??`: prefill.script can be "" (no script selected for an
+    // unrecognized language), which must also fall back.
+    script: identityResult?.prefill.script || "Latn",
+    ...(identityResult !== null && identityResult.bcp47 !== ""
+      ? { bcp47: identityResult.bcp47 }
+      : {}),
   };
 
   return (
