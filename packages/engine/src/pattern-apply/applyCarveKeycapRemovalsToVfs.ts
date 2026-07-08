@@ -11,10 +11,11 @@
 // The VirtualFS is mutated in-place; the studio never writes to host disk
 // during authoring (spec §11).
 
-import type { KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
+import type { IRStore, KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import { isTouchSubKeyDuplicate } from "./touch-mechanism-shared.js";
 import { parseSlotId } from "./slotId.js";
+import { classifyStoreSlotEdit } from "./applyStoreSlotRemovals.js";
 import { readVfsText, resolveOskAssetPaths, xmlUnescape } from "./oskAssetShared.js";
 
 // ---------------------------------------------------------------------------
@@ -51,6 +52,12 @@ export interface CarveKeycapRemovalInput {
  * `index()`/`outs()`. This protects the single-`deleteItem` path from
  * blanking a keycap whose character remains typeable via another source.
  *
+ * Blocked stores: a slot on a store that {@link classifyStoreSlotEdit} marks
+ * `blocked` is one applyStoreSlotRemovals REFUSES to edit — the character is
+ * still produced, so it contributes no candidate and all its chars count as
+ * survivors. This keeps the keycap projection consistent with what the .kmn
+ * projection actually applied.
+ *
  * Pure — exported for direct unit testing.
  */
 export function collectCarvedKeycapTexts(
@@ -62,6 +69,18 @@ export function collectCarvedKeycapTexts(
   const storeByNodeId = new Map(baseIr.stores.map((s) => [s.nodeId, s]));
   const storeByName = new Map(baseIr.stores.map((s) => [s.name, s]));
 
+  // Lazy per-store blocked-classification cache (classifyStoreSlotEdit scans
+  // every rule, so compute at most once per store actually referenced).
+  const blockedCache = new Map<string, boolean>();
+  const isBlockedStore = (store: IRStore): boolean => {
+    let blocked = blockedCache.get(store.nodeId);
+    if (blocked === undefined) {
+      blocked = classifyStoreSlotEdit(store, baseIr).mode === "blocked";
+      blockedCache.set(store.nodeId, blocked);
+    }
+    return blocked;
+  };
+
   // --- Candidates ---
   const candidates = new Set<string>();
 
@@ -70,7 +89,7 @@ export function collectCarvedKeycapTexts(
     if (parsed === null) continue;
     const store = storeByNodeId.get(parsed.storeNodeId);
     const item = store?.items[parsed.itemsIndex];
-    if (item !== undefined && item.kind === "char") {
+    if (store !== undefined && item !== undefined && item.kind === "char" && !isBlockedStore(store)) {
       candidates.add(item.value.normalize("NFC"));
     }
   }
@@ -118,8 +137,11 @@ export function collectCarvedKeycapTexts(
   for (const name of outputStoreNames) {
     const store = storeByName.get(name);
     if (store === undefined || wholeNodeIds.has(store.nodeId)) continue;
+    // A blocked store's slots are never actually edited — every char it
+    // holds keeps being produced, carved slot ids notwithstanding.
+    const blocked = isBlockedStore(store);
     store.items.forEach((item, i) => {
-      if (item.kind === "char" && !slotIds.has(`${store.nodeId}#${i}`)) {
+      if (item.kind === "char" && (blocked || !slotIds.has(`${store.nodeId}#${i}`))) {
         survivors.add(item.value.normalize("NFC"));
       }
     });

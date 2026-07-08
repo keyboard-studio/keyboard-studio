@@ -306,6 +306,29 @@ describe("collectCarvedKeycapTexts — derivation and survivor guard", () => {
     ).toBe(0);
   });
 
+  it("skips slots on blocked stores — the .kmn projection refuses those edits", () => {
+    // A store that is BOTH an any() source and an index() output target in
+    // the same rule classifies as blocked (dual-use / paired-input on the
+    // nul-fill classifier) — applyStoreSlotRemovals refuses to edit it, so
+    // its character keeps being produced and must keep its keycap.
+    const dualStore: IRStore = {
+      nodeId: "store#dual",
+      name: "dualX",
+      items: [{ kind: "char", value: "é" }],
+      isSystem: false,
+    };
+    const dualRule: IRRule = {
+      nodeId: "rule#dual",
+      context: [{ kind: "any", storeRef: "dualX" }],
+      output: [{ kind: "index", storeRef: "dualX", offset: 1 }],
+    };
+    const ir = makeIR([makeGroup("group#0", [dualRule])], [dualStore]);
+
+    expect(
+      collectCarvedKeycapTexts(ir, removalsOf({ slotIds: ["store#dual#0"] })).size,
+    ).toBe(0);
+  });
+
   it("ignores input-only stores when looking for survivors", () => {
     // "keys" is an any() matcher (input side) that happens to contain é — it
     // does not PRODUCE é, so it must not keep the keycap alive.
