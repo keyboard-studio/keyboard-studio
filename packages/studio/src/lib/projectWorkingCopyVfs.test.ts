@@ -555,4 +555,63 @@ describe("projectWorkingCopyVfs — id rename (step 4)", () => {
     );
     expect(vfs.get("source/ewondo.css")).toBeUndefined();
   });
+
+  // Regression coverage for the adapt-a-base compile-after-rename bug: the
+  // compile step (useKeyboardArtifact) cannot know the VFS was renamed unless
+  // the transform result tells it so.
+  it("returns effectiveKeyboardId === targetKeyboardId when the rename pass fires", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const vfs = createVirtualFS([
+      { path: "source/sil_akebu.kmn", content: "c stub\n", isBinary: false },
+    ]);
+    const result = projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "sil_akebu",
+      targetKeyboardId: "ewondo",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: { displayName: "Ewondo" },
+    });
+    expect(result.effectiveKeyboardId).toBe("ewondo");
+    // And the renamed .kmn is really what compile() would read.
+    expect(vfs.get("source/ewondo.kmn")).toBeDefined();
+    expect(vfs.get("source/sil_akebu.kmn")).toBeUndefined();
+  });
+
+  it("does NOT return effectiveKeyboardId when targetKeyboardId is omitted", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const vfs = createVirtualFS([
+      { path: "source/sil_akebu.kmn", content: "c stub\n", isBinary: false },
+    ]);
+    const result = projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "sil_akebu",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+    expect(result.effectiveKeyboardId).toBeUndefined();
+  });
+
+  it("does NOT return effectiveKeyboardId when targetKeyboardId equals keyboardId", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const vfs = createVirtualFS([
+      { path: "source/sil_akebu.kmn", content: "c stub\n", isBinary: false },
+    ]);
+    const result = projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "sil_akebu",
+      targetKeyboardId: "sil_akebu",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+    expect(result.effectiveKeyboardId).toBeUndefined();
+  });
 });

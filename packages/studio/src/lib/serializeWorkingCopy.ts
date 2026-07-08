@@ -244,7 +244,7 @@ export async function projectWorkingCopyForOutput(): Promise<ProjectWorkingCopyF
 
   // 5. Project the working copy onto the cloned VFS. targetKeyboardId triggers
   //    the final rename pass when the author picked a different id.
-  const { warnings: projectionWarnings } = projectWorkingCopyVfs({
+  const { warnings: projectionWarnings, effectiveKeyboardId } = projectWorkingCopyVfs({
     vfs: clonedVfs,
     keyboardId,
     targetKeyboardId: outputKeyboardId,
@@ -256,6 +256,17 @@ export async function projectWorkingCopyForOutput(): Promise<ProjectWorkingCopyF
     identity: identityForProjection,
     touchLayoutJson,
   });
+
+  // The projector's own report of what id the VFS actually ended up under is
+  // the single source of truth for the result's keyboardId — not a second,
+  // independently re-derived `outputKeyboardId`. The two are provably equal
+  // (outputKeyboardId is always defined, so effectiveKeyboardId is set exactly
+  // when it differs from the base id and equals outputKeyboardId in that case;
+  // otherwise effectiveKeyboardId is undefined and the base id is correct),
+  // but consuming the return value keeps this call site and
+  // useKeyboardArtifact's compile-id derivation reading from the same
+  // contract instead of two hand-maintained copies of the same rule.
+  const resolvedKeyboardId = effectiveKeyboardId ?? keyboardId;
 
   // 6. Merge the adapt-path warnings (HISTORY/.kps staging) with the projection
   //    warnings. Both output paths (zip + PR) surface the same set.
@@ -271,7 +282,7 @@ export async function projectWorkingCopyForOutput(): Promise<ProjectWorkingCopyF
   // filename and the PR path get the correct release version.
   return {
     vfs: clonedVfs,
-    keyboardId: outputKeyboardId,
+    keyboardId: resolvedKeyboardId,
     displayName: identity?.displayName ?? baseKeyboard.displayName,
     version,
     warnings,
