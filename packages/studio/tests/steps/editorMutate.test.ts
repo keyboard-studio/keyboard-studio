@@ -34,10 +34,8 @@ function group(nodeId: string, name: string, rules: IRRule[]): IRGroup {
   return { nodeId, name, usingKeys: true, rules, readonly: false };
 }
 
-// An output store referenced by index(), positionally paired (via the
-// pairing graph) with the any() input store "dkf" in the same rule — so
-// applyStoreSlotRemovals treats a slot removal on EITHER as a coordinated
-// drop across both.
+// An output store referenced by index() so applyStoreSlotRemovals treats its
+// slots as eligible for nul-fillers.
 function outputStore(nodeId: string, name: string, chars: string): IRStore {
   return makeCharStore(nodeId, name, chars);
 }
@@ -47,15 +45,11 @@ function freshIR(): KeyboardIR {
     rule("r0"),
     {
       nodeId: "r1",
-      context: [{ kind: "deadkey", id: 1 }, { kind: "any", storeRef: "dkf" }],
+      context: [{ kind: "vkey", name: "K_B", modifiers: [] }],
       output: [{ kind: "index", storeRef: "dkt", offset: 2 }],
     },
   ]);
-  const stores = [
-    outputStore("dkt", "dkt", "xyz"),
-    makeCharStore("dkf", "dkf", "abc"),
-    makeCharStore("s1", "extra", "de"),
-  ];
+  const stores = [outputStore("dkt", "dkt", "xyz"), makeCharStore("s1", "extra", "de")];
   return makeTestIR([g], stores);
 }
 
@@ -88,25 +82,16 @@ describe("editorMutate — buildCarvePatch / applyCarveMutate (containment, M3)"
   it("drops a whole store via the seam (stores[] write)", () => {
     const ir = freshIR();
     const out = applyCarveMutate(ir, new Set(["s1"]), new Set());
-    expect(out.stores.map((s) => s.nodeId)).toEqual(["dkt", "dkf"]);
+    expect(out.stores.map((s) => s.nodeId)).toEqual(["dkt"]);
   });
 
-  it("coordinates a drop across the paired output+input stores (deletedItemIds slot path)", () => {
+  it("rewrites a store slot to a nul filler (deletedItemIds slot path)", () => {
     const ir = freshIR();
     const out = applyCarveMutate(ir, new Set(), new Set(["dkt#1"]));
     const dkt = out.stores.find((s) => s.nodeId === "dkt")!;
-    const dkf = out.stores.find((s) => s.nodeId === "dkf")!;
-    // dkt "xyz" drops position 1 ('y') -> "xz"; no nul filler introduced.
-    expect(dkt.items).toEqual([
-      { kind: "char", value: "x" },
-      { kind: "char", value: "z" },
-    ]);
-    // dkf "abc" is spliced at the SAME position (1, 'b') -> "ac", per the
-    // pairing graph coordinating the drop across both stores.
-    expect(dkf.items).toEqual([
-      { kind: "char", value: "a" },
-      { kind: "char", value: "c" },
-    ]);
+    expect(dkt.items[1]).toEqual({ kind: "raw", text: "nul" });
+    // sibling slots preserved
+    expect(dkt.items[0]).toEqual({ kind: "char", value: "x" });
   });
 
   it("treats a bare rule item id as a whole-node deletion", () => {
@@ -127,11 +112,11 @@ describe("editorMutate — idempotency (M4) and reversibility", () => {
   it("re-deriving from baseIr with a SHRINKING deletion set yields fewer deletions", () => {
     const ir = freshIR();
     const more = applyCarveMutate(ir, new Set(["s1"]), new Set());
-    expect(more.stores.map((s) => s.nodeId)).toEqual(["dkt", "dkf"]); // s1 deleted
+    expect(more.stores.map((s) => s.nodeId)).toEqual(["dkt"]); // s1 deleted
 
     // Restore: derive from baseIr again with the shrunk set (empty) — s1 returns.
     const fewer = applyCarveMutate(ir, new Set(), new Set());
-    expect(fewer.stores.map((s) => s.nodeId)).toEqual(["dkt", "dkf", "s1"]);
+    expect(fewer.stores.map((s) => s.nodeId)).toEqual(["dkt", "s1"]);
   });
 });
 

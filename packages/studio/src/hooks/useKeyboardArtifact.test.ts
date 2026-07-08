@@ -278,62 +278,6 @@ describe("useKeyboardArtifact — onInstantiate timing", () => {
 });
 
 // ---------------------------------------------------------------------------
-// transformVersion recompile effect — vfsTransform warnings/notices must
-// reach the ready stage on EVERY reapply, not just the first (regression:
-// this effect previously hardcoded runCompile(..., [], false), discarding
-// transformResult entirely on every recompile after the first fetch).
-// ---------------------------------------------------------------------------
-
-describe("useKeyboardArtifact — transformVersion recompile carries the CURRENT transform's warnings/notices", () => {
-  it("a vfsTransform reapplied after the first fetch surfaces its warnings AND notices on the ready stage", async () => {
-    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
-
-    const makeTransform = (warnings: string[], notices: string[]) =>
-      vi.fn(() => ({ warnings, notices }));
-
-    const firstTransform = makeTransform([], []);
-
-    const { result, rerender } = renderHook(
-      ({ transform }: { transform: ReturnType<typeof makeTransform> | null }) =>
-        useKeyboardArtifact(baseKb, null, transform, null),
-      { initialProps: { transform: firstTransform } },
-    );
-
-    // Wait for the full fetch→compile run to complete.
-    await act(async () => {
-      await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    });
-    expect(result.current.stage.kind).toBe("ready");
-    if (result.current.stage.kind === "ready") {
-      expect(result.current.stage.scaffoldWarnings).toEqual([]);
-      expect(result.current.stage.scaffoldNotices).toEqual([]);
-    }
-
-    // Reapply with a DIFFERENT transform (simulates a carve/assignment change)
-    // that returns non-empty warnings AND notices.
-    const secondTransform = makeTransform(
-      ["[store-slot] index 9 out of range for store \"x\" (length: 1); slot skipped."],
-      ["[store-slot] coordinated removal across paired stores \"dkfX\", \"dktX\": dropped 1 position(s) from each to preserve index() alignment."],
-    );
-    rerender({ transform: secondTransform });
-
-    await act(async () => {
-      await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    });
-
-    expect(result.current.stage.kind).toBe("ready");
-    if (result.current.stage.kind === "ready") {
-      expect(result.current.stage.scaffoldWarnings).toEqual([
-        "[store-slot] index 9 out of range for store \"x\" (length: 1); slot skipped.",
-      ]);
-      expect(result.current.stage.scaffoldNotices).toEqual([
-        "[store-slot] coordinated removal across paired stores \"dkfX\", \"dktX\": dropped 1 position(s) from each to preserve index() alignment.",
-      ]);
-    }
-  });
-});
-
-// ---------------------------------------------------------------------------
 // Slice 4: graceful degradation when parseKmn throws (AC #4)
 // ---------------------------------------------------------------------------
 // When the codec can't model a real-world .kmn construct, parseKmn() throws.

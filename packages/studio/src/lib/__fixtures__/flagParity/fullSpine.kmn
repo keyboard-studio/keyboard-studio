@@ -14,8 +14,8 @@ c Pressing K_QUOTE alone commits nothing; it arms a deadkey state.
 + [K_QUOTE] > deadkey(accent)
 
 
-store(dktX) 'ÀZ'
-store(dkfX) 'ac'
+store(dktX) 'À' nul 'Z'
+store(dkfX) 'abc'
 + [K_A] > U+0078
 + [K_B] > U+0079
 + dk(003b) any(dkfX) > index(dktX, 2)

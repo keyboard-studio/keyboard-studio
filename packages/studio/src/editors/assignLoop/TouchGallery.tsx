@@ -495,7 +495,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       if (touchLayoutJson !== null) {
         vfs.set(`source/${kbId}.keyman-touch-layout`, touchLayoutJson);
       }
-      return { warnings: [], notices: [] };
+      return { warnings: [] };
     },
     [touchLayoutJson],
   );

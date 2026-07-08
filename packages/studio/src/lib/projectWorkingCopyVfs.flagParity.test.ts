@@ -271,11 +271,9 @@ const FULL_SPINE_TOUCH_JSON =
 
 /**
  * Run the WHOLE projection spine for one flag state and return both projected
- * artifacts. Carve drops a non-entry group + a whole store + coordinates a
- * drop of one output slot of the parallel-store deadkey (which, per the
- * pairing graph, also drops the paired input slot in dkfX at the same
- * index); add-gallery injects the acute mechanism; the Phase E touch layout
- * is injected at step 0.
+ * artifacts. Carve drops a non-entry group + a whole store + nuls one output
+ * slot of the parallel-store deadkey; add-gallery injects the acute mechanism;
+ * the Phase E touch layout is injected at step 0.
  */
 function projectFullSpine(seamOn: boolean): { kmn: string; touch: string } {
   vi.stubEnv("VITE_KM_MUTATE_SEAM", seamOn ? "1" : "");
@@ -284,9 +282,8 @@ function projectFullSpine(seamOn: boolean): { kmn: string; touch: string } {
     vfs,
     keyboardId: "kb",
     baseIr: makeFixtureIr(),
-    // Carve: whole-group + whole-store deletion, plus a store-slot drop
-    // (slot 1 of the dktX output store, coordinated with dkfX slot 1 via the
-    // parallel deadkey rule's pairing).
+    // Carve: whole-group + whole-store deletion, plus a store-slot nul rewrite
+    // (slot 1 of the dktX output store referenced by the parallel deadkey rule).
     deletedNodeIds: new Set(["group#second", "store#extra"]),
     deletedItemIds: new Set(["store#dkt#1"]),
     // Add-gallery: a real physical mechanism assignment.
@@ -312,14 +309,11 @@ describe("projectWorkingCopyVfs — FULL-SPINE flag parity (carve + add-gallery 
 
     // The spine actually took effect (not a vacuous pass):
     //   - carve whole-node deletions removed the second group + extra store,
-    //   - the store-slot deletion dropped slot 1 of BOTH the dktX output
-    //     store and its paired dkfX input store (coordinated drop — no nul),
+    //   - the store-slot deletion nul'd slot 1 of the dktX output store,
     //   - the add-gallery mechanism injected the acute deadkey trigger.
     expect(on.kmn).not.toMatch(/group\(second\)/);
     expect(on.kmn).not.toMatch(/store\(extraX\)/);
-    expect(on.kmn).toMatch(/store\(dktX\) 'ÀZ'/);
-    expect(on.kmn).not.toContain("nul");
-    expect(on.kmn).toMatch(/store\(dkfX\) 'ac'/);
+    expect(on.kmn).toMatch(/store\(dktX\) 'À' nul 'Z'/);
     expect(on.kmn).toMatch(/\[K_QUOTE\] > deadkey\(accent\)/);
   });
 

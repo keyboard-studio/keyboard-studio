@@ -28,7 +28,7 @@ import type { KeyboardIR } from "@keyboard-studio/contracts";
  * within surviving groups), and `raw`. `header` and `comments` pass through
  * untouched. `baseIr` is never mutated.
  *
- * NOTE: store-slot item drops (the `<storeNodeId>#<index>` coordinated-drop path)
+ * NOTE: store-slot item rewrites (the `<storeNodeId>#<index>` nul-filler path)
  * are NOT handled here — they are applied by {@link applyStoreSlotRemovals}
  * before this function (the caller partitions slot ids vs whole-node ids). Pass
  * the slot-removed IR as `baseIr` to compose the two.

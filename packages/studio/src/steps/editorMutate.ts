@@ -16,8 +16,7 @@
 //     carve write exactly as they do to the per-question writes.
 //
 // Carve affects exactly: groups[] (whole-group + rule deletion), stores[] (store
-// deletion + store-slot item drop, coordinated across pairing-graph-linked
-// stores), raw[] (raw-fragment deletion).
+// deletion + store-slot item nul-rewrite), raw[] (raw-fragment deletion).
 // header/comments are never touched.
 //
 // CRITICAL (idempotency / reversibility): the patch is ALWAYS computed from
@@ -34,8 +33,7 @@ import { applyMutatePatch } from "./mutateApply.ts";
  * The carve write surface — the IR arrays carve deletions may rewrite.
  *
  * - `groups[]` — whole-group deletion + rule deletion within a surviving group.
- * - `stores[]` — whole-store deletion + store-slot item drop (coordinated across
- *   pairing-graph-linked stores; never a nul-rewrite — see applyStoreSlotRemovals).
+ * - `stores[]` — whole-store deletion + store-slot item nul-rewrite.
  * - `raw[]`    — raw-fragment deletion.
  *
  * `header` and `comments` are intentionally absent: carve never touches them, so
@@ -53,7 +51,7 @@ export const CARVE_WRITES: readonly IRPath[] = [
  * to the legacy VFS path.
  *
  * An id parses as a slot id AND its store exists in `baseIr` → a slot id (the
- * store-slot drop path). Anything else (a bare rule/store nodeId, or a
+ * nul-filler rewrite path). Anything else (a bare rule/store nodeId, or a
  * slot-shaped id whose store is absent) → a whole-node deletion.
  */
 function partitionItemIds(
@@ -76,7 +74,7 @@ function partitionItemIds(
 
 /**
  * Build the carve patch (the carve-affected IR arrays) from `baseIr` and the
- * current carve overlay. Slot-item drops are applied first
+ * current carve overlay. Slot-item nul-rewrites are applied first
  * (applyStoreSlotRemovals), then whole-node deletions (carveFilterIr); the
  * result's carve arrays become the patch.
  *
@@ -96,7 +94,7 @@ export function buildCarvePatch(
     return {};
   }
 
-  // 1. Store-slot drop (coordinated across pairing-graph-linked stores; never a nul-rewrite).
+  // 1. Store-slot nul-rewrite (alignment-preserving; never splices items).
   const slotResult = applyStoreSlotRemovals(baseIr, slotIds);
   const slotIr = slotResult.ir; // === baseIr when slotIds was empty / all rejected
 

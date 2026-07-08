@@ -3,7 +3,7 @@
  *
  * Finds every place in the IR that contributes to producing a given target character:
  *   - ruleNodeIds:  whole-rule delete candidates (entire NFC output === targetChar)
- *   - storeSlotIds: output-store slot ids to remove ("<storeNodeId>#<i>")
+ *   - storeSlotIds: output-store slot nul-fills ("<storeNodeId>#<i>")
  *   - locations:    human-readable origin labels for the confirmation dialog
  *   - blocked:      multi-char / opaque producers that cannot be surgically removed
  *
@@ -14,12 +14,8 @@
  *     NEVER enter the contributor set; only the fan-out rule's single matching
  *     SLOT is a contributor. A trigger rule is detected as: output is exactly one
  *     `{kind:"deadkey"}` element.
- *   - OUTPUT-STORE ONLY (this function's job): only the one matching slot index
- *     in the output store is added to `storeSlotIds` here — the input/trigger
- *     store is never explicitly targeted by THIS function. applyStoreSlotRemovals
- *     is the one that resolves the pairing graph and coordinates the drop across
- *     the paired input store too, so the caller doesn't need to (and shouldn't)
- *     duplicate that resolution here.
+ *   - OUTPUT-STORE ONLY: slot nul-fill targets the one matching slot index in the
+ *     output store only; the input/trigger store is never touched.
  *   - SINGLE-CHAR WHOLE-DELETE: whole-rule-delete only when the rule's ENTIRE
  *     NFC output === targetChar (single-char producer). Multi-char producers go
  *     to `blocked`.
@@ -39,7 +35,7 @@ export interface CharContributors {
   targetChar: string;
   /** nodeIds of rules whose ENTIRE NFC output equals targetChar — whole-rule delete. */
   ruleNodeIds: string[];
-  /** "<storeNodeId>#<index>" output-store slots to remove (one slot per matching position). */
+  /** "<storeNodeId>#<index>" output-store slots to nul-fill (one slot per matching position). */
   storeSlotIds: string[];
   /** Human-readable origin labels for the confirmation dialog. */
   locations: { kind: 'group' | 'pattern' | 'store'; label: string; nodeId: string }[];
@@ -143,8 +139,7 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
       // (a) Store-produced target — the character is emitted through an
       //     index()/outs() over a store (base-layer alphabet fan-out OR a
       //     deadkey fan-out). The surgical unit is the matching store SLOT
-      //     (a drop, coordinated by applyStoreSlotRemovals with any paired
-      //     store), NEVER the whole rule — the rule produces the entire
+      //     (nul-fill), NEVER the whole rule — the rule produces the entire
       //     store's worth of characters, so deleting it would remove them all.
       let storeMatched = false;
       for (const el of outEls) {

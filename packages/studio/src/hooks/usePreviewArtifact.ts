@@ -45,8 +45,6 @@ export interface PreviewArtifact {
   downloading: boolean;
   downloadError: string | null;
   downloadWarnings: string[];
-  /** Informational notices from the download's projection steps — never a problem (e.g. coordinated store-slot drops). Kept separate from downloadWarnings so a caller doesn't render a success notice as an alert. */
-  downloadNotices: string[];
   handleDownload: () => Promise<void>;
 
   // Identity warning
@@ -90,7 +88,6 @@ export function usePreviewArtifact(): PreviewArtifact {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadWarnings, setDownloadWarnings] = useState<string[]>([]);
-  const [downloadNotices, setDownloadNotices] = useState<string[]>([]);
   const zipBlobUrlRef = useRef<string | null>(null);
 
   // Clean up any lingering zip blob URL on unmount.
@@ -156,7 +153,6 @@ export function usePreviewArtifact(): PreviewArtifact {
     setDownloading(true);
     setDownloadError(null);
     setDownloadWarnings([]);
-    setDownloadNotices([]);
     try {
       // Serialize via the canonical path: projectWorkingCopyVfs (carve +
       // assignments + identity) → toZip. Returns null when the working copy
@@ -173,9 +169,6 @@ export function usePreviewArtifact(): PreviewArtifact {
       if (result.warnings.length > 0) {
         console.warn("[studio] download projection warnings:", result.warnings);
         setDownloadWarnings(result.warnings);
-      }
-      if (result.notices.length > 0) {
-        setDownloadNotices(result.notices);
       }
 
       const { bytes } = result;
@@ -233,7 +226,6 @@ export function usePreviewArtifact(): PreviewArtifact {
     downloading,
     downloadError,
     downloadWarnings,
-    downloadNotices,
     handleDownload,
     showIdentityWarn,
   };

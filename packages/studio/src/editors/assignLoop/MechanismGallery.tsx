@@ -4,16 +4,6 @@
 // Kept as separate components here because the behavior divergence (modality,
 // VFS transform, lint panel, navigation stack) is deep enough to warrant a
 // dedicated extraction pass rather than risking a behavior diff in P4a.
-//
-// The scaffoldSpec/transform/artifact triad below (identity → ScaffoldSpec →
-// useWorkingCopyTransform → useKeyboardArtifact) is now duplicated a THIRD
-// time — CarveGallery.tsx grew its own near-verbatim copy to get a warm OSK
-// preview during carve. TouchGallery.tsx is the second copy. Once P4b lands,
-// pull this triad into a shared `useGalleryPreview` hook (own the
-// ScaffoldSpec memo + useWorkingCopyTransform + useKeyboardArtifact call,
-// parameterized by an optional patternMap) rather than folding it into
-// AssignLoopShell alone — CarveGallery has no left/right shell to extract
-// into but still needs the same triad.
 
 // MechanismGallery — Phase C "add a key" flow (two-pane redesign).
 //

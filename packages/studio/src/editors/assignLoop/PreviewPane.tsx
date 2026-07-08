@@ -28,8 +28,6 @@ export interface GalleryPreviewPaneProps {
   defaultOskMode: OskMode;
   heading: string;
   warningLabel?: string;
-  /** Label for the neutral-style notices block (informational, never a problem). */
-  noticeLabel?: string;
 }
 
 export function GalleryPreviewPane({
@@ -40,21 +38,12 @@ export function GalleryPreviewPane({
   defaultOskMode,
   heading,
   warningLabel = "Warnings:",
-  noticeLabel = "Notices:",
 }: GalleryPreviewPaneProps) {
   const [oskMode, setOskMode] = useState<OskMode>(defaultOskMode);
 
   const applyWarnings =
     stage.kind === "ready" && stage.scaffoldWarnings.length > 0
       ? stage.scaffoldWarnings
-      : [];
-
-  // Informational notices (e.g. a coordinated store-slot drop) — never a
-  // problem, so rendered separately from applyWarnings in a neutral style,
-  // not the orange role="alert" banner below.
-  const applyNotices =
-    stage.kind === "ready" && stage.scaffoldNotices.length > 0
-      ? stage.scaffoldNotices
       : [];
 
   return (
@@ -113,33 +102,6 @@ export function GalleryPreviewPane({
           <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
             {applyWarnings.map((w, i) => (
               <li key={i}>{w}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {applyNotices.length > 0 && (
-        // Neutral (non-alert) styling — these are informational confirmations
-        // of expected behavior (e.g. a coordinated store-slot drop), never a
-        // problem, so they must not read like the orange applyWarnings banner.
-        <div
-          role="status"
-          aria-live="polite"
-          aria-label={noticeLabel}
-          style={{
-            background: "#0d1b2a",
-            border: "1px solid #388bfd",
-            borderRadius: 6,
-            padding: "8px 12px",
-            fontSize: 12,
-            color: "#79c0ff",
-            fontFamily: FONT,
-          }}
-        >
-          <strong>{noticeLabel}</strong>
-          <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
-            {applyNotices.map((n, i) => (
-              <li key={i}>{n}</li>
             ))}
           </ul>
         </div>

@@ -16,9 +16,6 @@ import { useHoverInfoStore } from '../../stores/hoverInfoStore.ts';
 import { collectCharContributors } from '@keyboard-studio/engine';
 import type { CharContributors } from '@keyboard-studio/engine';
 import type { RemovalCapability } from '@keyboard-studio/contracts';
-import { useKeyboardArtifact, type ScaffoldSpec } from '../../hooks/useKeyboardArtifact.ts';
-import { useWorkingCopyTransform } from '../../hooks/useWorkingCopyTransform.ts';
-import { GalleryPreviewPane } from '../assignLoop/PreviewPane.tsx';
 
 /** Pending cascade state — set when the user clicks a cross-wired chip. */
 interface PendingCascade {
@@ -62,42 +59,6 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
   // Clear stale hover info when CarveGallery unmounts (e.g. navigating away).
   useEffect(() => () => clearInfo(), [clearInfo]);
-
-  // ---------------------------------------------------------------------------
-  // Keyboard artifact pipeline — CarveGallery's own warm OSK preview.
-  //
-  // CarveGallery is rendered full-screen (SurveyView returns early for
-  // layout:"full" steps). SurveyView's useKeyboardArtifact hook remains
-  // mounted but its OSK preview section is not rendered while carve is
-  // active. Mirrors MechanismGallery/TouchGallery: own the single live
-  // pipeline here (not a second one) and feed it into the shared
-  // GalleryPreviewPane/OSKFrame so removals patch an already-mounted iframe
-  // instead of leaving no preview at all during carve, which reads as a
-  // cold rebuild the moment the next full-screen step mounts its own
-  // pipeline. useWorkingCopyTransform already composes carve deletions
-  // (deletedNodeIds/deletedItemIds) into the VfsTransform, so removals flow
-  // through automatically once this pipeline is mounted — no patternMap is
-  // needed here (mechanism assignments don't exist yet at this point in the
-  // spine; if the author backtracks here after Phase C, the transform skips
-  // assignment projection and logs a warning, same graceful-degradation as
-  // the pre-Phase-C SurveyView path).
-  // ---------------------------------------------------------------------------
-
-  const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
-  const identity = useWorkingCopyStore((s) => s.identity);
-  const galleryScaffoldSpec = useMemo<ScaffoldSpec | null>(
-    () =>
-      identity?.keyboardId != null
-        ? { keyboardId: identity.keyboardId, displayName: identity.displayName ?? '' }
-        : null,
-    [identity?.keyboardId, identity?.displayName],
-  );
-  const galleryVfsTransform = useWorkingCopyTransform();
-  const { stage: artifactStage, retry: artifactRetry } = useKeyboardArtifact(
-    baseKeyboard,
-    galleryScaffoldSpec,
-    galleryVfsTransform,
-  );
 
   const nodes = useMemo(() => (ir ? toRailNodes(ir, removalCapabilities) : []), [ir, removalCapabilities]);
 
@@ -494,7 +455,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
         onRemoveNode={(nodeId) => handleToggleNode(nodeId, true)}
       />
 
-      {/* Three-panel body: Rail | Inspector(+InfoView) | live OSK preview */}
+      {/* Two-panel body */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <Rail
           nodes={nodes}
@@ -505,7 +466,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
           onSetManyGlyphs={handleSetManyGlyphs}
           onToggleNode={handleToggleNode}
         />
-        <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <Inspector
             node={selectedNode}
             nodes={nodes}
@@ -520,38 +481,6 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
             onWebTag={handleWebTag}
           />
           {infoOpen && <InfoView />}
-        </div>
-        {/* Live preview — warm across removals; see the pipeline comment near
-            the top of this component for why CarveGallery owns its own
-            useKeyboardArtifact instance rather than sharing SurveyView's.
-            Sized like MechanismGallery/TouchGallery's two-pane split
-            (flexBasis fixed share + flexShrink: 0 on the smaller pane,
-            flexGrow: 1 on the pane that keeps priority) — but with the roles
-            reversed from those siblings: there, the OSK preview is the
-            primary *interactive* surface (onKeyTap) so it gets the flexGrow
-            share. Here the preview is a passive read-only render and the
-            Inspector is where the actual rule-carving happens, so the
-            Inspector keeps the flexGrow share and this pane gets the
-            smaller, fixed 45% share instead. */}
-        <div
-          style={{
-            flexBasis: '45%',
-            flexShrink: 0,
-            minWidth: 0,
-            borderLeft: '1px solid var(--app-border)',
-            overflowY: 'auto',
-            padding: '20px 22px',
-            boxSizing: 'border-box',
-          }}
-        >
-          <GalleryPreviewPane
-            baseKeyboard={baseKeyboard}
-            stage={artifactStage}
-            retry={artifactRetry}
-            defaultOskMode="desktop"
-            heading="Live preview"
-            warningLabel="Carve warnings:"
-          />
         </div>
       </div>
 

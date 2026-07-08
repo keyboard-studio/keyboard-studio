@@ -106,7 +106,7 @@ export type Stage =
    */
   | { kind: "vfs-loading" }
   | { kind: "compiling"; isWarmCompile: boolean }
-  | { kind: "ready"; compileResult: CompileResult; jsBlobUrl: string; vfs: VirtualFS; scaffoldWarnings: string[]; scaffoldNotices: string[]; keyboardId: string; fontFaceUrl?: string; fontFaceFamily?: string; keyboardCssUrls?: string[] }
+  | { kind: "ready"; compileResult: CompileResult; jsBlobUrl: string; vfs: VirtualFS; scaffoldWarnings: string[]; keyboardId: string; fontFaceUrl?: string; fontFaceFamily?: string; keyboardCssUrls?: string[] }
   | {
       kind: "error";
       step: "fetch" | "vfs" | "compile";
@@ -125,10 +125,7 @@ export interface ScaffoldSpec {
  * Optional post-scaffold transform applied to the VFS before the compile step.
  * Receives the populated VFS and the keyboardId; may mutate the VFS in-place
  * (VFS entries are immutable values — use vfs.set() for updates) and MUST
- * return any diagnostic warnings to surface in the UI, plus any informational
- * `notices` (successful, expected behavior — never a problem, e.g. a
- * coordinated store-slot drop) kept separate so a caller doesn't render a
- * notice in an alert-severity banner.
+ * return any diagnostic warnings to surface in the UI.
  *
  * Called exactly once per run(), not on recompile() calls (which skip the
  * scaffold step entirely). Keeping it here enforces the single compile cycle
@@ -137,7 +134,7 @@ export interface ScaffoldSpec {
 export type VfsTransform = (
   vfs: VirtualFS,
   keyboardId: string,
-) => { warnings: string[]; notices: string[] };
+) => { warnings: string[] };
 
 /**
  * Called exactly once per successful fetch→compile run, after both the
@@ -246,9 +243,6 @@ export function useKeyboardArtifact(
   // Separate compile step, callable independently for the recompile() path.
   // `warnings` carries any scaffold warnings from the preceding fetch step;
   // empty for recompile() calls (which don't re-scaffold).
-  // `notices` carries any informational notices from the preceding transform
-  // step (e.g. a coordinated store-slot drop); empty when there is no
-  // transform result to report.
   // `isFullRun` distinguishes a full fetch→compile run (fires onInstantiate)
   // from a recompile()-only call (does NOT fire onInstantiate — no VFS change).
   const runCompile = useCallback(async (
@@ -256,7 +250,6 @@ export function useKeyboardArtifact(
     thisRunId: number,
     warnings: string[] = [],
     isFullRun: boolean = false,
-    notices: string[] = [],
   ): Promise<void> => {
     const engine = engineRef.current;
     const vfs = vfsRef.current;
@@ -415,7 +408,7 @@ export function useKeyboardArtifact(
 
     // Carry font face info (added by the .kps font-loading path) onto the ready stage.
     const readyStage: Extract<Stage, { kind: "ready" }> = {
-      kind: "ready", compileResult: result, jsBlobUrl, vfs, scaffoldWarnings: warnings, scaffoldNotices: notices, keyboardId: compileId,
+      kind: "ready", compileResult: result, jsBlobUrl, vfs, scaffoldWarnings: warnings, keyboardId: compileId,
     };
     if (prevFontBlobUrl.current !== null) readyStage.fontFaceUrl = prevFontBlobUrl.current;
     if (fontFaceFamilyRef.current !== null) readyStage.fontFaceFamily = fontFaceFamilyRef.current;
@@ -467,7 +460,6 @@ export function useKeyboardArtifact(
     vfsRef.current = vfs;
 
     const scaffoldWarnings: string[] = [];
-    const scaffoldNotices: string[] = [];
 
     // Reset any OSK-font and keyboard-CSS state carried over from a previous
     // selection. A fresh run rebuilds them from the fetched source (or leaves
@@ -566,7 +558,6 @@ export function useKeyboardArtifact(
         const keyboardId = scaffoldSpec?.keyboardId ?? kb.id;
         const transformResult = vfsTransformRef.current(vfsRef.current, keyboardId);
         scaffoldWarnings.push(...transformResult.warnings);
-        scaffoldNotices.push(...transformResult.notices);
 
         // Rebuild the keyboard CSS blob URLs from the projected VFS so the OSK
         // frame's <style> tags carry the post-rename `.kmw-keyboard-<newId>`
@@ -605,7 +596,7 @@ export function useKeyboardArtifact(
 
     // Pass scaffold warnings into runCompile so they surface on the ready Stage.
     // isFullRun=true: this is a full fetch→compile cycle; onInstantiate fires.
-    await runCompile(kb, thisRunId, scaffoldWarnings, true, scaffoldNotices);
+    await runCompile(kb, thisRunId, scaffoldWarnings, true);
   }, [scaffoldSpec, runCompile]);
 
   useEffect(() => {
@@ -648,11 +639,6 @@ export function useKeyboardArtifact(
     }
 
     const keyboardId = scaffoldSpec?.keyboardId ?? baseKeyboard.id;
-    // Captured from the freshly re-applied transform so the CURRENT warnings
-    // and notices reach the preview — previously hardcoded to [], which
-    // discarded transformResult entirely on every recompile after the first.
-    let transformWarnings: string[] = [];
-    let transformNotices: string[] = [];
     if (vfsTransformRef.current !== null && vfsTransformRef.current !== undefined) {
       // Restore the clean base VFS snapshot so the transform always starts from
       // the unmodified keyboard source, not an accumulated previous result.
@@ -660,16 +646,14 @@ export function useKeyboardArtifact(
         vfsRef.current = createVirtualFS(baseVfsRef.current.entries());
       }
       try {
-        const transformResult = vfsTransformRef.current(vfsRef.current, keyboardId);
-        transformWarnings = transformResult.warnings;
-        transformNotices = transformResult.notices;
+        vfsTransformRef.current(vfsRef.current, keyboardId);
       } catch {
         // Transform errors surface as compile diagnostics; don't abort.
       }
     }
 
     const thisRunId = ++runId.current;
-    void runCompile(baseKeyboard, thisRunId, transformWarnings, false, transformNotices);
+    void runCompile(baseKeyboard, thisRunId, [], false);
   }, [transformVersion, baseKeyboard, scaffoldSpec, runCompile]);
 
   useEffect(() => {

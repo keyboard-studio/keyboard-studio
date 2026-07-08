@@ -12,15 +12,3 @@
 export function isDeadkeyOnlyOutput(rule: { output: { kind: string }[] }): boolean {
   return rule.output.length === 1 && rule.output[0]?.kind === "deadkey";
 }
-
-/**
- * True for the codec's synthetic keystroke-boundary separator — the `+`
- * token the parser inserts as a `{kind:"raw", text:"+"}` context element to
- * mark where pre-context ends and the matched keystroke begins (see
- * emit.ts's `hasInlinePlus`). It is a codec/round-trip artifact, not a real
- * kmcmplib context item, so shape/pairing predicates that count or resolve
- * context positions must exclude it first.
- */
-export function isPlusSeparator(el: { kind: string; text?: string }): boolean {
-  return el.kind === "raw" && el.text?.trim() === "+";
-}

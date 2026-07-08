@@ -141,7 +141,7 @@ export function useWorkingCopyTransform(
     const capturedBaseIr = baseIr;
     const capturedTouchLayoutJson = touchLayoutJson;
 
-    return (vfs: VirtualFS, keyboardId: string): { warnings: string[]; notices: string[] } => {
+    return (vfs: VirtualFS, keyboardId: string): { warnings: string[] } => {
       // Assignment-warning: when assignments exist but no patternMap was supplied,
       // emit a diagnostic and skip assignments (pass empty array to projectWorkingCopyVfs).
       const preWarnings: string[] = [];
@@ -169,7 +169,7 @@ export function useWorkingCopyTransform(
             }
           : null;
 
-      const { warnings: projectionWarnings, notices: projectionNotices } = projectWorkingCopyVfs({
+      const { warnings: projectionWarnings } = projectWorkingCopyVfs({
         vfs,
         keyboardId,
         ...(capturedKeyboardId !== null && capturedKeyboardId !== keyboardId
@@ -184,7 +184,7 @@ export function useWorkingCopyTransform(
         touchLayoutJson: capturedTouchLayoutJson,
       });
 
-      return { warnings: [...preWarnings, ...projectionWarnings], notices: projectionNotices };
+      return { warnings: [...preWarnings, ...projectionWarnings] };
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [

@@ -34,10 +34,8 @@ import { bumpKeyboardVersion, stageAdaptHistory } from "@keyboard-studio/engine"
 export interface SerializeWorkingCopyResult {
   /** Raw zip bytes, ready for a Blob / URL.createObjectURL / download link. */
   bytes: Uint8Array;
-  /** Warnings from projection steps (carve, assignments, identity) — real problems only. May be empty. */
+  /** Warnings from projection steps (carve, assignments, identity). May be empty. */
   warnings: string[];
-  /** Informational notices from projection steps (e.g. coordinated store-slot drops) — never a problem. May be empty. */
-  notices: string[];
   /** The keyboard id resolved from the store (for the filename). */
   keyboardId: string;
   /**
@@ -67,10 +65,8 @@ export interface ProjectWorkingCopyForOutputResult {
   displayName: string;
   /** Keyboard version (identity has no version field yet, so the base version). */
   version: string;
-  /** Warnings from projection steps (carve, assignments, identity) — real problems only. May be empty. */
+  /** Warnings from projection steps (carve, assignments, identity). May be empty. */
   warnings: string[];
-  /** Informational notices from projection steps (e.g. coordinated store-slot drops) — never a problem. May be empty. */
-  notices: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -248,7 +244,7 @@ export async function projectWorkingCopyForOutput(): Promise<ProjectWorkingCopyF
 
   // 5. Project the working copy onto the cloned VFS. targetKeyboardId triggers
   //    the final rename pass when the author picked a different id.
-  const { warnings: projectionWarnings, notices } = projectWorkingCopyVfs({
+  const { warnings: projectionWarnings } = projectWorkingCopyVfs({
     vfs: clonedVfs,
     keyboardId,
     targetKeyboardId: outputKeyboardId,
@@ -279,7 +275,6 @@ export async function projectWorkingCopyForOutput(): Promise<ProjectWorkingCopyF
     displayName: identity?.displayName ?? baseKeyboard.displayName,
     version,
     warnings,
-    notices,
   };
 }
 
@@ -312,7 +307,6 @@ export async function serializeWorkingCopy(): Promise<SerializeWorkingCopyResult
   return {
     bytes,
     warnings: projected.warnings,
-    notices: projected.notices,
     keyboardId: projected.keyboardId,
     version: projected.version,
   };

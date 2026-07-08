@@ -41,7 +41,6 @@ export function OutputScreen() {
     downloading,
     downloadError,
     downloadWarnings,
-    downloadNotices,
     handleDownload,
     showIdentityWarn,
   } = artifact;
@@ -190,41 +189,6 @@ export function OutputScreen() {
                 >
                   {downloadWarnings.map((w) => (
                     <li key={w}>{w}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {downloadNotices.length > 0 && (
-              // Neutral (non-alert) styling — these are informational confirmations
-              // of expected behavior (e.g. a coordinated store-slot drop), never a
-              // problem, so they must not read like the orange downloadWarnings block.
-              <div
-                role="status"
-                aria-live="polite"
-                aria-label="Download projection notices"
-                style={{
-                  marginTop: 4,
-                  padding: "8px 12px",
-                  background: "#0d1b2a",
-                  border: "1px solid #388bfd",
-                  borderRadius: 6,
-                  fontSize: 12,
-                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-                }}
-              >
-                <div style={{ color: "#79c0ff", fontWeight: 600, marginBottom: 4 }}>
-                  Download completed:
-                </div>
-                <ul
-                  style={{
-                    margin: 0,
-                    paddingLeft: 18,
-                    color: "#79c0ff",
-                    lineHeight: 1.6,
-                  }}
-                >
-                  {downloadNotices.map((n) => (
-                    <li key={n}>{n}</li>
                   ))}
                 </ul>
               </div>

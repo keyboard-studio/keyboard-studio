@@ -488,17 +488,12 @@ describe('irToCarveNodes — #523 storeCharChips chip ids equal fan-out glyph gi
     expect(chipIds).toEqual(['store#dkt#0', 'store#dkt#1']);
   });
 
-  it('the output store classifies as a coordinated drop for every chip (matches the #530 slot-fill capability; pairing-graph fix — no more nul-fill)', () => {
+  it('the output store classifies as nul-fill for every chip (matches the #530 slot-fill capability)', () => {
     const ir = makeTestIR();
     const outputStore = ir.stores.find((s) => s.name === 'dktX')!;
     const chips = storeCharChips(outputStore, ir);
 
     expect(chips.length).toBeGreaterThan(0);
-    chips.forEach((c) => {
-      expect(c.action).toBe('drop');
-      // dktX is positionally paired with dkfX (the deadkey-body any() source);
-      // removing a char here now coordinates a splice of dkfX at the same index.
-      expect(c.coordinatedWith).toEqual(['dkfX']);
-    });
+    chips.forEach((c) => expect(c.action).toBe('nul-fill'));
   });
 });

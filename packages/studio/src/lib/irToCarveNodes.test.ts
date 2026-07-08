@@ -1,4 +1,4 @@
-// Tests for ruleModifier(), modifierLabel(), glyph-shape integration, StoreUsage.patternRefs, store pairing display (via toRailNodes + the engine's describeStorePairing), and storeRoleLine in irToCarveNodes.ts
+// Tests for ruleModifier(), modifierLabel(), glyph-shape integration, StoreUsage.patternRefs, detectStorePairs, and storeRoleLine in irToCarveNodes.ts
 
 import { describe, it, expect } from 'vitest';
 import type { IRRule, IRGroup, IRStore, KeyboardIR, Pattern, StoreItem } from '@keyboard-studio/contracts';
@@ -10,6 +10,7 @@ import {
   toRailNodes,
   collectOwnedNodeIds,
   patternToGlyphs,
+  detectStorePairs,
   vkeyLabel,
   triggerKeyLabel,
   storeItemsAreKeys,
@@ -811,38 +812,61 @@ describe('StoreUsage.patternRefs', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Store pairing display — toRailNodes' storePairingKind/pairedStore* fields,
-// driven by the engine's describeStorePairing (single source of truth; no
-// local cross-product heuristic — see the applyStoreSlotRemovals.ts
-// canonical-failure regression test for the shape this replaced).
+// detectStorePairs — any()/index() cross-store pairing (StorePairEntry[] shape)
 // ---------------------------------------------------------------------------
 
-describe('toRailNodes — store pairing display', () => {
-  it('"none": a store with no index()-output pairing relationship has no pairing fields at all', () => {
+describe('detectStorePairs', () => {
+  it('returns empty map when there are no rules', () => {
+    const ir = makeIR({ groups: [] });
+    expect(detectStorePairs(ir).size).toBe(0);
+  });
+
+  it('returns empty map when rules have any() but no index() output', () => {
     const ir = makeIR({
-      stores: [{ nodeId: 'sid-X', name: 'storeX', items: [], isSystem: false } as any],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'r1',
+          context: [{ kind: 'any', storeRef: 'storeA' }],
+          output: [{ kind: 'char', value: 'x' }],
+        }],
+      }],
+    });
+    expect(detectStorePairs(ir).size).toBe(0);
+  });
+
+  it('returns empty map when rules have index() but no any() in context', () => {
+    const ir = makeIR({
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
         rules: [{
           nodeId: 'r1',
           context: [{ kind: 'char', value: 'a' }],
-          output: [{ kind: 'char', value: 'b' }],
+          output: [{ kind: 'index', storeRef: 'storeB', offset: 1 }],
         }],
       }],
     });
-    const nodeX = toRailNodes(ir).find((n) => n.name === 'storeX');
-    expect(nodeX?.storePairingKind).toBeUndefined();
-    expect(nodeX?.pairedStoreIds).toBeUndefined();
-    expect(nodeX?.pairedStoreNames).toBeUndefined();
-    expect(nodeX?.pairedStoreTriggers).toBeUndefined();
+    expect(detectStorePairs(ir).size).toBe(0);
   });
 
-  it('"cross": a clean any(A)/index(B) pair names each other as partners, with trigger + ids resolved', () => {
+  it('detects a clean any(A)/index(B) pair — both stores get each other as a peer', () => {
     const ir = makeIR({
-      stores: [
-        { nodeId: 'sid-A', name: 'storeA', items: [], isSystem: false } as any,
-        { nodeId: 'sid-B', name: 'storeB', items: [], isSystem: false } as any,
-      ],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'r1',
+          context: [{ kind: 'any', storeRef: 'storeA' }],
+          output: [{ kind: 'index', storeRef: 'storeB', offset: 1 }],
+        }],
+      }],
+    });
+    const pairs = detectStorePairs(ir);
+    expect(pairs.get('storeA')).toEqual([{ pairedName: 'storeB', trigger: undefined }]);
+    expect(pairs.get('storeB')).toEqual([{ pairedName: 'storeA', trigger: undefined }]);
+  });
+
+  it('captures the trigger key (K_BKSP -> "Backspace") when present after the + separator', () => {
+    const ir = makeIR({
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
         rules: [{
@@ -856,91 +880,82 @@ describe('toRailNodes — store pairing display', () => {
         }],
       }],
     });
-    const nodes = toRailNodes(ir);
-    const nodeA = nodes.find((n) => n.name === 'storeA');
-    const nodeB = nodes.find((n) => n.name === 'storeB');
-    expect(nodeA?.storePairingKind).toBe('cross');
-    expect(nodeA?.pairedStoreNames).toEqual(['storeB']);
-    expect(nodeA?.pairedStoreIds).toEqual(['sid-B']);
-    expect(nodeA?.pairedStoreTriggers).toEqual(['Backspace']);
-    expect(nodeB?.storePairingKind).toBe('cross');
-    expect(nodeB?.pairedStoreNames).toEqual(['storeA']);
-    expect(nodeB?.pairedStoreIds).toEqual(['sid-A']);
-    expect(nodeB?.pairedStoreTriggers).toEqual(['Backspace']);
+    const pairs = detectStorePairs(ir);
+    expect(pairs.get('storeA')?.[0]?.trigger).toBe('Backspace');
+    expect(pairs.get('storeB')?.[0]?.trigger).toBe('Backspace');
   });
 
-  // Canonical failure case (Cameroon):
-  //   platform('touch') any(word) any(final) + [K_SPACE] > index(word,2) index(final,3)
-  // Two any() context sources, two index() output targets in the SAME rule —
-  // but each index() resolves back to the SAME store at its own offset, so
-  // this is TWO independent self-pairs, never a word<->final cross-pair. The
-  // old detectStorePairs heuristic (cross-product every any() against every
-  // index() in the rule, positionally blind) wrongly asserted word<->final.
-  it('"self" x2: a 2-any()/2-index() rule with own-offset resolution is two independent self-pairs, NOT a cross-pair', () => {
+  it('deduplicates when multiple rules use the same pair (trigger from first rule wins)', () => {
     const ir = makeIR({
-      stores: [
-        { nodeId: 'sid-word', name: 'word', items: [], isSystem: false } as any,
-        { nodeId: 'sid-final', name: 'final', items: [], isSystem: false } as any,
-      ],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          {
+            nodeId: 'r1',
+            context: [
+              { kind: 'any', storeRef: 'storeA' },
+              { kind: 'raw', text: '+' },
+              { kind: 'vkey', name: 'K_BKSP', modifiers: [] },
+            ],
+            output: [{ kind: 'index', storeRef: 'storeB', offset: 1 }],
+          },
+          {
+            nodeId: 'r2',
+            context: [
+              { kind: 'any', storeRef: 'storeA' },
+              { kind: 'raw', text: '+' },
+              { kind: 'vkey', name: 'K_BKSP', modifiers: [] },
+            ],
+            output: [{ kind: 'index', storeRef: 'storeB', offset: 1 }],
+          },
+        ],
+      }],
+    });
+    const pairs = detectStorePairs(ir);
+    expect(pairs.get('storeA')).toHaveLength(1);
+    expect(pairs.get('storeA')?.[0]?.pairedName).toBe('storeB');
+    expect(pairs.get('storeA')?.[0]?.trigger).toBe('Backspace');
+  });
+
+  it('records multiple paired stores when one input store pairs with several output stores', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          {
+            nodeId: 'r1',
+            context: [{ kind: 'any', storeRef: 'storeA' }],
+            output: [{ kind: 'index', storeRef: 'storeB', offset: 1 }],
+          },
+          {
+            nodeId: 'r2',
+            context: [{ kind: 'any', storeRef: 'storeA' }],
+            output: [{ kind: 'index', storeRef: 'storeC', offset: 1 }],
+          },
+        ],
+      }],
+    });
+    const pairs = detectStorePairs(ir);
+    // storeA pairs with both B and C (sorted by pairedName)
+    expect(pairs.get('storeA')).toHaveLength(2);
+    expect(pairs.get('storeA')!.map((e) => e.pairedName)).toEqual(['storeB', 'storeC']);
+    expect(pairs.get('storeB')?.[0]?.pairedName).toBe('storeA');
+    expect(pairs.get('storeC')?.[0]?.pairedName).toBe('storeA');
+  });
+
+  it('does not pair a store with itself', () => {
+    const ir = makeIR({
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
         rules: [{
           nodeId: 'r1',
-          context: [
-            { kind: 'raw', text: "platform('touch')" },
-            { kind: 'any', storeRef: 'word' },
-            { kind: 'any', storeRef: 'final' },
-            { kind: 'raw', text: '+' },
-            { kind: 'vkey', name: 'K_SPACE', modifiers: [] },
-          ],
-          output: [
-            { kind: 'index', storeRef: 'word', offset: 2 },
-            { kind: 'index', storeRef: 'final', offset: 3 },
-          ],
+          context: [{ kind: 'any', storeRef: 'storeA' }],
+          output: [{ kind: 'index', storeRef: 'storeA', offset: 1 }],
         }],
       }],
     });
-    const nodes = toRailNodes(ir);
-    const wordNode = nodes.find((n) => n.name === 'word');
-    const finalNode = nodes.find((n) => n.name === 'final');
-    expect(wordNode?.storePairingKind).toBe('self');
-    expect(wordNode?.pairedStoreNames).toBeUndefined();
-    expect(finalNode?.storePairingKind).toBe('self');
-    expect(finalNode?.pairedStoreNames).toBeUndefined();
-  });
-
-  it('"unresolved": a store targeted by index() whose pairing cannot be resolved to an any() source', () => {
-    const ir = makeIR({
-      stores: [{ nodeId: 'sid-X', name: 'storeX', items: [], isSystem: false } as any],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
-        rules: [{
-          nodeId: 'r1',
-          context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
-          output: [{ kind: 'index', storeRef: 'storeX', offset: 1 }],
-        }],
-      }],
-    });
-    const nodeX = toRailNodes(ir).find((n) => n.name === 'storeX');
-    expect(nodeX?.storePairingKind).toBe('unresolved');
-    expect(nodeX?.pairedStoreNames).toBeUndefined();
-  });
-
-  it('"unresolved": a store referenced via outs() (Amendment 4 fail-closed) has no nameable partners', () => {
-    const ir = makeIR({
-      stores: [{ nodeId: 'sid-outs', name: 'outsStore', items: [], isSystem: false } as any],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
-        rules: [{
-          nodeId: 'r1',
-          context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
-          output: [{ kind: 'outs', storeRef: 'outsStore' }],
-        }],
-      }],
-    });
-    const nodeOuts = toRailNodes(ir).find((n) => n.name === 'outsStore');
-    expect(nodeOuts?.storePairingKind).toBe('unresolved');
-    expect(nodeOuts?.pairedStoreNames).toBeUndefined();
+    const pairs = detectStorePairs(ir);
+    expect(pairs.size).toBe(0);
   });
 });
 
@@ -1251,48 +1266,22 @@ describe('storeCharChips — chip id stability + TRUE itemsIndex', () => {
 });
 
 describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dispatch)', () => {
-  it('disabled (unresolved-index-pairing): an output-target store whose index() offset never resolves to an any() source maps every char chip to disabled', () => {
+  it('nul-fill: an output-target store (index() in a rule output) maps every char chip to nul-fill', () => {
     const outputStore = makeChipStore('store#out', 'outX', [
       { kind: 'char', value: 'x' },
       { kind: 'char', value: 'y' },
     ]);
     const rule: IRRule = {
       nodeId: 'rule#1',
-      // offset 1 resolves to the vkey — not an any() — so pairing is unresolved.
       context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
-      output: [{ kind: 'index', storeRef: 'outX', offset: 1 }],
+      output: [{ kind: 'index', storeRef: 'outX', offset: 0 }],
     };
     const ir = makeChipIR([makeChipGroup('g1', [rule])], [outputStore]);
 
     const chips = storeCharChips(outputStore, ir);
     expect(chips).toHaveLength(2);
     chips.forEach((c) => {
-      expect(c.action).toBe('disabled');
-      expect(c.disabledReason).toMatch(/pairing/i);
-    });
-  });
-
-  it('drop (coordinated): an output-target store whose index() offset resolves to an any() source maps every char chip to a coordinated drop', () => {
-    const inputStore = makeChipStore('store#in', 'inX', [
-      { kind: 'char', value: 'a' },
-      { kind: 'char', value: 'b' },
-    ]);
-    const outputStore = makeChipStore('store#out', 'outX', [
-      { kind: 'char', value: 'x' },
-      { kind: 'char', value: 'y' },
-    ]);
-    const rule: IRRule = {
-      nodeId: 'rule#1',
-      context: [{ kind: 'any', storeRef: 'inX' }],
-      output: [{ kind: 'index', storeRef: 'outX', offset: 1 }],
-    };
-    const ir = makeChipIR([makeChipGroup('g1', [rule])], [inputStore, outputStore]);
-
-    const chips = storeCharChips(outputStore, ir);
-    expect(chips).toHaveLength(2);
-    chips.forEach((c) => {
-      expect(c.action).toBe('drop');
-      expect(c.coordinatedWith).toEqual(['inX']);
+      expect(c.action).toBe('nul-fill');
       expect(c.disabledReason).toBeUndefined();
     });
   });
@@ -1366,30 +1355,28 @@ describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dis
     expect(chips[0]!.disabledReason).toMatch(/position/i);
   });
 
-  it('drop (coordinated, formerly paired-input): an any()-source store paired with an output index() maps to a coordinated drop, not disabled (the pairing-graph fix)', () => {
+  it('disabled (paired-input): an any()-source store paired with an output index() maps to disabled with the pairing reason', () => {
     const inputStore = makeChipStore('store#paired-in', 'pairedInX', [{ kind: 'char', value: 'p' }]);
     const outputStore = makeChipStore('store#paired-out', 'pairedOutX', [{ kind: 'char', value: 'o' }]);
     const rule: IRRule = {
       nodeId: 'rule#1',
       context: [{ kind: 'any', storeRef: 'pairedInX' }],
-      output: [{ kind: 'index', storeRef: 'pairedOutX', offset: 1 }],
+      output: [{ kind: 'index', storeRef: 'pairedOutX', offset: 0 }],
     };
     const ir = makeChipIR([makeChipGroup('g1', [rule])], [inputStore, outputStore]);
 
     const chips = storeCharChips(inputStore, ir);
     expect(chips).toHaveLength(1);
-    expect(chips[0]!.action).toBe('drop');
-    expect(chips[0]!.coordinatedWith).toEqual(['pairedOutX']);
+    expect(chips[0]!.action).toBe('disabled');
+    expect(chips[0]!.disabledReason).toMatch(/pairing/i);
   });
 
-  it('disabled (unresolved-index-pairing, genuinely-ambiguous dual role): a store that is an output target in one rule (whose OWN context has no any() to pair with) and an any()-source in an unrelated rule stays blocked', () => {
+  it('disabled (dual-use): a store that is both an output target and an any() source maps to disabled with the dual-role reason', () => {
     const store = makeChipStore('store#dual', 'dualX', [{ kind: 'char', value: 'd' }]);
     const outRule: IRRule = {
       nodeId: 'rule#out',
-      // This rule's own context has no any() at all — index(dualX, 1) can never
-      // resolve a pairing from HERE, regardless of what dualX does elsewhere.
       context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
-      output: [{ kind: 'index', storeRef: 'dualX', offset: 1 }],
+      output: [{ kind: 'index', storeRef: 'dualX', offset: 0 }],
     };
     const sourceRule: IRRule = {
       nodeId: 'rule#src',
@@ -1401,27 +1388,7 @@ describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dis
     const chips = storeCharChips(store, ir);
     expect(chips).toHaveLength(1);
     expect(chips[0]!.action).toBe('disabled');
-    expect(chips[0]!.disabledReason).toMatch(/pairing/i);
-  });
-
-  it('drop (coordinated, formerly dual-use): a store that is both an output target and an any() source, positionally paired with itself, maps to a coordinated drop', () => {
-    const store = makeChipStore('store#dual', 'dualX', [{ kind: 'char', value: 'd' }, { kind: 'char', value: 'e' }]);
-    // Self-paired: the rule's own any(dualX) supplies the index(dualX, 1) offset.
-    const rule: IRRule = {
-      nodeId: 'rule#out',
-      context: [{ kind: 'any', storeRef: 'dualX' }],
-      output: [{ kind: 'index', storeRef: 'dualX', offset: 1 }],
-    };
-    const ir = makeChipIR([makeChipGroup('g1', [rule])], [store]);
-
-    const chips = storeCharChips(store, ir);
-    expect(chips).toHaveLength(2);
-    chips.forEach((c) => {
-      expect(c.action).toBe('drop');
-      // Self-paired: no OTHER store name to coordinate with.
-      expect(c.coordinatedWith).toBeUndefined();
-      expect(c.disabledReason).toBeUndefined();
-    });
+    expect(chips[0]!.disabledReason).toMatch(/dual role/i);
   });
 });
 
