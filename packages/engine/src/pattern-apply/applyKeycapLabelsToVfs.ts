@@ -10,7 +10,12 @@
 //   S-08 AltGr      → kvks shift="RA" / touch layer "rightalt"
 
 import type { MechanismAssignment, VirtualFS } from "@keyboard-studio/contracts";
-import { parseKmnHeaderStores } from "../compiler/parseKmnHeaderStores.js";
+import {
+  escapeRegExp,
+  readVfsText,
+  resolveOskAssetPaths,
+  xmlEscape,
+} from "./oskAssetShared.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -92,30 +97,7 @@ export function applyKeycapLabelsToVfs(
   // -------------------------------------------------------------------------
   // Step 2 — locate asset paths from the .kmn header stores (with fallback).
   // -------------------------------------------------------------------------
-  const kmnPath = `source/${keyboardId}.kmn`;
-  const kmnEntry = vfs.get(kmnPath);
-  let kmnText = "";
-  if (kmnEntry !== undefined && !kmnEntry.isBinary) {
-    kmnText =
-      typeof kmnEntry.content === "string"
-        ? kmnEntry.content
-        : new TextDecoder().decode(kmnEntry.content as Uint8Array);
-  }
-
-  const headerStores = kmnText ? parseKmnHeaderStores(kmnText) : [];
-
-  const kvksPath = resolveAssetPath(
-    headerStores,
-    "VISUALKEYBOARD",
-    keyboardId,
-    ".kvks",
-  );
-  const touchPath = resolveAssetPath(
-    headerStores,
-    "LAYOUTFILE",
-    keyboardId,
-    ".keyman-touch-layout",
-  );
+  const { kvksPath, touchPath } = resolveOskAssetPaths(vfs, keyboardId);
 
   // -------------------------------------------------------------------------
   // Step 3 — patch .kvks (text splice via regex).
@@ -147,36 +129,6 @@ function parseLastTokenFromBracket(text: string): string {
   if (!m) return "";
   const tokens = (m[1] ?? "").trim().split(/\s+/);
   return tokens[tokens.length - 1] ?? "";
-}
-
-/**
- * Resolve the VFS path for a sibling asset file.
- *
- * 1. Look for the store in parsed header stores and return `source/<path>`.
- * 2. Fall back to `source/<keyboardId><extension>`.
- */
-function resolveAssetPath(
-  stores: ReturnType<typeof parseKmnHeaderStores>,
-  storeName: string,
-  keyboardId: string,
-  extension: string,
-): string {
-  const store = stores.find((s) => s.storeName === storeName);
-  if (store?.path) {
-    // Paths in .kmn headers are relative to source/
-    return `source/${store.path}`;
-  }
-  return `source/${keyboardId}${extension}`;
-}
-
-/**
- * XML-escape a character for insertion into `.kvks` text content.
- */
-function xmlEscape(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }
 
 /**
@@ -269,14 +221,9 @@ function patchTouchLayout(
   touchPath: string,
   targets: KeycapTarget[],
 ): void {
-  const entry = vfs.get(touchPath);
   // Touch layout is optional — skip silently when absent or binary.
-  if (entry === undefined || entry.isBinary) return;
-
-  const raw =
-    typeof entry.content === "string"
-      ? entry.content
-      : new TextDecoder().decode(entry.content as Uint8Array);
+  const raw = readVfsText(vfs, touchPath);
+  if (raw === undefined) return;
 
   let data: unknown;
   try {
@@ -386,11 +333,4 @@ function synthesizeKvksLayer(xml: string, vkey: string, escapedChar: string): st
   }
 
   return patched;
-}
-
-/**
- * Escape a string for safe use inside a `new RegExp(…)` pattern.
- */
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
