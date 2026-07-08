@@ -5,6 +5,7 @@
   "rewrites": [
     { "source": "/oauth/exchange", "destination": "/api/oauth/exchange" },
     { "source": "/oauth/refresh", "destination": "/api/oauth/refresh" },
+    { "source": "/oauth/google/exchange", "destination": "/api/oauth/google/exchange" },
     { "source": "/oauth/health", "destination": "/api/oauth/health" },
     { "source": "/submit/managed-pr", "destination": "/api/submit/managed-pr" },
     {
