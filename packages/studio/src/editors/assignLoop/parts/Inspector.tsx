@@ -166,6 +166,15 @@ interface StoreDetailProps {
   onSelectNode?: ((nodeId: string) => void) | undefined;
   onToggleGlyph: (gid: string) => void;
   onSetManyGlyphs: (gids: string[], off: boolean) => void;
+  /**
+   * Called when the user clicks a store chip's body — CarveGallery resolves
+   * the character's cross-wired contributors (same as onCascadeDelete, but
+   * store chips already know their own character directly) and opens the
+   * cascade ConfirmDialog when the character is produced elsewhere too.
+   *
+   * When absent, chip clicks fall back to the plain onToggleGlyph path.
+   */
+  onStoreCascade?: ((chipId: string, ch: string) => void) | undefined;
 }
 function storeRoleChip(node: CarveNode): React.ReactNode {
   const u = node.storeUsage;
@@ -242,7 +251,7 @@ function PlatformBadge({ platform }: { platform: string }) {
 
 const RULE_GROUP_THRESHOLD = 10;
 
-function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSelectNode, onToggleGlyph, onSetManyGlyphs }: StoreDetailProps) {
+function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSelectNode, onToggleGlyph, onSetManyGlyphs, onStoreCascade }: StoreDetailProps) {
   const off = isDeleted(node.nodeId);
   const setInfo = useHoverInfoStore((s) => s.setInfo);
   const clearInfo = useHoverInfoStore((s) => s.clearInfo);
@@ -354,7 +363,7 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
                 key={chip.chipId}
                 chip={chip}
                 off={off || isItemDeleted(chip.chipId)}
-                onToggle={onToggleGlyph}
+                onToggle={onStoreCascade ? () => onStoreCascade(chip.chipId, chip.ch) : onToggleGlyph}
               />
             ))}
           </div>
@@ -576,13 +585,18 @@ interface InspectorProps {
    * When absent, chip clicks fall back to the plain onToggleGlyph path.
    */
   onCascadeDelete?: ((gid: string) => void) | undefined;
+  /**
+   * Store-chip counterpart of onCascadeDelete — see StoreDetailProps.onStoreCascade.
+   * Forwarded straight through to StoreDetail; unused by the pattern/group branch.
+   */
+  onStoreCascade?: ((chipId: string, ch: string) => void) | undefined;
   /** character → all its locations (built once by CarveGallery); powers the cross-reference tags. */
   charWeb?: Map<string, CharLocation[]> | undefined;
   /** Clicking a cross-reference tag — CarveGallery navigates (1 location) or opens the web popup (>1). */
   onWebTag?: ((ch: string, locations: CharLocation[]) => void) | undefined;
 }
 
-export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetManyGlyphs, isDeleted, onToggleNode, onSelectNode, onCascadeDelete, charWeb, onWebTag }: InspectorProps) {
+export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetManyGlyphs, isDeleted, onToggleNode, onSelectNode, onCascadeDelete, onStoreCascade, charWeb, onWebTag }: InspectorProps) {
   const [q, setQ] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   useEffect(() => { setQ(''); setCollapsed(new Set()); }, [node?.nodeId]);
@@ -598,7 +612,7 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
   }
 
   if (node.kind === 'raw') return <RawDetail node={node} isDeleted={isDeleted} onToggleNode={onToggleNode} />;
-  if (node.kind === 'store') return <StoreDetail key={node.nodeId} node={node} nodes={nodes} isDeleted={isDeleted} isItemDeleted={isItemDeleted} onToggleNode={onToggleNode} onSelectNode={onSelectNode} onToggleGlyph={onToggleGlyph} onSetManyGlyphs={onSetManyGlyphs} />;
+  if (node.kind === 'store') return <StoreDetail key={node.nodeId} node={node} nodes={nodes} isDeleted={isDeleted} isItemDeleted={isItemDeleted} onToggleNode={onToggleNode} onSelectNode={onSelectNode} onToggleGlyph={onToggleGlyph} onSetManyGlyphs={onSetManyGlyphs} onStoreCascade={onStoreCascade} />;
 
   const glyphs = node.glyphs ?? [];
   const st = nodeState(node, isItemDeleted, isDeleted);

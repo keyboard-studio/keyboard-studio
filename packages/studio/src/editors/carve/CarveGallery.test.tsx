@@ -74,6 +74,21 @@ function makeGroup(nodeId: string, name: string, rules: IRRule[]): IRGroup {
   return { nodeId, name, usingKeys: true, rules, readonly: false };
 }
 
+/** notany() context rule — used to force classifyStoreSlotEdit's "blocked" path
+ * (reason "notany-widens") for the #523 disabled-chip test, without touching
+ * isSystem (system stores never even get a CarveNode — see toRailNodes). */
+function makeNotAnyRule(nodeId: string, storeName: string, outChar: string): IRRule {
+  return {
+    nodeId,
+    context: [{ kind: 'notany', storeRef: storeName }],
+    output: [{ kind: 'char', value: outChar }],
+  };
+}
+
+function makeStore(nodeId: string, name: string, chars: string[]): IRStore {
+  return { nodeId, name, items: chars.map((c) => ({ kind: 'char' as const, value: c })), isSystem: false };
+}
+
 function makeIR(groups: IRGroup[], stores: IRStore[] = []): KeyboardIR {
   return {
     origin: 'imported',
@@ -328,5 +343,143 @@ describe('CarveGallery — web-tag navigation', () => {
     // the kind + label spans, so matching by inner text is more robust).
     fireEvent.click(within(popup).getByText('second').closest('button')!);
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('second');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 8-11. #523 — store-chip cascade. StoreChip clicks inside StoreDetail route
+// through the SAME cascade decision (buildPendingCascade) as glyph chips,
+// via handleStoreChipCascade / onStoreCascade, instead of a plain toggle.
+// ---------------------------------------------------------------------------
+
+describe('CarveGallery — store-chip cascade (#523)', () => {
+  it('a store char also produced by a group rule opens the "remove everywhere" dialog; confirming cascades both', () => {
+    const ir = makeIR(
+      [makeGroup('g-main', 'main', [makeSimpleRule('r-a', 'K_A', 'a')])],
+      [makeStore('store#s', 'sX', ['a'])],
+    );
+    const caps = new Map<string, RemovalCapability>([['r-a', 'removable:simple']]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => ({
+      ...emptyContributors(ch),
+      ruleNodeIds: ['r-a'],
+      storeSlotIds: ['store#s#0'],
+      locations: [
+        { kind: 'group' as const, label: 'main', nodeId: 'g-main' },
+        { kind: 'store' as const, label: 'sX', nodeId: 'store#s' },
+      ],
+    }));
+
+    renderGallery(ir, caps);
+    fireEvent.click(screen.getByTestId('carve-card-store#s'));
+    fireEvent.click(screen.getByRole('button', { name: 'a' }));
+
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog.textContent).toContain('Remove "a" everywhere?');
+    expect(dialog.textContent).toContain('main');
+    expect(dialog.textContent).toContain('sX');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, remove everywhere' }));
+
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(true);
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#s#0')).toBe(true);
+  });
+
+  it('a store char that is its char\'s sole producer plain-toggles (no dialog)', () => {
+    const ir = makeIR(
+      [makeGroup('g-main', 'main', [])],
+      [makeStore('store#s', 'sX', ['a'])],
+    );
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => ({
+      ...emptyContributors(ch),
+      storeSlotIds: ['store#s#0'],
+    }));
+
+    renderGallery(ir);
+    fireEvent.click(screen.getByTestId('carve-card-store#s'));
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#s#0')).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'a' }));
+
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#s#0')).toBe(true);
+  });
+
+  it('restore path: clicking an already-removed cross-wired store char opens the "restore everywhere" dialog', () => {
+    const ir = makeIR(
+      [makeGroup('g-main', 'main', [makeSimpleRule('r-a', 'K_A', 'a')])],
+      [makeStore('store#s', 'sX', ['a'])],
+    );
+    const caps = new Map<string, RemovalCapability>([['r-a', 'removable:simple']]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => ({
+      ...emptyContributors(ch),
+      ruleNodeIds: ['r-a'],
+      storeSlotIds: ['store#s#0'],
+    }));
+
+    renderGallery(ir, caps);
+    useWorkingCopyStore.getState().deleteItem('r-a');
+    useWorkingCopyStore.getState().deleteItem('store#s#0');
+
+    fireEvent.click(screen.getByTestId('carve-card-store#s'));
+    fireEvent.click(screen.getByRole('button', { name: 'a' }));
+
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog.textContent).toContain('Restore "a" everywhere?');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, restore everywhere' }));
+
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(false);
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#s#0')).toBe(false);
+  });
+
+  it('a disabled/blocked store chip shows its reason and never cascades', () => {
+    const ir = makeIR(
+      [makeGroup('g-block', 'blockGroup', [makeNotAnyRule('r-block', 'blockedStore', 'x')])],
+      [makeStore('store#blocked', 'blockedStore', ['z'])],
+    );
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => emptyContributors(ch));
+
+    renderGallery(ir);
+    fireEvent.click(screen.getByTestId('carve-card-store#blocked'));
+    fireEvent.click(screen.getByRole('button', { name: 'z' }));
+
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(collectCharContributorsMock).not.toHaveBeenCalled();
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#blocked#0')).toBe(false);
+  });
+
+  // Fully-blocked branch (actionCount === 0) driven through the store-chip
+  // path — mirrors the glyph-path test in the "not-removable chip" describe
+  // block above, but here the clicked store chip itself is toggleable
+  // (classifyStoreSlotEdit allows the edit; there's no notany()/dual-use
+  // reference on this store), and it's collectCharContributors' `blocked`
+  // array — not a per-chip clickedCapability, which store chips never carry
+  // — that reports every contributor as not-removable. This proves
+  // buildPendingCascade's shared "nothing removable" branch also opens the
+  // single-button info dialog for the store path.
+  it('a store char whose contributors are all not-removable opens the single-button info dialog', () => {
+    const ir = makeIR(
+      [makeGroup('g-main', 'main', [])],
+      [makeStore('store#s', 'sX', ['a'])],
+    );
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => ({
+      ...emptyContributors(ch),
+      blocked: [{ label: 'main', reason: 'Only produced by an opaque advanced rule.' }],
+    }));
+
+    renderGallery(ir);
+    fireEvent.click(screen.getByTestId('carve-card-store#s'));
+    fireEvent.click(screen.getByRole('button', { name: 'a' }));
+
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog.textContent).toContain('"a" can\'t be fully removed');
+    expect(dialog.textContent).toContain('Only produced by an opaque advanced rule.');
+
+    // Single-button (fix 3) — omitting secondaryLabel collapses to one button.
+    expect(within(dialog).getAllByRole('button')).toHaveLength(1);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#s#0')).toBe(false);
   });
 });
