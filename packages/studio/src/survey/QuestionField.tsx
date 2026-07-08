@@ -113,6 +113,15 @@ function AutocompleteField({ question, value, onChange }: FieldProps) {
 // (synchronous after the one-time import resolves), so it is instantaneous.
 // ---------------------------------------------------------------------------
 
+// Hard cap on datalist size. The full langtags index is ~8,000 entries;
+// rendering them all as <option> elements janks real browsers and crashes
+// embedded Electron webviews outright (VS Code's Simple Browser takes the
+// whole window down with it). A native datalist dropdown only ever shows a
+// handful of rows, and lookupByName returns ranked matches (exact code,
+// then name prefixes, then substrings), so the useful suggestions survive
+// the cut.
+const MAX_DATALIST_OPTIONS = 50;
+
 function LangtagsAutocompleteField({ question, value, onChange }: FieldProps) {
   const strVal = stringValue(value);
   const [options, setOptions] = useState<LanguageSummary[]>([]);
@@ -136,12 +145,12 @@ function LangtagsAutocompleteField({ question, value, onChange }: FieldProps) {
     loadedRef.current = true;
     loadLangtags()
       .then((mod) => {
-        // Pre-populate with the full list so the datalist is available immediately
-        // before the user starts typing. listLanguages() returns a readonly array
-        // from the already-loaded module (synchronous after the import resolves).
+        // Pre-populate a capped slice so the datalist offers something to
+        // browse before the user starts typing. Never the full list — see
+        // MAX_DATALIST_OPTIONS above.
         if (!isMountedRef.current) return;
         const all = mod.listLanguages();
-        setOptions(all as LanguageSummary[]);
+        setOptions(all.slice(0, MAX_DATALIST_OPTIONS) as LanguageSummary[]);
         setLoaded(true);
       })
       .catch(() => {
@@ -153,7 +162,7 @@ function LangtagsAutocompleteField({ question, value, onChange }: FieldProps) {
 
   // Update the datalist dynamically as the user types. The lookupByName search
   // runs synchronously against the in-memory index (no network, no async). When
-  // the query is empty we show the full list (listLanguages) so browsing works.
+  // the query is empty we show the head of the list (capped) so browsing works.
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const typed = e.target.value;
     onChange(typed);
@@ -164,7 +173,7 @@ function LangtagsAutocompleteField({ question, value, onChange }: FieldProps) {
           const results = typed
             ? mod.lookupByName(typed)
             : mod.listLanguages();
-          setOptions(results as LanguageSummary[]);
+          setOptions(results.slice(0, MAX_DATALIST_OPTIONS) as LanguageSummary[]);
         })
         .catch(() => {
           // Silently ignore — module is loaded (we got here from the mount effect).
