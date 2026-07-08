@@ -2,10 +2,10 @@
 // release tree into the VirtualFS, ready for CompilerService.compile().
 //
 // Resolves `<proxyBase>/<baseKeyboard.path>/source/<id>.kmn`, parses the
-// header for sibling deps (LAYOUTFILE / VISUALKEYBOARD / KMW_EMBEDJS /
-// KMW_EMBEDCSS / BITMAP / KMW_HELPFILE / DISPLAYMAP / INCLUDECODES), fetches each,
-// plus the optional <id>.kpj for compiler flags. Writes everything flat into the
-// VFS at `source/...` (the layout CompilerService.compile() expects).
+// header for sibling deps (see shared/siblingAssetStores.ts for the
+// canonical store inventory), fetches each, plus the optional <id>.kpj for
+// compiler flags. Writes everything flat into the VFS at `source/...` (the
+// layout CompilerService.compile() expects).
 
 import type { BaseKeyboard, VirtualFS, KpsFontEntry, KpsStylesheetEntry } from "@keyboard-studio/contracts";
 import { parseKmnHeaderStores } from "../compiler/parseKmnHeaderStores.js";
@@ -117,9 +117,9 @@ async function getBytes(
  * Populate the VFS with the source files for the chosen base keyboard.
  *
  * Throws on a missing required file (the `.kmn` itself, or a required
- * sibling named in a LAYOUTFILE / VISUALKEYBOARD / KMW_EMBEDJS / INCLUDECODES store).
- * Returns silently on missing optional files (BITMAP / KMW_HELPFILE / KMW_EMBEDCSS /
- * DISPLAYMAP / .kpj), adding a warning string.
+ * sibling store) and returns silently (adding a warning string) on a missing
+ * optional file or `.kpj` — see shared/siblingAssetStores.ts for the
+ * canonical store inventory and which stores are required vs. optional.
  */
 export async function fetchKeyboardSourceToVfs(
   baseKeyboard: BaseKeyboard,

@@ -25,6 +25,12 @@ export { parseSlotId } from "./slotId.js";
 
 export { applyKeycapLabelsToVfs } from "./applyKeycapLabelsToVfs.js";
 
+export {
+  applyCarveKeycapRemovalsToVfs,
+  collectCarvedKeycapTexts,
+} from "./applyCarveKeycapRemovalsToVfs.js";
+export type { CarveKeycapRemovalInput } from "./applyCarveKeycapRemovalsToVfs.js";
+
 export { applyTouchAssignments } from "./applyTouchAssignments.js";
 export type { ApplyTouchAssignmentsResult } from "./applyTouchAssignments.js";
 

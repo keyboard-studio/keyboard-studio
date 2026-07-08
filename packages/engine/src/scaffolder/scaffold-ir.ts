@@ -13,6 +13,10 @@ import type {
   StoreItem,
   RoutingGroup,
 } from "@keyboard-studio/contracts";
+import {
+  unconditionalScaffoldRenameStores,
+  conditionalScaffoldRenameStores,
+} from "../shared/siblingAssetStores.js";
 
 export interface ScaffoldIRIdentity {
   keyboardId: string;
@@ -128,13 +132,8 @@ function rewriteSiblingPathStores(
   keyboardId: string,
   baseKeyboardId: string,
 ): void {
-  const PATH_STORES = [
-    "VISUALKEYBOARD",
-    "LAYOUTFILE",
-    "KMW_EMBEDCSS",
-    "KMW_EMBEDJS",
-    "KMW_HELPFILE",
-  ];
+  // Stores rewritten unconditionally whenever present (siblingAssetStores.ts).
+  const PATH_STORES = unconditionalScaffoldRenameStores();
   for (const name of PATH_STORES) {
     const value = getSystemStoreString(ir, name);
     if (value === null) continue;
@@ -146,16 +145,18 @@ function rewriteSiblingPathStores(
     setSystemStore(ir, name, `${keyboardId}${extension}`);
   }
 
-  const bitmap = getSystemStoreString(ir, "BITMAP");
-  if (bitmap !== null) {
-    const trimmed = bitmap.trim();
+  // BITMAP is the one conditionally-renamed store — see the docstring above.
+  for (const name of conditionalScaffoldRenameStores()) {
+    const value = getSystemStoreString(ir, name);
+    if (value === null) continue;
+    const trimmed = value.trim();
     if (
       trimmed.includes(".") &&
       !/[\\/]/.test(trimmed) &&
       trimmed.slice(0, trimmed.indexOf(".")) === baseKeyboardId
     ) {
       const extension = trimmed.slice(trimmed.indexOf("."));
-      setSystemStore(ir, "BITMAP", `${keyboardId}${extension}`);
+      setSystemStore(ir, name, `${keyboardId}${extension}`);
     }
   }
 }

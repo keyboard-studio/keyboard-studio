@@ -23,22 +23,18 @@
 
 import type { VirtualFS } from "@keyboard-studio/contracts";
 import { parseKmnHeaderStores } from "./parseKmnHeaderStores.js";
+import {
+  danglingPreviewStripStores,
+  alwaysPreviewStripStores,
+} from "../shared/siblingAssetStores.js";
 
 // Packaging-asset stores stripped only when their file is absent from VFS.
-const DANGLING_STORES = new Set([
-  "BITMAP",
-  "VISUALKEYBOARD",
-  "LAYOUTFILE",
-  "DISPLAYMAP",
-]);
+const DANGLING_STORES = danglingPreviewStripStores();
 
 // Help-panel stores stripped unconditionally for preview compiles — their
 // presence causes KMW to render the help documentation panel instead of the
 // keyboard layout OSK, which is never useful in the live preview.
-const ALWAYS_STRIP_STORES = new Set([
-  "KMW_HELPFILE",
-  "KMW_EMBEDJS",
-]);
+const ALWAYS_STRIP_STORES = alwaysPreviewStripStores();
 
 /**
  * Remove header `store(&ASSET) 'path'` lines that would interfere with the
