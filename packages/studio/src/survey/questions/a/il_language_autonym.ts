@@ -1,12 +1,12 @@
 // Per-question module: il_language_autonym (identity-lite)
 //
 // THIRD question (spec 030): the language name in the community's own script.
-// PRE-FILLED from the langtags entry resolved by il_language_code (getSeedValue
-// in IdentityLite.tsx seeds it from the resolved entry's autonym); the author
-// confirms or edits it. Only ~40% of langtags languages carry a local name, so
-// this frequently arrives empty and the author types it (spec 030 T008 / FR-005).
-// US2 will turn this into a multi-choice picker over the entry's localNames;
-// for now it is a single-value pre-filled text field.
+// A multi-choice picker over the langtags entry's recorded local names, with a
+// free-text override (spec 030 US2). IdentityLite.tsx supplies the options via
+// getSeedOptions (the resolved entry's localNames) and pre-fills the primary
+// autonym via getSeedValue. Only ~40% of langtags languages carry a local name
+// (T008), so the option list is frequently empty — the `autocomplete` field
+// then behaves as a plain free-text input, which the author types (FR-005).
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
 
@@ -15,9 +15,9 @@ export const definition = {
   prompt: "What is your language called in your own language?",
   help_text:
     "The name your community uses for the language, in your own spelling and " +
-    "characters. For example: Fà', Kiswahili, हिन्दी. Pre-filled from your " +
-    "selection above when available — edit it to match your spelling.",
-  type: "text" as const,
+    "characters. For example: Fà', Kiswahili, हिन्दी. Pick a suggested name or " +
+    "type your own — edit it to match your spelling.",
+  type: "autocomplete" as const,
   required: true,
   next: "il_target_script",
 } satisfies import("../../types.ts").FlowQuestion;

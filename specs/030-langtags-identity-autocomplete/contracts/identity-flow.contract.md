@@ -58,9 +58,11 @@ SHIPPED (US1):
 - `getSeedValue("il_target_script")` → `scriptSeedRef` (unchanged mapping).
 - `extractIdentityLite` is UNCHANGED: `english` ← `il_language_english`, `autonym` ← `il_language_autonym`, `languageSubtag` ← `il_language_code`. The old autonym→English seed and `autonymRef` are removed. SurveyRunner's "seed on first arrival, never overwrite" preserves author edits.
 
-DEFERRED (US2/US3):
-- US2: `getSeedValue("il_language_autonym")` returns the resolved entry's `localNames` as multi-choice options (still free-text override).
-- US3: `handleAnswerCommit("il_language_region", …)` + a `selectedVariantRef`; region routing shown only when `regionVariants.length > 1`; script/localNames then sourced from the selected variant.
+SHIPPED (US2):
+- `il_language_autonym` is now `type: autocomplete`. Its datalist **options** are supplied dynamically via a new SurveyRunner `getSeedOptions(questionId)` callback (parallel to `getSeedValue`) — `IdentityLite` returns the resolved entry's `localNames` (from `localNamesSeedRef`) mapped to `{value,label}`. When empty (~60% of languages, T008) the field is plain free text. `getSeedValue("il_language_autonym")` still returns the primary autonym as the pre-filled default value; free-text override preserved. SurveyRunner injects the options into `displayQ.options` for the current question only.
+
+DEFERRED (US3):
+- `handleAnswerCommit("il_language_region", …)` + a `selectedVariantRef`; region routing shown only when `regionVariants.length > 1`; script/localNames then sourced from the selected variant.
 - **Invariant**: seed on first arrival only; never overwrite an author-edited value (existing SurveyRunner contract — SC-005). Editing Q1/region via Back re-resolves and re-seeds downstream, without clobbering values the author already customized.
 - **Free-text/no match**: `resolvedEntryRef = null` → no seeds; Q2 is a single free-text field, Q3 free-text/blank; every step completable (FR-003).
 

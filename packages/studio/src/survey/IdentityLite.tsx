@@ -8,7 +8,7 @@ import { useMemo, useRef, useCallback, useEffect } from "react";
 import type { SurveyPhaseResult, LintFinding, LangtagsProvenance } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { loadModularFlow } from "./loadModularFlow.ts";
-import type { SurveyContext } from "./types.ts";
+import type { SurveyContext, FlowOption } from "./types.ts";
 import {
   deriveScriptPrefill,
   normalizeTargetScript,
@@ -133,6 +133,12 @@ export function IdentityLite({
   // only ~40% of languages carry a local name (T008).
   const autonymSeedRef = useRef<string | undefined>(undefined);
 
+  // Local-name options from the resolved entry (spec 030 US2): the datalist
+  // choices for il_language_autonym, supplied via getSeedOptions. Frequently
+  // undefined/empty (~60% of languages have no local name — T008), in which case
+  // the autocomplete field behaves as plain free text.
+  const localNamesSeedRef = useRef<readonly string[] | undefined>(undefined);
+
   // Track the proposed script seed from langtags (derived from the language
   // code), and whether it has been seeded already. The seeded flag prevents
   // re-seeding if the user goes Back and changes a prior answer.
@@ -170,6 +176,7 @@ export function IdentityLite({
         scriptSeedRef.current = undefined;
         englishNameSeedRef.current = undefined;
         autonymSeedRef.current = undefined;
+        localNamesSeedRef.current = undefined;
         provenanceRef.current = new Map();
 
         if (code !== "") {
@@ -192,6 +199,11 @@ export function IdentityLite({
               }
               if (defaults.autonym !== undefined && defaults.autonym !== "") {
                 autonymSeedRef.current = defaults.autonym;
+              }
+              // Local-name choices for the autonym picker (US2). Absent for most
+              // languages — then the field stays free text.
+              if (defaults.localNames !== undefined && defaults.localNames.length > 0) {
+                localNamesSeedRef.current = defaults.localNames;
               }
 
               // Record provenance only for fields we actually seeded.
@@ -263,6 +275,22 @@ export function IdentityLite({
     [],
   );
 
+  // Dynamic datalist options (spec 030 US2): the resolved entry's local names
+  // are offered as choices for il_language_autonym. Undefined when the language
+  // has no recorded local name — the field is then plain free text.
+  const getSeedOptions = useCallback(
+    (questionId: string): FlowOption[] | undefined => {
+      if (questionId === "il_language_autonym") {
+        const names = localNamesSeedRef.current;
+        if (names !== undefined && names.length > 0) {
+          return names.map((n) => ({ value: n, label: n }));
+        }
+      }
+      return undefined;
+    },
+    [],
+  );
+
   function handleComplete(result: SurveyPhaseResult) {
     onComplete(result, extractIdentityLite(result));
   }
@@ -294,6 +322,7 @@ export function IdentityLite({
         onAnswerCommit={handleAnswerCommit}
         getSeedValue={getSeedValue}
         getSeedProvenance={getSeedProvenance}
+        getSeedOptions={getSeedOptions}
         {...(onBack !== undefined ? { onBack } : {})}
         {...(findingsByQuestionId !== undefined ? { findingsByQuestionId } : {})}
       />

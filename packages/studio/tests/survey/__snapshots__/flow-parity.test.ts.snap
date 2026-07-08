@@ -23,14 +23,14 @@ exports[`flow-parity: identity_lite — questions[] > projected fields are stabl
     "type": "text",
   },
   {
-    "help_text": "The name your community uses for the language, in your own spelling and characters. For example: Fà', Kiswahili, हिन्दी. Pre-filled from your selection above when available — edit it to match your spelling.",
+    "help_text": "The name your community uses for the language, in your own spelling and characters. For example: Fà', Kiswahili, हिन्दी. Pick a suggested name or type your own — edit it to match your spelling.",
     "id": "il_language_autonym",
     "next": "il_target_script",
     "options": undefined,
     "options_source": undefined,
     "prompt": "What is your language called in your own language?",
     "required": true,
-    "type": "text",
+    "type": "autocomplete",
   },
   {
     "help_text": "Choose the writing system this keyboard produces. It can differ from the script your language normally uses: pick "Latin romanization" or "IPA" if you are building a romanized or phonetic keyboard. The script you choose here — not the language — decides the keyboard's layout family.",
