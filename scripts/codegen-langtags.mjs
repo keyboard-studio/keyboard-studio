@@ -73,6 +73,24 @@ function parseFull(full) {
   return { script, region };
 }
 
+/**
+ * De-duplicate a list of names preserving order, dropping empty/undefined.
+ * Used to merge the singular primary name with its array of alternates so the
+ * primary stays first (spec 030: englishNames / localNames).
+ */
+function dedupeNames(list) {
+  const seen = new Set();
+  const out = [];
+  for (const n of list) {
+    if (typeof n !== 'string') continue;
+    const v = n.trim();
+    if (v === '' || seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+  }
+  return out;
+}
+
 // Map: lowercased subtag key -> LanguageDefaults object (plain JS, no TS yet)
 const index = new Map();
 
@@ -95,7 +113,7 @@ for (const entry of raw) {
   // individual variety codes (e.g. "cmn", "yue"), never as a single bare entry.
   if (entry.tag.includes('-')) continue;
 
-  const { full, iso639_3, iso639_3extra, localname, name, regions } = entry;
+  const { full, iso639_3, iso639_3extra, localname, name, regions, names, localnames, regionname } = entry;
 
   let defaultScript;
   let defaultRegion;
@@ -106,6 +124,12 @@ for (const entry of raw) {
     defaultRegion = parsed.region;
   }
 
+  // Merge the singular primary with its alternates array, primary first
+  // (spec 030 FR-001/FR-004). Only ~40% of subtags carry any local name, so
+  // localNames is frequently empty — that is expected, not a defect.
+  const englishNames = dedupeNames([name, ...(Array.isArray(names) ? names : [])]);
+  const localNames = dedupeNames([localname, ...(Array.isArray(localnames) ? localnames : [])]);
+
   const record = {
     code: entry.tag.toLowerCase(),
     ...(iso639_3 !== undefined ? { iso639_3: iso639_3.toLowerCase() } : {}),
@@ -114,6 +138,10 @@ for (const entry of raw) {
     regions: Array.isArray(regions) ? [...regions].sort() : [],
     ...(localname !== undefined ? { autonym: localname } : {}),
     ...(name !== undefined ? { englishName: name } : {}),
+    ...(englishNames.length ? { englishNames } : {}),
+    ...(localNames.length ? { localNames } : {}),
+    // regionVariants (cross-tagset region grouping) is deferred to the US3
+    // phase — those variants live in the non-bare tagsets this loop skips.
   };
 
   const tagKey = entry.tag.toLowerCase();
@@ -152,6 +180,9 @@ for (const entry of raw) {
       englishName: record.englishName ?? '',
       ...(record.autonym !== undefined ? { autonym: record.autonym } : {}),
       ...(record.defaultScript !== undefined ? { defaultScript: record.defaultScript } : {}),
+      // regionName distinguishes homonym languages in the picker (spec 030 T008:
+      // ~98 English names map to >1 distinct language).
+      ...(regionname !== undefined ? { regionName: regionname } : {}),
     });
   }
 }
@@ -178,7 +209,7 @@ mkdirSync(OUT_DIR, { recursive: true });
 
 // Deterministic JSON serializer (stable key order within each record)
 function serializeRecord(r) {
-  const keys = ['code', 'iso639_3', 'defaultScript', 'defaultRegion', 'regions', 'autonym', 'englishName'];
+  const keys = ['code', 'iso639_3', 'defaultScript', 'defaultRegion', 'regions', 'autonym', 'englishName', 'englishNames', 'localNames'];
   const obj = {};
   for (const k of keys) {
     if (k in r) obj[k] = r[k];
@@ -187,7 +218,7 @@ function serializeRecord(r) {
 }
 
 function serializeSummary(s) {
-  const keys = ['code', 'englishName', 'autonym', 'defaultScript'];
+  const keys = ['code', 'englishName', 'autonym', 'defaultScript', 'regionName'];
   const obj = {};
   for (const k of keys) {
     if (k in s) obj[k] = s[k];
@@ -199,8 +230,12 @@ const indexLines = sortedIndexEntries.map(([k, v]) =>
   `  ${JSON.stringify(k)}: ${serializeRecord(v)},`
 );
 
+// Per-element `as LanguageSummary` keeps the array's element type uniform so
+// tsc does not build a literal-shape union over ~8k elements (TS2590 "union
+// too complex"). defaultsIndex avoids this via its Record<string, …> index
+// signature; the array literal needs the cast.
 const languageLines = languages.map(s =>
-  `  ${serializeSummary(s)},`
+  `  ${serializeSummary(s)} as LanguageSummary,`
 );
 
 const header = `\

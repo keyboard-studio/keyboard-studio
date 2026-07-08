@@ -65,6 +65,17 @@ All spec-level ambiguities were resolved in the `/speckit-clarify` session (FR-0
 
 **Rationale**: These artifacts pin flow order and question membership; the reorder + new module necessarily changes them. Snapshot updates are mechanical once behavior is correct.
 
+## T008 — Data verification results (pinned langtags `99b856b`, 9600 records)
+
+Ran against the fetched `packages/engine/data/langtags/langtags.json`:
+
+- **Field coverage** (of 9600 records): `name` 9596, `names[]` **8243**, `localname` 1990, `localnames[]` **3313**, `regionname` **9497**, `regions[]` 2069, `script`/`region` 9596. → the data carries everything the feature needs (R1 confirmed).
+- **Region variants are rare**: of **7898 distinct bare subtags**, only **205 (2.6%)** have >1 distinct `regionname` across their entries. The FR-014 region prompt is a genuine minority path — matches the "ask only when ambiguous" design.
+- **NEW finding — homonym languages (spec gap)**: **98 English `name` strings map to >1 distinct subtag** (different languages sharing an English name, e.g. `Ainu`→{`aib`,`ain`}, `Karo`→{`arr`,`kxh`}, `Aja`→{`aja`,`ajg`}). This is **not** a region variant of one language, so the FR-014 region question does not resolve it. It must be disambiguated **in the autocomplete suggestion list** (show region/ISO code alongside the English name so duplicate-named languages are distinguishable). → `LanguageSummary` MUST carry `region`/`regionName` (and expose the subtag it already has) so the picker can render distinct suggestions. Recorded as a US1 refinement; foundational types updated to support it.
+- **Local names are sparse**: only **3120/7898 subtags (39.5%)** have any local name. → for ~60% of languages Q2 has **zero** local-name choices; free-text is the common case, not the fallback (FR-005). The multi-choice UI MUST degrade cleanly to a plain free-text field when `localNames` is empty (add to US2 acceptance + Edge Cases).
+
+**Design impact**: (a) add `region`/`regionName` to `LanguageSummary` (T002) for homonym disambiguation; (b) treat empty-`localNames` as the majority Q2 path; (c) FR-014 region prompt stays as specced but is confirmed rare. No blocker — the feature is buildable as planned with these refinements.
+
 ## Summary of decisions
 
 | # | Decision |
