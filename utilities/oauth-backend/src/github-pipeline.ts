@@ -100,7 +100,8 @@ const API_BASE = "https://api.github.com";
 // cross-repo contributor affordance. Promotion staging -> keymanapp is a separate
 // downstream step. When UPSTREAM_OWNER === orgLogin the pipeline runs as a
 // same-repo PR (fork base === PR base), which is the current staging model.
-const UPSTREAM_OWNER = "keyboard-studio";
+// Exported so tests can pin the same-repo topology to the real constant.
+export const UPSTREAM_OWNER = "keyboard-studio";
 const UPSTREAM_REPO = "keyboards";
 
 // ---------------------------------------------------------------------------

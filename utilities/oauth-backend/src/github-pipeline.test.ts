@@ -2,9 +2,9 @@
  * Unit tests for the Option B managed-PR pipeline in github-pipeline.ts.
  *
  * All tests use an injected stub fetch -- no real GitHub calls. The stub routes
- * by URL + method so the 7-step pipeline (ref -> parent commit -> tree ->
- * commit -> branch -> PR) can be exercised end-to-end and individual steps
- * overridden to provoke each error path.
+ * by URL + method so the 7-step pipeline (ref -> parent commit -> build tree
+ * -> create tree -> commit -> branch -> PR) can be exercised end-to-end and
+ * individual steps overridden to provoke each error path.
  */
 
 import { describe, it, expect } from "vitest";
@@ -14,6 +14,7 @@ import {
   buildManagedBranchName,
   normalizePrTitle,
   buildPrBody,
+  UPSTREAM_OWNER,
   type ManagedPRPipelineConfig,
   type GitHubPipelineFetchResponse,
   type GitHubPipelineFetchFn,
@@ -263,17 +264,17 @@ describe("submitManagedPR() -- success", () => {
     const { fetch, calls } = makeStub();
     const config: ManagedPRPipelineConfig = {
       getInstallationToken: () => Promise.resolve(INSTALLATION_TOKEN),
-      orgLogin: "keyboard-studio",
+      orgLogin: UPSTREAM_OWNER,
       fetch,
     };
     const result = await submitManagedPR(VALID_BODY, config);
     expect(result.ok).toBe(true);
     for (const c of calls) {
-      expect(c.url.startsWith("https://api.github.com/repos/keyboard-studio/keyboards")).toBe(true);
+      expect(c.url.startsWith(`https://api.github.com/repos/${UPSTREAM_OWNER}/keyboards`)).toBe(true);
     }
     const prCall = calls.find((c) => c.url.endsWith("/pulls") && c.method === "POST");
     const body = JSON.parse(prCall!.body!) as { head: string };
-    expect(body.head).toBe("keyboard-studio:add/my_keyboard-abc1234");
+    expect(body.head).toBe(`${UPSTREAM_OWNER}:add/my_keyboard-abc1234`);
   });
 
   it("appends importAttribution to the PR body when supplied", async () => {

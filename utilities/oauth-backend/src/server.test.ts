@@ -616,7 +616,7 @@ const managedPipelineFetch: GitHubPipelineFetchFn = async (url, init) => {
   if (url.endsWith("/git/refs") && method === "POST") return pipelineOk({ ref: "ok" }, 201);
   if (url.endsWith("/pulls") && method === "POST")
     return pipelineOk({ html_url: "https://github.com/keymanapp/keyboards/pull/77" }, 201);
-  return pipelineOk({ full_name: `${ORG_LOGIN}/keyboards` });
+  throw new Error(`unexpected request: ${method} ${url}`);
 };
 
 function validManagedBody(overrides: Record<string, unknown> = {}) {
