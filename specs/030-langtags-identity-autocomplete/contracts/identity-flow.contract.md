@@ -2,6 +2,44 @@
 
 **Owner**: Content (survey text/order/flow) with an Engine dependency (langtags API above). **Files**: `content/flows/identity_lite.modular.yaml`, `content/flows/proposed/phase_a_identity.modular.yaml`, `packages/studio/src/survey/questions/a/*`, `packages/studio/src/survey/IdentityLite.tsx`, `packages/studio/src/survey/questions/registry.a.ts`.
 
+## US1 structural decision — option A (single picker), 2026-07-08
+
+Resolved during implementation recon (mechanism finding): the langtags
+autocomplete field (`LangtagsAutocompleteField`, `options_source:
+"@langtags_iso639"`) **commits the language CODE** as the answer
+(QuestionField.tsx: "the datalist value is the language code"), and resolves to
+exactly one unambiguous langtags entry. Committing the *name* instead would
+reintroduce homonym ambiguity (T008: "Ainu" → aib/ain), so the picker MUST stay
+code-committing.
+
+Therefore (option A, chosen by the operator):
+
+- **Q1 = one langtags picker** (`il_language_english` becomes `type:
+  autocomplete`, `options_source: "@langtags_iso639"`). The author types the
+  **English name**; suggestions render as "EnglishName (code)" (+ region, to
+  distinguish homonyms — T008); picking commits the **code** and resolves the
+  entry. No separate free-text English-name field.
+- **English name, autonym, script, local names all DERIVE** from the resolved
+  entry — they are not independently-typed answers.
+- **Q3 `il_language_code` becomes an auto-filled confirmation** of the resolved
+  code (US4 folds into this structure — the two are entangled under option A).
+
+**Key implementation consequence — `extractIdentityLite` must invert:**
+today it reads `il_language_english` as the English *name* and
+`il_language_code` as the code. After option A, `il_language_english`'s answer
+is a **code** (the picker value), so:
+- `languageSubtag` = the picker's committed code (from `il_language_english`,
+  and/or the `il_language_code` confirmation).
+- `english` = **derived** via `getLanguageDefaults(code).englishName` (NOT read
+  from the `il_language_english` answer, which now holds a code).
+- `autonym` = `il_language_autonym` (seeded from the resolved entry; US2 makes it
+  a multi-choice, US1 gives it a single primary-autonym seed).
+- Resolution must be available synchronously at extraction time (langtags is
+  loaded by the mount effect; cache the resolved entry in a ref alongside
+  `autonymRef`/`languageCodeRef`).
+
+This is the delicate part of US1 and the reason it is more than a reorder.
+
 ## Question order (post-change)
 
 **Live IdentityLite (`il_*`)** — membership list in `identity_lite.modular.yaml` AND `next` pointers must agree:
