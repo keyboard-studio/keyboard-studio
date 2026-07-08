@@ -28,6 +28,9 @@ vi.mock("@keyboard-studio/engine", () => ({
   isReady: vi.fn(() => true),
   compile: vi.fn(() => new Promise(() => { /* never settles in this test */ })),
   fetchKeyboardSourceToVfs: vi.fn(() => new Promise(() => { /* never settles */ })),
+  // workingCopyStore.instantiateFrom* calls this during mount-seeding; return
+  // undefined so no A3a fill is seeded (this test doesn't exercise rule 3a).
+  detectMarkInputOrderFromImport: vi.fn(() => undefined),
 }));
 
 function resetStore() {

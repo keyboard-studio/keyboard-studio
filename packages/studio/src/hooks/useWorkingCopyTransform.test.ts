@@ -25,16 +25,23 @@ import type { Pattern } from "@keyboard-studio/contracts";
 // Spies on the three projection functions
 // ---------------------------------------------------------------------------
 
-const applyCarveToVfsSpy = vi.fn((_vfs: unknown, _id: string, _ir: unknown, _ids: unknown, _opts?: unknown) => ({
-  warnings: [] as string[],
+// Hoisted so they are initialized before the (hoisted) vi.mock factory runs.
+// workingCopyStore now imports @keyboard-studio/engine at module top level, so
+// importing the store forces this mock's factory to evaluate eagerly — before
+// plain top-level `const` spies would have initialized (TDZ). vi.hoisted runs
+// ahead of all imports and mock factories, so the spies exist when needed.
+const { applyCarveToVfsSpy, applyAssignmentsToVfsSpy, applyIdentityStubMutationSpy } = vi.hoisted(() => ({
+  applyCarveToVfsSpy: vi.fn((_vfs: unknown, _id: string, _ir: unknown, _ids: unknown, _opts?: unknown) => ({
+    warnings: [] as string[],
+  })),
+  applyAssignmentsToVfsSpy: vi.fn((_vfs: unknown, _id: string, _a: unknown, _fn: unknown) => ({
+    kmn: "c mock",
+    warnings: [] as string[],
+  })),
+  applyIdentityStubMutationSpy: vi.fn((_vfs: unknown, _id: string, _identity: unknown) => {
+    /* no-op */
+  }),
 }));
-const applyAssignmentsToVfsSpy = vi.fn((_vfs: unknown, _id: string, _a: unknown, _fn: unknown) => ({
-  kmn: "c mock",
-  warnings: [] as string[],
-}));
-const applyIdentityStubMutationSpy = vi.fn((_vfs: unknown, _id: string, _identity: unknown) => {
-  /* no-op */
-});
 
 vi.mock("@keyboard-studio/engine", async (importOriginal) => {
   const original = await importOriginal<typeof import("@keyboard-studio/engine")>();
@@ -288,6 +295,50 @@ describe("useWorkingCopyTransform — touch layout injection (step 0)", () => {
     });
     // touchLayoutJson is a memo dependency — the transform reference must change.
     expect(result.current).not.toBe(first);
+  });
+});
+
+describe("useWorkingCopyTransform — effectiveKeyboardId (Track 1 identity rename)", () => {
+  // Regression coverage for the adapt-a-base bug where a Track 1 (no
+  // scaffoldSpec) id rename left the compile step reading the stale base id.
+  // The transform must surface the renamed id so useKeyboardArtifact's
+  // runCompile can pick it up.
+  it("returns effectiveKeyboardId when identity.keyboardId differs from the base id", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedBase();
+    useWorkingCopyStore.getState().setIdentity({ keyboardId: "ha_sil" });
+    const { result } = renderHook(() => useWorkingCopyTransform());
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    const { effectiveKeyboardId } = result.current!(vfs, "basic_kbdus");
+    expect(effectiveKeyboardId).toBe("ha_sil");
+    // And the VFS is really renamed underneath — this is what compile() reads.
+    expect(vfs.get("source/ha_sil.kmn")).toBeDefined();
+    expect(vfs.get("source/basic_kbdus.kmn")).toBeUndefined();
+  });
+
+  it("does NOT return effectiveKeyboardId when identity.keyboardId is unset", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedBase();
+    const { result } = renderHook(() => useWorkingCopyTransform());
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    const { effectiveKeyboardId } = result.current!(vfs, "basic_kbdus");
+    expect(effectiveKeyboardId).toBeUndefined();
+  });
+
+  it("does NOT return effectiveKeyboardId when identity.keyboardId equals the base id", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedBase();
+    useWorkingCopyStore.getState().setIdentity({ keyboardId: "basic_kbdus" });
+    const { result } = renderHook(() => useWorkingCopyTransform());
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    const { effectiveKeyboardId } = result.current!(vfs, "basic_kbdus");
+    expect(effectiveKeyboardId).toBeUndefined();
   });
 });
 

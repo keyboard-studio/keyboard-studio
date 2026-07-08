@@ -15,11 +15,11 @@ Your keyboard has been packaged and is ready to submit to the Keyman keyboard re
 
 ## Option A — Submit via GitHub (recommended)
 
-1. Fork \`mattgyverlee/keyboards\` at https://github.com/mattgyverlee/keyboards
+1. Fork \`keyboard-studio/keyboards\` at https://github.com/keyboard-studio/keyboards
 2. Create a branch: \`git checkout -b add/<your-keyboard-id>\`
 3. Copy the contents of this zip into \`release/<first-letter>/<your-keyboard-id>/\`
 4. Commit and push your branch
-5. Open a pull request from your fork to \`mattgyverlee/keyboards:master\`
+5. Open a pull request from your fork to \`keyboard-studio/keyboards:master\`
 
 ## Option B — Email submission
 

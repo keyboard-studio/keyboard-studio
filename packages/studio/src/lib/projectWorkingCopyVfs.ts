@@ -132,6 +132,17 @@ export type IdentityOverlay = {
 export interface ProjectWorkingCopyVfsResult {
   /** Warnings from any of the three projection steps (empty when all is well). */
   warnings: string[];
+  /**
+   * The keyboard id the VFS actually ends up keyed under after projection —
+   * i.e. `targetKeyboardId` when the Step 4 id-rename pass fired (author chose
+   * a new id different from `keyboardId`), otherwise `undefined`.
+   *
+   * Callers that need to locate `source/<id>.kmn` (or any other id-derived
+   * path) AFTER calling this function — most importantly the compile step —
+   * must use this value when present instead of the `keyboardId` they passed
+   * in, or they will look for the pre-rename filename and fail to find it.
+   */
+  effectiveKeyboardId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -362,10 +373,17 @@ export function projectWorkingCopyVfs(
   // `.kmw-keyboard-<keyboardId>` selectors in *.css plus <ID> / <kbdname>
   // references in *.kps / *.kvks. Without this, a renamed keyboard ships with
   // CSS that targets the base id's wrapper class and never matches.
+  //
+  // When this pass fires, the VFS's `.kmn` (and siblings) now live under
+  // `source/<targetKeyboardId>.*`, not `source/<keyboardId>.*`. Report the new
+  // id via the result so callers that compile/re-read from the VFS after this
+  // function returns know to use `targetKeyboardId`, not `keyboardId`.
+  let effectiveKeyboardId: string | undefined;
   if (
     targetKeyboardId !== undefined &&
     targetKeyboardId !== keyboardId
   ) {
+    effectiveKeyboardId = targetKeyboardId;
     const kmnPath = `source/${keyboardId}.kmn`;
     const kmnEntry = vfs.get(kmnPath);
     if (kmnEntry !== undefined && typeof kmnEntry.content === "string") {
@@ -391,5 +409,8 @@ export function projectWorkingCopyVfs(
     renameFilesInVfs(vfs, keyboardId, targetKeyboardId);
   }
 
-  return { warnings };
+  return {
+    warnings,
+    ...(effectiveKeyboardId !== undefined ? { effectiveKeyboardId } : {}),
+  };
 }

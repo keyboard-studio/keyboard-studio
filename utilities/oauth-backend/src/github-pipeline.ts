@@ -3,7 +3,7 @@
  *
  * The SPA never holds a token in this path. It POSTs pre-filtered source files
  * plus author attribution to POST /submit/managed-pr; this module runs the
- * fork -> tree -> commit -> branch -> draft-PR pipeline using the GitHub App
+ * tree -> commit -> branch -> draft-PR pipeline using the GitHub App
  * installation token, which lives server-side only.
  *
  * Vendored from packages/engine/src/output/github.ts -- keep in sync.
@@ -61,7 +61,11 @@ export interface ManagedPRPipelineConfig {
    * The returned token has contents:write + pull_requests:write scope. Never logged.
    */
   getInstallationToken: () => Promise<string>;
-  /** GitHub login that owns the studio's standing fork of mattgyverlee/keyboards. */
+  /**
+   * GitHub login that owns the studio's staging repo (its fork of
+   * keymanapp/keyboards). In the current model this equals UPSTREAM_OWNER, so
+   * commits and the PR both target this repo (same-repo PR).
+   */
   orgLogin: string;
   fetch: GitHubPipelineFetchFn;
 }
@@ -88,7 +92,16 @@ export type ManagedPRHandlerResult =
 // ---------------------------------------------------------------------------
 
 const API_BASE = "https://api.github.com";
-const UPSTREAM_OWNER = "mattgyverlee";
+// Base repo the managed PR is opened against. The studio owns this as a staging
+// repo (its own fork of keymanapp/keyboards): because the GitHub App is installed
+// here, the installation token can open the PR. Opening PRs directly against a
+// repo the App is NOT installed on (e.g. keymanapp/keyboards) fails 403
+// "Resource not accessible by integration" -- an installation token has no
+// cross-repo contributor affordance. Promotion staging -> keymanapp is a separate
+// downstream step. When UPSTREAM_OWNER === orgLogin the pipeline runs as a
+// same-repo PR (fork base === PR base), which is the current staging model.
+// Exported so tests can pin the same-repo topology to the real constant.
+export const UPSTREAM_OWNER = "keyboard-studio";
 const UPSTREAM_REPO = "keyboards";
 
 // ---------------------------------------------------------------------------
@@ -96,9 +109,9 @@ const UPSTREAM_REPO = "keyboards";
 // ---------------------------------------------------------------------------
 
 /**
- * Normalize a PR title to the mattgyverlee/keyboards convention.
+ * Normalize a PR title to the keymanapp/keyboards convention.
  *
- * All keyboard PRs in mattgyverlee/keyboards are titled "[<id>] <desc>". If the
+ * All keyboard PRs in keymanapp/keyboards are titled "[<id>] <desc>". If the
  * SPA-supplied title already starts with "[" it is returned unchanged (to
  * avoid double-wrapping a title the caller already formatted). Otherwise the
  * keyboard ID bracket prefix is prepended.
@@ -121,7 +134,7 @@ export function buildCommitMessage(
 
 /**
  * Build the PR body, prepending a provenance block that names the human author
- * so mattgyverlee/keyboards maintainers have a reachability channel. The
+ * so downstream keymanapp/keyboards maintainers have a reachability channel. The
  * importAttribution section (when present) is appended after prBody.
  *
  * Divergence 5 from the Option A origin: Option A uses the PR body verbatim;
@@ -220,27 +233,24 @@ export async function submitManagedPR(
   const normalizedTitle = normalizePrTitle(body.keyboardId, body.prTitle);
 
   try {
-    // 1. Ensure the org fork exists.
-    const forkCheck = await call(forkBase);
-    if (!forkCheck.ok) {
-      if (forkCheck.status !== 404) return mapNonOk(forkCheck);
-      const created = await call(`${upstreamBase}/forks`, "POST", {});
-      if (!created.ok) return mapNonOk(created);
-    }
+    // (No "ensure the fork exists" step: under the same-repo model
+    // (orgLogin === UPSTREAM_OWNER) there is no distinct upstream to fork
+    // from, so a missing staging repo is a provisioning error the pipeline
+    // cannot repair -- the ref read below surfaces it as upstream_error.)
 
-    // 2. Read the fork's master HEAD commit SHA.
+    // 1. Read the staging repo's master HEAD commit SHA.
     const masterRef = await call(`${forkBase}/git/ref/heads/master`);
     if (!masterRef.ok) return mapNonOk(masterRef);
     const refData = (await masterRef.json()) as { object: { sha: string } };
     const masterCommitSha = refData.object.sha;
 
-    // 3. Read the base tree SHA from the parent commit.
+    // 2. Read the base tree SHA from the parent commit.
     const parentCommit = await call(`${forkBase}/git/commits/${masterCommitSha}`);
     if (!parentCommit.ok) return mapNonOk(parentCommit);
     const parentData = (await parentCommit.json()) as { tree: { sha: string } };
     const baseTreeSha = parentData.tree.sha;
 
-    // 4. Build the tree from the SPA-filtered source files (text content only).
+    // 3. Build the tree from the SPA-filtered source files (text content only).
     const treeEntries = body.sourceFiles.map((f) => ({
       path: f.path,
       mode: "100644",
@@ -248,7 +258,7 @@ export async function submitManagedPR(
       content: f.content,
     }));
 
-    // 5. Create the tree.
+    // 4. Create the tree.
     const newTree = await call(`${forkBase}/git/trees`, "POST", {
       base_tree: baseTreeSha,
       tree: treeEntries,
@@ -256,7 +266,7 @@ export async function submitManagedPR(
     if (!newTree.ok) return mapNonOk(newTree);
     const newTreeSha = ((await newTree.json()) as { sha: string }).sha;
 
-    // 6. Create the commit (org committer + Co-authored-by human trailer).
+    // 5. Create the commit (org committer + Co-authored-by human trailer).
     const newCommit = await call(`${forkBase}/git/commits`, "POST", {
       message: buildCommitMessage(normalizedTitle, body.attribution),
       tree: newTreeSha,
@@ -265,7 +275,7 @@ export async function submitManagedPR(
     if (!newCommit.ok) return mapNonOk(newCommit);
     const newCommitSha = ((await newCommit.json()) as { sha: string }).sha;
 
-    // 7. Create the branch ref (content-unique short-SHA suffix).
+    // 6. Create the branch ref (content-unique short-SHA suffix).
     const branchName = buildManagedBranchName(body.keyboardId, newCommitSha);
     const branchRef = await call(`${forkBase}/git/refs`, "POST", {
       ref: `refs/heads/${branchName}`,
@@ -278,7 +288,7 @@ export async function submitManagedPR(
       return mapNonOk(branchRef);
     }
 
-    // 8. Open the draft PR upstream (divergences 4 and 5 from Option A).
+    // 7. Open the draft PR upstream (divergences 4 and 5 from Option A).
     const pr = await call(`${upstreamBase}/pulls`, "POST", {
       title: normalizedTitle,
       body: buildPrBody(body),

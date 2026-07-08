@@ -608,7 +608,6 @@ function pipelineOk(body: object, status = 200): Awaited<ReturnType<GitHubPipeli
 /** Multi-call fetch stub that walks the managed-PR pipeline happy path. */
 const managedPipelineFetch: GitHubPipelineFetchFn = async (url, init) => {
   const method = init?.method ?? "GET";
-  if (url.endsWith("/forks") && method === "POST") return pipelineOk({}, 202);
   if (url.includes("/git/ref/heads/master")) return pipelineOk({ object: { sha: "masterSha" } });
   if (url.includes("/git/commits/masterSha")) return pipelineOk({ tree: { sha: "treeSha" } });
   if (url.endsWith("/git/trees") && method === "POST") return pipelineOk({ sha: "newTree" });
@@ -617,7 +616,7 @@ const managedPipelineFetch: GitHubPipelineFetchFn = async (url, init) => {
   if (url.endsWith("/git/refs") && method === "POST") return pipelineOk({ ref: "ok" }, 201);
   if (url.endsWith("/pulls") && method === "POST")
     return pipelineOk({ html_url: "https://github.com/keymanapp/keyboards/pull/77" }, 201);
-  return pipelineOk({ full_name: `${ORG_LOGIN}/keyboards` }); // fork-exists GET
+  throw new Error(`unexpected request: ${method} ${url}`);
 };
 
 function validManagedBody(overrides: Record<string, unknown> = {}) {

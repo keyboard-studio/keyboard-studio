@@ -969,3 +969,43 @@ describe("MechanismGallery — intro splash", () => {
     expect(screen.queryByRole("status")).not.toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Import-derived A3a provenance on the Flow Map (spec §7.2 rule 3a, #926)
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — import-derived markInputOrder provenance", () => {
+  it("publishes the import-derived provenance fill when the base seeded A3a=postfix", async () => {
+    // seedIrAxesFromBaseIr seeds markInputOrder="postfix" onto irAxes at
+    // instantiation. defaultFillAxes correctly omits an already-present axis
+    // from its own axisFills, so MechanismGallery reconstructs the
+    // import-derived provenance (postfix can only be base-derived) and
+    // publishes it so the Flow Map's DefaultFillProvenance panel shows it.
+    useWorkingCopyStore.getState().setIrAxes({ markInputOrder: "postfix" });
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    await waitFor(() => {
+      expect(useWorkingCopyStore.getState().axisFills).toContainEqual({
+        axis: "markInputOrder",
+        value: "postfix",
+        source: "import-derived",
+      });
+    });
+  });
+
+  it("publishes no import-derived fill when markInputOrder is absent", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    await waitFor(() => {
+      expect(
+        useWorkingCopyStore
+          .getState()
+          .axisFills.some((f) => f.source === "import-derived"),
+      ).toBe(false);
+    });
+  });
+});

@@ -134,7 +134,23 @@ export interface ScaffoldSpec {
 export type VfsTransform = (
   vfs: VirtualFS,
   keyboardId: string,
-) => { warnings: string[] };
+) => {
+  warnings: string[];
+  /**
+   * The keyboard id the VFS ends up keyed under after the transform runs,
+   * when it differs from the `keyboardId` the transform was called with
+   * (e.g. the Track 1 identity-rename projection step renames
+   * `source/<baseId>.kmn` to `source/<targetId>.kmn`). Omit or leave
+   * `undefined` when the transform did not change the effective id — the
+   * caller then keeps using the `keyboardId` it already has.
+   *
+   * `useKeyboardArtifact` reads this so the subsequent compile step reads
+   * `source/<effectiveKeyboardId>.kmn` instead of the stale base id, which
+   * would otherwise throw "required file not found" and strand the compile
+   * stage in "error" permanently.
+   */
+  effectiveKeyboardId?: string;
+};
 
 /**
  * Called exactly once per successful fetch→compile run, after both the
@@ -215,6 +231,15 @@ export function useKeyboardArtifact(
   // reapply so that applyCarveToVfs's no-op fast-path (empty deletedNodeIds)
   // does not cause assignments to accumulate on a stale .kmn.
   const baseVfsRef = useRef<VirtualFS | null>(null);
+  // Effective keyboard id reported by the last vfsTransform application, when
+  // it differs from the id the transform was invoked with (Track 1 identity
+  // rename with no scaffoldSpec — see VfsTransform's effectiveKeyboardId doc).
+  // runCompile reads this so it compiles `source/<renamedId>.kmn` instead of
+  // the stale base id. Reset to null at the start of every full run() so a
+  // rename from a previous keyboard selection can never leak into the next
+  // one; persists across recompile()/transformVersion cycles for the same
+  // keyboard so a rename made once stays in effect until the next full run.
+  const effectiveKeyboardIdRef = useRef<string | null>(null);
 
   // vfsTransform stored in a ref so that assignment changes (which produce a
   // new function reference from useWorkingCopyTransform) do NOT re-trigger
@@ -267,7 +292,14 @@ export function useKeyboardArtifact(
     let result: CompileResult;
     let parsedIr: KeyboardIR | null = null;
     let parsedRemovalCapabilities: Map<string, RemovalCapability> = new Map();
-    const compileId = scaffoldSpec?.keyboardId ?? kb.id;
+    // effectiveKeyboardIdRef takes precedence: it is set only when the last
+    // vfsTransform application (Track 1 identity rename) actually renamed
+    // source/<baseId>.* to source/<targetId>.* inside the VFS, so the compile
+    // must read the renamed path. scaffoldSpec?.keyboardId covers the
+    // Track-1-with-scaffold / new-keyboard path (no rename involved — the VFS
+    // was scaffolded under this id from the start). kb.id is the fallback for
+    // an unmodified open-base compile.
+    const compileId = effectiveKeyboardIdRef.current ?? scaffoldSpec?.keyboardId ?? kb.id;
     // Parse failure is captured here so it can be surfaced as a non-fatal
     // warning rather than aborting the compile/preview flow (slice 4, AC #4).
     let parseWarning: string | null = null;
@@ -424,6 +456,11 @@ export function useKeyboardArtifact(
     // after the transform is applied at the end of the fetch step.
     hasFetchedRef.current = false;
 
+    // Reset any id rename carried over from a previous keyboard selection —
+    // a fresh full run starts from the new base's unrenamed id until (and
+    // unless) the transform below reports otherwise.
+    effectiveKeyboardIdRef.current = null;
+
     // Transition to fetching immediately so the preview pane shows a loading
     // state rather than blank/idle during the async engine + source load.
     setStage({ kind: "fetching" });
@@ -558,6 +595,9 @@ export function useKeyboardArtifact(
         const keyboardId = scaffoldSpec?.keyboardId ?? kb.id;
         const transformResult = vfsTransformRef.current(vfsRef.current, keyboardId);
         scaffoldWarnings.push(...transformResult.warnings);
+        // Capture the rename (if any) so runCompile below reads
+        // source/<effectiveKeyboardId>.kmn instead of the stale base id.
+        effectiveKeyboardIdRef.current = transformResult.effectiveKeyboardId ?? null;
 
         // Rebuild the keyboard CSS blob URLs from the projected VFS so the OSK
         // frame's <style> tags carry the post-rename `.kmw-keyboard-<newId>`
@@ -645,10 +685,31 @@ export function useKeyboardArtifact(
       if (baseVfsRef.current !== null) {
         vfsRef.current = createVirtualFS(baseVfsRef.current.entries());
       }
+      // Reset BEFORE invoking the transform, not after. If the transform
+      // throws, the catch below leaves this at null rather than a stale
+      // renamed id from a PREVIOUS successful reapply — otherwise runCompile
+      // would read source/<staleRenamedId>.kmn against the vfsRef.current
+      // just restored to the clean, un-renamed base snapshot above,
+      // reproducing the exact "compile looks for a file that isn't there"
+      // bug class this hook exists to prevent.
+      effectiveKeyboardIdRef.current = null;
       try {
-        vfsTransformRef.current(vfsRef.current, keyboardId);
+        const transformResult = vfsTransformRef.current(vfsRef.current, keyboardId);
+        // Capture the rename (if any) so runCompile reads
+        // source/<effectiveKeyboardId>.kmn instead of the stale base id.
+        // The base VFS snapshot restore above means each reapply starts
+        // clean, so a rename that no longer applies (e.g. the author reverted
+        // the id) correctly clears back to null here.
+        effectiveKeyboardIdRef.current = transformResult.effectiveKeyboardId ?? null;
       } catch {
-        // Transform errors surface as compile diagnostics; don't abort.
+        // The transform threw. effectiveKeyboardIdRef was already reset to
+        // null above and vfsRef.current is the clean, un-renamed base
+        // snapshot restored a few lines up (no partial carve/assignment/
+        // identity edit applied) — so the recompile below reads
+        // source/<baseId>.kmn against unmodified source. No warning is
+        // attached anywhere for this failure (it is silent beyond whatever
+        // the transform itself may log); that pre-existing gap is not
+        // introduced by this comment fix and is left as-is here.
       }
     }
 

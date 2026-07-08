@@ -5,9 +5,11 @@
 //      picked up, verifyToken is called with it, and a scoped result → connected.
 //   2. needs-scope: oauth_app token + verifyToken returns ok:false / missingScopes
 //      → "needs-scope" and canSubmit is false.
-//   3. github_app token + verify.ok → "connected" regardless of missingScopes
-//      (identity flow sends no scope; missing scopes are expected and irrelevant).
-//   3b. github_app token + verify.ok=false → "error" (revoked/invalid token).
+//   3. github_app token + login present → "connected" regardless of verify.ok /
+//      missingScopes (identity flow sends no scope, so the engine's verifyToken
+//      — whose `ok` is the fork+PR scope gate — ALWAYS returns ok:false with
+//      missingScopes non-empty for it; login presence is the identity check).
+//   3b. github_app token + no login (/user non-200: revoked/invalid) → "error".
 //       Must NOT yield "needs-scope" — that would make the user appear linked.
 //   4. disconnect() clears the stored token and returns the hook to idle.
 //   5. oauth_error pickup: a `?oauth_error=` query param is read into the
@@ -61,12 +63,14 @@ afterEach(() => {
 });
 
 describe("useGitHubAuth — github_app (identity) flow", () => {
-  it("github_app token + verify.ok → 'connected' even when missingScopes is non-empty", async () => {
-    // GitHub App identity flow sends no scope, so GitHub returns all scopes as
-    // missing. The hook must NOT enter needs-scope for a github_app token.
+  it("github_app token + login present → 'connected' even though ok=false / missingScopes non-empty", async () => {
+    // This is the EXACT shape the engine's verifyToken returns for a real
+    // GitHub App identity token: /user 200 (login present) but X-OAuth-Scopes
+    // empty, so ok — the fork+PR scope gate — is false and public_repo is
+    // "missing". The hook must still report connected (and NOT needs-scope).
     seedToken("", "github_app");
     verifyToken.mockResolvedValue({
-      ok: true,
+      ok: false,
       login: "octocat",
       scopes: [],
       missingScopes: ["public_repo"],
@@ -79,12 +83,14 @@ describe("useGitHubAuth — github_app (identity) flow", () => {
     expect(result.current.canSubmit).toBe(false);
   });
 
-  it("github_app token + verify.ok + empty missingScopes → 'connected'", async () => {
-    seedToken("user:email", "github_app");
+  it("github_app token + login present + scope gate passing → 'connected'", async () => {
+    // Contract-valid (if unusual for an identity token) shape: the token
+    // happens to satisfy the fork+PR scope gate too. Still connected.
+    seedToken("public_repo", "github_app");
     verifyToken.mockResolvedValue({
       ok: true,
       login: "octocat",
-      scopes: ["user:email"],
+      scopes: ["public_repo"],
       missingScopes: [],
     });
 
@@ -93,15 +99,17 @@ describe("useGitHubAuth — github_app (identity) flow", () => {
     expect(result.current.canSubmit).toBe(false);
   });
 
-  it("github_app token + verify.ok=false → 'error' (token revoked/invalid, NOT needs-scope)", async () => {
+  it("github_app token + no login → 'error' (token revoked/invalid, NOT needs-scope)", async () => {
     // A dead github_app token must yield "error", not "needs-scope".
-    // needs-scope is reserved for oauth_app tokens that authenticated but lack
-    // public_repo. Returning needs-scope here would make the user appear linked
-    // in SignUpPanel / AccountControl (both treat connected|needs-scope as linked).
+    // The engine's verifyToken omits `login` when /user returns non-200 —
+    // that absence is what distinguishes a dead token from a live scope-less
+    // one. needs-scope is reserved for oauth_app tokens that authenticated but
+    // lack public_repo. Returning needs-scope here would make the user appear
+    // linked in SignUpPanel / AccountControl (both treat connected|needs-scope
+    // as linked).
     seedToken("", "github_app");
     verifyToken.mockResolvedValue({
       ok: false,
-      login: "octocat",
       scopes: [],
       missingScopes: ["public_repo"],
     });
