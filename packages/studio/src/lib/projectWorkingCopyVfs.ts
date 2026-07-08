@@ -14,6 +14,8 @@
 // Projection order (spec §12 "re-projected layers"):
 //   0. Touch layout     — inject Phase E touchLayoutJson into .keyman-touch-layout
 //   1. Carve deletions  — applyCarveToVfs (re-emits filtered IR into .kmn)
+//   1.5 Carve keycaps   — applyCarveKeycapRemovalsToVfs (blanks carved chars off
+//                         .kvks / .keyman-touch-layout keycaps in place)
 //   2. Assignments      — applyAssignmentsToVfs (injects mechanism patterns)
 //   3. Identity         — applyIdentityStubMutation (writes &NAME)
 //
@@ -32,6 +34,7 @@ import type { KeyboardIR, Pattern, VirtualFS } from "@keyboard-studio/contracts"
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import {
   applyCarveToVfs,
+  applyCarveKeycapRemovalsToVfs,
   applyStoreSlotRemovals,
   applyAssignmentsToVfs,
   applyIdentityStubMutation,
@@ -253,6 +256,27 @@ export function projectWorkingCopyVfs(
     });
   }
   warnings.push(...carveResult.warnings);
+
+  // Step 1.5: Carve keycap projection — blank carved characters off the .kvks /
+  // .keyman-touch-layout keycaps IN PLACE (layer/row/key structure is never
+  // dropped), so the live preview's visual keyboard keeps its full layout with
+  // just the carved caps blank. Runs before Step 3.5 so a subsequent assignment
+  // label re-populates a blanked keycap, and before Step 4 so paths resolve
+  // against the pre-rename source/<keyboardId>.* filenames.
+  if (hasCarveEdit) {
+    try {
+      const keycapRemovalResult = applyCarveKeycapRemovalsToVfs(vfs, keyboardId, baseIr, {
+        slotIds,
+        wholeNodeIds: allWholeNodeIds,
+      });
+      warnings.push(...keycapRemovalResult.warnings);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      warnings.push(
+        `[project-working-copy] carve keycap projection skipped: ${msg}`,
+      );
+    }
+  }
 
   // Step 2: Assignments projection — inject mechanism pattern fragments.
   // Physical-only: touch assignments are handled by a separate gallery.
