@@ -20,18 +20,13 @@
 
 import type { VirtualFS } from "@keyboard-studio/contracts";
 import { parseKmnHeaderStores } from "./parseKmnHeaderStores.js";
+import { reconcileRepairStores } from "../shared/siblingAssetStores.js";
 
 // Header stores that carry sibling-file paths (kmcmplib's kmw-compiler store
 // sweep, same set rewriteSiblingPathStores + stripDanglingAssetStores cover).
-const SIBLING_PATH_STORES = new Set([
-  "VISUALKEYBOARD",
-  "LAYOUTFILE",
-  "KMW_EMBEDCSS",
-  "KMW_EMBEDJS",
-  "KMW_HELPFILE",
-  "BITMAP",
-  "DISPLAYMAP",
-]);
+// INCLUDECODES is excluded — it names a shared constants file, not a
+// per-keyboard-id sibling filename.
+const SIBLING_PATH_STORES = reconcileRepairStores();
 
 /**
  * Rewrite sibling asset-path header stores whose referenced file is missing

@@ -180,9 +180,18 @@ export function collectCarvedKeycapTexts(
  *   let the OSK renderer fall back to the underlying layout's cap, which is
  *   exactly the visual degradation this pass prevents.
  * - `.keyman-touch-layout`: matching main keys get `text: ""` (the key stays,
- *   so rows never reflow); a `U_<HEX>` id for the carved character is
- *   rewritten to `T_carved_<HEX>` because a `U_` id both emits its code point
- *   without any .kmn rule and re-labels a text-less key. Matching longpress /
+ *   so rows never reflow) when the displayed text or `output` itself matches
+ *   a carved character. A carved `output` value is additionally DELETED and
+ *   the id neutralized to an inert `T_carved_*` id. Separately — and
+ *   unconditionally, regardless of `text`/`output` — any main key whose id
+ *   encodes a carved character (a `U_<HEX>` id, which emits its code point
+ *   and re-labels purely off the id, independent of `text`) has that id
+ *   neutralized to `T_carved_<HEX>`; a stale/mismatched `text` label is left
+ *   untouched unless it separately matched a carved character. When
+ *   `output` is present on a non-`U_` id (e.g. `K_X`), its id similarly
+ *   becomes `T_carved_<id>` (with `output` gone, a `K_` id would otherwise
+ *   fall back to its underlying .kmn rule and could silently emit a
+ *   different character under a now-blank cap). Matching longpress /
  *   multitap / flick entries are REMOVED (an invisible popup entry would
  *   still emit), and the property is dropped when it empties.
  *
@@ -266,9 +275,10 @@ function clearKvksKeycaps(
 
 /**
  * Clear matching keycaps in the `.keyman-touch-layout` JSON across all
- * platforms and ALL layers. Main keys keep their object (`text: ""`, `U_` id
- * neutralized); longpress/multitap/flick entries are removed. Writes back
- * only when something changed.
+ * platforms and ALL layers. Main keys keep their object (`text: ""`, a
+ * carved `output` deleted and the id neutralized to `T_carved_*`);
+ * longpress/multitap/flick entries are removed. Writes back only when
+ * something changed.
  */
 function clearTouchKeycaps(
   vfs: VirtualFS,
@@ -307,6 +317,12 @@ function clearTouchKeycaps(
     return false;
   };
 
+  // Main-key text/output match, separate from isTouchSubKeyDuplicate above:
+  // sub-key popup entries compare exactly, but the main-key path (like the
+  // .kvks path) has always normalized to NFC, and `carved` holds NFC values.
+  const mainKeyValueMatches = (value: string | undefined): boolean =>
+    value !== undefined && value !== "" && carved.has(value.normalize("NFC"));
+
   // Same platform discovery as applyKeycapLabelsToVfs's patchTouchLayout:
   // any top-level object value with a `layer` array, else the top object itself.
   const topObj = data as Record<string, unknown>;
@@ -337,22 +353,45 @@ function clearTouchKeycaps(
           const keyObj = key as {
             id?: string;
             text?: string;
+            output?: string;
             sk?: { text?: string; output?: string; id?: string }[];
             multitap?: { text?: string; output?: string; id?: string }[];
             flick?: Record<string, { text?: string; output?: string; id?: string }>;
           };
 
-          // Main keycap: match by displayed text, or by a text-less U_ id.
+          // Main keycap: match by displayed text, by `output`, or by a
+          // carved U_ id (a U_ id both emits and re-labels its code point
+          // purely off the id, independent of `text`/`output`).
           const text = keyObj.text ?? "";
+          const textMatches = mainKeyValueMatches(text);
+          const outputMatches = mainKeyValueMatches(keyObj.output);
           const idIsCarved =
             typeof keyObj.id === "string" && carvedUnicodeIds.has(keyObj.id);
-          if ((text !== "" && carved.has(text.normalize("NFC"))) || (text === "" && idIsCarved)) {
+          if (textMatches || outputMatches) {
             keyObj.text = "";
             changed = true;
           }
-          // A U_ id keeps emitting (and re-labeling) the carved character even
-          // with empty text — neutralize it to an inert T_ id.
-          if (idIsCarved && keyObj.text === "") {
+          if (outputMatches) {
+            // With `output` present, the key emits/re-labels through it
+            // regardless of the .kmn rules — delete it, and neutralize the id
+            // to an inert `T_carved_*` id so a `K_` id can't fall back to its
+            // underlying .kmn rule and silently emit a different character
+            // under a now-blank cap (mirrors the U_-id neutralization below;
+            // the key element itself is always kept — never remove keys/rows/
+            // layers).
+            delete keyObj.output;
+            if (typeof keyObj.id === "string") {
+              keyObj.id = keyObj.id.startsWith("U_")
+                ? `T_carved_${keyObj.id.slice(2)}`
+                : `T_carved_${keyObj.id}`;
+            }
+            changed = true;
+          } else if (idIsCarved) {
+            // A carved U_ id keeps emitting (and re-labeling) the carved
+            // character regardless of `text` — neutralize it to an inert T_
+            // id unconditionally. The label itself is left alone here: it
+            // wasn't necessarily carved (a stale/mismatched `text` is only
+            // cleared above, via textMatches).
             keyObj.id = `T_carved_${(keyObj.id as string).slice(2)}`;
             changed = true;
           }

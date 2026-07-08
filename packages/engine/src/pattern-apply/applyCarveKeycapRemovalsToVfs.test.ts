@@ -194,6 +194,113 @@ describe("applyCarveKeycapRemovalsToVfs — touch layout", () => {
   });
 });
 
+describe("applyCarveKeycapRemovalsToVfs — touch layout main key U_ id independent of text", () => {
+  it("neutralizes a U_ id with a stale non-carved text label, leaving the label alone", () => {
+    // A U_ id emits its code point purely off the id (KMW activeLayout /
+    // defaultOutputRules), independent of `text` — a mismatched label like
+    // { id: "U_00E9", text: "e" } must still have its emission killed, but
+    // the label itself was never carved and must not be blanked.
+    const touchLayout = JSON.stringify({
+      tablet: {
+        layer: [
+          {
+            id: "default",
+            row: [{ id: 1, key: [{ id: "U_00E9", text: "e" }] }],
+          },
+        ],
+      },
+    });
+    const vfs = makeVfs([
+      { path: "source/test.keyman-touch-layout", content: touchLayout },
+    ]);
+    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+
+    const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
+      wholeNodeIds: ["rule#e"],
+    }));
+
+    expect(warnings).toHaveLength(0);
+    const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
+    const key = data.tablet.layer[0].row[0].key[0];
+
+    expect(key.id).toBe("T_carved_00E9");
+    expect(key.text).toBe("e");
+    expect(key).toBeDefined();
+  });
+});
+
+describe("applyCarveKeycapRemovalsToVfs — touch layout main key matched by output", () => {
+  function vfsWithMainKey(key: Record<string, unknown>) {
+    const touchLayout = JSON.stringify({
+      tablet: {
+        layer: [{ id: "default", row: [{ id: 1, key: [key] }] }],
+      },
+    });
+    return makeVfs([{ path: "source/test.keyman-touch-layout", content: touchLayout }]);
+  }
+
+  function loadKey(vfs: ReturnType<typeof makeVfs>) {
+    const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
+    return data.tablet.layer[0].row[0].key[0];
+  }
+
+  it("clears a K_ main key matched only by `output` (no text)", () => {
+    const vfs = vfsWithMainKey({ id: "K_X", output: "é" });
+    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+
+    const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
+      wholeNodeIds: ["rule#e"],
+    }));
+
+    expect(warnings).toHaveLength(0);
+    const key = loadKey(vfs);
+    expect(key.output).toBeUndefined();
+    expect(key.text).toBe("");
+    expect(key.id).toBe("T_carved_K_X");
+    // Key element itself stays present (row/key structure intact).
+    expect(key).toBeDefined();
+  });
+
+  it("clears a K_ main key matched by both `text` and `output`", () => {
+    const vfs = vfsWithMainKey({ id: "K_X", text: "é", output: "é" });
+    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+
+    applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({ wholeNodeIds: ["rule#e"] }));
+
+    const key = loadKey(vfs);
+    expect(key.output).toBeUndefined();
+    expect(key.text).toBe("");
+    expect(key.id).toBe("T_carved_K_X");
+  });
+
+  it("leaves a main key with a non-carved `output` completely untouched", () => {
+    const vfs = vfsWithMainKey({ id: "K_X", output: "z" });
+    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+    const setSpy = vi.spyOn(vfs, "set");
+
+    const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
+      wholeNodeIds: ["rule#e"],
+    }));
+
+    expect(warnings).toHaveLength(0);
+    expect(setSpy).not.toHaveBeenCalled();
+    const key = loadKey(vfs);
+    expect(key).toEqual({ id: "K_X", output: "z" });
+  });
+
+  it("matches an NFD `output` against a carved NFC character", () => {
+    const vfs = vfsWithMainKey({ id: "K_X", output: "e" + String.fromCharCode(0x0301) });
+    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+
+    applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({ wholeNodeIds: ["rule#e"] }));
+
+    const key = loadKey(vfs);
+    expect(key.output).toBeUndefined();
+    expect(key.text).toBe("");
+    expect(key.id).toBe("T_carved_K_X");
+  });
+});
+
 describe("applyCarveKeycapRemovalsToVfs — carved char absent from layer files", () => {
   it("leaves the VFS byte-identical and returns no warnings", () => {
     const touch = JSON.stringify({ tablet: { layer: [{ id: "default", row: [{ id: 1, key: [{ id: "K_A", text: "a" }] }] }] } });
