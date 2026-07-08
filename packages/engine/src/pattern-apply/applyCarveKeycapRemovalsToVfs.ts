@@ -52,11 +52,14 @@ export interface CarveKeycapRemovalInput {
  * `index()`/`outs()`. This protects the single-`deleteItem` path from
  * blanking a keycap whose character remains typeable via another source.
  *
- * Blocked stores: a slot on a store that {@link classifyStoreSlotEdit} marks
- * `blocked` is one applyStoreSlotRemovals REFUSES to edit — the character is
- * still produced, so it contributes no candidate and all its chars count as
- * survivors. This keeps the keycap projection consistent with what the .kmn
- * projection actually applied.
+ * Two refinements keep the guard honest:
+ *   - SELF-PAIR `index()` references don't count as producers. An
+ *     `index(B, n)` whose n-th context item is `any(B)` (same store — e.g. an
+ *     auto-capitalize transform) only re-emits a character that was already
+ *     TYPED, so it cannot keep a carved character alive on its own.
+ *   - A store that {@link classifyStoreSlotEdit} marks `blocked` is one
+ *     applyStoreSlotRemovals REFUSES to edit, so for survivor purposes ALL
+ *     its char slots count as intact — carved slot ids on it notwithstanding.
  *
  * Pure — exported for direct unit testing.
  */
@@ -89,7 +92,7 @@ export function collectCarvedKeycapTexts(
     if (parsed === null) continue;
     const store = storeByNodeId.get(parsed.storeNodeId);
     const item = store?.items[parsed.itemsIndex];
-    if (store !== undefined && item !== undefined && item.kind === "char" && !isBlockedStore(store)) {
+    if (item !== undefined && item.kind === "char") {
       candidates.add(item.value.normalize("NFC"));
     }
   }
@@ -119,16 +122,28 @@ export function collectCarvedKeycapTexts(
     if (wholeNodeIds.has(group.nodeId)) continue;
     for (const rule of group.rules) {
       if (wholeNodeIds.has(rule.nodeId)) continue;
-      const outEls = rule.output as { kind: string; value?: string; storeRef?: string }[];
+      const outEls = rule.output as { kind: string; value?: string; storeRef?: string; offset?: number }[];
 
       const charVals = outEls.filter((el) => el.kind === "char").map((el) => el.value ?? "");
       if (charVals.length > 0 && charVals.length === outEls.length) {
         survivors.add(charVals.join("").normalize("NFC"));
       }
 
+      // The codec's synthetic keystroke-boundary "+" is not a real context
+      // item — index() offsets are 1-based over the remaining items.
+      const effectiveContext = (rule.context as { kind: string; text?: string; storeRef?: string }[])
+        .filter((el) => !(el.kind === "raw" && el.text?.trim() === "+"));
+
       for (const el of outEls) {
-        if ((el.kind === "index" || el.kind === "outs") && el.storeRef !== undefined) {
+        if (el.storeRef === undefined) continue;
+        if (el.kind === "outs") {
           outputStoreNames.add(el.storeRef);
+        } else if (el.kind === "index") {
+          const target = el.offset !== undefined ? effectiveContext[el.offset - 1] : undefined;
+          const isSelfPair = target?.kind === "any" && target.storeRef === el.storeRef;
+          // A self-pair only re-emits what was already typed — it is not an
+          // independent producer, so it keeps nothing alive.
+          if (!isSelfPair) outputStoreNames.add(el.storeRef);
         }
       }
     }

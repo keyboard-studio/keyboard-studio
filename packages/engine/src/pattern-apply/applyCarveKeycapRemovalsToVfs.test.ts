@@ -306,11 +306,11 @@ describe("collectCarvedKeycapTexts — derivation and survivor guard", () => {
     ).toBe(0);
   });
 
-  it("skips slots on blocked stores — the .kmn projection refuses those edits", () => {
-    // A store that is BOTH an any() source and an index() output target in
-    // the same rule classifies as blocked (dual-use / paired-input on the
-    // nul-fill classifier) — applyStoreSlotRemovals refuses to edit it, so
-    // its character keeps being produced and must keep its keycap.
+  it("a self-pair transform store does not keep a carved char alive (Cameroon auto-caps shape)", () => {
+    // any(dualX) > index(dualX, 1) only re-emits what was already typed — it
+    // is not an independent producer. Even though the .kmn slot edit on the
+    // dual-use store is REFUSED, the carved char's keycaps must still blank
+    // once its real producers are gone.
     const dualStore: IRStore = {
       nodeId: "store#dual",
       name: "dualX",
@@ -322,10 +322,53 @@ describe("collectCarvedKeycapTexts — derivation and survivor guard", () => {
       context: [{ kind: "any", storeRef: "dualX" }],
       output: [{ kind: "index", storeRef: "dualX", offset: 1 }],
     };
-    const ir = makeIR([makeGroup("group#0", [dualRule])], [dualStore]);
+    const ir = makeIR(
+      [makeGroup("group#0", [dualRule, makeCharRule("rule#e", "é")])],
+      [dualStore],
+    );
+
+    expect([
+      ...collectCarvedKeycapTexts(
+        ir,
+        removalsOf({ slotIds: ["store#dual#0"], wholeNodeIds: ["rule#e"] }),
+      ),
+    ]).toEqual(["é"]);
+  });
+
+  it("a blocked CROSS-pair store keeps its chars — the refused slot still produces", () => {
+    // outX is fed by any(inX) via index(outX, 1) (cross-pair: typing inX[i]
+    // produces outX[i]) AND is itself an any() source elsewhere → dual-use →
+    // blocked. The carve on outX#0 is refused by applyStoreSlotRemovals, so
+    // é keeps being produced by typing "e" and must keep its keycap.
+    const inStore: IRStore = {
+      nodeId: "store#in",
+      name: "inX",
+      items: [{ kind: "char", value: "e" }],
+      isSystem: false,
+    };
+    const outStore: IRStore = {
+      nodeId: "store#out",
+      name: "outX",
+      items: [{ kind: "char", value: "é" }],
+      isSystem: false,
+    };
+    const crossRule: IRRule = {
+      nodeId: "rule#cross",
+      context: [{ kind: "any", storeRef: "inX" }],
+      output: [{ kind: "index", storeRef: "outX", offset: 1 }],
+    };
+    const dualUseRule: IRRule = {
+      nodeId: "rule#dualuse",
+      context: [{ kind: "any", storeRef: "outX" }],
+      output: [{ kind: "char", value: "x" }],
+    };
+    const ir = makeIR(
+      [makeGroup("group#0", [crossRule, dualUseRule])],
+      [inStore, outStore],
+    );
 
     expect(
-      collectCarvedKeycapTexts(ir, removalsOf({ slotIds: ["store#dual#0"] })).size,
+      collectCarvedKeycapTexts(ir, removalsOf({ slotIds: ["store#out#0"] })).size,
     ).toBe(0);
   });
 
