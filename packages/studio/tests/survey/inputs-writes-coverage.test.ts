@@ -16,8 +16,8 @@ describe("inputs/writes coverage gate — every registered module declares both 
     expect(Object.keys(questionRegistry).length).toBeGreaterThan(0);
   });
 
-  it("registry has exactly 101 modules (floor guard — accidental deletions fail here)", () => {
-    expect(Object.keys(questionRegistry).length).toBe(101);
+  it("registry has exactly 102 modules (floor guard — accidental deletions fail here)", () => {
+    expect(Object.keys(questionRegistry).length).toBe(102);
   });
 
   for (const [id, mod] of Object.entries(questionRegistry)) {

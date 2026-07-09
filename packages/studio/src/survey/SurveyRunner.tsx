@@ -12,7 +12,7 @@
 //     Full boolean DSL is out of scope — these cover the actual YAML content.
 
 import { useState, useId, useMemo, useRef } from "react";
-import type { FlowDef, FlowQuestion, FlowGotoRule, SurveyContext, AnswerStackEntry } from "./types.ts";
+import type { FlowDef, FlowQuestion, FlowOption, FlowGotoRule, SurveyContext, AnswerStackEntry } from "./types.ts";
 import type { SurveyAnswer, SurveyPhaseResult, LintFinding, LangtagsProvenance } from "@keyboard-studio/contracts";
 import { QuestionField } from "./QuestionField.tsx";
 import { debugPinsStore } from "../stores/debugPinsStore.ts";
@@ -185,9 +185,19 @@ export function advanceThrough(
   value: string | string[] | undefined,
   ctx: SurveyContext,
   index: Map<string, FlowQuestion>,
+  getNextOverride?: (questionId: string, value: string | string[] | undefined) => string | undefined,
 ): string | null {
   const visited = new Set<string>();
-  let nextId = resolveNext(currentQ, value, ctx);
+  // Dynamic-next override (spec 030 US3): lets the caller route based on
+  // resolved-entry state that no static `next`/condition can express — e.g. send
+  // il_language_code to il_language_region only when the picked language is
+  // region-ambiguous. Evaluated at render from the current value, so it does not
+  // depend on onAnswerCommit ordering. Returns undefined ⇒ use the static next.
+  const overridden = getNextOverride?.(currentQ.id, value);
+  let nextId =
+    overridden !== undefined && overridden !== ""
+      ? overridden
+      : resolveNext(currentQ, value, ctx);
   while (nextId !== null) {
     const next = index.get(nextId);
     if (next === undefined) {
@@ -246,6 +256,26 @@ export interface SurveyRunnerProps {
    * value is a suggestion — the author can edit it freely (FR-008).
    */
   getSeedProvenance?: (questionId: string) => LangtagsProvenance | undefined;
+  /**
+   * Called when rendering a question to retrieve DYNAMIC datalist options — e.g.
+   * the resolved langtags entry's local names for il_language_autonym (spec 030
+   * US2). When it returns a non-empty array, SurveyRunner uses it as the field's
+   * options (overriding any static options); the field still accepts free text.
+   * Returns undefined/[] when no dynamic options apply — the field falls back to
+   * its static options (or plain free text), which is the common case since most
+   * languages carry no local name (T008).
+   */
+  getSeedOptions?: (questionId: string) => FlowOption[] | undefined;
+  /**
+   * Called at render to optionally override the current question's next target
+   * based on state no static `next`/condition can see — e.g. routing
+   * il_language_code to il_language_region only when the picked language is
+   * region-ambiguous (spec 030 US3). Receives the current question id + value;
+   * returns a question id to route there, or undefined to use the static next.
+   * Evaluated during render (before onAnswerCommit), so it must resolve
+   * synchronously from the value.
+   */
+  getNextOverride?: (questionId: string, value: string | string[] | undefined) => string | undefined;
 }
 
 export function SurveyRunner({
@@ -257,6 +287,8 @@ export function SurveyRunner({
   onAnswerCommit,
   getSeedValue,
   getSeedProvenance,
+  getSeedOptions,
+  getNextOverride,
 }: SurveyRunnerProps) {
   // Single gate for all debug-mode behaviour — evaluated once per render so all
   // branches are driven by the same boolean, not scattered checks.
@@ -272,6 +304,10 @@ export function SurveyRunner({
   getSeedValueRef.current = getSeedValue;
   const getSeedProvenanceRef = useRef(getSeedProvenance);
   getSeedProvenanceRef.current = getSeedProvenance;
+  const getSeedOptionsRef = useRef(getSeedOptions);
+  getSeedOptionsRef.current = getSeedOptions;
+  const getNextOverrideRef = useRef(getNextOverride);
+  getNextOverrideRef.current = getNextOverride;
 
   // Derive flow-level constants once per flow identity change.
   // context is intentionally excluded from the deps array: findFirstRenderable
@@ -321,7 +357,15 @@ export function SurveyRunner({
     );
   }
 
-  const displayQ = interpolateQuestion(currentQ, context);
+  const baseDisplayQ = interpolateQuestion(currentQ, context);
+  // Dynamic datalist options (spec 030 US2): when the caller supplies non-empty
+  // options for this question (e.g. the resolved entry's local names), they
+  // override the static options; the field still accepts free text.
+  const dynamicOptions = getSeedOptionsRef.current?.(currentQId);
+  const displayQ: FlowQuestion =
+    dynamicOptions !== undefined && dynamicOptions.length > 0
+      ? { ...baseDisplayQ, options: dynamicOptions }
+      : baseDisplayQ;
   const stepNum = stack.length;
 
   const canGoBack = stack.length > 1 || onBack !== undefined;
@@ -332,7 +376,7 @@ export function SurveyRunner({
   // Derive the next question id once so that both the button label and handleNext
   // share the same result — avoids a second advanceThrough call that would cause
   // a brief button-label flicker when value changes mid-render.
-  const nextIdForCurrent = advanceThrough(currentQ, value, context, index);
+  const nextIdForCurrent = advanceThrough(currentQ, value, context, index, getNextOverrideRef.current);
   const isLastQuestion = nextIdForCurrent === null;
 
   function handleNext() {

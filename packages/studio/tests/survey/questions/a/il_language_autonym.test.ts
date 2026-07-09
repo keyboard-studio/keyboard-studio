@@ -12,16 +12,16 @@ describe("il_language_autonym — definition", () => {
     expect(definition.id).toBe("il_language_autonym");
   });
 
-  it("type is text", () => {
-    expect(definition.type).toBe("text");
+  it("type is autocomplete (multi-choice localNames + free text — spec 030 US2)", () => {
+    expect(definition.type).toBe("autocomplete");
   });
 
   it("required is true", () => {
     expect(definition.required).toBe(true);
   });
 
-  it("routes to il_language_english", () => {
-    expect(definition.next).toBe("il_language_english");
+  it("routes to il_target_script", () => {
+    expect(definition.next).toBe("il_target_script");
   });
 });
 

@@ -199,8 +199,8 @@ describe("flow-parity: phase_f_helpdocs — questions[]", () => {
 describe("flow-parity: identity_lite — questions[]", () => {
   const modular = loadModularFlow(identityLiteModularRaw);
 
-  it("has exactly 5 questions", () => {
-    expect(modular.questions.length).toBe(5);
+  it("has exactly 6 questions", () => {
+    expect(modular.questions.length).toBe(6);
   });
 
   it("flow_id is identity_lite", () => {
@@ -208,10 +208,15 @@ describe("flow-parity: identity_lite — questions[]", () => {
   });
 
   it("question IDs in order", () => {
+    // spec 030: langtags picker (il_language_code) first; english + autonym
+    // become confirmations seeded from the resolved entry. il_language_region
+    // (US3) is a conditional step reached only when the picked language is
+    // region-ambiguous; it sits in the membership after the picker.
     expect(modular.questions.map((q) => q.id)).toEqual([
-      "il_language_autonym",
-      "il_language_english",
       "il_language_code",
+      "il_language_region",
+      "il_language_english",
+      "il_language_autonym",
       "il_target_script",
       "il_script_not_supported",
     ]);
