@@ -1,17 +1,19 @@
 // Per-question module: pb_discovery_intro (Phase B)
-// Ported verbatim from content/flows/phase_b_characters.yaml.
+// Source of truth for this question's rendered copy (the modular flow YAML
+// lists only question IDs). Prompt/help text use the "add your whole alphabet"
+// phrasing to match the PhaseB IntroChooser.
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
 
 export const definition = {
   id: "pb_discovery_intro",
-  prompt: "How would you like to tell us which characters your language uses?",
+  prompt: "How would you like to add the alphabet your language uses?",
   help_text:
-    "There are several ways to build your character list. You can answer the " +
+    "There are several ways to add your whole alphabet. You can answer the " +
     "questions below one by one, paste a paragraph of text in your language " +
-    "so we harvest the characters automatically, confirm a list we suggest " +
+    "so we harvest the characters automatically, confirm a suggested alphabet " +
     "based on your language, or browse a grid and tick the characters you " +
-    "need. All of these feed the same final list -- you can use more than one " +
+    "need. All of these feed the same final alphabet -- you can use more than one " +
     "method. Choose your preferred starting point, or pick \"Step by step\" to " +
     "begin the guided questions.",
   type: "radio" as const,
