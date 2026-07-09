@@ -77,13 +77,21 @@ function parseFull(full) {
  * De-duplicate a list of names preserving order, dropping empty/undefined.
  * Used to merge the singular primary name with its array of alternates so the
  * primary stays first (spec 030: englishNames / localNames).
+ *
+ * Names are compared AND emitted as NFC. The upstream langtags source mixes
+ * canonically-equivalent-but-byte-distinct forms of the same own-script name
+ * (e.g. `vi`'s `localname` vs `localnames[0]` for "Tiếng Việt"), which a raw
+ * string compare treats as two distinct entries — surfacing two identical-looking
+ * choices in the survey picker. Normalizing to NFC before the compare collapses
+ * them, and emitting the normalized form keeps output byte-stable regardless of
+ * which source field appeared first (Unicode TR15).
  */
 function dedupeNames(list) {
   const seen = new Set();
   const out = [];
   for (const n of list) {
     if (typeof n !== 'string') continue;
-    const v = n.trim();
+    const v = n.trim().normalize('NFC');
     if (v === '' || seen.has(v)) continue;
     seen.add(v);
     out.push(v);
@@ -111,14 +119,30 @@ for (const entry of raw) {
   if (!entry.tag || entry.tag.startsWith('_') || !entry.region) continue;
   const bare = entry.tag.split('-')[0].toLowerCase();
   const arr = regionVariantsByBare.get(bare) ?? [];
-  if (arr.some((v) => v.region === entry.region)) continue; // dedupe by region
   const vScript = entry.full ? parseFull(entry.full).script : undefined;
+  const entryLocalNames = dedupeNames([entry.localname, ...(Array.isArray(entry.localnames) ? entry.localnames : [])]);
+  // Region, not script, keys the disambiguation question (FR-014: script
+  // differences are handled by the separate script step). So keep ONE variant
+  // per region — but when a second same-region tagset appears (a co-located
+  // multi-script community, e.g. am/ET's Ethi + Arab + Brai), MERGE its recorded
+  // own-script names into the kept variant rather than dropping them, and
+  // backfill any field the first-seen tagset happened to lack. Dropping the
+  // later tagset outright silently loses real localnames for ~39 subtags.
+  const existing = arr.find((v) => v.region === entry.region);
+  if (existing !== undefined) {
+    existing.localNames = dedupeNames([...existing.localNames, ...entryLocalNames]);
+    if (existing.regionName === undefined && entry.regionname !== undefined) existing.regionName = entry.regionname;
+    if (existing.defaultScript === undefined && vScript !== undefined) existing.defaultScript = vScript;
+    if (existing.autonym === undefined && entry.localname !== undefined) existing.autonym = entry.localname;
+    regionVariantsByBare.set(bare, arr);
+    continue;
+  }
   arr.push({
     region: entry.region,
     ...(entry.regionname !== undefined ? { regionName: entry.regionname } : {}),
     ...(vScript !== undefined ? { defaultScript: vScript } : {}),
     ...(entry.localname !== undefined ? { autonym: entry.localname } : {}),
-    localNames: dedupeNames([entry.localname, ...(Array.isArray(entry.localnames) ? entry.localnames : [])]),
+    localNames: entryLocalNames,
   });
   regionVariantsByBare.set(bare, arr);
 }
@@ -240,12 +264,25 @@ if (aliasCollisions === 0) {
 
 mkdirSync(OUT_DIR, { recursive: true });
 
+// Canonical key order for a regionVariant — applied before serialization so a
+// variant that was built incrementally (fields backfilled during a same-region
+// merge) emits the same key order as one built in a single pass.
+function canonicalVariant(v) {
+  const keys = ['region', 'regionName', 'defaultScript', 'autonym', 'localNames'];
+  const obj = {};
+  for (const k of keys) {
+    if (k in v) obj[k] = v[k];
+  }
+  return obj;
+}
+
 // Deterministic JSON serializer (stable key order within each record)
 function serializeRecord(r) {
   const keys = ['code', 'iso639_3', 'defaultScript', 'defaultRegion', 'regions', 'autonym', 'englishName', 'englishNames', 'localNames', 'regionVariants'];
   const obj = {};
   for (const k of keys) {
-    if (k in r) obj[k] = r[k];
+    if (k === 'regionVariants' && Array.isArray(r[k])) obj[k] = r[k].map(canonicalVariant);
+    else if (k in r) obj[k] = r[k];
   }
   return JSON.stringify(obj);
 }

@@ -174,3 +174,65 @@ describe("langtags extended fields (spec 030)", () => {
     expect(lookupByName("hi")[0]?.hasRegionVariants).toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// spec 030 — codegen data-fidelity regressions (name de-dup + region merge)
+// Exemplars are stable against the pinned langtags commit 99b856b.
+// ---------------------------------------------------------------------------
+
+describe("langtags name de-duplication is Unicode-canonical (spec 030)", () => {
+  // A name array must not contain two entries that are canonically equal (NFC)
+  // but byte-distinct — those render as identical-looking duplicate choices in
+  // the survey picker. The codegen normalizes to NFC before de-duping.
+  function hasCanonicalDuplicate(names: readonly string[] | undefined): boolean {
+    if (names === undefined) return false;
+    const seen = new Set<string>();
+    for (const n of names) {
+      const nfc = n.normalize("NFC");
+      if (seen.has(nfc)) return true;
+      seen.add(nfc);
+    }
+    return false;
+  }
+
+  it("no localNames/englishNames array (top-level or per-variant) has an NFC-duplicate", () => {
+    const offenders: string[] = [];
+    for (const summary of listLanguages()) {
+      const d = getLanguageDefaults(summary.code);
+      if (d === null) continue;
+      if (hasCanonicalDuplicate(d.localNames)) offenders.push(`${d.code}.localNames`);
+      if (hasCanonicalDuplicate(d.englishNames)) offenders.push(`${d.code}.englishNames`);
+      for (const v of d.regionVariants ?? []) {
+        if (hasCanonicalDuplicate(v.localNames)) offenders.push(`${d.code}/${v.region}.localNames`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("collapses the vi NFC-duplicate own-script name to a single entry", () => {
+    // Regression: upstream vi carries localname + localnames[0] as
+    // canonically-equal-but-byte-distinct NFC/NFD forms of "Tiếng Việt"; both
+    // previously survived as two picker choices.
+    const vi = getLanguageDefaults("vi");
+    expect(vi!.localNames).toEqual(["Tiếng Việt".normalize("NFC")]);
+  });
+});
+
+describe("region-variant merge preserves co-located names (spec 030)", () => {
+  // When a bare subtag has more than one tagset for the SAME region (a co-located
+  // multi-script community), the codegen keeps one variant per region but merges
+  // every recorded own-script name into it, rather than dropping all but the
+  // first tagset's names (region — not script — keys the disambiguation question,
+  // FR-014).
+  it("retains a same-region variant's own-script name that a region-only dedupe would drop", () => {
+    const az = getLanguageDefaults("az"); // Azerbaijani — IR has Brai + Arab tagsets
+    expect(az?.regionVariants).toBeDefined();
+    const ir = az!.regionVariants!.find((v) => v.region === "IR");
+    expect(ir).toBeDefined();
+    // Before the merge fix the first-seen IR tagset (Brai) carried no localname,
+    // so IR.localNames was [] and the co-located Arab tagset's name was lost.
+    expect(ir!.localNames.length).toBeGreaterThan(0);
+    expect(ir!.autonym).toBeDefined();
+    expect(ir!.localNames).toContain(ir!.autonym);
+  });
+});
