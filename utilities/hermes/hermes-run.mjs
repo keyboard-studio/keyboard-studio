@@ -43,6 +43,11 @@
 //                           no-swap; set to a lighter model for split-model setups)
 //   --endpoint <url>        default: http://localhost:11434/api/generate
 //   --out <dir>             default: utilities/hermes/reports
+//   --reason-temp <t>       REASON (Step 1) sampling temperature, [0,2] (default 0.1). Raising this
+//                           is what makes --samples / ensemble unions actually diversify.
+//   --judge-temp <t>        JUDGE sampling temperature, [0,2] (default 0.2). Keep low — the judge
+//                           is deterministic in practice (18/18 unanimous across 9 votes).
+//                           STRUCTURE + reconciliation temperature is fixed at 0.1 (mechanical).
 //   --no-judge              skip the per-finding judge pass (fast, unfiltered; escalation.md uses
 //                           self-scored ACT criteria only — no judge_verdict filtering)
 //   --judge                 harmless no-op alias (judge is ON by default)
@@ -57,8 +62,10 @@
 // ARTIFACTS (written to --out dir):
 //   findings.json     — full raw output (all shards, all findings, reconciliation)
 //   report.md         — full bucketed view (ACT/REVIEW/NOISE) — the audit trail
-//   escalation.md     — LOCAL-FILTERED SURVIVORS only: ACT findings that passed judge+scoring
-//   escalation.json   — machine form of escalation.md (array of ACT findings with all scores)
+//   escalation.md     — SURFACED set: auto-safe + needs-human + uncertain tiers, each split
+//                       Converged (>=2 sources) vs Single-source. NOISE excluded. Fix-risk
+//                       (danger) TAGS a finding needs-human; it never filters it out.
+//   escalation.json   — machine form of escalation.md (findings + surfaceTier/agreement/converged)
 //
 // Node >= 20 required (global fetch).
 
@@ -149,7 +156,7 @@ const EXCLUDE_RE =
 const argv = process.argv.slice(2);
 
 // Value-expecting flags: if the flag is the last argument (no value follows), abort early.
-const VALUE_FLAGS = ['--shard', '--limit', '--model', '--structure-model', '--judge-model', '--endpoint', '--out', '--pr', '--commit', '--since', '--reason-mode', '--judge-set', '--file', '--samples', '--reason-models'];
+const VALUE_FLAGS = ['--shard', '--limit', '--model', '--structure-model', '--judge-model', '--endpoint', '--out', '--pr', '--commit', '--since', '--reason-mode', '--judge-set', '--file', '--samples', '--reason-models', '--reason-temp', '--judge-temp'];
 // --no-judge / --judge / --self-test are boolean flags (no value); listed separately so the help text is accurate.
 for (const vf of VALUE_FLAGS) {
   const i = argv.indexOf(vf);
@@ -188,6 +195,25 @@ const LIMIT = flag('--limit') !== null ? parseInt(flag('--limit'), 10) : null;
 const REASON_MODEL = flag('--model') ?? DEFAULT_REASON_MODEL;
 const STRUCTURE_MODEL = flag('--structure-model') ?? REASON_MODEL;
 const JUDGE_MODEL = flag('--judge-model') ?? STRUCTURE_MODEL;
+
+// --reason-temp / --judge-temp: sampling temperature for the REASON (Step 1) and JUDGE
+// passes respectively. Defaults reproduce the historical hardcoded values exactly
+// (reason 0.1, judge 0.2) so omitting both flags is a zero-behaviour-change no-op.
+// STRUCTURE + reconciliation stay hardcoded at 0.1 (mechanical JSON conversion — no
+// reason to vary). Raising --reason-temp is what makes --samples / ensemble unions
+// actually diversify; keep --judge-temp low (the judge is deterministic in practice).
+function parseTemp(flagName, def) {
+  const raw = flag(flagName);
+  if (raw === null) return def;
+  const t = parseFloat(raw);
+  if (isNaN(t) || t < 0 || t > 2) {
+    console.error(`[ERROR] ${flagName} must be a number in [0, 2] (got "${raw}")`);
+    process.exit(1);
+  }
+  return t;
+}
+const REASON_TEMP = parseTemp('--reason-temp', 0.1);
+const JUDGE_TEMP = parseTemp('--judge-temp', 0.2);
 
 // --reason-models <m1,m2,...>: ENSEMBLE mode — run multiple reason models per file, union
 // findings across models, then judge the unioned set with JUDGE_MODEL.
@@ -1087,7 +1113,7 @@ async function callModelReason(system, prompt) {
     stream: false,
     // NO format:json — free-form reasoning for high recall
     options: {
-      temperature: 0.1,
+      temperature: REASON_TEMP,
       num_ctx: 32768,
       num_predict: REASON_NUM_PREDICT,
       repeat_penalty: 1.15,
@@ -1191,7 +1217,7 @@ async function callModelReasonWith(modelName, system, prompt) {
     prompt,
     stream: false,
     options: {
-      temperature: 0.1,
+      temperature: REASON_TEMP,
       num_ctx: 32768,
       num_predict: REASON_NUM_PREDICT,
       repeat_penalty: 1.15,
@@ -1487,14 +1513,50 @@ Scoring rules:
 If there are no findings, emit {"findings":[]}.`;
 
 /**
- * Parse a "start-end" or "start" lines string into { start, end } integers.
- * Returns { start: 0, end: 0 } if unparseable.
+ * Parse a finding's `lines` string into a list of numeric ranges.
+ * Handles all the shapes models actually emit:
+ *   "88-134"              → [{88,134}]
+ *   "312"                 → [{312,312}]
+ *   "727, 796, 820"       → [{727,727},{796,796},{820,820}]
+ *   "284-292 and 394-406" → [{284,292},{394,406}]
+ *   "~L312" / "L88"       → [{312,312}] / [{88,88}]   (prefix noise ignored)
+ * Returns [] when no line numbers are present. Backwards range endpoints are normalised.
+ */
+function parseLineRanges(linesStr) {
+  const s = String(linesStr ?? '');
+  const ranges = [];
+  const re = /(\d+)\s*-\s*(\d+)|(\d+)/g;
+  let m;
+  while ((m = re.exec(s)) !== null) {
+    if (m[1] !== undefined) {
+      let a = parseInt(m[1], 10);
+      let b = parseInt(m[2], 10);
+      if (a > b) [a, b] = [b, a];
+      ranges.push({ start: a, end: b });
+    } else {
+      const n = parseInt(m[3], 10);
+      ranges.push({ start: n, end: n });
+    }
+  }
+  return ranges;
+}
+
+/**
+ * Parse a lines string into a single { start, end } envelope (min start, max end
+ * across all ranges present). Used by the convergence/sample/model overlap checks,
+ * which only need a spanning interval. Returns { start: 0, end: 0 } if unparseable.
+ * (Previously a single-range regex — multi-location refs like "727, 796, 820" fell
+ * through to {0,0} and could never converge; they now envelope correctly.)
  */
 function parseLineRange(linesStr) {
-  const m = String(linesStr ?? '').match(/^(\d+)(?:-(\d+))?$/);
-  if (!m) return { start: 0, end: 0 };
-  const start = parseInt(m[1], 10);
-  const end = m[2] ? parseInt(m[2], 10) : start;
+  const ranges = parseLineRanges(linesStr);
+  if (ranges.length === 0) return { start: 0, end: 0 };
+  let start = ranges[0].start;
+  let end = ranges[0].end;
+  for (const r of ranges) {
+    if (r.start < start) start = r.start;
+    if (r.end > end) end = r.end;
+  }
   return { start, end };
 }
 
@@ -2264,9 +2326,44 @@ function applyDangerOverride(finding) {
 // ---------------------------------------------------------------------------
 
 /**
- * Read a code snippet from the current working-tree file for a finding's line range.
- * Returns the snippet string (with JUDGE_CONTEXT_LINES of context on each side),
- * or an empty string if the file cannot be read or lines are not parseable.
+ * Merge line ranges into non-overlapping windows, each padded by `ctx` lines on both
+ * sides and clamped to [1, total]. Adjacent/overlapping windows are coalesced so the
+ * result is a minimal ordered list of { start, end }.
+ */
+function buildContextWindows(ranges, total, ctx) {
+  const padded = ranges
+    .map((r) => ({ start: Math.max(1, r.start - ctx), end: Math.min(total, r.end + ctx) }))
+    .filter((w) => w.start <= w.end)
+    .sort((a, b) => a.start - b.start);
+  const merged = [];
+  for (const w of padded) {
+    const last = merged[merged.length - 1];
+    if (last && w.start <= last.end + 1) last.end = Math.max(last.end, w.end);
+    else merged.push({ ...w });
+  }
+  return merged;
+}
+
+/**
+ * Render numbered source lines for a set of windows, separating non-contiguous
+ * windows with an elision marker so the judge sees each referenced location.
+ */
+function renderWindows(srcLines, windows) {
+  const parts = [];
+  windows.forEach((w, i) => {
+    if (i > 0) parts.push('        …');
+    for (let ln = w.start; ln <= w.end; ln++) {
+      parts.push(`${String(ln).padStart(4, ' ')}: ${srcLines[ln - 1] ?? ''}`);
+    }
+  });
+  return parts.join('\n');
+}
+
+/**
+ * Read a code snippet from the current working-tree file for a finding's line ref.
+ * Handles multi-location refs ("727, 796, 820", "284-292 and 394-406") by emitting
+ * one padded window per location. Returns '' if the file cannot be read; falls back
+ * to the file head when the line ref carries no parseable line numbers.
  */
 function readFindingSnippet(finding) {
   const filePath = join(ROOT, finding.file ?? '');
@@ -2276,27 +2373,15 @@ function readFindingSnippet(finding) {
   } catch {
     return '';
   }
-  const lines = src.split('\n');
-  const total = lines.length;
+  const srcLines = src.split('\n');
+  const total = srcLines.length;
 
-  // Parse "start-end" or just "start"
-  let startLine = 1;
-  let endLine = 1;
-  const linesStr = String(finding.lines ?? '');
-  const lm = linesStr.match(/^(\d+)(?:-(\d+))?$/);
-  if (lm) {
-    startLine = parseInt(lm[1], 10);
-    endLine = lm[2] ? parseInt(lm[2], 10) : startLine;
+  const ranges = parseLineRanges(finding.lines).filter((r) => r.start >= 1 && r.start <= total);
+  if (ranges.length === 0) {
+    // Unparseable / out-of-range ref — show the file head as a best-effort snippet.
+    return renderWindows(srcLines, [{ start: 1, end: Math.min(total, 2 * JUDGE_CONTEXT_LINES) }]);
   }
-
-  const ctxStart = Math.max(1, startLine - JUDGE_CONTEXT_LINES);
-  const ctxEnd = Math.min(total, endLine + JUDGE_CONTEXT_LINES);
-
-  const snippet = lines
-    .slice(ctxStart - 1, ctxEnd)
-    .map((l, i) => `${String(ctxStart + i).padStart(4, ' ')}: ${l}`)
-    .join('\n');
-  return snippet;
+  return renderWindows(srcLines, buildContextWindows(ranges, total, JUDGE_CONTEXT_LINES));
 }
 
 const JUDGE_SYSTEM = `You are a strict code-review judge.
@@ -2330,7 +2415,7 @@ async function callModelJudge(finding, snippet, findingLabel) {
     stream: false,
     format: 'json',
     options: {
-      temperature: 0.2, // greedy-ish, stable; judge is deterministic in practice
+      temperature: JUDGE_TEMP, // default 0.2 — greedy-ish, stable; judge is deterministic in practice
       num_ctx: 32768,
       num_predict: JUDGE_NUM_PREDICT,
       repeat_penalty: 1.15,
@@ -3152,30 +3237,67 @@ function severityLabel(sev) {
  * Priority: NOISE > REVIEW > ACT (a finding only enters ACT if it avoids both
  * NOISE and REVIEW conditions).
  */
-function bucketFinding(f) {
+/**
+ * Cross-source agreement count for a finding: the max of lens-convergence,
+ * sample-agreement, and cross-model agreement (whichever mode(s) ran). 1 = single
+ * source; >=2 = multiple independent sources flagged the same location.
+ */
+function agreementCount(f) {
+  return Math.max(
+    typeof f.convergence === 'number' ? f.convergence : 1,
+    typeof f.samples_hit === 'number' ? f.samples_hit : 1,
+    typeof f.models_hit === 'number' ? f.models_hit : 1,
+  );
+}
+function isConverged(f) {
+  return agreementCount(f) >= 2;
+}
+
+/**
+ * Surfacing tier for a finding — the escalation-facing classification.
+ * Separates the two orthogonal meters the tool models:
+ *   confidence (is it real) gates surfacing; fix-risk (danger) only TAGS a surfaced
+ *   finding as needs-human vs auto-safe — it never routes it out of sight.
+ *
+ *   'auto-safe'   : real, non-trivial, conf >= floor, danger=low        → apply w/ light review
+ *   'needs-human' : real, non-trivial, conf >= floor, danger med/high OR cross-file type
+ *   'uncertain'   : judge said "uncertain" (model still conf >= floor, non-trivial) → worth a look
+ *   'noise'       : conf < floor OR trivial OR judge said "not-real"     → excluded from escalation
+ *
+ * In --no-judge mode the judge branches are inert, so findings split auto-safe/needs-human
+ * by danger exactly as the old ACT/REVIEW split did.
+ */
+function surfaceTier(f) {
   const conf = typeof f.confidence === 'number' ? f.confidence : 0.5;
   const impact = f.impact ?? 'minor';
   const danger = f.danger ?? 'med';
   const type = f.type ?? '';
+  const judged = USE_JUDGE && f.judge_verdict !== undefined;
 
-  // NOISE conditions
-  const judgeRejected = USE_JUDGE && f.judge_verdict !== undefined && f.judge_verdict !== 'real';
-  const isNoise =
-    conf < ACT_CONFIDENCE_MIN ||
-    impact === 'trivial' ||
-    judgeRejected;
+  // Hard-noise conditions (excluded from escalation entirely).
+  if (impact === 'trivial') return 'noise';
+  if (conf < ACT_CONFIDENCE_MIN) return 'noise';
+  if (judged && f.judge_verdict === 'not-real') return 'noise';
 
-  if (isNoise) return 'NOISE';
+  // Judge-uncertain gets its own surfaced tier rather than being dropped as noise —
+  // recovers judge false-negatives (a "not-real" the judge wasn't actually sure about).
+  if (judged && f.judge_verdict === 'uncertain') return 'uncertain';
 
-  // REVIEW conditions
-  const isReview =
-    danger === 'med' ||
-    danger === 'high' ||
-    CROSS_FILE_TYPES.has(type);
+  // Real (or no-judge mode): fix-risk decides the tag, not visibility.
+  const needsHuman = danger === 'med' || danger === 'high' || CROSS_FILE_TYPES.has(type);
+  return needsHuman ? 'needs-human' : 'auto-safe';
+}
 
-  if (isReview) return 'REVIEW';
-
-  return 'ACT';
+/**
+ * Classify a finding into ACT / REVIEW / NOISE for report.md (the audit trail).
+ * Delegates to surfaceTier so the two views can't diverge: auto-safe → ACT,
+ * needs-human + uncertain → REVIEW (both need human eyes), noise → NOISE.
+ */
+function bucketFinding(f) {
+  const tier = surfaceTier(f);
+  if (tier === 'auto-safe') return 'ACT';
+  if (tier === 'noise') return 'NOISE';
+  return 'REVIEW'; // needs-human or uncertain
 }
 
 /**
@@ -3244,66 +3366,97 @@ function formatFinding(f) {
 
 /**
  * Check whether a finding qualifies for the escalation set.
- * Escalation = ACT bucket (judge_verdict=="real" when judge ran, danger=="low",
- * impact!="trivial", confidence >= ACT_CONFIDENCE_MIN).
- * This is identical to bucketFinding(f) === 'ACT' but expressed explicitly
- * so the criteria are obvious at the call site.
+ * Escalation = the full surfaced set (auto-safe + needs-human + uncertain);
+ * only 'noise' (below the confidence floor, trivial, or judge=not-real) is excluded.
  */
 function isEscalation(f) {
-  return bucketFinding(f) === 'ACT';
+  return surfaceTier(f) !== 'noise';
 }
 
 /**
- * Generate escalation.md: only the ACT survivors, formatted for direct review.
- * Header states how many of the total findings passed vs were dropped.
+ * Render a single finding as escalation.md lines (shared across tiers).
  */
-function generateEscalationMd(actFindings, totalFindings) {
-  const n = actFindings.length;
+function formatEscalationFinding(f) {
+  const lines = [];
+  const fileLine = `${f.file ?? '?'}:${f.lines ?? '?'}`;
+  const agree = agreementCount(f);
+  const agreeBadge = agree >= 2 ? ` — agreed by ${agree} sources` : '';
+  lines.push(`### ${f.id ?? '?'} — \`${fileLine}\`${agreeBadge}`);
+  lines.push('');
+  lines.push(`**Type:** ${f.type ?? '?'}  |  **Impact:** ${f.impact ?? '?'}  |  **Fix-risk (danger):** ${f.danger ?? '?'}`);
+
+  // Provenance: lens convergence and/or sample/model agreement, whichever ran.
+  const lensesArr = Array.isArray(f.lenses) ? f.lenses : (f.lens ? [f.lens] : []);
+  const prov = [];
+  if (typeof f.convergence === 'number' && f.convergence >= 2) prov.push(`${f.convergence} lenses (${lensesArr.join(', ')})`);
+  else if (lensesArr.length) prov.push(`lens ${lensesArr[0]}`);
+  if (typeof f.samples_hit === 'number' && f.samples_hit >= 2) prov.push(`${f.samples_hit} samples`);
+  if (typeof f.models_hit === 'number' && f.models_hit >= 2) prov.push(`${f.models_hit} models`);
+  if (prov.length) lines.push(`**Agreement:** ${prov.join(' · ')}`);
+
+  if (f.judge_verdict !== undefined) {
+    const jconf = typeof f.judge_confidence === 'number' ? f.judge_confidence.toFixed(2) : '?';
+    lines.push(`**Judge:** verdict=${f.judge_verdict}, confidence=${jconf}, danger=${f.judge_danger ?? '?'} — ${f.judge_note ?? ''}`);
+  }
+  lines.push('');
+  lines.push(`**Summary:** ${f.summary ?? '?'}`);
+  lines.push('');
+  lines.push(`**Suggestion:** ${f.suggestion ?? '?'}`);
+  if (f.reuse_target) lines.push(`**Reuse target:** \`${f.reuse_target}\``);
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+  return lines;
+}
+
+/**
+ * Generate escalation.md: the full surfaced set, organised into three fix-risk/verdict
+ * tiers (Auto-safe / Needs-human / Uncertain), each split by cross-source agreement
+ * (Converged >=2 sources vs Single-source). NOISE is excluded (see report.md for it).
+ */
+function generateEscalationMd(surfaced, totalFindings) {
+  const n = surfaced.length;
   const dropped = totalFindings - n;
   const lines = [];
-  lines.push('# Hermes Escalation Set — Local-Filtered Survivors');
+  lines.push('# Hermes Escalation Set — Surfaced Findings');
   lines.push('');
-  lines.push(`> Local-filtered survivors — ${n} of ${totalFindings} findings passed the local judge+scoring filter;`);
-  lines.push(`> the other ${dropped} were dropped as false-positive/inconsequential and are NOT included here.`);
-  lines.push(`> Filter: judge_verdict=real (K=1), danger=low, impact!=trivial, confidence>=${ACT_CONFIDENCE_MIN}.`);
-  lines.push(`> Pass \`--no-judge\` to skip judging (escalation.md will then use self-scored ACT criteria only).`);
+  lines.push(`> ${n} of ${totalFindings} findings surfaced; ${dropped} excluded as noise`);
+  lines.push(`> (confidence < ${ACT_CONFIDENCE_MIN}, impact=trivial, or judge=not-real) — see report.md for those.`);
+  lines.push('> Tiers: **Auto-safe** (danger=low) · **Needs-human** (danger med/high or cross-file) · **Uncertain** (judge unsure).');
+  lines.push('> Each tier is split **Converged** (>=2 independent sources agreed) vs **Single-source** (potential).');
   lines.push('');
   lines.push('---');
   lines.push('');
 
   if (n === 0) {
-    lines.push('_No findings survived the local filter._');
+    lines.push('_No findings surfaced._');
     lines.push('');
     return lines.join('\n');
   }
 
-  for (const f of actFindings) {
-    const fileLine = `${f.file ?? '?'}:${f.lines ?? '?'}`;
-    lines.push(`## ${f.id ?? '?'} — \`${fileLine}\``);
-    lines.push('');
-    lines.push(`**Type:** ${f.type ?? '?'}  |  **Impact:** ${f.impact ?? '?'}  |  **Danger:** ${f.danger ?? '?'}`);
+  const TIERS = [
+    { key: 'auto-safe', title: 'Auto-safe — apply with light review (danger=low)' },
+    { key: 'needs-human', title: 'Needs-human — surfaced, do NOT auto-apply (fix-risk med/high or cross-file)' },
+    { key: 'uncertain', title: 'Uncertain — judge was not sure; worth a human look' },
+  ];
 
-    // Lens provenance + convergence
-    const convergence = typeof f.convergence === 'number' ? f.convergence : 1;
-    const lensesArr = Array.isArray(f.lenses) ? f.lenses : (f.lens ? [f.lens] : []);
-    if (convergence >= 2) {
-      lines.push(`**Convergence:** flagged by ${convergence} lenses: ${lensesArr.join(', ')} (confidence boost: +${(CONVERGENCE_BOOST_PER_LENS * (convergence - 1)).toFixed(2)})`);
-    } else {
-      lines.push(`**Lens:** ${lensesArr[0] ?? '?'}`);
+  for (const tier of TIERS) {
+    const inTier = sortFindings(surfaced.filter((f) => surfaceTier(f) === tier.key));
+    if (inTier.length === 0) continue;
+    lines.push(`## ${tier.title} (${inTier.length})`);
+    lines.push('');
+    const converged = inTier.filter(isConverged);
+    const single = inTier.filter((f) => !isConverged(f));
+    if (converged.length) {
+      lines.push(`### Converged (${converged.length}) — multiple sources agreed`);
+      lines.push('');
+      for (const f of converged) lines.push(...formatEscalationFinding(f));
     }
-
-    if (f.judge_verdict !== undefined) {
-      const jconf = typeof f.judge_confidence === 'number' ? f.judge_confidence.toFixed(2) : '?';
-      lines.push(`**Judge:** verdict=${f.judge_verdict}, confidence=${jconf} — ${f.judge_note ?? ''}`);
+    if (single.length) {
+      lines.push(`### Single-source (${single.length}) — potential, one source only`);
+      lines.push('');
+      for (const f of single) lines.push(...formatEscalationFinding(f));
     }
-    lines.push('');
-    lines.push(`**Summary:** ${f.summary ?? '?'}`);
-    lines.push('');
-    lines.push(`**Suggestion:** ${f.suggestion ?? '?'}`);
-    if (f.reuse_target) lines.push(`**Reuse target:** \`${f.reuse_target}\``);
-    lines.push('');
-    lines.push('---');
-    lines.push('');
   }
 
   return lines.join('\n');
@@ -3363,8 +3516,8 @@ function generateReport(allResults, reconciliation) {
   lines.push(`| Bucket | Count | Criteria |`);
   lines.push(`|---|---|---|`);
   lines.push(`| **ACT** | ${actFindings.length} | confidence >= ${ACT_CONFIDENCE_MIN}, danger=low, impact != trivial${USE_JUDGE ? ', judge=real' : ' (no-judge mode)'} |`);
-  lines.push(`| **REVIEW** | ${reviewFindings.length} | danger med/high or cross-file type (not NOISE) |`);
-  lines.push(`| **NOISE** | ${noiseFindings.length} | confidence < ${ACT_CONFIDENCE_MIN} or impact=trivial${USE_JUDGE ? ' or judge=not-real/uncertain' : ' (no-judge mode)'} |`);
+  lines.push(`| **REVIEW** | ${reviewFindings.length} | danger med/high, cross-file type${USE_JUDGE ? ', or judge=uncertain' : ''} (not NOISE) |`);
+  lines.push(`| **NOISE** | ${noiseFindings.length} | confidence < ${ACT_CONFIDENCE_MIN} or impact=trivial${USE_JUDGE ? ' or judge=not-real' : ' (no-judge mode)'} |`);
   lines.push('');
 
   // ---- ACT bucket ----
@@ -3744,12 +3897,62 @@ function runSelfTest() {
     failed++;
   }
 
+  // ---- Surfacing/bucketing tier tests (guards the escalation reshape) ----
+  // These assume judge-ON semantics (the default). USE_JUDGE is true unless --no-judge,
+  // which the self-test never passes, so f.judge_verdict is honoured.
+  console.log('');
+  console.log('[self-test] surfaceTier / bucketFinding / agreement — deterministic classification');
+  const check = (label, got, want) => {
+    if (got === want) { console.log(`[self-test] PASS ${label}: ${got}`); passed++; }
+    else { console.log(`[self-test] FAIL ${label}: got ${got}, want ${want}`); failed++; }
+  };
+  const base = { confidence: 0.8, impact: 'moderate', danger: 'low', type: 'quality', judge_verdict: 'real' };
+  // auto-safe: real, low danger, confident, non-trivial
+  check('auto-safe tier', surfaceTier({ ...base }), 'auto-safe');
+  check('auto-safe→ACT', bucketFinding({ ...base }), 'ACT');
+  // needs-human: high fix-risk must still surface (not be filtered out)
+  check('high-danger → needs-human', surfaceTier({ ...base, danger: 'high' }), 'needs-human');
+  check('cross-file type → needs-human', surfaceTier({ ...base, danger: 'low', type: 'reuse' }), 'needs-human');
+  check('needs-human is surfaced', isEscalation({ ...base, danger: 'high' }), true);
+  // uncertain: own tier, still surfaced
+  check('judge uncertain → uncertain tier', surfaceTier({ ...base, judge_verdict: 'uncertain' }), 'uncertain');
+  check('uncertain is surfaced', isEscalation({ ...base, judge_verdict: 'uncertain' }), true);
+  check('uncertain → REVIEW bucket', bucketFinding({ ...base, judge_verdict: 'uncertain' }), 'REVIEW');
+  // noise: below floor / trivial / not-real — excluded
+  check('low confidence → noise', surfaceTier({ ...base, confidence: 0.4 }), 'noise');
+  check('trivial impact → noise', surfaceTier({ ...base, impact: 'trivial' }), 'noise');
+  check('judge not-real → noise', surfaceTier({ ...base, judge_verdict: 'not-real' }), 'noise');
+  check('noise not surfaced', isEscalation({ ...base, confidence: 0.4 }), false);
+  // agreement
+  check('single-source not converged', isConverged({ ...base }), false);
+  check('2 lenses converged', isConverged({ ...base, convergence: 2 }), true);
+  check('2 models converged', isConverged({ ...base, models_hit: 2 }), true);
+
+  // ---- line-ref parsing (the multi-location snippet/convergence fix) ----
+  const rangesStr = (s) => JSON.stringify(parseLineRanges(s).map((r) => [r.start, r.end]));
+  const envStr = (s) => { const e = parseLineRange(s); return `${e.start}-${e.end}`; };
+  check('single range parse', rangesStr('88-134'), '[[88,134]]');
+  check('point parse', rangesStr('312'), '[[312,312]]');
+  check('comma multi-point', rangesStr('727, 796, 820'), '[[727,727],[796,796],[820,820]]');
+  check('multi-range "and"', rangesStr('284-292 and 394-406'), '[[284,292],[394,406]]');
+  check('L-prefix noise', rangesStr('~L312'), '[[312,312]]');
+  check('unparseable → empty', rangesStr('n/a'), '[]');
+  // envelope (feeds convergence/dedup): multi-location must NOT collapse to 0-0 anymore
+  check('envelope multi-point', envStr('727, 796, 820'), '727-820');
+  check('envelope multi-range', envStr('284-292 and 394-406'), '284-406');
+  check('envelope unparseable', envStr('n/a'), '0-0');
+  // window merge: two nearby ranges coalesce, far ones stay separate (ctx=15)
+  const merged = buildContextWindows([{ start: 100, end: 100 }, { start: 110, end: 110 }], 1000, 15);
+  check('nearby windows merge', JSON.stringify(merged.map((w) => [w.start, w.end])), '[[85,125]]');
+  const split = buildContextWindows([{ start: 100, end: 100 }, { start: 500, end: 500 }], 1000, 15);
+  check('far windows stay split', split.length, 2);
+
   console.log('');
   if (failed === 0) {
-    console.log(`[self-test] All ${passed} branches passed.`);
+    console.log(`[self-test] All ${passed} checks passed.`);
     process.exit(0);
   } else {
-    console.log(`[self-test] ${failed} branch(es) FAILED (${passed} passed).`);
+    console.log(`[self-test] ${failed} check(s) FAILED (${passed} passed).`);
     process.exit(1);
   }
 }
@@ -3783,21 +3986,11 @@ function readBenchmarkSnippet(item) {
   const srcLines = src.split('\n');
   const total = srcLines.length;
 
-  // --- Try line-window first ---
-  const linesStr = String(item.lines ?? '');
-  const lm = linesStr.match(/^(\d+)(?:-(\d+))?$/);
-  if (lm) {
-    const startLine = parseInt(lm[1], 10);
-    const endLine = lm[2] ? parseInt(lm[2], 10) : startLine;
-    if (startLine >= 1 && startLine <= total) {
-      const ctxStart = Math.max(1, startLine - JUDGE_SET_CONTEXT_LINES);
-      const ctxEnd = Math.min(total, endLine + JUDGE_SET_CONTEXT_LINES);
-      const snippet = srcLines
-        .slice(ctxStart - 1, ctxEnd)
-        .map((l, i) => `${String(ctxStart + i).padStart(4, ' ')}: ${l}`)
-        .join('\n');
-      return { snippet, method: 'line-window' };
-    }
+  // --- Try line-window first (handles multi-location refs) ---
+  const ranges = parseLineRanges(item.lines).filter((r) => r.start >= 1 && r.start <= total);
+  if (ranges.length > 0) {
+    const windows = buildContextWindows(ranges, total, JUDGE_SET_CONTEXT_LINES);
+    return { snippet: renderWindows(srcLines, windows), method: 'line-window' };
   }
 
   // --- Grep file for key symbol from summary ---
@@ -3997,7 +4190,8 @@ async function main() {
   console.log(`     judge model    : ${JUDGE_MODEL}`);
   console.log(`     endpoint : ${ENDPOINT}`);
   console.log(`     out dir  : ${OUT_DIR}`);
-  console.log(`     judge    : ${USE_JUDGE ? 'ON (K=1, temp=0.2) — use --no-judge to skip' : 'OFF (--no-judge)'}`);
+  console.log(`     temps    : reason=${REASON_TEMP} judge=${JUDGE_TEMP} (structure/reconcile fixed at 0.1)`);
+  console.log(`     judge    : ${USE_JUDGE ? `ON (K=1, temp=${JUDGE_TEMP}) — use --no-judge to skip` : 'OFF (--no-judge)'}`);
   console.log(`     mode     : ${modeLabel}${scopeModeLabel}`);
   if (IS_ENSEMBLE) {
     console.log(`     reason-mode: ensemble (${ENSEMBLE_MODELS.length} reason models → cross-model union → ${JUDGE_MODEL} judge)`);
@@ -4183,7 +4377,7 @@ async function main() {
   // Write artifacts
   const allFindings = allResults.flatMap((r) => r.findings);
   const totalFindings = allFindings.length;
-  const actFindings = sortFindings(allFindings.filter(isEscalation));
+  const surfacedFindings = sortFindings(allFindings.filter(isEscalation));
 
   const findingsArtifact = {
     generatedAt: new Date().toISOString(),
@@ -4197,20 +4391,29 @@ async function main() {
     reconciliation,
   };
 
-  // Escalation JSON: array of ACT findings with all score fields, for machine consumption.
+  // Escalation JSON: the full surfaced set (auto-safe + needs-human + uncertain) with
+  // per-finding tier + agreement stamped on, for machine consumption. NOISE excluded.
+  const tierCounts = { 'auto-safe': 0, 'needs-human': 0, uncertain: 0 };
+  const escalationFindings = surfacedFindings.map((f) => {
+    const tier = surfaceTier(f);
+    tierCounts[tier] = (tierCounts[tier] ?? 0) + 1;
+    return { ...f, surfaceTier: tier, agreementCount: agreementCount(f), converged: isConverged(f) };
+  });
   const escalationArtifact = {
     generatedAt: new Date().toISOString(),
     totalFindings,
-    escalationCount: actFindings.length,
-    droppedCount: totalFindings - actFindings.length,
+    escalationCount: surfacedFindings.length,
+    droppedCount: totalFindings - surfacedFindings.length,
+    tierCounts,
     filter: {
       judgeEnabled: USE_JUDGE,
-      requireJudgeVerdict: USE_JUDGE ? 'real' : '(no-judge)',
-      danger: 'low',
-      impactNot: 'trivial',
+      surfaced: 'auto-safe + needs-human + uncertain (noise excluded)',
+      excludedAsNoise: USE_JUDGE
+        ? `confidence < ${ACT_CONFIDENCE_MIN}, impact=trivial, or judge=not-real`
+        : `confidence < ${ACT_CONFIDENCE_MIN} or impact=trivial (no-judge mode)`,
       confidenceMin: ACT_CONFIDENCE_MIN,
     },
-    findings: actFindings,
+    findings: escalationFindings,
   };
 
   const findingsPath = join(OUT_DIR, 'findings.json');
@@ -4220,7 +4423,7 @@ async function main() {
 
   writeFileSync(findingsPath, JSON.stringify(findingsArtifact, null, 2), 'utf8');
   writeFileSync(reportPath, generateReport(allResults, reconciliation), 'utf8');
-  writeFileSync(escalationMdPath, generateEscalationMd(actFindings, totalFindings), 'utf8');
+  writeFileSync(escalationMdPath, generateEscalationMd(surfacedFindings, totalFindings), 'utf8');
   writeFileSync(escalationJsonPath, JSON.stringify(escalationArtifact, null, 2), 'utf8');
 
   // Retry queue: isolated sub-batch failures (the shard still produced other findings) —
@@ -4235,14 +4438,14 @@ async function main() {
   console.log(`[OK] Artifacts written:`);
   console.log(`     ${findingsPath}`);
   console.log(`     ${reportPath}`);
-  console.log(`     ${escalationMdPath}  (${actFindings.length} of ${totalFindings} findings — ACT survivors)`);
+  console.log(`     ${escalationMdPath}  (${surfacedFindings.length} of ${totalFindings} surfaced — auto-safe=${tierCounts['auto-safe']} needs-human=${tierCounts['needs-human']} uncertain=${tierCounts.uncertain})`);
   console.log(`     ${escalationJsonPath}`);
 
   // Summary
   const totalErrors = allResults.reduce((n, r) => n + r.errors.length, 0);
   console.log('');
   console.log(`[OK] Done. ${allResults.length} shard(s), ${totalFindings} finding(s), ${totalErrors} error(s).`);
-  console.log(`[OK] Escalation set: ${actFindings.length} of ${totalFindings} findings passed the local filter.`);
+  console.log(`[OK] Escalation set: ${surfacedFindings.length} of ${totalFindings} findings surfaced (noise excluded).`);
   if (aborted) process.exit(2);
   if (totalErrors > 0) process.exit(1);
 }
