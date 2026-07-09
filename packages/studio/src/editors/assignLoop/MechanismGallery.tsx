@@ -738,9 +738,33 @@ export function MechanismGallery({
     [currentChar, placementMap],
   );
 
-  // Whether the author has dismissed the suggestion row for the current char.
-  // Reset to false whenever currentChar changes (see effect below).
-  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
+  // Characters whose suggestion row has been explicitly accepted or denied.
+  // Component-level state (same scope as skippedChars — survives navigation
+  // within the mounted session but is not persisted across unmount/remount,
+  // since MechanismGallery has no draft-store slot for Phase C in-progress
+  // state today). Once a char is in this set its suggestion row must never
+  // reappear, even when the user navigates Back to it.
+  const [suggestionResolved, setSuggestionResolved] = useState<Set<string>>(
+    new Set(),
+  );
+
+  const markSuggestionResolved = useCallback((char: string) => {
+    setSuggestionResolved((prev) => {
+      if (prev.has(char)) return prev;
+      const next = new Set(prev);
+      next.add(char);
+      return next;
+    });
+  }, []);
+
+  // Whether the suggestion row must stay hidden for the current character —
+  // true once explicitly resolved (Accept/Deny), or once the character is
+  // already covered or skipped (a configured/skipped char never re-prompts).
+  const suggestionDismissed =
+    currentChar !== null &&
+    (suggestionResolved.has(currentChar) ||
+      coveredChars.has(currentChar) ||
+      skippedChars.has(currentChar));
 
   // ---------------------------------------------------------------------------
   // Method-input reset — called after apply or suggestion accept
@@ -756,9 +780,9 @@ export function MechanismGallery({
     setSelectedRaltKey("");
   }, []);
 
-  // Reset inputs whenever currentChar changes.
+  // Reset method inputs (not suggestionResolved — that persists per char)
+  // whenever currentChar changes.
   useEffect(() => {
-    setSuggestionDismissed(false);
     resetMethodState();
     if (currentChar !== null && isDecomposableAccented(currentChar)) {
       // §3c defaults-first: for a decomposable accented letter the natural method
@@ -798,19 +822,19 @@ export function MechanismGallery({
         source: "user",
       };
     } else {
-      setSuggestionDismissed(true);
+      markSuggestionResolved(currentChar);
       console.warn(`[MechanismGallery] handleSuggestionAccept: unrecognised strategyId "${suggestion.strategyId}" — dismissing suggestion`);
       return;
     }
     recordAssignments([...sessionAssignments, assignment]);
-    setSuggestionDismissed(true);
+    markSuggestionResolved(currentChar);
     resetMethodState();
-  }, [suggestion, currentChar, sessionAssignments, recordAssignments, resetMethodState]);
+  }, [suggestion, currentChar, sessionAssignments, recordAssignments, resetMethodState, markSuggestionResolved]);
 
   // Change: dismiss the suggestion row; pickers stay blank for manual selection.
   const handleSuggestionChange = useCallback(() => {
-    setSuggestionDismissed(true);
-  }, []);
+    if (currentChar !== null) markSuggestionResolved(currentChar);
+  }, [currentChar, markSuggestionResolved]);
 
   // ---------------------------------------------------------------------------
   // Apply action
@@ -949,6 +973,14 @@ export function MechanismGallery({
   );
   const canGoNext = appliedForCurrentChar > 0;
 
+  // Visited-character history stack (most-recently-visited at the end).
+  // Populated by forward navigation (handleNext/handleSkip); popped by
+  // handleBack. Mirrors TouchGallery's history-stack model — using a stack
+  // rather than index-1 arithmetic because handleNext/handleSkip search with
+  // wrap-around (skipping already-covered/skipped chars), so the actual
+  // sequence visited is not simply lettersToAdd[i-1].
+  const [charHistory, setCharHistory] = useState<string[]>([]);
+
   const handleNext = useCallback(() => {
     if (currentChar === null) return;
     const idx = lettersToAdd.indexOf(currentChar);
@@ -962,23 +994,45 @@ export function MechanismGallery({
       null;
     // When no uncovered+unskipped char remains, explicitly land on null so the
     // "All done" branch (currentChar === null && isDone) becomes visible.
+    setCharHistory((h) => [...h, currentChar]);
     setCurrentChar(next);
   }, [currentChar, lettersToAdd, coveredChars, skippedChars]);
 
-  const canGoBack = useMemo(() => {
+  // Whether pressing Next from the CURRENT position would land on another
+  // real character rather than finish — drives the forward button's label so
+  // it reflects the current position rather than the global isDone flag (a
+  // back-navigated interior character must not be labeled "All done" when
+  // characters after it still need a visit).
+  const hasAnotherCharAfterCurrent = useMemo(() => {
     if (currentChar === null) return false;
-    return lettersToAdd.indexOf(currentChar) > 0;
-  }, [currentChar, lettersToAdd]);
-
-  const handleBack = useCallback(() => {
-    if (currentChar === null) return;
     const idx = lettersToAdd.indexOf(currentChar);
-    if (idx <= 0) return;
-    setCurrentChar(lettersToAdd[idx - 1] ?? null);
-  }, [currentChar, lettersToAdd]);
+    const forward = lettersToAdd
+      .slice(idx + 1)
+      .some((c) => !coveredChars.has(c) && !skippedChars.has(c));
+    if (forward) return true;
+    return lettersToAdd
+      .slice(0, idx)
+      .some((c) => !coveredChars.has(c) && !skippedChars.has(c));
+  }, [currentChar, lettersToAdd, coveredChars, skippedChars]);
+
+  // Back handler — pops the history stack to return to the previous character.
+  // When history is empty (first character reached, or no forward move has
+  // happened yet this session) calls onBack (if provided) to return to the
+  // previous phase. Back is always reachable: rendered in the per-char UI,
+  // the all-done panel, and the no-new-characters panel.
+  const handleBack = useCallback(() => {
+    if (charHistory.length === 0) {
+      onBack?.();
+      return;
+    }
+    const prev = charHistory[charHistory.length - 1] ?? null;
+    setCharHistory((h) => h.slice(0, -1));
+    setCurrentChar(prev);
+  }, [charHistory, onBack]);
 
   const handleSkip = useCallback(() => {
     if (currentChar === null) return;
+    const skippedFrom = currentChar;
     setSkippedChars((prev) => new Set([...prev, currentChar]));
     const idx = lettersToAdd.indexOf(currentChar);
     const next =
@@ -999,6 +1053,7 @@ export function MechanismGallery({
             c !== currentChar,
         ) ??
       null;
+    setCharHistory((h) => [...h, skippedFrom]);
     setCurrentChar(next);
   }, [currentChar, lettersToAdd, coveredChars, skippedChars]);
 
@@ -1063,19 +1118,25 @@ export function MechanismGallery({
 
   if (selectedBaseKeyboard === null) {
     return (
-      <div style={pageStyle}>
-        <div
-          style={{
-            maxWidth: 560,
-            margin: "60px auto",
-            textAlign: "center",
-            color: TEXT_DIM,
-            padding: "0 24px",
-          }}
-        >
-          <p style={{ fontSize: 15 }}>
-            No base keyboard selected. Go back to choose a starting point.
-          </p>
+      <div style={{ ...pageStyle, padding: "24px 32px" }}>
+        <div style={{ maxWidth: 780, margin: "0 auto" }}>
+          {onBack !== undefined && (
+            <button type="button" onClick={onBack} style={ghostBtn}>
+              &larr; Back
+            </button>
+          )}
+          <div
+            style={{
+              maxWidth: 560,
+              margin: "60px auto",
+              textAlign: "center",
+              color: TEXT_DIM,
+            }}
+          >
+            <p style={{ fontSize: 15 }}>
+              No base keyboard selected. Go back to choose a starting point.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -1203,44 +1264,25 @@ export function MechanismGallery({
             </p>
           )}
 
-          {/* Back button */}
-          {onBack !== undefined && !isDone && (
+          {/* Back button — always reachable (present in every state: the
+              no-new-characters panel below, the all-done panel, and the
+              per-char UI). Uses the history-stack handleBack rather than
+              calling onBack directly, so back-navigation within the loop is
+              possible even after the loop is done. Only hidden when there is
+              genuinely nowhere to go (no history AND no onBack). */}
+          {(onBack !== undefined || charHistory.length > 0) && (
             <button
               type="button"
-              onClick={onBack}
+              onClick={handleBack}
               style={{ ...ghostBtn, alignSelf: "flex-start", fontSize: 13 }}
             >
               &larr; Back
             </button>
           )}
 
-          {/* Locked — always show a forward escape so the user cannot be trapped
-              after navigating back from Phase E. Editing is disabled by locked but
-              onComplete is always callable. */}
-          {locked && onComplete !== undefined && (
-            <button
-              type="button"
-              data-testid="mechanisms-continue"
-              onClick={onComplete}
-              aria-label="Continue to touch layout (desktop layout locked)"
-              style={{
-                padding: "9px 20px",
-                background: BLUE_ACTION,
-                border: "none",
-                borderRadius: 6,
-                color: "#e6edf3",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: FONT,
-                alignSelf: "flex-start",
-              }}
-            >
-              Continue to touch layout &rarr;
-            </button>
-          )}
-
-          {/* All-done / empty states */}
+          {/* All-done / empty states — the forward/completion control itself
+              (Continue / Done) lives in the header top-right (see the
+              component's return JSX); only the status text stays here. */}
           {lettersToAdd.length === 0 && (
             <div
               style={{
@@ -1253,25 +1295,6 @@ export function MechanismGallery({
               <p style={{ margin: 0, fontSize: 14 }}>
                 No new characters to add.
               </p>
-              <button
-                type="button"
-                data-testid="mechanisms-continue"
-                onClick={onComplete}
-                style={{
-                  padding: "10px 24px",
-                  background: BLUE_ACTION,
-                  border: "none",
-                  borderRadius: 6,
-                  color: "#e6edf3",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  fontFamily: FONT,
-                  alignSelf: "flex-start",
-                }}
-              >
-                Done
-              </button>
             </div>
           )}
 
@@ -1280,25 +1303,6 @@ export function MechanismGallery({
               <p style={{ margin: 0, fontSize: 14, color: TEXT_DIM }}>
                 All keys added.
               </p>
-              <button
-                type="button"
-                data-testid="mechanisms-continue"
-                onClick={onComplete}
-                style={{
-                  padding: "10px 24px",
-                  background: BLUE_ACTION,
-                  border: "none",
-                  borderRadius: 6,
-                  color: "#e6edf3",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  fontFamily: FONT,
-                  alignSelf: "flex-start",
-                }}
-              >
-                Done
-              </button>
             </div>
           )}
 
@@ -1488,26 +1492,11 @@ export function MechanismGallery({
                     })}
                 </div>
               )}
+              {/* Apply + Skip. Back moved to the shared top-of-pane Back button;
+                  Next / Done moved to the header top-right (see the
+                  component's return JSX) so the forward-advance control is
+                  spatially separated from these editing actions. */}
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                {canGoBack && (
-                  <button
-                    type="button"
-                    onClick={handleBack}
-                    aria-label="Go back to previous character"
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      color: TEXT_DIM,
-                      fontSize: 12,
-                      cursor: "pointer",
-                      fontFamily: FONT,
-                      padding: "4px 8px",
-                      textDecoration: "underline",
-                    }}
-                  >
-                    &larr; Back
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={handleApply}
@@ -1526,29 +1515,6 @@ export function MechanismGallery({
                   }}
                 >
                   Apply method
-                </button>
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  disabled={!canGoNext || locked}
-                  aria-label={
-                    isDone && canGoNext
-                      ? "All methods applied, finish"
-                      : `Next character`
-                  }
-                  style={{
-                    padding: "9px 20px",
-                    background: canGoNext ? "#238636" : "#21262d",
-                    border: "none",
-                    borderRadius: 6,
-                    color: canGoNext ? "#e6edf3" : TEXT_DIM,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: canGoNext ? "pointer" : "not-allowed",
-                    fontFamily: FONT,
-                  }}
-                >
-                  {isDone && canGoNext ? "All done →" : "Next character →"}
                 </button>
                 <button
                   type="button"
@@ -1698,6 +1664,80 @@ export function MechanismGallery({
         >
           Desktop
         </span>
+
+        {/* Primary forward action — top-right, spatially separated from the
+            left-pane editing controls (Apply method / Skip) so it is not
+            accidentally pressed. Exactly one control renders per state:
+            the locked forward-escape, the Done completion (empty-diff or
+            all-done), or the per-character Next/Done advance button. */}
+        {locked && onComplete !== undefined ? (
+          <button
+            type="button"
+            data-testid="mechanisms-continue"
+            onClick={onComplete}
+            aria-label="Continue to touch layout (desktop layout locked)"
+            style={{
+              marginLeft: "auto",
+              alignSelf: "center",
+              padding: "9px 20px",
+              background: BLUE_ACTION,
+              border: "none",
+              borderRadius: 6,
+              color: "#e6edf3",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: FONT,
+            }}
+          >
+            Continue to touch layout &rarr;
+          </button>
+        ) : lettersToAdd.length === 0 || (isDone && currentChar === null) ? (
+          <button
+            type="button"
+            data-testid="mechanisms-continue"
+            onClick={onComplete}
+            style={{
+              marginLeft: "auto",
+              alignSelf: "center",
+              padding: "9px 20px",
+              background: BLUE_ACTION,
+              border: "none",
+              borderRadius: 6,
+              color: "#e6edf3",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: FONT,
+            }}
+          >
+            Done
+          </button>
+        ) : currentChar !== null ? (
+          <button
+            type="button"
+            onClick={handleNext}
+            disabled={!canGoNext || locked}
+            aria-label={
+              hasAnotherCharAfterCurrent ? "Next character" : "All methods applied, finish"
+            }
+            style={{
+              marginLeft: "auto",
+              alignSelf: "center",
+              padding: "9px 20px",
+              background: canGoNext ? "#238636" : "#21262d",
+              border: "none",
+              borderRadius: 6,
+              color: canGoNext ? "#e6edf3" : TEXT_DIM,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: canGoNext ? "pointer" : "not-allowed",
+              fontFamily: FONT,
+            }}
+          >
+            {hasAnotherCharAfterCurrent ? "Next character →" : "Done"}
+          </button>
+        ) : null}
       </div>
 
       {/* Two-pane row */}

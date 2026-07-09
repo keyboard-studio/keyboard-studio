@@ -11,8 +11,11 @@
 //
 // LEFT pane: one-character-at-a-time iteration over session.confirmedInventory.
 //   - When a suggestion applies (long-press / replace / "already in layout"),
-//     shows a suggestion card: Accept applies it and advances; Deny shows the
-//     method chooser. When there is no suggestion, the method chooser is shown
+//     shows a suggestion card: Accept records/applies the suggested method
+//     but does NOT advance — the author stays on the character and may keep
+//     editing; advancing to the next character always requires an explicit
+//     click on the header's "Next character" button. Deny shows the method
+//     chooser. When there is no suggestion, the method chooser is shown
 //     directly (no intermediate card).
 //   - Method chooser offers 4 expandable cards (longpress, flick, multitap,
 //     replace). "Apply method" + "Next character →" + "Skip" follow
@@ -502,6 +505,25 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
   const { stage, retry } = useKeyboardArtifact(baseKeyboard, scaffoldSpec, vfsTransform);
 
+  // Characters whose suggestion card has been explicitly accepted or denied.
+  // Rehydrated from the store draft on mount (mirrors charTouch/skippedChars)
+  // so a resolved suggestion never reappears after back-navigation +
+  // unmount/remount.
+  const [suggestionResolved, setSuggestionResolved] = useState<Set<string>>(() =>
+    touchDraft !== null
+      ? new Set(touchDraft.suggestionResolvedChars)
+      : new Set(),
+  );
+
+  const markSuggestionResolved = useCallback((char: string) => {
+    setSuggestionResolved((prev) => {
+      if (prev.has(char)) return prev;
+      const next = new Set(prev);
+      next.add(char);
+      return next;
+    });
+  }, []);
+
   // Skipped characters. Rehydrated from store draft on mount.
   const [skippedChars, setSkippedChars] = useState<Set<string>>(() =>
     touchDraft !== null
@@ -522,15 +544,17 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // and not again on back-and-forth navigation to Phase C.
   const [showIntro, setShowIntro] = useState(() => !touchIntroSeen);
 
-  // Write charTouch + skippedChars back to the store draft whenever they change
-  // so that back-navigation (unmount) preserves in-progress work.
+  // Write charTouch + skippedChars + suggestionResolved back to the store
+  // draft whenever they change so that back-navigation (unmount) preserves
+  // in-progress work, including which suggestion cards are already decided.
   useEffect(() => {
     setTouchDraft({
       charTouchEntries: [...charTouch.entries()],
       skippedChars: [...skippedChars],
+      suggestionResolvedChars: [...suggestionResolved],
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [charTouch, skippedChars]);
+  }, [charTouch, skippedChars, suggestionResolved]);
 
   // Current character index.
   const [currentChar, setCurrentChar] = useState<string | null>(null);
@@ -694,28 +718,36 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const [hostKey, setHostKey] = useState("");
   const [flickDirection, setFlickDirection] = useState("");
 
-  // Whether the suggestion card has been dismissed for the current character.
-  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
+  // Whether the suggestion card must stay hidden for the current character —
+  // true once explicitly resolved (Accept/Deny — persisted in
+  // suggestionResolved, see above), or once the character is already
+  // configured or skipped (a configured/skipped char never re-prompts).
+  // Derived rather than reset-on-navigate, so returning to an
+  // already-decided character never re-shows its suggestion card.
+  const suggestionDismissed =
+    currentChar !== null &&
+    (suggestionResolved.has(currentChar) ||
+      charTouch.has(currentChar) ||
+      skippedChars.has(currentChar));
 
   // Whether the method has been applied (enables "Next character ->").
-  const [appliedForCurrentChar, setAppliedForCurrentChar] = useState(false);
+  // Derived from charTouch rather than tracked as separate state — a char is
+  // "applied" exactly when it has an entry in charTouch, so removing that
+  // entry (handleRemoveConfigured) automatically flips this back to false
+  // for the currently-displayed character. Mirrors MechanismGallery's
+  // canGoNext, which derives from sessionAssignments rather than local state.
+  const appliedForCurrentChar = useMemo(
+    () => currentChar !== null && charTouch.has(currentChar),
+    [currentChar, charTouch],
+  );
 
-  // Reset method state and suggestion dismissal when currentChar changes.
+  // Reset method inputs (not suggestionResolved — that persists per char)
+  // when currentChar changes.
   useEffect(() => {
-    setSuggestionDismissed(false);
     setMethod("longpress_alternates");
     setHostKey("");
     setFlickDirection("");
-    setAppliedForCurrentChar(false);
   }, [currentChar]);
-
-  // Also mark as applied if the char already has an entry in charTouch
-  // (handles re-visiting a character).
-  useEffect(() => {
-    if (currentChar !== null && charTouch.has(currentChar)) {
-      setAppliedForCurrentChar(true);
-    }
-  }, [currentChar, charTouch]);
 
   // ---------------------------------------------------------------------------
   // canApply
@@ -802,6 +834,11 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // Suggestion card handlers
   // ---------------------------------------------------------------------------
 
+  // Accept the "already in touch layout" suggestion: record the inherited
+  // assignment and mark the suggestion resolved. Stays on currentChar — the
+  // user may still want to make further edits; advancing happens only via
+  // the explicit Next button (gallery-QoL: answering a suggestion must not
+  // force the user forward).
   const handleSuggestionAccept = useCallback(() => {
     if (currentChar === null) return;
     const assignment: TouchAssignment = {
@@ -814,22 +851,19 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     const next = new Map(charTouch);
     next.set(currentChar, assignment);
     setCharTouch(next);
-    setSuggestionDismissed(true);
-    setAppliedForCurrentChar(true);
-    advanceToNext(currentChar, next, skippedChars);
-  // inventory is included so the handler re-captures the latest advanceToNext
-  // (which closes over inventory) if the confirmed inventory ever changes.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentChar, charTouch, skippedChars, inventory]);
+    markSuggestionResolved(currentChar);
+  }, [currentChar, charTouch, markSuggestionResolved]);
 
   // Accept the suggestion: build the suggested assignment and apply it
-  // immediately, then advance to the next character. If no host key could be
+  // immediately, then mark the suggestion resolved and stay on currentChar
+  // so the user can keep editing (see handleSuggestionAccept above — advancing
+  // happens only via the explicit Next button). If no host key could be
   // derived, fall back to opening the chooser pre-filled at the suggested
   // method so the user can pick a key.
   const handleUseSuggestion = useCallback(() => {
     if (currentChar === null) return;
     if (suggestion.kind !== "longpress" && suggestion.kind !== "replace") {
-      setSuggestionDismissed(true);
+      markSuggestionResolved(currentChar);
       return;
     }
     const nextMethod: TouchMethod =
@@ -839,7 +873,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       setMethod(nextMethod);
       setHostKey("");
       setFlickDirection("");
-      setSuggestionDismissed(true);
+      markSuggestionResolved(currentChar);
       return;
     }
     const assignment: TouchAssignment = {
@@ -852,17 +886,12 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     const next = new Map(charTouch);
     next.set(currentChar, assignment);
     setCharTouch(next);
-    setSuggestionDismissed(true);
-    setAppliedForCurrentChar(true);
-    advanceToNext(currentChar, next, skippedChars);
-  // inventory is included so the handler re-captures the latest advanceToNext
-  // (which closes over inventory) if the confirmed inventory ever changes.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suggestion, currentChar, charTouch, skippedChars, inventory]);
+    markSuggestionResolved(currentChar);
+  }, [suggestion, currentChar, charTouch, markSuggestionResolved]);
 
   const handleSuggestionChange = useCallback(() => {
-    setSuggestionDismissed(true);
-  }, []);
+    if (currentChar !== null) markSuggestionResolved(currentChar);
+  }, [currentChar, markSuggestionResolved]);
 
   // ---------------------------------------------------------------------------
   // Apply / Next / Skip handlers
@@ -874,7 +903,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     const next = new Map(charTouch);
     next.set(currentChar, assignment);
     setCharTouch(next);
-    setAppliedForCurrentChar(true);
     // spec-014 FR-014/R4: a manual edit to the host touch key PROMOTES it to
     // `hand-set` in the working IR so subsequent re-propagation never clobbers
     // the author's edit. Flag-gated — off ⇒ byte-identical to P4b (no IR write).
@@ -938,6 +966,23 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     setCharHistory((h) => h.slice(0, -1));
     setCurrentChar(prev);
   }, [charHistory, onBack]);
+
+  // Whether pressing Next from the CURRENT position would land on another
+  // real character rather than finish — drives the forward button's label so
+  // it reflects the current position rather than the global isDone flag (a
+  // back-navigated interior character must not be labeled "All done" when
+  // characters after it still need a visit). Mirrors MechanismGallery.
+  const hasAnotherCharAfterCurrent = useMemo(() => {
+    if (currentChar === null) return false;
+    const idx = inventory.indexOf(currentChar);
+    const forward = inventory
+      .slice(idx + 1)
+      .some((c) => !charTouch.has(c) && !skippedChars.has(c));
+    if (forward) return true;
+    return inventory
+      .slice(0, idx)
+      .some((c) => !charTouch.has(c) && !skippedChars.has(c));
+  }, [currentChar, inventory, charTouch, skippedChars]);
 
   const handleRemoveConfigured = useCallback((char: string) => {
     setCharTouch((prev) => {
@@ -1119,7 +1164,9 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
         {charTouch.size} of {totalChars} configured
       </p>
 
-      {/* All-done state */}
+      {/* All-done state — the forward/completion control (Done) lives in the
+          header top-right (see the component's return JSX); only the status
+          text and Back stay here. */}
       {isDone && currentChar === null && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <p style={{ margin: 0, fontSize: 14, color: TEXT_DIM }}>
@@ -1133,26 +1180,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               style={ghostBtn}
             >
               &larr; Back
-            </button>
-            <button
-              type="button"
-              data-testid="touch-continue"
-              onClick={handleContinue}
-              aria-label="Continue to next phase"
-              style={{
-                padding: "10px 24px",
-                background: BLUE_ACTION,
-                border: "none",
-                borderRadius: 6,
-                color: "#e6edf3",
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: FONT,
-                alignSelf: "flex-start",
-              }}
-            >
-              Done
             </button>
           </div>
         </div>
@@ -1406,7 +1433,9 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             />
           )}
 
-          {/* Apply + Next + Skip button row */}
+          {/* Apply + Skip. Next / Done moved to the header top-right (see the
+              component's return JSX) so the forward-advance control is
+              spatially separated from these editing actions. */}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             {showChooser && (
               <button
@@ -1429,29 +1458,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                 Apply method
               </button>
             )}
-            <button
-              type="button"
-              onClick={handleNext}
-              disabled={!appliedForCurrentChar}
-              aria-label={
-                isDone && appliedForCurrentChar
-                  ? "All characters configured, finish"
-                  : "Next character"
-              }
-              style={{
-                padding: "9px 20px",
-                background: appliedForCurrentChar ? "#238636" : "#21262d",
-                border: "none",
-                borderRadius: 6,
-                color: appliedForCurrentChar ? "#e6edf3" : TEXT_DIM,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: appliedForCurrentChar ? "pointer" : "not-allowed",
-                fontFamily: FONT,
-              }}
-            >
-              {isDone && appliedForCurrentChar ? "All done →" : "Next character →"}
-            </button>
             <button
               type="button"
               onClick={handleSkip}
@@ -1626,6 +1632,59 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             {totalChars}
           </span>
         )}
+
+        {/* Primary forward action — top-right, spatially separated from the
+            left-pane editing controls (Apply method / Skip) so it is not
+            accidentally pressed. Exactly one control renders per state: the
+            Done completion (all-done) or the per-character Next/Done advance
+            button. */}
+        {isDone && currentChar === null ? (
+          <button
+            type="button"
+            data-testid="touch-continue"
+            onClick={handleContinue}
+            aria-label="Continue to next phase"
+            style={{
+              marginLeft: "auto",
+              alignSelf: "center",
+              padding: "9px 20px",
+              background: BLUE_ACTION,
+              border: "none",
+              borderRadius: 6,
+              color: "#e6edf3",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: FONT,
+            }}
+          >
+            Done
+          </button>
+        ) : currentChar !== null ? (
+          <button
+            type="button"
+            onClick={handleNext}
+            disabled={!appliedForCurrentChar}
+            aria-label={
+              hasAnotherCharAfterCurrent ? "Next character" : "All characters configured, finish"
+            }
+            style={{
+              marginLeft: "auto",
+              alignSelf: "center",
+              padding: "9px 20px",
+              background: appliedForCurrentChar ? "#238636" : "#21262d",
+              border: "none",
+              borderRadius: 6,
+              color: appliedForCurrentChar ? "#e6edf3" : TEXT_DIM,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: appliedForCurrentChar ? "pointer" : "not-allowed",
+              fontFamily: FONT,
+            }}
+          >
+            {hasAnotherCharAfterCurrent ? "Next character →" : "Done"}
+          </button>
+        ) : null}
       </div>
 
       {/* Two-pane body */}

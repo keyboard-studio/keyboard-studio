@@ -24,6 +24,7 @@ import type { PatternLibraryService, VirtualFS } from "@keyboard-studio/contract
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { latinDeadkeyAcuteSingle } from "@keyboard-studio/contracts/fixtures";
+import { corpusBackedQwerty } from "@keyboard-studio/contracts/fixtures";
 import type { PatternMatch } from "@keyboard-studio/contracts";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
@@ -670,6 +671,138 @@ describe("MechanismGallery — Back button", () => {
     expect(btn).toBeTruthy();
     fireEvent.click(btn);
     expect(onBack).toHaveBeenCalledOnce();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// History-based Back navigation (mirrors TouchGallery's history-stack model)
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — history-based Back navigation", () => {
+  it("Back from character 2 returns to character 1 without calling onBack; Back again from character 1 calls onBack", async () => {
+    const onBack = vi.fn();
+    seedInventory(["á", "é"]);
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} />,
+      );
+    });
+
+    // Apply the (pre-filled, always-enabled) deadkey method for "á".
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
+
+    // Advance to "é" via the header "Next character" button.
+    await waitFor(() => {
+      const nextBtn = screen.getByRole("button", { name: /Next character/i });
+      expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(nextBtn);
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText(/U\+00E9/i)).toBeTruthy();
+    });
+
+    // Click Back — history-based: returns to "á" within the loop, does NOT
+    // call onBack. Anchored regex: "á" is covered, so an "Added" chip
+    // ("Remove U+00E1 á") also carries "U+00E1" in its aria-label — match only
+    // the character-heading span's exact label.
+    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+    });
+    expect(onBack).not.toHaveBeenCalled();
+
+    // Click Back again from "á" — history is now empty, so onBack fires.
+    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Back button in the all-done panel
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — Back in the all-done panel", () => {
+  it("renders a Back button in the all-keys-added state", async () => {
+    const onBack = vi.fn();
+    seedInventory(["á"]);
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} />,
+      );
+    });
+
+    // Skip the only character — reaches the all-done state (currentChar===null).
+    fireEvent.click(screen.getByRole("button", { name: /Skip á/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/All keys added/i)).toBeTruthy();
+    });
+
+    // A Back button is genuinely present in this state, not just the per-char UI.
+    const backBtn = screen.getByRole("button", { name: /← back/i });
+    expect(backBtn).toBeTruthy();
+    fireEvent.click(backBtn);
+    // History has "á" from the skip, so Back returns within the loop rather
+    // than calling onBack.
+    expect(onBack).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// kbgen suggestion row — persistence across Back navigation
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — kbgen suggestion persistence across Back navigation", () => {
+  it("an accepted suggestion row does not reappear after navigating forward and back", async () => {
+    // corpusBackedQwerty proposes RALT+K_E for U+00E9 (é) and RALT+K_A for
+    // U+00E0 (à) — both S-08 (modifier_as_layer_switch) candidates.
+    const onBack = vi.fn();
+    seedInventory(["é", "à"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          onBack={onBack}
+          placementMap={corpusBackedQwerty}
+        />,
+      );
+    });
+
+    // Suggestion row shows for "é".
+    expect(screen.getByText(/Suggested: Right Alt \+ E for é/i)).toBeTruthy();
+
+    // Accept it — records the S-08 assignment and dismisses the row (the
+    // dismissal is also implied by coveredChars once accepted).
+    fireEvent.click(
+      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ K_E for é/i }),
+    );
+    await waitFor(() => {
+      expect(screen.queryByText(/Suggested: Right Alt \+ E for é/i)).toBeNull();
+    });
+
+    // Advance to "à" — its own (not-yet-resolved) suggestion row shows.
+    await waitFor(() => {
+      const nextBtn = screen.getByRole("button", { name: /Next character/i });
+      expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(nextBtn);
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/Suggested: Right Alt \+ A for à/i)).toBeTruthy();
+    });
+
+    // Navigate back to "é" without resolving à's suggestion. Anchored regex:
+    // "é" is covered (accepted above), so an "Added" chip ("Remove U+00E9 é")
+    // also carries "U+00E9" in its aria-label — match only the
+    // character-heading span's exact label.
+    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    expect(onBack).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+    });
+
+    // The already-accepted suggestion for "é" must NOT re-render its card.
+    expect(screen.queryByText(/Suggested: Right Alt \+ E for é/i)).toBeNull();
   });
 });
 

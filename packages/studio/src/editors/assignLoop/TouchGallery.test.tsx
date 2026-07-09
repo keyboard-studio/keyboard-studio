@@ -379,10 +379,11 @@ describe("TouchGallery — back navigation", () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={onBack} />);
     });
 
-    // Accept the suggestion for "ä" — this calls handleUseSuggestion (longpress)
-    // or handleSuggestionAccept (already), both of which call advanceToNext,
-    // pushing "ä" onto history and advancing to "ö". Click Accept on the
-    // suggestion card (Accept is present for all non-none suggestion kinds).
+    // Accept the suggestion for "ä" (Accept is present for all non-none
+    // suggestion kinds). Gallery-QoL fix: answering a suggestion no longer
+    // forces an advance — it records the assignment and stays on "ä" so the
+    // user can keep editing. Advancing now requires an explicit click on the
+    // header's "Next character" button.
     const allButtons = screen.queryAllByRole("button");
     const acceptBtn = allButtons.find(
       (b) => b.textContent?.trim() === "Accept",
@@ -392,7 +393,18 @@ describe("TouchGallery — back navigation", () => {
       fireEvent.click(acceptBtn!);
     });
 
-    // Should now be on "ö" — find and click Back.
+    // Still on "ä" — the suggestion card is gone (resolved) and the header's
+    // forward button is enabled since a method was applied.
+    expect(screen.queryByLabelText(/^U\+00E4 ä$/)).not.toBeNull();
+
+    // Click "Next character" (header, top-right) to advance to "ö".
+    const nextBtn = screen.getByRole("button", { name: /next character/i });
+    await act(async () => {
+      fireEvent.click(nextBtn);
+    });
+    expect(screen.queryByLabelText(/^U\+00F6 ö$/)).not.toBeNull();
+
+    // Now on "ö" — find and click Back.
     const backBtnsAfter = screen.queryAllByRole("button", { name: /back/i });
     const backBtn = backBtnsAfter.find((b) => b.textContent?.includes("Back")) ?? null;
     expect(backBtn).not.toBeNull();
@@ -403,10 +415,11 @@ describe("TouchGallery — back navigation", () => {
     // onBack should NOT have been called — we went back within Phase E.
     expect(onBack).not.toHaveBeenCalled();
 
-    // The "ä" character heading should now be visible (we returned to char 1).
-    // Use the per-char "Touch mapping" label which is unique to the per-char UI.
-    const headings = screen.queryAllByText(/Touch mapping/i);
-    expect(headings.length).toBeGreaterThan(0);
+    // We are back on "ä" (char 1) — the suggestion was already resolved, so
+    // the suggestion card must NOT reappear (gallery-QoL fix #2); the method
+    // chooser (or the "Configured" chip) reflects the already-accepted state.
+    expect(screen.queryByLabelText(/^U\+00E4 ä$/)).not.toBeNull();
+    expect(screen.queryByText(/Suggested: long-press/i)).toBeNull();
   });
 
   it("Back from empty-inventory guard calls onBack", async () => {
