@@ -104,7 +104,25 @@ export function usePreviewArtifact(): PreviewArtifact {
   // Delegates to instantiateFromBaseIfConfirmed which reads live store state via
   // getState() so the stale-closure problem cannot arise even though this
   // callback is memoised.
+  //
+  // Re-instantiation guard: by the time these screens mount, the working copy is
+  // already a persistent singleton in the store — instantiated during the survey
+  // (Track 1 new-from-base OR Track 2 adapt-existing) with the author's carve
+  // deletions and survey answers. This screen runs its OWN decoupled compile
+  // pipeline (see the module comment), whose full run() fires onInstantiate on
+  // mount. Re-instantiating from that mount would pop the rebase-confirm dialog
+  // ("Switching base keyboards will discard your current edits…") over work that
+  // is already in the store, and confirming it is destructive: this path only
+  // knows Track 1 instantiateFromBase, so against a Track 2 store it is a
+  // same-id/different-mode "genuine switch" that resets phaseResults + irAxes —
+  // discarding the survey answers and leaving nothing valid to submit. So skip
+  // entirely when the store already holds a working copy for this same base;
+  // only genuinely NEW bases picked via this screen's own picker fall through to
+  // instantiate. Mirrors StudioShell's instantiatedRef gate, keyed on the store
+  // (survives this screen's own mount/unmount) rather than a per-mount ref.
   const onInstantiate = useCallback<OnInstantiateCallback>((base, { vfs, ir, removalCapabilities }) => {
+    const current = useWorkingCopyStore.getState().baseKeyboard;
+    if (current !== null && current.id === base.id) return;
     instantiateFromBaseIfConfirmed(base, { vfs, ir, removalCapabilities });
   }, []);
 
