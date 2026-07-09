@@ -121,9 +121,20 @@ vi.mock("@keyboard-studio/engine", async (importOriginal) => {
 // ---------------------------------------------------------------------------
 
 vi.mock("../../components/OSKFrame.tsx", () => ({
-  OSKFrame: ({ stage }: { stage: Stage }) => (
+  OSKFrame: ({
+    stage,
+    onKeyTap,
+  }: {
+    stage: Stage;
+    onKeyTap?: (keyId: string) => void;
+  }) => (
     <div data-testid="osk-frame" data-stage={stage.kind}>
       osk-frame-mock
+      {onKeyTap !== undefined && (
+        <button type="button" onClick={() => onKeyTap("K_E")}>
+          tap-K_E
+        </button>
+      )}
     </div>
   ),
 }));
@@ -1125,6 +1136,167 @@ describe("MechanismGallery — shift-layer targeting (S-01)", () => {
       .session.assignments.filter((a) => a.modality === "physical");
     expect(assignments[0]?.mechanisms[0]?.slotValues?.["kmnRules"]).toBe(
       "+ [K_Q] > U+03B8",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// RAlt layer targeting (S-08) — Base/Shift plane choice
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
+  it("emits a [RALT K_X] rule by default (unshifted plane)", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/RAlt \+ key/i));
+    fireEvent.change(screen.getByLabelText(/Base key for RAlt layer/i), {
+      target: { value: "K_E" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for ε/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0]?.target).toBe("ε");
+    expect(assignments[0]?.mechanisms[0]?.patternId).toBe("modifier_as_layer_switch");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
+      "[RALT K_E]",
+    );
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrOutputList"]).toBe(
+      "ε",
+    );
+  });
+
+  it("emits a [SHIFT RALT K_X] rule when the Shift+RAlt layer is selected", async () => {
+    // The user is adding Ε (capital epsilon) via the shifted RAlt plane of
+    // K_E — Shift+RAlt+E should produce Ε, not the unshifted RAlt character.
+    instantiateWorkingCopy();
+    seedInventory(["Ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/RAlt \+ key/i));
+    fireEvent.change(screen.getByLabelText(/Base key for RAlt layer/i), {
+      target: { value: "K_E" },
+    });
+    fireEvent.click(screen.getByRole("radio", { name: "Shift+RAlt" }));
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for Ε/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0]?.target).toBe("Ε");
+    expect(assignments[0]?.mechanisms[0]?.patternId).toBe("modifier_as_layer_switch");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
+      "[SHIFT RALT K_E]",
+    );
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrOutputList"]).toBe(
+      "Ε",
+    );
+  });
+
+  it("is not gated by mnemonic layout (unlike the S-01 Shift toggle)", async () => {
+    // [SHIFT RALT K_X] is a hardware modifier-plane combo, legitimate even on
+    // mnemonic keyboards (russian_mnemonic_r proves it) — the Shift+RAlt
+    // radio must remain enabled regardless of &MNEMONICLAYOUT.
+    instantiateWorkingCopy({ mnemonic: true });
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/RAlt \+ key/i));
+    const shiftRaltToggle = screen.getByRole("radio", { name: "Shift+RAlt" }) as HTMLButtonElement;
+    expect(shiftRaltToggle.disabled).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Covered-chip badge text — methodLabel render-level assertions (S-08 layers)
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — covered-chip badge text for RAlt/Shift+RAlt (methodLabel)", () => {
+  it('shows "RAlt: K_E" on the badge for an unshifted RAlt assignment', async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/RAlt \+ key/i));
+    fireEvent.change(screen.getByLabelText(/Base key for RAlt layer/i), {
+      target: { value: "K_E" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for ε/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /Remove method RAlt: K_E for ε/i }),
+      ).toBeTruthy();
+    });
+  });
+
+  it('shows "Shift+RAlt: K_E" on the badge for a shifted RAlt assignment', async () => {
+    instantiateWorkingCopy();
+    seedInventory(["Ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/RAlt \+ key/i));
+    fireEvent.change(screen.getByLabelText(/Base key for RAlt layer/i), {
+      target: { value: "K_E" },
+    });
+    fireEvent.click(screen.getByRole("radio", { name: "Shift+RAlt" }));
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for Ε/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /Remove method Shift\+RAlt: K_E for Ε/i }),
+      ).toBeTruthy();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// OSK key-tap → base key selection while RAlt method + Shift+RAlt layer is
+// active (handleKeyTap wiring, covers the keycap-mislabel fix's companion
+// authoring path: picking the base key via the OSK rather than the dropdown).
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — OSK key-tap selects the RAlt base key", () => {
+  it("tapping the OSK sets the base key and Apply emits [SHIFT RALT <tappedKey>] when Shift+RAlt is selected", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["Ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      // Flush the patterns-loading microtasks so GalleryPreviewWithPatterns
+      // (and the mocked OSKFrame's tap button) mounts.
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    fireEvent.click(screen.getByText(/RAlt \+ key/i));
+    fireEvent.click(screen.getByRole("radio", { name: "Shift+RAlt" }));
+
+    // Tap the OSK mock (always taps "K_E") to pick the base key instead of
+    // using the dropdown.
+    fireEvent.click(screen.getByRole("button", { name: "tap-K_E" }));
+
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for Ε/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
+      "[SHIFT RALT K_E]",
     );
   });
 });

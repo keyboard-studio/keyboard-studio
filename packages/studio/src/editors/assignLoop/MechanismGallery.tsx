@@ -97,8 +97,12 @@ function methodLabel(ref: { patternId: string; slotValues?: Record<string, strin
       const firstLine = (sv["kmnRules"] ?? "").split("\n")[0] ?? "";
       return `Key: ${firstLine.replace(/^\+ \[/, "").replace(/\].*/, "")}`;
     }
-    case "modifier_as_layer_switch":
-      return `RAlt: ${(sv["altgrKeyList"] ?? "").split(" ").pop()?.replace(/^\[/, "").replace(/\]$/, "") ?? "?"}`;
+    case "modifier_as_layer_switch": {
+      const altgrKeyList = sv["altgrKeyList"] ?? "";
+      const key = altgrKeyList.split(" ").pop()?.replace(/^\[/, "").replace(/\]$/, "") ?? "?";
+      const prefix = altgrKeyList.includes("SHIFT") ? "Shift+RAlt" : "RAlt";
+      return `${prefix}: ${key}`;
+    }
     default:
       return ref.patternId;
   }
@@ -182,6 +186,16 @@ type Method = "sequence" | "deadkey" | "swap" | "ralt";
 // carve gallery's Inspector/Rail.
 type SwapLayer = "base" | "shift";
 
+// S-08 "RAlt + key" target plane. 'ralt' is the long-standing default
+// (`[RALT K_X]`); 'shift-ralt' targets the SHIFTED RAlt plane on the same
+// base key (`[SHIFT RALT K_X]`) — e.g. a capital letter reached via
+// Shift+RAlt+key. Unlike the S-01 Shift toggle, this is NOT gated on
+// mnemonic layouts: `[SHIFT RALT K_X]` is a hardware modifier-plane combo,
+// legitimate even on mnemonic keyboards (russian_mnemonic_r ships
+// `[SHIFT RALT K_PERIOD]`) — SHIFT here modifies RALT, it does not
+// re-apply the base layout's own shift semantics.
+type RaltLayer = "ralt" | "shift-ralt";
+
 interface MethodChooserProps {
   currentChar: string;
   method: Method;
@@ -201,6 +215,9 @@ interface MethodChooserProps {
   /** S-01 target layer — 'base' (default) or 'shift' (shift+key). */
   swapLayer: SwapLayer;
   onSwapLayerChange: (v: SwapLayer) => void;
+  /** S-08 target plane — 'ralt' (default) or 'shift-ralt' (shift+RAlt+key). */
+  raltLayer: RaltLayer;
+  onRaltLayerChange: (v: RaltLayer) => void;
   /**
    * True when the working keyboard is mnemonic — shift behaviour comes from
    * the base layout, so the Shift toggle must be disabled (planShiftAssignment
@@ -250,6 +267,8 @@ function MethodChooser({
   onRaltKeyChange,
   swapLayer,
   onSwapLayerChange,
+  raltLayer,
+  onRaltLayerChange,
   shiftLayerDisabled,
 }: MethodChooserProps) {
 
@@ -540,6 +559,27 @@ function MethodChooser({
                 ))}
               </select>
             </label>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span id="ralt-layer-label" style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
+                Layer:
+              </span>
+              <RadioGroup
+                name="ralt-layer"
+                value={raltLayer}
+                onChange={(v) => onRaltLayerChange(v as RaltLayer)}
+                ariaLabelledby="ralt-layer-label"
+                options={[
+                  { value: "ralt", label: "RAlt" },
+                  { value: "shift-ralt", label: "Shift+RAlt" },
+                ]}
+              />
+            </div>
+            {raltLayer === "shift-ralt" && selectedRaltKey !== "" && (
+              <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
+                Shift + RAlt + {selectedRaltKey.replace(/^K_/, "")} &rarr;{" "}
+                <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentChar}</span>
+              </p>
+            )}
             <p style={{ margin: 0, fontSize: 11, color: "#d29922", fontFamily: FONT }}>
               Note: RAlt may conflict with system shortcuts on macOS.
             </p>
@@ -789,6 +829,7 @@ export function MechanismGallery({
   const [selectedSwapKey, setSelectedSwapKey] = useState("");
   const [selectedRaltKey, setSelectedRaltKey] = useState("");
   const [swapLayer, setSwapLayer] = useState<SwapLayer>("base");
+  const [raltLayer, setRaltLayer] = useState<RaltLayer>("ralt");
 
   // Propose-then-confirm case-pair companion (spec v1.3.1 §3c — never apply
   // silently). Set right after a base-layer S-01 apply when the applied
@@ -855,6 +896,7 @@ export function MechanismGallery({
     setSelectedSwapKey("");
     setSelectedRaltKey("");
     setSwapLayer("base");
+    setRaltLayer("ralt");
   }, []);
 
   // Reset inputs whenever currentChar changes.
@@ -1063,7 +1105,10 @@ export function MechanismGallery({
             patternId: PATTERN_RALT,
             strategyId: "S-08",
             slotValues: {
-              altgrKeyList: `[RALT ${selectedRaltKey}]`,
+              altgrKeyList:
+                raltLayer === "shift-ralt"
+                  ? `[SHIFT RALT ${selectedRaltKey}]`
+                  : `[RALT ${selectedRaltKey}]`,
               altgrOutputList: currentChar,
             },
           },
@@ -1085,6 +1130,7 @@ export function MechanismGallery({
     selectedSwapKey,
     selectedRaltKey,
     swapLayer,
+    raltLayer,
     shiftLayerAllowed,
     workingIr,
     identityBcp47,
@@ -1689,6 +1735,8 @@ export function MechanismGallery({
                 onRaltKeyChange={setSelectedRaltKey}
                 swapLayer={swapLayer}
                 onSwapLayerChange={setSwapLayer}
+                raltLayer={raltLayer}
+                onRaltLayerChange={setRaltLayer}
                 shiftLayerDisabled={!shiftLayerAllowed}
               />
 
