@@ -773,9 +773,21 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     return { patternId: "multitap", slotValues: { hostKey, char } };
   }
 
-  /** Deep-equality for a MechanismRef (patternId + slotValues). */
+  /**
+   * Structural equality for a MechanismRef: same `patternId` and the same
+   * `slotValues` (compared by key set + per-key value, order-independent).
+   * Deliberately not `JSON.stringify` — key order in `slotValues` is not
+   * semantically meaningful, and two refs built from differently-ordered
+   * object literals must still dedupe to one chip.
+   */
   function mechanismRefEquals(a: MechanismRef, b: MechanismRef): boolean {
-    return a.patternId === b.patternId && JSON.stringify(a.slotValues ?? {}) === JSON.stringify(b.slotValues ?? {});
+    if (a.patternId !== b.patternId) return false;
+    const aSlots = a.slotValues ?? {};
+    const bSlots = b.slotValues ?? {};
+    const aKeys = Object.keys(aSlots);
+    const bKeys = Object.keys(bSlots);
+    if (aKeys.length !== bKeys.length) return false;
+    return aKeys.every((key) => aSlots[key] === bSlots[key]);
   }
 
   /**

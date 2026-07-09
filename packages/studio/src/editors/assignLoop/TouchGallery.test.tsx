@@ -877,6 +877,9 @@ describe("TouchGallery — no suggestion goes straight to chooser", () => {
   it("shows the method chooser directly (no 'Set how … is reached' prompt) when there is no suggestion", async () => {
     // "中" has no Phase C desktop assignment, is not in the default touch layout,
     // and is not a decomposable accented letter, so suggestion kind = "none".
+    // Chosen only to exercise the no-suggestion path deterministically — not a
+    // CJK-support claim; v1 routes CJK input to a "not yet supported" stub
+    // per spec §9/§16.
     seedStore({ withInventory: ["中"] });
 
     await act(async () => {
@@ -994,6 +997,74 @@ describe("TouchGallery — QC P1 dedupe / revisit invariants", () => {
     const draft = useWorkingCopyStore.getState().touchDraft;
     const entry = draft?.charTouchEntries.find(([c]) => c === "中");
     expect(entry?.[1]?.mechanisms.length).toBe(1);
+  });
+
+  it("dedupes a mechanism whose existing slotValues has a different key order (mechanismRefEquals must be order-independent)", async () => {
+    // Two-character inventory: "y" is left unconfigured so the sync effect
+    // lands the initial currentChar there (not on the preconfigured "中"),
+    // and charHistory seeds a pending Back hop to "中" — mirroring how a
+    // real session would have visited "中" earlier, then moved on.
+    seedStore({ withInventory: ["中", "y"] });
+
+    // Seed an existing mechanism for "中" whose slotValues key order is
+    // { char, hostKey } — the reverse of what buildMechanismRef produces
+    // ({ hostKey, char }). A JSON.stringify-based comparison would treat
+    // this as a distinct ref and append a duplicate; the structural
+    // comparison must recognize it as the same mechanism.
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [
+        [
+          "中",
+          {
+            scope: "individual",
+            target: "中",
+            modality: "touch",
+            mechanisms: [
+              { patternId: "longpress_alternates", slotValues: { char: "中", hostKey: "K_A" } },
+            ],
+            source: "user",
+          },
+        ],
+      ],
+      skippedChars: [],
+      charHistory: ["中"],
+    });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // Mount lands on "y" (first unconfigured char). Back pops "中" off the
+    // seeded charHistory, landing on the preconfigured character — "中" has
+    // no suggestion, so the chooser (not a suggestion card) shows directly.
+    const backBtn = screen.queryAllByRole("button", { name: /back/i }).find(
+      (b) => b.textContent?.includes("Back"),
+    ) ?? null;
+    expect(backBtn).not.toBeNull();
+    await act(async () => { fireEvent.click(backBtn!); });
+
+    // Apply the same method+hostKey via the chooser (default method is
+    // already "longpress_alternates" — matches buildMechanismRef's key order).
+    const hostKeySelect = screen.queryByRole("combobox", { name: /host key/i });
+    expect(hostKeySelect).not.toBeNull();
+    await act(async () => {
+      fireEvent.change(hostKeySelect!, { target: { value: "K_A" } });
+    });
+    const applyBtn = screen.queryAllByRole("button").find(
+      (b) => b.textContent?.trim() === "Apply method",
+    ) ?? null;
+    expect(applyBtn).not.toBeNull();
+    await act(async () => { fireEvent.click(applyBtn!); });
+
+    // Still exactly one chip / one mechanism — no duplicate from the
+    // key-order mismatch.
+    const configuredGroup = screen.queryByRole("group", { name: /configured characters/i });
+    expect(configuredGroup).not.toBeNull();
+    expect(configuredGroup!.querySelectorAll("button").length).toBe(1);
+
+    const draftAfter = useWorkingCopyStore.getState().touchDraft;
+    const entryAfter = draftAfter?.charTouchEntries.find(([c]) => c === "中");
+    expect(entryAfter?.[1]?.mechanisms.length).toBe(1);
   });
 
   it("accepting the 'already in layout' suggestion then adding a real method leaves no stray touch_inherited (mutual exclusivity holds)", async () => {
