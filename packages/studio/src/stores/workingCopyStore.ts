@@ -218,6 +218,11 @@ export interface WorkingCopyState {
    * - `charTouchEntries`: serializable form of the `charTouch` Map
    *   (array of [char, TouchAssignment] pairs so it survives JSON round-trips).
    * - `skippedChars`: array form of the `skippedChars` Set.
+   * - `charHistory`: the visited-character history stack (most-recently-visited
+   *   last), so the Back button's depth survives an unmount/remount caused by
+   *   navigating to Phase C and returning — without this, Back would always
+   *   land on `onBack()` after a remount regardless of how many characters
+   *   had actually been visited.
    *
    * Null until Phase E first mounts and writes back state. Cleared on reset
    * and on a new instantiation.
@@ -225,6 +230,7 @@ export interface WorkingCopyState {
   touchDraft: {
     charTouchEntries: Array<[string, TouchAssignment]>;
     skippedChars: string[];
+    charHistory: string[];
   } | null;
 
   /**
@@ -368,7 +374,11 @@ export interface WorkingCopyState {
    * charTouch or skippedChars change (or on unmount). Pass null to clear.
    */
   setTouchDraft: (
-    draft: { charTouchEntries: Array<[string, TouchAssignment]>; skippedChars: string[] } | null,
+    draft: {
+      charTouchEntries: Array<[string, TouchAssignment]>;
+      skippedChars: string[];
+      charHistory: string[];
+    } | null,
   ) => void;
   /** Mark a gallery's one-time intro splash as seen for this working-copy session. */
   markGalleryIntroSeen: (gallery: "mechanism" | "touch") => void;

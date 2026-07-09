@@ -380,9 +380,10 @@ describe("TouchGallery — back navigation", () => {
     });
 
     // Accept the suggestion for "ä" — this calls handleUseSuggestion (longpress)
-    // or handleSuggestionAccept (already), both of which call advanceToNext,
-    // pushing "ä" onto history and advancing to "ö". Click Accept on the
-    // suggestion card (Accept is present for all non-none suggestion kinds).
+    // or handleSuggestionAccept (already). Per issue 4 (stay on the character
+    // after accepting a suggestion), accepting no longer advances by itself —
+    // click "Next character →" afterward to push "ä" onto history and advance
+    // to "ö".
     const allButtons = screen.queryAllByRole("button");
     const acceptBtn = allButtons.find(
       (b) => b.textContent?.trim() === "Accept",
@@ -390,6 +391,14 @@ describe("TouchGallery — back navigation", () => {
     expect(acceptBtn).not.toBeNull();
     await act(async () => {
       fireEvent.click(acceptBtn!);
+    });
+
+    const nextBtn = screen.queryAllByRole("button").find(
+      (b) => b.textContent?.trim() === "Next character →",
+    ) ?? null;
+    expect(nextBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(nextBtn!);
     });
 
     // Should now be on "ö" — find and click Back.
@@ -483,7 +492,7 @@ describe("TouchGallery — draft persistence across unmount/remount", () => {
     );
 
     // "ä" is decomposable and not in the default layout, so the suggestion is
-    // "longpress". Accept it — advances to "ö" and records "ä" in charTouch.
+    // "longpress". Accept it — records "ä" in charTouch (stays on "ä"; issue 4).
     const allButtons = screen.queryAllByRole("button");
     const acceptBtn = allButtons.find(
       (b) => b.textContent?.trim() === "Accept",
@@ -511,6 +520,191 @@ describe("TouchGallery — draft persistence across unmount/remount", () => {
     expect(configuredGroup).not.toBeNull();
     const chipButton = screen.queryByRole("button", { name: new RegExp("ä") });
     expect(chipButton).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Multiple methods per character (issue 3 — core model change)
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — multiple methods per character", () => {
+  it("applying two methods to one character produces two chips, each independently removable", async () => {
+    // "中" has no Phase C assignment, is not in the default touch layout, and
+    // is not decomposable, so suggestion kind = "none" — the chooser shows
+    // directly and there is nothing to Accept/Deny first.
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // Apply method 1: long-press K_A (the chooser's default active method).
+    const hostKeySelect1 = screen.queryByRole("combobox", { name: /host key/i });
+    expect(hostKeySelect1).not.toBeNull();
+    await act(async () => {
+      fireEvent.change(hostKeySelect1!, { target: { value: "K_A" } });
+    });
+    let applyBtn = screen.queryAllByRole("button").find(
+      (b) => b.textContent?.trim() === "Apply method",
+    ) ?? null;
+    expect(applyBtn).not.toBeNull();
+    await act(async () => { fireEvent.click(applyBtn!); });
+
+    // Apply method 2: multitap K_B, for the SAME character (re-picking a method
+    // after the first apply must not be blocked, and must not overwrite method 1).
+    const multitapOption = screen.queryByText(/tap multiple times/i);
+    expect(multitapOption).not.toBeNull();
+    await act(async () => { fireEvent.click(multitapOption!); });
+
+    const hostKeySelect2 = screen.queryByRole("combobox", { name: /host key/i });
+    expect(hostKeySelect2).not.toBeNull();
+    await act(async () => {
+      fireEvent.change(hostKeySelect2!, { target: { value: "K_B" } });
+    });
+    applyBtn = screen.queryAllByRole("button").find(
+      (b) => b.textContent?.trim() === "Apply method",
+    ) ?? null;
+    expect(applyBtn).not.toBeNull();
+    await act(async () => { fireEvent.click(applyBtn!); });
+
+    // Two chips now exist in the Configured group — one per mechanism.
+    const configuredGroup = screen.queryByRole("group", { name: /configured characters/i });
+    expect(configuredGroup).not.toBeNull();
+    let chips = configuredGroup!.querySelectorAll("button");
+    expect(chips.length).toBe(2);
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const entry = draft?.charTouchEntries.find(([c]) => c === "中");
+    expect(entry?.[1]?.mechanisms.length).toBe(2);
+    expect(entry?.[1]?.mechanisms.map((m) => m.patternId)).toEqual([
+      "longpress_alternates",
+      "multitap",
+    ]);
+
+    // Remove one mechanism — the other survives, the char entry survives.
+    await act(async () => {
+      fireEvent.click(chips[0]!);
+    });
+    const draftAfterOneRemoval = useWorkingCopyStore.getState().touchDraft;
+    const entryAfterOneRemoval = draftAfterOneRemoval?.charTouchEntries.find(([c]) => c === "中");
+    expect(entryAfterOneRemoval).toBeDefined();
+    expect(entryAfterOneRemoval?.[1]?.mechanisms.length).toBe(1);
+
+    chips = screen.queryByRole("group", { name: /configured characters/i })!.querySelectorAll("button");
+    expect(chips.length).toBe(1);
+
+    // Remove the last remaining mechanism — the whole char entry disappears.
+    await act(async () => {
+      fireEvent.click(chips[0]!);
+    });
+    const draftAfterAllRemoved = useWorkingCopyStore.getState().touchDraft;
+    expect(draftAfterAllRemoved?.charTouchEntries.some(([c]) => c === "中")).toBe(false);
+    expect(screen.queryByRole("group", { name: /configured characters/i })).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stay on character after accepting a suggestion (issue 4)
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — accepting a suggestion stays on the same character", () => {
+  it("keeps the same character current after Accept, shows the chooser, and allows adding a second method", async () => {
+    // "ä" is decomposable and not in the default layout → longpress suggestion.
+    seedStore({ withInventory: ["ä"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const acceptBtn = screen.queryAllByRole("button").find(
+      (b) => b.textContent?.trim() === "Accept",
+    ) ?? null;
+    expect(acceptBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(acceptBtn!);
+    });
+
+    // Still on "ä" (per-char card visible); the suggestion card is gone and the
+    // chooser is now visible so the author can add another method to "ä".
+    expect(screen.queryAllByText(/Touch mapping/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Suggested: long-press/i)).toBeNull();
+    expect(screen.queryByText(/How to reach it on touch/i)).not.toBeNull();
+
+    // Add a second method (flick) for the same character.
+    const flickOption = screen.queryByText(/swipe a key \(flick\)/i);
+    expect(flickOption).not.toBeNull();
+    await act(async () => { fireEvent.click(flickOption!); });
+
+    const hostKeySelect = screen.queryByRole("combobox", { name: /host key/i });
+    expect(hostKeySelect).not.toBeNull();
+    await act(async () => {
+      fireEvent.change(hostKeySelect!, { target: { value: "K_B" } });
+    });
+    const directionSelect = screen.queryByRole("combobox", { name: /flick direction/i });
+    expect(directionSelect).not.toBeNull();
+    await act(async () => {
+      fireEvent.change(directionSelect!, { target: { value: "n" } });
+    });
+
+    const applyBtn = screen.queryAllByRole("button").find(
+      (b) => b.textContent?.trim() === "Apply method",
+    ) ?? null;
+    expect(applyBtn).not.toBeNull();
+    await act(async () => { fireEvent.click(applyBtn!); });
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const entry = draft?.charTouchEntries.find(([c]) => c === "ä");
+    expect(entry?.[1]?.mechanisms.length).toBe(2);
+    expect(entry?.[1]?.mechanisms.map((m) => m.patternId)).toEqual([
+      "longpress_alternates",
+      "flick_gestures",
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Back preserves history depth across remount (issue 2)
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — Back preserves history depth across a remount", () => {
+  it("rehydrates charHistory from the store draft so Back steps to the previous character instead of calling onBack", async () => {
+    seedStore({ withInventory: ["ä", "ö"] });
+
+    // Simulate a prior mount that configured "ä", advanced to "ö" (pushing "ä"
+    // onto charHistory), and wrote the draft back to the store before
+    // unmounting — the exact state a real unmount/remount (back-nav to Phase C
+    // and returning) would leave behind.
+    const configuredAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "ä",
+      modality: "touch",
+      mechanisms: [{ patternId: "longpress_alternates", slotValues: { hostKey: "K_A", char: "ä" } }],
+      source: "user",
+    };
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [["ä", configuredAssignment]],
+      skippedChars: [],
+      charHistory: ["ä"],
+    });
+
+    const onBack = vi.fn();
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={onBack} />);
+    });
+
+    // "ä" is already configured, so the current-character sync lands on "ö".
+    const backBtn = screen.queryAllByRole("button", { name: /back/i }).find(
+      (b) => b.textContent?.includes("Back"),
+    ) ?? null;
+    expect(backBtn).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(backBtn!);
+    });
+
+    // The regression this guards: charHistory used to reset to [] on every
+    // mount, so Back always called onBack (exiting Phase E) regardless of how
+    // many characters had actually been visited. With charHistory rehydrated,
+    // Back must step back to "ä" instead.
+    expect(onBack).not.toHaveBeenCalled();
+    expect(screen.queryAllByText(/Touch mapping/i).length).toBeGreaterThan(0);
   });
 });
 
