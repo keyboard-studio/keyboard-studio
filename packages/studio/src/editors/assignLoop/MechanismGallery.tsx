@@ -55,6 +55,8 @@ import {
   isMnemonicLayout,
   planShiftAssignment,
   buildShiftRuleLines,
+  buildBaseRuleLines,
+  buildCasePairRuleLines,
 } from "@keyboard-studio/engine";
 import { useKeyboardArtifact, type ScaffoldSpec, type Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
@@ -64,6 +66,7 @@ import { getSuggestionForChar } from "../../survey/placementSeeds.ts";
 import { KEY_OPTIONS, ALL_PICKABLE_KEYS } from "../../lib/keyOptions.ts";
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
+import { RadioGroup } from "../../ui/RadioGroup.tsx";
 import {
   BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
 } from "../../lib/galleryTheme.ts";
@@ -281,18 +284,6 @@ function MethodChooser({
     gap: 8,
   };
 
-  const layerToggleBtn = (active: boolean, disabled: boolean): CSSProperties => ({
-    padding: "4px 12px",
-    background: active ? ACCENT : "transparent",
-    border: `1px solid ${active ? ACCENT : BORDER}`,
-    borderRadius: 6,
-    color: disabled ? TEXT_DIM : active ? BG_PAGE : TEXT_MAIN,
-    fontSize: 12,
-    fontFamily: FONT,
-    cursor: disabled ? "not-allowed" : "pointer",
-    opacity: disabled ? 0.5 : 1,
-  });
-
   const inputStyle: CSSProperties = {
     width: 52,
     padding: "6px 8px",
@@ -476,38 +467,27 @@ function MethodChooser({
                 ))}
               </select>
             </label>
-            <div
-              role="radiogroup"
-              aria-label="Target layer"
-              style={{ display: "flex", alignItems: "center", gap: 8 }}
-            >
-              <span style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>Layer:</span>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={swapLayer === "base"}
-                onClick={() => onSwapLayerChange("base")}
-                style={layerToggleBtn(swapLayer === "base", false)}
-              >
-                Base
-              </button>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={swapLayer === "shift"}
-                disabled={shiftLayerDisabled}
-                title={
-                  shiftLayerDisabled
-                    ? "Mnemonic keyboard: shift behaviour comes from the base layout"
-                    : undefined
-                }
-                onClick={() => {
-                  if (!shiftLayerDisabled) onSwapLayerChange("shift");
-                }}
-                style={layerToggleBtn(swapLayer === "shift", shiftLayerDisabled)}
-              >
-                Shift
-              </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span id="swap-layer-label" style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
+                Layer:
+              </span>
+              <RadioGroup
+                name="swap-layer"
+                value={swapLayer}
+                onChange={(v) => onSwapLayerChange(v as SwapLayer)}
+                ariaLabelledby="swap-layer-label"
+                options={[
+                  { value: "base", label: "Base" },
+                  {
+                    value: "shift",
+                    label: "Shift",
+                    disabled: shiftLayerDisabled,
+                    ...(shiftLayerDisabled
+                      ? { title: "Mnemonic keyboard: shift behaviour comes from the base layout" }
+                      : {}),
+                  },
+                ]}
+              />
             </div>
             {swapLayer === "shift" && selectedSwapKey !== "" && (
               <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
@@ -1000,18 +980,28 @@ export function MechanismGallery({
       // when shift targeting isn't allowed.
       const effectiveLayer: SwapLayer =
         swapLayer === "shift" && shiftLayerAllowed ? "shift" : "base";
+      // capsHandling is a property of the KEY, not of which layer the author
+      // is targeting — a key that already carries explicit CAPS/NCAPS rules
+      // needs a CAPS-aware pair on EITHER layer (Layer-A Check #10), so
+      // compute it once and reuse for both the base and shift branches below.
+      const capsHandling =
+        workingIr !== null
+          ? planShiftAssignment(workingIr, "main", selectedSwapKey).capsHandling
+          : false;
       let kmnRules: string;
-      let capsHandling = false;
-      if (effectiveLayer === "shift" && workingIr !== null) {
-        const plan = planShiftAssignment(workingIr, "main", selectedSwapKey);
-        capsHandling = plan.capsHandling;
+      if (effectiveLayer === "shift") {
         kmnRules = buildShiftRuleLines(selectedSwapKey, currentChar, {
           capsHandling,
         }).join("\n");
       } else {
-        // Base layer: single `+ [K_X] > U+XXXX` line.
-        const cp = currentChar.codePointAt(0)?.toString(16).toUpperCase().padStart(4, "0") ?? "0000";
-        kmnRules = `+ [${selectedSwapKey}] > U+${cp}`;
+        // Base layer: bare `+ [K_X] > U+XXXX` when the key has no CAPS
+        // handling; the CAPS-aware NCAPS+CAPS pair otherwise — a bare rule on
+        // a CAPS-handling key would shadow that key's pre-existing CAPS/NCAPS
+        // pair, since applyAssignments splices new lines before existing
+        // ones (first-match-wins).
+        kmnRules = buildBaseRuleLines(selectedSwapKey, currentChar, {
+          capsHandling,
+        }).join("\n");
       }
       assignment = {
         scope: "individual",
@@ -1033,19 +1023,20 @@ export function MechanismGallery({
       // never apply silently). Only for a BASE-layer apply: the user chose
       // base for currentChar, so the counterpart's natural home is the shift
       // layer of the SAME key. Suppressed for mnemonic keyboards (shift
-      // targeting is unavailable) and for the toLower direction (assigning an
-      // uppercase char to base) — see report for the toLower scope cut.
+      // targeting is unavailable) and for the toLower direction — assigning
+      // an uppercase char to base proposes nothing; only the base->uppercase
+      // (toUpper) direction is offered a companion. Scope cut, not a defect:
+      // the reverse direction is left for a future pass.
       if (effectiveLayer === "base" && shiftLayerAllowed) {
         const bcp47 =
           identityBcp47 !== undefined && identityBcp47 !== "" ? identityBcp47 : undefined;
         const counterpart = caseCounterpart(currentChar, bcp47);
         if (counterpart !== null && counterpart.direction === "toUpper" && workingIr !== null) {
-          const companionPlan = planShiftAssignment(workingIr, "main", selectedSwapKey);
           setPendingCompanion({
             originalChar: currentChar,
             counterpart: counterpart.counterpart,
             vkey: selectedSwapKey,
-            capsHandling: companionPlan.capsHandling,
+            capsHandling,
           });
         }
       }
@@ -1098,23 +1089,71 @@ export function MechanismGallery({
 
   const handleCompanionConfirm = useCallback(() => {
     if (pendingCompanion === null) return;
-    const kmnRules = buildShiftRuleLines(pendingCompanion.vkey, pendingCompanion.counterpart, {
-      capsHandling: pendingCompanion.capsHandling,
-    }).join("\n");
-    const companionAssignment: MechanismAssignment = {
-      scope: "individual",
-      target: pendingCompanion.counterpart,
-      modality: "physical",
-      mechanisms: [
-        {
-          patternId: PATTERN_SWAP,
-          strategyId: "S-01",
-          slotValues: { kmnRules },
-        },
-      ],
-      source: "user",
-    };
-    recordAssignments([...sessionAssignments, companionAssignment]);
+
+    if (pendingCompanion.capsHandling) {
+      // CAPS-handling key: the base assignment just recorded (for
+      // originalChar) already carries an explicit NCAPS/CAPS pair
+      // (buildBaseRuleLines). Appending a SEPARATE companion assignment with
+      // its own [CAPS K_X] line would conflict with that pair's [CAPS K_X]
+      // line — two rules targeting the identical context, first-inserted
+      // silently wins (Layer-A Check #10). Instead, REPLACE the base
+      // assignment with a single combined assignment carrying the full
+      // CAPS-as-case-inverter quad (buildCasePairRuleLines).
+      let baseAssignmentIdx = -1;
+      for (let i = sessionAssignments.length - 1; i >= 0; i--) {
+        const a = sessionAssignments[i];
+        if (a?.scope === "individual" && a.target === pendingCompanion.originalChar) {
+          baseAssignmentIdx = i;
+          break;
+        }
+      }
+      const kmnRules = buildCasePairRuleLines(
+        pendingCompanion.vkey,
+        pendingCompanion.originalChar,
+        pendingCompanion.counterpart,
+        { capsHandling: true },
+      ).join("\n");
+      const combinedAssignment: MechanismAssignment = {
+        scope: "individual",
+        target: pendingCompanion.originalChar,
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_SWAP,
+            strategyId: "S-01",
+            slotValues: { kmnRules },
+          },
+        ],
+        source: "user",
+      };
+      const next =
+        baseAssignmentIdx === -1
+          ? [...sessionAssignments, combinedAssignment]
+          : sessionAssignments.map((a, i) => (i === baseAssignmentIdx ? combinedAssignment : a));
+      recordAssignments(next);
+    } else {
+      // No CAPS handling on the key: base (`[K_X]`) and shift (`[SHIFT K_X]`)
+      // target disjoint contexts — appending a separate companion assignment
+      // cannot conflict with the base assignment.
+      const kmnRules = buildShiftRuleLines(pendingCompanion.vkey, pendingCompanion.counterpart, {
+        capsHandling: false,
+      }).join("\n");
+      const companionAssignment: MechanismAssignment = {
+        scope: "individual",
+        target: pendingCompanion.counterpart,
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_SWAP,
+            strategyId: "S-01",
+            slotValues: { kmnRules },
+          },
+        ],
+        source: "user",
+      };
+      recordAssignments([...sessionAssignments, companionAssignment]);
+    }
+
     setPendingCompanion(null);
   }, [pendingCompanion, sessionAssignments, recordAssignments]);
 

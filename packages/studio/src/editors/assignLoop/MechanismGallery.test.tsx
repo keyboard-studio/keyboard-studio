@@ -26,7 +26,7 @@ import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { latinDeadkeyAcuteSingle } from "@keyboard-studio/contracts/fixtures";
 import type { PatternMatch } from "@keyboard-studio/contracts";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
-import type { MechanismAssignment, IRGroup, IRStore } from "@keyboard-studio/contracts";
+import type { MechanismAssignment, IRGroup, IRRule, IRStore } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
@@ -158,6 +158,25 @@ function mainGroup(): IRGroup {
   return { nodeId: "g-main", name: "main", usingKeys: true, rules: [], readonly: false };
 }
 
+/**
+ * A `group(main)` block that already carries an explicit CAPS/NCAPS pair for
+ * K_Q — exercises the caps-handling (Layer-A Check #10) branch of
+ * planShiftAssignment/keyHasCapsHandling (P0 scenario C/D fixture).
+ */
+function mainGroupWithCaps(): IRGroup {
+  const capsRule: IRRule = {
+    nodeId: "r-K_Q-caps",
+    context: [{ kind: "vkey", name: "K_Q", modifiers: ["CAPS"] }],
+    output: [{ kind: "char", value: "Q" }],
+  };
+  const ncapsRule: IRRule = {
+    nodeId: "r-K_Q-ncaps",
+    context: [{ kind: "vkey", name: "K_Q", modifiers: ["NCAPS"] }],
+    output: [{ kind: "char", value: "q" }],
+  };
+  return { nodeId: "g-main", name: "main", usingKeys: true, rules: [capsRule, ncapsRule], readonly: false };
+}
+
 /** The `&MNEMONICLAYOUT` system store, set to "1". */
 function mnemonicStore(): IRStore {
   return {
@@ -174,12 +193,17 @@ function mnemonicStore(): IRStore {
  * without this, MechanismGallery's workingIr is null and Shift targeting is
  * disabled by design (see "shift toggle disabled" tests below for the
  * mnemonic case; this helper covers the "IR present" case).
+ *
+ * `opts.caps` swaps in {@link mainGroupWithCaps} — a main group where K_Q
+ * already has an explicit CAPS/NCAPS pair, exercising the caps-handling
+ * branch of planShiftAssignment.
  */
-function instantiateWorkingCopy(opts: { mnemonic?: boolean } = {}) {
+function instantiateWorkingCopy(opts: { mnemonic?: boolean; caps?: boolean } = {}) {
   const seedVfs = createVirtualFS([
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
   ]);
-  const ir = makeTestIR([mainGroup()], opts.mnemonic === true ? [mnemonicStore()] : []);
+  const group = opts.caps === true ? mainGroupWithCaps() : mainGroup();
+  const ir = makeTestIR([group], opts.mnemonic === true ? [mnemonicStore()] : []);
   useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: seedVfs, ir });
 }
 
@@ -1199,5 +1223,127 @@ describe("MechanismGallery — case-pair companion proposal", () => {
     fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
 
     expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P0 — base-layer swap on a CAPS-handling key (scenario C/D)
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — CAPS-aware base-layer swap (P0)", () => {
+  it("scenario C: base swap only on a CAPS-handling key emits the NCAPS+CAPS pair", async () => {
+    instantiateWorkingCopy({ caps: true });
+    seedInventory(["θ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: "K_Q" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+
+    // Decline the companion so only the base swap is recorded.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Do not map Θ to the shift layer/i }),
+    );
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["kmnRules"]).toBe(
+      "+ [NCAPS K_Q] > U+03B8\n+ [CAPS K_Q] > U+03B8",
+    );
+  });
+
+  it("scenario D: base swap + confirmed companion on a CAPS-handling key replaces the base assignment with the full quad", async () => {
+    instantiateWorkingCopy({ caps: true });
+    seedInventory(["θ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: "K_Q" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Map Θ to the shift layer of K_Q/i }),
+    );
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    // The companion REPLACES the base assignment (one combined rule set) —
+    // no separate second assignment, and no conflicting duplicate [CAPS K_Q].
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0]?.target).toBe("θ");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["kmnRules"]).toBe(
+      [
+        "+ [NCAPS K_Q] > U+03B8",
+        "+ [NCAPS SHIFT K_Q] > U+0398",
+        "+ [CAPS K_Q] > U+0398",
+        "+ [CAPS SHIFT K_Q] > U+03B8",
+      ].join("\n"),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P1.5 — bcp47 plumbing for the case-pair companion proposal
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — companion proposal bcp47 plumbing", () => {
+  it("proposes İ (U+0130) for 'i' under the 'tr' identity bcp47 tag", async () => {
+    instantiateWorkingCopy();
+    // instantiateFromBase resets identity to null — set it explicitly.
+    useWorkingCopyStore.getState().setIdentity({ bcp47: "tr" });
+    seedInventory(["i"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: "K_Q" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for i/i }));
+
+    expect(screen.getByText(/has an uppercase form, İ/i)).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Map İ to the shift layer of K_Q/i }),
+    );
+
+    const companion = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical")
+      .find((a) => a.target === "İ");
+    expect(companion?.mechanisms[0]?.slotValues?.["kmnRules"]).toBe(
+      "+ [SHIFT K_Q] > U+0130",
+    );
+  });
+
+  it("does not crash on a malformed identity bcp47 tag — the companion still proposes via the locale-insensitive fallback", async () => {
+    instantiateWorkingCopy();
+    useWorkingCopyStore.getState().setIdentity({ bcp47: "not a tag!!" });
+    seedInventory(["θ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: "K_Q" },
+    });
+    expect(() => {
+      fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+    }).not.toThrow();
+
+    expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
   });
 });
