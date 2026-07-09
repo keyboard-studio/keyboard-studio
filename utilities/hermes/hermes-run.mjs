@@ -1097,12 +1097,58 @@ async function callModelReason(system, prompt) {
 }
 
 /**
+ * Lenient JSON extraction from free-form model text. Scans for the first balanced
+ * {...} block that contains the substring `"${requiredKey}"` and JSON.parse-s it.
+ * Returns the parsed object, or null if no such block parses.
+ * Used as the gpt-oss / reasoning-model fallback when format:json yields empty output.
+ */
+function lenientExtractObject(text, requiredKey) {
+  if (typeof text !== 'string' || text.length === 0) return null;
+  const marker = `"${requiredKey}"`;
+  let searchFrom = 0;
+  while (true) {
+    const open = text.indexOf('{', searchFrom);
+    if (open === -1) return null;
+    // Balance braces from `open`, respecting string literals + escapes.
+    let depth = 0;
+    let inStr = false;
+    let esc = false;
+    let close = -1;
+    for (let i = open; i < text.length; i++) {
+      const c = text[i];
+      if (esc) { esc = false; continue; }
+      if (c === '\\') { esc = true; continue; }
+      if (c === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (c === '{') depth++;
+      else if (c === '}') { depth--; if (depth === 0) { close = i; break; } }
+    }
+    if (close === -1) return null; // unbalanced to EOF
+    const candidate = text.slice(open, close + 1);
+    if (candidate.includes(marker)) {
+      try {
+        return JSON.parse(candidate);
+      } catch {
+        // fall through and keep scanning for the next {
+      }
+    }
+    searchFrom = open + 1;
+  }
+}
+
+/**
  * Step 2 STRUCTURE: call STRUCTURE_MODEL with format:json to convert Step 1 prose
  * to the findings schema. Returns the parsed JSON object.
  * Retries once on SyntaxError (JSON parse failure). Applies MODEL_TIMEOUT_MS timeout.
+ *
+ * gpt-oss / reasoning-model fallback: some harmony models return EMPTY output under
+ * Ollama `format:json` (both .response and .thinking length 0). When the format:json
+ * path yields empty/unparseable output after its retry, fall back to ONE free-form call
+ * (no format:json) and lenient-extract the first {…"findings"…} block from .response or
+ * .thinking. The 6 models that already work under format:json never reach the fallback.
  */
 async function callModelStructure(structureSystem, notesPrompt, shardId) {
-  const body = {
+  const jsonBody = {
     model: STRUCTURE_MODEL,
     system: structureSystem,
     prompt: notesPrompt,
@@ -1117,7 +1163,16 @@ async function callModelStructure(structureSystem, notesPrompt, shardId) {
     },
   };
 
-  async function attempt() {
+  // One request/parse attempt. `useJson` toggles format:json; when false we read from
+  // .response OR .thinking and lenient-extract instead of a strict JSON.parse.
+  async function attempt(useJson) {
+    const body = useJson
+      ? jsonBody
+      : {
+          ...jsonBody,
+          format: undefined,
+          system: `${structureSystem}\n\nRespond with ONLY the JSON object, no prose, no markdown fences.`,
+        };
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
     try {
@@ -1132,11 +1187,21 @@ async function callModelStructure(structureSystem, notesPrompt, shardId) {
         throw new Error(`HTTP ${res.status} ${res.statusText}`);
       }
       const outer = await res.json();
-      const raw = outer.response;
-      if (typeof raw !== 'string') {
-        throw new Error(`Unexpected response shape: .response is ${typeof raw}`);
+      const raw = typeof outer.response === 'string' ? outer.response : '';
+      const think = typeof outer.thinking === 'string' ? outer.thinking : '';
+      if (useJson) {
+        if (raw.length === 0) {
+          // Empty output under format:json (the gpt-oss symptom) — signal the fallback.
+          throw new SyntaxError('empty response under format:json');
+        }
+        return JSON.parse(raw);
       }
-      return JSON.parse(raw);
+      // Free-form fallback: try .response then .thinking as the JSON source.
+      const parsed = lenientExtractObject(raw, 'findings') ?? lenientExtractObject(think, 'findings');
+      if (!parsed) {
+        throw new SyntaxError('no {…"findings"…} block found in free-form output');
+      }
+      return parsed;
     } catch (err) {
       clearTimeout(timer);
       throw err;
@@ -1144,15 +1209,21 @@ async function callModelStructure(structureSystem, notesPrompt, shardId) {
   }
 
   try {
-    return await attempt();
+    return await attempt(true);
   } catch (err) {
-    // Retry ONLY on JSON parse failure.
+    // Retry / fall back ONLY on JSON parse (or empty-output) failure.
     if (!(err instanceof SyntaxError)) throw err;
     console.error(`[WARN] shard ${shardId}: structure JSON parse failed (${err.message}), retrying once…`);
     try {
-      return await attempt();
+      return await attempt(true);
     } catch (err2) {
-      throw new Error(`Structure model call failed after retry: ${err2.message}`);
+      if (!(err2 instanceof SyntaxError)) throw err2;
+      console.error(`[WARN] shard ${shardId}: format:json still failing (${err2.message}); falling back to free-form structure…`);
+      try {
+        return await attempt(false);
+      } catch (err3) {
+        throw new Error(`Structure model call failed after free-form fallback: ${err3.message}`);
+      }
     }
   }
 }
@@ -1831,7 +1902,7 @@ async function callModelJudge(finding, snippet, findingLabel) {
   });
   const prompt = `FINDING:\n${findingDesc}\n\nCODE SNIPPET (file: ${finding.file ?? '?'}, lines shown):\n\`\`\`\n${snippet}\n\`\`\``;
 
-  const body = {
+  const jsonBody = {
     model: STRUCTURE_MODEL,
     system: JUDGE_SYSTEM,
     prompt,
@@ -1846,7 +1917,18 @@ async function callModelJudge(finding, snippet, findingLabel) {
     },
   };
 
-  async function attempt() {
+  // useJson=false is the gpt-oss / reasoning-model fallback: some harmony models return
+  // EMPTY output under Ollama format:json, so we retry free-form and lenient-extract the
+  // {…"verdict"…} block from .response or .thinking. Models that work under format:json
+  // never reach the fallback.
+  async function attempt(useJson) {
+    const body = useJson
+      ? jsonBody
+      : {
+          ...jsonBody,
+          format: undefined,
+          system: `${JUDGE_SYSTEM}\n\nRespond with ONLY the JSON object, no prose, no markdown fences.`,
+        };
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
     try {
@@ -1859,37 +1941,45 @@ async function callModelJudge(finding, snippet, findingLabel) {
       clearTimeout(timer);
       if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
       const outer = await res.json();
-      const raw = outer.response;
-      if (typeof raw !== 'string') throw new Error(`Unexpected response shape: .response is ${typeof raw}`);
-      return JSON.parse(raw);
+      const raw = typeof outer.response === 'string' ? outer.response : '';
+      const think = typeof outer.thinking === 'string' ? outer.thinking : '';
+      if (useJson) {
+        if (raw.length === 0) throw new SyntaxError('empty response under format:json');
+        return JSON.parse(raw);
+      }
+      const parsed = lenientExtractObject(raw, 'verdict') ?? lenientExtractObject(think, 'verdict');
+      if (!parsed) throw new SyntaxError('no {…"verdict"…} block found in free-form output');
+      return parsed;
     } catch (err) {
       clearTimeout(timer);
       throw err;
     }
   }
 
+  const shape = (parsed) => ({
+    judge_verdict: parsed.verdict ?? 'uncertain',
+    judge_confidence: typeof parsed.judge_confidence === 'number' ? parsed.judge_confidence : 0.5,
+    judge_danger: parsed.judge_danger ?? 'med',
+    judge_note: parsed.note ?? '',
+  });
+
   try {
-    const parsed = await attempt();
-    return {
-      judge_verdict: parsed.verdict ?? 'uncertain',
-      judge_confidence: typeof parsed.judge_confidence === 'number' ? parsed.judge_confidence : 0.5,
-      judge_danger: parsed.judge_danger ?? 'med',
-      judge_note: parsed.note ?? '',
-    };
+    return shape(await attempt(true));
   } catch (err) {
-    // Retry once on JSON parse failure
+    // Retry once on JSON parse / empty-output failure, then fall back to free-form.
     if (err instanceof SyntaxError) {
       console.error(`[WARN] judge ${findingLabel}: JSON parse failed, retrying once…`);
       try {
-        const parsed2 = await attempt();
-        return {
-          judge_verdict: parsed2.verdict ?? 'uncertain',
-          judge_confidence: typeof parsed2.judge_confidence === 'number' ? parsed2.judge_confidence : 0.5,
-          judge_danger: parsed2.judge_danger ?? 'med',
-          judge_note: parsed2.note ?? '',
-        };
-      } catch {
-        // fall through
+        return shape(await attempt(true));
+      } catch (err2) {
+        if (err2 instanceof SyntaxError) {
+          console.error(`[WARN] judge ${findingLabel}: format:json still failing; falling back to free-form…`);
+          try {
+            return shape(await attempt(false));
+          } catch {
+            // fall through
+          }
+        }
       }
     }
     console.error(`[WARN] judge ${findingLabel}: call failed (${err.message}); skipping`);

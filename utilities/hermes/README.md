@@ -280,14 +280,20 @@ Gold is regenerated per-file (not whole-shard) so it reflects what a per-file ru
 
 ```
 # From the repo root (nohup recommended for overnight runs):
-nohup stdbuf -oL node utilities/hermes/vet.mjs > reports/vet/vet.log 2>&1 &
+nohup stdbuf -oL node utilities/hermes/vet.mjs > utilities/hermes/reports/vet/vet.log 2>&1 &
+
+# Re-run only one (or a few) models — e.g. after a per-model fix — without the full ~5.5h matrix.
+# --only takes comma-separated substrings matched against the roster ids.
+# NOTE: a partial run overwrites scorecard.{md,json} with a scorecard for ONLY the selected
+# model(s); back up the full scorecard first and merge the fresh rows back in.
+nohup stdbuf -oL node utilities/hermes/vet.mjs --only gpt-oss:20b > utilities/hermes/reports/vet/gptrun.log 2>&1 &
 ```
 
 `stdbuf -oL` forces line-buffered stdout so you can `tail -f vet.log` and see progress without waiting for buffer flush.
 
 **Runtime:** approximately 20 minutes per model per file with `--samples 5`. The full 7-model roster on both S10 and S07 is an overnight run.
 
-**"Is it stuck?" heuristic:** do NOT use GPU utilization as a liveness indicator — GPU dips between files are normal (repo-map rebuilds run between files; these are CPU-bound). Instead watch the `simp-*` directory count in `reports/vet/` rising. Each completed file creates one new `simp-<model>-<shard>-<file>/` directory. Stalls are `MODEL_TIMEOUT_MS` (300 s) + retry delay (max ~17 s) = approximately 5 minutes before the process moves on.
+**"Is it stuck?" heuristic:** do NOT use GPU utilization as a liveness indicator — GPU dips between files are normal (repo-map rebuilds run between files; these are CPU-bound). Instead watch the `simp-*` directory count in `utilities/hermes/reports/vet/` rising. Each completed file creates one new `simp-<model>-<shard>-<file>/` directory. Stalls are `MODEL_TIMEOUT_MS` (300 s) + retry delay (max ~17 s) = approximately 5 minutes before the process moves on.
 
 ---
 
@@ -318,3 +324,16 @@ These are the hard-won experimental results that shaped the current design. Each
 - **nemotron-3-nano:30b excluded: 24 GB weight load leaves no room for a 32k KV cache on a 24 GB card.** The full 30B dense weights + 32k context KV cache exceed GPU memory. nemotron is not in the vet.mjs MODELS roster.
 
 - **Context7 does not help this internal-refactor track.** The eval files have zero third-party dependencies; the real reuse signal is internal — e.g. the `escapeRegExp` / `escapeForRegex` triplication found by grep across `packages/`. The hook A adjacent-exports injection is the mechanism that surfaces these internal reuse targets.
+
+- **gpt-oss (harmony/reasoning model) returns EMPTY output under Ollama `format:json`.** Both `.response` and `.thinking` come back length-0 with `done_reason: stop`; the same prompt free-form returns a good answer. Because the STRUCTURE step (and the JUDGE call) used `format:json`, gpt-oss scored 0/30 recall and F1=0.000 — a harness bug, not model quality. Fix: `callModelStructure` and `callModelJudge` now fall back to ONE free-form call (no `format:json`) and lenient-extract the first balanced `{…}` block containing the required key (`"findings"` / `"verdict"`) from `.response` or `.thinking` (`lenientExtractObject`). The 6 models that work under `format:json` never reach the fallback. Post-fix, gpt-oss is the **2nd-best simplifier (17/30 strict, ~94% extra-precision — the cleanest signal-to-noise of any model)** and a mid-pack judge (F1=0.720).
+
+## 8. Locked baseline (2026-07-09)
+
+After the 7-model vet on the S10+S07 slice, the same-issue Claude pass, and the gpt-oss `format:json` fix + re-run:
+
+- **Simplifier: `devstral-small-2`** — recall leader, 20/30 strict (semantic ≈21/30), confidence-weighted 0.705.
+  - Runner-up: **`gpt-oss:20b`** (17/30 strict, ~94% extra-precision, zero internal redundancy). Prefer it when human/Claude vetting bandwidth — not recall — is the bottleneck.
+- **Judge: `gemma4:26b-a4b-it-qat`** — sharpest judge, F1=0.800. Deliberately a *different* model from the simplifier: the best generator (devstral) is a mediocre judge (F1=0.645), and the terse gemma4 is a poor generator (4/30) but the best verifier.
+- **Baseline pair: `devstral-small-2` (simplify) → `gemma4` (judge).**
+
+Full scorecard + the same-issue precision analysis: [reports/vet/scorecard.md](reports/vet/scorecard.md) (gitignored). Caveat: this is a **2-shard slice**; confirm the winner on a wider set before making it the repo-wide default.

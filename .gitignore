@@ -72,10 +72,8 @@ packages/studio/playwright-report/
 repo-map.json
 repo-map*.json
 
-# hermes report artifacts — hermes-run.mjs writes to utilities/hermes/reports/;
-# vet.mjs writes to the repo-root reports/ (anchored so nested package reports/ dirs are unaffected)
+# hermes report artifacts (hermes-run.mjs + vet.mjs both write under utilities/hermes/reports/)
 utilities/hermes/reports/
-/reports/
 
 utilities/hermes/repo-map*.json
 

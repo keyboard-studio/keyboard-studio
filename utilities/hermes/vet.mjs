@@ -43,7 +43,7 @@ const ROOT = resolve(__dirname, '..', '..'); // repo root
 
 // Full 7-model vetting roster for the overnight run.
 // Nemotron excluded (24 GB — won't fit alongside the 32k context window).
-const MODELS = [
+const ALL_MODELS = [
   'qwen3:30b-a3b-instruct-2507-q4_K_M',  // champion
   'qwen3-coder:30b',
   'gpt-oss:20b',
@@ -52,6 +52,23 @@ const MODELS = [
   'deepcoder:14b',
   'hermes-simplify-14b',
 ];
+
+// `--only <substr>[,<substr>...]` restricts the roster to models whose id contains any
+// of the comma-separated substrings — for re-running a single model (e.g. gpt-oss)
+// without the full ~5.5h matrix. Note: a partial run overwrites scorecard.{md,json}
+// with a scorecard for only the selected model(s); back up the full scorecard first.
+function selectModels() {
+  const idx = process.argv.indexOf('--only');
+  if (idx === -1 || !process.argv[idx + 1]) return ALL_MODELS;
+  const needles = process.argv[idx + 1].split(',').map((s) => s.trim()).filter(Boolean);
+  const picked = ALL_MODELS.filter((m) => needles.some((n) => m.includes(n)));
+  if (picked.length === 0) {
+    console.error(`[ERROR] --only ${process.argv[idx + 1]} matched no models in the roster: ${ALL_MODELS.join(', ')}`);
+    process.exit(1);
+  }
+  return picked;
+}
+const MODELS = selectModels();
 
 // ---------------------------------------------------------------------------
 // Self-consistency sample count for Scorecard A
@@ -384,7 +401,7 @@ function fileSlug(relPath) {
 
 const HERMES_RUN = join(__dirname, 'hermes-run.mjs');
 const JUDGE_BENCHMARK = join(__dirname, 'eval', 'judge-benchmark.json');
-const VET_DIR = join(ROOT, 'reports', 'vet');
+const VET_DIR = join(__dirname, 'reports', 'vet');
 
 // Per-call timeout: generous for a 30B model on one file (20 min)
 const CALL_TIMEOUT_MS = 20 * 60 * 1000;
