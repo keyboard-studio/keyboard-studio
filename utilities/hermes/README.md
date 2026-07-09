@@ -191,11 +191,17 @@ Writes `repo-map.json` (full) or `repo-map.<pkg>.json` (per-package slice). Both
 | `--judge` | (no-op) | Harmless alias; judge is on by default. |
 | `--judge-set <path>` | (none) | Evaluate a labeled benchmark JSON file with the judge model only; skips the normal simplify pipeline. Writes `<out>/verdicts.json`. |
 | `--model <name>` | `qwen3:30b-a3b-instruct-2507-q4_K_M` | Override REASON_MODEL (Step 1). |
-| `--structure-model <name>` | same as `--model` (no-swap) | Override STRUCTURE_MODEL (Step 2 + Phase 4 + judge). Pass a lighter model for split-model setups. |
+| `--structure-model <name>` | same as `--model` (no-swap) | Override STRUCTURE_MODEL (Step 2 + Phase 4). Pass a lighter model for split-model setups. |
+| `--judge-model <name>` | same as `--structure-model` | Override the JUDGE pass model independently. Allows a different model to judge than the one used for structure/reason. Example: `--model devstral-small-2 --judge-model gemma4:26b-a4b-it-qat` runs devstral for reasoning and structuring, gemma4 for judging — this is the locked baseline pipeline (devstral simplifies, gemma4 judges). |
+| `--reason-models <m1,m2,...>` | (none) | **Ensemble mode.** Comma-separated list of reason models. When present: for each file, runs the reason→structure stage once per model (using that model for both steps — gpt-oss gets its free-form fallback intact), unions all per-model finding sets by location, boosts confidence by model agreement (+0.1 per extra model, capped at 1.0), then judges the unioned set with `--judge-model`. Representative selection on overlap: LONGEST suggestion text wins (empirically favors gpt-oss's detailed descriptions); tie-break: highest confidence. Supersedes `--model` when both are given (logs `[WARN]`). Only compatible with `--reason-mode monolithic` (errors out on `--reason-mode lenses`). Compatible with `--file`, `--shard`, `--pr`, `--commit`, `--since`, and `--samples`. |
 | `--endpoint <url>` | `http://localhost:11434/api/generate` | Ollama generate endpoint. |
 | `--out <dir>` | `utilities/hermes/reports` | Directory for output artifacts (`findings.json`, `report.md`, `escalation.md`, `escalation.json`). |
 | `--dry-run` | off | Assemble prompts and print input token estimates; do NOT call the model. Also runs hook A (adjacent-exports) and hook B (caller-grep) deterministically. |
 | `--self-test` | off | Run the deterministic hook B post-filter test (3 branches) and exit; no model calls, no shard. |
+| `--no-circuit-breaker` | (breaker on) | Force a full multi-shard pass even on systemic failures. By default the run aborts (exit 2) when a whole batch produces nothing — see below. |
+| `--cb-consecutive <n>` | `2` | How many consecutive fully-broken shards trip the circuit breaker mid-run. The first batch trips immediately when fully broken (all-error/zero-files always; all-empty only in a multi-shard pass). |
+
+**Circuit breaker (systemic-failure early abort).** A multi-shard pass stops after the first batch that reveals a *systemic* problem rather than churning through all 39 shards. A shard is "broken" when it produces **0 findings**; the breaker classifies why — `zero-files` (INPUT: bad `covers` cell), `error` (PIPELINE: model call/structure failed — `fetch failed`, HTTP 404/5xx, timeout), or `empty` (OUTPUT: model returned nothing structured — the `format:json` empty-output signature or a decode regression). On trip it writes the partial artifacts, prints a cause->fix hint, and exits **2** (distinct from exit 1 = completed-with-errors). **Isolated** sub-batch failures — where the shard still produced other findings — are *not* systemic: they are recorded in `retry-queue.json` (`{shard, files, reason}` per entry) for a targeted `--file` re-run later, and the pass continues.
 
 ### Example invocations
 
@@ -225,6 +231,20 @@ node utilities/hermes/hermes-run.mjs \
 node utilities/hermes/hermes-run.mjs \
   --judge-set utilities/hermes/eval/judge-benchmark.json \
   --out utilities/hermes/reports/vet/judge-qwen3
+
+# Locked baseline: devstral simplifies/structures, gemma4 judges (see §8 Locked baseline)
+node utilities/hermes/hermes-run.mjs \
+  --model devstral-small-2 \
+  --judge-model gemma4:26b-a4b-it-qat \
+  --file packages/engine/src/codec/parse.ts
+
+# Locked baseline ENSEMBLE: devstral∪gpt-oss simplify, gemma4 judges (see §8)
+node utilities/hermes/hermes-run.mjs \
+  --reason-models devstral-small-2,gpt-oss:20b \
+  --judge-model gemma4:26b-a4b-it-qat \
+  --reason-mode monolithic \
+  --samples 5 \
+  --file packages/engine/src/codec/parse.ts
 ```
 
 ---
@@ -329,11 +349,29 @@ These are the hard-won experimental results that shaped the current design. Each
 
 ## 8. Locked baseline (2026-07-09)
 
-After the 7-model vet on the S10+S07 slice, the same-issue Claude pass, and the gpt-oss `format:json` fix + re-run:
+After the 7-model vet on the S10+S07 slice, the same-issue Claude pass, the gpt-oss `format:json` fix + re-run, and a third evaluation axis (description usefulness / actionability):
 
-- **Simplifier: `devstral-small-2`** — recall leader, 20/30 strict (semantic ≈21/30), confidence-weighted 0.705.
-  - Runner-up: **`gpt-oss:20b`** (17/30 strict, ~94% extra-precision, zero internal redundancy). Prefer it when human/Claude vetting bandwidth — not recall — is the bottleneck.
-- **Judge: `gemma4:26b-a4b-it-qat`** — sharpest judge, F1=0.800. Deliberately a *different* model from the simplifier: the best generator (devstral) is a mediocre judge (F1=0.645), and the terse gemma4 is a poor generator (4/30) but the best verifier.
-- **Baseline pair: `devstral-small-2` (simplify) → `gemma4` (judge).**
+- **Simplifier: `devstral-small-2` UNION `gpt-oss:20b` ensemble** — recall 23/30 on the S10+S07 slice (best of both models combined; [VETTING-RESULTS.md §4b](VETTING-RESULTS.md)). On overlapping hits, prefer the gpt-oss description: GPT-oss descriptions score mean 3.20/4 on the actionability heuristic, approximately Claude-quality — naming symbols, giving module-scope specifics, and often including drop-in snippets ([VETTING-RESULTS.md §4c](VETTING-RESULTS.md)). Devstral descriptions score 2.00/4 (terse generic pointers, prompt-tunable).
+- **Judge: `gemma4:26b-a4b-it-qat`** — sharpest judge, F1=0.800. Deliberately a *different* model from the simplifiers: the best generator (devstral) is a mediocre judge (F1=0.645), and gemma4 drops ~no gold (3 distinct across both models on 30 gold) ([VETTING-RESULTS.md §3](VETTING-RESULTS.md), [§5](VETTING-RESULTS.md)).
+- **Baseline pipeline: devstral∪gpt-oss ensemble (simplify) → gemma4 (judge).**
 
-Full scorecard + the same-issue precision analysis: [reports/vet/scorecard.md](reports/vet/scorecard.md) (gitignored). Caveat: this is a **2-shard slice**; confirm the winner on a wider set before making it the repo-wide default.
+**Ensemble mode is implemented** via `--reason-models`. Run the locked baseline with:
+
+```
+node utilities/hermes/hermes-run.mjs \
+  --reason-models devstral-small-2,gpt-oss:20b \
+  --judge-model gemma4:26b-a4b-it-qat \
+  --reason-mode monolithic \
+  --samples 5
+```
+
+On overlap, the finding with the LONGEST suggestion text is kept as representative (empirically favors gpt-oss's detailed descriptions without hardcoding a model). Single-model fallback (devstral alone, 20/30 recall):
+
+```
+node utilities/hermes/hermes-run.mjs \
+  --model devstral-small-2 \
+  --judge-model gemma4:26b-a4b-it-qat \
+  --samples 5
+```
+
+Full scorecard + same-issue precision analysis: [reports/vet/scorecard.md](reports/vet/scorecard.md) (gitignored). Vetting detail: [VETTING-RESULTS.md](VETTING-RESULTS.md) §4b, §4c, §6. **Caveat: 2-shard slice only** — confirm on a wider file set before making this the repo-wide default.

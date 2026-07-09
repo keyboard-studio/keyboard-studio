@@ -149,7 +149,7 @@ const EXCLUDE_RE =
 const argv = process.argv.slice(2);
 
 // Value-expecting flags: if the flag is the last argument (no value follows), abort early.
-const VALUE_FLAGS = ['--shard', '--limit', '--model', '--structure-model', '--endpoint', '--out', '--pr', '--commit', '--since', '--reason-mode', '--judge-set', '--file', '--samples'];
+const VALUE_FLAGS = ['--shard', '--limit', '--model', '--structure-model', '--judge-model', '--endpoint', '--out', '--pr', '--commit', '--since', '--reason-mode', '--judge-set', '--file', '--samples', '--reason-models'];
 // --no-judge / --judge / --self-test are boolean flags (no value); listed separately so the help text is accurate.
 for (const vf of VALUE_FLAGS) {
   const i = argv.indexOf(vf);
@@ -183,8 +183,42 @@ const ONLY_SHARD = flag('--shard');
 const LIMIT = flag('--limit') !== null ? parseInt(flag('--limit'), 10) : null;
 // --model overrides the Step 1 REASON model; --structure-model overrides Step 2 STRUCTURE model.
 // No-swap default: STRUCTURE_MODEL = REASON_MODEL so a stock run loads only one model.
+// --judge-model overrides the JUDGE pass model. Defaults to STRUCTURE_MODEL so existing
+// single-model and split-model setups are unaffected when the flag is absent.
 const REASON_MODEL = flag('--model') ?? DEFAULT_REASON_MODEL;
 const STRUCTURE_MODEL = flag('--structure-model') ?? REASON_MODEL;
+const JUDGE_MODEL = flag('--judge-model') ?? STRUCTURE_MODEL;
+
+// --reason-models <m1,m2,...>: ENSEMBLE mode — run multiple reason models per file, union
+// findings across models, then judge the unioned set with JUDGE_MODEL.
+// When present, supersedes --model (logs a [WARN] if --model is also given).
+// Only compatible with --reason-mode monolithic; errors out if combined with lenses.
+const REASON_MODELS_RAW = flag('--reason-models');
+const ENSEMBLE_MODELS = REASON_MODELS_RAW !== null
+  ? REASON_MODELS_RAW.split(',').map((m) => m.trim()).filter(Boolean)
+  : null;
+const IS_ENSEMBLE = ENSEMBLE_MODELS !== null && ENSEMBLE_MODELS.length > 0;
+
+// Validate ensemble flag interactions
+if (IS_ENSEMBLE && flag('--model') !== null) {
+  console.warn('[WARN] --reason-models and --model are both set; --reason-models wins (ignoring --model)');
+}
+// Error out only if --reason-mode lenses was EXPLICITLY passed alongside --reason-models.
+// When --reason-mode is absent (defaults to 'lenses'), ensemble silently runs in monolithic style.
+if (IS_ENSEMBLE && flag('--reason-mode') === 'lenses') {
+  console.error('[ERROR] --reason-models is not compatible with --reason-mode lenses. Omit --reason-mode (ensemble always runs monolithic per model) or pass --reason-mode monolithic explicitly.');
+  process.exit(1);
+}
+if (IS_ENSEMBLE && ENSEMBLE_MODELS.length < 2) {
+  console.error('[ERROR] --reason-models requires at least 2 comma-separated model names (got 1).');
+  process.exit(1);
+}
+
+// Cross-model confidence boost: +MODEL_BOOST_PER_EXTRA per additional model that agreed.
+// Composing with existing lens-convergence and sample boosts under the 1.0 cap.
+const MODEL_BOOST_PER_EXTRA = 0.1;
+// Cross-model union-find line gap (same as SAMPLE_LINE_GAP — same dedup intent).
+const MODEL_LINE_GAP = 5;
 const ENDPOINT = flag('--endpoint') ?? DEFAULT_ENDPOINT;
 const OUT_DIR = flag('--out') ?? DEFAULT_OUT;
 const DRY_RUN = hasFlag('--dry-run');
@@ -223,6 +257,16 @@ if (isNaN(SAMPLES) || SAMPLES < 1) {
   console.error(`[ERROR] --samples must be a positive integer (got "${SAMPLES_RAW}")`);
   process.exit(1);
 }
+
+// Circuit breaker: abort a multi-shard pass early on a *systemic* failure signature
+// (input=zero-files, pipeline=error, output=empty) instead of churning through every
+// remaining shard. Isolated sub-batch failures are NOT systemic — they are flagged into
+// retry-queue.json and the pass continues. On by default; --no-circuit-breaker forces a
+// full pass. --cb-consecutive N sets how many consecutive broken shards trip it mid-run
+// (default 2); the first batch trips immediately when fully broken (an all-error/zero-files
+// first shard is unambiguously systemic — an all-empty first shard only in a multi-shard pass).
+const CIRCUIT_BREAKER = !hasFlag('--no-circuit-breaker');
+const CB_CONSECUTIVE = flag('--cb-consecutive') !== null ? Math.max(1, parseInt(flag('--cb-consecutive'), 10)) : 2;
 
 // ---------------------------------------------------------------------------
 // Package -> pnpm filter name mapping
@@ -1137,6 +1181,138 @@ function lenientExtractObject(text, requiredKey) {
 }
 
 /**
+ * Model-parameterised variant of callModelReason. Used by ensemble mode to run each
+ * reason model independently without mutating the global REASON_MODEL constant.
+ */
+async function callModelReasonWith(modelName, system, prompt) {
+  const body = {
+    model: modelName,
+    system,
+    prompt,
+    stream: false,
+    options: {
+      temperature: 0.1,
+      num_ctx: 32768,
+      num_predict: REASON_NUM_PREDICT,
+      repeat_penalty: 1.15,
+      repeat_last_n: 256,
+    },
+  };
+
+  const maxAttempts = 1 + REASON_RETRY_DELAYS.length;
+  let lastErr;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
+    try {
+      const res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      const outer = await res.json();
+      const raw = outer.response;
+      if (typeof raw !== 'string') throw new Error(`Unexpected response shape: .response is ${typeof raw}`);
+      const capChars = REASON_NUM_PREDICT * 4;
+      if (raw.length >= capChars * 0.95) {
+        console.warn(`[WARN] reason output hit num_predict cap — possible runaway/verbose; findings may be truncated`);
+      }
+      return raw;
+    } catch (err) {
+      clearTimeout(timer);
+      lastErr = err;
+      if (!isTransientError(err)) throw err;
+      if (attempt < maxAttempts) {
+        const delayMs = REASON_RETRY_DELAYS[attempt - 1];
+        console.warn(`[WARN] reason step transient failure (attempt ${attempt}/${maxAttempts - 1}): ${err.message}; retrying in ${delayMs / 1000}s`);
+        await sleep(delayMs);
+      }
+    }
+  }
+
+  throw new Error(`reason step failed after ${maxAttempts - 1} retries: ${lastErr.message}`);
+}
+
+/**
+ * Model-parameterised variant of callModelStructure. Used by ensemble mode so each
+ * reason model's output is structured by the same model (gpt-oss structures via its
+ * own free-form fallback path — that fallback is intact via callModelStructureWith).
+ */
+async function callModelStructureWith(modelName, structureSystem, notesPrompt, shardId) {
+  const jsonBody = {
+    model: modelName,
+    system: structureSystem,
+    prompt: notesPrompt,
+    stream: false,
+    format: 'json',
+    options: {
+      temperature: 0.1,
+      num_ctx: 32768,
+      num_predict: STRUCTURE_NUM_PREDICT,
+      repeat_penalty: 1.15,
+      repeat_last_n: 256,
+    },
+  };
+
+  async function attempt(useJson) {
+    const body = useJson
+      ? jsonBody
+      : {
+          ...jsonBody,
+          format: undefined,
+          system: `${structureSystem}\n\nRespond with ONLY the JSON object, no prose, no markdown fences.`,
+        };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
+    try {
+      const res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      const outer = await res.json();
+      const raw = typeof outer.response === 'string' ? outer.response : '';
+      const think = typeof outer.thinking === 'string' ? outer.thinking : '';
+      if (useJson) {
+        if (raw.length === 0) throw new SyntaxError('empty response under format:json');
+        return JSON.parse(raw);
+      }
+      const parsed = lenientExtractObject(raw, 'findings') ?? lenientExtractObject(think, 'findings');
+      if (!parsed) throw new SyntaxError('no {…"findings"…} block found in free-form output');
+      return parsed;
+    } catch (err) {
+      clearTimeout(timer);
+      throw err;
+    }
+  }
+
+  try {
+    return await attempt(true);
+  } catch (err) {
+    if (!(err instanceof SyntaxError)) throw err;
+    console.error(`[WARN] shard ${shardId}: structure JSON parse failed (${err.message}), retrying once…`);
+    try {
+      return await attempt(true);
+    } catch (err2) {
+      if (!(err2 instanceof SyntaxError)) throw err2;
+      console.error(`[WARN] shard ${shardId}: format:json still failing (${err2.message}); falling back to free-form structure…`);
+      try {
+        return await attempt(false);
+      } catch (err3) {
+        throw new Error(`Structure model call failed after free-form fallback: ${err3.message}`);
+      }
+    }
+  }
+}
+
+/**
  * Step 2 STRUCTURE: call STRUCTURE_MODEL with format:json to convert Step 1 prose
  * to the findings schema. Returns the parsed JSON object.
  * Retries once on SyntaxError (JSON parse failure). Applies MODEL_TIMEOUT_MS timeout.
@@ -1606,6 +1782,251 @@ async function callOneLens(lensName, lensSystem, batchPrompt, shardLabel, fileSe
 }
 
 /**
+ * Run one monolithic reason→structure pass using a specific model name.
+ * Used by ensemble mode so each reason model runs independently.
+ * Returns an array of finding objects tagged with `lens='monolithic'` (may be empty).
+ */
+async function callOneLensWithModel(modelName, lensSystem, batchPrompt, shardLabel, fileSet, extraContext = '') {
+  const fullPrompt = extraContext ? `${extraContext}${batchPrompt}` : batchPrompt;
+
+  let notes;
+  try {
+    notes = await callModelReasonWith(modelName, lensSystem, fullPrompt);
+  } catch (err) {
+    throw new Error(`Step 1 (reason/${modelName}) failed: ${err.message}`);
+  }
+
+  const trimmedNotes = notes.trim();
+  if (!trimmedNotes || trimmedNotes.length < 20) {
+    console.log(`    ${shardLabel}[${modelName}]: Step 1 returned no content — skipping Step 2`);
+    return [];
+  }
+
+  console.log(`    ${shardLabel}[${modelName}]: Step 1 done (${trimmedNotes.length} chars) — Step 2…`);
+
+  const structurePrompt = `REVIEW NOTES:\n${trimmedNotes}`;
+  let parsed;
+  try {
+    // Each model structures its own output (gpt-oss gets the free-form fallback intact).
+    parsed = await callModelStructureWith(modelName, STRUCTURE_SYSTEM, structurePrompt, `${shardLabel}[${modelName}]`);
+  } catch (err) {
+    throw new Error(`Step 2 (structure/${modelName}) failed: ${err.message}`);
+  }
+
+  const findings = Array.isArray(parsed.findings) ? parsed.findings : [];
+  const valid = findings.filter((f) => f.file && fileSet.has(f.file));
+  const dropped = findings.length - valid.length;
+  if (dropped > 0) {
+    console.log(`    ${shardLabel}[${modelName}]: dropped ${dropped} finding(s) outside sub-batch`);
+  }
+
+  for (const f of valid) {
+    f.lens = 'monolithic';
+    f._reasonModel = modelName; // internal tag for cross-model union
+    if (!('reuse_target' in f)) f.reuse_target = null;
+    applyDangerOverride(f);
+  }
+
+  return valid;
+}
+
+/**
+ * Cross-model union: merge per-model finding sets into a deduplicated list.
+ *
+ * Two findings converge if same file AND line ranges overlap or are within
+ * MODEL_LINE_GAP (5) lines — the same union-find as samples/lenses.
+ *
+ * Each merged finding gains:
+ *   models_hit               : number of distinct reason models that produced it
+ *   models_hit_names         : sorted array of those model names
+ *   confidence_pre_model_boost: confidence BEFORE the model-agreement boost
+ *   confidence               : min(1.0, base + MODEL_BOOST_PER_EXTRA * (models_hit - 1))
+ *
+ * REPRESENTATIVE selection: when multiple models agree on a location, pick the finding
+ * with the LONGEST suggestion text as the representative (more actionable description).
+ * Tie-break: highest confidence. This empirically favors gpt-oss's detailed descriptions
+ * without hardcoding a model name.
+ *
+ * @param {Array<{model: string, findings: object[]}>} modelResults
+ * @returns {object[]} merged findings array
+ */
+function mergeByConvergenceMultiModel(modelResults) {
+  if (modelResults.length === 0) return [];
+
+  // Flatten all findings, tagging each with its source model.
+  const tagged = [];
+  for (const { model, findings } of modelResults) {
+    for (const f of findings) {
+      tagged.push({ ...f, _reasonModel: model });
+    }
+  }
+
+  if (tagged.length === 0) return [];
+
+  // Union-Find grouping: converge by file + overlapping/adjacent line range.
+  const parent = tagged.map((_, i) => i);
+  function find(x) {
+    while (parent[x] !== x) {
+      parent[x] = parent[parent[x]];
+      x = parent[x];
+    }
+    return x;
+  }
+  function union(x, y) {
+    const px = find(x), py = find(y);
+    if (px !== py) parent[px] = py;
+  }
+
+  for (let i = 0; i < tagged.length; i++) {
+    for (let j = i + 1; j < tagged.length; j++) {
+      if (tagged[i].file !== tagged[j].file) continue;
+      const a = parseLineRange(tagged[i].lines);
+      const b = parseLineRange(tagged[j].lines);
+      if (a.start === 0 || b.start === 0) continue;
+      if (a.start <= b.end + MODEL_LINE_GAP && b.start <= a.end + MODEL_LINE_GAP) {
+        union(i, j);
+      }
+    }
+  }
+
+  // Group by root
+  const groups = new Map();
+  for (let i = 0; i < tagged.length; i++) {
+    const root = find(i);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root).push(tagged[i]);
+  }
+
+  const merged = [];
+  for (const group of groups.values()) {
+    const modelSet = new Set(group.map((f) => f._reasonModel));
+    const modelsHit = modelSet.size;
+
+    // Pick the representative: LONGEST suggestion text (prefer more actionable description).
+    // Empirically favors gpt-oss's detailed fixes (with drop-in snippets) over terse pointer descriptions.
+    // Tie-break: highest confidence.
+    const best = group.reduce((a, b) => {
+      const lenA = (a.suggestion ?? '').length;
+      const lenB = (b.suggestion ?? '').length;
+      if (lenB !== lenA) return lenB > lenA ? b : a;
+      const ca = typeof a.confidence === 'number' ? a.confidence : 0.5;
+      const cb = typeof b.confidence === 'number' ? b.confidence : 0.5;
+      return cb > ca ? b : a;
+    });
+
+    const preBoost = typeof best.confidence === 'number' ? best.confidence : 0.5;
+    const boosted = Math.min(1.0, preBoost + MODEL_BOOST_PER_EXTRA * (modelsHit - 1));
+
+    // Remove internal _reasonModel tag from emitted finding (replace with public field)
+    const { _reasonModel: _ignored, ...rest } = best;
+    merged.push({
+      ...rest,
+      models_hit: modelsHit,
+      models_hit_names: [...modelSet].sort(),
+      confidence_pre_model_boost: parseFloat(preBoost.toFixed(3)),
+      confidence: parseFloat(boosted.toFixed(3)),
+    });
+  }
+
+  return merged;
+}
+
+/**
+ * ENSEMBLE orchestrator: run the monolithic reason→structure stage once per model in
+ * ENSEMBLE_MODELS, union the per-model finding sets with mergeByConvergenceMultiModel,
+ * then apply hook B post-filter. Hook A and B are injected (same as monolithic path).
+ *
+ * This is the production entry point for the locked devstral∪gpt-oss baseline.
+ *
+ * @param {string} batchPrompt   - assembled shard content prompt (REPO MAP + SHARD FILES)
+ * @param {string} shardLabel    - e.g. "S10" or "S10[1/2]" (for log messages)
+ * @param {Set<string>} fileSet  - files in this sub-batch
+ * @param {object|null} mapData  - parsed repo-map JSON for hook A (adjacent exports)
+ */
+async function callModelEnsemble(batchPrompt, shardLabel, fileSet, mapData = null) {
+  const batchFiles = [...fileSet];
+
+  // Hook A: adjacent exports (same as monolithic path)
+  const adjacentExportsBlock = buildAdjacentExportsBlock(batchFiles, mapData);
+  if (adjacentExportsBlock) {
+    console.log(`    ${shardLabel}[hook-A]: adjacent-exports block: ${adjacentExportsBlock.split('\n').length - 1} entries`);
+  }
+
+  // Hook B pre-pass: caller-grep (same as monolithic path)
+  const { confirmedUnused, checkedCount, unusedCount, skipped: grepSkipped, skipReason } = computeConfirmedUnused(batchFiles);
+  if (grepSkipped) {
+    console.log(`    ${shardLabel}[hook-B]: caller-grep skipped (${skipReason ?? 'unknown reason'}) — dead-code post-filter will drop all unverified claims`);
+  } else {
+    console.log(`    ${shardLabel}[hook-B]: caller-grep checked ${checkedCount} symbols, confirmed unused: ${unusedCount}`);
+  }
+  const confirmedUnusedBlock = buildConfirmedUnusedBlock(confirmedUnused);
+
+  const extraContext = [adjacentExportsBlock, confirmedUnusedBlock].filter(Boolean).join('');
+
+  // Run each ensemble model independently.
+  const modelResults = [];
+  for (const modelName of ENSEMBLE_MODELS) {
+    // --samples applies per-model: each model runs SAMPLES times, findings unioned within that model.
+    const sampleResults = [];
+    for (let sIdx = 1; sIdx <= SAMPLES; sIdx++) {
+      const sampleLabel = SAMPLES > 1 ? `${shardLabel}[${modelName}][s${sIdx}/${SAMPLES}]` : `${shardLabel}[${modelName}]`;
+      try {
+        const sFindings = await callOneLensWithModel(modelName, MONOLITHIC_REASON_SYSTEM, batchPrompt, sampleLabel, fileSet, extraContext);
+        sampleResults.push({ sample: sIdx, findings: sFindings });
+      } catch (err) {
+        console.error(`[WARN] ${shardLabel} ensemble model ${modelName} sample ${sIdx}/${SAMPLES} failed: ${err.message} — skipping sample`);
+        sampleResults.push({ sample: sIdx, findings: [] });
+      }
+    }
+
+    // Union across samples within this model (same as monolithic path).
+    const unionedForModel = mergeByConvergenceMultiSample(sampleResults);
+    if (SAMPLES > 1) {
+      const dist = {};
+      for (const f of unionedForModel) {
+        const k = `${f.samples_hit}x`;
+        dist[k] = (dist[k] ?? 0) + 1;
+      }
+      const distStr = Object.entries(dist).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([k, v]) => `${k}=${v}`).join(' ');
+      console.log(`[samples] ${shardLabel}[${modelName}]: ${SAMPLES} runs -> ${unionedForModel.length} merged (samples_hit dist: ${distStr || 'none'})`);
+    }
+
+    // Stamp convergence=1 and lenses=['monolithic'] (single monolithic pass per model)
+    for (const f of unionedForModel) {
+      f.convergence = 1;
+      f.lenses = ['monolithic'];
+      f.confidence_pre_boost = f.confidence_pre_sample_boost ?? (typeof f.confidence === 'number' ? parseFloat(f.confidence.toFixed(3)) : 0.5);
+    }
+
+    console.log(`    ${shardLabel}[${modelName}]: ${unionedForModel.length} finding(s) after sample union`);
+    modelResults.push({ model: modelName, findings: unionedForModel });
+  }
+
+  // Cross-model union: merge finding sets from all models.
+  const crossModelUnioned = mergeByConvergenceMultiModel(modelResults);
+
+  // Log models_hit distribution
+  const mDist = {};
+  for (const f of crossModelUnioned) {
+    const k = `${f.models_hit}x`;
+    mDist[k] = (mDist[k] ?? 0) + 1;
+  }
+  const mDistStr = Object.entries(mDist).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([k, v]) => `${k}=${v}`).join(' ');
+  console.log(`    ${shardLabel}[ensemble]: cross-model union -> ${crossModelUnioned.length} finding(s) (models_hit dist: ${mDistStr || 'none'})`);
+
+  // Hook B post-filter: drop unverified dead-code claims.
+  const beforePostFilter = crossModelUnioned.length;
+  const postFiltered = postFilterDeadCodeClaims(crossModelUnioned, confirmedUnused);
+  const droppedByPostFilter = beforePostFilter - postFiltered.length;
+  if (droppedByPostFilter > 0) {
+    console.log(`    ${shardLabel}[hook-B]: post-filter dropped ${droppedByPostFilter} unverified dead-code claim(s)`);
+  }
+
+  console.log(`    ${shardLabel}: ensemble findings after post-filter: ${postFiltered.length}`);
+  return postFiltered;
+}
+
+/**
  * Run all three lenses for one sub-batch, then merge by convergence.
  * Injects hook A (adjacent exports) for the reuse lens and hook B (confirmed-unused
  * pre-pass + post-filter) for the simplification lens.
@@ -1903,7 +2324,7 @@ async function callModelJudge(finding, snippet, findingLabel) {
   const prompt = `FINDING:\n${findingDesc}\n\nCODE SNIPPET (file: ${finding.file ?? '?'}, lines shown):\n\`\`\`\n${snippet}\n\`\`\``;
 
   const jsonBody = {
-    model: STRUCTURE_MODEL,
+    model: JUDGE_MODEL,
     system: JUDGE_SYSTEM,
     prompt,
     stream: false,
@@ -2450,8 +2871,9 @@ async function runShard(shard) {
   const result = {
     shardId: shard.id,
     package: shard.package,
-    reasonModel: REASON_MODEL,
+    reasonModel: IS_ENSEMBLE ? ENSEMBLE_MODELS.join(',') : REASON_MODEL,
     structureModel: STRUCTURE_MODEL,
+    ensembleMode: IS_ENSEMBLE,
     files: [],
     tokenEstimate: 0,
     droppedCount: 0,
@@ -2459,6 +2881,7 @@ async function runShard(shard) {
     findings: [],
     errors: [],
     warnings: [],
+    retriable: [],
   };
 
   // 1. Resolve files
@@ -2528,7 +2951,16 @@ async function runShard(shard) {
     // Dry-run proofs: show prompts assemble, hook A adjacent-exports block,
     // and hook B confirmed-unused pre-pass (grep runs — it is deterministic, no model needed).
     // Also prove that repo-map/prompt assembly happens ONCE regardless of --samples N.
-    if (REASON_MODE === 'monolithic') {
+    if (IS_ENSEMBLE) {
+      const totalModelCalls = ENSEMBLE_MODELS.length * SAMPLES;
+      console.log(`  ${shard.id} [dry-run]: mode: ensemble (${ENSEMBLE_MODELS.length} reason models, reason→structure stage runs ${totalModelCalls}x total, then cross-model union, then judge)`);
+      console.log(`    ensemble models: ${ENSEMBLE_MODELS.join(', ')}`);
+      console.log(`    judge model: ${JUDGE_MODEL}`);
+      console.log(`    samples per model: ${SAMPLES} (prompt assembled ONCE per model; model called ${SAMPLES}x per model)`);
+      for (const modelName of ENSEMBLE_MODELS) {
+        console.log(`    model=${modelName}: reason→structure ${SAMPLES} sample(s) (${SAMPLES} model calls)`);
+      }
+    } else if (REASON_MODE === 'monolithic') {
       const totalModelCalls = SAMPLES;
       console.log(`  ${shard.id} [dry-run]: assembling 1 monolithic reasoning prompt (prompt assembled ONCE; model will be called ${totalModelCalls}x for --samples ${SAMPLES})…`);
       console.log(`    reason-mode=monolithic: system prompt ${MONOLITHIC_REASON_SYSTEM.length} chars`);
@@ -2594,24 +3026,30 @@ async function runShard(shard) {
       const batchPrompt = `REPO MAP:\n${repoMapStr}\n\nSHARD FILES:\n${batchContent}`;
       const batchLabel = `${shard.id}[${bi + 1}/${batches.length}]`;
       try {
-        const bFindings = REASON_MODE === 'monolithic'
-          ? await callModelMonolithic(batchPrompt, batchLabel, batchFileSet, mapData)
-          : await callModelMultiLens(batchPrompt, batchLabel, batchFileSet, mapData);
+        const bFindings = IS_ENSEMBLE
+          ? await callModelEnsemble(batchPrompt, batchLabel, batchFileSet, mapData)
+          : REASON_MODE === 'monolithic'
+            ? await callModelMonolithic(batchPrompt, batchLabel, batchFileSet, mapData)
+            : await callModelMultiLens(batchPrompt, batchLabel, batchFileSet, mapData);
         allFindings.push(...bFindings);
       } catch (err) {
         result.errors.push(`Sub-batch ${bi + 1} failed: ${err.message}`);
-        console.error(`[ERROR] ${shard.id} sub-batch ${bi + 1}: ${err.message}`);
+        result.retriable.push({ files: batchFiles, reason: err.message });
+        console.error(`[ERROR] ${shard.id} sub-batch ${bi + 1}: ${err.message} — flagged for retry`);
       }
     }
   } else {
-    // Single reasoning pass (lenses or monolithic)
+    // Single reasoning pass (ensemble, lenses, or monolithic)
     const fileSet = new Set(files);
     try {
-      allFindings = REASON_MODE === 'monolithic'
-        ? await callModelMonolithic(userPrompt, shard.id, fileSet, mapData)
-        : await callModelMultiLens(userPrompt, shard.id, fileSet, mapData);
+      allFindings = IS_ENSEMBLE
+        ? await callModelEnsemble(userPrompt, shard.id, fileSet, mapData)
+        : REASON_MODE === 'monolithic'
+          ? await callModelMonolithic(userPrompt, shard.id, fileSet, mapData)
+          : await callModelMultiLens(userPrompt, shard.id, fileSet, mapData);
     } catch (err) {
       result.errors.push(`Model call failed: ${err.message}`);
+      result.retriable.push({ files, reason: err.message });
       console.error(`[ERROR] ${shard.id}: ${err.message}`);
       return result;
     }
@@ -2880,6 +3318,7 @@ function generateReport(allResults, reconciliation) {
   lines.push('');
   lines.push(`**Reason model (Step 1):** ${REASON_MODEL}`);
   lines.push(`**Structure model (Step 2 + Phase 4):** ${STRUCTURE_MODEL}`);
+  lines.push(`**Judge model:** ${JUDGE_MODEL}`);
   lines.push(`**Endpoint:** ${ENDPOINT}`);
   lines.push(`**Generated:** ${new Date().toISOString()}`);
   lines.push(`**Mode:** ${DRY_RUN ? 'DRY RUN (no model calls)' : 'live'}${USE_JUDGE ? ' + judge (default-ON, K=1)' : ' + no-judge (skipped)'}`);
@@ -3395,7 +3834,7 @@ function readBenchmarkSnippet(item) {
  */
 async function runJudgeSet() {
   console.log(`[OK] hermes-run.mjs — judge-set mode`);
-  console.log(`     model    : ${STRUCTURE_MODEL}`);
+  console.log(`     model    : ${JUDGE_MODEL}`);
   console.log(`     endpoint : ${ENDPOINT}`);
   console.log(`     out dir  : ${OUT_DIR}`);
   console.log(`     benchmark: ${JUDGE_SET_PATH}`);
@@ -3507,6 +3946,31 @@ async function runJudgeSet() {
   console.log(`     TP=${tp}  FP=${fp}  FN=${fn}  TN=${tn}  (of ${items.length} items: ${realItems.length} real, ${fakeItems.length} fake)`);
 }
 
+/** Classify a completed shard for the circuit breaker; null = healthy (>=1 finding). */
+function shardBrokenKind(result) {
+  if (result.findings.length > 0) return null;
+  if (result.errors.some((e) => /resolved to 0 files/i.test(e))) return 'zero-files';
+  if (result.errors.length > 0) return 'error';
+  return 'empty';
+}
+
+/** Best-effort cause->fix hint from the accumulated broken shards' error text. */
+function circuitBreakerHint(brokenResults) {
+  const kinds = new Set(brokenResults.map(shardBrokenKind));
+  const errText = brokenResults.flatMap((r) => r.errors).join(' | ').toLowerCase();
+  if (kinds.has('zero-files'))
+    return 'INPUT: a shard resolved to 0 files. Check its "covers" cell in shard-manifest.md and the src prefix.';
+  if (/fetch failed|econnrefused|socket|network/.test(errText))
+    return 'PIPELINE: model calls cannot connect. Ollama is likely down/unloaded — check `docker exec ollama ollama ps` and ENDPOINT, then resume.';
+  if (/http 404|not found|no such model|\bpull\b/.test(errText))
+    return 'PIPELINE: model unavailable. `ollama pull <model>` and confirm --model/--structure-model/--judge-model, then resume.';
+  if (/http (429|5\d\d)|timeout|timed out|aborted/.test(errText))
+    return 'PIPELINE: model calls timing out / rate-limited. GPU may be contended or MODEL_TIMEOUT_MS too low — check `nvidia-smi`, then resume.';
+  if (kinds.has('empty'))
+    return 'OUTPUT: shards produced 0 findings and 0 errors — the format:json empty-output signature (see the gpt-oss fix) or a decode/prompt regression. Verify with `--file <path> --no-judge` before resuming.';
+  return 'Consistent failures with no clear signature — inspect the shard errors above before resuming.';
+}
+
 async function main() {
   // --self-test: run the deterministic post-filter test and exit immediately
   if (SELF_TEST) {
@@ -3523,17 +3987,29 @@ async function main() {
   const modeLabel = DRY_RUN ? 'DRY RUN' : 'live';
   const scopeModeLabel = IS_FILE_MODE ? ' (file)' : IS_SCOPING_MODE ? ' (scoping)' : '';
   console.log(`[OK] hermes-run.mjs — report-only shard runner (3-lens multi-pass)`);
-  console.log(`     reason model   : ${REASON_MODEL}`);
+  if (IS_ENSEMBLE) {
+    console.log(`     mode: ensemble (${ENSEMBLE_MODELS.length} reason models)`);
+    console.log(`     reason models  : ${ENSEMBLE_MODELS.join(', ')}`);
+  } else {
+    console.log(`     reason model   : ${REASON_MODEL}`);
+  }
   console.log(`     structure model: ${STRUCTURE_MODEL}`);
+  console.log(`     judge model    : ${JUDGE_MODEL}`);
   console.log(`     endpoint : ${ENDPOINT}`);
   console.log(`     out dir  : ${OUT_DIR}`);
   console.log(`     judge    : ${USE_JUDGE ? 'ON (K=1, temp=0.2) — use --no-judge to skip' : 'OFF (--no-judge)'}`);
   console.log(`     mode     : ${modeLabel}${scopeModeLabel}`);
-  console.log(`     reason-mode: ${REASON_MODE}${REASON_MODE === 'monolithic' ? ' (single free-form pass)' : ' (3 focused lens passes)'}`);
-  console.log(`     samples  : ${SAMPLES}${SAMPLES > 1 ? ` (self-consistency union; boost +${SAMPLE_BOOST_PER_HIT} per extra hit, gap=${SAMPLE_LINE_GAP} lines)` : ' (single pass — default)'}`);
-  if (REASON_MODE === 'lenses') {
-    console.log(`     lenses   : ${LENSES.map((l) => l.name).join(', ')} (${LENSES.length} passes per shard)`);
-    console.log(`     convergence boost: +${CONVERGENCE_BOOST_PER_LENS} per extra lens (gap=${CONVERGENCE_LINE_GAP} lines)`);
+  if (IS_ENSEMBLE) {
+    console.log(`     reason-mode: ensemble (${ENSEMBLE_MODELS.length} reason models → cross-model union → ${JUDGE_MODEL} judge)`);
+    console.log(`     samples  : ${SAMPLES} per model${SAMPLES > 1 ? ` (self-consistency union per model; boost +${SAMPLE_BOOST_PER_HIT} per extra hit)` : ' (single pass per model — default)'}`);
+    console.log(`     model boost: +${MODEL_BOOST_PER_EXTRA} per extra model agreeing on a location (gap=${MODEL_LINE_GAP} lines)`);
+  } else {
+    console.log(`     reason-mode: ${REASON_MODE}${REASON_MODE === 'monolithic' ? ' (single free-form pass)' : ' (3 focused lens passes)'}`);
+    console.log(`     samples  : ${SAMPLES}${SAMPLES > 1 ? ` (self-consistency union; boost +${SAMPLE_BOOST_PER_HIT} per extra hit, gap=${SAMPLE_LINE_GAP} lines)` : ' (single pass — default)'}`);
+    if (REASON_MODE === 'lenses') {
+      console.log(`     lenses   : ${LENSES.map((l) => l.name).join(', ')} (${LENSES.length} passes per shard)`);
+      console.log(`     convergence boost: +${CONVERGENCE_BOOST_PER_LENS} per extra lens (gap=${CONVERGENCE_LINE_GAP} lines)`);
+    }
   }
   if (IS_FILE_MODE) {
     console.log(`     file     : ${SCOPE_FILE}`);
@@ -3645,10 +4121,10 @@ async function main() {
       } catch (err) {
         console.error(
           `[ERROR] Endpoint unreachable at ${ENDPOINT}\n` +
-            `  Models expected: reason=${REASON_MODEL}, structure=${STRUCTURE_MODEL}\n` +
+            `  Models expected: reason=${REASON_MODEL}, structure=${STRUCTURE_MODEL}, judge=${JUDGE_MODEL}\n` +
             `  Error: ${err.message}\n` +
             `  Start Ollama with: ollama serve\n` +
-            `  Pull models with:  ollama pull ${REASON_MODEL} && ollama pull ${STRUCTURE_MODEL}`,
+            `  Pull models with:  ollama pull ${REASON_MODEL} && ollama pull ${STRUCTURE_MODEL} && ollama pull ${JUDGE_MODEL}`,
         );
         process.exit(1);
       }
@@ -3661,6 +4137,8 @@ async function main() {
   console.log('');
 
   const allResults = [];
+  let consecutiveBroken = 0;
+  let aborted = false;
   for (const shard of shards) {
     console.log(`--- Shard ${shard.id} (${shard.package}) ---`);
     const result = await runShard(shard);
@@ -3669,11 +4147,33 @@ async function main() {
       `    findings: ${result.findings.length} (${result.findings.filter((f) => f.severity === 'safe-auto').length} safe-auto), errors: ${result.errors.length}`,
     );
     console.log('');
+
+    if (CIRCUIT_BREAKER && !DRY_RUN) {
+      const kind = shardBrokenKind(result);
+      if (kind) {
+        consecutiveBroken++;
+        const isFirst = allResults.length === 1;
+        // A fully-broken first batch is systemic by definition. Empty-first counts only in a
+        // multi-shard pass — a lone shard can legitimately yield 0 findings.
+        const firstBatchSystemic = isFirst && (kind !== 'empty' || shards.length > 1);
+        if (firstBatchSystemic || consecutiveBroken >= CB_CONSECUTIVE) {
+          aborted = true;
+          const hint = circuitBreakerHint(allResults.slice(-consecutiveBroken));
+          console.error('');
+          console.error(`[ABORT] Systemic failure after batch ${allResults.length}/${shards.length}: ${consecutiveBroken} broken shard(s) (kind=${kind}).`);
+          console.error(`[ABORT] ${hint}`);
+          console.error(`[ABORT] Writing partial artifacts + retry queue, then exiting 2. --no-circuit-breaker forces a full pass.`);
+          break;
+        }
+      } else {
+        consecutiveBroken = 0;
+      }
+    }
   }
 
-  // Phase 4 reconciliation (skip if only one shard or dry-run with --shard)
+  // Phase 4 reconciliation (skip if only one shard, dry-run with --shard, or aborted)
   let reconciliation = { clusters: [] };
-  if (!ONLY_SHARD || allResults.length > 1) {
+  if (!aborted && (!ONLY_SHARD || allResults.length > 1)) {
     console.log('--- Phase 4: Reconciliation ---');
     const fullMap = DRY_RUN ? null : getRepoMapSlice('_full_');
     reconciliation = await runReconciliation(allResults, fullMap);
@@ -3689,6 +4189,7 @@ async function main() {
     generatedAt: new Date().toISOString(),
     reasonModel: REASON_MODEL,
     structureModel: STRUCTURE_MODEL,
+    judgeModel: JUDGE_MODEL,
     endpoint: ENDPOINT,
     dryRun: DRY_RUN,
     judgeEnabled: USE_JUDGE,
@@ -3722,6 +4223,15 @@ async function main() {
   writeFileSync(escalationMdPath, generateEscalationMd(actFindings, totalFindings), 'utf8');
   writeFileSync(escalationJsonPath, JSON.stringify(escalationArtifact, null, 2), 'utf8');
 
+  // Retry queue: isolated sub-batch failures (the shard still produced other findings) —
+  // flagged for a later targeted re-run, NOT a reason to abort the pass.
+  const retriable = allResults.flatMap((r) => (r.retriable ?? []).map((x) => ({ shard: r.shardId, ...x })));
+  if (retriable.length > 0) {
+    const retryPath = join(OUT_DIR, 'retry-queue.json');
+    writeFileSync(retryPath, JSON.stringify({ generatedAt: new Date().toISOString(), count: retriable.length, items: retriable }, null, 2), 'utf8');
+    console.log(`[WARN] ${retriable.length} isolated sub-batch failure(s) flagged for retry -> ${retryPath}`);
+  }
+
   console.log(`[OK] Artifacts written:`);
   console.log(`     ${findingsPath}`);
   console.log(`     ${reportPath}`);
@@ -3733,6 +4243,7 @@ async function main() {
   console.log('');
   console.log(`[OK] Done. ${allResults.length} shard(s), ${totalFindings} finding(s), ${totalErrors} error(s).`);
   console.log(`[OK] Escalation set: ${actFindings.length} of ${totalFindings} findings passed the local filter.`);
+  if (aborted) process.exit(2);
   if (totalErrors > 0) process.exit(1);
 }
 
