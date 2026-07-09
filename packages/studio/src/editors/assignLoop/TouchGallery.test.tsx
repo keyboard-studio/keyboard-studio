@@ -900,6 +900,141 @@ describe("TouchGallery — no suggestion goes straight to chooser", () => {
 // useTouchLint error surface — AC#3 (swallowed-catch bugfix)
 // ---------------------------------------------------------------------------
 
+describe("TouchGallery — QC P1 dedupe / revisit invariants", () => {
+  it("revisiting an already-configured character skips the suggestion and does not duplicate its mechanism", async () => {
+    // "ä" is decomposable and not in the default layout → longpress suggestion,
+    // derives hostKey K_A automatically so Accept records the mechanism directly.
+    seedStore({ withInventory: ["ä", "ö"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const acceptBtn = screen.queryAllByRole("button").find(
+      (b) => b.textContent?.trim() === "Accept",
+    ) ?? null;
+    expect(acceptBtn).not.toBeNull();
+    await act(async () => { fireEvent.click(acceptBtn!); });
+
+    // Advance to "ö" (pushes "ä" onto history).
+    const nextBtn = screen.queryAllByRole("button").find(
+      (b) => b.textContent?.trim() === "Next character →",
+    ) ?? null;
+    expect(nextBtn).not.toBeNull();
+    await act(async () => { fireEvent.click(nextBtn!); });
+
+    // Back to "ä" — now a revisit of an already-configured character.
+    const backBtn = screen.queryAllByRole("button", { name: /back/i }).find(
+      (b) => b.textContent?.includes("Back"),
+    ) ?? null;
+    expect(backBtn).not.toBeNull();
+    await act(async () => { fireEvent.click(backBtn!); });
+
+    // P1 fix (a): the suggestion card must NOT reappear for a char that already
+    // has a real mechanism — the chooser shows directly instead.
+    expect(screen.queryByText(/Suggested: long-press/i)).toBeNull();
+    expect(screen.queryByText(/How to reach it on touch/i)).not.toBeNull();
+
+    // Configured chip count for "ä" is still exactly 1.
+    let configuredGroup = screen.queryByRole("group", { name: /configured characters/i });
+    expect(configuredGroup).not.toBeNull();
+    expect(configuredGroup!.querySelectorAll("button").length).toBe(1);
+
+    // P1 fix (b): even if the same method+hostKey is (re-)applied via the
+    // chooser, appendMechanismToChar dedupes — no second identical chip.
+    const hostKeySelect = screen.queryByRole("combobox", { name: /host key/i });
+    expect(hostKeySelect).not.toBeNull();
+    await act(async () => {
+      fireEvent.change(hostKeySelect!, { target: { value: "K_A" } });
+    });
+    const applyBtn = screen.queryAllByRole("button").find(
+      (b) => b.textContent?.trim() === "Apply method",
+    ) ?? null;
+    expect(applyBtn).not.toBeNull();
+    await act(async () => { fireEvent.click(applyBtn!); });
+
+    configuredGroup = screen.queryByRole("group", { name: /configured characters/i });
+    expect(configuredGroup).not.toBeNull();
+    expect(configuredGroup!.querySelectorAll("button").length).toBe(1);
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const entry = draft?.charTouchEntries.find(([c]) => c === "ä");
+    expect(entry?.[1]?.mechanisms.length).toBe(1);
+  });
+
+  it("applying the identical method+hostKey twice yields ONE chip, not two", async () => {
+    // "中" has no suggestion — the chooser shows directly.
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const applyIdenticalLongpress = async () => {
+      const hostKeySelect = screen.queryByRole("combobox", { name: /host key/i });
+      expect(hostKeySelect).not.toBeNull();
+      await act(async () => {
+        fireEvent.change(hostKeySelect!, { target: { value: "K_A" } });
+      });
+      const applyBtn = screen.queryAllByRole("button").find(
+        (b) => b.textContent?.trim() === "Apply method",
+      ) ?? null;
+      expect(applyBtn).not.toBeNull();
+      await act(async () => { fireEvent.click(applyBtn!); });
+    };
+
+    // Apply longpress K_A once.
+    await applyIdenticalLongpress();
+    // Apply the exact same method+hostKey again (chooser stays open/reopens
+    // at the default longpress method after Apply resets its inputs).
+    await applyIdenticalLongpress();
+
+    const configuredGroup = screen.queryByRole("group", { name: /configured characters/i });
+    expect(configuredGroup).not.toBeNull();
+    expect(configuredGroup!.querySelectorAll("button").length).toBe(1);
+
+    const draft = useWorkingCopyStore.getState().touchDraft;
+    const entry = draft?.charTouchEntries.find(([c]) => c === "中");
+    expect(entry?.[1]?.mechanisms.length).toBe(1);
+  });
+
+  it("accepting the 'already in layout' suggestion then adding a real method leaves no stray touch_inherited (mutual exclusivity holds)", async () => {
+    // "a" is present in the scaffolded default QWERTY touch layout → "already"
+    // suggestion (touch_inherited).
+    seedStore({ withInventory: ["a"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const acceptBtn = screen.queryAllByRole("button").find(
+      (b) => b.textContent?.trim() === "Accept",
+    ) ?? null;
+    expect(acceptBtn).not.toBeNull();
+    await act(async () => { fireEvent.click(acceptBtn!); });
+
+    // touch_inherited recorded; chooser now visible (suggestionDismissed forced
+    // true by handleSuggestionAccept) so a real method can be added.
+    let draft = useWorkingCopyStore.getState().touchDraft;
+    let entry = draft?.charTouchEntries.find(([c]) => c === "a");
+    expect(entry?.[1]?.mechanisms.map((m) => m.patternId)).toEqual(["touch_inherited"]);
+
+    const hostKeySelect = screen.queryByRole("combobox", { name: /host key/i });
+    expect(hostKeySelect).not.toBeNull();
+    await act(async () => {
+      fireEvent.change(hostKeySelect!, { target: { value: "K_A" } });
+    });
+    const applyBtn = screen.queryAllByRole("button").find(
+      (b) => b.textContent?.trim() === "Apply method",
+    ) ?? null;
+    expect(applyBtn).not.toBeNull();
+    await act(async () => { fireEvent.click(applyBtn!); });
+
+    // The real method REPLACES the inherited-only placeholder — no stray
+    // touch_inherited alongside it.
+    draft = useWorkingCopyStore.getState().touchDraft;
+    entry = draft?.charTouchEntries.find(([c]) => c === "a");
+    expect(entry?.[1]?.mechanisms.map((m) => m.patternId)).toEqual(["longpress_alternates"]);
+  });
+});
+
 describe("TouchGallery — lint error finding surfaces in LintSummary (AC#3)", () => {
   it("renders KM_WARN_LINT_ERROR code in LintSummary when useTouchLint returns LINT_ERROR_FINDING", async () => {
     // Import the constant here (dynamic import avoids hoisting issues).

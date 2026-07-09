@@ -710,12 +710,24 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const [appliedForCurrentChar, setAppliedForCurrentChar] = useState(false);
 
   // Reset method state and suggestion dismissal when currentChar changes.
+  //
+  // P1 fix: a char revisited after it already has a real (non-inherited)
+  // mechanism must NOT re-show the suggestion card — re-accepting it would
+  // otherwise offer a no-op/duplicate action. Land straight on the chooser
+  // instead. A char with only a touch_inherited placeholder (or none) still
+  // sees the suggestion, since accepting it there is meaningful.
   useEffect(() => {
-    setSuggestionDismissed(false);
+    const existing = currentChar !== null ? charTouch.get(currentChar) : undefined;
+    const hasRealMechanism =
+      existing !== undefined && existing.mechanisms.some((m) => m.patternId !== "touch_inherited");
+    setSuggestionDismissed(hasRealMechanism);
     setMethod("longpress_alternates");
     setHostKey("");
     setFlickDirection("");
     setAppliedForCurrentChar(false);
+  // charTouch intentionally excluded — this effect should only re-run on
+  // currentChar change (a fresh read of charTouch at that moment is enough).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentChar]);
 
   // Also mark as applied if the char already has an entry in charTouch
@@ -761,14 +773,25 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     return { patternId: "multitap", slotValues: { hostKey, char } };
   }
 
+  /** Deep-equality for a MechanismRef (patternId + slotValues). */
+  function mechanismRefEquals(a: MechanismRef, b: MechanismRef): boolean {
+    return a.patternId === b.patternId && JSON.stringify(a.slotValues ?? {}) === JSON.stringify(b.slotValues ?? {});
+  }
+
   /**
    * Append `ref` to `char`'s mechanisms[] in `prev`, returning a new Map
    * (immutable update — issue 3, multiple methods per character).
    *
+   * Total invariants (hold regardless of call site — QC P1):
    * - No existing entry for `char` → create a new single-mechanism assignment.
-   * - Existing entry whose ONLY mechanism is `touch_inherited` → REPLACE it
-   *   with `[ref]`. `touch_inherited` (the auto-detected "already in layout"
-   *   suggestion) is mutually exclusive with a real configured method.
+   * - `touch_inherited` is mutually exclusive with a real configured method —
+   *   appending it when the char already has a real (non-inherited)
+   *   mechanism is a no-op.
+   * - A `ref` that deep-equals a mechanism the char already has is a no-op
+   *   (never append/duplicate an identical MechanismRef — covers re-accepting
+   *   a suggestion or re-applying the same method+hostKey via the chooser).
+   * - A real method REPLACES an existing inherited-only placeholder (`[{
+   *   patternId: "touch_inherited" }]`) rather than sitting alongside it.
    * - Otherwise → append `ref` to the existing mechanisms[] array.
    */
   function appendMechanismToChar(
@@ -786,14 +809,24 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
         mechanisms: [ref],
         source: "user",
       });
-    } else if (
+      return next;
+    }
+    const hasRealMechanism = existing.mechanisms.some((m) => m.patternId !== "touch_inherited");
+    if (ref.patternId === "touch_inherited" && hasRealMechanism) {
+      return next;
+    }
+    if (existing.mechanisms.some((m) => mechanismRefEquals(m, ref))) {
+      return next;
+    }
+    if (
+      ref.patternId !== "touch_inherited" &&
       existing.mechanisms.length === 1 &&
       existing.mechanisms[0]?.patternId === "touch_inherited"
     ) {
       next.set(char, { ...existing, mechanisms: [ref] });
-    } else {
-      next.set(char, { ...existing, mechanisms: [...existing.mechanisms, ref] });
+      return next;
     }
+    next.set(char, { ...existing, mechanisms: [...existing.mechanisms, ref] });
     return next;
   }
 
