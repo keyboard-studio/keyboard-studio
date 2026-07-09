@@ -25,6 +25,12 @@ import identityLiteRaw from "../../../../content/flows/identity_lite.modular.yam
 // ends on the "not supported" notice and the slice should not proceed.
 const UNSUPPORTED_SCRIPTS = new Set(["Ethi", "Hani", "Hang"]);
 
+// Shared caption for every langtags-derived seed (spec 030 FR-010).
+const LANGTAGS_PROVENANCE: LangtagsProvenance = {
+  source: "langtags",
+  caption: "Suggested from langtags — edit if needed",
+};
+
 /** Typed result of the identity-lite step. */
 export interface IdentityLiteResult {
   /** Language name in its own script (autonym). */
@@ -242,19 +248,15 @@ export function IdentityLite({
               }
 
               // Record provenance only for fields we actually seeded.
-              const provenance: LangtagsProvenance = {
-                source: "langtags",
-                caption: "Suggested from langtags — edit if needed",
-              };
               provenanceRef.current = new Map([
                 ...(scriptSeedRef.current !== undefined
-                  ? [["il_target_script", provenance] as [string, LangtagsProvenance]]
+                  ? [["il_target_script", LANGTAGS_PROVENANCE] as [string, LangtagsProvenance]]
                   : []),
                 ...(englishNameSeedRef.current !== undefined
-                  ? [["il_language_english", provenance] as [string, LangtagsProvenance]]
+                  ? [["il_language_english", LANGTAGS_PROVENANCE] as [string, LangtagsProvenance]]
                   : []),
                 ...(autonymSeedRef.current !== undefined
-                  ? [["il_language_autonym", provenance] as [string, LangtagsProvenance]]
+                  ? [["il_language_autonym", LANGTAGS_PROVENANCE] as [string, LangtagsProvenance]]
                   : []),
               ]);
             }
@@ -277,6 +279,24 @@ export function IdentityLite({
             variant.autonym !== undefined && variant.autonym !== "" ? variant.autonym : undefined;
           localNamesSeedRef.current = variant.localNames.length > 0 ? variant.localNames : undefined;
           scriptSeedRef.current = scriptToTargetOption(variant.defaultScript) ?? undefined;
+
+          // Keep provenance in step with the reseeded fields (FR-010): the
+          // variant may supply a value the primary entry lacked (needs a new
+          // caption) or lack one the primary entry had (stale caption must be
+          // cleared). il_language_english is untouched — region variants don't
+          // carry an English name.
+          const nextProvenance = new Map(provenanceRef.current);
+          if (scriptSeedRef.current !== undefined) {
+            nextProvenance.set("il_target_script", LANGTAGS_PROVENANCE);
+          } else {
+            nextProvenance.delete("il_target_script");
+          }
+          if (autonymSeedRef.current !== undefined) {
+            nextProvenance.set("il_language_autonym", LANGTAGS_PROVENANCE);
+          } else {
+            nextProvenance.delete("il_language_autonym");
+          }
+          provenanceRef.current = nextProvenance;
         }
       }
     },
