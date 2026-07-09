@@ -25,11 +25,13 @@ import identityLiteRaw from "../../../../content/flows/identity_lite.modular.yam
 // ends on the "not supported" notice and the slice should not proceed.
 const UNSUPPORTED_SCRIPTS = new Set(["Ethi", "Hani", "Hang"]);
 
-// Shared caption for every langtags-derived seed (spec 030 FR-010).
-const LANGTAGS_PROVENANCE: LangtagsProvenance = {
+// Shared caption for every langtags-derived seed (spec 030 FR-010). Frozen: it
+// is stored by reference into provenanceRef at multiple sites, so an in-place
+// mutation would silently corrupt every other seeded field's caption.
+const LANGTAGS_PROVENANCE: LangtagsProvenance = Object.freeze({
   source: "langtags",
   caption: "Suggested from langtags — edit if needed",
-};
+});
 
 /** Typed result of the identity-lite step. */
 export interface IdentityLiteResult {
