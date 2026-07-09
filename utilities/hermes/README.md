@@ -9,15 +9,71 @@ gh/GitHub.** It reads code and a local Ollama model, and writes two report artif
 `utilities/hermes/reports/`. Both artifacts are gitignored. The word "REPORT ONLY" appears in
 the first line of every generated `report.md`.
 
-## Two-step decoding design
+## Three-lens multi-pass design
 
-Each shard (or sub-batch) is processed in two model calls:
+Instead of a single "find every simplification" prompt, each shard (or sub-batch) runs
+**three focused reasoning passes** — one per lens — then merges the results by location with
+cross-lens convergence scoring. These are Claude's official `/simplify` reviewer lenses,
+adapted for whole-file review (not diff-scoped).
 
-**Step 1 — REASON** (`REASON_MODEL`, default `qwen3:30b-a3b-instruct-2507-q4_K_M`)
-Calls the model WITHOUT `format:json`. The prompt encourages high recall: it lists every class of simplification to look for (dead vars, per-call allocations, duplicated blocks, etc.) and tells the model "Finding many is good." The REFUSE list and behavior-preservation constraint are preserved — the suppressive "emit JSON only" framing is removed. Input is capped at ~18 k tokens so that input + verbose reasoning output fit within the 32 k context window (~14 k reserved for Step 1 output). Transient network/connection errors and timeouts are retried up to 3 times with increasing backoff (2 s / 5 s / 10 s). A per-call timeout (`MODEL_TIMEOUT_MS`, 300 s) prevents indefinite stalls on verbose reasoning runs.
+### Why three lenses?
 
-**Step 2 — STRUCTURE** (`STRUCTURE_MODEL`, default: same as resolved `REASON_MODEL` — see no-swap note below)
-Feeds Step 1's prose into a second call WITH `format:json` to convert it to the findings schema. This step only structures what Step 1 found — it does not add or invent findings. If Step 1 returned effectively nothing (< 20 chars), Step 2 is skipped and 0 findings are recorded. The same `MODEL_TIMEOUT_MS` timeout is applied. SyntaxError (malformed JSON) is retried once.
+A monolithic "find everything" prompt both under-generates (the model loses focus across
+too many categories) and over-generates mush (weak findings padded out). Diverse specialised
+passes improve recall because each lens only hunts its narrow class. Agreement **across**
+lenses is a genuine confidence signal — unlike repeating the same prompt, which is trivially
+deterministic. Local compute is the cheap resource, so spending ~3 passes per shard is the
+intended trade-off.
+
+### The three lenses
+
+| Lens | Hunts | types emitted |
+|------|-------|---------------|
+| **reuse** | Code that re-implements something already in the codebase; uses adjacent-exports injection (hook A) to name existing helpers | `reuse`, `crosslink` |
+| **simplification** | Unnecessary complexity: redundant/derivable state, copy-paste variation, deep nesting, defensive branches, dead code (verified by caller-grep, hook B) | `quality`, `altitude` |
+| **efficiency** | Wasted work: per-call allocations (RegExp/Set/array rebuilt every call), hoistable computation, repeated scans, string re-parsing | `efficiency` |
+
+Each lens shares the same precision guardrail ("behavior-preserving only") and REFUSE list.
+
+### Harness verification hooks
+
+Two deterministic hooks run before/after the model calls per shard:
+
+**Hook A — Adjacent exports (REUSE lens only).** Before calling the reuse lens, the harness
+computes the exported symbols of modules adjacent to the shard's files (same package, from
+the repo-map `exportInventory`), and injects them as an `ADJACENT EXPORTS` block into the
+prompt. This gives the model a concrete list of existing helpers to reference, approximating
+the official prompt's "grep adjacent files for existing helpers." Capped at 120 entries.
+
+**Hook B — Caller-grep (SIMPLIFICATION lens only).** The harness runs a pre-pass that greps
+the repo (`packages/`, `utilities/`, `api/`) for external callers of every top-level symbol
+in the shard's files. Symbols with no references outside their own file become the
+`CONFIRMED-UNUSED` list, which is injected into the simplification lens prompt. After
+structuring, a post-filter drops any finding whose text claims a symbol is dead/unused but
+that symbol is NOT in the confirmed-unused set, logging `[verify] dropped unverified
+dead-code claim: <symbol> (still has callers)`. Uses `rg` if available, else `grep -r`;
+skips gracefully with `[WARN]` if neither is installed.
+
+### Cross-lens convergence
+
+After all three lenses run, findings are **merged by location**: two findings converge if they
+are in the same file AND their line ranges overlap or are within 3 lines. Merged findings carry:
+- `lenses`: the set of distinct lenses that flagged the location
+- `convergence`: count of distinct lenses (1–3)
+- `confidence_pre_boost`: original confidence from the best single-lens finding
+- `confidence`: boosted confidence (+0.15 per extra lens, capped at 1.0)
+
+A finding flagged by 2+ lenses is a strong signal — the boost feeds directly into the
+ACT/REVIEW/NOISE bucketing threshold, so converging findings are more likely to survive
+to the escalation set. The report shows the convergence distribution (1-lens / 2-lens / 3-lens)
+for each shard and globally.
+
+### Step 2 — STRUCTURE
+
+Each per-lens prose output is fed into a second call WITH `format:json` to convert it to the
+findings schema. This step only structures what the lens found — it does not add or invent
+findings. If a lens Step 1 returned effectively nothing (< 20 chars), Step 2 is skipped for
+that lens.
 
 **Phase 4 reconciliation** stays as a single structured call (STRUCTURE_MODEL with `format:json`).
 
@@ -90,6 +146,7 @@ node utilities/hermes/hermes-run.mjs \
 | `--endpoint <url>` | `http://localhost:11434/api/generate` | Ollama generate endpoint |
 | `--out <dir>` | `utilities/hermes/reports` | Directory for output artifacts |
 | `--dry-run` | off | Assemble prompts + print input token estimates; do NOT call the model |
+| `--self-test` | off | Run the deterministic hook-B post-filter test and exit (no model, no shard) |
 
 ## Output artifacts
 
