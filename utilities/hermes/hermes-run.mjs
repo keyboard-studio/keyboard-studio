@@ -94,6 +94,14 @@ const ROOT = resolve(__dirname, '..', '..'); // repo root (two levels up from ut
 //                 treated as transient and enter the retry path in callModelReason.
 const DEFAULT_REASON_MODEL = 'qwen3:30b-a3b-instruct-2507-q4_K_M';
 const MODEL_TIMEOUT_MS = 300_000; // 300 s — generous for verbose 30B reasoning; applies to both steps
+
+// Hard output-token caps per call type — prevent runaway/degenerate generation that fills
+// the context window (~15 min pegged GPU) when the 30B enters a repetitive loop.
+// Reason is free-form and can be legitimately verbose; structure emits a JSON findings list;
+// judge emits a tiny verdict object.
+const REASON_NUM_PREDICT = 4096;    // free-form reasoning; bounded but roomy
+const STRUCTURE_NUM_PREDICT = 2048; // schema conversion; JSON output is compact
+const JUDGE_NUM_PREDICT = 384;      // verdict JSON; tiny
 const DEFAULT_ENDPOINT = 'http://localhost:11434/api/generate';
 const DEFAULT_OUT = join(ROOT, 'utilities', 'hermes', 'reports');
 const SHARD_MANIFEST = join(__dirname, 'shard-manifest.md');
@@ -1024,7 +1032,13 @@ async function callModelReason(system, prompt) {
     prompt,
     stream: false,
     // NO format:json — free-form reasoning for high recall
-    options: { temperature: 0.1, num_ctx: 32768 },
+    options: {
+      temperature: 0.1,
+      num_ctx: 32768,
+      num_predict: REASON_NUM_PREDICT,
+      repeat_penalty: 1.15,
+      repeat_last_n: 256,
+    },
   };
 
   const maxAttempts = 1 + REASON_RETRY_DELAYS.length; // 4 total (1 original + 3 retries)
@@ -1049,6 +1063,12 @@ async function callModelReason(system, prompt) {
       const raw = outer.response;
       if (typeof raw !== 'string') {
         throw new Error(`Unexpected response shape: .response is ${typeof raw}`);
+      }
+      // Degenerate-generation detection: if the response is within 5% of the num_predict*4
+      // char ceiling the model likely hit the cap (repetitive loop or genuinely very verbose).
+      const capChars = REASON_NUM_PREDICT * 4;
+      if (raw.length >= capChars * 0.95) {
+        console.warn(`[WARN] reason output hit num_predict cap — possible runaway/verbose; findings may be truncated`);
       }
       return raw;
     } catch (err) {
@@ -1078,7 +1098,13 @@ async function callModelStructure(structureSystem, notesPrompt, shardId) {
     prompt: notesPrompt,
     stream: false,
     format: 'json',
-    options: { temperature: 0.1, num_ctx: 32768 },
+    options: {
+      temperature: 0.1,
+      num_ctx: 32768,
+      num_predict: STRUCTURE_NUM_PREDICT,
+      repeat_penalty: 1.15,
+      repeat_last_n: 256,
+    },
   };
 
   async function attempt() {
@@ -1133,7 +1159,13 @@ async function callModel(system, prompt, shardId) {
     prompt,
     stream: false,
     format: 'json',
-    options: { temperature: 0.1, num_ctx: 32768 },
+    options: {
+      temperature: 0.1,
+      num_ctx: 32768,
+      num_predict: STRUCTURE_NUM_PREDICT,
+      repeat_penalty: 1.15,
+      repeat_last_n: 256,
+    },
   };
 
   async function attempt() {
@@ -1640,7 +1672,13 @@ async function callModelJudge(finding, snippet, findingLabel) {
     prompt,
     stream: false,
     format: 'json',
-    options: { temperature: 0.2, num_ctx: 32768 }, // 0.2: greedy-ish, stable; judge is deterministic in practice
+    options: {
+      temperature: 0.2, // greedy-ish, stable; judge is deterministic in practice
+      num_ctx: 32768,
+      num_predict: JUDGE_NUM_PREDICT,
+      repeat_penalty: 1.15,
+      repeat_last_n: 256,
+    },
   };
 
   async function attempt() {
