@@ -26,7 +26,7 @@ import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { latinDeadkeyAcuteSingle } from "@keyboard-studio/contracts/fixtures";
 import type { PatternMatch } from "@keyboard-studio/contracts";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
-import type { MechanismAssignment } from "@keyboard-studio/contracts";
+import type { MechanismAssignment, IRGroup, IRStore } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
@@ -151,6 +151,36 @@ function seedInventory(chars: string[], opts: { intro?: boolean } = {}) {
   if (!opts.intro) {
     useWorkingCopyStore.getState().markGalleryIntroSeen("mechanism");
   }
+}
+
+/** A minimal `group(main)` block — enough for planShiftAssignment/isMnemonicLayout. */
+function mainGroup(): IRGroup {
+  return { nodeId: "g-main", name: "main", usingKeys: true, rules: [], readonly: false };
+}
+
+/** The `&MNEMONICLAYOUT` system store, set to "1". */
+function mnemonicStore(): IRStore {
+  return {
+    nodeId: "s-mnemonic",
+    name: "MNEMONICLAYOUT",
+    items: [{ kind: "char", value: "1" }],
+    isSystem: true,
+  };
+}
+
+/**
+ * Instantiate the working copy with a `main` group so shift-layer targeting
+ * (planShiftAssignment / isMnemonicLayout) has an IR to evaluate against —
+ * without this, MechanismGallery's workingIr is null and Shift targeting is
+ * disabled by design (see "shift toggle disabled" tests below for the
+ * mnemonic case; this helper covers the "IR present" case).
+ */
+function instantiateWorkingCopy(opts: { mnemonic?: boolean } = {}) {
+  const seedVfs = createVirtualFS([
+    { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+  ]);
+  const ir = makeTestIR([mainGroup()], opts.mnemonic === true ? [mnemonicStore()] : []);
+  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: seedVfs, ir });
 }
 
 afterEach(() => {
@@ -1007,5 +1037,167 @@ describe("MechanismGallery — import-derived markInputOrder provenance", () => 
           .axisFills.some((f) => f.source === "import-derived"),
       ).toBe(false);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Shift-layer targeting (S-01) — Base/Shift toggle in the "Assign to a key" flow
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — shift-layer targeting (S-01)", () => {
+  it("emits a [SHIFT K_X] rule when the Shift layer is selected", async () => {
+    // The user is adding Θ (uppercase) itself via the shift layer of K_Q —
+    // shift+K_Q should produce Θ (U+0398), not the base-layer character.
+    instantiateWorkingCopy();
+    seedInventory(["Θ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: "K_Q" },
+    });
+    fireEvent.click(screen.getByRole("radio", { name: "Shift" }));
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for Θ/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0]?.target).toBe("Θ");
+    expect(assignments[0]?.mechanisms[0]?.patternId).toBe("simple_swap");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["kmnRules"]).toBe(
+      "+ [SHIFT K_Q] > U+0398",
+    );
+
+    // A Shift-layer apply is not a base-layer apply — the companion prompt
+    // (base-layer only, per spec) must not appear.
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+
+  it("disables the Shift toggle for a mnemonic keyboard, with an explanatory title", async () => {
+    instantiateWorkingCopy({ mnemonic: true });
+    seedInventory(["θ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    const shiftToggle = screen.getByRole("radio", { name: "Shift" }) as HTMLButtonElement;
+    expect(shiftToggle.disabled).toBe(true);
+    expect(shiftToggle.getAttribute("title")).toMatch(/Mnemonic keyboard/i);
+
+    // Clicking a disabled toggle must not change the layer — applying still
+    // produces a base-layer rule.
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: "K_Q" },
+    });
+    fireEvent.click(shiftToggle);
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["kmnRules"]).toBe(
+      "+ [K_Q] > U+03B8",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Case-pair companion proposal (propose-then-confirm, spec v1.3.1 §3c)
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — case-pair companion proposal", () => {
+  it("shows the companion prompt for θ and records Θ on the shift layer on confirm", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["θ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: "K_Q" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+
+    expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Map Θ to the shift layer of K_Q/i }),
+    );
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments).toHaveLength(2);
+    const companion = assignments.find((a) => a.target === "Θ");
+    expect(companion).toBeDefined();
+    expect(companion?.mechanisms[0]?.patternId).toBe("simple_swap");
+    expect(companion?.mechanisms[0]?.slotValues?.["kmnRules"]).toBe(
+      "+ [SHIFT K_Q] > U+0398",
+    );
+
+    // Prompt is dismissed after confirm.
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+
+  it("records nothing additional when the companion prompt is declined", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["θ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: "K_Q" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Do not map Θ to the shift layer/i }),
+    );
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0]?.target).toBe("θ");
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+
+  it("does not show the companion prompt for a caseless character", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ا"]); // Arabic alef — caseless (\p{Lo}), no case counterpart
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: "K_Q" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for ا/i }));
+
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+
+  it("does not show the companion prompt when the keyboard is mnemonic (shift unavailable)", async () => {
+    instantiateWorkingCopy({ mnemonic: true });
+    seedInventory(["θ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: "K_Q" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
   });
 });
