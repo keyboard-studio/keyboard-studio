@@ -25,8 +25,17 @@ describe("il_language_code — definition", () => {
     expect(definition.required).toBe(false);
   });
 
-  it("routes to il_language_english", () => {
-    expect(definition.next).toBe("il_language_english");
+  it("declares a conditional next: region branch (US3) + default to il_language_english", () => {
+    // The region branch is fired at runtime by IdentityLite.getNextOverride; the
+    // static rule set declares both edges so the flow graph / drift guardrail see
+    // il_language_region as reachable and the default resolves to the name step.
+    const next = definition.next;
+    expect(Array.isArray(next)).toBe(true);
+    const rules = next as Array<{ condition?: string; default?: boolean; goto?: string | null }>;
+    const regionRule = rules.find((r) => r.goto === "il_language_region");
+    expect(regionRule?.condition).toBeTruthy();
+    const defaultRule = rules.find((r) => r.default === true);
+    expect(defaultRule?.goto).toBe("il_language_english");
   });
 });
 

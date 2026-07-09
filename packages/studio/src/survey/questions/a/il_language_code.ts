@@ -17,6 +17,16 @@
 // Type is "autocomplete" with options_source "@langtags_iso639" so QuestionField
 // renders the langtags-backed searchable picker. Free-text entry is preserved via
 // the Autocomplete primitive (datalist approach allows arbitrary typed values).
+//
+// Region-disambiguation branch (spec 030 US3): the picker may route to
+// il_language_region when the resolved langtags entry has more than one region
+// variant. That decision depends on the resolved entry's regionVariants — state
+// no static value/ctx condition can express — so IdentityLite.getNextOverride is
+// the runtime authority that fires the branch (it wins over this static `next` in
+// advanceThrough). The conditional `next` below DECLARES the edge structurally so
+// the Flow Map paints the branch and the drift guardrail sees il_language_region
+// as reachable; the ctx guard is never set on the resolveNext path, so the static
+// fallback always resolves to il_language_english.
 
 import type { QuestionModule } from "../../types.ts";
 
@@ -32,7 +42,12 @@ export const definition = {
   type: "autocomplete" as const,
   options_source: "@langtags_iso639" as const,
   required: false,
-  next: "il_language_english",
+  next: [
+    // Taken at runtime by IdentityLite.getNextOverride when the picked language
+    // is region-ambiguous; declared here for the flow graph.
+    { condition: "ctx.ilRegionAmbiguous == 'true'", goto: "il_language_region" },
+    { default: true, goto: "il_language_english" },
+  ],
 } satisfies import("../../types.ts").FlowQuestion;
 
 // No validate() — optional free-text; no client-side gating implied by the YAML.

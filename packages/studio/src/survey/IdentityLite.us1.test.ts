@@ -20,9 +20,12 @@ import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 const flow = loadModularFlow(identityLiteRaw as string);
 
 describe("spec 030 US1 — identity flow order (langtags picker first)", () => {
-  it("orders the questions: picker -> english -> autonym -> script -> not-supported", () => {
+  it("orders the questions: picker -> region -> english -> autonym -> script -> not-supported", () => {
+    // il_language_region (US3) sits after the picker in the membership; it is a
+    // conditional step reached only when the picked language is region-ambiguous.
     expect(flow.questions.map((q) => q.id)).toEqual([
       "il_language_code",
+      "il_language_region",
       "il_language_english",
       "il_language_autonym",
       "il_target_script",

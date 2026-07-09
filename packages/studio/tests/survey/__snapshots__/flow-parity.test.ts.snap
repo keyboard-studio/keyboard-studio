@@ -5,10 +5,29 @@ exports[`flow-parity: identity_lite — questions[] > projected fields are stabl
   {
     "help_text": "Start typing your language's English name and pick it from the list — you can also search by autonym or ISO 639 code (e.g. "Hausa", "Hindi", "ha", "hi"). If your language is not listed, type its ISO 639 code directly (e.g. "bft" for Balti) and continue — free text is always accepted. Leave blank if you are unsure.",
     "id": "il_language_code",
-    "next": "il_language_english",
+    "next": [
+      {
+        "condition": "ctx.ilRegionAmbiguous == 'true'",
+        "goto": "il_language_region",
+      },
+      {
+        "default": true,
+        "goto": "il_language_english",
+      },
+    ],
     "options": undefined,
     "options_source": "@langtags_iso639",
     "prompt": "What language is this keyboard for?",
+    "required": false,
+    "type": "autocomplete",
+  },
+  {
+    "help_text": "This language is used in more than one place, and the local name or spelling can differ by region. Pick the region that matches your community — or skip if you are unsure.",
+    "id": "il_language_region",
+    "next": "il_language_english",
+    "options": undefined,
+    "options_source": undefined,
+    "prompt": "Which region is your language from?",
     "required": false,
     "type": "autocomplete",
   },

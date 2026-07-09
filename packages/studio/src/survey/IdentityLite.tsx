@@ -5,7 +5,7 @@
 // confirmations (spec §5, §9). Language and script are decoupled. refs #369.
 
 import { useMemo, useRef, useCallback, useEffect } from "react";
-import type { SurveyPhaseResult, LintFinding, LangtagsProvenance } from "@keyboard-studio/contracts";
+import type { SurveyPhaseResult, LintFinding, LangtagsProvenance, LanguageDefaults } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { loadModularFlow } from "./loadModularFlow.ts";
 import type { SurveyContext, FlowOption } from "./types.ts";
@@ -37,6 +37,12 @@ export interface IdentityLiteResult {
    * Region and variant refinement are deferred to the documentation stage (§8).
    */
   languageSubtag: string;
+  /**
+   * Region subtag chosen at `il_language_region` (spec 030 US3), e.g. "DJ".
+   * Empty string when the language was unambiguous by region or the step was
+   * skipped. Folded into `bcp47` at the region position.
+   */
+  region: string;
   /** Raw `il_target_script` answer (e.g. "Latn", "romanization-Latn", "fonipa"). */
   targetScriptRaw: string;
   /**
@@ -65,22 +71,30 @@ export interface IdentityLiteResult {
  *   (Latin is implied by the variant; BCP47 omits the script subtag for fonipa)
  * - empty `lang` → "" (no BCP47; caller degrades to script-match ranking)
  *
+ * An optional `region` subtag (from il_language_region, spec 030 US3) is folded
+ * in at the BCP47 region position (language-script-region-variant). Empty region
+ * (unambiguous or skipped) leaves the tag exactly as before.
+ *
  * @param languageSubtag  ISO 639 subtag from `il_language_code`, may be "".
  * @param targetScriptRaw Raw `il_target_script` value from the survey.
+ * @param region          Optional region subtag from il_language_region, may be "".
  */
 export function buildTargetBcp47(
   languageSubtag: string,
   targetScriptRaw: string,
+  region = "",
 ): string {
   const lang = languageSubtag.trim();
   if (lang === "") return "";
-  if (targetScriptRaw === "fonipa") return `${lang}-fonipa`;
-  if (targetScriptRaw === "romanization-Latn") return `${lang}-Latn`;
+  const reg = region.trim();
+  // BCP47 order: language-script-region-variant.
+  if (targetScriptRaw === "fonipa") return [lang, reg, "fonipa"].filter((p) => p !== "").join("-");
+  if (targetScriptRaw === "romanization-Latn") return [lang, "Latn", reg].filter((p) => p !== "").join("-");
   const { script } = normalizeTargetScript(targetScriptRaw);
-  // "other" and empty string are not valid ISO-15924 subtags; return the bare
-  // language tag (valid BCP47) rather than the malformed "lang-other".
-  if (script === "" || script === "other") return lang;
-  return `${lang}-${script}`;
+  // "other" and empty string are not valid ISO-15924 subtags; omit the script
+  // rather than emit the malformed "lang-other".
+  const scriptPart = script === "" || script === "other" ? "" : script;
+  return [lang, scriptPart, reg].filter((p) => p !== "").join("-");
 }
 
 function answerString(result: SurveyPhaseResult, questionId: string): string {
@@ -96,12 +110,14 @@ function answerString(result: SurveyPhaseResult, questionId: string): string {
 export function extractIdentityLite(result: SurveyPhaseResult): IdentityLiteResult {
   const targetScriptRaw = answerString(result, "il_target_script");
   const languageSubtag = answerString(result, "il_language_code");
+  const region = answerString(result, "il_language_region");
   return {
     autonym: answerString(result, "il_language_autonym"),
     english: answerString(result, "il_language_english"),
     languageSubtag,
+    region,
     targetScriptRaw,
-    bcp47: buildTargetBcp47(languageSubtag, targetScriptRaw),
+    bcp47: buildTargetBcp47(languageSubtag, targetScriptRaw, region),
     supported: !UNSUPPORTED_SCRIPTS.has(targetScriptRaw),
     prefill: deriveScriptPrefill(targetScriptRaw),
   };
@@ -159,11 +175,27 @@ export function IdentityLite({
   // Stored in a ref so getSeedProvenance reads it without re-renders.
   const provenanceRef = useRef<Map<string, LangtagsProvenance>>(new Map());
 
+  // Cached langtags module (spec 030 US3): lets getNextOverride resolve
+  // synchronously at render time to decide whether the region step applies.
+  const langtagsModRef = useRef<Awaited<ReturnType<typeof loadLangtags>> | null>(null);
+
+  // The langtags entry resolved by il_language_code (spec 030 US3): read by the
+  // region question's options and its variant-selection handler. Null until a
+  // known language is picked.
+  const resolvedEntryRef = useRef<LanguageDefaults | null>(null);
+
+  // The region subtag chosen at il_language_region (spec 030 US3), folded into
+  // the BCP47 tag. Empty when unambiguous or skipped.
+  const selectedRegionRef = useRef<string>("");
+
   // Kick off the one-time lazy load on mount so the langtags module is ready
-  // by the time the user reaches il_language_code. Does NOT block rendering.
+  // by the time the user reaches il_language_code. Caches the module for
+  // synchronous getNextOverride resolution. Does NOT block rendering.
   useEffect(() => {
-    void loadLangtags().catch(() => {
-      // Degrade silently on import failure — no seed, fields stay free-text (FR-009).
+    void loadLangtags().then((mod) => {
+      langtagsModRef.current = mod;
+    }).catch(() => {
+      // Degrade silently on import failure — no seed/routing, fields stay free-text (FR-009).
     });
   }, []);
 
@@ -177,6 +209,8 @@ export function IdentityLite({
         englishNameSeedRef.current = undefined;
         autonymSeedRef.current = undefined;
         localNamesSeedRef.current = undefined;
+        resolvedEntryRef.current = null;
+        selectedRegionRef.current = "";
         provenanceRef.current = new Map();
 
         if (code !== "") {
@@ -186,6 +220,7 @@ export function IdentityLite({
           void loadLangtags().then((mod) => {
             const defaults = mod.getLanguageDefaults(code);
             if (defaults !== null) {
+              resolvedEntryRef.current = defaults;
               const scriptOption = scriptToTargetOption(defaults.defaultScript);
               // Only seed when there is a dedicated option for this script.
               // null means no mapping — seeding "other" would be misleading.
@@ -227,6 +262,21 @@ export function IdentityLite({
             // Degrade silently on import failure — seeds stay undefined, fields
             // remain free-text (FR-009). No unhandled rejection.
           });
+        }
+      }
+
+      if (questionId === "il_language_region") {
+        // The chosen region narrows the resolved variant (spec 030 US3): its
+        // autonym / local-name / script can differ by region, so override those
+        // seeds. Skipping (blank) leaves the primary-variant seeds in place.
+        const region = typeof value === "string" ? value.trim() : "";
+        selectedRegionRef.current = region;
+        const variant = resolvedEntryRef.current?.regionVariants?.find((v) => v.region === region);
+        if (variant !== undefined) {
+          autonymSeedRef.current =
+            variant.autonym !== undefined && variant.autonym !== "" ? variant.autonym : undefined;
+          localNamesSeedRef.current = variant.localNames.length > 0 ? variant.localNames : undefined;
+          scriptSeedRef.current = scriptToTargetOption(variant.defaultScript) ?? undefined;
         }
       }
     },
@@ -286,6 +336,35 @@ export function IdentityLite({
           return names.map((n) => ({ value: n, label: n }));
         }
       }
+      if (questionId === "il_language_region") {
+        // The resolved entry's region variants (spec 030 US3): value = region
+        // code (folded into BCP47), label = region name.
+        const variants = resolvedEntryRef.current?.regionVariants;
+        if (variants !== undefined && variants.length > 0) {
+          return variants.map((v) => ({ value: v.region, label: v.regionName ?? v.region }));
+        }
+      }
+      return undefined;
+    },
+    [],
+  );
+
+  // Route il_language_code -> il_language_region only when the picked language is
+  // region-ambiguous (spec 030 US3 / FR-014). Resolves synchronously from the
+  // cached langtags module against the current value at render time (no
+  // dependency on onAnswerCommit ordering).
+  const getNextOverride = useCallback(
+    (questionId: string, value: string | string[] | undefined): string | undefined => {
+      if (questionId === "il_language_code") {
+        const code = typeof value === "string" ? value.trim() : "";
+        const mod = langtagsModRef.current;
+        if (code !== "" && mod !== null) {
+          const defaults = mod.getLanguageDefaults(code);
+          if (defaults?.regionVariants !== undefined && defaults.regionVariants.length > 1) {
+            return "il_language_region";
+          }
+        }
+      }
       return undefined;
     },
     [],
@@ -323,6 +402,7 @@ export function IdentityLite({
         getSeedValue={getSeedValue}
         getSeedProvenance={getSeedProvenance}
         getSeedOptions={getSeedOptions}
+        getNextOverride={getNextOverride}
         {...(onBack !== undefined ? { onBack } : {})}
         {...(findingsByQuestionId !== undefined ? { findingsByQuestionId } : {})}
       />
