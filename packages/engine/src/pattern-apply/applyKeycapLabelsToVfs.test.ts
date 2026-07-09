@@ -40,7 +40,11 @@ import type { MechanismAssignment, VirtualFS } from "@keyboard-studio/contracts"
 // Fixture helpers
 // ---------------------------------------------------------------------------
 
+/** Builds a bare-vkey S-01 rule line whose RHS decodes back to `target`,
+ * matching how the studio always builds these two values in lockstep
+ * (shiftRules.ts's buildBaseRuleLines uses the same char for both). */
 function makeS01Assignment(target: string, vkey: string): MechanismAssignment {
+  const cp = (target.codePointAt(0) ?? 0x41).toString(16).toUpperCase().padStart(4, "0");
   return {
     scope: "individual",
     target,
@@ -49,7 +53,7 @@ function makeS01Assignment(target: string, vkey: string): MechanismAssignment {
       {
         patternId: "p-s01",
         strategyId: "S-01",
-        slotValues: { kmnRules: `+ [${vkey}] > U+0041` },
+        slotValues: { kmnRules: `+ [${vkey}] > U+${cp}` },
       },
     ],
   };
@@ -65,6 +69,22 @@ function makeS08Assignment(target: string, vkey: string): MechanismAssignment {
         patternId: "p-s08",
         strategyId: "S-08",
         slotValues: { altgrKeyList: `[RALT ${vkey}]` },
+      },
+    ],
+  };
+}
+
+/** Shifted AltGr (Shift+RightAlt) variant: `[SHIFT RALT K_X]`. */
+function makeS08ShiftedAssignment(target: string, vkey: string): MechanismAssignment {
+  return {
+    scope: "individual",
+    target,
+    modality: "physical",
+    mechanisms: [
+      {
+        patternId: "p-s08-shift",
+        strategyId: "S-08",
+        slotValues: { altgrKeyList: `[SHIFT RALT ${vkey}]` },
       },
     ],
   };
@@ -97,6 +117,25 @@ const KVKS_WITH_RA = `<visualkeyboard><encoding name="unicode">
 </layer>
 <layer shift="RA">
 <key vkey="K_A">a-ra</key>
+</layer>
+</encoding></visualkeyboard>`;
+
+const KVKS_WITH_SRA = `<visualkeyboard><encoding name="unicode">
+<layer shift="">
+<key vkey="K_A">a</key>
+</layer>
+<layer shift="SRA">
+<key vkey="K_A">a-sra</key>
+</layer>
+</encoding></visualkeyboard>`;
+
+/** Includes a real `shift="S"` layer with a K_E key, for the S-01 shift-companion tests. */
+const KVKS_WITH_SHIFT = `<visualkeyboard><encoding name="unicode">
+<layer shift="">
+<key vkey="K_E">e</key>
+</layer>
+<layer shift="S">
+<key vkey="K_E">E</key>
 </layer>
 </encoding></visualkeyboard>`;
 
@@ -186,6 +225,206 @@ describe("applyKeycapLabelsToVfs — .kvks S-08 (AltGr layer)", () => {
     expect(xml).toContain('<key vkey="K_B">Q</key>');
     expect(xml).toContain("<usealtgr/>");
     expect(xml.match(/<layer\b/g)).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Shifted AltGr (Shift+RightAlt / shift="SRA" layer)
+// ---------------------------------------------------------------------------
+
+describe('applyKeycapLabelsToVfs — .kvks S-08 shifted (Shift+RightAlt / shift="SRA" layer)', () => {
+  it('replaces text on an existing shift="SRA" layer, leaving the unshifted layer alone', () => {
+    const vfs = makeVfs([{ path: "source/test.kvks", content: KVKS_WITH_SRA }]);
+
+    const { warnings } = applyKeycapLabelsToVfs(vfs, "test", [
+      makeS08ShiftedAssignment("Q", "K_A"),
+    ]);
+
+    expect(warnings).toHaveLength(0);
+    const xml = vfs.get("source/test.kvks")?.content as string;
+    expect(xml).toContain('<key vkey="K_A">a</key>'); // unshifted layer untouched
+    expect(xml).toContain('<key vkey="K_A">Q</key>'); // SRA layer patched
+    expect(xml.match(/<layer\b/g)).toHaveLength(2);
+  });
+
+  it('synthesizes a new shift="SRA" layer plus <usealtgr/> when none exists', () => {
+    const vfs = makeVfs([{ path: "source/test.kvks", content: KVKS_BASE }]);
+
+    const { warnings } = applyKeycapLabelsToVfs(vfs, "test", [
+      makeS08ShiftedAssignment("Q", "K_B"),
+    ]);
+
+    expect(warnings).toHaveLength(0);
+    const xml = vfs.get("source/test.kvks")?.content as string;
+    expect(xml).toContain('<layer shift="SRA">');
+    expect(xml).toContain('<key vkey="K_B">Q</key>');
+    expect(xml).toContain("<usealtgr/>");
+    expect(xml.match(/<layer\b/g)).toHaveLength(2);
+  });
+
+  it("lands an unshifted and a shifted AltGr char for the same key on different layers (no collision)", () => {
+    const vfs = makeVfs([{ path: "source/test.kvks", content: KVKS_BASE }]);
+
+    const { warnings } = applyKeycapLabelsToVfs(vfs, "test", [
+      makeS08Assignment("Q", "K_B"),
+      makeS08ShiftedAssignment("W", "K_B"),
+    ]);
+
+    expect(warnings).toHaveLength(0);
+    const xml = vfs.get("source/test.kvks")?.content as string;
+    const raMatch = /<layer shift="RA">[\s\S]*?<\/layer>/.exec(xml);
+    const sraMatch = /<layer shift="SRA">[\s\S]*?<\/layer>/.exec(xml);
+    expect(raMatch?.[0]).toContain('<key vkey="K_B">Q</key>');
+    expect(sraMatch?.[0]).toContain('<key vkey="K_B">W</key>');
+    expect(raMatch?.[0]).not.toContain("W");
+    expect(sraMatch?.[0]).not.toContain("Q");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// S-01 base + shift companion (reported bug: companion's uppercase used to
+// overwrite the base keycap instead of landing on the shift layer).
+// ---------------------------------------------------------------------------
+
+describe("applyKeycapLabelsToVfs — S-01 base + shift companion (reported bug)", () => {
+  function makeCasePairAssignments(): MechanismAssignment[] {
+    return [
+      {
+        scope: "individual",
+        target: "θ", // theta (lowercase)
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: "p-base",
+            strategyId: "S-01",
+            slotValues: { kmnRules: "+ [K_E] > U+03B8" },
+          },
+        ],
+      },
+      {
+        scope: "individual",
+        target: "Θ", // Theta (uppercase companion)
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: "p-shift",
+            strategyId: "S-01",
+            slotValues: { kmnRules: "+ [SHIFT K_E] > U+0398" },
+          },
+        ],
+      },
+    ];
+  }
+
+  it("base keycap shows the lowercase char, shift keycap shows the companion — no collision", () => {
+    const vfs = makeVfs([{ path: "source/test.kvks", content: KVKS_WITH_SHIFT }]);
+
+    const { warnings } = applyKeycapLabelsToVfs(vfs, "test", makeCasePairAssignments());
+
+    expect(warnings).toHaveLength(0);
+    const xml = vfs.get("source/test.kvks")?.content as string;
+    const baseMatch = /<layer shift="">[\s\S]*?<\/layer>/.exec(xml);
+    const shiftMatch = /<layer shift="S">[\s\S]*?<\/layer>/.exec(xml);
+    expect(baseMatch?.[0]).toContain('<key vkey="K_E">θ</key>');
+    expect(shiftMatch?.[0]).toContain('<key vkey="K_E">Θ</key>');
+    expect(baseMatch?.[0]).not.toContain("Θ");
+    expect(shiftMatch?.[0]).not.toContain(">θ<");
+  });
+
+  it("CAPS case-pair quad in ONE assignment: base+shift patched, CAPS-state lines ignored, no collision", () => {
+    // Mirrors shiftRules.ts's buildCasePairRuleLines quad for a CAPS-handling key.
+    const kmnRules = [
+      "+ [NCAPS K_E] > U+03B8",
+      "+ [NCAPS SHIFT K_E] > U+0398",
+      "+ [CAPS K_E] > U+0398",
+      "+ [CAPS SHIFT K_E] > U+03B8",
+    ].join("\n");
+    const assignment: MechanismAssignment = {
+      scope: "individual",
+      target: "θ",
+      modality: "physical",
+      mechanisms: [
+        { patternId: "p-quad", strategyId: "S-01", slotValues: { kmnRules } },
+      ],
+    };
+    const vfs = makeVfs([{ path: "source/test.kvks", content: KVKS_WITH_SHIFT }]);
+
+    const { warnings } = applyKeycapLabelsToVfs(vfs, "test", [assignment]);
+
+    expect(warnings).toHaveLength(0);
+    const xml = vfs.get("source/test.kvks")?.content as string;
+    const baseMatch = /<layer shift="">[\s\S]*?<\/layer>/.exec(xml);
+    const shiftMatch = /<layer shift="S">[\s\S]*?<\/layer>/.exec(xml);
+    expect(baseMatch?.[0]).toContain('<key vkey="K_E">θ</key>');
+    expect(shiftMatch?.[0]).toContain('<key vkey="K_E">Θ</key>');
+    expect(baseMatch?.[0]).not.toContain("Θ");
+    expect(shiftMatch?.[0]).not.toContain(">θ<");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// S-01 shift companion — touch layout
+// ---------------------------------------------------------------------------
+
+describe("applyKeycapLabelsToVfs — touch layout S-01 shift label", () => {
+  it('patches the "shift" layer key when present, leaving "default" untouched', () => {
+    const touchLayout = JSON.stringify({
+      tablet: {
+        layer: [
+          { id: "default", row: [{ id: 1, key: [{ id: "K_E", text: "e" }] }] },
+          { id: "shift", row: [{ id: 1, key: [{ id: "K_E", text: "E" }] }] },
+        ],
+      },
+    });
+    const vfs = makeVfs([
+      { path: "source/test.kvks", content: KVKS_WITH_SHIFT },
+      { path: "source/test.keyman-touch-layout", content: touchLayout },
+    ]);
+    const assignment: MechanismAssignment = {
+      scope: "individual",
+      target: "Θ",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "p-shift",
+          strategyId: "S-01",
+          slotValues: { kmnRules: "+ [SHIFT K_E] > U+0398" },
+        },
+      ],
+    };
+
+    const { warnings } = applyKeycapLabelsToVfs(vfs, "test", [assignment]);
+
+    expect(warnings).toHaveLength(0);
+    const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
+    expect(data.tablet.layer[1].row[0].key[0].text).toBe("Θ");
+    expect(data.tablet.layer[0].row[0].key[0].text).toBe("e"); // default untouched
+  });
+
+  it('no-ops silently (no throw) when the touch layout has no "shift" layer', () => {
+    const touchLayout = JSON.stringify({
+      tablet: { layer: [{ id: "default", row: [{ id: 1, key: [{ id: "K_E", text: "e" }] }] }] },
+    });
+    const vfs = makeVfs([
+      { path: "source/test.kvks", content: KVKS_WITH_SHIFT },
+      { path: "source/test.keyman-touch-layout", content: touchLayout },
+    ]);
+    const assignment: MechanismAssignment = {
+      scope: "individual",
+      target: "Θ",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "p-shift",
+          strategyId: "S-01",
+          slotValues: { kmnRules: "+ [SHIFT K_E] > U+0398" },
+        },
+      ],
+    };
+
+    expect(() => applyKeycapLabelsToVfs(vfs, "test", [assignment])).not.toThrow();
+    const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
+    expect(data.tablet.layer[0].row[0].key[0].text).toBe("e"); // untouched, no throw
   });
 });
 
