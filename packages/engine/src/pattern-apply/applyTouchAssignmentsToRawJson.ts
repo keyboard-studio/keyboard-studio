@@ -194,7 +194,7 @@ export function applyTouchAssignmentsToRawJson(
         continue;
       }
 
-      // Unknown patternId — one warning per assignment.
+      // Unknown patternId — one warning per mechanism.
       warnings.push(
         `[touch-apply-raw] unknown patternId "${patternId}" — assignment skipped`,
       );
