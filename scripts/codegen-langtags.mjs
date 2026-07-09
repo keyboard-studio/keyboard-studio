@@ -99,6 +99,15 @@ function dedupeNames(list) {
   return out;
 }
 
+/**
+ * NFC-normalize a name so a singular convenience field (autonym/englishName)
+ * shares the canonical form dedupeNames() emits for its array counterpart.
+ * Returns undefined for a non-string input.
+ */
+function toNFC(s) {
+  return typeof s === 'string' ? s.normalize('NFC') : undefined;
+}
+
 // Map: lowercased subtag key -> LanguageDefaults object (plain JS, no TS yet)
 const index = new Map();
 
@@ -120,7 +129,7 @@ for (const entry of raw) {
   const bare = entry.tag.split('-')[0].toLowerCase();
   const arr = regionVariantsByBare.get(bare) ?? [];
   const vScript = entry.full ? parseFull(entry.full).script : undefined;
-  const entryAutonym = typeof entry.localname === 'string' ? entry.localname.normalize('NFC') : undefined;
+  const entryAutonym = toNFC(entry.localname);
   const entryLocalNames = dedupeNames([entry.localname, ...(Array.isArray(entry.localnames) ? entry.localnames : [])]);
   // Region, not script, keys the disambiguation question (FR-014: script
   // differences are handled by the separate script step). So keep ONE variant
@@ -141,8 +150,12 @@ for (const entry of raw) {
     if (existing.autonym === undefined && entryAutonym !== undefined) {
       // First same-region tagset to supply a name: adopt its script+name pair,
       // overriding a script-only primary carried from an earlier nameless tagset.
+      // If the naming tagset has no resolvable script of its own, drop the
+      // carried-over script rather than pairing the name with a stale, mismatched
+      // one — the pair degrades to (no script, name), never (wrong script, name).
       existing.autonym = entryAutonym;
       if (vScript !== undefined) existing.defaultScript = vScript;
+      else delete existing.defaultScript;
     } else if (existing.defaultScript === undefined && vScript !== undefined) {
       existing.defaultScript = vScript;
     }
@@ -199,8 +212,8 @@ for (const entry of raw) {
   // for the arrays, so autonym === localNames[0] byte-for-byte (and any consumer
   // comparing them agrees). Without this a raw-NFD source value would leave the
   // singular field in a different form than its array counterpart.
-  const autonym = typeof localname === 'string' ? localname.normalize('NFC') : undefined;
-  const englishName = typeof name === 'string' ? name.normalize('NFC') : undefined;
+  const autonym = toNFC(localname);
+  const englishName = toNFC(name);
 
   // Attach region variants only when the subtag is region-ambiguous (>1 distinct
   // region) — that is the region-disambiguation trigger (spec 030 US3 / FR-014).
