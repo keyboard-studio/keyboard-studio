@@ -1,202 +1,320 @@
 # Hermes — repo-wide /simplify shard runner
 
-Phases 0–4 of the repo-wide simplify pass described in [PLAN.md](PLAN.md).
+## 1. Overview
 
-## Report-only guarantee
+Hermes is a **report-only** local-model tool for running a repo-wide `/simplify` pass (and PR/commit-scoped triage) over the keyboard-studio TypeScript monorepo. It produces structured findings for human or Claude review; it never applies any change.
 
-`hermes-run.mjs` (Phase 2 + 4) **never edits source files, never runs git, never calls
-gh/GitHub.** It reads code and a local Ollama model, and writes two report artifacts under
-`utilities/hermes/reports/`. Both artifacts are gitignored. The word "REPORT ONLY" appears in
-the first line of every generated `report.md`.
+**Hard guarantees:**
 
-## Three-lens multi-pass design
+- `hermes-run.mjs` never edits source files, never commits, never calls `gh pr comment / gh pr edit / gh pr review / gh label / git commit / git push`.
+- The only read-only git/gh operations allowed are file-name derivation for scoping modes (`gh pr view/diff`, `git show`, `git diff`). File content is always read from the current working tree, not from git history.
+- Inference goes direct to Ollama at `POST http://localhost:11434/api/generate`. The NousResearch hermes-agent (Docker) handles orchestration only (cron/gateway); it does not see or relay source code.
+- Every generated `report.md` begins with the phrase "REPORT ONLY".
 
-Instead of a single "find every simplification" prompt, each shard (or sub-batch) runs
-**three focused reasoning passes** — one per lens — then merges the results by location with
-cross-lens convergence scoring. These are Claude's official `/simplify` reviewer lenses,
-adapted for whole-file review (not diff-scoped).
+The vetting harness ([vet.mjs](vet.mjs)) runs `hermes-run.mjs` as a subprocess; it also never edits source files or commits.
 
-### Why three lenses?
+---
 
-A monolithic "find everything" prompt both under-generates (the model loses focus across
-too many categories) and over-generates mush (weak findings padded out). Diverse specialised
-passes improve recall because each lens only hunts its narrow class. Agreement **across**
-lenses is a genuine confidence signal — unlike repeating the same prompt, which is trivially
-deterministic. Local compute is the cheap resource, so spending ~3 passes per shard is the
-intended trade-off.
+## 2. Serving / models
 
-### The three lenses
+**Endpoint:** `POST http://localhost:11434/api/generate`
 
-| Lens | Hunts | types emitted |
-|------|-------|---------------|
-| **reuse** | Code that re-implements something already in the codebase; uses adjacent-exports injection (hook A) to name existing helpers | `reuse`, `crosslink` |
-| **simplification** | Unnecessary complexity: redundant/derivable state, copy-paste variation, deep nesting, defensive branches, dead code (verified by caller-grep, hook B) | `quality`, `altitude` |
-| **efficiency** | Wasted work: per-call allocations (RegExp/Set/array rebuilt every call), hoistable computation, repeated scans, string re-parsing | `efficiency` |
+| Model | Role | Base | Temperature |
+|---|---|---|---|
+| `qwen3:30b-a3b-instruct-2507-q4_K_M` | Default REASON model (Step 1) | Qwen3 30B MoE | 0.1 |
+| `hermes-simplify-14b` | Optional STRUCTURE/judge override | `FROM qwen2.5-coder:14b` | 0.1 |
+| `hermes-simplify-7b` | Light/cheap option | `FROM qwen2.5:7b` | 0.1 |
 
-Each lens shares the same precision guardrail ("behavior-preserving only") and REFUSE list.
+The default reason model is a **mixture-of-experts** (MoE) with approximately 3B parameters active per token. In practice it runs at roughly 248 tok/s on this machine — faster than the dense 14B (~89 tok/s) and even the 7B (~160 tok/s). Do not downsize to the 14B or 7B for speed; the 30B MoE is already the fast option.
 
-### Harness verification hooks
+**Real context ceiling is 32k (32768 tokens).** The Modelfiles request `num_ctx 65536`, but Qwen2.5 has no YaRN rope-scaling (native trained context is 32768 tokens). The Ollama runner silently clamps `options.num_ctx` to 32768. A true 64k context would require a YaRN re-quant of the base weights and would not fit on the 24 GB GPU alongside other tenants. Plan accordingly.
 
-Two deterministic hooks run before/after the model calls per shard:
+**No-swap default.** `STRUCTURE_MODEL` defaults to the resolved `REASON_MODEL`. The 30B reason model (~20 GB) and a separate 14B structure model (~14 GB) cannot co-reside on a 24 GB GPU, causing swap-thrash on every inter-step transition. With the default, only one model loads for the entire run. Pass `--structure-model <name>` to override for split-model setups (two GPUs, or a smaller reason model that leaves room).
 
-**Hook A — Adjacent exports (REUSE lens only).** Before calling the reuse lens, the harness
-computes the exported symbols of modules adjacent to the shard's files (same package, from
-the repo-map `exportInventory`), and injects them as an `ADJACENT EXPORTS` block into the
-prompt. This gives the model a concrete list of existing helpers to reference, approximating
-the official prompt's "grep adjacent files for existing helpers." Capped at 120 entries.
-
-**Hook B — Caller-grep (SIMPLIFICATION lens only).** The harness runs a pre-pass that greps
-the repo (`packages/`, `utilities/`, `api/`) for external callers of every top-level symbol
-in the shard's files. Symbols with no references outside their own file become the
-`CONFIRMED-UNUSED` list, which is injected into the simplification lens prompt. After
-structuring, a post-filter drops any finding whose text claims a symbol is dead/unused but
-that symbol is NOT in the confirmed-unused set, logging `[verify] dropped unverified
-dead-code claim: <symbol> (still has callers)`. Uses `rg` if available, else `grep -r`;
-skips gracefully with `[WARN]` if neither is installed.
-
-### Cross-lens convergence
-
-After all three lenses run, findings are **merged by location**: two findings converge if they
-are in the same file AND their line ranges overlap or are within 3 lines. Merged findings carry:
-- `lenses`: the set of distinct lenses that flagged the location
-- `convergence`: count of distinct lenses (1–3)
-- `confidence_pre_boost`: original confidence from the best single-lens finding
-- `confidence`: boosted confidence (+0.15 per extra lens, capped at 1.0)
-
-A finding flagged by 2+ lenses is a strong signal — the boost feeds directly into the
-ACT/REVIEW/NOISE bucketing threshold, so converging findings are more likely to survive
-to the escalation set. The report shows the convergence distribution (1-lens / 2-lens / 3-lens)
-for each shard and globally.
-
-### Step 2 — STRUCTURE
-
-Each per-lens prose output is fed into a second call WITH `format:json` to convert it to the
-findings schema. This step only structures what the lens found — it does not add or invent
-findings. If a lens Step 1 returned effectively nothing (< 20 chars), Step 2 is skipped for
-that lens.
-
-**Phase 4 reconciliation** stays as a single structured call (STRUCTURE_MODEL with `format:json`).
-
-**No-swap default:** `STRUCTURE_MODEL` defaults to the resolved `REASON_MODEL`. On a single 24 GB GPU the 30B reason model (~20 GB) and a separate 14B structure model (~14 GB) cannot co-reside, causing swap-thrash on every call. With the default, only one model is loaded for the entire run. Pass `--structure-model <name>` to override for split-model setups (e.g. two GPUs, or a smaller reason model that leaves room).
-
-## Prerequisites
+**Prerequisites:**
 
 - Node >= 20 (global `fetch` required)
-- Ollama running locally: `ollama serve`
-- Models pulled:
-  - `ollama pull qwen3:30b-a3b-instruct-2507-q4_K_M` (reason model — ~20 GB; fits when whisperX is idle)
-  - `ollama pull hermes-simplify-14b` (structure model — only needed if you pass `--structure-model hermes-simplify-14b`; not required for the default no-swap run)
-- Repo deps installed: `pnpm install` (needed for `build-repo-map.mjs` to invoke `pnpm depcruise`)
+- `ollama serve` running locally
+- `ollama pull qwen3:30b-a3b-instruct-2507-q4_K_M` (reason model, ~20 GB; fits when whisperX is idle)
+- `pnpm install` at repo root (needed by `build-repo-map.mjs`, which calls `pnpm depcruise`)
 
-## Running the harness
+---
 
-All commands run from the **repo root**.
+## 3. Pipeline / process
 
-### Phase 0: build repo map (once, no LLM)
+The pipeline is per-file (or per-shard). Each file's prompt, repo-map slice, and hooks are assembled once; only model calls repeat per sample.
+
+### (a) Per-file review, not per-shard-batch
+
+The vetting harness (`vet.mjs`) runs `--file <path>` for each file individually (fan-out). Grouping multiple files into a single model pass dilutes findings approximately 3x. The gold set went from 12 findings (whole-set) to 30 (per-file) after this change.
+
+### (b) Two-step decoding
+
+One-shot constrained-JSON decoding with `format:json` plus a strict rubric produced near-zero recall (0 findings on most shards). Two-step decoding recovers it:
+
+**Step 1 — REASON:** call `REASON_MODEL` without `format:json`. Ask for free-form findings prose. No format suppression. The input is capped at ~14k tokens (TOKEN_BUDGET), leaving ~18k for verbose reasoning output within the 32k window. Transient network failures and timeouts are retried up to 3 times with backoff (2s / 5s / 10s). If Step 1 returns fewer than 20 characters, Step 2 is skipped and 0 findings are recorded.
+
+**Step 2 — STRUCTURE:** feed Step 1 prose into `STRUCTURE_MODEL` with `format:json` to convert to the findings schema. Purely mechanical — does not add or invent findings. Retried once on JSON parse failure.
+
+**Phase 4 reconciliation** (cross-file reuse/crosslink clustering) stays as a single structured call on `STRUCTURE_MODEL`.
+
+### (c) --samples N: multi-sample self-consistency
+
+The free-form reason step is high-variance: the same file can produce 0, 5, or 19 findings across independent runs. A gold finding was hit in 2/3 single runs but 4/5 with `--samples 5`.
+
+With `--samples N`, the reason→structure pair runs N times per file/shard. Prompt and repo-map assembly happens **once**; only the model calls repeat.
+
+Findings from all N samples are merged by location (union-find: same file + line ranges overlap or within `SAMPLE_LINE_GAP` = 5 lines). Each merged finding records:
+
+- `samples_hit`: how many of the N samples produced it
+- `confidence_pre_sample_boost`: confidence before the sample boost
+- `confidence`: `min(1.0, base + SAMPLE_BOOST_PER_HIT * (samples_hit - 1))`
+
+where `SAMPLE_BOOST_PER_HIT = 0.1`. A finding in 4/5 samples gets a +0.3 boost.
+
+### (d) Hooks: adjacent-exports (reuse) and caller-grep dead-code filter
+
+Two deterministic hooks run before the model calls per shard:
+
+**Hook A — Adjacent exports (REUSE lens only).** Computes exported symbols from modules adjacent to the shard's files (same package, from repo-map `exportInventory`), capped at 120 entries. Injected as an `ADJACENT EXPORTS` block into the reuse lens prompt, giving the model a concrete list of existing helpers rather than requiring hallucination.
+
+**Hook B — Caller-grep (SIMPLIFICATION lens only).** Pre-pass: greps `packages/`, `utilities/`, `api/` for external callers of every top-level symbol in the shard's files (using `rg` if available, else `grep -r`; skips gracefully with `[WARN]` if neither is installed). Symbols with no external references become the `CONFIRMED-UNUSED` list, injected into the simplification lens prompt. Post-filter: after structuring, drops any finding whose text claims a symbol is dead/unused but that symbol is NOT in the confirmed-unused set, logging `[verify] dropped unverified dead-code claim: <symbol> (still has callers)`.
+
+### (e) JUDGE pass (default-on, K=1)
+
+Each finding receives one extra model call on `STRUCTURE_MODEL` at `temperature=0.2` with `format:json`. The judge returns `{"verdict":"real"|"not-real"|"uncertain", "judge_confidence":0..1, "judge_danger":"low"|"med"|"high", "note":"<one line>"}`. Only `"real"` verdicts survive into the ACT bucket and escalation set.
+
+The judge is effectively deterministic under an identical prompt (18/18 unanimous across 9 votes in the benchmark). K=1 is therefore sufficient; self-consistency must come from diverse prompts, lenses, models, or samples — not from repeating the same judge call.
+
+Skip with `--no-judge` (fast, unfiltered).
+
+### (f) Scoring: confidence / impact / danger + deterministic danger override
+
+Each finding carries three self-rated scores from the STRUCTURE step:
+
+- `confidence` (0..1): model's estimate that the finding is real and behavior-preserving
+- `impact`: `trivial | minor | moderate | significant`
+- `modelDanger`: `low | med | high`
+
+A **deterministic heuristic** then sets `danger = max(modelDanger, heuristicDanger)`:
+
+- HIGH: text matches `DANGER_HIGH_RE` (export, public API, signature, return type, rename, relocate, throw, exception, async, await), OR type is cross-file (reuse/crosslink/altitude), OR file is a barrel (`index.ts`/`index.tsx`)
+- LOW: text matches `DANGER_LOW_RE` (dead, unused, redundant, hoist, inline, one-use, whitespace, comment, duplicate literal, constant) AND type is quality or efficiency AND not a barrel
+- else MED
+
+Both `modelDanger` and `heuristicDanger` are preserved in the output for auditability.
+
+In lenses mode, an additional **lens-convergence boost** applies: `confidence += CONVERGENCE_BOOST_PER_LENS * (convergence - 1)`, capped at 1.0, where `CONVERGENCE_BOOST_PER_LENS = 0.15`. The lens boost and sample boost are applied sequentially, both capped at 1.0.
+
+### (g) ACT / REVIEW / NOISE bucketing + escalation
+
+After scoring, findings are assigned to buckets (priority: NOISE > REVIEW > ACT):
+
+- **NOISE:** `confidence < ACT_CONFIDENCE_MIN (0.6)`, OR `impact == "trivial"`, OR (when judge ran) `judge_verdict != "real"`
+- **REVIEW:** `danger` is med or high, OR type is cross-file (reuse/crosslink/altitude) — and not NOISE
+- **ACT:** everything else (confidence >= 0.6, danger == low, impact != trivial, judge = real when active)
+
+ACT survivors are written to `escalation.md` and `escalation.json` for direct human or Claude hand-off.
+
+`report.md` shows all three buckets plus per-shard detail. `findings.json` is the full machine-readable output.
+
+### (h) --reason-mode monolithic | lenses
+
+**lenses (default):** three focused passes — REUSE, SIMPLIFICATION, EFFICIENCY — run sequentially per shard. Findings from all three are merged by location (union-find: same file + line ranges within `CONVERGENCE_LINE_GAP` = 3 lines). This is the primary mode; convergence across lenses is a genuine confidence signal because each lens hunts a different category.
+
+**monolithic:** one comprehensive pass covering all simplification kinds. Used by the vetting harness (`vet.mjs`) for Scorecard A. Both hooks (A and B) are injected. Convergence is trivially 1 for every finding (single pass). Everything downstream (danger override, judge, bucketing, escalation) is identical to lenses mode.
+
+### (i) Scoping modes: --file / --pr / --commit / --since
+
+git/gh are used **only** to derive file names (which files are in scope). File content is always read from the current working tree. These modes are mutually exclusive.
+
+- `--file <path>`: single-file review (repo-relative or absolute; .ts/.tsx only)
+- `--pr <n>`: files changed in PR n (`gh pr diff --name-only`, fallback to `gh pr view --json files`)
+- `--commit <sha>`: files changed in a single commit (`git show --name-only`)
+- `--since <ref>`: files changed since `<ref>...HEAD` (`git diff --name-only`)
+
+---
+
+## 4. Configuration / knobs
+
+| Name | Value | Location | Why |
+|---|---|---|---|
+| `REASON_NUM_PREDICT` | 4096 | `hermes-run.mjs` constant | Caps free-form reasoning output; without it a degenerate/looping generation fills the full 32k context (~15 min pegged GPU) that client-side abort cannot stop |
+| `STRUCTURE_NUM_PREDICT` | 2048 | `hermes-run.mjs` constant | JSON schema output is compact; 2048 is ample with headroom |
+| `JUDGE_NUM_PREDICT` | 384 | `hermes-run.mjs` constant | Verdict JSON is tiny; tight cap keeps judge calls fast |
+| `repeat_penalty` | 1.15 | all three call types | Cuts per-sample over-generation noise (~19 noisy -> ~5 findings typical); value chosen to reduce noise without inducing frequent degenerate/empty output (the `--samples` union compensates for occasional empty outputs) |
+| `repeat_last_n` | 256 | all three call types | Context window for the repeat penalty; 256 tokens is enough to detect repetitive loops |
+| `TOKEN_BUDGET` | 14000 tokens (56000 chars) | `hermes-run.mjs` constant | Input cap for the REASON step; reduced from 18k after the 30B showed compute-exhaustion timeouts at the original cap on large sub-batches. Leaves ~18k for verbose reasoning output within 32k window |
+| `temperature` (REASON/STRUCTURE) | 0.1 | all model body options | Low temperature for stable, deterministic outputs; `--samples` provides variance |
+| `temperature` (JUDGE) | 0.2 | judge call | Slightly higher for judge to avoid mechanical repetition; judge is deterministic in practice under identical prompts |
+| `num_ctx` | 32768 | all model body options | Real ceiling; Qwen2.5 clamps 65536 to this silently |
+| `ACT_CONFIDENCE_MIN` | 0.6 | `hermes-run.mjs` constant | Minimum confidence to be eligible for ACT bucket |
+| Danger override — HIGH | DANGER_HIGH_RE matches export/API/signature/etc.; OR cross-file type; OR barrel file | deterministic heuristic | Prevents auto-ACT on anything touching public surface |
+| Danger override — LOW | DANGER_LOW_RE matches dead/unused/redundant/etc. AND type quality or efficiency AND not barrel | deterministic heuristic | Allows low-risk local findings to reach ACT |
+| `CONVERGENCE_BOOST_PER_LENS` | 0.15 | `hermes-run.mjs` constant | +0.15 per extra lens flagging the same location; 3-lens agreement gives +0.30 max |
+| `CONVERGENCE_LINE_GAP` | 3 | `hermes-run.mjs` constant | Two findings converge if their line ranges overlap or are within 3 lines |
+| `SAMPLE_BOOST_PER_HIT` | 0.1 | `hermes-run.mjs` constant | +0.1 per additional sample hit; 5 of 5 gives +0.4 |
+| `SAMPLE_LINE_GAP` | 5 | `hermes-run.mjs` constant | Dedup tolerance across samples (wider than convergence gap to accommodate slight line-range drift between runs) |
+| `JUDGE_CONTEXT_LINES` | 15 | `hermes-run.mjs` constant | Lines of context before/after the finding's line range fed to the judge |
+| `ADJACENT_EXPORTS_MAX` | 120 | `hermes-run.mjs` constant | Symbol-name entries in the hook A adjacent-exports block; keeps within token budget |
+| `SAMPLES` (vet.mjs) | 5 | `vet.mjs` constant near top | Scorecard A per-file sample count; easily tuned without touching hermes-run.mjs |
+| `MODEL_TIMEOUT_MS` | 300000 ms (300 s) | `hermes-run.mjs` constant | Per-call timeout; generous for verbose 30B reasoning; timeouts are treated as transient and enter the retry path |
+
+---
+
+## 5. CLI reference
+
+All commands run from the repo root. The report-only guarantee holds for every flag combination.
+
+### Build the repo map (Phase 0, no LLM)
 
 ```
 node utilities/hermes/build-repo-map.mjs
-node utilities/hermes/build-repo-map.mjs --package llm
+node utilities/hermes/build-repo-map.mjs --package engine
 ```
 
 Writes `repo-map.json` (full) or `repo-map.<pkg>.json` (per-package slice). Both are gitignored.
 
-### Phase 2 + 4: shard runner
-
-```
-# Dry run on one shard — proves prompt assembly + input token estimate (no model call)
-node utilities/hermes/hermes-run.mjs --shard S17 --dry-run
-
-# Run one shard live
-node utilities/hermes/hermes-run.mjs --shard S17
-
-# Run first N shards
-node utilities/hermes/hermes-run.mjs --limit 5
-
-# Run all 39 shards
-node utilities/hermes/hermes-run.mjs
-
-# Override the reason model (Step 1)
-node utilities/hermes/hermes-run.mjs --model hermes-simplify-14b
-
-# Override the structure model (Step 2 + Phase 4)
-node utilities/hermes/hermes-run.mjs --structure-model hermes-simplify-7b
-
-# Custom output directory
-node utilities/hermes/hermes-run.mjs --out /tmp/hermes-out
-
-# All flags (split-model example — omit --structure-model for the no-swap default)
-node utilities/hermes/hermes-run.mjs \
-  --shard S07 \
-  --model qwen3:30b-a3b-instruct-2507-q4_K_M \
-  --structure-model hermes-simplify-14b \
-  --endpoint http://localhost:11434/api/generate \
-  --out utilities/hermes/reports \
-  --dry-run
-```
-
-### CLI flags (all optional)
+### hermes-run.mjs flags
 
 | Flag | Default | Description |
-|------|---------|-------------|
-| `--shard <id>` | (all) | Run a single shard by id (e.g. `S17`) |
-| `--limit <n>` | (all) | Run first N shards in manifest order |
-| `--model <name>` | `qwen3:30b-a3b-instruct-2507-q4_K_M` | Step 1 REASON model (Ollama tag) |
-| `--structure-model <n>` | same as `--model` (no-swap) | Step 2 STRUCTURE + Phase 4 model; override for split-model setups |
-| `--endpoint <url>` | `http://localhost:11434/api/generate` | Ollama generate endpoint |
-| `--out <dir>` | `utilities/hermes/reports` | Directory for output artifacts |
-| `--dry-run` | off | Assemble prompts + print input token estimates; do NOT call the model |
-| `--self-test` | off | Run the deterministic hook-B post-filter test and exit (no model, no shard) |
-| `--samples <n>` | `1` | Self-consistency sample count: run the reason→structure step N times per file/shard, union the findings, and boost confidence by agreement. Default 1 = current single-pass behaviour. Prompt + repo-map assembly happens **once**; only model calls repeat. |
+|---|---|---|
+| `--file <path>` | (none) | Single-file review (.ts/.tsx, repo-relative or absolute). Mutually exclusive with `--shard`, `--pr`, `--commit`, `--since`. |
+| `--shard <id>` | (all shards) | Run one shard by id, e.g. `S17`. Mutually exclusive with `--file`. |
+| `--limit <n>` | (all) | Run the first N shards in manifest order. |
+| `--pr <n>` | (none) | Derive changed files from PR n using `gh pr diff --name-only` (read-only). |
+| `--commit <sha>` | (none) | Derive changed files from a single commit using `git show --name-only` (read-only). |
+| `--since <ref>` | (none) | Derive changed files since `<ref>...HEAD` using `git diff --name-only` (read-only). |
+| `--reason-mode lenses\|monolithic` | `lenses` | Reasoning pass: `lenses` = 3 focused passes (REUSE/SIMPLIFICATION/EFFICIENCY) with cross-lens convergence scoring; `monolithic` = one comprehensive pass (convergence=1 for all findings). |
+| `--samples <n>` | `1` | Run reason->structure N times per file/shard, union findings, and boost confidence by agreement. Prompt + repo-map assembly happens once; only model calls repeat. |
+| `--no-judge` | (judge on) | Skip the per-finding judge pass (fast, unfiltered; escalation.md uses self-scored ACT criteria only). |
+| `--judge` | (no-op) | Harmless alias; judge is on by default. |
+| `--judge-set <path>` | (none) | Evaluate a labeled benchmark JSON file with the judge model only; skips the normal simplify pipeline. Writes `<out>/verdicts.json`. |
+| `--model <name>` | `qwen3:30b-a3b-instruct-2507-q4_K_M` | Override REASON_MODEL (Step 1). |
+| `--structure-model <name>` | same as `--model` (no-swap) | Override STRUCTURE_MODEL (Step 2 + Phase 4 + judge). Pass a lighter model for split-model setups. |
+| `--endpoint <url>` | `http://localhost:11434/api/generate` | Ollama generate endpoint. |
+| `--out <dir>` | `utilities/hermes/reports` | Directory for output artifacts (`findings.json`, `report.md`, `escalation.md`, `escalation.json`). |
+| `--dry-run` | off | Assemble prompts and print input token estimates; do NOT call the model. Also runs hook A (adjacent-exports) and hook B (caller-grep) deterministically. |
+| `--self-test` | off | Run the deterministic hook B post-filter test (3 branches) and exit; no model calls, no shard. |
 
-### Multi-sample self-consistency (`--samples N`)
+### Example invocations
 
-The free-form reason step (Step 1) is high-variance: the same file can produce 4, 3, or 1
-findings across three independent runs, and may miss the single real gold finding on a bad draw.
-Running N samples and unioning recovers those misses and provides a **self-consistency confidence
-signal**.
+```
+# Dry run on one shard — proves prompt assembly + token estimate (no model call)
+node utilities/hermes/hermes-run.mjs --shard S07 --dry-run
 
-- **Prompt assembly is ONCE.** The repo-map slice, adjacent-exports block (hook A), and
-  confirmed-unused block (hook B) are all computed once per file/shard. Only the `callModelReason`
-  + `callModelStructure` pair repeats N times. This keeps the cost proportional to N model calls,
-  not N full setup passes.
-- **Union by location.** Findings from all N samples are merged using the same union-find as lens
-  convergence: two findings converge if same file AND line ranges overlap or are within 5 lines.
-- **`samples_hit`** records how many of the N samples produced each merged finding.
-- **Confidence boost:** `confidence = min(1.0, base + 0.1 * (samples_hit - 1))`. A finding in
-  4/5 samples is more trustworthy than 1/5. `confidence_pre_sample_boost` records the pre-boost
-  value for auditability.
-- **Composition with lens convergence:** In lenses mode, each lens is sampled N times and its
-  sample-union output feeds into the existing lens-convergence merge. The two boosts are applied
-  sequentially (sample boost first, then lens boost), both capped at 1.0. They are independent
-  signals — sample agreement within a lens, cross-lens agreement across lenses — so composing
-  them is sound. The cap prevents double-counting from inflating past 1.0.
-- **Log line per file:** `[samples] <shard>[<lens>]: N runs -> <count> merged (samples_hit dist: 1x=.. 2x=.. ..)`
+# Run one shard live (default: lenses mode, judge on, single sample)
+node utilities/hermes/hermes-run.mjs --shard S07
 
-The `vet.mjs` scorecard uses `SAMPLES=5` (a constant near the top, easily tuned) for all
-Scorecard A per-file runs.
+# Single-file review with multi-sample and monolithic mode (as used by vet.mjs Scorecard A)
+node utilities/hermes/hermes-run.mjs --file packages/engine/src/codec/parse.ts \
+  --reason-mode monolithic --no-judge --samples 5
 
-## Output artifacts
+# PR-scoped review (file names from PR; content from working tree)
+node utilities/hermes/hermes-run.mjs --pr 1027
 
-Both written to `--out` dir (default `utilities/hermes/reports/`):
+# Run all shards with a custom output directory
+node utilities/hermes/hermes-run.mjs --out /tmp/hermes-out
 
-- **`findings.json`** — machine-readable: per-shard metadata (shardId, package, model, files,
-  tokenEstimate, droppedCount, timestamp, findings array) plus reconciliation clusters from Phase 4.
-- **`report.md`** — human-readable: header with "REPORT ONLY" guarantee; per-shard sections
-  grouping findings by severity (`safe-auto` vs `needs-human`); ranked reconciliation clusters.
+# Split-model run: 30B reason, 7B structure (requires two GPUs or room for both)
+node utilities/hermes/hermes-run.mjs \
+  --model qwen3:30b-a3b-instruct-2507-q4_K_M \
+  --structure-model hermes-simplify-7b
 
-## Shard LOC cross-check
+# Judge benchmark evaluation only
+node utilities/hermes/hermes-run.mjs \
+  --judge-set utilities/hermes/eval/judge-benchmark.json \
+  --out utilities/hermes/reports/vet/judge-qwen3
+```
 
-After resolving each shard's file list, the runner sums `wc -l`-equivalent line counts and
-compares against the manifest's stated LOC. If the delta exceeds 10%, it logs a `[WARN]` in
-the report. A shard resolving to 0 files is a hard `[ERROR]` (the shard is recorded as errored
-but the run continues to the next shard).
+---
 
-## Sequencing
+## 6. Vetting harness (vet.mjs) + eval fixtures
 
-Run shards S01 -> S39 (manifest order: contracts -> engine -> keyboard-lint -> llm -> studio ->
-api -> oauth-backend). Deps-first means reuse targets in `contracts` are confirmed before
-downstream shards reference them.
+[vet.mjs](vet.mjs) is an unattended overnight orchestrator that runs all model work via `hermes-run.mjs` subprocesses (no Claude calls, no source writes). Models run sequentially (single GPU). One bad model never aborts the batch — each scorecard call is wrapped in try/catch and records a SKIP on failure.
 
-Phase 3 (apply + verify) is NOT part of this harness — it requires `git` and test gates. See
-[PLAN.md](PLAN.md) Phase 3.
+### Scorecard A — Simplifier
+
+Per-file fan-out scored against frozen gold findings.
+
+**File lists:**
+
+- S10: `packages/engine/src/codec/parse.ts` — gold has 8 findings ([eval/gold-s10.json](eval/gold-s10.json))
+- S07: all non-test `.ts` files in `packages/engine/src/pattern-apply/` — gold has 22 findings ([eval/gold-s07.json](eval/gold-s07.json))
+
+For each model x file: one `hermes-run --file <path> --reason-mode monolithic --no-judge --samples 5`.
+
+**Gold-match scoring — STRICT vs LOOSE:**
+
+A gold finding G is a STRICT HIT if some local finding L satisfies all of:
+1. `L.file === G.file`
+2. Line ranges overlap within ±5 lines
+3. At least one shared key term (backtick-quoted identifier or camelCase/PascalCase/snake_case/ALL_CAPS identifier of length >= 4) from G's summary/suggestion appears in L's text
+
+A gold finding G is a LOOSE HIT (old metric) if conditions 1 and 2 are met without the key-term gate.
+
+The key-term gate exists because line-overlap alone overcounts via coincidental co-location. A finding about "rename var" at the same lines as a gold finding about `escapeRegExp` is not the same issue. STRICT is the primary metric; LOOSE is shown for comparison.
+
+**extras** = local findings that hit no gold finding (strict gate) — a noise/bonus proxy. Raw finding count is a noise meter, not a quality meter: gold averages ~1-2 findings per file; a 19-finding output on a 1-gold file is approximately 95% noise.
+
+**Confidence-weighted recall** = `sum(gold.confidence for hits) / sum(gold.confidence for all gold in shard)`.
+
+### Cross-model ensemble
+
+After all models complete, findings from all models are merged by file + overlapping/adjacent line range (gap = 5 lines) using union-find. Each merged finding records `_convergence` (count of distinct models) and `_models`. The ensemble is scored against gold (strict + loose) and its convergence distribution (1-model / 2-model / 3+-model) is reported.
+
+### Scorecard B — Judge
+
+Precision/recall/F1 evaluated on the frozen 22-item [eval/judge-benchmark.json](eval/judge-benchmark.json). Items are labeled `real` (behavior-preserving simplifications confirmed by Claude) or `fake` (hallucinated or behavior-changing). Label `real` = positive; `not-real` or `uncertain` = negative. Metrics: precision, recall, F1, accuracy, TP/FP/FN/TN.
+
+### Gold standard
+
+- [eval/gold-s10.json](eval/gold-s10.json): 8 findings for `parse.ts`, regenerated per-file, confidence-scored, precise-not-exhaustive
+- [eval/gold-s07.json](eval/gold-s07.json): 22 findings for the full `pattern-apply/` directory, same methodology
+
+Gold is regenerated per-file (not whole-shard) so it reflects what a per-file run can actually find. It is precise rather than exhaustive: only findings with clear evidence and a concrete suggestion are included.
+
+[eval/gold-match-detail-<model>.json](eval/) (written per model run) shows per-gold-finding match records with `strictHit`, `strictHitBy`, `looseHit`, `looseHitBy`, and extracted key terms — use this for spot-checking recall misses.
+
+### How to run vet.mjs
+
+```
+# From the repo root (nohup recommended for overnight runs):
+nohup stdbuf -oL node utilities/hermes/vet.mjs > reports/vet/vet.log 2>&1 &
+```
+
+`stdbuf -oL` forces line-buffered stdout so you can `tail -f vet.log` and see progress without waiting for buffer flush.
+
+**Runtime:** approximately 20 minutes per model per file with `--samples 5`. The full 7-model roster on both S10 and S07 is an overnight run.
+
+**"Is it stuck?" heuristic:** do NOT use GPU utilization as a liveness indicator — GPU dips between files are normal (repo-map rebuilds run between files; these are CPU-bound). Instead watch the `simp-*` directory count in `reports/vet/` rising. Each completed file creates one new `simp-<model>-<shard>-<file>/` directory. Stalls are `MODEL_TIMEOUT_MS` (300 s) + retry delay (max ~17 s) = approximately 5 minutes before the process moves on.
+
+---
+
+## 7. Findings / lessons learned
+
+These are the hard-won experimental results that shaped the current design. Each is backed by the evidence cited.
+
+- **One-shot format:json + strict rubric gave near-zero recall; two-step free-form reasoning recovered it.** This is the pivotal finding. The strict/silencing framing combined with `format:json` in one shot produced 0 findings on most shards in early testing. Removing `format:json` from Step 1 and letting the model reason freely recovered recall. The STRUCTURE step (Step 2) then does the purely mechanical schema conversion without adding findings.
+
+- **Decoding/prompt design dominates model size for recall.** Speed comparison on this hardware: qwen3-30B-A3B (MoE, ~3B active) ~248 tok/s vs dense 14B ~89 tok/s vs dense 7B ~160 tok/s. The 30B MoE is faster than both dense alternatives because its active parameter count per token is ~3B. Do not downsize for speed; the 30B MoE is already the fast option, and it has better recall.
+
+- **Per-file review beats per-shard-batch.** Multi-file passes dilute findings approximately 3x. The gold set grew from 12 whole-set findings to 30 per-file findings after switching to per-file fan-out. Each file gets the model's full attention rather than sharing context with unrelated code.
+
+- **Free-form generation is high-variance per file.** The same file produced 0, 5, and 19 findings across independent single runs. A specific gold finding was hit 2/3 as single runs and 4/5 with `--samples 5`. The `--samples` union + `samples_hit` confidence boost is the fix: agreement across runs is a genuine signal; disagreement at a location means the finding is fragile.
+
+- **num_predict output cap is mandatory.** Without it, a degenerate or looping generation ran to the full 32k context (approximately 15 minutes of pegged GPU) that a client-side AbortController could not stop once the generation was in progress. `REASON_NUM_PREDICT = 4096` provides ample room for verbose reasoning while bounding worst-case runtime.
+
+- **repeat_penalty (1.15) cuts per-sample over-generation noise** (~19 noisy findings reduced to ~5 typical) but can occasionally produce degenerate/empty output on a single sample. The `--samples` union compensates: a finding that is genuinely real will re-appear in subsequent samples even if one sample was degenerate.
+
+- **Raw finding count is a noise meter, not a quality meter.** Gold averages ~1-2 findings per file. A 19-finding output on a 1-gold file is approximately 95% noise. The escalation set (ACT bucket) is the actionable output, not the raw findings list.
+
+- **Recall must be semantic (same issue), not line-overlap alone.** Pure line-overlap overcounts via coincidental co-location: a finding about "rename var" at the same lines as a gold `escapeRegExp` finding appears to be a hit under loose scoring but is not the same issue. The strict gate (line-overlap + shared key term from gold summary/suggestion) is the correct primary metric. The vet.mjs self-test (`--self-test`) proves this divergence with a synthetic case.
+
+- **The JUDGE is deterministic under an identical prompt.** 18/18 findings gave unanimous verdicts across 9 vote calls. Self-consistency for the judge must come from diverse prompts, lenses, models, or samples — not from repeating the same judge call. K=1 is sufficient.
+
+- **The 7B is too weak as a judge.** Precision approximately 0.55 — it waves fake findings through at an unacceptably high rate. Use the 30B (or 14B at minimum) for judge calls.
+
+- **nemotron-3-nano:30b excluded: 24 GB weight load leaves no room for a 32k KV cache on a 24 GB card.** The full 30B dense weights + 32k context KV cache exceed GPU memory. nemotron is not in the vet.mjs MODELS roster.
+
+- **Context7 does not help this internal-refactor track.** The eval files have zero third-party dependencies; the real reuse signal is internal — e.g. the `escapeRegExp` / `escapeForRegex` triplication found by grep across `packages/`. The hook A adjacent-exports injection is the mechanism that surfaces these internal reuse targets.
