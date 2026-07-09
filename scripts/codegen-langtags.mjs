@@ -120,20 +120,35 @@ for (const entry of raw) {
   const bare = entry.tag.split('-')[0].toLowerCase();
   const arr = regionVariantsByBare.get(bare) ?? [];
   const vScript = entry.full ? parseFull(entry.full).script : undefined;
+  const entryAutonym = typeof entry.localname === 'string' ? entry.localname.normalize('NFC') : undefined;
   const entryLocalNames = dedupeNames([entry.localname, ...(Array.isArray(entry.localnames) ? entry.localnames : [])]);
   // Region, not script, keys the disambiguation question (FR-014: script
   // differences are handled by the separate script step). So keep ONE variant
   // per region — but when a second same-region tagset appears (a co-located
-  // multi-script community, e.g. am/ET's Ethi + Arab + Brai), MERGE its recorded
-  // own-script names into the kept variant rather than dropping them, and
-  // backfill any field the first-seen tagset happened to lack. Dropping the
-  // later tagset outright silently loses real localnames for ~39 subtags.
+  // multi-script community, e.g. az/IR's Brai + Arab), aggregate its recorded
+  // own-script names into the kept variant's localNames choice list rather than
+  // dropping them (dropping lost real localnames for ~39 subtags).
+  //
+  // The (defaultScript, autonym) PRIMARY pair MUST stay internally consistent —
+  // a script tag paired with a name in a different script is a data defect. So
+  // the pair is adopted from a SINGLE tagset, and we PREFER a tagset that carries
+  // a name: a nameless specialty tagset (e.g. Braille) must not win the primary
+  // slot over a co-located tagset that holds the real orthography. Extra
+  // different-script names still survive as choices in localNames.
   const existing = arr.find((v) => v.region === entry.region);
   if (existing !== undefined) {
-    existing.localNames = dedupeNames([...existing.localNames, ...entryLocalNames]);
     if (existing.regionName === undefined && entry.regionname !== undefined) existing.regionName = entry.regionname;
-    if (existing.defaultScript === undefined && vScript !== undefined) existing.defaultScript = vScript;
-    if (existing.autonym === undefined && entry.localname !== undefined) existing.autonym = entry.localname;
+    if (existing.autonym === undefined && entryAutonym !== undefined) {
+      // First same-region tagset to supply a name: adopt its script+name pair,
+      // overriding a script-only primary carried from an earlier nameless tagset.
+      existing.autonym = entryAutonym;
+      if (vScript !== undefined) existing.defaultScript = vScript;
+    } else if (existing.defaultScript === undefined && vScript !== undefined) {
+      existing.defaultScript = vScript;
+    }
+    // Primary autonym first (matching the top-level localNames[0] === autonym
+    // contract), then every other recorded same-region name as a choice.
+    existing.localNames = dedupeNames([existing.autonym, ...existing.localNames, ...entryLocalNames]);
     regionVariantsByBare.set(bare, arr);
     continue;
   }
@@ -141,7 +156,7 @@ for (const entry of raw) {
     region: entry.region,
     ...(entry.regionname !== undefined ? { regionName: entry.regionname } : {}),
     ...(vScript !== undefined ? { defaultScript: vScript } : {}),
-    ...(entry.localname !== undefined ? { autonym: entry.localname } : {}),
+    ...(entryAutonym !== undefined ? { autonym: entryAutonym } : {}),
     localNames: entryLocalNames,
   });
   regionVariantsByBare.set(bare, arr);
@@ -180,6 +195,13 @@ for (const entry of raw) {
   const englishNames = dedupeNames([name, ...(Array.isArray(names) ? names : [])]);
   const localNames = dedupeNames([localname, ...(Array.isArray(localnames) ? localnames : [])]);
 
+  // NFC-normalize the singular primary fields to the SAME form dedupeNames emits
+  // for the arrays, so autonym === localNames[0] byte-for-byte (and any consumer
+  // comparing them agrees). Without this a raw-NFD source value would leave the
+  // singular field in a different form than its array counterpart.
+  const autonym = typeof localname === 'string' ? localname.normalize('NFC') : undefined;
+  const englishName = typeof name === 'string' ? name.normalize('NFC') : undefined;
+
   // Attach region variants only when the subtag is region-ambiguous (>1 distinct
   // region) — that is the region-disambiguation trigger (spec 030 US3 / FR-014).
   const variants = regionVariantsByBare.get(entry.tag.toLowerCase()) ?? [];
@@ -191,8 +213,8 @@ for (const entry of raw) {
     ...(defaultScript !== undefined ? { defaultScript } : {}),
     ...(defaultRegion !== undefined ? { defaultRegion } : {}),
     regions: Array.isArray(regions) ? [...regions].sort() : [],
-    ...(localname !== undefined ? { autonym: localname } : {}),
-    ...(name !== undefined ? { englishName: name } : {}),
+    ...(autonym !== undefined ? { autonym } : {}),
+    ...(englishName !== undefined ? { englishName } : {}),
     ...(englishNames.length ? { englishNames } : {}),
     ...(localNames.length ? { localNames } : {}),
     ...(isRegionAmbiguous ? { regionVariants: variants } : {}),

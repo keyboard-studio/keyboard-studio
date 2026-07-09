@@ -216,6 +216,26 @@ describe("langtags name de-duplication is Unicode-canonical (spec 030)", () => {
     const vi = getLanguageDefaults("vi");
     expect(vi!.localNames).toEqual(["Tiếng Việt".normalize("NFC")]);
   });
+
+  it("the singular autonym/englishName fields are themselves NFC and match their array head", () => {
+    // The singular convenience fields must share the NFC form dedupeNames emits
+    // for the arrays, so autonym === localNames[0] byte-for-byte (regression:
+    // singular fields were built from raw source and could be NFD, e.g. dtn).
+    const offenders: string[] = [];
+    for (const summary of listLanguages()) {
+      const d = getLanguageDefaults(summary.code);
+      if (d === null) continue;
+      if (d.autonym !== undefined) {
+        if (d.autonym !== d.autonym.normalize("NFC")) offenders.push(`${d.code}.autonym !NFC`);
+        if (d.localNames !== undefined && d.localNames[0] !== d.autonym) offenders.push(`${d.code}.autonym!=localNames[0]`);
+      }
+      if (d.englishName !== undefined) {
+        if (d.englishName !== d.englishName.normalize("NFC")) offenders.push(`${d.code}.englishName !NFC`);
+        if (d.englishNames !== undefined && d.englishNames[0] !== d.englishName) offenders.push(`${d.code}.englishName!=englishNames[0]`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
 });
 
 describe("region-variant merge preserves co-located names (spec 030)", () => {
@@ -233,6 +253,22 @@ describe("region-variant merge preserves co-located names (spec 030)", () => {
     // so IR.localNames was [] and the co-located Arab tagset's name was lost.
     expect(ir!.localNames.length).toBeGreaterThan(0);
     expect(ir!.autonym).toBeDefined();
-    expect(ir!.localNames).toContain(ir!.autonym);
+    expect(ir!.localNames[0]).toBe(ir!.autonym); // primary first
+  });
+
+  it("adopts a consistent script+name primary pair — a nameless specialty tagset does not pair a mismatched script with a name", () => {
+    // Regression (km-review of this PR): the first-seen IR tagset is Braille
+    // (Brai, no name); the merge must adopt the co-located Arab tagset's
+    // script+name TOGETHER, not pair the Braille script tag with the Arabic name.
+    const ir = getLanguageDefaults("az")!.regionVariants!.find((v) => v.region === "IR");
+    expect(ir!.defaultScript).toBe("Arab"); // the named orthography's script, NOT "Brai"
+    // Same shape for Arabic in Saudi Arabia / Syria (first-seen Brai / Hebr,
+    // no name; real Arab orthography adopted).
+    const ar = getLanguageDefaults("ar")!.regionVariants!;
+    for (const region of ["SA", "SY"]) {
+      const v = ar.find((x) => x.region === region)!;
+      expect(v.defaultScript, `ar/${region}`).toBe("Arab");
+      expect(v.localNames[0], `ar/${region}`).toBe(v.autonym);
+    }
   });
 });
