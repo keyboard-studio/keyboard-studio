@@ -15,7 +15,7 @@ import { ConfirmDialog } from '../assignLoop/parts/ConfirmDialog.tsx';
 import { useHoverInfoStore } from '../../stores/hoverInfoStore.ts';
 import { collectCharContributors } from '@keyboard-studio/engine';
 import type { CharContributors } from '@keyboard-studio/engine';
-import type { RemovalCapability } from '@keyboard-studio/contracts';
+import type { KeyboardIR, RemovalCapability } from '@keyboard-studio/contracts';
 
 /** Pending cascade state — set when the user clicks a cross-wired chip. */
 interface PendingCascade {
@@ -29,6 +29,78 @@ interface PendingCascade {
   restoreIds: string[];
   /** contributors.ruleNodeIds is the REMOVABLE set only; blocked carries the warnings (remove mode). */
   contributors: CharContributors;
+}
+
+interface BuildPendingCascadeArgs {
+  ir: KeyboardIR | null;
+  gid: string;
+  targetChar: string;
+  /** The clicked chip's own removal capability; undefined when the caller has none (store chips). */
+  clickedCapability?: RemovalCapability | undefined;
+  /** The clicked chip's card name, used only in the not-removable-clicked-chip warning. */
+  clickedLabel: string;
+  isItemDeleted: (id: string) => boolean;
+  removalCapabilities: Map<string, RemovalCapability>;
+  nodes: CarveNode[];
+}
+
+/**
+ * Pure resolver shared by the glyph-chip (handleCascadeDelete) and store-chip
+ * (handleStoreChipCascade) cascade handlers. Runs collectCharContributors for
+ * targetChar and decides whether the click should plain-toggle (returns null)
+ * or open the cascade ConfirmDialog (returns a PendingCascade). Only the
+ * caller-resolved clickedCapability/clickedLabel differ between callers —
+ * store chips carry no per-rule capability, so they pass undefined / 'this character'.
+ */
+function buildPendingCascade({
+  ir, gid, targetChar, clickedCapability, clickedLabel, isItemDeleted, removalCapabilities, nodes,
+}: BuildPendingCascadeArgs): PendingCascade | null {
+  // No IR to analyse → plain single-chip toggle.
+  if (ir == null) return null;
+
+  const found: CharContributors = collectCharContributors(ir, targetChar);
+  const isNotRemovable = (id: string) => (removalCapabilities.get(id) ?? '').startsWith('not-removable:');
+  const clickedIsNotRemovable = (clickedCapability ?? '').startsWith('not-removable:');
+
+  // --- RESTORE: the clicked chip is currently removed ---
+  if (isItemDeleted(gid)) {
+    const restoreIds = [...found.ruleNodeIds, ...found.storeSlotIds].filter((id) => isItemDeleted(id));
+    if (!restoreIds.includes(gid)) restoreIds.push(gid);
+    if (restoreIds.length <= 1) return null;
+    return {
+      gid, targetChar, mode: 'restore', actionCount: restoreIds.length, restoreIds,
+      contributors: { ...found, blocked: [] },
+    };
+  }
+
+  // --- REMOVE: the clicked chip is live ---
+  const removableRuleIds = found.ruleNodeIds.filter((id) => !isNotRemovable(id));
+  const blockedRuleIds = found.ruleNodeIds.filter(isNotRemovable);
+  const ruleLabel = (id: string): string => {
+    for (const node of nodes) if (node.glyphs?.some((g) => g.gid === id)) return node.name;
+    return 'an advanced rule';
+  };
+  const blocked = [
+    ...found.blocked,
+    ...blockedRuleIds.map((id) => ({ label: ruleLabel(id), reason: capabilityHint(removalCapabilities.get(id) ?? 'not-removable:unknown') })),
+  ];
+  // The clicked "!" chip is often NOT a plain single-char producer, so it never
+  // lands in found.ruleNodeIds/blockedRuleIds — add it explicitly so the warning
+  // box always names the not-removable chip the user actually clicked.
+  if (clickedIsNotRemovable && !blockedRuleIds.includes(gid)) {
+    blocked.push({ label: clickedLabel, reason: capabilityHint(clickedCapability ?? 'not-removable:unknown') });
+  }
+
+  const removableCount = removableRuleIds.length + found.storeSlotIds.length;
+
+  // Plain toggle (no dialog) ONLY for a removable chip that is its char's sole
+  // producer with nothing blocked. A not-removable chip ALWAYS opens the dialog.
+  if (!clickedIsNotRemovable && removableCount <= 1 && blocked.length === 0) return null;
+
+  return {
+    gid, targetChar, mode: 'remove', actionCount: removableCount, restoreIds: [],
+    contributors: { ...found, ruleNodeIds: removableRuleIds, blocked },
+  };
 }
 
 interface CarveGalleryProps {
@@ -126,7 +198,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   const handleCascadeDelete = useCallback((gid: string) => {
     // Resolve the clicked glyph — output char, removal capability, and its card.
     let targetChar: string | undefined;
-    let clickedCapability: RemovalCapability | '' = '';
+    let clickedCapability: RemovalCapability | undefined;
     let clickedLabel = 'this key';
     for (const node of nodes) {
       if (!node.glyphs) continue;
@@ -136,55 +208,29 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
     // Glyph not found → do nothing rather than toggle an untracked id.
     if (targetChar === undefined) return;
-    // No IR to analyse → plain single-glyph toggle.
-    if (ir == null) { handleToggleGlyph(gid); return; }
 
-    const found: CharContributors = collectCharContributors(ir, targetChar);
-    const isNotRemovable = (id: string) => (removalCapabilities.get(id) ?? '').startsWith('not-removable:');
-    const clickedIsNotRemovable = clickedCapability.startsWith('not-removable:');
-
-    // --- RESTORE: the clicked chip is currently removed ---
-    if (isItemDeleted(gid)) {
-      const restoreIds = [...found.ruleNodeIds, ...found.storeSlotIds].filter((id) => isItemDeleted(id));
-      if (!restoreIds.includes(gid)) restoreIds.push(gid);
-      if (restoreIds.length <= 1) { handleToggleGlyph(gid); return; }
-      setPendingCascade({
-        gid, targetChar, mode: 'restore', actionCount: restoreIds.length, restoreIds,
-        contributors: { ...found, blocked: [] },
-      });
-      return;
-    }
-
-    // --- REMOVE: the clicked chip is live ---
-    const removableRuleIds = found.ruleNodeIds.filter((id) => !isNotRemovable(id));
-    const blockedRuleIds = found.ruleNodeIds.filter(isNotRemovable);
-    const ruleLabel = (id: string): string => {
-      for (const node of nodes) if (node.glyphs?.some((g) => g.gid === id)) return node.name;
-      return 'an advanced rule';
-    };
-    const blocked = [
-      ...found.blocked,
-      ...blockedRuleIds.map((id) => ({ label: ruleLabel(id), reason: capabilityHint(removalCapabilities.get(id) ?? 'not-removable:unknown') })),
-    ];
-    // The clicked "!" chip is often NOT a plain single-char producer, so it never
-    // lands in found.ruleNodeIds/blockedRuleIds — add it explicitly so the warning
-    // box always names the not-removable chip the user actually clicked.
-    if (clickedIsNotRemovable && clickedCapability !== '' && !blockedRuleIds.includes(gid)) {
-      blocked.push({ label: clickedLabel, reason: capabilityHint(clickedCapability) });
-    }
-
-    const removableCount = removableRuleIds.length + found.storeSlotIds.length;
-
-    // Plain toggle (no dialog) ONLY for a removable chip that is its char's sole
-    // producer with nothing blocked. A not-removable chip ALWAYS opens the dialog.
-    if (!clickedIsNotRemovable && removableCount <= 1 && blocked.length === 0) {
-      handleToggleGlyph(gid);
-      return;
-    }
-    setPendingCascade({
-      gid, targetChar, mode: 'remove', actionCount: removableCount, restoreIds: [],
-      contributors: { ...found, ruleNodeIds: removableRuleIds, blocked },
+    const pending = buildPendingCascade({
+      ir, gid, targetChar, clickedCapability, clickedLabel, isItemDeleted, removalCapabilities, nodes,
     });
+    if (pending === null) { handleToggleGlyph(gid); return; }
+    setPendingCascade(pending);
+  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities]);
+
+  /**
+   * Store-chip cascade toggle — same "remove/restore everywhere" contract as
+   * handleCascadeDelete, but for a StoreChip inside StoreDetail. Store chips
+   * already know their character directly (StoreCharChip.ch), so there's no
+   * nodes[].glyphs lookup and no per-chip removal capability to weigh — a
+   * store slot's own removability is decided upstream by classifyStoreSlotEdit
+   * (StoreChip never calls onToggle for a 'disabled' chip in the first place).
+   */
+  const handleStoreChipCascade = useCallback((chipId: string, ch: string) => {
+    const pending = buildPendingCascade({
+      ir, gid: chipId, targetChar: ch, clickedLabel: 'this character',
+      isItemDeleted, removalCapabilities, nodes,
+    });
+    if (pending === null) { handleToggleGlyph(chipId); return; }
+    setPendingCascade(pending);
   }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities]);
 
   const handleCascadePrimary = useCallback(() => {
@@ -477,6 +523,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
             onToggleNode={handleToggleNode}
             onSelectNode={setSelectedId}
             onCascadeDelete={handleCascadeDelete}
+            onStoreCascade={handleStoreChipCascade}
             charWeb={charWeb}
             onWebTag={handleWebTag}
           />

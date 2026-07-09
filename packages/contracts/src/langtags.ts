@@ -39,6 +39,45 @@ export interface LanguageDefaults {
   autonym?: string;
   /** English name for the language, e.g. `"Hausa"`, `"Hindi"`. */
   englishName?: string;
+  /**
+   * All recorded English/alternate names (langtags `name` + `names[]`),
+   * de-duplicated, primary (`englishName`) first. Absent when the source has
+   * no names. Powers the English-name autocomplete (spec 030 FR-001).
+   */
+  englishNames?: readonly string[];
+  /**
+   * All recorded own-script names (langtags `localname` + `localnames[]`),
+   * de-duplicated, primary (`autonym`) first. Frequently ABSENT — only ~40% of
+   * langtags subtags carry any local name — so Q2 must degrade to free text
+   * when this is empty (spec 030 FR-004/FR-005).
+   */
+  localNames?: readonly string[];
+  /**
+   * Region-distinct resolutions of this language (spec 030 FR-014). One entry
+   * per region that carries its own orthography/names. `length > 1` is the
+   * region-disambiguation trigger; rare (~2.6% of subtags). Absent/length-1
+   * means the language is unambiguous by region.
+   */
+  regionVariants?: readonly RegionVariant[];
+}
+
+/**
+ * A region-distinct resolution of a language (spec 030 FR-014 / data-model).
+ * Produced when a bare subtag has entries differing by region.
+ *
+ * @see specs/030-langtags-identity-autocomplete/data-model.md
+ */
+export interface RegionVariant {
+  /** Region subtag (ISO 3166-1 alpha-2 or UN M.49), e.g. `"NG"`, `"GE"`. */
+  region: string;
+  /** Country/region display name (the region-question choice label), e.g. `"Georgia"`. */
+  regionName?: string;
+  /** Script for this variant (ISO 15924). */
+  defaultScript?: string;
+  /** Primary own-script name for this variant. */
+  autonym?: string;
+  /** Own-script names for this variant (Q2 choices); may be empty. */
+  localNames: readonly string[];
 }
 
 /**
@@ -58,6 +97,18 @@ export interface LanguageSummary {
   autonym?: string;
   /** Default script subtag (ISO 15924), used to seed the target-script proposal. */
   defaultScript?: string;
+  /**
+   * Region display name for this language. Lets the picker disambiguate
+   * homonym languages — ~98 English names in langtags map to >1 distinct
+   * language (e.g. "Ainu" → aib/ain), so a name alone is not enough to tell
+   * two suggestions apart (spec 030 T008 finding). Absent when unknown.
+   */
+  regionName?: string;
+  /**
+   * True when this language's bare subtag resolves to more than one region
+   * variant — i.e. a region-disambiguation step will follow (spec 030 FR-014).
+   */
+  hasRegionVariants?: boolean;
 }
 
 /**

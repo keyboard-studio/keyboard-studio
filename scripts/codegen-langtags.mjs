@@ -73,6 +73,24 @@ function parseFull(full) {
   return { script, region };
 }
 
+/**
+ * De-duplicate a list of names preserving order, dropping empty/undefined.
+ * Used to merge the singular primary name with its array of alternates so the
+ * primary stays first (spec 030: englishNames / localNames).
+ */
+function dedupeNames(list) {
+  const seen = new Set();
+  const out = [];
+  for (const n of list) {
+    if (typeof n !== 'string') continue;
+    const v = n.trim();
+    if (v === '' || seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+  }
+  return out;
+}
+
 // Map: lowercased subtag key -> LanguageDefaults object (plain JS, no TS yet)
 const index = new Map();
 
@@ -81,6 +99,32 @@ const languagesByTag = new Map();
 
 let skipped = 0;
 let aliasCollisions = 0;
+
+// Gather region variants per bare subtag from ALL tagsets (bare + non-bare).
+// A language used across regions has separate tagsets (e.g. ab, ab-Cyrl-TR);
+// distinct regions become regionVariants[]. >1 distinct region ⇒ the region
+// disambiguation step fires (spec 030 US3 / FR-014). Region-specific local names
+// come from each tagset's own localname/localnames. Sorted by region code for
+// deterministic output.
+const regionVariantsByBare = new Map();
+for (const entry of raw) {
+  if (!entry.tag || entry.tag.startsWith('_') || !entry.region) continue;
+  const bare = entry.tag.split('-')[0].toLowerCase();
+  const arr = regionVariantsByBare.get(bare) ?? [];
+  if (arr.some((v) => v.region === entry.region)) continue; // dedupe by region
+  const vScript = entry.full ? parseFull(entry.full).script : undefined;
+  arr.push({
+    region: entry.region,
+    ...(entry.regionname !== undefined ? { regionName: entry.regionname } : {}),
+    ...(vScript !== undefined ? { defaultScript: vScript } : {}),
+    ...(entry.localname !== undefined ? { autonym: entry.localname } : {}),
+    localNames: dedupeNames([entry.localname, ...(Array.isArray(entry.localnames) ? entry.localnames : [])]),
+  });
+  regionVariantsByBare.set(bare, arr);
+}
+for (const arr of regionVariantsByBare.values()) {
+  arr.sort((a, b) => a.region.localeCompare(b.region));
+}
 
 for (const entry of raw) {
   // Skip underscore-prefixed header records (_version, _globalvar, _phonvar, etc.)
@@ -95,7 +139,7 @@ for (const entry of raw) {
   // individual variety codes (e.g. "cmn", "yue"), never as a single bare entry.
   if (entry.tag.includes('-')) continue;
 
-  const { full, iso639_3, iso639_3extra, localname, name, regions } = entry;
+  const { full, iso639_3, iso639_3extra, localname, name, regions, names, localnames, regionname } = entry;
 
   let defaultScript;
   let defaultRegion;
@@ -106,6 +150,17 @@ for (const entry of raw) {
     defaultRegion = parsed.region;
   }
 
+  // Merge the singular primary with its alternates array, primary first
+  // (spec 030 FR-001/FR-004). Only ~40% of subtags carry any local name, so
+  // localNames is frequently empty — that is expected, not a defect.
+  const englishNames = dedupeNames([name, ...(Array.isArray(names) ? names : [])]);
+  const localNames = dedupeNames([localname, ...(Array.isArray(localnames) ? localnames : [])]);
+
+  // Attach region variants only when the subtag is region-ambiguous (>1 distinct
+  // region) — that is the region-disambiguation trigger (spec 030 US3 / FR-014).
+  const variants = regionVariantsByBare.get(entry.tag.toLowerCase()) ?? [];
+  const isRegionAmbiguous = variants.length > 1;
+
   const record = {
     code: entry.tag.toLowerCase(),
     ...(iso639_3 !== undefined ? { iso639_3: iso639_3.toLowerCase() } : {}),
@@ -114,6 +169,9 @@ for (const entry of raw) {
     regions: Array.isArray(regions) ? [...regions].sort() : [],
     ...(localname !== undefined ? { autonym: localname } : {}),
     ...(name !== undefined ? { englishName: name } : {}),
+    ...(englishNames.length ? { englishNames } : {}),
+    ...(localNames.length ? { localNames } : {}),
+    ...(isRegionAmbiguous ? { regionVariants: variants } : {}),
   };
 
   const tagKey = entry.tag.toLowerCase();
@@ -152,6 +210,12 @@ for (const entry of raw) {
       englishName: record.englishName ?? '',
       ...(record.autonym !== undefined ? { autonym: record.autonym } : {}),
       ...(record.defaultScript !== undefined ? { defaultScript: record.defaultScript } : {}),
+      // regionName distinguishes homonym languages in the picker (spec 030 T008:
+      // ~98 English names map to >1 distinct language).
+      ...(regionname !== undefined ? { regionName: regionname } : {}),
+      // hasRegionVariants tells the survey a region-disambiguation step follows
+      // (spec 030 US3 / FR-014).
+      ...(isRegionAmbiguous ? { hasRegionVariants: true } : {}),
     });
   }
 }
@@ -178,7 +242,7 @@ mkdirSync(OUT_DIR, { recursive: true });
 
 // Deterministic JSON serializer (stable key order within each record)
 function serializeRecord(r) {
-  const keys = ['code', 'iso639_3', 'defaultScript', 'defaultRegion', 'regions', 'autonym', 'englishName'];
+  const keys = ['code', 'iso639_3', 'defaultScript', 'defaultRegion', 'regions', 'autonym', 'englishName', 'englishNames', 'localNames', 'regionVariants'];
   const obj = {};
   for (const k of keys) {
     if (k in r) obj[k] = r[k];
@@ -187,7 +251,7 @@ function serializeRecord(r) {
 }
 
 function serializeSummary(s) {
-  const keys = ['code', 'englishName', 'autonym', 'defaultScript'];
+  const keys = ['code', 'englishName', 'autonym', 'defaultScript', 'regionName', 'hasRegionVariants'];
   const obj = {};
   for (const k of keys) {
     if (k in s) obj[k] = s[k];
@@ -199,8 +263,12 @@ const indexLines = sortedIndexEntries.map(([k, v]) =>
   `  ${JSON.stringify(k)}: ${serializeRecord(v)},`
 );
 
+// Per-element `as LanguageSummary` keeps the array's element type uniform so
+// tsc does not build a literal-shape union over ~8k elements (TS2590 "union
+// too complex"). defaultsIndex avoids this via its Record<string, …> index
+// signature; the array literal needs the cast.
 const languageLines = languages.map(s =>
-  `  ${serializeSummary(s)},`
+  `  ${serializeSummary(s)} as LanguageSummary,`
 );
 
 const header = `\

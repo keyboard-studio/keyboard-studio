@@ -41,6 +41,7 @@ import provenance_additional_notes from "./a/provenance_additional_notes.ts";
 import il_language_autonym from "./a/il_language_autonym.ts";
 import il_language_english from "./a/il_language_english.ts";
 import il_language_code from "./a/il_language_code.ts";
+import il_language_region from "./a/il_language_region.ts";
 import il_target_script from "./a/il_target_script.ts";
 import il_script_not_supported from "./a/il_script_not_supported.ts";
 
@@ -83,6 +84,7 @@ export const phaseARegistry: Readonly<Record<string, QuestionModule>> = {
   il_language_autonym,
   il_language_english,
   il_language_code,
+  il_language_region,
   il_target_script,
   il_script_not_supported,
 } as const;

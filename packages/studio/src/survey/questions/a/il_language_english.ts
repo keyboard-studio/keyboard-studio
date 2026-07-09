@@ -1,8 +1,11 @@
 // Per-question module: il_language_english (identity-lite)
-// Ported verbatim from content/flows/identity_lite.yaml.
 //
-// The autonym-to-English seed (getSeedValue in IdentityLite.tsx) stays in the
-// component — do NOT move that seeding logic here.
+// SECOND question (spec 030): a confirmation of the English name, PRE-FILLED
+// from the langtags entry resolved by il_language_code (getSeedValue in
+// IdentityLite.tsx seeds it from the resolved entry's englishName). The author
+// confirms or edits it — this is the display name that lands on the package.
+// When il_language_code was left blank / matched nothing, this arrives empty and
+// the author types it (graceful degradation, spec 030 FR-003).
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
 
@@ -11,11 +14,11 @@ export const definition = {
   prompt: "What is your language called in English?",
   help_text:
     "The English name used in directories and official language lists, for " +
-    "example: Bafut, Swahili, Hindi. If your language has no widely-used English " +
-    "name, repeat the name you gave above.",
+    "example: Bafut, Swahili, Hindi. Pre-filled from your selection above — edit " +
+    "it if you prefer a different name.",
   type: "text" as const,
   required: true,
-  next: "il_language_code",
+  next: "il_language_autonym",
 } satisfies import("../../types.ts").FlowQuestion;
 
 export function validate(

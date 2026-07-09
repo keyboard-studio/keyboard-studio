@@ -30,6 +30,7 @@
 
 import type { KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
 import { emit } from "../codec/emit.js";
+import { reconcileSiblingAssetPaths } from "../compiler/reconcileSiblingAssetPaths.js";
 import { carveFilterIr } from "./carveFilterIr.js";
 
 /**
@@ -113,6 +114,14 @@ export function applyCarveToVfs(
     warnings.push(`[carve-project] emit failed: ${msg}`);
     return { warnings };
   }
+
+  // The re-emit serializes baseIr's header, whose sibling asset-path stores
+  // may predate a scaffold()/id-rename of the VFS files (Track 1: baseIr is
+  // captured at keyboard selection under the BASE id). Repoint any reference
+  // whose file is missing to the keyboardId-named sibling that actually
+  // exists — otherwise stripDanglingAssetStores removes the reference before
+  // the preview compile and the OSK silently loses its visual keyboard.
+  emitted = reconcileSiblingAssetPaths(emitted, vfs, keyboardId).kmn;
 
   vfs.set(kmnPath, emitted, false); // isBinary = false
 

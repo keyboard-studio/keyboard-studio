@@ -108,3 +108,69 @@ describe("lookupByName", () => {
     expect(lookupByName("")).toStrictEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// spec 030 — extended fields (englishNames[], localNames[], summary regionName)
+// Exemplars are stable against the pinned langtags commit 99b856b.
+// ---------------------------------------------------------------------------
+
+describe("langtags extended fields (spec 030)", () => {
+  it("exposes englishNames[] with the primary first, de-duplicated, alternates retained", () => {
+    const ab = getLanguageDefaults("ab");
+    expect(ab).not.toBeNull();
+    expect(ab!.englishName).toBe("Abkhaz");
+    expect(ab!.englishNames?.[0]).toBe("Abkhaz"); // primary first
+    expect(ab!.englishNames).toContain("Abkhazian"); // alternate retained
+    expect(new Set(ab!.englishNames).size).toBe(ab!.englishNames!.length); // de-duped
+  });
+
+  it("exposes localNames[] (own-script) with the primary autonym first; primary autonym unchanged", () => {
+    const ab = getLanguageDefaults("ab");
+    expect(ab!.localNames?.[0]).toBe(ab!.autonym); // primary autonym first
+    expect(ab!.localNames!.length).toBeGreaterThan(1); // alternates retained
+    expect(ab!.autonym).toBe("Аԥсшәа"); // back-compat: singular primary unchanged
+  });
+
+  it("omits localNames when the language has no recorded own-script name (the ~60% majority)", () => {
+    const arum = getLanguageDefaults("aab"); // Arum — englishNames present, no local name
+    expect(arum).not.toBeNull();
+    expect(arum!.englishNames).toContain("Arum");
+    expect(arum!.localNames).toBeUndefined();
+    expect(arum!.autonym).toBeUndefined();
+  });
+
+  it("summaries carry regionName so homonym languages can be disambiguated in the picker", () => {
+    const [ab] = lookupByName("ab"); // exact code match
+    expect(ab?.code).toBe("ab");
+    expect(ab?.regionName).toBe("Georgia");
+  });
+
+  it("back-compat — a single-local-name language keeps englishName/autonym and arrays the local name", () => {
+    const ha = getLanguageDefaults("ha");
+    expect(ha!.englishName).toBe("Hausa");
+    expect(ha!.autonym).toBe("Hausa");
+    expect(ha!.defaultScript).toBe("Latn");
+    expect(ha!.localNames).toEqual(["Hausa"]);
+  });
+
+  it("attaches regionVariants (distinct regions, each with region/regionName) for a region-ambiguous language", () => {
+    const aa = getLanguageDefaults("aa"); // Afar — spoken in ET + DJ
+    expect(aa?.regionVariants).toBeDefined();
+    expect(aa!.regionVariants!.length).toBeGreaterThan(1);
+    const regions = aa!.regionVariants!.map((v) => v.region);
+    expect(new Set(regions).size).toBe(regions.length); // regions are distinct
+    expect(aa!.regionVariants!.every((v) => typeof v.region === "string")).toBe(true);
+    expect(aa!.regionVariants!.some((v) => v.regionName === "Djibouti")).toBe(true);
+  });
+
+  it("omits regionVariants for a single-region language", () => {
+    const hi = getLanguageDefaults("hi"); // Hindi — single dominant region
+    expect(hi).not.toBeNull();
+    expect(hi!.regionVariants).toBeUndefined();
+  });
+
+  it("lookupByName sets hasRegionVariants iff the subtag has >1 region variant", () => {
+    expect(lookupByName("aa")[0]?.hasRegionVariants).toBe(true);
+    expect(lookupByName("hi")[0]?.hasRegionVariants).toBeUndefined();
+  });
+});

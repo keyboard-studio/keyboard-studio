@@ -11,6 +11,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { applyCarveToVfs } from "./applyCarveToVfs.js";
+import { parse } from "../codec/parse.js";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { KeyboardIR, IRGroup, IRStore, IRRule } from "@keyboard-studio/contracts";
 
@@ -304,5 +305,42 @@ describe("applyCarveToVfs — returns warnings", () => {
     const ir = makeIR([makeGroup("group#main", "main", [makeRule("rule#0")])]);
     const { warnings } = applyCarveToVfs(vfs, "test", ir, new Set(["rule#0"]));
     expect(warnings).toHaveLength(0);
+  });
+});
+
+describe("applyCarveToVfs — reconciles stale sibling asset paths (Track 1 rename)", () => {
+  it("repoints a base-id &VISUALKEYBOARD reference at the renamed sibling that exists in the VFS", () => {
+    // Track 1 shape: the VFS has been scaffolded/renamed to the new id, but
+    // baseIr (captured at keyboard selection) still references the base-id
+    // .kvks. Without reconciliation the re-emitted reference dangles and
+    // stripDanglingAssetStores later removes the visual keyboard entirely.
+    const baseKmn = [
+      "store(&VERSION) '10.0'",
+      "store(&VISUALKEYBOARD) 'old_id.kvks'",
+      "",
+      "begin Unicode > use(main)",
+      "",
+      "group(main) using keys",
+      "+ [K_A] > 'a'",
+      "+ [K_B] > 'b'",
+      "",
+    ].join("\n");
+    const parsed = parse(baseKmn, "old_id");
+    const ruleB = parsed.ir.groups
+      .flatMap((g) => g.rules)
+      .find((r) => r.output.some((el) => el.kind === "char" && el.value === "b"));
+
+    const vfs = createVirtualFS([
+      { path: "source/new_id.kmn", content: baseKmn, isBinary: false },
+      { path: "source/new_id.kvks", content: "<visualkeyboard/>", isBinary: false },
+    ]);
+
+    const { warnings } = applyCarveToVfs(vfs, "new_id", parsed.ir, new Set([ruleB!.nodeId]));
+
+    expect(warnings).toHaveLength(0);
+    const content = vfs.get("source/new_id.kmn")?.content as string;
+    expect(content).toContain("store(&VISUALKEYBOARD) 'new_id.kvks'");
+    expect(content).not.toContain("old_id.kvks");
+    expect(content).not.toContain("K_B");
   });
 });

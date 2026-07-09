@@ -245,6 +245,52 @@ describe("advanceThrough — cycle detection", () => {
 });
 
 // ---------------------------------------------------------------------------
+// getNextOverride — dynamic-next hook (spec 030 US3)
+// ---------------------------------------------------------------------------
+
+describe("advanceThrough — getNextOverride", () => {
+  it("routes to the overridden id when the hook returns a non-empty string", () => {
+    const q1 = q("q1", "q2");
+    const q2 = q("q2", null);
+    const alt = q("alt", null);
+    const override = () => "alt";
+    expect(advanceThrough(q1, undefined, {}, idx(q1, q2, alt), override)).toBe("alt");
+  });
+
+  it("falls back to the static next when the hook returns undefined", () => {
+    const q1 = q("q1", "q2");
+    const q2 = q("q2", null);
+    const override = () => undefined;
+    expect(advanceThrough(q1, undefined, {}, idx(q1, q2), override)).toBe("q2");
+  });
+
+  it("falls back to the static next when the hook returns an empty string", () => {
+    const q1 = q("q1", "q2");
+    const q2 = q("q2", null);
+    const override = () => "";
+    expect(advanceThrough(q1, undefined, {}, idx(q1, q2), override)).toBe("q2");
+  });
+
+  it("passes the current question id and value to the hook", () => {
+    const q1 = q("q1", "q2");
+    const q2 = q("q2", null);
+    const region = q("region", null);
+    const seen: Array<[string, string | string[] | undefined]> = [];
+    const override = (
+      id: string,
+      value: string | string[] | undefined,
+    ): string | undefined => {
+      seen.push([id, value]);
+      // Mimic US3: send the picker to the region step only for an ambiguous code.
+      return id === "q1" && value === "aa" ? "region" : undefined;
+    };
+    expect(advanceThrough(q1, "aa", {}, idx(q1, q2, region), override)).toBe("region");
+    expect(advanceThrough(q1, "ha", {}, idx(q1, q2, region), override)).toBe("q2");
+    expect(seen[0]).toEqual(["q1", "aa"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Defect 6 regression — terminal { default: true, goto: null } rule
 // ---------------------------------------------------------------------------
 

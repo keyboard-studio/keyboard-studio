@@ -21,7 +21,7 @@
 //   - All survey/hooks imports are type-only (depcruise / bundle hygiene, D-R2).
 
 import { create } from "zustand";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import type { IdentityLiteResult } from "../survey/index.ts";
 import type { SurveyContext } from "../survey/types.ts";
 import type { Track } from "../survey/index.ts";
@@ -79,6 +79,14 @@ export interface SurveySessionState {
   identityResult: IdentityLiteResult | null;
 
   /**
+   * Raw phase result of the completed identity-lite flow (the answers that
+   * produced identityResult). Persisted so a history pop back onto the identity
+   * step resumes the flow at its last question with answers restored, rather
+   * than replaying from question 1. Null until the identity step completes.
+   */
+  identityPhaseResult: SurveyPhaseResult | null;
+
+  /**
    * Derived from identityResult via contextFromIdentity. Stored (not re-derived)
    * to match today's useState semantics. Empty object until identity completes.
    */
@@ -129,6 +137,9 @@ export interface SurveySessionState {
   /** Plain setter — identity-lite output. */
   setIdentityResult: (r: IdentityLiteResult | null) => void;
 
+  /** Plain setter — raw identity-lite phase result (history-pop resume). */
+  setIdentityPhaseResult: (r: SurveyPhaseResult | null) => void;
+
   /** Plain setter — survey context derived from identity. */
   setSurveyContext: (c: SurveyContext) => void;
 
@@ -153,6 +164,7 @@ const INITIAL_STATE = {
   activeStepId: "identity" as ActiveStepId,
   history: [] as readonly ActiveStepId[],
   identityResult: null,
+  identityPhaseResult: null,
   surveyContext: {} as SurveyContext,
   selectedTrack: null,
   scaffoldSpec: null,
@@ -161,8 +173,8 @@ const INITIAL_STATE = {
 } as const satisfies Omit<
   SurveySessionState,
   | "advance" | "popHistory" | "reset"
-  | "setIdentityResult" | "setSurveyContext" | "setSelectedTrack"
-  | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
+  | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
+  | "setSelectedTrack" | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
 >;
 
 // ---------------------------------------------------------------------------
@@ -197,6 +209,7 @@ export const useSurveySessionStore = create<SurveySessionState>((set, get) => ({
     }),
 
   setIdentityResult: (r) => set({ identityResult: r }),
+  setIdentityPhaseResult: (r) => set({ identityPhaseResult: r }),
   setSurveyContext: (c) => set({ surveyContext: c }),
   setSelectedTrack: (t) => set({ selectedTrack: t }),
   setScaffoldSpec: (s) => set({ scaffoldSpec: s }),

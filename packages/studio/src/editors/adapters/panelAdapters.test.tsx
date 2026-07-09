@@ -11,7 +11,7 @@
 //      falls back to "Latn" instead of failing every script comparison.
 
 import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/react";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import {
   basicKbdus,
@@ -43,7 +43,7 @@ vi.mock("../../lib/services.ts", () => ({
   USE_REAL: false,
 }));
 
-import { BaseResolutionAdapter } from "./panelAdapters.tsx";
+import { BaseResolutionAdapter, IdentityLiteAdapter } from "./panelAdapters.tsx";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -121,5 +121,58 @@ describe("BaseResolutionAdapter — suggest target sourced from surveySessionSto
       expect(screen.getByText("Matches your script")).toBeDefined();
     });
     expect(screen.queryByText("Already supports your language")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// IdentityLiteAdapter — history-pop resume wiring (identityPhaseResult)
+// ---------------------------------------------------------------------------
+
+/** A completed identity-lite phase result, as the flow would produce it. */
+const IDENTITY_PHASE_RESULT = {
+  phase: "A" as const,
+  answers: [
+    { questionId: "il_language_autonym", answerType: "text" as const, value: "Hausa" },
+    { questionId: "il_language_english", answerType: "text" as const, value: "Hausa" },
+    { questionId: "il_language_code", answerType: "text" as const, value: "ha" },
+    { questionId: "il_target_script", answerType: "select" as const, value: "Latn" },
+  ],
+};
+
+describe("IdentityLiteAdapter — resume from identityPhaseResult", () => {
+  it("first visit (no stored phase result) starts the flow at question 1", () => {
+    render(<IdentityLiteAdapter onComplete={() => {}} />);
+    // il_language_code is the first question in the merged flow (spec 030).
+    expect(
+      screen.getByText("What language is this keyboard for?"),
+    ).toBeDefined();
+  });
+
+  it("re-entry with a stored phase result resumes on the flow's last question", () => {
+    useSurveySessionStore.getState().setIdentityPhaseResult(IDENTITY_PHASE_RESULT);
+
+    render(<IdentityLiteAdapter onComplete={() => {}} />);
+
+    expect(screen.getByText("Which script will THIS keyboard type?")).toBeDefined();
+    expect(
+      screen.queryByText("What is your language called in your own language?"),
+    ).toBeNull();
+  });
+
+  it("completion writes identityResult, surveyContext, AND identityPhaseResult before onComplete", () => {
+    useSurveySessionStore.getState().setIdentityPhaseResult(IDENTITY_PHASE_RESULT);
+    const onComplete = vi.fn((_result: unknown) => {
+      // Store writes must have landed BEFORE onComplete fires (R7 ordering).
+      const s = useSurveySessionStore.getState();
+      expect(s.identityResult?.bcp47).toBe("ha-Latn");
+      expect(s.surveyContext.language_name).toBe("Hausa");
+      expect(s.identityPhaseResult?.answers.length).toBe(4);
+    });
+
+    render(<IdentityLiteAdapter onComplete={onComplete} />);
+    // Resumed on the last question with its answer restored — Finish directly.
+    fireEvent.click(screen.getByTestId("survey-advance"));
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
   });
 });
