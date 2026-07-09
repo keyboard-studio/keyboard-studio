@@ -88,6 +88,16 @@ function inherited(char: string): TouchAssignment {
   };
 }
 
+function keyReplace(hostKey: string, char: string): TouchAssignment {
+  return {
+    scope: "individual",
+    target: char,
+    modality: "touch",
+    mechanisms: [{ patternId: "touch_key_replace", slotValues: { hostKey, char } }],
+    source: "user",
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Synthetic fixture helpers
 // ---------------------------------------------------------------------------
@@ -380,6 +390,126 @@ describe("applyTouchAssignmentsToRawJson — multitap", () => {
     expect(ka.multitap![0]!.id).toBe("U_00E2");
     expect(ka.multitap![0]!.text).toBe("â");
     expect(ka.multitap![0]!.output).toBeUndefined();
+  });
+});
+
+describe("applyTouchAssignmentsToRawJson — touch_key_replace (Case B)", () => {
+  it("sets the raw key's id to the U_ id and text to the char, and drops stale output", () => {
+    const json = makePhoneOnlyJson([{ id: "K_X", text: "x", output: "x" }]);
+    const { json: out, warnings } = applyTouchAssignmentsToRawJson(json, [keyReplace("K_X", "ñ")]);
+    expect(warnings).toHaveLength(0);
+    const parsed = JSON.parse(out) as {
+      phone: { layer: Array<{ id: string; row: Array<{ key: Array<Record<string, unknown>> }> }> };
+    };
+    const defLayer = parsed.phone.layer.find((l) => l.id === "default")!;
+    const allKeys = defLayer.row.flatMap((r) => r.key);
+    const replaced = allKeys.find((k) => k["id"] === "U_00F1")!;
+    expect(replaced).toBeDefined();
+    expect(replaced["text"]).toBe("ñ");
+    expect(replaced["output"]).toBeUndefined();
+    // Old K_X id is gone — the same object was mutated in place.
+    expect(allKeys.find((k) => k["id"] === "K_X")).toBeUndefined();
+  });
+
+  it("preserves geometry and other raw key properties untouched", () => {
+    const json = makePhoneOnlyJson([
+      { id: "K_X", text: "x", sp: 1, pad: 5, width: 110, nextlayer: "shift" },
+    ]);
+    const { json: out } = applyTouchAssignmentsToRawJson(json, [keyReplace("K_X", "ñ")]);
+    const parsed = JSON.parse(out) as {
+      phone: { layer: Array<{ id: string; row: Array<{ key: Array<Record<string, unknown>> }> }> };
+    };
+    const defLayer = parsed.phone.layer.find((l) => l.id === "default")!;
+    const replaced = defLayer.row.flatMap((r) => r.key).find((k) => k["id"] === "U_00F1")!;
+    expect(replaced["sp"]).toBe(1);
+    expect(replaced["pad"]).toBe(5);
+    expect(replaced["width"]).toBe(110);
+    expect(replaced["nextlayer"]).toBe("shift");
+  });
+
+  it("warns when the host key is absent from every platform's default layer", () => {
+    const json = makePhoneOnlyJson([{ id: "K_A", text: "a" }]);
+    const { warnings } = applyTouchAssignmentsToRawJson(json, [keyReplace("K_MISSING", "ñ")]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/K_MISSING/);
+  });
+
+  it("applies to every matched platform when both tablet and phone have the host key", () => {
+    const json = makeTabletPhoneJson(
+      [{ id: "K_X", text: "x" }],
+      [{ id: "K_X", text: "x" }],
+    );
+    const { json: out, warnings } = applyTouchAssignmentsToRawJson(json, [keyReplace("K_X", "ñ")]);
+    expect(warnings).toHaveLength(0);
+    const parsed = JSON.parse(out) as {
+      tablet: { layer: Array<{ id: string; row: Array<{ key: Array<Record<string, unknown>> }> }> };
+      phone: { layer: Array<{ id: string; row: Array<{ key: Array<Record<string, unknown>> }> }> };
+    };
+    const tabletDef = parsed.tablet.layer.find((l) => l.id === "default")!;
+    expect(tabletDef.row.flatMap((r) => r.key).find((k) => k["id"] === "U_00F1")).toBeDefined();
+    const phoneDef = parsed.phone.layer.find((l) => l.id === "default")!;
+    expect(phoneDef.row.flatMap((r) => r.key).find((k) => k["id"] === "U_00F1")).toBeDefined();
+  });
+});
+
+describe("applyTouchAssignmentsToRawJson — multiple mechanisms per assignment", () => {
+  it("applies every mechanism in a single assignment's mechanisms[] (longpress + multitap on the same host key)", () => {
+    const json = makePhoneOnlyJson([{ id: "K_A", text: "a" }]);
+    const combined: TouchAssignment = {
+      scope: "individual",
+      target: "a",
+      modality: "touch",
+      mechanisms: [
+        { patternId: "longpress_alternates", slotValues: { hostKey: "K_A", char: "á" } },
+        { patternId: "multitap", slotValues: { hostKey: "K_A", char: "â" } },
+      ],
+      source: "user",
+    };
+    const { json: out, warnings } = applyTouchAssignmentsToRawJson(json, [combined]);
+    expect(warnings).toHaveLength(0);
+    const parsed = JSON.parse(out) as {
+      phone: {
+        layer: Array<{
+          id: string;
+          row: Array<{ key: Array<{ id: string; sk?: Array<{ id: string; text?: string }>; multitap?: Array<{ id: string; text?: string }> }> }>;
+        }>;
+      };
+    };
+    const defLayer = parsed.phone.layer.find((l) => l.id === "default")!;
+    const ka = defLayer.row[0]!.key.find((k) => k.id === "K_A")!;
+    expect(ka.sk).toHaveLength(1);
+    expect(ka.sk![0]!.text).toBe("á");
+    expect(ka.multitap).toHaveLength(1);
+    expect(ka.multitap![0]!.text).toBe("â");
+  });
+
+  it("applies mechanisms targeting two different host keys within one assignment", () => {
+    const json = makePhoneOnlyJson([{ id: "K_A", text: "a" }, { id: "K_B", text: "b" }]);
+    const combined: TouchAssignment = {
+      scope: "individual",
+      target: "x",
+      modality: "touch",
+      mechanisms: [
+        { patternId: "longpress_alternates", slotValues: { hostKey: "K_A", char: "á" } },
+        { patternId: "multitap", slotValues: { hostKey: "K_B", char: "β" } },
+      ],
+      source: "user",
+    };
+    const { json: out, warnings } = applyTouchAssignmentsToRawJson(json, [combined]);
+    expect(warnings).toHaveLength(0);
+    const parsed = JSON.parse(out) as {
+      phone: {
+        layer: Array<{
+          id: string;
+          row: Array<{ key: Array<{ id: string; sk?: Array<{ text?: string }>; multitap?: Array<{ text?: string }> }> }>;
+        }>;
+      };
+    };
+    const defLayer = parsed.phone.layer.find((l) => l.id === "default")!;
+    const ka = defLayer.row[0]!.key.find((k) => k.id === "K_A")!;
+    const kb = defLayer.row[0]!.key.find((k) => k.id === "K_B")!;
+    expect(ka.sk?.[0]?.text).toBe("á");
+    expect(kb.multitap?.[0]?.text).toBe("β");
   });
 });
 

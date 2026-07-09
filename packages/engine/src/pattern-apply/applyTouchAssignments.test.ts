@@ -519,6 +519,53 @@ describe("applyTouchAssignments — touch_key_replace", () => {
 });
 
 // ---------------------------------------------------------------------------
+// multiple mechanisms per assignment
+// ---------------------------------------------------------------------------
+
+describe("applyTouchAssignments — multiple mechanisms per assignment", () => {
+  it("applies every mechanism in a single assignment's mechanisms[] (longpress + multitap on the same host key)", () => {
+    const layout = makeLayout([makeKey("K_A")]);
+    const combined: TouchAssignment = {
+      scope: "individual",
+      target: "a",
+      modality: "touch",
+      mechanisms: [
+        { patternId: "longpress_alternates", slotValues: { hostKey: "K_A", char: "á" } },
+        { patternId: "multitap", slotValues: { hostKey: "K_A", char: "â" } },
+      ],
+      source: "user",
+    };
+    const { layout: out, warnings } = applyTouchAssignments(layout, [combined]);
+
+    expect(warnings).toHaveLength(0);
+    const key = getKey(out, "K_A")!;
+    expect(key.sk).toHaveLength(1);
+    expect(key.sk![0]!.text).toBe("á");
+    expect(key.multitap).toHaveLength(1);
+    expect(key.multitap![0]!.text).toBe("â");
+  });
+
+  it("applies mechanisms targeting two different host keys within one assignment", () => {
+    const layout = makeLayout([makeKey("K_A"), makeKey("K_B")]);
+    const combined: TouchAssignment = {
+      scope: "individual",
+      target: "x",
+      modality: "touch",
+      mechanisms: [
+        { patternId: "longpress_alternates", slotValues: { hostKey: "K_A", char: "á" } },
+        { patternId: "multitap", slotValues: { hostKey: "K_B", char: "β" } },
+      ],
+      source: "user",
+    };
+    const { layout: out, warnings } = applyTouchAssignments(layout, [combined]);
+
+    expect(warnings).toHaveLength(0);
+    expect(getKey(out, "K_A")!.sk?.[0]?.text).toBe("á");
+    expect(getKey(out, "K_B")!.multitap?.[0]?.text).toBe("β");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 7. Emit-side round-trip for sk, flick, and multitap
 // ---------------------------------------------------------------------------
 

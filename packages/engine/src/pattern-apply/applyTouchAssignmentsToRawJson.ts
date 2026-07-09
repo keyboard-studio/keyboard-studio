@@ -19,10 +19,15 @@
  *     `defaultHint: "dot"` if the platform object has no `defaultHint` field
  *     already.  This keeps newly-added longpress menus discoverable on
  *     Keyman 17+.
+ *   - `touch_key_replace` → sets the host key's `id` to the U_-form Unicode
+ *     key id and `text` to the character, and deletes any stale `output`
+ *     field (mirrors Case A's `applyTouchAssignments` semantics).
  *   - `touch_inherited` → no-op, no warning.
  *   - Unknown patternId → one warning, no mutation.
  *   - Do NOT auto-seed sk[] from deadkey patterns (that is Case A behaviour,
  *     for keyboards that ship no touch layout).
+ *   - Each assignment's `mechanisms[]` are ALL applied (not just the first) —
+ *     one character may carry multiple touch methods simultaneously.
  *
  * Non-standard top-level keys (e.g. `"_comment"` strings) and platforms
  * missing a `layer` array are silently skipped — this function NEVER throws
@@ -140,58 +145,60 @@ export function applyTouchAssignmentsToRawJson(
   const platformsGainingSk = new Set<string>();
 
   for (const assignment of assignments) {
-    const ref = assignment.mechanisms[0];
-    if (!ref) continue;
+    for (const ref of assignment.mechanisms) {
+      const { patternId, slotValues } = ref;
 
-    const { patternId, slotValues } = ref;
+      // touch_inherited: intentional no-op, no warning.
+      if (patternId === "touch_inherited") continue;
 
-    // touch_inherited: intentional no-op, no warning.
-    if (patternId === "touch_inherited") continue;
+      if (
+        patternId === "longpress_alternates" ||
+        patternId === "flick_gestures" ||
+        patternId === "multitap" ||
+        patternId === "touch_key_replace"
+      ) {
+        const hostKey = slotValues?.["hostKey"] ?? "";
+        const char = slotValues?.["char"] ?? "";
 
-    if (
-      patternId === "longpress_alternates" ||
-      patternId === "flick_gestures" ||
-      patternId === "multitap"
-    ) {
-      const hostKey = slotValues?.["hostKey"] ?? "";
-      const char = slotValues?.["char"] ?? "";
+        // Find which platforms have this host key in their default layer.
+        const matchedPlatforms: string[] = [];
+        for (const [pName, keyMap] of platformDefaultKeyMaps) {
+          if (keyMap.has(hostKey)) matchedPlatforms.push(pName);
+        }
 
-      // Find which platforms have this host key in their default layer.
-      const matchedPlatforms: string[] = [];
-      for (const [pName, keyMap] of platformDefaultKeyMaps) {
-        if (keyMap.has(hostKey)) matchedPlatforms.push(pName);
-      }
+        // Warn only when the key is found in NO platform.
+        if (matchedPlatforms.length === 0) {
+          warnings.push(
+            `[touch-apply-raw] host key "${hostKey}" not found in any platform's default layer — assignment for "${char}" skipped`,
+          );
+          continue;
+        }
 
-      // Warn only when the key is found in NO platform.
-      if (matchedPlatforms.length === 0) {
-        warnings.push(
-          `[touch-apply-raw] host key "${hostKey}" not found in any platform's default layer — assignment for "${char}" skipped`,
-        );
+        // Apply to each matched platform.
+        for (const pName of matchedPlatforms) {
+          const keyMap = platformDefaultKeyMaps.get(pName)!;
+          const key = keyMap.get(hostKey)!;
+
+          if (patternId === "longpress_alternates") {
+            applyLongpress(key, char, pName, platformsGainingSk);
+          } else if (patternId === "flick_gestures") {
+            const direction = slotValues?.["direction"] ?? "";
+            applyFlick(key, direction, char);
+          } else if (patternId === "multitap") {
+            applyMultitap(key, char);
+          } else {
+            // touch_key_replace
+            applyKeyReplace(key, char);
+          }
+        }
         continue;
       }
 
-      // Apply to each matched platform.
-      for (const pName of matchedPlatforms) {
-        const keyMap = platformDefaultKeyMaps.get(pName)!;
-        const key = keyMap.get(hostKey)!;
-
-        if (patternId === "longpress_alternates") {
-          applyLongpress(key, char, pName, platformsGainingSk);
-        } else if (patternId === "flick_gestures") {
-          const direction = slotValues?.["direction"] ?? "";
-          applyFlick(key, direction, char);
-        } else {
-          // multitap
-          applyMultitap(key, char);
-        }
-      }
-      continue;
+      // Unknown patternId — one warning per assignment.
+      warnings.push(
+        `[touch-apply-raw] unknown patternId "${patternId}" — assignment skipped`,
+      );
     }
-
-    // Unknown patternId — one warning per assignment.
-    warnings.push(
-      `[touch-apply-raw] unknown patternId "${patternId}" — assignment skipped`,
-    );
   }
 
   // Add defaultHint:"dot" to each platform that gained new sk[] entries and
@@ -242,4 +249,14 @@ function applyMultitap(key: RawKey, char: string): void {
   if (key.multitap.some((s) => isTouchSubKeyDuplicate(s, char))) return;
 
   key.multitap.push({ id: charToUnicodeKeyId(char), text: char });
+}
+
+function applyKeyReplace(key: RawKey, char: string): void {
+  // Case A semantics: the U_-id supersedes any existing `output` field (a
+  // stale output would otherwise take precedence over the id-derived
+  // codepoint). All other properties — pad/width/sp geometry, nextlayer,
+  // existing sk/flick/multitap — are left untouched.
+  key.id = charToUnicodeKeyId(char);
+  key.text = char;
+  delete key.output;
 }
