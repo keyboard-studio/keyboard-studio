@@ -241,7 +241,6 @@ export function BaseResolution({
           ))}
         </div>
       </div>
-
     </div>
   );
 }

@@ -112,6 +112,9 @@ const ORACLE_INAPPLICABLE_SYMBOLS: ReadonlySet<string> = new Set([
  */
 export function isOracleInapplicable(kmcmpCode: string): boolean {
   if (ORACLE_INAPPLICABLE_SYMBOLS.has(kmcmpCode)) return true;
+  // Short-circuit blank input: Number("") and Number("   ") both coerce to 0,
+  // which passes Number.isInteger and would reach the mask-and-lookup.
+  if (kmcmpCode.trim() === "") return false;
   const numeric = Number(kmcmpCode);
   if (!Number.isInteger(numeric)) return false;
   return ORACLE_INAPPLICABLE_BASE_CODES.has(numeric & KMCMP_BASECODE_MASK);

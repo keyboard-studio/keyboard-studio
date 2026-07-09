@@ -148,4 +148,9 @@ describe("isOracleInapplicable", () => {
     expect(isOracleInapplicable("UNKNOWN")).toBe(false);
     expect(isOracleInapplicable("")).toBe(false);
   });
+
+  it("short-circuits blank/whitespace input (Number('  ') coerces to 0)", () => {
+    expect(isOracleInapplicable("   ")).toBe(false);
+    expect(isOracleInapplicable("\t")).toBe(false);
+  });
 });

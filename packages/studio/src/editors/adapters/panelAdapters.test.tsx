@@ -142,8 +142,9 @@ const IDENTITY_PHASE_RESULT = {
 describe("IdentityLiteAdapter — resume from identityPhaseResult", () => {
   it("first visit (no stored phase result) starts the flow at question 1", () => {
     render(<IdentityLiteAdapter onComplete={() => {}} />);
+    // il_language_code is the first question in the merged flow (spec 030).
     expect(
-      screen.getByText("What is your language called in your own language?"),
+      screen.getByText("What language is this keyboard for?"),
     ).toBeDefined();
   });
 

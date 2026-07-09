@@ -103,10 +103,11 @@ describe("IdentityLite — resume", () => {
   it("Back from the resumed last question restores the prior answer", () => {
     render(<IdentityLite onComplete={vi.fn()} resume={COMPLETED} />);
     fireEvent.click(screen.getByTestId("survey-back"));
-    expect(screen.getByText("What language is this keyboard for?")).toBeTruthy();
-    // il_language_code renders as a datalist-backed input (role combobox) —
-    // assert on the restored display value rather than a specific role.
-    expect(screen.getByDisplayValue("ha")).toBeTruthy();
+    // Flow order (spec 030): code → english → autonym → target_script. Back
+    // from the last question (target_script) lands on il_language_autonym with
+    // its restored value; assert on the display value rather than input role.
+    expect(screen.getByText("What is your language called in your own language?")).toBeTruthy();
+    expect(screen.getByDisplayValue("Hausa")).toBeTruthy();
   });
 
   it("Finish on a resumed flow re-completes with the same extracted identity", () => {
@@ -131,8 +132,9 @@ describe("IdentityLite — resume", () => {
 
   it("without resume, mounts on the first question as before", () => {
     render(<IdentityLite onComplete={vi.fn()} />);
+    // il_language_code is the first question in the merged flow (spec 030).
     expect(
-      screen.getByText("What is your language called in your own language?"),
+      screen.getByText("What language is this keyboard for?"),
     ).toBeTruthy();
   });
 });
