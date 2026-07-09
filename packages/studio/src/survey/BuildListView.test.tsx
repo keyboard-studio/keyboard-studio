@@ -506,6 +506,22 @@ describe("BuildListView — end-to-end onComplete", () => {
 // 8. Back button returns to IntroChooser
 // ---------------------------------------------------------------------------
 
+describe("BuildListView — whole-alphabet instructions", () => {
+  it("shows the instruction callout with the space-separated example", async () => {
+    await renderBuildListView({});
+    // Callout: whole-alphabet wording + explicit spacing instruction.
+    expect(
+      screen.getByText(/every\s+character your language uses, not just the special ones/i),
+    ).toBeTruthy();
+    // The spaced example line.
+    expect(screen.getByText("a b c d e ɛ ŋ ɔ …")).toBeTruthy();
+    // Type-in section repeats the spacing instruction.
+    expect(
+      screen.getByText(/putting a space between each\s+character/i),
+    ).toBeTruthy();
+  });
+});
+
 describe("BuildListView — Back navigation", () => {
   it("clicking Back shows the IntroChooser again", async () => {
     await renderBuildListView({});

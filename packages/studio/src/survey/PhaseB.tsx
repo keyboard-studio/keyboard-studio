@@ -505,7 +505,7 @@ function GridPlaceholder() {
 }
 
 // ---------------------------------------------------------------------------
-// BuildListView — unified "build my character list" method
+// BuildListView — unified "add your whole alphabet" method
 // ---------------------------------------------------------------------------
 
 interface BuildListViewProps {
