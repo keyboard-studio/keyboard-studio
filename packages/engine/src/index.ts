@@ -125,10 +125,13 @@ export { createFetchCldrLoader, createFetchCldrFullLoader } from "./character-di
 // Phase B high-confidence missing-character suggestions (CLDR-grounded, no LLM).
 export { suggestMissingCharacters } from "./character-discovery/suggestMissing.js";
 export type { MissingCharSuggestions } from "./character-discovery/suggestMissing.js";
+// Case-pair proposal helper for the shift-layer studio feature (bidirectional;
+// distinct from suggestMissing's isCovered coverage check — see casePair.ts docstring).
+export { caseCounterpart } from "./character-discovery/casePair.js";
 
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.
-export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyStoreSlotRemovals, classifyStoreSlotEdit, parseSlotId, collectCharContributors } from "./pattern-apply/index.js";
-export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, ApplyCarveToVfsOpts, CarveKeycapRemovalInput, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason, CharContributors } from "./pattern-apply/index.js";
+export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyStoreSlotRemovals, classifyStoreSlotEdit, parseSlotId, collectCharContributors, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, planShiftAssignment } from "./pattern-apply/index.js";
+export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, ApplyCarveToVfsOpts, CarveKeycapRemovalInput, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason, CharContributors, ShiftAssignmentPlan } from "./pattern-apply/index.js";
 
 // Inventory diff (spec §8): static extraction of a keyboard's produced glyph set.
 export { producedGlyphs, collectFromOutput } from "./inventory/producedGlyphs.js";

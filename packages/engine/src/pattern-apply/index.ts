@@ -40,3 +40,11 @@ export type { ApplyTouchAssignmentsToRawJsonResult } from "./applyTouchAssignmen
 export { collectCharContributors } from "./collectCharContributors.js";
 export type { CharContributors } from "./collectCharContributors.js";
 
+export {
+  isMnemonicLayout,
+  keyHasCapsHandling,
+  buildShiftRuleLines,
+  planShiftAssignment,
+} from "./shiftRules.js";
+export type { ShiftAssignmentPlan } from "./shiftRules.js";
+
