@@ -216,11 +216,13 @@ describe("langtags name de-duplication is Unicode-canonical (spec 030)", () => {
     const vi = getLanguageDefaults("vi");
     expect(vi!.localNames).toEqual(["Tiếng Việt".normalize("NFC")]);
   });
+});
 
+describe("the singular autonym/englishName fields are NFC-normalized (spec 030)", () => {
+  // The singular convenience fields must share the NFC form dedupeNames emits
+  // for the arrays, so autonym === localNames[0] byte-for-byte (regression:
+  // singular fields were built from raw source and could be NFD, e.g. dtn).
   it("the singular autonym/englishName fields are themselves NFC and match their array head", () => {
-    // The singular convenience fields must share the NFC form dedupeNames emits
-    // for the arrays, so autonym === localNames[0] byte-for-byte (regression:
-    // singular fields were built from raw source and could be NFD, e.g. dtn).
     const offenders: string[] = [];
     for (const summary of listLanguages()) {
       const d = getLanguageDefaults(summary.code);
@@ -243,32 +245,113 @@ describe("region-variant merge preserves co-located names (spec 030)", () => {
   // multi-script community), the codegen keeps one variant per region but merges
   // every recorded own-script name into it, rather than dropping all but the
   // first tagset's names (region — not script — keys the disambiguation question,
-  // FR-014).
-  it("retains a same-region variant's own-script name that a region-only dedupe would drop", () => {
+  // FR-014). The emitted (defaultScript, autonym) pair must also come from the
+  // SAME (script-eligible) tagset — Braille/derived-script tagsets are ineligible
+  // to win that slot, so a first-seen Braille tagset can no longer pair its
+  // (nonexistent) script with another tagset's autonym.
+  it("retains a same-region variant's own-script name that a region-only dedupe would drop, and sources defaultScript from the same eligible tagset as the autonym", () => {
     const az = getLanguageDefaults("az"); // Azerbaijani — IR has Brai + Arab tagsets
     expect(az?.regionVariants).toBeDefined();
     const ir = az!.regionVariants!.find((v) => v.region === "IR");
     expect(ir).toBeDefined();
-    // Before the merge fix the first-seen IR tagset (Brai) carried no localname,
-    // so IR.localNames was [] and the co-located Arab tagset's name was lost.
+    // Before the fix the first-seen IR tagset (Brai, no localname) won the
+    // primary slot, so IR emitted defaultScript "Brai" paired with the
+    // Arabic-script autonym recovered from the other tagset — a mismatch.
+    expect(ir!.defaultScript).toBe("Arab");
+    expect(ir!.autonym).toBe("تۆرکجه");
     expect(ir!.localNames.length).toBeGreaterThan(0);
-    expect(ir!.autonym).toBeDefined();
-    expect(ir!.localNames[0]).toBe(ir!.autonym); // primary first
+    expect(ir!.localNames).toContain(ir!.autonym);
+    // localNames orders the selected tagset's own autonym first — the union
+    // of co-located names must not reorder it behind an alternate.
+    expect(ir!.localNames[0]).toBe(ir!.autonym);
   });
 
-  it("adopts a consistent script+name primary pair — a nameless specialty tagset does not pair a mismatched script with a name", () => {
-    // Regression (km-review of this PR): the first-seen IR tagset is Braille
-    // (Brai, no name); the merge must adopt the co-located Arab tagset's
-    // script+name TOGETHER, not pair the Braille script tag with the Arabic name.
-    const ir = getLanguageDefaults("az")!.regionVariants!.find((v) => v.region === "IR");
-    expect(ir!.defaultScript).toBe("Arab"); // the named orthography's script, NOT "Brai"
-    // Same shape for Arabic in Saudi Arabia / Syria (first-seen Brai / Hebr,
-    // no name; real Arab orthography adopted).
+  it("adopts a consistent script+name primary pair for other co-located languages too (ar/SA, ar/SY)", () => {
+    // Same shape as az/IR: first-seen SA/SY tagsets are Braille/Hebrew-derived
+    // with no name; the real Arab orthography tagset must win the primary slot.
     const ar = getLanguageDefaults("ar")!.regionVariants!;
     for (const region of ["SA", "SY"]) {
       const v = ar.find((x) => x.region === region)!;
       expect(v.defaultScript, `ar/${region}`).toBe("Arab");
       expect(v.localNames[0], `ar/${region}`).toBe(v.autonym);
     }
+  });
+});
+
+describe("region variants with no script-eligible tagset emit no fabricated script/autonym (spec 030)", () => {
+  // aln (Gheg Albanian) AL region has ONLY a Braille tagset on record (no
+  // Latin/other real-script tagset for AL); XK has a genuine Latin tagset.
+  // Per the 2d rule: if NO tagset in a (bare, region) group is script-eligible,
+  // defaultScript/autonym must stay undefined and localNames must be empty —
+  // never fabricated, and never leaked in from another region's tagset.
+  it("aln/AL (Braille-only) has no defaultScript/autonym and empty localNames", () => {
+    const aln = getLanguageDefaults("aln");
+    expect(aln?.regionVariants).toBeDefined();
+    const al = aln!.regionVariants!.find((v) => v.region === "AL");
+    expect(al).toBeDefined();
+    expect(al!.defaultScript).toBeUndefined();
+    expect(al!.autonym).toBeUndefined();
+    expect(al!.localNames).toEqual([]);
+  });
+
+  it("aln/XK (contrast — a genuine Latin tagset) does get a defaultScript", () => {
+    const aln = getLanguageDefaults("aln");
+    const xk = aln!.regionVariants!.find((v) => v.region === "XK");
+    expect(xk).toBeDefined();
+    expect(xk!.defaultScript).toBe("Latn");
+  });
+});
+
+describe("region variants source (defaultScript, autonym, localNames) from ONE eligible tagset when two real scripts co-locate (spec 030)", () => {
+  // aeb (Tunisian Arabic) TN region has TWO genuinely-eligible, non-excluded
+  // scripts on record for the same region: an Arabic-script tagset (the
+  // language's top-level default script) and a Latin-script romanization
+  // tagset — both real scripts a co-located community writes in, unlike the
+  // Braille/derived-script exclusions covered above. The selection rule must
+  // pick ONE of them (the one matching the top-level defaultScript, per
+  // priority (a)) to source defaultScript+autonym, while localNames still
+  // unions both tagsets' own-script names.
+  it("aeb/TN selects the Arabic-script tagset for (defaultScript, autonym) and unions both tagsets' names into localNames", () => {
+    const aeb = getLanguageDefaults("aeb");
+    expect(aeb?.regionVariants).toBeDefined();
+    const tn = aeb!.regionVariants!.find((v) => v.region === "TN");
+    expect(tn).toBeDefined();
+    // Selected tagset is the Arabic one (matches aeb's top-level defaultScript).
+    expect(tn!.defaultScript).toBe("Arab");
+    expect(tn!.autonym).toBe("تونسي");
+    // autonym is script-consistent with the selected tagset (Arabic text, not
+    // the Latin romanization "Derja").
+    expect(tn!.autonym).not.toBe("Derja");
+    // localNames unions BOTH tagsets' own-script names — the Arabic autonym
+    // first, then the Latin-script tagset's own name "Derja" — even though
+    // only the Arabic tagset won the primary (defaultScript, autonym) slot.
+    expect(tn!.localNames).toEqual(["تونسي", "Derja"]);
+  });
+});
+
+describe("region variants never let a non-primary script win the primary slot (spec 030)", () => {
+  // Braille and the ISO 15924 unwritten/undetermined/inherited/uncoded
+  // placeholder scripts are derived/auxiliary encodings, not a script a
+  // co-located community actually writes in. They must never surface as a
+  // region variant's defaultScript, and whenever a variant carries both
+  // defaultScript and autonym, the pair must be internally consistent — at
+  // minimum, defaultScript must not be one of these excluded scripts. This is
+  // a data-driven scan (not a fixed pin list) so a future langtags pin that
+  // attaches a localname to a Braille/undetermined tagset cannot silently let
+  // it win the primary slot again.
+  const NON_PRIMARY_SCRIPTS = new Set(["Brai", "Dupl", "Zxxx", "Zyyy", "Zinh", "Zzzz"]);
+
+  it("no regionVariant.defaultScript is a non-primary/derived script, across every language", () => {
+    const offenders: string[] = [];
+    for (const summary of listLanguages()) {
+      const d = getLanguageDefaults(summary.code);
+      if (d === null) continue;
+      for (const v of d.regionVariants ?? []) {
+        if (v.defaultScript !== undefined && NON_PRIMARY_SCRIPTS.has(v.defaultScript)) {
+          offenders.push(`${d.code}/${v.region} defaultScript=${v.defaultScript}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 });

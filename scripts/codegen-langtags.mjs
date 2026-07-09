@@ -117,65 +117,101 @@ const languagesByTag = new Map();
 let skipped = 0;
 let aliasCollisions = 0;
 
+// Region-variant construction is three passes over `raw`, in this order:
+// (1) bareTopScript below, (2) groupsByBare (gather tagsets per bare+region),
+// (3) the select loop (regionVariantsByBare) that picks one eligible tagset
+// per group — each pass depends on data the previous pass finished computing,
+// so they cannot be collapsed or reordered.
+//
+// Precompute bare -> top-level defaultScript from each bare subtag's own `full`
+// tag. Needed by the region-variant primary-script rule below (2a), which runs
+// before the main derive loop where defaultScript is otherwise computed.
+const bareTopScript = new Map();
+for (const entry of raw) {
+  if (!entry.tag || entry.tag.startsWith('_') || entry.tag.includes('-') || !entry.full) continue;
+  const { script } = parseFull(entry.full);
+  if (script !== undefined) bareTopScript.set(entry.tag.toLowerCase(), script);
+}
+
+// Scripts that must never win the (defaultScript, autonym) primary slot for a
+// region variant: Braille and shorthand/duplicate encodings, plus the ISO 15924
+// "unwritten / undetermined / inherited / uncoded" placeholders. A co-located
+// tagset in one of these is a derived/auxiliary encoding of the same community,
+// not a second script the community actually writes in — it must not out-rank
+// (or stand in alone for) the community's real script. There is no fallback: a
+// future langtags pin that attaches a localname to one of these tagsets must
+// not let it win the primary slot either.
+const NON_PRIMARY_SCRIPTS = new Set(['Brai', 'Dupl', 'Zxxx', 'Zyyy', 'Zinh', 'Zzzz']);
+function isScriptEligible(t) {
+  return t.script !== undefined && !NON_PRIMARY_SCRIPTS.has(t.script);
+}
+
 // Gather region variants per bare subtag from ALL tagsets (bare + non-bare).
 // A language used across regions has separate tagsets (e.g. ab, ab-Cyrl-TR);
 // distinct regions become regionVariants[]. >1 distinct region ⇒ the region
-// disambiguation step fires (spec 030 US3 / FR-014). Region-specific local names
-// come from each tagset's own localname/localnames. Sorted by region code for
-// deterministic output.
-const regionVariantsByBare = new Map();
+// disambiguation step fires (spec 030 US3 / FR-014).
+//
+// Region, not script, keys the disambiguation question (FR-014: script
+// differences are handled by the separate script step), so we keep ONE variant
+// per region. But when more than one tagset shares a region (a co-located
+// multi-script community, e.g. az/IR's Brai + Arab), the (defaultScript,
+// autonym) pair emitted for that region MUST come from the SAME tagset —
+// picking the script from one member and the autonym from another produces a
+// script/autonym mismatch (e.g. az/IR emitting defaultScript "Brai" paired
+// with the Arabic-script autonym "تۆرکجه"). Group first, then select one
+// script-eligible tagset per (bare, region) group to source the primary triple.
+const groupsByBare = new Map(); // bare -> Map<region, tagset[]>
 for (const entry of raw) {
   if (!entry.tag || entry.tag.startsWith('_') || !entry.region) continue;
   const bare = entry.tag.split('-')[0].toLowerCase();
-  const arr = regionVariantsByBare.get(bare) ?? [];
   const vScript = entry.full ? parseFull(entry.full).script : undefined;
+  // NFC-normalize the tagset's own autonym up front so both the singular
+  // (defaultScript, autonym) primary and the localNames choice list emit the
+  // same canonical form dedupeNames() produces for its array counterpart.
   const entryAutonym = toNFC(entry.localname);
   const entryLocalNames = dedupeNames([entry.localname, ...(Array.isArray(entry.localnames) ? entry.localnames : [])]);
-  // Region, not script, keys the disambiguation question (FR-014: script
-  // differences are handled by the separate script step). So keep ONE variant
-  // per region — but when a second same-region tagset appears (a co-located
-  // multi-script community, e.g. az/IR's Brai + Arab), aggregate its recorded
-  // own-script names into the kept variant's localNames choice list rather than
-  // dropping them (dropping lost real localnames for ~39 subtags).
-  //
-  // The (defaultScript, autonym) PRIMARY pair MUST stay internally consistent —
-  // a script tag paired with a name in a different script is a data defect. So
-  // the pair is adopted from a SINGLE tagset, and we PREFER a tagset that carries
-  // a name: a nameless specialty tagset (e.g. Braille) must not win the primary
-  // slot over a co-located tagset that holds the real orthography. Extra
-  // different-script names still survive as choices in localNames.
-  const existing = arr.find((v) => v.region === entry.region);
-  if (existing !== undefined) {
-    if (existing.regionName === undefined && entry.regionname !== undefined) existing.regionName = entry.regionname;
-    if (existing.autonym === undefined && entryAutonym !== undefined) {
-      // First same-region tagset to supply a name: adopt its script+name pair,
-      // overriding a script-only primary carried from an earlier nameless tagset.
-      // If the naming tagset has no resolvable script of its own, drop the
-      // carried-over script rather than pairing the name with a stale, mismatched
-      // one — the pair degrades to (no script, name), never (wrong script, name).
-      existing.autonym = entryAutonym;
-      if (vScript !== undefined) existing.defaultScript = vScript;
-      else delete existing.defaultScript;
-    } else if (existing.defaultScript === undefined && vScript !== undefined) {
-      existing.defaultScript = vScript;
-    }
-    // Primary autonym first (matching the top-level localNames[0] === autonym
-    // contract), then every other recorded same-region name as a choice.
-    existing.localNames = dedupeNames([existing.autonym, ...existing.localNames, ...entryLocalNames]);
-    regionVariantsByBare.set(bare, arr);
-    continue;
-  }
-  arr.push({
-    region: entry.region,
-    ...(entry.regionname !== undefined ? { regionName: entry.regionname } : {}),
-    ...(vScript !== undefined ? { defaultScript: vScript } : {}),
-    ...(entryAutonym !== undefined ? { autonym: entryAutonym } : {}),
+  const byRegion = groupsByBare.get(bare) ?? new Map();
+  const tagsets = byRegion.get(entry.region) ?? [];
+  tagsets.push({
+    script: vScript,
+    autonym: entryAutonym,
     localNames: entryLocalNames,
+    regionName: entry.regionname,
   });
-  regionVariantsByBare.set(bare, arr);
+  byRegion.set(entry.region, tagsets);
+  groupsByBare.set(bare, byRegion);
 }
-for (const arr of regionVariantsByBare.values()) {
-  arr.sort((a, b) => a.region.localeCompare(b.region));
+
+const regionVariantsByBare = new Map();
+for (const [bare, byRegion] of groupsByBare) {
+  const topScript = bareTopScript.get(bare);
+  const variants = [];
+  for (const [region, tagsets] of byRegion) {
+    const eligible = tagsets.filter(isScriptEligible);
+    // Priority: (a) matches the language's top-level script, (b) carries a
+    // non-empty autonym, (c) first-seen — all restricted to script-eligible
+    // tagsets. If none are eligible, defaultScript stays undefined (2d): never
+    // fabricate a script, never fall through to another region's.
+    const selected =
+      eligible.find((t) => t.script === topScript) ??
+      eligible.find((t) => t.autonym !== undefined) ??
+      eligible[0];
+    // regionName is script-independent (the country label), so it may come
+    // from any tagset in the group, eligible or not — first-seen wins.
+    const regionName = tagsets.find((t) => t.regionName !== undefined)?.regionName;
+    const localNames = selected !== undefined
+      ? dedupeNames([selected.autonym, ...eligible.flatMap((t) => t.localNames)])
+      : [];
+    variants.push({
+      region,
+      ...(regionName !== undefined ? { regionName } : {}),
+      ...(selected?.script !== undefined ? { defaultScript: selected.script } : {}),
+      ...(selected?.autonym !== undefined ? { autonym: selected.autonym } : {}),
+      localNames,
+    });
+  }
+  variants.sort((a, b) => a.region.localeCompare(b.region));
+  regionVariantsByBare.set(bare, variants);
 }
 
 for (const entry of raw) {
@@ -300,8 +336,9 @@ if (aliasCollisions === 0) {
 mkdirSync(OUT_DIR, { recursive: true });
 
 // Canonical key order for a regionVariant — applied before serialization so a
-// variant that was built incrementally (fields backfilled during a same-region
-// merge) emits the same key order as one built in a single pass.
+// variant emits a stable key order regardless of which optional fields the
+// group-then-select pass populated (defaultScript/autonym are absent when no
+// script-eligible tagset was found for the region).
 function canonicalVariant(v) {
   const keys = ['region', 'regionName', 'defaultScript', 'autonym', 'localNames'];
   const obj = {};
