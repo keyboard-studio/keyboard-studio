@@ -66,6 +66,13 @@ const isShiftLayer = (_vkey: string, modifiers: string[]): boolean => {
  * `begin Unicode > use(...)`).  An ANSI-only keyboard has `"begin ANSI"` and
  * no `"begin Unicode"`.
  *
+ * Distinct from pattern-apply/shiftRules.ts's `isMnemonicLayout`: that reads
+ * the `&mnemoniclayout` system store's runtime value to decide whether a NEW
+ * key the studio is about to author is mnemonic or positional; this reads
+ * the begin-encoding shape to decide whether an EXISTING keyboard's IR is
+ * safe to mine for placement data at all. Different signal, different
+ * question — do not merge them.
+ *
  * @see spec.md §7.6 (mnemonic-exclusion filter)
  */
 export function isMnemonicKeyboard(ir: KeyboardIR): boolean {

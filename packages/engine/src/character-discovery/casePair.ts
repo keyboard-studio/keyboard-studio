@@ -23,6 +23,34 @@
  */
 
 /**
+ * Case-map `char` using the locale-sensitive `toLocale{Upper,Lower}Case`
+ * when `bcp47` is supplied, falling back to the plain locale-insensitive
+ * mapping when `bcp47` is malformed. Per ECMA-402, `toLocaleUpperCase` /
+ * `toLocaleLowerCase` throw a `RangeError` for a tag that isn't a
+ * structurally valid BCP47 string (e.g. "not a tag!!") — a caller-supplied
+ * identity `bcp47` should degrade the proposal, not crash the studio.
+ */
+function localeCase(
+  char: string,
+  bcp47: string | undefined,
+  direction: "toUpper" | "toLower",
+): string {
+  if (bcp47 === undefined) {
+    return direction === "toUpper" ? char.toUpperCase() : char.toLowerCase();
+  }
+  try {
+    return direction === "toUpper"
+      ? char.toLocaleUpperCase(bcp47)
+      : char.toLocaleLowerCase(bcp47);
+  } catch (err) {
+    if (err instanceof RangeError) {
+      return direction === "toUpper" ? char.toUpperCase() : char.toLowerCase();
+    }
+    throw err;
+  }
+}
+
+/**
  * Returns the case counterpart of a single character, or null when no
  * confident single-character counterpart exists.
  *
@@ -33,15 +61,18 @@
  *      Devanagari, etc.) returns null.
  *   3. The candidate is computed via `toLocaleUpperCase(bcp47)` /
  *      `toLocaleLowerCase(bcp47)` when `bcp47` is supplied (plain
- *      `toUpperCase()` / `toLowerCase()` otherwise), and must itself be
- *      exactly one code point, different from `char`, and match the expected
- *      general category (`\p{Lu}` for toUpper, `\p{Ll}` for toLower) — this
- *      rejects multi-character case expansions (ß -> SS, ﬃ -> FFI) and
- *      self-mapping letters (e.g. U+0138 LATIN SMALL LETTER KRA).
+ *      `toUpperCase()` / `toLowerCase()` otherwise, and also as a fallback
+ *      when `bcp47` is malformed — see {@link localeCase}), and must itself
+ *      be exactly one code point, different from `char`, and match the
+ *      expected general category (`\p{Lu}` for toUpper, `\p{Ll}` for toLower)
+ *      — this rejects multi-character case expansions (ß -> SS, ﬃ -> FFI)
+ *      and self-mapping letters (e.g. U+0138 LATIN SMALL LETTER KRA).
  *
  * @param char   Exactly one character (code point) to find the counterpart of.
  * @param bcp47  Optional BCP47 tag used for locale-sensitive case mapping
- *               (e.g. "tr" so "i" maps to "İ" rather than "I").
+ *               (e.g. "tr" so "i" maps to "İ" rather than "I"). A malformed
+ *               tag falls back to the locale-insensitive mapping rather than
+ *               throwing — see {@link localeCase}.
  */
 export function caseCounterpart(
   char: string,
@@ -55,10 +86,10 @@ export function caseCounterpart(
 
   if (/^\p{Ll}$/u.test(char)) {
     direction = "toUpper";
-    candidate = bcp47 !== undefined ? char.toLocaleUpperCase(bcp47) : char.toUpperCase();
+    candidate = localeCase(char, bcp47, direction);
   } else if (/^\p{Lu}$/u.test(char)) {
     direction = "toLower";
-    candidate = bcp47 !== undefined ? char.toLocaleLowerCase(bcp47) : char.toLowerCase();
+    candidate = localeCase(char, bcp47, direction);
   } else {
     return null;
   }

@@ -53,4 +53,11 @@ describe("caseCounterpart", () => {
   it("returns null for a multi-code-point input", () => {
     expect(caseCounterpart("ab")).toBeNull();
   });
+
+  it("falls back to the locale-insensitive mapping for a malformed bcp47 tag (no throw)", () => {
+    expect(caseCounterpart("a", "not a tag!!")).toEqual({
+      counterpart: "A",
+      direction: "toUpper",
+    });
+  });
 });
