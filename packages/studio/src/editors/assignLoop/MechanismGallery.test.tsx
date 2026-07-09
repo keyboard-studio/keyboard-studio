@@ -1294,6 +1294,165 @@ describe("MechanismGallery — CAPS-aware base-layer swap (P0)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// P1/P2 regression — companion proposal tracked by assignment identity, not
+// by re-matching target/scope, and invalidated when the base assignment it
+// refers to is removed. Reproduces: swap-assign a caps-handling key (banner
+// up) -> apply a SECOND, unrelated mechanism for the same char -> confirm
+// must replace the ORIGINAL base swap, not the second mechanism, and must
+// not leave two assignments emitting conflicting [CAPS K_Q] lines.
+//
+// NOTE: reads Phase C assignments directly (mirrors the component's own
+// `sessionAssignments`, see the comment at its definition) rather than the
+// store's merged `session.assignments` view — the merge is last-wins per
+// (modality, scope, target) and would collapse the two coexisting θ
+// mechanisms these tests need to distinguish.
+// ---------------------------------------------------------------------------
+
+function getPhaseCPhysicalAssignments(): MechanismAssignment[] {
+  const phaseResults = useWorkingCopyStore.getState().phaseResults;
+  return (phaseResults.find((p) => p.phase === "C")?.assignments ?? []).filter(
+    (a) => a.modality === "physical",
+  );
+}
+
+describe("MechanismGallery — companion proposal identity tracking (P1/P2 regression)", () => {
+  it("confirming the companion after a second mechanism was applied replaces only the original base swap", async () => {
+    instantiateWorkingCopy({ caps: true });
+    seedInventory(["θ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    // 1. Apply the base swap on the CAPS-handling key K_Q — raises the
+    //    companion banner and records the NCAPS/CAPS base pair.
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: "K_Q" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+    expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+
+    // 2. Apply a SECOND, unrelated mechanism for the same char (θ) while the
+    //    banner is still up — an RAlt assignment on a different key.
+    fireEvent.click(screen.getByText(/RAlt \+ key/i));
+    fireEvent.change(screen.getByLabelText(/Base key for RAlt layer/i), {
+      target: { value: "K_W" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+
+    // Banner must still be up — applying an unrelated mechanism does not
+    // touch the pending companion proposal.
+    expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+
+    // 3. Confirm the companion.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Map Θ to the shift layer of K_Q/i }),
+    );
+
+    const assignments = getPhaseCPhysicalAssignments();
+
+    // Exactly two assignments survive: the RAlt mechanism (untouched) and the
+    // combined CAPS-as-case-inverter quad (replacing the original base swap).
+    // If Finding 1 regressed, the RAlt assignment would be the one replaced
+    // (or a third, extra assignment would appear).
+    expect(assignments).toHaveLength(2);
+
+    const raltAssignment = assignments.find(
+      (a) => a.mechanisms[0]?.patternId === "modifier_as_layer_switch",
+    );
+    expect(raltAssignment).toBeDefined();
+    expect(raltAssignment?.target).toBe("θ");
+    expect(raltAssignment?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
+      "[RALT K_W]",
+    );
+
+    const quadAssignment = assignments.find(
+      (a) => a.mechanisms[0]?.patternId === "simple_swap",
+    );
+    expect(quadAssignment).toBeDefined();
+    expect(quadAssignment?.target).toBe("θ");
+    expect(quadAssignment?.mechanisms[0]?.slotValues?.["kmnRules"]).toBe(
+      [
+        "+ [NCAPS K_Q] > U+03B8",
+        "+ [NCAPS SHIFT K_Q] > U+0398",
+        "+ [CAPS K_Q] > U+0398",
+        "+ [CAPS SHIFT K_Q] > U+03B8",
+      ].join("\n"),
+    );
+
+    // No two recorded assignments emit conflicting [CAPS K_Q] lines — exactly
+    // one assignment's kmnRules mentions "[CAPS K_Q]" at all (the quad).
+    const withConflictingCapsLine = assignments.filter((a) =>
+      (a.mechanisms[0]?.slotValues?.["kmnRules"] ?? "").includes("[CAPS K_Q]"),
+    );
+    expect(withConflictingCapsLine).toHaveLength(1);
+  });
+
+  it("removing the base swap while the banner is up dismisses the companion proposal", async () => {
+    instantiateWorkingCopy({ caps: true });
+    seedInventory(["θ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: "K_Q" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+    expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+
+    // Remove the just-applied base swap via its per-method badge.
+    const removeBadge = screen.getByRole("button", { name: /^Remove method/i });
+    fireEvent.click(removeBadge);
+
+    // The companion banner must be gone — a dead proposal is not offered.
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /Map Θ to the shift layer/i }),
+    ).toBeNull();
+
+    expect(getPhaseCPhysicalAssignments()).toHaveLength(0);
+  });
+
+  it("stale-guard: confirming a companion whose base assignment vanished via an unaudited mutation path records nothing", async () => {
+    instantiateWorkingCopy({ caps: true });
+    seedInventory(["θ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: "K_Q" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));
+    expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+
+    // Simulate a hypothetical future mutation path that touches
+    // sessionAssignments WITHOUT going through handleRemoveCovered /
+    // handleRemoveMechanism (which proactively dismiss the banner) — direct
+    // store mutation bypassing the component's own handlers entirely. The
+    // component's pendingCompanion state is untouched by this, so the banner
+    // remains visible in the DOM, exercising the confirm-time staleness
+    // re-check (handleCompanionConfirm) rather than the removal-time
+    // dismissal.
+    await act(async () => {
+      useWorkingCopyStore.getState().recordAssignments([]);
+    });
+    expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Map Θ to the shift layer of K_Q/i }),
+    );
+
+    // Nothing was recorded — the stale proposal was dismissed, not applied.
+    expect(getPhaseCPhysicalAssignments()).toHaveLength(0);
+    expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // P1.5 — bcp47 plumbing for the case-pair companion proposal
 // ---------------------------------------------------------------------------
 

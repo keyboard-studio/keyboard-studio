@@ -794,11 +794,20 @@ export function MechanismGallery({
   // silently). Set right after a base-layer S-01 apply when the applied
   // character has a known case counterpart; cleared on confirm/decline or
   // when currentChar changes.
+  // `baseAssignment` captures the identity (object reference) of the
+  // assignment created at apply time, NOT its target/index — the gallery
+  // allows multiple mechanisms per character, and a subsequent apply for the
+  // same character appends a new, unrelated assignment. Confirming the
+  // companion must locate and replace exactly the assignment this proposal
+  // was raised for; a target/index scan would silently grab whichever
+  // assignment for that char happens to match, which is the P1 defect this
+  // guards against.
   const [pendingCompanion, setPendingCompanion] = useState<{
     originalChar: string;
     counterpart: string;
     vkey: string;
     capsHandling: boolean;
+    baseAssignment: MechanismAssignment;
   } | null>(null);
 
   // Working IR used to plan shift-layer assignments — prefer the carve
@@ -1037,6 +1046,7 @@ export function MechanismGallery({
             counterpart: counterpart.counterpart,
             vkey: selectedSwapKey,
             capsHandling,
+            baseAssignment: assignment,
           });
         }
       }
@@ -1090,6 +1100,18 @@ export function MechanismGallery({
   const handleCompanionConfirm = useCallback(() => {
     if (pendingCompanion === null) return;
 
+    // Stale-proposal guard: locate the exact assignment object this proposal
+    // was raised for, by reference — not by re-matching target/scope, which
+    // would happily grab a different, unrelated assignment for the same
+    // character (P1: multiple mechanisms per character). If it is no longer
+    // present in sessionAssignments (removed, or somehow replaced by another
+    // path), the proposal is stale: dismiss the banner and record nothing.
+    const baseAssignmentIdx = sessionAssignments.indexOf(pendingCompanion.baseAssignment);
+    if (baseAssignmentIdx === -1) {
+      setPendingCompanion(null);
+      return;
+    }
+
     if (pendingCompanion.capsHandling) {
       // CAPS-handling key: the base assignment just recorded (for
       // originalChar) already carries an explicit NCAPS/CAPS pair
@@ -1099,14 +1121,6 @@ export function MechanismGallery({
       // silently wins (Layer-A Check #10). Instead, REPLACE the base
       // assignment with a single combined assignment carrying the full
       // CAPS-as-case-inverter quad (buildCasePairRuleLines).
-      let baseAssignmentIdx = -1;
-      for (let i = sessionAssignments.length - 1; i >= 0; i--) {
-        const a = sessionAssignments[i];
-        if (a?.scope === "individual" && a.target === pendingCompanion.originalChar) {
-          baseAssignmentIdx = i;
-          break;
-        }
-      }
       const kmnRules = buildCasePairRuleLines(
         pendingCompanion.vkey,
         pendingCompanion.originalChar,
@@ -1126,10 +1140,9 @@ export function MechanismGallery({
         ],
         source: "user",
       };
-      const next =
-        baseAssignmentIdx === -1
-          ? [...sessionAssignments, combinedAssignment]
-          : sessionAssignments.map((a, i) => (i === baseAssignmentIdx ? combinedAssignment : a));
+      const next = sessionAssignments.map((a, i) =>
+        i === baseAssignmentIdx ? combinedAssignment : a,
+      );
       recordAssignments(next);
     } else {
       // No CAPS handling on the key: base (`[K_X]`) and shift (`[SHIFT K_X]`)
@@ -1230,15 +1243,29 @@ export function MechanismGallery({
         (a) => !(a.scope === "individual" && a.target === char),
       );
       recordAssignments(next);
+      // Finding 2 (P2): a pending case-pair companion refers to a specific
+      // base assignment by identity. If that assignment no longer survives
+      // the removal, the proposal is dead — dismiss it proactively rather
+      // than leaving a stale-but-visible banner (propose-then-confirm,
+      // spec v1.3.1 §3c). The staleness re-check in handleCompanionConfirm
+      // is a backstop for paths this dismissal doesn't cover.
+      if (pendingCompanion !== null && !next.includes(pendingCompanion.baseAssignment)) {
+        setPendingCompanion(null);
+      }
     },
-    [sessionAssignments, recordAssignments],
+    [sessionAssignments, recordAssignments, pendingCompanion],
   );
 
   const handleRemoveMechanism = useCallback(
     (assignment: MechanismAssignment) => {
-      recordAssignments(sessionAssignments.filter((a) => a !== assignment));
+      const next = sessionAssignments.filter((a) => a !== assignment);
+      recordAssignments(next);
+      // See handleRemoveCovered above — same proactive-dismissal rationale.
+      if (pendingCompanion !== null && !next.includes(pendingCompanion.baseAssignment)) {
+        setPendingCompanion(null);
+      }
     },
-    [sessionAssignments, recordAssignments],
+    [sessionAssignments, recordAssignments, pendingCompanion],
   );
 
   const handleKeyTap = useCallback(
