@@ -3,6 +3,7 @@ import {
   CODE_MAP,
   translatePassthrough,
   translateWasmFinding,
+  isOracleInapplicable,
 } from "./codeMap.js";
 
 describe("CODE_MAP", () => {
@@ -119,5 +120,37 @@ describe("translateWasmFinding", () => {
     expect(finding.layer).toBe("A");
     expect(finding.location).toEqual({ file: "file.kmn", line: 2 });
     expect(group).toBe("passthrough");
+  });
+});
+
+describe("isOracleInapplicable", () => {
+  it("matches ERROR_CannotReadBitmapFile by its full numeric wire code", () => {
+    // Error(0x500000) | KmnCompiler(0x2000) | 0x031 = 0x502031 = 5251121 —
+    // the value observed from kmc-kmn's reportMessage.
+    expect(isOracleInapplicable("5251121")).toBe(true);
+  });
+
+  it("matches regardless of the severity bits (upstream re-tag safe)", () => {
+    // Same namespace|base with Warn(0x400000) instead of Error(0x500000).
+    expect(isOracleInapplicable(String(0x402031))).toBe(true);
+  });
+
+  it("matches the symbolic alias", () => {
+    expect(isOracleInapplicable("ERROR_CannotReadBitmapFile")).toBe(true);
+  });
+
+  it("does not match neighbouring codes or other symbols", () => {
+    expect(isOracleInapplicable(String(0x502032))).toBe(false);
+    expect(isOracleInapplicable("ERROR_InvalidIf")).toBe(false);
+  });
+
+  it("does not match non-numeric junk", () => {
+    expect(isOracleInapplicable("UNKNOWN")).toBe(false);
+    expect(isOracleInapplicable("")).toBe(false);
+  });
+
+  it("short-circuits blank/whitespace input (Number('  ') coerces to 0)", () => {
+    expect(isOracleInapplicable("   ")).toBe(false);
+    expect(isOracleInapplicable("\t")).toBe(false);
   });
 });

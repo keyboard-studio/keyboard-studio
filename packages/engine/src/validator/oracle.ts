@@ -25,7 +25,7 @@ import {
   type GroupName,
   type LintOptions,
 } from "./types.js";
-import { translateWasmFinding } from "./codeMap.js";
+import { translateWasmFinding, isOracleInapplicable } from "./codeMap.js";
 import {
   loadWasmOracle as defaultLoadWasmOracle,
   type WasmOracleHandle,
@@ -169,6 +169,11 @@ function makeOracle(load: LoadHandle): OracleInstance {
         const requestedSet = new Set(requested);
         const out: LintFinding[] = [];
         for (const raw of raws) {
+          // File-existence diagnostics are structurally meaningless here: the
+          // oracle lints a lone in-memory source, so kmcmplib can never open a
+          // referenced packaging asset (&BITMAP etc.). Drop them — asset
+          // presence is validated on the artifact/output path instead.
+          if (isOracleInapplicable(raw.kmcmpCode)) continue;
           const { finding, group } = translateWasmFinding(raw, "");
           if (requestedSet.has(group)) {
             out.push(finding);

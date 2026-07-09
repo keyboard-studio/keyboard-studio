@@ -81,10 +81,29 @@ describe("surveySessionStore", () => {
     expect(s.activeStepId).toBe("identity");
     expect(s.history).toEqual([]);
     expect(s.identityResult).toBeNull();
+    expect(s.identityPhaseResult).toBeNull();
     expect(s.surveyContext).toEqual({});
     expect(s.selectedTrack).toBeNull();
     expect(s.scaffoldSpec).toBeNull();
     expect(s.localBase).toBeNull();
+  });
+
+  // identityPhaseResult round-trip — the history-pop resume payload
+  it("identityPhaseResult round-trips through set and is cleared by reset()", () => {
+    const phaseResult = {
+      phase: "A" as const,
+      answers: [
+        { questionId: "il_language_autonym", answerType: "text" as const, value: "Hausa" },
+        { questionId: "il_target_script", answerType: "select" as const, value: "Latn" },
+      ],
+    };
+
+    expect(getStore().identityPhaseResult).toBeNull();
+    getStore().setIdentityPhaseResult(phaseResult);
+    expect(getStore().identityPhaseResult).toEqual(phaseResult);
+
+    getStore().reset();
+    expect(getStore().identityPhaseResult).toBeNull();
   });
 
   // (d) double-advance idempotence — no stack corruption

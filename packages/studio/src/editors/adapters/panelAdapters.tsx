@@ -78,11 +78,16 @@ export function IdentityLiteAdapter({ onComplete }: EditorStepProps) {
   // golden-walk ordering is setIdentityResult → setSurveyContext → advance).
   const setIdentityResult = useSurveySessionStore((s) => s.setIdentityResult);
   const setSurveyContext = useSurveySessionStore((s) => s.setSurveyContext);
+  const setIdentityPhaseResult = useSurveySessionStore((s) => s.setIdentityPhaseResult);
+  // Prior completed run, if any — lets a history pop back onto this step resume
+  // the flow at its last question instead of replaying from question 1.
+  const identityPhaseResult = useSurveySessionStore((s) => s.identityPhaseResult);
 
   function handleComplete(result: SurveyPhaseResult, identity: IdentityLiteResult) {
     // R7: identity-specific writes fire here, before onComplete → host → advance.
     setIdentityResult(identity);
     setSurveyContext(contextFromIdentity(identity));
+    setIdentityPhaseResult(result);
     // Forward the phase result; host guards on SurveyPhaseResult shape and calls
     // recordPhase + routeAnswersThroughMutate.
     onComplete(result);
@@ -93,6 +98,7 @@ export function IdentityLiteAdapter({ onComplete }: EditorStepProps) {
       context={surveyContext}
       onComplete={handleComplete}
       findingsByQuestionId={findingsByQuestionId}
+      {...(identityPhaseResult !== null ? { resume: identityPhaseResult } : {})}
     />
   );
 }

@@ -4,6 +4,7 @@
 // CJK/Ethiopic guard lives in OSKFrame, not here.
 
 import { useEffect, useState, useDeferredValue, useMemo, useRef, useId } from "react";
+import type { CSSProperties } from "react";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { ImportStatus } from "@keyboard-studio/contracts";
 import { getBaseBrowserService } from "../lib/services.ts";
@@ -145,13 +146,50 @@ export interface BaseKeyboardPickerProps {
   value: BaseKeyboard | null;
   onChange: (kb: BaseKeyboard | null) => void;
   target?: SuggestTarget;
+  /** Visible label above the input. Defaults to "Base keyboard". */
+  label?: string;
+  /**
+   * When provided, search is restricted to keyboards whose id is in this set
+   * (e.g. the suggested bases for the author's target). Omit (or pass
+   * undefined) to search the full catalog.
+   */
+  scopeIds?: ReadonlySet<string> | undefined;
+  /**
+   * Escape hatch out of a scoped search. When set together with `scopeIds`,
+   * the zero-match state offers a "Search all keyboards" action (also
+   * triggered by Enter on an empty result list) that calls this instead of
+   * dead-ending the author.
+   */
+  onSearchAll?: () => void;
 }
 
 // Render/screen-reader-noise cap — not a hard data limit; the full ranked list is
 // retained in state and filtering continues as the user types.
 const MAX_VISIBLE = 100;
 
-export function BaseKeyboardPicker({ value, onChange, target }: BaseKeyboardPickerProps) {
+// Shared visual shell for the combobox popup — used by both the option
+// listbox and the zero-match status panel so they occupy the same space.
+const POPUP_STYLE: CSSProperties = {
+  position: "absolute",
+  top: "100%",
+  left: 0,
+  right: 0,
+  zIndex: 50,
+  margin: "2px 0 0",
+  background: "var(--app-surface)",
+  border: "1px solid var(--app-border-strong)",
+  borderRadius: 8,
+  boxShadow: "0 8px 24px color-mix(in srgb, var(--app-bg) 22%, transparent)",
+};
+
+export function BaseKeyboardPicker({
+  value,
+  onChange,
+  target,
+  label = "Base keyboard",
+  scopeIds,
+  onSearchAll,
+}: BaseKeyboardPickerProps) {
   const [keyboards, setKeyboards] = useState<BaseKeyboard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -184,14 +222,21 @@ export function BaseKeyboardPicker({ value, onChange, target }: BaseKeyboardPick
     [targetScript, targetBcp47],
   );
 
+  // Optional scope restriction (e.g. "suggested bases only") applied before
+  // ranking; the full catalog stays loaded so widening the scope is instant.
+  const scopedKeyboards = useMemo(
+    () => (scopeIds === undefined ? keyboards : keyboards.filter((k) => scopeIds.has(k.id))),
+    [keyboards, scopeIds],
+  );
+
   const languagesById = useMemo(
-    () => Object.fromEntries(keyboards.map((k) => [k.id, k.languages ?? []] as const)),
-    [keyboards],
+    () => Object.fromEntries(scopedKeyboards.map((k) => [k.id, k.languages ?? []] as const)),
+    [scopedKeyboards],
   );
 
   const ranked = useMemo(
-    () => rankBases(keyboards, deferredQuery, stableTarget, languagesById),
-    [keyboards, deferredQuery, stableTarget, languagesById],
+    () => rankBases(scopedKeyboards, deferredQuery, stableTarget, languagesById),
+    [scopedKeyboards, deferredQuery, stableTarget, languagesById],
   );
 
   const visibleRanked = ranked.slice(0, MAX_VISIBLE);
@@ -331,12 +376,16 @@ export function BaseKeyboardPicker({ value, onChange, target }: BaseKeyboardPick
         break;
       }
       case "Enter": {
-        if (open && activeIndex >= 0) {
-          const item = visibleRanked[activeIndex];
-          if (item !== undefined) {
-            e.preventDefault();
-            commit(item.base);
-          }
+        if (!open) break;
+        const item = activeIndex >= 0 ? visibleRanked[activeIndex] : undefined;
+        if (item !== undefined) {
+          e.preventDefault();
+          commit(item.base);
+        } else if (len === 0 && scopeIds !== undefined && onSearchAll !== undefined) {
+          // Scoped search came up empty — Enter widens to the full catalog
+          // (same action as the "Search all keyboards" button in the popup).
+          e.preventDefault();
+          onSearchAll();
         }
         break;
       }
@@ -393,7 +442,7 @@ export function BaseKeyboardPicker({ value, onChange, target }: BaseKeyboardPick
           fontFamily: "var(--app-font)",
         }}
       >
-        Base keyboard
+        {label}
       </label>
 
       {/* Loading state */}
@@ -490,43 +539,63 @@ export function BaseKeyboardPicker({ value, onChange, target }: BaseKeyboardPick
             }}
           />
 
-          {/* Listbox popup */}
-          {open && (
+          {/* Zero-match popup — a plain status panel, NOT a listbox: an
+              interactive button may not live inside role="listbox" (whose
+              children must be options), so the empty state renders as its own
+              popup element. It takes over the listboxId so the combobox's
+              aria-controls always points at the visible popup. */}
+          {open && ranked.length === 0 && (
+            <div
+              id={listboxId}
+              role="status"
+              style={{
+                ...POPUP_STYLE,
+                padding: "10px 12px",
+                fontSize: 13,
+                color: "var(--app-text-muted)",
+                fontFamily: "var(--app-font)",
+              }}
+            >
+              No keyboards match &ldquo;{query}&rdquo;.
+              {scopeIds !== undefined && onSearchAll !== undefined && (
+                <button
+                  type="button"
+                  // onMouseDown prevents blur-close before click fires.
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={onSearchAll}
+                  style={{
+                    display: "block",
+                    marginTop: 6,
+                    padding: "4px 10px",
+                    background: "transparent",
+                    border: "1px solid var(--app-border-strong)",
+                    borderRadius: 6,
+                    color: "var(--app-accent)",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    fontFamily: "var(--app-font)",
+                  }}
+                >
+                  Search all keyboards instead (or press Enter)
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Listbox popup — options only (role="option" children) */}
+          {open && ranked.length > 0 && (
             <ul
               id={listboxId}
               role="listbox"
               aria-label="Base keyboard options"
               style={{
-                position: "absolute",
-                top: "100%",
-                left: 0,
-                right: 0,
-                zIndex: 50,
-                margin: "2px 0 0",
+                ...POPUP_STYLE,
                 padding: 0,
                 listStyle: "none",
-                background: "var(--app-surface)",
-                border: "1px solid var(--app-border-strong)",
-                borderRadius: 8,
-                boxShadow: "0 8px 24px color-mix(in srgb, var(--app-bg) 22%, transparent)",
                 maxHeight: 260,
                 overflowY: "auto",
               }}
             >
-              {ranked.length === 0 && (
-                <li
-                  role="status"
-                  style={{
-                    padding: "10px 12px",
-                    fontSize: 13,
-                    color: "var(--app-text-muted)",
-                    fontFamily: "var(--app-font)",
-                  }}
-                >
-                  No keyboards match &ldquo;{query}&rdquo;.
-                </li>
-              )}
-
               {(optionRefs.current = [], visibleRanked).map((rb: RankedBase, i: number) => {
                 const kb = rb.base;
                 const isActive = i === safeActiveIndex;

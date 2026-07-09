@@ -276,6 +276,15 @@ export interface SurveyRunnerProps {
    * synchronously from the value.
    */
   getNextOverride?: (questionId: string, value: string | string[] | undefined) => string | undefined;
+  /**
+   * Answers from a previously completed run of this flow, keyed by questionId.
+   * When provided, the runner rebuilds the walked stack by replaying the flow
+   * with these answers and mounts on the LAST reachable question (values
+   * restored) instead of question 1. Used when back-navigation re-enters a
+   * step whose flow already completed — Back then walks the replayed stack
+   * question by question, exactly as if the author had just finished it.
+   */
+  resumeAnswers?: Readonly<Record<string, string | string[]>>;
 }
 
 export function SurveyRunner({
@@ -289,6 +298,7 @@ export function SurveyRunner({
   getSeedProvenance,
   getSeedOptions,
   getNextOverride,
+  resumeAnswers,
 }: SurveyRunnerProps) {
   // Single gate for all debug-mode behaviour — evaluated once per render so all
   // branches are driven by the same boolean, not scattered checks.
@@ -332,9 +342,15 @@ export function SurveyRunner({
     if (callerFirst !== undefined) return callerFirst;
     return debugEnabled ? debugPinsStore.getPinned(firstId) : undefined;
   })();
-  const [stack, setStack] = useState<AnswerStackEntry[]>([
-    { questionId: firstId ?? "", value: firstSeed },
-  ]);
+  const [stack, setStack] = useState<AnswerStackEntry[]>(() => {
+    // Resume: rebuild the walked stack from a prior completed run so the
+    // author lands on the flow's last question, not question 1.
+    if (resumeAnswers !== undefined) {
+      const resumed = buildResumeStack(firstId, resumeAnswers, context, index);
+      if (resumed !== null) return resumed;
+    }
+    return [{ questionId: firstId ?? "", value: firstSeed }];
+  });
   const [currentValue, setCurrentValue] = useState<string | string[] | undefined>(undefined);
 
   const progressDescId = useId();
@@ -383,9 +399,12 @@ export function SurveyRunner({
     if (currentQ === undefined) return;
 
     if (nextIdForCurrent === null) {
-      // End of flow — build the result
+      // End of flow — build the result. The current (last) entry is excluded
+      // from the loop: its answer is appended from `value` below. Including it
+      // here too would duplicate the final answer whenever the last entry
+      // already carries a value (a seeded or resumed final question).
       const answers: SurveyAnswer[] = [];
-      for (const entry of stack) {
+      for (const entry of stack.slice(0, -1)) {
         if (entry.value === undefined) continue;
         const q = index.get(entry.questionId);
         if (q === undefined) continue;
@@ -632,5 +651,66 @@ function findFirstRenderable(
     if (q.engine_resolved !== true) return q.id;
   }
   return null;
+}
+
+/**
+ * Resume-time dynamic-branch resolver. buildResumeStack runs synchronously in
+ * SurveyRunner's useState initializer — before any effect fires — so an async
+ * getNextOverride authority (e.g. IdentityLite's langtags lookup, which routes
+ * il_language_code → il_language_region only for region-ambiguous languages)
+ * cannot resolve at replay time. Re-deriving the branch there would
+ * deterministically drop the region step from a completed run.
+ *
+ * Instead, trust the recorded answers: a conditional edge whose target question
+ * carries a recorded answer is one the original walk actually took, so follow
+ * it. Non-conditional (default) edges are left to the static resolveNext path
+ * inside advanceThrough. Returns undefined when no dynamic branch applies.
+ */
+function resumeBranchOverride(
+  questionId: string,
+  answers: Readonly<Record<string, string | string[]>>,
+  index: Map<string, FlowQuestion>,
+): string | undefined {
+  const { next } = index.get(questionId) ?? {};
+  if (next === undefined || next === null || typeof next === "string") return undefined;
+  for (const rule of next as FlowGotoRule[]) {
+    if (rule.condition !== undefined && rule.goto !== null && answers[rule.goto] !== undefined) {
+      return rule.goto;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Rebuild the walked answer stack by replaying the flow with previously
+ * committed answers. Walks from the first renderable question, restoring each
+ * question's recorded answer and following the same goto routing the original
+ * walk took. Stops ON the last reachable question — end of flow, or the first
+ * required question with no recorded answer (as far as the original walk can
+ * be faithfully replayed). Returns null when there is nothing to replay.
+ */
+export function buildResumeStack(
+  firstId: string | null,
+  answers: Readonly<Record<string, string | string[]>>,
+  ctx: SurveyContext,
+  index: Map<string, FlowQuestion>,
+): AnswerStackEntry[] | null {
+  if (firstId === null) return null;
+  const stack: AnswerStackEntry[] = [];
+  const visited = new Set<string>();
+  let qId: string | null = firstId;
+  while (qId !== null && !visited.has(qId)) {
+    visited.add(qId);
+    const q = index.get(qId);
+    if (q === undefined) break;
+    const value = answers[qId];
+    stack.push({ questionId: qId, value });
+    if (q.type !== "notice" && q.required === true && !hasValue(value)) break;
+    // Dynamic branches (e.g. spec 030 US3 region step) are reconstructed from
+    // the recorded answers, not re-derived via the async getNextOverride, which
+    // is unavailable in this synchronous initializer.
+    qId = advanceThrough(q, value, ctx, index, (id) => resumeBranchOverride(id, answers, index));
+  }
+  return stack.length > 0 ? stack : null;
 }
 
