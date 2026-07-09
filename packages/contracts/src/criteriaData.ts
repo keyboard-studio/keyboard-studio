@@ -7,7 +7,7 @@ import { CriterionSchema } from "./schemas";
 import data from "../data/criteria.json" with { type: "json" };
 
 /**
- * The full triaged Criterion catalog — 148 entries derived from the
+ * The full triaged Criterion catalog — 149 entries derived from the
  * `criteria.md` review-process source per the §11 four-band model
  * (Decision 4, §14); includes the 7.7a split row from the flagged-criteria re-review;
  * section 19 (import output, 2 entries: 19.1 PR-body attribution block,

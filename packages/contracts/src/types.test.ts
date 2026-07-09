@@ -478,12 +478,12 @@ describe("criteria.json schema conformance", () => {
     Object.keys(counts).forEach((k) => {
       expect(validBands).toContain(k);
     });
-    // 133 original repo-hygiene criteria + 12 section-18 DISCUS design
+    // 133 original repo-hygiene criteria + 13 section-18 DISCUS design
     // heuristics + 1 split row (7.7a) from the flagged-criteria re-review
-    // + 2 section-19 import-output criteria = 148 total.
-    expect(records.length).toBe(148);
+    // + 2 section-19 import-output criteria = 149 total.
+    expect(records.length).toBe(149);
     expect(counts["scaffolder-bake"]).toBe(40);
-    expect(counts["layer-c-enforce"]).toBe(66);
+    expect(counts["layer-c-enforce"]).toBe(67);
     expect(counts["yellow-survey"]).toBe(32);
     expect(counts["red-checklist"]).toBe(10);
   });
@@ -500,14 +500,14 @@ describe("criteria.json schema conformance", () => {
     const section18 = records.filter((c) =>
       c.section.startsWith("18.")
     );
-    expect(section18.length).toBe(12);
+    expect(section18.length).toBe(13);
     section18.forEach((c) => {
       expect(validPrinciples, `${c.id}.principle`).toContain(c.principle);
     });
-    // The seven auto-checkable heuristics are layer-c-enforce.
+    // The eight auto-checkable heuristics are layer-c-enforce.
     expect(
       section18.filter((c) => c.band === "layer-c-enforce").length
-    ).toBe(7);
+    ).toBe(8);
   });
 
   it("every principle-tagged record uses a valid DiscusPrinciple value", () => {
@@ -597,7 +597,7 @@ describe("criteria.json schema conformance", () => {
 describe("criteriaData loader (#116)", () => {
   it("ALL_CRITERIA is a non-empty readonly Criterion[]", () => {
     expect(Array.isArray(ALL_CRITERIA)).toBe(true);
-    expect(ALL_CRITERIA.length).toBe(148);
+    expect(ALL_CRITERIA.length).toBe(149);
   });
 
   it("CRITERIA_BY_BAND partitions ALL_CRITERIA across the four bands", () => {
