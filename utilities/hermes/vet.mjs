@@ -54,6 +54,16 @@ const MODELS = [
 ];
 
 // ---------------------------------------------------------------------------
+// Self-consistency sample count for Scorecard A
+// ---------------------------------------------------------------------------
+//
+// Each per-file hermes-run call in runScorecardA passes --samples SAMPLES so the
+// simplifier runs SAMPLES independent reason->structure passes and unions the results.
+// Higher SAMPLES recovers misses (high-variance free-form step) at the cost of wall
+// time. Set to 1 to disable multi-sample (falls back to single-pass behaviour).
+const SAMPLES = 5;
+
+// ---------------------------------------------------------------------------
 // Shard file lists
 // ---------------------------------------------------------------------------
 
@@ -94,13 +104,15 @@ const GOLD_LINE_TOLERANCE = 5; // ±5 lines for a hit
 /**
  * Parse a "start-end" or "start" lines string into { start, end } integers.
  * Returns { start: 0, end: 0 } if unparseable.
+ * Handles comma-separated multi-ranges like "179, 243" by taking the full span.
  */
 function parseLineRange(linesStr) {
-  const m = String(linesStr ?? '').match(/^(\d+)(?:-(\d+))?$/);
-  if (!m) return { start: 0, end: 0 };
-  const start = parseInt(m[1], 10);
-  const end = m[2] ? parseInt(m[2], 10) : start;
-  return { start, end };
+  const s = String(linesStr ?? '');
+  // Multi-range: "179, 243" — take full span of all mentioned numbers
+  const allNums = s.match(/\d+/g);
+  if (!allNums || allNums.length === 0) return { start: 0, end: 0 };
+  const nums = allNums.map((n) => parseInt(n, 10));
+  return { start: Math.min(...nums), end: Math.max(...nums) };
 }
 
 /**
@@ -129,51 +141,203 @@ function loadGold(filePath) {
 const GOLD_S10_PATH = join(__dirname, 'eval', 'gold-s10.json');
 const GOLD_S07_PATH = join(__dirname, 'eval', 'gold-s07.json');
 
+// Common English and code stopwords to exclude from key-term extraction.
+// These appear frequently but carry no discriminating signal for issue identity.
+const STOPWORDS = new Set([
+  'the', 'this', 'that', 'than', 'then', 'with', 'from', 'into', 'onto',
+  'have', 'has', 'had', 'are', 'were', 'was', 'will', 'would', 'could',
+  'should', 'does', 'done', 'been', 'being',
+  'function', 'const', 'return', 'value', 'type', 'call', 'calls',
+  'each', 'every', 'both', 'some', 'same', 'also', 'only', 'just',
+  'when', 'where', 'which', 'while', 'there', 'their', 'they',
+  'null', 'true', 'false', 'void', 'undefined', 'object', 'array',
+  'string', 'number', 'boolean', 'line', 'lines', 'file', 'files',
+  'already', 'inside', 'outside', 'before', 'after', 'instead',
+  'scope', 'since', 'once', 'using', 'used', 'uses', 'use',
+  'here', 'thus', 'note', 'case', 'block', 'node', 'name', 'item',
+  'loop', 'code', 'text', 'list', 'flag', 'data', 'size', 'move',
+  'push', 'call', 'emit', 'read', 'write', 'parse', 'build',
+]);
+
 /**
- * Score a set of local findings against gold findings for a given shard.
+ * Extract key terms from a gold finding's text fields (summary + suggestion).
  *
- * A gold finding G is HIT if some local finding L satisfies:
- *   L.file === G.file  AND  rangesOverlap(L.lines, G.lines)
+ * Extracts two categories:
+ *   1. Backtick-quoted tokens: `identifierName`
+ *   2. Identifier-like tokens: camelCase, PascalCase, snake_case, or ALL_CAPS
+ *      of length >= 4, after stripping punctuation.
  *
- * Returns:
- *   hits         — count of gold findings that matched at least one local finding
- *   totalGold    — total gold findings in this shard
- *   weightedRecall — sum(G.confidence over hits) / sum(G.confidence over all gold)
- *   extras       — local findings that hit NO gold finding (noise/bonus proxy)
- *   hitGoldIds   — Set of gold ids that were hit
+ * All terms are lowercased for case-insensitive comparison.
+ * Stopwords are removed.
+ *
+ * Returns { terms: Set<string>, isFallback: boolean }
+ * isFallback=true when no identifier terms were extracted (gold has only prose).
  */
-function scoreGoldRecall(localFindings, goldFindings) {
-  const totalGold = goldFindings.length;
-  if (totalGold === 0) return { hits: 0, totalGold: 0, weightedRecall: 0, extras: localFindings.length, hitGoldIds: new Set() };
+function extractGoldKeyTerms(goldFinding) {
+  const text = `${goldFinding.summary ?? ''} ${goldFinding.suggestion ?? ''}`;
+  const terms = new Set();
 
-  const hitGoldIds = new Set();
+  // 1. Backtick-quoted tokens (highest priority)
+  for (const m of text.matchAll(/`([^`]+)`/g)) {
+    const tok = m[1].trim();
+    if (tok.length >= 2) terms.add(tok.toLowerCase());
+  }
 
-  for (const g of goldFindings) {
-    for (const l of localFindings) {
-      if (l.file === g.file && rangesOverlap(l.lines, g.lines)) {
-        hitGoldIds.add(g.id);
-        break; // one local hit per gold finding is enough
-      }
+  // 2. Identifier-like tokens: camelCase, PascalCase, snake_case, ALL_CAPS (len >= 4)
+  // Strip common punctuation first, then split on whitespace
+  const stripped = text.replace(/[`"'()[\]{},;:.<>!=+\-*/\\|@#$%^&?]/g, ' ');
+  for (const tok of stripped.split(/\s+/)) {
+    if (tok.length < 4) continue;
+    // Must contain at least one uppercase letter, underscore, or be all-caps
+    // to qualify as an identifier-like token (filters pure prose words)
+    const isIdentifierLike = /[A-Z_]/.test(tok) && /[a-zA-Z]/.test(tok);
+    if (!isIdentifierLike) continue;
+    const lower = tok.toLowerCase();
+    if (!STOPWORDS.has(lower)) terms.add(lower);
+  }
+
+  const isFallback = terms.size === 0;
+
+  // Fallback: extract distinctive non-stopword tokens of length >= 5 from raw text
+  if (isFallback) {
+    const words = text.toLowerCase().split(/\W+/);
+    for (const w of words) {
+      if (w.length >= 5 && !STOPWORDS.has(w)) terms.add(w);
     }
   }
 
-  const hits = hitGoldIds.size;
+  return { terms, isFallback };
+}
 
-  // Confidence-weighted recall: sum(G.confidence for hits) / sum(G.confidence all)
+/**
+ * Returns true if at least one gold key term appears in the local finding text,
+ * using a word-boundary-ish match (case-insensitive, not embedded in another word).
+ */
+function localFindingContainsTerm(localFinding, terms) {
+  const localText = `${localFinding.summary ?? ''} ${localFinding.suggestion ?? ''} ${localFinding.reuse_target ?? ''}`.toLowerCase();
+  for (const term of terms) {
+    // Word-ish boundary: term must not be immediately preceded/followed by word chars
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`(?<![a-z0-9_])${escaped}(?![a-z0-9_])`);
+    if (re.test(localText)) return true;
+  }
+  return false;
+}
+
+/**
+ * Score a set of local findings against gold findings for a given shard.
+ *
+ * A gold finding G is HIT (strict) if some local finding L satisfies:
+ *   L.file === G.file  AND  rangesOverlap(L.lines, G.lines)  AND  sharedKeyTerm(L, G)
+ *
+ * A gold finding G is HIT (loose) if some local finding L satisfies:
+ *   L.file === G.file  AND  rangesOverlap(L.lines, G.lines)
+ *   (the old behavior)
+ *
+ * Returns:
+ *   hits              — strict hits (line-overlap + key-term gate)
+ *   hitsLoose         — loose hits (line-overlap only, old metric)
+ *   totalGold         — total gold findings in this shard
+ *   weightedRecall    — confidence-weighted strict recall (used as primary metric)
+ *   weightedRecallLoose — confidence-weighted loose recall (for comparison)
+ *   extras            — local findings that hit NO gold finding (strict, noise/bonus proxy)
+ *   hitGoldIds        — Set of gold ids that were strictly hit
+ *   hitGoldIdsLoose   — Set of gold ids that were loosely hit
+ *   matchDetail       — per-gold-finding match record for gold-match-detail.json
+ */
+function scoreGoldRecall(localFindings, goldFindings) {
+  const totalGold = goldFindings.length;
+  if (totalGold === 0) {
+    return {
+      hits: 0, hitsLoose: 0, totalGold: 0,
+      weightedRecall: 0, weightedRecallLoose: 0,
+      extras: localFindings.length,
+      hitGoldIds: new Set(), hitGoldIdsLoose: new Set(),
+      matchDetail: [],
+    };
+  }
+
+  const hitGoldIds = new Set();      // strict
+  const hitGoldIdsLoose = new Set(); // loose (line-only)
+  const matchDetail = [];
+
+  for (const g of goldFindings) {
+    const { terms, isFallback } = extractGoldKeyTerms(g);
+    let strictHitBy = null;
+    let looseHitBy = null;
+
+    for (const l of localFindings) {
+      if (l.file !== g.file) continue;
+      if (!rangesOverlap(l.lines, g.lines)) continue;
+
+      // Loose: line-overlap only (old behavior)
+      if (looseHitBy === null) {
+        looseHitBy = l;
+        hitGoldIdsLoose.add(g.id);
+      }
+
+      // Strict: additionally requires a shared key term
+      if (strictHitBy === null && localFindingContainsTerm(l, terms)) {
+        strictHitBy = l;
+        hitGoldIds.add(g.id);
+      }
+
+      // Once we have both, no need to keep scanning
+      if (strictHitBy !== null && looseHitBy !== null) break;
+    }
+
+    matchDetail.push({
+      goldId: g.id,
+      goldFile: g.file,
+      goldLines: g.lines,
+      goldSummary: g.summary,
+      goldKeyTerms: [...terms],
+      goldKeyTermsFallback: isFallback,
+      strictHit: strictHitBy !== null,
+      strictHitBy: strictHitBy
+        ? { id: strictHitBy.id ?? null, summary: strictHitBy.summary ?? '', suggestion: strictHitBy.suggestion ?? '' }
+        : null,
+      looseHit: looseHitBy !== null,
+      looseHitBy: looseHitBy
+        ? { id: looseHitBy.id ?? null, summary: looseHitBy.summary ?? '', suggestion: looseHitBy.suggestion ?? '' }
+        : null,
+    });
+  }
+
+  const hits = hitGoldIds.size;
+  const hitsLoose = hitGoldIdsLoose.size;
+
+  // Confidence-weighted recall
   const totalConf = goldFindings.reduce((s, g) => s + (typeof g.confidence === 'number' ? g.confidence : 0.5), 0);
   const hitConf = goldFindings
     .filter((g) => hitGoldIds.has(g.id))
     .reduce((s, g) => s + (typeof g.confidence === 'number' ? g.confidence : 0.5), 0);
+  const hitConfLoose = goldFindings
+    .filter((g) => hitGoldIdsLoose.has(g.id))
+    .reduce((s, g) => s + (typeof g.confidence === 'number' ? g.confidence : 0.5), 0);
   const weightedRecall = totalConf > 0 ? hitConf / totalConf : 0;
+  const weightedRecallLoose = totalConf > 0 ? hitConfLoose / totalConf : 0;
 
-  // Extras: local findings that matched no gold finding
+  // Extras: local findings that matched no gold finding (strict gate for extras)
   let extras = 0;
   for (const l of localFindings) {
-    const hitsSomeGold = goldFindings.some((g) => l.file === g.file && rangesOverlap(l.lines, g.lines));
+    const { terms } = extractGoldKeyTerms({ summary: '', suggestion: '' }); // not used here
+    const hitsSomeGold = goldFindings.some((g) => {
+      if (l.file !== g.file) return false;
+      if (!rangesOverlap(l.lines, g.lines)) return false;
+      const { terms: gTerms } = extractGoldKeyTerms(g);
+      return localFindingContainsTerm(l, gTerms);
+    });
     if (!hitsSomeGold) extras++;
   }
 
-  return { hits, totalGold, weightedRecall, extras, hitGoldIds };
+  return {
+    hits, hitsLoose, totalGold,
+    weightedRecall, weightedRecallLoose,
+    extras,
+    hitGoldIds, hitGoldIdsLoose,
+    matchDetail,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -304,6 +468,7 @@ function runScorecardA(model, mkey, vetDir, s07Files) {
       '--no-judge',
       '--model', model,
       '--out', outDir,
+      '--samples', String(SAMPLES),
     ]);
 
     if (!result.ok) {
@@ -319,22 +484,30 @@ function runScorecardA(model, mkey, vetDir, s07Files) {
   }
 
   // Score S10 vs gold (or keyword fallback)
-  let s10GoldHits = 0, s10GoldTotal = 0, s10WeightedRecall = 0, s10Extras = 0;
+  let s10GoldHits = 0, s10GoldHitsLoose = 0, s10GoldTotal = 0;
+  let s10WeightedRecall = 0, s10WeightedRecallLoose = 0;
+  let s10Extras = 0;
+  let s10MatchDetail = [];
   let s10UsedGold = false;
   if (goldS10) {
     const scored = scoreGoldRecall(s10AllFindings, goldS10);
     s10GoldHits = scored.hits;
+    s10GoldHitsLoose = scored.hitsLoose;
     s10GoldTotal = scored.totalGold;
     s10WeightedRecall = scored.weightedRecall;
+    s10WeightedRecallLoose = scored.weightedRecallLoose;
     s10Extras = scored.extras;
+    s10MatchDetail = scored.matchDetail;
     s10UsedGold = true;
-    console.log(`  [simp] ${mkey} S10 gold-recall: ${s10GoldHits}/${s10GoldTotal} (wtd=${s10WeightedRecall.toFixed(3)}) extras=${s10Extras} total-findings=${s10AllFindings.length}`);
+    console.log(`  [simp] ${mkey} S10 recall_strict=${s10GoldHits}/${s10GoldTotal}(wtd=${s10WeightedRecall.toFixed(3)}) recall_loose=${s10GoldHitsLoose}/${s10GoldTotal}(wtd=${s10WeightedRecallLoose.toFixed(3)}) extras=${s10Extras} total-findings=${s10AllFindings.length}`);
   } else {
     // Keyword fallback
     const hitMarkers = scoreMarkersForFallback(s10AllFindings, MARKERS.S10);
     s10GoldHits = hitMarkers.size;
+    s10GoldHitsLoose = s10GoldHits;
     s10GoldTotal = MARKERS.S10.length;
     s10WeightedRecall = s10GoldTotal > 0 ? s10GoldHits / s10GoldTotal : 0;
+    s10WeightedRecallLoose = s10WeightedRecall;
     console.log(`  [simp] ${mkey} S10 marker-fallback: ${s10GoldHits}/${s10GoldTotal} (no gold file)`);
   }
 
@@ -354,6 +527,7 @@ function runScorecardA(model, mkey, vetDir, s07Files) {
       '--no-judge',
       '--model', model,
       '--out', outDir,
+      '--samples', String(SAMPLES),
     ]);
 
     if (!result.ok) {
@@ -369,45 +543,71 @@ function runScorecardA(model, mkey, vetDir, s07Files) {
   }
 
   // Score S07 vs gold (or keyword fallback)
-  let s07GoldHits = 0, s07GoldTotal = 0, s07WeightedRecall = 0, s07Extras = 0;
+  let s07GoldHits = 0, s07GoldHitsLoose = 0, s07GoldTotal = 0;
+  let s07WeightedRecall = 0, s07WeightedRecallLoose = 0;
+  let s07Extras = 0;
+  let s07MatchDetail = [];
   let s07UsedGold = false;
   if (goldS07) {
     const scored = scoreGoldRecall(s07AllFindings, goldS07);
     s07GoldHits = scored.hits;
+    s07GoldHitsLoose = scored.hitsLoose;
     s07GoldTotal = scored.totalGold;
     s07WeightedRecall = scored.weightedRecall;
+    s07WeightedRecallLoose = scored.weightedRecallLoose;
     s07Extras = scored.extras;
+    s07MatchDetail = scored.matchDetail;
     s07UsedGold = true;
-    console.log(`  [simp] ${mkey} S07 gold-recall: ${s07GoldHits}/${s07GoldTotal} (wtd=${s07WeightedRecall.toFixed(3)}) extras=${s07Extras} total-findings=${s07AllFindings.length}`);
+    console.log(`  [simp] ${mkey} S07 recall_strict=${s07GoldHits}/${s07GoldTotal}(wtd=${s07WeightedRecall.toFixed(3)}) recall_loose=${s07GoldHitsLoose}/${s07GoldTotal}(wtd=${s07WeightedRecallLoose.toFixed(3)}) extras=${s07Extras} total-findings=${s07AllFindings.length}`);
   } else {
     const hitMarkers = scoreMarkersForFallback(s07AllFindings, MARKERS.S07);
     s07GoldHits = hitMarkers.size;
+    s07GoldHitsLoose = s07GoldHits;
     s07GoldTotal = MARKERS.S07.length;
     s07WeightedRecall = s07GoldTotal > 0 ? s07GoldHits / s07GoldTotal : 0;
+    s07WeightedRecallLoose = s07WeightedRecall;
     console.log(`  [simp] ${mkey} S07 marker-fallback: ${s07GoldHits}/${s07GoldTotal} (no gold file)`);
   }
 
   // Overall (combined) gold recall
   const overallHits = s10GoldHits + s07GoldHits;
+  const overallHitsLoose = s10GoldHitsLoose + s07GoldHitsLoose;
   const overallTotal = s10GoldTotal + s07GoldTotal;
   const allFindings = [...s10AllFindings, ...s07AllFindings];
 
   // Overall weighted recall: compute from both gold arrays together
   let overallWeightedRecall = 0;
+  let overallWeightedRecallLoose = 0;
   if (s10UsedGold && s07UsedGold && goldS10 && goldS07) {
     const allGold = [...goldS10, ...goldS07];
     const combined = scoreGoldRecall(allFindings, allGold);
     overallWeightedRecall = combined.weightedRecall;
+    overallWeightedRecallLoose = combined.weightedRecallLoose;
   } else if (overallTotal > 0) {
     overallWeightedRecall = overallHits / overallTotal;
+    overallWeightedRecallLoose = overallHitsLoose / overallTotal;
+  }
+
+  // Write gold-match-detail.json for this model
+  const matchDetailPath = join(vetDir, `gold-match-detail-${mkey}.json`);
+  try {
+    writeFileSync(matchDetailPath, JSON.stringify({
+      model, mkey,
+      generatedAt: new Date().toISOString(),
+      s10: s10MatchDetail,
+      s07: s07MatchDetail,
+    }, null, 2), 'utf8');
+    console.log(`  [simp] ${mkey} match detail -> ${matchDetailPath}`);
+  } catch {
+    console.warn(`  [WARN] ${mkey} could not write gold-match-detail`);
   }
 
   return {
     model, mkey,
     s10AllFindings, s07AllFindings, allFindings,
-    s10GoldHits, s10GoldTotal, s10WeightedRecall, s10Extras,
-    s07GoldHits, s07GoldTotal, s07WeightedRecall, s07Extras,
-    overallHits, overallTotal, overallWeightedRecall,
+    s10GoldHits, s10GoldHitsLoose, s10GoldTotal, s10WeightedRecall, s10WeightedRecallLoose, s10Extras,
+    s07GoldHits, s07GoldHitsLoose, s07GoldTotal, s07WeightedRecall, s07WeightedRecallLoose, s07Extras,
+    overallHits, overallHitsLoose, overallTotal, overallWeightedRecall, overallWeightedRecallLoose,
     s10UsedGold, s07UsedGold,
   };
 }
@@ -550,17 +750,21 @@ function buildEnsemble(allModelResults, goldS10, goldS07) {
     mergedFindings.push({ ...best, _convergence: conv, _models: [...distinctModels].sort() });
   }
 
-  // Score ensemble against gold
+  // Score ensemble against gold (strict + loose)
   const scoreEnsemble = (gold) => {
-    if (!gold || gold.length === 0) return { hits: 0, total: 0, weighted: 0 };
+    if (!gold || gold.length === 0) return { hits: 0, hitsLoose: 0, total: 0, weighted: 0, weightedLoose: 0 };
     const scored = scoreGoldRecall(mergedFindings, gold);
-    return { hits: scored.hits, total: scored.totalGold, weighted: scored.weightedRecall };
+    return {
+      hits: scored.hits, hitsLoose: scored.hitsLoose,
+      total: scored.totalGold,
+      weighted: scored.weightedRecall, weightedLoose: scored.weightedRecallLoose,
+    };
   };
 
   const goldRecallS10 = scoreEnsemble(goldS10);
   const goldRecallS07 = scoreEnsemble(goldS07);
   const allGold = [...(goldS10 ?? []), ...(goldS07 ?? [])];
-  const goldRecallOverall = allGold.length > 0 ? scoreEnsemble(allGold) : { hits: 0, total: 0, weighted: 0 };
+  const goldRecallOverall = allGold.length > 0 ? scoreEnsemble(allGold) : { hits: 0, hitsLoose: 0, total: 0, weighted: 0, weightedLoose: 0 };
 
   return { mergedFindings, goldRecallS10, goldRecallS07, goldRecallOverall, convergenceDist };
 }
@@ -582,28 +786,37 @@ function generateScorecard(simpResults, ensembleResult, judgeResults, s07Files, 
   lines.push('');
 
   // --- Scorecard A: Simplifier ---
-  lines.push('## Scorecard A — Simplifier (per-file fan-out, gold-recall, ranked by overall weighted recall)');
+  lines.push('## Scorecard A — Simplifier (per-file fan-out, gold-recall, ranked by overall strict weighted recall)');
   lines.push('');
-  lines.push(`Scoring: gold hit = local finding overlaps gold within ±${GOLD_LINE_TOLERANCE} lines on the same file.`);
+  lines.push(`Scoring: **recall_strict** (primary) = line-overlap ±${GOLD_LINE_TOLERANCE} lines AND shared key term from gold summary/suggestion.`);
+  lines.push(`**recall_loose** (old metric, shown for comparison) = line-overlap ±${GOLD_LINE_TOLERANCE} lines only.`);
   lines.push(`Confidence-weighted recall = sum(gold.confidence for hits) / sum(gold.confidence for all gold in shard).`);
-  lines.push(`Extras = local findings that hit no gold finding (noise/bonus proxy — unclassified without Claude).`);
+  lines.push(`Extras = local findings that hit no gold finding (strict gate; noise/bonus proxy).`);
+  lines.push(`Per-finding match detail: \`reports/vet/gold-match-detail-<model>.json\``);
   lines.push('');
-  lines.push('| Model | S10 recall (hits/8, wtd) | S07 recall (hits/22, wtd) | overall (hits/30, wtd) | total findings | extras |');
-  lines.push('|---|---|---|---|---|---|');
+  lines.push('| Model | S10 strict (hits/total, wtd) | S10 loose (hits/total, wtd) | S07 strict (hits/total, wtd) | S07 loose (hits/total, wtd) | overall strict (wtd) | overall loose (wtd) | total findings | extras |');
+  lines.push('|---|---|---|---|---|---|---|---|---|');
 
-  // Sort by overall weighted recall descending
+  // Sort by overall strict weighted recall descending (primary metric)
   const sortedSimp = [...simpResults].sort((a, b) => b.overallWeightedRecall - a.overallWeightedRecall);
   for (const mr of sortedSimp) {
-    const s10Label = mr.s10UsedGold
+    const s10Strict = mr.s10UsedGold
       ? `${mr.s10GoldHits}/${mr.s10GoldTotal}, wtd=${mr.s10WeightedRecall.toFixed(3)}`
       : `${mr.s10GoldHits}/${mr.s10GoldTotal} (marker)`;
-    const s07Label = mr.s07UsedGold
+    const s10Loose = mr.s10UsedGold
+      ? `${mr.s10GoldHitsLoose}/${mr.s10GoldTotal}, wtd=${mr.s10WeightedRecallLoose.toFixed(3)}`
+      : '-';
+    const s07Strict = mr.s07UsedGold
       ? `${mr.s07GoldHits}/${mr.s07GoldTotal}, wtd=${mr.s07WeightedRecall.toFixed(3)}`
       : `${mr.s07GoldHits}/${mr.s07GoldTotal} (marker)`;
-    const overallLabel = `${mr.overallHits}/${mr.overallTotal}, wtd=${mr.overallWeightedRecall.toFixed(3)}`;
+    const s07Loose = mr.s07UsedGold
+      ? `${mr.s07GoldHitsLoose}/${mr.s07GoldTotal}, wtd=${mr.s07WeightedRecallLoose.toFixed(3)}`
+      : '-';
+    const overallStrict = `**${mr.overallHits}/${mr.overallTotal}, wtd=${mr.overallWeightedRecall.toFixed(3)}**`;
+    const overallLoose = `${mr.overallHitsLoose}/${mr.overallTotal}, wtd=${mr.overallWeightedRecallLoose.toFixed(3)}`;
     const totalExtras = mr.s10Extras + mr.s07Extras;
     lines.push(
-      `| ${mr.mkey} | ${s10Label} | ${s07Label} | **${overallLabel}** | ${mr.allFindings.length} | ${totalExtras} |`
+      `| ${mr.mkey} | ${s10Strict} | ${s10Loose} | ${s07Strict} | ${s07Loose} | ${overallStrict} | ${overallLoose} | ${mr.allFindings.length} | ${totalExtras} |`
     );
   }
   lines.push('');
@@ -613,9 +826,9 @@ function generateScorecard(simpResults, ensembleResult, judgeResults, s07Files, 
   lines.push('## Ensemble (S10 + S07 — all models union, deduped by file+line range ±5)');
   lines.push('');
   lines.push(`- Merged findings: ${ens.mergedFindings.length}`);
-  lines.push(`- S10 gold-recall: **${ens.goldRecallS10.hits}/${ens.goldRecallS10.total}** (wtd=${ens.goldRecallS10.weighted.toFixed(3)})`);
-  lines.push(`- S07 gold-recall: **${ens.goldRecallS07.hits}/${ens.goldRecallS07.total}** (wtd=${ens.goldRecallS07.weighted.toFixed(3)})`);
-  lines.push(`- Overall gold-recall: **${ens.goldRecallOverall.hits}/${ens.goldRecallOverall.total}** (wtd=${ens.goldRecallOverall.weighted.toFixed(3)})`);
+  lines.push(`- S10 gold-recall (strict): **${ens.goldRecallS10.hits}/${ens.goldRecallS10.total}** (wtd=${ens.goldRecallS10.weighted.toFixed(3)}) | loose: ${ens.goldRecallS10.hitsLoose}/${ens.goldRecallS10.total} (wtd=${ens.goldRecallS10.weightedLoose.toFixed(3)})`);
+  lines.push(`- S07 gold-recall (strict): **${ens.goldRecallS07.hits}/${ens.goldRecallS07.total}** (wtd=${ens.goldRecallS07.weighted.toFixed(3)}) | loose: ${ens.goldRecallS07.hitsLoose}/${ens.goldRecallS07.total} (wtd=${ens.goldRecallS07.weightedLoose.toFixed(3)})`);
+  lines.push(`- Overall gold-recall (strict): **${ens.goldRecallOverall.hits}/${ens.goldRecallOverall.total}** (wtd=${ens.goldRecallOverall.weighted.toFixed(3)}) | loose: ${ens.goldRecallOverall.hitsLoose}/${ens.goldRecallOverall.total} (wtd=${ens.goldRecallOverall.weightedLoose.toFixed(3)})`);
   lines.push('');
   lines.push('### Convergence distribution');
   lines.push('');
@@ -653,6 +866,98 @@ function generateScorecard(simpResults, ensembleResult, judgeResults, s07Files, 
   lines.push('');
 
   return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Self-test (--self-test): static proof of strict vs loose divergence
+// ---------------------------------------------------------------------------
+
+/**
+ * Run two synthetic test cases:
+ *   (a) local "rename var" at gold lines, NO shared identifier -> strict miss, loose hit
+ *   (b) local "reuse escapeRegExp helper" at gold's escapeRegExp lines -> strict hit, loose hit
+ * Prints results and exits 0 (pass) or 1 (fail).
+ */
+function runSelfTest() {
+  console.log('[SELF-TEST] Starting static recall strict-vs-loose proof...');
+  let passed = true;
+
+  // Synthetic gold finding: escapeRegExp duplicates escapeForRegex at line 394
+  const goldEscapeRegExp = {
+    id: 'test-gold-01',
+    file: 'src/utils.ts',
+    lines: '390-398',
+    type: 'reuse',
+    severity: 'safe-auto',
+    summary: '`escapeRegExp` duplicates `escapeForRegex` — inline function body is identical',
+    suggestion: 'Replace `escapeRegExp` with a re-export alias of `escapeForRegex`.',
+    confidence: 0.9,
+  };
+
+  // Case (a): local finding at same lines but NO shared identifier term (just "rename var")
+  const localRenameVar = {
+    id: 'local-a',
+    file: 'src/utils.ts',
+    lines: '394',
+    summary: 'rename var to improve readability at line 394',
+    suggestion: 'Consider a more descriptive variable name.',
+  };
+
+  // Case (b): local finding that mentions escapeRegExp — genuine semantic hit
+  const localReuseEscapeRegExp = {
+    id: 'local-b',
+    file: 'src/utils.ts',
+    lines: '393-396',
+    summary: 'reuse escapeRegExp helper instead of duplicating the logic',
+    suggestion: 'Call escapeRegExp directly to avoid the duplicated escapeForRegex implementation.',
+  };
+
+  // Score case (a): rename-var vs gold-escapeRegExp
+  const scoreA = scoreGoldRecall([localRenameVar], [goldEscapeRegExp]);
+  const caseAStrictMiss = scoreA.hits === 0;       // must NOT count strict
+  const caseALooseHit  = scoreA.hitsLoose === 1;   // WOULD count loose
+
+  if (caseAStrictMiss && caseALooseHit) {
+    console.log('[SELF-TEST] [OK] Case (a): rename-var at same lines -> strict=miss (0/1), loose=hit (1/1) — overcounting confirmed and rejected');
+  } else {
+    console.log(`[SELF-TEST] [FAIL] Case (a): expected strict=0 loose=1, got strict=${scoreA.hits} loose=${scoreA.hitsLoose}`);
+    console.log(`            gold key terms: ${[...extractGoldKeyTerms(goldEscapeRegExp).terms].join(', ')}`);
+    passed = false;
+  }
+
+  // Score case (b): reuse-escapeRegExp vs gold-escapeRegExp
+  const scoreB = scoreGoldRecall([localReuseEscapeRegExp], [goldEscapeRegExp]);
+  const caseBStrictHit = scoreB.hits === 1;
+  const caseBLooseHit  = scoreB.hitsLoose === 1;
+
+  if (caseBStrictHit && caseBLooseHit) {
+    console.log('[SELF-TEST] [OK] Case (b): reuse-escapeRegExp at gold lines -> strict=hit (1/1), loose=hit (1/1)');
+  } else {
+    console.log(`[SELF-TEST] [FAIL] Case (b): expected strict=1 loose=1, got strict=${scoreB.hits} loose=${scoreB.hitsLoose}`);
+    console.log(`            gold key terms: ${[...extractGoldKeyTerms(goldEscapeRegExp).terms].join(', ')}`);
+    passed = false;
+  }
+
+  // Verify the two recall numbers differ on case (a): strict < loose
+  const strictDiffersFromLoose = scoreA.weightedRecall < scoreA.weightedRecallLoose;
+  if (strictDiffersFromLoose) {
+    console.log(`[SELF-TEST] [OK] Case (a) recall_strict (${scoreA.weightedRecall.toFixed(3)}) < recall_loose (${scoreA.weightedRecallLoose.toFixed(3)}) — metrics diverge as expected`);
+  } else {
+    console.log(`[SELF-TEST] [FAIL] Case (a): recall_strict (${scoreA.weightedRecall.toFixed(3)}) should be < recall_loose (${scoreA.weightedRecallLoose.toFixed(3)})`);
+    passed = false;
+  }
+
+  // Also print extracted key terms for human inspection
+  const { terms, isFallback } = extractGoldKeyTerms(goldEscapeRegExp);
+  console.log(`[SELF-TEST] Gold key terms extracted: [${[...terms].join(', ')}] (fallback=${isFallback})`);
+
+  if (passed) {
+    console.log('[SELF-TEST] All cases passed.');
+    process.exit(0);
+  } else {
+    console.log('[SELF-TEST] One or more cases FAILED.');
+    process.exit(1);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -707,10 +1012,13 @@ async function main() {
       simpResults.push({
         model, mkey,
         s10AllFindings: [], s07AllFindings: [], allFindings: [],
-        s10GoldHits: 0, s10GoldTotal: goldS10?.length ?? 0, s10WeightedRecall: 0, s10Extras: 0,
-        s07GoldHits: 0, s07GoldTotal: goldS07?.length ?? 0, s07WeightedRecall: 0, s07Extras: 0,
-        overallHits: 0, overallTotal: (goldS10?.length ?? 0) + (goldS07?.length ?? 0),
-        overallWeightedRecall: 0,
+        s10GoldHits: 0, s10GoldHitsLoose: 0, s10GoldTotal: goldS10?.length ?? 0,
+        s10WeightedRecall: 0, s10WeightedRecallLoose: 0, s10Extras: 0,
+        s07GoldHits: 0, s07GoldHitsLoose: 0, s07GoldTotal: goldS07?.length ?? 0,
+        s07WeightedRecall: 0, s07WeightedRecallLoose: 0, s07Extras: 0,
+        overallHits: 0, overallHitsLoose: 0,
+        overallTotal: (goldS10?.length ?? 0) + (goldS07?.length ?? 0),
+        overallWeightedRecall: 0, overallWeightedRecallLoose: 0,
         s10UsedGold: !!goldS10, s07UsedGold: !!goldS07,
       });
     }
@@ -751,12 +1059,14 @@ async function main() {
     },
     simplifier: simpResults.map((mr) => ({
       model: mr.model, mkey: mr.mkey,
-      s10GoldHits: mr.s10GoldHits, s10GoldTotal: mr.s10GoldTotal,
-      s10WeightedRecall: mr.s10WeightedRecall, s10Extras: mr.s10Extras,
-      s07GoldHits: mr.s07GoldHits, s07GoldTotal: mr.s07GoldTotal,
-      s07WeightedRecall: mr.s07WeightedRecall, s07Extras: mr.s07Extras,
-      overallHits: mr.overallHits, overallTotal: mr.overallTotal,
-      overallWeightedRecall: mr.overallWeightedRecall,
+      s10GoldHits: mr.s10GoldHits, s10GoldHitsLoose: mr.s10GoldHitsLoose, s10GoldTotal: mr.s10GoldTotal,
+      s10WeightedRecall: mr.s10WeightedRecall, s10WeightedRecallLoose: mr.s10WeightedRecallLoose,
+      s10Extras: mr.s10Extras,
+      s07GoldHits: mr.s07GoldHits, s07GoldHitsLoose: mr.s07GoldHitsLoose, s07GoldTotal: mr.s07GoldTotal,
+      s07WeightedRecall: mr.s07WeightedRecall, s07WeightedRecallLoose: mr.s07WeightedRecallLoose,
+      s07Extras: mr.s07Extras,
+      overallHits: mr.overallHits, overallHitsLoose: mr.overallHitsLoose, overallTotal: mr.overallTotal,
+      overallWeightedRecall: mr.overallWeightedRecall, overallWeightedRecallLoose: mr.overallWeightedRecallLoose,
       totalFindings: mr.allFindings.length,
     })),
     ensemble: {
@@ -783,7 +1093,11 @@ async function main() {
   console.log('[OK] vet.mjs complete.');
 }
 
-main().catch((err) => {
-  console.error(`[ERROR] Unhandled error: ${err.message}`);
-  process.exit(1);
-});
+if (process.argv.includes('--self-test')) {
+  runSelfTest();
+} else {
+  main().catch((err) => {
+    console.error(`[ERROR] Unhandled error: ${err.message}`);
+    process.exit(1);
+  });
+}

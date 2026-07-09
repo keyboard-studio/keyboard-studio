@@ -149,7 +149,7 @@ const EXCLUDE_RE =
 const argv = process.argv.slice(2);
 
 // Value-expecting flags: if the flag is the last argument (no value follows), abort early.
-const VALUE_FLAGS = ['--shard', '--limit', '--model', '--structure-model', '--endpoint', '--out', '--pr', '--commit', '--since', '--reason-mode', '--judge-set', '--file'];
+const VALUE_FLAGS = ['--shard', '--limit', '--model', '--structure-model', '--endpoint', '--out', '--pr', '--commit', '--since', '--reason-mode', '--judge-set', '--file', '--samples'];
 // --no-judge / --judge / --self-test are boolean flags (no value); listed separately so the help text is accurate.
 for (const vf of VALUE_FLAGS) {
   const i = argv.indexOf(vf);
@@ -213,6 +213,16 @@ if (SCOPE_FILE && argv.includes('--shard')) {
 }
 const IS_SCOPING_MODE = SCOPE_PR !== null || SCOPE_COMMIT !== null || SCOPE_SINCE !== null;
 const IS_FILE_MODE = SCOPE_FILE !== null;
+
+// --samples N: run the reason->structure step N times per file/shard and union findings.
+// Default 1 = current single-pass behaviour (no change in model call count).
+// Prompt + repo-map assembly happens ONCE; only the model calls repeat.
+const SAMPLES_RAW = flag('--samples');
+const SAMPLES = SAMPLES_RAW !== null ? parseInt(SAMPLES_RAW, 10) : 1;
+if (isNaN(SAMPLES) || SAMPLES < 1) {
+  console.error(`[ERROR] --samples must be a positive integer (got "${SAMPLES_RAW}")`);
+  process.exit(1);
+}
 
 // ---------------------------------------------------------------------------
 // Package -> pnpm filter name mapping
@@ -1348,6 +1358,122 @@ function mergeByConvergence(lensResults) {
 }
 
 /**
+ * Union N samples' structured findings into a deduplicated list.
+ *
+ * @param {Array<{sample: number, findings: object[]}>} sampleResults
+ * @returns {object[]} merged findings with samples_hit and confidence boost
+ *
+ * Each merged finding gains:
+ *   samples_hit          : count of samples that produced this finding
+ *   confidence_pre_sample_boost : confidence BEFORE the sample boost is applied
+ *   confidence           : boosted (both lens-convergence boost already present + sample boost
+ *                          applied on top, capped at 1.0 — does not double-count lens boost)
+ *
+ * Dedup rule: two findings converge if same file AND line ranges overlap or are within
+ * SAMPLE_LINE_GAP (5) lines. Reuses the same union-find as mergeByConvergence.
+ */
+function mergeByConvergenceMultiSample(sampleResults) {
+  if (sampleResults.length === 0) return [];
+
+  // If only one sample, stamp samples_hit=1 and return as-is (no union needed).
+  if (sampleResults.length === 1) {
+    const { findings } = sampleResults[0];
+    return findings.map((f) => {
+      const preBoost = typeof f.confidence === 'number' ? f.confidence : 0.5;
+      return {
+        ...f,
+        samples_hit: 1,
+        confidence_pre_sample_boost: parseFloat(preBoost.toFixed(3)),
+        // boost = 0 (samples_hit - 1 = 0) → confidence unchanged
+      };
+    });
+  }
+
+  // Flatten all findings, tagging each with its sample index.
+  const tagged = [];
+  for (const { sample, findings } of sampleResults) {
+    for (const f of findings) {
+      tagged.push({ ...f, _sample: sample });
+    }
+  }
+
+  if (tagged.length === 0) return [];
+
+  // Union-Find grouping: converge by file + overlapping/adjacent line range.
+  const parent = tagged.map((_, i) => i);
+  function find(x) {
+    while (parent[x] !== x) {
+      parent[x] = parent[parent[x]];
+      x = parent[x];
+    }
+    return x;
+  }
+  function union(x, y) {
+    const px = find(x), py = find(y);
+    if (px !== py) parent[px] = py;
+  }
+
+  for (let i = 0; i < tagged.length; i++) {
+    for (let j = i + 1; j < tagged.length; j++) {
+      if (tagged[i].file !== tagged[j].file) continue;
+      const a = parseLineRange(tagged[i].lines);
+      const b = parseLineRange(tagged[j].lines);
+      if (a.start === 0 || b.start === 0) continue;
+      if (a.start <= b.end + SAMPLE_LINE_GAP && b.start <= a.end + SAMPLE_LINE_GAP) {
+        union(i, j);
+      }
+    }
+  }
+
+  // Group by root
+  const groups = new Map();
+  for (let i = 0; i < tagged.length; i++) {
+    const root = find(i);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root).push(tagged[i]);
+  }
+
+  const merged = [];
+  for (const group of groups.values()) {
+    // Distinct samples that produced this finding.
+    const sampleSet = new Set(group.map((f) => f._sample));
+    const samplesHit = sampleSet.size;
+
+    // Pick the representative: highest confidence.
+    const best = group.reduce((a, b) => {
+      const ca = typeof a.confidence === 'number' ? a.confidence : 0.5;
+      const cb = typeof b.confidence === 'number' ? b.confidence : 0.5;
+      return cb > ca ? b : a;
+    });
+
+    // Merge summaries from other samples if different.
+    const altSummaries = group
+      .filter((f) => f !== best && f.summary && f.summary !== best.summary)
+      .map((f) => f.summary);
+    const mergedSummary =
+      altSummaries.length > 0 ? `${best.summary ?? ''}; also: ${altSummaries.join('; ')}` : (best.summary ?? '');
+
+    // Apply sample-agreement confidence boost on top of whatever confidence the finding
+    // already has (which may already include a lens-convergence boost).
+    // boost = SAMPLE_BOOST_PER_HIT * (samplesHit - 1), capped at 1.0.
+    const preBoost = typeof best.confidence === 'number' ? best.confidence : 0.5;
+    const boosted = Math.min(1.0, preBoost + SAMPLE_BOOST_PER_HIT * (samplesHit - 1));
+
+    // Remove internal _sample tag from emitted finding
+    const { _sample: _ignored, ...rest } = best;
+    merged.push({
+      ...rest,
+      summary: mergedSummary,
+      samples_hit: samplesHit,
+      confidence_pre_sample_boost: parseFloat(preBoost.toFixed(3)),
+      confidence: parseFloat(boosted.toFixed(3)),
+    });
+  }
+
+  return merged;
+}
+
+/**
  * Run one lens (reason + structure) for a sub-batch.
  * Returns an array of finding objects tagged with `lens` name (may be empty).
  *
@@ -1447,14 +1573,34 @@ async function callModelMultiLens(batchPrompt, shardLabel, fileSet, mapData = nu
     if (name === 'reuse') extraContext = adjacentExportsBlock;
     if (name === 'simplification') extraContext = confirmedUnusedBlock;
 
-    try {
-      const findings = await callOneLens(name, system, batchPrompt, shardLabel, fileSet, extraContext);
-      lensResults.push({ lens: name, findings });
-      totalRaw += findings.length;
-    } catch (err) {
-      console.error(`[WARN] ${shardLabel} lens ${name} failed: ${err.message} — skipping lens`);
-      lensResults.push({ lens: name, findings: [] });
+    // Run SAMPLES times; prompt+repo-map assembled once above (batchPrompt); only model repeats.
+    const sampleResults = [];
+    for (let sIdx = 1; sIdx <= SAMPLES; sIdx++) {
+      const sampleLabel = SAMPLES > 1 ? `${shardLabel}[${name}][s${sIdx}/${SAMPLES}]` : `${shardLabel}`;
+      try {
+        const findings = await callOneLens(name, system, batchPrompt, sampleLabel, fileSet, extraContext);
+        sampleResults.push({ sample: sIdx, findings });
+      } catch (err) {
+        console.error(`[WARN] ${shardLabel} lens ${name} sample ${sIdx}/${SAMPLES} failed: ${err.message} — skipping sample`);
+        sampleResults.push({ sample: sIdx, findings: [] });
+      }
     }
+
+    // Union across samples for this lens; records samples_hit + confidence boost.
+    const unionedFindings = mergeByConvergenceMultiSample(sampleResults);
+    if (SAMPLES > 1) {
+      // Build samples_hit distribution for log.
+      const dist = {};
+      for (const f of unionedFindings) {
+        const k = `${f.samples_hit}x`;
+        dist[k] = (dist[k] ?? 0) + 1;
+      }
+      const distStr = Object.entries(dist).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([k, v]) => `${k}=${v}`).join(' ');
+      console.log(`[samples] ${shardLabel}[${name}]: ${SAMPLES} runs -> ${unionedFindings.length} merged (samples_hit dist: ${distStr || 'none'})`);
+    }
+
+    lensResults.push({ lens: name, findings: unionedFindings });
+    totalRaw += unionedFindings.length;
   }
 
   const perLensCounts = lensResults.map(({ lens, findings }) => `${lens}:${findings.length}`).join(' ');
@@ -1522,12 +1668,30 @@ async function callModelMonolithic(batchPrompt, shardLabel, fileSet, mapData = n
   // Inject both hook blocks (adjacent exports + confirmed-unused) into the monolithic prompt
   const extraContext = [adjacentExportsBlock, confirmedUnusedBlock].filter(Boolean).join('');
 
-  let findings;
-  try {
-    findings = await callOneLens('monolithic', MONOLITHIC_REASON_SYSTEM, batchPrompt, shardLabel, fileSet, extraContext);
-  } catch (err) {
-    console.error(`[WARN] ${shardLabel} monolithic pass failed: ${err.message}`);
-    findings = [];
+  // Run SAMPLES times; prompt+repo-map assembled once (batchPrompt reused); only model repeats.
+  const sampleResults = [];
+  for (let sIdx = 1; sIdx <= SAMPLES; sIdx++) {
+    const sampleLabel = SAMPLES > 1 ? `${shardLabel}[mono][s${sIdx}/${SAMPLES}]` : shardLabel;
+    try {
+      const sFindings = await callOneLens('monolithic', MONOLITHIC_REASON_SYSTEM, batchPrompt, sampleLabel, fileSet, extraContext);
+      sampleResults.push({ sample: sIdx, findings: sFindings });
+    } catch (err) {
+      console.error(`[WARN] ${shardLabel} monolithic sample ${sIdx}/${SAMPLES} failed: ${err.message} — skipping sample`);
+      sampleResults.push({ sample: sIdx, findings: [] });
+    }
+  }
+
+  // Union across samples; records samples_hit + confidence boost.
+  const findings = mergeByConvergenceMultiSample(sampleResults);
+
+  if (SAMPLES > 1) {
+    const dist = {};
+    for (const f of findings) {
+      const k = `${f.samples_hit}x`;
+      dist[k] = (dist[k] ?? 0) + 1;
+    }
+    const distStr = Object.entries(dist).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([k, v]) => `${k}=${v}`).join(' ');
+    console.log(`[samples] ${shardLabel}[monolithic]: ${SAMPLES} runs -> ${findings.length} merged (samples_hit dist: ${distStr || 'none'})`);
   }
 
   console.log(`    ${shardLabel}: monolithic raw count — ${findings.length}`);
@@ -1536,8 +1700,9 @@ async function callModelMonolithic(batchPrompt, shardLabel, fileSet, mapData = n
   for (const f of findings) {
     f.convergence = 1;
     f.lenses = ['monolithic'];
-    f.confidence_pre_boost = typeof f.confidence === 'number' ? parseFloat(f.confidence.toFixed(3)) : 0.5;
-    // No confidence boost (convergence=1 → boost = 0)
+    // confidence_pre_boost from lens-convergence perspective (convergence=1 → no lens boost).
+    // confidence_pre_sample_boost is already set by mergeByConvergenceMultiSample.
+    f.confidence_pre_boost = f.confidence_pre_sample_boost ?? (typeof f.confidence === 'number' ? parseFloat(f.confidence.toFixed(3)) : 0.5);
   }
 
   // Hook B post-filter: same dead-code claim filter as lenses path
@@ -2173,6 +2338,20 @@ const CONVERGENCE_LINE_GAP = 3;
 const CONVERGENCE_BOOST_PER_LENS = 0.15;
 
 // ---------------------------------------------------------------------------
+// Multi-sample self-consistency constants
+// ---------------------------------------------------------------------------
+
+// Line-range tolerance for deduplicating findings across N samples.
+// Two findings from different samples converge if same file AND line ranges
+// overlap or are within SAMPLE_LINE_GAP lines — same union-find as lenses.
+const SAMPLE_LINE_GAP = 5;
+
+// Confidence boost per additional sample hit beyond the first.
+// e.g. samples_hit=3 of 5 → base + 0.1*(3-1) = base + 0.2.
+// Capped at 1.0 after applying both sample and lens boosts.
+const SAMPLE_BOOST_PER_HIT = 0.1;
+
+// ---------------------------------------------------------------------------
 // Per-shard runner
 // ---------------------------------------------------------------------------
 
@@ -2258,13 +2437,16 @@ async function runShard(shard) {
 
     // Dry-run proofs: show prompts assemble, hook A adjacent-exports block,
     // and hook B confirmed-unused pre-pass (grep runs — it is deterministic, no model needed).
+    // Also prove that repo-map/prompt assembly happens ONCE regardless of --samples N.
     if (REASON_MODE === 'monolithic') {
-      console.log(`  ${shard.id} [dry-run]: assembling 1 monolithic reasoning prompt…`);
+      const totalModelCalls = SAMPLES;
+      console.log(`  ${shard.id} [dry-run]: assembling 1 monolithic reasoning prompt (prompt assembled ONCE; model will be called ${totalModelCalls}x for --samples ${SAMPLES})…`);
       console.log(`    reason-mode=monolithic: system prompt ${MONOLITHIC_REASON_SYSTEM.length} chars`);
     } else {
-      console.log(`  ${shard.id} [dry-run]: assembling ${LENSES.length} lens prompt(s)…`);
+      const totalModelCalls = LENSES.length * SAMPLES;
+      console.log(`  ${shard.id} [dry-run]: assembling ${LENSES.length} lens prompt(s) (prompt assembled ONCE per lens; each lens model called ${SAMPLES}x → ${totalModelCalls} model calls total for --samples ${SAMPLES})…`);
       for (const { name, system } of LENSES) {
-        console.log(`    lens=${name}: system prompt ${system.length} chars`);
+        console.log(`    lens=${name}: system prompt ${system.length} chars, ${SAMPLES} sample(s)`);
       }
     }
 
@@ -3258,6 +3440,7 @@ async function main() {
   console.log(`     judge    : ${USE_JUDGE ? 'ON (K=1, temp=0.2) — use --no-judge to skip' : 'OFF (--no-judge)'}`);
   console.log(`     mode     : ${modeLabel}${scopeModeLabel}`);
   console.log(`     reason-mode: ${REASON_MODE}${REASON_MODE === 'monolithic' ? ' (single free-form pass)' : ' (3 focused lens passes)'}`);
+  console.log(`     samples  : ${SAMPLES}${SAMPLES > 1 ? ` (self-consistency union; boost +${SAMPLE_BOOST_PER_HIT} per extra hit, gap=${SAMPLE_LINE_GAP} lines)` : ' (single pass — default)'}`);
   if (REASON_MODE === 'lenses') {
     console.log(`     lenses   : ${LENSES.map((l) => l.name).join(', ')} (${LENSES.length} passes per shard)`);
     console.log(`     convergence boost: +${CONVERGENCE_BOOST_PER_LENS} per extra lens (gap=${CONVERGENCE_LINE_GAP} lines)`);

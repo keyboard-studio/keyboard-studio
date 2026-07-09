@@ -147,6 +147,34 @@ node utilities/hermes/hermes-run.mjs \
 | `--out <dir>` | `utilities/hermes/reports` | Directory for output artifacts |
 | `--dry-run` | off | Assemble prompts + print input token estimates; do NOT call the model |
 | `--self-test` | off | Run the deterministic hook-B post-filter test and exit (no model, no shard) |
+| `--samples <n>` | `1` | Self-consistency sample count: run the reason→structure step N times per file/shard, union the findings, and boost confidence by agreement. Default 1 = current single-pass behaviour. Prompt + repo-map assembly happens **once**; only model calls repeat. |
+
+### Multi-sample self-consistency (`--samples N`)
+
+The free-form reason step (Step 1) is high-variance: the same file can produce 4, 3, or 1
+findings across three independent runs, and may miss the single real gold finding on a bad draw.
+Running N samples and unioning recovers those misses and provides a **self-consistency confidence
+signal**.
+
+- **Prompt assembly is ONCE.** The repo-map slice, adjacent-exports block (hook A), and
+  confirmed-unused block (hook B) are all computed once per file/shard. Only the `callModelReason`
+  + `callModelStructure` pair repeats N times. This keeps the cost proportional to N model calls,
+  not N full setup passes.
+- **Union by location.** Findings from all N samples are merged using the same union-find as lens
+  convergence: two findings converge if same file AND line ranges overlap or are within 5 lines.
+- **`samples_hit`** records how many of the N samples produced each merged finding.
+- **Confidence boost:** `confidence = min(1.0, base + 0.1 * (samples_hit - 1))`. A finding in
+  4/5 samples is more trustworthy than 1/5. `confidence_pre_sample_boost` records the pre-boost
+  value for auditability.
+- **Composition with lens convergence:** In lenses mode, each lens is sampled N times and its
+  sample-union output feeds into the existing lens-convergence merge. The two boosts are applied
+  sequentially (sample boost first, then lens boost), both capped at 1.0. They are independent
+  signals — sample agreement within a lens, cross-lens agreement across lenses — so composing
+  them is sound. The cap prevents double-counting from inflating past 1.0.
+- **Log line per file:** `[samples] <shard>[<lens>]: N runs -> <count> merged (samples_hit dist: 1x=.. 2x=.. ..)`
+
+The `vet.mjs` scorecard uses `SAMPLES=5` (a constant near the top, easily tuned) for all
+Scorecard A per-file runs.
 
 ## Output artifacts
 
