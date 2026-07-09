@@ -346,7 +346,7 @@ export function SurveyRunner({
     // Resume: rebuild the walked stack from a prior completed run so the
     // author lands on the flow's last question, not question 1.
     if (resumeAnswers !== undefined) {
-      const resumed = buildResumeStack(firstId, resumeAnswers, context, index, getNextOverride);
+      const resumed = buildResumeStack(firstId, resumeAnswers, context, index);
       if (resumed !== null) return resumed;
     }
     return [{ questionId: firstId ?? "", value: firstSeed }];
@@ -654,6 +654,34 @@ function findFirstRenderable(
 }
 
 /**
+ * Resume-time dynamic-branch resolver. buildResumeStack runs synchronously in
+ * SurveyRunner's useState initializer — before any effect fires — so an async
+ * getNextOverride authority (e.g. IdentityLite's langtags lookup, which routes
+ * il_language_code → il_language_region only for region-ambiguous languages)
+ * cannot resolve at replay time. Re-deriving the branch there would
+ * deterministically drop the region step from a completed run.
+ *
+ * Instead, trust the recorded answers: a conditional edge whose target question
+ * carries a recorded answer is one the original walk actually took, so follow
+ * it. Non-conditional (default) edges are left to the static resolveNext path
+ * inside advanceThrough. Returns undefined when no dynamic branch applies.
+ */
+function resumeBranchOverride(
+  questionId: string,
+  answers: Readonly<Record<string, string | string[]>>,
+  index: Map<string, FlowQuestion>,
+): string | undefined {
+  const { next } = index.get(questionId) ?? {};
+  if (next === undefined || next === null || typeof next === "string") return undefined;
+  for (const rule of next as FlowGotoRule[]) {
+    if (rule.condition !== undefined && rule.goto !== null && answers[rule.goto] !== undefined) {
+      return rule.goto;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Rebuild the walked answer stack by replaying the flow with previously
  * committed answers. Walks from the first renderable question, restoring each
  * question's recorded answer and following the same goto routing the original
@@ -666,7 +694,6 @@ export function buildResumeStack(
   answers: Readonly<Record<string, string | string[]>>,
   ctx: SurveyContext,
   index: Map<string, FlowQuestion>,
-  getNextOverride?: (questionId: string, value: string | string[] | undefined) => string | undefined,
 ): AnswerStackEntry[] | null {
   if (firstId === null) return null;
   const stack: AnswerStackEntry[] = [];
@@ -679,10 +706,10 @@ export function buildResumeStack(
     const value = answers[qId];
     stack.push({ questionId: qId, value });
     if (q.type !== "notice" && q.required === true && !hasValue(value)) break;
-    // Replay must follow the same routing authority as the forward walk, so a
-    // dynamic-next branch (spec 030 US3 region step) is reconstructed rather
-    // than skipped whenever the override can resolve synchronously.
-    qId = advanceThrough(q, value, ctx, index, getNextOverride);
+    // Dynamic branches (e.g. spec 030 US3 region step) are reconstructed from
+    // the recorded answers, not re-derived via the async getNextOverride, which
+    // is unavailable in this synchronous initializer.
+    qId = advanceThrough(q, value, ctx, index, (id) => resumeBranchOverride(id, answers, index));
   }
   return stack.length > 0 ? stack : null;
 }

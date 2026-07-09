@@ -131,7 +131,9 @@ export function BaseResolution({
           variant="back"
           data-testid="base-back"
           onClick={onBack}
-          style={{ marginBottom: 12 }}
+          // marginTop:0 overrides the back variant's legacy bottom-of-panel
+          // margin now that the button sits at the top with the search bar.
+          style={{ marginTop: 0, marginBottom: 12 }}
         >
           &larr; Back
         </Button>

@@ -32,6 +32,22 @@ const COMPLETED: SurveyPhaseResult = {
   ],
 };
 
+// A completed run for a region-AMBIGUOUS language (Afar, region DJ) — the
+// original walk routed through il_language_region via getNextOverride. On
+// resume, langtags is not yet loaded (getNextOverride can't fire), so the
+// region step is reconstructed purely from the recorded answer. Regression
+// guard for the resume-replay region-drop bug.
+const COMPLETED_AMBIGUOUS: SurveyPhaseResult = {
+  phase: "A",
+  answers: [
+    { questionId: "il_language_code", answerType: "text", value: "aa" },
+    { questionId: "il_language_region", answerType: "text", value: "DJ" },
+    { questionId: "il_language_english", answerType: "text", value: "Afar" },
+    { questionId: "il_language_autonym", answerType: "text", value: "Qafar" },
+    { questionId: "il_target_script", answerType: "select", value: "Latn" },
+  ],
+};
+
 // ---------------------------------------------------------------------------
 // toResumeAnswers — per-answerType flattening
 // ---------------------------------------------------------------------------
@@ -136,5 +152,19 @@ describe("IdentityLite — resume", () => {
     expect(
       screen.getByText("What language is this keyboard for?"),
     ).toBeTruthy();
+  });
+
+  it("resuming a region-ambiguous run preserves the region on Finish (no drop)", () => {
+    const onComplete =
+      vi.fn<[SurveyPhaseResult, IdentityLiteResult], void>();
+    render(<IdentityLite onComplete={onComplete} resume={COMPLETED_AMBIGUOUS} />);
+    // Mounts on the last question; Finish without touching anything must not
+    // silently drop il_language_region (langtags is unloaded at replay time).
+    fireEvent.click(screen.getByTestId("survey-advance"));
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    const [result, identity] = onComplete.mock.calls[0]!;
+    expect(result.answers.map((a) => a.questionId)).toContain("il_language_region");
+    expect(identity.region).toBe("DJ");
+    expect(identity.bcp47).toBe("aa-Latn-DJ");
   });
 });

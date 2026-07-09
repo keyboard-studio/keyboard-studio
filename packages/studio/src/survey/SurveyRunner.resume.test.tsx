@@ -150,4 +150,45 @@ describe("buildResumeStack", () => {
   it("returns null when there is no first renderable question", () => {
     expect(buildResumeStack(null, RESUME, {}, index)).toBeNull();
   });
+
+  // Regression: a dynamic branch whose condition keys off CONTEXT (not the
+  // value) — the shape of identity-lite's il_language_code → il_language_region
+  // edge, which fires only via an async getNextOverride at forward-walk time.
+  // At resume the context is absent, so static resolveNext can't take the
+  // branch; replay must reconstruct it from the recorded answer instead.
+  const ctxBranch = idx(
+    {
+      id: "code",
+      type: "short_text",
+      required: false,
+      // condition references ctx, never set on the resolveNext path.
+      next: [
+        { condition: "ctx.ambiguous == 'true'", goto: "region" },
+        { default: true, goto: "english" },
+      ],
+    },
+    { id: "region", type: "short_text", required: false, next: "english" },
+    { id: "english", type: "short_text", required: false, next: "script" },
+    { id: "script", type: "select", required: true, options: [{ value: "Latn", label: "Latin" }], next: null },
+  );
+
+  it("reconstructs a ctx-driven branch from recorded answers (region not dropped)", () => {
+    const stack = buildResumeStack(
+      "code",
+      { code: "aa", region: "DJ", english: "Afar", script: "Latn" },
+      {}, // no ctx.ambiguous — static routing would skip 'region'
+      ctxBranch,
+    );
+    expect(stack?.map((e) => e.questionId)).toEqual(["code", "region", "english", "script"]);
+  });
+
+  it("skips the ctx-driven branch when no answer was recorded for it", () => {
+    const stack = buildResumeStack(
+      "code",
+      { code: "en", english: "English", script: "Latn" },
+      {},
+      ctxBranch,
+    );
+    expect(stack?.map((e) => e.questionId)).toEqual(["code", "english", "script"]);
+  });
 });
