@@ -7,8 +7,8 @@ describe("desktop_first_notice — definition", () => {
   it("has type notice", () => {
     expect(definition.type).toBe("notice");
   });
-  it("routes to language_name_autonym", () => {
-    expect(definition.next).toBe("language_name_autonym");
+  it("routes to language_name_english", () => {
+    expect(definition.next).toBe("language_name_english");
   });
 });
 

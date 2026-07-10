@@ -1,13 +1,15 @@
-// spec 030 US1 — langtags-picker-first identity flow.
+// spec 030 US1/FR-009 — English-name-first identity flow.
 //
-// The langtags picker (il_language_code) becomes the FIRST question; selecting a
-// language resolves the entry, which seeds the English-name and autonym
-// confirmations (il_language_english / il_language_autonym) and the script.
-// extractIdentityLite is deliberately UNCHANGED (english/autonym/code are still
-// read from their answers — now pre-filled), so identity extraction stays valid.
+// The English-name picker (il_language_english, options_source @langtags_names)
+// is the FIRST question; selecting a language resolves the entry, which seeds the
+// autonym choices (il_language_autonym), the target script, and the code
+// CONFIRMATION (il_language_code — now last of the three name/code steps).
+// extractIdentityLite is deliberately UNCHANGED (english/autonym/code are read
+// from their answers — now in the reordered positions), so identity extraction
+// stays valid.
 //
-// Pure-logic tests (no jsdom), matching IdentityLite.langtags.test.ts. The seed
-// WIRING itself (getSeedValue returning the resolved englishName/autonym) is
+// Pure-logic tests (no jsdom). The seed WIRING itself (getSeedValue returning the
+// resolved autonym/code, onEntryResolved carrying the picked entry) is
 // component-internal (refs in IdentityLite.tsx) and is covered by typecheck +
 // the flow/extraction contracts asserted here.
 
@@ -19,31 +21,32 @@ import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 
 const flow = loadModularFlow(identityLiteRaw as string);
 
-describe("spec 030 US1 — identity flow order (langtags picker first)", () => {
-  it("orders the questions: picker -> region -> english -> autonym -> script -> not-supported", () => {
-    // il_language_region (US3) sits after the picker in the membership; it is a
-    // conditional step reached only when the picked language is region-ambiguous.
+describe("spec 030 US1 — identity flow order (English name first)", () => {
+  it("orders the questions: english -> region -> autonym -> code -> script -> not-supported", () => {
+    // il_language_region (US3) sits after the English-name step in the
+    // membership; it is a conditional step reached only when the picked language
+    // is region-ambiguous.
     expect(flow.questions.map((q) => q.id)).toEqual([
-      "il_language_code",
-      "il_language_region",
       "il_language_english",
+      "il_language_region",
       "il_language_autonym",
+      "il_language_code",
       "il_target_script",
       "il_script_not_supported",
     ]);
   });
 
-  it("the first question is the langtags-backed autocomplete picker", () => {
+  it("the first question is the English-name langtags picker", () => {
     const first = flow.questions[0];
-    expect(first?.id).toBe("il_language_code");
+    expect(first?.id).toBe("il_language_english");
     expect(first?.type).toBe("autocomplete");
-    expect(first?.options_source).toBe("@langtags_iso639");
+    expect(first?.options_source).toBe("@langtags_names");
   });
 
-  it("the name confirmations follow the picker (english then autonym)", () => {
+  it("autonym then code confirmation follow the English name", () => {
     const ids = flow.questions.map((q) => q.id);
-    expect(ids.indexOf("il_language_english")).toBeGreaterThan(ids.indexOf("il_language_code"));
     expect(ids.indexOf("il_language_autonym")).toBeGreaterThan(ids.indexOf("il_language_english"));
+    expect(ids.indexOf("il_language_code")).toBeGreaterThan(ids.indexOf("il_language_autonym"));
   });
 });
 

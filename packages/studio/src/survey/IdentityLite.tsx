@@ -4,8 +4,8 @@
 // and the INDEPENDENT target script, deriving the routing/A2 prefill
 // confirmations (spec §5, §9). Language and script are decoupled. refs #369.
 
-import { useMemo, useRef, useCallback, useEffect } from "react";
-import type { SurveyPhaseResult, LintFinding, LangtagsProvenance, LanguageDefaults } from "@keyboard-studio/contracts";
+import { useMemo, useRef, useCallback } from "react";
+import type { SurveyPhaseResult, LintFinding, LangtagsProvenance, LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { loadModularFlow } from "./loadModularFlow.ts";
 import type { SurveyContext, FlowOption } from "./types.ts";
@@ -195,160 +195,165 @@ export function IdentityLite({
     [resume],
   );
 
-  // Initialised from the resumed answers so seeding stays coherent after a
-  // history-pop resume (mount lands on the last question with values restored).
-  const resumedLanguageCode = resumeAnswers?.["il_language_code"];
+  // The English name the author entered/picked at Q1 (il_language_english). Used
+  // as Q2's FALLBACK own-language name (spec 030 US2, per author request) only when
+  // langtags has no recorded own-script name for the language — the ~60% with no
+  // localname (T008), and free-text/unmatched languages. Captured on Q1 commit.
+  const q1EnglishRef = useRef<string>("");
 
-  // Track the latest committed language code (from il_language_code — now the
-  // FIRST question), used to look up langtags defaults for the downstream seeds.
-  const languageCodeRef = useRef<string>(
-    typeof resumedLanguageCode === "string" ? resumedLanguageCode : "",
-  );
-
-  // Autonym seed from the resolved langtags entry (spec 030). Seeds
-  // il_language_autonym. Read synchronously by getSeedValue in the same tick as
-  // onAnswerCommit. SurveyRunner enforces "seed on first arrival, never overwrite
-  // a user value", so Back-and-change re-seeds correctly. Frequently undefined —
-  // only ~40% of languages carry a local name (T008).
-  const autonymSeedRef = useRef<string | undefined>(undefined);
-
-  // Local-name options from the resolved entry (spec 030 US2): the datalist
-  // choices for il_language_autonym, supplied via getSeedOptions. Frequently
-  // undefined/empty (~60% of languages have no local name — T008), in which case
-  // the autocomplete field behaves as plain free text.
+  // Own-script names from the resolved entry / selected region variant (langtags
+  // `localname` + `localnames`). Head Q2's dropdown and, when present, seed its
+  // default (localNames[0] = the primary autonym). Frequently undefined (~60% of
+  // languages carry no local name — T008).
   const localNamesSeedRef = useRef<readonly string[] | undefined>(undefined);
 
-  // Track the proposed script seed from langtags (derived from the language
-  // code), and whether it has been seeded already. The seeded flag prevents
-  // re-seeding if the user goes Back and changes a prior answer.
-  //
-  // "Default once, then user owns it" — SurveyRunner already enforces this for
-  // the seed on first arrival; we use the ref so our seed function always
-  // returns the langtags-derived value when arriving forward at il_target_script.
-  // If the user edits the script and goes Back, Back discards the edit and the
-  // seed fires again on re-arrival — which is correct behavior (spec §8).
+  // Alternate/English names from the resolved entry (langtags `name` + `names`).
+  // Q2 dropdown FALLBACK only (spec 030 US2, per author request): offered as the
+  // choice list solely when the language has no own-script name; never mixed in
+  // alongside localNames. Not used as a default — an English name is never
+  // auto-selected as the own-language name.
+  const englishNamesSeedRef = useRef<readonly string[] | undefined>(undefined);
+
+  // Proposed target-script seed from langtags (from the resolved variant).
+  // "Default once, then user owns it" — SurveyRunner enforces the seed only on
+  // first forward arrival at il_target_script; Back discards unsaved edits so
+  // re-arrival re-seeds from this ref, which is correct (spec §8).
   const scriptSeedRef = useRef<string | undefined>(undefined);
 
-  // English-name seed from the resolved langtags entry (spec 030): seeds the
-  // il_language_english confirmation. Only seeds when blank; never overwrites a
-  // user value — enforced by SurveyRunner's "seed on first arrival" contract.
-  const englishNameSeedRef = useRef<string | undefined>(undefined);
+  // Language-code seed (spec 030 US4): the 3-letter ISO 639-3 code of the
+  // resolved entry (falling back to the canonical bare subtag when the entry has
+  // no 639-3 code). Seeds il_language_code for confirmation. Undefined when the
+  // English name matched nothing — the author types a code or leaves it blank.
+  const codeSeedRef = useRef<string | undefined>(undefined);
 
   // Provenance map: questionId → LangtagsProvenance, for seeded fields.
   // Stored in a ref so getSeedProvenance reads it without re-renders.
   const provenanceRef = useRef<Map<string, LangtagsProvenance>>(new Map());
 
-  // Cached langtags module (spec 030 US3): lets getNextOverride resolve
-  // synchronously at render time to decide whether the region step applies.
-  const langtagsModRef = useRef<Awaited<ReturnType<typeof loadLangtags>> | null>(null);
+  // The search summary the author selected at il_language_english (spec 030 US1).
+  // Its `hasRegionVariants` flag is read synchronously by getNextOverride at
+  // render time to decide whether the region step follows — a name string alone
+  // cannot carry this. Null until a listed language is picked (free text → null).
+  const resolvedSummaryRef = useRef<LanguageSummary | null>(null);
 
-  // The langtags entry resolved by il_language_code (spec 030 US3): read by the
-  // region question's options and its variant-selection handler. Null until a
-  // known language is picked.
+  // The full langtags entry resolved from the selected summary (spec 030 US3):
+  // read by the region question's options and its variant-selection handler, and
+  // the source of the autonym / local-name / script / code seeds. Null until a
+  // known language is picked; populated asynchronously right after selection.
   const resolvedEntryRef = useRef<LanguageDefaults | null>(null);
 
   // The region subtag chosen at il_language_region (spec 030 US3), folded into
   // the BCP47 tag. Empty when unambiguous or skipped.
   const selectedRegionRef = useRef<string>("");
 
-  // Kick off the one-time lazy load on mount so the langtags module is ready
-  // by the time the user reaches il_language_code. Caches the module for
-  // synchronous getNextOverride resolution. Does NOT block rendering.
-  useEffect(() => {
-    void loadLangtags().then((mod) => {
-      langtagsModRef.current = mod;
-    }).catch(() => {
-      // Degrade silently on import failure — no seed/routing, fields stay free-text (FR-009).
-    });
+  // Seed the downstream fields from a resolved langtags entry. Shared by the
+  // English-name selection (primary variant) and — via reseedFromVariant — the
+  // region pick. Records provenance only for the fields actually seeded (FR-010).
+  const seedFromEntry = useCallback((defaults: LanguageDefaults) => {
+    scriptSeedRef.current = scriptToTargetOption(defaults.defaultScript) ?? undefined;
+    // 3-letter ISO 639-3 code preferred (author's choice), else the bare subtag.
+    codeSeedRef.current =
+      defaults.iso639_3 !== undefined && defaults.iso639_3 !== ""
+        ? defaults.iso639_3
+        : defaults.code !== ""
+          ? defaults.code
+          : undefined;
+    // Own-script names head Q2's dropdown and seed its default (localNames[0]);
+    // English/alternate names are the dropdown's fallback only (used when there is
+    // no own-script name). When a recorded own-script name IS the default, the
+    // autonym field shows the langtags caption.
+    localNamesSeedRef.current =
+      defaults.localNames !== undefined && defaults.localNames.length > 0
+        ? defaults.localNames
+        : undefined;
+    englishNamesSeedRef.current =
+      defaults.englishNames !== undefined && defaults.englishNames.length > 0
+        ? defaults.englishNames
+        : undefined;
+
+    const provenance = new Map<string, LangtagsProvenance>();
+    if (scriptSeedRef.current !== undefined) provenance.set("il_target_script", LANGTAGS_PROVENANCE);
+    if (codeSeedRef.current !== undefined) provenance.set("il_language_code", LANGTAGS_PROVENANCE);
+    // The autonym default is a langtags value only when an own-script name exists.
+    if (localNamesSeedRef.current !== undefined) provenance.set("il_language_autonym", LANGTAGS_PROVENANCE);
+    provenanceRef.current = provenance;
   }, []);
+
+  // Reset every resolved-entry-derived seed. Called when the English name is
+  // cleared / matches nothing (free text → graceful degradation, FR-003).
+  const clearSeeds = useCallback(() => {
+    scriptSeedRef.current = undefined;
+    codeSeedRef.current = undefined;
+    localNamesSeedRef.current = undefined;
+    englishNamesSeedRef.current = undefined;
+    resolvedEntryRef.current = null;
+    selectedRegionRef.current = "";
+    provenanceRef.current = new Map();
+  }, []);
+
+  // Side-channel from the @langtags_names picker (spec 030 US1): the author
+  // selected (entry) or cleared/free-texted (null) a concrete language at
+  // il_language_english. resolvedSummaryRef is set synchronously so
+  // getNextOverride sees hasRegionVariants on the same render; the full entry is
+  // fetched asynchronously to seed the downstream steps (module already loaded).
+  const handleEntryResolved = useCallback(
+    (questionId: string, entry: LanguageSummary | null) => {
+      if (questionId !== "il_language_english") return;
+      resolvedSummaryRef.current = entry;
+      selectedRegionRef.current = "";
+      if (entry === null) {
+        clearSeeds();
+        return;
+      }
+      void loadLangtags()
+        .then((mod) => {
+          const defaults = mod.getLanguageDefaults(entry.code);
+          if (defaults !== null) {
+            resolvedEntryRef.current = defaults;
+            seedFromEntry(defaults);
+          } else {
+            clearSeeds();
+          }
+        })
+        .catch(() => {
+          // Degrade silently on import failure — seeds stay undefined, fields
+          // remain free-text (FR-009). No unhandled rejection.
+        });
+    },
+    [seedFromEntry, clearSeeds],
+  );
 
   const handleAnswerCommit = useCallback(
     (questionId: string, value: string | string[] | undefined) => {
-      if (questionId === "il_language_code") {
-        const code = typeof value === "string" ? value.trim() : "";
-        languageCodeRef.current = code;
-        // Reset prior seeds so re-selecting the language re-derives them.
-        scriptSeedRef.current = undefined;
-        englishNameSeedRef.current = undefined;
-        autonymSeedRef.current = undefined;
-        localNamesSeedRef.current = undefined;
-        resolvedEntryRef.current = null;
-        selectedRegionRef.current = "";
-        provenanceRef.current = new Map();
-
-        if (code !== "") {
-          // Resolve langtags defaults asynchronously. The module is already
-          // loaded from the mount effect; by the time the user reaches the
-          // downstream confirmations (english/autonym/script) it has resolved.
-          void loadLangtags().then((mod) => {
-            const defaults = mod.getLanguageDefaults(code);
-            if (defaults !== null) {
-              resolvedEntryRef.current = defaults;
-              const scriptOption = scriptToTargetOption(defaults.defaultScript);
-              // Only seed when there is a dedicated option for this script.
-              // null means no mapping — seeding "other" would be misleading.
-              scriptSeedRef.current = scriptOption ?? undefined;
-
-              // Seed the English-name and autonym confirmations from the resolved
-              // entry. autonym is frequently absent (~60% of languages) — then the
-              // seed stays undefined and the author types it (FR-003/FR-005).
-              if (defaults.englishName !== undefined && defaults.englishName !== "") {
-                englishNameSeedRef.current = defaults.englishName;
-              }
-              if (defaults.autonym !== undefined && defaults.autonym !== "") {
-                autonymSeedRef.current = defaults.autonym;
-              }
-              // Local-name choices for the autonym picker (US2). Absent for most
-              // languages — then the field stays free text.
-              if (defaults.localNames !== undefined && defaults.localNames.length > 0) {
-                localNamesSeedRef.current = defaults.localNames;
-              }
-
-              // Record provenance only for fields we actually seeded.
-              provenanceRef.current = new Map([
-                ...(scriptSeedRef.current !== undefined
-                  ? [["il_target_script", LANGTAGS_PROVENANCE] as [string, LangtagsProvenance]]
-                  : []),
-                ...(englishNameSeedRef.current !== undefined
-                  ? [["il_language_english", LANGTAGS_PROVENANCE] as [string, LangtagsProvenance]]
-                  : []),
-                ...(autonymSeedRef.current !== undefined
-                  ? [["il_language_autonym", LANGTAGS_PROVENANCE] as [string, LangtagsProvenance]]
-                  : []),
-              ]);
-            }
-          }).catch(() => {
-            // Degrade silently on import failure — seeds stay undefined, fields
-            // remain free-text (FR-009). No unhandled rejection.
-          });
-        }
+      if (questionId === "il_language_english") {
+        // Capture the Q1 name so it can seed Q2's default own-language name and
+        // head its choice list (spec 030 US2). Works for a picked language and
+        // for free text with no langtags match alike.
+        q1EnglishRef.current = typeof value === "string" ? value.trim() : "";
       }
 
       if (questionId === "il_language_region") {
-        // The chosen region narrows the resolved variant (spec 030 US3): its
-        // autonym / local-name / script can differ by region, so override those
-        // seeds. Skipping (blank) leaves the primary-variant seeds in place.
+        // The chosen region narrows the resolved variant (spec 030 US3): its own-
+        // script names / script can differ by region, so override those seeds.
+        // Skipping (blank) leaves the primary-variant seeds in place. englishNames
+        // stay the entry-level set (region variants carry no English names).
         const region = typeof value === "string" ? value.trim() : "";
         selectedRegionRef.current = region;
         const variant = resolvedEntryRef.current?.regionVariants?.find((v) => v.region === region);
         if (variant !== undefined) {
-          autonymSeedRef.current =
-            variant.autonym !== undefined && variant.autonym !== "" ? variant.autonym : undefined;
           localNamesSeedRef.current = variant.localNames.length > 0 ? variant.localNames : undefined;
           scriptSeedRef.current = scriptToTargetOption(variant.defaultScript) ?? undefined;
 
-          // Keep provenance in step with the reseeded fields (FR-010): the
-          // variant may supply a value the primary entry lacked (needs a new
-          // caption) or lack one the primary entry had (stale caption must be
-          // cleared). il_language_english is untouched — region variants don't
-          // carry an English name.
+          // Keep provenance in step with the reseeded fields (FR-010): the autonym
+          // default is a langtags value only when the variant has an own-script
+          // name; il_language_code is untouched (region variants share the subtag).
           const nextProvenance = new Map(provenanceRef.current);
           if (scriptSeedRef.current !== undefined) {
             nextProvenance.set("il_target_script", LANGTAGS_PROVENANCE);
           } else {
             nextProvenance.delete("il_target_script");
           }
-          if (autonymSeedRef.current !== undefined) {
+          if (localNamesSeedRef.current !== undefined) {
             nextProvenance.set("il_language_autonym", LANGTAGS_PROVENANCE);
           } else {
             nextProvenance.delete("il_language_autonym");
@@ -360,8 +365,8 @@ export function IdentityLite({
     [],
   );
 
-  // Pre-fill the english / autonym / script confirmations from the langtags
-  // entry resolved by il_language_code (spec 030).
+  // Pre-fill the autonym / code / script steps from the langtags entry resolved
+  // at il_language_english (spec 030 US2/US4).
   //
   // "Default once, then user owns it" contract is upheld by SurveyRunner:
   // the seed only fires on forward push; Back discards unsaved edits (stack pop),
@@ -374,16 +379,20 @@ export function IdentityLite({
   // NOT called for that entry — preserving author override.
   const getSeedValue = useCallback(
     (questionId: string): string | string[] | undefined => {
-      if (questionId === "il_language_english") {
-        // English-name confirmation, seeded from the langtags entry resolved by
-        // il_language_code (spec 030). Undefined when the language was blank /
-        // unmatched — the author types it.
-        return englishNameSeedRef.current;
-      }
       if (questionId === "il_language_autonym") {
-        // Own-script name, seeded from the resolved entry's autonym; frequently
-        // undefined (~60% of languages have no local name) — then free text.
-        return autonymSeedRef.current;
+        // Default own-language name (spec 030 US2, per author request): the primary
+        // recorded own-script name (localNames[0]) when langtags has one; otherwise
+        // fall back to the Q1 response. The author keeps it or picks from the
+        // dropdown (own-script + English/alternate names).
+        const locals = localNamesSeedRef.current;
+        if (locals !== undefined && locals.length > 0 && locals[0]!.trim() !== "") {
+          return locals[0];
+        }
+        return q1EnglishRef.current !== "" ? q1EnglishRef.current : undefined;
+      }
+      if (questionId === "il_language_code") {
+        // 3-letter language-code confirmation, seeded from the resolved entry.
+        return codeSeedRef.current;
       }
       if (questionId === "il_target_script") {
         return scriptSeedRef.current;
@@ -402,16 +411,30 @@ export function IdentityLite({
     [],
   );
 
-  // Dynamic datalist options (spec 030 US2): the resolved entry's local names
-  // are offered as choices for il_language_autonym. Undefined when the language
-  // has no recorded local name — the field is then plain free text.
+  // Dynamic datalist options (spec 030 US2, per author request). For
+  // il_language_autonym the choice list comes from langtags as a FALLBACK CHAIN,
+  // not a concatenation: prefer the recorded own-script names (langtags localname
+  // + localnames, merged into localNames with the primary first). ONLY when the
+  // language has no own-script name at all does the list fall back to the English/
+  // alternate names (langtags name + names). English names are never mixed in
+  // alongside own-script names. De-duplicated case-insensitively; when langtags
+  // has neither the list is empty (undefined) and the field falls back to the Q1
+  // name as plain free text.
   const getSeedOptions = useCallback(
     (questionId: string): FlowOption[] | undefined => {
       if (questionId === "il_language_autonym") {
-        const names = localNamesSeedRef.current;
-        if (names !== undefined && names.length > 0) {
-          return names.map((n) => ({ value: n, label: n }));
+        const locals = localNamesSeedRef.current ?? [];
+        const source = locals.length > 0 ? locals : (englishNamesSeedRef.current ?? []);
+        const seen = new Set<string>();
+        const opts: FlowOption[] = [];
+        for (const n of source) {
+          const trimmed = n.trim();
+          const key = trimmed.toLowerCase();
+          if (trimmed === "" || seen.has(key)) continue;
+          seen.add(key);
+          opts.push({ value: trimmed, label: trimmed });
         }
+        return opts.length > 0 ? opts : undefined;
       }
       if (questionId === "il_language_region") {
         // The resolved entry's region variants (spec 030 US3): value = region
@@ -426,20 +449,16 @@ export function IdentityLite({
     [],
   );
 
-  // Route il_language_code -> il_language_region only when the picked language is
-  // region-ambiguous (spec 030 US3 / FR-014). Resolves synchronously from the
-  // cached langtags module against the current value at render time (no
-  // dependency on onAnswerCommit ordering).
+  // Route il_language_english -> il_language_region only when the picked language
+  // is region-ambiguous (spec 030 US3 / FR-014). Reads resolvedSummaryRef, set
+  // synchronously by handleEntryResolved when the author selects a suggestion, so
+  // it is current at render time (no dependency on onAnswerCommit ordering, and
+  // no need to re-derive from the name — which a homonym could not).
   const getNextOverride = useCallback(
-    (questionId: string, value: string | string[] | undefined): string | undefined => {
-      if (questionId === "il_language_code") {
-        const code = typeof value === "string" ? value.trim() : "";
-        const mod = langtagsModRef.current;
-        if (code !== "" && mod !== null) {
-          const defaults = mod.getLanguageDefaults(code);
-          if (defaults?.regionVariants !== undefined && defaults.regionVariants.length > 1) {
-            return "il_language_region";
-          }
+    (questionId: string, _value: string | string[] | undefined): string | undefined => {
+      if (questionId === "il_language_english") {
+        if (resolvedSummaryRef.current?.hasRegionVariants === true) {
+          return "il_language_region";
         }
       }
       return undefined;
@@ -480,6 +499,9 @@ export function IdentityLite({
         getSeedProvenance={getSeedProvenance}
         getSeedOptions={getSeedOptions}
         getNextOverride={getNextOverride}
+        onEntryResolved={handleEntryResolved}
+        advanceOnSelect
+        contentMinHeight={220}
         {...(onBack !== undefined ? { onBack } : {})}
         {...(findingsByQuestionId !== undefined ? { findingsByQuestionId } : {})}
         {...(resumeAnswers !== undefined ? { resumeAnswers } : {})}

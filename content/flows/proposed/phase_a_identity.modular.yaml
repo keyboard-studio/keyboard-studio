@@ -23,8 +23,8 @@ status: proposed
 
 questions:
   - desktop_first_notice
-  - language_name_autonym
   - language_name_english
+  - language_name_autonym
   - iso_code
   - region
   - primary_script

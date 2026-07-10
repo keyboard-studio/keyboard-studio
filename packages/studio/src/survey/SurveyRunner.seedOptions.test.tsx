@@ -1,9 +1,11 @@
 // Component test for SurveyRunner's getSeedOptions plumbing (spec 030 US2):
-// dynamic datalist options injected for the current question (e.g. the resolved
-// langtags entry's local names for il_language_autonym). jsdom render.
+// dynamic options injected for the current question (e.g. the resolved langtags
+// entry's local names for il_language_autonym). The field is the shared
+// StyledCombobox, which renders its rows only while open, so the helper focuses
+// the input before reading the option values. jsdom render.
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, cleanup } from "@testing-library/react";
+import { render, cleanup, fireEvent } from "@testing-library/react";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import type { FlowDef, FlowOption } from "./types.ts";
 
@@ -23,14 +25,18 @@ const FLOW: FlowDef = {
 
 afterEach(cleanup);
 
-function datalistOptionValues(container: HTMLElement): string[] {
-  return Array.from(container.querySelectorAll("datalist option")).map(
-    (o) => o.getAttribute("value") ?? "",
+// Focus the styled combobox (its rows render only while open) and read the
+// value of each rendered option row.
+function styledOptionValues(container: HTMLElement): string[] {
+  const input = container.querySelector<HTMLInputElement>('[role="combobox"]');
+  if (input !== null) fireEvent.focus(input);
+  return Array.from(container.querySelectorAll('[role="option"]')).map(
+    (o) => o.getAttribute("data-value") ?? "",
   );
 }
 
-describe("SurveyRunner getSeedOptions — dynamic datalist options (spec 030 US2)", () => {
-  it("injects the caller's options as the current field's datalist choices", () => {
+describe("SurveyRunner getSeedOptions — dynamic options (spec 030 US2)", () => {
+  it("injects the caller's options as the current field's dropdown choices", () => {
     const opts: FlowOption[] = [
       { value: "Аԥсшәа", label: "Аԥсшәа" },
       { value: "аҧсуа бызшәа", label: "аҧсуа бызшәа" },
@@ -38,7 +44,7 @@ describe("SurveyRunner getSeedOptions — dynamic datalist options (spec 030 US2
     const { container } = render(
       <SurveyRunner flow={FLOW} onComplete={vi.fn()} getSeedOptions={() => opts} />,
     );
-    const values = datalistOptionValues(container);
+    const values = styledOptionValues(container);
     expect(values).toContain("Аԥсшәа");
     expect(values).toContain("аҧсуа бызшәа");
   });
@@ -47,14 +53,14 @@ describe("SurveyRunner getSeedOptions — dynamic datalist options (spec 030 US2
     const { container } = render(
       <SurveyRunner flow={FLOW} onComplete={vi.fn()} getSeedOptions={() => undefined} />,
     );
-    expect(datalistOptionValues(container)).toHaveLength(0);
+    expect(styledOptionValues(container)).toHaveLength(0);
   });
 
   it("degrades to a plain field when getSeedOptions returns an empty array (the ~60% no-local-name case)", () => {
     const { container } = render(
       <SurveyRunner flow={FLOW} onComplete={vi.fn()} getSeedOptions={() => []} />,
     );
-    expect(datalistOptionValues(container)).toHaveLength(0);
+    expect(styledOptionValues(container)).toHaveLength(0);
   });
 
   it("injects options only for the matching question id", () => {
@@ -65,6 +71,6 @@ describe("SurveyRunner getSeedOptions — dynamic datalist options (spec 030 US2
         getSeedOptions={(id) => (id === "some-other-id" ? [{ value: "x", label: "x" }] : undefined)}
       />,
     );
-    expect(datalistOptionValues(container)).toHaveLength(0);
+    expect(styledOptionValues(container)).toHaveLength(0);
   });
 });
