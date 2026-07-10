@@ -70,26 +70,14 @@ describe("defaultProvenance", () => {
 // ---------------------------------------------------------------------------
 
 describe("DEFAULT_TOUCH_SUGGEST_POLICY", () => {
-  it("has widthBudget of 10", () => {
-    expect(DEFAULT_TOUCH_SUGGEST_POLICY.widthBudget).toBe(10);
-  });
-
-  it("targets symbol-layer for number-row characters", () => {
-    expect(DEFAULT_TOUCH_SUGGEST_POLICY.numberRowTarget).toBe("symbol-layer");
-  });
-
-  it("uses long-press-demotion for modifier policy", () => {
-    expect(DEFAULT_TOUCH_SUGGEST_POLICY.modifierPolicy).toBe(
-      "long-press-demotion"
-    );
-  });
-
-  it("hosts dead-key output on the base character", () => {
-    expect(DEFAULT_TOUCH_SUGGEST_POLICY.deadKeyHost).toBe("base");
-  });
-
-  it("defaults to long-press gesture", () => {
-    expect(DEFAULT_TOUCH_SUGGEST_POLICY.defaultGesture).toBe("long-press");
+  it("has expected default values", () => {
+    expect(DEFAULT_TOUCH_SUGGEST_POLICY).toEqual({
+      widthBudget: 10,
+      numberRowTarget: "symbol-layer",
+      modifierPolicy: "long-press-demotion",
+      deadKeyHost: "base",
+      defaultGesture: "long-press",
+    });
   });
 
   it("is structurally complete — all required fields present", () => {
@@ -106,35 +94,16 @@ describe("DEFAULT_TOUCH_SUGGEST_POLICY", () => {
   });
 
   it("policy is overridable per-field without clobbering siblings", () => {
-    const override: Partial<TouchSuggestPolicy> = { widthBudget: 11 };
     const merged: TouchSuggestPolicy = {
       ...DEFAULT_TOUCH_SUGGEST_POLICY,
-      ...override,
+      widthBudget: 11,
     };
 
-    // Overridden field
     expect(merged.widthBudget).toBe(11);
-
-    // Sibling fields preserved
-    expect(merged.numberRowTarget).toBe(
-      DEFAULT_TOUCH_SUGGEST_POLICY.numberRowTarget
-    );
-    expect(merged.modifierPolicy).toBe(
-      DEFAULT_TOUCH_SUGGEST_POLICY.modifierPolicy
-    );
+    expect(merged.numberRowTarget).toBe(DEFAULT_TOUCH_SUGGEST_POLICY.numberRowTarget);
+    expect(merged.modifierPolicy).toBe(DEFAULT_TOUCH_SUGGEST_POLICY.modifierPolicy);
     expect(merged.deadKeyHost).toBe(DEFAULT_TOUCH_SUGGEST_POLICY.deadKeyHost);
-    expect(merged.defaultGesture).toBe(
-      DEFAULT_TOUCH_SUGGEST_POLICY.defaultGesture
-    );
-  });
-
-  it("numberRowTarget override does not affect other fields", () => {
-    const merged: TouchSuggestPolicy = {
-      ...DEFAULT_TOUCH_SUGGEST_POLICY,
-      numberRowTarget: "numeric-layer",
-    };
-    expect(merged.numberRowTarget).toBe("numeric-layer");
-    expect(merged.widthBudget).toBe(10);
+    expect(merged.defaultGesture).toBe(DEFAULT_TOUCH_SUGGEST_POLICY.defaultGesture);
   });
 });
 

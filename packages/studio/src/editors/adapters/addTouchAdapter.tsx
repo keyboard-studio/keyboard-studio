@@ -28,12 +28,10 @@ export function AddTouchAdapter({ onComplete, onBack }: EditorStepProps) {
   const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
 
   function handleComplete(assignments: TouchAssignment[]) {
-    const payload: TouchCompleteResult = { assignments, baseIr, baseVfs };
-    onComplete(payload);
+    onComplete({ assignments, baseIr, baseVfs });
   }
 
   // TouchGallery requires onBack — the manifest must supply it for this step.
   // If absent (misconfigured manifest), fall back to a no-op so the UI doesn't crash.
-  const handleBack = onBack ?? (() => undefined);
-  return <TouchGallery onComplete={handleComplete} onBack={handleBack} />;
+  return <TouchGallery onComplete={handleComplete} onBack={onBack ?? (() => undefined)} />;
 }

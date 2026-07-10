@@ -15,6 +15,22 @@ const btnRemove: React.CSSProperties = {
   borderRadius: 7, padding: '4px 11px', whiteSpace: 'nowrap',
 };
 
+interface BannerRow { node: DepNode; message: string; buttonLabel: string }
+
+function BannerItem({ node, message, buttonLabel, onRemove }: BannerRow & { onRemove: (nodeId: string) => void }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--app-text)' }}>
+      <span style={{ color: 'var(--sil-orange-dark)', display: 'inline-flex', flexShrink: 0 }}><WarnIcon size={15} /></span>
+      <span style={{ flex: 1 }}>
+        <b>{node.name}</b> {message}
+      </span>
+      <button style={btnRemove} onClick={() => onRemove(node.nodeId)}>
+        {buttonLabel}
+      </button>
+    </div>
+  );
+}
+
 export function DepBanner({ orphanedNodes, unusedStoreNodes, onRemoveNode }: DepBannerProps) {
   if (orphanedNodes.length === 0 && unusedStoreNodes.length === 0) return null;
   return (
@@ -25,26 +41,22 @@ export function DepBanner({ orphanedNodes, unusedStoreNodes, onRemoveNode }: Dep
       borderBottom: '1px solid color-mix(in srgb, var(--sil-orange) 35%, transparent)',
     }}>
       {orphanedNodes.map((n) => (
-        <div key={n.nodeId} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--app-text)' }}>
-          <span style={{ color: 'var(--sil-orange-dark)', display: 'inline-flex', flexShrink: 0 }}><WarnIcon size={15} /></span>
-          <span style={{ flex: 1 }}>
-            <b>{n.name}</b> has no outputs left. Its trigger key will silently swallow the input, blocking the normal keystroke. Remove the rule too to restore default key behavior.
-          </span>
-          <button style={btnRemove} onClick={() => onRemoveNode(n.nodeId)}>
-            Remove trigger key too
-          </button>
-        </div>
+        <BannerItem
+          key={n.nodeId}
+          node={n}
+          message="has no outputs left. Its trigger key will silently swallow the input, blocking the normal keystroke. Remove the rule too to restore default key behavior."
+          buttonLabel="Remove trigger key too"
+          onRemove={onRemoveNode}
+        />
       ))}
       {unusedStoreNodes.map((n) => (
-        <div key={n.nodeId} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--app-text)' }}>
-          <span style={{ color: 'var(--sil-orange-dark)', display: 'inline-flex', flexShrink: 0 }}><WarnIcon size={15} /></span>
-          <span style={{ flex: 1 }}>
-            <b>{n.name}</b> is no longer referenced and can be removed too.
-          </span>
-          <button style={btnRemove} onClick={() => onRemoveNode(n.nodeId)}>
-            Remove store too
-          </button>
-        </div>
+        <BannerItem
+          key={n.nodeId}
+          node={n}
+          message="is no longer referenced and can be removed too."
+          buttonLabel="Remove store too"
+          onRemove={onRemoveNode}
+        />
       ))}
     </div>
   );

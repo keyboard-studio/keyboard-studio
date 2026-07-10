@@ -11,8 +11,8 @@
 //   8. Download warning: base-id warning shown when keyboardId is still the base id.
 //   9. No base-id warning once keyboardId differs from base id.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
@@ -45,11 +45,6 @@ function seedTrack2() {
 beforeEach(() => {
   useWorkingCopyStore.getState().reset();
   vi.clearAllMocks();
-});
-
-afterEach(() => {
-  useWorkingCopyStore.getState().reset();
-  cleanup();
 });
 
 // ---------------------------------------------------------------------------
