@@ -1320,6 +1320,48 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     expect(screen.queryByRole("button", { name: /Add another layer/i })).toBeNull();
   });
 
+  it("handleRemoveRaltSlot: removing a middle layer slot shifts later slots down and keeps their values", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    // Slot 1 defaults to RALT. Add slot 2 (CTRL) and slot 3 (SHIFT).
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    fireEvent.change(screen.getByLabelText(/Layer 2 for layer-switch combo/i), {
+      target: { value: "CTRL" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    fireEvent.change(screen.getByLabelText(/Layer 3 for layer-switch combo/i), {
+      target: { value: "SHIFT" },
+    });
+
+    // Remove the middle slot (CTRL, index 1).
+    fireEvent.click(screen.getByRole("button", { name: /Remove layer 2/i }));
+
+    // Slot 3 is gone; slot 2 now holds what was slot 3's value (SHIFT) —
+    // values are re-indexed by the removal, not reset to blank.
+    expect(screen.queryByLabelText(/Layer 3 for layer-switch combo/i)).toBeNull();
+    const layer2 = screen.getByLabelText(/Layer 2 for layer-switch combo/i) as HTMLSelectElement;
+    expect(layer2.value).toBe("SHIFT");
+
+    // Applying still produces a valid, canonically-ordered combo from the
+    // remaining (RALT, SHIFT) slots — the removed CTRL is gone entirely.
+    fireEvent.change(screen.getByLabelText(/Base key for layer-switch combo/i), {
+      target: { value: "K_E" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for ε/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
+      "[SHIFT RALT K_E]",
+    );
+  });
+
   it("hides the Add-layer button until every rendered dropdown has a selection", async () => {
     instantiateWorkingCopy();
     seedInventory(["ε"]);
@@ -1416,6 +1458,44 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     fireEvent.change(firstLayerSelect, { target: { value: "CAPS" } });
 
     expect(secondLayerSelect.value).toBe("");
+  });
+
+  it("falls back to the default modifier pool (no crash) when workingIr is null but a base keyboard is selected", async () => {
+    // No instantiateWorkingCopy() call — store.ir and store.baseIr both stay
+    // null, so MechanismGallery's workingIr resolves to null even though
+    // selectedBaseKeyboard is set. collectModifierTokensInUse must not be
+    // called on a null IR; the pool must fall back to the documented
+    // defaults (SHIFT/CTRL/RALT/LALT/CAPS/NCAPS) rather than crashing.
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    const firstLayerSelect = screen.getByLabelText(
+      /Layer 1 for layer-switch combo/i,
+    ) as HTMLSelectElement;
+
+    // Pre-filled with the default alt-family token.
+    expect(firstLayerSelect.value).toBe("RALT");
+
+    const optionValues = Array.from(firstLayerSelect.options)
+      .map((o) => o.value)
+      .filter((v) => v !== "");
+    expect(new Set(optionValues)).toEqual(
+      new Set(["SHIFT", "CTRL", "RALT", "LALT", "CAPS", "NCAPS"]),
+    );
+
+    // Applying still works end to end against the fallback pool.
+    fireEvent.change(screen.getByLabelText(/Base key for layer-switch combo/i), {
+      target: { value: "K_E" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for ε/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe("[RALT K_E]");
   });
 });
 

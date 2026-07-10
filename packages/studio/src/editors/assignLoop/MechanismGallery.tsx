@@ -1327,6 +1327,16 @@ export function MechanismGallery({
       // Build a single-entry held-layer rule for this character, keyed on
       // whichever combo of ModifierTokens the author picked (generalized S-08).
       const chosenTokens = raltTokens.filter((t): t is ModifierToken => t !== "");
+      let altgrKeyList: string;
+      try {
+        altgrKeyList = comboToKeySpec(canonicalizeCombo(chosenTokens), selectedRaltKey);
+      } catch {
+        // canonicalizeCombo only throws for a mutually-exclusive combo, which
+        // the dropdown's own exclusion logic (handleRaltTokenChange) already
+        // prevents from being selected — structurally unreachable today.
+        // Guarded anyway: skip recording rather than crashing the gallery.
+        return;
+      }
       assignment = {
         scope: "individual",
         target: currentChar,
@@ -1336,7 +1346,7 @@ export function MechanismGallery({
             patternId: PATTERN_RALT,
             strategyId: "S-08",
             slotValues: {
-              altgrKeyList: comboToKeySpec(canonicalizeCombo(chosenTokens), selectedRaltKey),
+              altgrKeyList,
               altgrOutputList: currentChar,
             },
           },

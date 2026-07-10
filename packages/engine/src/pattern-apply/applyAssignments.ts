@@ -454,8 +454,8 @@ export function applyAssignments(
   // RAlt assignments share a single store(altgrKeys)/store(altgrOutput) pair.
   // Having multiple refs with the same patternId but different slots would
   // produce duplicate store declarations → KMN compile error.
-  const RALT_PATTERN = "modifier_as_layer_switch";
-  const raltRefs = [...seen.values()].filter((r) => r.patternId === RALT_PATTERN);
+  const LAYER_SWITCH_PATTERN = "modifier_as_layer_switch";
+  const raltRefs = [...seen.values()].filter((r) => r.patternId === LAYER_SWITCH_PATTERN);
   if (raltRefs.length > 1) {
     for (const r of raltRefs) seen.delete(mechanismKey(r));
     const merged: MechanismRef = {

@@ -26,7 +26,7 @@
  *     has its own callers).
  */
 
-import type { KeyboardIR, IRRule } from "@keyboard-studio/contracts";
+import type { KeyboardIR, IRRule, StoreItem } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -276,9 +276,93 @@ function firstRuleCharOutput(rule: IRRule): string | undefined {
   return undefined;
 }
 
+// ---------------------------------------------------------------------------
+// `any(store) > index(store, N)` store-indirection resolution — the shape
+// the production S-08 pattern uses (content/patterns/desktop-input/
+// modifier-as-layer-switch.yaml) instead of one `[MODS VKEY] > 'char'` rule
+// per key. Mirrors collectCharContributors.ts's store/index resolution
+// approach (walk `ir.stores` by name, pair positions), generalized here to
+// also recover each entry's modifier combo.
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve a single store item that names a key (with or without modifiers)
+ * into its combo tokens + vkey, or `null` for an item that isn't a key-spec
+ * entry (e.g. the bare `any` marker).
+ *
+ * A modifier-free bracket (`[K_E]`) parses to a typed `{kind:"vkey"}` store
+ * item (parse.ts's parseStoreItems) — resolved here with an empty token list.
+ * A modifier-bearing bracket (`[SHIFT RALT K_E]`) has no typed StoreItem
+ * representation (the locked `StoreItem` union has no modifiers field), so
+ * the codec preserves it verbatim as `{kind:"raw"}` — resolved here by
+ * re-parsing that text through {@link parseKeySpec}.
+ */
+function resolveStoreKeyItem(item: StoreItem): { tokens: ModifierToken[]; vkey: string } | null {
+  if (item.kind === "vkey") return { tokens: [], vkey: item.name };
+  if (item.kind === "raw") return parseKeySpec(item.text);
+  return null;
+}
+
+/** One resolved position of an `any(inputStore) > index(outputStore, N)` rule. */
+interface AnyIndexEntry {
+  tokens: ModifierToken[];
+  vkey: string;
+  /** `undefined` when the output store has no char at the matching position. */
+  char: string | undefined;
+}
+
+/**
+ * Resolve the `any(store) > index(store, N)` store-indirection form into
+ * per-position combo/vkey/char entries, positionally pairing each entry in
+ * the `any()` store with the same-position entry in the `index()` store
+ * (KMN's `index(store, N)` here always refers back to the sole `any()`
+ * context group, so position i of the input store maps to position i of the
+ * output store). Returns `[]` for rules that aren't this shape — including
+ * ordinary per-key `[MODS VKEY] > 'char'` rules, which extractRuleModifiers/
+ * extractRuleVkey already handle directly.
+ */
+function resolveAnyIndexEntries(ir: KeyboardIR, rule: IRRule): AnyIndexEntry[] {
+  const anyEl = rule.context.find(
+    (el): el is Extract<IRRule["context"][number], { kind: "any" }> => el.kind === "any",
+  );
+  if (!anyEl) return [];
+
+  const indexEl = rule.output.find(
+    (el): el is Extract<IRRule["output"][number], { kind: "index" }> => el.kind === "index",
+  );
+
+  const inputStore = ir.stores.find((s) => s.name === anyEl.storeRef);
+  if (!inputStore) return [];
+  const outputStore = indexEl ? ir.stores.find((s) => s.name === indexEl.storeRef) : undefined;
+
+  const entries: AnyIndexEntry[] = [];
+  for (let i = 0; i < inputStore.items.length; i++) {
+    const item = inputStore.items[i];
+    if (!item) continue;
+
+    const resolved = resolveStoreKeyItem(item);
+    if (!resolved) continue;
+
+    let tokens: ModifierToken[];
+    try {
+      tokens = canonicalizeCombo(resolved.tokens);
+    } catch {
+      continue;
+    }
+
+    const outItem = outputStore?.items[i];
+    const char = outItem?.kind === "char" ? outItem.value : undefined;
+
+    entries.push({ tokens, vkey: resolved.vkey, char });
+  }
+  return entries;
+}
+
 /**
  * Collect every distinct {@link ModifierToken} used anywhere in the IR's
- * (non-readonly) rule groups.
+ * (non-readonly) rule groups — both from direct `[MODS VKEY] > 'char'` rules
+ * and from the `any(store) > index(store, N)` store-indirection form (see
+ * {@link resolveAnyIndexEntries}).
  */
 export function collectModifierTokensInUse(ir: KeyboardIR): Set<ModifierToken> {
   const result = new Set<ModifierToken>();
@@ -286,6 +370,9 @@ export function collectModifierTokensInUse(ir: KeyboardIR): Set<ModifierToken> {
     if (group.readonly) continue;
     for (const rule of group.rules) {
       for (const token of extractRuleModifiers(rule)) result.add(token);
+      for (const entry of resolveAnyIndexEntries(ir, rule)) {
+        for (const token of entry.tokens) result.add(token);
+      }
     }
   }
   return result;
@@ -299,29 +386,38 @@ export function collectModifierTokensInUse(ir: KeyboardIR): Set<ModifierToken> {
  *
  * Rules whose raw modifier set is internally exclusion-inconsistent (which
  * cannot come from a `.kmn` source kmcmplib would have accepted) are skipped
- * defensively rather than thrown on during this read-only scan.
+ * defensively rather than thrown on during this read-only scan. Also reports
+ * combos that exist only inside `any(store) > index(store, N)` rules — the
+ * store-indirection form the production S-08 pattern uses (see
+ * {@link resolveAnyIndexEntries}) — not just direct per-key rules.
  */
 export function collectLayerCombosInUse(ir: KeyboardIR): ModifierToken[][] {
   const seen = new Set<string>();
   const combos: ModifierToken[][] = [];
 
+  const addCombo = (canon: ModifierToken[]): void => {
+    const key = comboJoinKey(canon);
+    if (seen.has(key)) return;
+    seen.add(key);
+    combos.push(canon);
+  };
+
   for (const group of ir.groups) {
     if (group.readonly) continue;
     for (const rule of group.rules) {
       const raw = extractRuleModifiers(rule);
-      if (raw.length === 0) continue;
-
-      let canon: ModifierToken[];
-      try {
-        canon = canonicalizeCombo(raw);
-      } catch {
-        continue;
+      if (raw.length > 0) {
+        try {
+          addCombo(canonicalizeCombo(raw));
+        } catch {
+          // Internally exclusion-inconsistent — skip defensively.
+        }
       }
 
-      const key = comboJoinKey(canon);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      combos.push(canon);
+      for (const entry of resolveAnyIndexEntries(ir, rule)) {
+        if (entry.tokens.length === 0) continue; // no-modifier entry is not a "layer" combo
+        addCombo(entry.tokens);
+      }
     }
   }
 
@@ -333,6 +429,12 @@ export function collectLayerCombosInUse(ir: KeyboardIR): ModifierToken[][] {
  * combo — the per-combo generalization of scaffoldTouchLayout's `buildKeyMap`
  * (which buckets into "default"/"shift"/"altgr" instead of an arbitrary
  * combo). First-wins per vkey, same as `buildKeyMap`.
+ *
+ * Resolves both direct `+ [MODS VKEY] > 'char'` rules and the `any(store) >
+ * index(store, N)` store-indirection form the production S-08 pattern uses
+ * (see {@link resolveAnyIndexEntries}) — a single store can mix entries
+ * across several combos (e.g. some RALT-only, some SHIFT+RALT), so each
+ * entry's own combo is checked against `combo` individually.
  *
  * @param combo Canonicalized combo (as returned by {@link collectLayerCombosInUse}
  *              or {@link parseKeySpec}).
@@ -348,21 +450,29 @@ export function buildComboKeyMap(
     if (group.readonly) continue;
     for (const rule of group.rules) {
       const vkey = extractRuleVkey(rule);
-      if (!vkey) continue;
+      if (vkey) {
+        const raw = extractRuleModifiers(rule);
+        let canon: ModifierToken[];
+        try {
+          canon = canonicalizeCombo(raw);
+        } catch {
+          continue;
+        }
+        if (comboJoinKey(canon) !== targetKey) continue;
 
-      const raw = extractRuleModifiers(rule);
-      let canon: ModifierToken[];
-      try {
-        canon = canonicalizeCombo(raw);
-      } catch {
+        const char = firstRuleCharOutput(rule);
+        if (!char) continue;
+
+        if (!map.has(vkey)) map.set(vkey, char);
         continue;
       }
-      if (comboJoinKey(canon) !== targetKey) continue;
 
-      const char = firstRuleCharOutput(rule);
-      if (!char) continue;
-
-      if (!map.has(vkey)) map.set(vkey, char);
+      // Store-indirection form: `+ any(store) > index(store, N)`.
+      for (const entry of resolveAnyIndexEntries(ir, rule)) {
+        if (comboJoinKey(entry.tokens) !== targetKey) continue;
+        if (entry.char === undefined) continue;
+        if (!map.has(entry.vkey)) map.set(entry.vkey, entry.char);
+      }
     }
   }
 

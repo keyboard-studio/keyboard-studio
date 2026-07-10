@@ -56,8 +56,40 @@ const RALT_PATTERN: Pattern = {
   reviewDate: "2026-01-01",
 };
 
+/**
+ * The REAL content pattern's fragment shape — a store/any()/index()
+ * indirection, not a bare per-key rule (see content/patterns/desktop-input/
+ * modifier-as-layer-switch.yaml). Regression coverage for the P0 gap where
+ * buildComboKeyMap (engine) failed to resolve this shape and shipped blank
+ * touch keycaps.
+ */
+const REAL_SHAPE_PATTERN: Pattern = {
+  id: "modifier_as_layer_switch",
+  title: "Test layer-switch pattern (real store/any/index shape)",
+  description: "test fixture",
+  category: "desktop",
+  appliesTo: [],
+  strategyId: "S-08",
+  questions: [],
+  kmnFragment:
+    "store(altgrKeys)   {{altgrKeyList}}\n" +
+    "store(altgrOutput) '{{altgrOutputList}}'\n" +
+    "\n" +
+    "+ any(altgrKeys) > index(altgrOutput, 1)\n",
+  tests: [],
+  validatedForFamilies: [],
+  sourceKeyboards: [],
+  reviewedBy: "test",
+  reviewDate: "2026-01-01",
+};
+
 function getPattern(id: string): Pattern | undefined {
-  return id === RALT_PATTERN.id ? RALT_PATTERN : undefined;
+  if (id === RALT_PATTERN.id) return RALT_PATTERN;
+  return undefined;
+}
+
+function getRealShapePattern(id: string): Pattern | undefined {
+  return id === REAL_SHAPE_PATTERN.id ? REAL_SHAPE_PATTERN : undefined;
 }
 
 function makeRaltAssignment(): MechanismAssignment {
@@ -137,6 +169,33 @@ describe("projectWorkingCopyVfs — step 2.5 desktop-to-touch layer propagation"
     // No propagation-step warnings (the missing-.kvks warning is step 3.5's
     // keycap-label projection — irrelevant to this test's fixture, which
     // ships no .kvks file).
+    expect(warnings.some((w) => w.includes("propagation"))).toBe(false);
+  });
+
+  // P0 regression companion: the RALT_PATTERN fixture above uses a bare
+  // per-key rule, which never exercised buildComboKeyMap's any()/index()
+  // store-indirection path — the shape the real content pattern actually
+  // uses. This test uses that real shape directly.
+  it("surfaces real key text via the real pattern's store/any()/index() indirection shape", () => {
+    const vfs = makeVfsWithTouchLayout(makeBaseTouchJson());
+
+    const { warnings } = projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      assignments: [makeRaltAssignment()],
+      getPattern: getRealShapePattern,
+      identity: null,
+    });
+
+    const entry = vfs.get("source/test_kb.keyman-touch-layout");
+    const data = JSON.parse(entry!.content as string);
+    const raltLayer = data.phone.layer.find((l: { id: string }) => l.id === "rightalt");
+    expect(raltLayer).toBeDefined();
+    const eKey = raltLayer.row[0].key.find((k: { id: string }) => k.id === "K_E");
+    expect(eKey.text).toBe("é");
+    expect(eKey.output).toBe("é");
     expect(warnings.some((w) => w.includes("propagation"))).toBe(false);
   });
 

@@ -260,10 +260,17 @@ function parseStoreItems(rawValue: string): { items: StoreItem[]; opaqueReason: 
       items.push({ kind: "deadkey", id: dkId });
       continue;
     }
-    // vkey bracket
+    // vkey bracket. The typed `StoreItem` "vkey" variant has no modifiers
+    // field (locked contract — see @keyboard-studio/contracts's keyboard-ir.ts),
+    // so a modifier-free bracket (`[K_E]`) parses to `{kind:"vkey"}` as before,
+    // but a modifier-bearing bracket (`[SHIFT RALT K_E]`, as used by the
+    // generalized S-08 "any(store) > index(store, N)" pattern) is preserved
+    // verbatim as `{kind:"raw"}` rather than silently dropping its modifiers —
+    // downstream consumers (modifierCombos.ts's resolveStoreKeyItem) re-parse
+    // the bracket text via parseKeySpec to recover the combo.
     const vk = parseVkeyBracket(tok);
     if (vk !== null) {
-      items.push({ kind: "vkey", name: vk.name });
+      items.push(vk.modifiers.length > 0 ? { kind: "raw", text: tok } : { kind: "vkey", name: vk.name });
       continue;
     }
     // outs(store) — inline expansion of another store's content. The typed

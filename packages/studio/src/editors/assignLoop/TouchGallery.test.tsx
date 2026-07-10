@@ -828,6 +828,36 @@ describe("TouchGallery — suggestion card variants", () => {
     // Suggestion card should mention "long-press" for á.
     expect(screen.queryByText(/Suggested: long-press/i)).not.toBeNull();
   });
+
+  it("shows a 'longpress' suggestion for a multi-token modifier_as_layer_switch combo (SHIFT+CTRL+RALT)", async () => {
+    // Regression: the host-key extraction previously hardcoded a
+    // /\[RALT\s+.../ regex, which silently produced no suggestion (empty
+    // hostKey) for any combo other than a bare RALT bracket. A three-token
+    // combo exercises the general parseKeySpec-based extraction.
+    const layerSwitchAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "€",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "modifier_as_layer_switch",
+          strategyId: "S-08",
+          slotValues: { altgrKeyList: "[SHIFT CTRL RALT K_4]", altgrOutputList: "€" },
+        },
+      ],
+      source: "user",
+    };
+    seedWithDesktopAssignment("€", layerSwitchAssignment);
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // The suggestion names the extracted host key ("4", from K_4) — not the
+    // "a key" fallback the component shows when hostKey extraction fails.
+    expect(screen.queryByText(/Suggested: long-press 4 to reach/i)).not.toBeNull();
+    expect(screen.queryByText(/Suggested: long-press a key to reach/i)).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

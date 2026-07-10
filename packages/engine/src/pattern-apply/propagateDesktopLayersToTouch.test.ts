@@ -2,8 +2,14 @@
 // modifier-combo layers (generalized S-08) onto a shipped
 // `.keyman-touch-layout`.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { propagateDesktopLayersToTouch } from "./propagateDesktopLayersToTouch.js";
+import { applyAssignments } from "./applyAssignments.js";
+import { loadPatterns, getById } from "../pattern-library/index.js";
+import { parse as parseKmn, emitTouchLayout } from "../codec/index.js";
+import { scaffoldTouchLayout } from "../scaffolder/scaffoldTouchLayout.js";
 import type { KeyboardIR, IRGroup, IRRule, MechanismAssignment } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
@@ -313,5 +319,125 @@ describe("propagateDesktopLayersToTouch — idempotency", () => {
 
     expect(second.json).toBe(first.json);
     expect(second.warnings).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P0 regression — the REAL production S-08 pattern's store-indirection shape
+// (`store(altgrKeys)` / `store(altgrOutput)` + `any()`/`index()`, as opposed
+// to one `[MODS VKEY] > 'char'` rule per key). buildComboKeyMap must resolve
+// this shape or the synthesized touch layer ships with blank keycaps.
+// ---------------------------------------------------------------------------
+
+const REAL_CONTENT_DIR = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../../content/patterns",
+);
+
+describe("propagateDesktopLayersToTouch — real S-08 pattern (any/index store indirection)", () => {
+  beforeAll(async () => {
+    await loadPatterns(REAL_CONTENT_DIR);
+  });
+
+  it("surfaces real key text (not blank) for a SHIFT+RALT combo authored via the production pattern", () => {
+    const pattern = getById("modifier_as_layer_switch");
+    expect(pattern).toBeDefined();
+
+    const baseKmn =
+      "store(&VERSION) '10.0'\n" +
+      "store(&NAME) 'Test'\n" +
+      "store(&TARGETS) 'any'\n" +
+      "begin Unicode > use(main)\n" +
+      "\n" +
+      "group(main) using keys\n" +
+      "\n" +
+      "+ [K_E] > 'e'\n";
+
+    const assignment: MechanismAssignment = {
+      scope: "individual",
+      target: "é",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "modifier_as_layer_switch",
+          strategyId: "S-08",
+          slotValues: { altgrKeyList: "[SHIFT RALT K_E]", altgrOutputList: "é" },
+        },
+      ],
+      source: "user",
+    };
+
+    const { kmn, warnings } = applyAssignments(
+      [assignment],
+      (id) => (id === pattern!.id ? pattern : undefined),
+      baseKmn,
+    );
+    expect(warnings).toEqual([]);
+
+    const { ir } = parseKmn(kmn, "test_kb");
+
+    const rawTouchJson = JSON.stringify({
+      phone: {
+        layer: [
+          {
+            id: "default",
+            row: [{ id: 1, key: [{ id: "K_E", text: "e" }, { id: "K_LOPT", text: "*Menu*" }] }],
+          },
+        ],
+      },
+    });
+
+    const { json } = propagateDesktopLayersToTouch(rawTouchJson, ir, [assignment]);
+    const data = JSON.parse(json);
+
+    const layer = data.phone.layer.find((l: { id: string }) => l.id === "rightalt-shift");
+    expect(layer).toBeDefined();
+    const eKey = layer.row[0].key.find((k: { id: string }) => k.id === "K_E");
+    expect(eKey.text).toBe("é");
+    expect(eKey.output).toBe("é");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P1-1 regression — scaffoldTouchLayout's Case A (no shipped touch layout)
+// synthesizes its RALT-only layer under the id "altgr", not "rightalt"
+// (comboToTouchLayerId's id for the same combo). Propagation must patch
+// that existing layer rather than synthesizing a duplicate "rightalt" one.
+// ---------------------------------------------------------------------------
+
+describe("propagateDesktopLayersToTouch — Case A 'altgr' layer-id alias", () => {
+  it("patches the real scaffoldTouchLayout-produced 'altgr' layer, no duplicate 'rightalt' layer", () => {
+    // A RALT rule already present when the touch layout was first scaffolded.
+    const initialIr = makeMinimalIR([
+      makeGroup([makeRule("K_Q", ["RALT"], "1"), makeRule("K_Q", [], "q")]),
+    ]);
+    const rawTouchJson = emitTouchLayout(scaffoldTouchLayout(initialIr));
+
+    // The author now assigns a second RALT key via the mechanism gallery —
+    // the freshly re-parsed/updated IR carries both RALT rules.
+    const updatedIr = makeMinimalIR([
+      makeGroup([
+        makeRule("K_Q", ["RALT"], "1"),
+        makeRule("K_Q", [], "q"),
+        makeRule("K_E", ["RALT"], "é"),
+        makeRule("K_E", [], "e"),
+      ]),
+    ]);
+
+    const { json } = propagateDesktopLayersToTouch(rawTouchJson, updatedIr, []);
+    const data = JSON.parse(json);
+
+    const altLayers = data.phone.layer.filter(
+      (l: { id: string }) => l.id === "altgr" || l.id === "rightalt",
+    );
+    expect(altLayers).toHaveLength(1);
+    expect(altLayers[0].id).toBe("altgr");
+
+    const eKey = altLayers[0].row
+      .flatMap((r: { key: { id: string }[] }) => r.key)
+      .find((k: { id: string }) => k.id === "K_E");
+    expect(eKey).toBeDefined();
+    expect(eKey.text).toBe("é");
+    expect(eKey.output).toBe("é");
   });
 });

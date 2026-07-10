@@ -112,6 +112,18 @@ function isRawPlatform(value: unknown): value is RawPlatform {
   return !!value && typeof value === "object" && Array.isArray((value as RawPlatform).layer);
 }
 
+/**
+ * Legacy touch-layer-id aliases, keyed by {@link comboToTouchLayerId}'s
+ * canonical id. scaffoldTouchLayout.ts's Case A (keyboards with NO shipped
+ * touch layout) synthesizes a RALT-only layer under the id "altgr" rather
+ * than "rightalt" — the only combo attested to diverge. Deliberately not
+ * migrated here (out of scope for this fix); this alias lets propagation
+ * find and patch that existing layer instead of creating a duplicate.
+ */
+const LEGACY_TOUCH_LAYER_ID_ALIASES: ReadonlyMap<string, string> = new Map([
+  ["rightalt", "altgr"],
+]);
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -203,6 +215,20 @@ export function propagateDesktopLayersToTouch(
 
       if (isRawLayer(existingLayer)) {
         patchExistingComboLayer(existingLayer, keyMap);
+        continue;
+      }
+
+      // Legacy-id alias: scaffoldTouchLayout.ts's Case A (no shipped touch
+      // layout) synthesizes a RALT-only layer under the id "altgr", not
+      // "rightalt" (comboToTouchLayerId's id for the same combo). Patch that
+      // existing layer instead of synthesizing a second, duplicate one.
+      const aliasId = LEGACY_TOUCH_LAYER_ID_ALIASES.get(layerId);
+      const aliasLayer =
+        aliasId !== undefined
+          ? platformVal.layer.find((l) => isRawLayer(l) && l.id === aliasId)
+          : undefined;
+      if (isRawLayer(aliasLayer)) {
+        patchExistingComboLayer(aliasLayer, keyMap);
         continue;
       }
 

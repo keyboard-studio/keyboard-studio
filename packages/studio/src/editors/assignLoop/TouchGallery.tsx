@@ -37,6 +37,7 @@
 import { useState, useEffect, useMemo, useCallback, type CSSProperties } from "react";
 import type { TouchAssignment, MechanismRef } from "@keyboard-studio/contracts";
 import { createVirtualFS, toUPlusNotation, isDecomposableAccented } from "@keyboard-studio/contracts";
+import { parseKeySpec } from "@keyboard-studio/engine";
 import { buildTouchLayoutJson } from "../../lib/buildTouchLayoutJson.ts";
 import { resolveBaseTouchJson } from "../../lib/resolveBaseTouchJson.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
@@ -657,8 +658,8 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
       // modifier_as_layer_switch / S-08 → longpress from altgrKeyList
       if (pid === "modifier_as_layer_switch" || sid === "S-08") {
-        const match = (sv["altgrKeyList"] ?? "").match(/\[RALT\s+([A-Z0-9_]+)\]/);
-        const hk = match?.[1] ?? "";
+        const parsed = parseKeySpec(sv["altgrKeyList"] ?? "");
+        const hk = parsed?.vkey ?? "";
         return { kind: "longpress", hostKey: hk };
       }
 
