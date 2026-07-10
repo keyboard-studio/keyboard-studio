@@ -119,11 +119,11 @@ describe("IdentityLite — resume", () => {
   it("Back from the resumed last question restores the prior answer", () => {
     render(<IdentityLite onComplete={vi.fn()} resume={COMPLETED} />);
     fireEvent.click(screen.getByTestId("survey-back"));
-    // Flow order (spec 030): code → english → autonym → target_script. Back
-    // from the last question (target_script) lands on il_language_autonym with
+    // Flow order (spec 030 FR-009): english → autonym → code → target_script.
+    // Back from the last question (target_script) lands on il_language_code with
     // its restored value; assert on the display value rather than input role.
-    expect(screen.getByText("What is your language called in your own language?")).toBeTruthy();
-    expect(screen.getByDisplayValue("Hausa")).toBeTruthy();
+    expect(screen.getByText("Confirm your language's code")).toBeTruthy();
+    expect(screen.getByDisplayValue("ha")).toBeTruthy();
   });
 
   it("Finish on a resumed flow re-completes with the same extracted identity", () => {
@@ -148,9 +148,10 @@ describe("IdentityLite — resume", () => {
 
   it("without resume, mounts on the first question as before", () => {
     render(<IdentityLite onComplete={vi.fn()} />);
-    // il_language_code is the first question in the merged flow (spec 030).
+    // il_language_english (English-name picker) is the first question in the
+    // reordered flow (spec 030 FR-009).
     expect(
-      screen.getByText("What language is this keyboard for?"),
+      screen.getByText("What is your language called in English?"),
     ).toBeTruthy();
   });
 

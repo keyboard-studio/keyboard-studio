@@ -1,6 +1,8 @@
 // Colocated vitest spec for il_language_code (identity-lite).
 // No validate() — optional free-text / autocomplete with no client-side gating.
-// Type changed from "text" to "autocomplete" (T014 — langtags picker wiring).
+// spec 030 US4: repositioned after the name steps as a code CONFIRMATION; routes
+// straight on to il_target_script (region disambiguation now branches off the
+// English-name step, not this one).
 
 import { describe, it, expect } from "vitest";
 import mod, {
@@ -25,17 +27,10 @@ describe("il_language_code — definition", () => {
     expect(definition.required).toBe(false);
   });
 
-  it("declares a conditional next: region branch (US3) + default to il_language_english", () => {
-    // The region branch is fired at runtime by IdentityLite.getNextOverride; the
-    // static rule set declares both edges so the flow graph / drift guardrail see
-    // il_language_region as reachable and the default resolves to the name step.
-    const next = definition.next;
-    expect(Array.isArray(next)).toBe(true);
-    const rules = next as Array<{ condition?: string; default?: boolean; goto?: string | null }>;
-    const regionRule = rules.find((r) => r.goto === "il_language_region");
-    expect(regionRule?.condition).toBeTruthy();
-    const defaultRule = rules.find((r) => r.default === true);
-    expect(defaultRule?.goto).toBe("il_language_english");
+  it("routes straight to il_target_script (US4 — confirmation step, no branch)", () => {
+    // Region disambiguation now branches off il_language_english, not the code
+    // step, so this node advances unconditionally to the script question.
+    expect(definition.next).toBe("il_target_script");
   });
 });
 

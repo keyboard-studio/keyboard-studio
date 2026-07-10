@@ -76,8 +76,8 @@ describe("flow-parity: phase_a_identity — questions[]", () => {
   it("expected question IDs in order", () => {
     expect(modular.questions.map((q) => q.id)).toEqual([
       "desktop_first_notice",
-      "language_name_autonym",
       "language_name_english",
+      "language_name_autonym",
       "iso_code",
       "region",
       "primary_script",
@@ -208,15 +208,16 @@ describe("flow-parity: identity_lite — questions[]", () => {
   });
 
   it("question IDs in order", () => {
-    // spec 030: langtags picker (il_language_code) first; english + autonym
-    // become confirmations seeded from the resolved entry. il_language_region
+    // spec 030 FR-009: English-name picker (il_language_english, @langtags_names)
+    // first; autonym is a choice over the resolved local names; il_language_code
+    // is a code CONFIRMATION seeded from the resolved entry. il_language_region
     // (US3) is a conditional step reached only when the picked language is
-    // region-ambiguous; it sits in the membership after the picker.
+    // region-ambiguous; it sits in the membership after the English-name step.
     expect(modular.questions.map((q) => q.id)).toEqual([
-      "il_language_code",
-      "il_language_region",
       "il_language_english",
+      "il_language_region",
       "il_language_autonym",
+      "il_language_code",
       "il_target_script",
       "il_script_not_supported",
     ]);
