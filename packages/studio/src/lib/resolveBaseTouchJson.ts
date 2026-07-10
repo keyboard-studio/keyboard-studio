@@ -19,10 +19,9 @@ import { findTouchLayoutPath } from "./findTouchLayoutPath.js";
  * scratch) path should run instead of the Case B (faithful edit) path.
  */
 export function resolveBaseTouchJson(vfs: VirtualFS | null): string | undefined {
-  if (vfs === null) return undefined;
-  const p = findTouchLayoutPath(vfs);
-  if (p === undefined) return undefined;
-  const content = vfs.get(p)?.content;
-  // Guard against binary/Uint8Array entries — only return string content.
+  if (!vfs) return undefined;
+  const path = findTouchLayoutPath(vfs);
+  if (!path) return undefined;
+  const content = vfs.get(path)?.content;
   return typeof content === "string" ? content : undefined;
 }
