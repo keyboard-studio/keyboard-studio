@@ -98,4 +98,51 @@ describe("SurveyRunner getSeedOptions — dynamic options (spec 030 US2)", () =>
     fireEvent.change(input, { target: { value: NFD } });
     expect(styledOptionValues(container)).toContain(NFC);
   });
+
+  // Sibling of the test above, but pinning the OTHER half of the fix. The test
+  // above types the full NFD form of an option's value, so `exact` (the
+  // whole-value NFC comparison) is true and `shown` short-circuits to
+  // `allOptions` — `.filter()` is never reached, so that test alone does not
+  // guard StyledOptionsField's filter-branch `.normalize("NFC")` calls.
+  // Reverting only those two filter-branch calls (leaving the exact-match
+  // fix intact) still passes the test above but must fail this one.
+  //
+  // To reach `.filter()`, `exact` must be false (typed value must NOT equal
+  // any option's full value) and `q` must be non-empty. So here we type only
+  // an NFC-composed SUBSTRING of an NFD-decomposed option label/value.
+  it("matches the filter() branch when the author types an NFC-composed substring of an NFD-decomposed option", () => {
+    // Decomposed literal, built explicitly from base + combining acute
+    // (U+0065 U+0301) rather than a source-file "é", so the byte difference
+    // from the composed form below is unambiguous and not an artifact of
+    // editor/file normalization.
+    const NFD_LABEL = "Café Music"; // decomposed: e (U+0065) + combining acute (U+0301)
+    const NFC_LABEL = "Café Music"; // composed: single U+00e9 codepoint
+    expect(NFD_LABEL).not.toBe(NFC_LABEL);
+    expect(NFD_LABEL.normalize("NFC")).toBe(NFC_LABEL);
+
+    // The typed substring: NFC-composed "café", genuinely byte-different from
+    // the "café" embedded (decomposed) inside NFD_LABEL.
+    const typedSubstring = "café";
+    expect(typedSubstring.normalize("NFC")).toBe(typedSubstring);
+
+    const opts: FlowOption[] = [
+      { value: NFD_LABEL, label: NFD_LABEL },
+      // A second, unrelated option: proves (a) the typed substring equals no
+      // option's full value, so `exact` stays false and the filter really
+      // runs, and (b) the filter genuinely narrows the list rather than
+      // `shown` having fallen back to `allOptions`.
+      { value: "Jazz Ensemble", label: "Jazz Ensemble" },
+    ];
+
+    const { container } = render(
+      <SurveyRunner flow={FLOW} onComplete={vi.fn()} getSeedOptions={() => opts} />,
+    );
+    const input = container.querySelector<HTMLInputElement>('[role="combobox"]')!;
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: typedSubstring } });
+
+    const values = styledOptionValues(container);
+    expect(values).toContain(NFD_LABEL);
+    expect(values).not.toContain("Jazz Ensemble");
+  });
 });

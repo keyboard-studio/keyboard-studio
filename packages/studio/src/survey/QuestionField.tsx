@@ -265,10 +265,15 @@ function LangtagsComboboxField({
   const modRef = useRef<Awaited<ReturnType<typeof loadLangtags>> | null>(null);
   const loadedRef = useRef(false);
   const isMountedRef = useRef(true);
-  // Mirrors the latest typed value for the load-.then callback below, which
-  // closes over the value from mount time otherwise (empty-deps effect).
+  // Mirrors the latest typed value AND the latest onEntryResolved callback for
+  // the load-.then callback below, which otherwise closes over both from mount
+  // time (empty-deps effect). Matches SurveyRunner's onEntryResolvedRef idiom so
+  // a post-load resolve calls the current handler even if this instance survives
+  // a question transition mid-load.
   const latestValueRef = useRef(strVal);
   latestValueRef.current = strVal;
+  const onEntryResolvedRef = useRef(onEntryResolved);
+  onEntryResolvedRef.current = onEntryResolved;
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -308,7 +313,9 @@ function LangtagsComboboxField({
         );
         setLoaded(true);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs exactly once on mount; resolveTyped is a stable per-render closure and re-running the effect would re-trigger the load
+    // Runs exactly once on mount (loadedRef guards re-entry). The typed value and
+    // onEntryResolved are read through refs (latestValueRef / onEntryResolvedRef),
+    // so the effect captures nothing reactive and needs no dependencies.
   }, []);
 
   // Resolve the currently-typed text to a single entry, or null when it matches
@@ -316,18 +323,22 @@ function LangtagsComboboxField({
   // code-mode is a plain picker with no onEntryResolved. Selection — handled in
   // onSelect — always resolves unambiguously via the row's payload.
   function resolveTyped(text: string, results: readonly LanguageSummary[]): void {
-    if (onEntryResolved === undefined) return;
+    // Read through the ref so the post-load re-resolve (mount-time effect) uses
+    // the current handler, not a stale mount-time closure. During live typing
+    // ref.current is the current prop, so this path is unchanged.
+    const onResolved = onEntryResolvedRef.current;
+    if (onResolved === undefined) return;
     // NFC-normalize before case-folding so NFC/NFD variants of the same name
     // compare equal — matches the own-name dedup key in IdentityLite.getSeedOptions.
     const trimmed = text.trim().normalize("NFC").toLowerCase();
     if (trimmed === "") {
-      onEntryResolved(null);
+      onResolved(null);
       return;
     }
     const exact = results.filter(
       (r) => (r.englishName ?? "").normalize("NFC").toLowerCase() === trimmed,
     );
-    onEntryResolved(exact.length === 1 ? exact[0]! : null);
+    onResolved(exact.length === 1 ? exact[0]! : null);
   }
 
   function handleType(text: string): void {

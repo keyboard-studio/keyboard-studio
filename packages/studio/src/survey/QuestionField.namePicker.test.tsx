@@ -31,11 +31,14 @@ const AINU_CN: LanguageSummary = {
 const SWAHILI: LanguageSummary = { code: "sw", englishName: "Swahili", autonym: "Kiswahili" };
 
 // NFC-composed name (km-review PR #1055 comment: resolveTyped must compare
-// NFC-normalized forms so an NFD-typed value still matches). "Tiếng Việt" here
-// is stored precomposed (each diacritic is a single NFC codepoint).
-const VIETNAMESE: LanguageSummary = { code: "vie", englishName: "Tiếng Việt" };
+// NFC-normalized forms so an NFD-typed value still matches). Real langtags
+// "mri" carries englishName "Māori" (the autonym is "Reo Māori" / "Te Reo
+// Māori", kept out of this field per the IdentityLite.autonymDedup.test.tsx
+// convention of not conflating englishName with autonym). "Māori" here is
+// stored precomposed (the macron is a single NFC codepoint).
+const MAORI: LanguageSummary = { code: "mri", englishName: "Māori" };
 
-const ALL: LanguageSummary[] = [AINU_JP, AINU_CN, SWAHILI, VIETNAMESE];
+const ALL: LanguageSummary[] = [AINU_JP, AINU_CN, SWAHILI, MAORI];
 
 // A large list to prove the option cap.
 const MANY: LanguageSummary[] = Array.from({ length: 300 }, (_, i) => ({
@@ -140,7 +143,7 @@ describe("LangtagsNamePickerField (spec 030 US1)", () => {
     // Confirm the fixture is genuinely byte-different-but-NFC-equal before
     // relying on it: NFD decomposes each precomposed diacritic into base +
     // combining marks, so the two forms differ codepoint-for-codepoint.
-    const nfc = VIETNAMESE.englishName;
+    const nfc = MAORI.englishName;
     const nfd = nfc.normalize("NFD");
     expect(nfd).not.toBe(nfc);
     expect(nfd.normalize("NFC")).toBe(nfc);
@@ -148,10 +151,10 @@ describe("LangtagsNamePickerField (spec 030 US1)", () => {
     // lookupByName's own matching is a separate concern (real langtags search);
     // here it just needs to surface the candidate so resolveTyped's NFC
     // comparison — the fix under test — is what decides the match.
-    searchImpl = () => [VIETNAMESE];
+    searchImpl = () => [MAORI];
     const { input, onEntryResolved } = await renderPicker();
     fireEvent.change(input, { target: { value: nfd } });
-    await waitFor(() => expect(onEntryResolved).toHaveBeenLastCalledWith(VIETNAMESE));
+    await waitFor(() => expect(onEntryResolved).toHaveBeenLastCalledWith(MAORI));
   });
 
   it("typing an ambiguous name does NOT auto-resolve (must pick a row)", async () => {
