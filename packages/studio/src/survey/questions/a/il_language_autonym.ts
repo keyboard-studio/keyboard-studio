@@ -1,12 +1,13 @@
 // Per-question module: il_language_autonym (identity-lite)
 //
-// THIRD question (spec 030): the language name in the community's own script.
-// A multi-choice picker over the langtags entry's recorded local names, with a
-// free-text override (spec 030 US2). IdentityLite.tsx supplies the options via
-// getSeedOptions (the resolved entry's localNames) and pre-fills the primary
-// autonym via getSeedValue. Only ~40% of langtags languages carry a local name
-// (T008), so the option list is frequently empty — the `autocomplete` field
-// then behaves as a plain free-text input, which the author types (FR-005).
+// SECOND question (spec 030 US2, FR-009): the language name in the community's
+// own script. IdentityLite.tsx offers a dropdown sourced from langtags as a
+// fallback chain — recorded own-script names (localname + localnames) when the
+// language has any, otherwise the English/alternate names (name + names) — via
+// getSeedOptions, with a free-text override.
+// getSeedValue defaults it to the primary own-script name when langtags has one;
+// when it has none (~60% of languages — T008, and free-text/unmatched languages)
+// it falls back to the Q1 English name. Advances to il_language_code.
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
 
@@ -19,7 +20,7 @@ export const definition = {
     "type your own — edit it to match your spelling.",
   type: "autocomplete" as const,
   required: true,
-  next: "il_target_script",
+  next: "il_language_code",
 } satisfies import("../../types.ts").FlowQuestion;
 
 export function validate(

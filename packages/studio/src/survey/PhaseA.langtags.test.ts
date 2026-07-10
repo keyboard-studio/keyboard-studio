@@ -176,10 +176,10 @@ describe("T022(e) — FR-008 override-wins: author value is preserved", () => {
 // ---------------------------------------------------------------------------
 // T023 — free-text escape on the language autocomplete (FR-009)
 //
-// The Autocomplete widget uses <input list> + <datalist> which natively accepts
-// any typed value — the user is never forced to pick from the list.  This test
-// asserts the behavioral contract: a typed value not in the list becomes the
-// committed answer and flows through to the BCP47 construction unchanged.
+// The language pickers (styled combobox) always accept free text via onType —
+// the user is never forced to pick from the list. This test asserts the
+// behavioral contract: a typed value not in the list becomes the committed
+// answer and flows through to the BCP47 construction unchanged.
 // ---------------------------------------------------------------------------
 
 describe("T023 — free-text escape: unknown language value is accepted", () => {

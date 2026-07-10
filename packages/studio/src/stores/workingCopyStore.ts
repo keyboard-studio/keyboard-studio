@@ -221,6 +221,12 @@ export interface WorkingCopyState {
    *   characters whose suggestion card has been explicitly accepted or denied,
    *   so it never reappears on back-navigation to an already-decided char.
    *
+   * Navigation itself (Back/Next/Previous) is purely positional — derived from
+   * the character's index in `session.confirmedInventory` — so it needs no
+   * persisted history stack; `skippedChars` was removed entirely because Skip
+   * records nothing (it is identical to Next, just forward navigation with no
+   * assignment). Do not resurrect either field.
+   *
    * Null until Phase E first mounts and writes back state. Cleared on reset
    * and on a new instantiation.
    */

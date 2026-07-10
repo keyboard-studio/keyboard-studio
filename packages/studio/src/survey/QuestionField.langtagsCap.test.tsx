@@ -1,9 +1,10 @@
-// Datalist size cap for the langtags-backed autocomplete (il_language_code).
-// The full langtags index is ~8,000 entries; rendering them all as <option>
-// elements crashes embedded Electron webviews (VS Code Simple Browser) and
-// janks real browsers. LangtagsAutocompleteField must never render more than
-// MAX_DATALIST_OPTIONS options — neither on mount (pre-populated browse list)
-// nor after typing (lookupByName results).
+// Dropdown size cap for the langtags-backed code picker (il_language_code, Q3,
+// @langtags_iso639). The full langtags index is ~8,000 entries; rendering them
+// all crashes embedded Electron webviews (VS Code Simple Browser) and janks real
+// browsers. The shared LangtagsComboboxField must never render more than
+// MAX_DATALIST_OPTIONS rows — neither on mount (pre-populated browse list) nor
+// after typing (lookupByName results). Q3 now uses the same StyledCombobox as Q1,
+// whose rows render only while the dropdown is open, so each case opens it first.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup, waitFor, fireEvent } from "@testing-library/react";
@@ -41,17 +42,27 @@ afterEach(() => {
   cleanup();
 });
 
-describe("LangtagsAutocompleteField datalist cap", () => {
-  it("caps the pre-populated browse list on mount", async () => {
+function optionCount(container: HTMLElement): number {
+  return container.querySelectorAll('[role="option"]').length;
+}
+
+describe("LangtagsComboboxField (code mode) dropdown cap", () => {
+  it("caps the pre-populated browse list when opened", async () => {
     const { container } = render(
       <QuestionField question={QUESTION} value={undefined} onChange={() => {}} />,
     );
+    // Wait for the one-time langtags load to settle (placeholder flips).
     await waitFor(() => {
-      expect(container.querySelectorAll("datalist option").length).toBeGreaterThan(0);
+      expect(
+        (container.querySelector('[role="combobox"]') as HTMLInputElement).placeholder,
+      ).toMatch(/Search by name/);
     });
-    expect(
-      container.querySelectorAll("datalist option").length,
-    ).toBeLessThanOrEqual(50);
+    // Rows render only while open — focus to open the list.
+    fireEvent.focus(container.querySelector('[role="combobox"]') as HTMLInputElement);
+    await waitFor(() => {
+      expect(optionCount(container)).toBeGreaterThan(0);
+    });
+    expect(optionCount(container)).toBeLessThanOrEqual(50);
   });
 
   it("caps the search results after typing", async () => {
@@ -60,15 +71,17 @@ describe("LangtagsAutocompleteField datalist cap", () => {
       <QuestionField question={QUESTION} value={undefined} onChange={onChange} />,
     );
     await waitFor(() => {
-      expect(container.querySelectorAll("datalist option").length).toBeGreaterThan(0);
+      expect(
+        (container.querySelector('[role="combobox"]') as HTMLInputElement).placeholder,
+      ).toMatch(/Search by name/);
     });
-    const input = container.querySelector("input") as HTMLInputElement;
+    const input = container.querySelector('[role="combobox"]') as HTMLInputElement;
     fireEvent.change(input, { target: { value: "Lang" } });
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith("Lang");
     });
     await waitFor(() => {
-      const n = container.querySelectorAll("datalist option").length;
+      const n = optionCount(container);
       expect(n).toBeGreaterThan(0);
       expect(n).toBeLessThanOrEqual(50);
     });

@@ -10,6 +10,45 @@
 
 ## Clarifications
 
+### Session 2026-07-09 (implementation realignment)
+
+The first landed increment (US1–US3) kept the language **code** as the first
+question (searchable by English name, storing the code). This session realigned
+the live flow to the specified FR-009 order (English name → region → own-language
+name → code confirmation) and resolved three implementation choices:
+
+- Q: How is a homonym (one English name → several distinct languages, e.g. "Ainu"
+  → `ain`/`aib`) disambiguated? → A: **Inline in the picker dropdown.** Each
+  suggestion shows English name + region + own-language name + code, and selecting
+  a row resolves that specific entry via an `onEntryResolved` side-channel. The
+  answer value stays the English name; the resolved entry is carried out-of-band
+  (a name string alone cannot identify the language). A new `@langtags_names`
+  options-source drives this picker; the existing `@langtags_iso639` datalist
+  (value = code) now backs only the Q3 code confirmation.
+- Q: What does the code confirmation (Q3) pre-fill — the canonical subtag or the
+  3-letter code? → A: **The 3-letter ISO 639-3 code** (`hau`, `hin`), falling back
+  to the canonical bare subtag when the entry carries no 639-3 code. The author can
+  override. Consequence accepted: the assembled tag is e.g. `hau-Latn` rather than
+  the canonical `ha-Latn`; canonicalization can be added at tag-assembly only if
+  Layer-A validation later objects.
+- Q: Is the separate region step kept now that the picker shows region inline? →
+  A: **Kept as a conditional refinement.** It fires only when the picked language's
+  code has more than one region variant (same code, different regional orthography),
+  which the inline pick cannot settle; for the ~97% unambiguous case the author sees
+  Q1 → Q2 → Q3 with no region screen. Q1 is required (free-text-with-suggestions),
+  with no "leave blank" escape — a name is not a technical code.
+- Q: What is Q2's (own-language name) choice list and default? → A: The **dropdown is
+  sourced from langtags** — the recorded own-script names (`localname` + `localnames`)
+  first, then the English/alternate names (`name` + `names`), de-duplicated. The
+  **default** is the primary own-script name (`localNames[0]`) when langtags has one;
+  when it has none (~45% of languages, plus free-text/unmatched languages) the default
+  **falls back to the Q1 response**. An English name is never auto-selected as the
+  own-language name (it is only ever an explicit dropdown choice). The "Suggested from
+  langtags" caption shows on Q2 only when the default is a genuine recorded own-script
+  name; when the default is the author's Q1 input there is no caption (it stays on the
+  code + script confirmations). This supersedes the earlier "default = Q1 name" and the
+  region-variant autonym-provenance behavior.
+
 ### Session 2026-07-08
 
 - Q: How should the English-name autocomplete behave (strict pick vs free-text)? → A: Free-text with suggestions — the author may pick a suggested language or keep a typed English name that matches nothing (unmatched → no defaults, degrade gracefully).

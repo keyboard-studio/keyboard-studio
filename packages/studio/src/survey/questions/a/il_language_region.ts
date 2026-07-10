@@ -1,16 +1,17 @@
 // Per-question module: il_language_region (identity-lite)
 //
-// CONDITIONAL question (spec 030 US3): shown only when the language picked in
-// il_language_code is region-ambiguous — i.e. its resolved langtags entry has
-// more than one regionVariant. SurveyRunner reaches it via IdentityLite's
-// getNextOverride (il_language_code -> il_language_region); when the language is
-// unambiguous the static next (il_language_code -> il_language_english) is used
-// and this question never appears.
+// CONDITIONAL question (spec 030 US3): shown only when the language picked at
+// il_language_english is region-ambiguous — i.e. its resolved langtags entry
+// has more than one regionVariant. SurveyRunner reaches it via IdentityLite's
+// getNextOverride (il_language_english -> il_language_region); when the language
+// is unambiguous the static next (il_language_english -> il_language_autonym) is
+// used and this question never appears.
 //
 // The datalist options are supplied dynamically by IdentityLite.getSeedOptions
 // (the resolved entry's regionVariants as {value: region-code, label: region
 // name}). Picking a region narrows the resolved variant, which then drives the
-// autonym / local-name / script seeds and the BCP47 region subtag.
+// autonym / local-name / script seeds and the BCP47 region subtag. Advances to
+// il_language_autonym.
 //
 // optional (required: false) — the author may skip; the flow then falls back to
 // the primary/default variant rather than blocking (spec 030 FR-014).
@@ -26,7 +27,7 @@ export const definition = {
     "if you are unsure.",
   type: "autocomplete" as const,
   required: false,
-  next: "il_language_english",
+  next: "il_language_autonym",
 } satisfies import("../../types.ts").FlowQuestion;
 
 // No validate() — optional; any region code (or free text / blank) is accepted.

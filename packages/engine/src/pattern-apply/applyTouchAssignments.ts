@@ -6,6 +6,10 @@
  * sharing — no original objects are modified). All other platforms and
  * layers are returned by reference.
  *
+ * Each assignment's `mechanisms[]` are ALL applied, not just the first —
+ * one character may carry multiple touch methods simultaneously (e.g.
+ * longpress + multitap on the same host key).
+ *
  * @see spec.md §8 Phase E (touch gallery)
  */
 
@@ -105,161 +109,162 @@ export function applyTouchAssignments(
     workingRows[pos.rowIdx]!.keys[pos.keyIdx] = updated;
   }
 
-  // Process each assignment in order.
+  // Process each assignment in order, applying EVERY mechanism it carries —
+  // a single character may combine multiple touch methods (e.g. longpress +
+  // multitap on the same host key).
   for (const assignment of assignments) {
-    const ref = assignment.mechanisms[0];
-    if (!ref) continue;
+    for (const ref of assignment.mechanisms) {
+      const { patternId, slotValues } = ref;
 
-    const { patternId, slotValues } = ref;
+      // touch_inherited: intentional no-op, no warning.
+      if (patternId === "touch_inherited") {
+        continue;
+      }
 
-    // touch_inherited: intentional no-op, no warning.
-    if (patternId === "touch_inherited") {
-      continue;
+      if (patternId === "longpress_alternates") {
+        const hostKey = slotValues?.["hostKey"] ?? "";
+        const char = slotValues?.["char"] ?? "";
+
+        const key = getWorkingKey(hostKey);
+        if (!key) {
+          warnings.push(
+            `[touch-apply] host key "${hostKey}" not found in phone default layer — assignment for "${char}" skipped`
+          );
+          continue;
+        }
+
+        const existingSk = key.sk ?? [];
+        // Dedupe: skip if already present by text/output OR by U_ id (shared
+        // predicate — covers id-only sk entries that carry no text/output field).
+        if (existingSk.some((s) => isTouchSubKeyDuplicate(s, char))) {
+          continue;
+        }
+
+        const newSkKey: TouchKeyIR = {
+          nodeId: minter.mint("touchKey"),
+          // U_<UPPERHEX> id: Keyman outputs the Unicode codepoint directly from
+          // this id form — no `output` field needed (adding one is redundant and
+          // can cause kmc-kmn to fail to produce artifacts). `text` is kept so
+          // the on-key glyph is rendered correctly in the OSK.
+          id: charToUnicodeKeyId(char),
+          text: char,
+        };
+
+        const updated: TouchKeyIR = {
+          ...key,
+          sk: [...existingSk, newSkKey],
+        };
+
+        // No per-key hint set here. The dot (•) is supplied automatically by the
+        // Keyman runtime because the platform defaultHint is "dot"; an explicit
+        // hint would override the dot and re-reveal a character.
+
+        setWorkingKey(hostKey, updated);
+        continue;
+      }
+
+      if (patternId === "flick_gestures") {
+        const hostKey = slotValues?.["hostKey"] ?? "";
+        const direction = slotValues?.["direction"] ?? "";
+        const char = slotValues?.["char"] ?? "";
+
+        const key = getWorkingKey(hostKey);
+        if (!key) {
+          warnings.push(
+            `[touch-apply] host key "${hostKey}" not found in phone default layer — assignment for "${char}" skipped`
+          );
+          continue;
+        }
+
+        const newFlickKey: TouchKeyIR = {
+          nodeId: minter.mint("touchKey"),
+          // U_<UPPERHEX> id: same rationale as longpress sk — Keyman derives
+          // output from the id; `text` provides the on-key glyph.
+          id: charToUnicodeKeyId(char),
+          text: char,
+        };
+
+        // Merge with existing flick map; avoid spreading `undefined`.
+        const mergedFlick: NonNullable<TouchKeyIR["flick"]> = {
+          ...(key.flick ?? {}),
+          [direction]: newFlickKey,
+        };
+
+        const updated: TouchKeyIR = {
+          ...key,
+          flick: mergedFlick,
+        };
+
+        setWorkingKey(hostKey, updated);
+        continue;
+      }
+
+      if (patternId === "multitap") {
+        const hostKey = slotValues?.["hostKey"] ?? "";
+        const char = slotValues?.["char"] ?? "";
+
+        const key = getWorkingKey(hostKey);
+        if (!key) {
+          warnings.push(
+            `[touch-apply] host key "${hostKey}" not found in phone default layer — assignment for "${char}" skipped`
+          );
+          continue;
+        }
+
+        const existingMt = key.multitap ?? [];
+        // Dedupe: same predicate as longpress sk — covers id-only multitap entries.
+        if (existingMt.some((s) => isTouchSubKeyDuplicate(s, char))) {
+          continue;
+        }
+
+        const newMtKey: TouchKeyIR = {
+          nodeId: minter.mint("touchKey"),
+          // U_<UPPERHEX> id: same rationale as longpress sk — Keyman derives
+          // output from the id; `text` provides the on-key glyph.
+          id: charToUnicodeKeyId(char),
+          text: char,
+        };
+
+        const updated: TouchKeyIR = {
+          ...key,
+          multitap: [...existingMt, newMtKey],
+        };
+
+        setWorkingKey(hostKey, updated);
+        continue;
+      }
+
+      if (patternId === "touch_key_replace") {
+        const hostKey = slotValues?.["hostKey"] ?? "";
+        const char = slotValues?.["char"] ?? "";
+
+        const key = getWorkingKey(hostKey);
+        if (!key) {
+          warnings.push(
+            `[touch-apply] host key "${hostKey}" not found in phone default layer — assignment for "${char}" skipped`
+          );
+          continue;
+        }
+
+        // Destructure out any existing `output` field so the U_-id supersedes it.
+        // Preserve all other properties: nodeId, geometry (pad, width, sp),
+        // nextlayer, and any existing sk / flick / multitap.
+        const { output: _omit, ...rest } = key;
+        const updated: TouchKeyIR = {
+          ...rest,
+          id: charToUnicodeKeyId(char),
+          text: char,
+        };
+
+        setWorkingKey(hostKey, updated);
+        continue;
+      }
+
+      // Unknown patternId — one warning per mechanism.
+      warnings.push(
+        `[touch-apply] unknown patternId "${patternId}" — mechanism skipped`
+      );
     }
-
-    if (patternId === "longpress_alternates") {
-      const hostKey = slotValues?.["hostKey"] ?? "";
-      const char = slotValues?.["char"] ?? "";
-
-      const key = getWorkingKey(hostKey);
-      if (!key) {
-        warnings.push(
-          `[touch-apply] host key "${hostKey}" not found in phone default layer — assignment for "${char}" skipped`
-        );
-        continue;
-      }
-
-      const existingSk = key.sk ?? [];
-      // Dedupe: skip if already present by text/output OR by U_ id (shared
-      // predicate — covers id-only sk entries that carry no text/output field).
-      if (existingSk.some((s) => isTouchSubKeyDuplicate(s, char))) {
-        continue;
-      }
-
-      const newSkKey: TouchKeyIR = {
-        nodeId: minter.mint("touchKey"),
-        // U_<UPPERHEX> id: Keyman outputs the Unicode codepoint directly from
-        // this id form — no `output` field needed (adding one is redundant and
-        // can cause kmc-kmn to fail to produce artifacts). `text` is kept so
-        // the on-key glyph is rendered correctly in the OSK.
-        id: charToUnicodeKeyId(char),
-        text: char,
-      };
-
-      const updated: TouchKeyIR = {
-        ...key,
-        sk: [...existingSk, newSkKey],
-      };
-
-      // No per-key hint set here. The dot (•) is supplied automatically by the
-      // Keyman runtime because the platform defaultHint is "dot"; an explicit
-      // hint would override the dot and re-reveal a character.
-
-      setWorkingKey(hostKey, updated);
-      continue;
-    }
-
-    if (patternId === "flick_gestures") {
-      const hostKey = slotValues?.["hostKey"] ?? "";
-      const direction = slotValues?.["direction"] ?? "";
-      const char = slotValues?.["char"] ?? "";
-
-      const key = getWorkingKey(hostKey);
-      if (!key) {
-        warnings.push(
-          `[touch-apply] host key "${hostKey}" not found in phone default layer — assignment for "${char}" skipped`
-        );
-        continue;
-      }
-
-      const newFlickKey: TouchKeyIR = {
-        nodeId: minter.mint("touchKey"),
-        // U_<UPPERHEX> id: same rationale as longpress sk — Keyman derives
-        // output from the id; `text` provides the on-key glyph.
-        id: charToUnicodeKeyId(char),
-        text: char,
-      };
-
-      // Merge with existing flick map; avoid spreading `undefined`.
-      const mergedFlick: NonNullable<TouchKeyIR["flick"]> = {
-        ...(key.flick ?? {}),
-        [direction]: newFlickKey,
-      };
-
-      const updated: TouchKeyIR = {
-        ...key,
-        flick: mergedFlick,
-      };
-
-      setWorkingKey(hostKey, updated);
-      continue;
-    }
-
-    if (patternId === "multitap") {
-      const hostKey = slotValues?.["hostKey"] ?? "";
-      const char = slotValues?.["char"] ?? "";
-
-      const key = getWorkingKey(hostKey);
-      if (!key) {
-        warnings.push(
-          `[touch-apply] host key "${hostKey}" not found in phone default layer — assignment for "${char}" skipped`
-        );
-        continue;
-      }
-
-      const existingMt = key.multitap ?? [];
-      // Dedupe: same predicate as longpress sk — covers id-only multitap entries.
-      if (existingMt.some((s) => isTouchSubKeyDuplicate(s, char))) {
-        continue;
-      }
-
-      const newMtKey: TouchKeyIR = {
-        nodeId: minter.mint("touchKey"),
-        // U_<UPPERHEX> id: same rationale as longpress sk — Keyman derives
-        // output from the id; `text` provides the on-key glyph.
-        id: charToUnicodeKeyId(char),
-        text: char,
-      };
-
-      const updated: TouchKeyIR = {
-        ...key,
-        multitap: [...existingMt, newMtKey],
-      };
-
-      setWorkingKey(hostKey, updated);
-      continue;
-    }
-
-    if (patternId === "touch_key_replace") {
-      const hostKey = slotValues?.["hostKey"] ?? "";
-      const char = slotValues?.["char"] ?? "";
-
-      const key = getWorkingKey(hostKey);
-      if (!key) {
-        warnings.push(
-          `[touch-apply] host key "${hostKey}" not found in phone default layer — assignment for "${char}" skipped`
-        );
-        continue;
-      }
-
-      // Destructure out any existing `output` field so the U_-id supersedes it.
-      // Preserve all other properties: nodeId, geometry (pad, width, sp),
-      // nextlayer, and any existing sk / flick / multitap.
-      const { output: _omit, ...rest } = key;
-      const updated: TouchKeyIR = {
-        ...rest,
-        id: charToUnicodeKeyId(char),
-        text: char,
-      };
-
-      setWorkingKey(hostKey, updated);
-      continue;
-    }
-
-    // Unknown patternId — one warning per assignment.
-    warnings.push(
-      `[touch-apply] unknown patternId "${patternId}" — assignment skipped`
-    );
   }
 
   // Reconstruct the layout with structural sharing.

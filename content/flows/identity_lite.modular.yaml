@@ -11,9 +11,9 @@ flow_id: identity_lite
 phase: "A"
 
 questions:
-  - il_language_code
-  - il_language_region
   - il_language_english
+  - il_language_region
   - il_language_autonym
+  - il_language_code
   - il_target_script
   - il_script_not_supported

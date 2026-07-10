@@ -58,9 +58,10 @@ describe("buildModularFlowGraph — identity_lite (fully specified)", () => {
   const g = buildModularFlowGraph(identityLiteModularRaw, "Identity-lite", phaseARegistry);
 
   it("uses the first question as the entry", () => {
-    // spec 030: the langtags picker (il_language_code) is now the first question.
-    expect(g.entryId).toBe("il_language_code");
-    expect(g.nodes.find((n) => n.id === "il_language_code")?.isEntry).toBe(true);
+    // spec 030 FR-009: the English-name picker (il_language_english) is the
+    // first question; the language code is a later confirmation step.
+    expect(g.entryId).toBe("il_language_english");
+    expect(g.nodes.find((n) => n.id === "il_language_english")?.isEntry).toBe(true);
   });
 
   it("flags the script question as a gate (it has conditional branching)", () => {

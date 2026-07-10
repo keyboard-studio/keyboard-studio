@@ -21,8 +21,8 @@ describe("il_language_region — definition", () => {
     expect(definition.required).toBe(false);
   });
 
-  it("routes to il_language_english (rejoins the main flow)", () => {
-    expect(definition.next).toBe("il_language_english");
+  it("routes to il_language_autonym (rejoins the main flow)", () => {
+    expect(definition.next).toBe("il_language_autonym");
   });
 
   it("has a prompt", () => {
