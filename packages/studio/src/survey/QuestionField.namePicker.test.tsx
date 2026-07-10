@@ -30,7 +30,12 @@ const AINU_CN: LanguageSummary = {
 };
 const SWAHILI: LanguageSummary = { code: "sw", englishName: "Swahili", autonym: "Kiswahili" };
 
-const ALL: LanguageSummary[] = [AINU_JP, AINU_CN, SWAHILI];
+// NFC-composed name (km-review PR #1055 comment: resolveTyped must compare
+// NFC-normalized forms so an NFD-typed value still matches). "Tiếng Việt" here
+// is stored precomposed (each diacritic is a single NFC codepoint).
+const VIETNAMESE: LanguageSummary = { code: "vie", englishName: "Tiếng Việt" };
+
+const ALL: LanguageSummary[] = [AINU_JP, AINU_CN, SWAHILI, VIETNAMESE];
 
 // A large list to prove the option cap.
 const MANY: LanguageSummary[] = Array.from({ length: 300 }, (_, i) => ({
@@ -129,6 +134,24 @@ describe("LangtagsNamePickerField (spec 030 US1)", () => {
     const { input, onEntryResolved } = await renderPicker();
     fireEvent.change(input, { target: { value: "Swahili" } });
     await waitFor(() => expect(onEntryResolved).toHaveBeenLastCalledWith(SWAHILI));
+  });
+
+  it("typing an NFD-decomposed name resolves against an NFC-composed englishName (PR #1055 comment)", async () => {
+    // Confirm the fixture is genuinely byte-different-but-NFC-equal before
+    // relying on it: NFD decomposes each precomposed diacritic into base +
+    // combining marks, so the two forms differ codepoint-for-codepoint.
+    const nfc = VIETNAMESE.englishName;
+    const nfd = nfc.normalize("NFD");
+    expect(nfd).not.toBe(nfc);
+    expect(nfd.normalize("NFC")).toBe(nfc);
+
+    // lookupByName's own matching is a separate concern (real langtags search);
+    // here it just needs to surface the candidate so resolveTyped's NFC
+    // comparison — the fix under test — is what decides the match.
+    searchImpl = () => [VIETNAMESE];
+    const { input, onEntryResolved } = await renderPicker();
+    fireEvent.change(input, { target: { value: nfd } });
+    await waitFor(() => expect(onEntryResolved).toHaveBeenLastCalledWith(VIETNAMESE));
   });
 
   it("typing an ambiguous name does NOT auto-resolve (must pick a row)", async () => {

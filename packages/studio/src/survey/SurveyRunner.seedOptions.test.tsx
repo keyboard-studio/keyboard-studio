@@ -73,4 +73,29 @@ describe("SurveyRunner getSeedOptions — dynamic options (spec 030 US2)", () =>
     );
     expect(styledOptionValues(container)).toHaveLength(0);
   });
+
+  // NFC/NFD sibling of the getSeedOptions dedup key + resolveTyped comparison
+  // fix (IdentityLite.getSeedOptions / QuestionField.resolveTyped): the option
+  // filter in StyledOptionsField must NFC-normalize before case-folding too, so
+  // typing the NFD-decomposed form of an own-script autonym still matches the
+  // NFC-stored option instead of being filtered out.
+  it("matches an NFC-stored option when the author types its NFD-decomposed form", () => {
+    // "café" precomposed (U+0065 U+0301 vs U+00E9) — the canonical NFC/NFD pair.
+    const NFC = "café";
+    const NFD = "café";
+    expect(NFC).not.toBe(NFD);
+    expect(NFC.normalize("NFC")).toBe(NFD.normalize("NFC"));
+
+    const { container } = render(
+      <SurveyRunner
+        flow={FLOW}
+        onComplete={vi.fn()}
+        getSeedOptions={() => [{ value: NFC, label: NFC }]}
+      />,
+    );
+    const input = container.querySelector<HTMLInputElement>('[role="combobox"]')!;
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: NFD } });
+    expect(styledOptionValues(container)).toContain(NFC);
+  });
 });

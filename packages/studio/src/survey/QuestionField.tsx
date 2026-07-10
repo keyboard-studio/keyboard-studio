@@ -167,13 +167,20 @@ function StyledOptionsField({ question, value, onChange, onSelectAdvance }: Fiel
   // Native-datalist-style filtering so the styled list still narrows as the
   // author types: an empty value — or one that exactly matches a chosen option —
   // shows every option; a partial value filters by label/value substring.
-  const q = typed.trim().toLowerCase();
-  const exact = allOptions.some((o) => o.value === typed);
+  // NFC-normalize before case-folding so NFC/NFD variants of the same name
+  // (Vietnamese, Yorùbá/Akan, Ainu diacritics) still match — these options carry
+  // own-script autonyms in both value and label (IdentityLite.getSeedOptions),
+  // matching the dedup key in IdentityLite.getSeedOptions and the comparison in
+  // LangtagsComboboxField.resolveTyped.
+  const q = typed.trim().normalize("NFC").toLowerCase();
+  const exact = allOptions.some((o) => o.value.normalize("NFC") === typed.normalize("NFC"));
   const shown =
     q === "" || exact
       ? allOptions
       : allOptions.filter(
-          (o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q),
+          (o) =>
+            o.label.normalize("NFC").toLowerCase().includes(q) ||
+            o.value.normalize("NFC").toLowerCase().includes(q),
         );
 
   return (
@@ -296,7 +303,7 @@ function LangtagsComboboxField({
         // Degrade to a plain free-text field on import failure (FR-009).
         if (!isMountedRef.current) return;
         console.warn(
-          "[survey] langtags load failed for LangtagsComboboxField; degrading to free-text input",
+          "[LangtagsComboboxField] langtags load failed; degrading to free-text input",
           err,
         );
         setLoaded(true);
