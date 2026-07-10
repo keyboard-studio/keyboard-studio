@@ -13,7 +13,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
-import type { EditorStepProps } from "../steps/types.ts";
+import type { EditorStepProps } from "../../src/steps/types.ts";
 
 // ---------------------------------------------------------------------------
 // Hoisted refs for mock callbacks
@@ -38,7 +38,7 @@ const { mockFlowStepHostCompleteRef, mockFlowStepHostGetSeedValueRef, mockFlowSt
 // so we mock that file.
 // ---------------------------------------------------------------------------
 
-vi.mock("../survey/FlowStepHost.tsx", () => ({
+vi.mock("../../src/survey/FlowStepHost.tsx", () => ({
   FlowStepHost: ({
     onComplete,
     title,
@@ -88,7 +88,7 @@ const mockSetSelectedTrack = vi.fn();
 const mockSetScaffoldSpec = vi.fn();
 const mockSetIdentity = vi.fn();
 
-vi.mock("../stores/surveySessionStore.ts", () => ({
+vi.mock("../../src/stores/surveySessionStore.ts", () => ({
   useSurveySessionStore: (selector: (s: unknown) => unknown) => {
     const store = {
       localBase: { displayName: "Test Base" },
@@ -101,7 +101,7 @@ vi.mock("../stores/surveySessionStore.ts", () => ({
   },
 }));
 
-vi.mock("../stores/workingCopyStore.ts", () => ({
+vi.mock("../../src/stores/workingCopyStore.ts", () => ({
   useWorkingCopyStore: (selector: (s: unknown) => unknown) => {
     const store = {
       validatorFindings: [],
@@ -111,7 +111,7 @@ vi.mock("../stores/workingCopyStore.ts", () => ({
   },
 }));
 
-vi.mock("../lint/lintToQuestion.ts", () => ({
+vi.mock("../../src/lint/lintToQuestion.ts", () => ({
   buildFindingsByQuestionId: () => ({}),
 }));
 
@@ -119,8 +119,8 @@ vi.mock("../lint/lintToQuestion.ts", () => ({
 // Imports (after vi.mock)
 // ---------------------------------------------------------------------------
 
-import { makeFlowStepComponent } from "../editors/adapters/makeFlowStepComponent.tsx";
-import type { FlowStepOptions, FlowStepDeps } from "../editors/adapters/makeFlowStepComponent.tsx";
+import { makeFlowStepComponent } from "../../src/editors/adapters/makeFlowStepComponent.tsx";
+import type { FlowStepOptions, FlowStepDeps } from "../../src/editors/adapters/makeFlowStepComponent.tsx";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
@@ -194,16 +194,16 @@ describe("makeFlowStepComponent", () => {
         render(<TrackComponent onComplete={onComplete} onBack={onBack} />);
       });
 
-      expect(screen.getByTestId("flow-step-host")).toBeTruthy();
+      expect(screen.getByTestId("flow-step-host")).toBeDefined();
       expect(screen.getByTestId("flow-step-title").textContent).toBe("Authoring Track");
     });
 
     it("fires setSelectedTrack('copy') BEFORE onComplete when extract succeeds (R7 ordering)", async () => {
       const callOrder: string[] = [];
 
-      const onCommitSpy = vi.fn((_extracted: TrackPayload, deps: Parameters<NonNullable<FlowStepOptions<TrackPayload>["onCommit"]>>[1]) => {
+      const onCommitSpy = vi.fn((extracted: TrackPayload, deps: FlowStepDeps) => {
         callOrder.push("onCommit");
-        deps.setSelectedTrack(_extracted.track);
+        deps.setSelectedTrack(extracted.track);
       });
       const onCompleteSpy = vi.fn(() => {
         callOrder.push("onComplete");
@@ -217,20 +217,18 @@ describe("makeFlowStepComponent", () => {
         render(<TrackComponent onComplete={onCompleteSpy} />);
       });
 
-      // Trigger completion via the FlowStepHost stub.
       await act(async () => {
         fireEvent.click(screen.getByTestId("fsh-complete"));
       });
 
-      // onCommit fires before onComplete.
+      // R7: onCommit fires before onComplete (state mutations before navigation).
       expect(callOrder).toEqual(["onCommit", "onComplete"]);
-      // setSelectedTrack fired from within onCommit.
       expect(mockSetSelectedTrack).toHaveBeenCalledWith("copy");
       expect(onCompleteSpy).toHaveBeenCalledWith({ track: "copy" });
     });
 
     it("stays on step (no onComplete call) when extract returns undefined", async () => {
-      const extractReturnsUndefined = vi.fn(() => undefined as undefined);
+      const extractReturnsUndefined = vi.fn(() => undefined);
       const onCompleteSpy = vi.fn();
 
       const TrackComponent = makeFlowStepComponent(
@@ -248,19 +246,12 @@ describe("makeFlowStepComponent", () => {
         fireEvent.click(screen.getByTestId("fsh-complete"));
       });
 
-      // extract returned undefined → stay on step → onComplete not called.
       expect(extractReturnsUndefined).toHaveBeenCalled();
       expect(onCompleteSpy).not.toHaveBeenCalled();
     });
   });
 
-  // ---------------------------------------------------------------------------
-  // FIX 5: seeds depsRef indirection — getSeedValue/onAnswerCommit receive
-  // current deps at call time, not at render time (verifies the useRef mechanism).
-  // Also verifies per-mount displayNameRef isolation (re-entry reset).
-  // ---------------------------------------------------------------------------
-
-  describe("seeds — depsRef indirection (FIX 5)", () => {
+  describe("seeds — depsRef indirection (FIX 5: live deps, no stale closures)", () => {
     // Build a project_name-like options record that reads/writes displayNameRef.
     function buildSeedOptions(): FlowStepOptions<{ name: string }> {
       return {
@@ -292,38 +283,33 @@ describe("makeFlowStepComponent", () => {
         render(<SeedComponent onComplete={vi.fn()} />);
       });
 
-      // displayNameRef starts as "" on a fresh mount.
-      expect(mockFlowStepHostGetSeedValueRef.current).not.toBeNull();
-      expect(mockFlowStepHostGetSeedValueRef.current!("the_name")).toBe("");
+      const getSeedValue = mockFlowStepHostGetSeedValueRef.current!;
+      const onAnswerCommit = mockFlowStepHostOnAnswerCommitRef.current!;
 
-      // Simulate onAnswerCommit writing to displayNameRef via depsRef.
-      expect(mockFlowStepHostOnAnswerCommitRef.current).not.toBeNull();
-      mockFlowStepHostOnAnswerCommitRef.current!("the_name", "Hausa (new)");
+      expect(getSeedValue("the_name")).toBe("");
 
-      // getSeedValue now reads the updated value — proves depsRef is live.
-      expect(mockFlowStepHostGetSeedValueRef.current!("the_name")).toBe("Hausa (new)");
+      onAnswerCommit("the_name", "Hausa (new)");
+
+      // Proves depsRef is live — reads the updated value immediately.
+      expect(getSeedValue("the_name")).toBe("Hausa (new)");
     });
 
     it("fresh mount does NOT retain the previous mount's displayNameRef value (re-entry resets)", async () => {
       const SeedComponent = makeFlowStepComponent(buildSeedOptions());
-      const onComplete = vi.fn();
 
-      // First mount: simulate writing a display name.
       await act(async () => {
-        render(<SeedComponent onComplete={onComplete} />);
+        render(<SeedComponent onComplete={vi.fn()} />);
       });
       mockFlowStepHostOnAnswerCommitRef.current!("the_name", "Session One Value");
       expect(mockFlowStepHostGetSeedValueRef.current!("the_name")).toBe("Session One Value");
 
-      // Unmount (simulates survey re-entry / navigation back past this step).
       cleanup();
       vi.clearAllMocks();
 
-      // Second mount: displayNameRef must start at "" — NOT "Session One Value".
       await act(async () => {
         render(<SeedComponent onComplete={vi.fn()} />);
       });
-      // A fresh useRef("") is allocated; the prior session's value is gone.
+      // Fresh useRef("") is allocated; prior session's value is gone.
       expect(mockFlowStepHostGetSeedValueRef.current!("the_name")).toBe("");
     });
   });
