@@ -1,6 +1,5 @@
 // Custom DOM events for lint chip interactions.
-// Consumers listen on `document` with addEventListener("navigateToLocation", ...)
-// and addEventListener("applyLintFix", ...).
+// Consumers listen on `document` with addEventListener("navigateToLocation", ...).
 
 import type { SourceLocation, LintCode } from "@keyboard-studio/contracts";
 
@@ -14,9 +13,6 @@ export type ApplyLintFixDetail = { code: LintCode; hint: string | undefined };
 export function dispatchNavigateTo(location: SourceLocation): void {
   const detail: NavigateToLocationDetail = { location };
   document.dispatchEvent(
-    new CustomEvent<NavigateToLocationDetail>("navigateToLocation", {
-      detail,
-      bubbles: true,
-    }),
+    new CustomEvent<NavigateToLocationDetail>("navigateToLocation", { detail }),
   );
 }
