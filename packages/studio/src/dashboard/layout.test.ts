@@ -237,12 +237,11 @@ describe("layoutFlowGraph — empty graph", () => {
     expect(Number.isFinite(laid!.width)).toBe(true);
     expect(Number.isFinite(laid!.height)).toBe(true);
 
-    // Width: maxRowLen=1 (guard), contentW = 1*NODE_W + 0*H_GAP = 220,
-    // width = 220 + 2*24 = 268.
-    expect(laid!.width).toBe(220 + 24 * 2);
+    // Width: maxRowLen=1 (guard), contentW = 1*NODE_W + 0*H_GAP.
+    expect(laid!.width).toBe(NODE_W + PAD * 2);
 
-    // Height: maxRank=0 (guard), height = 1*NODE_H + 0*V_GAP + 2*PAD = 94 + 48 = 142 (NODE_H=94).
-    expect(laid!.height).toBe(94 + 24 * 2);
+    // Height: maxRank=0 (guard), height = 1*NODE_H + 0*V_GAP + 2*PAD.
+    expect(laid!.height).toBe(NODE_H + PAD * 2);
 
     // No nodes to position.
     expect(laid!.nodes.length).toBe(0);
@@ -289,11 +288,10 @@ describe("layoutFlowGraph — Phase B loop-back topology (55-node synthetic)", (
     // After |V|=10 passes the pump reaches about rank 10+9=19 for J.
     // Post-fix: B stays at rank 1, J stays at rank 9.
     const maxY = Math.max(...laid.nodes.map((n) => n.y));
-    // maxRank 9 => maxY = PAD + 9*(NODE_H+V_GAP) = 24 + 9*146 = 1338 (NODE_H=94)
-    expect(maxY).toBeLessThanOrEqual(24 + 9 * (94 + 52));
+    expect(maxY).toBeLessThanOrEqual(yForRank(9));
 
     // B must not have been rank-inflated above its natural rank 1.
     const nodeB = laid.nodes.find((n) => n.id === "B");
-    expect(nodeB!.y).toBe(24 + 1 * 146); // rank 1 (NODE_H=94, V_GAP=52 => step=146)
+    expect(nodeB!.y).toBe(yForRank(1));
   });
 });
