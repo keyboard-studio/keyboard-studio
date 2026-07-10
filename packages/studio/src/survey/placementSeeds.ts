@@ -143,7 +143,7 @@ export function extractSeedEntries(
 
   for (const entry of placementMap.entries) {
     const top = topCandidate(entry);
-    if (top === undefined || top.confidence < threshold) continue;
+    if (top === undefined || !(top.confidence >= threshold)) continue;
 
     const character = parseUPlusNotation(entry.codepoint);
     if (character === null) continue;

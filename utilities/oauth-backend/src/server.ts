@@ -263,7 +263,7 @@ export async function buildServer(opts: {
       const res = await (globalThis as unknown as { fetch: typeof fetch }).fetch(url, {
         method: init.method,
         headers: init.headers,
-        body: init.body,
+        ...(init.body !== undefined ? { body: init.body } : {}),
       });
       return {
         ok: res.ok,
@@ -282,14 +282,14 @@ export async function buildServer(opts: {
     pipelineFetch(url, {
       method: init?.method ?? "GET",
       headers: init?.headers ?? {},
-      body: init?.body,
+      ...(init?.body !== undefined ? { body: init.body! } : {}),
     });
 
   const handlerConfig: HandlerConfig = {
     clientId: opts.clientId,
     clientSecret: opts.clientSecret,
-    oauthClientId: opts.oauthClientId,
-    oauthClientSecret: opts.oauthClientSecret,
+    ...(opts.oauthClientId !== undefined ? { oauthClientId: opts.oauthClientId } : {}),
+    ...(opts.oauthClientSecret !== undefined ? { oauthClientSecret: opts.oauthClientSecret } : {}),
     fetch: nodeFetch,
   };
 
@@ -443,13 +443,13 @@ if (isMain) {
   const app = await buildServer({
     clientId: config.clientId,
     clientSecret: config.clientSecret,
-    oauthClientId: config.oauthClientId,
-    oauthClientSecret: config.oauthClientSecret,
+    ...(config.oauthClientId !== undefined ? { oauthClientId: config.oauthClientId } : {}),
+    ...(config.oauthClientSecret !== undefined ? { oauthClientSecret: config.oauthClientSecret } : {}),
     googleOAuthEnabled: config.googleOAuthEnabled,
-    googleClientId: config.googleClientId,
-    googleClientSecret: config.googleClientSecret,
-    getInstallationToken: tokenProvider,
-    orgLogin: config.orgLogin || undefined,
+    ...(config.googleClientId !== undefined ? { googleClientId: config.googleClientId } : {}),
+    ...(config.googleClientSecret !== undefined ? { googleClientSecret: config.googleClientSecret } : {}),
+    ...(tokenProvider !== undefined ? { getInstallationToken: tokenProvider } : {}),
+    ...(config.orgLogin ? { orgLogin: config.orgLogin } : {}),
     allowedOrigins: config.allowedOrigins,
   });
   const address = await app.listen({ port: config.port, host: "0.0.0.0" });

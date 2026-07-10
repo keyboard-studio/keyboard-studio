@@ -158,7 +158,10 @@ describe("suggestBases", () => {
       version: "1.0",
       languages: ["ha", "ha-Latn"],
     });
-    const allBases = [basicKbdus, silEuroLatin, haBase];
+    // silEuroLatin already covers "ha", which would tie with haBase at
+    // language-match and win by input order — use silDevanagariPhonetic (Deva
+    // script, no "ha") so haBase is the sole language-match for ha-Latn.
+    const allBases = [basicKbdus, silDevanagariPhonetic, haBase];
     const languagesById = Object.fromEntries(
       allBases.map((b) => [b.id, b.languages ?? []] as const),
     );
