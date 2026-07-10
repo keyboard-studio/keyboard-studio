@@ -28,6 +28,14 @@ export type LabelProps = React.HTMLAttributes<HTMLElement> & {
   htmlFor?: string | undefined;
 };
 
+const BASE_STYLE: React.CSSProperties = {
+  display: "block",
+  fontSize: 13,
+  color: TEXT_MAIN,
+  fontWeight: 600,
+  marginBottom: 6,
+};
+
 /**
  * Label primitive. Matches the `<label>` + `LABEL_STYLE` rendering in
  * QuestionField.tsx exactly (fontSize 13, color #e6edf3, fontWeight 600,
@@ -45,14 +53,6 @@ export function Label({
   htmlFor,
   ...rest
 }: LabelProps): React.ReactElement {
-  const baseStyle: React.CSSProperties = {
-    display: "block",
-    fontSize: 13,
-    color: TEXT_MAIN,
-    fontWeight: 600,
-    marginBottom: 6,
-  };
-
   const content = (
     <>
       {children}
@@ -66,14 +66,14 @@ export function Label({
 
   if (as === "span") {
     return (
-      <span style={{ ...baseStyle, ...style }} {...rest}>
+      <span style={{ ...BASE_STYLE, ...style }} {...rest}>
         {content}
       </span>
     );
   }
 
   return (
-    <label htmlFor={htmlFor} style={{ ...baseStyle, ...style }} {...rest}>
+    <label htmlFor={htmlFor} style={{ ...BASE_STYLE, ...style }} {...rest}>
       {content}
     </label>
   );
