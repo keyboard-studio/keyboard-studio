@@ -13,10 +13,13 @@ import { describe, it, expect } from "vitest";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import { latinDeadkeyAcuteSingle } from "@keyboard-studio/contracts/fixtures";
 import type { Pattern } from "@keyboard-studio/contracts";
+import { makePattern } from "@keyboard-studio/contracts";
+import { parse as parseKmn, emit as emitKmn } from "../codec/index.js";
 import {
   applyAssignments,
   resolveRenderableMechanisms,
 } from "./applyAssignments.js";
+import { buildShiftRuleLines } from "./shiftRules.js";
 
 // ---------------------------------------------------------------------------
 // Shared test data
@@ -529,5 +532,106 @@ describe("resolveRenderableMechanisms — §7.7 precedence", () => {
     // The same ref covers all three, but must appear only once.
     expect(refs).toHaveLength(1);
     expect(refs[0]?.patternId).toBe("shared_pat");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Shift-rule injection — proves a `[SHIFT K_X]` line built by
+// buildShiftRuleLines survives applyAssignments and round-trips through
+// parse -> emit with its SHIFT modifier intact.
+// ---------------------------------------------------------------------------
+
+describe("applyAssignments — shift-rule injection round-trip", () => {
+  const SHIFT_SWAP_PATTERN: Pattern = makePattern({
+    id: "shift_swap_test_pattern",
+    title: "Shift-layer swap (test fixture)",
+    description: "Injects one or more literal .kmn rule lines into group(main).",
+    category: "substitute",
+    appliesTo: [],
+    questions: [
+      {
+        id: "kmnRules",
+        prompt: "Literal .kmn rule lines.",
+        answerType: "text",
+      },
+    ],
+    kmnFragment: "group(main) using keys\n{{kmnRules}}\n",
+    tests: [],
+    validatedForFamilies: [],
+    sourceKeyboards: [],
+    reviewedBy: "",
+    reviewDate: "2026-01-01",
+  });
+
+  const resolver = makeResolver([SHIFT_SWAP_PATTERN]);
+
+  it("injects a [SHIFT K_X] > U+XXXX line and it survives applyAssignments", () => {
+    const kmnRules = buildShiftRuleLines("K_A", "Θ", { capsHandling: false }).join("\n");
+    const assignment: MechanismAssignment = {
+      scope: "individual",
+      target: "Θ",
+      modality: "physical",
+      mechanisms: [
+        { patternId: SHIFT_SWAP_PATTERN.id, slotValues: { kmnRules } },
+      ],
+    };
+
+    const { kmn, warnings } = applyAssignments([assignment], resolver, BASE_WITH_MAIN_GROUP);
+    expect(warnings).toEqual([]);
+    expect(kmn).toContain("+ [SHIFT K_A] > U+0398");
+  });
+
+  it("round-trips through parse -> emit with the SHIFT modifier intact", () => {
+    const kmnRules = buildShiftRuleLines("K_A", "Θ", { capsHandling: false }).join("\n");
+    const assignment: MechanismAssignment = {
+      scope: "individual",
+      target: "Θ",
+      modality: "physical",
+      mechanisms: [
+        { patternId: SHIFT_SWAP_PATTERN.id, slotValues: { kmnRules } },
+      ],
+    };
+
+    const { kmn } = applyAssignments([assignment], resolver, BASE_WITH_MAIN_GROUP);
+    const { ir } = parseKmn(kmn, "shift-roundtrip-test");
+
+    const mainGroup = ir.groups.find((g) => g.name === "main");
+    expect(mainGroup).toBeDefined();
+    const shiftRule = mainGroup?.rules.find(
+      (r) =>
+        r.context.length === 1 &&
+        r.context[0]?.kind === "vkey" &&
+        r.context[0].name === "K_A" &&
+        r.context[0].modifiers.includes("SHIFT"),
+    );
+    expect(shiftRule).toBeDefined();
+    expect(shiftRule?.output).toEqual([{ kind: "char", value: "Θ" }]);
+
+    const reemitted = emitKmn(ir);
+    expect(reemitted).toContain("+ [SHIFT K_A] > U+0398");
+  });
+
+  it("injects both NCAPS/CAPS lines when capsHandling is true, and both survive round-trip", () => {
+    const kmnRules = buildShiftRuleLines("K_B", "É", { capsHandling: true }).join("\n");
+    const assignment: MechanismAssignment = {
+      scope: "individual",
+      target: "É",
+      modality: "physical",
+      mechanisms: [
+        { patternId: SHIFT_SWAP_PATTERN.id, slotValues: { kmnRules } },
+      ],
+    };
+
+    const { kmn } = applyAssignments([assignment], resolver, BASE_WITH_MAIN_GROUP);
+    expect(kmn).toContain("+ [NCAPS SHIFT K_B] > U+00C9");
+    expect(kmn).toContain("+ [CAPS SHIFT K_B] > U+00C9");
+
+    const { ir } = parseKmn(kmn, "shift-roundtrip-caps-test");
+    const mainGroup = ir.groups.find((g) => g.name === "main");
+    const modifierSets = mainGroup?.rules
+      .filter((r) => r.context[0]?.kind === "vkey" && r.context[0].name === "K_B")
+      .map((r) => (r.context[0]?.kind === "vkey" ? [...r.context[0].modifiers].sort() : []));
+    expect(modifierSets).toContainEqual(["NCAPS", "SHIFT"]);
+    expect(modifierSets).toContainEqual(["CAPS", "SHIFT"]);
   });
 });

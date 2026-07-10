@@ -17,6 +17,10 @@ export interface RadioOption {
   value: string;
   label: string;
   note?: string;
+  /** Disables this option's input (e.g. shift-layer targeting on a mnemonic keyboard). */
+  disabled?: boolean;
+  /** Tooltip shown on the input — typically explains why `disabled` is set. */
+  title?: string;
 }
 
 export interface RadioGroupProps {
@@ -77,6 +81,8 @@ interface RadioItemProps {
   accentColor: string;
   onChange: (v: string) => void;
   required?: boolean | undefined;
+  disabled?: boolean | undefined;
+  title?: string | undefined;
 }
 
 function RadioItem({
@@ -89,6 +95,8 @@ function RadioItem({
   accentColor,
   onChange,
   required,
+  disabled,
+  title,
 }: RadioItemProps): React.ReactElement {
   return (
     <label htmlFor={inputId} style={OPTION_ROW_STYLE}>
@@ -99,6 +107,8 @@ function RadioItem({
         value={optValue}
         checked={checked}
         onChange={() => onChange(optValue)}
+        disabled={disabled}
+        title={title}
         style={{ marginTop: 2, flexShrink: 0, accentColor }}
         aria-required={required}
         // E2E hook: the live "adapt" option of the track_choice question
@@ -174,6 +184,8 @@ export function RadioGroup({
             checked={value === opt.value}
             accentColor={resolvedAccent}
             onChange={onChange}
+            {...(opt.disabled !== undefined ? { disabled: opt.disabled } : {})}
+            {...(opt.title !== undefined ? { title: opt.title } : {})}
           />
         );
       })}

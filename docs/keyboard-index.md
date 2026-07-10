@@ -102,6 +102,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | சுரதா-பாமுனி \| Suratha Bamini | `thamizha_bamini` | `ta` | © thamizha.com and SIL Global | `../keyboards/release/t/thamizha_bamini` |
 | புதிய தட்டெழுதி \| New Typewriter | `thamizha_new_typewriter` | `ta` | Mugunth (mugunth@gmail.com), Umar (csd_one@yahoo.com) and K. Sethu (skhome@gmail.com) | `../keyboards/release/t/thamizha_new_typewriter` |
 | Triqui Itunyoso | `triqui_itunyoso` | `trq` | Kayla Shames | `../keyboards/release/t/triqui_itunyoso` |
+| Unifon | `unifon` | `en` | SIL International | `../keyboards/experimental/u/unifon` |
 | Vietnamese Telex | `vietnamese_telex` | `vi` | Mike Vo | `../keyboards/release/v/vietnamese_telex` |
 | Wancho | `wancho` | `nnp-Wcho` | Banwang Losu | `../keyboards/experimental/w/wancho` |
 | Winchus | `winchus` | `qu` | Alex Castille Larkin (SIL) | `../keyboards/release/w/winchus` |
