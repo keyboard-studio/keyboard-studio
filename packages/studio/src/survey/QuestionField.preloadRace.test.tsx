@@ -104,4 +104,48 @@ describe("LangtagsComboboxField pre-load race (PR #1055 regression)", () => {
     // lands — the previously-typed exact match must now resolve.
     await waitFor(() => expect(onEntryResolved).toHaveBeenCalledWith(SWAHILI));
   });
+
+  it("re-resolves against the CURRENT onEntryResolved after a mid-load prop change, not the mount-time callback", async () => {
+    // Covers the other half of the fix: onEntryResolvedRef. The value-half test
+    // above proves the post-load resolve sees the current TYPED VALUE via
+    // latestValueRef; this proves it also calls the current CALLBACK IDENTITY
+    // via onEntryResolvedRef, not whichever onEntryResolved closure was in
+    // scope when the mount-time effect was created.
+    const cb1 = vi.fn();
+    const cb2 = vi.fn();
+    const { rerender } = render(<Harness onEntryResolved={cb1} />);
+
+    // The module load is still pending.
+    const input = await screen.findByRole<HTMLInputElement>("combobox");
+    expect(input.placeholder).toBe("Loading languages…");
+
+    // Type the exact English name while the module is still unresolved, same
+    // as the value-half test — this is the pre-load exact match.
+    fireEvent.change(input, { target: { value: "Swahili" } });
+    await waitFor(() => expect(input.value).toBe("Swahili"));
+    expect(cb1).not.toHaveBeenCalled();
+
+    // Rerender the SAME component instance (no `key` change) with a new
+    // onEntryResolved identity — simulating the prop changing mid-load (e.g.
+    // a parent re-creating its callback across a re-render). The Harness's
+    // own `value` state is untouched by this rerender, so the typed value
+    // stays "Swahili" throughout.
+    rerender(<Harness onEntryResolved={cb2} />);
+    expect(input.value).toBe("Swahili");
+
+    // Now let the langtags module resolve.
+    expect(resolveLoad).not.toBeNull();
+    resolveLoad!({
+      getLanguageDefaults: () => null,
+      listLanguages: () => ALL,
+      lookupByName: (q: string) =>
+        ALL.filter((l) => l.englishName.toLowerCase().includes(q.toLowerCase())),
+    });
+
+    // The post-load re-resolve must call the CURRENT handler (cb2) — not the
+    // mount-time closure (cb1), which would indicate resolveTyped read the
+    // onEntryResolved prop directly instead of onEntryResolvedRef.current.
+    await waitFor(() => expect(cb2).toHaveBeenCalledWith(SWAHILI));
+    expect(cb1).not.toHaveBeenCalledWith(SWAHILI);
+  });
 });
