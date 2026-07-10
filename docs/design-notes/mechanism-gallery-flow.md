@@ -50,8 +50,9 @@ gallery and back.
 ## 2. Left pane — the per-character assign loop (UI state machine)
 
 `currentChar` is **explicit state**: applying a method does *not* auto-advance.
-Only `Next`, `Skip`, or `Back` move the cursor. Done = every char in
-`lettersToAdd` is covered (≥1 assignment) or skipped.
+Only `Next`, `Skip`, or `Back` move the cursor. Skip is pure positional
+navigation — it records nothing; only Apply marks a character handled.
+Done = every char in `lettersToAdd` is covered (≥1 assignment).
 
 ```mermaid
 flowchart TD
@@ -79,15 +80,14 @@ flowchart TD
   ACT{"author action"}
   CHOOSE --> ACT
   ACT -- "Apply method (canApply)" --> APPLY["handleApply<br/>build MechanismAssignment(scope:individual)<br/>→ recordAssignments → resetMethodState"]
-  ACT -- "Next char (canGoNext)" --> NEXT["handleNext<br/>next uncovered+unskipped"]
-  ACT -- "Skip" --> SKIP["handleSkip<br/>add to skippedChars + advance"]
+  ACT -- "Next char (canGoNext)" --> NEXT["handleNext<br/>advance one position<br/>(or complete from last char)"]
+  ACT -- "Skip (ungated)" --> NEXT
   ACT -- "Back (canGoBack)" --> BACK["handleBack<br/>previous char"]
 
   APPLY --> STAY["stay on currentChar<br/>(multiple methods allowed)"]
   APPLYSUG --> STAY
   STAY --> RENDER
   NEXT --> RENDER
-  SKIP --> RENDER
   BACK --> RENDER
 
   classDef done fill:#0d2218,stroke:#238636,color:#56d364;
@@ -101,8 +101,9 @@ Notes that matter for the refactor:
 - **`Apply` does not advance.** The author may stack several methods on one
   character; the applied-methods chip row lets them remove individual
   mechanisms. `canGoNext` is gated on `appliedForCurrentChar > 0`.
-- **Skipped chars count toward Done** but are not covered — they're tracked in
-  local `skippedChars` state, *not* the store, so they reset on remount.
+- **Skip records nothing; it is pure positional navigation** (advances one
+  character, completes on the last). Only Apply marks a character handled —
+  `canGoNext` stays gated until the current character is actually covered.
 - **`desktopLocked`** disables every write affordance but always leaves
   `onComplete` callable (forward escape after navigating back from Phase E).
 - **kbgen suggestion** only fires for S-01 / S-08 candidates; any other
@@ -210,4 +211,4 @@ cut along:
 | **Pattern IDs** | `PATTERN_*` constants must match `content/patterns/` `id:` fields | A mismatch makes `getById()` return undefined → preview never reflects the key. Keep these in lock-step. |
 | **Method → assignment** | `handleApply` / `handleSuggestionAccept` each hand-build slotValues per method | Candidate for a shared `buildAssignment(method, ...)` factory — the two paths already drift (suggestion path only covers S-01/S-08) |
 | **Compile ownership** | `MechanismGallery` owns the single pipeline; `SurveyView`'s hook stays mounted but unrendered | Single-artifact invariant (D3). Any refactor must not introduce a second concurrent compile. |
-| **Skipped state** | local `skippedChars`, not persisted | If the loop becomes resumable, this needs to move to the store. |
+| **Skipped state** | removed — Skip is pure positional navigation, records nothing | Moot; no skip state exists to move to the store. |
