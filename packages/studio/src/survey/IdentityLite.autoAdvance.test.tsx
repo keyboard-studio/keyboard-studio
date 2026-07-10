@@ -80,4 +80,34 @@ describe("IdentityLite auto-advance seed race (PR #1050 regression)", () => {
     // And specifically NOT the English Q1 name (the old racy fallback).
     expect(screen.getByRole<HTMLInputElement>("combobox").value).not.toBe("Zeta");
   });
+
+  it("Q3 code dropdown offers the resolved language's candidate code forms", async () => {
+    render(<IdentityLite onComplete={vi.fn()} />);
+    await waitFor(() => {
+      expect(screen.getByRole<HTMLInputElement>("combobox").placeholder).toMatch(/Type your language/);
+    });
+
+    // Q1: pick Zeta → auto-advance to Q2 (no region variants).
+    fireEvent.focus(screen.getByRole("combobox"));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: /\(zz\)/ }));
+    await waitFor(() => {
+      expect(screen.getByText(/What is your language called in your own language\?/)).toBeTruthy();
+    });
+
+    // Q2 → Q3 (code confirmation) via Next.
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => {
+      expect(screen.getByText(/Confirm your language's code/)).toBeTruthy();
+    });
+
+    // Q3 is seeded with the ISO 639-3 code, and its dropdown offers BOTH plausible
+    // forms for the resolved language: "zzz" (ISO 639-3) and "zz" (BCP 47 subtag).
+    expect(screen.getByRole<HTMLInputElement>("combobox").value).toBe("zzz");
+    fireEvent.focus(screen.getByRole("combobox"));
+    const codes = Array.from(document.querySelectorAll('[role="option"]')).map(
+      (o) => o.getAttribute("data-value") ?? "",
+    );
+    expect(codes).toContain("zzz");
+    expect(codes).toContain("zz");
+  });
 });

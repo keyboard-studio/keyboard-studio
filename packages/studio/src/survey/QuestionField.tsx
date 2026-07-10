@@ -14,7 +14,6 @@ import {
   RadioGroup,
   Notice,
   Label,
-  Autocomplete,
   MultiSelect,
 } from "../ui/index.ts";
 import type { DropdownOption } from "../ui/Dropdown.tsx";
@@ -91,25 +90,44 @@ function AutocompleteField({ question, value, onChange, onEntryResolved, onSelec
   // onEntryResolved so homonyms (same name, different code) can be told apart.
   if (question.options_source === "@langtags_names") {
     return (
-      <LangtagsNamePickerField
+      <LangtagsComboboxField
         question={question}
         value={value}
         onChange={onChange}
+        valueMode="name"
+        placeholder="Type your language name in English…"
         {...(onEntryResolved !== undefined ? { onEntryResolved } : {})}
         {...(onSelectAdvance !== undefined ? { onSelectAdvance } : {})}
       />
     );
   }
 
-  // When options_source is "@langtags_iso639", delegate to the langtags-backed
-  // picker. The static options array is the fallback when options_source is
-  // absent or a different source.
+  // When options_source is "@langtags_iso639" (Q3 code confirmation):
+  //  - if the survey injected candidate codes for the resolved language
+  //    (getSeedOptions → question.options), offer THOSE possible matches in the
+  //    styled dropdown (e.g. Hausa → "hau" / "ha"); otherwise
+  //  - fall back to the full styled langtags picker (same rows as Q1) so an
+  //    unresolved / free-text language can still be searched by name or code.
+  // Both render the same StyledCombobox and commit the language CODE.
   if (question.options_source === "@langtags_iso639") {
+    if ((question.options?.length ?? 0) > 0) {
+      return (
+        <StyledOptionsField
+          question={question}
+          value={value}
+          onChange={onChange}
+          {...(onSelectAdvance !== undefined ? { onSelectAdvance } : {})}
+        />
+      );
+    }
     return (
-      <LangtagsAutocompleteField
+      <LangtagsComboboxField
         question={question}
         value={value}
         onChange={onChange}
+        valueMode="code"
+        placeholder="Search by name, autonym, or code…"
+        {...(onSelectAdvance !== undefined ? { onSelectAdvance } : {})}
       />
     );
   }
@@ -174,15 +192,16 @@ function StyledOptionsField({ question, value, onChange, onSelectAdvance }: Fiel
 }
 
 // ---------------------------------------------------------------------------
-// LangtagsNamePickerField — the English-name-first language picker (spec 030
-// US1). Unlike the code-valued datalist picker, this field holds the English
-// NAME as its value and reports the resolved langtags entry via onEntryResolved
-// so homonyms (same English name, different code) are told apart at selection.
-// It uses the custom StyledCombobox (not a native datalist) because a datalist
-// cannot distinguish two rows that share a display string, and cannot carry the
-// resolved LanguageSummary payload a homonym pick needs.
+// LangtagsComboboxField — the shared langtags-backed language picker behind both
+// Q1 (`@langtags_names`, valueMode "name") and Q3 (`@langtags_iso639`, valueMode
+// "code"). Both render the same StyledCombobox with the same rows (nameOptionLabel:
+// "English / autonym — region (code)"), search the same in-memory langtags index,
+// and cap the list identically — so the two dropdowns are visually and behaviourally
+// identical; only what a pick commits differs (name vs code). The custom combobox
+// (not a native datalist) is required for Q1 so homonyms sharing a display string
+// stay distinguishable and each row can carry its resolved LanguageSummary payload.
 //
-// Resolution rules:
+// Resolution (name-mode only):
 //   - selecting a row → onChange(englishName) + onEntryResolved(summary);
 //   - typing a name that uniquely matches one entry's English name → resolve it;
 //   - typing an ambiguous name (>1 exact English-name match) → onEntryResolved(null);
@@ -202,7 +221,35 @@ function nameOptionLabel(summary: LanguageSummary): string {
   return `${base}${autonym}${region} (${summary.code})`;
 }
 
-function LangtagsNamePickerField({ question, value, onChange, onEntryResolved, onSelectAdvance }: FieldProps) {
+// Hard cap on how many rows the dropdown renders. The full langtags index is
+// ~8,000 entries; rendering them all janks real browsers and crashes embedded
+// Electron webviews (VS Code's Simple Browser takes the whole window down).
+// lookupByName returns ranked matches (exact code, then name prefixes, then
+// substrings), so the useful suggestions survive the cut.
+const MAX_DATALIST_OPTIONS = 50;
+
+/**
+ * `valueMode` selects what a picked row commits as the answer:
+ *   - `"name"` (Q1, `@langtags_names`): the English NAME, plus onEntryResolved
+ *     carries the resolved entry so homonyms are told apart and downstream
+ *     fields can be seeded.
+ *   - `"code"` (Q3, `@langtags_iso639`): the language CODE; a pure picker with
+ *     no entry resolution.
+ */
+interface LangtagsComboboxExtras {
+  valueMode: "name" | "code";
+  placeholder: string;
+}
+
+function LangtagsComboboxField({
+  question,
+  value,
+  onChange,
+  onEntryResolved,
+  onSelectAdvance,
+  valueMode,
+  placeholder,
+}: FieldProps & LangtagsComboboxExtras) {
   const strVal = stringValue(value);
   const [options, setOptions] = useState<LanguageSummary[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -237,16 +284,18 @@ function LangtagsNamePickerField({ question, value, onChange, onEntryResolved, o
   }, []);
 
   // Resolve the currently-typed text to a single entry, or null when it matches
-  // nothing or is ambiguous (>1 entry sharing the English name). Selection —
-  // handled in onSelect — always resolves unambiguously via the row's payload.
+  // nothing or is ambiguous (>1 entry sharing the English name). Name-mode only;
+  // code-mode is a plain picker with no onEntryResolved. Selection — handled in
+  // onSelect — always resolves unambiguously via the row's payload.
   function resolveTyped(text: string, results: readonly LanguageSummary[]): void {
+    if (onEntryResolved === undefined) return;
     const trimmed = text.trim().toLowerCase();
     if (trimmed === "") {
-      onEntryResolved?.(null);
+      onEntryResolved(null);
       return;
     }
     const exact = results.filter((r) => (r.englishName ?? "").toLowerCase() === trimmed);
-    onEntryResolved?.(exact.length === 1 ? exact[0]! : null);
+    onEntryResolved(exact.length === 1 ? exact[0]! : null);
   }
 
   function handleType(text: string): void {
@@ -268,14 +317,14 @@ function LangtagsNamePickerField({ question, value, onChange, onEntryResolved, o
 
   function handleSelect(opt: ComboOption): void {
     const summary = opt.data ?? null;
-    // The answer value is the English NAME (not the code); the resolved identity
-    // travels via onEntryResolved so downstream steps see the exact entry.
-    const name = summary?.englishName ?? opt.value;
-    onChange(name);
+    // Name-mode commits the English NAME (the resolved identity travels via
+    // onEntryResolved); code-mode commits the language CODE (the option value).
+    const committed = valueMode === "name" ? (summary?.englishName ?? opt.value) : opt.value;
+    onChange(committed);
     onEntryResolved?.(summary);
     // Auto-advance runs last so onEntryResolved's synchronous seed refs are set
     // before the survey routes to (and seeds) the next question.
-    onSelectAdvance?.(name);
+    onSelectAdvance?.(committed);
   }
 
   const comboOptions: ComboOption[] = options.map((summary) => ({
@@ -289,121 +338,11 @@ function LangtagsNamePickerField({ question, value, onChange, onEntryResolved, o
       id={question.id}
       value={strVal}
       options={comboOptions}
-      placeholder={loaded ? "Type your language name in English…" : "Loading languages…"}
+      placeholder={loaded ? placeholder : "Loading languages…"}
       required={question.required === true}
       onType={handleType}
       onSelect={handleSelect}
       onOpen={handleOpen}
-    />
-  );
-}
-
-// ---------------------------------------------------------------------------
-// LangtagsAutocompleteField — langtags-backed searchable language picker.
-//
-// The langtags module is loaded lazily (one-time async on first render) and
-// the datalist is populated from the search results. The Autocomplete primitive
-// uses a native <input list> which always accepts free text, satisfying FR-009
-// (a typed value not in the list is passed directly to onChange).
-//
-// No per-keystroke debounce is added here — this is NOT the 300 ms validator
-// cycle (decision D3). The search runs on the already-loaded in-memory index
-// (synchronous after the one-time import resolves), so it is instantaneous.
-// ---------------------------------------------------------------------------
-
-// Hard cap on datalist size. The full langtags index is ~8,000 entries;
-// rendering them all as <option> elements janks real browsers and crashes
-// embedded Electron webviews outright (VS Code's Simple Browser takes the
-// whole window down with it). A native datalist dropdown only ever shows a
-// handful of rows, and lookupByName returns ranked matches (exact code,
-// then name prefixes, then substrings), so the useful suggestions survive
-// the cut.
-const MAX_DATALIST_OPTIONS = 50;
-
-function LangtagsAutocompleteField({ question, value, onChange }: FieldProps) {
-  const strVal = stringValue(value);
-  const [options, setOptions] = useState<LanguageSummary[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const loadedRef = useRef(false);
-  // Unmount guard: prevents setOptions from running after the component unmounts,
-  // which would produce a React "state update on unmounted component" warning.
-  const isMountedRef = useRef(true);
-
-  // One-time lazy load of the langtags module on mount. The module promise is
-  // memoized in langtagsDefaults.ts so repeated renders share the same import.
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (loadedRef.current) return;
-    loadedRef.current = true;
-    loadLangtags()
-      .then((mod) => {
-        // Pre-populate a capped slice so the datalist offers something to
-        // browse before the user starts typing. Never the full list — see
-        // MAX_DATALIST_OPTIONS above.
-        if (!isMountedRef.current) return;
-        const all = mod.listLanguages();
-        setOptions(all.slice(0, MAX_DATALIST_OPTIONS) as LanguageSummary[]);
-        setLoaded(true);
-      })
-      .catch(() => {
-        // If the module fails to load, the field degrades to a plain text input.
-        if (!isMountedRef.current) return;
-        setLoaded(true);
-      });
-  }, []);
-
-  // Update the datalist dynamically as the user types. The lookupByName search
-  // runs synchronously against the in-memory index (no network, no async). When
-  // the query is empty we show the head of the list (capped) so browsing works.
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const typed = e.target.value;
-    onChange(typed);
-    if (loaded) {
-      loadLangtags()
-        .then((mod) => {
-          if (!isMountedRef.current) return;
-          const results = typed
-            ? mod.lookupByName(typed)
-            : mod.listLanguages();
-          setOptions(results.slice(0, MAX_DATALIST_OPTIONS) as LanguageSummary[]);
-        })
-        .catch(() => {
-          // Silently ignore — module is loaded (we got here from the mount effect).
-        });
-    }
-  }
-
-  // Build datalist options: label = "EnglishName (code)" + autonym if present.
-  // The datalist value is the language code (what gets written to the answer),
-  // and the label is the human-readable string shown in the suggestion dropdown.
-  const acOptions = options.map((lang) => {
-    const autonymSuffix =
-      lang.autonym !== undefined && lang.autonym !== lang.englishName
-        ? ` / ${lang.autonym}`
-        : "";
-    return {
-      value: lang.code,
-      label: `${lang.englishName} (${lang.code})${autonymSuffix}`,
-    };
-  });
-
-  // aria-label is omitted here: the input's `id` matches the `<Label htmlFor={question.id}>`
-  // rendered by QuestionField, so the accessible name comes from the associated <label>
-  // element — consistent with all sibling field renderers (TextFieldControl, SelectField, etc.).
-  return (
-    <Autocomplete
-      id={question.id}
-      aria-required={question.required === true}
-      placeholder={loaded ? "Search by name, autonym, or code..." : "Loading languages..."}
-      value={strVal}
-      onChange={handleChange}
-      options={acOptions}
     />
   );
 }

@@ -458,6 +458,27 @@ export function IdentityLite({
           return variants.map((v) => ({ value: v.region, label: v.regionName ?? v.region }));
         }
       }
+      if (questionId === "il_language_code") {
+        // Possible code matches FOR THE RESOLVED LANGUAGE (spec 030 US4): the two
+        // plausible subtag forms langtags records — the ISO 639-3 code (the seeded
+        // default) and the canonical bare/2-letter subtag — so the author can pick
+        // the form they want (e.g. Hausa: "hau" or "ha"). De-duplicated (many
+        // languages carry only one form). Undefined when no language resolved — the
+        // field then falls back to a full langtags code search / free text.
+        const d = resolvedEntryRef.current;
+        if (d === null) return undefined;
+        const seen = new Set<string>();
+        const opts: FlowOption[] = [];
+        const add = (code: string | undefined, label: string) => {
+          const c = code?.trim();
+          if (c === undefined || c === "" || seen.has(c)) return;
+          seen.add(c);
+          opts.push({ value: c, label });
+        };
+        add(d.iso639_3, `${d.iso639_3 ?? ""} — ISO 639-3`);
+        add(d.code, `${d.code} — BCP 47 language subtag`);
+        return opts.length > 0 ? opts : undefined;
+      }
       return undefined;
     },
     [],
