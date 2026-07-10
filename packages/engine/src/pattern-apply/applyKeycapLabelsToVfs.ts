@@ -8,8 +8,13 @@
 // Mapping of strategy → layer ids (GATE-confirmed):
 //   S-01 unshifted        → kvks shift="" / touch layer "default"
 //   S-01 shift            → kvks shift="S" / touch layer "shift"
-//   S-08 AltGr            → kvks shift="RA" / touch layer "rightalt"
-//   S-08 Shift+AltGr      → kvks shift="SRA" / touch layer "rightalt-shift"
+//   S-08 (modifier_as_layer_switch, arbitrary combo up to 4 tokens) → see
+//     modifierCombos.ts's comboToKvksShiftToken / comboToTouchLayerId. RALT
+//     alone and SHIFT+RALT ("RA"/"SRA", "rightalt"/"rightalt-shift") are the
+//     two combos previously hard-coded here; any other combo now routes
+//     through the same lookup. Combos containing CAPS/NCAPS have no kvks
+//     token or touch layer (both return null) and are skipped for that
+//     surface — never an error, and never silently folded into another layer.
 //
 // S-01's `kmnRules` slot value may hold MULTIPLE newline-separated rule
 // lines (e.g. a CAPS-handling case-pair quad — see shiftRules.ts's
@@ -25,6 +30,12 @@ import {
   resolveOskAssetPaths,
   xmlEscape,
 } from "./oskAssetShared.js";
+import {
+  comboToKvksShiftToken,
+  comboToTouchLayerId,
+  parseKeySpec,
+  type ModifierToken,
+} from "./modifierCombos.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,10 +47,25 @@ interface KeycapTarget {
   vkey: string;
   /** The new character to display on the keycap. */
   char: string;
-  /** `.kvks` shift attribute value: "" | "S" | "RA" | "SRA". */
-  kvksLayer: string;
-  /** `.keyman-touch-layout` layer id: "default" | "shift" | "rightalt" | "rightalt-shift". */
-  touchLayer: string;
+  /**
+   * `.kvks` shift attribute value, e.g. "" | "S" | "RA" | "SRA" | "C" | ...
+   * `null` when the combo carries CAPS/NCAPS — no distinct kvks layer exists
+   * for a caps-lock state, so this surface is skipped for that target.
+   */
+  kvksLayer: string | null;
+  /**
+   * `.keyman-touch-layout` layer id, e.g. "default" | "shift" | "rightalt" | ...
+   * `null` when the combo carries CAPS/NCAPS — touch has no caps-lock state.
+   */
+  touchLayer: string | null;
+  /**
+   * The S-08 combo tokens, present only for modifier_as_layer_switch
+   * targets. Drives (a) whether a missing kvks layer may be synthesized —
+   * S-01 targets (undefined here) never synthesize, matching pre-existing
+   * behavior — and (b) whether the synthesized layer needs `<usealtgr/>`
+   * (only combos containing RALT need it).
+   */
+  combo?: readonly ModifierToken[];
 }
 
 // ---------------------------------------------------------------------------
@@ -97,16 +123,18 @@ export function applyKeycapLabelsToVfs(
           if (target) targets.push(target);
         }
       } else if (strategyId === "S-08") {
-        // altgrKeyList slot example: "[RALT K_A]" or "[SHIFT RALT K_A]"
+        // altgrKeyList slot example: "[RALT K_A]", "[SHIFT RALT K_A]", or any
+        // other combo of up to 4 tokens per modifierCombos.ts's exclusion
+        // matrix (e.g. "[CTRL ALT K_A]").
         const altgrKeyList = slotValues?.["altgrKeyList"] ?? "";
-        const vkey = parseLastTokenFromBracket(altgrKeyList);
-        if (vkey) {
-          const isShifted = /\bSHIFT\b/.test(altgrKeyList);
+        const parsed = parseKeySpec(altgrKeyList);
+        if (parsed && parsed.vkey) {
           targets.push({
-            vkey,
+            vkey: parsed.vkey,
             char,
-            kvksLayer: isShifted ? "SRA" : "RA",
-            touchLayer: isShifted ? "rightalt-shift" : "rightalt",
+            kvksLayer: comboToKvksShiftToken(parsed.tokens),
+            touchLayer: comboToTouchLayerId(parsed.tokens),
+            combo: parsed.tokens,
           });
         }
       }
@@ -152,21 +180,6 @@ export function applyKeycapLabelsToVfs(
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Parse the last space-separated token from inside the first `[…]` bracket
- * group in `text`.  Returns `""` when no bracket is found or it is empty.
- *
- * Examples:
- *   "+ [K_A] > U+0041"  → "K_A"
- *   "[RALT K_A]"        → "K_A"
- */
-function parseLastTokenFromBracket(text: string): string {
-  const m = /\[([^\]]+)\]/.exec(text);
-  if (!m) return "";
-  const tokens = (m[1] ?? "").trim().split(/\s+/);
-  return tokens[tokens.length - 1] ?? "";
-}
 
 /**
  * Parse a single S-01 `.kmn` rule line — `+ [<modifiers> VKEY] > <rhs>` —
@@ -267,7 +280,10 @@ function patchKvks(
       ? entry.content
       : new TextDecoder().decode(entry.content as Uint8Array);
 
-  for (const { vkey, char, kvksLayer } of targets) {
+  for (const { vkey, char, kvksLayer, combo } of targets) {
+    // CAPS/NCAPS combos have no kvks layer at all — skip this surface, not an error.
+    if (kvksLayer === null) continue;
+
     const escaped = xmlEscape(char);
 
     // Match the <layer shift="…">…</layer> block for this layer.
@@ -278,11 +294,14 @@ function patchKvks(
     );
     const layerMatch = layerPattern.exec(xml);
     if (!layerMatch) {
-      // Layer not present — for AltGr (kvksLayer === "RA" or "SRA") we synthesize
-      // a minimal new layer so the swapped keycap is visible when the user
-      // switches to that AltGr view. For other missing layers we skip silently.
-      if (kvksLayer === "RA" || kvksLayer === "SRA") {
-        xml = synthesizeKvksLayer(xml, vkey, escaped, kvksLayer);
+      // Layer not present — for an S-08 (modifier_as_layer_switch) target we
+      // synthesize a minimal new layer so the swapped keycap is visible when
+      // the user switches to that combo's view. S-01 targets (`combo`
+      // undefined) never synthesize, matching pre-existing behavior for the
+      // base/shift layers, which are assumed to already exist.
+      if (combo !== undefined) {
+        const needsUseAltGr = combo.includes("RALT");
+        xml = synthesizeKvksLayer(xml, vkey, escaped, kvksLayer, needsUseAltGr);
       }
       continue;
     }
@@ -339,8 +358,11 @@ function patchTouchLayout(
   if (!data || typeof data !== "object") return;
 
   // Build a lookup: touchLayer → vkey → char
+  // CAPS/NCAPS combos have no touch layer at all (touchLayer === null) —
+  // skip this surface, not an error.
   const patchMap = new Map<string, Map<string, string>>();
   for (const { vkey, char, touchLayer } of targets) {
+    if (touchLayer === null) continue;
     if (!patchMap.has(touchLayer)) patchMap.set(touchLayer, new Map());
     patchMap.get(touchLayer)!.set(vkey, char);
   }
@@ -407,19 +429,24 @@ function patchTouchLayout(
 }
 
 /**
- * Synthesize a minimal `<layer shift="RA">` (or `shift="SRA"` for Shift+AltGr)
- * block in the kvks XML for S-08 assignments when the base keyboard has no
- * existing AltGr layer for that shift state.
+ * Synthesize a minimal `<layer shift="...">` block (e.g. `"RA"`, `"SRA"`, or
+ * any other combo's kvks token — see modifierCombos.ts's
+ * `comboToKvksShiftToken`) in the kvks XML for an S-08
+ * (modifier_as_layer_switch) assignment when the base keyboard has no
+ * existing layer for that shift state.
  *
  * Inserts before `</encoding>` (or before `</visualkeyboard>` as fallback).
- * Also adds `<usealtgr/>` to the header flags block if not already present,
- * so KMW exposes the AltGr layer in the desktop OSK.
+ * When `needsUseAltGr` is set (the combo contains RALT), also adds
+ * `<usealtgr/>` to the header flags block if not already present, so KMW
+ * exposes the AltGr layer in the desktop OSK. Combos without RALT (e.g. a
+ * plain CTRL or ALT layer switch) have no equivalent KMW flag, so none is added.
  */
 function synthesizeKvksLayer(
   xml: string,
   vkey: string,
   escapedChar: string,
   kvksLayer: string,
+  needsUseAltGr: boolean,
 ): string {
   const newLayer = `\n<layer shift="${kvksLayer}">\n<key vkey="${vkey}">${escapedChar}</key>\n</layer>`;
 
@@ -428,6 +455,8 @@ function synthesizeKvksLayer(
   if (patched === xml) {
     patched = xml.replace(/(<\/visualkeyboard>)/i, `${newLayer}\n$1`);
   }
+
+  if (!needsUseAltGr) return patched;
 
   // Ensure <usealtgr/> is present in the header flags so KMW shows the AltGr view.
   if (!/<usealtgr\s*\/?>/i.test(patched)) {

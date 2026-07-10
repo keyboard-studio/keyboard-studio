@@ -575,6 +575,100 @@ describe("applyKeycapLabelsToVfs — malformed touch layout JSON", () => {
 // 12-13. Path resolution
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// S-08 generalized combos (CTRL/ALT/etc. beyond RALT/SHIFT+RALT)
+// ---------------------------------------------------------------------------
+
+/** Arbitrary-combo S-08 assignment builder — mirrors makeS08Assignment but for any combo spec. */
+function makeS08ComboAssignment(target: string, keySpec: string): MechanismAssignment {
+  return {
+    scope: "individual",
+    target,
+    modality: "physical",
+    mechanisms: [
+      {
+        patternId: "p-s08-combo",
+        strategyId: "S-08",
+        slotValues: { altgrKeyList: keySpec },
+      },
+    ],
+  };
+}
+
+describe("applyKeycapLabelsToVfs — S-08 generalized combos", () => {
+  it("synthesizes a new kvks layer (no <usealtgr/>) for a CTRL-only combo", () => {
+    const vfs = makeVfs([{ path: "source/test.kvks", content: KVKS_BASE }]);
+
+    const { warnings } = applyKeycapLabelsToVfs(vfs, "test", [
+      makeS08ComboAssignment("Q", "[CTRL K_B]"),
+    ]);
+
+    expect(warnings).toHaveLength(0);
+    const xml = vfs.get("source/test.kvks")?.content as string;
+    expect(xml).toContain('<layer shift="C">');
+    expect(xml).toContain('<key vkey="K_B">Q</key>');
+    expect(xml).not.toContain("<usealtgr/>");
+  });
+
+  it("synthesizes a new kvks layer WITH <usealtgr/> for a combo containing RALT", () => {
+    const vfs = makeVfs([{ path: "source/test.kvks", content: KVKS_BASE }]);
+
+    const { warnings } = applyKeycapLabelsToVfs(vfs, "test", [
+      makeS08ComboAssignment("Q", "[CTRL RALT K_B]"),
+    ]);
+
+    expect(warnings).toHaveLength(0);
+    const xml = vfs.get("source/test.kvks")?.content as string;
+    expect(xml).toContain('<layer shift="CRA">');
+    expect(xml).toContain("<usealtgr/>");
+  });
+
+  it("patches the generalized touch layer id for a CTRL+ALT combo", () => {
+    const touchLayout = JSON.stringify({
+      tablet: {
+        layer: [
+          { id: "default", row: [{ id: 1, key: [{ id: "K_A", text: "a" }] }] },
+          { id: "ctrl-alt", row: [{ id: 1, key: [{ id: "K_A", text: "old" }] }] },
+        ],
+      },
+    });
+    const vfs = makeVfs([
+      { path: "source/test.kvks", content: KVKS_BASE },
+      { path: "source/test.keyman-touch-layout", content: touchLayout },
+    ]);
+
+    const { warnings } = applyKeycapLabelsToVfs(vfs, "test", [
+      makeS08ComboAssignment("Z", "[CTRL ALT K_A]"),
+    ]);
+
+    expect(warnings).toHaveLength(0);
+    const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
+    expect(data.tablet.layer[0].row[0].key[0].text).toBe("a"); // default untouched
+    expect(data.tablet.layer[1].row[0].key[0].text).toBe("Z");
+  });
+
+  it("skips both surfaces (no error, no write for that target) for a combo containing CAPS", () => {
+    const touchLayout = JSON.stringify({
+      tablet: { layer: [{ id: "default", row: [{ id: 1, key: [{ id: "K_A", text: "a" }] }] }] },
+    });
+    const vfs = makeVfs([
+      { path: "source/test.kvks", content: KVKS_BASE },
+      { path: "source/test.keyman-touch-layout", content: touchLayout },
+    ]);
+
+    const { warnings } = applyKeycapLabelsToVfs(vfs, "test", [
+      makeS08ComboAssignment("Z", "[CAPS CTRL K_A]"),
+    ]);
+
+    expect(warnings).toHaveLength(0);
+    const xml = vfs.get("source/test.kvks")?.content as string;
+    // No new layer synthesized — kvksLayer is null for a CAPS-bearing combo.
+    expect(xml.match(/<layer\b/g)).toHaveLength(1);
+    const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
+    expect(data.tablet.layer[0].row[0].key[0].text).toBe("a"); // untouched
+  });
+});
+
 describe("applyKeycapLabelsToVfs — asset path resolution", () => {
   it("redirects both asset paths per the .kmn header's &VISUALKEYBOARD/&LAYOUTFILE stores", () => {
     const kmnWithHeaderStores = `store(&VISUALKEYBOARD) 'custom/foo.kvks'
