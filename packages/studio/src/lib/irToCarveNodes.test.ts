@@ -17,6 +17,7 @@ import {
   computeStoreRoleLine,
   storeCharChips,
   nodeState,
+  annotateRemovalRecommendations,
 } from './irToCarveNodes.ts';
 
 // ---------------------------------------------------------------------------
@@ -1509,5 +1510,154 @@ describe('nodeState — store tri-state over toggleable chips', () => {
     const node = makeStoreNode(chips);
 
     expect(nodeState(node, () => false, () => true)).toBe('off');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// annotateRemovalRecommendations (#525 FOUNDATION slice)
+// ---------------------------------------------------------------------------
+
+describe('annotateRemovalRecommendations', () => {
+  it("marks a group node 'high' when none of its produced characters are in the confirmed inventory", () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(['q']));
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('high');
+  });
+
+  it("marks a node 'none' when it produces a character that IS in the confirmed inventory", () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(['y']));
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+
+  it("marks a store 'none' via the dependency guard when its own chars are all out-of-inventory but a rule referencing it (any()) produces a confirmed-inventory character", () => {
+    const ir = makeIR({
+      stores: [{ nodeId: 'store-1', name: 'composed', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }], isSystem: false } as any],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule-1',
+          context: [{ kind: 'any', storeRef: 'composed' }],
+          output: [{ kind: 'char', value: 'y' }], // the wanted character
+        }],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+
+    // 'a' and 'b' (the store's own chars) are absent from the inventory; only
+    // the dependency guard (rule-1's output 'y') should save it from 'high'.
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(['y']));
+
+    const store = result.find((n) => n.kind === 'store' && n.name === 'composed');
+    expect(store?.recommendation).toBe('none');
+  });
+
+  it("returns 'none' for every node when the confirmed inventory is empty (Phase B not completed)", () => {
+    const ir = makeIR({
+      groups: [makeGroup([makeCharOnlyRule()])],
+      stores: [{ nodeId: 'store-1', name: 'unused', items: [{ kind: 'char', value: 'z' }], isSystem: false } as any],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set());
+
+    expect(result.every((n) => n.recommendation === 'none')).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  // #525 P1 fixes — the fan-out index()/outs() idiom's real produced chars
+  // must reach the recommendation signal, not the displayChar()/outputToChar()
+  // render-ready placeholders. See the fixture comment on each test for the
+  // exact shape.
+
+  it("does NOT mark the BASE store 'high' when it feeds a confirmed char only through the deadkey-body fan-out's index() output store (dependency-guard index() resolution)", () => {
+    // isParallelIndexFanOut shape: [dk(D), any(BASE)] > index(OUT, 2).
+    // OUT ('comp_dia') carries the confirmed-inventory char; BASE
+    // ('base_vowels')'s own chars ('a') are NOT in the inventory. Before the
+    // fix, storeFeedsConfirmedChar used outputToChar(rule.output), which
+    // returns the '…' placeholder for an index() output — never matching
+    // confirmedInventory — so BASE was wrongly recommended 'high'.
+    const ir = makeIR({
+      stores: [
+        { nodeId: 'store#comp_dia', name: 'comp_dia', items: [{ kind: 'char', value: 'à' }, { kind: 'char', value: 'á' }], isSystem: false } as any,
+        { nodeId: 'store#base_vowels', name: 'base_vowels', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'a' }], isSystem: false } as any,
+      ],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule#fanout',
+          context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'base_vowels' }],
+          output: [{ kind: 'index', storeRef: 'comp_dia', offset: 2 }],
+        }],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(['à']));
+
+    const baseStore = result.find((n) => n.kind === 'store' && n.name === 'base_vowels');
+    expect(baseStore?.recommendation).toBe('none');
+  });
+
+  it("marks a fan-out glyph node 'none' when its produced combining mark IS in the confirmed inventory (raw, un-prefixed) — proves the leading dotted-circle (U+25CC) strip", () => {
+    // Same fan-out shape as above, but OUT's items are combining marks —
+    // displayChar() prefixes them with U+25CC for standalone display, so the
+    // glyph's raw `.ch` is `◌̀`, not `̀`. Before the fix, producedCharsOf()
+    // added the ◌-prefixed string unmodified, which never matched the raw
+    // combining mark the author confirmed in Phase B.
+    const ir = makeIR({
+      stores: [
+        { nodeId: 'store#comp_dia', name: 'comp_dia', items: [{ kind: 'char', value: '̀' }, { kind: 'char', value: '́' }], isSystem: false } as any,
+        { nodeId: 'store#base_vowels', name: 'base_vowels', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'a' }], isSystem: false } as any,
+      ],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule#fanout',
+          context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'base_vowels' }],
+          output: [{ kind: 'index', storeRef: 'comp_dia', offset: 2 }],
+        }],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(['̀']));
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+
+  it("marks a node 'none' (not 'high') when its only glyph is the '…' placeholder from an unresolvable fan-out output store", () => {
+    // isParallelIndexFanOut shape matches structurally, but the output
+    // store ('missing_store') isn't in ir.stores, so expandParallelStoreRule
+    // falls back to a single '…' glyph. Before the fix, producedCharsOf()
+    // treated '…' as a real produced char (never in confirmedInventory) and
+    // recommended removal — a placeholder means "production unknown," which
+    // must never count as "produces an unwanted character."
+    const ir = makeIR({
+      stores: [],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule#unresolvable',
+          context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'base_vowels' }],
+          output: [{ kind: 'index', storeRef: 'missing_store', offset: 2 }],
+        }],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(['q']));
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
   });
 });

@@ -806,6 +806,18 @@ export interface CarveNode {
   pairedStoreRoles?: ('input' | 'output' | 'input+output' | undefined)[] | undefined;
   /** store: short top-of-panel role line ("Output — …" / "Input — …"); undefined when role is undetermined */
   storeRoleLine?: string | undefined;
+  /**
+   * Removal-recommendation confidence, computed by annotateRemovalRecommendations() as a
+   * separate pass over toRailNodes() output (see #525 FOUNDATION slice):
+   *   - 'high'   — safe-to-remove suggestion; every character this node produces is absent
+   *                from the author's confirmed inventory, with no wanted character depending
+   *                on it (see the store dependency guard in annotateRemovalRecommendations).
+   *   - 'medium' — reserved for softer signals (Unicode-block / Phase-C mechanism-not-enabled).
+   *                Not emitted by the slice-1 conservative rule; TODO(#525) once those signals land.
+   *   - 'none'   — no suggestion (default; also the value when Phase B inventory is empty).
+   * Undefined on nodes produced directly by toRailNodes() before annotation runs.
+   */
+  recommendation?: 'high' | 'medium' | 'none' | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -1165,4 +1177,165 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
   }
 
   return nodes;
+}
+
+// ---------------------------------------------------------------------------
+// annotateRemovalRecommendations — #525 FOUNDATION slice
+//
+// Separate, pure pass over an already-built CarveNode[] (from toRailNodes()).
+// Kept out of toRailNodes() itself so the node-building pass stays free of the
+// confirmed-inventory signal — callers that don't have a confirmed inventory
+// yet (or don't want recommendations) can use toRailNodes() output unannotated.
+//
+// Slice-1 scope is deliberately narrow: the ONLY signal is "does this node
+// produce any character the author confirmed they want?" No Unicode-block
+// signal, no Phase-C mechanism-not-enabled signal, no Track-1 default
+// filtering — see the TODO(#525) markers below for each deferred signal's
+// natural hook point.
+// ---------------------------------------------------------------------------
+
+// Non-literal markers outputToChar()/displayChar() can emit — a placeholder
+// means "production unknown", not "produces an unwanted character", so these
+// must never be treated as produced chars (they'd otherwise leak into the
+// removal-recommendation signal as false "unwanted" output — see #525 P1).
+const PLACEHOLDER_CHARS = new Set(['…', '‹dk›', '🔔', '?']);
+
+/**
+ * Produced output characters for a single node — the `.ch` of every glyph
+ * (group/pattern) or every store chip (store). Raw fragments produce nothing
+ * displayable, so they always resolve to an empty set (→ 'none').
+ *
+ * Two normalizations vs. the raw `.ch`:
+ * - Strips a leading dotted-circle (U+25CC) that displayChar() prefixes onto
+ *   combining-mark glyphs for standalone visibility, so a combining mark the
+ *   author confirmed (e.g. in confirmedInventory as raw `̀`) still
+ *   matches a fan-out glyph whose `.ch` is `◌̀`.
+ * - Drops placeholder chars (PLACEHOLDER_CHARS) entirely rather than adding
+ *   them to the set — an unresolved index()/outs()/deadkey/beep output is
+ *   "don't know what this produces," not "produces an unwanted character."
+ */
+function producedCharsOf(node: CarveNode): Set<string> {
+  const chars = new Set<string>();
+  const add = (raw: string) => {
+    const stripped = raw.startsWith('◌') ? raw.slice(1) : raw;
+    const normalized = stripped.normalize('NFC');
+    if (PLACEHOLDER_CHARS.has(normalized)) return;
+    chars.add(normalized);
+  };
+  for (const g of node.glyphs ?? []) add(g.ch);
+  for (const c of node.storeChips ?? []) add(c.ch);
+  return chars;
+}
+
+/**
+ * Resolve the real characters a rule's output can produce, for the store
+ * dependency guard below. Literal `char` outputs resolve directly; `index()`/
+ * `outs()` outputs resolve to ALL char items of the referenced output store
+ * (mirroring how expandParallelStoreRule resolves the same store reference
+ * for glyph fan-out) rather than the outputToChar() placeholder ('…') — that
+ * placeholder is what let the dk(D) any(BASE) > index(OUT, offset) idiom
+ * slip past the guard undetected. `unresolved` is true when an index()/outs()
+ * element names a store that isn't found in ir.stores.
+ */
+function producedCharsOfRuleOutput(
+  output: OutputElement[],
+  ir: KeyboardIR,
+): { chars: Set<string>; unresolved: boolean } {
+  const chars = new Set<string>();
+  let unresolved = false;
+  for (const el of output) {
+    switch (el.kind) {
+      case 'char':
+        chars.add(el.value.normalize('NFC'));
+        break;
+      case 'index':
+      case 'outs': {
+        const outputStore = ir.stores.find((s) => s.name === el.storeRef);
+        if (!outputStore) { unresolved = true; break; }
+        for (const item of outputStore.items) {
+          if (item.kind === 'char') chars.add(item.value.normalize('NFC'));
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  return { chars, unresolved };
+}
+
+/**
+ * Dependency guard for store nodes: true when ANY rule referencing this store
+ * (by name, via the same storeRefsOf() used by analyzeStoreUsage) produces a
+ * confirmed-inventory character in its output. Covers the case where a store
+ * is itself entirely out-of-inventory but a wanted character's rule depends
+ * on it positionally (e.g. an any()-matched context store feeding a literal
+ * output elsewhere, or the deadkey/combining-mark idiom's index()/outs()
+ * output store — resolved via producedCharsOfRuleOutput, not the
+ * outputToChar() placeholder).
+ *
+ * Conservative in the direction that matters: a false 'none' (skipping a
+ * removal recommendation) just means the author double-checks a store that
+ * turned out fine; a false 'high' (recommending removal of a store that
+ * actually feeds a wanted char) breaks the keyboard. So when a rule's output
+ * can't be resolved at all (an index()/outs() element naming a store this
+ * function can't find), this guard returns true — "assume it might feed a
+ * wanted char" — rather than let an unresolvable rule fall through to 'high'.
+ */
+function storeFeedsConfirmedChar(storeName: string, ir: KeyboardIR, confirmedInventory: ReadonlySet<string>): boolean {
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      if (!storeRefsOf(rule).some((r) => r.storeName === storeName)) continue;
+      const { chars, unresolved } = producedCharsOfRuleOutput(rule.output, ir);
+      if (unresolved) return true;
+      for (const ch of chars) {
+        if (confirmedInventory.has(ch)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Annotates each node's `recommendation` field. See CarveNode.recommendation
+ * for the meaning of each value; slice-1 only ever emits 'high' or 'none'.
+ *
+ * Conservative by design — "when in doubt, return 'none'": a node is 'high'
+ * iff it produces at least one character AND every character it produces is
+ * absent from confirmedInventory AND (for stores) no rule that references it
+ * produces a confirmed-inventory character (the dependency guard above).
+ *
+ * An empty confirmedInventory means Phase B hasn't been completed yet — every
+ * node gets 'none' rather than a spurious "everything is unwanted" result.
+ */
+export function annotateRemovalRecommendations(
+  nodes: CarveNode[],
+  ir: KeyboardIR,
+  confirmedInventory: ReadonlySet<string>,
+): CarveNode[] {
+  if (confirmedInventory.size === 0) {
+    return nodes.map((node) => ({ ...node, recommendation: 'none' }));
+  }
+
+  return nodes.map((node) => {
+    const produced = producedCharsOf(node);
+    if (produced.size === 0) return { ...node, recommendation: 'none' };
+
+    for (const ch of produced) {
+      if (confirmedInventory.has(ch)) return { ...node, recommendation: 'none' };
+    }
+
+    if (node.kind === 'store' && storeFeedsConfirmedChar(node.name, ir, confirmedInventory)) {
+      return { ...node, recommendation: 'none' };
+    }
+
+    // TODO(#525): fold in the Unicode-block signal here (a node whose produced
+    // chars all fall in a block the author's script routing never touches is a
+    // softer 'medium' signal, not 'high') once §9 routing exposes block ranges.
+    // TODO(#525): fold in the Phase-C mechanism-not-enabled signal here (a node
+    // that exists only to support a mechanism the author didn't select in
+    // Phase C survey answers) once that mechanism-selection data is threaded
+    // through to the carve step.
+    return { ...node, recommendation: 'high' };
+  });
 }

@@ -237,3 +237,55 @@ describe('Rail — store node fallback whole-node toggle', () => {
     expect(onToggleNode).toHaveBeenCalledWith('store#s', false);
   });
 });
+
+describe('Rail — removal-recommendation badge (#525 FOUNDATION slice)', () => {
+  // These set `recommendation` directly on the fixture node rather than
+  // running it through annotateRemovalRecommendations() — that computation
+  // is already covered by irToCarveNodes.test.ts. Here we only isolate the
+  // Rail render: does the badge show up exactly when recommendation === 'high'.
+  function makePatternNode(overrides: Partial<CarveNode> = {}): CarveNode {
+    return {
+      nodeId: 'pattern#p',
+      kind: 'pattern',
+      name: 'Grave accent',
+      ...overrides,
+    };
+  }
+
+  it('renders the "Suggested removal" badge for a node with recommendation "high"', () => {
+    const node = makePatternNode({ recommendation: 'high' });
+    render(<Rail {...baseRailProps} nodes={[node]} />);
+
+    const badge = screen.getByTestId('carve-suggested-removal-pattern#p');
+    expect(badge).toBeDefined();
+    expect(badge.getAttribute('aria-label')).toBe('Suggested removal');
+    expect(screen.getByText('Suggested removal')).toBeDefined();
+  });
+
+  it('does not render the badge for a node with recommendation "none"', () => {
+    const node = makePatternNode({ recommendation: 'none' });
+    render(<Rail {...baseRailProps} nodes={[node]} />);
+
+    expect(screen.queryByTestId('carve-suggested-removal-pattern#p')).toBeNull();
+    expect(screen.queryByText('Suggested removal')).toBeNull();
+  });
+
+  it('does not render the badge for a node with recommendation undefined (unannotated)', () => {
+    const node = makePatternNode();
+    render(<Rail {...baseRailProps} nodes={[node]} />);
+
+    expect(screen.queryByTestId('carve-suggested-removal-pattern#p')).toBeNull();
+    expect(screen.queryByText('Suggested removal')).toBeNull();
+  });
+
+  it('shows the badge only on the "high" node when rendered alongside a "none" node', () => {
+    const highNode = makePatternNode({ nodeId: 'pattern#high', recommendation: 'high' });
+    const noneNode = makePatternNode({ nodeId: 'pattern#none', name: 'Cedilla', recommendation: 'none' });
+    render(<Rail {...baseRailProps} nodes={[highNode, noneNode]} />);
+
+    expect(screen.getByTestId('carve-suggested-removal-pattern#high')).toBeDefined();
+    expect(screen.queryByTestId('carve-suggested-removal-pattern#none')).toBeNull();
+    // Exactly one badge across both nodes.
+    expect(screen.getAllByText('Suggested removal')).toHaveLength(1);
+  });
+});

@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
-import { toRailNodes, nodeState, buildCharWeb } from '../../lib/irToCarveNodes.ts';
+import { toRailNodes, nodeState, buildCharWeb, annotateRemovalRecommendations } from '../../lib/irToCarveNodes.ts';
 import type { CarveNode, CharLocation } from '../../lib/irToCarveNodes.ts';
 import { KIND_COLOR } from '../assignLoop/parts/KindBadge.tsx';
 import { StatusBar } from '../assignLoop/parts/StatusBar.tsx';
@@ -112,6 +112,15 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   const ir = useWorkingCopyStore((s) => s.ir);
   const removalCapabilities = useWorkingCopyStore((s) => s.removalCapabilities);
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
+  // #525 FOUNDATION slice — the confirmed Phase B inventory drives removal
+  // recommendations. session.confirmedInventory is a deduped, NFC-normalized
+  // string[] union across survey phases (see contracts/src/surveySession.ts);
+  // built into a Set here purely for annotateRemovalRecommendations() lookups.
+  const confirmedInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
+  const confirmedInventorySet = useMemo(
+    () => new Set(confirmedInventory.map((ch) => ch.normalize('NFC'))),
+    [confirmedInventory],
+  );
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const isDeleted = useWorkingCopyStore((s) => s.isDeleted);
@@ -134,6 +143,20 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
   const nodes = useMemo(() => (ir ? toRailNodes(ir, removalCapabilities) : []), [ir, removalCapabilities]);
 
+  // #525 FOUNDATION slice — non-destructive removal-recommendation annotation,
+  // kept as a SEPARATE pass over `nodes` (toRailNodes stays pure/unchanged).
+  // Skipped entirely (nodes pass through unannotated) when instantiationMode
+  // is null (working copy not yet instantiated) or the inventory is empty
+  // (Phase B not completed) — both cases have no signal to recommend from.
+  // TODO(#525): Track-1 default filtering hooks in here too — a Track 1
+  // (new-from-base) author gets different defaults than Track 2 (adapt-existing).
+  const recommendedNodes = useMemo(
+    () => (instantiationMode !== null && confirmedInventorySet.size > 0 && ir
+      ? annotateRemovalRecommendations(nodes, ir, confirmedInventorySet)
+      : nodes),
+    [nodes, ir, instantiationMode, confirmedInventorySet],
+  );
+
   // Cross-reference web: character → all the group/pattern/store cards it lives in.
   // Built ONCE per node set (not per glyph). Powers the summary tags on each card.
   const charWeb = useMemo(() => buildCharWeb(nodes), [nodes]);
@@ -143,6 +166,10 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   //   2. No recognised patterns, user stores, or raw fragments — nothing complex to carve.
   //   3. At most one plain group AND that group has ≤ 20 displayable glyphs — a truly small keyboard.
   //      Arabic / Ethiopic / CJK keyboards with hundreds of rules in "main" must go to the full carver.
+  // TODO(#525): once removal recommendations are trustworthy enough, this gate should
+  // also consider whether any 'high'-recommendation nodes exist ("Your rules look good"
+  // is a poor message when the tool has active suggestions to show) — deferred out of
+  // this FOUNDATION slice; do not change the gate predicate here yet.
   const isSimple = useMemo(() => {
     if (instantiationMode === 'adapt-existing') return false;
     if (nodes.some((n) => n.kind === 'pattern' || n.kind === 'store' || n.kind === 'raw')) return false;
@@ -156,8 +183,8 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
   const [selectedId, setSelectedId] = useState<string | null>(() => null);
   const selectedNode = useMemo<CarveNode | undefined>(
-    () => nodes.find((n) => n.nodeId === selectedId) ?? nodes[0],
-    [nodes, selectedId],
+    () => recommendedNodes.find((n) => n.nodeId === selectedId) ?? recommendedNodes[0],
+    [recommendedNodes, selectedId],
   );
 
   // -- Cascade-delete state ----------------------------------------------------
@@ -503,10 +530,16 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
         onRemoveNode={(nodeId) => handleToggleNode(nodeId, true)}
       />
 
+      {/* TODO(#525): inventory reference panel goes here — a collapsible list of the
+          author's confirmed Phase B inventory (confirmedInventorySet) alongside the rail,
+          so the author can cross-check a "Suggested removal" badge against their own
+          character list without leaving the carve step. Deferred out of this FOUNDATION
+          slice; the highlight-only badge + hover hint are the full surface for slice 1. */}
+
       {/* Two-panel body */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <Rail
-          nodes={nodes}
+          nodes={recommendedNodes}
           selectedId={selectedNode?.nodeId ?? null}
           onSelect={setSelectedId}
           isItemDeleted={isItemDeleted}
@@ -517,7 +550,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <Inspector
             node={selectedNode}
-            nodes={nodes}
+            nodes={recommendedNodes}
             isItemDeleted={isItemDeleted}
             onToggleGlyph={handleToggleGlyph}
             onSetManyGlyphs={handleSetManyGlyphs}
