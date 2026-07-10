@@ -131,62 +131,49 @@ export function useWorkingCopyTransform(
     // No baseIr → carve step cannot run. The transform is not usable yet.
     if (baseIr === null) return null;
 
-    const capturedDeletedIds = deletedNodeIds;
-    const capturedDeletedItemIds = deletedItemIds;
-    const capturedAssignments = sessionAssignments;
-    const capturedDisplayName = identityDisplayName;
-    const capturedKeyboardId = identityKeyboardId;
-    const capturedBcp47 = identityBcp47;
-    const capturedPatternMap = patternMap;
-    const capturedBaseIr = baseIr;
-    const capturedTouchLayoutJson = touchLayoutJson;
-
     return (vfs: VirtualFS, keyboardId: string): { warnings: string[]; effectiveKeyboardId?: string } => {
       // Assignment-warning: when assignments exist but no patternMap was supplied,
       // emit a diagnostic and skip assignments (pass empty array to projectWorkingCopyVfs).
       const preWarnings: string[] = [];
-      const effectiveAssignments =
-        capturedPatternMap !== null
-          ? capturedAssignments
-          : (() => {
-              if (capturedAssignments.length > 0) {
-                preWarnings.push(
-                  "[working-copy-transform] assignments exist but no patternMap supplied — assignment projection skipped",
-                );
-              }
-              return [];
-            })();
+      let effectiveAssignments = sessionAssignments;
+      if (patternMap === null) {
+        if (sessionAssignments.length > 0) {
+          preWarnings.push(
+            "[working-copy-transform] assignments exist but no patternMap supplied — assignment projection skipped",
+          );
+        }
+        effectiveAssignments = [];
+      }
 
       // Delegate to the pure projection helper. The VfsTransform contract is
       // in-place mutation of `vfs`; projectWorkingCopyVfs also mutates in-place.
       const identityArg =
-        capturedDisplayName !== null || capturedBcp47 !== null
+        identityDisplayName !== null || identityBcp47 !== null
           ? {
-              ...(capturedDisplayName !== null ? { displayName: capturedDisplayName } : {}),
-              ...(capturedBcp47 !== null && capturedBcp47 !== ""
-                ? { bcp47: capturedBcp47 }
-                : {}),
+              displayName: identityDisplayName ?? undefined,
+              bcp47: identityBcp47 && identityBcp47 !== "" ? identityBcp47 : undefined,
             }
           : null;
 
       const { warnings: projectionWarnings, effectiveKeyboardId } = projectWorkingCopyVfs({
         vfs,
         keyboardId,
-        ...(capturedKeyboardId !== null && capturedKeyboardId !== keyboardId
-          ? { targetKeyboardId: capturedKeyboardId }
-          : {}),
-        baseIr: capturedBaseIr,
-        deletedNodeIds: capturedDeletedIds,
-        deletedItemIds: capturedDeletedItemIds,
+        targetKeyboardId:
+          identityKeyboardId !== null && identityKeyboardId !== keyboardId
+            ? identityKeyboardId
+            : undefined,
+        baseIr,
+        deletedNodeIds,
+        deletedItemIds,
         assignments: effectiveAssignments,
-        getPattern: (id) => capturedPatternMap?.get(id),
+        getPattern: (id) => patternMap?.get(id),
         identity: identityArg,
-        touchLayoutJson: capturedTouchLayoutJson,
+        touchLayoutJson,
       });
 
       return {
         warnings: [...preWarnings, ...projectionWarnings],
-        ...(effectiveKeyboardId !== undefined ? { effectiveKeyboardId } : {}),
+        effectiveKeyboardId,
       };
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -117,6 +117,11 @@ export function useGitHubAuth(): UseGitHubAuthResult {
   );
   const [error, setError] = useState<string | null>(null);
 
+  // Helper: derive user-facing error message from unknown error.
+  const formatError = useCallback((err: unknown, fallback: string): string => {
+    return err instanceof Error ? err.message : fallback;
+  }, []);
+
   // On mount, pick up any `?oauth_error=` left by the boot-time OAuth callback
   // handler and surface it as the initial visible error, then strip it from the
   // URL. Empty deps → runs once. The token-verify effect below clears `error`
@@ -151,43 +156,33 @@ export function useGitHubAuth(): UseGitHubAuthResult {
         if (cancelled) return;
         setVerify(result);
 
-        // Scope check applies only to oauth_app tokens (Option A submit flow).
-        // A github_app identity token is "connected" as soon as GitHub recognises
-        // it — the App flow sends no scope, so verify.ok (the fork+PR scope gate,
-        // per the VerifyTokenResult contract) is ALWAYS false for it and must not
-        // be consulted. `login` is only present when /user returned 200, so its
-        // presence is the identity check.
-        if (token.client === "oauth_app") {
-          if (result.ok && result.missingScopes.length === 0) {
-            setStatus("connected");
-          } else {
-            setStatus("needs-scope");
-          }
+        // Determine status based on client type and verify result.
+        // oauth_app: requires both identity (login) and scope (public_repo).
+        // github_app: requires only identity (login); scope is not consulted.
+        const hasIdentity = result.login !== undefined;
+        const hasScope = result.ok && result.missingScopes.length === 0;
+
+        if (!hasIdentity) {
+          // Failed verify (revoked / expired / invalid token).
+          setStatus("error");
+        } else if (token.client === "oauth_app" && !hasScope) {
+          // oauth_app token authenticated but missing public_repo scope.
+          setStatus("needs-scope");
         } else {
-          // github_app token: identity established if the token is recognised
-          // (login present). A failed verify (revoked / expired / invalid —
-          // /user non-200, so no login) must be "error", NOT "needs-scope" —
-          // needs-scope is reserved for oauth_app tokens that authenticated
-          // successfully but are missing public_repo. Returning needs-scope
-          // here would cause SignUpPanel / AccountControl to treat a dead
-          // token as linked (they treat connected|needs-scope as linked).
-          if (result.login !== undefined) {
-            setStatus("connected");
-          } else {
-            setStatus("error");
-          }
+          // Either github_app with identity, or oauth_app with identity + scope.
+          setStatus("connected");
         }
       } catch (err: unknown) {
         if (cancelled) return;
         setVerify(null);
         setStatus("error");
-        setError(err instanceof Error ? err.message : "Failed to verify GitHub token.");
+        setError(formatError(err, "Failed to verify GitHub token."));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, formatError]);
 
   const connect = useCallback(async (flow: AuthFlow = "identity") => {
     setError(null);
@@ -196,10 +191,10 @@ export function useGitHubAuth(): UseGitHubAuthResult {
       snapshotWorkingCopyToSession();
       window.location.assign(url);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to start GitHub sign-in.");
+      setError(formatError(err, "Failed to start GitHub sign-in."));
       setStatus("error");
     }
-  }, []);
+  }, [formatError]);
 
   const disconnect = useCallback(() => {
     clearStoredToken();

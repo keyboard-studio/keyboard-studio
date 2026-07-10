@@ -45,22 +45,21 @@ export function useOskChannel(
 
       if (!isOskEvent(event.data)) return;
 
-      const oskEvent = event.data;
-      setLastEvent(oskEvent);
+      setLastEvent(event.data);
 
-      switch (oskEvent.type) {
+      switch (event.data.type) {
         case "ENGINE_READY":
           setEngineReady(true);
           setEngineError(null);
           break;
         case "ENGINE_ERROR":
-          setEngineError(oskEvent.message);
+          setEngineError(event.data.message);
           break;
         case "TEXT_UPDATED":
-          setTextValue(oskEvent.value);
+          setTextValue(event.data.value);
           break;
         case "KEY_TAPPED":
-          onKeyTapRef.current?.(oskEvent.keyId);
+          onKeyTapRef.current?.(event.data.keyId);
           break;
       }
     }
