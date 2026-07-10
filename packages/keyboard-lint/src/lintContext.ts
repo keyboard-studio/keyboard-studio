@@ -12,13 +12,12 @@ import { checkKeysPerRow } from "./checks/check-18-3-keys-per-row.js";
 import { checkControlKeyDrift } from "./checks/check-18-4-control-key-drift.js";
 import { checkLayerSwitchReturn } from "./checks/check-18-5-layer-switch-return.js";
 import { checkInventoryCoverage } from "./checks/check-18-6-inventory-coverage.js";
-import { checkTouchReplaceShadow } from "./checks/check-18-13-touch-replace-shadow.js";
 
 /**
  * Optional extra inputs for Layer C checks that need compiled artefacts.
  *
  * Gate -> check mapping:
- *   Phase E exit  -> 18.1, 18.2, 18.3, 18.4, 18.5, 18.13 (touch-layout checks; no context needed)
+ *   Phase E exit  -> 18.1, 18.2, 18.3, 18.4, 18.5 (touch-layout checks; no context needed)
  *   Compile gate  -> 18.6 (inventory coverage; needs keyboardIR + inventory)
  *   Submit        -> all of the above
  *   18.7 (currency) -> DEFERRED; not implemented
@@ -45,7 +44,7 @@ export async function lintWithContext(
 
   const findings: LintFinding[] = [];
 
-  // 18.1 – 18.5, 18.13: touch-layout checks
+  // 18.1 – 18.5: touch-layout checks
   const ir = parseTouchLayout(fs, keyboardId);
   if (ir) {
     findings.push(...checkLongpress(ir, tlPath));
@@ -53,7 +52,6 @@ export async function lintWithContext(
     findings.push(...checkKeysPerRow(ir, tlPath));
     findings.push(...checkControlKeyDrift(ir, tlPath));
     findings.push(...checkLayerSwitchReturn(ir, tlPath));
-    findings.push(...checkTouchReplaceShadow(ir, tlPath));
   }
 
   // 18.6: inventory coverage — only when both inputs are present

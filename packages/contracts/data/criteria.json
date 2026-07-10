@@ -1034,14 +1034,6 @@
     "description": "The keyboard meets any applicable legislated, societal, and accessibility requirements for its locale"
   },
   {
-    "id": "18.13-replace-does-not-shadow-alternate",
-    "section": "18. Design heuristics (DISCUS)",
-    "band": "layer-c-enforce",
-    "principle": "consistency",
-    "lintRuleId": "KM_WARN_TOUCH_REPLACE_SHADOWS_ALTERNATE",
-    "description": "A key's touch_key_replace primary tap output does not duplicate one of its own longpress/multitap/flick alternates"
-  },
-  {
     "id": "19.1-import-attribution-in-pr-body",
     "section": "19. Import output",
     "band": "scaffolder-bake",
