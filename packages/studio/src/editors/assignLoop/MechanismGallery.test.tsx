@@ -286,7 +286,7 @@ describe("MechanismGallery — current character display", () => {
     // The character heading renders "Add a key" label above the char glyph.
     expect(screen.getByText("Add a key")).toBeTruthy();
     // The char glyph has aria-label "U+00E1 á".
-    expect(screen.getByLabelText(/U\+00E1/i)).toBeTruthy();
+    expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
   });
 
   it("renders the coverage status line with initial 0-of-N count", async () => {
@@ -512,7 +512,7 @@ describe("MechanismGallery — advance after apply", () => {
 
     // Now the current char should be "é".
     await waitFor(() => {
-      expect(screen.getByLabelText(/U\+00E9/i)).toBeTruthy();
+      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
     });
   });
 
@@ -559,7 +559,7 @@ describe("MechanismGallery — skip character", () => {
 
     // Current char is now é.
     await waitFor(() => {
-      expect(screen.getByLabelText(/U\+00E9/i)).toBeTruthy();
+      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
     });
   });
 
@@ -574,7 +574,7 @@ describe("MechanismGallery — skip character", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/U\+00E9/i)).toBeTruthy();
+      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
     });
 
     // Skipping recorded nothing, so coverage is unchanged.

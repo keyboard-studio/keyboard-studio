@@ -2048,7 +2048,7 @@ export function MechanismGallery({
                   type="button"
                   onClick={handleNext}
                   disabled={locked}
-                  aria-label={`Skip this character (${currentChar})`}
+                  aria-label={`Skip this character (${toUPlusNotation(currentChar)} ${currentChar})`}
                   style={{
                     background: "transparent",
                     border: "none",
