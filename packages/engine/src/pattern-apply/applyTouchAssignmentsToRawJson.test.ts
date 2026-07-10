@@ -511,6 +511,61 @@ describe("applyTouchAssignmentsToRawJson — multiple mechanisms per assignment"
     expect(ka.sk?.[0]?.text).toBe("á");
     expect(kb.multitap?.[0]?.text).toBe("β");
   });
+
+  // Mirrors the Case A order-commutative pair in applyTouchAssignments.test.ts:
+  // touch_key_replace rewrites the raw key's id/text in place; a same-host-key
+  // longpress must still land (the key index is built from the ORIGINAL host
+  // key id, so it is unaffected by the id rewrite). Order-commutative — same
+  // result whichever mechanism runs first.
+  it("touch_key_replace + longpress_alternates on the same host key: both apply, order-commutative (replace-then-longpress)", () => {
+    const json = makePhoneOnlyJson([{ id: "K_X", text: "x" }]);
+    const combined: TouchAssignment = {
+      scope: "individual",
+      target: "ñ",
+      modality: "touch",
+      mechanisms: [
+        { patternId: "touch_key_replace", slotValues: { hostKey: "K_X", char: "ñ" } },
+        { patternId: "longpress_alternates", slotValues: { hostKey: "K_X", char: "ń" } },
+      ],
+      source: "user",
+    };
+    const { json: out, warnings } = applyTouchAssignmentsToRawJson(json, [combined]);
+    expect(warnings).toHaveLength(0);
+    const parsed = JSON.parse(out) as {
+      phone: { layer: Array<{ id: string; row: Array<{ key: Array<{ id: string; text?: string; sk?: Array<{ id: string; text?: string }> }> }> }> };
+    };
+    const defLayer = parsed.phone.layer.find((l) => l.id === "default")!;
+    const replaced = defLayer.row.flatMap((r) => r.key).find((k) => k.id === "U_00F1")!;
+    expect(replaced).toBeDefined();
+    expect(replaced.text).toBe("ñ");
+    expect(replaced.sk).toHaveLength(1);
+    expect(replaced.sk![0]!.text).toBe("ń");
+  });
+
+  it("touch_key_replace + longpress_alternates on the same host key: both apply, order-commutative (longpress-then-replace)", () => {
+    const json = makePhoneOnlyJson([{ id: "K_X", text: "x" }]);
+    const combined: TouchAssignment = {
+      scope: "individual",
+      target: "ñ",
+      modality: "touch",
+      mechanisms: [
+        { patternId: "longpress_alternates", slotValues: { hostKey: "K_X", char: "ń" } },
+        { patternId: "touch_key_replace", slotValues: { hostKey: "K_X", char: "ñ" } },
+      ],
+      source: "user",
+    };
+    const { json: out, warnings } = applyTouchAssignmentsToRawJson(json, [combined]);
+    expect(warnings).toHaveLength(0);
+    const parsed = JSON.parse(out) as {
+      phone: { layer: Array<{ id: string; row: Array<{ key: Array<{ id: string; text?: string; sk?: Array<{ id: string; text?: string }> }> }> }> };
+    };
+    const defLayer = parsed.phone.layer.find((l) => l.id === "default")!;
+    const replaced = defLayer.row.flatMap((r) => r.key).find((k) => k.id === "U_00F1")!;
+    expect(replaced).toBeDefined();
+    expect(replaced.text).toBe("ñ");
+    expect(replaced.sk).toHaveLength(1);
+    expect(replaced.sk![0]!.text).toBe("ń");
+  });
 });
 
 describe("applyTouchAssignmentsToRawJson — touch_inherited", () => {
