@@ -16,6 +16,7 @@ import {
 } from "../lib/scriptAxes.ts";
 import {
   loadLangtags,
+  getLoadedLangtags,
   scriptToTargetOption,
 } from "../lib/langtagsDefaults.ts";
 
@@ -305,20 +306,33 @@ export function IdentityLite({
         clearSeeds();
         return;
       }
+      const applyDefaults = (mod: NonNullable<ReturnType<typeof getLoadedLangtags>>) => {
+        const defaults = mod.getLanguageDefaults(entry.code);
+        if (defaults !== null) {
+          resolvedEntryRef.current = defaults;
+          seedFromEntry(defaults);
+        } else {
+          clearSeeds();
+        }
+      };
+      // Seed SYNCHRONOUSLY when the module is already loaded. The name picker
+      // cannot present a selectable row until it has loaded langtags, so on a
+      // real selection the module is present here — applying the seeds now, in
+      // the same tick as the selection, guarantees they are set BEFORE the
+      // survey auto-advances (advanceOnSelect) and reads them for the next
+      // question. An async `.then` would lose that race on the no-region path,
+      // silently defaulting Q2 to the English name instead of the local name.
+      const loaded = getLoadedLangtags();
+      if (loaded !== null) {
+        applyDefaults(loaded);
+        return;
+      }
+      // Fallback: module not yet resolved this session (improbable at selection
+      // time). Degrade silently on import failure — seeds stay undefined and
+      // fields remain free-text (FR-009); no unhandled rejection.
       void loadLangtags()
-        .then((mod) => {
-          const defaults = mod.getLanguageDefaults(entry.code);
-          if (defaults !== null) {
-            resolvedEntryRef.current = defaults;
-            seedFromEntry(defaults);
-          } else {
-            clearSeeds();
-          }
-        })
-        .catch(() => {
-          // Degrade silently on import failure — seeds stay undefined, fields
-          // remain free-text (FR-009). No unhandled rejection.
-        });
+        .then(applyDefaults)
+        .catch(() => {});
     },
     [seedFromEntry, clearSeeds],
   );
@@ -501,6 +515,9 @@ export function IdentityLite({
         getNextOverride={getNextOverride}
         onEntryResolved={handleEntryResolved}
         advanceOnSelect
+        // 220px ≈ the tallest identity question's label + help text + field, so
+        // Back/Next hold a steady vertical position as the help text varies in
+        // length across Q1–Q5 (tuned by eye against the live flow).
         contentMinHeight={220}
         {...(onBack !== undefined ? { onBack } : {})}
         {...(findingsByQuestionId !== undefined ? { findingsByQuestionId } : {})}

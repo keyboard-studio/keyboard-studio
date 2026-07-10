@@ -28,6 +28,11 @@ type LangtagsModule = {
 };
 
 let _modulePromise: Promise<LangtagsModule> | null = null;
+// Synchronously-readable handle to the resolved module, set once the dynamic
+// import settles. Backs getLoadedLangtags() so callers that have already awaited
+// a load (e.g. the name picker, which cannot show a selectable row until the
+// module is loaded) can seed downstream state without a microtask hop.
+let _loadedModule: LangtagsModule | null = null;
 
 /**
  * Lazily import the engine langtags module.
@@ -37,16 +42,35 @@ let _modulePromise: Promise<LangtagsModule> | null = null;
  */
 export function loadLangtags(): Promise<LangtagsModule> {
   if (_modulePromise === null) {
-    _modulePromise = (import("@keyboard-studio/engine/langtags") as Promise<LangtagsModule>).catch(
-      (err: unknown) => {
+    _modulePromise = (import("@keyboard-studio/engine/langtags") as Promise<LangtagsModule>)
+      .then((mod) => {
+        _loadedModule = mod;
+        return mod;
+      })
+      .catch((err: unknown) => {
         // Reset the memo so a subsequent call can retry. The success path remains
         // memoized (one load per session); only rejections clear the slot.
         _modulePromise = null;
         throw err;
-      },
-    );
+      });
   }
   return _modulePromise;
+}
+
+/**
+ * Return the langtags module synchronously if a prior loadLangtags() has already
+ * resolved it, otherwise null.
+ *
+ * This exists to close a race: after the author picks a language in the name
+ * picker (which has necessarily loaded the module to render its options), the
+ * survey may auto-advance to the next question in the same tick. Reading the
+ * module synchronously here lets the caller apply the resolved entry's seeds
+ * BEFORE that advance reads them, instead of losing the race to an async
+ * `.then`. Callers must still fall back to `loadLangtags()` when this returns
+ * null (the module has not been loaded yet in this session).
+ */
+export function getLoadedLangtags(): LangtagsModule | null {
+  return _loadedModule;
 }
 
 // ---------------------------------------------------------------------------
