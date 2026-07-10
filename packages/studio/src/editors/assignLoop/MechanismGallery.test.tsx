@@ -1152,8 +1152,8 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
 
-    fireEvent.click(screen.getByText(/RAlt \+ key/i));
-    fireEvent.change(screen.getByLabelText(/Base key for RAlt layer/i), {
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    fireEvent.change(screen.getByLabelText(/Base key for layer-switch combo/i), {
       target: { value: "K_E" },
     });
     fireEvent.click(screen.getByRole("button", { name: /Apply method for ε/i }));
@@ -1172,20 +1172,24 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     );
   });
 
-  it("emits a [SHIFT RALT K_X] rule when the Shift+RAlt layer is selected", async () => {
+  it("emits a [SHIFT RALT K_X] rule when a second SHIFT layer is added", async () => {
     // The user is adding Ε (capital epsilon) via the shifted RAlt plane of
     // K_E — Shift+RAlt+E should produce Ε, not the unshifted RAlt character.
+    // Base slot defaults to RALT; a second dropdown is added and set to SHIFT.
     instantiateWorkingCopy();
     seedInventory(["Ε"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
 
-    fireEvent.click(screen.getByText(/RAlt \+ key/i));
-    fireEvent.change(screen.getByLabelText(/Base key for RAlt layer/i), {
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    fireEvent.change(screen.getByLabelText(/Base key for layer-switch combo/i), {
       target: { value: "K_E" },
     });
-    fireEvent.click(screen.getByRole("radio", { name: "Shift+RAlt" }));
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    fireEvent.change(screen.getByLabelText(/Layer 2 for layer-switch combo/i), {
+      target: { value: "SHIFT" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /Apply method for Ε/i }));
 
     const assignments = useWorkingCopyStore
@@ -1202,20 +1206,216 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     );
   });
 
+  it("emits a canonically-ordered 3-layer combo (CTRL + RALT + CAPS)", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    fireEvent.change(screen.getByLabelText(/Base key for layer-switch combo/i), {
+      target: { value: "K_E" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    fireEvent.change(screen.getByLabelText(/Layer 2 for layer-switch combo/i), {
+      target: { value: "CTRL" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    fireEvent.change(screen.getByLabelText(/Layer 3 for layer-switch combo/i), {
+      target: { value: "CAPS" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for ε/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
+      "[CTRL RALT CAPS K_E]",
+    );
+  });
+
   it("is not gated by mnemonic layout (unlike the S-01 Shift toggle)", async () => {
-    // [SHIFT RALT K_X] selects the shifted RAlt plane — orthogonal to
-    // &MNEMONICLAYOUT, which only changes base-character resolution (real
-    // mnemonic keyboards like sil_euro_latin ship RALT SHIFT rules) — so the
-    // Shift+RAlt radio must remain enabled regardless of &MNEMONICLAYOUT.
+    // Adding SHIFT to the layer combo is orthogonal to &MNEMONICLAYOUT, which
+    // only gates the S-01 Shift radio (shiftLayerAllowed) — the layer-combo
+    // SHIFT option must stay selectable regardless.
     instantiateWorkingCopy({ mnemonic: true });
     seedInventory(["ε"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
 
-    fireEvent.click(screen.getByText(/RAlt \+ key/i));
-    const shiftRaltToggle = screen.getByRole("radio", { name: "Shift+RAlt" }) as HTMLButtonElement;
-    expect(shiftRaltToggle.disabled).toBe(false);
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    const secondLayerSelect = screen.getByLabelText(
+      /Layer 2 for layer-switch combo/i,
+    ) as HTMLSelectElement;
+    expect(secondLayerSelect.disabled).toBe(false);
+    fireEvent.change(secondLayerSelect, { target: { value: "SHIFT" } });
+    expect(secondLayerSelect.value).toBe("SHIFT");
+  });
+
+  it("excludes LALT from the next dropdown once RALT is chosen in an earlier slot", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    // Slot 1 defaults to RALT; adding a second slot must not offer LALT
+    // (or RALT again) — MODIFIER_EXCLUSIONS is self-inclusive + chiral.
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    const secondLayerSelect = screen.getByLabelText(
+      /Layer 2 for layer-switch combo/i,
+    ) as HTMLSelectElement;
+    const optionValues = Array.from(secondLayerSelect.options).map((o) => o.value);
+    expect(optionValues).not.toContain("LALT");
+    expect(optionValues).not.toContain("RALT");
+  });
+
+  it("excludes NCAPS from the next dropdown once CAPS is chosen in an earlier slot", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    const firstLayerSelect = screen.getByLabelText(
+      /Layer 1 for layer-switch combo/i,
+    ) as HTMLSelectElement;
+    fireEvent.change(firstLayerSelect, { target: { value: "CAPS" } });
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    const secondLayerSelect = screen.getByLabelText(
+      /Layer 2 for layer-switch combo/i,
+    ) as HTMLSelectElement;
+    const optionValues = Array.from(secondLayerSelect.options).map((o) => o.value);
+    expect(optionValues).not.toContain("CAPS");
+    expect(optionValues).not.toContain("NCAPS");
+  });
+
+  it("caps the layer combo at 4 dropdowns", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    fireEvent.change(screen.getByLabelText(/Layer 2 for layer-switch combo/i), {
+      target: { value: "CTRL" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    fireEvent.change(screen.getByLabelText(/Layer 3 for layer-switch combo/i), {
+      target: { value: "SHIFT" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    fireEvent.change(screen.getByLabelText(/Layer 4 for layer-switch combo/i), {
+      target: { value: "CAPS" },
+    });
+
+    expect(screen.queryByLabelText(/Layer 5 for layer-switch combo/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Add another layer/i })).toBeNull();
+  });
+
+  it("hides the Add-layer button until every rendered dropdown has a selection", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    // Default state (slot 1 pre-filled with RALT) already shows the button.
+    expect(screen.getByRole("button", { name: /Add another layer/i })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    // Slot 2 starts unselected — the Add button must hide until it is filled.
+    expect(screen.queryByRole("button", { name: /Add another layer/i })).toBeNull();
+
+    fireEvent.change(screen.getByLabelText(/Layer 2 for layer-switch combo/i), {
+      target: { value: "SHIFT" },
+    });
+    expect(screen.getByRole("button", { name: /Add another layer/i })).toBeTruthy();
+  });
+
+  it('shows "(in use)" on a modifier token already used elsewhere in the working IR', async () => {
+    // A `main` group with a rule under [RALT K_W] puts RALT "in use".
+    const group: IRGroup = {
+      nodeId: "g-main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [
+        {
+          nodeId: "r-ralt-w",
+          context: [{ kind: "vkey", name: "K_W", modifiers: ["RALT"] }],
+          output: [{ kind: "char", value: "w" }],
+        },
+      ],
+    };
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    const ir = makeTestIR([group], []);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: seedVfs, ir });
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    const firstLayerSelect = screen.getByLabelText(
+      /Layer 1 for layer-switch combo/i,
+    ) as HTMLSelectElement;
+    const raltOption = Array.from(firstLayerSelect.options).find((o) => o.value === "RALT");
+    expect(raltOption?.textContent).toBe("RALT (in use)");
+  });
+
+  it("shows a desktop-only note when the combo includes CAPS", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    const firstLayerSelect = screen.getByLabelText(
+      /Layer 1 for layer-switch combo/i,
+    ) as HTMLSelectElement;
+    fireEvent.change(firstLayerSelect, { target: { value: "CAPS" } });
+
+    expect(screen.getByText(/desktop only/i)).toBeTruthy();
+  });
+
+  it("drops a now-invalid later pick when an earlier dropdown changes", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    // Slot 1 starts at RALT (default); add slot 2 and pick CAPS (valid — CAPS
+    // isn't excluded by RALT). Slot 1's own options are never constrained by
+    // a LATER slot (options only cascade downward), so slot 1 can freely
+    // switch to CAPS too — which then excludes slot 2's CAPS pick and must
+    // drop it back to unselected.
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    const secondLayerSelect = screen.getByLabelText(
+      /Layer 2 for layer-switch combo/i,
+    ) as HTMLSelectElement;
+    fireEvent.change(secondLayerSelect, { target: { value: "CAPS" } });
+    expect(secondLayerSelect.value).toBe("CAPS");
+
+    const firstLayerSelect = screen.getByLabelText(
+      /Layer 1 for layer-switch combo/i,
+    ) as HTMLSelectElement;
+    fireEvent.change(firstLayerSelect, { target: { value: "CAPS" } });
+
+    expect(secondLayerSelect.value).toBe("");
   });
 });
 
@@ -1231,8 +1431,8 @@ describe("MechanismGallery — covered-chip badge text for RAlt/Shift+RAlt (meth
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
 
-    fireEvent.click(screen.getByText(/RAlt \+ key/i));
-    fireEvent.change(screen.getByLabelText(/Base key for RAlt layer/i), {
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    fireEvent.change(screen.getByLabelText(/Base key for layer-switch combo/i), {
       target: { value: "K_E" },
     });
     fireEvent.click(screen.getByRole("button", { name: /Apply method for ε/i }));
@@ -1251,11 +1451,14 @@ describe("MechanismGallery — covered-chip badge text for RAlt/Shift+RAlt (meth
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
 
-    fireEvent.click(screen.getByText(/RAlt \+ key/i));
-    fireEvent.change(screen.getByLabelText(/Base key for RAlt layer/i), {
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    fireEvent.change(screen.getByLabelText(/Base key for layer-switch combo/i), {
       target: { value: "K_E" },
     });
-    fireEvent.click(screen.getByRole("radio", { name: "Shift+RAlt" }));
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    fireEvent.change(screen.getByLabelText(/Layer 2 for layer-switch combo/i), {
+      target: { value: "SHIFT" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /Apply method for Ε/i }));
 
     await waitFor(() => {
@@ -1283,8 +1486,11 @@ describe("MechanismGallery — OSK key-tap selects the RAlt base key", () => {
       await new Promise((r) => setTimeout(r, 0));
     });
 
-    fireEvent.click(screen.getByText(/RAlt \+ key/i));
-    fireEvent.click(screen.getByRole("radio", { name: "Shift+RAlt" }));
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    fireEvent.change(screen.getByLabelText(/Layer 2 for layer-switch combo/i), {
+      target: { value: "SHIFT" },
+    });
 
     // Tap the OSK mock (always taps "K_E") to pick the base key instead of
     // using the dropdown.
@@ -1507,8 +1713,8 @@ describe("MechanismGallery — companion proposal identity tracking (P1/P2 regre
 
     // 2. Apply a SECOND, unrelated mechanism for the same char (θ) while the
     //    banner is still up — an RAlt assignment on a different key.
-    fireEvent.click(screen.getByText(/RAlt \+ key/i));
-    fireEvent.change(screen.getByLabelText(/Base key for RAlt layer/i), {
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    fireEvent.change(screen.getByLabelText(/Base key for layer-switch combo/i), {
       target: { value: "K_W" },
     });
     fireEvent.click(screen.getByRole("button", { name: /Apply method for θ/i }));

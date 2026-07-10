@@ -17,9 +17,15 @@
 //   1.5 Carve keycaps   — applyCarveKeycapRemovalsToVfs (blanks carved chars off
 //                         .kvks / .keyman-touch-layout keycaps in place)
 //   2. Assignments      — applyAssignmentsToVfs (injects mechanism patterns)
+//   2.5 Layer propagation — propagateDesktopLayersToTouch (surfaces S-08
+//                         generalized modifier-combo layers onto the
+//                         .keyman-touch-layout written by step 0; no-op when
+//                         the VFS has no touch layout file)
 //   3. Identity         — applyIdentityStubMutation (writes &NAME)
 //
 // Touch layout is injected FIRST (step 0) so:
+//   - Step 2.5 layer propagation patches the injected layout (or the base
+//     VFS's shipped one, when no Phase E edits exist yet).
 //   - Step 3.5 keycap-label patch (applyKeycapLabelsToVfs) patches the injected layout.
 //   - Step 4 id-rename pass renames source/<keyboardId>.keyman-touch-layout →
 //     source/<targetKeyboardId>.keyman-touch-layout when the author chose a new id.
@@ -44,9 +50,12 @@ import {
   resetIdentity,
   renameFilesInVfs,
   parseSlotId,
+  propagateDesktopLayersToTouch,
+  collectLayerCombosInUse,
 } from "@keyboard-studio/engine";
 import { applyCarveMutate, applyAddGalleryMutate } from "../steps/editorMutate.ts";
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
+import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
 
 /** Shared empty deletion set for the seam-path emit (the seam already filtered). */
 const EMPTY_DELETION_SET: ReadonlySet<string> = new Set<string>();
@@ -326,6 +335,60 @@ export function projectWorkingCopyVfs(
           const msg = err instanceof Error ? err.message : String(err);
           warnings.push(
             `[project-working-copy] add-gallery mutate-seam derivation skipped: ${msg}`,
+          );
+        }
+      }
+    }
+  }
+
+  // Step 2.5: Desktop -> touch layer propagation — surface any generalized
+  // S-08 (modifier_as_layer_switch) combo layer already in the IR, or about
+  // to be authored via a physical assignment just projected above, onto the
+  // `.keyman-touch-layout` written by step 0 (or shipped by the base VFS).
+  // A no-op when the VFS has no touch layout file, OR when there is no S-08
+  // combo to surface at all — propagateDesktopLayersToTouch always
+  // round-trips the JSON through JSON.parse/stringify even when nothing
+  // changes, which would needlessly reformat (and break byte-identical
+  // golden-artifact comparisons for) a keyboard that never touches this
+  // pattern, so the cheap baseIr/assignment check below gates the call.
+  //
+  // Re-parses the just-written .kmn (rather than reusing baseIr/carveIr)
+  // so a combo the author just added via step 2 gets real key text instead
+  // of blanks — feeding propagateDesktopLayersToTouch a stale IR is a known
+  // limitation of the engine helper. Runs AFTER step 2 (assignments) so it
+  // sees those combos, and BEFORE step 4 (id rename) so the path it edits
+  // still resolves under the pre-rename keyboardId; TouchGallery's own
+  // step-0 edits are preserved — propagateDesktopLayersToTouch only ever
+  // sets `text`/`output` on keys its own combo key-map defines, and never
+  // deletes or restructures existing keys/rows/layers.
+  const hasLayerSwitchAssignment = physicalAssignments.some((a) =>
+    a.mechanisms.some((m) => m.patternId === "modifier_as_layer_switch"),
+  );
+  const hasLayerSwitchInBaseIr = collectLayerCombosInUse(baseIr).length > 0;
+  if (hasLayerSwitchAssignment || hasLayerSwitchInBaseIr) {
+    const touchLayoutPath = findTouchLayoutPath(vfs);
+    if (touchLayoutPath !== undefined) {
+      const touchEntry = vfs.get(touchLayoutPath);
+      const kmnEntryForPropagation = vfs.get(`source/${keyboardId}.kmn`);
+      if (
+        touchEntry !== undefined &&
+        typeof touchEntry.content === "string" &&
+        kmnEntryForPropagation !== undefined &&
+        typeof kmnEntryForPropagation.content === "string"
+      ) {
+        try {
+          const freshIr = parseKmn(kmnEntryForPropagation.content, keyboardId).ir;
+          const propagateResult = propagateDesktopLayersToTouch(
+            touchEntry.content,
+            freshIr,
+            physicalAssignments,
+          );
+          vfs.set(touchLayoutPath, propagateResult.json, false);
+          warnings.push(...propagateResult.warnings);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          warnings.push(
+            `[project-working-copy] desktop-to-touch layer propagation skipped: ${msg}`,
           );
         }
       }

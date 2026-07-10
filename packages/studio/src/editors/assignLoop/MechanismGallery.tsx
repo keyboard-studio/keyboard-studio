@@ -17,7 +17,9 @@
 //       S-03 (sequence) — always shown
 //       S-02 (deadkey)  — only for decomposable accented letters
 //       S-01 (swap)     — always shown; user picks a physical key
-//       S-08 (ralt)     — always shown; user picks a base key for RAlt+key
+//       S-08 (ralt)     — always shown; user picks a base key + a modifier
+//                         layer combo (up to four ModifierTokens — see
+//                         @keyboard-studio/engine's modifierCombos.ts)
 //   - "Add key" records a MechanismAssignment(scope:"individual") and auto-advances.
 //   - "Skip" advances without recording (skipped chars count toward Done gate).
 //   - Done when every char in lettersToAdd is either covered or skipped.
@@ -57,6 +59,11 @@ import {
   buildShiftRuleLines,
   buildBaseRuleLines,
   buildCasePairRuleLines,
+  MODIFIER_EXCLUSIONS,
+  canonicalizeCombo,
+  comboToKeySpec,
+  collectModifierTokensInUse,
+  type ModifierToken,
 } from "@keyboard-studio/engine";
 import { useKeyboardArtifact, type ScaffoldSpec, type Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
@@ -84,6 +91,18 @@ export const PATTERN_DEADKEY = "deadkey_single_tap"; // S-02
 export const PATTERN_SWAP = "simple_swap"; // S-01
 export const PATTERN_RALT = "modifier_as_layer_switch"; // S-08
 
+/** Display label per ModifierToken for the S-08 covered-chip badge (methodLabel). */
+const MODIFIER_TOKEN_LABELS: Record<string, string> = {
+  SHIFT: "Shift",
+  CTRL: "Ctrl",
+  RCTRL: "RCtrl",
+  ALT: "Alt",
+  RALT: "RAlt",
+  LALT: "LAlt",
+  CAPS: "Caps",
+  NCAPS: "NCaps",
+};
+
 function methodLabel(ref: { patternId: string; slotValues?: Record<string, string> }): string {
   const sv = ref.slotValues ?? {};
   switch (ref.patternId) {
@@ -98,9 +117,13 @@ function methodLabel(ref: { patternId: string; slotValues?: Record<string, strin
       return `Key: ${firstLine.replace(/^\+ \[/, "").replace(/\].*/, "")}`;
     }
     case "modifier_as_layer_switch": {
+      // altgrKeyList is a bracket-notation combo spec — e.g. "[RALT K_E]" or
+      // "[SHIFT CTRL RALT K_E]" for an arbitrary generalized S-08 combo
+      // (modifierCombos.ts comboToKeySpec). The vkey is always the last token.
       const altgrKeyList = sv["altgrKeyList"] ?? "";
-      const key = altgrKeyList.split(" ").pop()?.replace(/^\[/, "").replace(/\]$/, "") ?? "?";
-      const prefix = altgrKeyList.includes("SHIFT") ? "Shift+RAlt" : "RAlt";
+      const parts = altgrKeyList.replace(/^\[/, "").replace(/\]$/, "").split(/\s+/).filter(Boolean);
+      const key = parts.pop() ?? "?";
+      const prefix = parts.length > 0 ? parts.map((t) => MODIFIER_TOKEN_LABELS[t] ?? t).join("+") : "Layer";
       return `${prefix}: ${key}`;
     }
     default:
@@ -186,18 +209,67 @@ type Method = "sequence" | "deadkey" | "swap" | "ralt";
 // carve gallery's Inspector/Rail.
 type SwapLayer = "base" | "shift";
 
-// S-08 "RAlt + key" target plane. 'ralt' is the long-standing default
-// (`[RALT K_X]`); 'shift-ralt' targets the SHIFTED RAlt plane on the same
-// base key (`[SHIFT RALT K_X]`) — e.g. a capital letter reached via
-// Shift+RAlt+key. Unlike the S-01 Shift toggle, this is NOT gated on
-// mnemonic layouts: `store(&mnemoniclayout)` changes only how the base
-// character of a key spec is resolved (base-layout character vs physical
-// position); the SHIFT flag in a `[SHIFT RALT ...]` combo selects the
-// shifted RAlt plane and does not re-apply the base layout's own shift
-// semantics, so the plane combo is legitimate either way. Real mnemonic
-// keyboards ship such rules: sil_euro_latin declares
-// `store(&mnemoniclayout) '1'` and maps e.g. `[RALT SHIFT '<'] > U+00AB`.
-type RaltLayer = "ralt" | "shift-ralt";
+// S-08 "layer + key" target combo. A list of up to four ModifierTokens
+// (SHIFT / CAPS / NCAPS / the alt family / the ctrl family), generalized
+// beyond the old binary 'ralt'|'shift-ralt' toggle (engine's modifierCombos.ts,
+// `modifier_as_layer_switch`). Unlike the S-01 Shift toggle, the layer combo
+// is NOT gated on mnemonic layouts: `store(&mnemoniclayout)` changes only how
+// the base character of a key spec is resolved (base-layout character vs
+// physical position); a SHIFT flag inside the combo selects the shifted
+// plane and does not re-apply the base layout's own shift semantics, so the
+// combo is legitimate either way. Real mnemonic keyboards ship such rules:
+// sil_euro_latin declares `store(&mnemoniclayout) '1'` and maps e.g.
+// `[RALT SHIFT '<'] > U+00AB`.
+//
+// A slot value of "" means "not yet chosen" — only valid for a freshly-added
+// slot (index > 0); the first slot always defaults to a non-empty token so
+// the card still reads as the AltGr method by default.
+const MAX_RALT_SLOTS = 4;
+
+/**
+ * Per-family dropdown option pool, derived once per keyboard from the
+ * modifier tokens already in use elsewhere in the IR:
+ *   - alt family:  RALT or LALT in use -> offer both; generic ALT in use (and
+ *                  neither chiral form) -> offer ALT only; neither -> offer both.
+ *   - ctrl family: RCTRL in use -> offer RCTRL only; otherwise -> offer CTRL only.
+ * LCTRL is never offered (product decision — MODIFIER_EXCLUSIONS never lists
+ * it as a chooseable token, only as an exclusion partner).
+ */
+function computeModifierPool(inUse: ReadonlySet<ModifierToken>): ModifierToken[] {
+  const altFamily: ModifierToken[] =
+    inUse.has("RALT") || inUse.has("LALT")
+      ? ["RALT", "LALT"]
+      : inUse.has("ALT")
+        ? ["ALT"]
+        : ["RALT", "LALT"];
+  const ctrlFamily: ModifierToken[] = inUse.has("RCTRL") ? ["RCTRL"] : ["CTRL"];
+  return ["SHIFT", ...ctrlFamily, ...altFamily, "CAPS", "NCAPS"];
+}
+
+/**
+ * Options available for dropdown `index`: the pool minus the exclusion set
+ * of every EARLIER slot's chosen token (MODIFIER_EXCLUSIONS is self-inclusive,
+ * so a token already chosen above never appears twice). Deliberately
+ * one-directional (earlier slots constrain later ones, never the reverse) —
+ * this is what makes "diminishing options" a per-row cascade and what makes
+ * the "changing an earlier dropdown drops now-invalid later picks" behavior
+ * (handleRaltTokenChange's forward-invalidation loop) both meaningful and
+ * necessary: an earlier slot is never blocked by a later slot's pick, so a
+ * change there can genuinely invalidate what a later slot already holds.
+ */
+function optionsForRaltSlot(
+  pool: readonly ModifierToken[],
+  tokens: readonly (ModifierToken | "")[],
+  index: number,
+): ModifierToken[] {
+  const excluded = new Set<ModifierToken>();
+  for (let i = 0; i < index; i++) {
+    const t = tokens[i];
+    if (t === undefined || t === "") continue;
+    for (const e of MODIFIER_EXCLUSIONS[t]) excluded.add(e);
+  }
+  return pool.filter((t) => !excluded.has(t));
+}
 
 interface MethodChooserProps {
   currentChar: string;
@@ -218,9 +290,19 @@ interface MethodChooserProps {
   /** S-01 target layer — 'base' (default) or 'shift' (shift+key). */
   swapLayer: SwapLayer;
   onSwapLayerChange: (v: SwapLayer) => void;
-  /** S-08 target plane — 'ralt' (default) or 'shift-ralt' (shift+RAlt+key). */
-  raltLayer: RaltLayer;
-  onRaltLayerChange: (v: RaltLayer) => void;
+  /**
+   * S-08 target combo — a list of up to {@link MAX_RALT_SLOTS} chosen
+   * ModifierTokens (one dropdown per slot; "" means "not yet chosen", only
+   * valid past the first slot).
+   */
+  raltTokens: (ModifierToken | "")[];
+  onRaltTokenChange: (index: number, value: string) => void;
+  onAddRaltSlot: () => void;
+  onRemoveRaltSlot: (index: number) => void;
+  /** Per-family option pool for the layer-combo dropdowns (computeModifierPool). */
+  modifierPool: ModifierToken[];
+  /** Tokens already used elsewhere in the working IR — rendered bold + "(in use)". */
+  modifierTokensInUse: ReadonlySet<ModifierToken>;
   /**
    * True when the working keyboard is mnemonic — shift behaviour comes from
    * the base layout, so the Shift toggle must be disabled (planShiftAssignment
@@ -270,8 +352,12 @@ function MethodChooser({
   onRaltKeyChange,
   swapLayer,
   onSwapLayerChange,
-  raltLayer,
-  onRaltLayerChange,
+  raltTokens,
+  onRaltTokenChange,
+  onAddRaltSlot,
+  onRemoveRaltSlot,
+  modifierPool,
+  modifierTokensInUse,
   shiftLayerDisabled,
 }: MethodChooserProps) {
 
@@ -530,64 +616,151 @@ function MethodChooser({
           style={headerBtnStyle}
         >
           <span style={{ fontWeight: 600, color: method === "ralt" ? ACCENT : TEXT_MAIN }}>
-            RAlt + key
+            Layer + key
           </span>
           {method !== "ralt" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              Hold RAlt and press a base key to get {currentChar}
+              Hold a modifier layer and press a base key to get {currentChar}
             </span>
           )}
         </button>
-        {method === "ralt" && (
-          <div style={configStyle}>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 12,
-                color: TEXT_DIM,
-                fontFamily: FONT,
-              }}
-            >
-              Base key:
-              <select
-                value={selectedRaltKey}
-                onChange={(e) => onRaltKeyChange(e.target.value)}
-                aria-label="Base key for RAlt layer"
-                style={selectStyle}
+        {method === "ralt" && (() => {
+          const filledRaltTokens = raltTokens.filter((t): t is ModifierToken => t !== "");
+          const raltAllFilled =
+            raltTokens.length > 0 && filledRaltTokens.length === raltTokens.length;
+          const raltHasRoomToAdd =
+            raltTokens.length < MAX_RALT_SLOTS &&
+            raltAllFilled &&
+            (() => {
+              const excluded = new Set<ModifierToken>();
+              for (const t of filledRaltTokens) {
+                for (const e of MODIFIER_EXCLUSIONS[t]) excluded.add(e);
+              }
+              return modifierPool.some((t) => !excluded.has(t));
+            })();
+          const raltIsDesktopOnly =
+            filledRaltTokens.includes("CAPS") || filledRaltTokens.includes("NCAPS");
+          let raltPreviewSpec: string | null = null;
+          if (selectedRaltKey !== "" && filledRaltTokens.length > 0) {
+            try {
+              raltPreviewSpec = comboToKeySpec(canonicalizeCombo(filledRaltTokens), selectedRaltKey);
+            } catch {
+              raltPreviewSpec = null;
+            }
+          }
+
+          return (
+            <div style={configStyle}>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 12,
+                  color: TEXT_DIM,
+                  fontFamily: FONT,
+                }}
               >
-                {KEY_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </label>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span id="ralt-layer-label" style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-                Layer:
-              </span>
-              <RadioGroup
-                name="ralt-layer"
-                value={raltLayer}
-                onChange={(v) => onRaltLayerChange(v as RaltLayer)}
-                ariaLabelledby="ralt-layer-label"
-                options={[
-                  { value: "ralt", label: "RAlt" },
-                  { value: "shift-ralt", label: "Shift+RAlt" },
-                ]}
-              />
+                Base key:
+                <select
+                  value={selectedRaltKey}
+                  onChange={(e) => onRaltKeyChange(e.target.value)}
+                  aria-label="Base key for layer-switch combo"
+                  style={selectStyle}
+                >
+                  {KEY_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <span style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
+                  Layer{raltTokens.length > 1 ? "s" : ""}:
+                </span>
+                {raltTokens.map((token, index) => {
+                  const options = optionsForRaltSlot(modifierPool, raltTokens, index);
+                  return (
+                    <div key={index} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <select
+                        value={token}
+                        onChange={(e) => onRaltTokenChange(index, e.target.value)}
+                        aria-label={`Layer ${index + 1} for layer-switch combo`}
+                        style={selectStyle}
+                      >
+                        <option value="">— Select —</option>
+                        {options.map((o) => (
+                          <option
+                            key={o}
+                            value={o}
+                            style={modifierTokensInUse.has(o) ? { fontWeight: 700 } : undefined}
+                          >
+                            {o}
+                            {modifierTokensInUse.has(o) ? " (in use)" : ""}
+                          </option>
+                        ))}
+                      </select>
+                      {index > 0 && (
+                        <button
+                          type="button"
+                          aria-label={`Remove layer ${index + 1}`}
+                          onClick={() => onRemoveRaltSlot(index)}
+                          style={{
+                            background: "transparent",
+                            border: `1px solid ${BORDER}`,
+                            borderRadius: 4,
+                            color: TEXT_DIM,
+                            fontSize: 12,
+                            padding: "2px 8px",
+                            cursor: "pointer",
+                            fontFamily: FONT,
+                          }}
+                        >
+                          &times;
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+                {raltHasRoomToAdd && (
+                  <button
+                    type="button"
+                    aria-label="Add another layer"
+                    onClick={onAddRaltSlot}
+                    style={{
+                      alignSelf: "flex-start",
+                      background: "transparent",
+                      border: `1px solid ${BORDER}`,
+                      borderRadius: 4,
+                      color: TEXT_DIM,
+                      fontSize: 12,
+                      padding: "2px 10px",
+                      cursor: "pointer",
+                      fontFamily: FONT,
+                    }}
+                  >
+                    + Add layer
+                  </button>
+                )}
+              </div>
+              {raltPreviewSpec !== null && (
+                <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
+                  {raltPreviewSpec} &rarr;{" "}
+                  <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentChar}</span>
+                </p>
+              )}
+              {raltIsDesktopOnly && (
+                <p style={{ margin: 0, fontSize: 11, color: TEXT_DIM, fontFamily: FONT }}>
+                  Desktop only — this layer will not appear on the touch layout.
+                </p>
+              )}
+              {filledRaltTokens.includes("RALT") && (
+                <p style={{ margin: 0, fontSize: 11, color: "#d29922", fontFamily: FONT }}>
+                  Note: RAlt may conflict with system shortcuts on macOS.
+                </p>
+              )}
             </div>
-            {raltLayer === "shift-ralt" && selectedRaltKey !== "" && (
-              <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-                Shift + RAlt + {selectedRaltKey.replace(/^K_/, "")} &rarr;{" "}
-                <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentChar}</span>
-              </p>
-            )}
-            <p style={{ margin: 0, fontSize: 11, color: "#d29922", fontFamily: FONT }}>
-              Note: RAlt may conflict with system shortcuts on macOS.
-            </p>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );
@@ -832,7 +1005,7 @@ export function MechanismGallery({
   const [selectedSwapKey, setSelectedSwapKey] = useState("");
   const [selectedRaltKey, setSelectedRaltKey] = useState("");
   const [swapLayer, setSwapLayer] = useState<SwapLayer>("base");
-  const [raltLayer, setRaltLayer] = useState<RaltLayer>("ralt");
+  const [raltTokens, setRaltTokens] = useState<(ModifierToken | "")[]>(["RALT"]);
 
   // Propose-then-confirm case-pair companion (spec v1.3.1 §3c — never apply
   // silently). Set right after a base-layer S-01 apply when the applied
@@ -871,6 +1044,25 @@ export function MechanismGallery({
     [workingIr],
   );
 
+  // S-08 layer-combo picker: the modifier tokens already used elsewhere in
+  // the working IR (drives both the per-family option pool and the
+  // "(in use)" dropdown highlighting), and the pool itself.
+  const modifierTokensInUse = useMemo<ReadonlySet<ModifierToken>>(
+    () => (workingIr !== null ? collectModifierTokensInUse(workingIr) : new Set<ModifierToken>()),
+    [workingIr],
+  );
+  const modifierPool = useMemo<ModifierToken[]>(
+    () => computeModifierPool(modifierTokensInUse),
+    [modifierTokensInUse],
+  );
+  // First-slot default — the alt-family entry the pool leads with, so the
+  // card still reads as the AltGr method by default (ALT when that's the
+  // only alt-family token on offer, else RALT).
+  const raltDefaultToken = useMemo<ModifierToken>(() => {
+    const altFamily = modifierPool.find((t) => t === "ALT" || t === "RALT" || t === "LALT");
+    return altFamily ?? "RALT";
+  }, [modifierPool]);
+
   // kbgen placement suggestion for the current character (null when no map or
   // no qualifying candidate). Memoized against currentChar + placementMap so it
   // only recomputes on actual input changes, not on unrelated re-renders.
@@ -899,8 +1091,8 @@ export function MechanismGallery({
     setSelectedSwapKey("");
     setSelectedRaltKey("");
     setSwapLayer("base");
-    setRaltLayer("ralt");
-  }, []);
+    setRaltTokens([raltDefaultToken]);
+  }, [raltDefaultToken]);
 
   // Reset inputs whenever currentChar changes.
   useEffect(() => {
@@ -973,11 +1165,45 @@ export function MechanismGallery({
       return selectedSwapKey !== "";
     }
     if (method === "ralt") {
-      return selectedRaltKey !== "";
+      // At least one layer chosen (empty-combo Apply is disabled).
+      return selectedRaltKey !== "" && raltTokens.some((t) => t !== "");
     }
     // deadkey: triggerKey always has a value; base letter must be non-empty.
     return deadkeyBaseLetter.trim().length > 0;
-  }, [currentChar, method, seqFirst, seqSecond, deadkeyBaseLetter, selectedSwapKey, selectedRaltKey]);
+  }, [currentChar, method, seqFirst, seqSecond, deadkeyBaseLetter, selectedSwapKey, selectedRaltKey, raltTokens]);
+
+  // ---------------------------------------------------------------------------
+  // S-08 layer-combo dropdown handlers
+  // ---------------------------------------------------------------------------
+
+  const handleRaltTokenChange = useCallback(
+    (index: number, value: string) => {
+      const token = (value || "") as ModifierToken | "";
+      setRaltTokens((prev) => {
+        const next = [...prev];
+        next[index] = token;
+        // Forward invalidation: an earlier slot's new value may exclude a
+        // later slot's existing selection (e.g. RALT chosen after LALT was
+        // already picked in a later slot) — drop those now-invalid picks.
+        for (let i = index + 1; i < next.length; i++) {
+          const stillValid = optionsForRaltSlot(modifierPool, next, i).includes(
+            next[i] as ModifierToken,
+          );
+          if (next[i] !== "" && !stillValid) next[i] = "";
+        }
+        return next;
+      });
+    },
+    [modifierPool],
+  );
+
+  const handleAddRaltSlot = useCallback(() => {
+    setRaltTokens((prev) => (prev.length >= MAX_RALT_SLOTS ? prev : [...prev, ""]));
+  }, []);
+
+  const handleRemoveRaltSlot = useCallback((index: number) => {
+    setRaltTokens((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
+  }, []);
 
   const handleApply = useCallback(() => {
     if (currentChar === null || !canApply) return;
@@ -1098,7 +1324,9 @@ export function MechanismGallery({
     } else {
       // method === "ralt"
       // S-08: modifier_as_layer_switch — kmnFragment uses {{altgrKeyList}} and {{altgrOutputList}}.
-      // Build a single-entry held-layer rule for this character.
+      // Build a single-entry held-layer rule for this character, keyed on
+      // whichever combo of ModifierTokens the author picked (generalized S-08).
+      const chosenTokens = raltTokens.filter((t): t is ModifierToken => t !== "");
       assignment = {
         scope: "individual",
         target: currentChar,
@@ -1108,10 +1336,7 @@ export function MechanismGallery({
             patternId: PATTERN_RALT,
             strategyId: "S-08",
             slotValues: {
-              altgrKeyList:
-                raltLayer === "shift-ralt"
-                  ? `[SHIFT RALT ${selectedRaltKey}]`
-                  : `[RALT ${selectedRaltKey}]`,
+              altgrKeyList: comboToKeySpec(canonicalizeCombo(chosenTokens), selectedRaltKey),
               altgrOutputList: currentChar,
             },
           },
@@ -1133,7 +1358,7 @@ export function MechanismGallery({
     selectedSwapKey,
     selectedRaltKey,
     swapLayer,
-    raltLayer,
+    raltTokens,
     shiftLayerAllowed,
     workingIr,
     identityBcp47,
@@ -1738,8 +1963,12 @@ export function MechanismGallery({
                 onRaltKeyChange={setSelectedRaltKey}
                 swapLayer={swapLayer}
                 onSwapLayerChange={setSwapLayer}
-                raltLayer={raltLayer}
-                onRaltLayerChange={setRaltLayer}
+                raltTokens={raltTokens}
+                onRaltTokenChange={handleRaltTokenChange}
+                onAddRaltSlot={handleAddRaltSlot}
+                onRemoveRaltSlot={handleRemoveRaltSlot}
+                modifierPool={modifierPool}
+                modifierTokensInUse={modifierTokensInUse}
                 shiftLayerDisabled={!shiftLayerAllowed}
               />
 
