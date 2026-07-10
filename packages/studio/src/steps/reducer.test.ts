@@ -56,6 +56,7 @@ function makeVirtualFS(): VirtualFS {
 function makeDepsMock(): ReducerDeps {
   return {
     lockDesktop: vi.fn(),
+    clearStale: vi.fn(),
     setTouchLayoutJson: vi.fn(),
     instantiateFromBase: vi.fn(),
     instantiateFromExisting: vi.fn(),
@@ -186,6 +187,20 @@ describe("R2 — touch-layout build at the touch step", () => {
     const result: TouchCompleteResult = { assignments, baseIr, baseVfs };
     applyStepCompletion(TOUCH_STEP_ID, result, deps);
     expect(deps.setTouchLayoutJson).toHaveBeenCalledWith(null);
+  });
+
+  // --- Re-completion clears a prior re-review flag ---
+
+  it("calls clearStale(TOUCH_STEP_ID) when the touch step completes, resolving any prior stale flag", () => {
+    const result: TouchCompleteResult = { assignments, baseIr, baseVfs };
+    applyStepCompletion(TOUCH_STEP_ID, result, deps);
+    expect(deps.clearStale).toHaveBeenCalledExactlyOnceWith(TOUCH_STEP_ID);
+  });
+
+  it("calls clearStale(TOUCH_STEP_ID) even on the empty-assignments/no-baseIr short-circuit path", () => {
+    const result: TouchCompleteResult = { assignments: [], baseIr: null, baseVfs };
+    applyStepCompletion(TOUCH_STEP_ID, result, deps);
+    expect(deps.clearStale).toHaveBeenCalledExactlyOnceWith(TOUCH_STEP_ID);
   });
 });
 

@@ -20,6 +20,7 @@ function makeDeps(initialIr: KeyboardIR | null): {
   let ir = initialIr;
   const deps: ReducerDeps = {
     lockDesktop: vi.fn(),
+    clearStale: vi.fn(),
     setTouchLayoutJson: vi.fn(),
     instantiateFromBase: vi.fn(),
     instantiateFromExisting: vi.fn(),

@@ -6,8 +6,10 @@
 // Component contract under test:
 //   - One character at a time from lettersToAdd (inventory when baseIr is null).
 //   - "Apply method for <char>" button records a MechanismAssignment(scope:"individual").
-//   - "Skip this character" advances without recording.
-//   - Done button appears when every char is covered or skipped (after clicking Next).
+//   - "Skip this character" is pure forward navigation — it records nothing;
+//     a skipped-over character is never treated as covered/resolved.
+//   - The last character's forward button always reads "Done", disabled
+//     until that character is actually covered.
 //   - Coverage status line: "<N> of <M> added".
 //   - Method chooser: "Type a sequence" always present; "Tap a trigger key, then a letter"
 //     always present (S-02 deadkey is always offered, regardless of char type).
@@ -19,9 +21,11 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
 import { MechanismGallery, PATTERN_SEQUENCE, PATTERN_DEADKEY } from "./MechanismGallery.tsx";
-import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useWorkingCopyStore, bindManifest } from "../../stores/workingCopyStore.ts";
+import { MECHANISMS_STEP_ID, TOUCH_STEP_ID } from "../../steps/reducer.ts";
+import type { EditorStep, Step } from "../../steps/types.ts";
 import type { PatternLibraryService, VirtualFS } from "@keyboard-studio/contracts";
-import { createVirtualFS } from "@keyboard-studio/contracts";
+import { createVirtualFS, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { latinDeadkeyAcuteSingle } from "@keyboard-studio/contracts/fixtures";
 import { corpusBackedQwerty } from "@keyboard-studio/contracts/fixtures";
@@ -470,7 +474,7 @@ describe("MechanismGallery — advance after apply", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Skip — advances without recording
+// Skip — pure forward navigation; records nothing.
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — skip character", () => {
@@ -479,7 +483,7 @@ describe("MechanismGallery — skip character", () => {
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
-    fireEvent.click(screen.getByRole("button", { name: /Skip á/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
 
     // No assignment recorded.
     expect(
@@ -494,16 +498,31 @@ describe("MechanismGallery — skip character", () => {
     });
   });
 
-  it("all-skipped state shows Done button", async () => {
-    seedInventory(["á"]);
+  it("skipping does not change the coverage count and does not mark the character resolved", async () => {
+    seedInventory(["á", "é"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
-    fireEvent.click(screen.getByRole("button", { name: /Skip á/i }));
 
+    // Coverage starts at 0 of 2.
+    expect(screen.getByRole("status").getAttribute("aria-label")).toBe("0 of 2 added");
+
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Done/i })).toBeTruthy();
+      expect(screen.getByLabelText(/U\+00E9/i)).toBeTruthy();
     });
+
+    // Skipping recorded nothing, so coverage is unchanged.
+    expect(screen.getByRole("status").getAttribute("aria-label")).toBe("0 of 2 added");
+
+    // Navigating back to the skipped-over "á": it is NOT treated as resolved —
+    // Next stays disabled until it is actually applied.
+    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+    });
+    const nextBtn = screen.getByRole("button", { name: /Next character/i });
+    expect((nextBtn as HTMLButtonElement).disabled).toBe(true);
   });
 });
 
@@ -511,30 +530,27 @@ describe("MechanismGallery — skip character", () => {
 // Done state
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — Done state", () => {
-  it("Done button appears when every character is covered and Next is clicked", async () => {
+describe("MechanismGallery — Done state (positional: last char's forward button)", () => {
+  it("the only (and therefore last) character's forward button already reads Done, disabled until Apply/Skip", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
+    // idx 0 === lettersToAdd.length - 1 for a single-char list, so the
+    // forward button reads "Done" from the very first render — there is no
+    // separate "Next character" step to click through first.
+    const doneBtn = screen.getByRole("button", { name: "Done" });
+    expect((doneBtn as HTMLButtonElement).disabled).toBe(true);
+
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
 
-    // After Apply: á is covered, isDone=true, currentChar still="á".
-    // The Next button aria-label is "All methods applied, finish"; click it to
-    // reach currentChar===null, which renders the Done button.
     await waitFor(() => {
-      const nextBtn = screen.getByRole("button", { name: /All methods applied, finish/i });
-      expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
-      fireEvent.click(nextBtn);
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Done/i })).toBeTruthy();
+      expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
     });
   });
 
-  it("clicking Done invokes the onComplete callback", async () => {
+  it("clicking Done invokes the onComplete callback directly (no intermediate Next click)", async () => {
     const onComplete = vi.fn();
     seedInventory(["á"]);
     await act(async () => {
@@ -548,31 +564,30 @@ describe("MechanismGallery — Done state", () => {
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
 
-    // Advance to currentChar===null so the Done button appears.
     await waitFor(() => {
-      const nextBtn = screen.getByRole("button", { name: /All methods applied, finish/i });
-      expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
-      fireEvent.click(nextBtn);
-    });
-
-    await waitFor(() => {
-      fireEvent.click(screen.getByRole("button", { name: /Done/i }));
+      const doneBtn = screen.getByRole("button", { name: "Done" });
+      expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(doneBtn);
     });
     expect(onComplete).toHaveBeenCalledOnce();
   });
 
-  it("empty lettersToAdd shows Done immediately", async () => {
-    // Seed an inventory whose only char is already on the base keyboard.
-    // Since baseIr is null here, lettersToAdd === inventory. Use empty inventory.
-    // (Empty inventory => survey prompt path, not this path. Instead: skip all.)
+  it("skipping the only (last) character completes the phase via onComplete", async () => {
+    // Skip on the last position is itself the phase completion — positional
+    // Skip advances by one position, or finishes if there is no next
+    // position, exactly like Next/Done.
+    const onComplete = vi.fn();
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          onComplete={onComplete}
+        />,
+      );
     });
-    fireEvent.click(screen.getByRole("button", { name: /Skip á/i }));
-    await waitFor(() => {
-      expect(screen.getByText(/All keys added|No new characters/i)).toBeTruthy();
-    });
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    expect(onComplete).toHaveBeenCalledOnce();
   });
 });
 
@@ -675,77 +690,339 @@ describe("MechanismGallery — Back button", () => {
 });
 
 // ---------------------------------------------------------------------------
-// History-based Back navigation (mirrors TouchGallery's history-stack model)
+// Positional Back/Next navigation — reported-bug regression coverage.
+//
+// The reported bug: implementing each character, moving on, and coming back
+// only showed the first character, and Next then skipped the others. Root
+// cause was a "search for next uncovered" forward nav plus a charHistory
+// stack for Back (reset on remount). Both handleNext/handleBack are now
+// strictly positional (idx +/- 1 in lettersToAdd) — this suite asserts Next
+// never skips an already-covered character and Back walks every character
+// in reverse position, including covered ones, landing on onBack only from
+// the very first position.
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — history-based Back navigation", () => {
-  it("Back from character 2 returns to character 1 without calling onBack; Back again from character 1 calls onBack", async () => {
+describe("MechanismGallery — positional Back/Next navigation", () => {
+  it("Next advances positionally over covered characters (never skips them); Back walks back through every character including covered ones; Back from the first character calls onBack", async () => {
     const onBack = vi.fn();
-    seedInventory(["á", "é"]);
+    seedInventory(["á", "é", "í"]);
     await act(async () => {
       render(
         <MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} />,
       );
     });
 
-    // Apply the (pre-filled, always-enabled) deadkey method for "á".
-    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    // --- Implement "á" (idx 0), then Next → "é" (idx 1). ---
+    expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
-
-    // Advance to "é" via the header "Next character" button.
     await waitFor(() => {
       const nextBtn = screen.getByRole("button", { name: /Next character/i });
       expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
       fireEvent.click(nextBtn);
     });
     await waitFor(() => {
-      expect(screen.getByLabelText(/U\+00E9/i)).toBeTruthy();
+      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
     });
 
-    // Click Back — history-based: returns to "á" within the loop, does NOT
-    // call onBack. Anchored regex: "á" is covered, so an "Added" chip
-    // ("Remove U+00E1 á") also carries "U+00E1" in its aria-label — match only
-    // the character-heading span's exact label.
+    // --- Implement "é" (idx 1), then Next → "í" (idx 2, the LAST character). ---
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for é/i }));
+    await waitFor(() => {
+      const nextBtn = screen.getByRole("button", { name: /Next character/i });
+      expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(nextBtn);
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+00ED í$/)).toBeTruthy();
+    });
+
+    // The last character's forward button already reads "Done" (not yet
+    // applied for "í", so it starts disabled).
+    const doneBtn = screen.getByRole("button", { name: "Done" });
+    expect((doneBtn as HTMLButtonElement).disabled).toBe(true);
+
+    // --- Back from "í" (idx 2) lands on "é" (idx 1) — covered, not skipped. ---
+    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+    });
+    expect(onBack).not.toHaveBeenCalled();
+
+    // Revisiting the covered "é": Next is already enabled (no re-apply
+    // needed) and — critically — advances to "í" (idx 2), NOT past it. This
+    // is the regression the reported bug hit: Next used to search forward
+    // for the next *uncovered* character and would jump straight to
+    // completion/an unrelated character from here.
+    const nextFromE = screen.getByRole("button", { name: /Next character/i });
+    expect((nextFromE as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(nextFromE);
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+00ED í$/)).toBeTruthy();
+    });
+
+    // --- Back twice more: "í" → "é" → "á" (idx 0), both covered, neither skipped. ---
+    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+    });
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     await waitFor(() => {
       expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
     });
     expect(onBack).not.toHaveBeenCalled();
 
-    // Click Back again from "á" — history is now empty, so onBack fires.
+    // --- Back from "á" (idx 0) — first position, nowhere further back — calls onBack. ---
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
-    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(onBack).toHaveBeenCalledOnce();
   });
 });
 
-// ---------------------------------------------------------------------------
-// Back button in the all-done panel
-// ---------------------------------------------------------------------------
-
-describe("MechanismGallery — Back in the all-done panel", () => {
-  it("renders a Back button in the all-keys-added state", async () => {
+describe("MechanismGallery — previous-character navigation", () => {
+  it("clicking '« Previous character' from an interior character moves to the immediately preceding character, ungated by intermediate implementation status", async () => {
     const onBack = vi.fn();
-    seedInventory(["á"]);
+    seedInventory(["á", "é", "í"]);
     await act(async () => {
       render(
         <MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} />,
       );
     });
 
-    // Skip the only character — reaches the all-done state (currentChar===null).
-    fireEvent.click(screen.getByRole("button", { name: /Skip á/i }));
-
+    // Advance to "é" (idx 1) via Apply + Next — "í" stays untouched.
+    expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
     await waitFor(() => {
-      expect(screen.getByText(/All keys added/i)).toBeTruthy();
+      const nextBtn = screen.getByRole("button", { name: /Next character/i });
+      expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(nextBtn);
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
     });
 
-    // A Back button is genuinely present in this state, not just the per-char UI.
+    const prevBtn = screen.getByTestId("mechanisms-prev-char");
+    expect(prevBtn.getAttribute("aria-label")).toBe("Previous character");
+    expect((prevBtn as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(prevBtn);
+
+    // Landed back on "á" (idx 0) — the phase was NOT exited.
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+    });
+    expect(onBack).not.toHaveBeenCalled();
+  });
+
+  it("renders the previous-character button DISABLED on the first character", async () => {
+    seedInventory(["á", "é", "í"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    // Starting on "á" (idx 0) — nowhere further back to step.
+    const prevBtn = screen.getByTestId("mechanisms-prev-char");
+    expect(prevBtn).toBeTruthy();
+    expect((prevBtn as HTMLButtonElement).disabled).toBe(true);
+
+    // Clicking a disabled button is a no-op — still on "á", onBack untouched.
+    fireEvent.click(prevBtn);
+    expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+  });
+
+  it("the previous-character button is enabled on later (non-first) characters", async () => {
+    seedInventory(["á", "é", "í"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    // Advance to "é" (idx 1) via Skip (records nothing).
+    fireEvent.click(
+      screen.getByRole("button", { name: /Skip this character/i }),
+    );
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+    });
+    expect((screen.getByTestId("mechanisms-prev-char") as HTMLButtonElement).disabled).toBe(false);
+
+    // Advance to "í" (idx 2, the last character) — still enabled there too.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Skip this character/i }),
+    );
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+00ED í$/)).toBeTruthy();
+    });
+    expect((screen.getByTestId("mechanisms-prev-char") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("does NOT render the previous-character button when the desktop layout is locked", async () => {
+    seedInventory(["á", "é", "í"]);
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />,
+      );
+    });
+    expect(screen.getByTestId("mechanisms-prev-char")).toBeTruthy();
+
+    act(() => {
+      useWorkingCopyStore.getState().lockDesktop();
+    });
+
+    expect(screen.queryByTestId("mechanisms-prev-char")).toBeNull();
+    // The locked-forward-escape button takes over the primary slot instead.
+    expect(screen.getByTestId("mechanisms-continue")).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Edit after Done — "Unlock to edit" affordance in the locked banner.
+//
+// Fixture manifest mirrors the shape of the production manifest for this
+// purpose: the "touch" step declares empty `inputs` (production deliberately
+// avoids a C2 data cycle with "mechanisms" — see registerEditorSteps.ts), so
+// there is no mechanisms→touch data edge for markStale("mechanisms") to
+// propagate across. handleUnlock therefore marks "touch" directly as a
+// re-opened root — that lands it in `staleSteps` regardless of the missing
+// edge, which is exactly what these tests assert.
+// ---------------------------------------------------------------------------
+
+const PATH_GROUPS_FIXTURE = irPath("groups", ARRAY_INDEX);
+
+function makeEditorStepFixture(
+  id: string,
+  writes: typeof PATH_GROUPS_FIXTURE[],
+  inputs: typeof PATH_GROUPS_FIXTURE[],
+): EditorStep {
+  return {
+    kind: "editor-step",
+    id,
+    title: id,
+    spine: true,
+    component: (() => null) as EditorStep["component"],
+    inputs,
+    writes,
+  };
+}
+
+const UNLOCK_FIXTURE_MANIFEST: readonly Step[] = [
+  makeEditorStepFixture(MECHANISMS_STEP_ID, [PATH_GROUPS_FIXTURE], []),
+  makeEditorStepFixture("touch", [], [PATH_GROUPS_FIXTURE]),
+];
+
+describe("MechanismGallery — edit after Done (unlock affordance)", () => {
+  beforeEach(() => {
+    bindManifest(UNLOCK_FIXTURE_MANIFEST);
+  });
+
+  it("renders 'Unlock to edit' in the locked banner and clicking it unlocks the gallery", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />,
+      );
+    });
+
+    act(() => {
+      useWorkingCopyStore.getState().lockDesktop();
+    });
+
+    expect(screen.getByText(/Desktop layout locked/i)).toBeTruthy();
+    const unlockBtn = screen.getByRole("button", { name: /unlock desktop layout to edit/i });
+    expect(unlockBtn).toBeTruthy();
+
+    fireEvent.click(unlockBtn);
+
+    expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);
+    // The gallery becomes editable again — Apply/Skip controls return.
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Apply method for á/i })).toBeTruthy();
+      expect(screen.getByRole("button", { name: /Skip this character/i })).toBeTruthy();
+    });
+  });
+
+  it("shows a caution line about re-reviewing the touch layout in the locked banner", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />,
+      );
+    });
+    act(() => {
+      useWorkingCopyStore.getState().lockDesktop();
+    });
+    expect(
+      screen.getByText(/re-reviewing your touch layout/i),
+    ).toBeTruthy();
+  });
+
+  it("unlocking when a touch layout already exists marks the touch step stale (surfaces re-review)", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />,
+      );
+    });
+    act(() => {
+      useWorkingCopyStore.getState().lockDesktop();
+      useWorkingCopyStore.getState().setTouchLayoutJson("{}");
+    });
+
+    expect(useWorkingCopyStore.getState().staleSteps.has(TOUCH_STEP_ID)).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: /unlock desktop layout to edit/i }));
+
+    // handleUnlock marks "touch" directly (not "mechanisms") — production's
+    // "touch" step has empty `inputs`, so there is no data edge for
+    // markStale("mechanisms") to propagate across; marking "touch" itself
+    // seeds it as a re-opened root regardless of the missing edge.
+    expect(useWorkingCopyStore.getState().staleSteps.has(TOUCH_STEP_ID)).toBe(true);
+    expect(useWorkingCopyStore.getState().staleSteps.has(MECHANISMS_STEP_ID)).toBe(false);
+  });
+
+  it("unlocking when no touch layout exists does NOT mark anything stale", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />,
+      );
+    });
+    act(() => {
+      useWorkingCopyStore.getState().lockDesktop();
+    });
+    expect(useWorkingCopyStore.getState().touchLayoutJson).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /unlock desktop layout to edit/i }));
+
+    expect(useWorkingCopyStore.getState().staleSteps.size).toBe(0);
+  });
+});
+
+describe("MechanismGallery — Back after skipping the only character", () => {
+  it("Back still calls onBack after skipping the only (first=last) character — position never changed", async () => {
+    const onBack = vi.fn();
+    const onComplete = vi.fn();
+    seedInventory(["á"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          onBack={onBack}
+          onComplete={onComplete}
+        />,
+      );
+    });
+
+    // Skipping the only character is itself the phase completion (idx 0 is
+    // also the last position) — it does not move currentChar anywhere.
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    expect(onComplete).toHaveBeenCalledOnce();
+
+    // The heading for "á" is still present — positional nav never nulled
+    // currentChar out from under the completed character.
+    expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+
+    // Back is still positional: idx 0 has no prior position, so it calls
+    // onBack — not gated by the character having just been skipped.
     const backBtn = screen.getByRole("button", { name: /← back/i });
     expect(backBtn).toBeTruthy();
     fireEvent.click(backBtn);
-    // History has "á" from the skip, so Back returns within the loop rather
-    // than calling onBack.
-    expect(onBack).not.toHaveBeenCalled();
+    expect(onBack).toHaveBeenCalledOnce();
   });
 });
 
@@ -803,6 +1080,42 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
 
     // The already-accepted suggestion for "é" must NOT re-render its card.
     expect(screen.queryByText(/Suggested: Right Alt \+ E for é/i)).toBeNull();
+  });
+
+  it("a suggestion row REAPPEARS after Skip (unlike Accept/Deny) — Skip resolves nothing", async () => {
+    // Same fixture as the accepted-suggestion test above, but this time the
+    // character is SKIPPED rather than accepted/denied. Skip is pure
+    // positional navigation and must not add the character to
+    // suggestionResolved, so returning to it must show the suggestion again.
+    seedInventory(["é", "à"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={corpusBackedQwerty}
+        />,
+      );
+    });
+
+    // Suggestion row shows for "é".
+    expect(screen.getByText(/Suggested: Right Alt \+ E for é/i)).toBeTruthy();
+
+    // Skip it — no accept/deny, no assignment recorded.
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+00E0 à$/)).toBeTruthy();
+    });
+
+    // Navigate back to "é" without ever resolving its suggestion.
+    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+00E9 é$/)).toBeTruthy();
+    });
+
+    // Unlike the accept/deny case above, the suggestion row for "é" MUST
+    // reappear — Skip resolved nothing. (If `skippedChars` were reintroduced
+    // to suppress the row, this assertion would fail.)
+    expect(screen.getByText(/Suggested: Right Alt \+ E for é/i)).toBeTruthy();
   });
 });
 

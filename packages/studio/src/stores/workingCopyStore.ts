@@ -217,7 +217,6 @@ export interface WorkingCopyState {
    *
    * - `charTouchEntries`: serializable form of the `charTouch` Map
    *   (array of [char, TouchAssignment] pairs so it survives JSON round-trips).
-   * - `skippedChars`: array form of the `skippedChars` Set.
    * - `suggestionResolvedChars`: array form of the `suggestionResolved` Set —
    *   characters whose suggestion card has been explicitly accepted or denied,
    *   so it never reappears on back-navigation to an already-decided char.
@@ -227,7 +226,6 @@ export interface WorkingCopyState {
    */
   touchDraft: {
     charTouchEntries: Array<[string, TouchAssignment]>;
-    skippedChars: string[];
     suggestionResolvedChars: string[];
   } | null;
 
@@ -369,12 +367,11 @@ export interface WorkingCopyState {
   /**
    * Persist the in-progress Phase E draft so it survives an unmount/remount
    * caused by back-navigation to Phase C. Call from TouchGallery whenever
-   * charTouch or skippedChars change (or on unmount). Pass null to clear.
+   * charTouch or suggestionResolved change (or on unmount). Pass null to clear.
    */
   setTouchDraft: (
     draft: {
       charTouchEntries: Array<[string, TouchAssignment]>;
-      skippedChars: string[];
       suggestionResolvedChars: string[];
     } | null,
   ) => void;
