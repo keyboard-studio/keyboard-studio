@@ -519,6 +519,130 @@ describe("applyTouchAssignments — touch_key_replace", () => {
 });
 
 // ---------------------------------------------------------------------------
+// multiple mechanisms per assignment
+// ---------------------------------------------------------------------------
+
+describe("applyTouchAssignments — multiple mechanisms per assignment", () => {
+  it("applies every mechanism in a single assignment's mechanisms[] (longpress + multitap on the same host key)", () => {
+    const layout = makeLayout([makeKey("K_A")]);
+    const combined: TouchAssignment = {
+      scope: "individual",
+      target: "a",
+      modality: "touch",
+      mechanisms: [
+        { patternId: "longpress_alternates", slotValues: { hostKey: "K_A", char: "á" } },
+        { patternId: "multitap", slotValues: { hostKey: "K_A", char: "â" } },
+      ],
+      source: "user",
+    };
+    const { layout: out, warnings } = applyTouchAssignments(layout, [combined]);
+
+    expect(warnings).toHaveLength(0);
+    const key = getKey(out, "K_A")!;
+    expect(key.sk).toHaveLength(1);
+    expect(key.sk![0]!.text).toBe("á");
+    expect(key.multitap).toHaveLength(1);
+    expect(key.multitap![0]!.text).toBe("â");
+  });
+
+  it("applies mechanisms targeting two different host keys within one assignment", () => {
+    const layout = makeLayout([makeKey("K_A"), makeKey("K_B")]);
+    const combined: TouchAssignment = {
+      scope: "individual",
+      target: "x",
+      modality: "touch",
+      mechanisms: [
+        { patternId: "longpress_alternates", slotValues: { hostKey: "K_A", char: "á" } },
+        { patternId: "multitap", slotValues: { hostKey: "K_B", char: "β" } },
+      ],
+      source: "user",
+    };
+    const { layout: out, warnings } = applyTouchAssignments(layout, [combined]);
+
+    expect(warnings).toHaveLength(0);
+    expect(getKey(out, "K_A")!.sk?.[0]?.text).toBe("á");
+    expect(getKey(out, "K_B")!.multitap?.[0]?.text).toBe("β");
+  });
+
+  // prior-triage finding #2 (minor, engine test): replace + additive on the same host key.
+  // touch_key_replace rewrites the key's id/text in place; a same-host-key
+  // longpress/multitap must still land (keyIndex is built from the ORIGINAL
+  // host key id, so it is unaffected by the id rewrite). The branch must be
+  // order-commutative — same result whichever mechanism runs first.
+  it("touch_key_replace + longpress_alternates on the same host key: both apply, order-commutative (replace-then-longpress)", () => {
+    const layout = makeLayout([makeKey("K_X")]);
+    const combined: TouchAssignment = {
+      scope: "individual",
+      target: "ñ",
+      modality: "touch",
+      mechanisms: [
+        { patternId: "touch_key_replace", slotValues: { hostKey: "K_X", char: "ñ" } },
+        { patternId: "longpress_alternates", slotValues: { hostKey: "K_X", char: "ń" } },
+      ],
+      source: "user",
+    };
+    const { layout: out, warnings } = applyTouchAssignments(layout, [combined]);
+
+    expect(warnings).toHaveLength(0);
+    const phone = out.platforms.find((p) => p.id === "phone")!;
+    const def = phone.layers.find((l) => l.id === "default")!;
+    const replaced = def.rows.flatMap((r) => r.keys).find((k) => k.id === "U_00F1")!;
+    expect(replaced).toBeDefined();
+    expect(replaced.text).toBe("ñ");
+    expect(replaced.sk).toHaveLength(1);
+    expect(replaced.sk![0]!.text).toBe("ń");
+  });
+
+  it("touch_key_replace + longpress_alternates on the same host key: both apply, order-commutative (longpress-then-replace)", () => {
+    const layout = makeLayout([makeKey("K_X")]);
+    const combined: TouchAssignment = {
+      scope: "individual",
+      target: "ñ",
+      modality: "touch",
+      mechanisms: [
+        { patternId: "longpress_alternates", slotValues: { hostKey: "K_X", char: "ń" } },
+        { patternId: "touch_key_replace", slotValues: { hostKey: "K_X", char: "ñ" } },
+      ],
+      source: "user",
+    };
+    const { layout: out, warnings } = applyTouchAssignments(layout, [combined]);
+
+    expect(warnings).toHaveLength(0);
+    const phone = out.platforms.find((p) => p.id === "phone")!;
+    const def = phone.layers.find((l) => l.id === "default")!;
+    const replaced = def.rows.flatMap((r) => r.keys).find((k) => k.id === "U_00F1")!;
+    expect(replaced).toBeDefined();
+    expect(replaced.text).toBe("ñ");
+    expect(replaced.sk).toHaveLength(1);
+    expect(replaced.sk![0]!.text).toBe("ń");
+  });
+
+  // prior-triage finding #4 (suggestion, engine test): the per-mechanism unknown-patternId
+  // warning must fire once PER mechanism, not once per assignment — locks in
+  // the loop-restructure that iterates assignment.mechanisms individually.
+  it("emits one warning PER unrecognized patternId when an assignment carries two unknown mechanisms", () => {
+    const layout = makeLayout([makeKey("K_A")]);
+    const clone = deepClone(layout);
+    const bad: TouchAssignment = {
+      scope: "individual",
+      target: "x",
+      modality: "touch",
+      mechanisms: [
+        { patternId: "totally_unknown_pattern_one", slotValues: { hostKey: "K_A", char: "x" } },
+        { patternId: "totally_unknown_pattern_two", slotValues: { hostKey: "K_A", char: "x" } },
+      ],
+    };
+
+    const { layout: out, warnings } = applyTouchAssignments(layout, [bad]);
+
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toContain("unknown patternId");
+    expect(warnings[1]).toContain("unknown patternId");
+    expect(out).toEqual(clone);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 7. Emit-side round-trip for sk, flick, and multitap
 // ---------------------------------------------------------------------------
 

@@ -35,7 +35,7 @@
 // Single 300 ms debounce contract upheld — no second timer introduced.
 
 import { useState, useEffect, useMemo, useCallback, type CSSProperties } from "react";
-import type { TouchAssignment } from "@keyboard-studio/contracts";
+import type { TouchAssignment, MechanismRef } from "@keyboard-studio/contracts";
 import { createVirtualFS, toUPlusNotation, isDecomposableAccented } from "@keyboard-studio/contracts";
 import { buildTouchLayoutJson } from "../../lib/buildTouchLayoutJson.ts";
 import { resolveBaseTouchJson } from "../../lib/resolveBaseTouchJson.ts";
@@ -72,22 +72,20 @@ function dirArrow(dir: string): string {
   return dir;
 }
 
-/** Produce a human-readable label for a configured TouchAssignment chip. */
-function touchMethodLabel(a: TouchAssignment): string {
-  const m = a.mechanisms[0];
-  if (!m) return a.target;
+/** Produce a human-readable label for a single configured mechanism chip. */
+function touchMechanismLabel(target: string, m: MechanismRef): string {
   const patternId = m.patternId;
   const sv = m.slotValues ?? {};
   const hkShort = sv["hostKey"] ? hostKeyShortLabel(sv["hostKey"]) : "";
-  if (patternId === "touch_inherited") return `${a.target} · inherited`;
-  if (patternId === "longpress_alternates") return `${a.target} · long-press ${hkShort}`;
+  if (patternId === "touch_inherited") return `${target} · inherited`;
+  if (patternId === "longpress_alternates") return `${target} · long-press ${hkShort}`;
   if (patternId === "flick_gestures") {
     const dir = sv["direction"] ?? "";
-    return `${a.target} · flick ${hkShort} ${dirArrow(dir)}`.trimEnd();
+    return `${target} · flick ${hkShort} ${dirArrow(dir)}`.trimEnd();
   }
-  if (patternId === "multitap") return `${a.target} · multitap ${hkShort}`;
-  if (patternId === "touch_key_replace") return `${a.target} · replace ${hkShort}`;
-  return a.target;
+  if (patternId === "multitap") return `${target} · multitap ${hkShort}`;
+  if (patternId === "touch_key_replace") return `${target} · replace ${hkShort}`;
+  return target;
 }
 
 const selectStyle: CSSProperties = {
@@ -468,11 +466,13 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // untouched and KMW renders its own polished native default (or the keyboard's
   // shipped .keyman-touch-layout file is used verbatim).
   //
-  // "Real edit" = at least one assignment whose patternId !== "touch_inherited".
-  // This filter matches handleContinue exactly (the single source of truth).
+  // "Real edit" = an assignment with at least one mechanism whose patternId
+  // !== "touch_inherited" (an assignment may carry several mechanisms — issue
+  // 3, multiple methods per character). This filter matches handleContinue
+  // exactly (the single source of truth).
   const touchLayoutJson = useMemo(() => {
-    const appliedEdits = [...charTouch.values()].filter(
-      (a) => a.mechanisms[0]?.patternId !== "touch_inherited",
+    const appliedEdits = [...charTouch.values()].filter((a) =>
+      a.mechanisms.some((m) => m.patternId !== "touch_inherited"),
     );
     if (appliedEdits.length === 0) return null;
     if (baseIr === null) return null;
@@ -514,7 +514,14 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // Using a history stack rather than index-1 arithmetic because the per-char
   // loop uses wrap-around logic (advanceToNext can skip already-configured chars),
   // so the actual sequence visited is not simply inventory[i-1].
-  const [charHistory, setCharHistory] = useState<string[]>([]);
+  //
+  // Rehydrated from the store draft on mount (mirrors charTouch/skippedChars
+  // above) so that Back preserves its depth across an unmount/remount caused
+  // by navigating to Phase C and returning. Missing gracefully to [] when an
+  // existing draft predates this field (older sessions / persisted snapshots).
+  const [charHistory, setCharHistory] = useState<string[]>(() =>
+    touchDraft !== null ? [...(touchDraft.charHistory ?? [])] : [],
+  );
 
   // Intro splash — shown once when the author first enters the touch gallery so
   // the move from the desktop (physical) gallery to touch is explicit. The
@@ -522,15 +529,17 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // and not again on back-and-forth navigation to Phase C.
   const [showIntro, setShowIntro] = useState(() => !touchIntroSeen);
 
-  // Write charTouch + skippedChars back to the store draft whenever they change
-  // so that back-navigation (unmount) preserves in-progress work.
+  // Write charTouch + skippedChars + charHistory back to the store draft
+  // whenever they change so that back-navigation (unmount) preserves both the
+  // in-progress work AND the Back button's depth.
   useEffect(() => {
     setTouchDraft({
       charTouchEntries: [...charTouch.entries()],
       skippedChars: [...skippedChars],
+      charHistory: [...charHistory],
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [charTouch, skippedChars]);
+  }, [charTouch, skippedChars, charHistory]);
 
   // Current character index.
   const [currentChar, setCurrentChar] = useState<string | null>(null);
@@ -701,12 +710,24 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const [appliedForCurrentChar, setAppliedForCurrentChar] = useState(false);
 
   // Reset method state and suggestion dismissal when currentChar changes.
+  //
+  // P1 fix: a char revisited after it already has a real (non-inherited)
+  // mechanism must NOT re-show the suggestion card — re-accepting it would
+  // otherwise offer a no-op/duplicate action. Land straight on the chooser
+  // instead. A char with only a touch_inherited placeholder (or none) still
+  // sees the suggestion, since accepting it there is meaningful.
   useEffect(() => {
-    setSuggestionDismissed(false);
+    const existing = currentChar !== null ? charTouch.get(currentChar) : undefined;
+    const hasRealMechanism =
+      existing !== undefined && existing.mechanisms.some((m) => m.patternId !== "touch_inherited");
+    setSuggestionDismissed(hasRealMechanism);
     setMethod("longpress_alternates");
     setHostKey("");
     setFlickDirection("");
     setAppliedForCurrentChar(false);
+  // charTouch intentionally excluded — this effect should only re-run on
+  // currentChar change (a fresh read of charTouch at that moment is enough).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentChar]);
 
   // Also mark as applied if the char already has an entry in charTouch
@@ -729,45 +750,96 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   }, [currentChar, method, hostKey, flickDirection]);
 
   // ---------------------------------------------------------------------------
-  // Build assignment from current method state
+  // Build a mechanism from current method state
   // ---------------------------------------------------------------------------
 
-  function buildTouchAssignment(char: string): TouchAssignment {
+  /**
+   * Build just the `{ patternId, slotValues }` mechanism for the current
+   * method/hostKey/flickDirection state. Callers append this to a char's
+   * existing `mechanisms[]` via {@link appendMechanismToChar} (regression 3,
+   * multi-method — multiple methods per character) rather than overwriting the assignment.
+   */
+  function buildMechanismRef(char: string): MechanismRef {
     if (method === "longpress_alternates") {
-      return {
-        scope: "individual",
-        target: char,
-        modality: "touch",
-        mechanisms: [{ patternId: "longpress_alternates", slotValues: { hostKey, char } }],
-        source: "user",
-      };
+      return { patternId: "longpress_alternates", slotValues: { hostKey, char } };
     }
     if (method === "flick_gestures") {
-      return {
-        scope: "individual",
-        target: char,
-        modality: "touch",
-        mechanisms: [{ patternId: "flick_gestures", slotValues: { hostKey, direction: flickDirection, char } }],
-        source: "user",
-      };
+      return { patternId: "flick_gestures", slotValues: { hostKey, direction: flickDirection, char } };
     }
     if (method === "touch_key_replace") {
-      return {
+      return { patternId: "touch_key_replace", slotValues: { hostKey, char } };
+    }
+    // multitap
+    return { patternId: "multitap", slotValues: { hostKey, char } };
+  }
+
+  /**
+   * Structural equality for a MechanismRef: same `patternId` and the same
+   * `slotValues` (compared by key set + per-key value, order-independent).
+   * Deliberately not `JSON.stringify` — key order in `slotValues` is not
+   * semantically meaningful, and two refs built from differently-ordered
+   * object literals must still dedupe to one chip.
+   */
+  function mechanismRefEquals(a: MechanismRef, b: MechanismRef): boolean {
+    if (a.patternId !== b.patternId) return false;
+    const aSlots = a.slotValues ?? {};
+    const bSlots = b.slotValues ?? {};
+    const aKeys = Object.keys(aSlots);
+    const bKeys = Object.keys(bSlots);
+    if (aKeys.length !== bKeys.length) return false;
+    return aKeys.every((key) => aSlots[key] === bSlots[key]);
+  }
+
+  /**
+   * Append `ref` to `char`'s mechanisms[] in `prev`, returning a new Map
+   * (immutable update — regression 3, multi-method, multiple methods per character).
+   *
+   * Total invariants (hold regardless of call site — prior-QC P1 finding):
+   * - No existing entry for `char` → create a new single-mechanism assignment.
+   * - `touch_inherited` is mutually exclusive with a real configured method —
+   *   appending it when the char already has a real (non-inherited)
+   *   mechanism is a no-op.
+   * - A `ref` that deep-equals a mechanism the char already has is a no-op
+   *   (never append/duplicate an identical MechanismRef — covers re-accepting
+   *   a suggestion or re-applying the same method+hostKey via the chooser).
+   * - A real method REPLACES an existing inherited-only placeholder (`[{
+   *   patternId: "touch_inherited" }]`) rather than sitting alongside it.
+   * - Otherwise → append `ref` to the existing mechanisms[] array.
+   */
+  function appendMechanismToChar(
+    prev: Map<string, TouchAssignment>,
+    char: string,
+    ref: MechanismRef,
+  ): Map<string, TouchAssignment> {
+    const next = new Map(prev);
+    const existing = next.get(char);
+    if (existing === undefined) {
+      next.set(char, {
         scope: "individual",
         target: char,
         modality: "touch",
-        mechanisms: [{ patternId: "touch_key_replace", slotValues: { hostKey, char } }],
+        mechanisms: [ref],
         source: "user",
-      };
+      });
+      return next;
     }
-    // multitap
-    return {
-      scope: "individual",
-      target: char,
-      modality: "touch",
-      mechanisms: [{ patternId: "multitap", slotValues: { hostKey, char } }],
-      source: "user",
-    };
+    const hasRealMechanism = existing.mechanisms.some((m) => m.patternId !== "touch_inherited");
+    if (ref.patternId === "touch_inherited" && hasRealMechanism) {
+      return next;
+    }
+    if (existing.mechanisms.some((m) => mechanismRefEquals(m, ref))) {
+      return next;
+    }
+    if (
+      ref.patternId !== "touch_inherited" &&
+      existing.mechanisms.length === 1 &&
+      existing.mechanisms[0]?.patternId === "touch_inherited"
+    ) {
+      next.set(char, { ...existing, mechanisms: [ref] });
+      return next;
+    }
+    next.set(char, { ...existing, mechanisms: [...existing.mechanisms, ref] });
+    return next;
   }
 
   // ---------------------------------------------------------------------------
@@ -802,30 +874,26 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // Suggestion card handlers
   // ---------------------------------------------------------------------------
 
+  // Accept the "already in touch layout" suggestion: records a touch_inherited
+  // mechanism (or replaces an existing touch_inherited-only entry — this is a
+  // re-accept, not a second method) and STAYS on the current character (issue
+  // 4) so "Next character →" remains the sole forward affordance and the
+  // chooser (via suggestionDismissed → showChooser) is available to add a real
+  // method alongside it.
   const handleSuggestionAccept = useCallback(() => {
     if (currentChar === null) return;
-    const assignment: TouchAssignment = {
-      scope: "individual",
-      target: currentChar,
-      modality: "touch",
-      mechanisms: [{ patternId: "touch_inherited" }],
-      source: "user",
-    };
-    const next = new Map(charTouch);
-    next.set(currentChar, assignment);
-    setCharTouch(next);
+    const ref: MechanismRef = { patternId: "touch_inherited" };
+    setCharTouch((prev) => appendMechanismToChar(prev, currentChar, ref));
     setSuggestionDismissed(true);
     setAppliedForCurrentChar(true);
-    advanceToNext(currentChar, next, skippedChars);
-  // inventory is included so the handler re-captures the latest advanceToNext
-  // (which closes over inventory) if the confirmed inventory ever changes.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentChar, charTouch, skippedChars, inventory]);
+  }, [currentChar]);
 
-  // Accept the suggestion: build the suggested assignment and apply it
-  // immediately, then advance to the next character. If no host key could be
-  // derived, fall back to opening the chooser pre-filled at the suggested
-  // method so the user can pick a key.
+  // Accept the suggestion: append the suggested mechanism immediately, then
+  // STAY on the current character (regression 4, stay-on-char) instead of advancing — dismissing
+  // the suggestion flips showChooser true so the author can add another
+  // method to the same character. If no host key could be derived, fall back
+  // to opening the chooser pre-filled at the suggested method so the user can
+  // pick a key.
   const handleUseSuggestion = useCallback(() => {
     if (currentChar === null) return;
     if (suggestion.kind !== "longpress" && suggestion.kind !== "replace") {
@@ -842,23 +910,11 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       setSuggestionDismissed(true);
       return;
     }
-    const assignment: TouchAssignment = {
-      scope: "individual",
-      target: currentChar,
-      modality: "touch",
-      mechanisms: [{ patternId: nextMethod, slotValues: { hostKey: hk, char: currentChar } }],
-      source: "user",
-    };
-    const next = new Map(charTouch);
-    next.set(currentChar, assignment);
-    setCharTouch(next);
+    const ref: MechanismRef = { patternId: nextMethod, slotValues: { hostKey: hk, char: currentChar } };
+    setCharTouch((prev) => appendMechanismToChar(prev, currentChar, ref));
     setSuggestionDismissed(true);
     setAppliedForCurrentChar(true);
-    advanceToNext(currentChar, next, skippedChars);
-  // inventory is included so the handler re-captures the latest advanceToNext
-  // (which closes over inventory) if the confirmed inventory ever changes.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suggestion, currentChar, charTouch, skippedChars, inventory]);
+  }, [suggestion, currentChar]);
 
   const handleSuggestionChange = useCallback(() => {
     setSuggestionDismissed(true);
@@ -870,10 +926,8 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
   const handleApply = useCallback(() => {
     if (currentChar === null || !canApply) return;
-    const assignment = buildTouchAssignment(currentChar);
-    const next = new Map(charTouch);
-    next.set(currentChar, assignment);
-    setCharTouch(next);
+    const ref = buildMechanismRef(currentChar);
+    setCharTouch((prev) => appendMechanismToChar(prev, currentChar, ref));
     setAppliedForCurrentChar(true);
     // spec-014 FR-014/R4: a manual edit to the host touch key PROMOTES it to
     // `hand-set` in the working IR so subsequent re-propagation never clobbers
@@ -892,7 +946,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     setHostKey("");
     setFlickDirection("");
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentChar, canApply, method, hostKey, flickDirection, charTouch]);
+  }, [currentChar, canApply, method, hostKey, flickDirection]);
 
   const handleNext = useCallback(() => {
     if (currentChar === null) return;
@@ -939,10 +993,23 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     setCurrentChar(prev);
   }, [charHistory, onBack]);
 
-  const handleRemoveConfigured = useCallback((char: string) => {
+  // Remove a single mechanism (by index within that char's mechanisms[]) from
+  // the configured chip row (regression 3, multi-method — multiple methods per character). If the
+  // removed mechanism was the char's only one, the whole char entry is deleted
+  // from the map — folding what was previously a separate
+  // "remove the whole configured character" handler into this one, since a
+  // char with exactly one mechanism behaves identically either way.
+  const handleRemoveMechanism = useCallback((char: string, idx: number) => {
     setCharTouch((prev) => {
+      const existing = prev.get(char);
+      if (existing === undefined) return prev;
+      const nextMechanisms = existing.mechanisms.filter((_, i) => i !== idx);
       const next = new Map(prev);
-      next.delete(char);
+      if (nextMechanisms.length === 0) {
+        next.delete(char);
+      } else {
+        next.set(char, { ...existing, mechanisms: nextMechanisms });
+      }
       return next;
     });
   }, []);
@@ -972,8 +1039,8 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const handleContinue = useCallback(() => {
     // Emit only chars where a real (non-inherited) or inherited assignment was
     // explicitly accepted — everything in charTouch was put there by the user.
-    const assignments: TouchAssignment[] = [...charTouch.values()].filter(
-      (a) => a.mechanisms[0]?.patternId !== "touch_inherited",
+    const assignments: TouchAssignment[] = [...charTouch.values()].filter((a) =>
+      a.mechanisms.some((m) => m.patternId !== "touch_inherited"),
     );
     onComplete(assignments);
   }, [charTouch, onComplete]);
@@ -1492,38 +1559,40 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             aria-label="Configured characters — click to remove"
             style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
           >
-            {[...charTouch.entries()].map(([c, assignment]) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => handleRemoveConfigured(c)}
-                aria-label={`Remove ${toUPlusNotation(c)} ${c}`}
-                title={`${toUPlusNotation(c)} — click to remove`}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 4,
-                  padding: "4px 10px",
-                  background: "#0d2218",
-                  border: "1px solid #238636",
-                  borderRadius: 16,
-                  color: "#56d364",
-                  fontSize: 12,
-                  fontFamily: "monospace",
-                  cursor: "pointer",
-                  lineHeight: 1.3,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {touchMethodLabel(assignment)}
-                <span
-                  aria-hidden="true"
-                  style={{ fontSize: 11, color: "#56d364", opacity: 0.7 }}
+            {[...charTouch.entries()].flatMap(([c, assignment]) =>
+              assignment.mechanisms.map((m, i) => (
+                <button
+                  key={`${c}-${i}`}
+                  type="button"
+                  onClick={() => handleRemoveMechanism(c, i)}
+                  aria-label={`Remove ${toUPlusNotation(c)} ${touchMechanismLabel(c, m)}`}
+                  title={`${toUPlusNotation(c)} — click to remove`}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    padding: "4px 10px",
+                    background: "#0d2218",
+                    border: "1px solid #238636",
+                    borderRadius: 16,
+                    color: "#56d364",
+                    fontSize: 12,
+                    fontFamily: "monospace",
+                    cursor: "pointer",
+                    lineHeight: 1.3,
+                    whiteSpace: "nowrap",
+                  }}
                 >
-                  &times;
-                </span>
-              </button>
-            ))}
+                  {touchMechanismLabel(c, m)}
+                  <span
+                    aria-hidden="true"
+                    style={{ fontSize: 11, color: "#56d364", opacity: 0.7 }}
+                  >
+                    &times;
+                  </span>
+                </button>
+              )),
+            )}
           </div>
         </div>
       )}
