@@ -56,7 +56,15 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { TOUCH_STEP_ID } from "../../steps/reducer.ts";
 import { getPatternLibraryService } from "../../lib/services.ts";
 import type { AxisFill, DiscoveryAxisVector } from "@keyboard-studio/contracts";
-import { defaultFillAxes } from "@keyboard-studio/engine";
+import {
+  defaultFillAxes,
+  caseCounterpart,
+  isMnemonicLayout,
+  planShiftAssignment,
+  buildShiftRuleLines,
+  buildBaseRuleLines,
+  buildCasePairRuleLines,
+} from "@keyboard-studio/engine";
 import { useKeyboardArtifact, type ScaffoldSpec, type Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
 import { useInventoryDiff } from "../../hooks/useInventoryDiff.ts";
@@ -65,6 +73,7 @@ import { getSuggestionForChar } from "../../survey/placementSeeds.ts";
 import { KEY_OPTIONS, ALL_PICKABLE_KEYS } from "../../lib/keyOptions.ts";
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
+import { RadioGroup } from "../../ui/RadioGroup.tsx";
 import {
   BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
 } from "../../lib/galleryTheme.ts";
@@ -89,10 +98,18 @@ function methodLabel(ref: { patternId: string; slotValues?: Record<string, strin
       return `Sequence: ${sv["firstLetterOut"] ?? "?"}+${sv["secondLetter"] ?? "?"}`;
     case "deadkey_single_tap":
       return `Deadkey: ${sv["triggerKey"] ?? "?"} + ${sv["baseLetters"] ?? "?"}`;
-    case "simple_swap":
-      return `Key: ${(sv["kmnRules"] ?? "").replace(/^\+ \[/, "").replace(/\].*/, "")}`;
-    case "modifier_as_layer_switch":
-      return `RAlt: ${(sv["altgrKeyList"] ?? "").split(" ").pop()?.replace(/^\[/, "").replace(/\]$/, "") ?? "?"}`;
+    case "simple_swap": {
+      // kmnRules may be multiple lines (e.g. shift-layer CAPS/NCAPS pair) —
+      // the badge only needs the bracketed vkey expression from the first line.
+      const firstLine = (sv["kmnRules"] ?? "").split("\n")[0] ?? "";
+      return `Key: ${firstLine.replace(/^\+ \[/, "").replace(/\].*/, "")}`;
+    }
+    case "modifier_as_layer_switch": {
+      const altgrKeyList = sv["altgrKeyList"] ?? "";
+      const key = altgrKeyList.split(" ").pop()?.replace(/^\[/, "").replace(/\]$/, "") ?? "?";
+      const prefix = altgrKeyList.includes("SHIFT") ? "Shift+RAlt" : "RAlt";
+      return `${prefix}: ${key}`;
+    }
     default:
       return ref.patternId;
   }
@@ -167,6 +184,28 @@ function GalleryPreviewWithPatterns({
 
 type Method = "sequence" | "deadkey" | "swap" | "ralt";
 
+// S-01 "assign to a key" target layer. 'base' is the long-standing default
+// (`+ [K_X] > ...`); 'shift' targets the shift layer of the same physical key
+// (`+ [SHIFT K_X] > ...`, or the NCAPS/CAPS pair when the key already has
+// explicit CAPS handling — see buildShiftRuleLines in @keyboard-studio/engine).
+// Labels follow the same 'Base'/'Shift' vocabulary as MOD_GROUP_DEFS
+// (packages/studio/src/lib/irToCarveNodes.ts) so the terminology matches the
+// carve gallery's Inspector/Rail.
+type SwapLayer = "base" | "shift";
+
+// S-08 "RAlt + key" target plane. 'ralt' is the long-standing default
+// (`[RALT K_X]`); 'shift-ralt' targets the SHIFTED RAlt plane on the same
+// base key (`[SHIFT RALT K_X]`) — e.g. a capital letter reached via
+// Shift+RAlt+key. Unlike the S-01 Shift toggle, this is NOT gated on
+// mnemonic layouts: `store(&mnemoniclayout)` changes only how the base
+// character of a key spec is resolved (base-layout character vs physical
+// position); the SHIFT flag in a `[SHIFT RALT ...]` combo selects the
+// shifted RAlt plane and does not re-apply the base layout's own shift
+// semantics, so the plane combo is legitimate either way. Real mnemonic
+// keyboards ship such rules: sil_euro_latin declares
+// `store(&mnemoniclayout) '1'` and maps e.g. `[RALT SHIFT '<'] > U+00AB`.
+type RaltLayer = "ralt" | "shift-ralt";
+
 interface MethodChooserProps {
   currentChar: string;
   method: Method;
@@ -183,6 +222,18 @@ interface MethodChooserProps {
   onSwapKeyChange: (v: string) => void;
   selectedRaltKey: string;
   onRaltKeyChange: (v: string) => void;
+  /** S-01 target layer — 'base' (default) or 'shift' (shift+key). */
+  swapLayer: SwapLayer;
+  onSwapLayerChange: (v: SwapLayer) => void;
+  /** S-08 target plane — 'ralt' (default) or 'shift-ralt' (shift+RAlt+key). */
+  raltLayer: RaltLayer;
+  onRaltLayerChange: (v: RaltLayer) => void;
+  /**
+   * True when the working keyboard is mnemonic — shift behaviour comes from
+   * the base layout, so the Shift toggle must be disabled (planShiftAssignment
+   * from @keyboard-studio/engine returns allowed:false, reason:"mnemonic").
+   */
+  shiftLayerDisabled: boolean;
 }
 
 const DEADKEY_OPTIONS = [
@@ -224,6 +275,11 @@ function MethodChooser({
   onSwapKeyChange,
   selectedRaltKey,
   onRaltKeyChange,
+  swapLayer,
+  onSwapLayerChange,
+  raltLayer,
+  onRaltLayerChange,
+  shiftLayerDisabled,
 }: MethodChooserProps) {
 
   // Each method is one card: transparent header button + inline config when selected.
@@ -440,6 +496,34 @@ function MethodChooser({
                 ))}
               </select>
             </label>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span id="swap-layer-label" style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
+                Layer:
+              </span>
+              <RadioGroup
+                name="swap-layer"
+                value={swapLayer}
+                onChange={(v) => onSwapLayerChange(v as SwapLayer)}
+                ariaLabelledby="swap-layer-label"
+                options={[
+                  { value: "base", label: "Base" },
+                  {
+                    value: "shift",
+                    label: "Shift",
+                    disabled: shiftLayerDisabled,
+                    ...(shiftLayerDisabled
+                      ? { title: "Mnemonic keyboard: shift behaviour comes from the base layout" }
+                      : {}),
+                  },
+                ]}
+              />
+            </div>
+            {swapLayer === "shift" && selectedSwapKey !== "" && (
+              <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
+                Shift + {selectedSwapKey.replace(/^K_/, "")} &rarr;{" "}
+                <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentChar}</span>
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -485,6 +569,27 @@ function MethodChooser({
                 ))}
               </select>
             </label>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span id="ralt-layer-label" style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
+                Layer:
+              </span>
+              <RadioGroup
+                name="ralt-layer"
+                value={raltLayer}
+                onChange={(v) => onRaltLayerChange(v as RaltLayer)}
+                ariaLabelledby="ralt-layer-label"
+                options={[
+                  { value: "ralt", label: "RAlt" },
+                  { value: "shift-ralt", label: "Shift+RAlt" },
+                ]}
+              />
+            </div>
+            {raltLayer === "shift-ralt" && selectedRaltKey !== "" && (
+              <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
+                Shift + RAlt + {selectedRaltKey.replace(/^K_/, "")} &rarr;{" "}
+                <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentChar}</span>
+              </p>
+            )}
             <p style={{ margin: 0, fontSize: 11, color: "#d29922", fontFamily: FONT }}>
               Note: RAlt may conflict with system shortcuts on macOS.
             </p>
@@ -723,6 +828,45 @@ export function MechanismGallery({
   const [deadkeyBaseLetter, setDeadkeyBaseLetter] = useState("");
   const [selectedSwapKey, setSelectedSwapKey] = useState("");
   const [selectedRaltKey, setSelectedRaltKey] = useState("");
+  const [swapLayer, setSwapLayer] = useState<SwapLayer>("base");
+  const [raltLayer, setRaltLayer] = useState<RaltLayer>("ralt");
+
+  // Propose-then-confirm case-pair companion (spec v1.3.1 §3c — never apply
+  // silently). Set right after a base-layer S-01 apply when the applied
+  // character has a known case counterpart; cleared on confirm/decline or
+  // when currentChar changes.
+  // `baseAssignment` captures the identity (object reference) of the
+  // assignment created at apply time, NOT its target/index — the gallery
+  // allows multiple mechanisms per character, and a subsequent apply for the
+  // same character appends a new, unrelated assignment. Confirming the
+  // companion must locate and replace exactly the assignment this proposal
+  // was raised for; a target/index scan would silently grab whichever
+  // assignment for that char happens to match, which is the P1 defect this
+  // guards against.
+  const [pendingCompanion, setPendingCompanion] = useState<{
+    originalChar: string;
+    counterpart: string;
+    vkey: string;
+    capsHandling: boolean;
+    baseAssignment: MechanismAssignment;
+  } | null>(null);
+
+  // Working IR used to plan shift-layer assignments — prefer the carve
+  // working IR (ir), falling back to baseIr before the carve step has run.
+  // Null when the working copy has not been instantiated yet (e.g. a bare
+  // inventory-only render in tests); shift targeting is disabled in that case
+  // since planShiftAssignment has nothing to evaluate against.
+  const workingIr = useWorkingCopyStore((s) => s.ir ?? s.baseIr);
+  const identityBcp47 = useWorkingCopyStore((s) => s.identity?.bcp47);
+
+  // Shift-layer targeting is disallowed for mnemonic keyboards (planShiftAssignment /
+  // isMnemonicLayout in @keyboard-studio/engine) — in mnemonic mode K_X already
+  // resolves to the base-layout character, so a SHIFT-flagged rule would
+  // double-apply shift. Also suppresses the case-pair companion prompt.
+  const shiftLayerAllowed = useMemo(
+    () => workingIr !== null && !isMnemonicLayout(workingIr),
+    [workingIr],
+  );
 
   // kbgen placement suggestion for the current character (null when no map or
   // no qualifying candidate). Memoized against currentChar + placementMap so it
@@ -775,11 +919,14 @@ export function MechanismGallery({
     setDeadkeyBaseLetter("");
     setSelectedSwapKey("");
     setSelectedRaltKey("");
+    setSwapLayer("base");
+    setRaltLayer("ralt");
   }, []);
 
   // Reset method inputs (not suggestionResolved — that persists per char)
   // whenever currentChar changes.
   useEffect(() => {
+    setPendingCompanion(null);
     resetMethodState();
     if (currentChar !== null && isDecomposableAccented(currentChar)) {
       // §3c defaults-first: for a decomposable accented letter the natural method
@@ -903,9 +1050,34 @@ export function MechanismGallery({
       };
     } else if (method === "swap") {
       // S-01: simple_swap — kmnFragment uses {{kmnRules}}.
-      // Build the single KMN rule for this character: `+ [K_X] > U+XXXX`.
-      const cp = currentChar.codePointAt(0)?.toString(16).toUpperCase().padStart(4, "0") ?? "0000";
-      const kmnRules = `+ [${selectedSwapKey}] > U+${cp}`;
+      // Guard against a stale "shift" selection surviving a mid-flow mnemonic
+      // transition (e.g. base keyboard swap) — never emit a SHIFT-flagged rule
+      // when shift targeting isn't allowed.
+      const effectiveLayer: SwapLayer =
+        swapLayer === "shift" && shiftLayerAllowed ? "shift" : "base";
+      // capsHandling is a property of the KEY, not of which layer the author
+      // is targeting — a key that already carries explicit CAPS/NCAPS rules
+      // needs a CAPS-aware pair on EITHER layer (Layer-A Check #10), so
+      // compute it once and reuse for both the base and shift branches below.
+      const capsHandling =
+        workingIr !== null
+          ? planShiftAssignment(workingIr, "main", selectedSwapKey).capsHandling
+          : false;
+      let kmnRules: string;
+      if (effectiveLayer === "shift") {
+        kmnRules = buildShiftRuleLines(selectedSwapKey, currentChar, {
+          capsHandling,
+        }).join("\n");
+      } else {
+        // Base layer: bare `+ [K_X] > U+XXXX` when the key has no CAPS
+        // handling; the CAPS-aware NCAPS+CAPS pair otherwise — a bare rule on
+        // a CAPS-handling key would shadow that key's pre-existing CAPS/NCAPS
+        // pair, since applyAssignments splices new lines before existing
+        // ones (first-match-wins).
+        kmnRules = buildBaseRuleLines(selectedSwapKey, currentChar, {
+          capsHandling,
+        }).join("\n");
+      }
       assignment = {
         scope: "individual",
         target: currentChar,
@@ -921,6 +1093,29 @@ export function MechanismGallery({
         ],
         source: "user",
       };
+
+      // Case-pair companion proposal (spec v1.3.1 §3c — propose-then-confirm,
+      // never apply silently). Only for a BASE-layer apply: the user chose
+      // base for currentChar, so the counterpart's natural home is the shift
+      // layer of the SAME key. Suppressed for mnemonic keyboards (shift
+      // targeting is unavailable) and for the toLower direction — assigning
+      // an uppercase char to base proposes nothing; only the base->uppercase
+      // (toUpper) direction is offered a companion. Scope cut, not a defect:
+      // the reverse direction is left for a future pass.
+      if (effectiveLayer === "base" && shiftLayerAllowed) {
+        const bcp47 =
+          identityBcp47 !== undefined && identityBcp47 !== "" ? identityBcp47 : undefined;
+        const counterpart = caseCounterpart(currentChar, bcp47);
+        if (counterpart !== null && counterpart.direction === "toUpper" && workingIr !== null) {
+          setPendingCompanion({
+            originalChar: currentChar,
+            counterpart: counterpart.counterpart,
+            vkey: selectedSwapKey,
+            capsHandling,
+            baseAssignment: assignment,
+          });
+        }
+      }
     } else {
       // method === "ralt"
       // S-08: modifier_as_layer_switch — kmnFragment uses {{altgrKeyList}} and {{altgrOutputList}}.
@@ -934,7 +1129,10 @@ export function MechanismGallery({
             patternId: PATTERN_RALT,
             strategyId: "S-08",
             slotValues: {
-              altgrKeyList: `[RALT ${selectedRaltKey}]`,
+              altgrKeyList:
+                raltLayer === "shift-ralt"
+                  ? `[SHIFT RALT ${selectedRaltKey}]`
+                  : `[RALT ${selectedRaltKey}]`,
               altgrOutputList: currentChar,
             },
           },
@@ -955,10 +1153,96 @@ export function MechanismGallery({
     deadkeyBaseLetter,
     selectedSwapKey,
     selectedRaltKey,
+    swapLayer,
+    raltLayer,
+    shiftLayerAllowed,
+    workingIr,
+    identityBcp47,
     recordAssignments,
     sessionAssignments,
     resetMethodState,
   ]);
+
+  // ---------------------------------------------------------------------------
+  // Case-pair companion — confirm/decline handlers
+  // ---------------------------------------------------------------------------
+
+  const handleCompanionConfirm = useCallback(() => {
+    if (pendingCompanion === null) return;
+
+    // Stale-proposal guard: locate the exact assignment object this proposal
+    // was raised for, by reference — not by re-matching target/scope, which
+    // would happily grab a different, unrelated assignment for the same
+    // character (P1: multiple mechanisms per character). If it is no longer
+    // present in sessionAssignments (removed, or somehow replaced by another
+    // path), the proposal is stale: dismiss the banner and record nothing.
+    const baseAssignmentIdx = sessionAssignments.indexOf(pendingCompanion.baseAssignment);
+    if (baseAssignmentIdx === -1) {
+      setPendingCompanion(null);
+      return;
+    }
+
+    if (pendingCompanion.capsHandling) {
+      // CAPS-handling key: the base assignment just recorded (for
+      // originalChar) already carries an explicit NCAPS/CAPS pair
+      // (buildBaseRuleLines). Appending a SEPARATE companion assignment with
+      // its own [CAPS K_X] line would conflict with that pair's [CAPS K_X]
+      // line — two rules targeting the identical context, first-inserted
+      // silently wins (Layer-A Check #10). Instead, REPLACE the base
+      // assignment with a single combined assignment carrying the full
+      // CAPS-as-case-inverter quad (buildCasePairRuleLines).
+      const kmnRules = buildCasePairRuleLines(
+        pendingCompanion.vkey,
+        pendingCompanion.originalChar,
+        pendingCompanion.counterpart,
+        { capsHandling: true },
+      ).join("\n");
+      const combinedAssignment: MechanismAssignment = {
+        scope: "individual",
+        target: pendingCompanion.originalChar,
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_SWAP,
+            strategyId: "S-01",
+            slotValues: { kmnRules },
+          },
+        ],
+        source: "user",
+      };
+      const next = sessionAssignments.map((a, i) =>
+        i === baseAssignmentIdx ? combinedAssignment : a,
+      );
+      recordAssignments(next);
+    } else {
+      // No CAPS handling on the key: base (`[K_X]`) and shift (`[SHIFT K_X]`)
+      // target disjoint contexts — appending a separate companion assignment
+      // cannot conflict with the base assignment.
+      const kmnRules = buildShiftRuleLines(pendingCompanion.vkey, pendingCompanion.counterpart, {
+        capsHandling: false,
+      }).join("\n");
+      const companionAssignment: MechanismAssignment = {
+        scope: "individual",
+        target: pendingCompanion.counterpart,
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_SWAP,
+            strategyId: "S-01",
+            slotValues: { kmnRules },
+          },
+        ],
+        source: "user",
+      };
+      recordAssignments([...sessionAssignments, companionAssignment]);
+    }
+
+    setPendingCompanion(null);
+  }, [pendingCompanion, sessionAssignments, recordAssignments]);
+
+  const handleCompanionDecline = useCallback(() => {
+    setPendingCompanion(null);
+  }, []);
 
   // How many methods have already been applied to the current character.
   const appliedForCurrentChar = useMemo(
@@ -1039,15 +1323,29 @@ export function MechanismGallery({
         (a) => !(a.scope === "individual" && a.target === char),
       );
       recordAssignments(next);
+      // Finding 2 (P2): a pending case-pair companion refers to a specific
+      // base assignment by identity. If that assignment no longer survives
+      // the removal, the proposal is dead — dismiss it proactively rather
+      // than leaving a stale-but-visible banner (propose-then-confirm,
+      // spec v1.3.1 §3c). The staleness re-check in handleCompanionConfirm
+      // is a backstop for paths this dismissal doesn't cover.
+      if (pendingCompanion !== null && !next.includes(pendingCompanion.baseAssignment)) {
+        setPendingCompanion(null);
+      }
     },
-    [sessionAssignments, recordAssignments],
+    [sessionAssignments, recordAssignments, pendingCompanion],
   );
 
   const handleRemoveMechanism = useCallback(
     (assignment: MechanismAssignment) => {
-      recordAssignments(sessionAssignments.filter((a) => a !== assignment));
+      const next = sessionAssignments.filter((a) => a !== assignment);
+      recordAssignments(next);
+      // See handleRemoveCovered above — same proactive-dismissal rationale.
+      if (pendingCompanion !== null && !next.includes(pendingCompanion.baseAssignment)) {
+        setPendingCompanion(null);
+      }
     },
-    [sessionAssignments, recordAssignments],
+    [sessionAssignments, recordAssignments, pendingCompanion],
   );
 
   // Edit-after-Done: unlocks the desktop layout so a completed Mechanism
@@ -1604,7 +1902,75 @@ export function MechanismGallery({
                 onSwapKeyChange={setSelectedSwapKey}
                 selectedRaltKey={selectedRaltKey}
                 onRaltKeyChange={setSelectedRaltKey}
+                swapLayer={swapLayer}
+                onSwapLayerChange={setSwapLayer}
+                raltLayer={raltLayer}
+                onRaltLayerChange={setRaltLayer}
+                shiftLayerDisabled={!shiftLayerAllowed}
               />
+
+              {/* Case-pair companion proposal — propose-then-confirm, never
+                  apply silently (spec v1.3.1 §3c). Shown after a base-layer
+                  S-01 apply when the applied character has a known
+                  uppercase counterpart. */}
+              {pendingCompanion !== null && (
+                <div
+                  role="note"
+                  aria-label="Case-pair companion proposal"
+                  style={{
+                    background: "#0d2218",
+                    border: "1px solid #238636",
+                    borderRadius: 8,
+                    padding: "10px 14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
+                  <p style={{ margin: 0, fontSize: 12, color: "#56d364", fontFamily: FONT }}>
+                    {pendingCompanion.originalChar} has an uppercase form,{" "}
+                    {pendingCompanion.counterpart}. Map {pendingCompanion.counterpart} to the
+                    shift layer of the same key as well?
+                  </p>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={handleCompanionConfirm}
+                      aria-label={`Map ${pendingCompanion.counterpart} to the shift layer of ${pendingCompanion.vkey}`}
+                      style={{
+                        padding: "5px 14px",
+                        background: "#238636",
+                        border: "none",
+                        borderRadius: 5,
+                        color: "#e6edf3",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        fontFamily: FONT,
+                      }}
+                    >
+                      Map it
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCompanionDecline}
+                      aria-label={`Do not map ${pendingCompanion.counterpart} to the shift layer`}
+                      style={{
+                        padding: "5px 14px",
+                        background: "transparent",
+                        border: `1px solid ${BORDER}`,
+                        borderRadius: 5,
+                        color: TEXT_DIM,
+                        fontSize: 12,
+                        cursor: "pointer",
+                        fontFamily: FONT,
+                      }}
+                    >
+                      No thanks
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Apply + Next + Skip actions */}
               {appliedForCurrentChar > 0 && (

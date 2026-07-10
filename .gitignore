@@ -71,3 +71,11 @@ packages/studio/playwright-report/
 # repo-map artifact (utilities/hermes/build-repo-map.mjs; written to repo root)
 repo-map.json
 repo-map*.json
+
+# hermes report artifacts (hermes-run.mjs + vet.mjs both write under utilities/hermes/reports/)
+utilities/hermes/reports/
+
+utilities/hermes/repo-map*.json
+
+# Local secrets for the Hermes harness (Context7 etc.) - never commit
+utilities/hermes/.env
