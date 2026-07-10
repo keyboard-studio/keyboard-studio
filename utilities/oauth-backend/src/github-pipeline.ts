@@ -206,7 +206,7 @@ export async function submitManagedPR(
     fetchFn(url, {
       method,
       headers: buildHeaders(installationToken),
-      ...(payload !== undefined ? { body: JSON.stringify(payload) } : {}),
+      body: payload !== undefined ? JSON.stringify(payload) : undefined,
     });
 
   // Map a GitHub non-ok response to a safe handler error. 401/403 mean the

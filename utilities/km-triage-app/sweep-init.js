@@ -57,21 +57,26 @@ function sweepInit(opts = {}) {
   const createLabels = opts.createLabels !== false;
   const ghRunner = opts.ghRunner || defaultGhRunner;
 
-  for (const d of SUBDIRS) fs.mkdirSync(path.join(root, d), { recursive: true });
+  for (const d of SUBDIRS) {
+    fs.mkdirSync(path.join(root, d), { recursive: true });
+  }
 
   const auditLog = path.join(root, 'audit-log.jsonl');
-  if (!fs.existsSync(auditLog)) fs.writeFileSync(auditLog, '');
+  if (!fs.existsSync(auditLog)) {
+    fs.writeFileSync(auditLog, '');
+  }
 
   const sentinel = path.join(root, SENTINEL);
-  let labelsCreated = false;
-  if (!fs.existsSync(sentinel)) {
+  const labelsCreated = !fs.existsSync(sentinel);
+  if (labelsCreated) {
     if (createLabels) {
       for (const label of LABELS) {
-        try { ghRunner(label); } catch (_) { /* best effort — mirrors `|| true` */ }
+        try {
+          ghRunner(label);
+        } catch (_) { /* best effort */ }
       }
     }
     fs.writeFileSync(sentinel, '');
-    labelsCreated = true;
   }
 
   return { root, auditLog, sentinel, labelsCreated, labels: LABELS.map((l) => l.name) };
@@ -96,7 +101,12 @@ function main() {
     if (!a.startsWith('--')) continue;
     const key = a.slice(2);
     const next = argv[i + 1];
-    if (next && !next.startsWith('--')) { args[key] = next; i++; } else { args[key] = true; }
+    if (next && !next.startsWith('--')) {
+      args[key] = next;
+      i++;
+    } else {
+      args[key] = true;
+    }
   }
 
   const info = sweepInit({
@@ -108,8 +118,7 @@ function main() {
   process.stdout.write(JSON.stringify({
     root: info.root,
     labelsCreated: info.labelsCreated,
-    head: baseline.head,
-    porcelain: baseline.porcelain,
+    ...baseline,
   }) + '\n');
 }
 

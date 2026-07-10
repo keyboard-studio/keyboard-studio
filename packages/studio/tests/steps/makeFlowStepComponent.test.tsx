@@ -194,7 +194,7 @@ describe("makeFlowStepComponent", () => {
         render(<TrackComponent onComplete={onComplete} onBack={onBack} />);
       });
 
-      expect(screen.getByTestId("flow-step-host")).toBeDefined();
+      screen.getByTestId("flow-step-host");
       expect(screen.getByTestId("flow-step-title").textContent).toBe("Authoring Track");
     });
 

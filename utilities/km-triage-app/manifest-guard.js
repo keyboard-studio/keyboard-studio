@@ -42,9 +42,7 @@ const MANIFEST_BASENAMES = new Set([
  * @returns {boolean}
  */
 function isManifestPath(filePath) {
-  if (typeof filePath !== 'string' || filePath === '') return false;
-  // Normalise backslashes, then take the POSIX basename so the result is the
-  // same regardless of which OS the triage host runs on.
+  if (typeof filePath !== 'string' || !filePath) return false;
   const basename = path.posix.basename(filePath.replace(/\\/g, '/'));
   return MANIFEST_BASENAMES.has(basename);
 }

@@ -138,6 +138,37 @@ function resolveCredentials(
 }
 
 // ---------------------------------------------------------------------------
+// Private helper: safe fetch with error mapping
+// ---------------------------------------------------------------------------
+
+/**
+ * Wrap a fetch call with consistent error mapping. Consolidates the
+ * network/parse/non-ok response handling that is identical across all
+ * OAuth endpoints.
+ */
+async function safeFetch(
+  fetchFn: OAuthFetchFn,
+  url: string,
+  init: { method: string; headers: Record<string, string>; body?: string }
+): Promise<{ response: OAuthFetchResponse; data: unknown } | HandlerError> {
+  let response: OAuthFetchResponse;
+  try {
+    response = await fetchFn(url, init);
+  } catch {
+    return { ok: false, status: 502, error: "upstream_unavailable" };
+  }
+
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    return { ok: false, status: 502, error: "upstream_invalid_response" };
+  }
+
+  return { response, data };
+}
+
+// ---------------------------------------------------------------------------
 // Private helper: call the GitHub token endpoint
 // ---------------------------------------------------------------------------
 
@@ -158,55 +189,44 @@ async function callGitHubTokenEndpoint(
   payload: Record<string, string>,
   config: HandlerConfig
 ): Promise<HandlerResult> {
-  let ghResponse: OAuthFetchResponse;
-  try {
-    ghResponse = await config.fetch(
-      "https://github.com/login/oauth/access_token",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(payload),
-      }
-    );
-  } catch {
-    // Network-level error — do not propagate internal details
-    return { ok: false, status: 502, error: "upstream_unavailable" };
-  }
+  const result = await safeFetch(config.fetch, "https://github.com/login/oauth/access_token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
 
-  let data: GitHubTokenResponseShape;
-  try {
-    data = (await ghResponse.json()) as GitHubTokenResponseShape;
-  } catch {
-    return { ok: false, status: 502, error: "upstream_invalid_response" };
-  }
+  if ("error" in result) return result;
+
+  const { response, data } = result;
+  const ghData = data as GitHubTokenResponseShape;
 
   // Upstream 4xx/5xx with no error field in the body → gateway error, not a
   // client error.  GitHub 429 (rate-limit) and 5xx (server error) fall here.
-  if (!ghResponse.ok && data.error === undefined) {
+  if (!response.ok && ghData.error === undefined) {
     return { ok: false, status: 502, error: "upstream_error" };
   }
 
-  if (data.error !== undefined || data.access_token === undefined) {
+  if (ghData.error !== undefined || ghData.access_token === undefined) {
     return {
       ok: false,
       status: 400,
-      error: safeErrorCode(data.error),
+      error: safeErrorCode(ghData.error),
     };
   }
 
   const tokenResponse: TokenResponse = {
-    access_token: data.access_token,
-    token_type: data.token_type ?? "bearer",
-    scope: data.scope ?? "",
+    access_token: ghData.access_token,
+    token_type: ghData.token_type ?? "bearer",
+    scope: ghData.scope ?? "",
   };
   // Forward a rotated refresh token when GitHub issues one (GitHub Apps with
   // token expiration enabled).  A refresh token is not the client secret —
   // the client secret is never present in any response.
-  if (data.refresh_token !== undefined) {
-    tokenResponse.refresh_token = data.refresh_token;
+  if (ghData.refresh_token !== undefined) {
+    tokenResponse.refresh_token = ghData.refresh_token;
   }
 
   return { ok: true, data: tokenResponse };

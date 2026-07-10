@@ -168,17 +168,14 @@ function loadConfig(): {
  */
 function staticZodDetail(issue: ZodIssue): string {
   const field = issue.path.join(".") || "(root)";
-  switch (issue.code) {
-    case "too_small":
-      return `${field}: must not be empty`;
-    case "invalid_format":
-      if (issue.format === "url") return `${field}: must be a valid URL`;
-      return `${field}: invalid string format`;
-    case "invalid_type":
-      return `${field}: expected ${issue.expected}`;
-    default:
-      return `${field}: invalid value`;
+  if (issue.code === "too_small") return `${field}: must not be empty`;
+  if (issue.code === "invalid_format") {
+    return issue.format === "url"
+      ? `${field}: must be a valid URL`
+      : `${field}: invalid string format`;
   }
+  if (issue.code === "invalid_type") return `${field}: expected ${issue.expected}`;
+  return `${field}: invalid value`;
 }
 
 // ---------------------------------------------------------------------------
@@ -263,16 +260,11 @@ export async function buildServer(opts: {
   const pipelineFetch: GitHubPipelineFetchFn =
     opts.fetchFn ??
     (async (url, init) => {
-      const res = await (globalThis as unknown as { fetch: typeof fetch }).fetch(
-        url,
-        // Build the init object only with defined fields to satisfy
-        // exactOptionalPropertyTypes — spread undefined keys are omitted.
-        {
-          ...(init?.method !== undefined ? { method: init.method } : {}),
-          ...(init?.headers !== undefined ? { headers: init.headers as Record<string, string> } : {}),
-          ...(init?.body !== undefined ? { body: init.body } : {}),
-        }
-      );
+      const res = await (globalThis as unknown as { fetch: typeof fetch }).fetch(url, {
+        method: init.method,
+        headers: init.headers,
+        body: init.body,
+      });
       return {
         ok: res.ok,
         status: res.status,
@@ -290,14 +282,14 @@ export async function buildServer(opts: {
     pipelineFetch(url, {
       method: init?.method ?? "GET",
       headers: init?.headers ?? {},
-      ...(init?.body !== undefined ? { body: init.body } : {}),
+      body: init?.body,
     });
 
   const handlerConfig: HandlerConfig = {
     clientId: opts.clientId,
     clientSecret: opts.clientSecret,
-    ...(opts.oauthClientId !== undefined ? { oauthClientId: opts.oauthClientId } : {}),
-    ...(opts.oauthClientSecret !== undefined ? { oauthClientSecret: opts.oauthClientSecret } : {}),
+    oauthClientId: opts.oauthClientId,
+    oauthClientSecret: opts.oauthClientSecret,
     fetch: nodeFetch,
   };
 
@@ -451,13 +443,13 @@ if (isMain) {
   const app = await buildServer({
     clientId: config.clientId,
     clientSecret: config.clientSecret,
-    ...(config.oauthClientId !== undefined ? { oauthClientId: config.oauthClientId } : {}),
-    ...(config.oauthClientSecret !== undefined ? { oauthClientSecret: config.oauthClientSecret } : {}),
+    oauthClientId: config.oauthClientId,
+    oauthClientSecret: config.oauthClientSecret,
     googleOAuthEnabled: config.googleOAuthEnabled,
     googleClientId: config.googleClientId,
     googleClientSecret: config.googleClientSecret,
-    ...(tokenProvider !== undefined ? { getInstallationToken: tokenProvider } : {}),
-    ...(config.orgLogin ? { orgLogin: config.orgLogin } : {}),
+    getInstallationToken: tokenProvider,
+    orgLogin: config.orgLogin || undefined,
     allowedOrigins: config.allowedOrigins,
   });
   const address = await app.listen({ port: config.port, host: "0.0.0.0" });

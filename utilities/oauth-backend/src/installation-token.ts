@@ -64,28 +64,23 @@ function getAuth(): AppAuth | undefined {
   const privateKeyB64 = (process.env["GITHUB_APP_PRIVATE_KEY"] ?? "").trim();
   const installationIdRaw = (process.env["GITHUB_APP_INSTALLATION_ID"] ?? "").trim();
 
-  if (!appIdRaw || !privateKeyB64 || !installationIdRaw) {
-    return undefined;
-  }
+  if (!appIdRaw || !privateKeyB64 || !installationIdRaw) return undefined;
 
   const appId = parseInt(appIdRaw, 10);
   const installationId = parseInt(installationIdRaw, 10);
 
   if (!Number.isFinite(appId) || !Number.isFinite(installationId)) {
-    // The vars are present but not parseable as integers — likely a typo in the
-    // App ID or installation ID. Warn so the operator sees this at startup rather
-    // than silently disabling the managed-PR route (mirrors server.ts partial-config warn).
     console.warn(
       "[WARN] managed submission is disabled: GITHUB_APP_ID and GITHUB_APP_INSTALLATION_ID must be parseable integers — at least one value is present but not a valid integer."
     );
     return undefined;
   }
 
-  // Decode the base64-encoded PEM. The decoded value is used in-memory only;
-  // it is never logged or included in any error message.
-  const privateKey = decodePem(privateKeyB64);
-
-  _auth = createAppAuth({ appId, privateKey, installationId });
+  _auth = createAppAuth({
+    appId,
+    privateKey: decodePem(privateKeyB64),
+    installationId,
+  });
   return _auth;
 }
 
