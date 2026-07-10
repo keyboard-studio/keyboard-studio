@@ -2,7 +2,7 @@
 //
 // These promote the cross-package boundary invariants from prose in CLAUDE.md
 // (spec §10 validator layering, §12/§13 team boundaries, the contracts
-// dependency-root rule, the studio-poc throwaway rule) into CI gates. A
+// dependency-root rule) into CI gates. A
 // teammate who crosses a boundary gets a red check naming the rule — the
 // "team knows when it's off track" signal (see docs/architecture.md ->
 // Conformance gates). Run: `pnpm depcruise`.
@@ -48,7 +48,7 @@ module.exports = {
         'not import any other workspace package (CLAUDE.md).',
       severity: 'error',
       from: { path: '^packages/contracts/src' },
-      to: { path: '^packages/(engine|studio|studio-poc|keyboard-lint|llm)/' },
+      to: { path: '^packages/(engine|studio|keyboard-lint|llm)/' },
     },
     {
       name: 'ui-is-a-leaf',
@@ -105,15 +105,6 @@ module.exports = {
       severity: 'error',
       from: { path: '^packages/studio/src/survey/questions/' },
       to:   { path: '^packages/studio/src/(stores|editors|lib)/' },
-    },
-    {
-      name: 'no-deps-on-studio-poc',
-      comment:
-        'studio-poc is a throwaway prototype — do not build on it (CLAUDE.md). ' +
-        'Nothing outside studio-poc may import it.',
-      severity: 'error',
-      from: { pathNot: '^packages/studio-poc/' },
-      to: { path: '^packages/studio-poc/' },
     },
   ],
   options: {
