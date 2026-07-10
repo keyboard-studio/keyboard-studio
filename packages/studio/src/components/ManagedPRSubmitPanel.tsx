@@ -31,6 +31,7 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import type { PublishManagedPRError } from "@keyboard-studio/contracts";
 import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
+import { clearDraft } from "../lib/draftAutosave.ts";
 import { getManagedPROutputService, getManagedPRProxyEndpoint } from "../lib/services.ts";
 import {
   publishManagedPRErrorMessage,
@@ -256,6 +257,9 @@ export function ManagedPRSubmitPanel({
         proxyEndpoint: getManagedPRProxyEndpoint(),
       });
       setSubmitState({ kind: "success", prUrl: result.prUrl });
+      // The keyboard shipped — discard the resumable draft so a later reload
+      // doesn't offer to resume an already-submitted survey.
+      clearDraft();
     } catch (err: unknown) {
       let message: string;
       if (isPublishManagedPRError(err)) {

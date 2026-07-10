@@ -72,7 +72,7 @@ interface SerializedEntry {
  * through unchanged — both are plain, JSON-safe data, so they round-trip
  * directly with no override.
  */
-type WorkingCopySnapshot = Omit<
+export type WorkingCopySnapshot = Omit<
   WorkingCopyData,
   | "baseVfs"
   | "deletedNodeIds"
@@ -128,14 +128,33 @@ function deserializeEntry(raw: SerializedEntry): VirtualFSEntry {
  * their in-progress work, which is the pre-existing behaviour — not a regression).
  */
 export function snapshotWorkingCopyToSession(): void {
+  const snapshot = captureWorkingCopySnapshot();
+  if (snapshot === null) return;
+
+  try {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(snapshot));
+  } catch {
+    // Quota exceeded or private-browsing restriction — skip, don't crash.
+  }
+}
+
+/**
+ * Build a serializable snapshot of the current working copy, or null when there
+ * is no real working copy yet (instantiationMode/ir still null — e.g. a survey
+ * still on the identity step before a base is picked).
+ *
+ * Shared by the OAuth session path (snapshotWorkingCopyToSession) and the
+ * localStorage draft path (lib/draftAutosave.ts) so both serialize identically.
+ */
+export function captureWorkingCopySnapshot(): WorkingCopySnapshot | null {
   const s = useWorkingCopyStore.getState();
 
   // Guard: only snapshot when there is a real working copy.
   if (s.instantiationMode === null || s.ir === null) {
-    return;
+    return null;
   }
 
-  const snapshot: WorkingCopySnapshot = {
+  return {
     instantiationMode: s.instantiationMode,
     baseKeyboard: s.baseKeyboard,
     baseVfsEntries: s.baseVfs !== null ? s.baseVfs.entries().map(serializeEntry) : [],
@@ -155,12 +174,6 @@ export function snapshotWorkingCopyToSession(): void {
     validatorFindings: s.validatorFindings,
     axisFills: s.axisFills,
   };
-
-  try {
-    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(snapshot));
-  } catch {
-    // Quota exceeded or private-browsing restriction — skip, don't crash.
-  }
 }
 
 /**
@@ -191,6 +204,19 @@ export function rehydrateWorkingCopyFromSession(): boolean {
     return false;
   }
 
+  return applyWorkingCopySnapshot(snapshot);
+}
+
+/**
+ * Apply a working-copy snapshot to the store, re-deriving the computed fields
+ * (removalCapabilities, session) from their restored source fields per the
+ * derived-field policy in the module header.
+ *
+ * Returns true when applied, false when the snapshot is not a real working copy
+ * (instantiationMode null). Shared by the OAuth session rehydrate and the
+ * localStorage draft resume (lib/draftAutosave.ts).
+ */
+export function applyWorkingCopySnapshot(snapshot: WorkingCopySnapshot): boolean {
   // Basic sanity: must have instantiationMode set.
   if (snapshot.instantiationMode === null) {
     return false;

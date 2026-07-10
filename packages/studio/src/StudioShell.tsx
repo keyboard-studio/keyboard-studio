@@ -39,7 +39,21 @@ import { navigateTo } from "./lib/navigate.ts";
 import { manifest } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { StepHost } from "./components/StepHost.tsx";
+import { ResumeDraftBanner } from "./components/ResumeDraftBanner.tsx";
+import {
+  loadDraftMeta,
+  applyDraft,
+  clearDraft,
+  startDraftAutosave,
+  type DraftMeta,
+} from "./lib/draftAutosave.ts";
 import { TEXT_MAIN, FONT } from "./survey/surveyStyles.ts";
+
+// Offer the resume banner only once per page load — on the first SurveyView
+// mount in this JS context, not on same-session route remounts (navigating away
+// and back is a fresh wizard, not a resume). A page reload resets this flag by
+// starting a new JS context.
+let resumeOfferConsumed = false;
 
 // Bind the manifest into the store's staleness actions.
 // Called once at module load; avoids a circular static import in the store
@@ -318,10 +332,34 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Without this reset the singleton would resume from stale prior state rather
   // than starting at "identity". Component-local useState used to give this
   // mount-fresh reset for free; this call restores that invariant for the store.
+  //
+  // Note: on a genuine page reload the store is already pristine (fresh JS
+  // context), so resetting over it is harmless. A saved draft lives in
+  // localStorage (not the store), so this reset does not touch it — the resume
+  // banner below reads it and only applyDraft() (on Resume) hydrates the store.
   useEffect(() => {
     useSurveySessionStore.getState().reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally empty: runs exactly once on mount
   }, []);
+
+  // ---------------------------------------------------------------------------
+  // Resume-draft banner + autosave (localStorage draft; lib/draftAutosave.ts).
+  //
+  // On the first SurveyView mount of a page load, peek at any saved draft and
+  // offer to resume it. Autosave does not start until the author decides, so a
+  // pending decision can't overwrite the very draft being offered. When there is
+  // no draft, autosave starts immediately.
+  // ---------------------------------------------------------------------------
+  const [resumeMeta, setResumeMeta] = useState<DraftMeta | null>(() => {
+    if (resumeOfferConsumed) return null;
+    resumeOfferConsumed = true;
+    return loadDraftMeta();
+  });
+
+  useEffect(() => {
+    if (resumeMeta !== null) return; // wait for the author's Resume/Discard choice
+    return startDraftAutosave();
+  }, [resumeMeta]);
 
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
   const { containerRef, leftPct, handleHovered, onPointerDown, setHandleHovered } =
@@ -485,6 +523,31 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     instantiatedRef.current = false;
     // sessionReset() calls reset() which already clears charactersSubStage to
     // "prefill" (spec 027 Stage 4 — the store slot is the authoritative owner).
+    // Discard any saved draft — start-over is an explicit "throw it away".
+    clearDraft();
+    setResumeMeta(null);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Resume banner handlers.
+  //
+  // Resume: restore both stores from the saved draft, then mark the working copy
+  // as already instantiated so the compile pipeline's onInstantiate does not
+  // re-run instantiateFromBase over the restored copy (which would pop the
+  // rebase-confirm dialog / risk discarding restored survey answers).
+  // Discard: drop the draft and continue fresh.
+  // Either way, clearing resumeMeta hides the banner and starts autosave.
+  // ---------------------------------------------------------------------------
+  function handleResumeDraft() {
+    if (applyDraft()) {
+      instantiatedRef.current = true;
+    }
+    setResumeMeta(null);
+  }
+
+  function handleDiscardDraft() {
+    clearDraft();
+    setResumeMeta(null);
   }
 
   // ---------------------------------------------------------------------------
@@ -550,6 +613,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     >
       {/* Left pane: survey questions (StepHost renders pane content) */}
       <section aria-label="Survey questions" style={questionsPaneStyle}>
+        {resumeMeta !== null && (
+          <ResumeDraftBanner
+            meta={resumeMeta}
+            onResume={handleResumeDraft}
+            onDiscard={handleDiscardDraft}
+          />
+        )}
         {globalFindings.length > 0 && (
           <LintSummary findings={globalFindings} />
         )}
