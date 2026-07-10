@@ -301,7 +301,7 @@ export function applyStepCompletion(
           console.warn("[applyStepCompletion:choose_base] Track 2 skipped: no parsed IR (mock engine?)");
           break;
         }
-        deps.instantiateFromExisting(base, opts);
+        deps.instantiateFromExisting(base, { ...opts, vfs, ir });
       } else {
         // Track 1 (or null/default): new keyboard from base, with rebase guard.
         deps.instantiateFromBaseIfConfirmed(base, opts);

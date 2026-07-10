@@ -542,6 +542,11 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
           : hasActions
             ? `Remove "${pendingCascade.targetChar}" everywhere?`
             : `"${pendingCascade.targetChar}" can't be fully removed`;
+        const message = isRestore
+          ? 'This character was removed from several places. Restore it everywhere it was removed?'
+          : hasActions
+            ? 'This character appears in multiple places. Removing it everywhere keeps the keyboard consistent; removing it from just one place may leave broken references.'
+            : 'This character is produced by advanced rules that can\'t be removed automatically — see below.';
         return (
         <ConfirmDialog
           open={true}
@@ -549,11 +554,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
           body={
             <div>
               <p style={{ margin: '0 0 10px' }}>
-                {isRestore
-                  ? 'This character was removed from several places. Restore it everywhere it was removed?'
-                  : hasActions
-                    ? 'This character appears in multiple places. Removing it everywhere keeps the keyboard consistent; removing it from just one place may leave broken references.'
-                    : 'This character is produced by advanced rules that can't be removed automatically — see below.'}
+                {message}
               </p>
               {!isRestore && pendingCascade.contributors.storeSlotIds.length > 0 && (
                 <p style={{ margin: '0 0 10px' }}>

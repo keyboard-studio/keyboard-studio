@@ -5,7 +5,7 @@
 import { type CSSProperties } from "react";
 import { buildScriptRouting, type ScriptRoutingRow } from "./buildScriptRouting.ts";
 import type { ScriptRoutingGroup } from "../lib/scriptAxes.ts";
-import { MONO, SANS, Badge, COLORS } from "./tokens.ts";
+import { MONO, SANS, Badge, COLORS } from "./tokens.tsx";
 
 function GroupChip({ group, gated }: { group: ScriptRoutingGroup | null; gated: boolean }) {
   if (gated) {

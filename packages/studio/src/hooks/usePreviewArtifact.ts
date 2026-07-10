@@ -178,7 +178,7 @@ export function usePreviewArtifact(): PreviewArtifact {
       const { bytes } = result;
       // Coerce to ArrayBuffer to satisfy Blob constructor's strict BlobPart type.
       const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-      const blob = new Blob([buf], { type: "application/zip" });
+      const blob = new Blob([buf as ArrayBuffer], { type: "application/zip" });
 
       // Revoke previous zip URL before creating a new one.
       revokeZipUrl();

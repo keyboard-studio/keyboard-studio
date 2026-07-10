@@ -32,8 +32,8 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
     <MechanismGallery
       selectedBaseKeyboard={baseKeyboard}
       onComplete={() => onComplete(undefined)}
-      placementMap={placementMap ?? undefined}
-      onBack={onBack}
+      {...(placementMap ? { placementMap } : {})}
+      {...(onBack ? { onBack } : {})}
     />
   );
 }

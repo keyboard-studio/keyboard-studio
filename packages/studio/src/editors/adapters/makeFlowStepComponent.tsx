@@ -202,10 +202,10 @@ export function makeFlowStepComponent<Extracted>(
         title={resolvedTitle}
         context={context}
         onComplete={wrappedOnComplete}
-        onBack={onBack}
-        getSeedValue={options.seeds ? getSeedValue : undefined}
-        onAnswerCommit={options.seeds?.onAnswerCommit ? onAnswerCommit : undefined}
-        findingsByQuestionId={options.usesFindings ? findingsByQuestionId : undefined}
+        {...(onBack ? { onBack } : {})}
+        {...(options.seeds ? { getSeedValue } : {})}
+        {...(options.seeds?.onAnswerCommit ? { onAnswerCommit } : {})}
+        {...(options.usesFindings ? { findingsByQuestionId } : {})}
       />
     );
   }

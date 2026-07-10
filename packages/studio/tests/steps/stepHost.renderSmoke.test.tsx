@@ -148,12 +148,12 @@ const noopReducerDeps: ReducerDeps = {
 };
 
 // Fake base keyboard — satisfies the localBase guard in TrackStepFactoryComponent.
-const fakeBase = {
+const fakeBase: import("@keyboard-studio/contracts").BaseKeyboard = {
   id: "basic_kbdus",
   path: "release/b/basic_kbdus",
   script: "Latn",
   displayName: "English (US)",
-  targets: ["windows"] as string[],
+  targets: ["windows"],
   version: "1.0",
 };
 
@@ -210,10 +210,11 @@ describe('StepHost terminal: "unsupported"', () => {
           autonym: "Test",
           english: "Test",
           languageSubtag: "te",
+          region: "",
           targetScriptRaw: "Ethi",
           bcp47: "te-Ethi",
           supported: false,
-          prefill: { script: "Ethi", scriptClass: "abugida-abjad", routingGroup: "ethiopic" },
+          prefill: { script: "Ethi", scriptClass: "abugida", routingGroup: "non-roman" },
         },
       });
     });

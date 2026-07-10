@@ -12,7 +12,7 @@ import {
   type ConditionalSecondary,
 } from "@keyboard-studio/engine";
 import type { AxisFill, StrategyId } from "@keyboard-studio/contracts";
-import { MONO, SANS, COLORS } from "./tokens.ts";
+import { MONO, SANS, COLORS } from "./tokens.tsx";
 
 function StrategyChip({
   id,

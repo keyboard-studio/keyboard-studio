@@ -98,7 +98,7 @@ export function IdentityLiteAdapter({ onComplete }: EditorStepProps) {
       context={surveyContext}
       onComplete={handleComplete}
       findingsByQuestionId={findingsByQuestionId}
-      resume={identityPhaseResult ?? undefined}
+      {...(identityPhaseResult ? { resume: identityPhaseResult } : {})}
     />
   );
 }
@@ -167,7 +167,7 @@ export function BaseResolutionAdapter({ onComplete, onBack }: EditorStepProps) {
         setLocalBase(base);
         onComplete({ base });
       }}
-      onBack={onBack}
+      {...(onBack ? { onBack } : {})}
     />
   );
 }

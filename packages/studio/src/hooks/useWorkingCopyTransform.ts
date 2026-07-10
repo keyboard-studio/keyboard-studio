@@ -147,33 +147,37 @@ export function useWorkingCopyTransform(
 
       // Delegate to the pure projection helper. The VfsTransform contract is
       // in-place mutation of `vfs`; projectWorkingCopyVfs also mutates in-place.
+      const hasDisplayName = identityDisplayName !== null;
+      const hasBcp47 = identityBcp47 !== null && identityBcp47 !== "";
       const identityArg =
-        identityDisplayName !== null || identityBcp47 !== null
-          ? {
-              displayName: identityDisplayName ?? undefined,
-              bcp47: identityBcp47 && identityBcp47 !== "" ? identityBcp47 : undefined,
-            }
+        hasDisplayName || hasBcp47
+          ? ({
+              ...(hasDisplayName ? { displayName: identityDisplayName } : {}),
+              ...(hasBcp47 ? { bcp47: identityBcp47 } : {}),
+            } as import("../lib/projectWorkingCopyVfs").IdentityOverlay)
           : null;
+
+      const targetKeyboardId =
+        identityKeyboardId !== null && identityKeyboardId !== keyboardId
+          ? identityKeyboardId
+          : undefined;
 
       const { warnings: projectionWarnings, effectiveKeyboardId } = projectWorkingCopyVfs({
         vfs,
         keyboardId,
-        targetKeyboardId:
-          identityKeyboardId !== null && identityKeyboardId !== keyboardId
-            ? identityKeyboardId
-            : undefined,
+        ...(targetKeyboardId ? { targetKeyboardId } : {}),
         baseIr,
         deletedNodeIds,
         deletedItemIds,
         assignments: effectiveAssignments,
         getPattern: (id) => patternMap?.get(id),
         identity: identityArg,
-        touchLayoutJson,
+        ...(touchLayoutJson !== null ? { touchLayoutJson } : {}),
       });
 
       return {
         warnings: [...preWarnings, ...projectionWarnings],
-        effectiveKeyboardId,
+        ...(effectiveKeyboardId ? { effectiveKeyboardId } : {}),
       };
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
