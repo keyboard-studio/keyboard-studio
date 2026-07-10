@@ -360,6 +360,33 @@ describe("applyKeycapLabelsToVfs — S-01 base + shift companion (reported bug)"
     expect(baseMatch?.[0]).not.toContain("Θ");
     expect(shiftMatch?.[0]).not.toContain(">θ<");
   });
+
+  it("falls back to the assignment's target when the RHS is not decodable (outs() reference)", () => {
+    // decodeRhsChar returns undefined for anything that is neither U+XXXX
+    // tokens nor a quoted literal; parseS01RuleLine must then label the
+    // keycap with the assignment's own target (backward compatibility with
+    // pre-existing simple single-rule callers).
+    const assignment: MechanismAssignment = {
+      scope: "individual",
+      target: "θ",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "p-outs",
+          strategyId: "S-01",
+          slotValues: { kmnRules: "+ [K_E] > outs(theta_store)" },
+        },
+      ],
+    };
+    const vfs = makeVfs([{ path: "source/test.kvks", content: KVKS_WITH_SHIFT }]);
+
+    const { warnings } = applyKeycapLabelsToVfs(vfs, "test", [assignment]);
+
+    expect(warnings).toHaveLength(0);
+    const xml = vfs.get("source/test.kvks")?.content as string;
+    const baseMatch = /<layer shift="">[\s\S]*?<\/layer>/.exec(xml);
+    expect(baseMatch?.[0]).toContain('<key vkey="K_E">θ</key>');
+  });
 });
 
 // ---------------------------------------------------------------------------

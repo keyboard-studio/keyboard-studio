@@ -190,10 +190,13 @@ type SwapLayer = "base" | "shift";
 // (`[RALT K_X]`); 'shift-ralt' targets the SHIFTED RAlt plane on the same
 // base key (`[SHIFT RALT K_X]`) — e.g. a capital letter reached via
 // Shift+RAlt+key. Unlike the S-01 Shift toggle, this is NOT gated on
-// mnemonic layouts: `[SHIFT RALT K_X]` is a hardware modifier-plane combo,
-// legitimate even on mnemonic keyboards (russian_mnemonic_r ships
-// `[SHIFT RALT K_PERIOD]`) — SHIFT here modifies RALT, it does not
-// re-apply the base layout's own shift semantics.
+// mnemonic layouts: `store(&mnemoniclayout)` changes only how the base
+// character of a key spec is resolved (base-layout character vs physical
+// position); the SHIFT flag in a `[SHIFT RALT ...]` combo selects the
+// shifted RAlt plane and does not re-apply the base layout's own shift
+// semantics, so the plane combo is legitimate either way. Real mnemonic
+// keyboards ship such rules: sil_euro_latin declares
+// `store(&mnemoniclayout) '1'` and maps e.g. `[RALT SHIFT '<'] > U+00AB`.
 type RaltLayer = "ralt" | "shift-ralt";
 
 interface MethodChooserProps {

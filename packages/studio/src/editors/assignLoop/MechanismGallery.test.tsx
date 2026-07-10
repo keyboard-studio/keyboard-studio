@@ -1203,9 +1203,10 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
   });
 
   it("is not gated by mnemonic layout (unlike the S-01 Shift toggle)", async () => {
-    // [SHIFT RALT K_X] is a hardware modifier-plane combo, legitimate even on
-    // mnemonic keyboards (russian_mnemonic_r proves it) — the Shift+RAlt
-    // radio must remain enabled regardless of &MNEMONICLAYOUT.
+    // [SHIFT RALT K_X] selects the shifted RAlt plane — orthogonal to
+    // &MNEMONICLAYOUT, which only changes base-character resolution (real
+    // mnemonic keyboards like sil_euro_latin ship RALT SHIFT rules) — so the
+    // Shift+RAlt radio must remain enabled regardless of &MNEMONICLAYOUT.
     instantiateWorkingCopy({ mnemonic: true });
     seedInventory(["ε"]);
     await act(async () => {
