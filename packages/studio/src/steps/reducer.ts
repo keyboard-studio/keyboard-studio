@@ -249,9 +249,7 @@ export function applyStepCompletion(
     // Same Case-A/B logic and graceful degradation on error.
     case TOUCH_STEP_ID: {
       const payload = result as Partial<TouchCompleteResult>;
-      const assignments = payload.assignments ?? [];
-      const baseIr = payload.baseIr ?? null;
-      const baseVfs = payload.baseVfs ?? null;
+      const { assignments = [], baseIr = null, baseVfs = null } = payload;
 
       if (assignments.length === 0 || baseIr === null) {
         // No real assignments — clear the stored touch layout (KMW uses its native default).
@@ -291,7 +289,11 @@ export function applyStepCompletion(
       const track = payload.track ?? null;
       const vfs = payload.vfs ?? null;
       const ir = payload.ir ?? null;
-      const removalCapabilities = payload.removalCapabilities;
+      const opts = {
+        vfs,
+        ir,
+        ...(payload.removalCapabilities !== undefined ? { removalCapabilities: payload.removalCapabilities } : {}),
+      };
 
       if (track === "adapt") {
         // Track 2: preserve existing keyboard identity.
@@ -299,18 +301,10 @@ export function applyStepCompletion(
           console.warn("[applyStepCompletion:choose_base] Track 2 skipped: no parsed IR (mock engine?)");
           break;
         }
-        deps.instantiateFromExisting(base, {
-          vfs,
-          ir,
-          ...(removalCapabilities !== undefined ? { removalCapabilities } : {}),
-        });
+        deps.instantiateFromExisting(base, opts);
       } else {
         // Track 1 (or null/default): new keyboard from base, with rebase guard.
-        deps.instantiateFromBaseIfConfirmed(base, {
-          vfs,
-          ir,
-          ...(removalCapabilities !== undefined ? { removalCapabilities } : {}),
-        });
+        deps.instantiateFromBaseIfConfirmed(base, opts);
       }
       break;
     }

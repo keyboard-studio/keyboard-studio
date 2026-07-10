@@ -18,6 +18,26 @@ import { manifest } from "./manifest.ts";
 import { flowSources } from "./flowSources.ts";
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Collects all flowRefs from all manifest steps. */
+function collectAllFlowRefs(): Set<string> {
+  const refs = new Set<string>();
+  for (const step of manifest) {
+    if (step.flowRefs) {
+      for (const ref of step.flowRefs) refs.add(ref);
+    }
+  }
+  return refs;
+}
+
+/** Checks if a flowRef exists in flowSources. */
+function hasFlowSource(ref: string): boolean {
+  return Object.prototype.hasOwnProperty.call(flowSources, ref);
+}
+
+// ---------------------------------------------------------------------------
 // (a) Every flowRef on every manifest step resolves to a flowSources entry.
 // ---------------------------------------------------------------------------
 
@@ -27,7 +47,7 @@ describe("D2a — every manifest flowRef resolves to a flowSources entry", () =>
     for (const ref of step.flowRefs) {
       it(`step "${step.id}" flowRef "${ref}" resolves`, () => {
         expect(
-          Object.prototype.hasOwnProperty.call(flowSources, ref),
+          hasFlowSource(ref),
           `flowSources["${ref}"] not found — add it to steps/flowSources.ts`,
         ).toBe(true);
       });
@@ -35,13 +55,8 @@ describe("D2a — every manifest flowRef resolves to a flowSources entry", () =>
   }
 
   it("no manifest step references an undefined flowSources key", () => {
-    const allRefs: string[] = [];
-    for (const step of manifest) {
-      if (step.flowRefs) allRefs.push(...step.flowRefs);
-    }
-    const missing = allRefs.filter(
-      (ref) => !Object.prototype.hasOwnProperty.call(flowSources, ref),
-    );
+    const allRefs = Array.from(collectAllFlowRefs());
+    const missing = allRefs.filter((ref) => !hasFlowSource(ref));
     expect(
       missing,
       `Unresolved flowRefs: ${missing.join(", ")}`,
@@ -54,12 +69,7 @@ describe("D2a — every manifest flowRef resolves to a flowSources entry", () =>
 // ---------------------------------------------------------------------------
 
 describe("D2b — every status:live flowSources entry is referenced by >=1 manifest step", () => {
-  const allRefs = new Set<string>();
-  for (const step of manifest) {
-    if (step.flowRefs) {
-      for (const ref of step.flowRefs) allRefs.add(ref);
-    }
-  }
+  const allRefs = collectAllFlowRefs();
 
   for (const [id, source] of Object.entries(flowSources)) {
     if (source.status !== "live") continue;

@@ -1,28 +1,15 @@
-// mutateApply — the pure patch-apply helper for the spec-014 `mutate()` seam.
+// mutateApply — pure patch-apply helper for the spec-014 `mutate()` seam.
 //
 // Contract: mutate-seam.contract.md (M1–M5) + plan.md (spec-014).
 //
-//   M1 (pure)        — applyMutatePatch NEVER mutates its inputs. It returns a
-//                      fresh IR; `base` and `patch` are untouched.
-//   M2 (path-scoped  — the patch is applied as a DEEP merge: a value nested
-//        deep merge)    under a shared parent is written at its leaf location;
-//                      sibling subtrees under that parent are preserved, not
-//                      branch-replaced. (Plain objects merge recursively;
-//                      arrays and primitive leaves replace.)
-//   M3 (declared-    — every leaf the patch would write MUST lie at or under a
-//        writes         declared `writes` IRPath. A patch touching ANY undeclared
-//        containment)   path is rejected WHOLE (no partial apply), the failure is
-//                      thrown (never swallowed), and the IR is left unchanged —
-//                      in ALL builds. The check runs before any merge so a
-//                      rejected patch cannot have produced a side effect.
-//   M4 (idempotent)  — applying the same patch to the same IR twice yields a
-//                      byte-identical result (a consequence of the value-level
-//                      deep merge: re-writing the same leaves changes nothing).
-//   M5 (empty patch) — `{}` is valid and merges to a structural copy of `base`
-//                      (a no-op in value terms).
+//   M1 (pure)              — never mutates inputs; returns fresh IR.
+//   M2 (path-scoped merge) — patch applied as deep merge; sibling subtrees preserved.
+//   M3 (containment)       — every leaf must lie at or under a declared `writes` IRPath.
+//                            Violations reject the whole patch (no partial apply).
+//   M4 (idempotent)        — applying the same patch twice yields byte-identical result.
+//   M5 (empty patch)       — `{}` is valid and merges to a structural copy of `base`.
 //
-// This helper is consumed by the reducer apply path (steps/reducer.ts,
-// applyStepCompletion → T014) when the mutate flag is on.
+// Consumed by the reducer apply path (steps/reducer.ts) when the mutate flag is on.
 
 import type { IRPath, KeyboardIR } from "@keyboard-studio/contracts";
 import { ARRAY_INDEX, formatIRPath } from "@keyboard-studio/contracts";
@@ -77,15 +64,9 @@ function segMatches(d: IRPath[number], l: ConcreteSegment): boolean {
 /**
  * Does the declared write path `decl` authorize the concrete patch leaf `leaf`?
  *
- * Authorized when, over their common length, every segment matches AND one path
- * is a prefix of the other:
- *   - `decl` is a prefix of `leaf` — declaring `header.bcp47` authorizes
- *     `header.bcp47` itself and anything nested beneath it; declaring `stores[]`
- *     authorizes `stores[3]` / `stores[3].items`.
- *   - `leaf` is a prefix of `decl` — writing the whole `stores` array (`leaf =
- *     ["stores"]`) is authorized by a `stores[]` declaration (the patch sets a
- *     container the declaration reaches into).
- * A segment mismatch in the common prefix means the paths diverge — not authorized.
+ * Authorized when all segments in the common prefix match and one path is a
+ * prefix of the other (prefix-containment rule). A segment mismatch means the
+ * paths diverge and the write is not authorized.
  */
 function pathAuthorizes(decl: IRPath, leaf: readonly ConcreteSegment[]): boolean {
   const common = Math.min(decl.length, leaf.length);
@@ -98,21 +79,16 @@ function pathAuthorizes(decl: IRPath, leaf: readonly ConcreteSegment[]): boolean
 /** Render a concrete patch leaf path for error messages (e.g. "header.bcp47", "stores[2].items"). */
 function formatConcrete(leaf: readonly ConcreteSegment[]): string {
   if (leaf.length === 0) return "(root)";
-  let out = "";
-  for (const seg of leaf) {
-    if (typeof seg === "number") out += `[${seg}]`;
-    else out += out === "" ? seg : `.${seg}`;
-  }
-  return out;
+  return leaf.reduce<string>((out, seg) => {
+    if (typeof seg === "number") return `${out}[${seg}]`;
+    return out === "" ? seg : `${out}.${seg}`;
+  }, "");
 }
 
 /**
- * Prototype-pollution guard: keys that, if copied onto the result object as
- * own-enumerable patch keys, could reach Object.prototype / the result's
- * prototype chain. We never merge or path-collect these — a `mutate()` patch has
- * no legitimate reason to carry them, and skipping them in BOTH the merge and the
- * containment walk means a hostile/buggy patch can't set the result's prototype.
- * (No in-scope module patch contains these keys, so this is behavior-preserving.)
+ * Prototype-pollution guard: keys that could reach Object.prototype. These are
+ * never merged or path-collected, preventing hostile/buggy patches from setting
+ * the result's prototype.
  */
 const UNSAFE_KEYS: ReadonlySet<string> = new Set(["__proto__", "constructor", "prototype"]);
 
@@ -136,42 +112,28 @@ function collectLeafPaths(
     const value = patch[key];
     const here: ConcreteSegment[] = [...prefix, key];
     if (isPlainObject(value)) {
-      const before = acc.length;
       collectLeafPaths(value, here, acc);
-      // An empty nested object contributes no leaf (still a no-op).
-      if (acc.length === before && Object.keys(value).length === 0) {
-        // explicit no-op: do not record an empty-object node as a write
-      }
     } else {
-      // Primitive, array, null, or undefined — a leaf write.
       acc.push(here);
     }
   }
 }
 
 /**
- * Deep-merge `patch` into a structural clone of `base`, returning the result.
- * Plain objects merge recursively (siblings preserved, M2); every other value
- * (arrays, primitives, null) replaces. `base` and `patch` are never mutated (M1).
+ * Deep-merge `patch` into a structural clone of `base`. Plain objects merge
+ * recursively (siblings preserved, M2); other values replace. Inputs are never
+ * mutated (M1).
  */
 function deepMerge<T>(base: T, patch: unknown): T {
-  if (!isPlainObject(patch)) {
-    // Non-object patch value replaces wholesale. Clone arrays/objects so the
-    // result shares no references with the patch (purity / idempotency).
-    return structuredClone(patch) as T;
-  }
-  // patch is a plain object; base may or may not be.
+  if (!isPlainObject(patch)) return structuredClone(patch) as T;
+
   const baseObj: Record<string, unknown> = isPlainObject(base)
     ? { ...(base as Record<string, unknown>) }
     : {};
   for (const key of Object.keys(patch)) {
-    if (UNSAFE_KEYS.has(key)) continue; // prototype-pollution guard (never merge these)
+    if (UNSAFE_KEYS.has(key)) continue;
     const pv = patch[key];
-    if (isPlainObject(pv)) {
-      baseObj[key] = deepMerge(baseObj[key], pv);
-    } else {
-      baseObj[key] = structuredClone(pv);
-    }
+    baseObj[key] = isPlainObject(pv) ? deepMerge(baseObj[key], pv) : structuredClone(pv);
   }
   return baseObj as T;
 }

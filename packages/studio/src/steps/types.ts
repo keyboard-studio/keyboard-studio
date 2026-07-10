@@ -109,9 +109,8 @@ export interface EditorStepProps {
    */
   onComplete: (result: unknown) => void;
   /**
-   * Optional — not every step has a back affordance. Panels that are entry
-   * points (TrackOneIdentityPanel, ScaffoldForm) may omit it; galleries and
-   * branching steps supply it.
+   * Panels that are entry points (TrackOneIdentityPanel, ScaffoldForm) may
+   * omit this; galleries and branching steps supply it.
    */
   onBack?: () => void;
   /** Shared survey/identity context (existing shape from survey/types.ts). */

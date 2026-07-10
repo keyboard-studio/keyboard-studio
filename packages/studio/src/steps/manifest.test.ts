@@ -20,16 +20,30 @@ import { assertUniqueIds } from "./types.test.ts";
 // Helpers
 // ---------------------------------------------------------------------------
 
-function spineSteps(steps: readonly Step[]): Step[] {
-  return steps.filter((s) => s.spine === true);
-}
+const spineSteps = (steps: readonly Step[]): Step[] =>
+  steps.filter((s) => s.spine === true);
 
-function lockedSteps(steps: readonly Step[]): Step[] {
-  return steps.filter((s) => s.lock !== undefined);
-}
+const lockedSteps = (steps: readonly Step[]): Step[] =>
+  steps.filter((s) => s.lock !== undefined);
 
-function offSpineSteps(steps: readonly Step[]): Step[] {
-  return steps.filter((s) => s.spine === false);
+const offSpineSteps = (steps: readonly Step[]): Step[] =>
+  steps.filter((s) => s.spine === false);
+
+/** Finds the index of a step by id; returns -1 if not found. */
+const findStepIndex = (steps: readonly Step[], id: string): number =>
+  steps.findIndex((s) => s.id === id);
+
+/** Asserts that stepA appears before stepB in the list. */
+function assertStepOrder(
+  steps: readonly Step[],
+  stepA: string,
+  stepB: string,
+): void {
+  const idxA = findStepIndex(steps, stepA);
+  const idxB = findStepIndex(steps, stepB);
+  expect(idxA).toBeGreaterThanOrEqual(0);
+  expect(idxB).toBeGreaterThanOrEqual(0);
+  expect(idxA).toBeLessThan(idxB);
 }
 
 // ---------------------------------------------------------------------------
@@ -83,50 +97,24 @@ describe("M2 — spine order matches FR-012", () => {
 
   it("'track' is a spine step between 'choose_base' and 'characters'", () => {
     const spine = spineSteps(manifest);
-    const baseIdx = spine.findIndex((s) => s.id === "choose_base");
-    const trackIdx = spine.findIndex((s) => s.id === "track");
-    const charIdx = spine.findIndex((s) => s.id === "characters");
-    expect(baseIdx).toBeGreaterThanOrEqual(0);
-    expect(trackIdx).toBeGreaterThanOrEqual(0);
-    expect(charIdx).toBeGreaterThanOrEqual(0);
-    expect(baseIdx).toBeLessThan(trackIdx);
-    expect(trackIdx).toBeLessThan(charIdx);
+    assertStepOrder(spine, "choose_base", "track");
+    assertStepOrder(spine, "track", "characters");
   });
 
   it("'mechanisms' appears before 'touch' on the spine", () => {
-    const spine = spineSteps(manifest);
-    const mechIdx = spine.findIndex((s) => s.id === "mechanisms");
-    const touchIdx = spine.findIndex((s) => s.id === "touch");
-    expect(mechIdx).toBeGreaterThanOrEqual(0);
-    expect(touchIdx).toBeGreaterThanOrEqual(0);
-    expect(mechIdx).toBeLessThan(touchIdx);
+    assertStepOrder(spineSteps(manifest), "mechanisms", "touch");
   });
 
   it("'carve' appears before 'mechanisms' on the spine", () => {
-    const spine = spineSteps(manifest);
-    const carveIdx = spine.findIndex((s) => s.id === "carve");
-    const mechIdx = spine.findIndex((s) => s.id === "mechanisms");
-    expect(carveIdx).toBeGreaterThanOrEqual(0);
-    expect(mechIdx).toBeGreaterThanOrEqual(0);
-    expect(carveIdx).toBeLessThan(mechIdx);
+    assertStepOrder(spineSteps(manifest), "carve", "mechanisms");
   });
 
   it("'characters' appears before 'carve' on the spine", () => {
-    const spine = spineSteps(manifest);
-    const charIdx = spine.findIndex((s) => s.id === "characters");
-    const carveIdx = spine.findIndex((s) => s.id === "carve");
-    expect(charIdx).toBeGreaterThanOrEqual(0);
-    expect(carveIdx).toBeGreaterThanOrEqual(0);
-    expect(charIdx).toBeLessThan(carveIdx);
+    assertStepOrder(spineSteps(manifest), "characters", "carve");
   });
 
   it("'help' appears before 'package' on the spine", () => {
-    const spine = spineSteps(manifest);
-    const helpIdx = spine.findIndex((s) => s.id === "help");
-    const pkgIdx = spine.findIndex((s) => s.id === "package");
-    expect(helpIdx).toBeGreaterThanOrEqual(0);
-    expect(pkgIdx).toBeGreaterThanOrEqual(0);
-    expect(helpIdx).toBeLessThan(pkgIdx);
+    assertStepOrder(spineSteps(manifest), "help", "package");
   });
 
   it("'project_name' is NOT a spine step (it is the copy-track CYOA fork)", () => {
@@ -167,11 +155,9 @@ describe("M3 — exactly one lock:physical then one lock:touch", () => {
   });
 
   it("lock:physical appears before lock:touch in the manifest array", () => {
-    const physIdx = manifest.findIndex((s) => s.lock === "physical");
-    const touchIdx = manifest.findIndex((s) => s.lock === "touch");
-    expect(physIdx).toBeGreaterThanOrEqual(0);
-    expect(touchIdx).toBeGreaterThanOrEqual(0);
-    expect(physIdx).toBeLessThan(touchIdx);
+    const locks = lockedSteps(manifest);
+    expect(locks[0]?.lock).toBe("physical");
+    expect(locks[1]?.lock).toBe("touch");
   });
 
   it("all lock-carrying steps are spine:true steps (not side trails)", () => {
@@ -220,11 +206,7 @@ describe("M4 — touch_seed_source fork", () => {
   });
 
   it("touch_seed_source appears in the manifest before the touch spine step", () => {
-    const seedIdx = manifest.findIndex((s) => s.id === "touch_seed_source");
-    const touchIdx = manifest.findIndex((s) => s.id === "touch");
-    expect(seedIdx).toBeGreaterThanOrEqual(0);
-    expect(touchIdx).toBeGreaterThanOrEqual(0);
-    expect(seedIdx).toBeLessThan(touchIdx);
+    assertStepOrder(manifest, "touch_seed_source", "touch");
   });
 });
 
@@ -258,14 +240,8 @@ describe("M4b — project_name CYOA fork (copy-track only)", () => {
   });
 
   it("project_name appears in the manifest between track and characters", () => {
-    const trackIdx = manifest.findIndex((s) => s.id === "track");
-    const projIdx = manifest.findIndex((s) => s.id === "project_name");
-    const charIdx = manifest.findIndex((s) => s.id === "characters");
-    expect(trackIdx).toBeGreaterThanOrEqual(0);
-    expect(projIdx).toBeGreaterThanOrEqual(0);
-    expect(charIdx).toBeGreaterThanOrEqual(0);
-    expect(trackIdx).toBeLessThan(projIdx);
-    expect(projIdx).toBeLessThan(charIdx);
+    assertStepOrder(manifest, "track", "project_name");
+    assertStepOrder(manifest, "project_name", "characters");
   });
 });
 
