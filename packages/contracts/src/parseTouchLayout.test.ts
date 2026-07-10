@@ -239,6 +239,43 @@ describe("parseTouchLayoutString — toNumber coercion (Number() semantics)", ()
 });
 
 // ---------------------------------------------------------------------------
+// D2. provenance — the `p` wire field (spec-014 FR-008/-009/-010)
+// ---------------------------------------------------------------------------
+
+describe("parseTouchLayoutString — provenance", () => {
+  it("reads each in-vocabulary provenance value off the `p` wire field", () => {
+    for (const p of ["base-derived", "physical-suggested", "hand-set"] as const) {
+      expect(firstKey(makeLayout({ p })).provenance).toBe(p);
+    }
+  });
+
+  it("always materialises provenance (absent `p` defaults to hand-set)", () => {
+    // FR-009: the no-clobber re-propagation rule must always have a tag to read.
+    expect(firstKey(makeLayout({})).provenance).toBe("hand-set");
+  });
+
+  it("defaults legacy / out-of-vocabulary `p` values to hand-set", () => {
+    expect(firstKey(makeLayout({ p: "bogus" })).provenance).toBe("hand-set");
+    expect(firstKey(makeLayout({ p: 42 })).provenance).toBe("hand-set");
+  });
+
+  it("materialises provenance on every nesting mechanism (sk, multitap, flick)", () => {
+    // convertKey is the single recursive function for all three, so provenance
+    // must apply uniformly — pin that here, not just for sk.
+    const key = firstKey(
+      makeLayout({
+        sk: [{ id: "K_SK", p: "base-derived" }],
+        multitap: [{ id: "K_MT", p: "physical-suggested" }],
+        flick: { n: { id: "K_FN", p: "base-derived" } },
+      }),
+    );
+    expect(key.sk?.[0]!.provenance).toBe("base-derived");
+    expect(key.multitap?.[0]!.provenance).toBe("physical-suggested");
+    expect(key.flick?.n!.provenance).toBe("base-derived");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // E. Error surface — throws on malformed input
 // ---------------------------------------------------------------------------
 

@@ -21,6 +21,7 @@
 
 import type { TouchLayoutIR, TouchKeyIR, IRNodeRef, TouchKeyProvenance } from "./keyboard-ir";
 import type { VirtualFS } from "./virtualFS";
+import { TouchKeyProvenanceSchema, DEFAULT_TOUCH_PROVENANCE } from "./schemas";
 
 // TextDecoder is a runtime global in both Node and the browser, but contracts'
 // tsconfig lib (ES2022) does not declare it. Minimal ambient declaration so the
@@ -92,34 +93,34 @@ const FLICK_DIRECTIONS = ["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const;
 // Per-key touch provenance (TouchKeyIR.provenance) must survive the codec
 // round-trip so the no-clobber re-propagation rule (US2) has a durable source.
 // The `.keyman-touch-layout` JSON key object does NOT reserve a `"p"` property
-// in the Keyman touch-layout schema, and kmcmplib's TouchLayoutFileReader
-// ignores properties it does not recognise, so writing provenance under a
-// short, non-colliding `"p"` key is a NON-BREAKING addition: the standard
-// Keyman parser tolerates and skips it.
+// in the Keyman touch-layout schema. The Keyman Developer touch-layout reader
+// that consumes this file on the `kmc build` path — kmc-kmn's
+// `TouchLayoutFileReader.read()` — passes through properties it does not
+// recognise, so writing provenance under a short, non-colliding `"p"` key is a
+// NON-BREAKING addition on that path. (This project's own `kmcmplib.wasm`
+// oracle validates `.kmn` source only and never reads touch-layout JSON.) Note
+// the reader's separate strict `validate()` (schema `additionalProperties:
+// false`) would reject `"p"`, but the compiler build path never invokes it.
 //
 // This canonical parser reads `p` back and validates it against the known
 // provenance vocabulary; an absent / legacy / out-of-vocabulary value defaults
-// to `"hand-set"` (FR-009 — conservative, never auto-clobbered). The inverse
-// write lives in the engine codec's emitter (the only emit path); it imports
-// {@link PROVENANCE_WIRE_KEY} from here so parse and emit share one wire key.
+// to `DEFAULT_TOUCH_PROVENANCE` (FR-009 — conservative, never auto-clobbered).
+// The inverse write lives in the engine codec's emitter (the only emit path);
+// it imports {@link PROVENANCE_WIRE_KEY} from here so parse and emit share one
+// wire key.
 
 /** Wire-format property carrying per-key provenance in `.keyman-touch-layout`. */
 export const PROVENANCE_WIRE_KEY = "p" as const;
 
-const PROVENANCE_VALUES: ReadonlySet<string> = new Set<TouchKeyProvenance>([
-  "base-derived",
-  "physical-suggested",
-  "hand-set",
-]);
-
 /**
  * Coerce a raw wire value to a {@link TouchKeyProvenance}. Absent, legacy, or
- * out-of-vocabulary values default to `"hand-set"` (FR-009).
+ * out-of-vocabulary values default to {@link DEFAULT_TOUCH_PROVENANCE}
+ * (`"hand-set"`, FR-009). Validation reuses {@link TouchKeyProvenanceSchema} so
+ * the vocabulary has exactly one drift-guarded source (see schemas.ts).
  */
 function readProvenance(raw: unknown): TouchKeyProvenance {
-  return typeof raw === "string" && PROVENANCE_VALUES.has(raw)
-    ? (raw as TouchKeyProvenance)
-    : "hand-set";
+  const parsed = TouchKeyProvenanceSchema.safeParse(raw);
+  return parsed.success ? parsed.data : DEFAULT_TOUCH_PROVENANCE;
 }
 
 /**

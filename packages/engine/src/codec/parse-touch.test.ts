@@ -676,4 +676,27 @@ describe("touch-key provenance round-trip (spec-014 T028)", () => {
     expect(parent?.provenance).toBe("physical-suggested");
     expect(parent?.sk?.[0]?.provenance).toBe("base-derived");
   });
+
+  it("round-trips provenance on multitap sub-keys too", () => {
+    // multitap is kept as its own array (not flattened into sk); provenance
+    // must survive the full cycle there as well.
+    const json = JSON.stringify({
+      tablet: {
+        layer: [{
+          id: "default",
+          row: [{
+            id: 1,
+            key: [{
+              id: "K_1", text: "1", p: "base-derived",
+              multitap: [{ id: "K_1_MT", text: "!", p: "physical-suggested" }],
+            }],
+          }],
+        }],
+      },
+    });
+    const ir2 = parseTouchLayout(emitTouchLayout(parseTouchLayout(json)));
+    const parent = ir2.platforms[0]?.layers[0]?.rows[0]?.keys[0];
+    expect(parent?.provenance).toBe("base-derived");
+    expect(parent?.multitap?.[0]?.provenance).toBe("physical-suggested");
+  });
 });

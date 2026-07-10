@@ -31,7 +31,9 @@ type EmittedKey = Record<string, unknown>;
 function emitKey(key: TouchKeyIR): EmittedKey {
   const out: EmittedKey = { id: key.id };
   // Provenance round-trip (FR-010): write the tag to the non-standard `"p"`
-  // wire property so it survives emit → re-parse. kmcmplib ignores it.
+  // wire property so it survives emit → re-parse. The Keyman Developer
+  // touch-layout reader (kmc-kmn's TouchLayoutFileReader.read()) passes it
+  // through on the build path; see the wire-key note in the canonical parser.
   if (key.provenance !== undefined) out[PROVENANCE_WIRE_KEY] = key.provenance;
   if (key.text !== undefined) out["text"] = key.text;
   if (key.output !== undefined) out["output"] = key.output;
