@@ -86,7 +86,7 @@ function cliValue(name) {
 const SAMPLES = cliValue('--samples') !== null ? Math.max(1, parseInt(cliValue('--samples'), 10)) : 5;
 
 // `--reason-temp <t>`: forwarded verbatim to each Scorecard A hermes-run invocation as
-// `--reason-temp <t>`. Omit to use hermes-run's own default (0.1). This is the knob the
+// `--reason-temp <t>`. Omit to use hermes-run's own default (0.3, the swept optimum). This is the knob the
 // temperature sweep drives; Scorecard B (judge) is unaffected. When set, the value is
 // stamped into scorecard output so sweep runs are self-describing.
 const REASON_TEMP_ARG = cliValue('--reason-temp');
@@ -809,7 +809,7 @@ function generateScorecard(simpResults, ensembleResult, judgeResults, s07Files, 
   lines.push('# Hermes Model-Vetting Scorecard');
   lines.push('');
   lines.push(`> Generated: ${new Date().toISOString()}`);
-  lines.push(`> Scorecard A config: samples=${SAMPLES}, reason-temp=${REASON_TEMP_ARG ?? '0.1 (hermes-run default)'}`);
+  lines.push(`> Scorecard A config: samples=${SAMPLES}, reason-temp=${REASON_TEMP_ARG ?? '0.3 (hermes-run default)'}`);
   lines.push(`> Benchmark: ${JUDGE_BENCHMARK}`);
   lines.push(`> Gold S10: ${GOLD_S10_PATH} (${goldS10 ? goldS10.length : 'missing — keyword fallback'} findings)`);
   lines.push(`> Gold S07: ${GOLD_S07_PATH} (${goldS07 ? goldS07.length : 'missing — keyword fallback'} findings)`);

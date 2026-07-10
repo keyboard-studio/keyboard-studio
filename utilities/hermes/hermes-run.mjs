@@ -43,8 +43,10 @@
 //                           no-swap; set to a lighter model for split-model setups)
 //   --endpoint <url>        default: http://localhost:11434/api/generate
 //   --out <dir>             default: utilities/hermes/reports
-//   --reason-temp <t>       REASON (Step 1) sampling temperature, [0,2] (default 0.1). Raising this
-//                           is what makes --samples / ensemble unions actually diversify.
+//   --reason-temp <t>       REASON (Step 1) sampling temperature, [0,2] (default 0.3). Raising this
+//                           is what makes --samples / ensemble unions actually diversify. 0.3 is the
+//                           swept optimum (2026-07-09 temp-sweep: peak gold-recall for devstral +
+//                           gpt-oss; 0.5/0.7 degrade monotonically). Below it S10 recall collapses.
 //   --judge-temp <t>        JUDGE sampling temperature, [0,2] (default 0.2). Keep low — the judge
 //                           is deterministic in practice (18/18 unanimous across 9 votes).
 //                           STRUCTURE + reconciliation temperature is fixed at 0.1 (mechanical).
@@ -197,8 +199,8 @@ const STRUCTURE_MODEL = flag('--structure-model') ?? REASON_MODEL;
 const JUDGE_MODEL = flag('--judge-model') ?? STRUCTURE_MODEL;
 
 // --reason-temp / --judge-temp: sampling temperature for the REASON (Step 1) and JUDGE
-// passes respectively. Defaults reproduce the historical hardcoded values exactly
-// (reason 0.1, judge 0.2) so omitting both flags is a zero-behaviour-change no-op.
+// passes respectively. Defaults are the swept optima
+// (reason 0.3 per the 2026-07-09 temp-sweep, judge 0.2) so omitting both flags is the tuned baseline.
 // STRUCTURE + reconciliation stay hardcoded at 0.1 (mechanical JSON conversion — no
 // reason to vary). Raising --reason-temp is what makes --samples / ensemble unions
 // actually diversify; keep --judge-temp low (the judge is deterministic in practice).
@@ -212,7 +214,7 @@ function parseTemp(flagName, def) {
   }
   return t;
 }
-const REASON_TEMP = parseTemp('--reason-temp', 0.1);
+const REASON_TEMP = parseTemp('--reason-temp', 0.3);
 const JUDGE_TEMP = parseTemp('--judge-temp', 0.2);
 
 // --reason-models <m1,m2,...>: ENSEMBLE mode — run multiple reason models per file, union

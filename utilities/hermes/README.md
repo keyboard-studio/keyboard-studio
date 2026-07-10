@@ -21,7 +21,7 @@ The vetting harness ([vet.mjs](vet.mjs)) runs `hermes-run.mjs` as a subprocess; 
 
 | Model | Role | Base | Temperature |
 |---|---|---|---|
-| `qwen3:30b-a3b-instruct-2507-q4_K_M` | Default REASON model (Step 1) | Qwen3 30B MoE | 0.1 |
+| `qwen3:30b-a3b-instruct-2507-q4_K_M` | Default REASON model (Step 1) | Qwen3 30B MoE | 0.3 |
 | `hermes-simplify-14b` | Optional STRUCTURE/judge override | `FROM qwen2.5-coder:14b` | 0.1 |
 | `hermes-simplify-7b` | Light/cheap option | `FROM qwen2.5:7b` | 0.1 |
 
@@ -145,7 +145,8 @@ git/gh are used **only** to derive file names (which files are in scope). File c
 | `repeat_penalty` | 1.15 | all three call types | Cuts per-sample over-generation noise (~19 noisy -> ~5 findings typical); value chosen to reduce noise without inducing frequent degenerate/empty output (the `--samples` union compensates for occasional empty outputs) |
 | `repeat_last_n` | 256 | all three call types | Context window for the repeat penalty; 256 tokens is enough to detect repetitive loops |
 | `TOKEN_BUDGET` | 14000 tokens (56000 chars) | `hermes-run.mjs` constant | Input cap for the REASON step; reduced from 18k after the 30B showed compute-exhaustion timeouts at the original cap on large sub-batches. Leaves ~18k for verbose reasoning output within 32k window |
-| `temperature` (REASON/STRUCTURE) | 0.1 | all model body options | Low temperature for stable, deterministic outputs; `--samples` provides variance |
+| `temperature` (REASON) | 0.3 | REASON call | Swept optimum (2026-07-09 temp-sweep): peak gold-recall for devstral + gpt-oss; 0.5/0.7 degrade monotonically, 0.1 collapses S10 recall. Override with `--reason-temp` |
+| `temperature` (STRUCTURE/reconcile) | 0.1 | structure call | Fixed low — mechanical JSON conversion, no reason to vary |
 | `temperature` (JUDGE) | 0.2 | judge call | Slightly higher for judge to avoid mechanical repetition; judge is deterministic in practice under identical prompts |
 | `num_ctx` | 32768 | all model body options | Real ceiling; Qwen2.5 clamps 65536 to this silently |
 | `ACT_CONFIDENCE_MIN` | 0.6 | `hermes-run.mjs` constant | Minimum confidence to be eligible for ACT bucket |
