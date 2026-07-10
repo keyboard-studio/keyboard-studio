@@ -258,6 +258,10 @@ function LangtagsComboboxField({
   const modRef = useRef<Awaited<ReturnType<typeof loadLangtags>> | null>(null);
   const loadedRef = useRef(false);
   const isMountedRef = useRef(true);
+  // Mirrors the latest typed value for the load-.then callback below, which
+  // closes over the value from mount time otherwise (empty-deps effect).
+  const latestValueRef = useRef(strVal);
+  latestValueRef.current = strVal;
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -275,12 +279,29 @@ function LangtagsComboboxField({
         modRef.current = mod;
         setOptions(mod.listLanguages().slice(0, MAX_DATALIST_OPTIONS) as LanguageSummary[]);
         setLoaded(true);
+        // A value typed before the module resolved never went through
+        // handleType's lookup (modRef.current was still null), so re-run the
+        // same lookup+resolve path now against whatever is currently typed —
+        // otherwise a pre-load exact match silently never seeds onEntryResolved.
+        // (No-op in code-mode: resolveTyped early-returns when onEntryResolved
+        // is undefined.)
+        const current = latestValueRef.current;
+        if (current.trim() !== "") {
+          const results = current.trim() ? mod.lookupByName(current) : mod.listLanguages();
+          setOptions(results.slice(0, MAX_DATALIST_OPTIONS) as LanguageSummary[]);
+          resolveTyped(current, results);
+        }
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         // Degrade to a plain free-text field on import failure (FR-009).
         if (!isMountedRef.current) return;
+        console.warn(
+          "[survey] langtags load failed for LangtagsComboboxField; degrading to free-text input",
+          err,
+        );
         setLoaded(true);
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs exactly once on mount; resolveTyped is a stable per-render closure and re-running the effect would re-trigger the load
   }, []);
 
   // Resolve the currently-typed text to a single entry, or null when it matches
@@ -289,12 +310,16 @@ function LangtagsComboboxField({
   // onSelect — always resolves unambiguously via the row's payload.
   function resolveTyped(text: string, results: readonly LanguageSummary[]): void {
     if (onEntryResolved === undefined) return;
-    const trimmed = text.trim().toLowerCase();
+    // NFC-normalize before case-folding so NFC/NFD variants of the same name
+    // compare equal — matches the own-name dedup key in IdentityLite.getSeedOptions.
+    const trimmed = text.trim().normalize("NFC").toLowerCase();
     if (trimmed === "") {
       onEntryResolved(null);
       return;
     }
-    const exact = results.filter((r) => (r.englishName ?? "").toLowerCase() === trimmed);
+    const exact = results.filter(
+      (r) => (r.englishName ?? "").normalize("NFC").toLowerCase() === trimmed,
+    );
     onEntryResolved(exact.length === 1 ? exact[0]! : null);
   }
 
