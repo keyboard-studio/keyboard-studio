@@ -16,6 +16,7 @@ import type { FlowDef, FlowQuestion, FlowOption, FlowGotoRule, SurveyContext, An
 import type { SurveyAnswer, SurveyPhaseResult, LintFinding, LangtagsProvenance, LanguageSummary } from "@keyboard-studio/contracts";
 import { QuestionField } from "./QuestionField.tsx";
 import { debugPinsStore } from "../stores/debugPinsStore.ts";
+import { secondaryButton, primaryButton } from "./surveyStyles.ts";
 
 // ---------------------------------------------------------------------------
 // Condition evaluator
@@ -675,16 +676,7 @@ export function SurveyRunner({
             type="button"
             data-testid="survey-back"
             onClick={handleBack}
-            style={{
-              padding: "8px 18px",
-              background: "transparent",
-              border: "1px solid #30363d",
-              borderRadius: 6,
-              color: "#8b949e",
-              fontSize: 13,
-              cursor: "pointer",
-              fontFamily: "inherit",
-            }}
+            style={secondaryButton}
           >
             Back
           </button>
@@ -695,17 +687,7 @@ export function SurveyRunner({
           onClick={handleNext}
           disabled={!canAdvance}
           aria-describedby={progressDescId}
-          style={{
-            padding: "8px 18px",
-            background: canAdvance ? "#1f6feb" : "#161b22",
-            border: "1px solid #30363d",
-            borderRadius: 6,
-            color: canAdvance ? "#e6edf3" : "#484f58",
-            fontSize: 13,
-            cursor: canAdvance ? "pointer" : "not-allowed",
-            fontFamily: "inherit",
-            transition: "background 120ms ease",
-          }}
+          style={{ ...primaryButton(!canAdvance), transition: "background 120ms ease" }}
         >
           {isLastQuestion ? "Finish" : "Next"}
         </button>

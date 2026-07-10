@@ -23,21 +23,14 @@ export const definition = {
   next: "iso_code",
 } satisfies import("../../types.ts").FlowQuestion;
 
-/**
- * Validate the autonym value.
- * Rules:
- *   1. Value must be present and non-empty after trimming.
- * No character-set constraints — the whole point is to accept any script.
- */
 export function validate(
   value: string | string[] | undefined,
 ): ValidationResult {
-  const trimmed =
-    typeof value === "string"
-      ? value.trim()
-      : Array.isArray(value)
-        ? value.join("").trim()
-        : "";
+  const trimmed = typeof value === "string"
+    ? value.trim()
+    : Array.isArray(value)
+      ? value.join("").trim()
+      : "";
 
   if (trimmed.length === 0) {
     return { ok: false, code: "required", message: "Language name is required." };
