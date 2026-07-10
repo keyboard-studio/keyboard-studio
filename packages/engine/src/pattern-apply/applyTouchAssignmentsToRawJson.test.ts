@@ -592,6 +592,28 @@ describe("applyTouchAssignmentsToRawJson — unknown patternId", () => {
     expect(warnings[0]).toContain("unknown patternId");
     expect(JSON.parse(out)).toEqual(JSON.parse(json));
   });
+
+  // Case-B mirror of the Case-A "one warning per mechanism" test: the
+  // per-mechanism unknown-patternId warning must fire once PER mechanism, not
+  // once per assignment — locks in that the raw-JSON applier iterates
+  // assignment.mechanisms individually (same loop restructure as the IR path).
+  it("emits one warning PER unrecognized patternId when an assignment carries two unknown mechanisms", () => {
+    const json = makePhoneOnlyJson([{ id: "K_A", text: "a" }]);
+    const bad: TouchAssignment = {
+      scope: "individual",
+      target: "x",
+      modality: "touch",
+      mechanisms: [
+        { patternId: "totally_unknown_pattern_one", slotValues: { hostKey: "K_A", char: "x" } },
+        { patternId: "totally_unknown_pattern_two", slotValues: { hostKey: "K_A", char: "x" } },
+      ],
+    };
+    const { json: out, warnings } = applyTouchAssignmentsToRawJson(json, [bad]);
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toContain("unknown patternId");
+    expect(warnings[1]).toContain("unknown patternId");
+    expect(JSON.parse(out)).toEqual(JSON.parse(json));
+  });
 });
 
 // ---------------------------------------------------------------------------

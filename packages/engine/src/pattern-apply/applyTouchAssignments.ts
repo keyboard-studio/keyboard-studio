@@ -262,7 +262,7 @@ export function applyTouchAssignments(
 
       // Unknown patternId — one warning per mechanism.
       warnings.push(
-        `[touch-apply] unknown patternId "${patternId}" — assignment skipped`
+        `[touch-apply] unknown patternId "${patternId}" — mechanism skipped`
       );
     }
   }

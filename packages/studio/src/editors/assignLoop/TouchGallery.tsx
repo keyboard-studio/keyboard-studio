@@ -756,8 +756,8 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   /**
    * Build just the `{ patternId, slotValues }` mechanism for the current
    * method/hostKey/flickDirection state. Callers append this to a char's
-   * existing `mechanisms[]` via {@link appendMechanismToChar} (issue 3 —
-   * multiple methods per character) rather than overwriting the assignment.
+   * existing `mechanisms[]` via {@link appendMechanismToChar} (regression 3,
+   * multi-method — multiple methods per character) rather than overwriting the assignment.
    */
   function buildMechanismRef(char: string): MechanismRef {
     if (method === "longpress_alternates") {
@@ -792,9 +792,9 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
   /**
    * Append `ref` to `char`'s mechanisms[] in `prev`, returning a new Map
-   * (immutable update — issue 3, multiple methods per character).
+   * (immutable update — regression 3, multi-method, multiple methods per character).
    *
-   * Total invariants (hold regardless of call site — QC P1):
+   * Total invariants (hold regardless of call site — prior-QC P1 finding):
    * - No existing entry for `char` → create a new single-mechanism assignment.
    * - `touch_inherited` is mutually exclusive with a real configured method —
    *   appending it when the char already has a real (non-inherited)
@@ -889,7 +889,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   }, [currentChar]);
 
   // Accept the suggestion: append the suggested mechanism immediately, then
-  // STAY on the current character (issue 4) instead of advancing — dismissing
+  // STAY on the current character (regression 4, stay-on-char) instead of advancing — dismissing
   // the suggestion flips showChooser true so the author can add another
   // method to the same character. If no host key could be derived, fall back
   // to opening the chooser pre-filled at the suggested method so the user can
@@ -994,7 +994,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   }, [charHistory, onBack]);
 
   // Remove a single mechanism (by index within that char's mechanisms[]) from
-  // the configured chip row (issue 3 — multiple methods per character). If the
+  // the configured chip row (regression 3, multi-method — multiple methods per character). If the
   // removed mechanism was the char's only one, the whole char entry is deleted
   // from the map — folding what was previously a separate
   // "remove the whole configured character" handler into this one, since a

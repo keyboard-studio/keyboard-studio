@@ -564,7 +564,7 @@ describe("applyTouchAssignments — multiple mechanisms per assignment", () => {
     expect(getKey(out, "K_B")!.multitap?.[0]?.text).toBe("β");
   });
 
-  // triage #2 (minor, engine test): replace + additive on the same host key.
+  // prior-triage finding #2 (minor, engine test): replace + additive on the same host key.
   // touch_key_replace rewrites the key's id/text in place; a same-host-key
   // longpress/multitap must still land (keyIndex is built from the ORIGINAL
   // host key id, so it is unaffected by the id rewrite). The branch must be
@@ -617,7 +617,7 @@ describe("applyTouchAssignments — multiple mechanisms per assignment", () => {
     expect(replaced.sk![0]!.text).toBe("ń");
   });
 
-  // triage #4 (suggestion, engine test): the per-mechanism unknown-patternId
+  // prior-triage finding #4 (suggestion, engine test): the per-mechanism unknown-patternId
   // warning must fire once PER mechanism, not once per assignment — locks in
   // the loop-restructure that iterates assignment.mechanisms individually.
   it("emits one warning PER unrecognized patternId when an assignment carries two unknown mechanisms", () => {

@@ -380,8 +380,8 @@ describe("TouchGallery — back navigation", () => {
     });
 
     // Accept the suggestion for "ä" — this calls handleUseSuggestion (longpress)
-    // or handleSuggestionAccept (already). Per issue 4 (stay on the character
-    // after accepting a suggestion), accepting no longer advances by itself —
+    // or handleSuggestionAccept (already). Per regression 4 (stay-on-char after
+    // accepting a suggestion), accepting no longer advances by itself —
     // click "Next character →" afterward to push "ä" onto history and advance
     // to "ö".
     const allButtons = screen.queryAllByRole("button");
@@ -492,7 +492,7 @@ describe("TouchGallery — draft persistence across unmount/remount", () => {
     );
 
     // "ä" is decomposable and not in the default layout, so the suggestion is
-    // "longpress". Accept it — records "ä" in charTouch (stays on "ä"; issue 4).
+    // "longpress". Accept it — records "ä" in charTouch (stays on "ä"; regression 4, stay-on-char).
     const allButtons = screen.queryAllByRole("button");
     const acceptBtn = allButtons.find(
       (b) => b.textContent?.trim() === "Accept",
@@ -524,7 +524,7 @@ describe("TouchGallery — draft persistence across unmount/remount", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Multiple methods per character (issue 3 — core model change)
+// Multiple methods per character (regression 3, multi-method — core model change)
 // ---------------------------------------------------------------------------
 
 describe("TouchGallery — multiple methods per character", () => {
@@ -603,7 +603,7 @@ describe("TouchGallery — multiple methods per character", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Stay on character after accepting a suggestion (issue 4)
+// Stay on character after accepting a suggestion (regression 4, stay-on-char)
 // ---------------------------------------------------------------------------
 
 describe("TouchGallery — accepting a suggestion stays on the same character", () => {
@@ -661,7 +661,7 @@ describe("TouchGallery — accepting a suggestion stays on the same character", 
 });
 
 // ---------------------------------------------------------------------------
-// Back preserves history depth across remount (issue 2)
+// Back preserves history depth across remount (regression 2, back-button depth)
 // ---------------------------------------------------------------------------
 
 describe("TouchGallery — Back preserves history depth across a remount", () => {
@@ -903,7 +903,7 @@ describe("TouchGallery — no suggestion goes straight to chooser", () => {
 // useTouchLint error surface — AC#3 (swallowed-catch bugfix)
 // ---------------------------------------------------------------------------
 
-describe("TouchGallery — QC P1 dedupe / revisit invariants", () => {
+describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", () => {
   it("revisiting an already-configured character skips the suggestion and does not duplicate its mechanism", async () => {
     // "ä" is decomposable and not in the default layout → longpress suggestion,
     // derives hostKey K_A automatically so Accept records the mechanism directly.
