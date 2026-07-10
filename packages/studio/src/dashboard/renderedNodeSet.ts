@@ -56,16 +56,9 @@ export interface BuiltFlowSource {
  * Build one flowSources entry into a FlowGraph, failing visibly.
  * Threads `stepId` through to BuiltFlowSource so attachDrillDowns groups correctly.
  *
- * NOTE: safeBuild's internal undefined-guard + status check are redundant with the
- * checks buildFlowSources() already performs before calling it. Retained as a
- * defensive belt-and-suspenders guard so a future caller that does not pre-filter
- * (or a missing flowSources entry) fails visibly rather than throwing. (Spec 025's
- * Library section builds proposed graphs via buildLibrarySection, not this helper.)
+ * Caller pre-validates that sourceId exists, but defensive guard retained for clarity.
  */
-function safeBuild(
-  sourceId: string,
-  stepId: string,
-): BuiltFlowSource {
+function safeBuild(sourceId: string, stepId: string): BuiltFlowSource {
   const source = flowSources[sourceId];
   if (source === undefined) {
     return {
@@ -229,20 +222,34 @@ interface ParsedSource {
   error: string | null;
 }
 
-/** Parse every flowSources entry once. A parse failure is recorded (not swallowed):
- *  it surfaces both as a null flow (so the entry contributes no ids) AND as an error
- *  on the built graph, and is logged in DEV — matching buildFlowSources' fail-loud
- *  behaviour so the id-collection and graph-build passes stay consistent. */
+/**
+ * Parse every flowSources entry once. A parse failure is recorded (not swallowed):
+ * it surfaces both as a null flow (so the entry contributes no ids) AND as an error
+ * on the built graph, and is logged in DEV — matching buildFlowSources' fail-loud
+ * behaviour so the id-collection and graph-build passes stay consistent.
+ */
 function parseAllSources(): ParsedSource[] {
   return Object.values(flowSources).map((source) => {
     try {
-      return { id: source.id, title: source.title, status: source.status, flow: loadModularFlow(source.raw), error: null };
+      return {
+        id: source.id,
+        title: source.title,
+        status: source.status,
+        flow: loadModularFlow(source.raw),
+        error: null,
+      };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (import.meta.env.DEV) {
         console.error(`[renderedNodeSet] flowSources["${source.id}"] failed to parse — ${message}`);
       }
-      return { id: source.id, title: source.title, status: source.status, flow: null, error: message };
+      return {
+        id: source.id,
+        title: source.title,
+        status: source.status,
+        flow: null,
+        error: message,
+      };
     }
   });
 }

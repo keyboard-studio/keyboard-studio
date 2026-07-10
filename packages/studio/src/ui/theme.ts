@@ -104,6 +104,9 @@ export const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 /** Primary action blue used by mechanism / touch galleries. */
 export const BLUE_ACTION = "#1f6feb";
 
+/** Monospace font stack used by editors, diagnostics, and code displays. */
+export const FONT_MONO = "ui-monospace, 'Cascadia Code', Consolas, monospace";
+
 // ---------------------------------------------------------------------------
 // 3. Divergent / preserved tokens
 //    Each value differs from every canonical token and is preserved exactly
@@ -163,3 +166,10 @@ export const CHECKED_CHIP_BG = "#0d2044";
  * distinct; preserved as-is (post-P1 normalization candidate).
  */
 export const DISABLED_DIVIDER = "#21262d";
+
+/**
+ * Card border color used by editors, diagnostics, metadata, and form panels.
+ * Appears 38 times across 18 files. Near canonical BORDER (#30363d) but
+ * intentionally distinct; preserved as-is (post-P1 normalization candidate).
+ */
+export const CARD_BORDER = "#283040";

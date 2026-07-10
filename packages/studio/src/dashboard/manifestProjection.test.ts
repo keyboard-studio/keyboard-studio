@@ -139,7 +139,7 @@ describe("attachDrillDowns — registry-keyed drill-downs (FR-004 / SC-003)", ()
         // Built (non-null) graphs key off a real registry id.
         if (dd.graph !== null) {
           expect(
-            Object.prototype.hasOwnProperty.call(questionRegistry, dd.registryKey),
+            dd.registryKey in questionRegistry,
             `drill-down key "${dd.registryKey}" (${dd.title}) is not a questionRegistry id`,
           ).toBe(true);
           expect(registryKeyForFlow(dd.graph)).toBe(dd.registryKey);

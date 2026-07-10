@@ -84,6 +84,18 @@ const TERMINAL_PANEL_STYLE: CSSProperties = {
   alignItems: "flex-start",
 };
 
+const TERMINAL_HEADING_STYLE: CSSProperties = {
+  margin: 0,
+  fontSize: "1.1rem",
+  fontWeight: 600,
+};
+
+const TERMINAL_TEXT_STYLE: CSSProperties = {
+  margin: 0,
+  fontSize: 13,
+  color: "#8b949e",
+};
+
 const START_OVER_BTN_STYLE: CSSProperties = {
   padding: "8px 18px",
   background: "transparent",
@@ -116,10 +128,10 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   if (activeStepId === "done") {
     return (
       <div style={TERMINAL_PANEL_STYLE}>
-        <h2 style={{ margin: 0, fontSize: "1.1rem", color: "#6ea8fe", fontWeight: 600 }}>
+        <h2 style={{ ...TERMINAL_HEADING_STYLE, color: "#6ea8fe" }}>
           Survey complete
         </h2>
-        <p style={{ margin: 0, fontSize: 13, color: "#8b949e" }}>
+        <p style={TERMINAL_TEXT_STYLE}>
           All authoring steps have been completed. Head to Output to download or
           submit your keyboard.
         </p>
@@ -152,10 +164,10 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     // Fallback: identityResult is null — render a generic fallback panel.
     return (
       <div style={TERMINAL_PANEL_STYLE}>
-        <h2 style={{ margin: 0, fontSize: "1.1rem", color: "#f85149", fontWeight: 600 }}>
+        <h2 style={{ ...TERMINAL_HEADING_STYLE, color: "#f85149" }}>
           Script not supported
         </h2>
-        <p style={{ margin: 0, fontSize: 13, color: "#8b949e" }}>
+        <p style={TERMINAL_TEXT_STYLE}>
           This script is not yet supported in v1. Please start over and choose a
           different script, or check back in a future release.
         </p>
