@@ -1,0 +1,42 @@
+# lineage.nearest-neighbors — the cohort facet: k-nearest corpus keyboards in
+# fingerprint space (layout affinity + script class + strategy fingerprint +
+# language/region tags). Powers "keyboards for communities like yours" and
+# upgrades rankBases from metadata-text tiers to structural similarity.
+
+id: lineage.nearest-neighbors
+family: lineage
+title: Nearest corpus neighbors
+description: >
+  The k most similar keyboards in the corpus fingerprint space for the
+  author's emerging profile. Not a taxonomy — an empirical neighborhood that
+  updates as answers accumulate. Every downstream lineage facet (siblings,
+  strategy fingerprint) reads from this one's distance function.
+valueType: vector
+
+modality: both
+modalityNotes: >
+  Physical fingerprints (vkey placements) and touch fingerprints (longpress /
+  layer conventions) are separate sub-spaces; neighbors can differ per modality.
+
+derivations:
+  - kind: corpus
+    source: "corpus:fingerprint-knn"
+    sourceStatus: planned
+    notes: >
+      Requires the supportability-scanner's import-corpus.json to grow full
+      per-keyboard fingerprints (layout affinity, strategy set, placements).
+      The scanner already parses every corpus keyboard and runs the recognizer.
+
+consumers:
+  prefills: []
+  proposes:
+    - "gallery:base-ranking"
+    - "gallery:similar-keyboards-shelf"
+
+provenanceLabel: "similar keyboards in the Keyman repository"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: corpus

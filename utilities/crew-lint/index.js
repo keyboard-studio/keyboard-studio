@@ -308,7 +308,7 @@ function checkDetectorsProven() {
 
   const emojiFailures = [
     ...testPattern(EMOJI, true, ["✅", "❌", "⚠️", "🤖", "✂", "✔", "✖"], "EMOJI"),
-    ...testPattern(EMOJI, false, ["→", "§", "×", "—", "–", """, """, "'", "≥", "≤", "A1-A7"], "EMOJI"),
+    ...testPattern(EMOJI, false, ["→", "§", "×", "—", "–", "“", "”", "'", "≥", "≤", "A1-A7"], "EMOJI"),
   ];
 
   const lineRefTests = [

@@ -1,0 +1,46 @@
+# env.device-mix — already asked as pa_primary_target, but today it gates the
+# flow; as a facet it should drive DUAL proposals instead: the same character
+# gets a physical mechanism proposal (e.g. RAlt+N) and a touch proposal
+# (longpress on N), and this facet decides which leads and whether the other is
+# generated at all.
+
+id: env.device-mix
+family: env
+title: Device mix
+description: >
+  Which device categories the keyboard must serve — desktop physical, touch,
+  or both — and which is primary for the community. Distinct from
+  community.digital-context (what the community habitually uses): this is the
+  author's declared target for THIS keyboard.
+valueType: enum
+values: [desktop-primary, touch-primary, both-equal]
+
+modality: both
+modalityNotes: >
+  This is the facet that arbitrates between modalities: it orders per-modality
+  mechanism proposals and controls whether touch layers are scaffolded at all.
+
+derivations:
+  - kind: confirmed
+    source: "question:pa_primary_target"
+    sourceStatus: available
+  - kind: corpus
+    source: "corpus:sibling-keyboard-targets"
+    sourceStatus: planned
+    notes: Sibling keyboards' .kps <Targets> hint at what the community ships.
+
+consumers:
+  prefills:
+    - pa_primary_target
+  proposes:
+    - "mechanism-gallery:per-modality-ordering"
+    - "scaffolder:touch-layer-inclusion"
+    - "strategy:S-13-consideration"
+
+provenanceLabel: "your device answer + similar keyboards' targets"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: confirmed

@@ -1,0 +1,41 @@
+# orth.regional-variant — the same language differs by country: digit shapes
+# (Arabic-Indic U+0660–U+0669 vs Extended Arabic-Indic U+06F0–U+06F9 vs European), quotation and punctuation
+# conventions, decimal separators. Region-conditioned corpus signals propose
+# these; today pb_digit_set and pb_punctuation_list are blank.
+
+id: orth.regional-variant
+family: orth
+title: Regional orthographic conventions
+description: >
+  Region-conditioned conventions orthogonal to the character inventory: which
+  digit set the community prints, punctuation and quotation style, currency
+  and separator characters. Derived from the region answer + what corpus
+  keyboards serving the same region/script actually emit.
+valueType: vector
+
+modality: both
+
+derivations:
+  - kind: corpus
+    source: "corpus:region-convention-priors"
+    sourceStatus: planned
+    notes: Same mining pass as placement priors, aggregated over digits/punctuation instead of letters.
+  - kind: confirmed
+    source: "question:region"
+    sourceStatus: available
+
+consumers:
+  prefills:
+    - pb_digit_set
+    - pb_punctuation_gate
+    - pb_punctuation_list
+  proposes:
+    - "placement:punctuation-defaults"
+
+provenanceLabel: "conventions of keyboards from your region"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: corpus

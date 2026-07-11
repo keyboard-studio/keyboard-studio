@@ -1,0 +1,40 @@
+# lineage.strategy-fingerprint — what strategies (S-01..S-13) the neighborhood
+# actually uses, from the recognizer's pattern-lift over corpus keyboards. The
+# structural half of community.input-conventions (which reads the prose half
+# from help docs). Second proposer for pb_typing_approach and the mechanism
+# defaults beyond the S-01/S-08 placement priors.
+
+id: lineage.strategy-fingerprint
+family: lineage
+title: Neighborhood strategy fingerprint
+description: >
+  The distribution of recognized strategies among the nearest corpus
+  neighbors: if 12 of 15 similar keyboards use deadkey composition (S-02) and
+  none use mnemonic spelling (S-05), the mechanism proposals should lead with
+  deadkeys. Derived entirely from the recognizer running over the corpus —
+  the supportability-scanner already performs the per-keyboard half.
+valueType: vector
+
+modality: both
+
+derivations:
+  - kind: corpus
+    source: "corpus:recognized-strategy-distribution"
+    sourceStatus: planned
+    notes: Aggregation over recognizer output per keyboard; the per-keyboard lift already runs in the scanner.
+
+consumers:
+  prefills:
+    - pb_typing_approach
+  proposes:
+    - "strategy:selection-bias"
+    - "mechanism-gallery:method-ordering"
+
+relatedAxes: [A3]
+provenanceLabel: "strategies used by similar keyboards"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: corpus

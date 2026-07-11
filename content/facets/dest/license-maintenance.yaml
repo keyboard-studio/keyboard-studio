@@ -1,0 +1,42 @@
+# dest.license-maintenance — license posture and maintenance intent, proposed
+# from author.authority and the delivery channel. keymanapp/keyboards PRs
+# effectively require MIT; a private institutional keyboard may not want it.
+# Maintenance intent (one-off vs maintained) drives the contact/version fields
+# that are blank free text today.
+
+id: dest.license-maintenance
+family: dest
+title: License and maintenance intent
+description: >
+  The output's license posture and whether the keyboard will be maintained
+  (versioned, contactable) or is a one-off delivery. Proposes the .kps
+  license/contact fields and the help-doc credits block as structured
+  confirmations instead of blank text.
+valueType: vector
+
+modality: both
+
+derivations:
+  - kind: computed
+    source: "planned:derive-from-authority-and-channel"
+    sourceStatus: planned
+  - kind: confirmed
+    source: "question:pa_copyright_holder"
+    sourceStatus: available
+
+consumers:
+  prefills:
+    - pf_contact_info
+    - pb_contact_language
+    - author_contact_email
+  proposes:
+    - "identity:license-proposal"
+    - "output:kps-fields"
+
+provenanceLabel: "your role and delivery choice"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: confirmed

@@ -1,0 +1,46 @@
+# author.authority — the 16-question provenance block and the copyright field
+# are today all blank free text. Who the author IS (community member, external
+# linguist, institution) predicts most of those answers. §3c marks attribution
+# as signal-weak territory: propose a STRUCTURED CHOICE here, never assert a
+# single value the studio cannot stand behind.
+
+id: author.authority
+family: author
+title: Author authority / affiliation
+description: >
+  The author's relationship to the language community: community member,
+  external linguist/consultant, or institution (SIL entity, university,
+  government body). Drives structured proposals for copyright holder,
+  credits, and the provenance block — converting a wall of blank free-text
+  fields into confirmations seeded from one answer.
+valueType: enum
+values: [community-member, external-linguist, institution]
+
+modality: both
+
+derivations:
+  - kind: asked
+    source: "planned:authority-question"
+    sourceStatus: planned
+    notes: One early question; OAuth org membership (author.github-presence) can seed it.
+  - kind: computed
+    source: "oauth:org-membership"
+    sourceStatus: planned
+
+consumers:
+  prefills:
+    - pa_copyright_holder
+    - provenance_requester_relation
+    - provenance_requester_affiliation
+    - provenance_community_involvement
+    - pf_credits
+  proposes:
+    - "identity:attribution-structured-choice"
+
+provenanceLabel: "your role answer"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: asked
