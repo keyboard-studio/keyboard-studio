@@ -55,6 +55,7 @@ import type { ScaffoldSpec, VfsTransform } from "../../hooks/useKeyboardArtifact
 import { scaffoldTouchLayout } from "@keyboard-studio/engine";
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
+import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { KEY_OPTIONS, VALID_HOST_KEYS } from "../../lib/keyOptions.ts";
 import {
   BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
@@ -508,24 +509,69 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
   const { stage, retry } = useKeyboardArtifact(baseKeyboard, scaffoldSpec, vfsTransform);
 
-  // Characters whose suggestion card has been explicitly accepted or denied.
-  // Rehydrated from the store draft on mount (mirrors charTouch) so a
-  // resolved suggestion never reappears after back-navigation +
-  // unmount/remount.
-  const [suggestionResolved, setSuggestionResolved] = useState<Set<string>>(() =>
-    touchDraft !== null
-      ? new Set(touchDraft.suggestionResolvedChars)
-      : new Set(),
-  );
+  // Current character index — synced with inventory. Declared here (moved up
+  // from its later position) so both handleContinue and usePositionalCharNav
+  // below can reference it; this state is otherwise independent of the
+  // intervening code, so the reorder carries no behavior change.
+  const [currentChar, setCurrentChar] = useState<string | null>(null);
 
-  const markSuggestionResolved = useCallback((char: string) => {
-    setSuggestionResolved((prev) => {
-      if (prev.has(char)) return prev;
-      const next = new Set(prev);
-      next.add(char);
-      return next;
+  // Sync currentChar when inventory loads or changes.
+  const inventoryKey = inventory.join("\0");
+  useEffect(() => {
+    setCurrentChar((prev) => {
+      if (inventory.length === 0) return null;
+      // Keep current char if it's still in the list.
+      if (prev !== null && inventory.includes(prev)) return prev;
+      // Pick the first unconfigured char.
+      return (
+        inventory.find((c) => !charTouch.has(c)) ??
+        inventory[0] ??
+        null
+      );
     });
-  }, []);
+    // Only re-run when the inventory list itself changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inventoryKey]);
+
+  // Completion — emit only explicitly-configured characters. Declared before
+  // usePositionalCharNav below because the hook calls it directly when
+  // forward navigation reaches the last character (the last character's
+  // forward button IS the phase completion, not a further navigation step).
+  const handleContinue = useCallback(() => {
+    // Emit only chars where a real (non-inherited) or inherited assignment was
+    // explicitly accepted — everything in charTouch was put there by the user.
+    // `.some()` rather than `mechanisms[0]` (regression 3, multi-method): a
+    // character can carry several mechanisms, so any real (non-inherited) one
+    // qualifies it, not just whichever happens to be first in the array.
+    const assignments: TouchAssignment[] = [...charTouch.values()].filter((a) =>
+      a.mechanisms.some((m) => m.patternId !== "touch_inherited"),
+    );
+    onComplete(assignments);
+  }, [charTouch, onComplete]);
+
+  // Positional Back/Next/Skip/Previous navigation + suggestion-dismissal
+  // tracking — shared with MechanismGallery via usePositionalCharNav so the
+  // two galleries cannot drift (see that hook for the Back/Next/Previous
+  // rationale, including the idx === -1 defense-in-depth guard).
+  // initialSuggestionResolved rehydrates the resolved set from the store
+  // draft on mount (mirrors charTouch) so a resolved suggestion never
+  // reappears after back-navigation + unmount/remount.
+  const {
+    currentIdx,
+    hasAnotherCharAfterCurrent,
+    handleNext,
+    handleBack,
+    handlePreviousChar,
+    suggestionResolved,
+    markSuggestionResolved,
+  } = usePositionalCharNav({
+    list: inventory,
+    currentChar,
+    setCurrentChar,
+    onComplete: handleContinue,
+    onBack,
+    initialSuggestionResolved: touchDraft?.suggestionResolvedChars,
+  });
 
   // Intro splash — shown once when the author first enters the touch gallery so
   // the move from the desktop (physical) gallery to touch is explicit. The
@@ -546,27 +592,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [charTouch, suggestionResolved]);
-
-  // Current character index.
-  const [currentChar, setCurrentChar] = useState<string | null>(null);
-
-  // Sync currentChar when inventory loads or changes.
-  const inventoryKey = inventory.join("\0");
-  useEffect(() => {
-    setCurrentChar((prev) => {
-      if (inventory.length === 0) return null;
-      // Keep current char if it's still in the list.
-      if (prev !== null && inventory.includes(prev)) return prev;
-      // Pick the first unconfigured char.
-      return (
-        inventory.find((c) => !charTouch.has(c)) ??
-        inventory[0] ??
-        null
-      );
-    });
-    // Only re-run when the inventory list itself changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inventoryKey]);
 
   // ---------------------------------------------------------------------------
   // Phase C desktop assignments + detected-chars from scaffoldTouchLayout
@@ -930,83 +955,11 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentChar, canApply, method, hostKey, flickDirection]);
 
-  // ---------------------------------------------------------------------------
-  // Completion — emit only explicitly-configured characters. Declared before
-  // the navigation handlers below because forward navigation on the LAST
-  // character calls it directly (the last character's forward button IS the
-  // phase completion, not a further navigation step).
-  // ---------------------------------------------------------------------------
-
-  const handleContinue = useCallback(() => {
-    // Emit only chars where a real (non-inherited) or inherited assignment was
-    // explicitly accepted — everything in charTouch was put there by the user.
-    // `.some()` rather than `mechanisms[0]` (regression 3, multi-method): a
-    // character can carry several mechanisms, so any real (non-inherited) one
-    // qualifies it, not just whichever happens to be first in the array.
-    const assignments: TouchAssignment[] = [...charTouch.values()].filter((a) =>
-      a.mechanisms.some((m) => m.patternId !== "touch_inherited"),
-    );
-    onComplete(assignments);
-  }, [charTouch, onComplete]);
-
-  // ---------------------------------------------------------------------------
-  // Navigation — deterministic linear positional navigation. idx is the
-  // position of currentChar in inventory; Back/Next always move by one
-  // position rather than searching for the next unconfigured character, so
-  // an already-configured character is never jumped over. Skip (see below)
-  // is identical to Next — it records nothing.
-  // ---------------------------------------------------------------------------
-
-  const currentIdx = currentChar !== null ? inventory.indexOf(currentChar) : -1;
-  const hasAnotherCharAfterCurrent = currentIdx >= 0 && currentIdx < inventory.length - 1;
-
-  const handleNext = useCallback(() => {
-    // currentIdx === -1 (currentChar not found in inventory) is defense-in-
-    // depth against the sync useEffect's invariant — reusing the outer
-    // currentIdx (already derived from currentChar/inventory, both already in
-    // this callback's deps) rather than recomputing indexOf(). Without this
-    // guard, an empty inventory would make currentIdx === -1 ===
-    // inventory.length - 1, spuriously firing the completion branch below.
-    if (currentChar === null || currentIdx === -1) return;
-    if (currentIdx === inventory.length - 1) {
-      handleContinue();
-      return;
-    }
-    setCurrentChar(inventory[currentIdx + 1] ?? null);
-  }, [currentChar, currentIdx, inventory, handleContinue]);
-
   // "Skip this character" is pure forward navigation — it records nothing,
   // so it is identical to handleNext (advance one position, or complete from
-  // the last character). The Skip button calls handleNext directly (see
-  // below) rather than duplicating this logic.
-
-  // Back handler — moves to the previous position in inventory. On the FIRST
-  // character (idx === 0, or currentChar === null e.g. the empty-inventory
-  // guard) calls onBack to return to Phase C (locked/read-only; no unlock is
-  // performed). Positional, so it survives remount — no history stack to lose.
-  const handleBack = useCallback(() => {
-    if (currentChar === null) {
-      onBack();
-      return;
-    }
-    // See handleNext for the currentIdx === -1 defense-in-depth rationale.
-    if (currentIdx === -1) return;
-    if (currentIdx <= 0) {
-      onBack();
-      return;
-    }
-    setCurrentChar(inventory[currentIdx - 1] ?? null);
-  }, [currentChar, currentIdx, inventory, onBack]);
-
-  // Previous character — steps back one position in inventory, ungated by
-  // configured status on the character being left. Unlike handleBack, this
-  // never exits the phase: it is a no-op on the first character
-  // (currentIdx <= 0), where the caller-side disabled condition already
-  // prevents the click, but the handler stays defensive on its own.
-  const handlePreviousChar = useCallback(() => {
-    if (currentChar === null || currentIdx <= 0) return;
-    setCurrentChar(inventory[currentIdx - 1] ?? null);
-  }, [currentChar, currentIdx, inventory]);
+  // the last character, both from usePositionalCharNav above). The Skip
+  // button calls handleNext directly (see below) rather than duplicating
+  // this logic.
 
   // Remove a single mechanism (by index within that char's mechanisms[]) from
   // the configured chip row (regression 3, multi-method — multiple methods per character). If the

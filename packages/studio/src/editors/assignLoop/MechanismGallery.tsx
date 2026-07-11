@@ -73,6 +73,7 @@ import { getSuggestionForChar } from "../../survey/placementSeeds.ts";
 import { KEY_OPTIONS, ALL_PICKABLE_KEYS } from "../../lib/keyOptions.ts";
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
+import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { RadioGroup } from "../../ui/RadioGroup.tsx";
 import {
   BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
@@ -879,24 +880,29 @@ export function MechanismGallery({
     [currentChar, placementMap],
   );
 
-  // Characters whose suggestion row has been explicitly accepted or denied.
-  // Component-level state — survives navigation within the mounted session
+  // Positional Back/Next/Skip/Previous navigation + suggestion-dismissal
+  // tracking — shared with TouchGallery via usePositionalCharNav so the two
+  // galleries cannot drift (see that hook for the Back/Next/Previous
+  // rationale, including the idx === -1 defense-in-depth guard). No
+  // initialSuggestionResolved is passed: suggestionResolved is component-
+  // level state here — it survives navigation within the mounted session
   // but is not persisted across unmount/remount, since MechanismGallery has
-  // no draft-store slot for Phase C in-progress state today. Once a char is
-  // in this set its suggestion row must never reappear, even when the user
-  // navigates Back to it.
-  const [suggestionResolved, setSuggestionResolved] = useState<Set<string>>(
-    new Set(),
-  );
-
-  const markSuggestionResolved = useCallback((char: string) => {
-    setSuggestionResolved((prev) => {
-      if (prev.has(char)) return prev;
-      const next = new Set(prev);
-      next.add(char);
-      return next;
-    });
-  }, []);
+  // no draft-store slot for Phase C in-progress state today.
+  const {
+    currentIdx,
+    hasAnotherCharAfterCurrent,
+    handleNext,
+    handleBack,
+    handlePreviousChar,
+    suggestionResolved,
+    markSuggestionResolved,
+  } = usePositionalCharNav({
+    list: lettersToAdd,
+    currentChar,
+    setCurrentChar,
+    onComplete,
+    onBack,
+  });
 
   // Whether the suggestion row must stay hidden for the current character —
   // true once explicitly resolved (Accept/Deny), or once the character is
@@ -1262,60 +1268,11 @@ export function MechanismGallery({
     currentChar !== null &&
     (appliedForCurrentChar > 0 || coveredChars.has(currentChar));
 
-  // Deterministic linear positional navigation — idx = position of
-  // currentChar in lettersToAdd. Forward/back always move by one position;
-  // they never search for the next uncovered character, so an implemented
-  // character is never skipped over.
-  const currentIdx =
-    currentChar !== null ? lettersToAdd.indexOf(currentChar) : -1;
-  const hasAnotherCharAfterCurrent =
-    currentIdx >= 0 && currentIdx < lettersToAdd.length - 1;
-
-  const handleNext = useCallback(() => {
-    // idx === -1 (currentChar not found in lettersToAdd) is defense-in-depth
-    // against the sync useEffect's invariant — reusing the outer currentIdx
-    // (already derived from currentChar/lettersToAdd, both already in this
-    // callback's deps) rather than recomputing indexOf(). Without this guard,
-    // an empty lettersToAdd would make idx === -1 === lettersToAdd.length - 1,
-    // spuriously firing the "last character → complete" branch below.
-    if (currentChar === null || currentIdx === -1) return;
-    if (currentIdx === lettersToAdd.length - 1) {
-      // Last character — forward is the phase completion.
-      onComplete?.();
-      return;
-    }
-    setCurrentChar(lettersToAdd[currentIdx + 1] ?? null);
-  }, [currentChar, currentIdx, lettersToAdd, onComplete]);
-
-  // Back handler — moves to the previous position in lettersToAdd. On the
-  // FIRST character, Back exits to the previous phase via onBack. Always
-  // available whenever currentChar !== null and lettersToAdd is non-empty —
-  // positional, so it survives remount (no history stack to lose).
-  const handleBack = useCallback(() => {
-    // See handleNext for the idx === -1 defense-in-depth rationale.
-    if (currentChar === null || currentIdx === -1) return;
-    if (currentIdx <= 0) {
-      onBack?.();
-      return;
-    }
-    setCurrentChar(lettersToAdd[currentIdx - 1] ?? null);
-  }, [currentChar, currentIdx, lettersToAdd, onBack]);
-
   // Skip is pure forward navigation — it records nothing, so it is identical
   // to handleNext (advance one position, or complete from the last
-  // character). The Skip button calls handleNext directly (see below) rather
-  // than duplicating this logic; kept as a single source of truth so the two
-  // controls can never drift.
-
-  // Previous character — steps back one position in lettersToAdd, ungated by
-  // covered/applied status on the character being left. Unlike handleBack,
-  // this never exits the phase: it is a no-op on the first character
-  // (currentIdx <= 0), where the caller-side disabled condition already
-  // prevents the click, but the handler stays defensive on its own.
-  const handlePreviousChar = useCallback(() => {
-    if (currentChar === null || currentIdx <= 0) return;
-    setCurrentChar(lettersToAdd[currentIdx - 1] ?? null);
-  }, [currentChar, currentIdx, lettersToAdd]);
+  // character, both from usePositionalCharNav above). The Skip button calls
+  // handleNext directly (see below) rather than duplicating this logic; kept
+  // as a single source of truth so the two controls can never drift.
 
   const handleRemoveCovered = useCallback(
     (char: string) => {
@@ -1507,6 +1464,77 @@ export function MechanismGallery({
   const coveredCount = lettersToAdd.filter((c) => coveredChars.has(c)).length;
 
   // ---------------------------------------------------------------------------
+  // Forward-button cluster — exactly one of three states applies: the
+  // locked-forward-escape ("Continue to touch layout"), the empty-diff
+  // completion ("Done" when there is nothing to add), or the per-character
+  // Next/Done advance. Computed once as a single spec so the JSX below
+  // renders one <button>, rather than three near-identical button blocks
+  // that differ only in label/onClick/testId/style.
+  // ---------------------------------------------------------------------------
+
+  const alwaysEnabledForwardStyle: CSSProperties = {
+    padding: "9px 20px",
+    background: BLUE_ACTION,
+    border: "none",
+    borderRadius: 6,
+    color: "#e6edf3",
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: "pointer",
+    fontFamily: FONT,
+  };
+
+  interface ForwardButtonSpec {
+    label: string;
+    onClick: (() => void) | undefined;
+    testId?: string;
+    ariaLabel?: string;
+    disabled: boolean;
+    style: CSSProperties;
+  }
+
+  // Invariant: callers always pass onComplete when locked can be true — so
+  // the "no actionable control" state (locked with Apply/Skip/Next all
+  // disabled and no completion button rendered) is unreachable.
+  const forwardButton: ForwardButtonSpec | null =
+    locked && onComplete !== undefined
+      ? {
+          label: "Continue to touch layout →",
+          onClick: onComplete,
+          testId: "mechanisms-continue",
+          ariaLabel: "Continue to touch layout (desktop layout locked)",
+          disabled: false,
+          style: alwaysEnabledForwardStyle,
+        }
+      : lettersToAdd.length === 0
+        ? {
+            label: "Done",
+            onClick: onComplete,
+            testId: "mechanisms-continue",
+            disabled: false,
+            style: alwaysEnabledForwardStyle,
+          }
+        : currentChar !== null
+          ? {
+              label: hasAnotherCharAfterCurrent ? "Next character →" : "Done",
+              onClick: handleNext,
+              ariaLabel: hasAnotherCharAfterCurrent ? "Next character" : "Done",
+              disabled: !canGoNext || locked,
+              style: {
+                padding: "9px 20px",
+                background: canGoNext ? "#238636" : "#21262d",
+                border: "none",
+                borderRadius: 6,
+                color: canGoNext ? "#e6edf3" : TEXT_DIM,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: canGoNext ? "pointer" : "not-allowed",
+                fontFamily: FONT,
+              },
+            }
+          : null;
+
+  // ---------------------------------------------------------------------------
   // Left pane content
   // ---------------------------------------------------------------------------
 
@@ -1674,72 +1702,26 @@ export function MechanismGallery({
                   </button>
                 )}
 
-                {/* Invariant: callers always pass onComplete when locked can
-                    be true — so the "no actionable control" state (locked
-                    with Apply/Skip/Next all disabled and no completion
-                    button rendered) is unreachable. */}
-                {locked && onComplete !== undefined ? (
+                {/* Single button driven by the forwardButton spec computed
+                    above — exactly one of the locked forward-escape, the
+                    empty-diff Done completion, or the per-character
+                    Next/Done advance is ever non-null. */}
+                {forwardButton !== null && (
                   <button
                     type="button"
-                    data-testid="mechanisms-continue"
-                    onClick={onComplete}
-                    aria-label="Continue to touch layout (desktop layout locked)"
-                    style={{
-                      padding: "9px 20px",
-                      background: BLUE_ACTION,
-                      border: "none",
-                      borderRadius: 6,
-                      color: "#e6edf3",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      fontFamily: FONT,
-                    }}
+                    onClick={forwardButton.onClick}
+                    disabled={forwardButton.disabled}
+                    {...(forwardButton.testId !== undefined
+                      ? { "data-testid": forwardButton.testId }
+                      : {})}
+                    {...(forwardButton.ariaLabel !== undefined
+                      ? { "aria-label": forwardButton.ariaLabel }
+                      : {})}
+                    style={forwardButton.style}
                   >
-                    Continue to touch layout &rarr;
+                    {forwardButton.label}
                   </button>
-                ) : lettersToAdd.length === 0 ? (
-                  <button
-                    type="button"
-                    data-testid="mechanisms-continue"
-                    onClick={onComplete}
-                    style={{
-                      padding: "9px 20px",
-                      background: BLUE_ACTION,
-                      border: "none",
-                      borderRadius: 6,
-                      color: "#e6edf3",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      fontFamily: FONT,
-                    }}
-                  >
-                    Done
-                  </button>
-                ) : currentChar !== null ? (
-                  <button
-                    type="button"
-                    onClick={handleNext}
-                    disabled={!canGoNext || locked}
-                    aria-label={
-                      hasAnotherCharAfterCurrent ? "Next character" : "Done"
-                    }
-                    style={{
-                      padding: "9px 20px",
-                      background: canGoNext ? "#238636" : "#21262d",
-                      border: "none",
-                      borderRadius: 6,
-                      color: canGoNext ? "#e6edf3" : TEXT_DIM,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: canGoNext ? "pointer" : "not-allowed",
-                      fontFamily: FONT,
-                    }}
-                  >
-                    {hasAnotherCharAfterCurrent ? "Next character →" : "Done"}
-                  </button>
-                ) : null}
+                )}
               </div>
             </div>
           )}
