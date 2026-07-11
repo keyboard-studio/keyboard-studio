@@ -95,14 +95,33 @@ export const CODE_MAP: Readonly<Record<string, CodeMapEntry>> = {
 /** Strips CompilerErrorSeverity (bits >= 0x100000), keeping namespace | base. */
 const KMCMP_BASECODE_MASK = 0xfffff;
 
-/** namespace|base values of file-read diagnostics meaningless in the oracle. */
+// namespace|base values of file-read diagnostics meaningless in the oracle.
+// Every sibling-asset store the header can name (BITMAP, VISUALKEYBOARD,
+// LAYOUTFILE, KMW_EMBEDJS, KMW_HELPFILE, INCLUDECODES, …) triggers a
+// file-open/exists diagnostic the oracle's loadFile/existsSync callbacks
+// structurally deny for EVERY keyboard — so the whole class is noise here,
+// regardless of upstream severity (some are Error, KMW_EMBEDJS/HELPFILE are
+// Warn). Values are namespace|base (severity bits masked off): note the
+// namespace is NOT uniformly KmnCompiler(0x2000) — the touch-layout check
+// lives in KmwCompiler(0x7000). Verified against the keymanapp/keyman source
+// (kmn_compiler_errors.h, kmc-kmn kmw-compiler / compiler messages).
 const ORACLE_INAPPLICABLE_BASE_CODES: ReadonlySet<number> = new Set([
-  0x2031, // ERROR_CannotReadBitmapFile — "Cannot open the bitmap or icon file for reading"
+  0x2031, // ERROR_CannotReadBitmapFile        — &BITMAP: "Cannot open the bitmap or icon file for reading"
+  0x290c, // ERROR_FileNotFound                — &VISUALKEYBOARD .kvks not found (also covers &DISPLAYMAP)
+  0x7004, // ERROR_TouchLayoutFileDoesNotExist — &LAYOUTFILE touch-layout file missing (KmwCompiler namespace)
+  0x2095, // WARN_EmbedJsFileMissing           — &KMW_EMBEDJS missing (also reused for &KMW_EMBEDCSS)
+  0x2094, // WARN_HelpFileMissing              — &KMW_HELPFILE missing
+  0x2038, // ERROR_CannotLoadIncludeFile       — &INCLUDECODES file cannot be loaded
 ]);
 
 /** Symbolic aliases of the same diagnostics (future-proofing the wire format). */
 const ORACLE_INAPPLICABLE_SYMBOLS: ReadonlySet<string> = new Set([
   "ERROR_CannotReadBitmapFile",
+  "ERROR_FileNotFound",
+  "ERROR_TouchLayoutFileDoesNotExist",
+  "WARN_EmbedJsFileMissing",
+  "WARN_HelpFileMissing",
+  "ERROR_CannotLoadIncludeFile",
 ]);
 
 /**
