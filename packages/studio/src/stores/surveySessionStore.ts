@@ -15,8 +15,11 @@
 //   - `popHistory()` pops the last entry off history and sets it as activeStepId.
 //     No-op when history is empty (back disabled at the first step).
 //   - `reset()` clears every slot to initial (start-over).
+//   - `hydrate(snapshot)` bulk-sets every value slot from a serialized draft.
+//     This store holds no persistence logic of its own; the draft layer
+//     (lib/draftAutosave.ts) reads the slots and calls hydrate() to restore them.
 //   - Plain setters for the five value slots.
-//   - No host-disk writes. No persistence.
+//   - No host-disk writes; the draft layer persists to browser localStorage.
 //   - Worker boundary upheld: WASM is not imported here.
 //   - All survey/hooks imports are type-only (depcruise / bundle hygiene, D-R2).
 
@@ -134,6 +137,13 @@ export interface SurveySessionState {
   /** Reset every slot to initial (start-over). Includes clearing history. */
   reset: () => void;
 
+  /**
+   * Bulk-restore every value slot from a serialized draft (lib/draftAutosave.ts).
+   * Used to resume an in-progress survey after a page reload. Does not touch the
+   * action functions; only the data slots enumerated in SurveySessionSnapshot.
+   */
+  hydrate: (snapshot: SurveySessionSnapshot) => void;
+
   /** Plain setter — identity-lite output. */
   setIdentityResult: (r: IdentityLiteResult | null) => void;
 
@@ -157,6 +167,22 @@ export interface SurveySessionState {
 }
 
 // ---------------------------------------------------------------------------
+// SurveySessionSnapshot — the serializable data slots (no action functions).
+//
+// This is exactly the shape reset()/the initializer produce and hydrate()
+// consumes. The draft layer (lib/draftAutosave.ts) serializes this to
+// localStorage and restores it via hydrate() on resume. Keeping it as an Omit
+// of the action keys means a new data slot lands here automatically.
+// ---------------------------------------------------------------------------
+
+type SurveySessionActionKey =
+  | "advance" | "popHistory" | "reset" | "hydrate"
+  | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
+  | "setSelectedTrack" | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage";
+
+export type SurveySessionSnapshot = Omit<SurveySessionState, SurveySessionActionKey>;
+
+// ---------------------------------------------------------------------------
 // Initial state (extracted so reset() and the initializer share one source)
 // ---------------------------------------------------------------------------
 
@@ -170,12 +196,7 @@ const INITIAL_STATE = {
   scaffoldSpec: null,
   localBase: null,
   charactersSubStage: "prefill" as CharactersSubStage,
-} as const satisfies Omit<
-  SurveySessionState,
-  | "advance" | "popHistory" | "reset"
-  | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
-  | "setSelectedTrack" | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
->;
+} as const satisfies SurveySessionSnapshot;
 
 // ---------------------------------------------------------------------------
 // Store
@@ -206,6 +227,14 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
       ...INITIAL_STATE,
       // Re-initialize array so mutations do not bleed across resets.
       history: [] as readonly ActiveStepId[],
+    }),
+
+  hydrate: (snapshot) =>
+    set({
+      ...snapshot,
+      // Copy the array so a mutation of the restored draft can't bleed back
+      // into the caller's snapshot object.
+      history: [...snapshot.history],
     }),
 
   setIdentityResult: (r) => set({ identityResult: r }),
