@@ -2,6 +2,8 @@
 
 All spec-level ambiguities were resolved in the `/speckit-clarify` session (FR-013/014/015). This document captures the **implementation-approach** decisions and their rationale.
 
+> **Note (2026-07-11)**: R4 and R7 below describe the plan as originally researched (promote `il_language_english` to Q1; move `il_language_code` to a post-name confirmation step). The team chose a different mechanism during implementation — see [spec.md Implementation Status](spec.md#implementation-status) and [contracts/identity-flow.contract.md](contracts/identity-flow.contract.md) for what actually shipped and why.
+
 ## R1 — Does langtags carry the multi-name / region data we need?
 
 **Decision**: Extend the codegen to retain `names[]`, `localnames[]`, and `regionname` from the SIL langtags source; the current slim index deliberately drops them.

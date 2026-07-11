@@ -2,6 +2,8 @@
 
 Runnable scenarios that prove the feature works end-to-end. See [data-model.md](data-model.md) and [contracts/](contracts/) for details; this file is the validation guide, not the implementation.
 
+> **Note (2026-07-11)**: Scenarios B and F below describe the question labels/order as originally planned (Q1 = `il_language_english`, code question last). The live flow shipped a mechanism-equivalent but structurally different Q1 — see [spec.md Implementation Status](spec.md#implementation-status) and [contracts/identity-flow.contract.md](contracts/identity-flow.contract.md) for the actual order before running these by hand.
+
 ## Prerequisites
 
 ```bash

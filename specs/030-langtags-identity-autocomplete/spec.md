@@ -4,9 +4,25 @@
 
 **Created**: 2026-07-08
 
-**Status**: Draft
+**Status**: Partially Implemented — see [Implementation Status](#implementation-status) below. The live flow ships this feature's user-facing goal through a Q1 mechanism the team chose over this document's original FR-008/FR-009 wording, for a documented correctness reason; the proposed-flow mirror (FR-015) has not been done.
 
 **Input**: User description: "Redesign the opening identity questions of the IdentityLite survey so the author's language is resolved from the SIL langtags dataset — English-name autocomplete first, then a choice of local names, region disambiguation when a name is ambiguous, and the language code confirmed rather than typed."
+
+## Implementation Status
+
+*(added 2026-07-11, during a km-triage doc-drift review — reconciles this spec's plan against what actually shipped; see [contracts/identity-flow.contract.md](contracts/identity-flow.contract.md) for the authoritative as-shipped mechanism and rationale)*
+
+`tasks.md` still shows every task unchecked, but substantial pieces of this feature landed under an alternate design that the sub-contract doc already records. This section is the reconciliation; FR-008/FR-009/FR-015 below are left as originally written (historical plan) with inline notes pointing here.
+
+| Item | Planned (this spec) | Shipped? | Notes |
+|---|---|---|---|
+| Langtags data-model extension | `LanguageDefaults`/`LanguageSummary` gain `englishNames`, `localNames`, `regionVariants` | Yes | [`packages/contracts/src/langtags.ts`](../../packages/contracts/src/langtags.ts), `packages/engine/src/langtags/` |
+| FR-001/FR-002 — resolve a language from an English-name search | Q1 becomes an English-name autocomplete | Yes, via an alternate mechanism | The pre-existing `il_language_code` picker stays Q1 (not `il_language_english`) and was reworded to search by English name; it commits the language CODE rather than the name, avoiding homonym ambiguity (~98 English names resolve to >1 langtags entry, e.g. "Ainu" -> aib/ain, per `research.md` T008). |
+| FR-004/FR-005 — own-language multi-choice | `il_language_autonym` offers recorded local names + free text | Yes | `packages/studio/src/survey/questions/a/il_language_autonym.ts` (`type: autocomplete`) |
+| FR-006/FR-007/FR-014 — region disambiguation | Conditional region question | Yes | `il_language_region.ts` + `IdentityLite.tsx` `getNextOverride` |
+| FR-008 — code question as a post-hoc confirmation step, positioned after the names | Move `il_language_code` after the name steps, auto-filled for confirmation | No — explicitly rejected | The contract doc records this as a rejected alternative ("No separate code-confirmation step and NO `extractIdentityLite` inversion"); `il_language_code` remains Q1 and doubles as the entry-resolving picker instead. |
+| FR-009 — question order | English name -> region (conditional) -> own-language name(s) -> code confirmation | No — shipped order differs | Actual live order: `il_language_code` (Q1, searchable by English name/autonym/ISO code, commits the resolved code) -> `il_language_region` (conditional) -> `il_language_english` (seeded confirmation) -> `il_language_autonym` (seeded multi-choice). See [contracts/identity-flow.contract.md](contracts/identity-flow.contract.md) "Question order (post-change)". |
+| FR-015 — mirror into the proposed Phase A flow | Same reorder + region module applied to `phase_a_identity.modular.yaml` / `language_name_*` | No — not started | `content/flows/proposed/phase_a_identity.modular.yaml` and `language_name_english.ts`/`language_name_autonym.ts` are unchanged from before this feature. This requirement is still open. |
 
 ## Clarifications
 
@@ -100,13 +116,16 @@ After the names, the author is shown the standard language code that was resolve
 - **FR-006**: When the entered English name resolves to more than one entry differing by region, the survey MUST present a region-selection question with the candidate regions; when it resolves to exactly one entry, no region question is shown.
 - **FR-007**: The selected region MUST determine which own-language-name choices are offered downstream and MUST be recorded in the language's identity/tag.
 - **FR-008**: The language-code question MUST be presented pre-filled with the code resolved from the author's earlier choices, for confirmation, and MUST allow the author to override or (for unmatched languages) enter/leave it blank.
+  > **Not shipped as written** — see [Implementation Status](#implementation-status). The live flow keeps `il_language_code` as Q1 (the entry-resolving picker) rather than adding a post-hoc confirmation step after the names; the contract doc records this as a deliberate rejection, not a pending item.
 - **FR-009**: The identity questions MUST appear in the order: English name → (region, only when ambiguous) → own-language name(s) → language-code confirmation.
+  > **Shipped differently** — see [Implementation Status](#implementation-status). The live order is `il_language_code` (Q1, searchable by English name) → `il_language_region` (conditional) → `il_language_english` (seeded confirmation) → `il_language_autonym` (seeded multi-choice).
 - **FR-010**: Values that were pre-filled from the database MUST be marked as suggestions/provenance so the author can see they were proposed (and are editable), consistent with the existing defaults-provenance treatment.
 - **FR-011**: The finished keyboard's language tag MUST be assembled from the confirmed language code, resolved script, and selected region.
 - **FR-012**: The curated language database used MUST be the version already pinned and fetched by the project's build (SIL langtags at the pinned commit); this feature MUST NOT introduce a second or live-fetched source.
 - **FR-013**: The English-name autocomplete MUST be free-text-with-suggestions: it offers matching langtags languages as the author types, but a typed value that matches no entry MUST be accepted (the author keeps their name; downstream defaults simply do not populate). A strict pick-from-list is explicitly rejected because target minority languages are often absent from langtags.
 - **FR-014**: The region question MUST fire only when the entered English name resolves to more than one langtags entry differing by region; it MUST present the candidate regions as country names (`regionname`); selecting one MUST resolve to that region's entry (determining Q2's local-name choices and the BCP47 region subtag); and if the author skips or leaves it unanswered, the flow MUST fall back to the primary/default entry rather than blocking. (Script differences are handled by the separate script step, not here.)
 - **FR-015**: This feature MUST be applied to **both** identity flows: the live IdentityLite flow (`il_*` question modules) and the proposed, non-live full Phase A identity flow (`language_name_*` modules), so the two copies of the identity questions stay consistent. The live flow is the primary target; the proposed flow mirrors the same question order, autocomplete, local-name choices, region disambiguation, and code-confirmation behavior.
+  > **Not started** — see [Implementation Status](#implementation-status). `phase_a_identity.modular.yaml` / `language_name_*` are unchanged from before this feature.
 
 ### Key Entities *(include if feature involves data)*
 
