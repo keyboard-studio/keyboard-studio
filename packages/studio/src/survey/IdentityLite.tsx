@@ -132,6 +132,22 @@ export function buildTargetBcp47(
   return [lang, scriptPart, reg].filter((p) => p !== "").join("-");
 }
 
+/**
+ * The single 3-letter confirmation code for a resolved langtags entry: the ISO
+ * 639-3 code when present, else the bare subtag (itself the 3-letter code when
+ * there is no 639-3 code). Trimmed; undefined when neither yields a non-empty
+ * value. Shared by the Q3 seed value (getSeedValue → codeSeedRef) and its single
+ * read-only option (getSeedOptions) so the two cannot drift (per author request,
+ * Q3 confirms the 3-letter code only — spec 030 Session 2026-07-11).
+ */
+export function resolveConfirmationCode(defaults: LanguageDefaults): string | undefined {
+  const iso = defaults.iso639_3?.trim() ?? "";
+  if (iso !== "") return iso;
+  const code = defaults.code.trim();
+  return code !== "" ? code : undefined;
+}
+
+
 /** Derive the typed identity-lite result from a completed flow. */
 export function extractIdentityLite(result: SurveyPhaseResult): IdentityLiteResult {
   const targetScriptRaw = answerString(result, "il_target_script");
@@ -272,12 +288,7 @@ export function IdentityLite({
   const seedFromEntry = useCallback((defaults: LanguageDefaults) => {
     scriptSeedRef.current = scriptToTargetOption(defaults.defaultScript) ?? undefined;
     // 3-letter ISO 639-3 code preferred (author's choice), else the bare subtag.
-    codeSeedRef.current =
-      defaults.iso639_3 !== undefined && defaults.iso639_3 !== ""
-        ? defaults.iso639_3
-        : defaults.code !== ""
-          ? defaults.code
-          : undefined;
+    codeSeedRef.current = resolveConfirmationCode(defaults);
     // Own-script names head Q2's dropdown and seed its default (localNames[0]);
     // English/alternate names are the dropdown's fallback only (used when there is
     // no own-script name). When a recorded own-script name IS the default, the
@@ -492,11 +503,8 @@ export function IdentityLite({
         // falls back to a full langtags code search / free text.
         const d = resolvedEntryRef.current;
         if (d === null) return undefined;
-        const code =
-          d.iso639_3 !== undefined && d.iso639_3.trim() !== ""
-            ? d.iso639_3.trim()
-            : d.code.trim();
-        if (code === "") return undefined;
+        const code = resolveConfirmationCode(d);
+        if (code === undefined) return undefined;
         return [{ value: code, label: `${code} — ISO 639-3` }];
       }
       return undefined;

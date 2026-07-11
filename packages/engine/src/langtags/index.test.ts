@@ -115,9 +115,11 @@ describe("lookupByName", () => {
     const results = lookupByName("Abkhazian");
     expect(results.map((r) => r.code)).toContain("ab");
 
-    // A pure alternate-name prefix also matches.
-    const prefix = lookupByName("Abkhaz");
-    expect(prefix.map((r) => r.code)).toContain("ab");
+    // A different alternate ("Abxazo") that is NOT a prefix of the primary name
+    // "Abkhaz" — so it can only resolve via the new alternate-name tier, not the
+    // pre-existing primary-name tier.
+    const alt = lookupByName("Abxazo");
+    expect(alt.map((r) => r.code)).toContain("ab");
   });
 });
 

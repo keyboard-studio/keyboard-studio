@@ -2,9 +2,11 @@
 //
 // THIRD question (spec 030 US4, FR-009): a CONFIRMATION of the language code,
 // pre-filled from the entry resolved by the English-name pick (il_language_english).
-// IdentityLite.getSeedValue seeds it with the resolved entry's 3-letter ISO 639-3
-// code (e.g. "hau", "hin"), falling back to the canonical bare subtag when the
-// entry carries no 639-3 code. The author confirms it or overrides it.
+// For a RESOLVED language, IdentityLite.getSeedValue seeds it with the entry's
+// 3-letter ISO 639-3 code (e.g. "hau", "hin"), falling back to the canonical bare
+// subtag when the entry carries no 639-3 code, and QuestionField renders it
+// READ-ONLY for confirmation (ReadOnlyCodeField) — to change it the author goes
+// Back and re-picks the language (spec 030, Session 2026-07-11 clarification).
 //
 // optional (required: false) — when the language was entered as free text with
 // no langtags match, this arrives empty and the author may type a code directly
@@ -12,9 +14,11 @@
 // drives IdentityLiteResult.bcp47 (buildTargetBcp47 in IdentityLite.tsx); an
 // empty subtag degrades suggestBases() to script-match ranking (spec §8).
 //
-// Type is "autocomplete" with options_source "@langtags_iso639" so the author
-// can search the code list when overriding; the native datalist always accepts
-// free text, so a typed/blank value is preserved.
+// Type is "autocomplete" with options_source "@langtags_iso639". For a resolved
+// language the survey injects the single 3-letter code and the field is read-only
+// (above). For an UNMATCHED free-text language no option is injected, so the field
+// falls back to the searchable langtags code picker and a typed/blank value is
+// preserved.
 
 import type { QuestionModule } from "../../types.ts";
 
@@ -38,7 +42,7 @@ export const fixtures: QuestionModule["fixtures"] = {
   valid: [
     { value: "hau", note: "ISO 639-3 code seeded for Hausa (confirmation)" },
     { value: "hin", note: "ISO 639-3 code seeded for Hindi" },
-    { value: "ha", note: "author override to the 2-letter subtag — accepted" },
+    { value: "ha", note: "2-letter subtag via the unmatched free-text fallback — accepted (a resolved language's code is read-only)" },
     { value: "bft", note: "free-text code for a language absent from langtags" },
     { value: undefined, note: "blank is explicitly allowed (required: false)" },
     { value: "", note: "empty string is acceptable for an optional question" },

@@ -153,25 +153,12 @@ function AutocompleteField({ question, value, onChange, onEntryResolved, onSelec
 
 function ReadOnlyCodeField({ question, value }: Pick<FieldProps, "question" | "value">) {
   return (
-    <input
-      type="text"
+    <TextField
       id={question.id}
       readOnly
       aria-readonly="true"
       value={stringValue(value)}
-      style={{
-        width: "100%",
-        padding: "8px 10px",
-        background: "#161b22",
-        border: "1px solid #30363d",
-        borderRadius: 6,
-        color: "#e6edf3",
-        fontSize: 14,
-        fontFamily: "inherit",
-        boxSizing: "border-box",
-        outline: "none",
-        cursor: "default",
-      }}
+      style={{ cursor: "default" }}
     />
   );
 }
