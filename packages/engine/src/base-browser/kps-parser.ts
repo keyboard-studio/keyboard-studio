@@ -79,20 +79,24 @@ const VALID_TARGETS = new Set<string>([
  * {@link parseKpsFontRefs} separately when they are needed (e.g. in the
  * loader).  This keeps the gallery listing path free of font-regex cost.
  */
-export function parseKps(xml: string): KpsMetadata {
-  // Standard .kps schema (Keyman Developer v7+): value attribute on Info children
-  const infoNameMatch = xml.match(/<Info[\s\S]*?<Name\s+value="([^"]+)"/);
-  // Fallback: text-content form for hand-edited or non-standard .kps files
-  const tagNameMatch = xml.match(/<Name\s*>([^<]+)<\/Name>/);
-  const displayName = (infoNameMatch?.[1] ?? tagNameMatch?.[1] ?? "").trim();
+/**
+ * Extract a single Info-child value for `tag`, preferring the standard
+ * Keyman Developer v7+ `<Info><Tag value="...">` form and falling back to
+ * the hand-edited text-content form `<Tag>...</Tag>`. Returns `fallback`
+ * (trimmed callers still get their own default applied) when neither form
+ * matches.
+ */
+function extractInfoValue(xml: string, tag: string, fallback: string): string {
+  const infoRe = new RegExp(`<Info[\\s\\S]*?<${tag}\\s+value="([^"]+)"`);
+  const tagRe = new RegExp(`<${tag}\\s*>([^<]+)<\\/${tag}>`);
+  const infoMatch = xml.match(infoRe);
+  const tagMatch = xml.match(tagRe);
+  return (infoMatch?.[1] ?? tagMatch?.[1] ?? fallback).trim();
+}
 
-  // Standard .kps schema (Keyman Developer v7+): value attribute on Info children
-  const infoVersionMatch = xml.match(/<Info[\s\S]*?<Version\s+value="([^"]+)"/);
-  // Fallback: text-content form for hand-edited or non-standard .kps files
-  const tagVersionMatch = xml.match(/<Version\s*>([^<]+)<\/Version>/);
-  const version = (
-    infoVersionMatch?.[1] ?? tagVersionMatch?.[1] ?? "1.0"
-  ).trim();
+export function parseKps(xml: string): KpsMetadata {
+  const displayName = extractInfoValue(xml, "Name", "");
+  const version = extractInfoValue(xml, "Version", "1.0");
 
   // <Targets>windows macosx linux web</Targets> — space-separated platform list
   const targetsMatch = xml.match(/<Targets\s*>([^<]+)<\/Targets>/);

@@ -256,7 +256,7 @@ function DefaultFillProvenance({ axisFills }: { axisFills: AxisFill[] | undefine
       <h3
         style={{
           fontSize: 13,
-          color: "#6ea8fe",
+          color: COLORS.blue.base,
           margin: "0 0 8px",
           textTransform: "uppercase",
           letterSpacing: 0.4,
@@ -264,13 +264,13 @@ function DefaultFillProvenance({ axisFills }: { axisFills: AxisFill[] | undefine
       >
         Pre-filled axes (not survey-elicited)
       </h3>
-      <p style={{ fontSize: 11.5, color: "#8b949e", margin: "0 0 8px", fontFamily: SANS }}>
+      <p style={{ fontSize: 11.5, color: COLORS.gray.textDim, margin: "0 0 8px", fontFamily: SANS }}>
         These phase-gated axes were not elicited by the survey. Each was supplied either by the §7.2
         script-class prior (the unmarked/off-state value, never rule-triggering) or derived from
         structural evidence in the base keyboard (which <em>can</em> be rule-triggering, e.g.{" "}
-        <code style={{ fontFamily: MONO, color: "#adbac7" }}>markInputOrder=&quot;postfix&quot;</code>{" "}
+        <code style={{ fontFamily: MONO, color: COLORS.gray.textMuted }}>markInputOrder=&quot;postfix&quot;</code>{" "}
         → rule 3a) — the source is shown on each row. Filled before{" "}
-        <code style={{ fontFamily: MONO, color: "#adbac7" }}>selectStrategy()</code> ran.
+        <code style={{ fontFamily: MONO, color: COLORS.gray.textMuted }}>selectStrategy()</code> ran.
         Read-only for now; confirm/override UI is a follow-up.
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -282,17 +282,17 @@ function DefaultFillProvenance({ axisFills }: { axisFills: AxisFill[] | undefine
               alignItems: "center",
               gap: 10,
               padding: "6px 12px",
-              background: "#11161d",
-              border: "1px solid #21262d",
+              background: COLORS.gray.bgPanel,
+              border: `1px solid ${COLORS.gray.border}`,
               borderRadius: 6,
               fontFamily: MONO,
               fontSize: 12,
             }}
           >
-            <span style={{ color: "#e3b341" }}>{String(f.axis)}</span>
-            <span style={{ color: "#6e7681" }}>→</span>
-            <span style={{ color: "#adbac7" }}>{JSON.stringify(f.value)}</span>
-            <span style={{ marginLeft: "auto", color: "#6e7681", fontSize: 11 }}>{f.source}</span>
+            <span style={{ color: COLORS.amber.base }}>{String(f.axis)}</span>
+            <span style={{ color: COLORS.gray.textVeryDim }}>→</span>
+            <span style={{ color: COLORS.gray.textMuted }}>{JSON.stringify(f.value)}</span>
+            <span style={{ marginLeft: "auto", color: COLORS.gray.textVeryDim, fontSize: 11 }}>{f.source}</span>
           </div>
         ))}
       </div>

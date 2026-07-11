@@ -6,6 +6,15 @@ Tests are included: the [contracts](contracts/) require langtags contract tests 
 
 **Team ownership** (Constitution Article VI): Phase 2 + Phase 8 langtags/codegen/type tasks are **Engine**; the survey-flow tasks (Phases 3–7) are **Content**. Grouped so `/km-lead` can dispatch km-programmer (engine) and km-frontend (survey) accordingly.
 
+## Implementation Status (2026-07-11)
+
+Every checkbox below is still literally `- [ ]`, but substantial pieces of this feature have already shipped via a different mechanism than these tasks describe — a deliberate alternative documented in [contracts/identity-flow.contract.md](contracts/identity-flow.contract.md) and reconciled in [spec.md Implementation Status](spec.md#implementation-status). Do not read the unchecked boxes as "nothing happened," and do not check them off from this note alone — verify each task's specific file/test claim before flipping it:
+
+- **Shipped**: Phase 2 (T002-T008, langtags data-model extension), Phase 4/US2 (T014-T017, autonym multi-choice), Phase 6/US3 (T022-T026, region disambiguation).
+- **Shipped via an alternate design, not as literally described**: Phase 3/US1 (T009-T013) — `il_language_code` was kept as Q1 and reworded for English-name search rather than `il_language_english` being promoted to first; Phase 5/US4 (T018-T021) — the dedicated post-hoc code-confirmation step was not built; the contract doc records this as a rejected alternative, not a deferred one.
+- **Not started**: Phase 7 (T027-T028, mirror into `phase_a_identity.modular.yaml` / `language_name_*` — FR-015 is still open).
+- **Unverified — check individually before assuming**: Phase 8 (T029-T032, snapshots/provenance/docs polish).
+
 ---
 
 ## Phase 1: Setup

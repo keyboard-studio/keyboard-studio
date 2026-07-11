@@ -10,6 +10,10 @@ const FIRST_ARG_RE = /\b(index|if)\s*\(\s*([^=,)]*)/;
 export function checkIdentifiers(source: string): LintFinding[] {
   const findings: LintFinding[] = [];
   const lines = source.split("\n");
+  const regexes = [
+    new RegExp(SINGLE_ARG_RE.source, "gi"),
+    new RegExp(FIRST_ARG_RE.source, "gi"),
+  ];
 
   const handleMatch = (match: RegExpExecArray, lineIdx: number): void => {
     const name = (match[2] ?? "").trim();
@@ -32,10 +36,11 @@ export function checkIdentifiers(source: string): LintFinding[] {
   // FIRST_ARG_RE within each line).
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
     const line = lines[lineIdx] ?? "";
-    for (const re of [SINGLE_ARG_RE, FIRST_ARG_RE]) {
-      const globalRe = new RegExp(re.source, "gi");
+
+    for (const re of regexes) {
+      re.lastIndex = 0;
       let match: RegExpExecArray | null;
-      while ((match = globalRe.exec(line)) !== null) {
+      while ((match = re.exec(line)) !== null) {
         handleMatch(match, lineIdx);
       }
     }

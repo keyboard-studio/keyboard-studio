@@ -19,6 +19,7 @@ import {
   getLoadedLangtags,
   scriptToTargetOption,
 } from "../lib/langtagsDefaults.ts";
+import { answerString } from "./answerString.ts";
 
 import identityLiteRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
 
@@ -48,8 +49,10 @@ export interface IdentityLiteResult {
   languageSubtag: string;
   /**
    * Region subtag chosen at `il_language_region` (spec 030 US3), e.g. "DJ".
-   * Empty string when the language was unambiguous by region or the step was
-   * skipped. Folded into `bcp47` at the region position.
+   * Empty string when the language was unambiguous by region, the step was
+   * skipped, or the entered value was not a shape-valid BCP47 region subtag
+   * (normalized via `normalizeRegionSubtag`). Folded into `bcp47` at the
+   * region position.
    */
   region: string;
   /** Raw `il_target_script` answer (e.g. "Latn", "romanization-Latn", "fonipa"). */
@@ -80,9 +83,32 @@ export interface IdentityLiteResult {
  *   (Latin is implied by the variant; BCP47 omits the script subtag for fonipa)
  * - empty `lang` → "" (no BCP47; caller degrades to script-match ranking)
  *
+ * Normalize a value from the `il_language_region` field into a shape-valid
+ * BCP47 region subtag, or "" when it is not one.
+ *
+ * A well-formed BCP47 region subtag is either an ISO 3166-1 alpha-2 code (two
+ * ASCII letters, canonically upper-case) or a UN M.49 area code (three
+ * digits). The region question offers region CODES as datalist options, but
+ * the field accepts free text — an author can type a region NAME ("Djibouti")
+ * instead of picking the "DJ" code. Folding that verbatim into the tag would
+ * produce an invalid BCP47 string ("aa-Latn-Djibouti"), so only a shape-valid
+ * subtag is kept; anything else is dropped. This mirrors the script handling
+ * in {@link buildTargetBcp47}, which omits a malformed subtag rather than emit
+ * one.
+ */
+export function normalizeRegionSubtag(region: string): string {
+  const reg = region.trim();
+  if (/^[A-Za-z]{2}$/.test(reg)) return reg.toUpperCase();
+  if (/^[0-9]{3}$/.test(reg)) return reg;
+  return "";
+}
+
+/**
  * An optional `region` subtag (from il_language_region, spec 030 US3) is folded
  * in at the BCP47 region position (language-script-region-variant). Empty region
- * (unambiguous or skipped) leaves the tag exactly as before.
+ * (unambiguous or skipped) leaves the tag exactly as before. The region is
+ * normalized to a shape-valid BCP47 region subtag first (see
+ * {@link normalizeRegionSubtag}); malformed free text is dropped.
  *
  * @param languageSubtag  ISO 639 subtag from `il_language_code`, may be "".
  * @param targetScriptRaw Raw `il_target_script` value from the survey.
@@ -95,7 +121,7 @@ export function buildTargetBcp47(
 ): string {
   const lang = languageSubtag.trim();
   if (lang === "") return "";
-  const reg = region.trim();
+  const reg = normalizeRegionSubtag(region);
   // BCP47 order: language-script-region-variant.
   if (targetScriptRaw === "fonipa") return [lang, reg, "fonipa"].filter((p) => p !== "").join("-");
   if (targetScriptRaw === "romanization-Latn") return [lang, "Latn", reg].filter((p) => p !== "").join("-");
@@ -106,20 +132,14 @@ export function buildTargetBcp47(
   return [lang, scriptPart, reg].filter((p) => p !== "").join("-");
 }
 
-function answerString(result: SurveyPhaseResult, questionId: string): string {
-  const answer = result.answers.find((a) => a.questionId === questionId);
-  if (answer === undefined) return "";
-  if (answer.answerType === "text" || answer.answerType === "select") {
-    return String(answer.value);
-  }
-  return "";
-}
-
 /** Derive the typed identity-lite result from a completed flow. */
 export function extractIdentityLite(result: SurveyPhaseResult): IdentityLiteResult {
   const targetScriptRaw = answerString(result, "il_target_script");
   const languageSubtag = answerString(result, "il_language_code");
-  const region = answerString(result, "il_language_region");
+  // Normalize so the recorded region and the folded bcp47 subtag agree: a
+  // free-text region name that is not a valid BCP47 subtag is dropped, not
+  // stored (see normalizeRegionSubtag).
+  const region = normalizeRegionSubtag(answerString(result, "il_language_region"));
   return {
     autonym: answerString(result, "il_language_autonym"),
     english: answerString(result, "il_language_english"),

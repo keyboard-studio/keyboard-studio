@@ -21,6 +21,7 @@
 
 import { loadModularFlow } from "../survey/loadModularFlow.ts";
 import type { FlowDef, FlowQuestion, QuestionModule } from "../survey/types.ts";
+import { computeDataEdges } from "./model.ts";
 import type { FlowGraph, GraphEdge, GraphNode, NodeKind, NodeRegion, StepGraph, StepGraphEdge, StepGraphNode } from "./model.ts";
 import { ruleTarget } from "./flowUtils.ts";
 import { manifest } from "../steps/manifest.ts";
@@ -377,20 +378,7 @@ export function buildManifestStepGraph(): StepGraph {
 
   // Data edges: from producer → consumer where producer.writePaths ∩ consumer.inputPaths ≠ ∅.
   // These power C1 (staleness fixpoint), C2 (cycle detection), C5 (orphan inputs).
-  const dataEdges: StepGraphEdge[] = [];
-  for (const producer of nodes) {
-    if (producer.writePaths.length === 0) continue;
-    const writeSet = new Set(producer.writePaths);
-    for (const consumer of nodes) {
-      if (consumer.id === producer.id) continue;
-      for (const inputPath of consumer.inputPaths) {
-        if (writeSet.has(inputPath)) {
-          dataEdges.push({ from: producer.id, to: consumer.id, kind: "spine" }); // kind reused; data edges have no order-kind
-          break; // one data edge per (producer, consumer) pair
-        }
-      }
-    }
-  }
+  const dataEdges: StepGraphEdge[] = computeDataEdges(nodes);
 
   return { nodes, edges, dataEdges };
 }

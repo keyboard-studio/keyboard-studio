@@ -582,47 +582,53 @@ export function SurveyRunner({
       </div>
 
       {/* Debug pin chip — only rendered when debug mode is active */}
-      {debugEnabled && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <button
-            type="button"
-            aria-pressed={debugPinsStore.isPinned(currentQId)}
-            aria-label={
-              debugPinsStore.isPinned(currentQId)
-                ? `Unpin default answer for question ${currentQId}`
-                : `Pin current answer as default for question ${currentQId}`
-            }
-            onClick={() => {
-              if (debugPinsStore.isPinned(currentQId)) {
-                debugPinsStore.unpin(currentQId);
-              } else {
-                debugPinsStore.pin(currentQId, value);
-              }
-              // Force a re-render so aria-pressed and label update
-              setDebugPinTick((n) => n + 1);
-            }}
+      {debugEnabled && (() => {
+        // Computed once per render — isPinned re-reads sessionStorage on every
+        // call, and the render below previously called it six times for the
+        // same questionId/tick.
+        const pinned = debugPinsStore.isPinned(currentQId);
+        return (
+          <div
             style={{
-              padding: "3px 10px",
-              background: debugPinsStore.isPinned(currentQId) ? "#2d3748" : "transparent",
-              border: `1px solid ${debugPinsStore.isPinned(currentQId) ? "#6ea8fe" : "#484f58"}`,
-              borderRadius: 12,
-              color: debugPinsStore.isPinned(currentQId) ? "#6ea8fe" : "#8b949e",
-              fontSize: 11,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              userSelect: "none",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
             }}
           >
-            {debugPinsStore.isPinned(currentQId) ? "[PIN] Pinned" : "[+] Pin this answer"}
-          </button>
-        </div>
-      )}
+            <button
+              type="button"
+              aria-pressed={pinned}
+              aria-label={
+                pinned
+                  ? `Unpin default answer for question ${currentQId}`
+                  : `Pin current answer as default for question ${currentQId}`
+              }
+              onClick={() => {
+                if (debugPinsStore.isPinned(currentQId)) {
+                  debugPinsStore.unpin(currentQId);
+                } else {
+                  debugPinsStore.pin(currentQId, value);
+                }
+                // Force a re-render so aria-pressed and label update
+                setDebugPinTick((n) => n + 1);
+              }}
+              style={{
+                padding: "3px 10px",
+                background: pinned ? "#2d3748" : "transparent",
+                border: `1px solid ${pinned ? "#6ea8fe" : "#484f58"}`,
+                borderRadius: 12,
+                color: pinned ? "#6ea8fe" : "#8b949e",
+                fontSize: 11,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                userSelect: "none",
+              }}
+            >
+              {pinned ? "[PIN] Pinned" : "[+] Pin this answer"}
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Question + caption block. When contentMinHeight is set (identity-lite),
           the block reserves a fixed minimum height so the Back/Next controls

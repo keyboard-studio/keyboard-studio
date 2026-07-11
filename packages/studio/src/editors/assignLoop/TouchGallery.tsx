@@ -98,6 +98,52 @@ const selectStyle: CSSProperties = {
   fontFamily: FONT,
 };
 
+// Static styles shared across TouchMethodChooser renders — none depend on
+// props or state, so they are hoisted to module scope rather than recreated
+// per render.
+const headerBtnStyle: CSSProperties = {
+  width: "100%",
+  padding: "10px 14px",
+  background: "transparent",
+  border: "none",
+  color: TEXT_MAIN,
+  fontSize: 13,
+  fontFamily: FONT,
+  cursor: "pointer",
+  textAlign: "left",
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+};
+
+const configStyle: CSSProperties = {
+  padding: "0 14px 12px",
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+};
+
+// Static page-level styles shared by TouchGallery's guard/content branches —
+// none depend on props or state.
+const pageStyle: CSSProperties = {
+  background: BG_PAGE,
+  height: "100%",
+  boxSizing: "border-box",
+  fontFamily: FONT,
+  color: TEXT_MAIN,
+};
+
+const ghostBtn: CSSProperties = {
+  padding: "8px 18px",
+  background: "transparent",
+  border: `1px solid ${BORDER}`,
+  borderRadius: 6,
+  color: TEXT_DIM,
+  fontSize: 13,
+  cursor: "pointer",
+  fontFamily: "inherit",
+};
+
 // ---------------------------------------------------------------------------
 // Touch method type
 // ---------------------------------------------------------------------------
@@ -147,28 +193,6 @@ function TouchMethodChooser({
     overflow: "hidden",
     transition: "border-color 120ms ease, background 120ms ease",
   });
-
-  const headerBtnStyle: CSSProperties = {
-    width: "100%",
-    padding: "10px 14px",
-    background: "transparent",
-    border: "none",
-    color: TEXT_MAIN,
-    fontSize: 13,
-    fontFamily: FONT,
-    cursor: "pointer",
-    textAlign: "left",
-    display: "flex",
-    flexDirection: "column",
-    gap: 4,
-  };
-
-  const configStyle: CSSProperties = {
-    padding: "0 14px 12px",
-    display: "flex",
-    flexDirection: "column",
-    gap: 8,
-  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1064,25 +1088,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // ---------------------------------------------------------------------------
   // Shared styles — defined before guards so they can be referenced in guard renders
   // ---------------------------------------------------------------------------
-
-  const pageStyle: CSSProperties = {
-    background: BG_PAGE,
-    height: "100%",
-    boxSizing: "border-box",
-    fontFamily: FONT,
-    color: TEXT_MAIN,
-  };
-
-  const ghostBtn: CSSProperties = {
-    padding: "8px 18px",
-    background: "transparent",
-    border: `1px solid ${BORDER}`,
-    borderRadius: 6,
-    color: TEXT_DIM,
-    fontSize: 13,
-    cursor: "pointer",
-    fontFamily: "inherit",
-  };
 
   const totalChars = inventory.length;
   const currentCharIndex = currentChar !== null ? inventory.indexOf(currentChar) : -1;

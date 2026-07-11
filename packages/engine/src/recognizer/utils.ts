@@ -30,7 +30,7 @@ export function storeItemsToCharString(store: IRStore): string {
  * Used to build rule context strings like "+ [SHIFT K_Q] > ...".
  */
 export function formatVKeyModifiers(mods: string[]): string {
-  return mods.length > 0 ? mods.join(" ") + " " : "";
+  return mods.length > 0 ? `${mods.join(" ")} ` : "";
 }
 
 /**

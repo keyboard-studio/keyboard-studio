@@ -14,6 +14,11 @@ import type { VirtualFS } from "@keyboard-studio/contracts";
 // bumpKeyboardVersion
 // ---------------------------------------------------------------------------
 
+// Trailing-dot stripper and pure-decimal-integer segment check, hoisted so
+// bumpKeyboardVersion doesn't recompile them on every call.
+const TRAILING_DOTS_RE = /\.+$/;
+const PURE_DECIMAL_RE = /^\d+$/;
+
 /**
  * Increment the last dot-separated segment of a keyboard release version string.
  *
@@ -42,7 +47,7 @@ import type { VirtualFS } from "@keyboard-studio/contracts";
  */
 export function bumpKeyboardVersion(version: string): string {
   // Guard: empty / whitespace input → treat as "1.0".
-  const trimmed = version.trim().replace(/\.+$/, "");
+  const trimmed = version.trim().replace(TRAILING_DOTS_RE, "");
   if (trimmed === "") {
     return "1.1";
   }
@@ -53,7 +58,7 @@ export function bumpKeyboardVersion(version: string): string {
   // The regex /^\d+$/ accepts "0", "09", "42" but not "0a", "1.2", or "".
   // This is looser than String(n) === last (which rejects "09"), which is correct:
   // "1.09" should increment to "1.10", not append ".1".
-  if (isNaN(n) || !/^\d+$/.test(last ?? "")) {
+  if (isNaN(n) || !PURE_DECIMAL_RE.test(last ?? "")) {
     // Last segment is not a pure decimal integer — append ".1" to the trimmed input.
     return `${trimmed}.1`;
   }

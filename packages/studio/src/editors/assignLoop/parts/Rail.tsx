@@ -49,6 +49,15 @@ interface RailProps {
   onToggleNode: (nodeId: string, off: boolean) => void;
 }
 
+function SectionHeader({ tone, label, count }: { tone: string; label: string; count: number }) {
+  return (
+    <div style={{ position: 'sticky', top: 0, zIndex: 1, display: 'flex', alignItems: 'center', gap: 7, font: '600 10.5px/1 var(--app-font)', letterSpacing: '.13em', textTransform: 'uppercase', color: tone, padding: '13px 16px 7px', background: 'var(--app-surface)' }}>
+      <span style={{ width: 9, height: 9, borderRadius: 2.5, background: tone, flex: '0 0 auto' }} />
+      {label} <span style={{ color: 'var(--app-text-subtle)' }}>· {count}</span>
+    </div>
+  );
+}
+
 export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, onSetManyGlyphs, onToggleNode }: RailProps) {
   const setInfo = useHoverInfoStore((s) => s.setInfo);
   const clearInfo = useHoverInfoStore((s) => s.clearInfo);
@@ -175,10 +184,7 @@ export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, on
 
           return (
             <div key={sec.label}>
-              <div style={{ position: 'sticky', top: 0, zIndex: 1, display: 'flex', alignItems: 'center', gap: 7, font: '600 10.5px/1 var(--app-font)', letterSpacing: '.13em', textTransform: 'uppercase', color: tone, padding: '13px 16px 7px', background: 'var(--app-surface)' }}>
-                <span style={{ width: 9, height: 9, borderRadius: 2.5, background: tone, flex: '0 0 auto' }} />
-                {sec.label} <span style={{ color: 'var(--app-text-subtle)' }}>· {items.length}</span>
-              </div>
+              <SectionHeader tone={tone} label={sec.label} count={items.length} />
               {STORE_SUBS.map((sub) => {
                 const subItems = grouped.get(sub.key)!;
                 if (subItems.length === 0) return null;
@@ -197,10 +203,7 @@ export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, on
 
         return (
           <div key={sec.label}>
-            <div style={{ position: 'sticky', top: 0, zIndex: 1, display: 'flex', alignItems: 'center', gap: 7, font: '600 10.5px/1 var(--app-font)', letterSpacing: '.13em', textTransform: 'uppercase', color: tone, padding: '13px 16px 7px', background: 'var(--app-surface)' }}>
-              <span style={{ width: 9, height: 9, borderRadius: 2.5, background: tone, flex: '0 0 auto' }} />
-              {sec.label} <span style={{ color: 'var(--app-text-subtle)' }}>· {items.length}</span>
-            </div>
+            <SectionHeader tone={tone} label={sec.label} count={items.length} />
             {items.map((node) => renderNode(node))}
           </div>
         );
