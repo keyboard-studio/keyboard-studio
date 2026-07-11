@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-07-13",
+  "lastUpdated": "2026-07-15",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -517,11 +517,11 @@
     },
     "specs/030-langtags-identity-autocomplete": {
       "title": "Feature Specification: Langtags-driven identity autocomplete",
-      "hash": "sha256:98fe41fb34b82356",
+      "hash": "sha256:2348bfe1e8e04451",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
-      "notes": "Merged km/codebase-cleanup <- main (#1074): hash conflicted between branches (HEAD sha256:099e0805f6251fc7 vs main sha256:30e820a16c8bfd88); kept main's per the merge-resolution policy of preferring main's data on irreconcilable same-key/different-hash entries."
+      "notes": "Merged km/codebase-cleanup <- main (#1074): hash conflicted between branches (HEAD sha256:099e0805f6251fc7 vs main sha256:30e820a16c8bfd88); kept main's per the merge-resolution policy of preferring main's data on irreconcilable same-key/different-hash entries. Rebase of km/identity-q3-code-confirm (#1078) then merged FR-008's read-only/ISO-639-3 wording with the not-shipped-as-written callout; hash re-acknowledged via `node utilities/spec-trace acknowledge` for the combined text."
     },
     "specs/030-step-model-gates": {
       "title": "Feature Specification: Step-model constitutional gates — machine-enforced survey integrity checks",

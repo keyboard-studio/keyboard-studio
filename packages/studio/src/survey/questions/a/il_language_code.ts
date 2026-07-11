@@ -22,7 +22,7 @@ export const definition = {
   id: "il_language_code",
   prompt: "Confirm your language's code",
   help_text:
-    "This is the standard 3-letter code for the language you picked — it goes " +
+    "This is the 3-letter ISO 639-3 code for the language you picked — it goes " +
     "on the finished keyboard. It is resolved from your choice above; to use a " +
     "different code, go back and change the language. If your language was not " +
     "in the list, type its code here.",

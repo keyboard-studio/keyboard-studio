@@ -26,6 +26,37 @@
 
 ## Clarifications
 
+### Session 2026-07-11 (Q3 read-only confirmation + alternate-name resolution)
+
+Three changes to the code-confirmation step and the English-name search, landed
+per author request. Recorded here because the first two **reverse** ratified
+decisions from Session 2026-07-09 / the original FR-008 (per the revision policy,
+a resolved decision reopened must cite the original — this is that record).
+
+- Q: Is the resolved language code editable in place, or presented read-only for
+  confirmation? → A: **Read-only.** For a resolved language Q3 (`il_language_code`)
+  now PRESENTS the resolved code as a non-editable confirmation (a `ReadOnlyCodeField`);
+  to change it the author goes **Back** and re-picks the language. This **supersedes**
+  "the author can override" (Session 2026-07-09 below), FR-008's in-place override,
+  US4 acceptance scenario 2, and SC-005 **as they applied to a resolved language**.
+  The **unresolved / free-text fallback** (language absent from langtags) stays fully
+  editable — an unlisted language's code can still be typed or left blank — so
+  FR-003 and US4 acceptance scenario 3 are unchanged.
+- Q: Which code form does Q3 offer — the 3-letter code only, or both the 3-letter
+  and the 2-letter subtag? → A: **The 3-letter ISO 639-3 code only** (`hau`, `hin`),
+  never the 2-letter subtag. **Consequence explicitly accepted:** for a language that
+  has a 2-letter ISO 639-1 code, the assembled tag is the non-canonical `hau-Latn` /
+  `ara-Latn` rather than the IANA-registered canonical `ha-Latn` / `ar-Latn`. This is a
+  known, deliberate deviation from BCP47/RFC 5646 §2.2.1; combined with the read-only
+  field it means an author cannot select the 2-letter form for a resolved language.
+  If Layer-A validation later objects, canonicalization can be added at tag-assembly
+  (FR-011) without reopening this decision.
+- Q: Must the English-name search resolve a language known by an alternate name? →
+  A: **Yes.** The search now resolves a language by **any** of its recorded English
+  names (langtags `name` + `names[]`), not just the primary — so an author who knows
+  their language by an alternate name (e.g. "Abkhazian" for `ab`, primary "Abkhaz")
+  resolves it and gets the downstream seeds. Extends FR-001/FR-002.
+
 ### Session 2026-07-09 (implementation realignment)
 
 The first landed increment (US1–US3) kept the language **code** as the first
@@ -43,10 +74,12 @@ name → code confirmation) and resolved three implementation choices:
   (value = code) now backs only the Q3 code confirmation.
 - Q: What does the code confirmation (Q3) pre-fill — the canonical subtag or the
   3-letter code? → A: **The 3-letter ISO 639-3 code** (`hau`, `hin`), falling back
-  to the canonical bare subtag when the entry carries no 639-3 code. The author can
-  override. Consequence accepted: the assembled tag is e.g. `hau-Latn` rather than
+  to the canonical bare subtag when the entry carries no 639-3 code. ~~The author can
+  override.~~ Consequence accepted: the assembled tag is e.g. `hau-Latn` rather than
   the canonical `ha-Latn`; canonicalization can be added at tag-assembly only if
-  Layer-A validation later objects.
+  Layer-A validation later objects. **(Override superseded by Session 2026-07-11
+  above: for a resolved language Q3 is now read-only; only the unmatched free-text
+  fallback stays editable.)**
 - Q: Is the separate region step kept now that the picker shows region inline? →
   A: **Kept as a conditional refinement.** It fires only when the picked language's
   code has more than one region variant (same code, different regional orthography),
@@ -123,15 +156,15 @@ Some English names map to more than one distinct language entry (the same name u
 
 ### User Story 4 — Confirm the language code rather than type it (Priority: P2)
 
-After the names, the author is shown the standard language code that was resolved from their earlier choices, and simply confirms it. If needed, they can override it (for example to select a specific code variant). The confirmed code drives the finished keyboard's language tag.
+After the names, the author is shown the 3-letter language code that was resolved from their earlier choices, presented read-only, and simply confirms it. To change it they go back and re-pick the language (an unmatched free-text language, which resolves to no code, remains directly editable — see Session 2026-07-11). The confirmed code drives the finished keyboard's language tag.
 
 **Why this priority**: Confirmation is lower-risk and lower-effort than free typing; it depends on US1 resolving a code. Keeping an explicit confirmation step preserves author control over the technical tag without forcing anyone to type one.
 
 **Acceptance Scenarios**:
 
-1. **Given** US1 resolved a language, **When** the author reaches the code step, **Then** the resolved code is pre-filled and presented for confirmation.
-2. **Given** the pre-filled code is shown, **When** the author overrides it with a different valid code, **Then** the override is used for the keyboard's language tag.
-3. **Given** the author's language was entered as free text with no database match, **When** they reach the code step, **Then** they may enter a code directly or leave it blank (as today).
+1. **Given** US1 resolved a language, **When** the author reaches the code step, **Then** the resolved 3-letter code is pre-filled and presented read-only for confirmation.
+2. **Given** US1 resolved a language, **When** the code step is shown, **Then** the code is not editable in place — to use a different code the author goes back and re-picks the language (Session 2026-07-11 supersedes the earlier in-place override).
+3. **Given** the author's language was entered as free text with no database match, **When** they reach the code step, **Then** they may enter a code directly or leave it blank (the unmatched fallback stays editable, as today).
 
 ---
 
@@ -154,7 +187,7 @@ After the names, the author is shown the standard language code that was resolve
 - **FR-005**: The own-language-name question MUST accept a free-text value different from every suggestion, and use it in place of a suggestion when provided.
 - **FR-006**: When the entered English name resolves to more than one entry differing by region, the survey MUST present a region-selection question with the candidate regions; when it resolves to exactly one entry, no region question is shown.
 - **FR-007**: The selected region MUST determine which own-language-name choices are offered downstream and MUST be recorded in the language's identity/tag.
-- **FR-008**: The language-code question MUST be presented pre-filled with the code resolved from the author's earlier choices, for confirmation, and MUST allow the author to override or (for unmatched languages) enter/leave it blank.
+- **FR-008**: The language-code question MUST be presented pre-filled with the 3-letter ISO 639-3 code resolved from the author's earlier choices, for confirmation. For a resolved language this confirmation is **read-only** — to change it the author goes back and re-picks the language (Session 2026-07-11 supersedes the earlier in-place override). For an unmatched free-text language (which resolves to no code) the field MUST allow the author to enter a code directly or leave it blank.
   > **Not shipped as written** — see [Implementation Status](#implementation-status). The live flow keeps `il_language_code` as Q1 (the entry-resolving picker) rather than adding a post-hoc confirmation step after the names; the contract doc records this as a deliberate rejection, not a pending item.
 - **FR-009**: The identity questions MUST appear in the order: English name → (region, only when ambiguous) → own-language name(s) → language-code confirmation.
   > **Shipped differently** — see [Implementation Status](#implementation-status). The live order is `il_language_code` (Q1, searchable by English name) → `il_language_region` (conditional) → `il_language_english` (seeded confirmation) → `il_language_autonym` (seeded multi-choice).
@@ -180,7 +213,7 @@ After the names, the author is shown the standard language code that was resolve
 - **SC-002**: For a language recorded in the database, the own-language name and language code are pre-filled from the author's English-name choice (the author confirms rather than types them).
 - **SC-003**: An author whose language is not in the database can still complete every identity question (no step blocks on a missing database match).
 - **SC-004**: When an English name is ambiguous across regions, the author is asked exactly one additional question (region) and the resulting keyboard is tagged for the region they chose — not a default guess.
-- **SC-005**: No author-entered or author-selected value is silently overwritten by a later database re-resolution (author overrides always survive).
+- **SC-005**: No author-entered or author-selected value — e.g. a typed own-language name, or a directly-entered code for an unmatched language — is silently overwritten by a later database re-resolution. (The resolved language code at Q3 is presented read-only per Session 2026-07-11, so there is no in-place edit there to preserve; changing it is done by re-picking the language.)
 
 ## Assumptions
 
