@@ -1,6 +1,6 @@
 {
   "specVersion": "1.3.1",
-  "lastUpdated": "2026-07-06",
+  "lastUpdated": "2026-07-11",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -502,6 +502,14 @@
     "specs/029-qu-flowstephost-convergence": {
       "title": "Feature Specification: FlowStepHost Convergence",
       "hash": "sha256:c61f48b7b3fddebd",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/030-langtags-identity-autocomplete": {
+      "title": "Feature Specification: Langtags-driven identity autocomplete",
+      "hash": "sha256:30e820a16c8bfd88",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

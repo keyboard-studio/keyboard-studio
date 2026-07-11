@@ -75,7 +75,11 @@ The survey's per-question `definition` (`id`, `prompt`, `type`, `required`, `nex
 **Live IdentityLite (`il_*`) order after change**:
 `il_language_english` (autocomplete) → *(il_language_region, conditional)* → `il_language_autonym` (multi-choice + free text) → `il_language_code` (confirm) → `il_target_script` → `il_script_not_supported`.
 
+> **Not what shipped** (added 2026-07-11, see [spec.md Implementation Status](spec.md#implementation-status)): the live flow keeps `il_language_code` as the first node rather than promoting `il_language_english`. Actual shipped order: `il_language_code` (Q1, searchable by English name, commits the resolved code) → *(il_language_region, conditional)* → `il_language_english` (seeded confirmation) → `il_language_autonym` (seeded multi-choice) → `il_target_script` → `il_script_not_supported`. Authoritative record: [contracts/identity-flow.contract.md](contracts/identity-flow.contract.md) "Question order (post-change)".
+
 **Proposed Phase A (`language_name_*`) mirror**: same reordering applied to `phase_a_identity.modular.yaml` + the `language_name_*` modules (per FR-015).
+
+> **Not started** — `phase_a_identity.modular.yaml` and the `language_name_*` modules are unchanged from before this feature (FR-015 still open).
 
 **New module**: `il_language_region` — `type: autocomplete`/choice, options = resolved entry's `regionVariants[].regionName`, `required: false` (skippable → primary variant), conditional `next` so it only appears when `hasRegionVariants`.
 

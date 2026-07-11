@@ -11,7 +11,7 @@
 // extractIdentityLite are the two seams whose contract is asserted here.
 
 import { describe, it, expect } from "vitest";
-import { buildTargetBcp47, extractIdentityLite } from "./IdentityLite.tsx";
+import { buildTargetBcp47, extractIdentityLite, normalizeRegionSubtag } from "./IdentityLite.tsx";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 
 describe("spec 030 US3 — buildTargetBcp47 region subtag (FR-011)", () => {
@@ -43,8 +43,46 @@ describe("spec 030 US3 — buildTargetBcp47 region subtag (FR-011)", () => {
     expect(buildTargetBcp47("aa", "Latn", "  DJ  ")).toBe("aa-Latn-DJ");
   });
 
+  it("upper-cases a lower-case alpha-2 region subtag", () => {
+    expect(buildTargetBcp47("aa", "Latn", "dj")).toBe("aa-Latn-DJ");
+  });
+
+  it("keeps a UN M.49 numeric region subtag", () => {
+    expect(buildTargetBcp47("aa", "Latn", "150")).toBe("aa-Latn-150");
+  });
+
+  it("drops a free-text region NAME rather than emit an invalid BCP47 tag", () => {
+    // Author typed the country name instead of picking the "DJ" datalist code:
+    // "aa-Latn-Djibouti" is not a valid BCP47 tag, so the region is dropped.
+    expect(buildTargetBcp47("aa", "Latn", "Djibouti")).toBe("aa-Latn");
+    expect(buildTargetBcp47("aa", "other", "Djibouti")).toBe("aa");
+    expect(buildTargetBcp47("aa", "fonipa", "Djibouti")).toBe("aa-fonipa");
+  });
+
   it("returns empty for an empty language regardless of region", () => {
     expect(buildTargetBcp47("", "Latn", "DJ")).toBe("");
+  });
+});
+
+describe("spec 030 US3 — normalizeRegionSubtag (BCP47 region shape validation)", () => {
+  it("keeps a valid ISO 3166-1 alpha-2 code, upper-cased", () => {
+    expect(normalizeRegionSubtag("DJ")).toBe("DJ");
+    expect(normalizeRegionSubtag("dj")).toBe("DJ");
+    expect(normalizeRegionSubtag("  fr  ")).toBe("FR");
+  });
+
+  it("keeps a valid UN M.49 three-digit area code", () => {
+    expect(normalizeRegionSubtag("150")).toBe("150");
+    expect(normalizeRegionSubtag("001")).toBe("001");
+  });
+
+  it("drops anything that is not a shape-valid region subtag", () => {
+    expect(normalizeRegionSubtag("Djibouti")).toBe("");
+    expect(normalizeRegionSubtag("USA")).toBe(""); // alpha-3 is not a BCP47 region subtag
+    expect(normalizeRegionSubtag("12")).toBe("");
+    expect(normalizeRegionSubtag("1500")).toBe("");
+    expect(normalizeRegionSubtag("")).toBe("");
+    expect(normalizeRegionSubtag("   ")).toBe("");
   });
 });
 
