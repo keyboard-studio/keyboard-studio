@@ -65,6 +65,13 @@ This satisfies the same `km-triage/review` required check the bot's App check-ru
 
 All other actions (REQUEST-CHANGES, MENTION_ONLY, ESCALATE, auto-fix) behave identically to bot mode — only the wrapper changes from `bot-gh.js` to `gh`.
 
+## Pre-crew canaries — same story in both modes
+
+Two mechanisms gate the LLM crew before or within the review itself; neither is identity-dependent, so both apply unchanged in personal mode:
+
+- **Phase 2's `ci_not_ready` gate** (km-triage.md, checking `statusCheckRollup`) is plain `gh`/`jq` — no bot token needed. A PR whose required CI check hasn't gone green is skipped before any specialist is dispatched, in personal mode exactly as in bot mode.
+- **km-review's Gate stage** (`.claude/workflows/km-review.js`) runs km-verification alone, before the four primaries, in every invocation of the workflow — km-triage calls the same shared workflow regardless of mode, so a confident "PR doesn't do what it claims" short-circuits identically whether you triggered the run yourself or the cron did.
+
 ## Permissions
 
 Run personal mode as an ordinary interactive slash command — **do not** pass `--dangerously-skip-permissions`. There is a human at the terminal to answer permission prompts; that is the whole point of this mode. (`--dangerously-skip-permissions` belongs only to the unattended scheduler wrappers, where the GitHub App permission ceiling, not the local prompt, is the safety boundary.)
