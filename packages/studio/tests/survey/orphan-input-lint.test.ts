@@ -63,7 +63,11 @@ function allIds(manifest: ReturnType<typeof parseThinYaml>): string[] {
 // filename as the phase label, ensuring future additions are never silently
 // skipped by this lint.
 const KNOWN_PHASE_ORDER: Array<{ phase: string; filename: string }> = [
-  { phase: "A", filename: "phase_a_identity.modular.yaml" },
+  // spec 025: phase_a_identity is a PROPOSED flow, relocated to content/flows/proposed/.
+  // It is still linted for orphan inputs (path is joined onto flowsDir below); the
+  // readdirSync auto-discovery only scans the top level, so proposed flows are listed
+  // explicitly here.
+  { phase: "A (proposed)", filename: path.join("proposed", "phase_a_identity.modular.yaml") },
   { phase: "B", filename: "phase_b_characters.modular.yaml" },
   { phase: "F", filename: "phase_f_helpdocs.modular.yaml" },
   // identity_lite is the short hybrid head (spec §8); its 5 il_* modules

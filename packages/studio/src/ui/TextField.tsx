@@ -23,6 +23,19 @@ export type TextFieldProps = React.InputHTMLAttributes<HTMLInputElement> & {
   mono?: boolean;
 };
 
+const BASE_STYLE: React.CSSProperties = {
+  width: "100%",
+  padding: "8px 10px",
+  background: BG_PAGE,
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderRadius: 6,
+  color: TEXT_MAIN,
+  fontSize: 14,
+  boxSizing: "border-box",
+  outline: "none",
+};
+
 /**
  * Single-line text input primitive. Matches the `<input type="text">` +
  * `INPUT_STYLE` rendering in QuestionField.tsx exactly.
@@ -37,25 +50,15 @@ export function TextField({
   style,
   ...rest
 }: TextFieldProps): React.ReactElement {
-  const baseStyle: React.CSSProperties = {
-    width: "100%",
-    padding: "8px 10px",
-    background: BG_PAGE,
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: error ? ERROR_BORDER : BORDER,
-    borderRadius: 6,
-    color: TEXT_MAIN,
-    fontSize: 14,
-    fontFamily: mono ? CSS_FONT_MONO : FONT,
-    boxSizing: "border-box",
-    outline: "none",
-  };
-
   return (
     <input
       type="text"
-      style={{ ...baseStyle, ...style }}
+      style={{
+        ...BASE_STYLE,
+        borderColor: error ? ERROR_BORDER : BORDER,
+        fontFamily: mono ? CSS_FONT_MONO : FONT,
+        ...style,
+      }}
       {...rest}
     />
   );

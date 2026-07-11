@@ -6,6 +6,15 @@
 
 import { describe, it, expect } from "vitest";
 
+const TEST_BASE = {
+  id: "basic_kbdus",
+  path: "release/b/basic_kbdus",
+  script: "Latn" as const,
+  targets: [] as never[],
+  displayName: "US English",
+  version: "1.0",
+};
+
 describe("browserPatternLibrary", () => {
   it("getPatternLibraryService() returns an object satisfying PatternLibraryService", async () => {
     const { getPatternLibraryService } = await import("./browserPatternLibrary.ts");
@@ -41,15 +50,7 @@ describe("browserPatternLibrary", () => {
   it("filterFor() returns an array for a Latin-script base", async () => {
     const { getPatternLibraryService } = await import("./browserPatternLibrary.ts");
     const svc = getPatternLibraryService();
-    const base = {
-      id: "basic_kbdus",
-      path: "release/b/basic_kbdus",
-      script: "Latn",
-      targets: [] as never[],
-      displayName: "US English",
-      version: "1.0",
-    };
-    const matches = await svc.filterFor(base);
+    const matches = await svc.filterFor(TEST_BASE);
     expect(Array.isArray(matches)).toBe(true);
     // All matches must have ascending rank starting at 1.
     matches.forEach((m, idx) => {
@@ -60,14 +61,6 @@ describe("browserPatternLibrary", () => {
   it("filterFor() with axes produces strategy-ranked matches", async () => {
     const { getPatternLibraryService } = await import("./browserPatternLibrary.ts");
     const svc = getPatternLibraryService();
-    const base = {
-      id: "basic_kbdus",
-      path: "release/b/basic_kbdus",
-      script: "Latn",
-      targets: [] as never[],
-      displayName: "US English",
-      version: "1.0",
-    };
     const axes = {
       scale: "small" as const,
       scriptClass: "alphabetic" as const,
@@ -77,7 +70,7 @@ describe("browserPatternLibrary", () => {
       constraintEnforcement: "none" as const,
       spareKeyAvailability: "many" as const,
     };
-    const matches = await svc.filterFor(base, axes);
+    const matches = await svc.filterFor(TEST_BASE, axes);
     expect(Array.isArray(matches)).toBe(true);
     // ranks start at 1 and are ascending
     matches.forEach((m, idx) => {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { CarveNode, CarveGlyph, StoreRuleDetail } from '../../../lib/irToCarveNodes.ts';
+import type { CarveNode, CarveGlyph, StoreRuleDetail, CharLocation } from '../../../lib/irToCarveNodes.ts';
 import { nodeState, MOD_GROUP_DEFS, glyphsTriState, idsTriState } from '../../../lib/irToCarveNodes.ts';
 import { ToggleBox } from './ToggleBox.tsx';
 import { GlyphCell } from './GlyphCell.tsx';
@@ -7,6 +7,40 @@ import { StoreChip } from './StoreChip.tsx';
 import { KindBadge, KIND_COLOR } from './KindBadge.tsx';
 import { WarnIcon } from './carveShared.tsx';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
+
+/**
+ * Pure helper — returns the plain-English description for the linked-pair section
+ * of a store's Inspector panel.
+ *
+ * Describes the invariant that always holds for any()/index() store pairs —
+ * the position-for-position alignment — without referencing the trigger key.
+ * The trigger is shown separately in the "Triggered by:" line.
+ *
+ * @param asSource - true when the store is used on the any() (input) side
+ * @param asOutput - true when the store is used on the index() (output) side
+ * @param pairedNames - display names of the peer stores
+ */
+export function storePairDescription(
+  asSource: boolean,
+  asOutput: boolean,
+  pairedNames: string[],
+): string {
+  const pairedList = pairedNames.join(', ');
+  // Both roles: this store is matched AND re-emitted (a match-and-reproduce),
+  // not a one-way input→output swap. Checked first so the in+out case is never
+  // mislabelled as "one provides input, the other output".
+  if (asSource && asOutput) {
+    return `This list sits on both sides of a paired-store rule with ${pairedList}: each character is matched as input and re-emitted as output at the same position — a match-and-reproduce, not a one-way input→output swap. The lists still line up one-for-one by position.`;
+  }
+  if (asSource && !asOutput) {
+    return `This is the input side of a paired-store rule. Its characters line up one-for-one with ${pairedList}. When one of these is matched and the rule fires, the keyboard outputs the character at the same position in ${pairedList}.`;
+  }
+  if (asOutput && !asSource) {
+    return `This is the output side of a paired-store rule. Each character lines up one-for-one with ${pairedList}; the rule picks the matching one based on what was input.`;
+  }
+  // Role undetermined (defensive) — assert only the invariant that always holds.
+  return `This list is paired with ${pairedList} by position — the lists line up one-for-one.`;
+}
 
 const btnGhost: React.CSSProperties = {
   font: '600 12.5px var(--app-font)', cursor: 'pointer',
@@ -31,21 +65,20 @@ function LoadBearing() {
   );
 }
 
-const blurbStyle: React.CSSProperties = {
-  margin: '10px 0 0', fontSize: 12, color: 'var(--app-text-subtle)', lineHeight: 1.55,
-};
+
+const STORE_INTRO = "Stores are named character lists that rules in patterns and groups reference, not the rules themselves.";
 
 function storeBlurb(node: CarveNode): string {
   if (node.referencedByNodeId !== undefined)
-    return "Stores are named character lists that rules in patterns and groups reference, not the rules themselves. This store belongs to the pattern above; its removal is managed through that pattern.";
+    return `${STORE_INTRO} This store belongs to the pattern above; its removal is managed through that pattern.`;
   const u = node.storeUsage;
   if (!u)
-    return "Stores are named character lists that rules in patterns and groups reference, not the rules themselves. This one isn't referenced by any active rules, so it's likely safe to remove on its own.";
+    return `${STORE_INTRO} This one isn't referenced by any active rules, so it's likely safe to remove on its own.`;
   if (u.asSource && u.asOutput)
-    return "Stores are named character lists that rules in patterns and groups reference, not the rules themselves. This one is used on both sides: rules scan your input against it AND pick their output from it.";
+    return `${STORE_INTRO} This one is used on both sides: rules scan your input against it AND pick their output from it.`;
   if (u.asSource)
-    return "Stores are named character lists that rules in patterns and groups reference, not the rules themselves. Rules scan your input against this list; when a character matches, the rule fires.";
-  return "Stores are named character lists that rules in patterns and groups reference, not the rules themselves. Rules pick their output character from this list based on which key was pressed.";
+    return `${STORE_INTRO} Rules scan your input against this list; when a character matches, the rule fires.`;
+  return `${STORE_INTRO} Rules pick their output character from this list based on which key was pressed.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -64,7 +97,7 @@ function RawDetail({ node, isDeleted, onToggleNode }: RawDetailProps) {
 
   return (
     <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '20px 24px' }}>
-      <p style={{ ...blurbStyle, margin: '0 0 14px' }}>
+      <p style={{ margin: '0 0 14px', fontSize: 12, color: 'var(--app-text-subtle)', lineHeight: 1.55 }}>
         Advanced rules use syntax the tool can't model automatically: deadkey chains, context-sensitive substitutions, or platform-specific behaviour. They're kept exactly as written from the original keyboard.
       </p>
       <div style={{
@@ -129,21 +162,40 @@ interface StoreDetailProps {
   isDeleted: (nodeId: string) => boolean;
   isItemDeleted: (id: string) => boolean;
   onToggleNode: (nodeId: string, off: boolean) => void;
+  onSelectNode?: ((nodeId: string) => void) | undefined;
   onToggleGlyph: (gid: string) => void;
   onSetManyGlyphs: (gids: string[], off: boolean) => void;
+  /**
+   * Called when the user clicks a store chip's body — CarveGallery resolves
+   * the character's cross-wired contributors (same as onCascadeDelete, but
+   * store chips already know their own character directly) and opens the
+   * cascade ConfirmDialog when the character is produced elsewhere too.
+   *
+   * When absent, chip clicks fall back to the plain onToggleGlyph path.
+   */
+  onStoreCascade?: ((chipId: string, ch: string) => void) | undefined;
 }
+type RoleType = 'input' | 'output' | 'input+output';
+
+function RoleChip({ role }: { role: RoleType }) {
+  const styles = {
+    'input+output': { bg: 'color-mix(in srgb, #b8a0d8 18%, var(--app-surface))', border: '1px solid color-mix(in srgb, #b8a0d8 50%, transparent)', color: '#c8b0e8', label: 'in+out' },
+    'input': { bg: 'var(--app-accent-subtle)', border: '1px solid var(--app-border)', color: 'var(--app-accent-text)', label: 'input' },
+    'output': { bg: 'color-mix(in srgb, #7dbf8e 15%, var(--app-surface))', border: '1px solid color-mix(in srgb, #7dbf8e 40%, transparent)', color: '#7dbf8e', label: 'output' },
+  }[role];
+  return (
+    <span style={{ font: '600 10px/1 var(--app-font)', padding: '3px 7px', borderRadius: 5, background: styles.bg, border: styles.border, color: styles.color }}>
+      {styles.label}
+    </span>
+  );
+}
+
 function storeRoleChip(node: CarveNode): React.ReactNode {
   const u = node.storeUsage;
   if (!u) return null;
-  if (u.asSource && u.asOutput) return (
-    <span style={{ font: '600 10px/1 var(--app-font)', padding: '3px 7px', borderRadius: 5, background: 'color-mix(in srgb, #b8a0d8 18%, var(--app-surface))', border: '1px solid color-mix(in srgb, #b8a0d8 50%, transparent)', color: '#c8b0e8' }}>in+out</span>
-  );
-  if (u.asSource) return (
-    <span style={{ font: '600 10px/1 var(--app-font)', padding: '3px 7px', borderRadius: 5, background: 'var(--app-accent-subtle)', border: '1px solid var(--app-border)', color: 'var(--app-accent-text)' }}>input</span>
-  );
-  if (u.asOutput) return (
-    <span style={{ font: '600 10px/1 var(--app-font)', padding: '3px 7px', borderRadius: 5, background: 'color-mix(in srgb, #7dbf8e 15%, var(--app-surface))', border: '1px solid color-mix(in srgb, #7dbf8e 40%, transparent)', color: '#7dbf8e' }}>output</span>
-  );
+  if (u.asSource && u.asOutput) return <RoleChip role="input+output" />;
+  if (u.asSource) return <RoleChip role="input" />;
+  if (u.asOutput) return <RoleChip role="output" />;
   return null;
 }
 
@@ -207,7 +259,7 @@ function PlatformBadge({ platform }: { platform: string }) {
 
 const RULE_GROUP_THRESHOLD = 10;
 
-function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onToggleGlyph, onSetManyGlyphs }: StoreDetailProps) {
+function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSelectNode, onToggleGlyph, onSetManyGlyphs, onStoreCascade }: StoreDetailProps) {
   const off = isDeleted(node.nodeId);
   const setInfo = useHoverInfoStore((s) => s.setInfo);
   const clearInfo = useHoverInfoStore((s) => s.clearInfo);
@@ -272,11 +324,25 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onTo
             {storeRoleChip(node)}
             {node.loadBearing === true && <LoadBearing />}
           </div>
-          <p style={{ ...blurbStyle, margin: 0 }}>
+          <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--app-text-subtle)', lineHeight: 1.55 }}>
             {storeBlurb(node)}
           </p>
         </div>
       </div>
+      {node.storeRoleLine !== undefined && (
+        <p style={{ margin: '12px 0 0', fontSize: 13, fontWeight: 600, color: 'var(--app-text-muted)', lineHeight: 1.45 }}>
+          {node.storeRoleLine}
+        </p>
+      )}
+      {node.pairedStoreTriggers && (() => {
+        const distinct = [...new Set(node.pairedStoreTriggers.filter((t): t is string => t !== undefined))];
+        return distinct.length > 0 ? (
+          <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--app-text-muted)', lineHeight: 1.45 }}>
+            {'Triggered by: '}
+            <b style={{ fontFamily: 'var(--app-font-mono)' }}>{distinct.join(', ')}</b>
+          </p>
+        ) : null;
+      })()}
       {chips.length > 0 && (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 18 }}>
@@ -302,7 +368,7 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onTo
                 key={chip.chipId}
                 chip={chip}
                 off={off || isItemDeleted(chip.chipId)}
-                onToggle={onToggleGlyph}
+                onToggle={onStoreCascade ? () => onStoreCascade(chip.chipId, chip.ch) : onToggleGlyph}
               />
             ))}
           </div>
@@ -333,6 +399,66 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onTo
           )}
         </>
       )}
+      {node.pairedStoreNames && node.pairedStoreNames.length > 0 && (
+          <div
+            style={{
+              marginTop: 18, padding: '12px 15px', borderRadius: 10,
+              background: `color-mix(in srgb, ${KIND_COLOR.store} 7%, var(--app-surface))`,
+              border: `1px solid color-mix(in srgb, ${KIND_COLOR.store} 30%, transparent)`,
+            }}
+          >
+            <div style={{ font: '600 10px/1 var(--app-font)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--app-text-subtle)', marginBottom: 8 }}>
+              Linked pair
+            </div>
+            {node.pairedStoreNames.map((pname, i) => {
+              const pairedId = node.pairedStoreIds?.[i];
+              const trigger = node.pairedStoreTriggers?.[i];
+              const role = node.pairedStoreRoles?.[i];
+              return (
+                <div key={pname} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+                  {/* Clickable store name — purple, matches KindBadge store color */}
+                  <button
+                    onClick={() => pairedId !== undefined && onSelectNode?.(pairedId)}
+                    disabled={pairedId === undefined || onSelectNode === undefined}
+                    aria-label={`Go to store ${pname}`}
+                    style={{
+                      font: '600 11px/1 var(--app-font-mono)', padding: '3px 8px', borderRadius: 5,
+                      background: `color-mix(in srgb, ${KIND_COLOR.store} 14%, transparent)`,
+                      border: `1px solid color-mix(in srgb, ${KIND_COLOR.store} 38%, transparent)`,
+                      color: KIND_COLOR.store,
+                      cursor: pairedId !== undefined && onSelectNode !== undefined ? 'pointer' : 'default',
+                      outline: 'none',
+                    }}
+                    onFocus={(e) => { (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 0 0 2px color-mix(in srgb, ${KIND_COLOR.store} 40%, transparent)`; }}
+                    onBlur={(e) => { (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none'; }}
+                  >
+                    {pname}
+                  </button>
+                  {/* Role chip — the paired store's own role (input/output/input+output) */}
+                  {role !== undefined && <RoleChip role={role} />}
+                  {/* Trigger key */}
+                  {trigger !== undefined && (
+                    <span style={{ font: '600 10px/1 var(--app-font)', color: 'var(--app-text-subtle)', whiteSpace: 'nowrap' }}>
+                      Triggered by: <b style={{ color: 'var(--app-text-muted)', fontFamily: 'var(--app-font-mono)' }}>{trigger}</b>
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+            <p style={{ margin: '4px 0 8px', fontSize: 12, color: 'var(--app-text-muted)', lineHeight: 1.55 }}>
+              {storePairDescription(
+                node.storeUsage?.asSource ?? false,
+                node.storeUsage?.asOutput ?? false,
+                node.pairedStoreNames,
+              )}
+            </p>
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--app-text-subtle)', lineHeight: 1.55, fontStyle: 'italic' }}>
+              {node.pairedStoreNames.length === 1
+                ? 'These two stores work as a pair. Removing one without the other will break the mechanism.'
+                : 'These stores work together as a set. Removing one without the others will break the mechanism.'}
+            </p>
+          </div>
+        )}
       {consumers.length > 0 && (
         <div
           style={{
@@ -402,12 +528,10 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onTo
             </div>
           ))}
           <p style={{ margin: '8px 0 0', fontSize: 12, lineHeight: 1.5, color: allConsumersDead ? 'var(--sil-orange-dark)' : 'var(--app-text-subtle)' }}>
-            {allConsumersDead
-              ? 'All consumers removed. This store is now orphaned and safe to drop.'
-              : (() => {
-                  const total = node.storeUsage?.ruleCount ?? consumers.reduce((s, c) => s + c.ruleCount, 0);
-                  return `If this store is removed, the ${total} ${total === 1 ? 'rule' : 'rules'} above that depend on it will break at compile time.`;
-                })()}
+            {allConsumersDead ? 'All consumers removed. This store is now orphaned and safe to drop.' : (() => {
+              const total = node.storeUsage?.ruleCount ?? consumers.reduce((s, c) => s + c.ruleCount, 0);
+              return `If this store is removed, the ${total} ${total === 1 ? 'rule' : 'rules'} above that depend on it will break at compile time.`;
+            })()}
           </p>
         </div>
       )}
@@ -442,10 +566,27 @@ interface InspectorProps {
   onSetManyGlyphs: (gids: string[], off: boolean) => void;
   isDeleted: (nodeId: string) => boolean;
   onToggleNode: (nodeId: string, off: boolean) => void;
-  onOwnerClick?: (nodeId: string) => void;
+  onSelectNode?: ((nodeId: string) => void) | undefined;
+  /**
+   * Called when the user clicks a chip body whose glyph is cross-wired to
+   * other nodes (group rule + pattern + output store slot). CarveGallery
+   * resolves the contributors and opens the ConfirmDialog.
+   *
+   * When absent, chip clicks fall back to the plain onToggleGlyph path.
+   */
+  onCascadeDelete?: ((gid: string) => void) | undefined;
+  /**
+   * Store-chip counterpart of onCascadeDelete — see StoreDetailProps.onStoreCascade.
+   * Forwarded straight through to StoreDetail; unused by the pattern/group branch.
+   */
+  onStoreCascade?: ((chipId: string, ch: string) => void) | undefined;
+  /** character → all its locations (built once by CarveGallery); powers the cross-reference tags. */
+  charWeb?: Map<string, CharLocation[]> | undefined;
+  /** Clicking a cross-reference tag — CarveGallery navigates (1 location) or opens the web popup (>1). */
+  onWebTag?: ((ch: string, locations: CharLocation[]) => void) | undefined;
 }
 
-export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetManyGlyphs, isDeleted, onToggleNode, onOwnerClick }: InspectorProps) {
+export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetManyGlyphs, isDeleted, onToggleNode, onSelectNode, onCascadeDelete, onStoreCascade, charWeb, onWebTag }: InspectorProps) {
   const [q, setQ] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   useEffect(() => { setQ(''); setCollapsed(new Set()); }, [node?.nodeId]);
@@ -461,7 +602,7 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
   }
 
   if (node.kind === 'raw') return <RawDetail node={node} isDeleted={isDeleted} onToggleNode={onToggleNode} />;
-  if (node.kind === 'store') return <StoreDetail key={node.nodeId} node={node} nodes={nodes} isDeleted={isDeleted} isItemDeleted={isItemDeleted} onToggleNode={onToggleNode} onToggleGlyph={onToggleGlyph} onSetManyGlyphs={onSetManyGlyphs} />;
+  if (node.kind === 'store') return <StoreDetail key={node.nodeId} node={node} nodes={nodes} isDeleted={isDeleted} isItemDeleted={isItemDeleted} onToggleNode={onToggleNode} onSelectNode={onSelectNode} onToggleGlyph={onToggleGlyph} onSetManyGlyphs={onSetManyGlyphs} onStoreCascade={onStoreCascade} />;
 
   const glyphs = node.glyphs ?? [];
   const st = nodeState(node, isItemDeleted, isDeleted);
@@ -498,7 +639,7 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
             <KindBadge kind={node.kind} />
             {node.strategy !== undefined && <StrategyChip id={node.strategy} />}
           </div>
-          <p style={{ ...blurbStyle, margin: 0 }}>
+          <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--app-text-subtle)', lineHeight: 1.55 }}>
             {node.kind === 'pattern'
               ? 'A recognized pattern groups related key rules by purpose, for example "vowels with diacritics" or "base alphabet". The tiles below show rules with visible character output. The pattern may also own store-dependent rules that don\'t appear as tiles; those are shown in the relevant stores\' "Used by" panels. Removing this pattern removes all of it.'
               : 'A group is a block of key rules from the original keyboard that hasn\'t been recognized as a named pattern. The tiles below show rules with visible character output. The group may also contain store-dependent rules that don\'t appear as tiles; those are shown in the relevant stores\' "Used by" panels. Removing this group removes all of it.'}
@@ -569,7 +710,8 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
             </div>
             {/* Per-group glyph subgrid */}
             {!isCollapsed && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gridAutoRows: rowHeight + 'px', gap: 8 }}>
+              // Rows grow to fit the cross-reference tags (min rowHeight, then auto).
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gridAutoRows: `minmax(${rowHeight}px, auto)`, gap: 8 }}>
                 {grp.glyphs.map((x: CarveGlyph) => (
                   <GlyphCell
                     key={x.gid}
@@ -582,7 +724,9 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
                     modifierLabel={x.modifierLabel}
                     capability={x.capability}
                     {...(x.owners ? { owners: x.owners } : {})}
-                    {...(onOwnerClick ? { onOwnerClick } : {})}
+                    webLocations={(charWeb?.get(x.ch) ?? []).filter((l) => l.nodeId !== node.nodeId)}
+                    {...(onWebTag ? { onWebTag } : {})}
+                    {...(onCascadeDelete ? { onCascadeDelete } : {})}
                   />
                 ))}
               </div>

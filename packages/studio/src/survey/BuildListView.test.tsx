@@ -506,11 +506,27 @@ describe("BuildListView — end-to-end onComplete", () => {
 // 8. Back button returns to IntroChooser
 // ---------------------------------------------------------------------------
 
+describe("BuildListView — whole-alphabet instructions", () => {
+  it("shows the instruction callout with the space-separated example", async () => {
+    await renderBuildListView({});
+    // Callout: whole-alphabet wording + explicit spacing instruction.
+    expect(
+      screen.getByText(/every\s+character your language uses, not just the special ones/i),
+    ).toBeTruthy();
+    // The spaced example line.
+    expect(screen.getByText("a b c d e ɛ ŋ ɔ …")).toBeTruthy();
+    // Type-in section repeats the spacing instruction.
+    expect(
+      screen.getByText(/putting a space between each\s+character/i),
+    ).toBeTruthy();
+  });
+});
+
 describe("BuildListView — Back navigation", () => {
   it("clicking Back shows the IntroChooser again", async () => {
     await renderBuildListView({});
     // We should be in BuildListView now.
-    expect(screen.queryByText(/Phase B — Build your character list/i)).not.toBeNull();
+    expect(screen.queryByText(/Phase B — Add your whole alphabet/i)).not.toBeNull();
     // Find and click the Back button in BuildListView.
     const backBtn = screen.getByRole("button", { name: /^Back$/i });
     await act(async () => {

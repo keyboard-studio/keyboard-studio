@@ -11,29 +11,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
-import type { BaseKeyboard, Pattern, SurveyPhaseResult, TouchAssignment } from "@keyboard-studio/contracts";
+import { ResizeHandle } from "./components/ResizeHandle.tsx";
+import type { BaseKeyboard, Pattern } from "@keyboard-studio/contracts";
 import { buildTouchLayoutJson } from "./lib/buildTouchLayoutJson.ts";
 import { useWorkingCopyStore, bindManifest } from "./stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
 import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
-import { IdentityLite, Prefill, PhaseB, PhaseF, PhaseTrack, PhaseProjectName, type IdentityLiteResult } from "./survey/index.ts";
-import { BaseResolution } from "./editors/panels/BaseResolution.tsx";
-import { UnsupportedScriptStub } from "./components/UnsupportedScriptStub.tsx";
-import type { SuggestTarget } from "./lib/suggestBase.ts";
-import type { SurveyContext } from "./survey/types.ts";
-import { CarveGallery } from "./editors/carve/CarveGallery.tsx";
-import { MechanismGallery } from "./editors/assignLoop/MechanismGallery.tsx";
-import { TouchGallery } from "./editors/assignLoop/TouchGallery.tsx";
 import { type RouteId } from "./lib/navigate.ts";
-import { useKeyboardArtifact, type OnInstantiateCallback, type ScaffoldSpec } from "./hooks/useKeyboardArtifact.ts";
+import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { OSKFrame } from "./components/OSKFrame.tsx";
 import { OskModeToggle, type OskMode } from "./components/OskModeToggle.tsx";
-import type { Track } from "./editors/panels/TrackStep.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
-import { usePlacementPriors } from "./hooks/usePlacementPriors.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
 import { resolveBaseTouchJson } from "./lib/resolveBaseTouchJson.ts";
-import { buildFindingsByQuestionId, selectUnmappedFindings } from "./lint/lintToQuestion.ts";
+import { selectUnmappedFindings } from "./lint/lintToQuestion.ts";
 import { LintSummary } from "./lint/index.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
 import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
@@ -46,34 +38,9 @@ import { ProfileScreen } from "./components/ProfileScreen.tsx";
 import { AccountControl } from "./components/AccountControl.tsx";
 import { navigateTo } from "./lib/navigate.ts";
 import { manifest } from "./steps/manifest.ts";
-import { applyStepCompletion, type ReducerDeps, type MutateRequest } from "./steps/reducer.ts";
-import { questionRegistry } from "./survey/questions/registry.ts";
-
-/**
- * spec-014 US1 (T014/T015): route each in-scope question answer through its
- * module's `mutate()` write seam via the reducer. The reducer gates execution
- * on the global mutate flag (off ⇒ no-op, byte-identical to P4b), so this is
- * safe to call unconditionally. A module without `mutate`/with empty `writes`
- * is skipped (display-only / answer-store-only stays a no-op, FR-007).
- */
-function routeAnswersThroughMutate(
-  result: SurveyPhaseResult,
-  deps: ReducerDeps,
-): void {
-  for (const answer of result.answers) {
-    const mod = questionRegistry[answer.questionId];
-    if (mod === undefined) continue;
-    if (mod.mutate === undefined || (mod.writes ?? []).length === 0) continue;
-    const value = answer.value as string | string[] | undefined;
-    const req: MutateRequest = {
-      kind: "mutate",
-      mutate: mod.mutate,
-      value,
-      writes: mod.writes!,
-    };
-    applyStepCompletion(answer.questionId, req, deps);
-  }
-}
+import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
+import { StepHost } from "./components/StepHost.tsx";
+import { TEXT_MAIN, FONT } from "./survey/surveyStyles.ts";
 
 // Bind the manifest into the store's staleness actions.
 // Called once at module load; avoids a circular static import in the store
@@ -226,31 +193,9 @@ const SURVEY_LEFT_MAX_PCT = 65;
 const SURVEY_LEFT_INIT_PCT = 45;
 
 // ---------------------------------------------------------------------------
-// ActiveStepId — the set of manifest step ids the runtime advances through,
-// plus terminal states "done" and "unsupported" not present in the manifest.
-//
-// track and project_name are real manifest steps (P0 fix); they appear here.
-// touch_seed_source is spine:false and skipped by nextSpineStepAfter — not listed.
-// package is reserved and maps to "done" in nextSpineStepAfter — not listed.
+// ActiveStepId — imported from surveySessionStore (the traversal vocabulary
+// owner). See stores/surveySessionStore.ts (research D-R1).
 // ---------------------------------------------------------------------------
-
-type ActiveStepId =
-  | "identity"
-  | "choose_base"
-  | "track"
-  | "project_name"
-  | "characters"
-  | "carve"
-  | "mechanisms"
-  | "touch"
-  | "help"
-  | "done"
-  | "unsupported";
-
-// Sub-stage within the characters manifest step (intra-phase routing).
-// prefill→B is legitimately internal to the Phase A/B SurveyRunner;
-// synthesis confirmed these should NOT be promoted to manifest steps.
-type CharactersSubStage = "prefill" | "B";
 
 // ---------------------------------------------------------------------------
 // validateManifestShape — throw-on-mismatch structural guard (M2, M3, M4).
@@ -306,63 +251,36 @@ function validateManifestShape(): void {
     }
     seen.add(id);
   }
+
+  // Layout guard (spec 028 Stage 5, T016): layout:"full" is now LOAD-BEARING —
+  // StepHost reads step.layout to select full-screen vs two-pane chrome (R4).
+  // EXACTLY {carve, mechanisms, touch} must declare layout:"full"; all others
+  // must be "pane" or omit layout. This assertion is retained (not removed) as
+  // a correctness gate: a mismatched layout would silently change the chrome.
+  const FULL_LAYOUT_IDS = new Set(["carve", "mechanisms", "touch"]);
+  for (const step of manifest) {
+    if (step.layout === "full") {
+      if (!FULL_LAYOUT_IDS.has(step.id)) {
+        throw new Error(
+          `[SurveyView] unexpected layout:"full" on step "${step.id}" — only carve/mechanisms/touch may be full-screen (spec 024 Stage 0)`,
+        );
+      }
+    }
+  }
+  for (const expectedId of FULL_LAYOUT_IDS) {
+    const step = manifest.find((s) => s.id === expectedId);
+    if (step?.layout !== "full") {
+      throw new Error(
+        `[SurveyView] step "${expectedId}" must declare layout:"full" (spec 024 Stage 0)`,
+      );
+    }
+  }
 }
 
 validateManifestShape();
 
-// ---------------------------------------------------------------------------
-// manifestIndexOf / nextSpineStepAfter — manifest traversal helpers
-// ---------------------------------------------------------------------------
-
-/** Return the manifest index for a given step id, or -1 if not found. */
-function manifestIndexOf(id: string): number {
-  return manifest.findIndex((s) => s.id === id);
-}
-
-/**
- * Advance to the next spine step in the manifest after currentId, skipping
- * spine:false side-trail steps. Returns the ActiveStepId of the next spine
- * step, or "done" when the reserved "package" step or end-of-manifest is reached.
- */
-function nextSpineStepAfter(currentId: string): ActiveStepId {
-  const currentIdx = manifestIndexOf(currentId);
-  for (let i = currentIdx + 1; i < manifest.length; i++) {
-    const step = manifest[i];
-    if (step === undefined) break;
-    // Skip side-trail (spine:false) steps — adapt-track skips project_name this way.
-    if (step.spine === false) continue;
-    const id = step.id;
-    if (
-      id === "identity" ||
-      id === "choose_base" ||
-      id === "track" ||
-      id === "project_name" ||
-      id === "characters" ||
-      id === "carve" ||
-      id === "mechanisms" ||
-      id === "touch" ||
-      id === "help"
-    ) {
-      return id;
-    }
-    // "package" is reserved — terminal, map to "done".
-    if (id === "package") return "done";
-  }
-  return "done";
-}
-
-/** Build the downstream SurveyContext from the identity-lite result. */
-function contextFromIdentity(identity: IdentityLiteResult): SurveyContext {
-  return {
-    language_name: identity.english || identity.autonym,
-    routing_group: identity.prefill.routingGroup,
-    script_family: identity.prefill.script,
-    // identity.bcp47 is the full BCP47 target tag (e.g. "yo-Latn", "ha-Latn").
-    // Empty string when the user left the language code blank; omit the field
-    // in that case so SuggestionPanel can gate on bcp47_tag being non-empty.
-    ...(identity.bcp47 !== "" ? { bcp47_tag: identity.bcp47 } : {}),
-  };
-}
+// manifestIndexOf and nextSpineStepAfter have moved to steps/advance.ts
+// (spec 028 Stage 5, T006). They are no longer needed in SurveyView.
 
 interface SurveyViewProps {
   /**
@@ -375,50 +293,50 @@ interface SurveyViewProps {
 
 export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // ---------------------------------------------------------------------------
-  // Manifest-driven step state (T028 — no SurveyStage union)
-  //
-  // activeStepId: current manifest step id (or terminal "done"/"unsupported").
+  // Traversal state — sourced from surveySessionStore (spec 026 Stage 3).
+  // StepHost reads activeStepId directly; SurveyView only needs scaffoldSpec
+  // (for the compile pipeline) and localBase (for the OSK right pane).
   // ---------------------------------------------------------------------------
-  const [activeStepId, setActiveStepId] = useState<ActiveStepId>("identity");
+  const activeStepId = useSurveySessionStore((s) => s.activeStepId);
+  const scaffoldSpec = useSurveySessionStore((s) => s.scaffoldSpec);
+  const localBase = useSurveySessionStore((s) => s.localBase);
+  const surveyContext = useSurveySessionStore((s) => s.surveyContext);
 
-  // Sub-stage for the characters manifest step (intra-phase: prefill → B).
-  const [charactersSub, setCharactersSub] = useState<CharactersSubStage>("prefill");
+  // Store actions needed by SurveyView (not delegated to StepHost).
+  const sessionReset = useSurveySessionStore((s) => s.reset);
+  const setLocalBase = useSurveySessionStore((s) => s.setLocalBase);
 
-  const [identityResult, setIdentityResult] = useState<IdentityLiteResult | null>(null);
-  const [surveyContext, setSurveyContext] = useState<SurveyContext>({});
+  // Derive whether the active step declares layout:"full" (load-bearing per Stage 5,
+  // FR-002, R4). SurveyView uses this to skip the two-pane shell for full-screen steps.
+  const activeStepIsFullScreen = useMemo(() => {
+    const step = manifest.find((s) => s.id === activeStepId);
+    return step?.layout === "full";
+  }, [activeStepId]);
+
+  // Reset the session store on mount — the store is a module-level singleton that
+  // persists across React tree unmounts/remounts (e.g. navigating away from the
+  // survey route and back creates a new SurveyView mount = a new wizard session).
+  // Without this reset the singleton would resume from stale prior state rather
+  // than starting at "identity". Component-local useState used to give this
+  // mount-fresh reset for free; this call restores that invariant for the store.
+  useEffect(() => {
+    useSurveySessionStore.getState().reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally empty: runs exactly once on mount
+  }, []);
+
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
-  const { containerRef, leftPct, handleHovered, onPointerDown, setHandleHovered } =
+  const { containerRef, leftPct, onPointerDown } =
     useResizablePanes({ minPct: SURVEY_LEFT_MIN_PCT, maxPct: SURVEY_LEFT_MAX_PCT, initPct: SURVEY_LEFT_INIT_PCT });
 
-  // Corpus placement priors — loaded lazily from docs/placement-priors.json.
-  // Null while loading or on error (gallery degrades gracefully without it).
-  const corpusPlacementMap = usePlacementPriors();
-
-  // Track 1 (Copy) vs Track 2 (Adapt) — set at the track manifest step.
-  const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
-
-  // ScaffoldSpec for Track 1: populated after the project_name step.
-  // Null for Track 2 (adapt uses the base's existing id/name).
-  const [scaffoldSpec, setScaffoldSpec] = useState<ScaffoldSpec | null>(null);
-
-  // Local base selection that drives the compile pipeline immediately on pick.
-  // This is separate from baseKeyboard (the store's instantiated base) so that:
-  //   (a) the pipeline starts as soon as BaseResolution resolves, not after
-  //       the store updates (which only happens after compile completes); and
-  //   (b) the OSK preview shows the base the user just picked, while compile runs.
-  // Once onInstantiate fires (compile succeeds), both values will agree.
-  const [localBase, setLocalBase] = useState<BaseKeyboard | null>(baseKeyboard);
-
-  // Sync localBase when the store's baseKeyboard prop changes (e.g. after a
-  // start-over that sets a new base, the wizard sees it).
+  // Sync localBase when the prop changes (e.g. after a start-over that sets a new base).
+  // localBase lives in the session store; we update it when the working-copy's baseKeyboard
+  // prop changes so the wizard stays in sync with the pipeline-settled base.
   useEffect(() => {
     setLocalBase(baseKeyboard);
-  }, [baseKeyboard]);
+  }, [baseKeyboard, setLocalBase]);
 
-  // Working-copy store actions.
-  const recordPhase = useWorkingCopyStore((s) => s.recordPhase);
+  // Working-copy store actions needed by SurveyView (not delegated to StepHost).
   const resetSurvey = useWorkingCopyStore((s) => s.reset);
-  const setStoreIdentity = useWorkingCopyStore((s) => s.setIdentity);
   const lockDesktop = useWorkingCopyStore((s) => s.lockDesktop);
   const setTouchLayoutJson = useWorkingCopyStore((s) => s.setTouchLayoutJson);
   const instantiateFromBase = useWorkingCopyStore((s) => s.instantiateFromBase);
@@ -426,14 +344,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
   const setValidatorFindings = useWorkingCopyStore((s) => s.setValidatorFindings);
-
-  // selectedTrack captured in a ref so the memoised onInstantiate callback
-  // always sees the current value even when the async compile completes after
-  // selectedTrack changes.
-  const selectedTrackRef = useRef<Track | null>(null);
-  useEffect(() => {
-    selectedTrackRef.current = selectedTrack;
-  }, [selectedTrack]);
 
   // ---------------------------------------------------------------------------
   // P1 fix: double-instantiation guard.
@@ -505,7 +415,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     if (instantiatedRef.current) return;
     instantiatedRef.current = true;
 
-    const track = selectedTrackRef.current;
+    // Reads via getState() escape hatch (not a selector) to avoid a stale closure — the callback is memoised with empty deps.
+    const track = useSurveySessionStore.getState().selectedTrack;
     applyStepCompletion(
       "choose_base",
       { base, vfs, ir, removalCapabilities, track: track ?? null },
@@ -544,7 +455,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Use localBase (immediately updated on selection) to drive the pipeline.
   // Pass scaffoldSpec so Track 1 routes through scaffold() instead of fetchKeyboardSourceToVfs.
   const { stage: artifactStage, retry } = useKeyboardArtifact(localBase, scaffoldSpec, workingCopyTransform, onInstantiate);
-  const rightPct = 100 - leftPct;
 
   // Derive KMN source from the working copy's base VFS for the validator.
   const kmnSource = useMemo(() => {
@@ -558,198 +468,28 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // spec-014 US5/T034 — publish the SINGLE debounced `useValidator` findings to
   // the store so the sibling `StudioShell` can feed C4 spine-prefix shippability
   // the REAL Layer-A findings WITHOUT a second `useValidator`/debounce (V3 /
-  // Article IV). This is a store-bridge publish, not a new validation source:
-  // `findings` only changes when the existing debounce cycle resolves, and the
-  // effect deps are `[findings, setValidatorFindings]` (both stable across
-  // renders that don't change the findings reference), so it never loops. The
-  // store setter is itself reference-equality guarded as a second line of defense.
+  // Article IV). This is a store-bridge publish, not a new validation source.
   useEffect(() => {
     setValidatorFindings(findings);
   }, [findings, setValidatorFindings]);
-  const findingsByQuestionId = useMemo(
-    () => buildFindingsByQuestionId(findings),
-    [findings],
-  );
   const globalFindings = useMemo(() => selectUnmappedFindings(findings), [findings]);
 
-  // The (language, script) target for base suggestion — keyed on the CHOSEN script.
-  const suggestTarget: SuggestTarget | null =
-    identityResult !== null
-      ? {
-          script: identityResult.prefill.script,
-          ...(identityResult.bcp47 !== "" ? { bcp47: identityResult.bcp47 } : {}),
-        }
-      : null;
-
   // ---------------------------------------------------------------------------
-  // Step completion handlers — all side effects dispatched through applyStepCompletion.
-  // FR-011: editor components are pure; only these handlers call applyStepCompletion.
+  // Start over — reset session store first (clears all traversal slots + history),
+  // then reset the working-copy store and local component state.
+  // Ordering: session.reset() before instantiatedRef.current = false so the
+  // guard is clear before any re-instantiation can fire (research D-R5).
   // ---------------------------------------------------------------------------
-
-  /** identity step completes → choose_base (or unsupported). */
-  function handleIdentityComplete(result: SurveyPhaseResult, identity: IdentityLiteResult) {
-    recordPhase(result);
-    // spec-014 US1: route Phase A identity/header answers through mutate() (flag-gated).
-    routeAnswersThroughMutate(result, reducerDeps);
-    setIdentityResult(identity);
-    setSurveyContext(contextFromIdentity(identity));
-    setActiveStepId(identity.supported ? nextSpineStepAfter("identity") : "unsupported");
-  }
-
-  /** choose_base step completes — start pipeline, advance to track manifest step. */
-  function handleBaseResolved(base: BaseKeyboard) {
-    setLocalBase(base);
-    setActiveStepId(nextSpineStepAfter("choose_base"));
-  }
-
-  /**
-   * track step completes.
-   * copy-track → project_name (spine:false manifest step).
-   * adapt-track → skip project_name (spine:false) → characters (nextSpineStepAfter("track")).
-   */
-  function handleTrackSelected(track: Track) {
-    setSelectedTrack(track);
-    if (track === "copy") {
-      // Copy-track takes the project_name side-trail.
-      setActiveStepId("project_name");
-    } else {
-      // Adapt-track: no scaffoldSpec needed — adapt uses base's own id/displayName.
-      setScaffoldSpec(null);
-      // Skip project_name (spine:false) — nextSpineStepAfter("track") jumps to characters.
-      setActiveStepId(nextSpineStepAfter("track"));
-      setCharactersSub("prefill");
-    }
-  }
-
-  /**
-   * project_name step completes (copy-track only).
-   * Sets scaffoldSpec so useKeyboardArtifact routes through scaffold(), pushes
-   * identity into the store, then advances to characters (project_name's joinTarget).
-   */
-  function handleProjectNameNext(displayName: string, keyboardId: string) {
-    setScaffoldSpec({ keyboardId, displayName });
-    setStoreIdentity({ keyboardId, displayName });
-    // project_name.joinTarget is "characters" — advance there directly.
-    setActiveStepId("characters");
-    setCharactersSub("prefill");
-  }
-
-  // --- characters internal sub-stage handlers (intra-phase routing) ---
-
-  /** Prefill confirmed — advance to B (Phase B question battery). */
-  function handlePrefillConfirm() {
-    setCharactersSub("B");
-  }
-
-  /**
-   * Phase B (characters) completes — record phase result, dispatch R5 (no-op),
-   * advance to carve (FR-012: characters BEFORE carve).
-   */
-  function handlePhaseBComplete(result: SurveyPhaseResult) {
-    recordPhase(result);
-    // spec-014 US1: route Phase B in-scope answers (pb_standard_letters) through
-    // mutate() (flag-gated) before the characters step's R5 side effect.
-    routeAnswersThroughMutate(result, reducerDeps);
-    applyStepCompletion("characters", result, reducerDeps);
-    setActiveStepId(nextSpineStepAfter("characters"));
-  }
-
-  // --- Spine gallery/phase completion handlers ---
-
-  /** carve step completes → mechanisms. */
-  function handleCarveComplete() {
-    applyStepCompletion("carve", undefined, reducerDeps);
-    setActiveStepId(nextSpineStepAfter("carve"));
-  }
-
-  /**
-   * mechanisms step completes — applyStepCompletion fires lockDesktop (R1),
-   * then advance to touch.
-   */
-  function handleMechanismsComplete() {
-    applyStepCompletion("mechanisms", undefined, reducerDeps);
-    setActiveStepId(nextSpineStepAfter("mechanisms"));
-  }
-
-  /**
-   * touch (Phase E) step completes — applyStepCompletion fires buildTouchLayoutJson (R2),
-   * then advance to help.
-   */
-  function handlePhaseEComplete(assignments: TouchAssignment[]) {
-    applyStepCompletion(
-      "touch",
-      { assignments, baseIr, baseVfs },
-      reducerDeps,
-    );
-    setActiveStepId(nextSpineStepAfter("touch"));
-  }
-
-  /** help (Phase F) step completes → done, navigate to output. */
-  function handlePhaseFComplete(result: SurveyPhaseResult) {
-    recordPhase(result);
-    applyStepCompletion("help", result, reducerDeps);
-    setActiveStepId("done");
-    navigateTo("output");
-  }
-
-  /** Start over — reset all wizard state to initial. */
   function handleStartOver() {
+    sessionReset();
     resetSurvey();
-    setIdentityResult(null);
-    setSurveyContext({});
-    setLocalBase(null);
-    setSelectedTrack(null);
-    setScaffoldSpec(null);
     instantiatedRef.current = false;
-    setActiveStepId("identity");
-    setCharactersSub("prefill");
+    // sessionReset() calls reset() which already clears charactersSubStage to
+    // "prefill" (spec 027 Stage 4 — the store slot is the authoritative owner).
   }
 
   // ---------------------------------------------------------------------------
-  // Back navigation handlers — purely local (no side effects via reducer).
-  // ---------------------------------------------------------------------------
-
-  /** Back from choose_base → identity. */
-  function handleBaseBack() { setActiveStepId("identity"); }
-
-  /** Back from track → choose_base. */
-  function handleTrackBack() { setActiveStepId("choose_base"); }
-
-  /**
-   * Back from project_name → track.
-   * (project_name is a manifest step with its own back affordance.)
-   */
-  function handleProjectNameBack() { setActiveStepId("track"); }
-
-  /**
-   * Back from characters/prefill.
-   * copy-track: → project_name (its preceding manifest step).
-   * adapt-track: → track (project_name was skipped on the adapt path).
-   */
-  function handlePrefillBack() {
-    setActiveStepId(selectedTrack === "copy" ? "project_name" : "track");
-  }
-
-  /** Back from characters/B → prefill (stays in characters intra-phase). */
-  function handlePhaseBBack() { setCharactersSub("prefill"); }
-
-  /** Back from carve → characters/B. */
-  function handleCarveBack() {
-    setActiveStepId("characters");
-    setCharactersSub("B");
-  }
-
-  /** Back from mechanisms → carve. */
-  function handleMechanismsBack() { setActiveStepId("carve"); }
-
-  /** Back from touch (E) → mechanisms. */
-  function handleTouchBack() { setActiveStepId("mechanisms"); }
-
-  /** Back from help (F) → touch (E). */
-  function handleHelpBack() { setActiveStepId("touch"); }
-
-  // ---------------------------------------------------------------------------
-  // Style constants
+  // Style constants (shared by full-screen and two-pane layouts)
   // ---------------------------------------------------------------------------
 
   const questionsPaneStyle: CSSProperties = {
@@ -762,228 +502,39 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     overflowY: "auto",
     padding: 24,
     boxSizing: "border-box",
-    color: "#e6edf3",
-    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    color: TEXT_MAIN,
+    fontFamily: FONT,
   };
 
   // ---------------------------------------------------------------------------
-  // Full-screen steps (carve, mechanisms, touch) — render without the two-pane layout.
+  // Render: StepHost drives all survey step rendering (spec 028 Stage 5, T012).
+  //
+  // StepHost reads activeStepId from surveySessionStore, resolves the manifest
+  // step, and selects chrome by step.layout (FR-002, R4):
+  //   layout:"full" → full-screen container (returned directly, wrapping the panes)
+  //   otherwise    → left pane content (returned inside the two-pane shell below)
+  //
+  // The host handles done/unsupported terminals and the unknown-id error panel.
+  // SurveyView retains: resizable panes, OSK right pane, validator, oskMode,
+  // pattern-map effect, instantiatedRef, onInstantiate (FR-009).
   // ---------------------------------------------------------------------------
 
-  if (activeStepId === "carve") {
-    return (
-      <div style={{ height: "100%", overflow: "hidden" }}>
-        <CarveGallery
-          onComplete={handleCarveComplete}
-          onBack={handleCarveBack}
-        />
-      </div>
-    );
-  }
-
-  if (activeStepId === "mechanisms") {
-    return (
-      <div style={{ height: "100%", overflow: "hidden" }}>
-        <MechanismGallery
-          selectedBaseKeyboard={localBase}
-          onComplete={handleMechanismsComplete}
-          onBack={handleMechanismsBack}
-          {...(corpusPlacementMap !== null ? { placementMap: corpusPlacementMap } : {})}
-        />
-      </div>
-    );
-  }
-
-  if (activeStepId === "touch") {
-    return (
-      <div style={{ height: "100%", overflow: "hidden" }}>
-        <TouchGallery
-          onComplete={handlePhaseEComplete}
-          onBack={handleTouchBack}
-        />
-      </div>
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Done / "survey complete" panel content
-  // ---------------------------------------------------------------------------
-
-  const donePaneContent = (
-    <div
-      style={{
-        padding: 24,
-        border: "1px solid #30363d",
-        borderRadius: 8,
-        display: "flex",
-        flexDirection: "column",
-        gap: 16,
-        alignItems: "flex-start",
-      }}
-    >
-      <h2 style={{ margin: 0, fontSize: "1.1rem", color: "#6ea8fe", fontWeight: 600 }}>
-        Survey complete
-      </h2>
-      <p style={{ margin: 0, fontSize: 13, color: "#8b949e" }}>
-        All authoring steps have been completed. Head to Output to download or
-        submit your keyboard.
-      </p>
-      <button
-        type="button"
-        onClick={handleStartOver}
-        style={{
-          padding: "8px 18px",
-          background: "transparent",
-          border: "1px solid #30363d",
-          borderRadius: 6,
-          color: "#8b949e",
-          fontSize: 13,
-          cursor: "pointer",
-          fontFamily: "inherit",
-        }}
-      >
-        Start over
-      </button>
-    </div>
+  const stepHost = (
+    <StepHost
+      reducerDeps={reducerDeps}
+      onStartOver={handleStartOver}
+      ctx={surveyContext}
+    />
   );
 
-  // ---------------------------------------------------------------------------
-  // Two-pane layout: questions (left) + OSK preview (right)
-  // ---------------------------------------------------------------------------
+  const rightPct = 100 - leftPct;
 
-  // Steps rendered full-screen (not in the two-pane layout) — handled as early
-  // returns above. Only the remaining ids reach the two-pane pane renderer.
-  type TwoPaneStepId = Exclude<ActiveStepId, "carve" | "mechanisms" | "touch">;
-
-  /**
-   * Render the left-pane content for the current active step.
-   * Receives the activeStepId narrowed to TwoPaneStepId (carve/mechanisms/touch
-   * are returned early before this is called). Exhaustiveness guard at the bottom
-   * renders a visible error panel rather than a blank pane for an unhandled id.
-   */
-  function renderQuestionsPane(stepId: TwoPaneStepId): ReactNode {
-    if (stepId === "done") {
-      return donePaneContent;
-    }
-
-    if (stepId === "identity") {
-      return (
-        <IdentityLite
-          context={surveyContext}
-          onComplete={handleIdentityComplete}
-          findingsByQuestionId={findingsByQuestionId}
-        />
-      );
-    }
-
-    // §9 three-group routing — not yet supported stub (CJK/Ethiopic).
-    if (stepId === "unsupported") {
-      return identityResult !== null ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "flex-start" }}>
-          <UnsupportedScriptStub script={identityResult.targetScriptRaw} />
-          <button
-            type="button"
-            onClick={handleStartOver}
-            style={{
-              padding: "8px 18px",
-              background: "transparent",
-              border: "1px solid #30363d",
-              borderRadius: 6,
-              color: "#8b949e",
-              fontSize: 13,
-              cursor: "pointer",
-              fontFamily: "inherit",
-            }}
-          >
-            Start over
-          </button>
-        </div>
-      ) : null;
-    }
-
-    // Manifest step: choose_base — base picker only.
-    if (stepId === "choose_base") {
-      return suggestTarget !== null ? (
-        <BaseResolution
-          target={suggestTarget}
-          onResolved={handleBaseResolved}
-          onBack={handleBaseBack}
-        />
-      ) : null;
-    }
-
-    // Manifest step: track — copy vs adapt choice (modular question flow).
-    if (stepId === "track") {
-      return localBase !== null ? (
-        <PhaseTrack
-          baseDisplayName={localBase.displayName}
-          onTrackSelected={handleTrackSelected}
-          onBack={handleTrackBack}
-        />
-      ) : null;
-    }
-
-    // Manifest step: project_name — copy-track CYOA fork (spine:false, modular question flow).
-    if (stepId === "project_name") {
-      return identityResult !== null ? (
-        <PhaseProjectName
-          defaultDisplayName={identityResult.autonym || identityResult.english}
-          onProjectNameNext={handleProjectNameNext}
-          onBack={handleProjectNameBack}
-        />
-      ) : null;
-    }
-
-    // Manifest step: characters — intra-phase routing: prefill → B.
-    if (stepId === "characters") {
-      if (charactersSub === "prefill" && identityResult !== null && localBase !== null) {
-        return (
-          <Prefill
-            identity={identityResult}
-            base={localBase}
-            onConfirm={handlePrefillConfirm}
-            onBack={handlePrefillBack}
-          />
-        );
-      }
-      if (charactersSub === "B") {
-        // NOTE: placementMap is intentionally not supplied here in v1 (see D-INT-2).
-        return (
-          <PhaseB
-            context={surveyContext}
-            onComplete={handlePhaseBComplete}
-            onBack={handlePhaseBBack}
-            findingsByQuestionId={findingsByQuestionId}
-          />
-        );
-      }
-      return null;
-    }
-
-    // Manifest step: help (Phase F).
-    if (stepId === "help") {
-      return (
-        <PhaseF
-          context={surveyContext}
-          onComplete={handlePhaseFComplete}
-          onBack={handleHelpBack}
-          findingsByQuestionId={findingsByQuestionId}
-        />
-      );
-    }
-
-    // Exhaustiveness guard: unknown TwoPaneStepId — this step has no renderer yet.
-    // Renders a visible error panel rather than a silent blank pane.
-    // If you see this, wire the new manifest step into SurveyView.
-    const _exhaustive: never = stepId;
-    return (
-      <div
-        role="alert"
-        style={{ padding: 24, color: "#f85149", fontFamily: "monospace", fontSize: 13 }}
-      >
-        {`[SurveyView] unhandled step id: "${String(_exhaustive)}" — wire this manifest step into SurveyView`}
-      </div>
-    );
+  // Full-screen steps (carve/mechanisms/touch) bypass the two-pane layout.
+  // StepHost returns the full-screen container; SurveyView renders it directly.
+  // This reproduces the pre-Stage-5 early-return pattern without per-step branches
+  // in SurveyView — the decision is data-driven via step.layout (R4, FR-002).
+  if (activeStepIsFullScreen) {
+    return stepHost;
   }
 
   return (
@@ -998,31 +549,16 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         overflow: "hidden",
       }}
     >
-      {/* Left pane: survey questions */}
+      {/* Left pane: survey questions (StepHost renders pane content) */}
       <section aria-label="Survey questions" style={questionsPaneStyle}>
         {globalFindings.length > 0 && (
           <LintSummary findings={globalFindings} />
         )}
-        {renderQuestionsPane(activeStepId as TwoPaneStepId)}
+        {stepHost}
       </section>
 
       {/* Drag handle */}
-      <div
-        role="separator"
-        aria-label="Resize panes"
-        aria-orientation="vertical"
-        onPointerDown={onPointerDown}
-        onMouseEnter={() => setHandleHovered(true)}
-        onMouseLeave={() => setHandleHovered(false)}
-        style={{
-          width: SURVEY_DIVIDER_WIDTH,
-          flexShrink: 0,
-          background: handleHovered ? "#3d5070" : "#283040",
-          cursor: "col-resize",
-          userSelect: "none",
-          transition: "background 120ms ease",
-        }}
-      />
+      <ResizeHandle onPointerDown={onPointerDown} />
 
       {/* Right pane: live OSK preview */}
       <section
@@ -1038,8 +574,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           overflow: "auto",
           padding: 24,
           boxSizing: "border-box",
-          color: "#e6edf3",
-          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+          color: TEXT_MAIN,
+          fontFamily: FONT,
         }}
       >
         {localBase === null ? (
@@ -1125,6 +661,11 @@ export function StudioShell() {
   // `validatorFindings` defaults to `[]` ⇒ the pure structural proxy, byte-
   // identical to P4b / flag-off.
   const validatorFindings = useWorkingCopyStore((s) => s.validatorFindings);
+  // #890 — default-fill provenance, published by MechanismGallery's
+  // pattern-loading effect. Passed down to FlowMapView -> StrategyTreeView as
+  // a prop for the same dashboard-layer boundary reason as completenessReport
+  // below (DashboardView/StrategyTreeView have NO stores/ import).
+  const axisFills = useWorkingCopyStore((s) => s.axisFills);
   const completenessReport = useMemo(
     () =>
       runCompleteness(
@@ -1151,7 +692,7 @@ export function StudioShell() {
       content = <OutputScreen />;
       break;
     case "flowmap":
-      content = <FlowMapView completeness={completenessReport} />;
+      content = <FlowMapView completeness={completenessReport} axisFills={axisFills} />;
       break;
     case "profile":
       content = <ProfileScreen />;

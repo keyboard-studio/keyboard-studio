@@ -41,7 +41,7 @@ export interface PublishPROptions {
   token: string;
   /**
    * GitHub username or organization that owns the fork target.
-   * The fork of `keymanapp/keyboards` is created under this owner.
+   * The fork of `keyboard-studio/keyboards` is created under this owner.
    */
   forkOwner: string;
   /**
@@ -177,7 +177,7 @@ export interface VerifyTokenResult {
  *      download. Works without a GitHub account. The studio appends
  *      `NEXT_STEPS.md` before calling this method.
  *   2. `publishPR` — GitHub OAuth fork+draft PR. Forks
- *      `keymanapp/keyboards`, creates branch `add/<id>`, commits the
+ *      `keyboard-studio/keyboards`, creates branch `add/<id>`, commits the
  *      virtual FS source tree (compiled artifacts excluded per criteria
  *      SS1), and opens a draft PR.
  *
@@ -233,7 +233,7 @@ export interface OutputService {
   verifyToken(token: string): Promise<VerifyTokenResult>;
 
   /**
-   * Fork `keymanapp/keyboards`, push the virtual FS source tree to a new
+   * Fork `keyboard-studio/keyboards`, push the virtual FS source tree to a new
    * branch, and open a draft PR.
    *
    * The commit includes only source files; `.kmx`, `.kvk`, and `.js`

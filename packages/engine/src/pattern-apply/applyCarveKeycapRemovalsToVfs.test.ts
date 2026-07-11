@@ -1,0 +1,505 @@
+// Tests for applyCarveKeycapRemovalsToVfs — the carve-side keycap blanker.
+//
+// Coverage:
+//   1. Base-layer .kvks key cleared in place; siblings and layer count unchanged.
+//   2. Same char on multiple shift layers (RA + S) both cleared (layer-agnostic).
+//   3. Touch: sk entry removed (property deleted when emptied); matched U_ main
+//      key gets text:"" and an inert T_carved_ id.
+//   4. Carved char absent from layer files → VFS byte-identical, no warnings.
+//   5. No .kvks / no touch layout at all → graceful silent no-op.
+//   6. NFC: decomposed .kvks key text matches a precomposed carved char.
+//   7. collectCarvedKeycapTexts survivor guard — one of two producers carved
+//      → empty set; both carved → the char. Slot-id derivation included.
+
+import { describe, it, expect, vi } from "vitest";
+import {
+  applyCarveKeycapRemovalsToVfs,
+  collectCarvedKeycapTexts,
+} from "./applyCarveKeycapRemovalsToVfs.js";
+import { createVirtualFS } from "@keyboard-studio/contracts";
+import type { KeyboardIR, IRGroup, IRStore, IRRule, OutputElement } from "@keyboard-studio/contracts";
+
+// ---------------------------------------------------------------------------
+// Fixture helpers
+// ---------------------------------------------------------------------------
+
+function makeCharRule(nodeId: string, char: string, vkeyName = "K_E"): IRRule {
+  return {
+    nodeId,
+    context: [{ kind: "vkey", name: vkeyName, modifiers: [] }],
+    output: [{ kind: "char", value: char }],
+  };
+}
+
+function makeRuleWithOutput(nodeId: string, output: OutputElement[]): IRRule {
+  return {
+    nodeId,
+    context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
+    output,
+  };
+}
+
+function makeGroup(nodeId: string, rules: IRRule[]): IRGroup {
+  return { nodeId, name: "main", usingKeys: true, rules, readonly: false };
+}
+
+function makeIR(groups: IRGroup[], stores: IRStore[] = []): KeyboardIR {
+  return {
+    origin: "imported",
+    header: {
+      keyboardId: "test",
+      name: "Test",
+      bcp47: [],
+      copyright: "",
+      version: "1.0",
+      targets: ["any"],
+      storeDirectives: [],
+    },
+    stores,
+    groups,
+    comments: [],
+    raw: [],
+    recognizedPatterns: [],
+  };
+}
+
+const KVKS_BASE = `<visualkeyboard>
+<header><version>10.0</version></header>
+<encoding name="unicode" fontname="Arial">
+<layer shift="">
+<key vkey="K_A">a</key>
+<key vkey="K_E">é</key>
+</layer>
+</encoding>
+</visualkeyboard>`;
+
+function makeVfs(entries: { path: string; content: string }[]) {
+  return createVirtualFS([
+    // No &VISUALKEYBOARD/&LAYOUTFILE header stores — assets resolve to the
+    // source/test.<ext> fallback paths.
+    { path: "source/test.kmn", content: "c test keyboard\n", isBinary: false },
+    ...entries.map((e) => ({ ...e, isBinary: false })),
+  ]);
+}
+
+function removalsOf(opts: { slotIds?: string[]; wholeNodeIds?: string[] }) {
+  return {
+    slotIds: new Set(opts.slotIds ?? []),
+    wholeNodeIds: new Set(opts.wholeNodeIds ?? []),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("applyCarveKeycapRemovalsToVfs — .kvks base layer", () => {
+  it("clears the carved keycap text in place, keeping the element and siblings", () => {
+    const vfs = makeVfs([{ path: "source/test.kvks", content: KVKS_BASE }]);
+    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+
+    const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
+      wholeNodeIds: ["rule#e"],
+    }));
+
+    expect(warnings).toHaveLength(0);
+    const xml = vfs.get("source/test.kvks")?.content as string;
+    expect(xml).toContain('<key vkey="K_E"></key>');
+    expect(xml).toContain('<key vkey="K_A">a</key>');
+    expect(xml.match(/<layer\b/g)).toHaveLength(1);
+  });
+});
+
+describe("applyCarveKeycapRemovalsToVfs — layer-agnostic .kvks scan", () => {
+  it("clears the carved char on every shift layer it appears on", () => {
+    const kvks = `<visualkeyboard><encoding name="unicode">
+<layer shift="">
+<key vkey="K_A">a</key>
+</layer>
+<layer shift="S">
+<key vkey="K_E">é</key>
+</layer>
+<layer shift="RA">
+<key vkey="K_Q">é</key>
+<key vkey="K_W">w</key>
+</layer>
+</encoding></visualkeyboard>`;
+    const vfs = makeVfs([{ path: "source/test.kvks", content: kvks }]);
+    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+
+    applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({ wholeNodeIds: ["rule#e"] }));
+
+    const xml = vfs.get("source/test.kvks")?.content as string;
+    expect(xml).toContain('<key vkey="K_E"></key>');
+    expect(xml).toContain('<key vkey="K_Q"></key>');
+    expect(xml).toContain('<key vkey="K_A">a</key>');
+    expect(xml).toContain('<key vkey="K_W">w</key>');
+    expect(xml.match(/<layer\b/g)).toHaveLength(3);
+  });
+});
+
+describe("applyCarveKeycapRemovalsToVfs — touch layout", () => {
+  const touchLayout = JSON.stringify({
+    tablet: {
+      layer: [
+        {
+          id: "default",
+          row: [
+            {
+              id: 1,
+              key: [
+                { id: "K_A", text: "a", sk: [{ id: "U_00E9", text: "é" }] },
+                {
+                  id: "K_O",
+                  text: "o",
+                  sk: [
+                    { id: "U_00E9", text: "é" },
+                    { id: "U_00E0", text: "à" },
+                  ],
+                },
+                { id: "U_00E9", text: "é" },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  it("removes matching popup entries and neutralizes a matched U_ main key", () => {
+    const vfs = makeVfs([
+      { path: "source/test.keyman-touch-layout", content: touchLayout },
+    ]);
+    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+
+    const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
+      wholeNodeIds: ["rule#e"],
+    }));
+
+    expect(warnings).toHaveLength(0);
+    const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
+    const keys = data.tablet.layer[0].row[0].key;
+
+    // Host whose only sk entry matched: property removed entirely.
+    expect(keys[0].sk).toBeUndefined();
+    expect(keys[0].text).toBe("a");
+
+    // Host with a surviving sibling entry: filtered, property kept.
+    expect(keys[1].sk).toHaveLength(1);
+    expect(keys[1].sk[0].id).toBe("U_00E0");
+
+    // Matched main key: blank cap, inert id (U_ would keep emitting é).
+    expect(keys[2].text).toBe("");
+    expect(keys[2].id).toBe("T_carved_00E9");
+  });
+});
+
+describe("applyCarveKeycapRemovalsToVfs — touch layout main key U_ id independent of text", () => {
+  it("neutralizes a U_ id with a stale non-carved text label, leaving the label alone", () => {
+    // A U_ id emits its code point purely off the id (KMW activeLayout /
+    // defaultOutputRules), independent of `text` — a mismatched label like
+    // { id: "U_00E9", text: "e" } must still have its emission killed, but
+    // the label itself was never carved and must not be blanked.
+    const touchLayout = JSON.stringify({
+      tablet: {
+        layer: [
+          {
+            id: "default",
+            row: [{ id: 1, key: [{ id: "U_00E9", text: "e" }] }],
+          },
+        ],
+      },
+    });
+    const vfs = makeVfs([
+      { path: "source/test.keyman-touch-layout", content: touchLayout },
+    ]);
+    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+
+    const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
+      wholeNodeIds: ["rule#e"],
+    }));
+
+    expect(warnings).toHaveLength(0);
+    const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
+    const key = data.tablet.layer[0].row[0].key[0];
+
+    expect(key.id).toBe("T_carved_00E9");
+    expect(key.text).toBe("e");
+    expect(key).toBeDefined();
+  });
+});
+
+describe("applyCarveKeycapRemovalsToVfs — touch layout main key matched by output", () => {
+  function vfsWithMainKey(key: Record<string, unknown>) {
+    const touchLayout = JSON.stringify({
+      tablet: {
+        layer: [{ id: "default", row: [{ id: 1, key: [key] }] }],
+      },
+    });
+    return makeVfs([{ path: "source/test.keyman-touch-layout", content: touchLayout }]);
+  }
+
+  function loadKey(vfs: ReturnType<typeof makeVfs>) {
+    const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
+    return data.tablet.layer[0].row[0].key[0];
+  }
+
+  it("clears a K_ main key matched only by `output` (no text)", () => {
+    const vfs = vfsWithMainKey({ id: "K_X", output: "é" });
+    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+
+    const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
+      wholeNodeIds: ["rule#e"],
+    }));
+
+    expect(warnings).toHaveLength(0);
+    const key = loadKey(vfs);
+    expect(key.output).toBeUndefined();
+    expect(key.text).toBe("");
+    expect(key.id).toBe("T_carved_K_X");
+    // Key element itself stays present (row/key structure intact).
+    expect(key).toBeDefined();
+  });
+
+  it("clears a K_ main key matched by both `text` and `output`", () => {
+    const vfs = vfsWithMainKey({ id: "K_X", text: "é", output: "é" });
+    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+
+    applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({ wholeNodeIds: ["rule#e"] }));
+
+    const key = loadKey(vfs);
+    expect(key.output).toBeUndefined();
+    expect(key.text).toBe("");
+    expect(key.id).toBe("T_carved_K_X");
+  });
+
+  it("leaves a main key with a non-carved `output` completely untouched", () => {
+    const vfs = vfsWithMainKey({ id: "K_X", output: "z" });
+    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+    const setSpy = vi.spyOn(vfs, "set");
+
+    const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
+      wholeNodeIds: ["rule#e"],
+    }));
+
+    expect(warnings).toHaveLength(0);
+    expect(setSpy).not.toHaveBeenCalled();
+    const key = loadKey(vfs);
+    expect(key).toEqual({ id: "K_X", output: "z" });
+  });
+
+  it("matches an NFD `output` against a carved NFC character", () => {
+    const vfs = vfsWithMainKey({ id: "K_X", output: "e" + String.fromCharCode(0x0301) });
+    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+
+    applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({ wholeNodeIds: ["rule#e"] }));
+
+    const key = loadKey(vfs);
+    expect(key.output).toBeUndefined();
+    expect(key.text).toBe("");
+    expect(key.id).toBe("T_carved_K_X");
+  });
+});
+
+describe("applyCarveKeycapRemovalsToVfs — carved char absent from layer files", () => {
+  it("leaves the VFS byte-identical and returns no warnings", () => {
+    const touch = JSON.stringify({ tablet: { layer: [{ id: "default", row: [{ id: 1, key: [{ id: "K_A", text: "a" }] }] }] } });
+    const vfs = makeVfs([
+      { path: "source/test.kvks", content: KVKS_BASE },
+      { path: "source/test.keyman-touch-layout", content: touch },
+    ]);
+    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#z", "ƶ")])]);
+    const setSpy = vi.spyOn(vfs, "set");
+
+    const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
+      wholeNodeIds: ["rule#z"],
+    }));
+
+    expect(warnings).toHaveLength(0);
+    expect(setSpy).not.toHaveBeenCalled();
+    expect(vfs.get("source/test.kvks")?.content).toBe(KVKS_BASE);
+    expect(vfs.get("source/test.keyman-touch-layout")?.content).toBe(touch);
+  });
+});
+
+describe("applyCarveKeycapRemovalsToVfs — no layer files at all", () => {
+  it("is a graceful silent no-op", () => {
+    const vfs = makeVfs([]);
+    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+
+    const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
+      wholeNodeIds: ["rule#e"],
+    }));
+
+    expect(warnings).toHaveLength(0);
+  });
+});
+
+describe("applyCarveKeycapRemovalsToVfs — NFC comparison", () => {
+  it("clears a decomposed .kvks keycap when the carved output is precomposed", () => {
+    // Keycap text is NFD (e + COMBINING ACUTE); the carved rule outputs NFC é.
+    const kvks = `<visualkeyboard><encoding name="unicode">
+<layer shift="">
+<key vkey="K_E">${"e" + String.fromCharCode(0x0301)}</key>
+</layer>
+</encoding></visualkeyboard>`;
+    const vfs = makeVfs([{ path: "source/test.kvks", content: kvks }]);
+    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+
+    applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({ wholeNodeIds: ["rule#e"] }));
+
+    const xml = vfs.get("source/test.kvks")?.content as string;
+    expect(xml).toContain('<key vkey="K_E"></key>');
+  });
+});
+
+describe("collectCarvedKeycapTexts — derivation and survivor guard", () => {
+  it("derives a char from a carved slot of an output store", () => {
+    const outStore: IRStore = {
+      nodeId: "store#out",
+      name: "out",
+      items: [
+        { kind: "char", value: "é" },
+        { kind: "char", value: "à" },
+      ],
+      isSystem: false,
+    };
+    const fanOut = makeRuleWithOutput("rule#fan", [
+      { kind: "index", storeRef: "out", offset: 1 },
+    ]);
+    const ir = makeIR([makeGroup("group#0", [fanOut])], [outStore]);
+
+    const texts = collectCarvedKeycapTexts(ir, removalsOf({ slotIds: ["store#out#0"] }));
+    expect([...texts]).toEqual(["é"]);
+  });
+
+  it("keeps a char produced by a surviving rule out of the carved set", () => {
+    const ir = makeIR([
+      makeGroup("group#0", [
+        makeCharRule("rule#e1", "é", "K_E"),
+        makeCharRule("rule#e2", "é", "K_Q"),
+      ]),
+    ]);
+
+    // Only one of the two producers carved → the char is still typeable.
+    expect(
+      collectCarvedKeycapTexts(ir, removalsOf({ wholeNodeIds: ["rule#e1"] })).size,
+    ).toBe(0);
+
+    // Both carved → the char is gone.
+    expect([
+      ...collectCarvedKeycapTexts(ir, removalsOf({ wholeNodeIds: ["rule#e1", "rule#e2"] })),
+    ]).toEqual(["é"]);
+  });
+
+  it("keeps a char whose un-carved slot survives in an output store", () => {
+    const outStore: IRStore = {
+      nodeId: "store#out",
+      name: "out",
+      items: [
+        { kind: "char", value: "é" },
+        { kind: "char", value: "é" },
+      ],
+      isSystem: false,
+    };
+    const fanOut = makeRuleWithOutput("rule#fan", [
+      { kind: "index", storeRef: "out", offset: 1 },
+    ]);
+    const ir = makeIR([makeGroup("group#0", [fanOut])], [outStore]);
+
+    // One of the two é slots carved → the other still produces é.
+    expect(
+      collectCarvedKeycapTexts(ir, removalsOf({ slotIds: ["store#out#0"] })).size,
+    ).toBe(0);
+  });
+
+  it("a self-pair transform store does not keep a carved char alive (Cameroon auto-caps shape)", () => {
+    // any(dualX) > index(dualX, 1) only re-emits what was already typed — it
+    // is not an independent producer. Even though the .kmn slot edit on the
+    // dual-use store is REFUSED, the carved char's keycaps must still blank
+    // once its real producers are gone.
+    const dualStore: IRStore = {
+      nodeId: "store#dual",
+      name: "dualX",
+      items: [{ kind: "char", value: "é" }],
+      isSystem: false,
+    };
+    const dualRule: IRRule = {
+      nodeId: "rule#dual",
+      context: [{ kind: "any", storeRef: "dualX" }],
+      output: [{ kind: "index", storeRef: "dualX", offset: 1 }],
+    };
+    const ir = makeIR(
+      [makeGroup("group#0", [dualRule, makeCharRule("rule#e", "é")])],
+      [dualStore],
+    );
+
+    expect([
+      ...collectCarvedKeycapTexts(
+        ir,
+        removalsOf({ slotIds: ["store#dual#0"], wholeNodeIds: ["rule#e"] }),
+      ),
+    ]).toEqual(["é"]);
+  });
+
+  it("a blocked CROSS-pair store keeps its chars — the refused slot still produces", () => {
+    // outX is fed by any(inX) via index(outX, 1) (cross-pair: typing inX[i]
+    // produces outX[i]) AND is itself an any() source elsewhere → dual-use →
+    // blocked. The carve on outX#0 is refused by applyStoreSlotRemovals, so
+    // é keeps being produced by typing "e" and must keep its keycap.
+    const inStore: IRStore = {
+      nodeId: "store#in",
+      name: "inX",
+      items: [{ kind: "char", value: "e" }],
+      isSystem: false,
+    };
+    const outStore: IRStore = {
+      nodeId: "store#out",
+      name: "outX",
+      items: [{ kind: "char", value: "é" }],
+      isSystem: false,
+    };
+    const crossRule: IRRule = {
+      nodeId: "rule#cross",
+      context: [{ kind: "any", storeRef: "inX" }],
+      output: [{ kind: "index", storeRef: "outX", offset: 1 }],
+    };
+    const dualUseRule: IRRule = {
+      nodeId: "rule#dualuse",
+      context: [{ kind: "any", storeRef: "outX" }],
+      output: [{ kind: "char", value: "x" }],
+    };
+    const ir = makeIR(
+      [makeGroup("group#0", [crossRule, dualUseRule])],
+      [inStore, outStore],
+    );
+
+    expect(
+      collectCarvedKeycapTexts(ir, removalsOf({ slotIds: ["store#out#0"] })).size,
+    ).toBe(0);
+  });
+
+  it("ignores input-only stores when looking for survivors", () => {
+    // "keys" is an any() matcher (input side) that happens to contain é — it
+    // does not PRODUCE é, so it must not keep the keycap alive.
+    const keysStore: IRStore = {
+      nodeId: "store#keys",
+      name: "keys",
+      items: [{ kind: "char", value: "é" }],
+      isSystem: false,
+    };
+    const matcher: IRRule = {
+      nodeId: "rule#m",
+      context: [{ kind: "any", storeRef: "keys" }],
+      output: [{ kind: "char", value: "x" }],
+    };
+    const ir = makeIR(
+      [makeGroup("group#0", [matcher, makeCharRule("rule#e", "é")])],
+      [keysStore],
+    );
+
+    expect([
+      ...collectCarvedKeycapTexts(ir, removalsOf({ wholeNodeIds: ["rule#e"] })),
+    ]).toEqual(["é"]);
+  });
+});

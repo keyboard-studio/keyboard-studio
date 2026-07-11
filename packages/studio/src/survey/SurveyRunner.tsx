@@ -11,11 +11,12 @@
 //     ctx.field != 'x', "or" (space-separated "or" tokens), "and" tokens.
 //     Full boolean DSL is out of scope — these cover the actual YAML content.
 
-import { useState, useId, useMemo, useRef } from "react";
-import type { FlowDef, FlowQuestion, FlowGotoRule, SurveyContext, AnswerStackEntry } from "./types.ts";
-import type { SurveyAnswer, SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts";
+import { useState, useId, useMemo, useRef, useEffect } from "react";
+import type { FlowDef, FlowQuestion, FlowOption, FlowGotoRule, SurveyContext, AnswerStackEntry } from "./types.ts";
+import type { SurveyAnswer, SurveyPhaseResult, LintFinding, LangtagsProvenance, LanguageSummary } from "@keyboard-studio/contracts";
 import { QuestionField } from "./QuestionField.tsx";
 import { debugPinsStore } from "../stores/debugPinsStore.ts";
+import { secondaryButton, primaryButton } from "./surveyStyles.ts";
 
 // ---------------------------------------------------------------------------
 // Condition evaluator
@@ -185,9 +186,19 @@ export function advanceThrough(
   value: string | string[] | undefined,
   ctx: SurveyContext,
   index: Map<string, FlowQuestion>,
+  getNextOverride?: (questionId: string, value: string | string[] | undefined) => string | undefined,
 ): string | null {
   const visited = new Set<string>();
-  let nextId = resolveNext(currentQ, value, ctx);
+  // Dynamic-next override (spec 030 US3): lets the caller route based on
+  // resolved-entry state that no static `next`/condition can express — e.g. send
+  // il_language_code to il_language_region only when the picked language is
+  // region-ambiguous. Evaluated at render from the current value, so it does not
+  // depend on onAnswerCommit ordering. Returns undefined ⇒ use the static next.
+  const overridden = getNextOverride?.(currentQ.id, value);
+  let nextId =
+    overridden !== undefined && overridden !== ""
+      ? overridden
+      : resolveNext(currentQ, value, ctx);
   while (nextId !== null) {
     const next = index.get(nextId);
     if (next === undefined) {
@@ -236,6 +247,68 @@ export interface SurveyRunnerProps {
    * the expected behavior — Back is an explicit discard.
    */
   getSeedValue?: (questionId: string) => string | string[] | undefined;
+  /**
+   * Called when rendering a question to retrieve its provenance label, if any.
+   * Returns a LangtagsProvenance when the question's current value was seeded
+   * from langtags, or undefined when no provenance applies.
+   *
+   * SurveyRunner renders the provenance caption beneath the field when a
+   * non-undefined provenance is returned (FR-007). The caption indicates the
+   * value is a suggestion — the author can edit it freely (FR-008).
+   */
+  getSeedProvenance?: (questionId: string) => LangtagsProvenance | undefined;
+  /**
+   * Called when rendering a question to retrieve DYNAMIC datalist options — e.g.
+   * the resolved langtags entry's local names for il_language_autonym (spec 030
+   * US2). When it returns a non-empty array, SurveyRunner uses it as the field's
+   * options (overriding any static options); the field still accepts free text.
+   * Returns undefined/[] when no dynamic options apply — the field falls back to
+   * its static options (or plain free text), which is the common case since most
+   * languages carry no local name (T008).
+   */
+  getSeedOptions?: (questionId: string) => FlowOption[] | undefined;
+  /**
+   * Called at render to optionally override the current question's next target
+   * based on state no static `next`/condition can see — e.g. routing
+   * il_language_code to il_language_region only when the picked language is
+   * region-ambiguous (spec 030 US3). Receives the current question id + value;
+   * returns a question id to route there, or undefined to use the static next.
+   * Evaluated during render (before onAnswerCommit), so it must resolve
+   * synchronously from the value.
+   */
+  getNextOverride?: (questionId: string, value: string | string[] | undefined) => string | undefined;
+  /**
+   * Called by the `@langtags_names` picker when the author selects (or clears)
+   * a concrete langtags entry for a question. The answer value stays the English
+   * NAME; this side-channel carries which entry that name resolved to (or null
+   * for unresolved free text) so the caller can seed downstream fields and
+   * decide region disambiguation (spec 030 US1/US3). Fires during the field's
+   * own event handling, before Next is pressed, so a ref updated here is current
+   * when getNextOverride / getSeedValue run on the next render.
+   */
+  onEntryResolved?: (questionId: string, entry: LanguageSummary | null) => void;
+  /**
+   * When true, picking a concrete option from a dropdown/combobox field
+   * auto-advances to the next question (no explicit Next click). Only discrete
+   * selections advance; free-text typing does not. Opt-in per flow so other
+   * flows keep the review-then-Next behavior. Used by the identity-lite flow.
+   */
+  advanceOnSelect?: boolean;
+  /**
+   * Minimum height (px) reserved for the question + provenance-caption block so
+   * the Back/Next controls sit at a stable vertical position across questions
+   * whose help text differs in length. Undefined leaves the block un-padded.
+   */
+  contentMinHeight?: number;
+  /**
+   * Answers from a previously completed run of this flow, keyed by questionId.
+   * When provided, the runner rebuilds the walked stack by replaying the flow
+   * with these answers and mounts on the LAST reachable question (values
+   * restored) instead of question 1. Used when back-navigation re-enters a
+   * step whose flow already completed — Back then walks the replayed stack
+   * question by question, exactly as if the author had just finished it.
+   */
+  resumeAnswers?: Readonly<Record<string, string | string[]>>;
 }
 
 export function SurveyRunner({
@@ -246,6 +319,13 @@ export function SurveyRunner({
   findingsByQuestionId,
   onAnswerCommit,
   getSeedValue,
+  getSeedProvenance,
+  getSeedOptions,
+  getNextOverride,
+  onEntryResolved,
+  advanceOnSelect,
+  contentMinHeight,
+  resumeAnswers,
 }: SurveyRunnerProps) {
   // Single gate for all debug-mode behaviour — evaluated once per render so all
   // branches are driven by the same boolean, not scattered checks.
@@ -259,6 +339,14 @@ export function SurveyRunner({
   onAnswerCommitRef.current = onAnswerCommit;
   const getSeedValueRef = useRef(getSeedValue);
   getSeedValueRef.current = getSeedValue;
+  const getSeedProvenanceRef = useRef(getSeedProvenance);
+  getSeedProvenanceRef.current = getSeedProvenance;
+  const getSeedOptionsRef = useRef(getSeedOptions);
+  getSeedOptionsRef.current = getSeedOptions;
+  const getNextOverrideRef = useRef(getNextOverride);
+  getNextOverrideRef.current = getNextOverride;
+  const onEntryResolvedRef = useRef(onEntryResolved);
+  onEntryResolvedRef.current = onEntryResolved;
 
   // Derive flow-level constants once per flow identity change.
   // context is intentionally excluded from the deps array: findFirstRenderable
@@ -283,10 +371,35 @@ export function SurveyRunner({
     if (callerFirst !== undefined) return callerFirst;
     return debugEnabled ? debugPinsStore.getPinned(firstId) : undefined;
   })();
-  const [stack, setStack] = useState<AnswerStackEntry[]>([
-    { questionId: firstId ?? "", value: firstSeed },
-  ]);
+  const [stack, setStack] = useState<AnswerStackEntry[]>(() => {
+    // Resume: rebuild the walked stack from a prior completed run so the
+    // author lands on the flow's last question, not question 1.
+    if (resumeAnswers !== undefined) {
+      const resumed = buildResumeStack(firstId, resumeAnswers, context, index);
+      if (resumed !== null) return resumed;
+    }
+    return [{ questionId: firstId ?? "", value: firstSeed }];
+  });
   const [currentValue, setCurrentValue] = useState<string | string[] | undefined>(undefined);
+
+  // Auto-advance on option select (advanceOnSelect flows only): a field reports a
+  // discrete selection via onSelectAdvance → requestAdvance stashes the picked
+  // value and bumps this tick; the effect runs AFTER the ensuing render commit —
+  // by which point synchronous onEntryResolved side-effects (e.g. IdentityLite's
+  // langtags seed refs) have settled — so advance() sees the correct routing and
+  // seeds. Declared here, BEFORE the early return below, so the hook call order is
+  // identical on every render (rules-of-hooks).
+  const pendingAdvanceValueRef = useRef<string | string[] | undefined>(undefined);
+  const [advanceTick, setAdvanceTick] = useState(0);
+  useEffect(() => {
+    if (advanceTick === 0) return;
+    advance(pendingAdvanceValueRef.current);
+    pendingAdvanceValueRef.current = undefined;
+    // advance is intentionally excluded: it is re-created each render and the
+    // effect must run only when a new selection ticks, using the current render's
+    // closure (fresh stack/currentQ). Adding it would fire on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [advanceTick]);
 
   const progressDescId = useId();
 
@@ -308,7 +421,15 @@ export function SurveyRunner({
     );
   }
 
-  const displayQ = interpolateQuestion(currentQ, context);
+  const baseDisplayQ = interpolateQuestion(currentQ, context);
+  // Dynamic datalist options (spec 030 US2): when the caller supplies non-empty
+  // options for this question (e.g. the resolved entry's local names), they
+  // override the static options; the field still accepts free text.
+  const dynamicOptions = getSeedOptionsRef.current?.(currentQId);
+  const displayQ: FlowQuestion =
+    dynamicOptions !== undefined && dynamicOptions.length > 0
+      ? { ...baseDisplayQ, options: dynamicOptions }
+      : baseDisplayQ;
   const stepNum = stack.length;
 
   const canGoBack = stack.length > 1 || onBack !== undefined;
@@ -319,16 +440,27 @@ export function SurveyRunner({
   // Derive the next question id once so that both the button label and handleNext
   // share the same result — avoids a second advanceThrough call that would cause
   // a brief button-label flicker when value changes mid-render.
-  const nextIdForCurrent = advanceThrough(currentQ, value, context, index);
+  const nextIdForCurrent = advanceThrough(currentQ, value, context, index, getNextOverrideRef.current);
   const isLastQuestion = nextIdForCurrent === null;
 
-  function handleNext() {
+  // Advance past the current question with an EXPLICIT committed value. Shared by
+  // the Next button (handleNext, committing the live field value) and the
+  // auto-advance-on-select path (requestAdvance, committing the picked option's
+  // value). Taking the value as a parameter — rather than reading `value` — lets
+  // the auto-advance effect commit exactly what was selected without racing the
+  // setCurrentValue re-render.
+  function advance(committedValue: string | string[] | undefined) {
     if (currentQ === undefined) return;
 
-    if (nextIdForCurrent === null) {
-      // End of flow — build the result
+    const nextId = advanceThrough(currentQ, committedValue, context, index, getNextOverrideRef.current);
+
+    if (nextId === null) {
+      // End of flow — build the result. The current (last) entry is excluded
+      // from the loop: its answer is appended from `committedValue` below.
+      // Including it here too would duplicate the final answer whenever the last
+      // entry already carries a value (a seeded or resumed final question).
       const answers: SurveyAnswer[] = [];
-      for (const entry of stack) {
+      for (const entry of stack.slice(0, -1)) {
         if (entry.value === undefined) continue;
         const q = index.get(entry.questionId);
         if (q === undefined) continue;
@@ -336,8 +468,8 @@ export function SurveyRunner({
         if (answer !== null) answers.push(answer);
       }
       // Include the current answer too
-      if (value !== undefined) {
-        const answer = toSurveyAnswer(currentQId, currentQ, value);
+      if (committedValue !== undefined) {
+        const answer = toSurveyAnswer(currentQId, currentQ, committedValue);
         if (answer !== null) answers.push(answer);
       }
       const phase = flow.phase as SurveyPhaseResult["phase"];
@@ -349,33 +481,46 @@ export function SurveyRunner({
     // before the stack update so that any ref-based seed map the caller maintains
     // (e.g. IdentityLite's autonymRef) is current when getSeedValue is called
     // for the very next push below.
-    onAnswerCommitRef.current?.(currentQId, value);
+    onAnswerCommitRef.current?.(currentQId, committedValue);
 
     // Resolve a seed value for the incoming question. getSeedValue is read via
     // ref so callers can update their seed source synchronously in onAnswerCommit
     // (above) and have the updated value visible here in the same tick.
     // Caller-provided seed takes precedence; debug pin is the fallback so that
     // the "default once, then user owns it" contract is preserved.
-    const callerSeed = getSeedValueRef.current?.(nextIdForCurrent);
+    const callerSeed = getSeedValueRef.current?.(nextId);
     const seedValue =
       callerSeed !== undefined
         ? callerSeed
         : debugEnabled
-          ? debugPinsStore.getPinned(nextIdForCurrent)
+          ? debugPinsStore.getPinned(nextId)
           : undefined;
 
-    // Save current value onto the current stack entry, then push the next.
+    // Save committed value onto the current stack entry, then push the next.
     // The new entry starts with the seed value (may be undefined) so the
     // question's input is pre-filled when the user first arrives.
     setStack((prev) => {
       const updated = prev.map((e, i) =>
-        i === prev.length - 1 ? { ...e, value } : e,
+        i === prev.length - 1 ? { ...e, value: committedValue } : e,
       );
-      return [...updated, { questionId: nextIdForCurrent, value: seedValue }];
+      return [...updated, { questionId: nextId, value: seedValue }];
     });
     // If there is a seed, start currentValue from it so the input is populated
     // immediately and Next is enabled (satisfies canAdvance for required fields).
     setCurrentValue(seedValue);
+  }
+
+  function handleNext() {
+    advance(value);
+  }
+
+  // Field → survey signal that a discrete option was picked (see the auto-advance
+  // hook block above the early return). Stashes the value and bumps the tick that
+  // drives the advance effect.
+  function requestAdvance(picked: string | string[]) {
+    setCurrentValue(picked);
+    pendingAdvanceValueRef.current = picked;
+    setAdvanceTick((n) => n + 1);
   }
 
   function handleBack() {
@@ -479,13 +624,50 @@ export function SurveyRunner({
         </div>
       )}
 
-      {/* Question */}
-      <QuestionField
-        question={displayQ}
-        value={value}
-        onChange={(v) => setCurrentValue(v)}
-        {...(findingsByQuestionId !== undefined ? { findingsByQuestionId } : {})}
-      />
+      {/* Question + caption block. When contentMinHeight is set (identity-lite),
+          the block reserves a fixed minimum height so the Back/Next controls
+          below sit at a stable vertical position across questions whose help
+          text differs in length. */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+          ...(contentMinHeight !== undefined ? { minHeight: contentMinHeight } : {}),
+        }}
+      >
+        <QuestionField
+          question={displayQ}
+          value={value}
+          onChange={(v) => setCurrentValue(v)}
+          onEntryResolved={(entry) => onEntryResolvedRef.current?.(currentQId, entry)}
+          {...(advanceOnSelect === true ? { onSelectAdvance: requestAdvance } : {})}
+          {...(findingsByQuestionId !== undefined ? { findingsByQuestionId } : {})}
+        />
+
+        {/* Provenance caption — only rendered when the current question was seeded
+            from langtags (FR-007). The aria-live region announces the caption to
+            screen readers when it appears. The caption is purely informational;
+            it does not block or gate the input (FR-008). */}
+        {(() => {
+          const provenance = getSeedProvenanceRef.current?.(currentQId);
+          if (provenance === undefined) return null;
+          return (
+            <p
+              aria-live="polite"
+              style={{
+                margin: 0,
+                fontSize: 12,
+                color: "#8b949e",
+                fontStyle: "italic",
+                lineHeight: 1.5,
+              }}
+            >
+              {provenance.caption}
+            </p>
+          );
+        })()}
+      </div>
 
       {/* Navigation */}
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -494,16 +676,7 @@ export function SurveyRunner({
             type="button"
             data-testid="survey-back"
             onClick={handleBack}
-            style={{
-              padding: "8px 18px",
-              background: "transparent",
-              border: "1px solid #30363d",
-              borderRadius: 6,
-              color: "#8b949e",
-              fontSize: 13,
-              cursor: "pointer",
-              fontFamily: "inherit",
-            }}
+            style={secondaryButton}
           >
             Back
           </button>
@@ -514,17 +687,7 @@ export function SurveyRunner({
           onClick={handleNext}
           disabled={!canAdvance}
           aria-describedby={progressDescId}
-          style={{
-            padding: "8px 18px",
-            background: canAdvance ? "#1f6feb" : "#161b22",
-            border: "1px solid #30363d",
-            borderRadius: 6,
-            color: canAdvance ? "#e6edf3" : "#484f58",
-            fontSize: 13,
-            cursor: canAdvance ? "pointer" : "not-allowed",
-            fontFamily: "inherit",
-            transition: "background 120ms ease",
-          }}
+          style={{ ...primaryButton(!canAdvance), transition: "background 120ms ease" }}
         >
           {isLastQuestion ? "Finish" : "Next"}
         </button>
@@ -552,5 +715,66 @@ function findFirstRenderable(
     if (q.engine_resolved !== true) return q.id;
   }
   return null;
+}
+
+/**
+ * Resume-time dynamic-branch resolver. buildResumeStack runs synchronously in
+ * SurveyRunner's useState initializer — before any effect fires — so an async
+ * getNextOverride authority (e.g. IdentityLite's langtags lookup, which routes
+ * il_language_code → il_language_region only for region-ambiguous languages)
+ * cannot resolve at replay time. Re-deriving the branch there would
+ * deterministically drop the region step from a completed run.
+ *
+ * Instead, trust the recorded answers: a conditional edge whose target question
+ * carries a recorded answer is one the original walk actually took, so follow
+ * it. Non-conditional (default) edges are left to the static resolveNext path
+ * inside advanceThrough. Returns undefined when no dynamic branch applies.
+ */
+function resumeBranchOverride(
+  questionId: string,
+  answers: Readonly<Record<string, string | string[]>>,
+  index: Map<string, FlowQuestion>,
+): string | undefined {
+  const { next } = index.get(questionId) ?? {};
+  if (next === undefined || next === null || typeof next === "string") return undefined;
+  for (const rule of next as FlowGotoRule[]) {
+    if (rule.condition !== undefined && rule.goto !== null && answers[rule.goto] !== undefined) {
+      return rule.goto;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Rebuild the walked answer stack by replaying the flow with previously
+ * committed answers. Walks from the first renderable question, restoring each
+ * question's recorded answer and following the same goto routing the original
+ * walk took. Stops ON the last reachable question — end of flow, or the first
+ * required question with no recorded answer (as far as the original walk can
+ * be faithfully replayed). Returns null when there is nothing to replay.
+ */
+export function buildResumeStack(
+  firstId: string | null,
+  answers: Readonly<Record<string, string | string[]>>,
+  ctx: SurveyContext,
+  index: Map<string, FlowQuestion>,
+): AnswerStackEntry[] | null {
+  if (firstId === null) return null;
+  const stack: AnswerStackEntry[] = [];
+  const visited = new Set<string>();
+  let qId: string | null = firstId;
+  while (qId !== null && !visited.has(qId)) {
+    visited.add(qId);
+    const q = index.get(qId);
+    if (q === undefined) break;
+    const value = answers[qId];
+    stack.push({ questionId: qId, value });
+    if (q.type !== "notice" && q.required === true && !hasValue(value)) break;
+    // Dynamic branches (e.g. spec 030 US3 region step) are reconstructed from
+    // the recorded answers, not re-derived via the async getNextOverride, which
+    // is unavailable in this synchronous initializer.
+    qId = advanceThrough(q, value, ctx, index, (id) => resumeBranchOverride(id, answers, index));
+  }
+  return stack.length > 0 ? stack : null;
 }
 

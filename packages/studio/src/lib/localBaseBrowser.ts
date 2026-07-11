@@ -15,21 +15,24 @@ let _cached: Promise<BaseKeyboard[]> | null = null;
 async function fetchCatalog(): Promise<BaseKeyboard[]> {
   if (_cached !== null) return _cached;
   _cached = (async () => {
-    const r = await fetch(LIST_ENDPOINT);
-    if (!r.ok) {
+    try {
+      const r = await fetch(LIST_ENDPOINT);
+      if (!r.ok) {
+        throw new Error(
+          `${LIST_ENDPOINT} returned HTTP ${r.status} — is the local-keyboards Vite plugin loaded?`,
+        );
+      }
+      const data = (await r.json()) as unknown;
+      if (!Array.isArray(data)) {
+        throw new Error(
+          `${LIST_ENDPOINT} returned non-array payload: ${JSON.stringify(data).slice(0, 200)}`,
+        );
+      }
+      return data as BaseKeyboard[];
+    } catch (err) {
       _cached = null; // allow retry on next call
-      throw new Error(
-        `${LIST_ENDPOINT} returned HTTP ${r.status} — is the local-keyboards Vite plugin loaded?`,
-      );
+      throw err;
     }
-    const data = (await r.json()) as unknown;
-    if (!Array.isArray(data)) {
-      _cached = null;
-      throw new Error(
-        `${LIST_ENDPOINT} returned non-array payload: ${JSON.stringify(data).slice(0, 200)}`,
-      );
-    }
-    return data as BaseKeyboard[];
   })();
   return _cached;
 }

@@ -41,11 +41,18 @@ export function parseUnicodeSet(str: string): ParsedExemplars {
   let s = str.trim();
   if (s.startsWith('[') && s.endsWith(']')) s = s.slice(1, -1);
   const chars = [...s];
+
   for (let i = 0; i < chars.length; i++) {
     const c = chars[i];
     if (c === ' ') continue;
-    if (c === '\\') { const n = chars[++i]; if (n) used.add(n); continue; }
-    if (c === '{') { // multi-char exemplar, e.g. {sh}
+
+    if (c === '\\') {
+      const n = chars[++i];
+      if (n) used.add(n);
+      continue;
+    }
+
+    if (c === '{') {
       let g = '';
       while (i + 1 < chars.length && chars[i + 1] !== '}') g += chars[++i];
       i++; // skip '}'
@@ -53,16 +60,19 @@ export function parseUnicodeSet(str: string): ParsedExemplars {
       for (const gc of g) used.add(gc);
       continue;
     }
+
     // range a-z
     if (chars[i + 1] === '-' && chars[i + 2] && chars[i + 2] !== ' ') {
-      const start = c.codePointAt(0) as number, end = chars[i + 2].codePointAt(0) as number;
+      const start = c.codePointAt(0)!, end = chars[i + 2].codePointAt(0)!;
       for (let cp = start; cp <= end; cp++) used.add(String.fromCodePoint(cp));
       i += 2;
       continue;
     }
+
     used.add(c);
   }
-  const specials = [...used].filter((ch) => (ch.codePointAt(0) as number) > 0x7f && /\p{L}/u.test(ch));
+
+  const specials = [...used].filter((ch) => ch.codePointAt(0)! > 0x7f && /\p{L}/u.test(ch));
   return { used, digraphs, specials };
 }
 

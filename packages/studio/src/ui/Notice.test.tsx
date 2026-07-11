@@ -1,16 +1,3 @@
-// Unit tests for ui/Notice.tsx
-//
-// Assertions:
-//   1. Renders a <div> element.
-//   2. tone="info" (default) → role="note".
-//   3. tone="warn" → role="status".
-//   4. tone="error" → role="alert".
-//   5. Info tone uses TEXT_DIM (#8b949e) color — verbatim from NoticeField.
-//   6. Warn tone uses WARNING (#d29922) color.
-//   7. Error tone uses ERROR_TEXT (#f0a0a0) color.
-//   8. Base layout styles are applied (padding, borderRadius, fontSize).
-//   9. Children appear as text content.
-
 import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup } from "@testing-library/react";
 import { Notice } from "./Notice.tsx";
@@ -32,13 +19,8 @@ describe("Notice — element and children", () => {
 });
 
 describe("Notice — tone→role mapping", () => {
-  it("no tone prop (default info) → role='note'", () => {
+  it("defaults to role='note' when no tone prop", () => {
     const { container } = render(<Notice>Info</Notice>);
-    expect(container.querySelector("div")?.getAttribute("role")).toBe("note");
-  });
-
-  it("tone='info' → role='note'", () => {
-    const { container } = render(<Notice tone="info">Info</Notice>);
     expect(container.querySelector("div")?.getAttribute("role")).toBe("note");
   });
 
@@ -74,22 +56,11 @@ describe("Notice — tone colors", () => {
 });
 
 describe("Notice — base layout styles", () => {
-  it("applies padding '14px 16px'", () => {
+  it("applies padding, fontSize, and borderRadius", () => {
     const { container } = render(<Notice>x</Notice>);
     const el = container.querySelector("div") as HTMLElement;
-    // jsdom normalises shorthand; check that the value contains the numbers.
     expect(el.style.padding).toBe("14px 16px");
-  });
-
-  it("applies fontSize 13px", () => {
-    const { container } = render(<Notice>x</Notice>);
-    const el = container.querySelector("div") as HTMLElement;
     expect(el.style.fontSize).toBe("13px");
-  });
-
-  it("applies borderRadius 8px", () => {
-    const { container } = render(<Notice>x</Notice>);
-    const el = container.querySelector("div") as HTMLElement;
     expect(el.style.borderRadius).toBe("8px");
   });
 });

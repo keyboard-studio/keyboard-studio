@@ -1,28 +1,20 @@
-// editorMutate — the carve/add editor-shell write helpers for the spec-014
+// editorMutate — carve/add editor-shell write helpers for the spec-014
 // mutate() seam (US1, FR-006a).
 //
-// The carve overlay (workingCopyStore deletedNodeIds / deletedItemIds) stays as
-// reversible UI state. What changes under the flag is that the PROJECTION /
-// DERIVATION of the working carve IR goes through the single mutate() write path
-// (applyMutatePatch) instead of being computed ad hoc inside the VFS projection.
+// Routes the working carve IR derivation through the single mutate() write path
+// (applyMutatePatch) instead of computing it ad hoc inside VFS projection.
 //
-// This module is the steps-layer carve adapter:
-//   - It depends only on the engine (carveFilterIr, applyStoreSlotRemovals,
-//     parseSlotId) and the local mutateApply helper — NOT on stores/ or lib/
-//     (steps-layer depcruise boundary). The caller passes `baseIr` as a param.
-//   - It declares CARVE_WRITES — the carve-affected IR arrays (groups, stores,
-//     raw) — and routes the derived IR through applyMutatePatch so the M2/M3
-//     guarantees (path-scoped merge + declared-writes containment) apply to the
-//     carve write exactly as they do to the per-question writes.
+// Declares CARVE_WRITES, ADD_GALLERY_WRITES, and TOUCH_WRITES — the IR arrays
+// affected by each editor operation — and routes derived IR through
+// applyMutatePatch so M2/M3 guarantees (path-scoped merge + declared-writes
+// containment) apply consistently.
 //
-// Carve affects exactly: groups[] (whole-group + rule deletion), stores[] (store
+// Carve affects: groups[] (whole-group + rule deletion), stores[] (store
 // deletion + store-slot item nul-rewrite), raw[] (raw-fragment deletion).
 // header/comments are never touched.
 //
-// CRITICAL (idempotency / reversibility): the patch is ALWAYS computed from
-// `baseIr`, never chained onto an already-mutated IR. Restoring (a shrinking
-// deletion set) therefore yields fewer deletions and keepAll/restoreAll → empty
-// deletion sets → an empty patch → a structural copy of baseIr.
+// Patches are always computed from `baseIr`, never chained onto already-mutated
+// IR, ensuring idempotency and reversibility.
 
 import type { IRPath, KeyboardIR } from "@keyboard-studio/contracts";
 import { irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
@@ -46,13 +38,9 @@ export const CARVE_WRITES: readonly IRPath[] = [
 ];
 
 /**
- * Partition raw carve item ids into store-slot ids and whole-node item ids,
- * exactly as projectWorkingCopyVfs does, so the seam path is behavior-identical
- * to the legacy VFS path.
- *
+ * Partition raw carve item ids into store-slot ids and whole-node item ids.
  * An id parses as a slot id AND its store exists in `baseIr` → a slot id (the
- * nul-filler rewrite path). Anything else (a bare rule/store nodeId, or a
- * slot-shaped id whose store is absent) → a whole-node deletion.
+ * nul-filler rewrite path). Anything else → a whole-node deletion.
  */
 function partitionItemIds(
   baseIr: KeyboardIR,
@@ -63,11 +51,7 @@ function partitionItemIds(
   const wholeNodeItemIds = new Set<string>();
   for (const id of deletedItemIds) {
     const parsed = parseSlotId(id);
-    if (parsed !== null && storeNodeIdSet.has(parsed.storeNodeId)) {
-      slotIds.add(id);
-    } else {
-      wholeNodeItemIds.add(id);
-    }
+    (parsed !== null && storeNodeIdSet.has(parsed.storeNodeId) ? slotIds : wholeNodeItemIds).add(id);
   }
   return { slotIds, wholeNodeItemIds };
 }
@@ -89,22 +73,14 @@ export function buildCarvePatch(
 ): Partial<KeyboardIR> {
   const { slotIds, wholeNodeItemIds } = partitionItemIds(baseIr, deletedItemIds);
 
-  // No deletions of any kind → empty patch (M5 no-op → structural copy of base).
   if (deletedNodeIds.size === 0 && slotIds.size === 0 && wholeNodeItemIds.size === 0) {
     return {};
   }
 
-  // 1. Store-slot nul-rewrite (alignment-preserving; never splices items).
-  const slotResult = applyStoreSlotRemovals(baseIr, slotIds);
-  const slotIr = slotResult.ir; // === baseIr when slotIds was empty / all rejected
-
-  // 2. Whole-node deletion (groups/rules/stores/raw) on the slot-rewritten IR.
+  const slotIr = applyStoreSlotRemovals(baseIr, slotIds).ir;
   const allWholeNodeIds = new Set([...deletedNodeIds, ...wholeNodeItemIds]);
   const filtered = carveFilterIr(slotIr, allWholeNodeIds);
 
-  // The patch is the carve-affected arrays only. Arrays replace wholesale under
-  // the deep merge, so writing the filtered arrays produces the carved IR while
-  // leaving header/comments/touchLayout/visualKeyboard/etc. untouched (M2).
   return {
     groups: filtered.groups,
     stores: filtered.stores,
@@ -140,34 +116,19 @@ export function applyCarveMutate(
 
 /**
  * The touch write surface — the IR location touch re-propagation (US2) may
- * rewrite. Exported here, alongside {@link CARVE_WRITES} / {@link ADD_GALLERY_WRITES},
- * so the next cycle's `repropagate.ts` routes its `touchSuggest`-derived patch
- * through `applyMutatePatch(baseIr, patch, TOUCH_WRITES)` and inherits the same
- * M2 (path-scoped deep merge) + M3 (declared-`writes` containment) guarantees.
+ * rewrite. Used by `repropagate.ts` to route `touchSuggest`-derived patches
+ * through `applyMutatePatch` with M2/M3 guarantees.
  *
  * Touch keys live at `touchLayout.platforms[].layers[].rows[].keys[]`. The
- * `keys[]` array is the addressable endpoint (a path that resolves TO a
- * `TouchKeyIR` — IRPath traversal is bounded at `TouchKeyIR`, so per-key
- * `sk`/`flick`/`multitap` sub-trees are intentionally not separate write paths;
- * a key and its whole sub-tree are written as a unit, FR-008 G4). Declaring the
- * path at `keys` authorizes both a whole-array replace (`keys`) and per-element
- * writes (`keys[3]`, `keys[3].provenance`) under the prefix-containment rule.
+ * `keys[]` array is the addressable endpoint (a path that resolves to a
+ * `TouchKeyIR` — per-key `sk`/`flick`/`multitap` sub-trees are written as a unit).
+ * Declaring the path at `keys` authorizes both whole-array replace and per-element
+ * writes under the prefix-containment rule.
  *
- * `touchLayout.nodeIds` is ALSO in the surface: re-suggesting touch keys
- * re-derives the platform+layer+key → nodeId map alongside the keys, so a
- * re-propagation patch legitimately rewrites both. It stays a SEPARATE declared
- * path (not a coarse `touchLayout` grant) so the containment guard keeps
- * unrelated touch-layout siblings — `header`/`stores`/`groups`/`comments`/`raw`
- * — out of bounds. Note that `platforms[].id`/`font` are NOT protected by this
- * path guard: the declared `keys[]`/`nodeIds[]` paths sit UNDER `platforms`, and
- * the re-propagation patch carries each whole `platforms[]` element (mergeNoClobber
- * spreads `...platform`), so `id`/`font` ride along inside an authorized subtree.
- * Their byte-identity is guaranteed by mergeNoClobber copying them verbatim, NOT
- * by the containment guard rejecting them.
- *
- * NOTE: this cycle exports the containment set ONLY. The re-propagation logic
- * (reading the staleness slice, re-running `touchSuggest`, the no-clobber
- * provenance gate) is deferred to the next cycle's US2 task set (T022–T024).
+ * `touchLayout.nodeIds` is also included: re-suggesting touch keys re-derives
+ * the platform+layer+key → nodeId map alongside the keys. It stays a separate
+ * declared path (not a coarse `touchLayout` grant) so the containment guard keeps
+ * unrelated siblings out of bounds.
  */
 export const TOUCH_WRITES: readonly IRPath[] = [
   irPath(
@@ -189,16 +150,14 @@ export const TOUCH_WRITES: readonly IRPath[] = [
 // ---------------------------------------------------------------------------
 
 /**
- * The add-gallery write surface — the PHYSICAL assignment IR targets only.
+ * The add-gallery write surface — the physical assignment IR targets only.
  *
- * applyAssignmentsToVfs injects exactly two kinds of IR-bearing content into the
- * .kmn:
+ * applyAssignmentsToVfs injects two kinds of IR-bearing content:
  *   - user `store(...)` declarations (non-&, hoisted before `begin`) → `stores[]`
  *   - `group(<name>)` blocks and rules (merged by name / appended)    → `groups[]`
  *
- * System stores (&-prefixed `header` fields) are explicitly skipped by the
- * injector, so `header` is NOT a write target. Keycap-label and touch-layout
- * projection are DEFERRED to US2 and are therefore NOT in this surface.
+ * System stores (&-prefixed `header` fields) are skipped, so `header` is not
+ * a write target. Keycap-label and touch-layout projection are deferred to US2.
  */
 export const ADD_GALLERY_WRITES: readonly IRPath[] = [
   irPath("groups", ARRAY_INDEX),
@@ -207,11 +166,7 @@ export const ADD_GALLERY_WRITES: readonly IRPath[] = [
 
 /**
  * Build the add-gallery patch: the physical-assignment IR arrays (`groups`,
- * `stores`) taken from the assignment-injected IR.
- *
- * `assignedIr` is the IR parsed back from the .kmn AFTER applyAssignmentsToVfs
- * has injected the selected patterns (i.e. the carved IR with mechanisms added).
- * Only `groups` and `stores` are taken — the physical assignment targets.
+ * `stores`) from the assignment-injected IR.
  */
 export function buildAddGalleryPatch(assignedIr: KeyboardIR): Partial<KeyboardIR> {
   return {
@@ -222,16 +177,10 @@ export function buildAddGalleryPatch(assignedIr: KeyboardIR): Partial<KeyboardIR
 
 /**
  * Route the add-gallery (mechanism assignment) IR derivation through the single
- * mutate() write path.
- *
- * The reference emit for the add path is text-based (applyAssignmentsToVfs writes
- * the injected .kmn directly, byte-identical in both flag states). This helper is
- * the IR-projection seam: given the carved `baseIr` and the assignment-injected
- * `assignedIr` (parsed back from that .kmn), it routes the physical-assignment
- * arrays through applyMutatePatch / {@link ADD_GALLERY_WRITES} so the mutate()
- * path is the canonical IR producer (M6/SC-001) and the containment guard (M3)
- * applies to the add write too — it never reaches `header`, comments, or the
- * deferred keycap/touch targets.
+ * mutate() write path. Routes the physical-assignment arrays through
+ * applyMutatePatch / {@link ADD_GALLERY_WRITES} so the mutate() path is the
+ * canonical IR producer (M6) and the containment guard (M3) prevents writes to
+ * `header`, comments, or deferred keycap/touch targets.
  *
  * @param baseIr      The carved working IR the assignment was applied onto.
  * @param assignedIr  The IR after mechanism injection (parsed from the .kmn).

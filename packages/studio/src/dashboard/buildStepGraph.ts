@@ -21,7 +21,7 @@
 
 import { loadModularFlow } from "../survey/loadModularFlow.ts";
 import type { FlowDef, FlowQuestion, QuestionModule } from "../survey/types.ts";
-import type { FlowGraph, GraphEdge, GraphNode, NodeKind, StepGraph, StepGraphEdge, StepGraphNode } from "./model.ts";
+import type { FlowGraph, GraphEdge, GraphNode, NodeKind, NodeRegion, StepGraph, StepGraphEdge, StepGraphNode } from "./model.ts";
 import { ruleTarget } from "./flowUtils.ts";
 import { manifest } from "../steps/manifest.ts";
 import { formatIRPath } from "@keyboard-studio/contracts";
@@ -40,17 +40,18 @@ interface RawGotoRule {
 }
 
 /** prompt ?? label ?? id — the text the runner would surface. */
-function nodeLabel(q: FlowQuestion): string {
-  return q.prompt ?? q.label ?? q.id;
-}
-
-function optionCount(q: FlowQuestion): number {
-  return Array.isArray(q.options) ? q.options.length : 0;
-}
+const nodeLabel = (q: FlowQuestion) => q.prompt ?? q.label ?? q.id;
+const optionCount = (q: FlowQuestion) => Array.isArray(q.options) ? q.options.length : 0;
 
 export interface BuildGraphOptions {
   /** Kind to stamp on all question nodes. Defaults to "live". */
   questionKind?: NodeKind;
+  /**
+   * Region to stamp on all question nodes. Defaults to "flow". Proposed-flow
+   * graphs pass "library" (spec 025) so their question nodes sit in the Library
+   * region rather than the live spine.
+   */
+  questionRegion?: NodeRegion;
   /** Pre-built extra nodes appended after question nodes (e.g. reserve nodes). */
   extraNodes?: GraphNode[];
 }
@@ -70,7 +71,7 @@ export function buildGraphFromQuestions(
   title: string,
   options: BuildGraphOptions = {},
 ): FlowGraph {
-  const { questionKind = "live", extraNodes = [] } = options;
+  const { questionKind = "live", questionRegion = "flow", extraNodes = [] } = options;
   // Phase A keeps a supplemental `provenance_questions` list that the main
   // questions branch into; include it so those goto targets resolve.
   const questions: FlowQuestion[] = [...flow.questions, ...(flow.provenance_questions ?? [])];
@@ -91,10 +92,9 @@ export function buildGraphFromQuestions(
   };
 
   for (const q of questions) {
-    const next = q.next;
-    if (next === undefined || next === null) {
-      continue; // terminal
-    }
+    const { next } = q;
+    if (!next) continue; // terminal
+
     if (typeof next === "string") {
       addEdge(q.id, next, "linear");
       continue;
@@ -103,11 +103,9 @@ export function buildGraphFromQuestions(
     for (const rule of next as RawGotoRule[]) {
       const target = ruleTarget(rule);
       if (target === null) continue; // terminal branch — no edge
-      if (rule.condition !== undefined) {
-        addEdge(q.id, target, "conditional", rule.condition);
-      } else {
-        addEdge(q.id, target, "default", "(else)");
-      }
+      const kind = rule.condition !== undefined ? "conditional" : "default";
+      const label = rule.condition !== undefined ? rule.condition : "(else)";
+      addEdge(q.id, target, kind, label);
     }
   }
 
@@ -126,7 +124,7 @@ export function buildGraphFromQuestions(
     isGate: Array.isArray(q.next),
     optionCount: optionCount(q),
     kind: questionKind,
-    region: "flow",
+    region: questionRegion,
   }));
 
   const nodes: GraphNode[] = [...questionNodes, ...extraNodes];
@@ -143,9 +141,45 @@ export function buildGraphFromQuestions(
 }
 
 /**
+ * Build one reserve GraphNode from a registry module. Shared by computeReserveNodes
+ * (per-flow reserve, region "not-yet-ordered") and buildLibraryReserveNodes
+ * (global Library reserve, region "library"). Reserve nodes are always
+ * kind:"library-not-in-flow", terminal, and carry no outgoing edges.
+ */
+function reserveNodeFor(
+  mod: QuestionModule,
+  flowId: string,
+  region: NodeRegion,
+): GraphNode {
+  const def = mod.definition;
+  return {
+    id: def.id,
+    flowId,
+    label: def.prompt ?? def.label ?? def.id,
+    type: def.type,
+    required: def.required === true,
+    engineResolved: def.engine_resolved === true,
+    advisory: def.advisory === true,
+    isEntry: false,
+    isTerminal: true, // no outgoing edges; reserve nodes are not wired into any spine
+    isGate: Array.isArray(def.next),
+    optionCount: Array.isArray(def.options) ? def.options.length : 0,
+    kind: "library-not-in-flow",
+    region,
+  };
+}
+
+/**
  * Compute reserve nodes: registry modules that are not referenced by the live
  * manifest. These carry kind "library-not-in-flow" and region "not-yet-ordered"
  * because they are NOT part of the ordered live spine.
+ *
+ * NOTE (spec 025): this per-flow computation is deliberately UNCHANGED. The live
+ * drill-downs (e.g. identity-lite) still emit the demoted Phase A modules as
+ * reserve nodes here — the byte-identical-live-map parity contract and the
+ * spec-022 phaseADemoteReserve guardrail both lock this. The D6 "reserve = in no
+ * flow at all" rule is realized by the SEPARATE buildLibraryReserveNodes below,
+ * used only by the new Library section.
  */
 function computeReserveNodes(
   flow: FlowDef,
@@ -158,26 +192,7 @@ function computeReserveNodes(
   const reserveIds = Object.keys(registry).filter((id) => !liveIds.has(id));
   return reserveIds.flatMap((id) => {
     const mod = registry[id];
-    // Belt-and-suspenders: registry[id] should always be defined for a registry key.
-    if (!mod) return [];
-    const def = mod.definition;
-    const node: GraphNode = {
-      id: def.id,
-      flowId: flow.flow_id,
-      label: def.prompt ?? def.label ?? def.id,
-      type: def.type,
-      required: def.required === true,
-      engineResolved: def.engine_resolved === true,
-      advisory: def.advisory === true,
-      isEntry: false,
-      isTerminal: true, // no outgoing edges; reserve nodes are not wired into the spine
-      isGate: Array.isArray(def.next),
-      optionCount: Array.isArray(def.options) ? def.options.length : 0,
-      kind: "library-not-in-flow",
-      // Reserve nodes are NOT part of the ordered live spine — same region as stubs.
-      region: "not-yet-ordered",
-    };
-    return [node];
+    return mod ? [reserveNodeFor(mod, flow.flow_id, "not-yet-ordered")] : [];
   });
 }
 
@@ -205,6 +220,87 @@ export function buildModularFlowGraph(
   const flow = loadModularFlow(raw);
   const reserveNodes = computeReserveNodes(flow, registry);
   return buildGraphFromQuestions(flow, title, { extraNodes: reserveNodes });
+}
+
+// ---------------------------------------------------------------------------
+// spec 025 (D6): proposed-flow Library graph + global Library reserve.
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the ORDERED graph for a proposed flow (spec 025, FR-001).
+ *
+ * Resolves the thin YAML through loadModularFlow (same path as live flows) and
+ * builds a FlowGraph whose question nodes carry kind:"proposed" / region:"library"
+ * — so the demoted battery keeps its authored sequence and branching visually,
+ * rather than collapsing to a flat reserve list. Unlike buildModularFlowGraph it
+ * appends NO per-flow reserve nodes: a proposed graph shows only its own questions.
+ *
+ * FR-005 ("also live"): any question id present in `liveIds` (i.e. also listed in a
+ * LIVE flow) is marked node.alsoLive = true so the Library graph can badge it. This
+ * is a WARN signal, never a failure. `liveIds` must contain QUESTION ids that appear
+ * in live survey YAML flows (e.g. flowQuestionIdsByStatus("live")) — NOT arbitrary
+ * node ids such as manifest step ids, or the badging would be meaningless.
+ *
+ * Proposed-flow node ids are excluded from the rendered<->runtime bijection
+ * (FR-006) — collectRenderedNodeIds never traverses these graphs.
+ *
+ * @param raw     the proposed thin-YAML source (Vite `?raw` import)
+ * @param title   friendly section title for the Library graph
+ * @param liveIds question ids that appear in any LIVE flow (for "also live" badging)
+ */
+export function buildProposedFlowGraph(
+  raw: string,
+  title: string,
+  liveIds: ReadonlySet<string> = new Set(),
+): FlowGraph {
+  return buildProposedFlowGraphFromFlow(loadModularFlow(raw), title, liveIds);
+}
+
+/**
+ * As buildProposedFlowGraph, but over an already-parsed FlowDef — lets a caller that
+ * has already run loadModularFlow (e.g. buildLibrarySection, which also collects the
+ * flow's ids) build the graph WITHOUT re-parsing the same YAML. See buildProposedFlowGraph
+ * for the `liveIds` contract.
+ */
+export function buildProposedFlowGraphFromFlow(
+  flow: FlowDef,
+  title: string,
+  liveIds: ReadonlySet<string> = new Set(),
+): FlowGraph {
+  const graph = buildGraphFromQuestions(flow, title, {
+    questionKind: "proposed",
+    questionRegion: "library",
+  });
+  for (const node of graph.nodes) {
+    if (liveIds.has(node.id)) node.alsoLive = true;
+  }
+  return graph;
+}
+
+/**
+ * Compute the flat Library reserve (spec 025, FR-004): registry modules that are
+ * in NO flow at all — neither a live flow nor a proposed flow. Questions that
+ * appear only in a proposed flow are NOT reserve (they render inside the proposed
+ * graph); `inAnyFlow` must therefore include every proposed-flow question id too.
+ *
+ * Distinct from computeReserveNodes (per-flow, unchanged). Nodes carry
+ * kind:"library-not-in-flow" and region:"library" so they render in the Library
+ * section rather than under a live drill-down.
+ *
+ * @param registry  the (merged) question registry — the universe of all questions
+ * @param inAnyFlow union of every question id listed in any live OR proposed flow
+ * @param flowId    synthetic flow id stamped on the reserve nodes (default "library")
+ */
+export function buildLibraryReserveNodes(
+  registry: Readonly<Record<string, QuestionModule>>,
+  inAnyFlow: ReadonlySet<string>,
+  flowId = "library",
+): GraphNode[] {
+  const reserveIds = Object.keys(registry).filter((id) => !inAnyFlow.has(id));
+  return reserveIds.flatMap((id) => {
+    const mod = registry[id];
+    return mod ? [reserveNodeFor(mod, flowId, "library")] : [];
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -263,32 +359,19 @@ export function buildManifestStepGraph(): StepGraph {
     const step = manifest[i]!;
 
     if (step.spine === true) {
-      // Spine edge: connect to the next spine step (skipping off-spine steps
-      // that appear between them in the array).
-      let j = i + 1;
-      while (j < manifest.length && manifest[j]!.spine !== true) {
-        j++;
-      }
-      if (j < manifest.length) {
-        edges.push({ from: step.id, to: manifest[j]!.id, kind: "spine" });
+      // Spine edge: connect to the next spine step (skipping off-spine steps).
+      const nextSpineIdx = manifest.findIndex((s, idx) => idx > i && s.spine === true);
+      if (nextSpineIdx !== -1) {
+        edges.push({ from: step.id, to: manifest[nextSpineIdx]!.id, kind: "spine" });
       }
 
-      // Fork edges: from this spine step to any off-spine step that immediately
-      // follows it in the manifest array (and has this step as its implicit fork
-      // origin — i.e., it appears before the next spine step).
-      let k = i + 1;
-      while (k < manifest.length && manifest[k]!.spine !== true) {
+      // Fork edges: from this spine step to any off-spine step that immediately follows.
+      for (let k = i + 1; k < manifest.length && manifest[k]!.spine !== true; k++) {
         edges.push({ from: step.id, to: manifest[k]!.id, kind: "fork" });
-        k++;
       }
-    } else {
+    } else if (step.joinTarget !== undefined && idToIndex.has(step.joinTarget)) {
       // Off-spine join edge: from this step back to its joinTarget.
-      if (step.joinTarget !== undefined) {
-        const targetIdx = idToIndex.get(step.joinTarget);
-        if (targetIdx !== undefined) {
-          edges.push({ from: step.id, to: step.joinTarget, kind: "join" });
-        }
-      }
+      edges.push({ from: step.id, to: step.joinTarget, kind: "join" });
     }
   }
 

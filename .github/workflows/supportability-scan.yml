@@ -28,10 +28,10 @@ jobs:
       - name: Checkout keyboard-studio
         uses: actions/checkout@v4
 
-      - name: Checkout keymanapp/keyboards (release/ only, shallow)
+      - name: Checkout keyboard-studio/keyboards (release/ only, shallow)
         uses: actions/checkout@v4
         with:
-          repository: keymanapp/keyboards
+          repository: keyboard-studio/keyboards
           path: .keyboards
           fetch-depth: 1
           sparse-checkout: release

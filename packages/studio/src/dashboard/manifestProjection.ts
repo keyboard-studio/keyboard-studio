@@ -197,7 +197,7 @@ export const CHARACTERS_STEP_ID = "characters";
  */
 export function registryKeyForFlow(graph: FlowGraph): string | null {
   for (const node of graph.nodes) {
-    if (Object.prototype.hasOwnProperty.call(questionRegistry, node.id)) {
+    if (node.id in questionRegistry) {
       return node.id;
     }
   }
@@ -227,13 +227,12 @@ export function attachDrillDowns(
   for (const f of flows) {
     const stepId = f.stepId ?? CHARACTERS_STEP_ID;
     const dd: ManifestDrillDown = {
-      registryKey:
-        f.graph !== null ? (registryKeyForFlow(f.graph) ?? f.title) : f.title,
+      registryKey: f.graph !== null ? (registryKeyForFlow(f.graph) ?? f.title) : f.title,
       title: f.title,
       graph: f.graph,
       error: f.error,
     };
-    if (!Object.prototype.hasOwnProperty.call(grouped, stepId)) {
+    if (!(stepId in grouped)) {
       grouped[stepId] = [];
     }
     grouped[stepId]!.push(dd);

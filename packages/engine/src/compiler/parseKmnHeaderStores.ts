@@ -23,6 +23,8 @@
 // `&` store). kmc-kmn emits an alert() stub for a missing one, so the compile
 // does not hard-fail — but the .call_js sibling is never fetched by this loader.
 
+import { fetchRequiredMap } from "../shared/siblingAssetStores.js";
+
 export interface KmnHeaderStore {
   /** Store name without the leading '&', uppercased (e.g. "LAYOUTFILE"). */
   storeName: string;
@@ -32,16 +34,10 @@ export interface KmnHeaderStore {
   required: boolean;
 }
 
-const SYSTEM_STORES: Record<string, boolean> = {
-  LAYOUTFILE: true,
-  VISUALKEYBOARD: true,
-  BITMAP: false,
-  KMW_EMBEDJS: true,
-  KMW_EMBEDCSS: false,
-  KMW_HELPFILE: false,
-  DISPLAYMAP: false,
-  INCLUDECODES: true,
-};
+// Which of the 8 canonical sibling-asset stores this scanner recognizes, and
+// whether each is a hard-fail-if-missing fetch (see siblingAssetStores.ts for
+// the per-store rationale).
+const SYSTEM_STORES: Record<string, boolean> = fetchRequiredMap();
 
 /**
  * Extract the system-store path references from the header of a .kmn file.

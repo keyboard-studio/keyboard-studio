@@ -29,14 +29,8 @@ export const CSS_BG = "var(--app-bg)" as const;
 /** Surface (card) background: `var(--app-surface)` — resolves to #1f2c49 */
 export const CSS_SURFACE = "var(--app-surface)" as const;
 
-/** Secondary surface: `var(--app-surface-2)` — resolves to #27365a */
-export const CSS_SURFACE_2 = "var(--app-surface-2)" as const;
-
 /** Default border: `var(--app-border)` — resolves to #33436a */
 export const CSS_BORDER = "var(--app-border)" as const;
-
-/** Strong border: `var(--app-border-strong)` — resolves to #44588a */
-export const CSS_BORDER_STRONG = "var(--app-border-strong)" as const;
 
 /** Primary text: `var(--app-text)` — resolves to #eaf1fb */
 export const CSS_TEXT = "var(--app-text)" as const;
@@ -50,15 +44,6 @@ export const CSS_TEXT_SUBTLE = "var(--app-text-subtle)" as const;
 /** Accent color: `var(--app-accent)` — resolves to #5aa7f0 */
 export const CSS_ACCENT = "var(--app-accent)" as const;
 
-/** Accent hover: `var(--app-accent-hover)` — resolves to #74b6f4 */
-export const CSS_ACCENT_HOVER = "var(--app-accent-hover)" as const;
-
-/** Accent subtle background: `var(--app-accent-subtle)` — resolves to #243c61 */
-export const CSS_ACCENT_SUBTLE = "var(--app-accent-subtle)" as const;
-
-/** Accent text: `var(--app-accent-text)` — resolves to #8fc4f6 */
-export const CSS_ACCENT_TEXT = "var(--app-accent-text)" as const;
-
 /** UI font stack: `var(--app-font)` — 'Source Sans 3', system-ui, … */
 export const CSS_FONT = "var(--app-font)" as const;
 
@@ -67,9 +52,6 @@ export const CSS_FONT_MONO = "var(--app-font-mono)" as const;
 
 /** SIL green: `var(--sil-green)` — resolves to #509E2F */
 export const CSS_SIL_GREEN = "var(--sil-green)" as const;
-
-/** SIL orange: `var(--sil-orange)` — resolves to #d9a441 */
-export const CSS_SIL_ORANGE = "var(--sil-orange)" as const;
 
 /** SIL orange dark: `var(--sil-orange-dark)` — resolves to #ecc26a */
 export const CSS_SIL_ORANGE_DARK = "var(--sil-orange-dark)" as const;
@@ -104,6 +86,9 @@ export const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 /** Primary action blue used by mechanism / touch galleries. */
 export const BLUE_ACTION = "#1f6feb";
 
+/** Monospace font stack used by editors, diagnostics, and code displays. */
+export const FONT_MONO = "ui-monospace, 'Cascadia Code', Consolas, monospace";
+
 // ---------------------------------------------------------------------------
 // 3. Divergent / preserved tokens
 //    Each value differs from every canonical token and is preserved exactly
@@ -137,3 +122,36 @@ export const WARNING = "#d29922";
  * is a post-P1 decision.
  */
 export const SUCCESS_ACCENT = "#7ee787";
+
+/**
+ * Survey chip glyph accent — the confirmed/checked character-glyph color in
+ * the Phase B chip pickers. No canonical counterpart; preserved exactly
+ * (post-P1 normalization candidate).
+ */
+export const CHIP_GLYPH_ACCENT = "#58a6ff";
+
+/**
+ * Error / danger red — the survey character-chip remove-x glyph. No canonical
+ * counterpart; preserved exactly.
+ */
+export const ERROR_RED = "#f85149";
+
+/**
+ * Checked survey-chip background (SuggestionChip, ticked state). No canonical
+ * counterpart; preserved exactly.
+ */
+export const CHECKED_CHIP_BG = "#0d2044";
+
+/**
+ * Disabled-control background / divider line color used by the survey panes
+ * (same value, dual use). Near canonical surface tokens but intentionally
+ * distinct; preserved as-is (post-P1 normalization candidate).
+ */
+export const DISABLED_DIVIDER = "#21262d";
+
+/**
+ * Card border color used by editors, diagnostics, metadata, and form panels.
+ * Appears 38 times across 18 files. Near canonical BORDER (#30363d) but
+ * intentionally distinct; preserved as-is (post-P1 normalization candidate).
+ */
+export const CARD_BORDER = "#283040";

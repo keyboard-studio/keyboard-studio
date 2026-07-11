@@ -9,6 +9,10 @@ const KEYBOARDS_REPO_ROOT =
   process.env["KEYBOARDS_REPO"] ??
   fileURLToPath(new URL("../../../keyboards", import.meta.url));
 
+const PATH_SHIM = fileURLToPath(
+  new URL("./src/lib/pathShim.ts", import.meta.url),
+);
+
 export default defineConfig({
   plugins: [
     react(),
@@ -19,10 +23,8 @@ export default defineConfig({
       // [SCAFFOLD] path shim required while @keymanapp/kmc-kmn is used
       // directly; Vite rewrites kmc-kmn's `require('path')` into an ESM
       // import that needs a browser-safe default export.
-      path: fileURLToPath(new URL("./src/lib/pathShim.ts", import.meta.url)),
-      "path-browserify": fileURLToPath(
-        new URL("./src/lib/pathShim.ts", import.meta.url),
-      ),
+      path: PATH_SHIM,
+      "path-browserify": PATH_SHIM,
       "@docs": fileURLToPath(new URL("../../docs", import.meta.url)),
     },
   },
@@ -34,6 +36,13 @@ export default defineConfig({
   server: {
     port: 5273,
     strictPort: true,
+    // Mirrors the vercel.json prod framing headers so dev/preview/prod stay
+    // consistent. Deliberately no script-src here (site-wide, not scoped to
+    // osk-frame.html) — it would break Vite's HMR inline scripts.
+    headers: {
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "frame-ancestors 'self'",
+    },
     proxy: {
       // Proxy for keyboard source files — rewrites /kbd-proxy/<path> to
       // https://raw.githubusercontent.com/keymanapp/keyboards/master/<path>.
@@ -42,7 +51,7 @@ export default defineConfig({
         target: "https://raw.githubusercontent.com",
         changeOrigin: true,
         rewrite: (path) =>
-          path.replace(/^\/kbd-proxy/, "/keymanapp/keyboards/master"),
+          path.replace(/^\/kbd-proxy/, "/keyboard-studio/keyboards/master"),
       },
     },
   },

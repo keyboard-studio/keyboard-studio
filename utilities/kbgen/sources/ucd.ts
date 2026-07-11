@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { codepointOf } from '../analyze.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -40,8 +41,7 @@ function load(): Map<number, UcdEntry> {
   return MAP;
 }
 
-const cpOf = (ch: string) => ch.codePointAt(0) as number;
 export const available = () => load().size > 0;
-export const nameOf = (ch: string): string | null => { const e = load().get(cpOf(ch)); return e ? e.name : null; };
-export const gcOf = (ch: string): string | null => { const e = load().get(cpOf(ch)); return e ? e.gc : null; };
-export const decompOf = (ch: string): number[] | null => { const e = load().get(cpOf(ch)); return e && e.decomp ? e.decomp : null; };
+export const nameOf = (ch: string): string | null => { const e = load().get(codepointOf(ch)); return e ? e.name : null; };
+export const gcOf = (ch: string): string | null => { const e = load().get(codepointOf(ch)); return e ? e.gc : null; };
+export const decompOf = (ch: string): number[] | null => { const e = load().get(codepointOf(ch)); return e && e.decomp ? e.decomp : null; };

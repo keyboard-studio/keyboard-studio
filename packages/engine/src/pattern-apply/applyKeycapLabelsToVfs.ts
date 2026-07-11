@@ -6,11 +6,25 @@
 // during authoring (spec §11).
 //
 // Mapping of strategy → layer ids (GATE-confirmed):
-//   S-01 unshifted  → kvks shift="" / touch layer "default"
-//   S-08 AltGr      → kvks shift="RA" / touch layer "rightalt"
+//   S-01 unshifted        → kvks shift="" / touch layer "default"
+//   S-01 shift            → kvks shift="S" / touch layer "shift"
+//   S-08 AltGr            → kvks shift="RA" / touch layer "rightalt"
+//   S-08 Shift+AltGr      → kvks shift="SRA" / touch layer "rightalt-shift"
+//
+// S-01's `kmnRules` slot value may hold MULTIPLE newline-separated rule
+// lines (e.g. a CAPS-handling case-pair quad — see shiftRules.ts's
+// buildCasePairRuleLines). Each line is parsed independently: its modifiers
+// decide whether it targets the base or shift keycap, and CAPS-state lines
+// (modifiers containing `CAPS`, as opposed to `NCAPS`) are skipped entirely
+// since they describe the caps-lock-on view, not a distinct OSK keycap.
 
 import type { MechanismAssignment, VirtualFS } from "@keyboard-studio/contracts";
-import { parseKmnHeaderStores } from "../compiler/parseKmnHeaderStores.js";
+import {
+  escapeRegExp,
+  readVfsText,
+  resolveOskAssetPaths,
+  xmlEscape,
+} from "./oskAssetShared.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -22,9 +36,9 @@ interface KeycapTarget {
   vkey: string;
   /** The new character to display on the keycap. */
   char: string;
-  /** `.kvks` shift attribute value: "" | "S" | "RA". */
+  /** `.kvks` shift attribute value: "" | "S" | "RA" | "SRA". */
   kvksLayer: string;
-  /** `.keyman-touch-layout` layer id: "default" | "rightalt". */
+  /** `.keyman-touch-layout` layer id: "default" | "shift" | "rightalt" | "rightalt-shift". */
   touchLayer: string;
 }
 
@@ -36,9 +50,12 @@ interface KeycapTarget {
  * Patch `.kvks` and `.keyman-touch-layout` VFS entries so the OSK preview
  * shows swapped characters on keycaps for S-01 and S-08 mechanism assignments.
  *
- * For S-01 assignments the unshifted layer is patched; for S-08 (AltGr/RightAlt)
- * assignments the AltGr layer is patched. Only `modality === "physical"` entries
- * are processed — touch-layout and kvks are both driven from the physical side.
+ * For S-01 assignments each `kmnRules` line routes to its own keycap — base
+ * or shift, per that line's modifiers (a CAPS-handling case-pair quad
+ * therefore patches both the base and shift keycaps from a single
+ * assignment); for S-08 (AltGr/RightAlt) assignments the AltGr layer is
+ * patched. Only `modality === "physical"` entries are processed —
+ * touch-layout and kvks are both driven from the physical side.
  *
  * @param vfs         The in-memory virtual filesystem for the keyboard project.
  * @param keyboardId  The keyboard identifier (used to derive default asset paths).
@@ -67,65 +84,67 @@ export function applyKeycapLabelsToVfs(
       const { strategyId, slotValues } = mechanism;
 
       if (strategyId === "S-01") {
-        // kmnRules slot example: "+ [K_A] > U+0041"
+        // kmnRules slot may hold multiple newline-separated rule lines, e.g.
+        // a CAPS-handling case-pair quad:
+        //   "+ [NCAPS K_E] > U+03B8\n+ [NCAPS SHIFT K_E] > U+0398\n
+        //    + [CAPS K_E] > U+0398\n+ [CAPS SHIFT K_E] > U+03B8"
+        // Parse each line independently so a base assignment and its
+        // shift-layer companion land on distinct keycaps instead of the
+        // companion's target overwriting the base keycap.
         const kmnRules = slotValues?.["kmnRules"] ?? "";
-        const vkey = parseLastTokenFromBracket(kmnRules);
-        if (vkey) {
-          targets.push({ vkey, char, kvksLayer: "", touchLayer: "default" });
+        for (const line of kmnRules.split("\n")) {
+          const target = parseS01RuleLine(line, char);
+          if (target) targets.push(target);
         }
       } else if (strategyId === "S-08") {
-        // altgrKeyList slot example: "[RALT K_A]"
+        // altgrKeyList slot example: "[RALT K_A]" or "[SHIFT RALT K_A]"
         const altgrKeyList = slotValues?.["altgrKeyList"] ?? "";
         const vkey = parseLastTokenFromBracket(altgrKeyList);
         if (vkey) {
-          targets.push({ vkey, char, kvksLayer: "RA", touchLayer: "rightalt" });
+          const isShifted = /\bSHIFT\b/.test(altgrKeyList);
+          targets.push({
+            vkey,
+            char,
+            kvksLayer: isShifted ? "SRA" : "RA",
+            touchLayer: isShifted ? "rightalt-shift" : "rightalt",
+          });
         }
       }
     }
   }
 
+  // De-duplicate targets that collapse to the same (vkey, kvksLayer, char) —
+  // cheap guard against redundant writes if rule-line parsing ever produces
+  // overlapping entries (e.g. a base-only line alongside an NCAPS base line
+  // with identical output, which buildBaseRuleLines never actually emits
+  // together, but the guard costs nothing).
+  const seen = new Set<string>();
+  const dedupedTargets = targets.filter((t) => {
+    const key = JSON.stringify([t.vkey, t.kvksLayer, t.char]);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
   // Nothing to patch — return immediately.
-  if (targets.length === 0) {
+  if (dedupedTargets.length === 0) {
     return { warnings };
   }
 
   // -------------------------------------------------------------------------
   // Step 2 — locate asset paths from the .kmn header stores (with fallback).
   // -------------------------------------------------------------------------
-  const kmnPath = `source/${keyboardId}.kmn`;
-  const kmnEntry = vfs.get(kmnPath);
-  let kmnText = "";
-  if (kmnEntry !== undefined && !kmnEntry.isBinary) {
-    kmnText =
-      typeof kmnEntry.content === "string"
-        ? kmnEntry.content
-        : new TextDecoder().decode(kmnEntry.content as Uint8Array);
-  }
-
-  const headerStores = kmnText ? parseKmnHeaderStores(kmnText) : [];
-
-  const kvksPath = resolveAssetPath(
-    headerStores,
-    "VISUALKEYBOARD",
-    keyboardId,
-    ".kvks",
-  );
-  const touchPath = resolveAssetPath(
-    headerStores,
-    "LAYOUTFILE",
-    keyboardId,
-    ".keyman-touch-layout",
-  );
+  const { kvksPath, touchPath } = resolveOskAssetPaths(vfs, keyboardId);
 
   // -------------------------------------------------------------------------
   // Step 3 — patch .kvks (text splice via regex).
   // -------------------------------------------------------------------------
-  patchKvks(vfs, kvksPath, keyboardId, targets, warnings);
+  patchKvks(vfs, kvksPath, keyboardId, dedupedTargets, warnings);
 
   // -------------------------------------------------------------------------
   // Step 4 — patch .keyman-touch-layout (JSON round-trip).
   // -------------------------------------------------------------------------
-  patchTouchLayout(vfs, touchPath, targets);
+  patchTouchLayout(vfs, touchPath, dedupedTargets);
 
   return { warnings };
 }
@@ -150,33 +169,69 @@ function parseLastTokenFromBracket(text: string): string {
 }
 
 /**
- * Resolve the VFS path for a sibling asset file.
+ * Parse a single S-01 `.kmn` rule line — `+ [<modifiers> VKEY] > <rhs>` —
+ * into a {@link KeycapTarget}, or `undefined` when the line should not
+ * produce a keycap (no bracket, or an explicit-CAPS-state modifier).
  *
- * 1. Look for the store in parsed header stores and return `source/<path>`.
- * 2. Fall back to `source/<keyboardId><extension>`.
+ * - Lines whose modifiers include `CAPS` (the caps-lock-ON state, distinct
+ *   from `NCAPS`) are skipped: the OSK keycap always shows the caps-off
+ *   view, so a `[CAPS K_X]` line describes a state with no keycap of its
+ *   own.
+ * - Modifiers including `SHIFT` route to the shift keycap (`kvksLayer: "S"`,
+ *   `touchLayer: "shift"`); otherwise the base keycap (`kvksLayer: ""`,
+ *   `touchLayer: "default"`).
+ * - The display char is decoded from the RHS (`U+XXXX` codepoint tokens,
+ *   concatenated; a quoted literal is used as-is) so a companion's shifted
+ *   output doesn't require the caller to have passed the right `char` in —
+ *   `fallbackChar` (the assignment's `target`) is only used when the RHS
+ *   can't be decoded, for backward compatibility with pre-existing simple
+ *   single-rule callers.
  */
-function resolveAssetPath(
-  stores: ReturnType<typeof parseKmnHeaderStores>,
-  storeName: string,
-  keyboardId: string,
-  extension: string,
-): string {
-  const store = stores.find((s) => s.storeName === storeName);
-  if (store?.path) {
-    // Paths in .kmn headers are relative to source/
-    return `source/${store.path}`;
-  }
-  return `source/${keyboardId}${extension}`;
+function parseS01RuleLine(line: string, fallbackChar: string): KeycapTarget | undefined {
+  const bracketMatch = /\[([^\]]+)\]/.exec(line);
+  if (!bracketMatch) return undefined;
+
+  const tokens = (bracketMatch[1] ?? "").trim().split(/\s+/);
+  const vkey = tokens[tokens.length - 1] ?? "";
+  if (!vkey) return undefined;
+
+  const modifiers = tokens.slice(0, -1);
+  // Explicit caps-lock-ON state — not a distinct OSK keycap. NCAPS is fine.
+  if (modifiers.includes("CAPS")) return undefined;
+
+  const isShift = modifiers.includes("SHIFT");
+
+  const rhs = line.split(">")[1]?.trim() ?? "";
+  const char = decodeRhsChar(rhs) ?? fallbackChar;
+  if (!char) return undefined;
+
+  return isShift
+    ? { vkey, char, kvksLayer: "S", touchLayer: "shift" }
+    : { vkey, char, kvksLayer: "", touchLayer: "default" };
 }
 
 /**
- * XML-escape a character for insertion into `.kvks` text content.
+ * Decode a `.kmn` rule RHS into its display string.
+ *
+ * Handles one or more whitespace-separated `U+XXXX` codepoint tokens
+ * (concatenated — this is how a multi-codepoint grapheme is expressed) and
+ * single-quoted literals (`'x'`). Returns `undefined` when the RHS matches
+ * neither shape, so the caller can fall back to the assignment's `target`.
  */
-function xmlEscape(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+function decodeRhsChar(rhs: string): string | undefined {
+  if (rhs === "") return undefined;
+
+  const quoted = /^'(.*)'$/.exec(rhs);
+  if (quoted) return quoted[1] ?? "";
+
+  const cpTokens = rhs.trim().split(/\s+/);
+  let decoded = "";
+  for (const token of cpTokens) {
+    const cpMatch = /^U\+([0-9A-Fa-f]+)$/.exec(token);
+    if (!cpMatch) return undefined;
+    decoded += String.fromCodePoint(parseInt(cpMatch[1] ?? "0", 16));
+  }
+  return decoded || undefined;
 }
 
 /**
@@ -223,11 +278,11 @@ function patchKvks(
     );
     const layerMatch = layerPattern.exec(xml);
     if (!layerMatch) {
-      // Layer not present — for AltGr (kvksLayer === "RA") we synthesize a minimal
-      // new layer so the swapped keycap is visible when the user switches to the
-      // AltGr view. For other missing layers we skip silently.
-      if (kvksLayer === "RA") {
-        xml = synthesizeKvksLayer(xml, vkey, escaped);
+      // Layer not present — for AltGr (kvksLayer === "RA" or "SRA") we synthesize
+      // a minimal new layer so the swapped keycap is visible when the user
+      // switches to that AltGr view. For other missing layers we skip silently.
+      if (kvksLayer === "RA" || kvksLayer === "SRA") {
+        xml = synthesizeKvksLayer(xml, vkey, escaped, kvksLayer);
       }
       continue;
     }
@@ -269,14 +324,9 @@ function patchTouchLayout(
   touchPath: string,
   targets: KeycapTarget[],
 ): void {
-  const entry = vfs.get(touchPath);
   // Touch layout is optional — skip silently when absent or binary.
-  if (entry === undefined || entry.isBinary) return;
-
-  const raw =
-    typeof entry.content === "string"
-      ? entry.content
-      : new TextDecoder().decode(entry.content as Uint8Array);
+  const raw = readVfsText(vfs, touchPath);
+  if (raw === undefined) return;
 
   let data: unknown;
   try {
@@ -357,15 +407,21 @@ function patchTouchLayout(
 }
 
 /**
- * Synthesize a minimal `<layer shift="RA">` block in the kvks XML for S-08
- * assignments when the base keyboard has no existing AltGr layer.
+ * Synthesize a minimal `<layer shift="RA">` (or `shift="SRA"` for Shift+AltGr)
+ * block in the kvks XML for S-08 assignments when the base keyboard has no
+ * existing AltGr layer for that shift state.
  *
  * Inserts before `</encoding>` (or before `</visualkeyboard>` as fallback).
  * Also adds `<usealtgr/>` to the header flags block if not already present,
  * so KMW exposes the AltGr layer in the desktop OSK.
  */
-function synthesizeKvksLayer(xml: string, vkey: string, escapedChar: string): string {
-  const newLayer = `\n<layer shift="RA">\n<key vkey="${vkey}">${escapedChar}</key>\n</layer>`;
+function synthesizeKvksLayer(
+  xml: string,
+  vkey: string,
+  escapedChar: string,
+  kvksLayer: string,
+): string {
+  const newLayer = `\n<layer shift="${kvksLayer}">\n<key vkey="${vkey}">${escapedChar}</key>\n</layer>`;
 
   // Insert before </encoding> if present, else before </visualkeyboard>.
   let patched = xml.replace(/(<\/encoding>)/i, `${newLayer}\n$1`);
@@ -386,11 +442,4 @@ function synthesizeKvksLayer(xml: string, vkey: string, escapedChar: string): st
   }
 
   return patched;
-}
-
-/**
- * Escape a string for safe use inside a `new RegExp(…)` pattern.
- */
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

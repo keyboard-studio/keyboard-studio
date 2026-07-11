@@ -50,6 +50,16 @@ function mockAuth(
   });
 }
 
+// Shared fixture for Google identity used across multiple tests
+const testGoogleIdentity = {
+  provider: "google" as const,
+  sub: "1234567890",
+  email: "user@example.com",
+  emailVerified: true,
+  name: "Test User",
+  picture: "https://example.com/photo.jpg",
+};
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -62,11 +72,12 @@ describe("SignUpPanel", () => {
     expect(screen.getByRole("button", { name: "Sign up with GitHub" })).toBeTruthy();
   });
 
-  it("calls connect() when the GitHub button is clicked", () => {
+  it("calls connect('identity') when the GitHub button is clicked (identity flow, no scope)", () => {
     mockAuth({ status: "idle" });
     render(<SignUpPanel />);
     screen.getByRole("button", { name: "Sign up with GitHub" }).click();
     expect(connect).toHaveBeenCalledOnce();
+    expect(connect).toHaveBeenCalledWith("identity");
   });
 
   it("shows the Google sign-up button enabled (not a disabled placeholder)", () => {
@@ -102,20 +113,7 @@ describe("SignUpPanel", () => {
   });
 
   it("shows the signed-in Google identity + sign-out when Google connected", () => {
-    mockAuth(
-      { status: "idle" },
-      {
-        status: "connected",
-        identity: {
-          provider: "google",
-          sub: "1234567890",
-          email: "user@example.com",
-          emailVerified: true,
-          name: "Test User",
-          picture: "https://example.com/photo.jpg",
-        },
-      },
-    );
+    mockAuth({ status: "idle" }, { status: "connected", identity: testGoogleIdentity });
     render(<SignUpPanel />);
     expect(screen.getByText(/Signed in with Google as Test User/)).toBeTruthy();
     const signOut = screen.getByRole("button", { name: "Sign out" });
@@ -127,17 +125,7 @@ describe("SignUpPanel", () => {
   it("shows both identities and exactly one global 'Sign out' when both are linked", () => {
     mockAuth(
       { status: "connected", login: "octocat" },
-      {
-        status: "connected",
-        identity: {
-          provider: "google",
-          sub: "1234567890",
-          email: "user@example.com",
-          emailVerified: true,
-          name: "Test User",
-          picture: "https://example.com/photo.jpg",
-        },
-      },
+      { status: "connected", identity: testGoogleIdentity },
     );
     render(<SignUpPanel />);
     expect(screen.getByText(/Signed up with GitHub as octocat/)).toBeTruthy();
@@ -154,17 +142,7 @@ describe("SignUpPanel", () => {
   it("global 'Sign out' disconnects both providers when both are linked", () => {
     mockAuth(
       { status: "connected", login: "octocat" },
-      {
-        status: "connected",
-        identity: {
-          provider: "google",
-          sub: "1234567890",
-          email: "user@example.com",
-          emailVerified: true,
-          name: "Test User",
-          picture: "https://example.com/photo.jpg",
-        },
-      },
+      { status: "connected", identity: testGoogleIdentity },
     );
     render(<SignUpPanel />);
     screen.getByRole("button", { name: "Sign out" }).click();

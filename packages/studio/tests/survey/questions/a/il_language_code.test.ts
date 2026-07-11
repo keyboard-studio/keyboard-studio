@@ -1,5 +1,8 @@
 // Colocated vitest spec for il_language_code (identity-lite).
-// No validate() — optional free-text with no client-side gating.
+// No validate() — optional free-text / autocomplete with no client-side gating.
+// spec 030 US4: repositioned after the name steps as a code CONFIRMATION; routes
+// straight on to il_target_script (region disambiguation now branches off the
+// English-name step, not this one).
 
 import { describe, it, expect } from "vitest";
 import mod, {
@@ -12,15 +15,21 @@ describe("il_language_code — definition", () => {
     expect(definition.id).toBe("il_language_code");
   });
 
-  it("type is text", () => {
-    expect(definition.type).toBe("text");
+  it("type is autocomplete (langtags-backed searchable picker; T014)", () => {
+    expect(definition.type).toBe("autocomplete");
+  });
+
+  it("options_source is @langtags_iso639", () => {
+    expect(definition.options_source).toBe("@langtags_iso639");
   });
 
   it("is optional (required: false)", () => {
     expect(definition.required).toBe(false);
   });
 
-  it("routes to il_target_script", () => {
+  it("routes straight to il_target_script (US4 — confirmation step, no branch)", () => {
+    // Region disambiguation now branches off il_language_english, not the code
+    // step, so this node advances unconditionally to the script question.
     expect(definition.next).toBe("il_target_script");
   });
 });

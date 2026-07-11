@@ -65,10 +65,15 @@ function parseArgs(argv: string[]): CliOptions {
   const o: CliOptions = { base: 'us', font: 'Tahoma' };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--free-swap') o.freeSwap = true;
-    else if (a === '--emit-source') o.emitSource = true;
-    else if (a === '--dry-run') o.dryRun = true;
-    else if (a.startsWith('--')) o[a.slice(2)] = argv[++i];
+    if (a === '--free-swap') {
+      o.freeSwap = true;
+    } else if (a === '--emit-source') {
+      o.emitSource = true;
+    } else if (a === '--dry-run') {
+      o.dryRun = true;
+    } else if (a.startsWith('--')) {
+      o[a.slice(2)] = argv[++i];
+    }
   }
   return o;
 }
@@ -92,17 +97,21 @@ function main() {
   const layout = getLayout(o.base);
 
   // Resolve inventory + used letters: explicit flags win; otherwise derive from CLDR.
-  let chars: string[] | null = null, used: string[] | null = null;
+  let chars: string[] | null = null;
+  let used: string[] | null = null;
+
   if (o.locale) {
     const exemplars = loadExemplars(o.locale);
     if (!exemplars) return fail(`no CLDR exemplar data for locale "${o.locale}" -- fetch it (npx tsx fetch-data.ts ${o.locale}) or pass --chars/--used`);
     used = [...exemplars.used];
     chars = exemplars.specials;
   }
+
   if (o.chars) chars = [...o.chars];
   if (o['chars-file']) chars = [...fs.readFileSync(o['chars-file'], 'utf8').replace(/\s+/g, '')];
   if (o.used) used = [...o.used.replace(/\s+/g, '')];
   if (o['used-file']) used = [...fs.readFileSync(o['used-file'], 'utf8').replace(/\s+/g, '')];
+
   if (!chars || !chars.length) fail('need a special-character inventory: pass --locale, --chars, or --chars-file');
   if (!used) used = [..."abcdefghijklmnopqrstuvwxyz"]; // all occupied -> everything on RALT (safe)
 

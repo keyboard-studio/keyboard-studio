@@ -142,7 +142,7 @@ export function SignUpPanel() {
         ) : (
           <button
             type="button"
-            onClick={() => { void github.connect(); }}
+            onClick={() => { void github.connect("identity"); }}
             aria-label="Sign up with GitHub"
             style={githubButtonStyle(true)}
           >
@@ -196,7 +196,7 @@ export function SignUpPanel() {
 
       <button
         type="button"
-        onClick={() => { void github.connect(); }}
+        onClick={() => { void github.connect("identity"); }}
         aria-label="Sign up with GitHub"
         style={githubButtonStyle(true)}
       >

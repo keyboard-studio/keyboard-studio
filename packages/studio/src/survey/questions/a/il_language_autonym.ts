@@ -1,10 +1,13 @@
 // Per-question module: il_language_autonym (identity-lite)
-// Ported verbatim from content/flows/identity_lite.yaml.
 //
-// This is the opening question of the identity-lite mini-flow (spec §8
-// "Workflow ordering"). It captures the language name in the community's own
-// script and spelling. The autonym is later seeded into il_language_english
-// by IdentityLite.tsx getSeedValue — that seeding logic stays in the component.
+// SECOND question (spec 030 US2, FR-009): the language name in the community's
+// own script. IdentityLite.tsx offers a dropdown sourced from langtags as a
+// fallback chain — recorded own-script names (localname + localnames) when the
+// language has any, otherwise the English/alternate names (name + names) — via
+// getSeedOptions, with a free-text override.
+// getSeedValue defaults it to the primary own-script name when langtags has one;
+// when it has none (~60% of languages — T008, and free-text/unmatched languages)
+// it falls back to the Q1 English name. Advances to il_language_code.
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
 
@@ -12,22 +15,23 @@ export const definition = {
   id: "il_language_autonym",
   prompt: "What is your language called in your own language?",
   help_text:
-    "Type the name your community uses for the language, using your own spelling " +
-    "and characters. For example: Fà', Kiswahili, हिन्दी.",
-  type: "text" as const,
+    "The name your community uses for the language, in your own spelling and " +
+    "characters. For example: Fà', Kiswahili, हिन्दी. Pick a suggested name or " +
+    "type your own — edit it to match your spelling.",
+  type: "autocomplete" as const,
   required: true,
-  next: "il_language_english",
+  next: "il_language_code",
 } satisfies import("../../types.ts").FlowQuestion;
 
 export function validate(
   value: string | string[] | undefined,
 ): ValidationResult {
-  const trimmed =
-    typeof value === "string"
-      ? value.trim()
-      : Array.isArray(value)
-        ? value.join("").trim()
-        : "";
+  const trimmed = typeof value === "string"
+    ? value.trim()
+    : Array.isArray(value)
+      ? value.join("").trim()
+      : "";
+
   if (trimmed.length === 0) {
     return { ok: false, code: "required", message: "Language name is required." };
   }

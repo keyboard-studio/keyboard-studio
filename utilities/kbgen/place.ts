@@ -16,10 +16,10 @@
 // longpress to restore the original; an RALT placement becomes a longpress of the
 // special on the (unchanged) anchor key.
 
-import { analyzeChar, scoreAnchors } from './analyze.ts';
+import { analyzeChar, scoreAnchors, codepointHex } from './analyze.ts';
 import type { Layout } from './layout.ts';
 
-const hex = (ch: string) => 'U+' + (ch.codePointAt(0) as number).toString(16).toUpperCase().padStart(4, '0');
+const hex = (ch: string) => 'U+' + codepointHex(ch);
 
 export interface KeyPlan {
   key: string;
@@ -88,6 +88,7 @@ export function plan(chars: string[], layout: Layout, free: Set<string>, opts: P
   // Track which (key, case, channel) slots are taken so collisions are caught.
   const taken = new Set<string>();
   const placements: Placement[] = [];
+  const slotId = (key: string, channel: 'direct' | 'ralt', upper: boolean) => `${key}|${channel}|${upper}`;
 
   // Sort by anchor confidence so the strongest signal claims a key first. The anchor is
   // resolved from the CASE-FOLDED (lowercase) form so a case pair always shares one key:
@@ -114,40 +115,46 @@ export function plan(chars: string[], layout: Layout, free: Set<string>, opts: P
     const isFree = free.has(anchorKey);
     if (!isFree && opts.freeSwap) {
       // Convenience route: move to the nearest unclaimed free key instead of using RALT.
-      const alt = [...free].find((id) => !taken.has(`${id}|direct|${upper}`));
-      if (alt) { anchorKey = alt; }
+      const alt = [...free].find((id) => !taken.has(slotId(id, 'direct', upper)));
+      if (alt) anchorKey = alt;
     }
 
-    const directSlot = `${anchorKey}|direct|${upper}`;
-    const raltSlot = `${anchorKey}|ralt|${upper}`;
     const kp = keyPlan(anchorKey);
+    const canUseDirect = free.has(anchorKey) || (opts.freeSwap && anchorKey !== anchor.key);
+    const directSlot = slotId(anchorKey, 'direct', upper);
+    const raltSlot = slotId(anchorKey, 'ralt', upper);
 
-    if (free.has(anchorKey) || (opts.freeSwap && anchorKey !== anchor.key)) {
+    if (canUseDirect && !taken.has(directSlot)) {
       // Direct remap on a free key. Restore the displaced original on RALT.
-      if (taken.has(directSlot)) { mechanism = 'ralt'; }
-      else {
-        mechanism = 'direct';
-        taken.add(directSlot);
-        if (upper) { kp.shiftOut = ch; if (kp.raltShift == null) kp.raltShift = kp.baseUpper; }
-        else { kp.defOut = ch; if (kp.raltDef == null) kp.raltDef = kp.baseLower; }
-        kp.displaced = true;
-        // Touch: special occupies the slot, original becomes the longpress.
-        (upper ? kp.skShift : kp.skDef).push(upper ? kp.baseUpper : kp.baseLower);
+      mechanism = 'direct';
+      taken.add(directSlot);
+      const baseChar = upper ? kp.baseUpper : kp.baseLower;
+      if (upper) {
+        kp.shiftOut = ch;
+        if (kp.raltShift == null) kp.raltShift = kp.baseUpper;
+        kp.skShift.push(baseChar);
+      } else {
+        kp.defOut = ch;
+        if (kp.raltDef == null) kp.raltDef = kp.baseLower;
+        kp.skDef.push(baseChar);
       }
+      kp.displaced = true;
     } else {
+      // Use RALT layer (occupied anchor or collision on direct slot).
       mechanism = 'ralt';
-    }
-
-    if (mechanism === 'ralt') {
       if (taken.has(raltSlot)) {
         unplaced.push({ ch, reason: `RALT+${anchorKey} already used (anchor collision)` });
         warnings.push(`Collision: ${ch} (${f.code}) and another char both want RALT+${anchorKey}`);
         continue;
       }
       taken.add(raltSlot);
-      if (upper) kp.raltShift = ch; else kp.raltDef = ch;
-      // Touch: longpress the special on the unchanged anchor key.
-      (upper ? kp.skShift : kp.skDef).push(ch);
+      if (upper) {
+        kp.raltShift = ch;
+        kp.skShift.push(ch);
+      } else {
+        kp.raltDef = ch;
+        kp.skDef.push(ch);
+      }
     }
 
     placements.push({ ch, code: hex(ch), upper, anchorKey, baseAnchorKey: anchor.key,

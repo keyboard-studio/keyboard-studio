@@ -12,16 +12,29 @@ describe("il_language_english — definition", () => {
     expect(definition.id).toBe("il_language_english");
   });
 
-  it("type is text", () => {
-    expect(definition.type).toBe("text");
+  it("type is autocomplete (English-name-first langtags picker; spec 030 US1)", () => {
+    expect(definition.type).toBe("autocomplete");
+  });
+
+  it("options_source is @langtags_names", () => {
+    expect(definition.options_source).toBe("@langtags_names");
   });
 
   it("required is true", () => {
     expect(definition.required).toBe(true);
   });
 
-  it("routes to il_language_code", () => {
-    expect(definition.next).toBe("il_language_code");
+  it("declares a conditional next: region branch (US3) + default to il_language_autonym", () => {
+    // The region branch is fired at runtime by IdentityLite.getNextOverride; the
+    // static rule set declares both edges so the flow graph / drift guardrail see
+    // il_language_region as reachable and the default resolves to the autonym step.
+    const next = definition.next;
+    expect(Array.isArray(next)).toBe(true);
+    const rules = next as Array<{ condition?: string; default?: boolean; goto?: string | null }>;
+    const regionRule = rules.find((r) => r.goto === "il_language_region");
+    expect(regionRule?.condition).toBeTruthy();
+    const defaultRule = rules.find((r) => r.default === true);
+    expect(defaultRule?.goto).toBe("il_language_autonym");
   });
 });
 

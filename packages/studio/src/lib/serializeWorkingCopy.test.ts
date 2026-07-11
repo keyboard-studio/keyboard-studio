@@ -24,8 +24,18 @@ import type { Pattern, MechanismAssignment } from "@keyboard-studio/contracts";
 // Spy on projectWorkingCopyVfs and the three engine functions
 // ---------------------------------------------------------------------------
 
+// Default implementation mirrors the real projectWorkingCopyVfs's rename
+// contract: effectiveKeyboardId is set (to targetKeyboardId) only when
+// targetKeyboardId is present and differs from keyboardId. This keeps the
+// keyboardId-derivation tests below meaningful without re-implementing the
+// full rename projection in the mock.
 const projectWorkingCopyVfsSpy = vi.fn(
-  (_input: unknown) => ({ warnings: [] as string[] }),
+  (input: { keyboardId?: string; targetKeyboardId?: string }) => ({
+    warnings: [] as string[],
+    ...(input.targetKeyboardId !== undefined && input.targetKeyboardId !== input.keyboardId
+      ? { effectiveKeyboardId: input.targetKeyboardId }
+      : {}),
+  }),
 );
 
 vi.mock("./projectWorkingCopyVfs.ts", () => ({
@@ -352,6 +362,36 @@ describe("serializeWorkingCopy — identity.keyboardId drives zip filename", () 
       w.includes("internal source paths"),
     );
     expect(hasMismatchWarn).toBe(false);
+  });
+
+  // Regression coverage: serializeWorkingCopy must CONSUME projectWorkingCopyVfs's
+  // returned effectiveKeyboardId as the single source of truth for result.keyboardId,
+  // not independently re-derive it from identity.keyboardId. Proven here by making
+  // the mock return an effectiveKeyboardId that disagrees with what a re-derivation
+  // from identity.keyboardId alone would produce — if the implementation ever
+  // regresses to re-deriving instead of consuming, this test goes red.
+  it("result.keyboardId is the projector's returned effectiveKeyboardId, not an independent re-derivation", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedStore();
+    useWorkingCopyStore.getState().setIdentity({ keyboardId: "ha_sil" });
+    projectWorkingCopyVfsSpy.mockReturnValueOnce({
+      warnings: [],
+      effectiveKeyboardId: "projector_reported_id",
+    });
+    const result = await serializeWorkingCopy();
+    expect(result).not.toBeNull();
+    expect(result!.keyboardId).toBe("projector_reported_id");
+  });
+
+  it("result.keyboardId falls back to the base id when the projector reports no effectiveKeyboardId", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedStore();
+    // No identity.keyboardId set — targetKeyboardId === keyboardId, so the
+    // default mock (and the real implementation) omit effectiveKeyboardId.
+    projectWorkingCopyVfsSpy.mockReturnValueOnce({ warnings: [] });
+    const result = await serializeWorkingCopy();
+    expect(result).not.toBeNull();
+    expect(result!.keyboardId).toBe(basicKbdus.id);
   });
 });
 

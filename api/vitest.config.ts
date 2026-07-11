@@ -6,7 +6,7 @@ import { defineConfig } from "vitest/config";
 //   npx vitest run --config api/vitest.config.ts
 export default defineConfig({
   test: {
-    include: ["oauth/**/*.test.ts"],
+    include: ["oauth/**/*.test.ts", "submit/**/*.test.ts"],
     environment: "node",
   },
 });

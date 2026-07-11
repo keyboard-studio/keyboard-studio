@@ -125,20 +125,14 @@ describe("EditorStepProps — onBack optional", () => {
   it("an EditorStepProps value with onBack absent is valid (compile + runtime)", () => {
     // If onBack were required on the interface, the assignment below would be a
     // TS error at compile time. This test pins the runtime side of that contract.
-    const props: EditorStepProps = {
-      onComplete: (_result: unknown) => undefined,
-      // onBack intentionally absent — entry-point panels have no back affordance
-    };
+    const props: EditorStepProps = { onComplete: () => undefined };
     expect(props.onBack).toBeUndefined();
     expect(typeof props.onComplete).toBe("function");
   });
 
   it("an EditorStepProps value with onBack present is also valid", () => {
     const onBack = () => undefined;
-    const props: EditorStepProps = {
-      onComplete: (_result: unknown) => undefined,
-      onBack,
-    };
+    const props: EditorStepProps = { onComplete: () => undefined, onBack };
     expect(props.onBack).toBe(onBack);
   });
 });

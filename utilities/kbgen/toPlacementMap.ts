@@ -67,11 +67,9 @@ const MAX_WEIGHT = 100;
 // Base-layout family derivation
 // ---------------------------------------------------------------------------
 
-/**
- * Map known base-layout IDs to their QWERTY/AZERTY/QWERTZ family name.
- * Unknown IDs are passed through verbatim so downstream can see the raw id
- * rather than receiving undefined; this is documented and intentional.
- */
+// Map known base-layout IDs to their QWERTY/AZERTY/QWERTZ family name.
+// Unknown IDs are passed through verbatim so downstream can see the raw id
+// rather than receiving undefined; this is documented and intentional.
 const BASE_FAMILY: Record<string, string> = {
   us: 'QWERTY',
   uk: 'QWERTY',
@@ -84,50 +82,31 @@ const BASE_FAMILY: Record<string, string> = {
   at: 'QWERTZ',
 };
 
-function deriveBaseLayoutFamily(baseId: string): string {
-  // Look up by lowercase id. Unknown ids are passed through so the survey
-  // can surface them for manual review rather than silently dropping context.
-  return BASE_FAMILY[baseId.toLowerCase()] ?? baseId;
-}
+// Look up by lowercase id. Unknown ids are passed through so the survey
+// can surface them for manual review rather than silently dropping context.
+const deriveBaseLayoutFamily = (baseId: string): string => BASE_FAMILY[baseId.toLowerCase()] ?? baseId;
 
 // ---------------------------------------------------------------------------
 // via → PriorSource mapping
 // ---------------------------------------------------------------------------
 
-/**
- * Map kbgen AnchorInfo.via values to the PlacementMap PriorSource union.
- *
- * Mapping table (per spec §7.6 "anchor cascade: NFD → name → confusable →
- * visual → phonetic"):
- *   DECOMPOSITION → 'unicode-decomp'  (NFD anchor: char decomposes to base+mark)
- *   NAME          → 'unicode-decomp'  (Unicode name parse also derives from UCD data)
- *   CONFUSABLE    → 'confusable'      (Unicode confusables dataset)
- *   VISUAL        → 'confusable'      (supplement.json look-alike; treated as visual
- *                                      confusable — closest contract member available;
- *                                      there is no 'visual' member in PriorSource v1)
- *   PHONETIC      → 'phonetic'        (supplement.json IPA / transliteration hint)
- *
- * 'corpus' and 'manual' do not appear in v1 kbgen output.
- */
-function viaToPriorSource(via: string): PriorSource {
-  switch (via) {
-    case 'DECOMPOSITION':
-    case 'NAME':
-      return 'unicode-decomp';
-    case 'CONFUSABLE':
-    case 'VISUAL':
-      // VISUAL is a supplement.json curated look-alike (see analyze.ts).
-      // The PriorSource union has no 'visual' member; 'confusable' is the
-      // closest semantic match (both are appearance-driven anchor sources).
-      return 'confusable';
-    case 'PHONETIC':
-      return 'phonetic';
-    default:
-      // Unknown via strings are treated as phonetic (weakest non-corpus source)
-      // to avoid dropping a placement candidate silently.
-      return 'phonetic';
-  }
-}
+// Map kbgen AnchorInfo.via values to the PlacementMap PriorSource union.
+// Mapping table (per spec §7.6 "anchor cascade: NFD → name → confusable → visual → phonetic"):
+//   DECOMPOSITION → 'unicode-decomp'  (NFD anchor: char decomposes to base+mark)
+//   NAME          → 'unicode-decomp'  (Unicode name parse also derives from UCD data)
+//   CONFUSABLE    → 'confusable'      (Unicode confusables dataset)
+//   VISUAL        → 'confusable'      (supplement.json look-alike; closest contract member)
+//   PHONETIC      → 'phonetic'        (supplement.json IPA / transliteration hint)
+// 'corpus' and 'manual' do not appear in v1 kbgen output.
+const VIA_TO_PRIOR: Record<string, PriorSource> = {
+  DECOMPOSITION: 'unicode-decomp',
+  NAME: 'unicode-decomp',
+  CONFUSABLE: 'confusable',
+  VISUAL: 'confusable',
+  PHONETIC: 'phonetic',
+};
+
+const viaToPriorSource = (via: string): PriorSource => VIA_TO_PRIOR[via] ?? 'phonetic';
 
 // ---------------------------------------------------------------------------
 // Main adapter

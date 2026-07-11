@@ -17,7 +17,7 @@ export const definition = {
     "layer switching.\n\n" +
     "Touch-first authoring — where the survey is built around touchscreen " +
     "gestures rather than physical keys — is a v1.1 roadmap candidate.",
-  next: "language_name_autonym",
+  next: "language_name_english",
 } satisfies import("../../types.ts").FlowQuestion;
 
 // No validate() — notice nodes have no user input.

@@ -9,15 +9,22 @@
 // post-primary passes in SECONDARY_RULES order. The existing index.test.ts
 // suite pins the exact behavior these tables must reproduce.
 //
-// NOTE on rule "3a": spec §7.2 documents a rule 3a (A2=alphabetic AND A3=strong
-// AND A3a=postfix → S-03) that intercepts between rules 3 and 4. It IS
-// implemented below, firing between rules 3 and 4 whenever `markInputOrder`
-// (A3a) is `"postfix"` — routing the primary to S-03 (sequence replace) with
-// S-04 as a secondary, and intercepting before rules 5 and 7 would otherwise
-// pick S-05 or S-02 off the A3=strong heuristic alone. `markInputOrder` is
-// optional and elicited only when A2=alphabetic AND A3=strong (see
-// `contracts/src/axes.ts` for the elicitation gate); when it is `undefined`,
-// rule 3a's `when` is false and evaluation falls through to rule 4 as before.
+// NOTE on rule "3a": spec §7.2 documents rule 3a (A2=alphabetic AND A3=strong
+// AND A3a=postfix → S-03) intercepting between rules 3 and 4. It IS implemented
+// below (in PRIMARY_RULES, between rules 3 and 4). The one production supply of
+// A3a=postfix is base-derived detection (detectMarkInputOrderFromImport,
+// import-mark-order.ts), which finds the unconditional postfix sequence-replace
+// shape in a base's KeyboardIR. The studio wires it into the live pipeline: at
+// instantiation (either track) seedIrAxesFromBaseIr (studio workingCopyStore.ts)
+// runs the detector on the base IR and seeds markInputOrder="postfix" onto
+// irAxes, from where it flows through defaultFillAxes into selectStrategy — so
+// rule 3a fires live for such a base. Caveat: `if(…)`-guarded rules are opaque
+// at parse time, so the live sil_ipa rules aren't reachable yet (see that
+// module's header). No survey phase elicits markInputOrder end-to-end yet (that
+// half remains deferred). The §7.2 script-class default-fill prior
+// (default-fill.ts) is NOT a source for this value: it deliberately never fills
+// A3a with "postfix" (only the unmarked "prefix" state, per the prior's
+// load-bearing invariant). See spec.md §7.2.
 
 import type {
   DiscoveryAxisVector,

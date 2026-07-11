@@ -219,6 +219,52 @@ describe("_createOracle with a live mock WASM handle", () => {
     const codes = findings.map((f) => f.code);
     expect(codes).not.toContain("KM_WARN_ORACLE_UNAVAILABLE");
   });
+
+  it("drops oracle-inapplicable file-existence diagnostics (bitmap/icon)", async () => {
+    // The text-only oracle can never open a referenced packaging asset, so
+    // ERROR_CannotReadBitmapFile (wire code 0x502031 = 5251121) fires for
+    // every base that names a &BITMAP — pure noise here. Other passthrough
+    // findings from the same run must survive the filter.
+    const { handle } = mockHandle([
+      {
+        kmcmpCode: "5251121",
+        line: 0,
+        text: "Cannot open the bitmap or icon file for reading",
+      },
+      { kmcmpCode: "WARN_SomethingNew", line: 2, text: "passthrough-bound" },
+    ]);
+    const oracle = _createOracle(handle);
+    const findings = await oracle.lint("source", { groups: ["passthrough"] });
+    const codes = findings.map((f) => f.code);
+    expect(codes).not.toContain("KM_HINT_KMCMP_5251121");
+    expect(codes).toContain("KM_WARN_KMCMP_SOMETHINGNEW");
+  });
+});
+
+describe("validateWithOracle — packaging-asset references (real WASM)", () => {
+  it("reports no bitmap/icon finding for a clean source naming a &BITMAP", async () => {
+    // Regression: a base keyboard header almost always carries
+    // `store(&BITMAP) '<id>.ico'`. The oracle lints the lone source text, so
+    // kmcmplib's "Cannot open the bitmap or icon file for reading" fired for
+    // every such keyboard and surfaced as a permanent banner in the studio.
+    const src = [
+      "store(&VERSION) '10.0'",
+      "store(&NAME) 'Probe'",
+      "store(&BITMAP) 'probe.ico'",
+      "",
+      "begin Unicode > use(main)",
+      "",
+      "group(main) using keys",
+      "",
+      "+ 'a' > 'b'",
+      "",
+    ].join("\n");
+    const findings = await validateWithOracle(src);
+    const bitmapFindings = findings.filter((f) =>
+      f.message.toLowerCase().includes("bitmap")
+    );
+    expect(bitmapFindings).toEqual([]);
+  }, 15000);
 });
 
 describe("_createOracle(null) — simulating WASM-down", () => {

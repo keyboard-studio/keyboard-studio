@@ -18,17 +18,18 @@ const KIND_LABEL: Record<CardKind, string> = {
 interface KindBadgeProps { kind: CardKind }
 
 export function KindBadge({ kind }: KindBadgeProps) {
-  const c = KIND_COLOR[kind];
+  const color = KIND_COLOR[kind];
+  const label = KIND_LABEL[kind];
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center',
       padding: '2px 8px', borderRadius: 999,
       font: '600 10px/1.4 var(--app-font)', letterSpacing: '.08em', textTransform: 'uppercase',
-      color: c,
-      background: `color-mix(in srgb, ${c} 14%, transparent)`,
-      border: `1px solid color-mix(in srgb, ${c} 38%, transparent)`,
+      color,
+      background: `color-mix(in srgb, ${color} 14%, transparent)`,
+      border: `1px solid color-mix(in srgb, ${color} 38%, transparent)`,
     }}>
-      {KIND_LABEL[kind]}
+      {label}
     </span>
   );
 }

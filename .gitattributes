@@ -1,0 +1,5 @@
+# The Claude Code Workflow tool rejects any script containing CR (U+000D)
+# characters ("script contains control characters that would be hidden in
+# the approval dialog"), so workflow scripts must stay LF even on
+# core.autocrlf=true Windows checkouts.
+.claude/workflows/** text eol=lf

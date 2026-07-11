@@ -2,9 +2,9 @@
  * Unit tests for the Option B managed-PR pipeline in github-pipeline.ts.
  *
  * All tests use an injected stub fetch -- no real GitHub calls. The stub routes
- * by URL + method so the 7-step pipeline (fork -> ref -> commit -> tree -> commit
- * -> branch -> PR) can be exercised end-to-end and individual steps overridden
- * to provoke each error path.
+ * by URL + method so the 7-step pipeline (ref -> parent commit -> build tree
+ * -> create tree -> commit -> branch -> PR) can be exercised end-to-end and
+ * individual steps overridden to provoke each error path.
  */
 
 import { describe, it, expect } from "vitest";
@@ -14,6 +14,7 @@ import {
   buildManagedBranchName,
   normalizePrTitle,
   buildPrBody,
+  UPSTREAM_OWNER,
   type ManagedPRPipelineConfig,
   type GitHubPipelineFetchResponse,
   type GitHubPipelineFetchFn,
@@ -24,7 +25,7 @@ import type { ManagedPRBody } from "./managed-pr-schemas.js";
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const ORG_TOKEN = "gho_ORG_SECRET_SHOULD_NEVER_LEAK";
+const INSTALLATION_TOKEN = "ghs_INSTALLATION_SECRET_SHOULD_NEVER_LEAK";
 const ORG_LOGIN = "keyboard-studio-bot";
 const NEW_COMMIT_SHA = "abc1234567890def00000000000000000000000";
 const PR_URL = "https://github.com/keymanapp/keyboards/pull/4242";
@@ -42,8 +43,6 @@ const VALID_BODY: ManagedPRBody = {
 
 /** Status of one step, keyed by a short tag, so tests override single calls. */
 interface StepOverrides {
-  forkCheck?: Partial<GitHubPipelineFetchResponse>;
-  forkCreate?: Partial<GitHubPipelineFetchResponse>;
   masterRef?: Partial<GitHubPipelineFetchResponse>;
   parentCommit?: Partial<GitHubPipelineFetchResponse>;
   tree?: Partial<GitHubPipelineFetchResponse>;
@@ -87,22 +86,19 @@ function makeStub(overrides: StepOverrides = {}): {
       ov?: Partial<GitHubPipelineFetchResponse>
     ) => (ov ? { ...base, ...ov } : base);
 
-    if (url.endsWith("/forks") && method === "POST") return apply(res({}, true, 202), overrides.forkCreate);
     if (url.includes("/git/ref/heads/master")) return apply(res({ object: { sha: "masterSha111" } }), overrides.masterRef);
     if (url.includes("/git/commits/masterSha111")) return apply(res({ tree: { sha: "treeShaBase" } }), overrides.parentCommit);
     if (url.endsWith("/git/trees") && method === "POST") return apply(res({ sha: "newTreeSha" }), overrides.tree);
     if (url.endsWith("/git/commits") && method === "POST") return apply(res({ sha: NEW_COMMIT_SHA }), overrides.commit);
     if (url.endsWith("/git/refs") && method === "POST") return apply(res({ ref: "ok" }, true, 201), overrides.branch);
     if (url.endsWith("/pulls") && method === "POST") return apply(res({ html_url: PR_URL }, true, 201), overrides.pr);
-    // GET on the fork base = fork-exists check
-    if (method === "GET") return apply(res({ full_name: `${ORG_LOGIN}/keyboards` }), overrides.forkCheck);
     throw new Error(`unexpected request: ${method} ${url}`);
   };
   return { fetch, calls };
 }
 
 function makeConfig(fetchFn: GitHubPipelineFetchFn): ManagedPRPipelineConfig {
-  return { orgToken: ORG_TOKEN, orgLogin: ORG_LOGIN, fetch: fetchFn };
+  return { getInstallationToken: () => Promise.resolve(INSTALLATION_TOKEN), orgLogin: ORG_LOGIN, fetch: fetchFn };
 }
 
 // ---------------------------------------------------------------------------
@@ -253,14 +249,32 @@ describe("submitManagedPR() -- success", () => {
     expect(parsed.body).toContain("ada@example.com");
   });
 
-  it("opens the PR from the org fork branch against keymanapp/keyboards master, as a draft", async () => {
+  it("opens the PR from the org branch against the keyboard-studio/keyboards staging repo, as a draft", async () => {
     const { fetch, calls } = makeStub();
     await submitManagedPR(VALID_BODY, makeConfig(fetch));
     const prCall = calls.find((c) => c.url.endsWith("/pulls"));
+    expect(prCall!.url).toBe("https://api.github.com/repos/keyboard-studio/keyboards/pulls");
     const body = JSON.parse(prCall!.body!) as { head: string; base: string; draft: boolean };
     expect(body.head).toBe(`${ORG_LOGIN}:add/my_keyboard-abc1234`);
     expect(body.base).toBe("master");
     expect(body.draft).toBe(true);
+  });
+
+  it("targets the single staging repo for every call when orgLogin === UPSTREAM_OWNER (deployed same-repo model)", async () => {
+    const { fetch, calls } = makeStub();
+    const config: ManagedPRPipelineConfig = {
+      getInstallationToken: () => Promise.resolve(INSTALLATION_TOKEN),
+      orgLogin: UPSTREAM_OWNER,
+      fetch,
+    };
+    const result = await submitManagedPR(VALID_BODY, config);
+    expect(result.ok).toBe(true);
+    for (const c of calls) {
+      expect(c.url.startsWith(`https://api.github.com/repos/${UPSTREAM_OWNER}/keyboards`)).toBe(true);
+    }
+    const prCall = calls.find((c) => c.url.endsWith("/pulls") && c.method === "POST");
+    const body = JSON.parse(prCall!.body!) as { head: string };
+    expect(body.head).toBe(`${UPSTREAM_OWNER}:add/my_keyboard-abc1234`);
   });
 
   it("appends importAttribution to the PR body when supplied", async () => {
@@ -274,11 +288,10 @@ describe("submitManagedPR() -- success", () => {
     expect(body.body).toContain("Import attribution");
   });
 
-  it("creates the fork first when it does not yet exist (404 -> POST /forks)", async () => {
-    const { fetch, calls } = makeStub({ forkCheck: { ok: false, status: 404 } });
-    const result = await submitManagedPR(VALID_BODY, makeConfig(fetch));
-    expect(result.ok).toBe(true);
-    expect(calls.some((c) => c.url.endsWith("/forks") && c.method === "POST")).toBe(true);
+  it("never attempts to create a fork (no ensure-fork step under the same-repo model)", async () => {
+    const { fetch, calls } = makeStub();
+    await submitManagedPR(VALID_BODY, makeConfig(fetch));
+    expect(calls.some((c) => c.url.endsWith("/forks"))).toBe(false);
   });
 });
 
@@ -321,6 +334,16 @@ describe("submitManagedPR() -- error mapping", () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("unreachable");
     expect(result.retryAfterSeconds).toBe(60);
+  });
+
+  it("maps a missing staging repo (404 on the ref read) to 502 upstream_error, without a fork fallback", async () => {
+    const { fetch, calls } = makeStub({ masterRef: { ok: false, status: 404 } });
+    const result = await submitManagedPR(VALID_BODY, makeConfig(fetch));
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.status).toBe(502);
+    expect(result.error).toBe("upstream_error");
+    expect(calls.some((c) => c.url.endsWith("/forks"))).toBe(false);
   });
 
   it("maps an org-token 401 to a generic 502 submission_unavailable (no token detail)", async () => {
@@ -366,11 +389,11 @@ describe("submitManagedPR() -- error mapping", () => {
 // submitManagedPR -- org token never leaks into any returned result
 // ---------------------------------------------------------------------------
 
-describe("submitManagedPR() -- org token never leaks", () => {
+describe("submitManagedPR() -- installation token never leaks", () => {
   it("is absent from a success result", async () => {
     const { fetch } = makeStub();
     const result = await submitManagedPR(VALID_BODY, makeConfig(fetch));
-    expect(JSON.stringify(result)).not.toContain(ORG_TOKEN);
+    expect(JSON.stringify(result)).not.toContain(INSTALLATION_TOKEN);
   });
 
   it("is absent from every error result", async () => {
@@ -383,17 +406,17 @@ describe("submitManagedPR() -- org token never leaks", () => {
     for (const ov of failures) {
       const { fetch } = makeStub(ov);
       const result = await submitManagedPR(VALID_BODY, makeConfig(fetch));
-      expect(JSON.stringify(result)).not.toContain(ORG_TOKEN);
+      expect(JSON.stringify(result)).not.toContain(INSTALLATION_TOKEN);
     }
   });
 
-  it("sends the org token in the Authorization header to GitHub (and only there)", async () => {
+  it("sends the installation token in the Authorization header to GitHub (and only there)", async () => {
     // The token must reach GitHub but never the result; assert it is used as a
     // Bearer credential on the request, not echoed back.
     let sawAuth = false;
     const fetch: GitHubPipelineFetchFn = async (url, init) => {
       const auth = init?.headers?.["Authorization"];
-      if (auth === `Bearer ${ORG_TOKEN}`) sawAuth = true;
+      if (auth === `Bearer ${INSTALLATION_TOKEN}`) sawAuth = true;
       // Delegate to the happy-path stub behaviour.
       const { fetch: inner } = makeStub();
       return inner(url, init);
@@ -408,13 +431,13 @@ describe("submitManagedPR() -- org token never leaks", () => {
 // ---------------------------------------------------------------------------
 
 describe("submitManagedPR() -- stateless / no token persistence", () => {
-  it("never places the org token in any request body -- only the header", async () => {
+  it("never places the installation token in any request body -- only the header", async () => {
     const { fetch, calls } = makeStub();
     await submitManagedPR(VALID_BODY, makeConfig(fetch));
     // The token may appear in Authorization headers (not captured here) but
     // must never be serialised into a request body the pipeline sends.
     for (const c of calls) {
-      expect(c.body ?? "").not.toContain(ORG_TOKEN);
+      expect(c.body ?? "").not.toContain(INSTALLATION_TOKEN);
     }
   });
 
@@ -433,13 +456,13 @@ describe("submitManagedPR() -- stateless / no token persistence", () => {
     };
     const OTHER_TOKEN = "gho_A_COMPLETELY_DIFFERENT_TOKEN";
     await submitManagedPR(VALID_BODY, {
-      orgToken: OTHER_TOKEN,
+      getInstallationToken: () => Promise.resolve(OTHER_TOKEN),
       orgLogin: ORG_LOGIN,
       fetch: probe,
     });
     // The second call must authenticate with its own config token, proving no
     // token from the first call was retained anywhere in module state.
     expect(observedToken).toBe(`Bearer ${OTHER_TOKEN}`);
-    expect(observedToken).not.toContain(ORG_TOKEN);
+    expect(observedToken).not.toContain(INSTALLATION_TOKEN);
   });
 });

@@ -14,6 +14,7 @@
  */
 
 import type {
+  ClientDiscriminator,
   ExchangeBody,
   RefreshBody,
   TokenResponse,
@@ -75,10 +76,96 @@ export type HandlerResult = HandlerSuccess | HandlerError;
 // ---------------------------------------------------------------------------
 
 export interface HandlerConfig {
+  /** GitHub App user-to-server client ID (`Iv23…`). Used when `client === "github_app"` (default). */
   clientId: string;
   /** Never log, never include in responses. */
   clientSecret: string;
+  /**
+   * Classic OAuth App client ID (`Ov23…`). Used when `client === "oauth_app"`.
+   * Optional — if absent, any `oauth_app` exchange/refresh returns a 500
+   * `server_misconfigured` error. The default `github_app` flow continues to
+   * work normally when these are unset.
+   */
+  oauthClientId?: string;
+  /** Never log, never include in responses. */
+  oauthClientSecret?: string;
   fetch: OAuthFetchFn;
+}
+
+// ---------------------------------------------------------------------------
+// Private helper: resolve credential pair from config + discriminator
+// ---------------------------------------------------------------------------
+
+/**
+ * Return the `{ client_id, client_secret }` pair that corresponds to the
+ * requested `client` discriminator, or a `HandlerError` if the requested
+ * pair is not configured.
+ *
+ * The `github_app` pair is always required (startup validation ensures it).
+ * The `oauth_app` pair is optional — absent config yields 500
+ * `server_misconfigured` so the operator sees a clear signal on first use
+ * rather than a confusing GitHub error about bad credentials.
+ */
+function resolveCredentials(
+  client: ClientDiscriminator | undefined,
+  config: HandlerConfig
+): { client_id: string; client_secret: string } | HandlerError {
+  if ((client ?? "github_app") === "oauth_app") {
+    if (
+      config.oauthClientId === undefined ||
+      config.oauthClientId === "" ||
+      config.oauthClientSecret === undefined ||
+      config.oauthClientSecret === ""
+    ) {
+      // Operator has not configured the OAuth App credentials.
+      // Return a 500 — this is a server-side misconfiguration, not a client error.
+      return {
+        ok: false,
+        status: 500,
+        error: "server_misconfigured",
+      };
+    }
+    return {
+      client_id: config.oauthClientId,
+      client_secret: config.oauthClientSecret,
+    };
+  }
+  // Default: github_app
+  return {
+    client_id: config.clientId,
+    client_secret: config.clientSecret,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Private helper: safe fetch with error mapping
+// ---------------------------------------------------------------------------
+
+/**
+ * Wrap a fetch call with consistent error mapping. Consolidates the
+ * network/parse/non-ok response handling that is identical across all
+ * OAuth endpoints.
+ */
+async function safeFetch(
+  fetchFn: OAuthFetchFn,
+  url: string,
+  init: { method: string; headers: Record<string, string>; body?: string }
+): Promise<{ response: OAuthFetchResponse; data: unknown } | HandlerError> {
+  let response: OAuthFetchResponse;
+  try {
+    response = await fetchFn(url, init);
+  } catch {
+    return { ok: false, status: 502, error: "upstream_unavailable" };
+  }
+
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    return { ok: false, status: 502, error: "upstream_invalid_response" };
+  }
+
+  return { response, data };
 }
 
 // ---------------------------------------------------------------------------
@@ -102,55 +189,44 @@ async function callGitHubTokenEndpoint(
   payload: Record<string, string>,
   config: HandlerConfig
 ): Promise<HandlerResult> {
-  let ghResponse: OAuthFetchResponse;
-  try {
-    ghResponse = await config.fetch(
-      "https://github.com/login/oauth/access_token",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(payload),
-      }
-    );
-  } catch {
-    // Network-level error — do not propagate internal details
-    return { ok: false, status: 502, error: "upstream_unavailable" };
-  }
+  const result = await safeFetch(config.fetch, "https://github.com/login/oauth/access_token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
 
-  let data: GitHubTokenResponseShape;
-  try {
-    data = (await ghResponse.json()) as GitHubTokenResponseShape;
-  } catch {
-    return { ok: false, status: 502, error: "upstream_invalid_response" };
-  }
+  if ("error" in result) return result;
+
+  const { response, data } = result;
+  const ghData = data as GitHubTokenResponseShape;
 
   // Upstream 4xx/5xx with no error field in the body → gateway error, not a
   // client error.  GitHub 429 (rate-limit) and 5xx (server error) fall here.
-  if (!ghResponse.ok && data.error === undefined) {
+  if (!response.ok && ghData.error === undefined) {
     return { ok: false, status: 502, error: "upstream_error" };
   }
 
-  if (data.error !== undefined || data.access_token === undefined) {
+  if (ghData.error !== undefined || ghData.access_token === undefined) {
     return {
       ok: false,
       status: 400,
-      error: safeErrorCode(data.error),
+      error: safeErrorCode(ghData.error),
     };
   }
 
   const tokenResponse: TokenResponse = {
-    access_token: data.access_token,
-    token_type: data.token_type ?? "bearer",
-    scope: data.scope ?? "",
+    access_token: ghData.access_token,
+    token_type: ghData.token_type ?? "bearer",
+    scope: ghData.scope ?? "",
   };
   // Forward a rotated refresh token when GitHub issues one (GitHub Apps with
   // token expiration enabled).  A refresh token is not the client secret —
   // the client secret is never present in any response.
-  if (data.refresh_token !== undefined) {
-    tokenResponse.refresh_token = data.refresh_token;
+  if (ghData.refresh_token !== undefined) {
+    tokenResponse.refresh_token = ghData.refresh_token;
   }
 
   return { ok: true, data: tokenResponse };
@@ -175,9 +251,12 @@ export async function exchange(
   body: ExchangeBody,
   config: HandlerConfig
 ): Promise<HandlerResult> {
+  const credentials = resolveCredentials(body.client, config);
+  if ("error" in credentials) return credentials;
+
   const payload: Record<string, string> = {
-    client_id: config.clientId,
-    client_secret: config.clientSecret,
+    client_id: credentials.client_id,
+    client_secret: credentials.client_secret,
     code: body.code,
   };
   if (body.code_verifier !== undefined) payload["code_verifier"] = body.code_verifier;
@@ -204,9 +283,12 @@ export async function refresh(
   body: RefreshBody,
   config: HandlerConfig
 ): Promise<HandlerResult> {
+  const credentials = resolveCredentials(body.client, config);
+  if ("error" in credentials) return credentials;
+
   const payload: Record<string, string> = {
-    client_id: config.clientId,
-    client_secret: config.clientSecret,
+    client_id: credentials.client_id,
+    client_secret: credentials.client_secret,
     grant_type: "refresh_token",
     refresh_token: body.refresh_token,
   };

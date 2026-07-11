@@ -1,0 +1,90 @@
+[
+  {
+    "id": "parse-01",
+    "file": "packages/engine/src/codec/parse.ts",
+    "lines": "221-224",
+    "type": "reuse",
+    "severity": "safe-auto",
+    "summary": "parseUse re-implements makeStoreParser exactly",
+    "suggestion": "Replace the parseUse function body with `const parseUse = makeStoreParser(\"use\");` alongside parseAny/parseNotAny/parseOuts.",
+    "confidence": 0.95,
+    "rationale": "makeStoreParser builds `^${keyword}\\s*\\(\\s*(${KMN_IDENT})\\s*\\)$` (case-insensitive) and returns `m ? (m[1] ?? null) : null`. parseUse constructs the byte-identical regex and returns the byte-identical expression, so it is a hand-inlined copy of makeStoreParser(\"use\"). Reusing the factory also removes the per-call `new RegExp` allocation. No /g flag; behavior identical."
+  },
+  {
+    "id": "parse-02",
+    "file": "packages/engine/src/codec/parse.ts",
+    "lines": "157-160",
+    "type": "efficiency",
+    "summary": "KNOWN_MODIFIERS Set rebuilt on every parseVkeyBracket call",
+    "severity": "safe-auto",
+    "suggestion": "Hoist the KNOWN_MODIFIERS Set to a module-scope const; parseVkeyBracket only reads it.",
+    "confidence": 0.9,
+    "rationale": "parseVkeyBracket runs for every [..] bracket token across context/store/output parsing, and each call allocates a fresh 10-element Set. The set is static and read-only, so a single module-scope Set is equivalent. No state, no /g concern."
+  },
+  {
+    "id": "parse-03",
+    "file": "packages/engine/src/codec/parse.ts",
+    "lines": "197-201",
+    "type": "efficiency",
+    "summary": "parseIndex builds a new RegExp on every call",
+    "severity": "safe-auto",
+    "suggestion": "Compile the index regex once into a module-scope const (KMN_IDENT is already a module const) and reference it inside parseIndex.",
+    "confidence": 0.88,
+    "rationale": "The pattern interpolates only the constant KMN_IDENT, so it is invariant across calls; recompiling it per token is wasted work. The regex has no /g flag and .exec is used non-cumulatively, so hoisting is safe (matches the makeStoreParser pattern already used for any/notany/outs)."
+  },
+  {
+    "id": "parse-04",
+    "file": "packages/engine/src/codec/parse.ts",
+    "lines": "616-644",
+    "type": "efficiency",
+    "summary": "parseStoreLine/parseGroupLine/parseBeginLine recompile new RegExp each call",
+    "severity": "needs-human",
+    "suggestion": "Hoist each of the three `new RegExp(...)` (store, group, begin line matchers) to module-scope consts; all interpolate only the constant KMN_IDENT.",
+    "confidence": 0.8,
+    "rationale": "Each patterns is invariant (only KMN_IDENT interpolated) and none use /g, so a single compiled instance per pattern is behavior-preserving. Lower call frequency than parse-02/03 (once per store/group/begin line), hence needs-human rather than a slam-dunk, but genuine redundant recompilation."
+  },
+  {
+    "id": "parse-05",
+    "file": "packages/engine/src/codec/parse.ts",
+    "lines": "164-166",
+    "type": "simplification",
+    "summary": "p.toUpperCase() computed twice per modifier part",
+    "severity": "safe-auto",
+    "suggestion": "Compute `const up = p.toUpperCase();` once, then test `KNOWN_MODIFIERS.has(up)` and push `up`.",
+    "confidence": 0.85,
+    "rationale": "Inside parseVkeyBracket the loop calls p.toUpperCase() for the membership test and again for the push. Caching the single result is a pure micro-cleanup with identical output."
+  },
+  {
+    "id": "parse-06",
+    "file": "packages/engine/src/codec/parse.ts",
+    "lines": "736-740",
+    "type": "simplification",
+    "summary": "Stale comment references a non-existent closure",
+    "severity": "safe-auto",
+    "suggestion": "Drop/trim the 'Store the encoding string ... Use a local variable captured by the closure below.' comment — beginEncoding is assigned directly, there is no closure.",
+    "confidence": 0.8,
+    "rationale": "The code assigns `beginEncoding = parsed.encoding` inline; no closure captures it. The comment describes an earlier design and is now misleading. Comment-only, behavior-preserving."
+  },
+  {
+    "id": "parse-07",
+    "file": "packages/engine/src/codec/parse.ts",
+    "lines": "284-292",
+    "type": "simplification",
+    "summary": "if/save-set-reset/call-return opaque-directive classification duplicated across three parsers",
+    "severity": "needs-human",
+    "suggestion": "Extract a helper `directiveOpaqueReason(tok): OpaqueReason | null` returning IF_OPTION_STORE / OPTION_STORE_DIRECTIVE / CALL_RETURN, and call it from parseStoreItems, parseContextElements, and the strict branch of parseOutputElementsCore.",
+    "confidence": 0.6,
+    "rationale": "The same three regex tests (`/^if\\s*\\(/i`, `/^(?:save|set|reset)\\s*\\(/i`, `/^call\\s*\\(/i` || `/^return$/i`) mapping to the same three OPAQUE_REASONS appear verbatim in all three functions. Consolidating removes the copy-paste. Marked needs-human because the output-core branch also emits a {kind:'raw'} element in lenient mode, so the extraction must preserve the strict-vs-lenient divergence per call site."
+  },
+  {
+    "id": "parse-08",
+    "file": "packages/engine/src/codec/parse.ts",
+    "lines": "884-904",
+    "type": "efficiency",
+    "severity": "needs-human",
+    "summary": "splitTokens(parsedLine.outputRaw) is recomputed at line 904 though outToks was already computed at line 885.",
+    "suggestion": "Hoist outToks above the ctxElements check (or reuse the existing binding) so the opaque produced-output sketch at line 904 reuses it instead of re-splitting the same string.",
+    "confidence": 0.5,
+    "rationale": "When ctxElements!==null but outElements===null, outToks (line 885) and the re-split at line 904 are the identical pure computation over the same string, so reusing the first result is byte-identical. Needs-human because outToks is currently scoped inside the ctxElements!==null block and a small restructure is required to reuse it safely."
+  }
+]

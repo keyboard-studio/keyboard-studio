@@ -17,17 +17,26 @@ interface RemovedMenuProps {
   onClose: () => void;
 }
 
+const backdrop: React.CSSProperties = { position: 'fixed', inset: 0, zIndex: 40 };
+const menuPanel: React.CSSProperties = {
+  position: 'absolute', top: 'calc(100% + 10px)', right: 0, zIndex: 41,
+  width: 400, maxWidth: '92vw',
+  background: 'var(--app-surface)', border: '1px solid var(--app-border-strong)',
+  borderRadius: 12, boxShadow: '0 16px 44px rgba(20,40,80,.18)', overflow: 'hidden',
+};
+const menuHeader: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+  gap: 10, padding: '11px 13px', borderBottom: '1px solid var(--app-border)',
+};
+const menuScroll: React.CSSProperties = { maxHeight: 340, overflowY: 'auto', padding: 6 };
+const menuRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px' };
+
 function RemovedMenu({ list, onRestore, onRestoreAll, onClose }: RemovedMenuProps) {
   return (
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-      <div style={{
-        position: 'absolute', top: 'calc(100% + 10px)', right: 0, zIndex: 41,
-        width: 400, maxWidth: '92vw',
-        background: 'var(--app-surface)', border: '1px solid var(--app-border-strong)',
-        borderRadius: 12, boxShadow: '0 16px 44px rgba(20,40,80,.18)', overflow: 'hidden',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 13px', borderBottom: '1px solid var(--app-border)' }}>
+      <div onClick={onClose} style={backdrop} />
+      <div style={menuPanel}>
+        <div style={menuHeader}>
           <span style={{ font: '600 11px/1 var(--app-font)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--app-text-subtle)' }}>
             Removed · {list.length}
           </span>
@@ -35,9 +44,9 @@ function RemovedMenu({ list, onRestore, onRestoreAll, onClose }: RemovedMenuProp
             <UndoIcon size={13} /> Restore all
           </button>
         </div>
-        <div style={{ maxHeight: 340, overflowY: 'auto', padding: 6 }}>
+        <div style={menuScroll}>
           {list.map((it) => (
-            <div key={it.type + ':' + it.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px' }}>
+            <div key={it.type + ':' + it.id} style={menuRow}>
               {it.type === 'node' ? (
                 <>
                   <KindBadge kind={it.kind} />
@@ -85,11 +94,14 @@ export function StatusBar({ kept, total, removedList, onRestore, onRestoreAll }:
   const setInfo = useHoverInfoStore((s) => s.setInfo);
   const clearInfo = useHoverInfoStore((s) => s.clearInfo);
 
+  const keptInfo = { kind: 'text' as const, title: 'Characters kept', body: 'How many characters you are keeping out of the total in this keyboard.' };
+  const removedInfo = { kind: 'text' as const, title: 'Removed items', body: 'Open this to see what you removed and restore anything you change your mind about.' };
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '12px 22px', borderBottom: '1px solid var(--app-border)', background: 'var(--app-surface)' }}>
       <div
-        onMouseEnter={() => setInfo({ kind: 'text', title: 'Characters kept', body: 'How many characters you are keeping out of the total in this keyboard.' })}
-        onFocus={() => setInfo({ kind: 'text', title: 'Characters kept', body: 'How many characters you are keeping out of the total in this keyboard.' })}
+        onMouseEnter={() => setInfo(keptInfo)}
+        onFocus={() => setInfo(keptInfo)}
         onMouseLeave={clearInfo}
         onBlur={clearInfo}
       >
@@ -104,8 +116,8 @@ export function StatusBar({ kept, total, removedList, onRestore, onRestoreAll }:
         <button
           onClick={() => setOpen((o) => !o)}
           disabled={removedList.length === 0}
-          onMouseEnter={() => setInfo({ kind: 'text', title: 'Removed items', body: 'Open this to see what you removed and restore anything you change your mind about.' })}
-          onFocus={() => setInfo({ kind: 'text', title: 'Removed items', body: 'Open this to see what you removed and restore anything you change your mind about.' })}
+          onMouseEnter={() => setInfo(removedInfo)}
+          onFocus={() => setInfo(removedInfo)}
           onMouseLeave={clearInfo}
           onBlur={clearInfo}
           style={{

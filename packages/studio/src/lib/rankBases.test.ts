@@ -1,47 +1,55 @@
 // Pure unit tests for rankBases() — no DOM, no async.
 // Covers all 13 cases specified in the task brief.
-// Uses inline BaseKeyboard literals where fixtures lack sufficient variety.
 
 import { describe, it, expect } from "vitest";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
-import { basicKbdus, silEuroLatin, silDevanagariPhonetic } from "@keyboard-studio/contracts/fixtures";
+import {
+  makeBaseKeyboard,
+  basicKbdus,
+  silEuroLatin,
+  silDevanagariPhonetic,
+} from "@keyboard-studio/contracts/fixtures";
 import { rankBases } from "./rankBases";
 
-// ---------------------------------------------------------------------------
-// Inline factory — keeps literals small and clear
-// ---------------------------------------------------------------------------
+// Additional fixtures for test coverage beyond the standard three
 
-function mk(
-  id: string,
-  script: string,
-  displayName: string,
-  languages?: string[],
-): BaseKeyboard {
-  return {
-    id,
-    script,
-    path: `release/x/${id}`,
-    targets: ["windows"],
-    displayName,
-    version: "1.0",
-    ...(languages !== undefined ? { languages } : {}),
-  };
-}
+const hauseLatn = makeBaseKeyboard({
+  id: "hausa_latn",
+  script: "Latn",
+  path: "release/x/hausa_latn",
+  targets: ["windows"],
+  displayName: "Hausa Latin",
+  version: "1.0",
+  languages: ["ha", "ha-Latn"],
+});
 
-// Additional inline fixtures to achieve the variety the three sample fixtures
-// can't cover on their own.
+const bareLatin = makeBaseKeyboard({
+  id: "bare_latin",
+  script: "Latn",
+  path: "release/x/bare_latin",
+  targets: ["windows"],
+  displayName: "Bare Latin",
+  version: "1.0",
+});
 
-// A Latin keyboard that explicitly declares Hausa ("ha")
-const hauseLatn = mk("hausa_latn", "Latn", "Hausa Latin", ["ha", "ha-Latn"]);
+const arabicKbd = makeBaseKeyboard({
+  id: "arabic_101",
+  script: "Arab",
+  path: "release/x/arabic_101",
+  targets: ["windows"],
+  displayName: "Arabic 101",
+  version: "1.0",
+  languages: ["ar"],
+});
 
-// A plain Latin keyboard — no languages declared
-const bareLatin = mk("bare_latin", "Latn", "Bare Latin");
-
-// An Arabic keyboard
-const arabicKbd = mk("arabic_101", "Arab", "Arabic 101", ["ar"]);
-
-// A Cyrillic keyboard
-const cyrKbd = mk("cyrillic_ru", "Cyrl", "Cyrillic Russian", ["ru"]);
+const cyrKbd = makeBaseKeyboard({
+  id: "cyrillic_ru",
+  script: "Cyrl",
+  path: "release/x/cyrillic_ru",
+  targets: ["windows"],
+  displayName: "Cyrillic Russian",
+  version: "1.0",
+  languages: ["ru"],
+});
 
 // ---------------------------------------------------------------------------
 // 1. Empty query, no target → all bases, alphabetical by id
@@ -146,8 +154,22 @@ describe("rankBases — exact id query (queryTier 0)", () => {
   });
 
   it("exact id match has queryTier 0; prefix match has queryTier 2 — exact wins", () => {
-    const kbExact = mk("sil_test", "Latn", "SIL Test");
-    const kbPrefix = mk("sil_test_extended", "Latn", "SIL Test Extended");
+    const kbExact = makeBaseKeyboard({
+      id: "sil_test",
+      script: "Latn",
+      path: "release/x/sil_test",
+      targets: ["windows"],
+      displayName: "SIL Test",
+      version: "1.0",
+    });
+    const kbPrefix = makeBaseKeyboard({
+      id: "sil_test_extended",
+      script: "Latn",
+      path: "release/x/sil_test_extended",
+      targets: ["windows"],
+      displayName: "SIL Test Extended",
+      version: "1.0",
+    });
     const result = rankBases([kbPrefix, kbExact], "sil_test");
     expect(result[0]!.base.id).toBe("sil_test");
   });
@@ -179,7 +201,14 @@ describe("rankBases — exact script query (script floods top)", () => {
   it("exact-script matches (tier 0) rank before prefix/substring matches (tier 2+)", () => {
     // "bare_latin" id contains "latn" as substring (not prefix), queryTier 3
     // but script==="Latn" → queryTier 0 via scriptLc === q
-    const latnBase = mk("arab_with_latn_in_name", "Arab", "Arab Latn Named");
+    const latnBase = makeBaseKeyboard({
+      id: "arab_with_latn_in_name",
+      script: "Arab",
+      path: "release/x/arab_with_latn_in_name",
+      targets: ["windows"],
+      displayName: "Arab Latn Named",
+      version: "1.0",
+    });
     const result = rankBases([latnBase, bareLatin], "latn");
     // bareLatin has script Latn (exact) → tier 0
     // latnBase has "latn" in displayName → tier 3 (id/displayName substring)
@@ -196,7 +225,14 @@ describe("rankBases — exact language query (queryTier 1)", () => {
     // hauseLatn.languages includes "ha" — exact match → tier 1
     // arabicKbd has id "arabic_101", which doesn't contain "ha" → excluded
     // sylLatn: id contains "ha" somewhere in displayName → tier 3 (substring)
-    const sylHa = mk("syllabic_ha", "Latn", "Syllabic HA Keyboard"); // displayName has "HA"
+    const sylHa = makeBaseKeyboard({
+      id: "syllabic_ha",
+      script: "Latn",
+      path: "release/x/syllabic_ha",
+      targets: ["windows"],
+      displayName: "Syllabic HA Keyboard",
+      version: "1.0",
+    });
     const result = rankBases([sylHa, hauseLatn], "ha");
     expect(result[0]!.base.id).toBe("hausa_latn"); // tier 1 via language tag
   });
@@ -220,16 +256,44 @@ describe("rankBases — prefix beats substring", () => {
     // basicKbdus id = "basic_kbdus" — contains "ic" not "sil"... use displayName
     // "SIL Euro Latin" starts with "sil" (downcased) → tier 2
     // "US English (Basic)" does NOT start with "sil"
-    const usBasic = mk("us_basic_sil_variant", "Latn", "US Basic SIL variant"); // "sil" in middle → tier 3
-    const silFirst = mk("sil_xkb_de", "Latn", "SIL German"); // starts with "sil" → tier 2
+    const usBasic = makeBaseKeyboard({
+      id: "us_basic_sil_variant",
+      script: "Latn",
+      path: "release/x/us_basic_sil_variant",
+      targets: ["windows"],
+      displayName: "US Basic SIL variant",
+      version: "1.0",
+    });
+    const silFirst = makeBaseKeyboard({
+      id: "sil_xkb_de",
+      script: "Latn",
+      path: "release/x/sil_xkb_de",
+      targets: ["windows"],
+      displayName: "SIL German",
+      version: "1.0",
+    });
     const result = rankBases([usBasic, silFirst], "sil");
     expect(result[0]!.base.id).toBe("sil_xkb_de"); // tier 2 (prefix)
     expect(result[1]!.base.id).toBe("us_basic_sil_variant"); // tier 3 (substring)
   });
 
   it("id prefix beats displayName substring when both match", () => {
-    const prefixId = mk("basic_foo", "Latn", "Contains basic somewhere"); // id prefix
-    const substrDisplay = mk("xyz_bar", "Latn", "Some basic keyword"); // displayName has 'basic'
+    const prefixId = makeBaseKeyboard({
+      id: "basic_foo",
+      script: "Latn",
+      path: "release/x/basic_foo",
+      targets: ["windows"],
+      displayName: "Contains basic somewhere",
+      version: "1.0",
+    });
+    const substrDisplay = makeBaseKeyboard({
+      id: "xyz_bar",
+      script: "Latn",
+      path: "release/x/xyz_bar",
+      targets: ["windows"],
+      displayName: "Some basic keyword",
+      version: "1.0",
+    });
     // prefixId: idLc.startsWith("basic") → tier 2
     // substrDisplay: dnLc.includes("basic") → tier 3
     const result = rankBases([substrDisplay, prefixId], "basic");
@@ -261,7 +325,14 @@ describe("rankBases — target tie-break within a query tier", () => {
     // Both keyboards start with "sil" → queryTier 2
     // silDevanagariPhonetic: script Deva, lang hi → ctxTier 0 for hi-Deva target
     // bareDeva: script Deva, no lang declared → ctxTier 1
-    const bareDeva = mk("sil_deva_other", "Deva", "SIL Deva Other");
+    const bareDeva = makeBaseKeyboard({
+      id: "sil_deva_other",
+      script: "Deva",
+      path: "release/x/sil_deva_other",
+      targets: ["windows"],
+      displayName: "SIL Deva Other",
+      version: "1.0",
+    });
     const result = rankBases(
       [bareDeva, silDevanagariPhonetic],
       "sil",
@@ -314,7 +385,15 @@ describe("rankBases — matchRanges", () => {
     // query = "deva" matches silDevanagariPhonetic's script ("Deva") as substring
     // but id = "sil_devanagari_phonetic" also contains "deva" → actually tier 3!
     // So test with a base where ONLY the script/lang matches.
-    const pureScriptBase = mk("zebra_kbd", "Arab", "Zebra Keyboard", ["ar"]);
+    const pureScriptBase = makeBaseKeyboard({
+      id: "zebra_kbd",
+      script: "Arab",
+      path: "release/x/zebra_kbd",
+      targets: ["windows"],
+      displayName: "Zebra Keyboard",
+      version: "1.0",
+      languages: ["ar"],
+    });
     const result = rankBases([pureScriptBase], "arab");
     expect(result).toHaveLength(1);
     // "arab" is in id? "zebra_kbd" no. displayName "Zebra Keyboard" no.

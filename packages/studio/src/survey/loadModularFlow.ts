@@ -10,6 +10,7 @@
 // The thin YAML shape:
 //   flow_id:  <string>
 //   phase:    <"A" | "B" | ... | "G">
+//   status:   <"live" | "proposed">         # optional, default "live" (spec 025)
 //   questions:            [id1, id2, ...]
 //   provenance_questions: [id1, id2, ...]   # optional
 //
@@ -26,9 +27,19 @@ import { VALID_PHASES } from "./constants.ts";
 // Thin YAML shape
 // ---------------------------------------------------------------------------
 
+/** Flow lifecycle status (spec 025, D6). "proposed" flows do not run in the live
+ *  survey; they render as ordered graphs in the Flow Map's Library section. */
+export type FlowStatus = "live" | "proposed";
+
 export interface ThinFlowYaml {
   flow_id: string;
   phase: string;
+  /**
+   * spec 025. NON-optional here on purpose: the parser NORMALISES the absent case,
+   * so the returned object always carries a status. The YAML *field* is optional —
+   * absent means "live" — and parseThinYaml fills that default.
+   */
+  status: FlowStatus;
   questions: string[];
   provenance_questions?: string[] | undefined;
 }
@@ -51,6 +62,16 @@ export function parseThinYaml(raw: string): ThinFlowYaml {
   }
   if (typeof p["phase"] !== "string" || !VALID_PHASES.has(p["phase"])) {
     throw new Error(`loadModularFlow: missing or unknown phase (got ${String(p["phase"])})`);
+  }
+  // spec 025: optional `status` — default "live"; only "live"/"proposed" are valid.
+  let status: FlowStatus = "live";
+  if (p["status"] !== undefined) {
+    if (p["status"] !== "live" && p["status"] !== "proposed") {
+      throw new Error(
+        `loadModularFlow: status must be "live" or "proposed" if present (got ${String(p["status"])})`,
+      );
+    }
+    status = p["status"];
   }
   if (!Array.isArray(p["questions"])) {
     throw new Error("loadModularFlow: questions must be an array");
@@ -76,6 +97,7 @@ export function parseThinYaml(raw: string): ThinFlowYaml {
   return {
     flow_id: p["flow_id"] as string,
     phase: p["phase"] as string,
+    status,
     questions: p["questions"] as string[],
     provenance_questions: p["provenance_questions"] as string[] | undefined,
   };
@@ -93,7 +115,7 @@ function resolveIds(ids: string[]): FlowDef["questions"] {
   }
   return ids.map((id) => {
     const mod = questionRegistry[id];
-    if (mod === undefined) {
+    if (!mod) {
       throw new Error(
         `loadModularFlow: question ID "${id}" not found in registry. ` +
           `Add it to packages/studio/src/survey/questions/registry.ts.`,
@@ -118,13 +140,10 @@ export function loadModularFlow(raw: string): FlowDef {
       ? resolveIds(thin.provenance_questions)
       : undefined;
 
-  const result: FlowDef = {
+  return {
     flow_id: thin.flow_id,
     phase: thin.phase,
     questions,
-    ...(provenanceQuestions !== undefined
-      ? { provenance_questions: provenanceQuestions }
-      : {}),
+    ...(provenanceQuestions && { provenance_questions: provenanceQuestions }),
   };
-  return result;
 }

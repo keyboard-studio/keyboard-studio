@@ -6,7 +6,7 @@
 //
 // Test-support module (imported only by *.test.ts); no runtime/app import.
 
-import phaseAModularRaw from "../../../../../content/flows/phase_a_identity.modular.yaml?raw";
+import phaseAModularRaw from "../../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
 import { loadModularFlow } from "../loadModularFlow.ts";
 
 const flow = loadModularFlow(phaseAModularRaw);

@@ -12,11 +12,14 @@ Package manager is **pnpm 9** (Node ≥ 20). Run from the repo root unless noted
 | Build everything | `pnpm build` (runs `prebuild` first — see below) |
 | Typecheck | `pnpm typecheck` |
 | Test everything | `pnpm test` (`pnpm -r test` → each package's vitest) |
-| Lint / format | `pnpm lint` (ESLint over `packages/*/src`, then `pnpm depcruise`, then `pnpm crew-lint` ([utilities/crew-lint/index.js](utilities/crew-lint/index.js) — 7 checks over `.claude/**/km-*` crew files; also run by `pnpm lint`), then `pnpm run facet-lint` (plain-node checker over `content/facets/**` records; also run by `pnpm lint`)) · `pnpm format` (Prettier) |
+| Lint / format | `pnpm lint` (ESLint over `packages/*/src`, then `pnpm depcruise`, then `pnpm crew-lint` (see the Crew-file consistency row below), then `pnpm run facet-lint` ([utilities/facet-lint/index.js](utilities/facet-lint/index.js) — plain-node checker over `content/facets/**` records)) · `pnpm format` (Prettier) |
 | Architecture boundaries | `pnpm depcruise` (dependency-cruiser fitness functions — cross-package layering/team-split/dependency-root rules in [.dependency-cruiser.cjs](.dependency-cruiser.cjs); also run by `pnpm lint`) |
+| Crew-file consistency | `pnpm crew-lint` ([utilities/crew-lint/index.js](utilities/crew-lint/index.js) — 7 machine-enforced checks over `.claude/**/km-*` crew files: no python fences, no emoji, no phantom package paths, no line-number self-refs in km-triage.md, km-qc rubric agreement, roster consistency, sentinel spelling; the full check list is documented in [.claude/agents/km-README.md](.claude/agents/km-README.md); also run by `pnpm lint`) |
 | Run the studio SPA | `pnpm dev` (builds `engine`, then runs `engine` watch + `studio` Vite dev server) |
 
-**`prebuild` is not optional for a clean checkout.** `pnpm build` runs it automatically, but a bare `tsc -b` inside a package will fail without it. It does two codegen/fetch steps, both producing build artifacts you should regenerate rather than hand-edit:
+**`prebuild` is not optional for a clean checkout.** `pnpm build` runs it automatically, but a bare `tsc -b` inside a package will fail without it. It does three codegen/fetch steps, all producing build artifacts you should regenerate rather than hand-edit:
+- `fetch-langtags` downloads the pinned SIL `langtags.json` (MIT; SHA-256 pinned in [scripts/langtags-version.json](scripts/langtags-version.json); raw file gitignored under `packages/engine/data/langtags/`).
+- `codegen-langtags` derives the slim lookup index into `packages/engine/src/langtags/generated/` from the downloaded data.
 - `fetch-kmcmplib` downloads the pinned `kmcmplib.wasm` into `packages/compiler/wasm/` (SHA-256 pinned in `scripts/kmcmplib-version.json`). Set `KEYBOARD_STUDIO_KMCMPLIB_SOURCE=dev` to build it from a sibling `../keyman` checkout instead of downloading.
 - `compile-recognizer-rules` codegens `content/recognizer-rules/*.yaml` → `packages/engine/src/recognizer/rules/generated/*.ts`.
 
@@ -34,7 +37,7 @@ Package manager is **pnpm 9** (Node ≥ 20). Run from the repo root unless noted
 **Day-1 contract is locked and the engine + studio are now built out** (this supersedes the earlier "contracts only" status). Packages under `packages/*`:
 
 - **`@keyboard-studio/contracts`** — the locked Day-1 shared contract: TS types, the seven service interfaces + mocks, fixtures, the criteria catalog at `packages/contracts/data/criteria.json` (148 rows — 133 repo-hygiene + 12 §18 DISCUS design-heuristic at Day-1 lock, plus post-lock additions; see spec §11 and [docs/discus-principles-integration.md](docs/discus-principles-integration.md)), and the runtime **zod schemas** (`src/schemas.ts`) that mirror the locked `Pattern`/`Criterion` types. The dependency root — everything else builds to it.
-- **`@keyboard-studio/engine`** — the real engine. Subsystems under `packages/engine/src/`: `codec` (.kmn ↔ KeyboardIR), `scaffolder`, `output` (VirtualFS → zip), `validator`, `compiler` (kmcmplib wrapper), `simulator`, `recognizer` (+ generated rules), `pattern-apply`, `pattern-library`, `strategy-selector`, `character-discovery`, `inventory`, `loader`, `base-browser`, `stub-mutator`.
+- **`@keyboard-studio/engine`** — the real engine. Subsystems under `packages/engine/src/`: `codec` (.kmn ↔ KeyboardIR), `scaffolder`, `output` (VirtualFS → zip), `validator`, `compiler` (kmcmplib wrapper), `simulator`, `recognizer` (+ generated rules), `pattern-apply`, `pattern-library`, `strategy-selector`, `character-discovery`, `inventory`, `loader`, `base-browser`, `stub-mutator`, `langtags` (SIL langtags slim-index lookup; exposed as `@keyboard-studio/engine/langtags`).
 - **`@keymanapp/keyboard-lint`** — Layer C hygiene lint engine (`lintEngine.ts`, `checks/`, `parsers/`).
 - **`@keyboard-studio/llm`** — pluggable LLM client (`backends/`) for prompt-driven assistance.
 - **`@keyboard-studio/studio`** — the React + Vite SPA (three-pane gallery / editor / preview; working-copy spine).
@@ -77,7 +80,7 @@ The spec embeds external docs by reference (Sec 19): `docs/KM-Questionnaire.md`,
 - **Single 300 ms debounce cycle (decision D3).** In the studio, the TS-check and the WASM `kmcmplib` oracle run as concurrent microtasks within one debounce cycle. Do not introduce a second debounce timer.
 - **Virtual FS (spec §11).** All authoring happens in an in-memory FS mirroring the `keymanapp/keyboards` layout; serialized at output to a `.zip` (`engine/src/output`) or committed via GitHub OAuth fork+PR. The studio never writes to host disk during authoring.
 - **Two teams (spec §12).** Engine owns the SPA, scaffolder, compiler service, validator, output paths. Content owns the pattern library, survey text, gallery ordering, LLM prompts, and criteria triage. Respect the split when picking up work.
-- **Standalone utilities.** `utilities/*` (kbgen, supportability-scanner, smoke-artifact, spec-trace, km-triage-app, Template Cleanup) are deliberately kept out of `packages/*` so they don't trip `pnpm -r`; run them with `tsx` (see each tool's tsconfig). Do not treat them as built workspace packages.
+- **Standalone utilities.** `utilities/*` (kbgen, supportability-scanner, smoke-artifact, spec-trace, km-triage-app, hermes, Template Cleanup) are deliberately kept out of `packages/*` so they don't trip `pnpm -r`; run them with `tsx` (see each tool's tsconfig). Do not treat them as built workspace packages.
 
 ## Pattern schema is a contract
 
@@ -97,7 +100,7 @@ Spec Sec 16. CJK and Ethiopic reorder patterns, LDML output, mobile-app integrat
 
 ## KM crew
 
-The KM crew is a specialist pipeline coordinated by **`/km-lead`**. Agent definitions live in `.claude/agents/km-*.md`; slash-command entry points live in `.claude/commands/km-*.md`.
+The KM crew is a specialist pipeline coordinated by **`/km-lead`**. Agent definitions live in `.claude/agents/km-*.md`; slash-command entry points live in `.claude/commands/km-*.md`. **Crew-file edits are gated by `pnpm crew-lint`** (see the commands table) — run it after touching any `.claude/**/km-*` file; the drift classes it catches (rubric forks, phantom paths, emoji, rotted line refs, sentinel misspellings) have all shipped before.
 
 ### The one skill: `/km-lead`
 

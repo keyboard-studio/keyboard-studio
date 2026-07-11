@@ -8,9 +8,11 @@
     "node": ">=20"
   },
   "scripts": {
+    "fetch-langtags": "node scripts/fetch-langtags.mjs",
+    "codegen-langtags": "node scripts/codegen-langtags.mjs",
     "fetch-kmcmplib": "node scripts/fetch-kmcmplib.mjs",
     "compile-recognizer-rules": "node scripts/compile-recognizer-rules.mjs",
-    "prebuild": "pnpm run fetch-kmcmplib && pnpm run compile-recognizer-rules",
+    "prebuild": "pnpm run fetch-langtags && pnpm run codegen-langtags && pnpm run fetch-kmcmplib && pnpm run compile-recognizer-rules",
     "build": "pnpm -r build",
     "dev": "pnpm --filter @keyboard-studio/engine build && pnpm --parallel --stream --filter @keyboard-studio/engine --filter @keyboard-studio/studio run dev",
     "test": "pnpm -r test",

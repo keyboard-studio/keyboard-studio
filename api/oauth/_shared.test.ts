@@ -29,6 +29,22 @@ function stubConfig(
   };
 }
 
+function stubConfigWithOAuth(
+  ghResponse: { ok: boolean; status: number; body: unknown },
+): HandlerConfig {
+  return {
+    clientId: "app-client-id",
+    clientSecret: "app-client-secret",
+    oauthClientId: "oauth-client-id",
+    oauthClientSecret: "oauth-client-secret",
+    fetch: async () => ({
+      ok: ghResponse.ok,
+      status: ghResponse.status,
+      json: () => Promise.resolve(ghResponse.body),
+    }),
+  };
+}
+
 function postReq(body: unknown): Request {
   return new Request("https://app.example/oauth/exchange", {
     method: "POST",
@@ -87,6 +103,60 @@ describe("runTokenHandler — HTTP glue", () => {
   });
 });
 
+describe("runTokenHandler — client discriminator", () => {
+  it("routes to github_app pair when client field is absent", async () => {
+    // The stub config carries both pairs; we verify the correct client_id
+    // reaches the GitHub fetch by capturing it via a custom fetch stub.
+    const captured: { body?: unknown } = {};
+    const config: HandlerConfig = {
+      clientId: "app-cid",
+      clientSecret: "app-csecret",
+      oauthClientId: "oauth-cid",
+      oauthClientSecret: "oauth-csecret",
+      fetch: async (_url, init) => {
+        captured.body = JSON.parse(init?.body ?? "{}") as unknown;
+        return { ok: true, status: 200, json: () => Promise.resolve({ access_token: "gho_app", token_type: "bearer", scope: "" }) };
+      },
+    };
+    const res = await runTokenHandler(postReq({ code: "abc" }), ExchangeBodySchema, exchangeCore, config);
+    expect(res.status).toBe(200);
+    expect((captured.body as Record<string, unknown>)["client_id"]).toBe("app-cid");
+  });
+
+  it("routes to oauth_app pair when client='oauth_app'", async () => {
+    const captured: { body?: unknown } = {};
+    const config: HandlerConfig = {
+      clientId: "app-cid",
+      clientSecret: "app-csecret",
+      oauthClientId: "oauth-cid",
+      oauthClientSecret: "oauth-csecret",
+      fetch: async (_url, init) => {
+        captured.body = JSON.parse(init?.body ?? "{}") as unknown;
+        return { ok: true, status: 200, json: () => Promise.resolve({ access_token: "gho_oauth", token_type: "bearer", scope: "public_repo" }) };
+      },
+    };
+    const res = await runTokenHandler(postReq({ code: "abc", client: "oauth_app" }), ExchangeBodySchema, exchangeCore, config);
+    expect(res.status).toBe(200);
+    expect((captured.body as Record<string, unknown>)["client_id"]).toBe("oauth-cid");
+  });
+
+  it("returns 500 server_misconfigured when oauth_app requested but pair not configured", async () => {
+    // stubConfigWithOAuth is used here — config has no OAuth pair
+    const config = stubConfig({ ok: true, status: 200, body: { access_token: "gho_app", token_type: "bearer", scope: "" } });
+    // config has no oauthClientId/oauthClientSecret
+    const res = await runTokenHandler(postReq({ code: "abc", client: "oauth_app" }), ExchangeBodySchema, exchangeCore, config);
+    expect(res.status).toBe(500);
+    expect((await res.json() as { error: string }).error).toBe("server_misconfigured");
+  });
+
+  it("returns 400 invalid_request when client has an unknown value", async () => {
+    const config = stubConfigWithOAuth({ ok: true, status: 200, body: {} });
+    const res = await runTokenHandler(postReq({ code: "abc", client: "not_valid" }), ExchangeBodySchema, exchangeCore, config);
+    expect(res.status).toBe(400);
+    expect((await res.json() as { error: string }).error).toBe("invalid_request");
+  });
+});
+
 describe("envConfig", () => {
   it("throws when GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET are unset", () => {
     const prevId = process.env["GITHUB_CLIENT_ID"];
@@ -109,5 +179,32 @@ describe("envConfig", () => {
     expect(cfg.clientId).toBe("id");
     expect(cfg.clientSecret).toBe("secret");
     expect(cfg.fetch).toBe(stub);
+  });
+
+  it("includes oauthClientId/oauthClientSecret when OAuth pair env vars are set", () => {
+    process.env["GITHUB_CLIENT_ID"] = "id";
+    process.env["GITHUB_CLIENT_SECRET"] = "secret";
+    process.env["GITHUB_OAUTH_CLIENT_ID"] = "oauth-id";
+    process.env["GITHUB_OAUTH_CLIENT_SECRET"] = "oauth-secret";
+    try {
+      const stub = async () => ({ ok: true, status: 200, json: () => Promise.resolve({}) });
+      const cfg = envConfig(stub);
+      expect(cfg.oauthClientId).toBe("oauth-id");
+      expect(cfg.oauthClientSecret).toBe("oauth-secret");
+    } finally {
+      delete process.env["GITHUB_OAUTH_CLIENT_ID"];
+      delete process.env["GITHUB_OAUTH_CLIENT_SECRET"];
+    }
+  });
+
+  it("omits oauthClientId/oauthClientSecret when OAuth pair env vars are absent", () => {
+    process.env["GITHUB_CLIENT_ID"] = "id";
+    process.env["GITHUB_CLIENT_SECRET"] = "secret";
+    delete process.env["GITHUB_OAUTH_CLIENT_ID"];
+    delete process.env["GITHUB_OAUTH_CLIENT_SECRET"];
+    const stub = async () => ({ ok: true, status: 200, json: () => Promise.resolve({}) });
+    const cfg = envConfig(stub);
+    expect(cfg.oauthClientId).toBeUndefined();
+    expect(cfg.oauthClientSecret).toBeUndefined();
   });
 });

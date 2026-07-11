@@ -24,7 +24,7 @@ describe("isOskEvent — valid OskEvent shapes", () => {
     expect(isOskEvent({ type: "KEY_TAPPED", keyId: "K_A" })).toBe(true);
   });
 
-  it("accepts KEY_TAPPED with an empty keyId string (type guard only checks the type field)", () => {
+  it("accepts KEY_TAPPED with an empty keyId", () => {
     expect(isOskEvent({ type: "KEY_TAPPED", keyId: "" })).toBe(true);
   });
 });

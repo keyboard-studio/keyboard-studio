@@ -1,10 +1,18 @@
-// Integration test: PhaseProjectName with the REAL SurveyRunner.
+// Integration test: ProjectNameStepFactoryComponent with the REAL SurveyRunner.
 //
-// Asserts the displayName→slug seed chain:
+// spec 029 (full convergence, Option A): PhaseProjectName wrapper deleted;
+// this test re-pointed at ProjectNameStepFactoryComponent from
+// editors/adapters/flowStepOptions.tsx. All assertions are PRESERVED.
+//
+// The factory reads defaultDisplayName from surveySessionStore.identityResult
+// (autonym or english). Tests set identityResult in the store before rendering
+// rather than passing a defaultDisplayName prop.
+//
+// Asserts the displayName->slug seed chain:
 //   1. project_display_name renders with the defaultDisplayName seed.
 //   2. Committing a display name seeds project_keyboard_id with the slug
 //      derived by slugifyKeyboardId (the chain under test).
-//   3. onProjectNameNext fires with the confirmed (displayName, keyboardId).
+//   3. onComplete fires with the confirmed {displayName, keyboardId}.
 //
 // Uses the real loadModularFlow + real project_name.modular.yaml ?raw import
 // (via the same module the production component uses). No mocks.
@@ -18,7 +26,9 @@
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
-import { PhaseProjectName } from "./PhaseProjectName.tsx";
+import { ProjectNameStepFactoryComponent } from "../editors/adapters/flowStepOptions.tsx";
+import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { loadModularFlow } from "./loadModularFlow.ts";
 import { slugifyKeyboardId } from "@keyboard-studio/contracts";
 
@@ -27,7 +37,11 @@ import { slugifyKeyboardId } from "@keyboard-studio/contracts";
 import projectNameRaw from "../../../../content/flows/project_name.modular.yaml?raw";
 import trackRaw from "../../../../content/flows/track.modular.yaml?raw";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  useSurveySessionStore.getState().reset();
+  useWorkingCopyStore.getState().reset();
+});
 
 // ---------------------------------------------------------------------------
 // Flow-parity: both modular YAMLs parse without error
@@ -59,29 +73,39 @@ describe("flow-parity: track.modular.yaml + project_name.modular.yaml load clean
 });
 
 // ---------------------------------------------------------------------------
-// Integration: PhaseProjectName with real SurveyRunner
+// Integration: ProjectNameStepFactoryComponent with real SurveyRunner
 // ---------------------------------------------------------------------------
 
-describe("PhaseProjectName — displayName→slug seed chain (real SurveyRunner)", () => {
-  it("seeds project_display_name from defaultDisplayName and auto-populates project_keyboard_id slug", async () => {
+describe("ProjectNameStepFactoryComponent — displayName->slug seed chain (real SurveyRunner)", () => {
+  it("seeds project_display_name from identityResult and auto-populates project_keyboard_id slug", async () => {
     const displayName = "Hausa (QWERTY)";
     const expectedSlug = slugifyKeyboardId(displayName);
+
+    // Set identityResult so the factory derives defaultDisplayName from autonym.
+    act(() => {
+      useSurveySessionStore.setState({
+        identityResult: {
+          autonym: displayName,
+          english: displayName,
+          languageSubtag: "ha",
+          targetScriptRaw: "Latn",
+          bcp47: "ha",
+          supported: true,
+          prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
+        },
+      });
+    });
 
     let capturedDisplayName: string | undefined;
     let capturedKeyboardId: string | undefined;
 
-    const onProjectNameNext = vi.fn((dn: string, kid: string) => {
-      capturedDisplayName = dn;
-      capturedKeyboardId = kid;
+    const onComplete = vi.fn((result: unknown) => {
+      const r = result as { displayName?: string; keyboardId?: string };
+      capturedDisplayName = r.displayName;
+      capturedKeyboardId = r.keyboardId;
     });
 
-    render(
-      <PhaseProjectName
-        defaultDisplayName={displayName}
-        onProjectNameNext={onProjectNameNext}
-        onBack={vi.fn()}
-      />,
-    );
+    render(<ProjectNameStepFactoryComponent onComplete={onComplete} onBack={vi.fn()} />);
 
     // Step 1: project_display_name question renders with the seeded value.
     // The SurveyRunner seeds the field via getSeedValue on first arrival.
@@ -107,8 +131,8 @@ describe("PhaseProjectName — displayName→slug seed chain (real SurveyRunner)
       fireEvent.click(nextButton2);
     });
 
-    // Step 5: onProjectNameNext fired with the correct pair.
-    expect(onProjectNameNext).toHaveBeenCalledOnce();
+    // Step 5: onComplete fired with the correct pair.
+    expect(onComplete).toHaveBeenCalledOnce();
     expect(capturedDisplayName).toBe(displayName);
     expect(capturedKeyboardId).toBe(expectedSlug);
   });
@@ -118,15 +142,23 @@ describe("PhaseProjectName — displayName→slug seed chain (real SurveyRunner)
     const editedName = "Ewondo (AZERTY)";
     const editedSlug = slugifyKeyboardId(editedName);
 
-    const onProjectNameNext = vi.fn();
+    act(() => {
+      useSurveySessionStore.setState({
+        identityResult: {
+          autonym: defaultName,
+          english: defaultName,
+          languageSubtag: "ewo",
+          targetScriptRaw: "Latn",
+          bcp47: "ewo",
+          supported: true,
+          prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
+        },
+      });
+    });
 
-    render(
-      <PhaseProjectName
-        defaultDisplayName={defaultName}
-        onProjectNameNext={onProjectNameNext}
-        onBack={vi.fn()}
-      />,
-    );
+    const onComplete = vi.fn();
+
+    render(<ProjectNameStepFactoryComponent onComplete={onComplete} onBack={vi.fn()} />);
 
     // Edit the display name before advancing.
     const displayNameInput = screen.getByRole("textbox");
@@ -151,19 +183,32 @@ describe("PhaseProjectName — displayName→slug seed chain (real SurveyRunner)
       fireEvent.click(nextButton2);
     });
 
-    expect(onProjectNameNext).toHaveBeenCalledOnce();
-    const [dn, kid] = (onProjectNameNext as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string];
-    expect(dn).toBe(editedName);
-    expect(kid).toBe(editedSlug);
+    expect(onComplete).toHaveBeenCalledOnce();
+    const result = (onComplete as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as { displayName: string; keyboardId: string } | undefined;
+    expect(result?.displayName).toBe(editedName);
+    expect(result?.keyboardId).toBe(editedSlug);
   });
 
   it("onBack fires when Back is clicked", async () => {
+    act(() => {
+      useSurveySessionStore.setState({
+        identityResult: {
+          autonym: "Test",
+          english: "Test",
+          languageSubtag: "te",
+          targetScriptRaw: "Latn",
+          bcp47: "te",
+          supported: true,
+          prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
+        },
+      });
+    });
+
     const onBack = vi.fn();
 
     render(
-      <PhaseProjectName
-        defaultDisplayName="Test"
-        onProjectNameNext={vi.fn()}
+      <ProjectNameStepFactoryComponent
+        onComplete={vi.fn()}
         onBack={onBack}
       />,
     );

@@ -1,0 +1,56 @@
+# Phase A modular flow descriptor — PROPOSED flow (spec 025, D6).
+#
+# This file lists the demoted 30-question Phase A battery (15 identity + 15
+# provenance_*). It is a PROPOSED flow: it is NOT referenced by any manifest step
+# and does NOT run in the live survey. It renders as an ordered graph in the Flow
+# Map's Library section so its intended sequence stays visible for eventual
+# promotion. See docs/adr/0001-flow-map-derived-from-one-source.md.
+#
+# The actual question definitions live in:
+#   packages/studio/src/survey/questions/a/{questionId}.ts
+# Its modules remain registered (spec-022 no-delete guardrail).
+#
+# PROMOTION: to make this live, follow the runbook in content/flows/README.md
+# (git mv out of proposed/, delete the `status:` line below, flip the flowSources
+# entry to "live", add flowRefs to a manifest step).
+
+flow_id: phase_a_identity
+phase: "A"
+# spec 025 (D6): machine-truth marker that this is a proposed (not live) flow.
+# Bound to the steps/flowSources.ts status:"proposed" entry by a completeness
+# test (proposedFlows.test.ts). Delete this line when promoting to live.
+status: proposed
+
+questions:
+  - desktop_first_notice
+  - language_name_english
+  - language_name_autonym
+  - iso_code
+  - region
+  - primary_script
+  - writing_direction
+  - script_not_supported_stub
+  - layout_family
+  - script_family
+  - pa_primary_target
+  - author_display_name
+  - author_contact_email
+  - pa_copyright_holder
+  - provenance_opt_in
+
+provenance_questions:
+  - provenance_requester_name
+  - provenance_requester_contact
+  - provenance_requester_affiliation
+  - provenance_requester_relation
+  - provenance_community_rep_name
+  - provenance_community_rep_role
+  - provenance_community_rep_email
+  - provenance_speaker_count
+  - provenance_regions
+  - provenance_language_status
+  - provenance_existing_tools
+  - provenance_orthography_url
+  - provenance_community_involvement
+  - provenance_casing_notes
+  - provenance_additional_notes

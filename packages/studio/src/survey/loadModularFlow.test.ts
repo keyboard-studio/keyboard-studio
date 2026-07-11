@@ -51,9 +51,9 @@ describe("loadModularFlow — pilot: language_name_autonym", () => {
     expect(flow.questions[0]?.id).toBe("language_name_autonym");
   });
 
-  it("sets definition.type to 'text'", () => {
+  it("sets definition.type to 'autocomplete'", () => {
     const flow = loadModularFlow(PILOT_YAML);
-    expect(flow.questions[0]?.type).toBe("text");
+    expect(flow.questions[0]?.type).toBe("autocomplete");
   });
 
   it("sets definition.required to true", () => {
@@ -61,9 +61,9 @@ describe("loadModularFlow — pilot: language_name_autonym", () => {
     expect(flow.questions[0]?.required).toBe(true);
   });
 
-  it("sets definition.next to 'language_name_english' (routing in module)", () => {
+  it("sets definition.next to 'iso_code' (routing in module)", () => {
     const flow = loadModularFlow(PILOT_YAML);
-    expect(flow.questions[0]?.next).toBe("language_name_english");
+    expect(flow.questions[0]?.next).toBe("iso_code");
   });
 
   it("returns no provenance_questions when omitted from YAML", () => {

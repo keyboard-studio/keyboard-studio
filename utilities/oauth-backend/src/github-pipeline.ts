@@ -3,8 +3,8 @@
  *
  * The SPA never holds a token in this path. It POSTs pre-filtered source files
  * plus author attribution to POST /submit/managed-pr; this module runs the
- * fork -> tree -> commit -> branch -> draft-PR pipeline using the org
- * service-account token, which lives server-side only.
+ * tree -> commit -> branch -> draft-PR pipeline using the GitHub App
+ * installation token, which lives server-side only.
  *
  * Vendored from packages/engine/src/output/github.ts -- keep in sync.
  *
@@ -14,13 +14,13 @@
  *   3. Commit carries a Co-authored-by trailer crediting the human author.
  *   4. PR title normalized to "[<keyboardId>] <desc>" (keymanapp convention).
  *   5. PR body prepends a provenance block naming the human author.
- *   6. Org-token 401/403 surfaces as upstream/unavailable, never as user auth/scope.
+ *   6. Installation-token 401/403 surfaces as upstream/unavailable, never as user auth/scope.
  *
  * SECURITY CONTRACT (parity with handlers.ts / google-handlers.ts):
- *  - The org token is never logged and never appears in any response body.
+ *  - The installation token is never logged and never appears in any response body.
  *  - On any GitHub auth/scope failure (401/403) the route returns a generic
- *    "submission_unavailable" -- a misconfigured org token is a server problem,
- *    never surfaced to the SPA as an actionable client error.
+ *    "submission_unavailable" -- a misconfigured installation token is a server
+ *    problem, never surfaced to the SPA as an actionable client error.
  */
 
 import type { ManagedPRBody } from "./managed-pr-schemas.js";
@@ -54,9 +54,18 @@ export type GitHubPipelineFetchFn = (
 // ---------------------------------------------------------------------------
 
 export interface ManagedPRPipelineConfig {
-  /** Org service-account OAuth token with public_repo scope. Never logged. */
-  orgToken: string;
-  /** GitHub login that owns the studio's standing fork of keymanapp/keyboards. */
+  /**
+   * Provider callback that returns a GitHub App installation token on each call.
+   * Called once per request so @octokit/auth-app's internal cache/refresh logic
+   * is exercised per-request rather than at server startup (tokens expire ~1 h).
+   * The returned token has contents:write + pull_requests:write scope. Never logged.
+   */
+  getInstallationToken: () => Promise<string>;
+  /**
+   * GitHub login that owns the studio's staging repo (its fork of
+   * keymanapp/keyboards). In the current model this equals UPSTREAM_OWNER, so
+   * commits and the PR both target this repo (same-repo PR).
+   */
   orgLogin: string;
   fetch: GitHubPipelineFetchFn;
 }
@@ -83,7 +92,16 @@ export type ManagedPRHandlerResult =
 // ---------------------------------------------------------------------------
 
 const API_BASE = "https://api.github.com";
-const UPSTREAM_OWNER = "keymanapp";
+// Base repo the managed PR is opened against. The studio owns this as a staging
+// repo (its own fork of keymanapp/keyboards): because the GitHub App is installed
+// here, the installation token can open the PR. Opening PRs directly against a
+// repo the App is NOT installed on (e.g. keymanapp/keyboards) fails 403
+// "Resource not accessible by integration" -- an installation token has no
+// cross-repo contributor affordance. Promotion staging -> keymanapp is a separate
+// downstream step. When UPSTREAM_OWNER === orgLogin the pipeline runs as a
+// same-repo PR (fork base === PR base), which is the current staging model.
+// Exported so tests can pin the same-repo topology to the real constant.
+export const UPSTREAM_OWNER = "keyboard-studio";
 const UPSTREAM_REPO = "keyboards";
 
 // ---------------------------------------------------------------------------
@@ -116,7 +134,7 @@ export function buildCommitMessage(
 
 /**
  * Build the PR body, prepending a provenance block that names the human author
- * so keymanapp/keyboards maintainers have a reachability channel. The
+ * so downstream keymanapp/keyboards maintainers have a reachability channel. The
  * importAttribution section (when present) is appended after prBody.
  *
  * Divergence 5 from the Option A origin: Option A uses the PR body verbatim;
@@ -176,20 +194,24 @@ export async function submitManagedPR(
   body: ManagedPRBody,
   config: ManagedPRPipelineConfig
 ): Promise<ManagedPRHandlerResult> {
-  const { orgToken, orgLogin, fetch: fetchFn } = config;
+  const { getInstallationToken, orgLogin, fetch: fetchFn } = config;
   const forkBase = `${API_BASE}/repos/${orgLogin}/${UPSTREAM_REPO}`;
   const upstreamBase = `${API_BASE}/repos/${UPSTREAM_OWNER}/${UPSTREAM_REPO}`;
+
+  // Mint (or retrieve from cache) the installation token once per request.
+  // If the provider throws, the outer try/catch maps it to 502 submission_unavailable.
+  const installationToken = await getInstallationToken();
 
   const call = (url: string, method = "GET", payload?: unknown) =>
     fetchFn(url, {
       method,
-      headers: buildHeaders(orgToken),
+      headers: buildHeaders(installationToken),
       ...(payload !== undefined ? { body: JSON.stringify(payload) } : {}),
     });
 
-  // Map a GitHub non-ok response to a safe handler error. 401/403 mean the org
-  // token is missing/insufficient -- a server-side misconfiguration, surfaced
-  // generically and never leaking that the *org* token is the problem.
+  // Map a GitHub non-ok response to a safe handler error. 401/403 mean the
+  // installation token is missing/insufficient -- a server-side misconfiguration,
+  // surfaced generically and never leaking that the installation token is the problem.
   const mapNonOk = (res: GitHubPipelineFetchResponse): ManagedPRHandlerResult => {
     if (res.status === 401 || res.status === 403) {
       return { ok: false, status: 502, error: "submission_unavailable" };
@@ -211,27 +233,24 @@ export async function submitManagedPR(
   const normalizedTitle = normalizePrTitle(body.keyboardId, body.prTitle);
 
   try {
-    // 1. Ensure the org fork exists.
-    const forkCheck = await call(forkBase);
-    if (!forkCheck.ok) {
-      if (forkCheck.status !== 404) return mapNonOk(forkCheck);
-      const created = await call(`${upstreamBase}/forks`, "POST", {});
-      if (!created.ok) return mapNonOk(created);
-    }
+    // (No "ensure the fork exists" step: under the same-repo model
+    // (orgLogin === UPSTREAM_OWNER) there is no distinct upstream to fork
+    // from, so a missing staging repo is a provisioning error the pipeline
+    // cannot repair -- the ref read below surfaces it as upstream_error.)
 
-    // 2. Read the fork's master HEAD commit SHA.
+    // 1. Read the staging repo's master HEAD commit SHA.
     const masterRef = await call(`${forkBase}/git/ref/heads/master`);
     if (!masterRef.ok) return mapNonOk(masterRef);
     const refData = (await masterRef.json()) as { object: { sha: string } };
     const masterCommitSha = refData.object.sha;
 
-    // 3. Read the base tree SHA from the parent commit.
+    // 2. Read the base tree SHA from the parent commit.
     const parentCommit = await call(`${forkBase}/git/commits/${masterCommitSha}`);
     if (!parentCommit.ok) return mapNonOk(parentCommit);
     const parentData = (await parentCommit.json()) as { tree: { sha: string } };
     const baseTreeSha = parentData.tree.sha;
 
-    // 4. Build the tree from the SPA-filtered source files (text content only).
+    // 3. Build the tree from the SPA-filtered source files (text content only).
     const treeEntries = body.sourceFiles.map((f) => ({
       path: f.path,
       mode: "100644",
@@ -239,7 +258,7 @@ export async function submitManagedPR(
       content: f.content,
     }));
 
-    // 5. Create the tree.
+    // 4. Create the tree.
     const newTree = await call(`${forkBase}/git/trees`, "POST", {
       base_tree: baseTreeSha,
       tree: treeEntries,
@@ -247,7 +266,7 @@ export async function submitManagedPR(
     if (!newTree.ok) return mapNonOk(newTree);
     const newTreeSha = ((await newTree.json()) as { sha: string }).sha;
 
-    // 6. Create the commit (org committer + Co-authored-by human trailer).
+    // 5. Create the commit (org committer + Co-authored-by human trailer).
     const newCommit = await call(`${forkBase}/git/commits`, "POST", {
       message: buildCommitMessage(normalizedTitle, body.attribution),
       tree: newTreeSha,
@@ -256,7 +275,7 @@ export async function submitManagedPR(
     if (!newCommit.ok) return mapNonOk(newCommit);
     const newCommitSha = ((await newCommit.json()) as { sha: string }).sha;
 
-    // 7. Create the branch ref (content-unique short-SHA suffix).
+    // 6. Create the branch ref (content-unique short-SHA suffix).
     const branchName = buildManagedBranchName(body.keyboardId, newCommitSha);
     const branchRef = await call(`${forkBase}/git/refs`, "POST", {
       ref: `refs/heads/${branchName}`,
@@ -269,7 +288,7 @@ export async function submitManagedPR(
       return mapNonOk(branchRef);
     }
 
-    // 8. Open the draft PR upstream (divergences 4 and 5 from Option A).
+    // 7. Open the draft PR upstream (divergences 4 and 5 from Option A).
     const pr = await call(`${upstreamBase}/pulls`, "POST", {
       title: normalizedTitle,
       body: buildPrBody(body),

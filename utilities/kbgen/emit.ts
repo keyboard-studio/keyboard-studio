@@ -7,10 +7,10 @@
 
 import type { PlanResult } from './place.ts';
 import type { Layout } from './layout.ts';
+import { codepointHex } from './analyze.ts';
 
-const cpHex = (ch: string) => (ch.codePointAt(0) as number).toString(16).toUpperCase().padStart(4, '0');
-const uId = (ch: string) => 'U_' + cpHex(ch);
-const uPlus = (ch: string) => 'U+' + cpHex(ch);
+const uId = (ch: string) => 'U_' + codepointHex(ch);
+const uPlus = (ch: string) => 'U+' + codepointHex(ch);
 
 export interface KbMeta {
   id: string;
@@ -77,28 +77,26 @@ interface TouchKey {
 
 function letterKey(entry: { key: string; lower: string; upper: string }, isShift: boolean, kp: { defOut: string | null; shiftOut: string | null; skDef: string[]; skShift: string[] } | undefined): TouchKey {
   const baseChar = isShift ? entry.upper : entry.lower;
-  const direct = kp ? (isShift ? kp.shiftOut : kp.defOut) : null;
-  const sk = kp ? (isShift ? kp.skShift : kp.skDef) : [];
-  const key: TouchKey = direct != null ? { id: uId(direct), text: direct } : { id: entry.key, text: baseChar };
-  if (sk && sk.length) key.sk = sk.map((c) => ({ text: c, id: uId(c) }));
+  const direct = kp && (isShift ? kp.shiftOut : kp.defOut);
+  const sk = kp && (isShift ? kp.skShift : kp.skDef);
+  const key: TouchKey = direct ? { id: uId(direct), text: direct } : { id: entry.key, text: baseChar };
+  if (sk?.length) key.sk = sk.map((c) => ({ text: c, id: uId(c) }));
   return key;
 }
 
 function buildLetterLayer(id: string, isShift: boolean, planResult: PlanResult, layout: Layout) {
-  const rows = layout.rows;
-  const mk = (entry: { key: string; lower: string; upper: string }) => letterKey(entry, isShift, planResult.keys.get(entry.key));
-  const toEntry = ([key, lower, upper]: [string, string, string]) => ({ key, lower, upper });
+  const makeKey = (t: [string, string, string]) => letterKey({ key: t[0], lower: t[1], upper: t[2] }, isShift, planResult.keys.get(t[0]));
 
-  const row1 = rows[0].map((t) => mk(toEntry(t)));
-  const row2 = rows[1].map((t) => mk(toEntry(t)));
-  (row2 as TouchKey[]).push({ id: `T_spacer_${id}`, text: '', width: '10', sp: '10' });
+  const row1 = layout.rows[0].map(makeKey);
+  const row2 = [...layout.rows[1].map(makeKey), { id: `T_spacer_${id}`, text: '', width: '10', sp: '10' }];
   const row3: TouchKey[] = [
     { id: 'K_SHIFT', text: '*Shift*', sp: isShift ? '2' : '1', nextlayer: isShift ? 'default' : 'shift' },
-    ...rows[2].map((t) => mk(toEntry(t))),
+    ...layout.rows[2].map(makeKey),
     periodKey(isShift),
     { id: 'K_BKSP', text: '*BkSp*', width: '100', sp: '1' },
   ];
   const row4 = bottomRow();
+
   return { id, row: [{ id: 1, key: row1 }, { id: 2, key: row2 }, { id: 3, key: row3 }, { id: 4, key: row4 }] };
 }
 
@@ -194,16 +192,18 @@ const xmlEsc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').rep
 
 export function emitKvks(planResult: PlanResult, layout: Layout, meta: KbMeta): string {
   const rowsFor = (isShift: boolean) => {
-    const out: string[] = [];
-    for (const k of layout.keys) {
+    const letterKeys = layout.keys.map((k) => {
       const kp = planResult.keys.get(k.key);
-      const direct = kp ? (isShift ? kp.shiftOut : kp.defOut) : null;
-      const ch = direct != null ? direct : (isShift ? k.upper : k.lower);
-      out.push(`      <key vkey="${k.key}">${xmlEsc(ch)}</key>`);
-    }
-    for (const [vk, lo, up] of PUNCT) out.push(`      <key vkey="${vk}">${xmlEsc(isShift ? up : lo)}</key>`);
-    return out.join('\n');
+      const direct = kp && (isShift ? kp.shiftOut : kp.defOut);
+      const ch = direct ?? (isShift ? k.upper : k.lower);
+      return `      <key vkey="${k.key}">${xmlEsc(ch)}</key>`;
+    });
+    const punctKeys = PUNCT.map(([vk, lo, up]) =>
+      `      <key vkey="${vk}">${xmlEsc(isShift ? up : lo)}</key>`
+    );
+    return [...letterKeys, ...punctKeys].join('\n');
   };
+
   return [
     '<?xml version="1.0" encoding="utf-8"?>',
     '<visualkeyboard>',

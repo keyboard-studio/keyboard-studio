@@ -6,6 +6,7 @@
 import { useState } from "react";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { Button, Card } from "../../ui/index.ts";
+import { TEXT_DIM } from "../../ui/theme.ts";
 
 export type Track = "copy" | "adapt";
 
@@ -25,7 +26,7 @@ const HEADING: React.CSSProperties = {
 const SUBTLE: React.CSSProperties = {
   margin: "0 0 20px 0",
   fontSize: 13,
-  color: "#8b949e",
+  color: TEXT_DIM,
 };
 
 export function TrackStep({ base, onNext, onBack }: TrackStepProps) {
@@ -47,10 +48,11 @@ export function TrackStep({ base, onNext, onBack }: TrackStepProps) {
           selected={track === "copy"}
           role="radio"
           aria-checked={track === "copy"}
+          data-testid="track-copy"
           onClick={() => setTrack("copy")}
         >
           <span style={{ fontWeight: 600, fontSize: 14 }}>Copy</span>
-          <span style={{ fontSize: 12, color: "#8b949e" }}>
+          <span style={{ fontSize: 12, color: TEXT_DIM }}>
             Start a new keyboard based on this layout. You&apos;ll give it a new name and ID.
           </span>
         </Card>
@@ -62,7 +64,7 @@ export function TrackStep({ base, onNext, onBack }: TrackStepProps) {
           onClick={() => setTrack("adapt")}
         >
           <span style={{ fontWeight: 600, fontSize: 14 }}>Adapt</span>
-          <span style={{ fontSize: 12, color: "#8b949e" }}>
+          <span style={{ fontSize: 12, color: TEXT_DIM }}>
             Modify this keyboard in place, keeping its name and ID.
           </span>
         </Card>
@@ -72,13 +74,14 @@ export function TrackStep({ base, onNext, onBack }: TrackStepProps) {
         <Button
           variant="primary"
           disabled={track === null}
+          data-testid="track-next"
           onClick={handleNext}
         >
           Next
         </Button>
       </div>
 
-      <Button variant="back" onClick={onBack}>
+      <Button variant="back" data-testid="track-back" onClick={onBack}>
         {"←"} Back
       </Button>
     </div>

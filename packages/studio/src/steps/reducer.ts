@@ -21,12 +21,13 @@
 // so this file remains boundary-clean. It captures exactly the store actions
 // and lib helpers the reducer needs — nothing more.
 
-import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS } from "@keyboard-studio/contracts";
+import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import type { BaseKeyboard, RemovalCapability } from "@keyboard-studio/contracts";
 import type { MutateContext } from "../survey/types.ts";
 import { applyMutatePatch } from "./mutateApply.ts";
 import { repropagate } from "./repropagate.ts";
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
+import { questionRegistry } from "../survey/questions/registry.ts";
 
 // ---------------------------------------------------------------------------
 // Step ids that carry side effects (keyed constants — never inline strings)
@@ -248,9 +249,7 @@ export function applyStepCompletion(
     // Same Case-A/B logic and graceful degradation on error.
     case TOUCH_STEP_ID: {
       const payload = result as Partial<TouchCompleteResult>;
-      const assignments = payload.assignments ?? [];
-      const baseIr = payload.baseIr ?? null;
-      const baseVfs = payload.baseVfs ?? null;
+      const { assignments = [], baseIr = null, baseVfs = null } = payload;
 
       if (assignments.length === 0 || baseIr === null) {
         // No real assignments — clear the stored touch layout (KMW uses its native default).
@@ -290,7 +289,11 @@ export function applyStepCompletion(
       const track = payload.track ?? null;
       const vfs = payload.vfs ?? null;
       const ir = payload.ir ?? null;
-      const removalCapabilities = payload.removalCapabilities;
+      const opts = {
+        vfs,
+        ir,
+        ...(payload.removalCapabilities !== undefined ? { removalCapabilities: payload.removalCapabilities } : {}),
+      };
 
       if (track === "adapt") {
         // Track 2: preserve existing keyboard identity.
@@ -298,18 +301,10 @@ export function applyStepCompletion(
           console.warn("[applyStepCompletion:choose_base] Track 2 skipped: no parsed IR (mock engine?)");
           break;
         }
-        deps.instantiateFromExisting(base, {
-          vfs,
-          ir,
-          ...(removalCapabilities !== undefined ? { removalCapabilities } : {}),
-        });
+        deps.instantiateFromExisting(base, { ...opts, vfs, ir });
       } else {
         // Track 1 (or null/default): new keyboard from base, with rebase guard.
-        deps.instantiateFromBaseIfConfirmed(base, {
-          vfs,
-          ir,
-          ...(removalCapabilities !== undefined ? { removalCapabilities } : {}),
-        });
+        deps.instantiateFromBaseIfConfirmed(base, opts);
       }
       break;
     }
@@ -317,5 +312,39 @@ export function applyStepCompletion(
     // R5 — unknown step id is a no-op (most question-steps have no side effect).
     default:
       break;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// routeAnswersThroughMutate — route in-scope question answers through mutate().
+//
+// Moved from StudioShell.tsx (was private) and exported here so StepHost can
+// call it in the centralized completion path without duplicating the logic.
+// Only question modules with both `mutate` and non-empty `writes` are routed
+// (flag-gated via applyStepCompletion → isMutateSeamEnabled). Answer modules
+// that are display-only or answer-store-only are skipped (no `mutate`/`writes`).
+//
+// spec-014 US1 (T014/T015): route each in-scope question answer through its
+// module's `mutate()` write seam. The reducer gates execution on the global
+// mutate flag (off ⇒ no-op, byte-identical to P4b), so this is safe to call
+// unconditionally. A module without `mutate`/with empty `writes` is skipped.
+// ---------------------------------------------------------------------------
+
+export function routeAnswersThroughMutate(
+  result: SurveyPhaseResult,
+  deps: ReducerDeps,
+): void {
+  for (const answer of result.answers) {
+    const mod = questionRegistry[answer.questionId];
+    if (mod === undefined) continue;
+    if (mod.mutate === undefined || (mod.writes ?? []).length === 0) continue;
+    const value = answer.value as string | string[] | undefined;
+    const req: MutateRequest = {
+      kind: "mutate",
+      mutate: mod.mutate,
+      value,
+      writes: mod.writes!,
+    };
+    applyStepCompletion(answer.questionId, req, deps);
   }
 }

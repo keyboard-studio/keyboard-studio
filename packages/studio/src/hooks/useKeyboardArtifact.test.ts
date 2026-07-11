@@ -27,7 +27,7 @@ import { renderHook, act } from "@testing-library/react";
 import type { BaseKeyboard, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { mixedDiagnosticsResult } from "@keyboard-studio/contracts/fixtures";
-import type { OnInstantiateCallback } from "./useKeyboardArtifact";
+import type { OnInstantiateCallback, VfsTransform } from "./useKeyboardArtifact";
 
 // ---------------------------------------------------------------------------
 // Engine mock — exposes the minimal surface loadEngine() checks for.
@@ -394,5 +394,240 @@ describe("useKeyboardArtifact — open-base proxyBase pass-through (regression g
     // omit the key, and this assertion will fail — that is the intended signal.
     expect(opts).toBeDefined();
     expect((opts as { proxyBase?: string })?.proxyBase).toBe(LOCAL_PROXY_BASE);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression guard: Track 1 (no scaffoldSpec) identity-rename compile.
+//
+// projectWorkingCopyVfs's Step 4 id-rename pass renames source/<baseId>.kmn to
+// source/<targetId>.kmn inside the VFS when the author changes the keyboard id
+// with no scaffoldSpec present. Before this fix, runCompile always compiled
+// scaffoldSpec?.keyboardId ?? kb.id — the stale base id — so compile() looked
+// for a file that no longer existed and the stage was stuck in "error"
+// permanently. The VfsTransform's effectiveKeyboardId return value is how the
+// transform tells the hook the rename happened; this suite pins that the hook
+// actually uses it.
+// ---------------------------------------------------------------------------
+
+describe("useKeyboardArtifact — vfsTransform effectiveKeyboardId (Track 1 id rename)", () => {
+  it("compiles with the renamed id when vfsTransform reports effectiveKeyboardId on the initial run", async () => {
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+    const renamingTransform: VfsTransform = (vfs, keyboardId) => {
+      // Mirror what projectWorkingCopyVfs's rename pass does: move the .kmn to
+      // the new id's path inside the VFS.
+      const entry = vfs.get(`source/${keyboardId}.kmn`);
+      if (entry !== undefined) {
+        vfs.delete(`source/${keyboardId}.kmn`);
+        vfs.set("source/renamed_kb.kmn", entry.content, entry.isBinary);
+      }
+      return { warnings: [], effectiveKeyboardId: "renamed_kb" };
+    };
+
+    const { result } = renderHook(() =>
+      useKeyboardArtifact(baseKb, null, renamingTransform, null),
+    );
+
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.stage.kind).toBe("ready");
+    // compile() must have been called with the renamed id, not baseKb.id.
+    expect(mockEngine.compile).toHaveBeenCalledWith(expect.anything(), "renamed_kb");
+    if (result.current.stage.kind === "ready") {
+      expect(result.current.stage.keyboardId).toBe("renamed_kb");
+    }
+  });
+
+  it("does not override compileId when vfsTransform reports no effectiveKeyboardId", async () => {
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+    const noopTransform: VfsTransform = () => ({ warnings: [] });
+
+    const { result } = renderHook(() =>
+      useKeyboardArtifact(baseKb, null, noopTransform, null),
+    );
+
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.stage.kind).toBe("ready");
+    expect(mockEngine.compile).toHaveBeenCalledWith(expect.anything(), baseKb.id);
+    if (result.current.stage.kind === "ready") {
+      expect(result.current.stage.keyboardId).toBe(baseKb.id);
+    }
+  });
+
+  it("carries the renamed id into a subsequent recompile() call (same run, no re-fetch)", async () => {
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+    const renamingTransform: VfsTransform = (vfs, keyboardId) => {
+      const entry = vfs.get(`source/${keyboardId}.kmn`);
+      if (entry !== undefined) {
+        vfs.delete(`source/${keyboardId}.kmn`);
+        vfs.set("source/renamed_kb.kmn", entry.content, entry.isBinary);
+      }
+      return { warnings: [], effectiveKeyboardId: "renamed_kb" };
+    };
+
+    const { result } = renderHook(() =>
+      useKeyboardArtifact(baseKb, null, renamingTransform, null),
+    );
+
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.stage.kind).toBe("ready");
+    mockEngine.compile.mockClear();
+
+    // recompile() re-runs runCompile against the already-transformed VFS —
+    // it must keep using the renamed id, not fall back to baseKb.id.
+    await act(async () => {
+      result.current.recompile();
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mockEngine.compile).toHaveBeenCalledWith(expect.anything(), "renamed_kb");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression guard: the transformVersion reapply effect (fires when the
+// vfsTransform prop reference changes after the initial fetch — e.g. an
+// identity-rename edit while already on the ready stage). This is a distinct
+// code path from the initial-run capture above: it restores the clean
+// baseVfsRef snapshot, re-invokes the transform, and recompiles WITHOUT a
+// re-fetch. effectiveKeyboardIdRef must be re-derived correctly on every
+// reapply, including when the transform throws.
+// ---------------------------------------------------------------------------
+
+describe("useKeyboardArtifact — vfsTransform effectiveKeyboardId (reapply effect)", () => {
+  function makeRenamingTransform(newId: string): VfsTransform {
+    return (vfs, keyboardId) => {
+      const entry = vfs.get(`source/${keyboardId}.kmn`);
+      if (entry !== undefined) {
+        vfs.delete(`source/${keyboardId}.kmn`);
+        vfs.set(`source/${newId}.kmn`, entry.content, entry.isBinary);
+      }
+      return { warnings: [], effectiveKeyboardId: newId };
+    };
+  }
+
+  const noopTransform: VfsTransform = () => ({ warnings: [] });
+
+  it("(a) reapply after a rename carries the renamed id into recompile", async () => {
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+    const { result, rerender } = renderHook(
+      ({ transform }: { transform: VfsTransform | null }) =>
+        useKeyboardArtifact(baseKb, null, transform, null),
+      { initialProps: { transform: noopTransform } },
+    );
+
+    // Initial full run — no rename yet.
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.stage.kind).toBe("ready");
+    expect(mockEngine.compile).toHaveBeenLastCalledWith(expect.anything(), baseKb.id);
+
+    // A NEW transform reference (e.g. the author renamed the id) triggers the
+    // transformVersion reapply effect — not a re-fetch.
+    mockEngine.fetchKeyboardSourceToVfs.mockClear();
+    mockEngine.compile.mockClear();
+    rerender({ transform: makeRenamingTransform("renamed_kb") });
+
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    // No re-fetch — the reapply effect works off the existing VFS.
+    expect(mockEngine.fetchKeyboardSourceToVfs).not.toHaveBeenCalled();
+    expect(mockEngine.compile).toHaveBeenCalledWith(expect.anything(), "renamed_kb");
+    if (result.current.stage.kind === "ready") {
+      expect(result.current.stage.keyboardId).toBe("renamed_kb");
+    }
+  });
+
+  it("(b) rename then revert to the base id in a later transform run clears the ref and compiles with the base id", async () => {
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+    const { result, rerender } = renderHook(
+      ({ transform }: { transform: VfsTransform | null }) =>
+        useKeyboardArtifact(baseKb, null, transform, null),
+      { initialProps: { transform: noopTransform } },
+    );
+
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    // Rename.
+    rerender({ transform: makeRenamingTransform("renamed_kb") });
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+    expect(mockEngine.compile).toHaveBeenLastCalledWith(expect.anything(), "renamed_kb");
+
+    // Revert: a later transform run reports no effectiveKeyboardId. The
+    // baseVfsRef snapshot restore means this transform sees the ORIGINAL
+    // (un-renamed) VFS again, matching what the author reverting the id
+    // field actually does in the real transform.
+    mockEngine.compile.mockClear();
+    rerender({ transform: noopTransform });
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mockEngine.compile).toHaveBeenCalledWith(expect.anything(), baseKb.id);
+    if (result.current.stage.kind === "ready") {
+      expect(result.current.stage.keyboardId).toBe(baseKb.id);
+    }
+  });
+
+  it("(c) a reapply whose transform throws falls back to the base id against the clean snapshot", async () => {
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+    const throwingTransform: VfsTransform = () => {
+      throw new Error("transform blew up");
+    };
+
+    const { result, rerender } = renderHook(
+      ({ transform }: { transform: VfsTransform | null }) =>
+        useKeyboardArtifact(baseKb, null, transform, null),
+      { initialProps: { transform: noopTransform } },
+    );
+
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    // Establish a rename first, so a stale effectiveKeyboardIdRef value would
+    // be observable if the throw path failed to clear it.
+    rerender({ transform: makeRenamingTransform("renamed_kb") });
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+    expect(mockEngine.compile).toHaveBeenLastCalledWith(expect.anything(), "renamed_kb");
+
+    // Now reapply with a transform that throws.
+    mockEngine.compile.mockClear();
+    rerender({ transform: throwingTransform });
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    // Must fall back to the base id — NOT the stale "renamed_kb" — because
+    // effectiveKeyboardIdRef is reset before the throwing transform runs, and
+    // vfsRef.current was restored to the clean un-renamed base snapshot
+    // before the (failed) transform call.
+    expect(mockEngine.compile).toHaveBeenCalledWith(expect.anything(), baseKb.id);
+    if (result.current.stage.kind === "ready") {
+      expect(result.current.stage.keyboardId).toBe(baseKb.id);
+    }
   });
 });

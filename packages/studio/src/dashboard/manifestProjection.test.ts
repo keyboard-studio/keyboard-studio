@@ -3,11 +3,16 @@
 // Asserts the dashboard spine node set equals the buildManifestStepGraph() →
 // adapter node set, every projected node carries kind:"stub", and the per-phase
 // modular graphs hang as registry-keyed drill-downs whose rendered node union is
-// a superset of today's four-section view (no node dropped).
+// a superset of the live drill-down node set (no live node dropped).
 //
 // This exercises the NEW adapter (buildManifestProjection), distinct from the
 // pre-existing tautology at buildStepGraph.test.ts (manifest ↔ buildManifestStepGraph
 // node ids).
+//
+// P1 fix (spec 024 / ADR-0001): FLOW_SOURCES local array + buildFlows() helper
+// have been removed. Drill-downs now derive from buildFlowSources() in
+// renderedNodeSet.ts — the EXACT same function DashboardView and driftGuardrail.test.ts
+// use — so this test cannot drift into a second, divergent list.
 
 import { describe, it, expect } from "vitest";
 
@@ -20,44 +25,10 @@ import {
   MANIFEST_FLOW_ID,
   MANIFEST_NODE_TYPE,
 } from "./manifestProjection.ts";
-import { buildManifestStepGraph, buildModularFlowGraph } from "./buildStepGraph.ts";
+import { buildManifestStepGraph } from "./buildStepGraph.ts";
+import { buildFlowSources } from "./renderedNodeSet.ts";
 import { manifest } from "../steps/manifest.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
-import { phaseARegistry } from "../survey/questions/registry.a.ts";
-import { phaseBRegistry } from "../survey/questions/registry.b.ts";
-import { phaseFRegistry } from "../survey/questions/registry.f.ts";
-import { phaseTrackRegistry, phaseProjectRegistry } from "../survey/questions/registry.g.ts";
-
-import identityLiteModularRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
-import phaseAModularRaw from "../../../../content/flows/phase_a_identity.modular.yaml?raw";
-import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modular.yaml?raw";
-import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
-import trackModularRaw from "../../../../content/flows/track.modular.yaml?raw";
-import projectNameModularRaw from "../../../../content/flows/project_name.modular.yaml?raw";
-
-// Mirror DashboardView's FLOW_SOURCES so the drill-down assertions exercise the
-// same modular graphs the dashboard renders today — including the Phase G wizard
-// flows (track / project_name), which hang under their OWN manifest step ids
-// (so the multi-key grouping path in attachDrillDowns is covered, not just the
-// characters bucket).
-const FLOW_SOURCES = [
-  { raw: identityLiteModularRaw, title: "Identity-lite (Phase A head)", registry: phaseARegistry, stepId: CHARACTERS_STEP_ID },
-  { raw: phaseAModularRaw, title: "Phase A — identity", registry: phaseARegistry, stepId: CHARACTERS_STEP_ID },
-  { raw: phaseBModularRaw, title: "Phase B — character discovery", registry: phaseBRegistry, stepId: CHARACTERS_STEP_ID },
-  { raw: phaseFModularRaw, title: "Phase F — help docs", registry: phaseFRegistry, stepId: CHARACTERS_STEP_ID },
-  { raw: trackModularRaw, title: "Phase G — track selection", registry: phaseTrackRegistry, stepId: "track" },
-  { raw: projectNameModularRaw, title: "Phase G — project name", registry: phaseProjectRegistry, stepId: "project_name" },
-] as const;
-
-function buildFlows() {
-  return FLOW_SOURCES.map((f) => {
-    try {
-      return { graph: buildModularFlowGraph(f.raw, f.title, f.registry), error: null as string | null, title: f.title, stepId: f.stepId };
-    } catch (err) {
-      return { graph: null, error: err instanceof Error ? err.message : String(err), title: f.title, stepId: f.stepId };
-    }
-  });
-}
 
 describe("buildManifestProjection — §2.5 map-projection (FR-010)", () => {
   const projection = buildManifestProjection();
@@ -135,19 +106,29 @@ describe("buildManifestProjection — §2.5 map-projection (FR-010)", () => {
 });
 
 describe("attachDrillDowns — registry-keyed drill-downs (FR-004 / SC-003)", () => {
-  const flows = buildFlows();
+  // P1 fix: derive from buildFlowSources() — the same function DashboardView and
+  // driftGuardrail.test.ts consume. No independent copy.
+  const flows = buildFlowSources();
   const drillDowns = attachDrillDowns(flows);
 
-  it("FR-004 — modular graphs hang under their manifest step id (characters + Phase G track/project_name)", () => {
+  // Production layout after Stage 1 re-homes:
+  //   identity_lite   -> "identity" step    (1 drill-down)
+  //   phase_b_chars   -> "characters" step  (1 drill-down)
+  //   phase_f_helpdocs -> "help" step       (1 drill-down)
+  //   track           -> "track" step       (1 drill-down)
+  //   project_name    -> "project_name" step (1 drill-down)
+  //   phase_a_identity -> status:"proposed" — excluded from live drill-downs
+  it("FR-004 — modular graphs hang under their manifest step id (identity/characters/help/track/project_name)", () => {
     expect(Object.keys(drillDowns).sort()).toEqual(
-      [CHARACTERS_STEP_ID, "project_name", "track"].sort(),
+      ["identity", CHARACTERS_STEP_ID, "help", "project_name", "track"].sort(),
     );
-    // The four identity/A/B/F flows hang under characters; the two Phase G flows
-    // each hang under their own manifest step (the multi-key grouping path).
-    expect(drillDowns[CHARACTERS_STEP_ID]!.length).toBe(4);
+    // Each step now has exactly one drill-down flow.
+    expect(drillDowns["identity"]!.length).toBe(1);
+    expect(drillDowns[CHARACTERS_STEP_ID]!.length).toBe(1);
+    expect(drillDowns["help"]!.length).toBe(1);
     expect(drillDowns["track"]!.length).toBe(1);
     expect(drillDowns["project_name"]!.length).toBe(1);
-    // Every flow is accounted for across the buckets — none dropped.
+    // Every live flow is accounted for across the buckets — none dropped.
     const total = Object.values(drillDowns).reduce((n, list) => n + list.length, 0);
     expect(total).toBe(flows.length);
   });
@@ -158,7 +139,7 @@ describe("attachDrillDowns — registry-keyed drill-downs (FR-004 / SC-003)", ()
         // Built (non-null) graphs key off a real registry id.
         if (dd.graph !== null) {
           expect(
-            Object.prototype.hasOwnProperty.call(questionRegistry, dd.registryKey),
+            dd.registryKey in questionRegistry,
             `drill-down key "${dd.registryKey}" (${dd.title}) is not a questionRegistry id`,
           ).toBe(true);
           expect(registryKeyForFlow(dd.graph)).toBe(dd.registryKey);
@@ -167,14 +148,19 @@ describe("attachDrillDowns — registry-keyed drill-downs (FR-004 / SC-003)", ()
     }
   });
 
-  // SC-003: the rendered node union is a superset of today's four-section node set.
-  it("SC-003 — rendered node union (spine + drill-downs) is a superset of today's four-section node set (no node dropped)", () => {
+  // SC-003: the rendered node union is a superset of the live drill-down node set.
+  // Note: phase_a_identity is status:"proposed" and is NOT part of the live
+  // drill-down set. Its modules appear only as reserve/library nodes in the
+  // identity_lite drill-down graph — they are excluded from both sides of the
+  // live-node superset assertion (they are not "today's live nodes").
+  it("SC-003 — rendered node union (spine + drill-downs) is a superset of the live drill-down node set (no live node dropped)", () => {
     const projection = buildManifestProjectionWithDrillDowns(flows);
 
-    // Today's four-section node set: the union of all four modular graph node ids.
-    const todayNodeIds = new Set<string>();
+    // Live drill-down node set: the union of all live flow graph node ids.
+    // (Derived from buildFlowSources(), which excludes proposed flows.)
+    const liveNodeIds = new Set<string>();
     for (const f of flows) {
-      if (f.graph !== null) for (const n of f.graph.nodes) todayNodeIds.add(n.id);
+      if (f.graph !== null) for (const n of f.graph.nodes) liveNodeIds.add(n.id);
     }
 
     // The rendered union under the projection: every node still rendered as a
@@ -187,15 +173,14 @@ describe("attachDrillDowns — registry-keyed drill-downs (FR-004 / SC-003)", ()
       }
     }
 
-    for (const id of todayNodeIds) {
-      expect(renderedIds.has(id), `node "${id}" shown today is dropped under the projection`).toBe(true);
+    for (const id of liveNodeIds) {
+      expect(renderedIds.has(id), `live node "${id}" is dropped under the projection`).toBe(true);
     }
   });
 
   it("SC-003 — every modular graph is retained across the step buckets (drop none)", () => {
-    // Flows now spread across multiple manifest-step buckets (characters + the
-    // Phase G track/project_name steps); the union of all buckets must retain
-    // every flow title, in FLOW_SOURCES order.
+    // Flows spread across identity / characters / help / track / project_name;
+    // the union of all buckets must retain every flow title, in flows order.
     const titles = Object.values(drillDowns).flatMap((list) => list.map((d) => d.title));
     expect(titles.sort()).toEqual(flows.map((f) => f.title).sort());
   });

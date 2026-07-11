@@ -8,6 +8,7 @@
 
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import type { IdentityLiteResult } from "./IdentityLite.tsx";
+import { secondaryButton, primaryButton } from "./surveyStyles.ts";
 
 /** One labelled confirmation row in the prefill summary. */
 export interface PrefillRow {
@@ -106,34 +107,18 @@ export function Prefill({ identity, base, onConfirm, onBack }: PrefillProps) {
         {onBack !== undefined && (
           <button
             type="button"
+            data-testid="prefill-back"
             onClick={onBack}
-            style={{
-              padding: "8px 18px",
-              background: "transparent",
-              border: "1px solid #30363d",
-              borderRadius: 6,
-              color: "#8b949e",
-              fontSize: 13,
-              cursor: "pointer",
-              fontFamily: "inherit",
-            }}
+            style={secondaryButton}
           >
             ← Back
           </button>
         )}
         <button
           type="button"
+          data-testid="prefill-confirm"
           onClick={onConfirm}
-          style={{
-            padding: "8px 18px",
-            background: "#1f6feb",
-            border: "1px solid #30363d",
-            borderRadius: 6,
-            color: "#fff",
-            fontSize: 13,
-            cursor: "pointer",
-            fontFamily: "inherit",
-          }}
+          style={primaryButton(false)}
         >
           Confirm and continue
         </button>

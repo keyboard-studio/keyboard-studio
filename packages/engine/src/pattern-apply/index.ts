@@ -25,9 +25,28 @@ export { parseSlotId } from "./slotId.js";
 
 export { applyKeycapLabelsToVfs } from "./applyKeycapLabelsToVfs.js";
 
+export {
+  applyCarveKeycapRemovalsToVfs,
+  collectCarvedKeycapTexts,
+} from "./applyCarveKeycapRemovalsToVfs.js";
+export type { CarveKeycapRemovalInput } from "./applyCarveKeycapRemovalsToVfs.js";
+
 export { applyTouchAssignments } from "./applyTouchAssignments.js";
 export type { ApplyTouchAssignmentsResult } from "./applyTouchAssignments.js";
 
 export { applyTouchAssignmentsToRawJson } from "./applyTouchAssignmentsToRawJson.js";
 export type { ApplyTouchAssignmentsToRawJsonResult } from "./applyTouchAssignmentsToRawJson.js";
+
+export { collectCharContributors } from "./collectCharContributors.js";
+export type { CharContributors } from "./collectCharContributors.js";
+
+export {
+  isMnemonicLayout,
+  keyHasCapsHandling,
+  buildShiftRuleLines,
+  buildBaseRuleLines,
+  buildCasePairRuleLines,
+  planShiftAssignment,
+} from "./shiftRules.js";
+export type { ShiftAssignmentPlan } from "./shiftRules.js";
 

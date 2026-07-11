@@ -14,6 +14,8 @@
 // Projection order (spec §12 "re-projected layers"):
 //   0. Touch layout     — inject Phase E touchLayoutJson into .keyman-touch-layout
 //   1. Carve deletions  — applyCarveToVfs (re-emits filtered IR into .kmn)
+//   1.5 Carve keycaps   — applyCarveKeycapRemovalsToVfs (blanks carved chars off
+//                         .kvks / .keyman-touch-layout keycaps in place)
 //   2. Assignments      — applyAssignmentsToVfs (injects mechanism patterns)
 //   3. Identity         — applyIdentityStubMutation (writes &NAME)
 //
@@ -32,6 +34,7 @@ import type { KeyboardIR, Pattern, VirtualFS } from "@keyboard-studio/contracts"
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import {
   applyCarveToVfs,
+  applyCarveKeycapRemovalsToVfs,
   applyStoreSlotRemovals,
   applyAssignmentsToVfs,
   applyIdentityStubMutation,
@@ -129,6 +132,17 @@ export type IdentityOverlay = {
 export interface ProjectWorkingCopyVfsResult {
   /** Warnings from any of the three projection steps (empty when all is well). */
   warnings: string[];
+  /**
+   * The keyboard id the VFS actually ends up keyed under after projection —
+   * i.e. `targetKeyboardId` when the Step 4 id-rename pass fired (author chose
+   * a new id different from `keyboardId`), otherwise `undefined`.
+   *
+   * Callers that need to locate `source/<id>.kmn` (or any other id-derived
+   * path) AFTER calling this function — most importantly the compile step —
+   * must use this value when present instead of the `keyboardId` they passed
+   * in, or they will look for the pre-rename filename and fail to find it.
+   */
+  effectiveKeyboardId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -254,6 +268,27 @@ export function projectWorkingCopyVfs(
   }
   warnings.push(...carveResult.warnings);
 
+  // Step 1.5: Carve keycap projection — blank carved characters off the .kvks /
+  // .keyman-touch-layout keycaps IN PLACE (layer/row/key structure is never
+  // dropped), so the live preview's visual keyboard keeps its full layout with
+  // just the carved caps blank. Runs before Step 3.5 so a subsequent assignment
+  // label re-populates a blanked keycap, and before Step 4 so paths resolve
+  // against the pre-rename source/<keyboardId>.* filenames.
+  if (hasCarveEdit) {
+    try {
+      const keycapRemovalResult = applyCarveKeycapRemovalsToVfs(vfs, keyboardId, baseIr, {
+        slotIds,
+        wholeNodeIds: allWholeNodeIds,
+      });
+      warnings.push(...keycapRemovalResult.warnings);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      warnings.push(
+        `[project-working-copy] carve keycap projection skipped: ${msg}`,
+      );
+    }
+  }
+
   // Step 2: Assignments projection — inject mechanism pattern fragments.
   // Physical-only: touch assignments are handled by a separate gallery.
   // Skipped when there are no physical assignments.
@@ -338,10 +373,17 @@ export function projectWorkingCopyVfs(
   // `.kmw-keyboard-<keyboardId>` selectors in *.css plus <ID> / <kbdname>
   // references in *.kps / *.kvks. Without this, a renamed keyboard ships with
   // CSS that targets the base id's wrapper class and never matches.
+  //
+  // When this pass fires, the VFS's `.kmn` (and siblings) now live under
+  // `source/<targetKeyboardId>.*`, not `source/<keyboardId>.*`. Report the new
+  // id via the result so callers that compile/re-read from the VFS after this
+  // function returns know to use `targetKeyboardId`, not `keyboardId`.
+  let effectiveKeyboardId: string | undefined;
   if (
     targetKeyboardId !== undefined &&
     targetKeyboardId !== keyboardId
   ) {
+    effectiveKeyboardId = targetKeyboardId;
     const kmnPath = `source/${keyboardId}.kmn`;
     const kmnEntry = vfs.get(kmnPath);
     if (kmnEntry !== undefined && typeof kmnEntry.content === "string") {
@@ -367,5 +409,8 @@ export function projectWorkingCopyVfs(
     renameFilesInVfs(vfs, keyboardId, targetKeyboardId);
   }
 
-  return { warnings };
+  return {
+    warnings,
+    ...(effectiveKeyboardId !== undefined ? { effectiveKeyboardId } : {}),
+  };
 }

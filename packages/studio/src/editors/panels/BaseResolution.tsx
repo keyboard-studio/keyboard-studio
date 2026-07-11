@@ -52,6 +52,9 @@ export function BaseResolution({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<BaseKeyboard | null>(null);
+  // What the top search bar looks through: the suggested bases (default) or
+  // the full catalog. Widened via the toggle or the picker's zero-match action.
+  const [searchScope, setSearchScope] = useState<"suggested" | "all">("suggested");
 
   useEffect(() => {
     let live = true;
@@ -92,6 +95,11 @@ export function BaseResolution({
     [bases, target, languagesById],
   );
 
+  const suggestedIds = useMemo(
+    () => new Set(suggestions.map((s) => s.base.id)),
+    [suggestions],
+  );
+
   const heading: React.CSSProperties = {
     margin: "0 0 8px 0",
     fontSize: "1.1rem",
@@ -116,48 +124,70 @@ export function BaseResolution({
     );
 
   return (
-    <div style={{ color: "var(--app-text)", fontFamily: "var(--app-font)" }}>
+    <div data-testid="base-picker" style={{ color: "var(--app-text)", fontFamily: "var(--app-font)" }}>
+      {/* Back — at the top with the search bar, not below the suggestion cards. */}
+      {onBack !== undefined && (
+        <Button
+          variant="back"
+          data-testid="base-back"
+          onClick={onBack}
+          // marginTop:0 overrides the back variant's legacy bottom-of-panel
+          // margin now that the button sits at the top with the search bar.
+          style={{ marginTop: 0, marginBottom: 12 }}
+        >
+          &larr; Back
+        </Button>
+      )}
       <h2 style={heading}>Choose a starting keyboard</h2>
       <p style={subtle}>
         Based on your language and chosen script, here are the closest starting
-        points. Pick one, or choose another below.
+        points. Search above or pick a suggestion below.
       </p>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
-        {suggestions.map(({ base, reason }) => (
-          <Button
-            key={base.id}
-            variant="secondary"
-            data-testid={`base-card-${base.id}`}
-            onClick={() => onResolved(base)}
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 12,
-              padding: "10px 14px",
-              background: "var(--app-surface)",
-              border: "1px solid var(--app-border)",
-              borderRadius: 8,
-              color: "var(--app-text)",
-              fontSize: 14,
-              cursor: "pointer",
-              textAlign: "left",
-              fontFamily: "var(--app-font)",
-            }}
-          >
-            <span>
-              <strong>{base.displayName}</strong>{" "}
-              <span style={{ color: "var(--app-text-muted)", fontSize: 12 }}>({base.id})</span>
-            </span>
-            <Badge tone={REASON_TONE[reason]}>{REASON_LABEL[reason]}</Badge>
-          </Button>
-        ))}
-      </div>
-
-      <div style={{ borderTop: "1px solid var(--app-border)", paddingTop: 16 }}>
-        <p style={{ ...subtle, marginBottom: 8 }}>Or pick any base keyboard:</p>
-        <BaseKeyboardPicker value={picked} onChange={setPicked} target={target} />
+      {/* Search — at the top, scoped to the suggestions by default with a
+          toggle to widen to the full catalog. */}
+      <div style={{ marginBottom: 20 }}>
+        <div
+          role="group"
+          aria-label="Search scope"
+          style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}
+        >
+          <span style={{ fontSize: 12, color: "var(--app-text-muted)", fontFamily: "var(--app-font)" }}>
+            Search in:
+          </span>
+          {(["suggested", "all"] as const).map((scope) => {
+            const active = searchScope === scope;
+            return (
+              <Button
+                key={scope}
+                variant="secondary"
+                data-testid={`search-scope-${scope}`}
+                aria-pressed={active}
+                onClick={() => setSearchScope(scope)}
+                style={{
+                  padding: "3px 10px",
+                  background: active ? "var(--app-accent-subtle)" : "transparent",
+                  border: `1px solid ${active ? "var(--app-accent)" : "var(--app-border)"}`,
+                  borderRadius: 999,
+                  color: active ? "var(--app-text)" : "var(--app-text-muted)",
+                  fontSize: 12,
+                  cursor: "pointer",
+                  fontFamily: "var(--app-font)",
+                }}
+              >
+                {scope === "suggested" ? "Suggested" : "All keyboards"}
+              </Button>
+            );
+          })}
+        </div>
+        <BaseKeyboardPicker
+          value={picked}
+          onChange={setPicked}
+          target={target}
+          label="Search keyboards"
+          scopeIds={searchScope === "suggested" ? suggestedIds : undefined}
+          onSearchAll={() => setSearchScope("all")}
+        />
         <Button
           variant="secondary"
           data-testid="base-confirm"
@@ -179,25 +209,40 @@ export function BaseResolution({
         </Button>
       </div>
 
-      {onBack !== undefined && (
-        <Button
-          variant="secondary"
-          onClick={onBack}
-          style={{
-            marginTop: 20,
-            padding: "6px 14px",
-            background: "transparent",
-            border: "1px solid var(--app-border)",
-            borderRadius: 6,
-            color: "var(--app-text-muted)",
-            fontSize: 13,
-            cursor: "pointer",
-            fontFamily: "var(--app-font)",
-          }}
-        >
-          &larr; Back
-        </Button>
-      )}
+      <div style={{ borderTop: "1px solid var(--app-border)", paddingTop: 16 }}>
+        <p style={{ ...subtle, marginBottom: 8 }}>Suggested for you:</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {suggestions.map(({ base, reason }) => (
+            <Button
+              key={base.id}
+              variant="secondary"
+              data-testid={`base-card-${base.id}`}
+              onClick={() => onResolved(base)}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+                padding: "10px 14px",
+                background: "var(--app-surface)",
+                border: "1px solid var(--app-border)",
+                borderRadius: 8,
+                color: "var(--app-text)",
+                fontSize: 14,
+                cursor: "pointer",
+                textAlign: "left",
+                fontFamily: "var(--app-font)",
+              }}
+            >
+              <span>
+                <strong>{base.displayName}</strong>{" "}
+                <span style={{ color: "var(--app-text-muted)", fontSize: 12 }}>({base.id})</span>
+              </span>
+              <Badge tone={REASON_TONE[reason]}>{REASON_LABEL[reason]}</Badge>
+            </Button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

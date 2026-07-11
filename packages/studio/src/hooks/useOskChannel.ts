@@ -45,22 +45,21 @@ export function useOskChannel(
 
       if (!isOskEvent(event.data)) return;
 
-      const oskEvent = event.data;
-      setLastEvent(oskEvent);
+      setLastEvent(event.data);
 
-      switch (oskEvent.type) {
+      switch (event.data.type) {
         case "ENGINE_READY":
           setEngineReady(true);
           setEngineError(null);
           break;
         case "ENGINE_ERROR":
-          setEngineError(oskEvent.message);
+          setEngineError(event.data.message);
           break;
         case "TEXT_UPDATED":
-          setTextValue(oskEvent.value);
+          setTextValue(event.data.value);
           break;
         case "KEY_TAPPED":
-          onKeyTapRef.current?.(oskEvent.keyId);
+          onKeyTapRef.current?.(event.data.keyId);
           break;
       }
     }
@@ -74,8 +73,10 @@ export function useOskChannel(
   const send = useCallback((cmd: OskCommand): void => {
     const frame = iframeRefRef.current.current;
     if (!frame || !frame.contentWindow) return;
-    // [TEMP] targetOrigin is "*" for dev; tighten to app origin in production build.
-    frame.contentWindow.postMessage(cmd, "*");
+    // Scoped to our own origin — the frame is same-origin-relative
+    // (src="/osk-frame.html") in every deployment, so this never needs a
+    // hardcoded value.
+    frame.contentWindow.postMessage(cmd, window.location.origin);
   }, []);
 
   return { send, lastEvent, engineReady, engineError, textValue };

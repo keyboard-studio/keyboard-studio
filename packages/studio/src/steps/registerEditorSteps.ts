@@ -17,9 +17,8 @@
 // Pool ↔ manifest reconciliation:
 //   - scaffoldStep was declared here but never placed in the manifest. The
 //     copy-track scaffold parameters (keyboardId, displayName) are collected
-//     by ProjectNameStepAdapter and passed through its onComplete result — they
-//     do not need a separate scaffold step. scaffoldStep is removed from this
-//     pool so the pool matches the manifest exactly.
+//     by ProjectNameStepFactoryComponent and passed through its onComplete result —
+//     no separate scaffold step needed. scaffoldStep removed from the pool.
 
 import { irPath } from "@keyboard-studio/contracts";
 import type { EditorStep } from "./types.ts";
@@ -28,83 +27,89 @@ import { CarveAdapter } from "../editors/adapters/carveAdapter.tsx";
 import { AddPhysicalAdapter } from "../editors/adapters/addPhysicalAdapter.tsx";
 import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
 import {
-  TrackStepAdapter,
-  ProjectNameStepAdapter,
-  TrackOneIdentityPanelAdapter,
   BaseResolutionAdapter,
+  IdentityLiteAdapter,
 } from "../editors/adapters/panelAdapters.tsx";
+import {
+  TrackStepFactoryComponent,
+  ProjectNameStepFactoryComponent,
+  PhaseFStepFactoryComponent,
+} from "../editors/adapters/flowStepOptions.tsx";
+
+// ---------------------------------------------------------------------------
+// Helper for common step structure
+// ---------------------------------------------------------------------------
+
+/** Creates an EditorStep with common defaults, reducing boilerplate. */
+function step(
+  base: Pick<EditorStep, "id" | "title" | "component"> &
+    Partial<Omit<EditorStep, "kind" | "id" | "title" | "component">>,
+): EditorStep {
+  return {
+    kind: "editor-step",
+    spine: true,
+    inputs: [],
+    writes: [],
+    ...base,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Panel steps (wizard panels — non-gallery)
 // ---------------------------------------------------------------------------
 
 /**
- * Identity step: the TrackOneIdentityPanel (continuous identity editor).
+ * Identity step: IdentityLiteAdapter (continuous identity editor).
  * No back affordance — entry-point panel.
+ * T011 (spec 028 Stage 5): real IdentityLiteAdapter replaces the
+ * TrackOneIdentityPanelAdapter placeholder.
  */
-export const identityStep: EditorStep = {
-  kind: "editor-step",
+export const identityStep: EditorStep = step({
   id: "identity",
   title: "Keyboard Identity",
-  spine: true,
-  component: TrackOneIdentityPanelAdapter,
-  inputs: [],
-  writes: [],
-};
+  component: IdentityLiteAdapter,
+  flowRefs: ["identity_lite"],
+});
 
 /**
  * Choose-base step: BaseResolution (keyboard base picker ONLY).
  * Track selection is a separate manifest step (trackStep).
  */
-export const chooseBaseStep: EditorStep = {
-  kind: "editor-step",
+export const chooseBaseStep: EditorStep = step({
   id: "choose_base",
   title: "Choose Base Keyboard",
-  spine: true,
   component: BaseResolutionAdapter,
-  inputs: [],
-  writes: [],
-};
+});
 
 /**
  * Track step: TrackStep (copy vs adapt choice).
- * Spine:true — every author chooses a track.
+ * Every author chooses a track.
+ * Reads session-derived header.bcp47 + resolved base display name (header.name).
+ * DEC-D2: branch selection only — no IR leaf in Phase 1, so writes is [].
  */
-export const trackStep: EditorStep = {
-  kind: "editor-step",
+export const trackStep: EditorStep = step({
   id: "track",
   title: "Authoring Track",
-  spine: true,
-  component: TrackStepAdapter,
-  // track reads the session-derived header.bcp47 (array) + the resolved base
-  // display name (header.name) to frame the copy-vs-adapt choice.
+  component: TrackStepFactoryComponent,
   inputs: [irPath("header", "bcp47"), irPath("header", "name")],
-  // DEC-D2 (Matt 2026-06-29): branch selection only (copy vs adapt) — no IR leaf
-  // in Phase 1, so writes is []. Empty writes orphans no input and never reds C5.
-  writes: [],
-};
+  flowRefs: ["track"],
+});
 
 /**
  * Project name step: ProjectNameStep (copy-track only).
- * Declared spine:true here (the pool default); the manifest overrides it to
- * spine:false with joinTarget:"characters" to model the CYOA copy-only fork.
- * ProjectNameStepAdapter collects both displayName and keyboardId (the scaffold
- * params) — no separate scaffold step is needed.
+ * Declared spine:true here; manifest overrides to spine:false with
+ * joinTarget:"characters" for the CYOA copy-only fork.
+ * Collects scaffold params displayName + keyboardId — no separate scaffold step.
+ * FR-004: header.script is intentionally NOT declared (does not exist in KeyboardIR).
  */
-export const projectNameStep: EditorStep = {
-  kind: "editor-step",
+export const projectNameStep: EditorStep = step({
   id: "project_name",
   title: "Project Name",
-  spine: true,
-  component: ProjectNameStepAdapter,
-  // project_name (copy-track fork) reads the session-derived header.bcp47 to
-  // pre-fill, and collects the scaffold params displayName + keyboardId —
-  // expressible as the existing header.name / header.keyboardId IR leaves.
-  // NB: irPath('header','script') is intentionally NOT declared (it does not
-  // exist in KeyboardIR — FR-004).
+  component: ProjectNameStepFactoryComponent,
   inputs: [irPath("header", "bcp47")],
   writes: [irPath("header", "name"), irPath("header", "keyboardId")],
-};
+  flowRefs: ["project_name"],
+});
 
 // ---------------------------------------------------------------------------
 // Gallery steps (carve + add galleries)
@@ -112,116 +117,87 @@ export const projectNameStep: EditorStep = {
 
 /**
  * Carve step: CarveGallery (remove-mode, distinct from add galleries).
+ * Self-read: reads and rewrites groups[]/stores[]/raw[] without upstream producer.
+ * inputs stays [] to avoid C2 data cycle with mechanisms/touch (FR-002).
+ * CARVE_WRITES: groups[] / stores[] / raw[] (editorMutate.ts).
  */
-export const carveStep: EditorStep = {
-  kind: "editor-step",
+export const carveStep: EditorStep = step({
   id: "carve",
   title: "Carve Keys",
-  spine: true,
+  layout: "full",
   component: CarveAdapter,
-  // Carve's deletion overlay reads and rewrites the same groups[]/stores[]/raw[]
-  // arrays (the surviving carve surface) — a self-read, not an upstream-producer
-  // dependency. Declaring those coarse paths as manifest-graph INPUTS would form a
-  // carve<->mechanisms<->touch C2 data cycle (all three read+write groups/stores
-  // at array granularity), so inputs stays [] in P1: the base layout has no
-  // distinct manifest producer to depend on, and C5 needs no producer for a path a
-  // step also writes. The load-bearing FR-002 contract is the `writes` set below.
-  inputs: [],
-  // CARVE_WRITES (editorMutate.ts:42-46): groups[] / stores[] / raw[].
   writes: [...CARVE_WRITES],
-};
+});
 
 /**
  * Mechanisms step: MechanismGallery (physical key assignment — Phase C).
  * The reducer fires lockDesktop() when this step completes.
+ * Self-read: assigns onto groups[]/stores[] without upstream producer.
+ * inputs stays [] to avoid C2 data cycle (FR-002).
+ * ADD_GALLERY_WRITES: groups[] / stores[] (editorMutate.ts).
  */
-export const mechanismsStep: EditorStep = {
-  kind: "editor-step",
+export const mechanismsStep: EditorStep = step({
   id: "mechanisms",
   title: "Assign Mechanisms",
-  spine: true,
+  layout: "full",
   component: AddPhysicalAdapter,
   surface: "physical",
-  // Mechanisms assigns onto the base layout groups[]/stores[] it also writes — a
-  // self-read. As with carve, declaring those coarse paths as inputs would form a
-  // C2 data cycle, so inputs stays [] in P1; the FR-002 contract is the `writes`
-  // set (ADD_GALLERY_WRITES, editorMutate.ts:203-206): groups[] / stores[].
-  inputs: [],
   writes: [...ADD_GALLERY_WRITES],
-};
+});
 
 /**
- * Touch seed source step: off-spine fork that lets the author choose how
- * the touch surface is seeded. Rejoins the spine at the touch carve+add step.
- * spine: false (FR-013, M4).
+ * Touch seed source step: off-spine fork for choosing touch surface seed.
+ * Rejoins the spine at the touch carve+add step (FR-013, M4).
  */
-export const touchSeedSourceStep: EditorStep = {
-  kind: "editor-step",
+export const touchSeedSourceStep: EditorStep = step({
   id: "touch_seed_source",
   title: "Touch Seed Source",
   spine: false,
   joinTarget: "touch",
   component: AddTouchAdapter,
   surface: "touch",
-  inputs: [],
-  writes: [],
-};
+});
 
 /**
  * Touch step: TouchGallery (touch key assignment — Phase E).
- * The reducer fires the buildTouchLayoutJson block when this step completes.
+ * The reducer fires buildTouchLayoutJson when this step completes.
+ * Seeds from locked physical layout; inputs stays [] to avoid C2 cycle (FR-002).
+ * TOUCH_WRITES: touchLayout...keys[] + touchLayout.nodeIds[] (editorMutate.ts).
  */
-export const touchStep: EditorStep = {
-  kind: "editor-step",
+export const touchStep: EditorStep = step({
   id: "touch",
   title: "Touch Layout",
-  spine: true,
+  layout: "full",
   component: AddTouchAdapter,
   surface: "touch",
-  // Touch seeds from the locked physical layout (groups[]/stores[]) that
-  // carve/mechanisms produce; declaring those as inputs would form a C2 data
-  // cycle with carve/mechanisms (which read+write the same arrays), so inputs
-  // stays [] in P1. The FR-002 contract is the `writes` set below.
-  inputs: [],
-  // TOUCH_WRITES (editorMutate.ts:172): touchLayout.platforms[].layers[].rows[].keys[]
-  // (+ touchLayout.nodeIds[]).
   writes: [...TOUCH_WRITES],
-};
+});
 
 // ---------------------------------------------------------------------------
-// Help step (Phase F — questions phase, but represented here as an editor step
-// placeholder until the question-step version is wired from the registry).
+// Help step (Phase F)
 // ---------------------------------------------------------------------------
 
 /**
- * Help step: placeholder for the Help/Phase F question phase.
- * In P4b this is a spine-only descriptor; the actual content resolves
- * through the PhaseF survey runner in SurveyView (T028).
+ * Help step: Phase F question phase (Help & Tips).
+ * Spine descriptor; content resolves through PhaseF survey runner (T028).
+ * spec 029: PhaseFStepFactoryComponent matches mounted component (SC-005).
  */
-export const helpStep: EditorStep = {
-  kind: "editor-step",
+export const helpStep: EditorStep = step({
   id: "help",
   title: "Help & Tips",
-  spine: true,
-  component: TrackOneIdentityPanelAdapter, // placeholder — wired in T028
-  inputs: [],
-  writes: [],
-};
+  component: PhaseFStepFactoryComponent,
+  flowRefs: ["phase_f_helpdocs"],
+});
 
 /**
- * Package step: reserved / out-of-scope for v1. Present as a spine placeholder
- * so the manifest spine is complete and the dashboard shows it as a future step.
- * The component is a stub that never advances (FR-012 "reserved").
+ * Package step: reserved / out-of-scope for v1.
+ * Spine placeholder for completeness; stub component never advances (FR-012).
  */
-export const packageStep: EditorStep = {
-  kind: "editor-step",
+export const packageStep: EditorStep = step({
   id: "package",
   title: "Package (reserved)",
-  spine: true,
-  component: TrackOneIdentityPanelAdapter, // stub — out of scope for v1
-  inputs: [],
-  writes: [],
-};
+  component: PhaseFStepFactoryComponent,
+});
 
 // ---------------------------------------------------------------------------
 // Exported list (unordered pool — the manifest imposes the spine order)

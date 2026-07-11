@@ -1,22 +1,24 @@
 // ResizeHandle — shared drag-handle divider used by PreviewScreen and OutputScreen.
 // Renders the vertical separator div with hover highlighting and pointer-capture
-// for resizing the two-pane layout.
+// for resizing the two-pane layout. Hover state is local (purely visual).
+
+import { useState } from "react";
 
 interface ResizeHandleProps {
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
-  hovered: boolean;
-  onHoverChange: (hovered: boolean) => void;
 }
 
-export function ResizeHandle({ onPointerDown, hovered, onHoverChange }: ResizeHandleProps) {
+export function ResizeHandle({ onPointerDown }: ResizeHandleProps) {
+  const [hovered, setHovered] = useState(false);
+
   return (
     <div
       role="separator"
       aria-label="Resize panes"
       aria-orientation="vertical"
       onPointerDown={onPointerDown}
-      onMouseEnter={() => onHoverChange(true)}
-      onMouseLeave={() => onHoverChange(false)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         width: 6,
         flexShrink: 0,

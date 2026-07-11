@@ -27,12 +27,6 @@ export function useValidator(kmnSource: string | null): ValidatorResult {
       setRunning(false);
       return;
     }
-    // Stale-guard: a newer debounced source must win even if its async
-    // validation resolves before an in-flight older one. Flip on cleanup.
-    // The guard is required in .finally() too: a superseded cycle must NOT
-    // clear `running`, because the newer cycle (which already called
-    // setRunning(true)) is still in flight — clearing it here would race it
-    // to a spurious running:false. Only the live cycle controls `running`.
     let cancelled = false;
     setRunning(true);
     validateWithOracle(debouncedSource)
@@ -48,7 +42,7 @@ export function useValidator(kmnSource: string | null): ValidatorResult {
         setFindings([VALIDATOR_ERROR_FINDING]);
       })
       .finally(() => {
-        if (cancelled) return;
+        if (cancelled) return; // Only the live cycle controls `running`.
         setRunning(false);
       });
     return () => {

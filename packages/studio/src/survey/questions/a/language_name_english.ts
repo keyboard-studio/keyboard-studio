@@ -1,5 +1,11 @@
-// Per-question module: language_name_english (Phase A)
-// Ported verbatim from content/flows/phase_a_identity.yaml.
+// Per-question module: language_name_english (Phase A — PROPOSED flow)
+//
+// Mirrors the live IdentityLite English-name-first redesign (spec 030 FR-015):
+// the English name is the FIRST identity question, an @langtags_names picker,
+// and advances to the own-language name. The proposed Phase A flow is
+// display-only (rendered as a graph in the Flow Map, not run live), so this
+// module carries the same shape as its live counterpart il_language_english for
+// consistency; no runtime resolver is wired for it.
 
 import type { QuestionModule, ValidationResult, MutateContext } from "../../types.ts";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
@@ -10,25 +16,20 @@ export const definition = {
   id: "language_name_english",
   prompt: "What is your language called in English?",
   help_text:
-    "The English name used in directories and official language lists, for " +
-    "example: Bafut, Swahili, Hindi. If your language does not have a " +
-    "widely-used English name, repeat the name you gave above.",
-  type: "text" as const,
+    "Start typing your language's English name and pick it from the list " +
+    "(for example: Bafut, Swahili, Hindi). When two languages share a name, " +
+    "the list shows the region and local name so you can choose the right one. " +
+    "If your language is not listed, just type its English name and continue.",
+  type: "autocomplete" as const,
+  options_source: "@langtags_names" as const,
   required: true,
-  next: "iso_code",
+  next: "language_name_autonym",
 } satisfies import("../../types.ts").FlowQuestion;
 
 export function validate(
   value: string | string[] | undefined,
 ): ValidationResult {
-  const trimmed =
-    typeof value === "string"
-      ? value.trim()
-      : Array.isArray(value)
-        ? value.join("").trim()
-        : "";
-
-  if (trimmed.length === 0) {
+  if (asText(value).length === 0) {
     return { ok: false, code: "required", message: "English language name is required." };
   }
   return { ok: true };

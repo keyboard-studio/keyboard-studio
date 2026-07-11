@@ -22,6 +22,7 @@ import { useEffect, useRef, useState } from "react";
 import { validateKeyboardId } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { TextField, Label, ErrorText } from "../../ui/index.ts";
+import { CARD_BORDER, TEXT_DIM, WARNING } from "../../ui/theme.ts";
 
 // ---------------------------------------------------------------------------
 // Component
@@ -38,10 +39,9 @@ export function TrackOneIdentityPanel() {
   const [displayName, setDisplayName] = useState<string>("");
   const [keyboardId, setKeyboardId] = useState<string>("");
 
-  // Track whether the user has interacted with each field yet (so we don't
-  // show errors on pristine fields).
+  // Track whether the user has interacted with the id field yet (so we don't
+  // show errors on pristine field).
   const [idTouched, setIdTouched] = useState(false);
-  const [nameTouched, setNameTouched] = useState(false);
 
   // Seed from store whenever the working copy is (re-)instantiated.
   // We guard with a ref to avoid re-seeding after the user has already typed.
@@ -58,7 +58,6 @@ export function TrackOneIdentityPanel() {
     setKeyboardId(seedId);
     setDisplayName(seedName);
     setIdTouched(false);
-    setNameTouched(false);
     seededForBaseRef.current = baseKeyboard.id;
   }, [baseKeyboard, identity]);
 
@@ -76,7 +75,6 @@ export function TrackOneIdentityPanel() {
   function handleDisplayNameChange(e: React.ChangeEvent<HTMLInputElement>) {
     const next = e.currentTarget.value;
     setDisplayName(next);
-    setNameTouched(true);
     setIdentity({
       ...identity,
       displayName: next,
@@ -109,7 +107,7 @@ export function TrackOneIdentityPanel() {
         gap: 12,
         padding: 16,
         background: "#161b22",
-        border: "1px solid #283040",
+        border: `1px solid ${CARD_BORDER}`,
         borderRadius: 12,
       }}
     >
@@ -127,14 +125,14 @@ export function TrackOneIdentityPanel() {
 
       {/* Display name */}
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        {/* one-off: hint #9aa7b8 — Label default is #e6edf3; override via style passthrough */}
+        {/* one-off: hint TEXT_DIM — Label default is #e6edf3; override via style passthrough */}
         <Label
           htmlFor="identity-display-name"
-          style={{ fontSize: 12, color: "#9aa7b8", fontWeight: 600, marginBottom: 0 }}
+          style={{ fontSize: 12, color: TEXT_DIM, fontWeight: 600, marginBottom: 0 }}
         >
           Display name
         </Label>
-        {/* one-off: input border #283040 — TextField BORDER is #30363d; override via style passthrough */}
+        {/* one-off: input border CARD_BORDER — TextField BORDER is #30363d; override via style passthrough */}
         <TextField
           id="identity-display-name"
           value={displayName}
@@ -142,32 +140,27 @@ export function TrackOneIdentityPanel() {
           placeholder="e.g. Hausa (SIL)"
           autoComplete="off"
           aria-describedby="identity-display-name-hint"
-          style={{ border: "1px solid #283040", fontSize: 13 }}
+          style={{ border: `1px solid ${CARD_BORDER}`, fontSize: 13 }}
         />
-        {/* one-off: hint #9aa7b8 — ErrorText hint renders var(--app-text-muted), not #9aa7b8 */}
+        {/* one-off: hint TEXT_DIM — ErrorText hint renders var(--app-text-muted), not TEXT_DIM */}
         <div
           id="identity-display-name-hint"
-          style={{ fontSize: 11, color: "#9aa7b8", lineHeight: 1.4 }}
+          style={{ fontSize: 11, color: TEXT_DIM, lineHeight: 1.4 }}
         >
           Shown on the spacebar in the on-screen keyboard.
         </div>
-        {nameTouched && displayName.trim().length === 0 && (
-          <ErrorText tone="error">
-            Display name cannot be empty.
-          </ErrorText>
-        )}
       </div>
 
       {/* Keyboard id */}
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        {/* one-off: hint #9aa7b8 — Label default is #e6edf3; override via style passthrough */}
+        {/* one-off: hint TEXT_DIM — Label default is #e6edf3; override via style passthrough */}
         <Label
           htmlFor="identity-keyboard-id"
-          style={{ fontSize: 12, color: "#9aa7b8", fontWeight: 600, marginBottom: 0 }}
+          style={{ fontSize: 12, color: TEXT_DIM, fontWeight: 600, marginBottom: 0 }}
         >
           Keyboard ID
         </Label>
-        {/* one-off: input border #283040 — TextField BORDER is #30363d; override via style passthrough */}
+        {/* one-off: input border CARD_BORDER — TextField BORDER is #30363d; override via style passthrough */}
         <TextField
           id="identity-keyboard-id"
           mono
@@ -187,7 +180,7 @@ export function TrackOneIdentityPanel() {
           }
           aria-invalid={idTouched && !isIdValid}
           style={{
-            border: `1px solid ${idTouched && !isIdValid ? "#7a2a2a" : "#283040"}`,
+            border: `1px solid ${CARD_BORDER}`,
             fontSize: 13,
           }}
         />
@@ -196,23 +189,23 @@ export function TrackOneIdentityPanel() {
             <ErrorText tone="error">{idError}</ErrorText>
           </div>
         ) : isIdUntouched ? (
-          // one-off: role=status + #d29922 advisory — no ErrorText tone matches
+          // one-off: role=status + WARNING advisory — no ErrorText tone matches
           // (ErrorText "warning" gives role="alert"; "hint" gives var(--app-text-muted)).
           // Preserved inline to avoid behavioral diff on role and color.
           <div
             id="identity-id-base-warn"
             role="status"
             aria-live="polite"
-            style={{ fontSize: 12, color: "#d29922", lineHeight: 1.4 }}
+            style={{ fontSize: 12, color: WARNING, lineHeight: 1.4 }}
           >
             [WARN] This is still the base keyboard&rsquo;s id. Set a unique id
             before submitting to the community repository.
           </div>
         ) : (
-          // one-off: hint #9aa7b8 — ErrorText hint renders var(--app-text-muted), not #9aa7b8
+          // one-off: hint TEXT_DIM — ErrorText hint renders var(--app-text-muted), not TEXT_DIM
           <div
             id="identity-id-hint"
-            style={{ fontSize: 11, color: "#9aa7b8", lineHeight: 1.4 }}
+            style={{ fontSize: 11, color: TEXT_DIM, lineHeight: 1.4 }}
           >
             1&ndash;255 chars; no spaces, parens, brackets, or commas. Used as
             the zip filename.

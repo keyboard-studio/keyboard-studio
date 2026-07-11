@@ -17,7 +17,7 @@ import type { FlowQuestion, FlowOption } from "../../src/survey/types.ts";
 // ?raw YAML imports (Vite handles these; typed via src/vite-env.d.ts)
 // ---------------------------------------------------------------------------
 
-import phaseAModularRaw from "../../../../content/flows/phase_a_identity.modular.yaml?raw";
+import phaseAModularRaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
 import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
 import identityLiteModularRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
 import trackModularRaw from "../../../../content/flows/track.modular.yaml?raw";
@@ -33,6 +33,7 @@ function projectQuestion(q: FlowQuestion): {
   help_text: string | undefined;
   type: string;
   options: Array<{ value: string; label: string }> | undefined;
+  options_source: string | undefined;
   required: boolean | undefined;
   next: FlowQuestion["next"];
 } {
@@ -47,6 +48,7 @@ function projectQuestion(q: FlowQuestion): {
           label: o.label,
         }))
       : undefined,
+    options_source: q.options_source,
     required: q.required,
     next: q.next,
   };
@@ -74,8 +76,8 @@ describe("flow-parity: phase_a_identity — questions[]", () => {
   it("expected question IDs in order", () => {
     expect(modular.questions.map((q) => q.id)).toEqual([
       "desktop_first_notice",
-      "language_name_autonym",
       "language_name_english",
+      "language_name_autonym",
       "iso_code",
       "region",
       "primary_script",
@@ -197,8 +199,8 @@ describe("flow-parity: phase_f_helpdocs — questions[]", () => {
 describe("flow-parity: identity_lite — questions[]", () => {
   const modular = loadModularFlow(identityLiteModularRaw);
 
-  it("has exactly 5 questions", () => {
-    expect(modular.questions.length).toBe(5);
+  it("has exactly 6 questions", () => {
+    expect(modular.questions.length).toBe(6);
   });
 
   it("flow_id is identity_lite", () => {
@@ -206,9 +208,15 @@ describe("flow-parity: identity_lite — questions[]", () => {
   });
 
   it("question IDs in order", () => {
+    // spec 030 FR-009: English-name picker (il_language_english, @langtags_names)
+    // first; autonym is a choice over the resolved local names; il_language_code
+    // is a code CONFIRMATION seeded from the resolved entry. il_language_region
+    // (US3) is a conditional step reached only when the picked language is
+    // region-ambiguous; it sits in the membership after the English-name step.
     expect(modular.questions.map((q) => q.id)).toEqual([
-      "il_language_autonym",
       "il_language_english",
+      "il_language_region",
+      "il_language_autonym",
       "il_language_code",
       "il_target_script",
       "il_script_not_supported",

@@ -1,8 +1,5 @@
-// MultiSelect — checkbox-row group.
-// Replaces MultiSelectField from survey/QuestionField.tsx (FR-005 zero-diff).
-// Accent color #6ea8fe and row styles match MultiSelectField verbatim.
-
 import React from "react";
+import { TEXT_MAIN, ACCENT } from "./theme.ts";
 
 export interface MultiSelectOption {
   value: string;
@@ -39,13 +36,18 @@ const OPTION_ROW_STYLE: React.CSSProperties = {
 
 const OPTION_LABEL_STYLE: React.CSSProperties = {
   fontSize: 13,
-  color: "#e6edf3",
+  color: TEXT_MAIN,
   lineHeight: 1.5,
   cursor: "pointer",
 };
 
-/** Checkbox-row group. Renders role="group" identical to MultiSelectField
- *  (FR-005). accentColor #6ea8fe is preserved verbatim. */
+const CHECKBOX_STYLE: React.CSSProperties = {
+  marginTop: 2,
+  flexShrink: 0,
+  accentColor: ACCENT,
+};
+
+/** Checkbox-row group. */
 export function MultiSelect({
   options,
   selected,
@@ -53,26 +55,25 @@ export function MultiSelect({
   idPrefix = "multiselect-",
   ariaLabelledby,
 }: MultiSelectProps): React.ReactElement {
-  function toggle(optValue: string): void {
+  const toggle = (optValue: string): void => {
     const next = selected.includes(optValue)
       ? selected.filter((v) => v !== optValue)
       : [...selected, optValue];
     onChange(next);
-  }
+  };
 
   return (
     <div role="group" aria-labelledby={ariaLabelledby}>
       {options.map((opt) => {
-        const checked = selected.includes(opt.value);
         const inputId = `${idPrefix}${opt.value}`;
         return (
           <label key={opt.value} htmlFor={inputId} style={OPTION_ROW_STYLE}>
             <input
               type="checkbox"
               id={inputId}
-              checked={checked}
+              checked={selected.includes(opt.value)}
               onChange={() => toggle(opt.value)}
-              style={{ marginTop: 2, flexShrink: 0, accentColor: "#6ea8fe" }}
+              style={CHECKBOX_STYLE}
             />
             <span style={OPTION_LABEL_STYLE}>{opt.label}</span>
           </label>

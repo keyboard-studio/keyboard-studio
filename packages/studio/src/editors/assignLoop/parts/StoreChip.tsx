@@ -42,6 +42,17 @@ export const StoreChip = memo(function StoreChip({ chip, off, onToggle }: StoreC
     onToggle(chip.chipId);
   };
 
+  const inactive = off || disabled;
+  const chipStyle: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    padding: label ? '9px 10px' : '9px 13px', borderRadius: 8,
+    cursor: disabled ? 'default' : 'pointer',
+    border: `1px solid var(--app-border${inactive ? '' : '-strong'})`,
+    borderTop: `3px solid ${inactive ? 'var(--app-border-strong)' : KIND_COLOR.store}`,
+    background: inactive ? 'var(--app-surface-2)' : 'var(--app-surface)',
+    opacity: off ? 0.6 : disabled ? 0.7 : 1,
+  };
+
   return (
     <button
       type="button"
@@ -52,15 +63,7 @@ export const StoreChip = memo(function StoreChip({ chip, off, onToggle }: StoreC
       onBlur={clearInfo}
       aria-disabled={disabled}
       aria-pressed={!disabled ? !off : undefined}
-      style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        padding: label ? '9px 10px' : '9px 13px', borderRadius: 8,
-        cursor: disabled ? 'default' : 'pointer',
-        border: '1px solid ' + (off || disabled ? 'var(--app-border)' : 'var(--app-border-strong)'),
-        borderTop: '3px solid ' + (off || disabled ? 'var(--app-border-strong)' : KIND_COLOR.store),
-        background: off || disabled ? 'var(--app-surface-2)' : 'var(--app-surface)',
-        opacity: off ? 0.6 : disabled ? 0.7 : 1,
-      }}
+      style={chipStyle}
     >
       {label ? (
         <span style={{ font: '600 10px/1 var(--app-font-mono)', color: off ? 'var(--app-text-subtle)' : 'var(--app-text-muted)', letterSpacing: '0.04em' }} title={codepoint}>

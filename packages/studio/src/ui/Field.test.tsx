@@ -26,30 +26,15 @@ vi.mock("./Label.tsx", () => ({
     children,
     htmlFor,
     required,
-    style,
   }: {
     children?: React.ReactNode;
     htmlFor?: string;
     required?: boolean;
-    style?: React.CSSProperties;
   }) => (
-    <label
-      htmlFor={htmlFor}
-      style={{
-        display: "block",
-        fontSize: 13,
-        color: "#e6edf3",
-        fontWeight: 600,
-        marginBottom: 6,
-        ...style,
-      }}
-    >
+    <label htmlFor={htmlFor}>
       {children}
       {required === true && (
-        <span
-          aria-label="required"
-          style={{ color: "#e74c3c", marginLeft: 4 }}
-        >
+        <span aria-label="required" style={{ color: "#e74c3c", marginLeft: 4 }}>
           *
         </span>
       )}

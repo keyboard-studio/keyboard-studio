@@ -1,16 +1,107 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
-import { toRailNodes, nodeState } from '../../lib/irToCarveNodes.ts';
-import type { CarveNode } from '../../lib/irToCarveNodes.ts';
+import { toRailNodes, nodeState, buildCharWeb } from '../../lib/irToCarveNodes.ts';
+import type { CarveNode, CharLocation } from '../../lib/irToCarveNodes.ts';
+import { KIND_COLOR } from '../assignLoop/parts/KindBadge.tsx';
 import { StatusBar } from '../assignLoop/parts/StatusBar.tsx';
 import type { RemovedItem } from '../assignLoop/parts/StatusBar.tsx';
 import { DepBanner } from '../assignLoop/parts/DepBanner.tsx';
 import type { DepNode } from '../assignLoop/parts/DepBanner.tsx';
 import { Rail } from '../assignLoop/parts/Rail.tsx';
 import { Inspector } from '../assignLoop/parts/Inspector.tsx';
-import { InfoView } from '../assignLoop/parts/InfoView.tsx';
+import { InfoView, capabilityHint } from '../assignLoop/parts/InfoView.tsx';
 import { InfoIcon } from '../assignLoop/parts/carveShared.tsx';
+import { ConfirmDialog } from '../assignLoop/parts/ConfirmDialog.tsx';
 import { useHoverInfoStore } from '../../stores/hoverInfoStore.ts';
+import { collectCharContributors } from '@keyboard-studio/engine';
+import type { CharContributors } from '@keyboard-studio/engine';
+import type { KeyboardIR, RemovalCapability } from '@keyboard-studio/contracts';
+
+/** Pending cascade state — set when the user clicks a cross-wired chip. */
+interface PendingCascade {
+  gid: string;
+  targetChar: string;
+  /** 'remove' when clicking a live chip; 'restore' when clicking an already-removed one. */
+  mode: 'remove' | 'restore';
+  /** How many contributors will actually change (removable to remove, or restorable to restore). */
+  actionCount: number;
+  /** restore mode: the item-channel ids to un-delete. */
+  restoreIds: string[];
+  /** contributors.ruleNodeIds is the REMOVABLE set only; blocked carries the warnings (remove mode). */
+  contributors: CharContributors;
+}
+
+interface BuildPendingCascadeArgs {
+  ir: KeyboardIR | null;
+  gid: string;
+  targetChar: string;
+  /** The clicked chip's own removal capability; undefined when the caller has none (store chips). */
+  clickedCapability?: RemovalCapability | undefined;
+  /** The clicked chip's card name, used only in the not-removable-clicked-chip warning. */
+  clickedLabel: string;
+  isItemDeleted: (id: string) => boolean;
+  removalCapabilities: Map<string, RemovalCapability>;
+  nodes: CarveNode[];
+}
+
+/**
+ * Pure resolver shared by the glyph-chip (handleCascadeDelete) and store-chip
+ * (handleStoreChipCascade) cascade handlers. Runs collectCharContributors for
+ * targetChar and decides whether the click should plain-toggle (returns null)
+ * or open the cascade ConfirmDialog (returns a PendingCascade). Only the
+ * caller-resolved clickedCapability/clickedLabel differ between callers —
+ * store chips carry no per-rule capability, so they pass undefined / 'this character'.
+ */
+function buildPendingCascade({
+  ir, gid, targetChar, clickedCapability, clickedLabel, isItemDeleted, removalCapabilities, nodes,
+}: BuildPendingCascadeArgs): PendingCascade | null {
+  // No IR to analyse → plain single-chip toggle.
+  if (ir == null) return null;
+
+  const found: CharContributors = collectCharContributors(ir, targetChar);
+  const isNotRemovable = (id: string) => (removalCapabilities.get(id) ?? '').startsWith('not-removable:');
+  const clickedIsNotRemovable = (clickedCapability ?? '').startsWith('not-removable:');
+
+  // --- RESTORE: the clicked chip is currently removed ---
+  if (isItemDeleted(gid)) {
+    const restoreIds = [...found.ruleNodeIds, ...found.storeSlotIds].filter((id) => isItemDeleted(id));
+    if (!restoreIds.includes(gid)) restoreIds.push(gid);
+    if (restoreIds.length <= 1) return null;
+    return {
+      gid, targetChar, mode: 'restore', actionCount: restoreIds.length, restoreIds,
+      contributors: { ...found, blocked: [] },
+    };
+  }
+
+  // --- REMOVE: the clicked chip is live ---
+  const removableRuleIds = found.ruleNodeIds.filter((id) => !isNotRemovable(id));
+  const blockedRuleIds = found.ruleNodeIds.filter(isNotRemovable);
+  const ruleLabel = (id: string): string => {
+    for (const node of nodes) if (node.glyphs?.some((g) => g.gid === id)) return node.name;
+    return 'an advanced rule';
+  };
+  const blocked = [
+    ...found.blocked,
+    ...blockedRuleIds.map((id) => ({ label: ruleLabel(id), reason: capabilityHint(removalCapabilities.get(id) ?? 'not-removable:unknown') })),
+  ];
+  // The clicked "!" chip is often NOT a plain single-char producer, so it never
+  // lands in found.ruleNodeIds/blockedRuleIds — add it explicitly so the warning
+  // box always names the not-removable chip the user actually clicked.
+  if (clickedIsNotRemovable && !blockedRuleIds.includes(gid)) {
+    blocked.push({ label: clickedLabel, reason: capabilityHint(clickedCapability ?? 'not-removable:unknown') });
+  }
+
+  const removableCount = removableRuleIds.length + found.storeSlotIds.length;
+
+  // Plain toggle (no dialog) ONLY for a removable chip that is its char's sole
+  // producer with nothing blocked. A not-removable chip ALWAYS opens the dialog.
+  if (!clickedIsNotRemovable && removableCount <= 1 && blocked.length === 0) return null;
+
+  return {
+    gid, targetChar, mode: 'remove', actionCount: removableCount, restoreIds: [],
+    contributors: { ...found, ruleNodeIds: removableRuleIds, blocked },
+  };
+}
 
 interface CarveGalleryProps {
   onComplete: () => void;
@@ -32,6 +123,9 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   const restoreAll = useWorkingCopyStore((s) => s.restoreAll);
   const keepAll = useWorkingCopyStore((s) => s.keepAll);
 
+  const cascadeDelete = useWorkingCopyStore((s) => s.cascadeDelete);
+  const cascadeRestore = useWorkingCopyStore((s) => s.cascadeRestore);
+
   const setInfo = useHoverInfoStore((s) => s.setInfo);
   const clearInfo = useHoverInfoStore((s) => s.clearInfo);
 
@@ -39,6 +133,10 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   useEffect(() => () => clearInfo(), [clearInfo]);
 
   const nodes = useMemo(() => (ir ? toRailNodes(ir, removalCapabilities) : []), [ir, removalCapabilities]);
+
+  // Cross-reference web: character → all the group/pattern/store cards it lives in.
+  // Built ONCE per node set (not per glyph). Powers the summary tags on each card.
+  const charWeb = useMemo(() => buildCharWeb(nodes), [nodes]);
 
   // Gate: show the "all clear" screen only when ALL of the following hold:
   //   1. Track 1 (adapting a base) — Track 2 authors know their own keyboard and want to review it.
@@ -62,6 +160,19 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
     [nodes, selectedId],
   );
 
+  // -- Cascade-delete state ----------------------------------------------------
+  const [pendingCascade, setPendingCascade] = useState<PendingCascade | null>(null);
+
+  // -- Cross-reference "web" popup (a character's other locations) --------------
+  const [webPopup, setWebPopup] = useState<{ ch: string; locations: CharLocation[] } | null>(null);
+
+  // Clicking a summary tag: exactly one other location → jump straight there;
+  // more than one → open the popup list so the user can pick.
+  const handleWebTag = useCallback((ch: string, locations: CharLocation[]) => {
+    if (locations.length === 1) { setSelectedId(locations[0]!.nodeId); return; }
+    if (locations.length > 1) { setWebPopup({ ch, locations }); }
+  }, []);
+
   // Handlers for Rail/Inspector callbacks
   const handleSetManyGlyphs = useCallback((gids: string[], off: boolean) => {
     gids.forEach((gid) => { if (off) { deleteItem(gid); } else { restoreItem(gid); } });
@@ -74,6 +185,72 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   const handleToggleGlyph = useCallback((gid: string) => {
     if (isItemDeleted(gid)) { restoreItem(gid); } else { deleteItem(gid); }
   }, [isItemDeleted, restoreItem, deleteItem]);
+
+  /**
+   * Chip-body click → cascade TOGGLE. Resolves every place the character is
+   * produced (collectCharContributors), then branches on the clicked chip's state:
+   *  - LIVE chip → remove. Sole removable producer with nothing blocked toggles
+   *    plainly; otherwise a "remove everywhere" dialog opens. Not-removable ("!")
+   *    pieces are split out of the delete set and shown as a warning, never swept.
+   *  - Already-REMOVED chip → restore. Sole restorable producer toggles plainly;
+   *    otherwise a "restore everywhere" dialog un-deletes every place it was cut.
+   */
+  const handleCascadeDelete = useCallback((gid: string) => {
+    // Resolve the clicked glyph — output char, removal capability, and its card.
+    let targetChar: string | undefined;
+    let clickedCapability: RemovalCapability | undefined;
+    let clickedLabel = 'this key';
+    for (const node of nodes) {
+      if (!node.glyphs) continue;
+      const glyph = node.glyphs.find((g) => g.gid === gid);
+      if (glyph) { targetChar = glyph.ch; clickedCapability = glyph.capability; clickedLabel = node.name; break; }
+    }
+
+    // Glyph not found → do nothing rather than toggle an untracked id.
+    if (targetChar === undefined) return;
+
+    const pending = buildPendingCascade({
+      ir, gid, targetChar, clickedCapability, clickedLabel, isItemDeleted, removalCapabilities, nodes,
+    });
+    if (pending === null) { handleToggleGlyph(gid); return; }
+    setPendingCascade(pending);
+  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities]);
+
+  /**
+   * Store-chip cascade toggle — same "remove/restore everywhere" contract as
+   * handleCascadeDelete, but for a StoreChip inside StoreDetail. Store chips
+   * already know their character directly (StoreCharChip.ch), so there's no
+   * nodes[].glyphs lookup and no per-chip removal capability to weigh — a
+   * store slot's own removability is decided upstream by classifyStoreSlotEdit
+   * (StoreChip never calls onToggle for a 'disabled' chip in the first place).
+   */
+  const handleStoreChipCascade = useCallback((chipId: string, ch: string) => {
+    const pending = buildPendingCascade({
+      ir, gid: chipId, targetChar: ch, clickedLabel: 'this character',
+      isItemDeleted, removalCapabilities, nodes,
+    });
+    if (pending === null) { handleToggleGlyph(chipId); return; }
+    setPendingCascade(pending);
+  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities]);
+
+  const handleCascadePrimary = useCallback(() => {
+    if (!pendingCascade) return;
+    if (pendingCascade.mode === 'restore') {
+      cascadeRestore(pendingCascade.restoreIds);
+    } else {
+      cascadeDelete(pendingCascade.contributors.ruleNodeIds, pendingCascade.contributors.storeSlotIds);
+    }
+    setPendingCascade(null);
+  }, [pendingCascade, cascadeDelete, cascadeRestore]);
+
+  const handleCascadeCancel = useCallback(() => {
+    // Cancel — do nothing. Also the target for Escape / backdrop click, so a
+    // dismissed dialog never leaves a half-cut character behind. Removing the
+    // character from only one of its wired locations is intentionally NOT
+    // offered: it would leave the broken cross-references this cascade exists
+    // to prevent.
+    setPendingCascade(null);
+  }, []);
 
   // Kept / total counts
   const { kept, total } = useMemo(() => {
@@ -97,84 +274,86 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
     // avoid listing the same removed character twice.
     const seenItemIds = new Set<string>();
 
-    nodes.forEach((node) => {
-      if (node.kind !== 'pattern' && node.kind !== 'group') return;
-      if (nodeState(node, isItemDeleted, isDeleted) === 'off') {
+    // Pattern/group nodes that are fully off
+    for (const node of nodes) {
+      if ((node.kind === 'pattern' || node.kind === 'group') && nodeState(node, isItemDeleted, isDeleted) === 'off') {
         fullOffIds.add(node.nodeId);
         list.push({ type: 'node', id: node.nodeId, kind: node.kind, label: node.name, count: node.glyphs?.length ?? 0, glyphIds: node.glyphs?.map((g) => g.gid) });
-      }
-    });
-    nodes.forEach((node) => {
-      if (node.kind !== 'store' && node.kind !== 'raw') return;
-      if (isDeleted(node.nodeId)) {
+      } else if ((node.kind === 'store' || node.kind === 'raw') && isDeleted(node.nodeId)) {
         list.push({ type: 'node', id: node.nodeId, kind: node.kind, label: node.name, count: 1 });
       }
-    });
-    nodes.forEach((node) => {
-      if (!node.glyphs) return;
-      if (fullOffIds.has(node.nodeId)) return;
-      node.glyphs.forEach((glyph) => {
-        if (!deletedItemIds.has(glyph.gid)) return;
-        seenItemIds.add(glyph.gid);
-        list.push({ type: 'item', id: glyph.gid, ch: glyph.ch, keys: glyph.keys, nodeName: node.name });
-      });
-    });
-    // Store per-character chips — skips whole-deleted stores (already listed
-    // above as a 'node' entry) and dedupes against ids already emitted by
-    // the pattern/group glyph pass.
-    nodes.forEach((node) => {
-      if (node.kind !== 'store' || !node.storeChips) return;
-      if (isDeleted(node.nodeId)) return;
-      node.storeChips.forEach((chip) => {
-        if (chip.action === 'disabled') return;
-        if (!deletedItemIds.has(chip.chipId)) return;
-        if (seenItemIds.has(chip.chipId)) return;
-        seenItemIds.add(chip.chipId);
-        list.push({ type: 'item', id: chip.chipId, ch: chip.ch, keys: [], nodeName: node.name });
-      });
-    });
+    }
+
+    // Partially-removed glyphs from pattern/group nodes
+    for (const node of nodes) {
+      if (!node.glyphs || fullOffIds.has(node.nodeId)) continue;
+      for (const glyph of node.glyphs) {
+        if (deletedItemIds.has(glyph.gid)) {
+          seenItemIds.add(glyph.gid);
+          list.push({ type: 'item', id: glyph.gid, ch: glyph.ch, keys: glyph.keys, nodeName: node.name });
+        }
+      }
+    }
+
+    // Store per-character chips — skips whole-deleted stores and dedupes
+    for (const node of nodes) {
+      if (node.kind !== 'store' || !node.storeChips || isDeleted(node.nodeId)) continue;
+      for (const chip of node.storeChips) {
+        if (chip.action !== 'disabled' && deletedItemIds.has(chip.chipId) && !seenItemIds.has(chip.chipId)) {
+          seenItemIds.add(chip.chipId);
+          list.push({ type: 'item', id: chip.chipId, ch: chip.ch, keys: [], nodeName: node.name });
+        }
+      }
+    }
     return list;
   }, [nodes, deletedItemIds, deletedNodeIds, isItemDeleted, isDeleted]);
 
   const handleRestore = useCallback((item: RemovedItem) => {
     if (item.type === 'item') { restoreItem(item.id); return; }
-    if (item.glyphIds) { item.glyphIds.forEach((gid) => restoreItem(gid)); restoreNode(item.id); }
-    else { restoreNode(item.id); }
+    item.glyphIds?.forEach((gid) => restoreItem(gid));
+    restoreNode(item.id);
   }, [restoreItem, restoreNode]);
 
   // DepBanner — orphaned patterns + newly-unused stores
   const { orphanedNodes, unusedStoreNodes } = useMemo(() => {
     const orphaned: DepNode[] = [];
     const unusedStores: DepNode[] = [];
-    nodes.forEach((node) => {
-      if ((node.kind === 'pattern' || node.kind === 'group') && !isDeleted(node.nodeId) && nodeState(node, isItemDeleted, isDeleted) === 'off') {
+
+    for (const node of nodes) {
+      const state = nodeState(node, isItemDeleted, isDeleted);
+
+      // Orphaned pattern/group — all glyphs removed but node itself not deleted
+      if ((node.kind === 'pattern' || node.kind === 'group') && !isDeleted(node.nodeId) && state === 'off') {
         orphaned.push({ nodeId: node.nodeId, name: node.name });
       }
-      if (node.kind === 'store' && node.referencedByNodeId !== undefined && !isDeleted(node.nodeId)) {
+
+      if (node.kind !== 'store' || isDeleted(node.nodeId)) continue;
+
+      // S-02 output stores — unused when their parent pattern is fully off
+      if (node.referencedByNodeId !== undefined) {
         const refNode = nodes.find((n) => n.nodeId === node.referencedByNodeId);
         if (refNode && nodeState(refNode, isItemDeleted, isDeleted) === 'off') {
           unusedStores.push({ nodeId: node.nodeId, name: node.name });
         }
+        continue;
       }
-      // Stores orphaned by any()/index() consumers — all referencing patterns AND groups are now off
-      if (
-        node.kind === 'store' &&
-        node.referencedByNodeId === undefined &&
-        !isDeleted(node.nodeId) &&
-        node.storeUsage !== undefined &&
-        (node.storeUsage.patternRefs.length > 0 || node.storeUsage.groupRefs.length > 0) &&
-        node.storeUsage.patternRefs.every((r) => {
-          const pNode = nodes.find((n) => n.nodeId === r.patternId);
-          return pNode ? nodeState(pNode, isItemDeleted, isDeleted) === 'off' : isDeleted(r.patternId);
-        }) &&
-        node.storeUsage.groupRefs.every((r) => {
-          const gNode = nodes.find((n) => n.nodeId === r.groupId);
-          return gNode ? nodeState(gNode, isItemDeleted, isDeleted) === 'off' : isDeleted(r.groupId);
-        })
-      ) {
-        unusedStores.push({ nodeId: node.nodeId, name: node.name });
+
+      // any()/index() stores — unused when ALL consumers are off
+      if (node.storeUsage && (node.storeUsage.patternRefs.length > 0 || node.storeUsage.groupRefs.length > 0)) {
+        const allConsumersOff =
+          node.storeUsage.patternRefs.every((r) => {
+            const pNode = nodes.find((n) => n.nodeId === r.patternId);
+            return pNode ? nodeState(pNode, isItemDeleted, isDeleted) === 'off' : isDeleted(r.patternId);
+          }) &&
+          node.storeUsage.groupRefs.every((r) => {
+            const gNode = nodes.find((n) => n.nodeId === r.groupId);
+            return gNode ? nodeState(gNode, isItemDeleted, isDeleted) === 'off' : isDeleted(r.groupId);
+          });
+        if (allConsumersOff) {
+          unusedStores.push({ nodeId: node.nodeId, name: node.name });
+        }
       }
-    });
+    }
     return { orphanedNodes: orphaned, unusedStoreNodes: unusedStores };
   }, [nodes, deletedItemIds, deletedNodeIds, isItemDeleted, isDeleted]);
 
@@ -344,11 +523,138 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
             onSetManyGlyphs={handleSetManyGlyphs}
             isDeleted={isDeleted}
             onToggleNode={handleToggleNode}
-            onOwnerClick={setSelectedId}
+            onSelectNode={setSelectedId}
+            onCascadeDelete={handleCascadeDelete}
+            onStoreCascade={handleStoreChipCascade}
+            charWeb={charWeb}
+            onWebTag={handleWebTag}
           />
           {infoOpen && <InfoView />}
         </div>
       </div>
+
+      {/* Cascade-delete confirmation dialog */}
+      {pendingCascade !== null && (() => {
+        const isRestore = pendingCascade.mode === 'restore';
+        const hasActions = pendingCascade.actionCount > 0;
+        const title = isRestore
+          ? `Restore "${pendingCascade.targetChar}" everywhere?`
+          : hasActions
+            ? `Remove "${pendingCascade.targetChar}" everywhere?`
+            : `"${pendingCascade.targetChar}" can't be fully removed`;
+        const message = isRestore
+          ? 'This character was removed from several places. Restore it everywhere it was removed?'
+          : hasActions
+            ? 'This character appears in multiple places. Removing it everywhere keeps the keyboard consistent; removing it from just one place may leave broken references.'
+            : 'This character is produced by advanced rules that can\'t be removed automatically — see below.';
+        return (
+        <ConfirmDialog
+          open={true}
+          title={title}
+          body={
+            <div>
+              <p style={{ margin: '0 0 10px' }}>
+                {message}
+              </p>
+              {!isRestore && pendingCascade.contributors.storeSlotIds.length > 0 && (
+                <p style={{ margin: '0 0 10px' }}>
+                  Note: the key or sequence that triggers this character will still
+                  exist, but will now produce nothing.
+                </p>
+              )}
+              <ul
+                aria-label="Locations affected"
+                style={{ margin: '0 0 10px', paddingLeft: 18, fontSize: 13 }}
+              >
+                {(['group', 'pattern', 'store'] as const).map((kind) => {
+                  const labels = pendingCascade.contributors.locations
+                    .filter((l) => l.kind === kind)
+                    .map((l) => l.label);
+                  if (labels.length === 0) return null;
+                  // Pluralize the kind label only when it has more than one entry.
+                  const kindLabel = labels.length > 1 ? `${kind}s` : kind;
+                  return (
+                    <li key={kind} style={{ marginBottom: 4 }}>
+                      <b style={{ textTransform: 'capitalize' }}>{kindLabel}</b>
+                      {': '}
+                      <span style={{ fontFamily: 'var(--app-font-mono)' }}>{labels.join(', ')}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+              {pendingCascade.contributors.blocked.length > 0 && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    background: 'color-mix(in srgb, var(--sil-orange) 10%, var(--app-surface))',
+                    border: '1px solid color-mix(in srgb, var(--sil-orange) 40%, transparent)',
+                    fontSize: 12,
+                    color: 'var(--sil-orange-dark)',
+                  }}
+                >
+                  <b>⚠ Marked not-removable — these will stay:</b>{' '}
+                  {pendingCascade.contributors.blocked.map((b, i) => (
+                    <span key={i}>
+                      {b.label} ({b.reason}){i < pendingCascade.contributors.blocked.length - 1 ? ', ' : ''}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          }
+          primaryLabel={isRestore ? 'Yes, restore everywhere' : hasActions ? 'Yes, remove everywhere' : 'OK'}
+          onPrimary={!isRestore && !hasActions ? handleCascadeCancel : handleCascadePrimary}
+          {...(!isRestore && !hasActions ? {} : { secondaryLabel: 'Cancel', onSecondary: handleCascadeCancel })}
+        />);
+      })()}
+
+      {/* Cross-reference web popup — the character's OTHER locations, each a link. */}
+      {webPopup !== null && (
+        <ConfirmDialog
+          open={webPopup !== null}
+          title={`Where "${webPopup.ch}" also appears`}
+          body={
+            <div>
+              <p style={{ margin: '0 0 12px' }}>
+                This character also lives in these places — click one to jump to it in the rail.
+              </p>
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {webPopup.locations.map((loc) => (
+                  <li key={loc.kind + ':' + loc.nodeId}>
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedId(loc.nodeId); setWebPopup(null); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+                        padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                        background: 'var(--app-surface-2)', border: '1px solid var(--app-border)',
+                        color: 'var(--app-text)', font: '500 13px var(--app-font)',
+                      }}
+                    >
+                      <span style={{
+                        font: '600 9px/1 var(--app-font-mono)', letterSpacing: '.04em', textTransform: 'uppercase',
+                        padding: '2px 6px', borderRadius: 6, whiteSpace: 'nowrap',
+                        color: KIND_COLOR[loc.kind],
+                        background: `color-mix(in srgb, ${KIND_COLOR[loc.kind]} 15%, transparent)`,
+                        border: `1px solid color-mix(in srgb, ${KIND_COLOR[loc.kind]} 40%, transparent)`,
+                      }}>
+                        {loc.kind}
+                      </span>
+                      <span style={{ fontFamily: 'var(--app-font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {loc.label}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          }
+          primaryLabel="Close"
+          onPrimary={() => setWebPopup(null)}
+        />
+      )}
     </div>
   );
 }
