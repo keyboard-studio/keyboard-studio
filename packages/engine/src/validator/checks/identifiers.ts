@@ -15,6 +15,25 @@ export function checkIdentifiers(source: string): LintFinding[] {
     new RegExp(FIRST_ARG_RE.source, "gi"),
   ];
 
+  const handleMatch = (match: RegExpExecArray, lineIdx: number): void => {
+    const name = (match[2] ?? "").trim();
+
+    // System stores (&BITMAP, &PLATFORM, etc.) are not user identifiers
+    if (name.startsWith("&")) return;
+
+    if (name.length === 0 || name.length > 255 || INVALID_CHAR_RE.test(name)) {
+      findings.push({
+        code: "KM_ERROR_INVALID_IDENTIFIER",
+        severity: "error",
+        layer: "A",
+        message: `Invalid identifier "${name}": must be 1–255 characters with no spaces, commas, parentheses, brackets, or control characters`,
+        location: { file: "", line: lineIdx + 1, column: match.index + 1 },
+      });
+    }
+  };
+
+  // Preserve original per-line, per-regex ordering (SINGLE_ARG_RE then
+  // FIRST_ARG_RE within each line).
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
     const line = lines[lineIdx] ?? "";
 
@@ -22,20 +41,7 @@ export function checkIdentifiers(source: string): LintFinding[] {
       re.lastIndex = 0;
       let match: RegExpExecArray | null;
       while ((match = re.exec(line)) !== null) {
-        const name = (match[2] ?? "").trim();
-
-        // System stores (&BITMAP, &PLATFORM, etc.) are not user identifiers
-        if (name.startsWith("&")) continue;
-
-        if (name.length === 0 || name.length > 255 || INVALID_CHAR_RE.test(name)) {
-          findings.push({
-            code: "KM_ERROR_INVALID_IDENTIFIER",
-            severity: "error",
-            layer: "A",
-            message: `Invalid identifier "${name}": must be 1–255 characters with no spaces, commas, parentheses, brackets, or control characters`,
-            location: { file: "", line: lineIdx + 1, column: match.index + 1 },
-          });
-        }
+        handleMatch(match, lineIdx);
       }
     }
   }

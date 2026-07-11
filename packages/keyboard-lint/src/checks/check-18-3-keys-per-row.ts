@@ -4,6 +4,7 @@
 
 import type { LintFinding } from "@keyboard-studio/contracts";
 import type { TouchLayoutIR } from "@keyboard-studio/contracts";
+import { makeLocation } from "./_shared.js";
 
 const MAX_KEYS: Partial<Record<string, number>> = {
   phone: 10,
@@ -38,7 +39,7 @@ export function checkKeysPerRow(
             severity: "warning",
             layer: "C",
             message: `Platform "${platform.id}" layer "${layer.id}" row ${rowIdx + 1} has ${keyCount} key(s); maximum is ${maxKeys}.`,
-            location: { file: touchLayoutPath, line: 1 },
+            location: makeLocation(touchLayoutPath),
             hint: `Remove keys from row ${rowIdx + 1} of layer "${layer.id}" on ${platform.id} until it has ${maxKeys} or fewer to avoid crowding on small screens.`,
           });
         }

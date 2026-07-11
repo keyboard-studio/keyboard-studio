@@ -4,6 +4,7 @@
 
 import type { LintFinding } from "@keyboard-studio/contracts";
 import type { TouchLayoutIR } from "@keyboard-studio/contracts";
+import { makeLocation } from "./_shared.js";
 
 const RULES: Partial<Record<string, { min: number; max: number }>> = {
   phone: { min: 4, max: 5 },
@@ -39,7 +40,7 @@ export function checkTouchRows(
           severity: "warning",
           layer: "C",
           message: `Platform "${platform.id}" layer "${layer.id}" has ${rowCount} row(s); expected ${expected}.`,
-          location: { file: touchLayoutPath, line: 1 },
+          location: makeLocation(touchLayoutPath),
           hint: `Adjust layer "${layer.id}" on ${platform.id} to ${expected} row(s) to meet the DISCUS platform guideline.`,
         });
       }

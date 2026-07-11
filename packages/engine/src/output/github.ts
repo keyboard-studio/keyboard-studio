@@ -105,6 +105,23 @@ async function ghFetch(
   });
 }
 
+/**
+ * Run `fn` (a GitHub API call) and re-throw any failure as a structured
+ * `{ kind: "network", message: "<label>: <error>" }` PublishPRError, matching
+ * the shape every publishPR/verifyToken phase previously hand-rolled in its
+ * own try/catch.
+ */
+async function fetchOrNetworkError(
+  label: string,
+  fn: () => Promise<GitHubFetchResponse>
+): Promise<GitHubFetchResponse> {
+  try {
+    return await fn();
+  } catch (err) {
+    throw { kind: "network", message: `${label}: ${String(err)}` } satisfies PublishPRError;
+  }
+}
+
 function authError(res: GitHubFetchResponse): PublishPRError | null {
   if (res.status === 401) return { kind: "auth", message: "GitHub token is invalid or expired" };
   if (res.status === 403)
@@ -128,12 +145,9 @@ export async function verifyToken(
   token: string,
   fetchFn: GitHubFetchFn
 ): Promise<VerifyTokenResult> {
-  let res: GitHubFetchResponse;
-  try {
-    res = await ghFetch(`${API_BASE}/user`, token, fetchFn);
-  } catch (err) {
-    throw { kind: "network", message: `Network error: ${String(err)}` } satisfies PublishPRError;
-  }
+  const res = await fetchOrNetworkError("Network error", () =>
+    ghFetch(`${API_BASE}/user`, token, fetchFn)
+  );
 
   if (!res.ok) {
     return { ok: false, scopes: [], missingScopes: ["public_repo"] };
@@ -197,12 +211,9 @@ export async function publishPR(
   // 1. Ensure the fork exists under forkOwner
   // ------------------------------------------------------------------
   report("fork-check");
-  let forkCheckRes: GitHubFetchResponse;
-  try {
-    forkCheckRes = await ghFetch(forkBase, token, fetchFn);
-  } catch (err) {
-    throw { kind: "network", message: `Fork check failed: ${String(err)}` } satisfies PublishPRError;
-  }
+  const forkCheckRes = await fetchOrNetworkError("Fork check failed", () =>
+    ghFetch(forkBase, token, fetchFn)
+  );
 
   if (!forkCheckRes.ok) {
     const ae = authError(forkCheckRes);
@@ -215,12 +226,9 @@ export async function publishPR(
 
     // 404 — fork doesn't exist yet; create it
     report("fork-create");
-    let createRes: GitHubFetchResponse;
-    try {
-      createRes = await ghFetch(`${upstreamBase}/forks`, token, fetchFn, "POST", {});
-    } catch (err) {
-      throw { kind: "network", message: `Fork creation failed: ${String(err)}` } satisfies PublishPRError;
-    }
+    const createRes = await fetchOrNetworkError("Fork creation failed", () =>
+      ghFetch(`${upstreamBase}/forks`, token, fetchFn, "POST", {})
+    );
     if (!createRes.ok) {
       const ae2 = authError(createRes);
       if (ae2 !== null) throw ae2;
@@ -235,16 +243,9 @@ export async function publishPR(
   // 2. Get master HEAD commit SHA on the fork
   // ------------------------------------------------------------------
   report("master-ref");
-  let masterRefRes: GitHubFetchResponse;
-  try {
-    masterRefRes = await ghFetch(
-      `${forkBase}/git/ref/heads/master`,
-      token,
-      fetchFn
-    );
-  } catch (err) {
-    throw { kind: "network", message: `Could not read fork master ref: ${String(err)}` } satisfies PublishPRError;
-  }
+  const masterRefRes = await fetchOrNetworkError("Could not read fork master ref", () =>
+    ghFetch(`${forkBase}/git/ref/heads/master`, token, fetchFn)
+  );
   if (!masterRefRes.ok) {
     throw {
       kind: "unknown",
@@ -258,16 +259,9 @@ export async function publishPR(
   // 3. Get the base tree SHA from the parent commit
   // ------------------------------------------------------------------
   report("parent-commit");
-  let parentCommitRes: GitHubFetchResponse;
-  try {
-    parentCommitRes = await ghFetch(
-      `${forkBase}/git/commits/${masterCommitSha}`,
-      token,
-      fetchFn
-    );
-  } catch (err) {
-    throw { kind: "network", message: `Could not read parent commit: ${String(err)}` } satisfies PublishPRError;
-  }
+  const parentCommitRes = await fetchOrNetworkError("Could not read parent commit", () =>
+    ghFetch(`${forkBase}/git/commits/${masterCommitSha}`, token, fetchFn)
+  );
   if (!parentCommitRes.ok) {
     throw {
       kind: "unknown",
@@ -294,15 +288,12 @@ export async function publishPR(
   // 5. Create the new tree
   // ------------------------------------------------------------------
   report("tree");
-  let newTreeRes: GitHubFetchResponse;
-  try {
-    newTreeRes = await ghFetch(`${forkBase}/git/trees`, token, fetchFn, "POST", {
+  const newTreeRes = await fetchOrNetworkError("Tree creation failed", () =>
+    ghFetch(`${forkBase}/git/trees`, token, fetchFn, "POST", {
       base_tree: baseTreeSha,
       tree: treeEntries,
-    });
-  } catch (err) {
-    throw { kind: "network", message: `Tree creation failed: ${String(err)}` } satisfies PublishPRError;
-  }
+    })
+  );
   if (!newTreeRes.ok) {
     const ae = authError(newTreeRes);
     if (ae !== null) throw ae;
@@ -318,22 +309,13 @@ export async function publishPR(
   // 6. Create the commit
   // ------------------------------------------------------------------
   report("commit");
-  let newCommitRes: GitHubFetchResponse;
-  try {
-    newCommitRes = await ghFetch(
-      `${forkBase}/git/commits`,
-      token,
-      fetchFn,
-      "POST",
-      {
-        message: commitMessage,
-        tree: newTreeSha,
-        parents: [masterCommitSha],
-      }
-    );
-  } catch (err) {
-    throw { kind: "network", message: `Commit creation failed: ${String(err)}` } satisfies PublishPRError;
-  }
+  const newCommitRes = await fetchOrNetworkError("Commit creation failed", () =>
+    ghFetch(`${forkBase}/git/commits`, token, fetchFn, "POST", {
+      message: commitMessage,
+      tree: newTreeSha,
+      parents: [masterCommitSha],
+    })
+  );
   if (!newCommitRes.ok) {
     const ae = authError(newCommitRes);
     if (ae !== null) throw ae;
@@ -349,15 +331,12 @@ export async function publishPR(
   // 7. Create branch ref (fail with branch-exists if already present)
   // ------------------------------------------------------------------
   report("branch");
-  let branchRes: GitHubFetchResponse;
-  try {
-    branchRes = await ghFetch(`${forkBase}/git/refs`, token, fetchFn, "POST", {
+  const branchRes = await fetchOrNetworkError("Branch creation failed", () =>
+    ghFetch(`${forkBase}/git/refs`, token, fetchFn, "POST", {
       ref: `refs/heads/${branchName}`,
       sha: newCommitSha,
-    });
-  } catch (err) {
-    throw { kind: "network", message: `Branch creation failed: ${String(err)}` } satisfies PublishPRError;
-  }
+    })
+  );
   if (!branchRes.ok) {
     if (branchRes.status === 422)
       throw {
@@ -377,18 +356,15 @@ export async function publishPR(
   // 8. Open draft PR on upstream
   // ------------------------------------------------------------------
   report("pr-open");
-  let prRes: GitHubFetchResponse;
-  try {
-    prRes = await ghFetch(`${upstreamBase}/pulls`, token, fetchFn, "POST", {
+  const prRes = await fetchOrNetworkError("PR creation failed", () =>
+    ghFetch(`${upstreamBase}/pulls`, token, fetchFn, "POST", {
       title: prTitle,
       body: fullPrBody,
       head: `${forkOwner}:${branchName}`,
       base: "master",
       draft: true,
-    });
-  } catch (err) {
-    throw { kind: "network", message: `PR creation failed: ${String(err)}` } satisfies PublishPRError;
-  }
+    })
+  );
   if (!prRes.ok) {
     const ae = authError(prRes);
     if (ae !== null) throw ae;

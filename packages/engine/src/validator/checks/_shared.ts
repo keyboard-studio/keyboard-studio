@@ -78,6 +78,40 @@ export function checkForDuplicateDeclarations(
 // Note: does not handle escaped quotes in body strings (e.g. "ab\"cd")
 const STORE_BODY_RE = /^\s*store\s*\([^)]+\)\s*(?:"([^"]*)"|'([^']*)')/i;
 
+/**
+ * Shared line-by-line, global-regex iteration used by checkDeprecatedStores,
+ * checkIdentifiers, checkCodepointFormat, and checkIfStoreResolution.
+ *
+ * Splits `source` into lines, and for each line clones `regex` (preserving its
+ * flags, forcing the global flag on) so `RegExp.exec`'s per-call `lastIndex`
+ * state never leaks across lines, then repeatedly execs it against the line,
+ * invoking `cb` with each match and the 0-based line index.
+ *
+ * @param source  Raw .kmn source text.
+ * @param regex   Pattern to match; flags (e.g. case-insensitivity) are preserved.
+ * @param cb      Called once per match with the match array and 0-based line index.
+ */
+export function forEachMatch(
+  source: string,
+  regex: RegExp,
+  cb: (match: RegExpExecArray, lineIdx: number) => void,
+): void {
+  const lines = source.split("\n");
+  const flags = regex.flags.includes("g") ? regex.flags : `${regex.flags}g`;
+
+  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    const line = lines[lineIdx] ?? "";
+    const re = new RegExp(regex.source, flags);
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(line)) !== null) {
+      cb(match, lineIdx);
+      // Guard against a zero-width match (e.g. a lookahead-only regex) leaving
+      // lastIndex unadvanced, which would spin the loop forever.
+      if (match.index === re.lastIndex) re.lastIndex++;
+    }
+  }
+}
+
 export function collectDeclaredStores(source: string): Map<string, StoreInfo> {
   const stores = new Map<string, StoreInfo>();
   const lines = source.split("\n");
