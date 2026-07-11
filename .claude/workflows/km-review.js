@@ -1,10 +1,15 @@
 export const meta = {
   name: "km-review",
   description:
-    "Four-primary-reviewer PR review pipeline (km-keyman, km-strategy, km-qc, km-domain); km-verification acts as universal skeptic and km-synthesis as final aggregator. Returns per-reviewer findings, km-verification verdicts on each finding, and a synthesis verdict. Does NOT merge, push, or post GitHub comments — those stay in the main session.",
+    "Four-primary-reviewer PR review pipeline (km-keyman, km-strategy, km-qc, km-domain); km-verification acts as universal skeptic and km-synthesis as final aggregator. A km-verification Gate stage runs first — if it confidently reports the PR does not do what it claims, the primaries/skeptic/synthesis stages are skipped and a REQUEST_CHANGES verdict is returned directly. Returns per-reviewer findings, km-verification verdicts on each finding, and a synthesis verdict. Does NOT merge, push, or post GitHub comments — those stay in the main session.",
   whenToUse:
     "Invoke for any keyboard-studio PR that passes the km-triage Phase-2/3 gates and needs substantive crew review. Pass prNumber (required) and optionally depth ('thorough' or 'quick', default 'thorough') and crew ('ENGINE' | 'CONTENT' | 'BOTH', default 'BOTH') to select which specialist primaries run. km-triage additionally passes cached-diff args (diffPath, filesPath, baseOid, headOid), a skipReviewers list, — only on a re-triggered review — an optional lean reviewContext string (the triggering comment text plus the prior verdict summary) that is prepended to each reviewer prompt as advisory 'Prior context', and — only on a commit-driven incremental sweep — an optional priorFindings array ({file, line, title}) of still-open findings from the previous sweep so reviewers can re-list any that the new commits did not address; all of these are optional and the workflow behaves as it always did when they are omitted.",
   phases: [
+    {
+      title: "Gate",
+      detail:
+        "km-verification runs once, alone, before any primary is dispatched: does the PR actually do what it claims? A confident 'no' short-circuits straight to a REQUEST_CHANGES return — the Review/Verify/Synthesize stages never run. A confident 'yes', or any low-confidence result, falls through to the full crew unchanged.",
+    },
     {
       title: "Review",
       detail:
@@ -98,6 +103,27 @@ const FINDINGS_SCHEMA = {
         },
       },
     },
+  },
+};
+
+// GATE_SCHEMA: what km-verification returns for the pre-crew sanity gate.
+// This is a distinct role from VERDICT_SCHEMA below (which scrutinises one
+// finding at a time, after the primaries have run) — here km-verification
+// checks once, before anyone else is dispatched, whether the PR's claimed
+// behavior actually holds at all.
+const GATE_SCHEMA = {
+  type: "object",
+  required: ["workDone", "confidence", "rationale"],
+  properties: {
+    // false only when you have DIRECT evidence (a run command, a failing
+    // assertion, a missing code path) that the PR's stated claim does not
+    // hold. Absence of evidence is not evidence of absence — default true
+    // when you cannot positively confirm or refute the claim.
+    workDone: { type: "boolean" },
+    confidence: { type: "string", enum: ["high", "medium", "low"] },
+    rationale: { type: "string" },
+    evidenceSummary: { type: "string" },
+    reproduceCommand: { type: "string" },
   },
 };
 
@@ -303,6 +329,34 @@ SCOPE DISCIPLINE — only review what THIS PR changes:
    - Schema-forced output: use the per-agent schema fields documented in your .claude/agents/${reviewer.agentType}.md under the "Schema-forced output mode" heading when that heading is present. Set findingKind on every finding when you are km-synthesis; use specReference/checkId for Layer-A citations when you are km-keyman; set linguisticCategory when you are km-domain; emit the pattern-audit gate finding with gateId: 'pattern-audit' when you are km-qc.
 
 Do NOT post GitHub comments, push, or merge. Return only the structured output.`;
+}
+
+function gatePrompt(prNumber, ctx = {}) {
+  const { diffPath, filesPath, headOid } = ctx;
+  const headRef = headOid || "<current head sha>";
+  const diffSteps = diffPath
+    ? `The PR diff has been fetched once for the whole crew and cached on disk. Read it from:
+     ${diffPath}
+   File list (paths only):
+     ${filesPath || "(not provided)"}
+   Do NOT re-run \`gh pr diff\` or \`git diff\` yourself.`
+    : `Fetch the PR diff: gh pr diff ${prNumber}`;
+
+  return `You are km-verification acting as the pre-crew GATE for PR #${prNumber} — this runs alone, before any of the four primary reviewers (km-keyman, km-strategy, km-qc, km-domain) are dispatched.
+
+Your ONLY question: does this PR actually do what it claims to do? Not style, not schema conformance, not linguistic correctness — those are the primaries' job and they never run if you say no here. You are checking whether the work is functionally there at all.
+
+Steps:
+1. Read the PR title and description: gh pr view ${prNumber} --json title,body
+2. ${diffSteps}
+3. Identify the PR's central claim (the feature/fix it says it delivers).
+4. Look for direct evidence the claim holds: an existing test that exercises it, or a targeted repro you run yourself. Respect the L1/L2/L3 cost ladder defined canonically in .claude/agents/km-verification.md ("Verification cost ladder (L1 / L2 / L3)") — start at L1 (read the diff and any tests it touches; typecheck/lint scoped to the changed files), escalate to L2 (build the touched package(s) + run the specific test(s) that exercise the claim) only when L1 leaves real doubt, and reach L3 only with a stated justification. Do NOT run the full test suite here — this gate must stay cheap; L3 defeats its purpose.
+5. Set workDone: false ONLY when you have direct, positive evidence the claim does not hold (a test that should exist and doesn't, a run that fails, a code path that is missing or clearly a no-op). Absence of evidence is not evidence of absence: if you cannot positively confirm OR refute the claim within L1/L2, set workDone: true with confidence: "low" — do not block the crew on inconclusive evidence.
+6. Note CI already gates on build/typecheck/test/lint passing before this workflow ever runs (see the "build" required check) — you are not re-litigating that. You are checking whether the shipped code actually does the specific thing the PR claims, which CI cannot know.
+
+Return a GATE_SCHEMA object: workDone, confidence, rationale, and (if you ran a probe) evidenceSummary + reproduceCommand.
+
+Do NOT post GitHub comments, push, or merge.`;
 }
 
 function verifyPrompt(finding, prNumber, reviewerKey) {
@@ -546,6 +600,69 @@ const activeReviewers = REVIEWERS.filter(
 // OIDs). Undefined fields simply omit the corresponding prompt sections, so
 // standalone callers that pass none fall back to `gh pr diff`.
 const reviewCtx = { diffPath, filesPath, baseOid, headOid, reviewContext, priorFindings };
+
+// ---------------------------------------------------------------------------
+// Gate — km-verification runs alone, before any primary is dispatched, to
+// check whether the PR actually does what it claims. This is a DIFFERENT
+// role than km-verification's later per-finding skeptic pass (verifyStage
+// below) — here it is checking the PR's central claim once, cheaply, not
+// scrutinising a specific reviewer's finding.
+//
+// Only a CONFIDENT "no" short-circuits. Any low-confidence result, or a
+// confident "yes", falls through to the full crew unchanged — mirrors the
+// "when in doubt, dispatch" philosophy of km-triage's Pre-filter C (a missed
+// real defect is worse than one extra crew cycle spent confirming a false
+// alarm never happened). This bounds the gate's risk to one direction: it
+// can only ever cause EXTRA scrutiny (a REQUEST_CHANGES that a human then
+// reviews), never skip scrutiny that was warranted.
+// ---------------------------------------------------------------------------
+phase("Gate");
+const gate = await agent(gatePrompt(prNumber, reviewCtx), {
+  agentType: "km-verification",
+  label: "Gate: verification",
+  phase: "Gate",
+  schema: GATE_SCHEMA,
+});
+
+if (gate && gate.workDone === false && gate.confidence !== "low") {
+  log(
+    `km-review: Gate failed (confidence=${gate.confidence}) for PR #${prNumber} — skipping Review/Verify/Synthesize. ${gate.rationale}`
+  );
+  const gateFinding = {
+    title: "km-verification gate: PR does not do what it claims",
+    severity: "critical",
+    rationale: gate.rationale,
+    evidence: gate.evidenceSummary,
+    testCommand: gate.reproduceCommand,
+  };
+  const gateVerdict = {
+    isReal: true,
+    confidence: gate.confidence,
+    rationale: gate.rationale,
+    evidenceSummary: gate.evidenceSummary,
+    reproduceCommand: gate.reproduceCommand,
+  };
+  return {
+    prNumber,
+    gated: true,
+    verifyEnvelopes: [
+      {
+        reviewerKey: "gate",
+        reviewerVerdict: "REQUEST_CHANGES",
+        confidence: gate.confidence,
+        verifiedFindings: [{ finding: gateFinding, verdict: gateVerdict }],
+      },
+    ],
+    confirmed: [{ finding: gateFinding, verdict: gateVerdict }],
+    refuted: [],
+    synthesis: {
+      verdict: "REQUEST_CHANGES",
+      autoFixable: [],
+      humanDecisionNeeded: [],
+      summary: `km-review Gate stopped this PR before the crew ran: ${gate.rationale}`.slice(0, 800),
+    },
+  };
+}
 
 // Run the review + verify pipeline across the selected primary reviewers.
 // pipeline(items, stage1, stage2) — no barrier between stages per item;

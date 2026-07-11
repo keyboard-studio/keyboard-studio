@@ -67,8 +67,6 @@ function finding(
 const PATH_GROUPS = irPath("groups", ARRAY_INDEX);
 // A valid IRPath that targets header.bcp47 — used as a distinct test path.
 const PATH_BCP47 = irPath("header", "bcp47");
-// A valid IRPath that targets header.name — a third distinct path.
-const PATH_NAME = irPath("header", "name");
 
 /** Build a minimal spine EditorStep for test fixtures. */
 function makeSpineStep(id: string, writes: typeof PATH_GROUPS[] = [], inputs: typeof PATH_GROUPS[] = []): EditorStep {

@@ -11,7 +11,6 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { TouchGallery } from "../assignLoop/TouchGallery.tsx";
 import type { TouchAssignment } from "@keyboard-studio/contracts";
-import type { TouchCompleteResult } from "../../steps/reducer.ts";
 
 /**
  * EditorStep adapter for the Touch Gallery (Phase E — touch key assignment

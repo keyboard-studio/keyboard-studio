@@ -30,7 +30,6 @@
 //   remain in SurveyView. StepHost only decides which container a step renders into.
 
 import type { ReactNode, CSSProperties } from "react";
-import { useMemo } from "react";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
