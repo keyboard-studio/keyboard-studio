@@ -79,8 +79,12 @@ notes: >
   **When the decision tree picks S-01:**
   The decision tree (spec.md §7.2, rule 11) selects S-01 when:
   - A1 = tiny (fewer than 5 new characters) AND
-  - A3 = strong (the user thinks "I'd type a Latin spelling of the sound") AND
-  - A4 = none (no diacritics, no tone marks, no combining)
+  - A3 = strong (the user thinks "I'd type a Latin spelling of the sound")
+
+  Editorial guidance (not a rule-11 condition): in practice, S-01 is rarely
+  appropriate when A4 ≠ none — combining marks make direct key-to-character
+  mapping cumbersome. Consider S-02 (deadkey composition) or S-07 (cycling)
+  if diacritics are involved.
 
   This is rare. Most keyboards either (1) have more characters (→ S-02/S-05),
   or (2) the characters are better organized via deadkeys or sequences.
@@ -99,15 +103,15 @@ notes: >
   - No spare keys, only RAlt available → Still use S-08 modifier-layer as secondary
 
 tests:
-  - input: ["[K_Q]"]
+  - input: ["K_Q"]
     expectedOutput: "ɛ"
     description: >
       Akan: pressing Q produces ɛ (Latin small letter open e)
-  - input: ["[K_C]"]
+  - input: ["K_C"]
     expectedOutput: "ɔ"
     description: >
       Akan: pressing C produces ɔ (Latin small letter open o)
-  - input: ["[SHIFT K_Q]"]
+  - input: ["K_SHIFT", "K_Q"]
     expectedOutput: "Ɛ"
     description: >
       Akan: pressing Shift+Q produces Ɛ (uppercase)
