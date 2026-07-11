@@ -3,6 +3,9 @@
 import { makeBaseKeyboard } from "../baseKeyboard";
 import type { BaseKeyboard } from "../baseKeyboard";
 
+export { makeBaseKeyboard };
+export type { BaseKeyboardInit } from "../baseKeyboard";
+
 /**
  * US-English offline fallback keyboard (spec §4).
  * Always present even when the GitHub API is unavailable.

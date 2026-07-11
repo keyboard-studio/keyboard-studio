@@ -69,29 +69,18 @@ function toPattern(data: RawPattern): Pattern {
     reviewDate: String(data.reviewDate),
   };
 
-  const strategyId = data.strategyId as StrategyId | undefined;
-  const combinesWith = data.combinesWith as StrategyId[] | undefined;
-  const provenance = data.provenance as ProvenanceItem[] | undefined;
-  const demo = data.demo as string | DemoObject | null | undefined;
+  const optional: Record<string, unknown> = {};
+  if (data.strategyId !== undefined) optional.strategyId = data.strategyId as StrategyId;
+  if (data.combinesWith !== undefined) optional.combinesWith = data.combinesWith as StrategyId[];
+  if (typeof data.touchLayoutFragment === "string") optional.touchLayoutFragment = data.touchLayoutFragment;
+  if (typeof data.reorderRules === "string") optional.reorderRules = data.reorderRules;
+  if (data.frequencyInCorpus !== undefined) optional.frequencyInCorpus = data.frequencyInCorpus;
+  if (data.provenance !== undefined) optional.provenance = data.provenance as ProvenanceItem[];
+  if (data.demo !== undefined) optional.demo = data.demo as string | DemoObject;
+  if (data.group_visibility !== undefined) optional.group_visibility = data.group_visibility;
+  if (data.priority !== undefined) optional.priority = data.priority;
 
-  return makePattern({
-    ...base,
-    ...(strategyId !== undefined ? { strategyId } : {}),
-    ...(combinesWith !== undefined ? { combinesWith } : {}),
-    ...(typeof data.touchLayoutFragment === "string"
-      ? { touchLayoutFragment: data.touchLayoutFragment }
-      : {}),
-    ...(typeof data.reorderRules === "string" ? { reorderRules: data.reorderRules } : {}),
-    ...(data.frequencyInCorpus !== undefined
-      ? { frequencyInCorpus: data.frequencyInCorpus }
-      : {}),
-    ...(provenance !== undefined ? { provenance } : {}),
-    ...(demo !== undefined ? { demo } : {}),
-    ...(data.group_visibility !== undefined
-      ? { group_visibility: data.group_visibility }
-      : {}),
-    ...(data.priority !== undefined ? { priority: data.priority } : {}),
-  });
+  return makePattern({ ...base, ...optional });
 }
 
 // ---------------------------------------------------------------------------
@@ -159,43 +148,32 @@ function rankPatterns(
 
   const rec = selectStrategy(axes);
 
-  const primaryPatterns: Pattern[] = [];
-  const secondaryPatterns: Pattern[] = [];
-  const appliesToOnlyPatterns: Pattern[] = [];
+  const categorized = {
+    primary: [] as Pattern[],
+    secondary: [] as Pattern[],
+    appliesTo: [] as Pattern[],
+  };
 
   for (const p of eligible) {
     if (p.strategyId === rec.primary) {
-      primaryPatterns.push(p);
-    } else if (
-      p.strategyId !== undefined &&
-      rec.secondaries.includes(p.strategyId)
-    ) {
-      secondaryPatterns.push(p);
-    } else if (
-      p.strategyId === undefined &&
-      (p.appliesTo.length === 0 || p.appliesTo.includes(base.script))
-    ) {
-      appliesToOnlyPatterns.push(p);
+      categorized.primary.push(p);
+    } else if (p.strategyId !== undefined && rec.secondaries.includes(p.strategyId)) {
+      categorized.secondary.push(p);
+    } else if (p.strategyId === undefined && (p.appliesTo.length === 0 || p.appliesTo.includes(base.script))) {
+      categorized.appliesTo.push(p);
     }
     // Off-strategy patterns (strategyId set but matches neither primary nor
     // secondaries) are intentionally excluded.
   }
 
-  const ordered = [
-    ...primaryPatterns,
-    ...secondaryPatterns,
-    ...appliesToOnlyPatterns,
-  ];
+  const ordered = [...categorized.primary, ...categorized.secondary, ...categorized.appliesTo];
 
   return ordered.map((p, idx) => {
-    const rank = idx + 1;
     const reason: PatternMatch["reason"] =
-      p.strategyId === rec.primary
-        ? "primary-strategy"
-        : p.strategyId !== undefined && rec.secondaries.includes(p.strategyId)
-          ? "secondary-strategy"
-          : "appliesTo-match";
-    return toPatternMatch(p, rank, reason);
+      p.strategyId === rec.primary ? "primary-strategy"
+      : p.strategyId !== undefined && rec.secondaries.includes(p.strategyId) ? "secondary-strategy"
+      : "appliesTo-match";
+    return toPatternMatch(p, idx + 1, reason);
   });
 }
 

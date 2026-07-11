@@ -21,16 +21,10 @@ import {
   REQUIRED_SCOPE,
   type StoredGitHubToken,
 } from "./githubOAuth.ts";
+import { clearAllStorage } from "../test-setup.ts";
 
-beforeEach(() => {
-  sessionStorage.clear();
-  localStorage.clear();
-});
-
-afterEach(() => {
-  sessionStorage.clear();
-  localStorage.clear();
-});
+beforeEach(clearAllStorage);
+afterEach(clearAllStorage);
 
 // ---------------------------------------------------------------------------
 // PKCE — S256 challenge for a known verifier (RFC 7636 §A test vector)

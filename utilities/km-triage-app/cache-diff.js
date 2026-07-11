@@ -59,21 +59,20 @@ const MAX_BUFFER = 512 * 1024 * 1024;
  */
 function classifyExclusions(numstatText, opts = {}) {
   const knownGenerated = opts.knownGenerated || KNOWN_GENERATED;
-  const threshold = opts.oversizedThreshold != null ? opts.oversizedThreshold : OVERSIZED_THRESHOLD;
+  const threshold = opts.oversizedThreshold ?? OVERSIZED_THRESHOLD;
   const excludePathspecs = [];
   const excludedLog = [];
 
   for (const line of String(numstatText).split('\n')) {
-    if (!line.trim()) continue;
-    const parts = line.split('\t');
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const parts = trimmed.split('\t');
     if (parts.length < 3) continue;
-    const added = parts[0];
-    const deleted = parts[1];
-    const filePath = parts.slice(2).join('\t');
+    const [added, deleted, ...pathParts] = parts;
+    const filePath = pathParts.join('\t');
 
     let reason = '';
     if (added === '-' || deleted === '-') {
-      // Binary: numstat marks added/deleted as "-". Catch first — see header.
       reason = 'binary';
     } else if (knownGenerated.includes(filePath)) {
       reason = 'generated';
@@ -107,8 +106,7 @@ function computeCachedDiff(o) {
   const threeDot = o.range === 'full';
   const range = `${o.base}${threeDot ? '...' : '..'}${o.head}`;
 
-  if (o.range === 'full') {
-    // Best-effort fetch of both endpoints so the pathspec diff resolves locally.
+  if (threeDot) {
     git(['fetch', '--quiet', 'origin', o.base, o.head]);
   }
 
@@ -118,14 +116,14 @@ function computeCachedDiff(o) {
   const diff = git(['diff', range, '--', '.', ...excl.excludePathspecs]);
   fs.writeFileSync(o.diffOut, diff.stdout || '');
 
-  // Keep the FULL file list (do not exclude — specialists must see the file changed).
-  if (o.range === 'full') {
-    const files = spawnSync('gh', ['pr', 'view', String(o.pr), '--json', 'files'],
-      { encoding: 'utf8', maxBuffer: MAX_BUFFER });
+  if (threeDot) {
+    const files = spawnSync('gh', ['pr', 'view', String(o.pr), '--json', 'files'], {
+      encoding: 'utf8',
+      maxBuffer: MAX_BUFFER,
+    });
     fs.writeFileSync(o.filesOut, files.stdout || '');
   } else {
-    const files = git(['diff', '--name-status', range]);
-    fs.writeFileSync(o.filesOut, files.stdout || '');
+    fs.writeFileSync(o.filesOut, git(['diff', '--name-status', range]).stdout || '');
   }
 
   return excl;
@@ -138,7 +136,12 @@ function parseArgs(argv) {
     if (!a.startsWith('--')) continue;
     const key = a.slice(2);
     const next = argv[i + 1];
-    if (next && !next.startsWith('--')) { args[key] = next; i++; } else { args[key] = true; }
+    if (next && !next.startsWith('--')) {
+      args[key] = next;
+      i++;
+    } else {
+      args[key] = true;
+    }
   }
   return args;
 }
@@ -168,11 +171,10 @@ function main() {
     filesOut: args['files-out'],
   });
 
-  // Required audit line — no silent caps.
   if (excludedLog.length > 0) {
     process.stdout.write(
-      `[km-triage] Pre-filter A excluded ${excludedLog.length} file(s) from cached diff: `
-      + `${excludedLog.join(', ')}. Files remain in ${args['files-out']}; spot-check via git show.\n`,
+      `[km-triage] Pre-filter A excluded ${excludedLog.length} file(s) from cached diff: ` +
+      `${excludedLog.join(', ')}. Files remain in ${args['files-out']}; spot-check via git show.\n`
     );
   }
 }

@@ -66,19 +66,16 @@ const manifest = {
 
 const state = crypto.randomBytes(16).toString('hex');
 
+const CSS = 'body{font-family:system-ui,sans-serif;max-width:680px;margin:48px auto;padding:0 24px;line-height:1.5;}' +
+  'button{font-size:18px;padding:12px 24px;cursor:pointer;}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;}';
+
 function pageShell(body) {
   return `<!doctype html><html><head><meta charset="utf-8"><title>km-triage setup</title>` +
-    `<style>body{font-family:system-ui,sans-serif;max-width:680px;margin:48px auto;padding:0 24px;line-height:1.5;}` +
-    `button{font-size:18px;padding:12px 24px;cursor:pointer;}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;}</style>` +
-    `</head><body>${body}</body></html>`;
+    `<style>${CSS}</style></head><body>${body}</body></html>`;
 }
 
 function homePage() {
-  // Inject the manifest into the input via JS rather than as an HTML attribute.
-  // This is the pattern used by Probot's create-probot-app and sidesteps every
-  // HTML-attribute parsing edge case that broke the encoded-attribute approach.
-  const manifestJson = JSON.stringify(manifest);
-  const manifestJsLiteral = JSON.stringify(manifestJson); // double-stringify: produces a JS string literal we can drop into a <script>
+  const manifestJsLiteral = JSON.stringify(JSON.stringify(manifest));
   return pageShell(`
     <h1>km-triage GitHub App setup</h1>
     <p>This will create a GitHub App named <code>${APP_NAME}</code> on your personal account.</p>
@@ -89,10 +86,7 @@ function homePage() {
       <button type="submit">Create GitHub App on github.com</button>
     </form>
     <p style="margin-top:48px;color:#888;font-size:13px;">Permissions requested: PRs read/write, Issues read/write, Contents read, Checks read, Metadata read. No webhooks.</p>
-    <script>
-      // Set the manifest value via JS (string assignment, no HTML escaping in play).
-      document.getElementById('manifest-input').value = ${manifestJsLiteral};
-    </script>
+    <script>document.getElementById('manifest-input').value = ${manifestJsLiteral};</script>
   `);
 }
 
@@ -149,6 +143,7 @@ const server = http.createServer(async (req, res) => {
       const { pem, client_secret, webhook_secret, ...safeConfig } = app;
       fs.writeFileSync(CONFIG_FILE, JSON.stringify(safeConfig, null, 2), { mode: 0o600 });
       const installUrl = `${app.html_url}/installations/new`;
+
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       res.end(pageShell(`
         <h1>[OK] App created</h1>
@@ -161,19 +156,15 @@ const server = http.createServer(async (req, res) => {
         <p>Pick <strong>Only select repositories</strong> and choose <code>keyboard-studio/keyboard-studio</code>.</p>
         <p>After installing, close this tab and run <code>node utilities/km-triage-app/mint-token.js</code> from a terminal to confirm a token mints.</p>
       `));
-      console.log('');
-      console.log('[OK] App created.');
+
+      console.log('\n[OK] App created.');
       console.log('     App ID:           ', app.id);
       console.log('     Slug:             ', app.slug);
       console.log('     Owner:            ', app.owner.login);
       console.log('     Config dir:       ', CONFIG_DIR);
       console.log('     Private key file: ', KEY_FILE);
-      console.log('');
-      console.log('Next: install the App on the repo.');
-      console.log('  ', installUrl);
-      console.log('');
-      console.log('After installing, verify with:');
-      console.log('   node utilities/km-triage-app/mint-token.js');
+      console.log('\nNext: install the App on the repo.\n  ', installUrl);
+      console.log('\nAfter installing, verify with:\n   node utilities/km-triage-app/mint-token.js');
       setTimeout(() => { server.close(); process.exit(0); }, 1500);
     } catch (err) {
       console.error('[ERROR] App creation failed:', err.message);

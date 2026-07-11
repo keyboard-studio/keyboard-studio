@@ -11,3 +11,12 @@ import { webcrypto } from "node:crypto";
 if (!globalThis.crypto) {
   globalThis.crypto = webcrypto as unknown as Crypto;
 }
+
+/**
+ * Clear sessionStorage and localStorage. Intended for beforeEach/afterEach in
+ * OAuth test suites to ensure each test starts with clean storage state.
+ */
+export function clearAllStorage(): void {
+  sessionStorage.clear();
+  localStorage.clear();
+}

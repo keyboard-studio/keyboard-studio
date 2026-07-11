@@ -12,7 +12,7 @@ import {
   type ConditionalSecondary,
 } from "@keyboard-studio/engine";
 import type { AxisFill, StrategyId } from "@keyboard-studio/contracts";
-import { MONO, SANS } from "./tokens.ts";
+import { MONO, SANS, COLORS } from "./tokens.tsx";
 
 function StrategyChip({
   id,
@@ -32,9 +32,9 @@ function StrategyChip({
         borderRadius: 5,
         fontFamily: SANS,
         fontSize: 12.5,
-        background: primary ? "#1f6feb" : "#21262d",
-        color: primary ? "#fff" : "#adbac7",
-        border: primary ? "1px solid #388bfd" : "1px solid #30363d",
+        background: primary ? COLORS.blue.dark : COLORS.gray.border,
+        color: primary ? "#fff" : COLORS.gray.textMuted,
+        border: `1px solid ${primary ? "#388bfd" : COLORS.gray.borderStrong}`,
         whiteSpace: "nowrap",
       }}
     >
@@ -47,12 +47,12 @@ function StrategyChip({
 function SecondaryChip({ sec }: { sec: ConditionalSecondary }) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-      <span style={{ color: "#6e7681", fontFamily: MONO, fontSize: 12 }}>
+      <span style={{ color: COLORS.gray.textVeryDim, fontFamily: MONO, fontSize: 12 }}>
         +
       </span>
       <StrategyChip id={sec.strategy} kind="secondary" />
       {sec.whenText !== undefined && (
-        <span style={{ color: "#8b949e", fontSize: 11, fontFamily: MONO }}>
+        <span style={{ color: COLORS.gray.textDim, fontSize: 11, fontFamily: MONO }}>
           if {sec.whenText}
         </span>
       )}
@@ -75,10 +75,10 @@ export interface StrategyTreeViewProps {
 
 export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
   return (
-    <div style={{ fontFamily: SANS, color: "#e6edf3", maxWidth: 920 }}>
-      <p style={{ fontSize: 13, color: "#8b949e", margin: "0 0 16px" }}>
+    <div style={{ fontFamily: SANS, color: COLORS.gray.text, maxWidth: 920 }}>
+      <p style={{ fontSize: 13, color: COLORS.gray.textDim, margin: "0 0 16px" }}>
         The survey computes a seven-axis vector (A1–A7), then{" "}
-        <code style={{ fontFamily: MONO, color: "#adbac7" }}>
+        <code style={{ fontFamily: MONO, color: COLORS.gray.textMuted }}>
           selectStrategy()
         </code>{" "}
         runs this tree. Primary rules are tried top-to-bottom; the first match
@@ -89,7 +89,7 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
       <h3
         style={{
           fontSize: 13,
-          color: "#6ea8fe",
+          color: COLORS.blue.base,
           margin: "0 0 8px",
           textTransform: "uppercase",
           letterSpacing: 0.4,
@@ -106,8 +106,8 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
                 alignItems: "center",
                 gap: 12,
                 padding: "10px 14px",
-                background: "#11161d",
-                border: "1px solid #21262d",
+                background: COLORS.gray.bgPanel,
+                border: `1px solid ${COLORS.gray.border}`,
                 borderRadius: 7,
                 flexWrap: "wrap",
               }}
@@ -117,7 +117,7 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
                   fontFamily: MONO,
                   fontSize: 12,
                   color: "#fff",
-                  background: "#30363d",
+                  background: COLORS.gray.borderStrong,
                   borderRadius: 4,
                   padding: "2px 8px",
                   minWidth: 56,
@@ -131,14 +131,14 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
                 style={{
                   fontFamily: MONO,
                   fontSize: 12.5,
-                  color: "#e3b341",
+                  color: COLORS.amber.base,
                   flex: 1,
                   minWidth: 220,
                 }}
               >
                 {r.conditionText}
               </code>
-              <span style={{ color: "#6e7681" }}>→</span>
+              <span style={{ color: COLORS.gray.textVeryDim }}>→</span>
               <StrategyChip id={r.primary} kind="primary" />
               {r.secondaries.map((sec) => (
                 <SecondaryChip key={sec.strategy} sec={sec} />
@@ -148,7 +148,7 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
               <div
                 style={{
                   paddingLeft: 22,
-                  color: "#6e7681",
+                  color: COLORS.gray.textVeryDim,
                   fontSize: 11,
                   fontFamily: MONO,
                   lineHeight: "18px",
@@ -164,7 +164,7 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
       <h3
         style={{
           fontSize: 13,
-          color: "#6ea8fe",
+          color: COLORS.blue.base,
           margin: "24px 0 8px",
           textTransform: "uppercase",
           letterSpacing: 0.4,
@@ -181,8 +181,8 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
               alignItems: "center",
               gap: 12,
               padding: "10px 14px",
-              background: "#11161d",
-              border: "1px solid #21262d",
+              background: COLORS.gray.bgPanel,
+              border: `1px solid ${COLORS.gray.border}`,
               borderRadius: 7,
               flexWrap: "wrap",
             }}
@@ -191,8 +191,8 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
               style={{
                 fontFamily: MONO,
                 fontSize: 12,
-                color: "#adbac7",
-                background: "#21262d",
+                color: COLORS.gray.textMuted,
+                background: COLORS.gray.border,
                 borderRadius: 4,
                 padding: "2px 8px",
                 whiteSpace: "nowrap",
@@ -204,20 +204,20 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
               style={{
                 fontFamily: MONO,
                 fontSize: 12.5,
-                color: "#e3b341",
+                color: COLORS.amber.base,
                 flex: 1,
                 minWidth: 220,
               }}
             >
               {sr.conditionText}
             </code>
-            <span style={{ color: "#6e7681" }}>→ add</span>
+            <span style={{ color: COLORS.gray.textVeryDim }}>→ add</span>
             <StrategyChip id={sr.add} kind="secondary" />
           </div>
         ))}
       </div>
 
-      <p style={{ fontSize: 11.5, color: "#6e7681", margin: "16px 0 0", fontFamily: SANS }}>
+      <p style={{ fontSize: 11.5, color: COLORS.gray.textVeryDim, margin: "16px 0 0", fontFamily: SANS }}>
         Note: rule 3a (postfix-preference intercept → S-03, shown above between rules 3 and 4) is
         implemented in <code style={{ fontFamily: MONO }}>selectStrategy()</code>. When a base is
         instantiated (either track), its IR is scanned for the unconditional postfix

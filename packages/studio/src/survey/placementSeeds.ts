@@ -142,10 +142,8 @@ export function extractSeedEntries(
   const result: PlacementSeedEntry[] = [];
 
   for (const entry of placementMap.entries) {
-    if (!qualifiesForSeed(entry, threshold)) continue;
-
     const top = topCandidate(entry);
-    if (top === undefined) continue;
+    if (top === undefined || !(top.confidence >= threshold)) continue;
 
     const character = parseUPlusNotation(entry.codepoint);
     if (character === null) continue;
@@ -159,15 +157,6 @@ export function extractSeedEntries(
   }
 
   return result;
-}
-
-/**
- * Whether a PlacementEntry's top candidate meets the confidence threshold.
- * Entries with no candidates never qualify.
- */
-function qualifiesForSeed(entry: PlacementEntry, threshold: number): boolean {
-  const top = topCandidate(entry);
-  return top !== undefined && top.confidence >= threshold;
 }
 
 // ---------------------------------------------------------------------------

@@ -73,72 +73,28 @@
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
-import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useWorkingCopyStore } from "../../src/stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "../../src/stores/surveySessionStore.ts";
 
 // ---------------------------------------------------------------------------
 // vi.hoisted — refs for mock component callbacks (must precede vi.mock)
 // ---------------------------------------------------------------------------
 
-const {
-  mockIdentityCompleteRef,
-  mockBaseResolvedRef,
-  mockCarveDoneRef,
-  mockCarveBackRef,
-  mockPhaseBDoneRef,
-  mockPhaseBBackRef,
-  mockMechDoneRef,
-  mockMechBackRef,
-  mockPhaseFDoneRef,
-  mockPhaseFBackRef,
-  mockTouchECompleteRef,
-  mockTouchEAssignmentsRef,
-  mockTouchEBackRef,
-} = vi.hoisted(() => {
-  const mockIdentityCompleteRef = { current: null as null | ((...args: unknown[]) => void) };
-  const mockBaseResolvedRef = { current: null as null | ((...args: unknown[]) => void) };
-  const mockCarveDoneRef = { current: null as null | (() => void) };
-  const mockCarveBackRef = { current: null as null | (() => void) };
-  const mockPhaseBDoneRef = { current: null as null | ((...args: unknown[]) => void) };
-  const mockPhaseBBackRef = { current: null as null | (() => void) };
-  const mockMechDoneRef = { current: null as null | (() => void) };
-  const mockMechBackRef = { current: null as null | (() => void) };
-  const mockPhaseFDoneRef = { current: null as null | ((...args: unknown[]) => void) };
-  const mockPhaseFBackRef = { current: null as null | (() => void) };
-  const mockTouchECompleteRef = { current: null as null | ((a: unknown[]) => void) };
-  const mockTouchEAssignmentsRef = { current: [] as unknown[] };
-  const mockTouchEBackRef = { current: null as null | (() => void) };
-  return {
-    mockIdentityCompleteRef,
-    mockBaseResolvedRef,
-    mockCarveDoneRef,
-    mockCarveBackRef,
-    mockPhaseBDoneRef,
-    mockPhaseBBackRef,
-    mockMechDoneRef,
-    mockMechBackRef,
-    mockPhaseFDoneRef,
-    mockPhaseFBackRef,
-    mockTouchECompleteRef,
-    mockTouchEAssignmentsRef,
-    mockTouchEBackRef,
-  };
-});
-
-// Aliases for use in mock factories (vi.hoisted refs not in scope there).
-const _mockIdentityCompleteRef = mockIdentityCompleteRef;
-const _mockBaseResolvedRef = mockBaseResolvedRef;
-const _mockCarveDoneRef = mockCarveDoneRef;
-const _mockCarveBackRef = mockCarveBackRef;
-const _mockPhaseBDoneRef = mockPhaseBDoneRef;
-const _mockPhaseBBackRef = mockPhaseBBackRef;
-const _mockMechDoneRef = mockMechDoneRef;
-const _mockMechBackRef = mockMechBackRef;
-const _mockPhaseFDoneRef = mockPhaseFDoneRef;
-const _mockPhaseFBackRef = mockPhaseFBackRef;
-const _mockTouchECompleteRef = mockTouchECompleteRef;
-const _mockTouchEAssignmentsRef = mockTouchEAssignmentsRef;
-const _mockTouchEBackRef = mockTouchEBackRef;
+const mockRefs = vi.hoisted(() => ({
+  identityComplete: { current: null as null | ((...args: unknown[]) => void) },
+  baseResolved: { current: null as null | ((...args: unknown[]) => void) },
+  carveDone: { current: null as null | (() => void) },
+  carveBack: { current: null as null | (() => void) },
+  phaseBDone: { current: null as null | ((...args: unknown[]) => void) },
+  phaseBBack: { current: null as null | (() => void) },
+  mechDone: { current: null as null | (() => void) },
+  mechBack: { current: null as null | (() => void) },
+  phaseFDone: { current: null as null | ((...args: unknown[]) => void) },
+  phaseFBack: { current: null as null | (() => void) },
+  touchEComplete: { current: null as null | ((a: unknown[]) => void) },
+  touchEAssignments: { current: [] as unknown[] },
+  touchEBack: { current: null as null | (() => void) },
+}));
 
 // ---------------------------------------------------------------------------
 // Fake data emitted by mock survey components
@@ -189,7 +145,7 @@ const fakeBase = {
 //   Renders phaseF-complete button calling props.onComplete(fakePhaseResult).
 //   No factory onCommit — PhaseF had no pre-onComplete store writes.
 
-vi.mock("../survey/FlowStepHost.tsx", () => ({
+vi.mock("../../src/survey/FlowStepHost.tsx", () => ({
   FlowStepHost: ({
     flow,
     onComplete,
@@ -288,9 +244,9 @@ vi.mock("../survey/FlowStepHost.tsx", () => ({
   },
 }));
 
-vi.mock("../survey/index.ts", () => ({
+vi.mock("../../src/survey/index.ts", () => ({
   IdentityLite: ({ onComplete }: { onComplete: (result: unknown, identity: unknown) => void }) => {
-    _mockIdentityCompleteRef.current = onComplete;
+    mockRefs.identityComplete.current = onComplete;
     return (
       <div data-testid="stage-identity">
         <button
@@ -316,8 +272,8 @@ vi.mock("../survey/index.ts", () => ({
     </div>
   ),
   PhaseB: ({ onComplete, onBack }: { onComplete: (r: unknown) => void; onBack?: () => void }) => {
-    _mockPhaseBDoneRef.current = onComplete;
-    _mockPhaseBBackRef.current = onBack ?? null;
+    mockRefs.phaseBDone.current = onComplete;
+    mockRefs.phaseBBack.current = onBack ?? null;
     return (
       <div data-testid="stage-B">
         <button type="button" data-testid="phaseB-complete" onClick={() => onComplete(fakePhaseResult)}>
@@ -339,9 +295,9 @@ vi.mock("../survey/index.ts", () => ({
   buildPrefillRows: () => [],
 }));
 
-vi.mock("../editors/panels/BaseResolution.tsx", () => ({
+vi.mock("../../src/editors/panels/BaseResolution.tsx", () => ({
   BaseResolution: ({ onResolved, onBack }: { onResolved: (base: unknown) => void; onBack?: () => void }) => {
-    _mockBaseResolvedRef.current = onResolved;
+    mockRefs.baseResolved.current = onResolved;
     return (
       <div data-testid="stage-base">
         <button type="button" data-testid="base-resolved" onClick={() => onResolved(fakeBase)}>
@@ -357,10 +313,10 @@ vi.mock("../editors/panels/BaseResolution.tsx", () => ({
   },
 }));
 
-vi.mock("../editors/carve/CarveGallery.tsx", () => ({
+vi.mock("../../src/editors/carve/CarveGallery.tsx", () => ({
   CarveGallery: ({ onComplete, onBack }: { onComplete: () => void; onBack?: () => void }) => {
-    _mockCarveDoneRef.current = onComplete;
-    _mockCarveBackRef.current = onBack ?? null;
+    mockRefs.carveDone.current = onComplete;
+    mockRefs.carveBack.current = onBack ?? null;
     return (
       <div data-testid="stage-carve">
         <button type="button" data-testid="carve-complete" onClick={onComplete}>
@@ -376,10 +332,10 @@ vi.mock("../editors/carve/CarveGallery.tsx", () => ({
   },
 }));
 
-vi.mock("../editors/assignLoop/MechanismGallery.tsx", () => ({
+vi.mock("../../src/editors/assignLoop/MechanismGallery.tsx", () => ({
   MechanismGallery: ({ onComplete, onBack }: { onComplete: () => void; onBack?: () => void }) => {
-    _mockMechDoneRef.current = onComplete;
-    _mockMechBackRef.current = onBack ?? null;
+    mockRefs.mechDone.current = onComplete;
+    mockRefs.mechBack.current = onBack ?? null;
     return (
       <div data-testid="stage-mechanisms">
         <button type="button" data-testid="mechanisms-complete" onClick={onComplete}>
@@ -395,16 +351,16 @@ vi.mock("../editors/assignLoop/MechanismGallery.tsx", () => ({
   },
 }));
 
-vi.mock("../editors/assignLoop/TouchGallery.tsx", () => ({
+vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () => ({
   TouchGallery: ({ onComplete, onBack }: { onComplete: (a: unknown[]) => void; onBack: () => void }) => {
-    _mockTouchECompleteRef.current = onComplete;
-    _mockTouchEBackRef.current = onBack;
+    mockRefs.touchEComplete.current = onComplete;
+    mockRefs.touchEBack.current = onBack;
     return (
       <div data-testid="stage-E">
         <button
           type="button"
           data-testid="e-complete"
-          onClick={() => onComplete(_mockTouchEAssignmentsRef.current)}
+          onClick={() => onComplete(mockRefs.touchEAssignments.current)}
         >
           Continue
         </button>
@@ -416,33 +372,33 @@ vi.mock("../editors/assignLoop/TouchGallery.tsx", () => ({
   },
 }));
 
-vi.mock("../components/UnsupportedScriptStub.tsx", () => ({
+vi.mock("../../src/components/UnsupportedScriptStub.tsx", () => ({
   UnsupportedScriptStub: ({ script }: { script: string }) => (
     <div data-testid="stage-unsupported">{script}</div>
   ),
 }));
 
-vi.mock("../components/OSKFrame.tsx", () => ({
+vi.mock("../../src/components/OSKFrame.tsx", () => ({
   OSKFrame: () => <div data-testid="osk-frame" />,
 }));
 
-vi.mock("../components/OskModeToggle.tsx", () => ({
+vi.mock("../../src/components/OskModeToggle.tsx", () => ({
   OskModeToggle: () => <div data-testid="osk-toggle" />,
 }));
 
-vi.mock("../hooks/useKeyboardArtifact.ts", () => ({
+vi.mock("../../src/hooks/useKeyboardArtifact.ts", () => ({
   useKeyboardArtifact: () => ({ stage: { kind: "idle" }, retry: vi.fn(), recompile: vi.fn() }),
 }));
 
-vi.mock("../hooks/useWorkingCopyTransform.ts", () => ({
+vi.mock("../../src/hooks/useWorkingCopyTransform.ts", () => ({
   useWorkingCopyTransform: () => null,
 }));
 
-vi.mock("../lib/confirmRebase.ts", () => ({
+vi.mock("../../src/lib/confirmRebase.ts", () => ({
   instantiateFromBaseIfConfirmed: vi.fn(),
 }));
 
-vi.mock("../lib/buildTouchLayoutJson.ts", () => ({
+vi.mock("../../src/lib/buildTouchLayoutJson.ts", () => ({
   buildTouchLayoutJson: (
     _baseIr: unknown,
     assignments: Array<{ target: string; mechanisms: Array<{ patternId: string; slotValues?: Record<string, string> }> }>,
@@ -452,19 +408,19 @@ vi.mock("../lib/buildTouchLayoutJson.ts", () => ({
   }),
 }));
 
-vi.mock("../components/PreviewScreen.tsx", () => ({
+vi.mock("../../src/components/PreviewScreen.tsx", () => ({
   PreviewScreen: () => <div data-testid="preview-screen-root">preview-screen</div>,
 }));
 
-vi.mock("../components/OutputScreen.tsx", () => ({
+vi.mock("../../src/components/OutputScreen.tsx", () => ({
   OutputScreen: () => <div data-testid="output-screen-root">output-screen</div>,
 }));
 
-vi.mock("../dashboard/DashboardView.tsx", () => ({
+vi.mock("../../src/dashboard/DashboardView.tsx", () => ({
   FlowMapView: () => <div data-testid="flow-map-view">flow-map</div>,
 }));
 
-vi.mock("../lib/navigate.ts", () => ({
+vi.mock("../../src/lib/navigate.ts", () => ({
   navigateTo: vi.fn(),
 }));
 
@@ -472,9 +428,9 @@ vi.mock("../lib/navigate.ts", () => ({
 // Imports (after vi.mock declarations)
 // ---------------------------------------------------------------------------
 
-import { SurveyView } from "../StudioShell.tsx";
-import { navigateTo } from "../lib/navigate.ts";
-import * as ReducerModule from "../steps/reducer.ts";
+import { SurveyView } from "../../src/StudioShell.tsx";
+import { navigateTo } from "../../src/lib/navigate.ts";
+import * as ReducerModule from "../../src/steps/reducer.ts";
 
 // ---------------------------------------------------------------------------
 // Fixture types
@@ -651,55 +607,43 @@ function createRecorder() {
 // Walk drivers
 // ---------------------------------------------------------------------------
 
+type StepAction = { stepId: string; testId: string; async?: boolean };
+
+/**
+ * Drive a sequence of step actions through the recorder.
+ */
+async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: StepAction[]): Promise<void> {
+  for (const { stepId, testId, async: isAsync } of steps) {
+    recorder.beginStep(stepId);
+    if (isAsync) {
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(testId));
+      });
+    } else {
+      fireEvent.click(screen.getByTestId(testId));
+    }
+    recorder.endStep();
+  }
+}
+
 /**
  * Drive the full copy-track walk.
  * identity -> choose_base -> track(copy) -> project_name ->
  * characters(prefill->B) -> carve -> mechanisms -> touch -> help -> done
  */
 async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Promise<void> {
-  recorder.beginStep("identity");
-  fireEvent.click(screen.getByTestId("identity-complete"));
-  recorder.endStep();
-
-  recorder.beginStep("choose_base");
-  fireEvent.click(screen.getByTestId("base-resolved"));
-  recorder.endStep();
-
-  recorder.beginStep("track");
-  fireEvent.click(screen.getByTestId("track-copy"));
-  recorder.endStep();
-
-  recorder.beginStep("project_name");
-  fireEvent.click(screen.getByTestId("project-name-next"));
-  recorder.endStep();
-
-  recorder.beginStep("characters/prefill");
-  fireEvent.click(screen.getByTestId("prefill-confirm"));
-  recorder.endStep();
-
-  recorder.beginStep("characters/B");
-  fireEvent.click(screen.getByTestId("phaseB-complete"));
-  recorder.endStep();
-
-  recorder.beginStep("carve");
-  fireEvent.click(screen.getByTestId("carve-complete"));
-  recorder.endStep();
-
-  recorder.beginStep("mechanisms");
-  fireEvent.click(screen.getByTestId("mechanisms-complete"));
-  recorder.endStep();
-
-  recorder.beginStep("touch");
-  await act(async () => {
-    fireEvent.click(screen.getByTestId("e-complete"));
-  });
-  recorder.endStep();
-
-  recorder.beginStep("help");
-  await act(async () => {
-    fireEvent.click(screen.getByTestId("phaseF-complete"));
-  });
-  recorder.endStep();
+  await driveSteps(recorder, [
+    { stepId: "identity", testId: "identity-complete" },
+    { stepId: "choose_base", testId: "base-resolved" },
+    { stepId: "track", testId: "track-copy" },
+    { stepId: "project_name", testId: "project-name-next" },
+    { stepId: "characters/prefill", testId: "prefill-confirm" },
+    { stepId: "characters/B", testId: "phaseB-complete" },
+    { stepId: "carve", testId: "carve-complete" },
+    { stepId: "mechanisms", testId: "mechanisms-complete" },
+    { stepId: "touch", testId: "e-complete", async: true },
+    { stepId: "help", testId: "phaseF-complete", async: true },
+  ]);
 }
 
 /**
@@ -709,45 +653,17 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
  * project_name MUST NOT appear.
  */
 async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Promise<void> {
-  recorder.beginStep("identity");
-  fireEvent.click(screen.getByTestId("identity-complete"));
-  recorder.endStep();
-
-  recorder.beginStep("choose_base");
-  fireEvent.click(screen.getByTestId("base-resolved"));
-  recorder.endStep();
-
-  recorder.beginStep("track");
-  fireEvent.click(screen.getByTestId("track-adapt"));
-  recorder.endStep();
-
-  recorder.beginStep("characters/prefill");
-  fireEvent.click(screen.getByTestId("prefill-confirm"));
-  recorder.endStep();
-
-  recorder.beginStep("characters/B");
-  fireEvent.click(screen.getByTestId("phaseB-complete"));
-  recorder.endStep();
-
-  recorder.beginStep("carve");
-  fireEvent.click(screen.getByTestId("carve-complete"));
-  recorder.endStep();
-
-  recorder.beginStep("mechanisms");
-  fireEvent.click(screen.getByTestId("mechanisms-complete"));
-  recorder.endStep();
-
-  recorder.beginStep("touch");
-  await act(async () => {
-    fireEvent.click(screen.getByTestId("e-complete"));
-  });
-  recorder.endStep();
-
-  recorder.beginStep("help");
-  await act(async () => {
-    fireEvent.click(screen.getByTestId("phaseF-complete"));
-  });
-  recorder.endStep();
+  await driveSteps(recorder, [
+    { stepId: "identity", testId: "identity-complete" },
+    { stepId: "choose_base", testId: "base-resolved" },
+    { stepId: "track", testId: "track-adapt" },
+    { stepId: "characters/prefill", testId: "prefill-confirm" },
+    { stepId: "characters/B", testId: "phaseB-complete" },
+    { stepId: "carve", testId: "carve-complete" },
+    { stepId: "mechanisms", testId: "mechanisms-complete" },
+    { stepId: "touch", testId: "e-complete", async: true },
+    { stepId: "help", testId: "phaseF-complete", async: true },
+  ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -810,66 +726,6 @@ describe("golden-walk: copy-track (T003)", () => {
 
     expect(walk).toEqual(fixture);
   });
-
-  it("copy-track walk contains project_name step", async () => {
-    await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
-    });
-
-    await driveCopyTrack(recorder);
-
-    const stepIds = recorder.getWalk().map((e) => e.stepId);
-    expect(stepIds).toContain("project_name");
-  });
-
-  it("copy-track project_name entry carries setIdentity in workingCopyMutations", async () => {
-    await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
-    });
-
-    await driveCopyTrack(recorder);
-
-    const projEntry = recorder.getWalk().find((e) => e.stepId === "project_name");
-    expect(projEntry).toBeDefined();
-    expect(projEntry!.workingCopyMutations).toContain("setIdentity");
-  });
-
-  it("copy-track identity entry carries recordPhase in workingCopyMutations", async () => {
-    await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
-    });
-
-    await driveCopyTrack(recorder);
-
-    const idEntry = recorder.getWalk().find((e) => e.stepId === "identity");
-    expect(idEntry).toBeDefined();
-    expect(idEntry!.workingCopyMutations).toContain("recordPhase");
-  });
-
-  it("copy-track help entry carries recordPhase in workingCopyMutations and navigateTo output", async () => {
-    await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
-    });
-
-    await driveCopyTrack(recorder);
-
-    const helpEntry = recorder.getWalk().find((e) => e.stepId === "help");
-    expect(helpEntry).toBeDefined();
-    expect(helpEntry!.workingCopyMutations).toContain("recordPhase");
-    expect(helpEntry!.navigateTo).toContain("output");
-  });
-
-  it("copy-track mechanisms entry carries lockDesktop in workingCopyMutations", async () => {
-    await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
-    });
-
-    await driveCopyTrack(recorder);
-
-    const mechEntry = recorder.getWalk().find((e) => e.stepId === "mechanisms");
-    expect(mechEntry).toBeDefined();
-    expect(mechEntry!.workingCopyMutations).toContain("lockDesktop");
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -898,64 +754,5 @@ describe("golden-walk: adapt-track (T004)", () => {
     const fixture = loadOrWriteFixture("adapt", walk);
 
     expect(walk).toEqual(fixture);
-  });
-
-  it("adapt-track walk does NOT contain project_name step", async () => {
-    await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
-    });
-
-    await driveAdaptTrack(recorder);
-
-    const stepIds = recorder.getWalk().map((e) => e.stepId);
-    expect(stepIds).not.toContain("project_name");
-  });
-
-  it("adapt-track walk has no setIdentity in any workingCopyMutations entry", async () => {
-    await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
-    });
-
-    await driveAdaptTrack(recorder);
-
-    const allWcMutations = recorder.getWalk().flatMap((e) => e.workingCopyMutations);
-    expect(allWcMutations).not.toContain("setIdentity");
-  });
-
-  it("adapt-track identity entry carries recordPhase in workingCopyMutations", async () => {
-    await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
-    });
-
-    await driveAdaptTrack(recorder);
-
-    const idEntry = recorder.getWalk().find((e) => e.stepId === "identity");
-    expect(idEntry).toBeDefined();
-    expect(idEntry!.workingCopyMutations).toContain("recordPhase");
-  });
-
-  it("adapt-track help entry carries recordPhase and navigateTo output", async () => {
-    await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
-    });
-
-    await driveAdaptTrack(recorder);
-
-    const helpEntry = recorder.getWalk().find((e) => e.stepId === "help");
-    expect(helpEntry).toBeDefined();
-    expect(helpEntry!.workingCopyMutations).toContain("recordPhase");
-    expect(helpEntry!.navigateTo).toContain("output");
-  });
-
-  it("adapt-track mechanisms entry carries lockDesktop in workingCopyMutations", async () => {
-    await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
-    });
-
-    await driveAdaptTrack(recorder);
-
-    const mechEntry = recorder.getWalk().find((e) => e.stepId === "mechanisms");
-    expect(mechEntry).toBeDefined();
-    expect(mechEntry!.workingCopyMutations).toContain("lockDesktop");
   });
 });

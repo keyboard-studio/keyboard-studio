@@ -1,31 +1,20 @@
 // repropagate — spec-014 US2 touch re-propagation (no-clobber), T022.
 //
-// On a physical change (physical-lock break / physical-step completion), the
-// touch surface is automatically re-derived — but only the keys it OWNS. Keys
-// the author placed or edited by hand are never overwritten (the no-clobber
-// rule). This module is the steps-layer re-propagation seam.
+// On a physical change, the touch surface is automatically re-derived, but only
+// for keys with auto-managed provenance. Hand-edited keys are never overwritten
+// (no-clobber rule). This is the steps-layer re-propagation seam.
 //
 // Guarantees (repropagation.contract.md):
-//   R1 — automatic, staleness-driven: the trigger (reducer.ts T024) calls this
-//        on a physical change; it reads the injected `staleSteps` slice.
-//   R2 — no-clobber: overwrites ONLY `base-derived` / `physical-suggested`
-//        keys; NEVER `hand-set`. Absent/undefined provenance is treated AS
-//        `hand-set` (protected). Empty-hand-set is the trivial pass.
-//   R3 — coalesced single pass: re-runs `touchSuggest` ONCE over the union of
-//        the staleness closure; each derived key re-suggested at most once.
-//   R4 — promotion is respected: a key promoted to `hand-set` (touchBehavior.ts)
-//        is left untouched here.
-//   R5 — no dependents: an empty staleness closure yields a no-op, not an error.
-//   R6 — orphaned hand-set keys are NOT auto-deleted (dashboard concern).
+//   R1 — automatic, staleness-driven trigger on physical changes.
+//   R2 — no-clobber: overwrites only `base-derived`/`physical-suggested` keys.
+//   R3 — coalesced single pass: re-runs `touchSuggest` once over staleness closure.
+//   R4 — promotion is respected: `hand-set` keys are left untouched.
+//   R5 — empty staleness closure yields a no-op, not an error.
+//   R6 — orphaned hand-set keys are not auto-deleted.
 //
-// Writes go THROUGH the single mutate() write path: a `touchLayout`
-// `Partial<KeyboardIR>` patch applied via `applyMutatePatch(base, patch,
-// TOUCH_WRITES)` (consistent with the M6 single-write-path; A3 RESOLVED). It is
-// NOT the side-car touch JSON.
-//
-// BOUNDARY COMPLIANCE: steps/ may NOT import stores/. The `staleSteps` slice
-// and the working-IR read/write are INJECTED via RepropagateDeps (mirroring the
-// reducer's getWorkingIR/setWorkingIR pattern). Pure / idempotent.
+// Writes go through the single mutate() write path via `applyMutatePatch(base,
+// patch, TOUCH_WRITES)`. Dependencies (`staleSteps`, working-IR read/write) are
+// injected via RepropagateDeps (steps/ may not import stores/). Pure/idempotent.
 //
 // Source of truth:
 //   specs/014-mutate-seam-touch-propagation/contracts/repropagation.contract.md
@@ -41,30 +30,18 @@ import { TOUCH_WRITES } from "./editorMutate.ts";
 // ---------------------------------------------------------------------------
 
 export interface RepropagateDeps {
-  /**
-   * The P4b staleness slice — the union of the staleness closure (root-set +
-   * completeness fixpoint). Re-propagation runs a SINGLE coalesced pass over
-   * this whole set (R3). An empty set is a no-op (R5).
-   */
+  /** The staleness closure. Re-propagation runs a single coalesced pass over
+   * this set (R3). An empty set is a no-op (R5). */
   readonly staleSteps: ReadonlySet<string>;
   /** Read the current working-copy IR, or null when not yet instantiated. */
   readonly getWorkingIR: () => KeyboardIR | null;
-  /** Write the merged IR back to the working copy (the mutate() write path). */
+  /** Write the merged IR back to the working copy. */
   readonly setWorkingIR: (ir: KeyboardIR) => void;
   /**
-   * OPTIONAL — persist the re-serialized `.keyman-touch-layout` side-car JSON
-   * (the `touchLayoutJson` store slot) so the SHIPPED artifact reflects
-   * re-propagation, not just the OSK preview (issue #831).
-   *
-   * When provided, re-propagation serializes the merged `touchLayout` IR via
-   * `emitTouchLayout` and writes the string here AFTER the working-IR write, so
-   * `serializeWorkingCopy` / `projectWorkingCopyForOutput` (which emit the
-   * downloaded artifact from this side-car) stay in lockstep with the preview.
-   *
-   * Absent ⇒ legacy behavior: re-propagation updates only the preview IR and the
-   * shipped side-car keeps the value set at the touch step (touch divergence is
-   * preview-only). The reducer injects it; tests may omit it to assert the
-   * pure IR merge in isolation.
+   * Optional: persist the re-serialized `.keyman-touch-layout` side-car JSON
+   * so the shipped artifact reflects re-propagation, not just the OSK preview
+   * (issue #831). When absent, only the preview IR is updated; tests may omit
+   * it to assert the pure IR merge in isolation.
    */
   readonly setTouchLayoutJson?: (json: string) => void;
 }
@@ -74,10 +51,9 @@ export interface RepropagateDeps {
 // ---------------------------------------------------------------------------
 
 /**
- * True when re-propagation is ALLOWED to overwrite this key — i.e. its
+ * True when re-propagation is allowed to overwrite this key — i.e. its
  * provenance is an auto-managed state (`base-derived` or `physical-suggested`).
- * A `hand-set` key, AND any key with absent/undefined provenance (legacy →
- * treated as `hand-set`, FR-009), is protected and returns false.
+ * A `hand-set` key or any key with absent/undefined provenance is protected.
  */
 export function isOverwritable(key: TouchKeyIR): boolean {
   return key.provenance === "base-derived" || key.provenance === "physical-suggested";
@@ -104,14 +80,13 @@ export function mergeNoClobber(
   existing: TouchLayoutIR,
   suggested: TouchLayoutIR,
 ): TouchLayoutIR {
-  // Index suggested keys by id for an O(1) lookup (each id at most once — the
-  // single coalesced pass produces one suggestion per key, R3).
+  // Index suggested keys by id for O(1) lookup.
   const suggestedById = new Map<string, TouchKeyIR>();
   for (const platform of suggested.platforms) {
     for (const layer of platform.layers) {
       for (const row of layer.rows) {
         for (const key of row.keys) {
-          if (!suggestedById.has(key.id)) suggestedById.set(key.id, key);
+          suggestedById.set(key.id, key);
         }
       }
     }
@@ -123,13 +98,8 @@ export function mergeNoClobber(
       ...layer,
       rows: layer.rows.map((row) => ({
         keys: row.keys.map((key) => {
-          if (!isOverwritable(key)) {
-            // hand-set / untagged → byte-identical clone (R2/R4).
-            return structuredClone(key);
-          }
-          const replacement = suggestedById.get(key.id);
-          // Overwritable but no suggestion exists for it → keep as-is (R6).
-          return replacement === undefined ? structuredClone(key) : structuredClone(replacement);
+          if (!isOverwritable(key)) return structuredClone(key);
+          return structuredClone(suggestedById.get(key.id) ?? key);
         }),
       })),
     })),
@@ -166,51 +136,30 @@ export function buildRepropagationPatch(
 /**
  * Re-propagate the touch layout after a physical change.
  *
- * R5 — short-circuits to a no-op when the staleness closure is empty (no
- *      derived touch dependents → nothing to re-suggest).
- * R1/R3 — re-runs `touchSuggest` ONCE over the working IR (the union of the
- *         staleness closure is a single physical-decision substrate) and merges
- *         it under the no-clobber rule.
- * The merged layout is written THROUGH the single mutate() write path
- * (applyMutatePatch / TOUCH_WRITES). A no-op patch (`{}` / unchanged layout) is
- * still applied as a structural copy, but `setWorkingIR` is skipped when there
- * is nothing to write (no touch layout) to avoid churn.
+ * R5 — short-circuits to a no-op when the staleness closure is empty.
+ * R1/R3 — re-runs `touchSuggest` ONCE over the working IR and merges it under
+ *         the no-clobber rule.
+ * The merged layout is written through the single mutate() write path
+ * (applyMutatePatch / TOUCH_WRITES).
  *
  * Side-car serialization (issue #831): when `setTouchLayoutJson` is injected,
- * the merged `touchLayout` IR is ALSO re-serialized via `emitTouchLayout` and
- * persisted into the `touchLayoutJson` side-car, so the SHIPPED
- * `.keyman-touch-layout` (emitted from that side-car by `serializeWorkingCopy`)
- * reflects re-propagation — not just the OSK preview. Without this, flag-on
- * touch re-propagation changed what the author SAW but not what they DOWNLOADED.
+ * the merged `touchLayout` IR is re-serialized via `emitTouchLayout` and
+ * persisted into the side-car, so the SHIPPED `.keyman-touch-layout` reflects
+ * re-propagation, not just the OSK preview.
  *
- * Idempotent: re-running against the merged result yields the same IR (the
- * suggestion is a pure function of the physical IR, and hand-set keys are
- * untouched), and the re-serialized side-car is therefore stable too.
+ * Idempotent: re-running against the merged result yields the same IR.
  */
 export function repropagate(deps: RepropagateDeps): void {
-  // R5 — empty closure ⇒ no-op.
   if (deps.staleSteps.size === 0) return;
 
   const base = deps.getWorkingIR();
-  if (base === null) return;
-  // Nothing to re-propagate over — no touch layout on the working copy.
-  if (base.touchLayout === undefined) return;
+  if (base === null || base.touchLayout === undefined) return;
 
-  // R1/R3 — single coalesced re-derivation over the physical IR.
   const suggested = touchSuggest({ physicalIR: base });
   const patch = buildRepropagationPatch(base, suggested);
-
-  // Route through the single mutate() write path (A3 / M6); TOUCH_WRITES
-  // containment + path-scoped deep merge (M2/M3) apply exactly as for carve/add.
   const next = applyMutatePatch(base, patch, TOUCH_WRITES);
   deps.setWorkingIR(next);
 
-  // Issue #831 — re-serialize the merged touch IR back into the shipped side-car
-  // so the downloaded `.keyman-touch-layout` reflects re-propagation, not just
-  // the preview. Emit from `next.touchLayout` (the freshly merged layout that was
-  // just written to the working IR) so the side-car and the preview IR are
-  // derived from the SAME source. Guarded on the optional dep + a defined layout
-  // (applyMutatePatch preserves it, but stay defensive against a no-op patch).
   if (deps.setTouchLayoutJson !== undefined && next.touchLayout !== undefined) {
     deps.setTouchLayoutJson(emitTouchLayout(next.touchLayout));
   }

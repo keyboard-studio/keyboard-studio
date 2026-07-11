@@ -37,15 +37,19 @@ function makeBaseKeyboard(id = "base_kbd"): BaseKeyboard {
     languages: [],
     path: `release/t/${id}`,
     bcp47: "en",
-  } as unknown as BaseKeyboard;
+  } as BaseKeyboard;
 }
 
 function makeKeyboardIR(): KeyboardIR {
-  return {} as unknown as KeyboardIR;
+  return {} as KeyboardIR;
 }
 
 function makeVirtualFS(): VirtualFS {
-  return new Map() as unknown as VirtualFS;
+  return new Map() as VirtualFS;
+}
+
+function makeTouchAssignments(): TouchCompleteResult["assignments"] {
+  return [{ key: "a" }] as TouchCompleteResult["assignments"];
 }
 
 // ---------------------------------------------------------------------------
@@ -100,7 +104,7 @@ describe("R2 — touch-layout build at the touch step", () => {
   let deps: ReducerDeps;
   const baseIr = makeKeyboardIR();
   const baseVfs = makeVirtualFS();
-  const assignments = [{ key: "a" }] as unknown as TouchCompleteResult["assignments"];
+  const assignments = makeTouchAssignments();
 
   beforeEach(() => { deps = makeDepsMock(); });
 
@@ -215,7 +219,7 @@ describe("R3 — copy/adapt instantiation routing at choose_base", () => {
   });
 
   it("Track 2: passes removalCapabilities when provided", () => {
-    const removalCapabilities = new Map<string, unknown>() as unknown as Map<string, import("@keyboard-studio/contracts").RemovalCapability>;
+    const removalCapabilities = new Map() as InstantiateResult["removalCapabilities"];
     const result: InstantiateResult = { base, ir, vfs, track: "adapt", removalCapabilities };
     applyStepCompletion(CHOOSE_BASE_STEP_ID, result, deps);
     expect(deps.instantiateFromExisting).toHaveBeenCalledWith(base, { vfs, ir, removalCapabilities });
@@ -310,17 +314,17 @@ describe("R6 — behavior parity with pre-refactor inline handlers", () => {
 
   // Pre-refactor handlePhaseEComplete: if assignments.length === 0 or baseIr === null →
   // setTouchLayoutJson(null); else try { build... setTouchLayoutJson(json) } catch { setTouchLayoutJson(null) }.
-  it("touch step: parity — empty assignments → setTouchLayoutJson(null)", () => {
+  it("touch step: empty assignments → setTouchLayoutJson(null)", () => {
     applyStepCompletion(TOUCH_STEP_ID, { assignments: [], baseIr: makeKeyboardIR(), baseVfs: null }, deps);
     expect(deps.setTouchLayoutJson).toHaveBeenCalledWith(null);
   });
 
-  it("touch step: parity — null baseIr → setTouchLayoutJson(null)", () => {
+  it("touch step: null baseIr → setTouchLayoutJson(null)", () => {
     applyStepCompletion(TOUCH_STEP_ID, { assignments: [{}], baseIr: null, baseVfs: null }, deps);
     expect(deps.setTouchLayoutJson).toHaveBeenCalledWith(null);
   });
 
-  it("touch step: parity — successful build → setTouchLayoutJson(json)", () => {
+  it("touch step: successful build → setTouchLayoutJson(json)", () => {
     const json = '{"k":1}';
     (deps.buildTouchLayoutJson as ReturnType<typeof vi.fn>).mockReturnValue({ json, warnings: [] });
     applyStepCompletion(TOUCH_STEP_ID, { assignments: [{}], baseIr: makeKeyboardIR(), baseVfs: null }, deps);
@@ -329,7 +333,7 @@ describe("R6 — behavior parity with pre-refactor inline handlers", () => {
 
   // Pre-refactor onInstantiate: if track === "adapt" → instantiateFromExisting(...);
   // else → instantiateFromBaseIfConfirmed(...).
-  it("choose_base step: parity — track adapt → instantiateFromExisting", () => {
+  it("choose_base step: track adapt → instantiateFromExisting", () => {
     const base = makeBaseKeyboard();
     const ir = makeKeyboardIR();
     const vfs = makeVirtualFS();
@@ -337,7 +341,7 @@ describe("R6 — behavior parity with pre-refactor inline handlers", () => {
     expect(deps.instantiateFromExisting).toHaveBeenCalledWith(base, { vfs, ir });
   });
 
-  it("choose_base step: parity — track null (default) → instantiateFromBaseIfConfirmed", () => {
+  it("choose_base step: track null (default) → instantiateFromBaseIfConfirmed", () => {
     const base = makeBaseKeyboard();
     const ir = makeKeyboardIR();
     const vfs = makeVirtualFS();
@@ -346,7 +350,7 @@ describe("R6 — behavior parity with pre-refactor inline handlers", () => {
   });
 
   // Pre-refactor: Track 2 with null ir → console.warn and return (no instantiation).
-  it("choose_base step: parity — Track 2 with null ir → no instantiation (mock engine guard)", () => {
+  it("choose_base step: Track 2 with null ir → no instantiation (mock engine guard)", () => {
     applyStepCompletion(CHOOSE_BASE_STEP_ID, { base: makeBaseKeyboard(), ir: null, vfs: null, track: "adapt" }, deps);
     expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
     expect(deps.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();

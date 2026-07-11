@@ -63,7 +63,7 @@ export function PickerPane({
       >
         <button
           type="button"
-          onClick={() => { handlePickerModeChange("open"); }}
+          onClick={() => handlePickerModeChange("open")}
           aria-pressed={pickerMode === "open"}
           style={{
             flex: 1,
@@ -82,7 +82,7 @@ export function PickerPane({
         </button>
         <button
           type="button"
-          onClick={() => { handlePickerModeChange("scaffold"); }}
+          onClick={() => handlePickerModeChange("scaffold")}
           aria-pressed={pickerMode === "scaffold"}
           style={{
             flex: 1,

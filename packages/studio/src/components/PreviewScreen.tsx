@@ -24,7 +24,7 @@ export function PreviewScreen() {
   // Each screen runs its own independent artifact pipeline — see usePreviewArtifact.ts module comment for why this is deliberate (do not "dedupe" across screens).
   const artifact = usePreviewArtifact();
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
-  const { containerRef, leftPct, handleHovered, onPointerDown, setHandleHovered } =
+  const { containerRef, leftPct, onPointerDown } =
     useResizablePanes({ minPct: LEFT_MIN_PCT, maxPct: LEFT_MAX_PCT, initPct: LEFT_INIT_PCT });
 
   const rightPct = 100 - leftPct;
@@ -56,7 +56,7 @@ export function PreviewScreen() {
         }
         scaffoldFormSlot={
           artifact.pickerMode === "scaffold" && artifact.baseKeyboard !== null ? (
-            <ScaffoldForm onSubmit={(spec) => { artifact.setScaffoldSpec(spec); }} />
+            <ScaffoldForm onSubmit={artifact.setScaffoldSpec} />
           ) : null
         }
         identityPanelSlot={<TrackOneIdentityPanel />}
@@ -68,11 +68,7 @@ export function PreviewScreen() {
       />
 
       {/* Drag handle */}
-      <ResizeHandle
-        onPointerDown={onPointerDown}
-        hovered={handleHovered}
-        onHoverChange={setHandleHovered}
-      />
+      <ResizeHandle onPointerDown={onPointerDown} />
 
       {/* Right pane: live OSK preview + diagnostics */}
       <section

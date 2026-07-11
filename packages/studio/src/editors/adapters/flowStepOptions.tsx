@@ -41,13 +41,11 @@ export const trackOptions: FlowStepOptions<TrackPayload> = {
 
   extract(result: SurveyPhaseResult): TrackPayload | undefined {
     const answer = result.answers.find((a) => a.questionId === "track_choice");
-    const v =
-      answer !== undefined &&
-      (answer.answerType === "select" || answer.answerType === "text")
-        ? String(answer.value)
-        : undefined;
-    if (v === "copy" || v === "adapt") return { track: v };
-    return undefined;
+    if (!answer || (answer.answerType !== "select" && answer.answerType !== "text")) {
+      return undefined;
+    }
+    const v = String(answer.value);
+    return v === "copy" || v === "adapt" ? { track: v } : undefined;
   },
 
   onCommit(extracted: TrackPayload, deps: FlowStepDeps): void {

@@ -70,20 +70,17 @@ function emitAudit(entry, opts = {}) {
   return result;
 }
 
-// Value inference for flat key=value CLI args. Mirrors progress-emit.js and
-// additionally parses inline JSON objects/arrays (audit entries nest).
 function parseValue(s) {
   if (s === 'true') return true;
   if (s === 'false') return false;
   if (s === 'null') return null;
   if (/^-?\d+$/.test(s)) return Number(s);
   if (s.startsWith('{') || s.startsWith('[')) {
-    try { return JSON.parse(s); } catch (_) { /* fall through */ }
+    try { return JSON.parse(s); } catch (_) { /* fall through to simple array */ }
   }
   if (s.startsWith('[') && s.endsWith(']')) {
     const inner = s.slice(1, -1).trim();
-    if (!inner) return [];
-    return inner.split(',').map((v) => v.trim()).filter(Boolean);
+    return inner ? inner.split(',').map((v) => v.trim()).filter(Boolean) : [];
   }
   return s;
 }
@@ -103,7 +100,8 @@ function main() {
       const key = a.slice(2);
       const next = argv[i + 1];
       if ((key === 'log' || key === 'json-file') && next && !next.startsWith('--')) {
-        flags[key] = next; i++;
+        flags[key] = next;
+        i++;
       } else {
         flags[key] = true;
       }
@@ -116,17 +114,17 @@ function main() {
   if (flags['json-file']) {
     entry = JSON.parse(fs.readFileSync(flags['json-file'], 'utf8'));
   } else if (!process.stdin.isTTY) {
-    // Read a piped JSON object, if any (empty stdin -> start from {}).
-    let raw = '';
-    try { raw = fs.readFileSync(0, 'utf8'); } catch (_) { raw = ''; }
-    if (raw.trim()) entry = JSON.parse(raw);
+    try {
+      const raw = fs.readFileSync(0, 'utf8').trim();
+      if (raw) entry = JSON.parse(raw);
+    } catch (_) { /* empty stdin or parse error -> start from {} */ }
   }
 
   for (const arg of kv) {
     const eq = arg.indexOf('=');
-    const key = arg.slice(0, eq);
-    if (!key) continue;
-    entry[key] = parseValue(arg.slice(eq + 1));
+    if (eq > 0) {
+      entry[arg.slice(0, eq)] = parseValue(arg.slice(eq + 1));
+    }
   }
 
   let result;
@@ -140,9 +138,7 @@ function main() {
   }
 
   if (result.repaired) {
-    process.stderr.write(
-      `[audit-emit] repaired empty/invalid ts (was ${JSON.stringify(result.original)}) -> ${result.entry.ts}\n`,
-    );
+    process.stderr.write(`[audit-emit] repaired empty/invalid ts (was ${JSON.stringify(result.original)}) -> ${result.entry.ts}\n`);
   }
   process.stdout.write(JSON.stringify(result.entry) + '\n');
 }

@@ -64,6 +64,11 @@ import type { KeyboardPlacementReport } from "../../packages/engine/src/placemen
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..");
 
+/** Normalize Windows-style paths to forward slashes. */
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, "/");
+}
+
 // ---------------------------------------------------------------------------
 // CLI args
 // ---------------------------------------------------------------------------
@@ -204,7 +209,7 @@ function kmnPathsForProject(kpjPath: string): string[] {
   const re = /<Filepath>([^<]*\.kmn)<\/Filepath>/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(xml)) !== null) {
-    const rel = (m[1] ?? "").replace(/\\/g, "/");
+    const rel = normalizePath(m[1] ?? "");
     paths.push(resolve(dir, rel));
   }
   if (paths.length === 0) {
@@ -294,13 +299,7 @@ interface LayerAPrimeResult {
 // Placement helpers (--emit-placements support, spec §7.6)
 // ---------------------------------------------------------------------------
 
-/**
- * Detect the base keyboard layout family from the unshifted letter layer.
- *
- * Heuristic: compare K_Q/K_A/K_Z outputs against known families:
- *   QWERTY  q/a/z, AZERTY  a/q/w, QWERTZ  q/a/y
- */
-// detectBaseLayoutFamily and computeFingerprint are provided by the placement module.
+// Placement helpers imported from the placement module above.
 
 /**
  * Scan one .kmn file.  Returns the scan report and, optionally, the parsed IR
@@ -312,7 +311,7 @@ function scanOne(
   releaseDir: string,
 ): { report: ScanReport; ir: KeyboardIR | null } {
   const keyboardId = basename(kmnPath, ".kmn");
-  const source = relative(releaseDir, kmnPath).replace(/\\/g, "/");
+  const source = normalizePath(relative(releaseDir, kmnPath));
   const base: ScanReport = {
     keyboardId,
     source,
@@ -368,30 +367,27 @@ function scanOne(
   // above from parsed.opaqueFeatures). Surfacing that array IS I4 — no separate
   // call needed.
 
-  // Emit once: reused by the I3 header check and the structural I2 proxy below.
+  // Emit once: reused by I3 header check and I2 structural round-trip.
   let emitted: string | null = null;
   try {
     emitted = emit(ir);
   } catch {
-    emitted = null;
+    // Failed emit → round-trip failure (handled below).
   }
 
   // I3 — header preservation (emit-stage; needs the emitted text).
-  // The short field label is recovered via layer-a-prime's own `headerFieldLabel`
-  // extractor (co-located with the message builder, lock-tested) rather than
-  // re-parsing the message prose here.
   // Scope caveat: BCP47 language tags live in the .kps / .keyboard_info, NOT in
   // the .kmn the scanner parses, so `ir.header.bcp47` is always empty here and
   // the check's bcp47 dimension is a guaranteed false positive in a .kmn-only
   // scan. Drop it; name/copyright/version come from .kmn stores and stay. The
   // bcp47 dimension remains valid on the import path (where package metadata
   // populates ir.header.bcp47) — this filter is scanner-context-only.
-  let i3HeaderMissing: string[] = [];
-  if (emitted !== null) {
-    i3HeaderMissing = checkHeaderPreservation(ir, emitted)
-      .map((f) => headerFieldLabel(f) ?? f.message)
-      .filter((label) => !label.startsWith("bcp47"));
-  }
+  const i3HeaderMissing: string[] =
+    emitted === null
+      ? []
+      : checkHeaderPreservation(ir, emitted)
+          .map((f) => headerFieldLabel(f) ?? f.message)
+          .filter((label) => !label.startsWith("bcp47"));
 
   // The keyboard parsed, so Layer A' actually ran — record the result object
   // (vs. the null default that marks a ParseFailure where the checks never ran).
@@ -482,8 +478,15 @@ function buildJson(sorted: ScanReport[], opaqueTotals: OpaqueEntry[]): string {
   return JSON.stringify(payload, null, 2) + "\n";
 }
 
-function fmtRatio(r: number): string {
-  return r.toFixed(2);
+/** Format Layer A' check result for table: null → "n/a", boolean → ✓/✗. */
+function fmtLayerACheck(layerAPrime: LayerAPrimeResult | null, check: (r: LayerAPrimeResult) => boolean): string {
+  return layerAPrime === null ? "n/a" : check(layerAPrime) ? "✓" : "✗";
+}
+
+/** Format I3 header result: null → "n/a", empty → ✓, else comma-joined. */
+function fmtI3Header(layerAPrime: LayerAPrimeResult | null): string {
+  if (layerAPrime === null) return "n/a";
+  return layerAPrime.i3HeaderMissing.length === 0 ? "✓" : layerAPrime.i3HeaderMissing.join(", ");
 }
 
 function fmtOpaque(inv: OpaqueEntry[]): string {
@@ -570,16 +573,10 @@ function buildMarkdown(sorted: ScanReport[], opaque: OpaqueEntry[]): string {
   lines.push("| --- | --- | ---: | ---: | --- | :-: | --- | --- |");
   for (const r of sorted) {
     const opaqueCount = r.opaqueFeatureInventory.reduce((s, o) => s + o.count, 0);
-    // null layerAPrime = ParseFailure (checks never ran) → "n/a", not a pass.
-    const i1 = r.layerAPrime === null ? "n/a" : r.layerAPrime.i1ParseComplete ? "✓" : "✗";
-    const i3 =
-      r.layerAPrime === null
-        ? "n/a"
-        : r.layerAPrime.i3HeaderMissing.length === 0
-          ? "✓"
-          : r.layerAPrime.i3HeaderMissing.join(", ");
+    const i1 = fmtLayerACheck(r.layerAPrime, (p) => p.i1ParseComplete);
+    const i3 = fmtI3Header(r.layerAPrime);
     lines.push(
-      `| \`${r.keyboardId}\` | ${r.status} | ${fmtRatio(r.recognizedRatio)} | ${opaqueCount} | ${r.i2} | ${i1} | ${i3} | ${fmtOpaque(r.opaqueFeatureInventory)} |`,
+      `| \`${r.keyboardId}\` | ${r.status} | ${r.recognizedRatio.toFixed(2)} | ${opaqueCount} | ${r.i2} | ${i1} | ${i3} | ${fmtOpaque(r.opaqueFeatureInventory)} |`,
     );
   }
   lines.push("");
@@ -617,8 +614,10 @@ async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
 
   if (!existsSync(args.releaseDir)) {
-    console.error(`[ERROR] release dir not found: ${args.releaseDir}`);
-    console.error("        Point --release-dir at a keymanapp/keyboards release/ tree.");
+    console.error(
+      `[ERROR] release dir not found: ${args.releaseDir}\n` +
+      "        Point --release-dir at a keymanapp/keyboards release/ tree."
+    );
     process.exit(2);
   }
 
@@ -682,11 +681,11 @@ async function main(): Promise<void> {
   if (args.check) {
     const existing = existsSync(jsonPath) ? readFileSync(jsonPath, "utf8") : "";
     if (existing !== json) {
-      console.error("[ERROR] docs/import-corpus.json is stale relative to current codec output.");
-      console.error("        Re-run the scanner and commit the regenerated docs/import-corpus.{md,json}:");
       console.error(
+        "[ERROR] docs/import-corpus.json is stale relative to current codec output.\n" +
+        "        Re-run the scanner and commit the regenerated docs/import-corpus.{md,json}:\n" +
         "        TSX_TSCONFIG_PATH=utilities/supportability-scanner/tsconfig.json \\\n" +
-          `          pnpm dlx tsx utilities/supportability-scanner/scan.ts --release-dir ${args.releaseDir}`,
+        `          pnpm dlx tsx utilities/supportability-scanner/scan.ts --release-dir ${args.releaseDir}`
       );
       process.exit(1);
     }
@@ -706,13 +705,13 @@ async function main(): Promise<void> {
     const priorsPath = join(args.outDir, "placement-priors.json");
     await fsp.writeFile(priorsPath, JSON.stringify(priorsJSON, null, 2) + "\n", "utf8");
     console.error(
-      `[OK] placement-priors.json written (${placementReports.length} keyboards with candidates) -> ${relative(REPO_ROOT, priorsPath).replace(/\\/g, "/")}`,
+      `[OK] placement-priors.json written (${placementReports.length} keyboards with candidates) -> ${normalizePath(relative(REPO_ROOT, priorsPath))}`,
     );
   }
 
   const counts = summarise(reports);
   console.error(
-    `[OK] scanned ${reports.length} keyboards in ${(elapsedMs / 1000).toFixed(1)}s -> ${relative(REPO_ROOT, jsonPath).replace(/\\/g, "/")}`,
+    `[OK] scanned ${reports.length} keyboards in ${(elapsedMs / 1000).toFixed(1)}s -> ${normalizePath(relative(REPO_ROOT, jsonPath))}`,
   );
   console.error(
     `     Clean ${counts[ImportStatus.Clean]} | CleanWithOpaque ${counts[ImportStatus.CleanWithOpaque]} | ` +

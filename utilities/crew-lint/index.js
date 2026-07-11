@@ -32,6 +32,7 @@ const { readFileSync, readdirSync, existsSync } = require("node:fs");
 const path = require("node:path");
 
 const REPO_ROOT = path.resolve(__dirname, "../..");
+const CLAUDE = path.join(REPO_ROOT, ".claude");
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -44,36 +45,30 @@ const REPO_ROOT = path.resolve(__dirname, "../..");
 // A CheckResult is { id, title, failures: Failure[] }.
 
 const rel = (abs) => path.relative(REPO_ROOT, abs);
-
-function read(abs) {
-  return readFileSync(abs, "utf8");
-}
-function lines(abs) {
-  return read(abs).split("\n");
-}
+const read = (abs) => readFileSync(abs, "utf8");
+const lines = (abs) => read(abs).split("\n");
 
 const BINARY_EXT = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".pdf"]);
 
 /** Recursively list files under `dir` (absolute), skipping obvious binaries. */
 function walk(dir) {
+  if (!existsSync(dir)) return [];
   const out = [];
-  if (!existsSync(dir)) return out;
   for (const ent of readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
     a.name < b.name ? -1 : 1,
   )) {
     const abs = path.join(dir, ent.name);
-    if (ent.isDirectory()) out.push(...walk(abs));
-    else if (!BINARY_EXT.has(path.extname(ent.name).toLowerCase())) out.push(abs);
+    if (ent.isDirectory()) {
+      out.push(...walk(abs));
+    } else if (!BINARY_EXT.has(path.extname(ent.name).toLowerCase())) {
+      out.push(abs);
+    }
   }
   return out;
 }
 
-const CLAUDE = path.join(REPO_ROOT, ".claude");
-
 // All km-*.md docs anywhere under .claude/ (agents + commands + elsewhere).
-function crewDocs() {
-  return walk(CLAUDE).filter((f) => /^km-.*\.md$/.test(path.basename(f)));
-}
+const crewDocs = () => walk(CLAUDE).filter((f) => /^km-.*\.md$/.test(path.basename(f)));
 
 /** Scan a file's lines with a global regex; one Failure per match. */
 function scanLines(abs, re, label) {
@@ -112,19 +107,13 @@ const LINE_REF_PATTERNS = [
   /\bsee\s+lines?\s+~?\d+/gi, // "see line 42"
   /~\d+\s*[-–—]\s*\d+/gi, // bare "~758-760" soft range
 ];
-function lineRefMatches(s) {
-  const out = [];
-  for (const re of LINE_REF_PATTERNS) for (const m of s.matchAll(re)) out.push(m[0]);
-  return out;
-}
+const lineRefMatches = (s) => LINE_REF_PATTERNS.flatMap((re) => [...s.matchAll(re)].map((m) => m[0]));
 
 // ---------------------------------------------------------------------------
 // Check 1 — no python fences
 // ---------------------------------------------------------------------------
 function checkNoPythonFences() {
-  const failures = [];
-  const re = /```\s*(python|py)\b/gi;
-  for (const f of crewDocs()) failures.push(...scanLines(f, re));
+  const failures = crewDocs().flatMap((f) => scanLines(f, /```\s*(python|py)\b/gi));
   return { id: "1", title: "No python fences in .claude/**/km-*.md", failures };
 }
 
@@ -132,15 +121,12 @@ function checkNoPythonFences() {
 // Check 2 — no emoji
 // ---------------------------------------------------------------------------
 function checkNoEmoji() {
-  const failures = [];
-  for (const f of crewDocs()) {
-    failures.push(
-      ...scanLines(f, EMOJI, (m) => {
-        const cp = m[0].codePointAt(0).toString(16).toUpperCase().padStart(4, "0");
-        return `${m[0]} (U+${cp})`;
-      }),
-    );
-  }
+  const failures = crewDocs().flatMap((f) =>
+    scanLines(f, EMOJI, (m) => {
+      const cp = m[0].codePointAt(0).toString(16).toUpperCase().padStart(4, "0");
+      return `${m[0]} (U+${cp})`;
+    }),
+  );
   return { id: "2", title: "No emoji in .claude/**/km-*.md", failures };
 }
 
@@ -148,13 +134,10 @@ function checkNoEmoji() {
 // Check 3 — no phantom package paths (anywhere under .claude/**)
 // ---------------------------------------------------------------------------
 function checkNoPhantomPaths() {
-  const failures = [];
   const re = /packages\/(scaffolder|validator)\b/g;
-  for (const f of walk(CLAUDE)) {
-    if (path.extname(f).toLowerCase() === ".md" || /\.(js|cjs|mjs|ts|json|txt)$/.test(f)) {
-      failures.push(...scanLines(f, re));
-    }
-  }
+  const failures = walk(CLAUDE)
+    .filter((f) => /\.(md|js|cjs|mjs|ts|json|txt)$/i.test(f))
+    .flatMap((f) => scanLines(f, re));
   return {
     id: "3",
     title:
@@ -185,7 +168,6 @@ function checkNoSelfLineRefs() {
 // Check 5 — km-qc rubric consistency across agent + command
 // ---------------------------------------------------------------------------
 function checkQcConsistency() {
-  const failures = [];
   const targets = [
     path.join(CLAUDE, "agents", "km-qc.md"),
     path.join(CLAUDE, "commands", "km-qc.md"),
@@ -211,21 +193,19 @@ function checkQcConsistency() {
     { re: /\bREJECT\b/g, desc: "stale 'REJECT' verdict" },
   ];
 
-  for (const t of targets) {
+  const failures = targets.flatMap((t) => {
     if (!existsSync(t)) {
-      failures.push({ file: rel(t), line: 0, text: "km-qc rubric file not found" });
-      continue;
+      return [{ file: rel(t), line: 0, text: "km-qc rubric file not found" }];
     }
     const txt = read(t);
-    for (const { re, desc } of required) {
-      if (!re.test(txt)) {
-        failures.push({ file: rel(t), line: 0, text: `missing canonical rubric token: ${desc}` });
-      }
-    }
-    for (const { re, desc } of forbidden) {
-      failures.push(...scanLines(t, re, () => `conflicting rubric token present: ${desc}`));
-    }
-  }
+    return [
+      ...required
+        .filter(({ re }) => !re.test(txt))
+        .map(({ desc }) => ({ file: rel(t), line: 0, text: `missing canonical rubric token: ${desc}` })),
+      ...forbidden.flatMap(({ re, desc }) => scanLines(t, re, () => `conflicting rubric token present: ${desc}`)),
+    ];
+  });
+
   return {
     id: "5",
     title: "km-qc rubric consistency (subtractive scheme + verdict thresholds agree)",
@@ -237,7 +217,6 @@ function checkQcConsistency() {
 // Check 6 — roster consistency
 // ---------------------------------------------------------------------------
 function checkRosterConsistency() {
-  const failures = [];
   const agentsDir = path.join(CLAUDE, "agents");
   const agentNames = new Set(
     walk(agentsDir)
@@ -248,42 +227,42 @@ function checkRosterConsistency() {
   // km-lead / km-triage are commands, km-review is a workflow — not subagents.
   const NON_AGENT = new Set(["km-lead", "km-triage", "km-review"]);
 
+  const checkRef = (name, fullMatch, filePath, lineNum) => {
+    if (!NON_AGENT.has(name) && !agentNames.has(name)) {
+      return { file: rel(filePath), line: lineNum, text: `referenced role "${fullMatch}" has no .claude/agents/${fullMatch}.md` };
+    }
+    return null;
+  };
+
   // (a) prose references in the two command docs.
   const docs = [
     path.join(CLAUDE, "commands", "km-lead.md"),
     path.join(CLAUDE, "commands", "km-triage.md"),
   ];
-  const tokenRe = /km-[a-zA-Z]+/g;
-  for (const d of docs) {
-    if (!existsSync(d)) continue;
-    lines(d).forEach((line, i) => {
-      for (const m of line.matchAll(tokenRe)) {
-        const name = m[0].toLowerCase();
-        if (NON_AGENT.has(name)) continue;
-        if (!agentNames.has(name)) {
-          failures.push({ file: rel(d), line: i + 1, text: `referenced role "${m[0]}" has no .claude/agents/${m[0]}.md` });
-        }
-      }
-    });
-  }
+  const proseFailures = docs
+    .filter(existsSync)
+    .flatMap((d) =>
+      lines(d).flatMap((line, i) =>
+        [...line.matchAll(/km-[a-zA-Z]+/g)]
+          .map((m) => checkRef(m[0].toLowerCase(), m[0], d, i + 1))
+          .filter(Boolean),
+      ),
+    );
 
   // (b) agentType values in the km-review workflow REVIEWERS/prompts.
   const review = path.join(CLAUDE, "workflows", "km-review.js");
-  if (existsSync(review)) {
-    lines(review).forEach((line, i) => {
-      for (const m of line.matchAll(/agentType:\s*"(km-[^"]+)"/g)) {
-        const name = m[1].toLowerCase();
-        if (NON_AGENT.has(name)) continue;
-        if (!agentNames.has(name)) {
-          failures.push({ file: rel(review), line: i + 1, text: `agentType "${m[1]}" has no .claude/agents/${m[1]}.md` });
-        }
-      }
-    });
-  }
+  const reviewFailures = existsSync(review)
+    ? lines(review).flatMap((line, i) =>
+        [...line.matchAll(/agentType:\s*"(km-[^"]+)"/g)]
+          .map((m) => checkRef(m[1].toLowerCase(), m[1], review, i + 1))
+          .filter(Boolean),
+      )
+    : [];
+
   return {
     id: "6",
     title: "Roster consistency (every referenced km-<role> has an agent file)",
-    failures,
+    failures: [...proseFailures, ...reviewFailures],
   };
 }
 
@@ -291,16 +270,15 @@ function checkRosterConsistency() {
 // Check 7 — sentinel single spelling (.escalations/.labels-created-v2)
 // ---------------------------------------------------------------------------
 function checkSentinelSpelling() {
-  const failures = [];
   // Match the stale form (no -v2 suffix). Negative lookahead keeps the correct
   // .labels-created-v2 spelling GREEN.
   const re = /\.escalations\/\.labels-created(?!-v2)/g;
   const roots = [CLAUDE, path.join(REPO_ROOT, "utilities", "km-triage-app")];
-  for (const root of roots) {
-    for (const f of walk(root)) {
-      if (/\.(md|js|cjs|mjs|ts|json|txt|sh|ps1)$/.test(f)) failures.push(...scanLines(f, re));
-    }
-  }
+  const failures = roots.flatMap((root) =>
+    walk(root)
+      .filter((f) => /\.(md|js|cjs|mjs|ts|json|txt|sh|ps1)$/.test(f))
+      .flatMap((f) => scanLines(f, re)),
+  );
   return {
     id: "7",
     title: "Sentinel single spelling (.escalations/.labels-created-v2 everywhere; no stale .labels-created)",
@@ -314,33 +292,39 @@ function checkSentinelSpelling() {
 // fire on known-bad text, or fires on known-good text.
 // ---------------------------------------------------------------------------
 function checkDetectorsProven() {
-  const failures = [];
+  const testPattern = (pattern, shouldMatch, samples, label) => {
+    return samples
+      .map((s) => {
+        pattern.lastIndex = 0;
+        const matched = pattern.test(s);
+        if (matched !== shouldMatch) {
+          const verb = shouldMatch ? "failed to flag" : "wrongly flagged";
+          return { file: "(self-test)", line: 0, text: `${label} ${verb} ${JSON.stringify(s)}` };
+        }
+        return null;
+      })
+      .filter(Boolean);
+  };
 
-  // Emoji detector: MUST flag these, MUST NOT flag those.
-  const mustFlag = ["✅", "❌", "⚠️", "🤖", "✂", "✔", "✖"];
-  const mustPass = ["→", "§", "×", "—", "–", "“", "”", "’", "≥", "≤", "A1-A7"];
-  for (const s of mustFlag) {
-    EMOJI.lastIndex = 0;
-    if (!EMOJI.test(s)) failures.push({ file: "(self-test)", line: 0, text: `EMOJI failed to flag ${JSON.stringify(s)} — detector is a no-op` });
-  }
-  for (const s of mustPass) {
-    EMOJI.lastIndex = 0;
-    if (EMOJI.test(s)) failures.push({ file: "(self-test)", line: 0, text: `EMOJI wrongly flagged legitimate ${JSON.stringify(s)}` });
-  }
+  const emojiFailures = [
+    ...testPattern(EMOJI, true, ["✅", "❌", "⚠️", "🤖", "✂", "✔", "✖"], "EMOJI"),
+    ...testPattern(EMOJI, false, ["→", "§", "×", "—", "–", """, """, "'", "≥", "≤", "A1-A7"], "EMOJI"),
+  ];
 
-  // Self line-ref detector: MUST catch the tilde soft-ref, MUST NOT catch the
-  // PR-#350 worked-example line numbers or the "~1000 fixtures" count.
-  if (lineRefMatches("mirrors the crew composition at lines ~758-760 above").length === 0) {
-    failures.push({ file: "(self-test)", line: 0, text: "line-ref detector failed to flag 'at lines ~758-760' — detector is a no-op" });
-  }
-  if (lineRefMatches("`scan.ts` cited at line 13617 vs. real line 195 because").length !== 0) {
-    failures.push({ file: "(self-test)", line: 0, text: "line-ref detector wrongly flagged the PR-#350 worked example (bare diff line numbers)" });
-  }
-  if (lineRefMatches("baseline/ (~1000 fixtures)").length !== 0) {
-    failures.push({ file: "(self-test)", line: 0, text: "line-ref detector wrongly flagged '~1000 fixtures' (an approximate count, not a line-ref)" });
-  }
+  const lineRefTests = [
+    { text: "mirrors the crew composition at lines ~758-760 above", shouldMatch: true, desc: "'at lines ~758-760'" },
+    { text: "`scan.ts` cited at line 13617 vs. real line 195 because", shouldMatch: false, desc: "the PR-#350 worked example (bare diff line numbers)" },
+    { text: "baseline/ (~1000 fixtures)", shouldMatch: false, desc: "'~1000 fixtures' (an approximate count, not a line-ref)" },
+  ];
+  const lineRefFailures = lineRefTests
+    .filter(({ text, shouldMatch }) => (lineRefMatches(text).length > 0) !== shouldMatch)
+    .map(({ shouldMatch, desc }) => ({
+      file: "(self-test)",
+      line: 0,
+      text: `line-ref detector ${shouldMatch ? "failed to flag" : "wrongly flagged"} ${desc}`,
+    }));
 
-  return { id: "0", title: "Detector self-verification (prove emoji + line-ref detectors both ways)", failures };
+  return { id: "0", title: "Detector self-verification (prove emoji + line-ref detectors both ways)", failures: [...emojiFailures, ...lineRefFailures] };
 }
 
 // ---------------------------------------------------------------------------

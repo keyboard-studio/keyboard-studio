@@ -43,12 +43,24 @@ const SUPP: Record<string, SuppEntry> = (JSON.parse(
 // scorer keeps them all (ranked) so output can explain why a key was chosen.
 export const WEIGHT: Record<string, number> = { DECOMPOSITION: 100, NAME: 90, CONFUSABLE: 70, VISUAL: 60, PHONETIC: 40 };
 
-const cp = (ch: string) => (ch.codePointAt(0) as number).toString(16).toUpperCase().padStart(4, '0');
-const isCombining = (ch: string) => {
-  const c = ch.codePointAt(0) as number;
+// Shared utilities for codepoint handling
+export const codepointOf = (ch: string): number => {
+  const cp = ch.codePointAt(0);
+  if (cp === undefined) throw new Error(`Invalid character: "${ch}"`);
+  return cp;
+};
+
+export const codepointHex = (ch: string): string => codepointOf(ch).toString(16).toUpperCase().padStart(4, '0');
+
+export const isCombining = (ch: string): boolean => {
+  const c = codepointOf(ch);
   return (c >= 0x0300 && c <= 0x036F) || (c >= 0x1AB0 && c <= 0x1AFF) ||
          (c >= 0x1DC0 && c <= 0x1DFF) || (c >= 0x20D0 && c <= 0x20FF);
 };
+
+export const isAsciiLetterCp = (cp: number): boolean => (cp >= 0x41 && cp <= 0x5a) || (cp >= 0x61 && cp <= 0x7a);
+
+const cp = codepointHex;
 
 export interface ParseNameResult {
   base: string | null;

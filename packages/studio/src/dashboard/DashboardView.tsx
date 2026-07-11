@@ -32,7 +32,7 @@ import { buildFlowSources, buildLibrarySection } from "./renderedNodeSet.ts";
 import { FlowGraphView } from "./FlowGraphView.tsx";
 import { StrategyTreeView } from "./StrategyTreeView.tsx";
 import { ScriptRoutingView } from "./ScriptRoutingView.tsx";
-import { MONO, SANS } from "./tokens.ts";
+import { MONO, SANS } from "./tokens.tsx";
 import type { CompletenessReport } from "./completeness.ts";
 import type { AxisFill } from "@keyboard-studio/contracts";
 

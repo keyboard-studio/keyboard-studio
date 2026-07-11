@@ -144,6 +144,10 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { Inspector } from './Inspector.tsx';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
 
+const noDelete = () => false;
+const noToggle = () => undefined;
+const noSetMany = () => undefined;
+
 function storeNode(overrides: Partial<CarveNode> = {}): CarveNode {
   return {
     nodeId: 's1',
@@ -152,10 +156,6 @@ function storeNode(overrides: Partial<CarveNode> = {}): CarveNode {
     ...overrides,
   };
 }
-
-const noDelete = () => false;
-const noToggle = () => undefined;
-const noSetMany = () => undefined;
 
 beforeEach(() => {
   useHoverInfoStore.setState({ info: null });
@@ -688,15 +688,6 @@ describe('<Inspector> StoreDetail — top trigger line absent when no captured t
   });
 });
 
-function makeStoreNode(overrides: Partial<CarveNode> = {}): CarveNode {
-  return {
-    nodeId: 'store#s',
-    kind: 'store',
-    name: 'sX',
-    ...overrides,
-  };
-}
-
 const baseInspectorProps = {
   nodes: [] as CarveNode[],
   isItemDeleted: () => false,
@@ -705,6 +696,15 @@ const baseInspectorProps = {
   isDeleted: () => false,
   onToggleNode: vi.fn(),
 };
+
+function makeStoreNode(overrides: Partial<CarveNode> = {}): CarveNode {
+  return {
+    nodeId: 'store#s',
+    kind: 'store',
+    name: 'sX',
+    ...overrides,
+  };
+}
 
 describe('Inspector — StoreDetail chip toggle wiring', () => {
   it('clicking a toggleable chip calls onToggleGlyph with the chip chipId', () => {

@@ -15,10 +15,9 @@ import { advance, nextSpineStepAfter, manifestIndexOf } from "./advance.ts";
 // Context helpers
 // ---------------------------------------------------------------------------
 
-const supported = { selectedTrack: "copy" as const, identitySupported: true };
-const unsupported = { selectedTrack: null, identitySupported: false };
 const copyCtx = { selectedTrack: "copy" as const, identitySupported: true };
 const adaptCtx = { selectedTrack: "adapt" as const, identitySupported: true };
+const unsupported = { selectedTrack: null, identitySupported: false };
 
 // ---------------------------------------------------------------------------
 // manifestIndexOf
@@ -84,7 +83,7 @@ describe("nextSpineStepAfter", () => {
 
 describe("advance: identity", () => {
   it("supported → choose_base", () => {
-    const { next, navigate } = advance("identity", undefined, supported);
+    const { next, navigate } = advance("identity", undefined, copyCtx);
     expect(next).toBe("choose_base");
     expect(navigate).toBeUndefined();
   });
@@ -95,7 +94,7 @@ describe("advance: identity", () => {
   });
 
   it("does not carry setCharactersSubStage", () => {
-    const outcome = advance("identity", undefined, supported);
+    const outcome = advance("identity", undefined, copyCtx);
     expect(outcome.setCharactersSubStage).toBeUndefined();
   });
 });
@@ -131,8 +130,6 @@ describe("advance: track — adapt fork (US2)", () => {
   it("adapt track → characters (skips project_name)", () => {
     const { next } = advance("track", undefined, adaptCtx);
     expect(next).toBe("characters");
-    // project_name must NOT appear in the path
-    expect(next).not.toBe("project_name");
   });
 
   it("adapt track carries setCharactersSubStage:'prefill'", () => {

@@ -35,14 +35,3 @@ export const registeredQuestionSteps: readonly QuestionStep[] = Object.entries(
   writes: mod.writes ?? [],
   questionId: mod.definition.id,
 }));
-
-/**
- * Look up a single QuestionStep descriptor by its question id.
- *
- * Returns undefined when the id is not in the registry (misspelled id in
- * the manifest, or a module that was removed). The manifest author is
- * responsible for ensuring the id matches an entry in the registry.
- */
-export function findQuestionStep(id: string): QuestionStep | undefined {
-  return registeredQuestionSteps.find((s) => s.id === id);
-}

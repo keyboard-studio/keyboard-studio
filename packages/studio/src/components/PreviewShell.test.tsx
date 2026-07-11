@@ -116,6 +116,9 @@ import { OutputScreen } from "./OutputScreen.tsx";
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Minimal valid ZIP file signature (empty ZIP, 22 bytes)
+const EMPTY_ZIP_BYTES = new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+
 function seedInstantiatedWorkingCopy() {
   const vfs = createVirtualFS([
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
@@ -126,22 +129,20 @@ function seedInstantiatedWorkingCopy() {
   });
 }
 
-const readyStage: Stage = {
-  kind: "ready",
-  compileResult: { success: true, artifacts: [], diagnostics: [], compileMs: 0, isWarmCompile: true },
-  jsBlobUrl: "",
-  vfs: createVirtualFS(),
-  scaffoldWarnings: [],
-  keyboardId: "basic_kbdus",
-};
-
 // ---------------------------------------------------------------------------
 // Setup / teardown
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
   useWorkingCopyStore.getState().reset();
-  mockStage.current = readyStage;
+  mockStage.current = {
+    kind: "ready",
+    compileResult: { success: true, artifacts: [], diagnostics: [], compileMs: 0, isWarmCompile: true },
+    jsBlobUrl: "",
+    vfs: createVirtualFS(),
+    scaffoldWarnings: [],
+    keyboardId: "basic_kbdus",
+  };
   mockSerializeResult.current = null;
 });
 
@@ -184,7 +185,7 @@ describe("OutputScreen — route-split AC", () => {
   it("renders the Download .zip button after base is picked", () => {
     seedInstantiatedWorkingCopy();
     mockSerializeResult.current = {
-      bytes: new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      bytes: EMPTY_ZIP_BYTES,
       warnings: [],
       keyboardId: "basic_kbdus",
       version: "1.0",
@@ -215,7 +216,7 @@ describe("OutputScreen — projection warnings", () => {
   it("does NOT render a warning region when serializeWorkingCopy returns no warnings", async () => {
     seedInstantiatedWorkingCopy();
     mockSerializeResult.current = {
-      bytes: new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      bytes: EMPTY_ZIP_BYTES,
       warnings: [],
       keyboardId: "basic_kbdus",
       version: "1.0",
@@ -239,7 +240,7 @@ describe("OutputScreen — projection warnings", () => {
   it("renders the warning region with each warning string when warnings are returned", async () => {
     seedInstantiatedWorkingCopy();
     mockSerializeResult.current = {
-      bytes: new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      bytes: EMPTY_ZIP_BYTES,
       warnings: [
         "[serialize] zip named ha_sil.zip but internal source paths still reference basic_kbdus",
         "[carve] opaque IR skipped",
@@ -265,7 +266,7 @@ describe("OutputScreen — projection warnings", () => {
   it("warning region has aria-live='polite' (non-blocking)", async () => {
     seedInstantiatedWorkingCopy();
     mockSerializeResult.current = {
-      bytes: new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      bytes: EMPTY_ZIP_BYTES,
       warnings: ["[serialize] something"],
       keyboardId: "basic_kbdus",
       version: "1.0",
@@ -287,7 +288,7 @@ describe("OutputScreen — projection warnings", () => {
 
     // First download — with warnings.
     mockSerializeResult.current = {
-      bytes: new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      bytes: EMPTY_ZIP_BYTES,
       warnings: ["[serialize] first warning"],
       keyboardId: "basic_kbdus",
       version: "1.0",
@@ -304,7 +305,7 @@ describe("OutputScreen — projection warnings", () => {
 
     // Second download — no warnings.
     mockSerializeResult.current = {
-      bytes: new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      bytes: EMPTY_ZIP_BYTES,
       warnings: [],
       keyboardId: "basic_kbdus",
       version: "1.0",
@@ -390,7 +391,7 @@ describe("OutputScreen — download filename", () => {
   it("names the download <keyboardId>-<version>.zip", async () => {
     seedInstantiatedWorkingCopy();
     mockSerializeResult.current = {
-      bytes: new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      bytes: EMPTY_ZIP_BYTES,
       warnings: [],
       keyboardId: "basic_kbdus",
       version: "2.5",

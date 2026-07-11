@@ -1,17 +1,3 @@
-// Card.test.tsx — vitest + @testing-library/react
-// Asserts element/role, CARD_BASE vs CARD_SELECTED styles, selected toggle,
-// and pass-through behavior.
-//
-// No @testing-library/jest-dom — DOM style properties accessed directly,
-// matching the TextField.test.tsx / Badge.test.tsx pattern.
-//
-// jsdom hex normalizations:
-//   #161b22 → rgb(22, 27, 34)    (BG_CARD / CARD_BASE background)
-//   #0d1f38 → rgb(13, 31, 56)    (CARD_SELECTED background)
-//   #30363d → rgb(48, 54, 61)    (BORDER / CARD_BASE border)
-//   #6ea8fe → rgb(110, 168, 254) (ACCENT / CARD_SELECTED border)
-//   #e6edf3 → rgb(230, 237, 243) (TEXT_MAIN)
-
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { Card } from "./Card.tsx";
@@ -52,54 +38,24 @@ describe("Card — as=div", () => {
 });
 
 describe("Card — CARD_BASE styles (selected=false)", () => {
-  it("applies CARD_BASE background (#161b22)", () => {
+  it("applies CARD_BASE styles", () => {
     const { container } = render(<Card>Option</Card>);
     const btn = container.querySelector("button") as HTMLButtonElement;
     expect(btn.style.background).toBe("rgb(22, 27, 34)");
-  });
-
-  it("applies CARD_BASE border color (#30363d)", () => {
-    const { container } = render(<Card>Option</Card>);
-    const btn = container.querySelector("button") as HTMLButtonElement;
     expect(btn.style.borderColor).toBe("rgb(48, 54, 61)");
-  });
-
-  it("applies flex-column layout", () => {
-    const { container } = render(<Card>Option</Card>);
-    const btn = container.querySelector("button") as HTMLButtonElement;
     expect(btn.style.display).toBe("flex");
     expect(btn.style.flexDirection).toBe("column");
-  });
-
-  it("applies border-radius 8px", () => {
-    const { container } = render(<Card>Option</Card>);
-    const btn = container.querySelector("button") as HTMLButtonElement;
     expect(btn.style.borderRadius).toBe("8px");
-  });
-
-  it("applies cursor:pointer", () => {
-    const { container } = render(<Card>Option</Card>);
-    const btn = container.querySelector("button") as HTMLButtonElement;
     expect(btn.style.cursor).toBe("pointer");
-  });
-
-  it("applies text-align:left", () => {
-    const { container } = render(<Card>Option</Card>);
-    const btn = container.querySelector("button") as HTMLButtonElement;
     expect(btn.style.textAlign).toBe("left");
   });
 });
 
 describe("Card — CARD_SELECTED styles (selected=true)", () => {
-  it("applies CARD_SELECTED background (#0d1f38)", () => {
+  it("applies CARD_SELECTED styles", () => {
     const { container } = render(<Card selected>Option</Card>);
     const btn = container.querySelector("button") as HTMLButtonElement;
     expect(btn.style.background).toBe("rgb(13, 31, 56)");
-  });
-
-  it("applies accent border color (#6ea8fe)", () => {
-    const { container } = render(<Card selected>Option</Card>);
-    const btn = container.querySelector("button") as HTMLButtonElement;
     expect(btn.style.borderColor).toBe("rgb(110, 168, 254)");
   });
 });

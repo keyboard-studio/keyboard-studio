@@ -115,7 +115,7 @@ function resolveIds(ids: string[]): FlowDef["questions"] {
   }
   return ids.map((id) => {
     const mod = questionRegistry[id];
-    if (mod === undefined) {
+    if (!mod) {
       throw new Error(
         `loadModularFlow: question ID "${id}" not found in registry. ` +
           `Add it to packages/studio/src/survey/questions/registry.ts.`,
@@ -140,13 +140,10 @@ export function loadModularFlow(raw: string): FlowDef {
       ? resolveIds(thin.provenance_questions)
       : undefined;
 
-  const result: FlowDef = {
+  return {
     flow_id: thin.flow_id,
     phase: thin.phase,
     questions,
-    ...(provenanceQuestions !== undefined
-      ? { provenance_questions: provenanceQuestions }
-      : {}),
+    ...(provenanceQuestions && { provenance_questions: provenanceQuestions }),
   };
-  return result;
 }

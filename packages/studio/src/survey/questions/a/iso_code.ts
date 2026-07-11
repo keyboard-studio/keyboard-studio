@@ -37,14 +37,12 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-/** Normalize the answer to a single trimmed lowercase language subtag. */
 function asLangSubtag(value: string | string[] | undefined): string {
-  const raw =
-    typeof value === "string"
-      ? value
-      : Array.isArray(value)
-        ? value[0] ?? ""
-        : "";
+  const raw = typeof value === "string"
+    ? value
+    : Array.isArray(value)
+      ? value[0] ?? ""
+      : "";
   return raw.trim().toLowerCase();
 }
 

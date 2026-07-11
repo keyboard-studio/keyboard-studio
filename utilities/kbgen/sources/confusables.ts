@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { codepointOf, isAsciiLetterCp } from '../analyze.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -32,18 +33,17 @@ function load(): Map<number, number[]> {
 }
 
 export const available = () => load().size > 0;
-const isAsciiLetter = (cp: number) => (cp >= 0x41 && cp <= 0x5a) || (cp >= 0x61 && cp <= 0x7a);
 
 // Resolve a character to the first base-layout ASCII letter reachable through its
 // confusable skeleton, or null. Follows the prototype chain a few hops.
 export function skeletonBase(ch: string, depth = 0): string | null {
   const m = load();
-  const cp = ch.codePointAt(0) as number;
-  if (depth > 0 && isAsciiLetter(cp)) return String.fromCodePoint(cp);
+  const cp = codepointOf(ch);
+  if (depth > 0 && isAsciiLetterCp(cp)) return String.fromCodePoint(cp);
   if (depth > 5) return null;
   const tgt = m.get(cp);
   if (!tgt) return null;
   const head = tgt[0];
-  if (isAsciiLetter(head)) return String.fromCodePoint(head);
+  if (isAsciiLetterCp(head)) return String.fromCodePoint(head);
   return skeletonBase(String.fromCodePoint(head), depth + 1);
 }

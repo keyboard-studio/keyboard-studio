@@ -14,7 +14,7 @@ import {
   type PositionedNode,
 } from "./layout.ts";
 import type { FlowGraph } from "./model.ts";
-import { MONO, SANS } from "./tokens.ts";
+import { MONO, SANS } from "./tokens.tsx";
 
 /** Truncate a path string to fit inside NODE_W with an ellipsis.
  *  maxLen=28: empirically fits NODE_W=220 px at the monospace font size (9.5 px) +

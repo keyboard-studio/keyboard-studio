@@ -30,7 +30,7 @@ import { DIVIDER_WIDTH, LEFT_MIN_PCT, LEFT_MAX_PCT, LEFT_INIT_PCT } from "./prev
 export function OutputScreen() {
   // Each screen runs its own independent artifact pipeline — see usePreviewArtifact.ts module comment for why this is deliberate (do not "dedupe" across screens).
   const artifact = usePreviewArtifact();
-  const { containerRef, leftPct, handleHovered, onPointerDown, setHandleHovered } =
+  const { containerRef, leftPct, onPointerDown } =
     useResizablePanes({ minPct: LEFT_MIN_PCT, maxPct: LEFT_MAX_PCT, initPct: LEFT_INIT_PCT });
 
   const {
@@ -103,11 +103,7 @@ export function OutputScreen() {
       />
 
       {/* Drag handle */}
-      <ResizeHandle
-        onPointerDown={onPointerDown}
-        hovered={handleHovered}
-        onHoverChange={setHandleHovered}
-      />
+      <ResizeHandle onPointerDown={onPointerDown} />
 
       {/* Right pane: download + submit controls */}
       <section

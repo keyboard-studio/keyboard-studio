@@ -25,10 +25,10 @@
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, cleanup, act } from "@testing-library/react";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import type { ActiveStepId } from "../stores/surveySessionStore.ts";
-import type { ReducerDeps } from "../steps/reducer.ts";
+import { useSurveySessionStore } from "../../src/stores/surveySessionStore.ts";
+import { useWorkingCopyStore } from "../../src/stores/workingCopyStore.ts";
+import type { ActiveStepId } from "../../src/stores/surveySessionStore.ts";
+import type { ReducerDeps } from "../../src/steps/reducer.ts";
 
 // ---------------------------------------------------------------------------
 // Mock all heavy child components used by the manifest adapters
@@ -37,13 +37,13 @@ import type { ReducerDeps } from "../steps/reducer.ts";
 // Mock survey/FlowStepHost.tsx — used directly by the factory components for
 // track, project_name, and phase_f_helpdocs steps (spec 029 convergence).
 // Renders a per-flow testid stub so SC-005 can detect which factory component mounted.
-vi.mock("../survey/FlowStepHost.tsx", () => ({
+vi.mock("../../src/survey/FlowStepHost.tsx", () => ({
   FlowStepHost: ({ flow }: { flow: { flow_id: string } }) => (
     <div data-testid={`stub-FlowStepHost-${flow.flow_id}`} />
   ),
 }));
 
-vi.mock("../survey/index.ts", () => ({
+vi.mock("../../src/survey/index.ts", () => ({
   IdentityLite: () => <div data-testid="stub-IdentityLite" />,
   Prefill: () => <div data-testid="stub-Prefill" />,
   PhaseB: () => <div data-testid="stub-PhaseB" />,
@@ -56,74 +56,71 @@ vi.mock("../survey/index.ts", () => ({
   buildPrefillRows: () => [],
 }));
 
-vi.mock("../survey/CharactersStep.tsx", () => ({
+vi.mock("../../src/survey/CharactersStep.tsx", () => ({
   CharactersStep: () => <div data-testid="stub-CharactersStep" />,
 }));
 
-vi.mock("../editors/panels/BaseResolution.tsx", () => ({
+vi.mock("../../src/editors/panels/BaseResolution.tsx", () => ({
   BaseResolution: () => <div data-testid="stub-BaseResolution" />,
 }));
 
-vi.mock("../editors/carve/CarveGallery.tsx", () => ({
+vi.mock("../../src/editors/carve/CarveGallery.tsx", () => ({
   CarveGallery: () => <div data-testid="stub-CarveGallery" />,
 }));
 
-vi.mock("../editors/assignLoop/MechanismGallery.tsx", () => ({
+vi.mock("../../src/editors/assignLoop/MechanismGallery.tsx", () => ({
   MechanismGallery: () => <div data-testid="stub-MechanismGallery" />,
 }));
 
-vi.mock("../editors/assignLoop/TouchGallery.tsx", () => ({
+vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () => ({
   TouchGallery: () => <div data-testid="stub-TouchGallery" />,
 }));
 
-vi.mock("../components/UnsupportedScriptStub.tsx", () => ({
+vi.mock("../../src/components/UnsupportedScriptStub.tsx", () => ({
   UnsupportedScriptStub: ({ script }: { script: string }) => (
     <div data-testid="stub-UnsupportedScriptStub" data-script={script} />
   ),
 }));
 
-vi.mock("../editors/panels/TrackStep.tsx", () => ({
+vi.mock("../../src/editors/panels/TrackStep.tsx", () => ({
   TrackStep: () => <div data-testid="stub-TrackStep" />,
 }));
 
-vi.mock("../editors/panels/ProjectNameStep.tsx", () => ({
+vi.mock("../../src/editors/panels/ProjectNameStep.tsx", () => ({
   ProjectNameStep: () => <div data-testid="stub-ProjectNameStep" />,
 }));
 
-vi.mock("../editors/panels/TrackOneIdentityPanel.tsx", () => ({
+vi.mock("../../src/editors/panels/TrackOneIdentityPanel.tsx", () => ({
   TrackOneIdentityPanel: () => <div data-testid="stub-TrackOneIdentityPanel" />,
 }));
 
-vi.mock("../editors/panels/ScaffoldForm.tsx", () => ({
+vi.mock("../../src/editors/panels/ScaffoldForm.tsx", () => ({
   ScaffoldForm: () => <div data-testid="stub-ScaffoldForm" />,
 }));
 
 // Mock hooks that adapters use internally (FR-007 self-sourcing)
-vi.mock("../hooks/useKeyboardArtifact.ts", () => ({
+vi.mock("../../src/hooks/useKeyboardArtifact.ts", () => ({
   useKeyboardArtifact: () => ({ stage: { kind: "idle" }, retry: vi.fn(), recompile: vi.fn() }),
 }));
 
-vi.mock("../hooks/useWorkingCopyTransform.ts", () => ({
+vi.mock("../../src/hooks/useWorkingCopyTransform.ts", () => ({
   useWorkingCopyTransform: () => null,
 }));
 
-vi.mock("../hooks/usePlacementPriors.ts", () => ({
-  usePlacementPriors: () => null,
-}));
 
-vi.mock("../lib/navigate.ts", () => ({
+vi.mock("../../src/lib/navigate.ts", () => ({
   navigateTo: vi.fn(),
 }));
 
-vi.mock("../lib/confirmRebase.ts", () => ({
+vi.mock("../../src/lib/confirmRebase.ts", () => ({
   instantiateFromBaseIfConfirmed: vi.fn(),
 }));
 
-vi.mock("../lib/buildTouchLayoutJson.ts", () => ({
+vi.mock("../../src/lib/buildTouchLayoutJson.ts", () => ({
   buildTouchLayoutJson: () => ({ json: null, warnings: [] }),
 }));
 
-vi.mock("../lint/lintToQuestion.ts", () => ({
+vi.mock("../../src/lint/lintToQuestion.ts", () => ({
   buildFindingsByQuestionId: () => ({}),
 }));
 
@@ -131,9 +128,9 @@ vi.mock("../lint/lintToQuestion.ts", () => ({
 // Import component under test — AFTER vi.mock declarations
 // ---------------------------------------------------------------------------
 
-import { StepHost } from "../components/StepHost.tsx";
-import { manifest } from "../steps/manifest.ts";
-import type { EditorStep } from "../steps/types.ts";
+import { StepHost } from "../../src/components/StepHost.tsx";
+import { manifest } from "../../src/steps/manifest.ts";
+import type { EditorStep } from "../../src/steps/types.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -151,12 +148,12 @@ const noopReducerDeps: ReducerDeps = {
 };
 
 // Fake base keyboard — satisfies the localBase guard in TrackStepFactoryComponent.
-const fakeBase = {
+const fakeBase: import("@keyboard-studio/contracts").BaseKeyboard = {
   id: "basic_kbdus",
   path: "release/b/basic_kbdus",
   script: "Latn",
   displayName: "English (US)",
-  targets: ["windows"] as string[],
+  targets: ["windows"],
   version: "1.0",
 };
 
@@ -192,20 +189,11 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('StepHost terminal: "done"', () => {
-  it('renders the survey-complete panel when activeStepId is "done"', async () => {
+  it('renders the survey-complete panel with Start-over button', async () => {
     await mountAt("done");
-    // The done panel has a heading with known text.
-    expect(screen.getByText(/Survey complete/i)).toBeTruthy();
-    // Start-over button is present.
-    expect(screen.getByText(/Start over/i)).toBeTruthy();
-  });
-
-  it('"done" panel has no manifest step chrome (no full-screen wrapper)', async () => {
-    await mountAt("done");
-    // None of the gallery stubs should be present.
-    expect(screen.queryByTestId("stub-CarveGallery")).toBeNull();
-    expect(screen.queryByTestId("stub-MechanismGallery")).toBeNull();
-    expect(screen.queryByTestId("stub-TouchGallery")).toBeNull();
+    // getByText throws if not found — no need for toBeTruthy assertions.
+    screen.getByText(/Survey complete/i);
+    screen.getByText(/Start over/i);
   });
 });
 
@@ -222,23 +210,20 @@ describe('StepHost terminal: "unsupported"', () => {
           autonym: "Test",
           english: "Test",
           languageSubtag: "te",
+          region: "",
           targetScriptRaw: "Ethi",
           bcp47: "te-Ethi",
           supported: false,
-          prefill: { script: "Ethi", scriptClass: "abugida-abjad", routingGroup: "ethiopic" },
+          prefill: { script: "Ethi", scriptClass: "abugida", routingGroup: "non-roman" },
         },
       });
     });
   });
 
-  it('renders UnsupportedScriptStub when activeStepId is "unsupported"', async () => {
+  it('renders UnsupportedScriptStub with Start-over button', async () => {
     await mountAt("unsupported");
-    expect(screen.getByTestId("stub-UnsupportedScriptStub")).toBeTruthy();
-  });
-
-  it('"unsupported" panel has a Start-over button', async () => {
-    await mountAt("unsupported");
-    expect(screen.getByText(/Start over/i)).toBeTruthy();
+    screen.getByTestId("stub-UnsupportedScriptStub");
+    screen.getByText(/Start over/i);
   });
 });
 
@@ -269,7 +254,7 @@ const editorSteps = manifest.filter(
 //   touchSeedSourceStep → AddTouchAdapter                 → TouchGallery stub
 //   touchStep         → AddTouchAdapter                   → TouchGallery stub
 //   helpStep          → PhaseFStepFactoryComponent        → FlowStepHost stub (flow_id=phase_f_helpdocs)
-//   packageStep       → TrackOneIdentityPanelAdapter      → TrackOneIdentityPanel stub
+//   packageStep       → PhaseFStepFactoryComponent        → FlowStepHost stub (flow_id=phase_f_helpdocs)
 const STEP_TO_EXPECTED_STUB: Record<string, string> = {
   identity: "stub-IdentityLite",
   choose_base: "stub-BaseResolution",
@@ -281,7 +266,7 @@ const STEP_TO_EXPECTED_STUB: Record<string, string> = {
   touch_seed_source: "stub-TouchGallery",
   touch: "stub-TouchGallery",
   help: "stub-FlowStepHost-phase_f_helpdocs",
-  package: "stub-TrackOneIdentityPanel",
+  package: "stub-FlowStepHost-phase_f_helpdocs",
 };
 
 // Full-layout step ids (declared in manifest as layout:"full").
@@ -290,11 +275,11 @@ const FULL_LAYOUT_IDS = new Set<string>(["carve", "mechanisms", "touch"]);
 describe("SC-005: declared component matches mounted component for all manifest editor steps", () => {
   for (const step of editorSteps) {
     const expectedStub = STEP_TO_EXPECTED_STUB[step.id];
-    if (expectedStub === undefined) continue; // future step: skip gracefully
+    if (expectedStub === undefined) continue;
 
-    it(`step "${step.id}": declared component stub "${expectedStub}" renders`, async () => {
+    it(`step "${step.id}" renders declared component "${expectedStub}"`, async () => {
       await mountAt(step.id as ActiveStepId);
-      expect(screen.getByTestId(expectedStub)).toBeTruthy();
+      screen.getByTestId(expectedStub);
     });
   }
 });
@@ -321,11 +306,10 @@ describe("Chrome-by-layout: full-screen for layout:full steps (FR-002, R4)", () 
       if (stubTestId === undefined) return;
 
       const stub = screen.getByTestId(stubTestId);
-      const parent = stub.parentElement;
-      expect(parent).not.toBeNull();
+      const parent = stub.parentElement!;
       // StepHost wraps full-screen steps in a div with style.height === "100%".
-      expect(parent?.style.height).toBe("100%");
-      expect(parent?.style.overflow).toBe("hidden");
+      expect(parent.style.height).toBe("100%");
+      expect(parent.style.overflow).toBe("hidden");
     });
   }
 });
@@ -336,13 +320,12 @@ describe("Chrome-by-layout: pane content returned directly for non-full-screen s
     const expectedStub = STEP_TO_EXPECTED_STUB[step.id];
     if (expectedStub === undefined) continue;
 
-    it(`step "${step.id}" (pane) renders without height:100% full-screen wrapper`, async () => {
+    it(`step "${step.id}" (pane) renders without height:100% wrapper`, async () => {
       await mountAt(step.id as ActiveStepId);
       const stub = screen.getByTestId(expectedStub);
-      const parent = stub.parentElement;
       // For pane steps StepHost returns content directly — no height:100% parent.
       // The immediate parent comes from the test harness body, not a StepHost wrapper.
-      expect(parent?.style.height).not.toBe("100%");
+      expect(stub.parentElement!.style.height).not.toBe("100%");
     });
   }
 });

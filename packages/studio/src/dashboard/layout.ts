@@ -226,8 +226,9 @@ export function layoutFlowGraph(graph: FlowGraph): LaidOutGraph {
   }
 
   const maxRank = Math.max(0, ...[...rows.keys()]);
-  const width = contentW + PAD * 2;
-  const height = (maxRank + 1) * NODE_H + maxRank * V_GAP + PAD * 2;
+  const doublePad = PAD * 2;
+  const width = contentW + doublePad;
+  const height = (maxRank + 1) * NODE_H + maxRank * V_GAP + doublePad;
 
   return {
     flowId: graph.flowId,

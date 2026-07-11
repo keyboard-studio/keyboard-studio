@@ -174,7 +174,6 @@ export function toResumeAnswers(
         break;
       default: {
         const _exhaustive: never = a;
-        void _exhaustive;
         break;
       }
     }

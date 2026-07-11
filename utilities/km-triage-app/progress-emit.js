@@ -32,28 +32,22 @@ function parseValue(s) {
   if (/^-?\d+$/.test(s)) return Number(s);
   if (s.startsWith('[') && s.endsWith(']')) {
     const inner = s.slice(1, -1).trim();
-    if (!inner) return [];
-    return inner.split(',').map((v) => v.trim()).filter(Boolean);
+    return inner ? inner.split(',').map((v) => v.trim()).filter(Boolean) : [];
   }
   return s;
 }
 
-function fallbackSweepId() {
-  return new Date().toISOString().replace(/[:.]/g, '-').replace(/Z$/, 'Z');
-}
-
+const now = new Date().toISOString();
 const event = {
-  ts: new Date().toISOString(),
-  sweep_id: process.env.KM_TRIAGE_SWEEP_ID || fallbackSweepId(),
+  ts: now,
+  sweep_id: process.env.KM_TRIAGE_SWEEP_ID || now.replace(/[:.]/g, '-'),
 };
 
 for (const arg of process.argv.slice(2)) {
   const eq = arg.indexOf('=');
-  if (eq === -1) continue;
-  const key = arg.slice(0, eq);
-  const val = arg.slice(eq + 1);
-  if (!key) continue;
-  event[key] = parseValue(val);
+  if (eq > 0) {
+    event[arg.slice(0, eq)] = parseValue(arg.slice(eq + 1));
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -80,5 +74,5 @@ try {
   fs.mkdirSync(path.dirname(PROGRESS_LOG), { recursive: true });
   fs.appendFileSync(PROGRESS_LOG, JSON.stringify(event) + '\n');
 } catch (err) {
-  process.stderr.write(`[progress-emit] write failed: ${err.message}\n`);
+  process.stderr.write(`[progress-emit] ${err.message}\n`);
 }

@@ -148,16 +148,7 @@ export function makeFlowStepComponent<Extracted>(
     const displayNameRef = useRef("");
 
     // Mutable ref so seed callbacks always read current store values.
-    const depsRef = useRef<FlowStepDeps>({
-      localBase,
-      identityResult,
-      surveyContext,
-      setSelectedTrack,
-      setScaffoldSpec,
-      setIdentity: setStoreIdentity,
-      findingsByQuestionId,
-      displayNameRef,
-    });
+    const depsRef = useRef<FlowStepDeps>({} as FlowStepDeps);
     depsRef.current = {
       localBase,
       identityResult,
@@ -211,9 +202,9 @@ export function makeFlowStepComponent<Extracted>(
         title={resolvedTitle}
         context={context}
         onComplete={wrappedOnComplete}
-        {...(onBack !== undefined ? { onBack } : {})}
-        {...(options.seeds !== undefined ? { getSeedValue } : {})}
-        {...(options.seeds?.onAnswerCommit !== undefined ? { onAnswerCommit } : {})}
+        {...(onBack ? { onBack } : {})}
+        {...(options.seeds ? { getSeedValue } : {})}
+        {...(options.seeds?.onAnswerCommit ? { onAnswerCommit } : {})}
         {...(options.usesFindings ? { findingsByQuestionId } : {})}
       />
     );

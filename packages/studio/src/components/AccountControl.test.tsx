@@ -22,6 +22,16 @@ const disconnect = vi.fn();
 const googleConnect = vi.fn(async () => {});
 const googleDisconnect = vi.fn();
 
+// Shared fixture for Google identity (used in one test)
+const testGoogleIdentity = {
+  provider: "google" as const,
+  sub: "123",
+  email: "tester@example.com",
+  emailVerified: true,
+  name: "Tester User",
+  picture: "",
+};
+
 function mockAuth(
   ghOverrides: Partial<UseGitHubAuthResult>,
   googleOverrides: Partial<UseGoogleAuthResult> = {},
@@ -178,20 +188,7 @@ describe("AccountControl — error display", () => {
 
 describe("AccountControl — signed in (Google)", () => {
   it("shows the initial from Google name and the display name in the menu", () => {
-    mockAuth(
-      { status: "idle" },
-      {
-        status: "connected",
-        identity: {
-          provider: "google",
-          sub: "123",
-          email: "tester@example.com",
-          emailVerified: true,
-          name: "Tester User",
-          picture: "",
-        },
-      },
-    );
+    mockAuth({ status: "idle" }, { status: "connected", identity: testGoogleIdentity });
     render(<AccountControl />);
     const avatarBtn = screen.getByRole("button", { name: /Account: Tester User/i });
     expect(avatarBtn.textContent).toBe("T");

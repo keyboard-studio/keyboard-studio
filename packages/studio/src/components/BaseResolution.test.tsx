@@ -12,13 +12,13 @@ import { sampleBaseKeyboards } from "@keyboard-studio/contracts/fixtures";
 // what BaseResolution builds its languagesById map from.
 // ---------------------------------------------------------------------------
 
+// Shared fixture: simulate BaseResolution building languagesById from base.languages
+const languagesById = Object.fromEntries(
+  sampleBaseKeyboards.map((b) => [b.id, b.languages ?? []] as const),
+);
+
 describe("BaseResolution — language-match integration via suggestBases", () => {
   it("a base with .languages matching the target language ranks as language-match", () => {
-    // Simulate BaseResolution building languagesById from base.languages:
-    const languagesById = Object.fromEntries(
-      sampleBaseKeyboards.map((b) => [b.id, b.languages ?? []] as const),
-    );
-
     // ha-Latn target: sil_euro_latin lists "ha" in its languages
     const suggestions = suggestBases(
       sampleBaseKeyboards,
@@ -33,10 +33,6 @@ describe("BaseResolution — language-match integration via suggestBases", () =>
   });
 
   it("hi-Deva target: sil_devanagari_phonetic ranks as language-match", () => {
-    const languagesById = Object.fromEntries(
-      sampleBaseKeyboards.map((b) => [b.id, b.languages ?? []] as const),
-    );
-
     const suggestions = suggestBases(
       sampleBaseKeyboards,
       { script: "Deva", bcp47: "hi-Deva" },
@@ -50,10 +46,6 @@ describe("BaseResolution — language-match integration via suggestBases", () =>
   });
 
   it("en target: basic_kbdus ranks as language-match (not just fallback)", () => {
-    const languagesById = Object.fromEntries(
-      sampleBaseKeyboards.map((b) => [b.id, b.languages ?? []] as const),
-    );
-
     const suggestions = suggestBases(
       sampleBaseKeyboards,
       { script: "Latn", bcp47: "en-Latn" },
@@ -66,10 +58,6 @@ describe("BaseResolution — language-match integration via suggestBases", () =>
   });
 
   it("unknown language code degrades to script-match, not language-match", () => {
-    const languagesById = Object.fromEntries(
-      sampleBaseKeyboards.map((b) => [b.id, b.languages ?? []] as const),
-    );
-
     // "xx" is not in any fixture's languages — should not produce language-match
     const suggestions = suggestBases(
       sampleBaseKeyboards,
@@ -84,10 +72,6 @@ describe("BaseResolution — language-match integration via suggestBases", () =>
   });
 
   it("missing bcp47 on target degrades to script-match (no language-match)", () => {
-    const languagesById = Object.fromEntries(
-      sampleBaseKeyboards.map((b) => [b.id, b.languages ?? []] as const),
-    );
-
     const suggestions = suggestBases(
       sampleBaseKeyboards,
       { script: "Latn" }, // no bcp47

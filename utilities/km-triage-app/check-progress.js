@@ -69,7 +69,7 @@ function readSidecar(sweepId) {
   try {
     return JSON.parse(fs.readFileSync(p, 'utf8'));
   } catch (err) {
-    process.stderr.write(`[check-progress] sidecar parse failed, treating as empty: ${err.message}\n`);
+    process.stderr.write(`[check-progress] sidecar parse failed: ${err.message}\n`);
     return {};
   }
 }
@@ -78,13 +78,6 @@ function writeSidecar(sweepId, data) {
   const p = sidecarPath(sweepId);
   fs.mkdirSync(path.dirname(p), { recursive: true });
   fs.writeFileSync(p, JSON.stringify(data, null, 2) + '\n');
-}
-
-function loadSummary(args) {
-  if (args['summary-file']) {
-    return fs.readFileSync(args['summary-file'], 'utf8');
-  }
-  return undefined;
 }
 
 function buildPayload(args, mode) {
@@ -99,14 +92,13 @@ function buildPayload(args, mode) {
   }
   if (args.conclusion) payload.conclusion = args.conclusion;
 
-  const output = {};
-  if (args.title) output.title = args.title;
-  const summary = loadSummary(args);
-  if (summary !== undefined) output.summary = summary;
-  if (Object.keys(output).length > 0) {
-    if (!output.title) output.title = `${CHECK_NAME} progress`;
-    if (output.summary === undefined) output.summary = '(no summary)';
-    payload.output = output;
+  const title = args.title || `${CHECK_NAME} progress`;
+  const summary = args['summary-file']
+    ? fs.readFileSync(args['summary-file'], 'utf8')
+    : '(no summary)';
+
+  if (args.title || args['summary-file']) {
+    payload.output = { title, summary };
   }
   return payload;
 }
@@ -118,17 +110,18 @@ function callBotGh(method, urlPath, payload) {
   fs.writeFileSync(tmpFile, JSON.stringify(payload));
 
   const botGh = path.join(__dirname, 'bot-gh.js');
-  const ghArgs = ['api', '--method', method, urlPath, '--input', tmpFile, '--jq', '.id'];
-  const result = spawnSync(process.execPath, [botGh, ...ghArgs], { encoding: 'utf8' });
+  const result = spawnSync(process.execPath, [botGh, 'api', '--method', method, urlPath, '--input', tmpFile, '--jq', '.id'], {
+    encoding: 'utf8',
+  });
 
   try { fs.unlinkSync(tmpFile); } catch (_) { /* best effort */ }
 
   if (result.status !== 0) {
-    process.stderr.write(result.stderr || '');
-    process.stderr.write(result.stdout || '');
+    if (result.stderr) process.stderr.write(result.stderr);
+    if (result.stdout) process.stderr.write(result.stdout);
     die(`bot-gh.js api ${method} ${urlPath} exited ${result.status}`, result.status || 1);
   }
-  return (result.stdout || '').trim();
+  return result.stdout.trim();
 }
 
 function main() {

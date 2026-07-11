@@ -188,13 +188,9 @@ describe("spec 020 — build-list branch surfaces as a drill-down under `charact
   it("the reachable node is the anchor `pb_discovery_intro`; pb_build_list is the descriptor anchored to it (I1, FR-001)", () => {
     expect(pbBuildListDrillDown.registryKey).toBe("pb_discovery_intro");
     // The anchor IS a real, reachable questionRegistry id (the IntroChooser gate).
-    expect(
-      Object.prototype.hasOwnProperty.call(questionRegistry, "pb_discovery_intro"),
-    ).toBe(true);
+    expect("pb_discovery_intro" in questionRegistry).toBe(true);
     // `pb_build_list` itself is NOT a questionRegistry id (declared-only descriptor).
-    expect(
-      Object.prototype.hasOwnProperty.call(questionRegistry, "pb_build_list"),
-    ).toBe(false);
+    expect("pb_build_list" in questionRegistry).toBe(false);
   });
 
   // T010 — the IntroChooser gate `pb_discovery_intro` is the SHARED anchor off
@@ -211,9 +207,7 @@ describe("spec 020 — build-list branch surfaces as a drill-down under `charact
     // the gate id is a real questionRegistry id (the shared branch point); the pb_*
     // battery membership/non-demotion is owned by spec 022 and the modular YAML —
     // not re-litigated here.
-    expect(
-      Object.prototype.hasOwnProperty.call(questionRegistry, "pb_discovery_intro"),
-    ).toBe(true);
+    expect("pb_discovery_intro" in questionRegistry).toBe(true);
   });
 });
 
@@ -230,10 +224,8 @@ describe("spec 020 — Phase-1 invariant guards (FR-012/SC-007)", () => {
   // invariant guard for THIS spec's diff, not as a re-litigation.
   it("pb_build_list stays a drill-down descriptor (writes []), not promoted (FR-012/SC-007)", () => {
     expect(pbBuildListDrillDown.writes).toEqual([]);
-    expect(manifest.filter((s) => s.id === "pb_build_list").length).toBe(0);
-    expect(
-      Object.prototype.hasOwnProperty.call(questionRegistry, "pb_build_list"),
-    ).toBe(false);
+    expect(manifest.some((s) => s.id === "pb_build_list")).toBe(false);
+    expect("pb_build_list" in questionRegistry).toBe(false);
     // Exactly one pb_build_list descriptor under `characters` (no re-declare); the
     // sibling prefill descriptor is unchanged.
     const charactersDrillDowns = drillDownDeclarations[CHARACTERS_NODE_ID] ?? [];

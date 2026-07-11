@@ -28,13 +28,12 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
   // FR-007: placement priors loaded here (moved from SurveyView.corpusPlacementMap).
   const placementMap = usePlacementPriors();
 
-  // MechanismGallery's onBack is optional in its own props — pass through directly.
   return (
     <MechanismGallery
       selectedBaseKeyboard={baseKeyboard}
       onComplete={() => onComplete(undefined)}
-      {...(placementMap !== null ? { placementMap } : {})}
-      {...(onBack !== undefined ? { onBack } : {})}
+      {...(placementMap ? { placementMap } : {})}
+      {...(onBack ? { onBack } : {})}
     />
   );
 }

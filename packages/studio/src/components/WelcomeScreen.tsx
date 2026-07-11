@@ -152,20 +152,12 @@ export function WelcomeScreen() {
           </button>
         </div>
 
-        {ghError !== null && (
+        {(ghError !== null || googleError !== null) && (
           <p
             role="alert"
             style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: "#f0a0a0", fontFamily: FONT }}
           >
-            {ghError}
-          </p>
-        )}
-        {googleError !== null && (
-          <p
-            role="alert"
-            style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: "#f0a0a0", fontFamily: FONT }}
-          >
-            {googleError}
+            {ghError ?? googleError}
           </p>
         )}
       </div>

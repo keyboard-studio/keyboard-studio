@@ -12,7 +12,5 @@ import type { VirtualFS } from "@keyboard-studio/contracts";
  * Returns `undefined` when no touch-layout file exists outside `tests/`.
  */
 export function findTouchLayoutPath(vfs: VirtualFS): string | undefined {
-  return vfs
-    .list()
-    .find((p) => p.endsWith(".keyman-touch-layout") && !p.startsWith("tests/"));
+  return vfs.list().find((p) => p.endsWith(".keyman-touch-layout") && !p.startsWith("tests/"));
 }
