@@ -609,7 +609,7 @@ function makeIR(overrides: Partial<KeyboardIR> = {}): KeyboardIR {
 describe('StoreUsage.patternRefs', () => {
   it('is empty when no recognized patterns exist', () => {
     const ir = makeIR({
-      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false } as any],
+      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false }],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
         rules: [{
@@ -627,7 +627,7 @@ describe('StoreUsage.patternRefs', () => {
 
   it('populates patternRefs when a recognized pattern owns a rule referencing the store via any()', () => {
     const ir = makeIR({
-      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false } as any],
+      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false }],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
         rules: [{
@@ -640,7 +640,7 @@ describe('StoreUsage.patternRefs', () => {
       recognizedPatterns: [{
         id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
         ownedNodes: [{ kind: 'rule', nodeId: 'rule-1' }],
-        description: '', category: 'substitution' as any, appliesTo: [],
+        description: '', category: 'substitute', appliesTo: [],
       }],
     });
     const nodes = toRailNodes(ir);
@@ -652,7 +652,7 @@ describe('StoreUsage.patternRefs', () => {
 
   it('populates patternRefs for the output store (index()) too', () => {
     const ir = makeIR({
-      stores: [{ nodeId: 'store-2', name: 'comp-dia', items: [], isSystem: false } as any],
+      stores: [{ nodeId: 'store-2', name: 'comp-dia', items: [], isSystem: false }],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
         rules: [{
@@ -665,7 +665,7 @@ describe('StoreUsage.patternRefs', () => {
       recognizedPatterns: [{
         id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
         ownedNodes: [{ kind: 'rule', nodeId: 'rule-1' }],
-        description: '', category: 'substitution' as any, appliesTo: [],
+        description: '', category: 'substitute', appliesTo: [],
       }],
     });
     const nodes = toRailNodes(ir);
@@ -677,7 +677,7 @@ describe('StoreUsage.patternRefs', () => {
 
   it('is empty for a store used only in a non-pattern (unowned) rule', () => {
     const ir = makeIR({
-      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false } as any],
+      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false }],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
         rules: [{
@@ -690,7 +690,7 @@ describe('StoreUsage.patternRefs', () => {
       recognizedPatterns: [{
         id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
         ownedNodes: [{ kind: 'rule', nodeId: 'rule-OTHER' }], // doesn't own rule-1
-        description: '', category: 'substitution' as any, appliesTo: [],
+        description: '', category: 'substitute', appliesTo: [],
       }],
     });
     const nodes = toRailNodes(ir);
@@ -700,7 +700,7 @@ describe('StoreUsage.patternRefs', () => {
 
   it('groupRefs is empty when no unowned rules reference the store', () => {
     const ir = makeIR({
-      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false } as any],
+      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false }],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
         rules: [{ nodeId: 'rule-1', context: [{ kind: 'any', storeRef: 'composed' }], output: [{ kind: 'char', value: 'á' }], ownedByPattern: 'pattern-1' }],
@@ -714,7 +714,7 @@ describe('StoreUsage.patternRefs', () => {
 
   it('populates groupRefs for unowned rules referencing the store', () => {
     const ir = makeIR({
-      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false } as any],
+      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false }],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
         rules: [{ nodeId: 'rule-1', context: [{ kind: 'any', storeRef: 'composed' }], output: [{ kind: 'char', value: 'á' }] }],
@@ -730,7 +730,7 @@ describe('StoreUsage.patternRefs', () => {
 
   it('aggregates rule count when a pattern owns multiple rules referencing the same store', () => {
     const ir = makeIR({
-      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false } as any],
+      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false }],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
         rules: [
@@ -741,7 +741,7 @@ describe('StoreUsage.patternRefs', () => {
       recognizedPatterns: [{
         id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
         ownedNodes: [{ kind: 'rule', nodeId: 'rule-1' }, { kind: 'rule', nodeId: 'rule-2' }],
-        description: '', category: 'substitution' as any, appliesTo: [],
+        description: '', category: 'substitute', appliesTo: [],
       }],
     });
     const nodes = toRailNodes(ir);
@@ -757,7 +757,7 @@ describe('StoreUsage.patternRefs', () => {
   // the collectOwnedNodeIds(ir) fallback so it is excluded from groupRefs.
   it('counts a rule in patternRefs only (not groupRefs) when ownedByPattern is unset but the rule is listed in a pattern\'s ownedNodes (#886 drift shape)', () => {
     const ir = makeIR({
-      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false } as any],
+      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false }],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
         rules: [{
@@ -771,7 +771,7 @@ describe('StoreUsage.patternRefs', () => {
       recognizedPatterns: [{
         id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
         ownedNodes: [{ kind: 'rule', nodeId: 'rule-1' }],
-        description: '', category: 'substitution' as any, appliesTo: [],
+        description: '', category: 'substitute', appliesTo: [],
       }],
     });
     const nodes = toRailNodes(ir);
@@ -787,7 +787,7 @@ describe('StoreUsage.patternRefs', () => {
   // pattern's ownedNodes — must still surface under groupRefs.
   it('still counts a genuinely unowned rule (no ownedByPattern, not in any ownedNodes) under groupRefs', () => {
     const ir = makeIR({
-      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false } as any],
+      stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false }],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
         rules: [{
@@ -799,7 +799,7 @@ describe('StoreUsage.patternRefs', () => {
       recognizedPatterns: [{
         id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
         ownedNodes: [{ kind: 'rule', nodeId: 'rule-1' }], // does not include rule-unowned
-        description: '', category: 'substitution' as any, appliesTo: [],
+        description: '', category: 'substitute', appliesTo: [],
       }],
     });
     const nodes = toRailNodes(ir);
@@ -1046,8 +1046,8 @@ describe('toRailNodes store pairedStoreIds / pairedStoreNames / pairedStoreTrigg
   it('populates pairedStoreNames, pairedStoreIds, and pairedStoreTriggers for the input-side store', () => {
     const ir = makeIR({
       stores: [
-        { nodeId: 'sid-A', name: 'storeA', items: [], isSystem: false } as any,
-        { nodeId: 'sid-B', name: 'storeB', items: [], isSystem: false } as any,
+        { nodeId: 'sid-A', name: 'storeA', items: [], isSystem: false },
+        { nodeId: 'sid-B', name: 'storeB', items: [], isSystem: false },
       ],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
@@ -1072,8 +1072,8 @@ describe('toRailNodes store pairedStoreIds / pairedStoreNames / pairedStoreTrigg
   it('populates fields for the output-side store too', () => {
     const ir = makeIR({
       stores: [
-        { nodeId: 'sid-A', name: 'storeA', items: [], isSystem: false } as any,
-        { nodeId: 'sid-B', name: 'storeB', items: [], isSystem: false } as any,
+        { nodeId: 'sid-A', name: 'storeA', items: [], isSystem: false },
+        { nodeId: 'sid-B', name: 'storeB', items: [], isSystem: false },
       ],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
@@ -1098,7 +1098,7 @@ describe('toRailNodes store pairedStoreIds / pairedStoreNames / pairedStoreTrigg
   it('leaves all paired fields absent when store has no pair', () => {
     const ir = makeIR({
       stores: [
-        { nodeId: 'sid-X', name: 'storeX', items: [], isSystem: false } as any,
+        { nodeId: 'sid-X', name: 'storeX', items: [], isSystem: false },
       ],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
@@ -1400,8 +1400,8 @@ describe('toRailNodes storeRoleLine', () => {
   it('populates storeRoleLine for an output-side store (char items)', () => {
     const ir = makeIR({
       stores: [
-        { nodeId: 'sid-A', name: 'storeA', items: [{ kind: 'char', value: 'a' }], isSystem: false } as any,
-        { nodeId: 'sid-B', name: 'storeB', items: [{ kind: 'char', value: 'x' }], isSystem: false } as any,
+        { nodeId: 'sid-A', name: 'storeA', items: [{ kind: 'char', value: 'a' }], isSystem: false },
+        { nodeId: 'sid-B', name: 'storeB', items: [{ kind: 'char', value: 'x' }], isSystem: false },
       ],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
@@ -1419,8 +1419,8 @@ describe('toRailNodes storeRoleLine', () => {
   it('populates storeRoleLine for a vkey input-side store', () => {
     const ir = makeIR({
       stores: [
-        { nodeId: 'sid-A', name: 'storeA', items: [{ kind: 'vkey', name: 'K_Q' }], isSystem: false } as any,
-        { nodeId: 'sid-B', name: 'storeB', items: [{ kind: 'char', value: 'x' }], isSystem: false } as any,
+        { nodeId: 'sid-A', name: 'storeA', items: [{ kind: 'vkey', name: 'K_Q' }], isSystem: false },
+        { nodeId: 'sid-B', name: 'storeB', items: [{ kind: 'char', value: 'x' }], isSystem: false },
       ],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
@@ -1437,7 +1437,7 @@ describe('toRailNodes storeRoleLine', () => {
 
   it('leaves storeRoleLine absent for an unreferenced store', () => {
     const ir = makeIR({
-      stores: [{ nodeId: 'sid-X', name: 'storeX', items: [], isSystem: false } as any],
+      stores: [{ nodeId: 'sid-X', name: 'storeX', items: [], isSystem: false }],
       groups: [],
     });
     const nodeX = toRailNodes(ir).find((n) => n.name === 'storeX');
