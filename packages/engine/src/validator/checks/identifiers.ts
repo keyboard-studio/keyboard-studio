@@ -11,30 +11,32 @@ export function checkIdentifiers(source: string): LintFinding[] {
   const findings: LintFinding[] = [];
   const lines = source.split("\n");
 
+  const handleMatch = (match: RegExpExecArray, lineIdx: number): void => {
+    const name = (match[2] ?? "").trim();
+
+    // System stores (&BITMAP, &PLATFORM, etc.) are not user identifiers
+    if (name.startsWith("&")) return;
+
+    if (name.length === 0 || name.length > 255 || INVALID_CHAR_RE.test(name)) {
+      findings.push({
+        code: "KM_ERROR_INVALID_IDENTIFIER",
+        severity: "error",
+        layer: "A",
+        message: `Invalid identifier "${name}": must be 1–255 characters with no spaces, commas, parentheses, brackets, or control characters`,
+        location: { file: "", line: lineIdx + 1, column: match.index + 1 },
+      });
+    }
+  };
+
+  // Preserve original per-line, per-regex ordering (SINGLE_ARG_RE then
+  // FIRST_ARG_RE within each line).
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
     const line = lines[lineIdx] ?? "";
-    const regexes = [
-      new RegExp(SINGLE_ARG_RE.source, "gi"),
-      new RegExp(FIRST_ARG_RE.source, "gi"),
-    ];
-
-    for (const re of regexes) {
+    for (const re of [SINGLE_ARG_RE, FIRST_ARG_RE]) {
+      const globalRe = new RegExp(re.source, "gi");
       let match: RegExpExecArray | null;
-      while ((match = re.exec(line)) !== null) {
-        const name = (match[2] ?? "").trim();
-
-        // System stores (&BITMAP, &PLATFORM, etc.) are not user identifiers
-        if (name.startsWith("&")) continue;
-
-        if (name.length === 0 || name.length > 255 || INVALID_CHAR_RE.test(name)) {
-          findings.push({
-            code: "KM_ERROR_INVALID_IDENTIFIER",
-            severity: "error",
-            layer: "A",
-            message: `Invalid identifier "${name}": must be 1–255 characters with no spaces, commas, parentheses, brackets, or control characters`,
-            location: { file: "", line: lineIdx + 1, column: match.index + 1 },
-          });
-        }
+      while ((match = globalRe.exec(line)) !== null) {
+        handleMatch(match, lineIdx);
       }
     }
   }
