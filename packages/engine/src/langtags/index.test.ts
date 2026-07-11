@@ -107,6 +107,18 @@ describe("lookupByName", () => {
   it("C9 — empty query returns []", () => {
     expect(lookupByName("")).toStrictEqual([]);
   });
+
+  it("finds a language by an alternate English name from the `names[]` field", () => {
+    // "Abkhazian" is an alternate name of `ab` (primary "Abkhaz"); it lives in
+    // englishNames[] but not in the slim summary. Searching it must still surface
+    // the entry so the identity flow can resolve it and seed the code (Q3).
+    const results = lookupByName("Abkhazian");
+    expect(results.map((r) => r.code)).toContain("ab");
+
+    // A pure alternate-name prefix also matches.
+    const prefix = lookupByName("Abkhaz");
+    expect(prefix.map((r) => r.code)).toContain("ab");
+  });
 });
 
 // ---------------------------------------------------------------------------

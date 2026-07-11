@@ -293,7 +293,9 @@ export function IdentityLite({
 
     const provenance = new Map<string, LangtagsProvenance>();
     if (scriptSeedRef.current !== undefined) provenance.set("il_target_script", LANGTAGS_PROVENANCE);
-    if (codeSeedRef.current !== undefined) provenance.set("il_language_code", LANGTAGS_PROVENANCE);
+    // il_language_code carries NO provenance caption: Q3 presents the resolved
+    // 3-letter code read-only for confirmation (not an editable suggestion), so
+    // the "edit if needed" caption would contradict the field.
     // The autonym default is a langtags value only when an own-script name exists.
     if (localNamesSeedRef.current !== undefined) provenance.set("il_language_autonym", LANGTAGS_PROVENANCE);
     provenanceRef.current = provenance;
@@ -481,25 +483,21 @@ export function IdentityLite({
         }
       }
       if (questionId === "il_language_code") {
-        // Possible code matches FOR THE RESOLVED LANGUAGE (spec 030 US4): the two
-        // plausible subtag forms langtags records — the ISO 639-3 code (the seeded
-        // default) and the canonical bare/2-letter subtag — so the author can pick
-        // the form they want (e.g. Hausa: "hau" or "ha"). De-duplicated (many
-        // languages carry only one form). Undefined when no language resolved — the
-        // field then falls back to a full langtags code search / free text.
+        // The 3-letter ISO 639-3 code FOR THE RESOLVED LANGUAGE (spec 030 US4, per
+        // author request): Q3 offers ONLY the three-letter code, never the 2-letter
+        // BCP 47 subtag (e.g. Hausa confirms as "hau", not "ha"). The single option
+        // matches the seeded default (codeSeedRef). Falls back to the bare subtag
+        // only when the entry has no 639-3 code — that subtag is itself the 3-letter
+        // code in that case. Undefined when no language resolved — the field then
+        // falls back to a full langtags code search / free text.
         const d = resolvedEntryRef.current;
         if (d === null) return undefined;
-        const seen = new Set<string>();
-        const opts: FlowOption[] = [];
-        const add = (code: string | undefined, label: string) => {
-          const c = code?.trim();
-          if (c === undefined || c === "" || seen.has(c)) return;
-          seen.add(c);
-          opts.push({ value: c, label });
-        };
-        add(d.iso639_3, `${d.iso639_3 ?? ""} — ISO 639-3`);
-        add(d.code, `${d.code} — BCP 47 language subtag`);
-        return opts.length > 0 ? opts : undefined;
+        const code =
+          d.iso639_3 !== undefined && d.iso639_3.trim() !== ""
+            ? d.iso639_3.trim()
+            : d.code.trim();
+        if (code === "") return undefined;
+        return [{ value: code, label: `${code} — ISO 639-3` }];
       }
       return undefined;
     },

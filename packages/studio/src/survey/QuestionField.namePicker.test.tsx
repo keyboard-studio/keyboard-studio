@@ -29,6 +29,9 @@ const AINU_CN: LanguageSummary = {
   hasRegionVariants: false,
 };
 const SWAHILI: LanguageSummary = { code: "sw", englishName: "Swahili", autonym: "Kiswahili" };
+// Abkhaz: the slim summary carries only the primary name; its alternate English
+// names ("Abkhazian", …) live on the full record returned by getLanguageDefaults.
+const ABKHAZ: LanguageSummary = { code: "ab", englishName: "Abkhaz", regionName: "Georgia" };
 
 // NFC-composed name (km-review PR #1055 comment: resolveTyped must compare
 // NFC-normalized forms so an NFD-typed value still matches). Real langtags
@@ -38,7 +41,13 @@ const SWAHILI: LanguageSummary = { code: "sw", englishName: "Swahili", autonym: 
 // stored precomposed (the macron is a single NFC codepoint).
 const MAORI: LanguageSummary = { code: "mri", englishName: "Māori" };
 
-const ALL: LanguageSummary[] = [AINU_JP, AINU_CN, SWAHILI, MAORI];
+const ALL: LanguageSummary[] = [AINU_JP, AINU_CN, SWAHILI, MAORI, ABKHAZ];
+
+// Full-record English-name lists (langtags `name` + `names[]`), keyed by code.
+// Only languages whose alternate names matter for these tests are listed.
+const ENGLISH_NAMES: Record<string, readonly string[]> = {
+  ab: ["Abkhaz", "Abkhazian", "Abxazo"],
+};
 
 // A large list to prove the option cap.
 const MANY: LanguageSummary[] = Array.from({ length: 300 }, (_, i) => ({
@@ -46,12 +55,18 @@ const MANY: LanguageSummary[] = Array.from({ length: 300 }, (_, i) => ({
   englishName: `Language ${i}`,
 }));
 
-let searchImpl: (q: string) => LanguageSummary[] = (q) =>
-  ALL.filter(
+// Search over primary name, code, AND alternate English names — mirroring the
+// engine's lookupByName so an alternate name (e.g. "Abkhazian") surfaces its row.
+const defaultSearch = (q: string): LanguageSummary[] => {
+  const needle = q.toLowerCase();
+  return ALL.filter(
     (l) =>
-      l.englishName.toLowerCase().includes(q.toLowerCase()) ||
-      l.code.toLowerCase().includes(q.toLowerCase()),
+      l.englishName.toLowerCase().includes(needle) ||
+      l.code.toLowerCase().includes(needle) ||
+      (ENGLISH_NAMES[l.code] ?? []).some((n) => n.toLowerCase().includes(needle)),
   );
+};
+let searchImpl: (q: string) => LanguageSummary[] = defaultSearch;
 let listImpl: () => LanguageSummary[] = () => ALL;
 
 vi.mock("../lib/langtagsDefaults.ts", async (importOriginal) => {
@@ -60,7 +75,10 @@ vi.mock("../lib/langtagsDefaults.ts", async (importOriginal) => {
     ...original,
     loadLangtags: () =>
       Promise.resolve({
-        getLanguageDefaults: () => null,
+        getLanguageDefaults: (code: string) => {
+          const englishNames = ENGLISH_NAMES[code.toLowerCase()];
+          return englishNames !== undefined ? { code, englishNames } : null;
+        },
         listLanguages: () => listImpl(),
         lookupByName: (q: string) => searchImpl(q),
       }),
@@ -79,12 +97,7 @@ const QUESTION = {
 
 afterEach(() => {
   cleanup();
-  searchImpl = (q) =>
-    ALL.filter(
-      (l) =>
-        l.englishName.toLowerCase().includes(q.toLowerCase()) ||
-        l.code.toLowerCase().includes(q.toLowerCase()),
-    );
+  searchImpl = defaultSearch;
   listImpl = () => ALL;
 });
 
@@ -155,6 +168,16 @@ describe("LangtagsNamePickerField (spec 030 US1)", () => {
     const { input, onEntryResolved } = await renderPicker();
     fireEvent.change(input, { target: { value: nfd } });
     await waitFor(() => expect(onEntryResolved).toHaveBeenLastCalledWith(MAORI));
+  });
+
+  it("typing an alternate English name (from the `names` field) resolves the entry", async () => {
+    // "Abkhazian" is an alternate name of `ab` (primary "Abkhaz"); it is only on
+    // the full record, not the summary. Typing it must still resolve `ab` so the
+    // downstream code (Q3) and script seeds populate. Regression: previously only
+    // the primary name matched, leaving the language unresolved and Q3 blank.
+    const { input, onEntryResolved } = await renderPicker();
+    fireEvent.change(input, { target: { value: "Abkhazian" } });
+    await waitFor(() => expect(onEntryResolved).toHaveBeenLastCalledWith(ABKHAZ));
   });
 
   it("typing an ambiguous name does NOT auto-resolve (must pick a row)", async () => {

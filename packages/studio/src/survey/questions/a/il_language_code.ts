@@ -22,10 +22,10 @@ export const definition = {
   id: "il_language_code",
   prompt: "Confirm your language's code",
   help_text:
-    "This is the standard code for the language you picked — it goes on the " +
-    "finished keyboard. It is filled in from your choice above; change it only " +
-    "if you need a different code, or type one directly if your language was " +
-    "not in the list.",
+    "This is the standard 3-letter code for the language you picked — it goes " +
+    "on the finished keyboard. It is resolved from your choice above; to use a " +
+    "different code, go back and change the language. If your language was not " +
+    "in the list, type its code here.",
   type: "autocomplete" as const,
   options_source: "@langtags_iso639" as const,
   required: false,

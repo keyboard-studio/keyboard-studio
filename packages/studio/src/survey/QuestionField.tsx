@@ -103,22 +103,15 @@ function AutocompleteField({ question, value, onChange, onEntryResolved, onSelec
   }
 
   // When options_source is "@langtags_iso639" (Q3 code confirmation):
-  //  - if the survey injected candidate codes for the resolved language
-  //    (getSeedOptions → question.options), offer THOSE possible matches in the
-  //    styled dropdown (e.g. Hausa → "hau" / "ha"); otherwise
+  //  - if the survey resolved the language (getSeedOptions → question.options
+  //    carries its 3-letter ISO 639-3 code), present that code READ-ONLY for
+  //    confirmation (per author request) — the author confirms via Next or goes
+  //    Back to change the language; the code itself is not edited here; otherwise
   //  - fall back to the full styled langtags picker (same rows as Q1) so an
   //    unresolved / free-text language can still be searched by name or code.
-  // Both render the same StyledCombobox and commit the language CODE.
   if (question.options_source === "@langtags_iso639") {
     if ((question.options?.length ?? 0) > 0) {
-      return (
-        <StyledOptionsField
-          question={question}
-          value={value}
-          onChange={onChange}
-          {...(onSelectAdvance !== undefined ? { onSelectAdvance } : {})}
-        />
-      );
+      return <ReadOnlyCodeField question={question} value={value} />;
     }
     return (
       <LangtagsComboboxField
@@ -143,6 +136,42 @@ function AutocompleteField({ question, value, onChange, onEntryResolved, onSelec
       value={value}
       onChange={onChange}
       {...(onSelectAdvance !== undefined ? { onSelectAdvance } : {})}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ReadOnlyCodeField — Q3 (il_language_code) read-only confirmation of the
+// resolved language's 3-letter ISO 639-3 code (per author request). The value
+// is the langtags seed applied by SurveyRunner; this field only DISPLAYS it —
+// there is no onChange, so the author cannot edit the code. To use a different
+// code they go Back and re-pick the language (or, for an unlisted language, the
+// unresolved free-text fallback in AutocompleteField stays editable). Rendered
+// as a readOnly <input> (role "textbox") so it stays focusable, selectable, and
+// associated with the field Label, while being visibly locked.
+// ---------------------------------------------------------------------------
+
+function ReadOnlyCodeField({ question, value }: Pick<FieldProps, "question" | "value">) {
+  return (
+    <input
+      type="text"
+      id={question.id}
+      readOnly
+      aria-readonly="true"
+      value={stringValue(value)}
+      style={{
+        width: "100%",
+        padding: "8px 10px",
+        background: "#161b22",
+        border: "1px solid #30363d",
+        borderRadius: 6,
+        color: "#e6edf3",
+        fontSize: 14,
+        fontFamily: "inherit",
+        boxSizing: "border-box",
+        outline: "none",
+        cursor: "default",
+      }}
     />
   );
 }
@@ -322,6 +351,14 @@ function LangtagsComboboxField({
   // nothing or is ambiguous (>1 entry sharing the English name). Name-mode only;
   // code-mode is a plain picker with no onEntryResolved. Selection — handled in
   // onSelect — always resolves unambiguously via the row's payload.
+  //
+  // The typed text is matched against EVERY recorded English name of each result
+  // (the primary `name` plus the alternate `names[]`), not just the display name.
+  // The alternates live on the full langtags record (read via getLanguageDefaults),
+  // not the slim summary — so an author who types an alternate name (e.g.
+  // "Abkhazian" for `ab`) still resolves the entry and gets the downstream
+  // code/script seeds. Without this the language stays unresolved and Q3's code
+  // is never seeded.
   function resolveTyped(text: string, results: readonly LanguageSummary[]): void {
     // Read through the ref so the post-load re-resolve (mount-time effect) uses
     // the current handler, not a stale mount-time closure. During live typing
@@ -335,9 +372,12 @@ function LangtagsComboboxField({
       onResolved(null);
       return;
     }
-    const exact = results.filter(
-      (r) => (r.englishName ?? "").normalize("NFC").toLowerCase() === trimmed,
-    );
+    const mod = modRef.current;
+    const exact = results.filter((r) => {
+      if ((r.englishName ?? "").normalize("NFC").toLowerCase() === trimmed) return true;
+      const names = mod?.getLanguageDefaults(r.code)?.englishNames;
+      return names?.some((n) => n.normalize("NFC").toLowerCase() === trimmed) ?? false;
+    });
     onResolved(exact.length === 1 ? exact[0]! : null);
   }
 

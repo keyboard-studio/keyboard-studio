@@ -3,7 +3,8 @@
 // "[Q1 name] + the resolved entry's / region variant's recorded local names".
 // Because the default is the author's own Q1 input — not a langtags value — the
 // autonym field carries NO "Suggested from langtags" caption (that caption stays
-// on the code + script confirmations, which are genuine langtags seeds). This
+// on the target-script confirmation, a genuine editable langtags seed; the code
+// confirmation is read-only, so it carries no "edit if needed" caption either). This
 // also supersedes the PR #1044 region-variant autonym-provenance regression:
 // autonym provenance no longer exists, so there is no stale-caption bug to guard.
 //
