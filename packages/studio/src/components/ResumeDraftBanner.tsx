@@ -81,7 +81,12 @@ export function ResumeDraftBanner({ meta, onResume, onDiscard }: ResumeDraftBann
   const name = meta.label !== null ? `"${meta.label}"` : "your keyboard";
 
   return (
-    <div role="status" data-testid="resume-draft-banner" style={bannerStyle}>
+    <div
+      role="region"
+      aria-label="Resume unfinished survey"
+      data-testid="resume-draft-banner"
+      style={bannerStyle}
+    >
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, marginBottom: 2 }}>
           Resume {name}?

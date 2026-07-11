@@ -8,7 +8,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { IdentityLiteResult } from "../survey/IdentityLite.tsx";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { saveDraft, loadDraftMeta, applyDraft, clearDraft } from "./draftAutosave.ts";
+import {
+  saveDraft,
+  loadDraftMeta,
+  applyDraft,
+  clearDraft,
+  startDraftAutosave,
+} from "./draftAutosave.ts";
 
 const DRAFT_KEY = "ks.studio.draft";
 
@@ -137,6 +143,38 @@ describe("draftAutosave", () => {
     );
     expect(loadDraftMeta()).toBeNull();
     expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
+  });
+
+  it("startDraftAutosave collapses a burst of edits into a single debounced write", () => {
+    vi.useFakeTimers();
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+    const draftWrites = () =>
+      setItemSpy.mock.calls.filter(([key]) => key === DRAFT_KEY).length;
+
+    const stop = startDraftAutosave();
+
+    // A burst of edits within one debounce window.
+    const store = useSurveySessionStore.getState();
+    store.advance("choose_base");
+    store.advance("track");
+    store.setSelectedTrack("copy");
+
+    // Still inside the debounce window — nothing written yet.
+    expect(draftWrites()).toBe(0);
+
+    vi.advanceTimersByTime(1000);
+
+    // Exactly one write for the whole burst.
+    expect(draftWrites()).toBe(1);
+    expect(loadDraftMeta()).not.toBeNull();
+
+    // A later edit debounces into a second, separate write.
+    store.advance("project_name");
+    vi.advanceTimersByTime(1000);
+    expect(draftWrites()).toBe(2);
+
+    stop();
+    setItemSpy.mockRestore();
   });
 
   it("clearDraft removes a saved draft", () => {

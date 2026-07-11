@@ -91,6 +91,16 @@ Three layers gate the working copy (spec [§10](../spec.md#10-validator-and-lint
 - **Layer C** hygiene → [`@keymanapp/keyboard-lint`](../packages/keyboard-lint/)
 - One **300 ms debounce** cycle runs the TS check and the WASM `kmcmplib` oracle
   as concurrent microtasks (decision D3). Do not add a second timer.
+  - **Scope of D3.** D3 governs the *validation/preview* trigger only — the rule
+    exists to prevent visible feedback races between the TS check and the WASM
+    oracle. It does not forbid every debounce in the studio. Non-validation
+    debounced side effects that produce no preview feedback are permitted: the
+    full-corpus import-fidelity round-trip (I2) already runs *outside* the cycle
+    (spec [§10](../spec.md#10-validator-and-lint-engine)), and the ~1 s
+    localStorage survey-draft autosave
+    ([`packages/studio/src/lib/draftAutosave.ts`](../packages/studio/src/lib/draftAutosave.ts))
+    debounces persistence only. Neither touches the validation path, so neither
+    is a "second debounce timer" in the D3 sense.
 
 ## Subsystem composition map
 

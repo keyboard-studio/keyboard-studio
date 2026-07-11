@@ -48,8 +48,16 @@ const DRAFT_VERSION = 1;
 /** Drafts older than this are treated as expired and discarded on load (7 days). */
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** Debounce window for autosave writes (ms). Coarser than the 300 ms validator
- *  cycle so a burst of edits collapses into one localStorage write. */
+/**
+ * Debounce window for autosave writes (ms). Coarser than the 300 ms validator
+ * cycle so a burst of edits collapses into one localStorage write.
+ *
+ * This is a persistence-only debounce and does NOT violate decision D3's
+ * "one debounce cycle" rule: D3 scopes the validation/preview trigger (TS-check
+ * + WASM oracle) to avoid visible feedback races. This timer touches no
+ * validation path and produces no preview feedback. See docs/architecture.md
+ * ("Scope of D3").
+ */
 const AUTOSAVE_DEBOUNCE_MS = 1000;
 
 // ---------------------------------------------------------------------------

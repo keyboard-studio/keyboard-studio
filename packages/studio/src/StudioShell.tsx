@@ -350,11 +350,24 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // pending decision can't overwrite the very draft being offered. When there is
   // no draft, autosave starts immediately.
   // ---------------------------------------------------------------------------
-  const [resumeMeta, setResumeMeta] = useState<DraftMeta | null>(() => {
-    if (resumeOfferConsumed) return null;
+  // The initializer must be PURE: <StrictMode> (main.tsx) double-invokes lazy
+  // useState initializers in dev, and only the *second* return value is kept.
+  // A flag flipped inside the initializer would make invocation 1 consume the
+  // offer and invocation 2 (the kept value) see it already consumed → the banner
+  // would silently never appear in `pnpm dev` / e2e. So read the flag here and
+  // mark it consumed in the mount effect below instead.
+  const [resumeMeta, setResumeMeta] = useState<DraftMeta | null>(() =>
+    resumeOfferConsumed ? null : loadDraftMeta(),
+  );
+
+  // Mark the one-per-page-load resume offer as consumed after commit (idempotent
+  // under StrictMode's mount/cleanup/mount). Subsequent same-session SurveyView
+  // remounts (route away + back = a fresh wizard) then read the flag and skip the
+  // banner; a real page reload resets the module flag by starting a new JS context.
+  useEffect(() => {
+    // Runs once on mount; touches only the module-level flag, so no deps.
     resumeOfferConsumed = true;
-    return loadDraftMeta();
-  });
+  }, []);
 
   useEffect(() => {
     if (resumeMeta !== null) return; // wait for the author's Resume/Discard choice
