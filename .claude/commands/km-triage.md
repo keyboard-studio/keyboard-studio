@@ -653,6 +653,8 @@ Populate `priorFindings` **only** when `review_range == "incremental"`; on a ful
 
 With the pre-filters resolved, build the args and make the single call. **This replaces the old inline briefing template, per-specialist dispatch, the fenced `verdict`-block contract, and the synthesis stage** — km-review owns all of that now, behind one schema-validated call. km-triage builds the args from its Phase 1–3 context:
 
+**Gate stage (inside km-review, no separate arg).** Before dispatching any primary, km-review runs km-verification alone as a sanity gate: does the PR actually do what it claims? A confident "no" short-circuits straight to a `REQUEST_CHANGES` result — the primaries, the per-finding skeptic pass, and km-synthesis never run for that PR. Any low-confidence result, or a confident "yes", falls through to the normal crew unchanged. This is a within-sweep gate (distinct from Pre-filter E's across-sweep skip above) and needs no args from km-triage — it always runs first.
+
 | Arg | Value | Source |
 |---|---|---|
 | `prNumber` (required) | the PR number | Phase 2 |
