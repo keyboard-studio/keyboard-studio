@@ -5,35 +5,28 @@
 // Glob path: from the Vite root (packages/studio), the content tree is at
 // ../../content/patterns/**/*.yaml  →  resolves to keyboard-studio/content/patterns.
 //
-// Ranking: delegates to selectStrategy() for the axis-based partition, then
-// mirrors the engine's filterFor() partition order (primary → secondary →
-// appliesTo-match). This avoids duplicating the partition logic: the engine's
-// filterFor() body is replicated here with a clear comment because extracting
-// a pure rankPatterns() helper from the engine package would require an
-// engine build-step change that is deferred to the #5b joint session. If that
-// refactor lands, replace the partition block below with a call to
-// rankPatterns(all, base, axes).
+// RawPattern -> Pattern mapping and strategy-partition ranking are shared
+// with the engine (packages/engine/src/pattern-library/loader.ts's
+// toPattern, filterFor.ts's rankPatterns), re-exported from the engine's
+// main entry. Both are pure (no node:fs/node:path), so importing them here
+// does not pull Node-only code into the browser bundle — the studio already
+// statically imports this same entry point elsewhere (e.g. workingCopyStore,
+// services.ts) without issue.
 //
 // PatternSchema is imported from "@keyboard-studio/engine/pattern-schema"
 // via the dedicated "./pattern-schema" export added to the engine's package.json.
 // This closes the drift window: the schema is now a single source of truth.
 
 import { parse } from "yaml";
-import { makePattern } from "@keyboard-studio/contracts";
-import { selectStrategy } from "@keyboard-studio/engine";
-import { toPatternMatch } from "@keyboard-studio/contracts";
+import { toPattern, rankPatterns } from "@keyboard-studio/engine";
 import { PatternSchema } from "@keyboard-studio/engine/pattern-schema";
 import type {
   Pattern,
-  PatternCategory,
-  StrategyId,
-  DemoObject,
   BaseKeyboard,
   DiscoveryAxisVector,
   PatternMatch,
   PatternLibraryService,
 } from "@keyboard-studio/contracts";
-import type { RawPattern } from "@keyboard-studio/engine/pattern-schema";
 
 // ---------------------------------------------------------------------------
 // Vite glob — eager, raw text. import.meta.glob resolves relative to THIS
@@ -46,42 +39,6 @@ const YAML_MODULES = import.meta.glob(
   "../../../../content/patterns/**/*.yaml",
   { eager: true, query: "?raw", import: "default" },
 ) as Record<string, string>;
-
-// ---------------------------------------------------------------------------
-// YAML → Pattern conversion (mirrors engine loader.ts toPattern)
-// ---------------------------------------------------------------------------
-
-type ProvenanceItem = { keyboard: string; rule?: string; notes?: string };
-
-function toPattern(data: RawPattern): Pattern {
-  const base = {
-    id: String(data.id),
-    title: String(data.title),
-    description: String(data.description),
-    category: data.category as PatternCategory,
-    appliesTo: data.appliesTo,
-    questions: data.questions as Parameters<typeof makePattern>[0]["questions"],
-    kmnFragment: data.kmnFragment,
-    tests: data.tests as Parameters<typeof makePattern>[0]["tests"],
-    validatedForFamilies: data.validatedForFamilies,
-    sourceKeyboards: data.sourceKeyboards,
-    reviewedBy: String(data.reviewedBy),
-    reviewDate: String(data.reviewDate),
-  };
-
-  const optional: Record<string, unknown> = {};
-  if (data.strategyId !== undefined) optional.strategyId = data.strategyId as StrategyId;
-  if (data.combinesWith !== undefined) optional.combinesWith = data.combinesWith as StrategyId[];
-  if (typeof data.touchLayoutFragment === "string") optional.touchLayoutFragment = data.touchLayoutFragment;
-  if (typeof data.reorderRules === "string") optional.reorderRules = data.reorderRules;
-  if (data.frequencyInCorpus !== undefined) optional.frequencyInCorpus = data.frequencyInCorpus;
-  if (data.provenance !== undefined) optional.provenance = data.provenance as ProvenanceItem[];
-  if (data.demo !== undefined) optional.demo = data.demo as string | DemoObject;
-  if (data.group_visibility !== undefined) optional.group_visibility = data.group_visibility;
-  if (data.priority !== undefined) optional.priority = data.priority;
-
-  return makePattern({ ...base, ...optional });
-}
 
 // ---------------------------------------------------------------------------
 // Load + validate all YAML modules at import time (eager glob runs once)
@@ -122,60 +79,6 @@ const _allPatterns: Pattern[] = loadAll();
 const _patternById: Map<string, Pattern> = new Map(
   _allPatterns.map((p) => [p.id, p]),
 );
-
-// ---------------------------------------------------------------------------
-// rankPatterns — replicated from engine filterFor.ts.
-// NOTE: If engine exposes a pure rankPatterns(all, base, axes) export, replace
-// this block with that call. Replicated because extracting it from the engine
-// would require an engine build step that is deferred to the #5b joint session.
-// ---------------------------------------------------------------------------
-
-function rankPatterns(
-  all: Pattern[],
-  base: BaseKeyboard,
-  axes?: DiscoveryAxisVector,
-): PatternMatch[] {
-  // §9: exclude reorder patterns for Latin-script keyboards.
-  const eligible =
-    base.script === "Latn" ? all.filter((p) => p.category !== "reorder") : all;
-
-  if (axes === undefined) {
-    const matches = eligible.filter(
-      (p) => p.appliesTo.length === 0 || p.appliesTo.includes(base.script),
-    );
-    return matches.map((p, idx) => toPatternMatch(p, idx + 1, "appliesTo-match"));
-  }
-
-  const rec = selectStrategy(axes);
-
-  const categorized = {
-    primary: [] as Pattern[],
-    secondary: [] as Pattern[],
-    appliesTo: [] as Pattern[],
-  };
-
-  for (const p of eligible) {
-    if (p.strategyId === rec.primary) {
-      categorized.primary.push(p);
-    } else if (p.strategyId !== undefined && rec.secondaries.includes(p.strategyId)) {
-      categorized.secondary.push(p);
-    } else if (p.strategyId === undefined && (p.appliesTo.length === 0 || p.appliesTo.includes(base.script))) {
-      categorized.appliesTo.push(p);
-    }
-    // Off-strategy patterns (strategyId set but matches neither primary nor
-    // secondaries) are intentionally excluded.
-  }
-
-  const ordered = [...categorized.primary, ...categorized.secondary, ...categorized.appliesTo];
-
-  return ordered.map((p, idx) => {
-    const reason: PatternMatch["reason"] =
-      p.strategyId === rec.primary ? "primary-strategy"
-      : p.strategyId !== undefined && rec.secondaries.includes(p.strategyId) ? "secondary-strategy"
-      : "appliesTo-match";
-    return toPatternMatch(p, idx + 1, reason);
-  });
-}
 
 // ---------------------------------------------------------------------------
 // Service implementation
