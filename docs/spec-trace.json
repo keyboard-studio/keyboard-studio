@@ -1,6 +1,6 @@
 {
-  "specVersion": "1.3.1",
-  "lastUpdated": "2026-07-06",
+  "specVersion": "2.0.0",
+  "lastUpdated": "2026-07-11",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -29,7 +29,7 @@
     },
     "§4": {
       "title": "4. System overview",
-      "hash": "sha256:1d74ecd33e9c7dda",
+      "hash": "sha256:8a6d49ef3d439955",
       "status": "partial",
       "implements": [
         "packages/contracts/src/baseBrowser.ts",
@@ -130,7 +130,7 @@
     },
     "§10": {
       "title": "10. Validator and lint engine",
-      "hash": "sha256:db644dd54c5ae5d7",
+      "hash": "sha256:cde63a4b7a61f34a",
       "status": "partial",
       "implements": [
         "packages/contracts/src/validator.ts",
@@ -291,7 +291,7 @@
     },
     "specs/007-strategy-selection": {
       "title": "Feature spec — Strategy selection (spec.md §7)",
-      "hash": "sha256:753ec1bea258fc49",
+      "hash": "sha256:fb3303c77cd43be5",
       "status": "partial",
       "implements": [
         "packages/contracts/src/strategy.ts",
@@ -444,7 +444,7 @@
       "notes": ""
     },
     "specs/022-qu-library-demote": {
-      "title": "Feature Specification: Library demote — demote the `pb_*` battery and the full Phase A to reserve/library under the no-delete guardrail",
+      "title": "Feature Specification: Library demote — demote the orphaned non-identity Phase A to reserve/library under the no-delete guardrail",
       "hash": "sha256:ac9af55293e53c62",
       "status": "unreviewed",
       "implements": [],
@@ -502,6 +502,54 @@
     "specs/029-qu-flowstephost-convergence": {
       "title": "Feature Specification: FlowStepHost Convergence",
       "hash": "sha256:c61f48b7b3fddebd",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/024-option-a-github-app": {
+      "title": "Feature Specification: Option A via GitHub App (retire the OAuth App)",
+      "hash": "sha256:8c7bb6f954ea6d5a",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/030-langtags-identity-autocomplete": {
+      "title": "Feature Specification: Langtags-driven identity autocomplete",
+      "hash": "sha256:099e0805f6251fc7",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/030-step-model-gates": {
+      "title": "Feature Specification: Step-model constitutional gates — machine-enforced survey integrity checks",
+      "hash": "sha256:65328b4f26369a55",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/031-specref-trace-join": {
+      "title": "Feature Specification: specRef anchors + spec-trace impacted-steps join — automated code-to-spec traceability",
+      "hash": "sha256:52e370d8ee0d47ef",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/032-journey-corpus": {
+      "title": "Feature Specification: Journey corpus — replayable end-to-end user-workflow fixtures with manifest edge-coverage gates",
+      "hash": "sha256:c8463862e63d5edf",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/033-qu-mutate-track": {
+      "title": "Feature Specification: Mutate track — route the track fork through the manifest reducer/mutate seam, replacing the hand-coded StudioShell fork",
+      "hash": "sha256:9e0f03bccf2c8d77",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
