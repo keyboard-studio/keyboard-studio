@@ -217,20 +217,22 @@ export interface WorkingCopyState {
    *
    * - `charTouchEntries`: serializable form of the `charTouch` Map
    *   (array of [char, TouchAssignment] pairs so it survives JSON round-trips).
-   * - `skippedChars`: array form of the `skippedChars` Set.
-   * - `charHistory`: the visited-character history stack (most-recently-visited
-   *   last), so the Back button's depth survives an unmount/remount caused by
-   *   navigating to Phase C and returning — without this, Back would always
-   *   land on `onBack()` after a remount regardless of how many characters
-   *   had actually been visited.
+   * - `suggestionResolvedChars`: array form of the `suggestionResolved` Set —
+   *   characters whose suggestion card has been explicitly accepted or denied,
+   *   so it never reappears on back-navigation to an already-decided char.
+   *
+   * Navigation itself (Back/Next/Previous) is purely positional — derived from
+   * the character's index in `session.confirmedInventory` — so it needs no
+   * persisted history stack; `skippedChars` was removed entirely because Skip
+   * records nothing (it is identical to Next, just forward navigation with no
+   * assignment). Do not resurrect either field.
    *
    * Null until Phase E first mounts and writes back state. Cleared on reset
    * and on a new instantiation.
    */
   touchDraft: {
     charTouchEntries: Array<[string, TouchAssignment]>;
-    skippedChars: string[];
-    charHistory: string[];
+    suggestionResolvedChars: string[];
   } | null;
 
   /**
@@ -371,13 +373,12 @@ export interface WorkingCopyState {
   /**
    * Persist the in-progress Phase E draft so it survives an unmount/remount
    * caused by back-navigation to Phase C. Call from TouchGallery whenever
-   * charTouch or skippedChars change (or on unmount). Pass null to clear.
+   * charTouch or suggestionResolved change (or on unmount). Pass null to clear.
    */
   setTouchDraft: (
     draft: {
       charTouchEntries: Array<[string, TouchAssignment]>;
-      skippedChars: string[];
-      charHistory: string[];
+      suggestionResolvedChars: string[];
     } | null,
   ) => void;
   /** Mark a gallery's one-time intro splash as seen for this working-copy session. */

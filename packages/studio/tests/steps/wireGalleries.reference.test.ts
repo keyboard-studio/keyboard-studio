@@ -80,6 +80,7 @@ function makeHarness(): Harness {
   let working: KeyboardIR = mixedProvenanceIR();
   const deps: ReducerDeps = {
     lockDesktop: vi.fn(),
+    clearStale: vi.fn(),
     setTouchLayoutJson: vi.fn(),
     instantiateFromBase: vi.fn(),
     instantiateFromExisting: vi.fn(),

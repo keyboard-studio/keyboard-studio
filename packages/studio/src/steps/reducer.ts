@@ -85,6 +85,12 @@ export interface ReducerDeps {
   lockDesktop: () => void;
   /** Persist the serialized touch layout JSON at Phase E completion (R2). */
   setTouchLayoutJson: (json: string | null) => void;
+  /**
+   * Clear a step's stale marker (removes it as a re-opened root and recomputes
+   * the staleness closure). Called at Touch completion (R2) so re-completing
+   * the touch step clears the re-review flag a prior Mechanisms edit set on it.
+   */
+  clearStale: (stepId: string) => void;
   /** Track 1 instantiation — copy from base, new identity. */
   instantiateFromBase: (
     base: BaseKeyboard,
@@ -272,6 +278,13 @@ export function applyStepCompletion(
           deps.setTouchLayoutJson(null);
         }
       }
+      // Re-completing the touch step resolves whatever re-review flag was set
+      // on it (e.g. by a Mechanisms edit after unlock — MechanismGallery marks
+      // "touch" stale directly, since the production manifest gives "touch"
+      // inputs: [] and a mechanisms→touch stale-propagation edge does not
+      // exist). Clearing here, not on entry, means the flag survives until
+      // the user has actually re-reviewed and re-completed the step.
+      deps.clearStale(TOUCH_STEP_ID);
       break;
     }
 

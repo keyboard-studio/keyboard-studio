@@ -338,6 +338,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Working-copy store actions needed by SurveyView (not delegated to StepHost).
   const resetSurvey = useWorkingCopyStore((s) => s.reset);
   const lockDesktop = useWorkingCopyStore((s) => s.lockDesktop);
+  const clearStale = useWorkingCopyStore((s) => s.clearStale);
   const setTouchLayoutJson = useWorkingCopyStore((s) => s.setTouchLayoutJson);
   const instantiateFromBase = useWorkingCopyStore((s) => s.instantiateFromBase);
   const instantiateFromExisting = useWorkingCopyStore((s) => s.instantiateFromExisting);
@@ -368,6 +369,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const reducerDeps: ReducerDeps = useMemo(
     () => ({
       lockDesktop,
+      clearStale,
       setTouchLayoutJson,
       instantiateFromBase,
       instantiateFromExisting,
@@ -390,7 +392,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     // Wrapper lambdas delegate to stable module imports — excluded from deps intentionally.
-    [lockDesktop, setTouchLayoutJson, instantiateFromBase, instantiateFromExisting],
+    [lockDesktop, clearStale, setTouchLayoutJson, instantiateFromBase, instantiateFromExisting],
   );
 
   // Keep reducerDepsRef current so the async onInstantiate callback always
