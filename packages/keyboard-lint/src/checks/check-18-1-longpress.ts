@@ -4,6 +4,7 @@
 
 import type { LintFinding } from "@keyboard-studio/contracts";
 import type { TouchLayoutIR } from "@keyboard-studio/contracts";
+import { makeLocation, walkTouchKeys } from "./_shared.js";
 
 const WARN_THRESHOLD = 8;
 const ERROR_THRESHOLD = 10;
@@ -21,26 +22,20 @@ export function checkLongpress(
 ): LintFinding[] {
   const findings: LintFinding[] = [];
 
-  for (const platform of ir.platforms) {
-    for (const layer of platform.layers) {
-      for (const row of layer.rows) {
-        for (const key of row.keys) {
-          const count = key.sk?.length ?? 0;
-          if (count > WARN_THRESHOLD) {
-            const severity = count > ERROR_THRESHOLD ? "error" : "warning";
-            findings.push({
-              code: "KM_WARN_LONGPRESS_OVERSIZE",
-              severity,
-              layer: "C",
-              message: `Key "${key.id}" has ${count} longpress option(s); the recommended maximum is ${WARN_THRESHOLD} (hard cap ${ERROR_THRESHOLD}).`,
-              location: { file: touchLayoutPath, line: 1 },
-              hint: `Reduce the ${count} longpress options on "${key.id}" to ${WARN_THRESHOLD} or fewer to keep the menu usable on phone screens.`,
-            });
-          }
-        }
-      }
+  walkTouchKeys(ir, ({ key }) => {
+    const count = key.sk?.length ?? 0;
+    if (count > WARN_THRESHOLD) {
+      const severity = count > ERROR_THRESHOLD ? "error" : "warning";
+      findings.push({
+        code: "KM_WARN_LONGPRESS_OVERSIZE",
+        severity,
+        layer: "C",
+        message: `Key "${key.id}" has ${count} longpress option(s); the recommended maximum is ${WARN_THRESHOLD} (hard cap ${ERROR_THRESHOLD}).`,
+        location: makeLocation(touchLayoutPath),
+        hint: `Reduce the ${count} longpress options on "${key.id}" to ${WARN_THRESHOLD} or fewer to keep the menu usable on phone screens.`,
+      });
     }
-  }
+  });
 
   return findings;
 }
