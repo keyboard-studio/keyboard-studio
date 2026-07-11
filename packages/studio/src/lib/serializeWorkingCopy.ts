@@ -26,6 +26,7 @@ import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { IdentityOverlay } from "./projectWorkingCopyVfs.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
 import { bumpKeyboardVersion, stageAdaptHistory } from "@keyboard-studio/engine";
+import { readVfsText } from "./vfsText.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -213,13 +214,13 @@ export async function projectWorkingCopyForOutput(): Promise<ProjectWorkingCopyF
     // that share this shape are patched; those that don't (unusual/legacy layouts)
     // emit a warning so the user knows the .kmn and .kps versions may differ.
     const kpsPath = `source/${keyboardId}.kps`;
-    const kpsEntry = clonedVfs.get(kpsPath);
-    if (kpsEntry !== undefined && typeof kpsEntry.content === "string") {
-      const patchedKps = kpsEntry.content.replace(
+    const kpsText = readVfsText(clonedVfs, kpsPath);
+    if (kpsText !== undefined) {
+      const patchedKps = kpsText.replace(
         /(<Keyboards>[\s\S]*?<Keyboard>[\s\S]*?<Version>)[^<]*(< *\/Version>)/,
         `$1${bumpedVersion}$2`,
       );
-      if (patchedKps !== kpsEntry.content) {
+      if (patchedKps !== kpsText) {
         clonedVfs.set(kpsPath, patchedKps, false);
       } else {
         // Regex produced no change — the .kps does not have <Version> inside

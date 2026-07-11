@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import type { VirtualFS } from "@keyboard-studio/contracts";
 import { useDebounce, DEBOUNCE_MS } from "../hooks/useDebounce.ts";
 import { findKmnPath } from "../lib/findKmnPath.ts";
+import { readVfsText } from "../lib/vfsText.ts";
 import { BG_CARD, CARD_BORDER, FONT_MONO, TEXT_MAIN } from "../ui/theme.ts";
 
 export interface KmnEditorProps {
@@ -19,7 +20,7 @@ export function KmnEditor({ vfs, onRecompile }: KmnEditorProps) {
   // Find the primary .kmn file once per render — exclude the tests/ directory.
   const kmnPath = findKmnPath(vfs);
   const initialContent = kmnPath !== undefined
-    ? (vfs.get(kmnPath)?.content as string | undefined) ?? ""
+    ? readVfsText(vfs, kmnPath) ?? ""
     : "";
 
   const [text, setText] = useState(initialContent);
@@ -32,7 +33,7 @@ export function KmnEditor({ vfs, onRecompile }: KmnEditorProps) {
   useEffect(() => {
     const path = findKmnPath(vfs);
     const content = path !== undefined
-      ? (vfs.get(path)?.content as string | undefined) ?? ""
+      ? readVfsText(vfs, path) ?? ""
       : "";
     setText(content);
     // Reset dirty flag so the fresh VFS seed doesn't trigger a recompile.

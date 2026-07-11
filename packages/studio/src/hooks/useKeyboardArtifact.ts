@@ -9,6 +9,7 @@ import { LOCAL_PROXY_BASE, getScaffolderService } from "../lib/services.ts";
 export { LOCAL_PROXY_BASE };
 import { findKmnPath } from "../lib/findKmnPath.ts";
 import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
+import { readVfsText } from "../lib/vfsText.ts";
 
 interface EngineModule {
   compile: (fs: VirtualFS, keyboardId: string) => Promise<CompileResult>;
@@ -351,7 +352,7 @@ export function useKeyboardArtifact(
     let parseWarning: string | null = null;
     try {
       const kmnPath = findKmnPath(vfs);
-      const kmnText = kmnPath ? (vfs.get(kmnPath)!.content as string) : "";
+      const kmnText = kmnPath ? (readVfsText(vfs, kmnPath) ?? "") : "";
 
       // Strip dangling packaging-asset references before compiling for preview.
       // If the base names a BITMAP / VISUALKEYBOARD / LAYOUTFILE that wasn't
@@ -370,7 +371,7 @@ export function useKeyboardArtifact(
         // may have its own dangling references even when kmnPath did not.
         const compilePath = `source/${compileId}.kmn`;
         if (compilePath !== kmnPath && vfs.get(compilePath) !== undefined) {
-          const compileEntry = vfs.get(compilePath)!.content as string;
+          const compileEntry = readVfsText(vfs, compilePath) ?? "";
           const { kmn: cleanedCompile, stripped: strippedCompile } =
             engine.stripDanglingAssetStores(compileEntry, vfs);
           if (strippedCompile.length > 0) {
@@ -404,10 +405,10 @@ export function useKeyboardArtifact(
             // the generated default remains the fallback.
             if (engine.parseTouchLayout && ir.touchLayout === undefined) {
               const touchPath = findTouchLayoutPath(vfs);
-              const touchEntry = touchPath ? vfs.get(touchPath) : undefined;
-              if (touchEntry && typeof touchEntry.content === "string") {
+              const touchText = touchPath ? readVfsText(vfs, touchPath) : undefined;
+              if (touchText !== undefined) {
                 try {
-                  ir = { ...ir, touchLayout: engine.parseTouchLayout(touchEntry.content) };
+                  ir = { ...ir, touchLayout: engine.parseTouchLayout(touchText) };
                 } catch (e) {
                   console.warn("[useKeyboardArtifact] parseTouchLayout failed, falling back to generated default:", e);
                   // Leave ir.touchLayout undefined; fall back to the generated default.
