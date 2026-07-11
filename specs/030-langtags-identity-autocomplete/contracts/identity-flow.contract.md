@@ -2,6 +2,8 @@
 
 **Owner**: Content (survey text/order/flow) with an Engine dependency (langtags API above). **Files**: `content/flows/identity_lite.modular.yaml`, `content/flows/proposed/phase_a_identity.modular.yaml`, `packages/studio/src/survey/questions/a/*`, `packages/studio/src/survey/IdentityLite.tsx`, `packages/studio/src/survey/questions/registry.a.ts`.
 
+> This is the authoritative as-shipped record for the live flow's question order, referenced from [../spec.md Implementation Status](../spec.md#implementation-status) (added 2026-07-11 to reconcile FR-008/FR-009 — written before this decision — against what actually shipped).
+
 ## US1 structural decision — option 1 "mechanism-clean" (as shipped), 2026-07-08
 
 Mechanism finding: the langtags autocomplete field (`LangtagsAutocompleteField`,

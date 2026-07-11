@@ -98,7 +98,7 @@ export function IdentityLiteAdapter({ onComplete }: EditorStepProps) {
       context={surveyContext}
       onComplete={handleComplete}
       findingsByQuestionId={findingsByQuestionId}
-      {...(identityPhaseResult !== null ? { resume: identityPhaseResult } : {})}
+      {...(identityPhaseResult ? { resume: identityPhaseResult } : {})}
     />
   );
 }
@@ -152,13 +152,11 @@ export function BaseResolutionAdapter({ onComplete, onBack }: EditorStepProps) {
   const identityResult = useSurveySessionStore((s) => s.identityResult);
   const setLocalBase = useSurveySessionStore((s) => s.setLocalBase);
 
+  // `||` not `??`: prefill.script can be "" (no script selected for an
+  // unrecognized language), which must also fall back.
   const target: SuggestTarget = {
-    // `||` not `??`: prefill.script can be "" (no script selected for an
-    // unrecognized language), which must also fall back.
     script: identityResult?.prefill.script || "Latn",
-    ...(identityResult !== null && identityResult.bcp47 !== ""
-      ? { bcp47: identityResult.bcp47 }
-      : {}),
+    ...(identityResult?.bcp47 ? { bcp47: identityResult.bcp47 } : {}),
   };
 
   return (
@@ -169,7 +167,7 @@ export function BaseResolutionAdapter({ onComplete, onBack }: EditorStepProps) {
         setLocalBase(base);
         onComplete({ base });
       }}
-      {...(onBack !== undefined ? { onBack } : {})}
+      {...(onBack ? { onBack } : {})}
     />
   );
 }

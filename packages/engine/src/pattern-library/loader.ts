@@ -226,8 +226,16 @@ type ProvenanceItem = { keyboard: string; rule?: string; notes?: string };
  * Each optional field is hoisted into a typed local before being passed so
  * that `exactOptionalPropertyTypes` sees a narrowed non-undefined value
  * rather than `T | undefined`.
+ *
+ * Exported (not just used internally) so the studio's browser pattern
+ * library — which loads the same YAML via `import.meta.glob` instead of
+ * `node:fs` — can share this mapping instead of re-implementing it. This
+ * function has no `node:fs`/`node:path` dependency, so re-exporting it from
+ * the engine's main entry does not pull Node-only code into the browser
+ * bundle (unlike {@link loadPatterns}, whose fs/path use is behind a dynamic
+ * `import()` and never invoked from the browser).
  */
-function toPattern(data: RawPattern): Pattern {
+export function toPattern(data: RawPattern): Pattern {
   // Required fields — always present after schema validation.
   const base = {
     id: String(data.id),

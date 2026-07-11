@@ -48,8 +48,8 @@ export function reconcileSiblingAssetPaths(
 
   for (const store of parseKmnHeaderStores(kmn)) {
     if (!SIBLING_PATH_STORES.has(store.storeName)) continue;
-    const path = store.path?.trim();
-    if (!path) continue;
+    const path = store.path.trim();
+    if (path === "") continue;
     // Reference already valid — leave it alone.
     if (vfs.get(`source/${path}`) !== undefined) continue;
     // Only bare sibling filenames are candidates (mirror rewriteSiblingPathStores).

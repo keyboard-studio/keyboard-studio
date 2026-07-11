@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
+import { ResizeHandle } from "./components/ResizeHandle.tsx";
 import type { BaseKeyboard, Pattern } from "@keyboard-studio/contracts";
 import { buildTouchLayoutJson } from "./lib/buildTouchLayoutJson.ts";
 import { useWorkingCopyStore, bindManifest } from "./stores/workingCopyStore.ts";
@@ -324,7 +325,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   }, []);
 
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
-  const { containerRef, leftPct, handleHovered, onPointerDown, setHandleHovered } =
+  const { containerRef, leftPct, onPointerDown } =
     useResizablePanes({ minPct: SURVEY_LEFT_MIN_PCT, maxPct: SURVEY_LEFT_MAX_PCT, initPct: SURVEY_LEFT_INIT_PCT });
 
   // Sync localBase when the prop changes (e.g. after a start-over that sets a new base).
@@ -559,22 +560,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       </section>
 
       {/* Drag handle */}
-      <div
-        role="separator"
-        aria-label="Resize panes"
-        aria-orientation="vertical"
-        onPointerDown={onPointerDown}
-        onMouseEnter={() => setHandleHovered(true)}
-        onMouseLeave={() => setHandleHovered(false)}
-        style={{
-          width: SURVEY_DIVIDER_WIDTH,
-          flexShrink: 0,
-          background: handleHovered ? "#3d5070" : "#283040",
-          cursor: "col-resize",
-          userSelect: "none",
-          transition: "background 120ms ease",
-        }}
-      />
+      <ResizeHandle onPointerDown={onPointerDown} />
 
       {/* Right pane: live OSK preview */}
       <section

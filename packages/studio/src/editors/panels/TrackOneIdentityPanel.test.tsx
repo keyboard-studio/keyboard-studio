@@ -48,8 +48,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  useWorkingCopyStore.getState().reset();
   cleanup();
+  useWorkingCopyStore.getState().reset();
 });
 
 // ---------------------------------------------------------------------------

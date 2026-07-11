@@ -1,0 +1,47 @@
+# env.os-ecosystem — modifier conventions and platform capabilities differ:
+# RAlt/AltGr is a Windows/Linux idiom, Option-key composition is macOS, S-12
+# (DLL IME callout) is Windows-only. Delivery advice (installer paths in help
+# docs) also depends on it.
+
+id: env.os-ecosystem
+family: env
+title: Operating-system ecosystem
+description: >
+  The operating systems the community types on (Windows, macOS, Linux,
+  Android, iOS, ChromeOS; multi-select). Drives which modifier-layer idiom to
+  propose (RAlt vs Option), whether Windows-only strategies (S-12) are even
+  offered, and what the generated help docs say about installation.
+valueType: set
+values: [windows, macos, linux, android, ios, chromeos]
+
+modality: both
+modalityNotes: android/ios membership implies touch proposals matter; desktop OSes imply physical.
+
+derivations:
+  - kind: corpus
+    source: "corpus:region-os-mix"
+    sourceStatus: planned
+  - kind: asked
+    source: "planned:os-ecosystem-question"
+    sourceStatus: planned
+    notes: No survey question exists today; add as a confirmation seeded from region.
+
+consumers:
+  prefills: []
+  proposes:
+    - "mechanism-gallery:modifier-idiom"
+    - "strategy:S-12-availability"
+    - "help-docs:install-instructions"
+
+relatedAxes: [A7]
+provenanceLabel: "typical systems in your region"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: corpus
+
+notes: >
+  Candidate with no prefills yet — earns promotion only if the modifier-idiom
+  and S-12 proposal sites get built. Retire if v1 stays desktop-Windows-first.

@@ -1,0 +1,54 @@
+# orth.inventory-delta — the workhorse computed facet: (characters the language
+# needs) minus (characters the base already covers). CLDR exemplars + text
+# sample give the need; the base IR gives the coverage. Kills pb_char_count,
+# prefills the letters questions, and combined with env.form-factor computes
+# the spare-key answers outright.
+
+id: orth.inventory-delta
+family: orth
+title: Inventory delta vs base
+description: >
+  The set of characters the target language needs that the chosen base
+  keyboard does not yet produce, with each character's source (CLDR main,
+  CLDR auxiliary, text-sample harvest, author-added). The single most
+  proposal-dense computed signal in the flow: its size proposes A1, its
+  members seed the character questions, and its complement over the base
+  yields the spare keys.
+valueType: set
+
+modality: both
+
+derivations:
+  - kind: computed
+    source: "engine:suggestMissingCharacters"
+    sourceStatus: available
+    notes: CLDR-grounded need-side exists today (character-discovery); the vs-base delta wiring is the planned half.
+  - kind: computed
+    source: "planned:delta-vs-base-ir"
+    sourceStatus: planned
+  - kind: confirmed
+    source: "question:pb_text_sample"
+    sourceStatus: available
+
+consumers:
+  prefills:
+    - pb_char_count
+    - pb_standard_letters
+    - pb_special_letters
+    - pb_special_letters_list
+    - pb_spare_keys_qwerty
+    - pb_spare_keys_azerty
+    - pb_punctuation_gate
+    - pb_digit_set
+  proposes:
+    - "axis:A1"
+    - "placement:character-worklist"
+
+relatedAxes: [A1]
+provenanceLabel: "CLDR data + your text sample, compared with your base"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed

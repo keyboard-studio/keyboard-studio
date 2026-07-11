@@ -128,18 +128,16 @@ export function touchSuggest(input: TouchSuggestInput): TouchLayoutIR {
   const derived = scaffoldTouchLayout(input.physicalIR);
 
   // Stamp provenance on every produced key (pure — fresh structures).
-  const platforms: TouchLayoutIR["platforms"] = derived.platforms.map((platform) => ({
-    ...platform,
-    layers: platform.layers.map((layer) => ({
-      ...layer,
-      rows: layer.rows.map((row) => ({
-        keys: row.keys.map((key) => stampKey(key, baseIds)),
+  return {
+    platforms: derived.platforms.map((platform) => ({
+      ...platform,
+      layers: platform.layers.map((layer) => ({
+        ...layer,
+        rows: layer.rows.map((row) => ({
+          keys: row.keys.map((key) => stampKey(key, baseIds)),
+        })),
       })),
     })),
-  }));
-
-  return {
-    platforms,
     nodeIds: structuredClone(derived.nodeIds),
   };
 }

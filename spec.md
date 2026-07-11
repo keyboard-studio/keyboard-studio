@@ -228,6 +228,9 @@ keyboard-studio
 +-- validator / lint engine    [engine]   Three layers: Layer A validity (TS + WASM oracle),
 |                                         Layer B style (TS AST rules), Layer C hygiene (criteria.md).
 |                                         Packaged as @keymanapp/kmn-validator + @keymanapp/keyboard-lint.
+|                                         [Not yet realised as written: @keymanapp/kmn-validator was
+|                                         never extracted; Layer A/B lives in packages/engine/src/validator
+|                                         — see CLAUDE.md "Repository status".]
 |                                         Also includes the new Layer A' import-fidelity checks I1-I5
 |                                         (§10) that run on every codec parse and on output emission.
 |
@@ -572,6 +575,8 @@ The validator is the sole arbiter of what the survey and LLM are allowed to emit
 | A | Validity (structural + semantic) | Per-keystroke (TS checks) + per-compile (WASM oracle) | `@keymanapp/kmn-validator` |
 | B | Style / canonical form | Per-compile (TS AST rules) | `@keymanapp/kmn-validator` |
 | C | Repo hygiene (criteria.md) | Per-phase-exit + at submit | `@keymanapp/keyboard-lint` |
+
+*Not yet realised as written: `@keymanapp/kmn-validator` was never extracted as a package. Layer A and Layer B validation currently live in `packages/engine/src/validator` — see CLAUDE.md "Repository status" for the up-to-date package map.*
 
 **Lint and compile cycle.** One debounce cycle (300 ms) runs two concurrent microtasks: the TS-check pass and the WASM oracle. A TS-check error suppresses the WASM call; a WASM diagnostic always supersedes a conflicting TS diagnostic. This is the resolved single-cycle design (see Sec 14, decision 3).
 

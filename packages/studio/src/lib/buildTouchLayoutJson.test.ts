@@ -48,25 +48,11 @@ function makeMinimalIR(overrides: Partial<KeyboardIR> = {}): KeyboardIR {
 
 // ---------------------------------------------------------------------------
 // Compact inline tablet-only JSON fixture (no phone, has displayUnderlying).
-// This mimics the structural shape of a real shipped tablet-only touch layout
-// (e.g. sil_cameroon_qwerty) without the file-system dependency.
 // ---------------------------------------------------------------------------
 
 const TABLET_ONLY_JSON = JSON.stringify({
   tablet: {
-    layer: [
-      {
-        id: "default",
-        row: [
-          {
-            id: 1,
-            key: [
-              { id: "K_A", text: "a" },
-            ],
-          },
-        ],
-      },
-    ],
+    layer: [{ id: "default", row: [{ id: 1, key: [{ id: "K_A", text: "a" }] }] }],
     displayUnderlying: false,
   },
 });
@@ -95,70 +81,43 @@ function longpress(hostKey: string, char: string): TouchAssignment {
 // ---------------------------------------------------------------------------
 
 describe("buildTouchLayoutJson — Case B (router → raw path)", () => {
-  it("when baseTouchJson is provided, the returned json parses to a valid object", () => {
-    const result = buildTouchLayoutJson(
-      makeMinimalIR(),
-      [longpress("K_A", "á")],
-      TABLET_ONLY_JSON,
-    );
+  it("returned json parses to a valid object when baseTouchJson is provided", () => {
+    const result = buildTouchLayoutJson(makeMinimalIR(), [longpress("K_A", "á")], TABLET_ONLY_JSON);
     expect(result.json).not.toBeNull();
-    const parsed = JSON.parse(result.json!);
-    expect(parsed).toBeTypeOf("object");
+    expect(JSON.parse(result.json!)).toBeTypeOf("object");
   });
 
-  it("Case B: result has ONLY a 'tablet' platform key — no 'phone' synthesized", () => {
-    // The raw path must preserve the shipped platforms and never invent phone.
-    const result = buildTouchLayoutJson(
-      makeMinimalIR(),
-      [longpress("K_A", "á")],
-      TABLET_ONLY_JSON,
-    );
+  it("preserves ONLY shipped platforms — no 'phone' synthesized", () => {
+    const result = buildTouchLayoutJson(makeMinimalIR(), [longpress("K_A", "á")], TABLET_ONLY_JSON);
     expect(result.json).not.toBeNull();
     const parsed = JSON.parse(result.json!) as Record<string, unknown>;
     expect(Object.keys(parsed)).toEqual(["tablet"]);
     expect("phone" in parsed).toBe(false);
   });
 
-  it("Case B: K_A gains an sk[] entry after a longpress assignment", () => {
-    // The raw path must splice assignments into the matching key.
-    const result = buildTouchLayoutJson(
-      makeMinimalIR(),
-      [longpress("K_A", "á")],
-      TABLET_ONLY_JSON,
-    );
+  it("splices longpress assignments into the matching key", () => {
+    const result = buildTouchLayoutJson(makeMinimalIR(), [longpress("K_A", "á")], TABLET_ONLY_JSON);
     expect(result.json).not.toBeNull();
     const parsed = JSON.parse(result.json!) as {
       tablet: { layer: Array<{ row: Array<{ key: Array<{ id: string; sk?: unknown[] }> }> }> };
     };
     const kaKey = parsed.tablet.layer[0]?.row[0]?.key.find((k) => k.id === "K_A");
-    expect(kaKey).toBeDefined();
+    expect(kaKey?.sk).toBeDefined();
     expect(Array.isArray(kaKey!.sk)).toBe(true);
     expect(kaKey!.sk!.length).toBeGreaterThan(0);
   });
 
-  it("Case B: non-IR field 'displayUnderlying:false' is preserved verbatim", () => {
-    // The IR path drops per-platform fields like displayUnderlying; the raw path
-    // must keep them. This is the key observable that distinguishes the two paths.
-    const result = buildTouchLayoutJson(
-      makeMinimalIR(),
-      [longpress("K_A", "á")],
-      TABLET_ONLY_JSON,
-    );
+  it("preserves non-IR fields like displayUnderlying", () => {
+    const result = buildTouchLayoutJson(makeMinimalIR(), [longpress("K_A", "á")], TABLET_ONLY_JSON);
     expect(result.json).not.toBeNull();
     const parsed = JSON.parse(result.json!) as { tablet: { displayUnderlying?: unknown } };
     expect(parsed.tablet.displayUnderlying).toBe(false);
   });
 
-  it("Case B: no warnings returned for a matched host key", () => {
-    const result = buildTouchLayoutJson(
-      makeMinimalIR(),
-      [longpress("K_A", "á")],
-      TABLET_ONLY_JSON,
-    );
-    // The only expected warning would be "key not found in any platform" — K_A is
-    // present in the fixture, so there should be none.
-    const unexpectedWarnings = result.warnings.filter((w) =>
-      w.includes("not found") || w.includes("unmatched"),
+  it("returns no warnings for matched host keys", () => {
+    const result = buildTouchLayoutJson(makeMinimalIR(), [longpress("K_A", "á")], TABLET_ONLY_JSON);
+    const unexpectedWarnings = result.warnings.filter(
+      (w) => w.includes("not found") || w.includes("unmatched"),
     );
     expect(unexpectedWarnings).toHaveLength(0);
   });
@@ -169,30 +128,24 @@ describe("buildTouchLayoutJson — Case B (router → raw path)", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildTouchLayoutJson — Case A (router → IR path, undefined)", () => {
-  it("when baseTouchJson is omitted, the returned json parses to a valid object", () => {
+  it("returned json parses to a valid object when baseTouchJson is omitted", () => {
     const result = buildTouchLayoutJson(makeMinimalIR(), []);
     expect(result.json).not.toBeNull();
-    const parsed = JSON.parse(result.json!);
-    expect(parsed).toBeTypeOf("object");
+    expect(JSON.parse(result.json!)).toBeTypeOf("object");
   });
 
-  it("Case A (undefined): result HAS a 'phone' platform — proving the IR path ran", () => {
-    // The generate-from-scratch IR path always synthesizes a phone platform.
-    // This is the canonical proof that Case A fired.
+  it("synthesizes a 'phone' platform — proving the IR path ran", () => {
     const result = buildTouchLayoutJson(makeMinimalIR(), []);
     expect(result.json).not.toBeNull();
     const parsed = JSON.parse(result.json!) as Record<string, unknown>;
     expect("phone" in parsed).toBe(true);
   });
 
-  it("Case A (undefined): the phone platform has a 'default' layer", () => {
+  it("phone platform includes a 'default' layer", () => {
     const result = buildTouchLayoutJson(makeMinimalIR(), []);
     expect(result.json).not.toBeNull();
-    const parsed = JSON.parse(result.json!) as {
-      phone: { layer: Array<{ id: string }> };
-    };
-    const layerIds = parsed.phone.layer.map((l) => l.id);
-    expect(layerIds).toContain("default");
+    const parsed = JSON.parse(result.json!) as { phone: { layer: Array<{ id: string }> } };
+    expect(parsed.phone.layer.map((l) => l.id)).toContain("default");
   });
 });
 
@@ -201,22 +154,16 @@ describe("buildTouchLayoutJson — Case A (router → IR path, undefined)", () =
 // ---------------------------------------------------------------------------
 
 describe("buildTouchLayoutJson — Case A (router → IR path, empty string)", () => {
-  it("when baseTouchJson is empty string, it is falsy and routes to Case A (IR path)", () => {
-    // "" is falsy in JS — the `if (baseTouchJson)` guard must not fire.
+  it("routes to Case A when baseTouchJson is empty string", () => {
     const result = buildTouchLayoutJson(makeMinimalIR(), [], "");
     expect(result.json).not.toBeNull();
     const parsed = JSON.parse(result.json!) as Record<string, unknown>;
     expect("phone" in parsed).toBe(true);
   });
 
-  it("empty string vs undefined produce the same router branch (both Case A)", () => {
-    // Belt-and-suspenders: the empty-string path and the undefined path must
-    // produce equivalent structure (both phone, both no tablet).
+  it("empty string and undefined produce equivalent output", () => {
     const resultUndefined = buildTouchLayoutJson(makeMinimalIR(), []);
     const resultEmpty = buildTouchLayoutJson(makeMinimalIR(), [], "");
-
-    expect(resultUndefined.json).not.toBeNull();
-    expect(resultEmpty.json).not.toBeNull();
 
     const parsedUndefined = JSON.parse(resultUndefined.json!) as Record<string, unknown>;
     const parsedEmpty = JSON.parse(resultEmpty.json!) as Record<string, unknown>;
@@ -234,29 +181,17 @@ describe("buildTouchLayoutJson — Case A (router → IR path, empty string)", (
 
 describe("buildTouchLayoutJson — malformed baseTouchJson", () => {
   it("returns json:null when baseTouchJson is not valid JSON", () => {
-    // The documented contract: any throw (incl. SyntaxError) is caught and
-    // surfaces as { json: null, warnings: [...] }.
-    const result = buildTouchLayoutJson(
-      makeMinimalIR(),
-      [longpress("K_A", "á")],
-      "this is not json {{{",
-    );
+    const result = buildTouchLayoutJson(makeMinimalIR(), [longpress("K_A", "á")], "this is not json {{{");
     expect(result.json).toBeNull();
   });
 
   it("includes a warning message when baseTouchJson is malformed", () => {
-    const result = buildTouchLayoutJson(
-      makeMinimalIR(),
-      [longpress("K_A", "á")],
-      "this is not json {{{",
-    );
+    const result = buildTouchLayoutJson(makeMinimalIR(), [longpress("K_A", "á")], "this is not json {{{");
     expect(result.warnings.length).toBeGreaterThan(0);
-    // The wrapper adds a "[buildTouchLayoutJson] failed:" prefix.
     expect(result.warnings[0]).toMatch(/\[buildTouchLayoutJson\] failed:/);
   });
 
-  it("does NOT throw — always returns a BuildTouchLayoutJsonResult", () => {
-    // Callers rely on this never throwing; verify the try/catch catches all errors.
+  it("never throws — always returns a BuildTouchLayoutJsonResult", () => {
     let threw = false;
     try {
       buildTouchLayoutJson(makeMinimalIR(), [], "{bad json");

@@ -48,8 +48,6 @@ import type {
   ContextElement,
   OutputElement,
   RawKmnFragment,
-  TouchLayoutIR,
-  KvksIR,
 } from "./keyboard-ir.js";
 import type { Pattern } from "./pattern.js";
 
@@ -343,16 +341,14 @@ function compareRules(
   // always be present but the "absent vs explicit []" case is tested below).
   const ra = a ?? [];
   const rb = b ?? [];
-  a = ra;
-  b = rb;
   // Rule order within a group IS semantically significant: KMN applies the
   // first matching rule. Do not sort.
-  if (a.length !== b.length) {
-    push(diffs, `${groupPath}.rules`, a.length, b.length, "rule count differs");
+  if (ra.length !== rb.length) {
+    push(diffs, `${groupPath}.rules`, ra.length, rb.length, "rule count differs");
     return;
   }
-  for (let i = 0; i < a.length; i++) {
-    compareRule(a[i]!, b[i]!, `${groupPath}.rules[${i}]`, diffs);
+  for (let i = 0; i < ra.length; i++) {
+    compareRule(ra[i]!, rb[i]!, `${groupPath}.rules[${i}]`, diffs);
   }
 }
 
@@ -424,51 +420,28 @@ function compareRaw(
 }
 
 // ---------------------------------------------------------------------------
-// Touch layout (structural deep-equal, ignoring nodeIds)
+// Structural deep-equal comparison, ignoring nodeIds (touch layout + visual
+// keyboard). nodeIds are internal parser bookkeeping, so they are stripped
+// before the JSON comparison.
 // ---------------------------------------------------------------------------
 
-function compareTouchLayout(
-  a: TouchLayoutIR | undefined,
-  b: TouchLayoutIR | undefined,
+function compareStructuralIgnoringNodeIds<T extends { nodeIds?: unknown }>(
+  a: T | undefined,
+  b: T | undefined,
+  path: string,
+  presenceReason: string,
+  differReason: string,
   diffs: SemanticDifference[],
 ): void {
   if (a === undefined && b === undefined) return;
   if (a === undefined || b === undefined) {
-    push(diffs, "touchLayout", a, b, "one IR has a touch layout and the other does not");
+    push(diffs, path, a, b, presenceReason);
     return;
   }
-  // Strip nodeIds before JSON comparison — they are internal parser bookkeeping.
-  const strip = (tl: TouchLayoutIR): unknown =>
-    JSON.parse(JSON.stringify({ ...tl, nodeIds: undefined }));
-  const sa = JSON.stringify(strip(a));
-  const sb = JSON.stringify(strip(b));
-  if (sa !== sb) {
-    push(diffs, "touchLayout", a, b,
-      "touch layout platforms/layers/keys differ (nodeIds excluded)");
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Visual keyboard (structural deep-equal, ignoring nodeIds)
-// ---------------------------------------------------------------------------
-
-function compareVisualKeyboard(
-  a: KvksIR | undefined,
-  b: KvksIR | undefined,
-  diffs: SemanticDifference[],
-): void {
-  if (a === undefined && b === undefined) return;
-  if (a === undefined || b === undefined) {
-    push(diffs, "visualKeyboard", a, b, "one IR has a visual keyboard and the other does not");
-    return;
-  }
-  const strip = (k: KvksIR): unknown =>
-    JSON.parse(JSON.stringify({ ...k, nodeIds: undefined }));
-  const sa = JSON.stringify(strip(a));
-  const sb = JSON.stringify(strip(b));
-  if (sa !== sb) {
-    push(diffs, "visualKeyboard", a, b,
-      "visual keyboard layers/keys differ (nodeIds excluded)");
+  const strip = (v: T): unknown =>
+    JSON.parse(JSON.stringify({ ...v, nodeIds: undefined }));
+  if (JSON.stringify(strip(a)) !== JSON.stringify(strip(b))) {
+    push(diffs, path, a, b, differReason);
   }
 }
 
@@ -515,7 +488,21 @@ function compareIR(
   compareStores(a.stores, b.stores, diffs);
   compareGroups(a.groups, b.groups, diffs);
   compareRaw(a.raw, b.raw, diffs);
-  compareTouchLayout(a.touchLayout, b.touchLayout, diffs);
-  compareVisualKeyboard(a.visualKeyboard, b.visualKeyboard, diffs);
+  compareStructuralIgnoringNodeIds(
+    a.touchLayout,
+    b.touchLayout,
+    "touchLayout",
+    "one IR has a touch layout and the other does not",
+    "touch layout platforms/layers/keys differ (nodeIds excluded)",
+    diffs,
+  );
+  compareStructuralIgnoringNodeIds(
+    a.visualKeyboard,
+    b.visualKeyboard,
+    "visualKeyboard",
+    "one IR has a visual keyboard and the other does not",
+    "visual keyboard layers/keys differ (nodeIds excluded)",
+    diffs,
+  );
   compareRecognizedPatterns(a.recognizedPatterns, b.recognizedPatterns, diffs);
 }

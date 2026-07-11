@@ -19,7 +19,11 @@
 // The function is pure and total — no throws.
 
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
-import { primarySubtag, hasExplicitScriptSubtag, type SuggestTarget } from "./suggestBase.ts";
+import {
+  primarySubtag,
+  hasExplicitScriptSubtag,
+  type SuggestTarget,
+} from "./suggestBase.ts";
 
 export interface RankedBase {
   base: BaseKeyboard;
@@ -60,24 +64,21 @@ export function rankBases(
 
   // ---- Empty query: return all sorted by ctxTier then id ----
   if (trimmed === "") {
-    const sorted = bases.slice().sort((a, b) => {
-      const tierDiff = ctxTier(a) - ctxTier(b);
-      if (tierDiff !== 0) return tierDiff;
-      return a.id.localeCompare(b.id);
-    });
-    return sorted.map((base) => ({ base }));
+    return bases
+      .slice()
+      .sort((a, b) => ctxTier(a) - ctxTier(b) || a.id.localeCompare(b.id))
+      .map((base) => ({ base }));
   }
 
   // ---- Non-empty query ----
   const q = trimmed.toLowerCase();
 
-  // Compute first hit matchRange for a base.
+  // Compute first hit matchRange for a base (displayName preferred over id).
   function matchRange(base: BaseKeyboard): { field: "displayName" | "id"; start: number; end: number } | undefined {
-    const dn = base.displayName.toLowerCase();
-    const idx = dn.indexOf(q);
-    if (idx !== -1) return { field: "displayName", start: idx, end: idx + q.length };
-    const idIdx = base.id.toLowerCase().indexOf(q);
-    if (idIdx !== -1) return { field: "id", start: idIdx, end: idIdx + q.length };
+    for (const [field, text] of [["displayName", base.displayName], ["id", base.id]] as const) {
+      const idx = text.toLowerCase().indexOf(q);
+      if (idx !== -1) return { field, start: idx, end: idx + q.length };
+    }
     return undefined;
   }
 
@@ -112,15 +113,13 @@ export function rankBases(
     results.push({ base, qTier, cTier: ctxTier(base), range });
   }
 
-  results.sort((a, b) => {
-    if (a.qTier !== b.qTier) return a.qTier - b.qTier;
-    if (a.cTier !== b.cTier) return a.cTier - b.cTier;
-    return a.base.id.localeCompare(b.base.id);
-  });
-
-  return results.map(({ base, range }) => {
-    const rb: RankedBase = { base };
-    if (range !== undefined) rb.matchRanges = [range];
-    return rb;
-  });
+  return results
+    .sort((a, b) =>
+      a.qTier - b.qTier ||
+      a.cTier - b.cTier ||
+      a.base.id.localeCompare(b.base.id)
+    )
+    .map(({ base, range }) =>
+      range !== undefined ? { base, matchRanges: [range] } : { base }
+    );
 }

@@ -1,6 +1,6 @@
 // PatternLibraryService.filterFor() — strategy-ranked pattern matching (spec §7.2 §9).
 
-import type { BaseKeyboard, DiscoveryAxisVector, PatternMatch } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, DiscoveryAxisVector, Pattern, PatternMatch } from "@keyboard-studio/contracts";
 import { toPatternMatch } from "@keyboard-studio/contracts";
 import { getPatterns } from "./loader.js";
 import { selectStrategy } from "../strategy-selector/index.js";
@@ -41,8 +41,24 @@ export async function filterFor(
   base: BaseKeyboard,
   axes?: DiscoveryAxisVector,
 ): Promise<PatternMatch[]> {
-  const all = getPatterns();
+  return rankPatterns(getPatterns(), base, axes);
+}
 
+/**
+ * Pure ranking core of {@link filterFor}: partitions and ranks an already-
+ * loaded pattern array, without touching the engine's `node:fs`-backed
+ * cache. Exported so callers with their own pattern source — e.g. the
+ * studio's browser pattern library, which loads YAML via
+ * `import.meta.glob` — can reuse the same partition/ranking logic instead
+ * of re-implementing it.
+ *
+ * See {@link filterFor} for the partition/ranking rules this implements.
+ */
+export function rankPatterns(
+  all: Pattern[],
+  base: BaseKeyboard,
+  axes?: DiscoveryAxisVector,
+): PatternMatch[] {
   // §9 Three-group routing: exclude reorder patterns for Latin-script keyboards.
   const eligible =
     base.script === "Latn" ? all.filter(p => p.category !== "reorder") : all;

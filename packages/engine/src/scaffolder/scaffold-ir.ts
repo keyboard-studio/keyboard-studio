@@ -38,7 +38,8 @@ function currentYear(): number {
 }
 
 // Replace C0/C1 control chars (incl. newlines, nulls) with spaces, collapse and trim.
-function sanitizeDisplayName(raw: string): string {
+// Exported: index.ts's text-based scaffold path shares this exact sanitizer.
+export function sanitizeDisplayName(raw: string): string {
   return raw
     .replace(/[\x00-\x1F\x7F-\x9F]/g, " ")
     .replace(/\s+/g, " ")
@@ -46,7 +47,8 @@ function sanitizeDisplayName(raw: string): string {
 }
 
 // In KMN, single-quoted strings have no escape sequence; U+2019 is the typographic equivalent.
-function kmnStringEscape(s: string): string {
+// Exported: index.ts's stub generation shares this exact escaper.
+export function kmnStringEscape(s: string): string {
   return s.replace(/'/g, "’");
 }
 
@@ -54,11 +56,14 @@ function stringToStoreItems(s: string): StoreItem[] {
   return [...s].map((ch) => ({ kind: "char", value: ch }) satisfies StoreItem);
 }
 
-function setSystemStore(ir: KeyboardIR, name: string, value: string): void {
+/** Shared lookup used by setSystemStore/hasSystemStore/getSystemStoreString below. */
+function findSystemStore(ir: KeyboardIR, name: string): IRStore | undefined {
   const upper = name.toUpperCase();
-  const existing = ir.stores.find(
-    (s) => s.isSystem && s.name.toUpperCase() === upper
-  );
+  return ir.stores.find((s) => s.isSystem && s.name.toUpperCase() === upper);
+}
+
+function setSystemStore(ir: KeyboardIR, name: string, value: string): void {
+  const existing = findSystemStore(ir, name);
   if (existing !== undefined) {
     existing.items = stringToStoreItems(value);
     return;
@@ -72,18 +77,12 @@ function setSystemStore(ir: KeyboardIR, name: string, value: string): void {
 }
 
 function hasSystemStore(ir: KeyboardIR, name: string): boolean {
-  const upper = name.toUpperCase();
-  return ir.stores.some(
-    (s) => s.isSystem && s.name.toUpperCase() === upper
-  );
+  return findSystemStore(ir, name) !== undefined;
 }
 
 /** Read a system store's char-run value back into a plain string, or null. */
 function getSystemStoreString(ir: KeyboardIR, name: string): string | null {
-  const upper = name.toUpperCase();
-  const store = ir.stores.find(
-    (s) => s.isSystem && s.name.toUpperCase() === upper
-  );
+  const store = findSystemStore(ir, name);
   if (store === undefined) return null;
   // Only collapse contiguous char items; bail when we see anything structural.
   let out = "";

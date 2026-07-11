@@ -1,15 +1,3 @@
-// Unit tests for ui/Badge.tsx
-//
-// Assertions:
-//   1. Renders a <span> element.
-//   2. Children appear as text content.
-//   3. Default tone ("default") uses CSS_TEXT_MUTED.
-//   4. tone="success" uses CSS_SIL_GREEN (var(--sil-green)).
-//   5. tone="accent" uses CSS_ACCENT (var(--app-accent)).
-//   6. tone="warn" uses CSS_SIL_ORANGE_DARK (var(--sil-orange-dark)).
-//   7. tone="subtle" uses CSS_TEXT_SUBTLE (var(--app-text-subtle)).
-//   8. Base typographic styles are applied (fontSize 11, fontWeight 600, whiteSpace nowrap).
-
 import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup } from "@testing-library/react";
 import { Badge } from "./Badge.tsx";
@@ -88,21 +76,11 @@ describe("Badge — style and className passthrough", () => {
 });
 
 describe("Badge — base typographic styles", () => {
-  it("applies fontSize 11px", () => {
+  it("applies fontSize 11px, fontWeight 600, whiteSpace nowrap", () => {
     const { container } = render(<Badge>x</Badge>);
     const el = container.querySelector("span") as HTMLElement;
     expect(el.style.fontSize).toBe("11px");
-  });
-
-  it("applies fontWeight 600", () => {
-    const { container } = render(<Badge>x</Badge>);
-    const el = container.querySelector("span") as HTMLElement;
     expect(el.style.fontWeight).toBe("600");
-  });
-
-  it("applies whiteSpace nowrap", () => {
-    const { container } = render(<Badge>x</Badge>);
-    const el = container.querySelector("span") as HTMLElement;
     expect(el.style.whiteSpace).toBe("nowrap");
   });
 });

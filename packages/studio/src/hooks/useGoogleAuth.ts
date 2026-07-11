@@ -95,15 +95,6 @@ export function useGoogleAuth(): UseGoogleAuthResult {
   );
   const [error, setError] = useState<string | null>(null);
 
-  const setStoredIdentity = useCallback(
-    (v: StoredGoogleIdentity | null) => setInit((prev) => ({ ...prev, identity: v })),
-    [],
-  );
-  const setStatus = useCallback(
-    (s: GoogleAuthStatus) => setInit((prev) => ({ ...prev, status: s })),
-    [],
-  );
-
   // On mount, pick up any `?google_oauth_error=` left by the boot-time Google
   // callback handler and surface it as the initial visible error, then strip
   // it from the URL. Mirrors the github oauth_error pickup in useGitHubAuth.
@@ -123,17 +114,16 @@ export function useGoogleAuth(): UseGoogleAuthResult {
       window.location.assign(url);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to start Google sign-in.");
-      setStatus("error");
+      setInit((prev) => ({ ...prev, status: "error" }));
     }
-  }, [setStatus]);
+  }, []);
 
   const disconnect = useCallback(() => {
     clearStoredGoogleIdentity();
     clearGoogleOAuthScratch();
-    setStoredIdentity(null);
-    setStatus("idle");
+    setInit({ identity: null, status: "idle" });
     setError(null);
-  }, [setStoredIdentity, setStatus]);
+  }, []);
 
   const identity =
     storedIdentity !== null ? toGoogleIdentitySession(storedIdentity) : null;

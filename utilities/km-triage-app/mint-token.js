@@ -35,20 +35,23 @@ const INSTALL_CACHE = path.join(CONFIG_DIR, 'installation.json');
 const REPO = process.env.KM_TRIAGE_REPO || 'keyboard-studio/keyboard-studio';
 
 function b64url(input) {
-  return Buffer.from(input).toString('base64')
-    .replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+  return Buffer.from(input)
+    .toString('base64')
+    .replace(/=+$/, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
 }
 
 function makeJwt(appId, privateKeyPem) {
   const now = Math.floor(Date.now() / 1000);
   const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
   const payload = b64url(JSON.stringify({ iat: now - 60, exp: now + 540, iss: appId }));
+  const message = `${header}.${payload}`;
   const signer = crypto.createSign('RSA-SHA256');
-  signer.update(`${header}.${payload}`);
+  signer.update(message);
   signer.end();
-  const sig = signer.sign(privateKeyPem).toString('base64')
-    .replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
-  return `${header}.${payload}.${sig}`;
+  const sig = b64url(signer.sign(privateKeyPem));
+  return `${message}.${sig}`;
 }
 
 async function ghApi(apiPath, jwt, init = {}) {
@@ -76,16 +79,19 @@ async function getInstallationId(jwt) {
     try {
       const cached = JSON.parse(fs.readFileSync(INSTALL_CACHE, 'utf8'));
       if (cached.repo === REPO && cached.installation_id) return cached.installation_id;
-    } catch {}
+    } catch (_) { /* cache miss or parse error -> fetch fresh */ }
   }
   const [owner, repo] = REPO.split('/');
   try {
     const inst = await ghApi(`/repos/${owner}/${repo}/installation`, jwt);
-    fs.writeFileSync(INSTALL_CACHE, JSON.stringify({ repo: REPO, installation_id: inst.id }, null, 2), { mode: 0o600 });
+    const cache = { repo: REPO, installation_id: inst.id };
+    fs.writeFileSync(INSTALL_CACHE, JSON.stringify(cache, null, 2), { mode: 0o600 });
     return inst.id;
   } catch (err) {
     if (err.status === 404) {
-      const e = new Error(`The App is not installed on ${REPO}. Open ${path.join(CONFIG_DIR, 'config.json')}, copy the App's html_url, append /installations/new, and install it on the repo. Then retry.`);
+      const msg = `The App is not installed on ${REPO}. Open ${path.join(CONFIG_DIR, 'config.json')}, ` +
+        `copy the App's html_url, append /installations/new, and install it on the repo. Then retry.`;
+      const e = new Error(msg);
       e.code = 'NOT_INSTALLED';
       throw e;
     }

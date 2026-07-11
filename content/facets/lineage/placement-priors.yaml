@@ -1,0 +1,53 @@
+# lineage.placement-priors — the one facet that is already ACTIVE: kbgen +
+# supportability-scanner mine per-character placements from the corpus into
+# docs/placement-priors.json; usePlacementPriors loads it; MechanismGallery
+# renders accept/dismiss suggestion rows; buildPlacementSeeds seeds
+# pb_special_letters_list. This record names the existing behavior so the
+# catalog starts with one proven member — and one declared gap: the priors are
+# physical-only, while the corpus's touch layouts go unmined.
+
+id: lineage.placement-priors
+family: lineage
+title: Corpus placement priors
+description: >
+  Per-character placement evidence mined from the corpus: which key, which
+  modifiers, which mechanism real keyboards chose for each codepoint, with
+  confidence from prior counts. The char-level member of the lineage family
+  and the template the other corpus facets follow.
+valueType: vector
+
+modality: physical
+modalityNotes: >
+  DECLARED GAP: priors currently cover physical placements (vkey+modifier)
+  only. The scanner parses TouchLayoutIR for every corpus keyboard; mining
+  longpress/layer conventions per script yields the touch-priors counterpart
+  that MechanismGallery's suggestion row could consume tomorrow.
+
+derivations:
+  - kind: corpus
+    source: "corpus:placement-priors-json"
+    sourceStatus: available
+    notes: docs/placement-priors.json via kbgen + supportability-scanner --emit-placements.
+  - kind: corpus
+    source: "planned:touch-priors"
+    sourceStatus: planned
+
+consumers:
+  prefills:
+    - pb_special_letters_list
+  proposes:
+    - "mechanism-gallery:suggestion-row"
+
+relatedAxes: [A7]
+provenanceLabel: "where existing keyboards place this character"
+
+status: active
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: corpus
+
+notes: >
+  Active before the catalog existed — grandfathered in as the proof the
+  facet→proposal loop works end to end. Its lift number should be the first
+  one the evaluation harness produces.

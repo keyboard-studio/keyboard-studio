@@ -76,6 +76,11 @@ export function ConfirmDialog({
   const titleId = `${baseId}-title`;
   const bodyId = `${baseId}-body`;
 
+  const btnBase: React.CSSProperties = {
+    font: '600 13px var(--app-font)', cursor: 'pointer',
+    border: 'none', borderRadius: 8, padding: '9px 16px', whiteSpace: 'nowrap',
+  };
+
   return (
     <dialog
       ref={dialogRef}
@@ -127,14 +132,10 @@ export function ConfirmDialog({
             <button
               onClick={dismiss}
               style={{
-                font: '600 13px var(--app-font)',
-                cursor: 'pointer',
+                ...btnBase,
                 color: 'var(--app-text-muted)',
                 background: 'transparent',
                 border: '1px solid var(--app-border-strong)',
-                borderRadius: 8,
-                padding: '9px 16px',
-                whiteSpace: 'nowrap',
               }}
             >
               {secondaryLabel}
@@ -145,14 +146,10 @@ export function ConfirmDialog({
             autoFocus
             onClick={onPrimary}
             style={{
-              font: '600 13px var(--app-font)',
-              cursor: 'pointer',
+              ...btnBase,
               color: '#fff',
               background: 'var(--app-accent)',
-              border: 'none',
-              borderRadius: 8,
               padding: '9px 18px',
-              whiteSpace: 'nowrap',
             }}
           >
             {primaryLabel}

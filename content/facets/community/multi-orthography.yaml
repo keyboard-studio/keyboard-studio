@@ -1,0 +1,44 @@
+# community.multi-orthography — the A5 axis (two-orthography → S-11 stateful
+# toggle) is Phase-C-gated and currently never elicited. The community-side
+# fact is knowable earlier and cheaper: do the typists really write this
+# language in two scripts, or does a romanization merely coexist informally?
+
+id: community.multi-orthography
+family: community
+title: Multi-orthography reality
+description: >
+  Whether the community actively writes the language in more than one script
+  or orthographic convention (e.g. dot-below vs bar forms, Ajami + Latin), as
+  opposed to a single orthography with an informal romanization alongside.
+  Proposes the A5 axis value that Rule 4 (S-11) needs, ahead of the deferred
+  Phase C elicitation.
+valueType: enum
+values: [single, dual-script, dual-convention, informal-romanization]
+
+modality: both
+
+derivations:
+  - kind: corpus
+    source: "corpus:sibling-script-spread"
+    sourceStatus: planned
+    notes: Siblings for the same BCP47 language across different scripts are the structural signal.
+  - kind: confirmed
+    source: "question:pb_additional_methods"
+    sourceStatus: available
+    notes: The nearest existing question; a dedicated confirmation is the better home.
+
+consumers:
+  prefills:
+    - pb_additional_methods
+  proposes:
+    - "axis:A5"
+    - "strategy:S-11-consideration"
+
+relatedAxes: [A5]
+provenanceLabel: "scripts used by existing keyboards for your language"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: corpus

@@ -9,6 +9,10 @@ const KEYBOARDS_REPO_ROOT =
   process.env["KEYBOARDS_REPO"] ??
   fileURLToPath(new URL("../../../keyboards", import.meta.url));
 
+const PATH_SHIM = fileURLToPath(
+  new URL("./src/lib/pathShim.ts", import.meta.url),
+);
+
 export default defineConfig({
   plugins: [
     react(),
@@ -19,10 +23,8 @@ export default defineConfig({
       // [SCAFFOLD] path shim required while @keymanapp/kmc-kmn is used
       // directly; Vite rewrites kmc-kmn's `require('path')` into an ESM
       // import that needs a browser-safe default export.
-      path: fileURLToPath(new URL("./src/lib/pathShim.ts", import.meta.url)),
-      "path-browserify": fileURLToPath(
-        new URL("./src/lib/pathShim.ts", import.meta.url),
-      ),
+      path: PATH_SHIM,
+      "path-browserify": PATH_SHIM,
       "@docs": fileURLToPath(new URL("../../docs", import.meta.url)),
     },
   },

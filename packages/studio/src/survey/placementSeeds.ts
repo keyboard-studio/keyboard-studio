@@ -38,7 +38,7 @@
 //   PlacementEntry.codepoint is "U+XXXX" (uppercase hex).
 //   We convert to the actual character via String.fromCodePoint.
 
-import type { PlacementMap, PlacementEntry, PlacementCandidate } from "@keyboard-studio/contracts";
+import type { PlacementMap, PlacementCandidate } from "@keyboard-studio/contracts";
 import { topCandidate, strategyForCandidate, parseUPlusNotation, toUPlusNotation } from "@keyboard-studio/contracts";
 import type { StrategyId } from "@keyboard-studio/contracts";
 
@@ -142,10 +142,8 @@ export function extractSeedEntries(
   const result: PlacementSeedEntry[] = [];
 
   for (const entry of placementMap.entries) {
-    if (!qualifiesForSeed(entry, threshold)) continue;
-
     const top = topCandidate(entry);
-    if (top === undefined) continue;
+    if (top === undefined || !(top.confidence >= threshold)) continue;
 
     const character = parseUPlusNotation(entry.codepoint);
     if (character === null) continue;
@@ -159,15 +157,6 @@ export function extractSeedEntries(
   }
 
   return result;
-}
-
-/**
- * Whether a PlacementEntry's top candidate meets the confidence threshold.
- * Entries with no candidates never qualify.
- */
-function qualifiesForSeed(entry: PlacementEntry, threshold: number): boolean {
-  const top = topCandidate(entry);
-  return top !== undefined && top.confidence >= threshold;
 }
 
 // ---------------------------------------------------------------------------

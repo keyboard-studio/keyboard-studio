@@ -113,6 +113,35 @@ export function validateIdTokenClaims(
 // googleExchange: POST /oauth/google/exchange
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Private helper: safe fetch with error mapping (mirrored from handlers.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Wrap a fetch call with consistent error mapping.
+ */
+async function safeFetch(
+  fetchFn: OAuthFetchFn,
+  url: string,
+  init: { method: string; headers: Record<string, string>; body: string }
+): Promise<{ response: OAuthFetchResponse; data: unknown } | GoogleHandlerError> {
+  let response: OAuthFetchResponse;
+  try {
+    response = await fetchFn(url, init);
+  } catch {
+    return { ok: false, status: 502, error: "upstream_unavailable" };
+  }
+
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    return { ok: false, status: 502, error: "upstream_invalid_response" };
+  }
+
+  return { response, data };
+}
+
 /**
  * Exchange a Google authorization code (PKCE) for identity claims.
  *
@@ -137,49 +166,35 @@ export async function googleExchange(
     code_verifier: body.code_verifier,
   });
 
-  let googleResponse: OAuthFetchResponse;
-  try {
-    googleResponse = await config.fetch(
-      "https://oauth2.googleapis.com/token",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: formParams.toString(),
-      }
-    );
-  } catch {
-    // Network-level error — do not propagate internal details
-    return { ok: false, status: 502, error: "upstream_unavailable" };
-  }
+  const result = await safeFetch(config.fetch, "https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: formParams.toString(),
+  });
 
-  let data: GoogleTokenResponseShape;
-  try {
-    data = (await googleResponse.json()) as GoogleTokenResponseShape;
-  } catch {
-    return { ok: false, status: 502, error: "upstream_invalid_response" };
-  }
+  if ("error" in result) return result;
+
+  const { response, data } = result;
+  const googleData = data as GoogleTokenResponseShape;
 
   // Google 4xx/5xx with no error field in the body → gateway error
-  if (!googleResponse.ok && data.error === undefined) {
+  if (!response.ok && googleData.error === undefined) {
     return { ok: false, status: 502, error: "upstream_error" };
   }
 
   // Google returned an error in the body (bad code, wrong client, etc.)
-  if (data.error !== undefined) {
-    // Map known Google error strings to safe codes; fall back to generic
-    const safeCode = SAFE_GOOGLE_ERROR_CODES[data.error] ?? "google_error";
+  if (googleData.error !== undefined) {
+    const safeCode = SAFE_GOOGLE_ERROR_CODES[googleData.error] ?? "google_error";
     return { ok: false, status: 400, error: safeCode };
   }
 
   // No id_token in the response — should not happen for a valid exchange
-  if (data.id_token === undefined || data.id_token === "") {
+  if (googleData.id_token === undefined || googleData.id_token === "") {
     return { ok: false, status: 502, error: "upstream_invalid_response" };
   }
 
   // Decode the id_token payload (no signature verification — see docstring)
-  const payload = decodeIdTokenPayload(data.id_token);
+  const payload = decodeIdTokenPayload(googleData.id_token);
   if (payload === null) {
     return { ok: false, status: 502, error: "upstream_invalid_response" };
   }

@@ -11,6 +11,7 @@
 
 import type { Layout } from './layout.ts';
 import type { PlanResult, Completeness } from './place.ts';
+import { codepointHex } from './analyze.ts';
 
 const mods = (shift: boolean, ralt: boolean) => [...(shift ? ['SHIFT'] : []), ...(ralt ? ['RALT'] : [])];
 
@@ -114,12 +115,12 @@ export function build(planResult: PlanResult, layout: Layout, ctx: BuildContext)
     const kp = planResult.keys.get(k.key);
     if (!kp) continue;
     if (kp.defOut != null) physical.push({
-      char: k.lower, codepoint: 'U+' + (k.lower.codePointAt(0) as number).toString(16).toUpperCase().padStart(4, '0'),
+      char: k.lower, codepoint: 'U+' + codepointHex(k.lower),
       key: k.key, shift: false, method: 'restore', modifiers: mods(false, true), output: k.lower,
       restoreOf: kp.defOut,
     });
     if (kp.shiftOut != null) physical.push({
-      char: k.upper, codepoint: 'U+' + (k.upper.codePointAt(0) as number).toString(16).toUpperCase().padStart(4, '0'),
+      char: k.upper, codepoint: 'U+' + codepointHex(k.upper),
       key: k.key, shift: true, method: 'restore', modifiers: mods(true, true), output: k.upper,
       restoreOf: kp.shiftOut,
     });

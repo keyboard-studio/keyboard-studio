@@ -34,13 +34,8 @@ function assertLiveNodeSetEqualsManifest(
   const liveNodeIds = new Set(
     graph.nodes.filter((n) => n.kind === "live").map((n) => n.id),
   );
-  for (const id of liveNodeIds) {
-    expect(expectedIds.has(id), `INV-1 ${label}: live node "${id}" not in manifest`).toBe(true);
-  }
-  for (const id of expectedIds) {
-    expect(liveNodeIds.has(id), `INV-1 ${label}: manifest id "${id}" missing from live nodes`).toBe(true);
-  }
-  expect(liveNodeIds.size).toBe(expectedIds.size);
+
+  expect(liveNodeIds).toEqual(expectedIds);
 }
 
 // ---------------------------------------------------------------------------
@@ -94,49 +89,27 @@ describe("buildModularFlowGraph — every shipped flow (INV-1)", () => {
     });
   }
 
-  it("Phase A exposes reserve nodes: registry modules not in the manifest show as library-not-in-flow", () => {
-    const g = buildModularFlowGraph(phaseAModularRaw, "Phase A", phaseARegistry);
-    const liveFlow = loadModularFlow(phaseAModularRaw);
-    const liveIds = new Set([
-      ...liveFlow.questions.map((q) => q.id),
-      ...(liveFlow.provenance_questions ?? []).map((q) => q.id),
-    ]);
-    const registryIds = new Set(Object.keys(phaseARegistry));
-    const expectedReserve = new Set([...registryIds].filter((id) => !liveIds.has(id)));
-    const reserveNodeIds = new Set(
-      g.nodes.filter((n) => n.kind === "library-not-in-flow").map((n) => n.id),
-    );
-    expect(reserveNodeIds.size).toBe(expectedReserve.size);
-    for (const id of expectedReserve) {
-      expect(reserveNodeIds.has(id), `registry id "${id}" missing from reserve nodes`).toBe(true);
-    }
-  });
+  const reserveTestCases = [
+    { raw: phaseAModularRaw, title: "Phase A", registry: phaseARegistry, includeProvenance: true },
+    { raw: phaseFModularRaw, title: "Phase F", registry: phaseFRegistry, includeProvenance: false },
+    { raw: identityLiteModularRaw, title: "identity-lite", registry: phaseARegistry, includeProvenance: false },
+  ];
 
-  it("Phase F exposes reserve nodes: registry modules not in the manifest show as library-not-in-flow", () => {
-    const g = buildModularFlowGraph(phaseFModularRaw, "Phase F", phaseFRegistry);
-    const liveFlow = loadModularFlow(phaseFModularRaw);
-    const liveIds = new Set(liveFlow.questions.map((q) => q.id));
-    const registryIds = new Set(Object.keys(phaseFRegistry));
-    const expectedReserve = new Set([...registryIds].filter((id) => !liveIds.has(id)));
-    const reserveNodeIds = new Set(
-      g.nodes.filter((n) => n.kind === "library-not-in-flow").map((n) => n.id),
-    );
-    expect(reserveNodeIds.size).toBe(expectedReserve.size);
-  });
-
-  it("identity-lite exposes reserve nodes: registry modules not in the manifest show as library-not-in-flow", () => {
-    const g = buildModularFlowGraph(identityLiteModularRaw, "Identity-lite", phaseARegistry);
-    const liveFlow = loadModularFlow(identityLiteModularRaw);
-    const liveIds = new Set(liveFlow.questions.map((q) => q.id));
-    const registryIds = new Set(Object.keys(phaseARegistry));
-    const expectedReserve = new Set([...registryIds].filter((id) => !liveIds.has(id)));
-    const reserveNodeIds = new Set(
-      g.nodes.filter((n) => n.kind === "library-not-in-flow").map((n) => n.id),
-    );
-    expect(reserveNodeIds.size).toBe(expectedReserve.size);
-    // Identity-lite only has 5 questions; phaseARegistry has many more — all others are reserve.
-    expect(reserveNodeIds.size).toBeGreaterThan(0);
-  });
+  for (const { raw, title, registry, includeProvenance } of reserveTestCases) {
+    it(`${title} exposes reserve nodes: registry modules not in the manifest show as library-not-in-flow`, () => {
+      const g = buildModularFlowGraph(raw, title, registry);
+      const liveFlow = loadModularFlow(raw);
+      const liveIds = new Set([
+        ...liveFlow.questions.map((q) => q.id),
+        ...(includeProvenance && liveFlow.provenance_questions ? liveFlow.provenance_questions.map((q) => q.id) : []),
+      ]);
+      const expectedReserve = new Set(Object.keys(registry).filter((id) => !liveIds.has(id)));
+      const reserveNodeIds = new Set(
+        g.nodes.filter((n) => n.kind === "library-not-in-flow").map((n) => n.id),
+      );
+      expect(reserveNodeIds).toEqual(expectedReserve);
+    });
+  }
 });
 
 // ---------------------------------------------------------------------------

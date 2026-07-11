@@ -1,0 +1,61 @@
+# env.base-layout-affinity — replaces the layout_family vocabulary question with
+# a computed distance. "Loosely based on AZERTY" is a score, not a label: weight
+# each key position by its discriminating power between reference layouts
+# (A/Q, Z/W, M, digits-behind-shift carry most of the AZERTY signal), so single
+# remapped keys degrade the score gracefully instead of flipping a class.
+
+id: env.base-layout-affinity
+family: env
+title: Base-layout affinity
+description: >
+  How close the keyboard the author/community types on sits to each reference
+  layout (QWERTY, QWERTZ, AZERTY, national variants), expressed as a weighted
+  per-position distance vector rather than a single label. Computed from the
+  chosen base's vkey-to-character map (.kvks layers or usingKeys rules) or from
+  a Track 2 import; confirmed by the author via an OSK picture-chooser, never
+  by asking them to know the word "AZERTY". Reference layouts are data tables,
+  so a regional team adds their national standard as a file, not a code change.
+valueType: vector
+
+modality: physical
+modalityNotes: >
+  Touch layouts have no fixed physical key grid; the touch analogue of this
+  facet is platform-convention affinity (see community.muscle-memory).
+
+derivations:
+  - kind: computed
+    source: "engine:detectBaseLayoutFamily"
+    sourceStatus: available
+    notes: >
+      Coarse family detection exists today in packages/engine/src/placement/;
+      the weighted per-position distance upgrade is the planned replacement.
+  - kind: computed
+    source: "planned:weighted-layout-distance"
+    sourceStatus: planned
+  - kind: confirmed
+    source: "planned:osk-picture-chooser"
+    sourceStatus: planned
+  - kind: asked
+    source: "question:layout_family"
+    sourceStatus: available
+    notes: The current vocabulary question; becomes the last-resort fallback.
+
+consumers:
+  prefills:
+    - layout_family
+    - pb_latin_azerty_branch
+    - pb_latin_qwerty_branch
+    - pb_azerty_qz_swap
+  proposes:
+    - "gallery:base-ranking"
+    - "placement:spare-key-set"
+    - "routing:layout-refinement"
+
+relatedAxes: [A7]
+provenanceLabel: "computed from your chosen base's key layout"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed

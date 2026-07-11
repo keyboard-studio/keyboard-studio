@@ -304,6 +304,41 @@ export async function beginAuthorize(flow: AuthFlow = "identity"): Promise<strin
 }
 
 // ---------------------------------------------------------------------------
+// Shared exchange helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a safe error code from a backend response body. Returns the backend's
+ * `error` field if present and a string, otherwise the fallback.
+ * Exported for reuse in googleOAuth.ts.
+ */
+export async function parseErrorCode(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = (await res.json()) as { error?: unknown };
+    if (typeof body.error === "string") return body.error;
+  } catch {
+    // non-JSON error body — keep the fallback
+  }
+  return fallback;
+}
+
+/**
+ * Wrapper for fetch that throws a typed error on network failure.
+ * Exported for reuse in googleOAuth.ts.
+ */
+export async function fetchWithNetworkError<E extends Error>(
+  url: string,
+  init: RequestInit,
+  createError: (message: string) => E,
+): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch {
+    throw createError("Network error during token exchange.");
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Token exchange (via the OAuth backend — secret stays server-side)
 // ---------------------------------------------------------------------------
 
@@ -351,9 +386,9 @@ export async function exchangeCode(
   const client: GitHubClient =
     flow === "submit" ? "oauth_app" : "github_app";
 
-  let res: Response;
-  try {
-    res = await fetch(url, {
+  const res = await fetchWithNetworkError(
+    url,
+    {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -362,19 +397,12 @@ export async function exchangeCode(
         redirect_uri: getRedirectUri(),
         client,
       }),
-    });
-  } catch {
-    throw new OAuthExchangeError("network", "Network error during token exchange.");
-  }
+    },
+    (msg) => new OAuthExchangeError("network", msg),
+  );
 
   if (!res.ok) {
-    let errorCode = "github_error";
-    try {
-      const body = (await res.json()) as { error?: unknown };
-      if (typeof body.error === "string") errorCode = body.error;
-    } catch {
-      // non-JSON error body — keep the default code
-    }
+    const errorCode = await parseErrorCode(res, "github_error");
     throw new OAuthExchangeError(errorCode, `Token exchange failed: ${errorCode}`);
   }
 

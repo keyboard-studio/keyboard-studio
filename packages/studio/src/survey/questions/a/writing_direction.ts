@@ -29,7 +29,11 @@ export const definition = {
 export function validate(
   value: string | string[] | undefined,
 ): ValidationResult {
-  const v = typeof value === "string" ? value : Array.isArray(value) ? value[0] ?? "" : "";
+  const v = typeof value === "string"
+    ? value
+    : Array.isArray(value)
+      ? value[0] ?? ""
+      : "";
 
   if (v.length === 0) {
     return { ok: false, code: "required", message: "Please select a writing direction." };

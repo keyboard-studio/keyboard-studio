@@ -15,23 +15,14 @@ import { describe, it, expect, afterEach, beforeAll, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen } from '@testing-library/react';
 import { ConfirmDialog } from './ConfirmDialog.tsx';
 
-// jsdom does not implement HTMLDialogElement.showModal()/close() (only the
-// reflected `open` IDL attribute exists) — see
-// https://github.com/jsdom/jsdom/issues/3294. ConfirmDialog's mount effect
-// calls showModal() unconditionally, so without this shim every render()
-// with open=true throws "showModal is not a function". The shim mirrors the
-// bit the component actually depends on: toggling the `open` attribute.
+// jsdom does not implement HTMLDialogElement.showModal()/close() — shim them.
 beforeAll(() => {
-  if (typeof HTMLDialogElement.prototype.showModal !== 'function') {
-    HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
-      this.setAttribute('open', '');
-    };
-  }
-  if (typeof HTMLDialogElement.prototype.close !== 'function') {
-    HTMLDialogElement.prototype.close = function (this: HTMLDialogElement) {
-      this.removeAttribute('open');
-    };
-  }
+  HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+    this.setAttribute('open', '');
+  };
+  HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
+    this.removeAttribute('open');
+  };
 });
 
 afterEach(() => {

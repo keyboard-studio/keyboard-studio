@@ -13,7 +13,7 @@ import { fetchKeyboardSourceToVfs, type FetchFn } from "../loader/fetchKeyboardS
 import { parse } from "../codec/parse.js";
 import { emit } from "../codec/emit.js";
 import { detectBaseLayoutFamily } from "../placement/filters.js";
-import { scaffoldIR } from "./scaffold-ir.js";
+import { scaffoldIR, sanitizeDisplayName, kmnStringEscape } from "./scaffold-ir.js";
 
 export { scaffoldIR, resetIdentity } from "./scaffold-ir.js";
 export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffold-ir.js";
@@ -22,19 +22,6 @@ export { scaffoldTouchLayout, buildMinimalPhoneTouchLayout } from "./scaffoldTou
 export interface ScaffolderServiceOptions {
   proxyBase?: string;
   fetchImpl?: FetchFn;
-}
-
-// Replace C0/C1 control chars (incl. newlines, nulls) with spaces, then collapse and trim.
-function sanitizeDisplayName(raw: string): string {
-  return raw
-    .replace(/[\x00-\x1F\x7F-\x9F]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-// In KMN, single-quoted strings have no escape sequence; U+2019 is the typographic equivalent.
-function kmnStringEscape(s: string): string {
-  return s.replace(/'/g, "’");
 }
 
 // Defuse PHP block-comment terminator '*/' for stub generation.
@@ -429,6 +416,17 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       };
       const vfs = createVirtualFS();
       const warnings: string[] = [];
+      // Shared IR-apply path for both the base-fetched .kmn and the caller-supplied
+      // pre-parsed IR branches below: refine group, scaffold identity/group into
+      // the IR, then emit the .kmn text back into the VFS.
+      const applyIrAndEmit = (ir: KeyboardIR, targetBaseId: string): void => {
+        refineGroupFromIR(ir);
+        scaffoldIR(ir, {
+          identity: { keyboardId, displayName },
+          group,
+        });
+        vfs.set(`source/${targetBaseId}.kmn`, emit(ir));
+      };
 
       let loaderFonts: import("@keyboard-studio/contracts").KpsFontEntry[] = [];
       let loaderStylesheets: import("@keyboard-studio/contracts").KpsStylesheetEntry[] = [];
@@ -458,21 +456,10 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       const kmnEntry = vfs.get(`source/${actualBaseId}.kmn`);
       if (kmnEntry !== undefined && typeof kmnEntry.content === "string") {
         const ir = scaffoldOpts?.ir ?? parse(kmnEntry.content, actualBaseId).ir;
-        refineGroupFromIR(ir);
-        scaffoldIR(ir, {
-          identity: { keyboardId, displayName },
-          group,
-        });
-        vfs.set(`source/${actualBaseId}.kmn`, emit(ir));
+        applyIrAndEmit(ir, actualBaseId);
       } else if (scaffoldOpts?.ir !== undefined) {
         // No base .kmn was fetched but caller supplied a pre-parsed IR — use it.
-        const ir = scaffoldOpts.ir;
-        refineGroupFromIR(ir);
-        scaffoldIR(ir, {
-          identity: { keyboardId, displayName },
-          group,
-        });
-        vfs.set(`source/${actualBaseId}.kmn`, emit(ir));
+        applyIrAndEmit(scaffoldOpts.ir, actualBaseId);
       }
 
       renameFilesInVfs(vfs, actualBaseId, keyboardId);

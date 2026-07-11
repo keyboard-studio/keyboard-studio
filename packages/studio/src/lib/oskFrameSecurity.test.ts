@@ -33,12 +33,12 @@ describe("osk-frame.js — message listener origin/source guard", () => {
 
 describe("osk-frame.js — jsUrl blob: allowlist", () => {
   it("refuses to load a keyboard whose jsUrl is not a blob: URL", () => {
-    expect(frameJs).toMatch(/jsUrl\.startsWith\(\s*"blob:"\s*\)/);
+    expect(frameJs).toContain('jsUrl.startsWith("blob:")');
   });
 });
 
 describe("osk-frame.js — no wildcard postMessage targets", () => {
-  it("never posts a message with \"*\" as the targetOrigin", () => {
+  it('never posts a message with "*" as the targetOrigin', () => {
     expect(frameJs).not.toMatch(/postMessage\([^)]*,\s*"\*"\s*\)/);
   });
 });

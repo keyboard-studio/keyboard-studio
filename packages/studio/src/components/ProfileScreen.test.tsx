@@ -144,28 +144,30 @@ describe("ProfileScreen — Google linked", () => {
 });
 
 describe("ProfileScreen — single global sign-out (one account)", () => {
-  const bothLinked = (): void => {
+  it("renders exactly one 'Sign out' button when both providers are linked", () => {
     mockAuth(
       { status: "connected", login: "octocat" },
       { status: "connected", identity: googleIdentity },
     );
-  };
-
-  it("renders exactly one 'Sign out' button when both providers are linked", () => {
-    bothLinked();
     render(<ProfileScreen />);
     expect(screen.getAllByRole("button", { name: "Sign out" })).toHaveLength(1);
   });
 
   it("does not render any per-provider sign-out buttons", () => {
-    bothLinked();
+    mockAuth(
+      { status: "connected", login: "octocat" },
+      { status: "connected", identity: googleIdentity },
+    );
     render(<ProfileScreen />);
     expect(screen.queryByRole("button", { name: "Sign out of GitHub" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Sign out of Google" })).toBeNull();
   });
 
   it("clicking 'Sign out' disconnects both providers", () => {
-    bothLinked();
+    mockAuth(
+      { status: "connected", login: "octocat" },
+      { status: "connected", identity: googleIdentity },
+    );
     render(<ProfileScreen />);
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
     expect(disconnect).toHaveBeenCalledOnce();

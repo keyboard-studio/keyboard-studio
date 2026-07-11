@@ -139,6 +139,29 @@ describe("isOracleInapplicable", () => {
     expect(isOracleInapplicable("ERROR_CannotReadBitmapFile")).toBe(true);
   });
 
+  // The other sibling-asset stores are the same class of file-read false
+  // positive (finding: BITMAP-only exemption was half-applied). Codes are
+  // severity | namespace | base; namespace is KmnCompiler(0x2000) except the
+  // touch-layout check which is KmwCompiler(0x7000).
+  it.each([
+    ["ERROR_FileNotFound (&VISUALKEYBOARD)", 0x50290c, "ERROR_FileNotFound"],
+    ["ERROR_TouchLayoutFileDoesNotExist (&LAYOUTFILE)", 0x507004, "ERROR_TouchLayoutFileDoesNotExist"],
+    ["WARN_EmbedJsFileMissing (&KMW_EMBEDJS)", 0x402095, "WARN_EmbedJsFileMissing"],
+    ["WARN_HelpFileMissing (&KMW_HELPFILE)", 0x402094, "WARN_HelpFileMissing"],
+    ["ERROR_CannotLoadIncludeFile (&INCLUDECODES)", 0x502038, "ERROR_CannotLoadIncludeFile"],
+  ])("exempts %s by numeric wire code and symbolic alias", (_label, wire, symbol) => {
+    expect(isOracleInapplicable(String(wire))).toBe(true);
+    expect(isOracleInapplicable(symbol)).toBe(true);
+  });
+
+  it("does not exempt content diagnostics that require a successfully-read file", () => {
+    // These fire only AFTER a file is read, so they carry real signal and must
+    // stay in the oracle's output (contrast the pure existence checks above).
+    expect(isOracleInapplicable(String(0x50290b))).toBe(false); // ERROR_InvalidKvkFile
+    expect(isOracleInapplicable("ERROR_InvalidKvkFile")).toBe(false);
+    expect(isOracleInapplicable(String(0x507003))).toBe(false); // ERROR_InvalidTouchLayoutFileFormat
+  });
+
   it("does not match neighbouring codes or other symbols", () => {
     expect(isOracleInapplicable(String(0x502032))).toBe(false);
     expect(isOracleInapplicable("ERROR_InvalidIf")).toBe(false);

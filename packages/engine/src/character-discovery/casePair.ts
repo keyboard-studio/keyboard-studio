@@ -82,17 +82,16 @@ export function caseCounterpart(
   if (/^\p{M}$/u.test(char)) return null;
 
   let direction: "toUpper" | "toLower";
-  let candidate: string;
 
   if (/^\p{Ll}$/u.test(char)) {
     direction = "toUpper";
-    candidate = localeCase(char, bcp47, direction);
   } else if (/^\p{Lu}$/u.test(char)) {
     direction = "toLower";
-    candidate = localeCase(char, bcp47, direction);
   } else {
     return null;
   }
+
+  const candidate = localeCase(char, bcp47, direction);
 
   if ([...candidate].length !== 1) return null;
   if (candidate === char) return null;

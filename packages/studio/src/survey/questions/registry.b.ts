@@ -47,7 +47,7 @@ import pbIndicNuktaGateMod from "./b/pb_indic_nukta_gate.ts";
 import pbIndicNuktaDetailMod from "./b/pb_indic_nukta_detail.ts";
 import pbIndicVowelsOnsetMod from "./b/pb_indic_vowels_onset.ts";
 import pbIndicVowelsOnsetListMod from "./b/pb_indic_vowels_onset_list.ts";
-import pbSeaMedialsaMod from "./b/pb_sea_medials.ts";
+import pbSeaMedialsMod from "./b/pb_sea_medials.ts";
 import pbSeaStackedConsonantsMod from "./b/pb_sea_stacked_consonants.ts";
 import pbRtlDirectionConfirmMod from "./b/pb_rtl_direction_confirm.ts";
 import pbRtlShortVowelsMod from "./b/pb_rtl_short_vowels.ts";
@@ -108,7 +108,7 @@ export const phaseBRegistry: Readonly<Record<string, QuestionModule>> = {
   pb_indic_nukta_detail: pbIndicNuktaDetailMod,
   pb_indic_vowels_onset: pbIndicVowelsOnsetMod,
   pb_indic_vowels_onset_list: pbIndicVowelsOnsetListMod,
-  pb_sea_medials: pbSeaMedialsaMod,
+  pb_sea_medials: pbSeaMedialsMod,
   pb_sea_stacked_consonants: pbSeaStackedConsonantsMod,
   pb_rtl_direction_confirm: pbRtlDirectionConfirmMod,
   pb_rtl_short_vowels: pbRtlShortVowelsMod,

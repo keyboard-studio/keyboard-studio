@@ -21,12 +21,12 @@ const path = require('path');
 const mintPath = path.join(__dirname, 'mint-token.js');
 const minted = spawnSync(process.execPath, [mintPath], { encoding: 'utf8' });
 if (minted.status !== 0) {
-  process.stderr.write(minted.stderr || '[bot-gh] mint-token.js failed with no stderr\n');
+  process.stderr.write(minted.stderr || '[bot-gh] mint-token.js failed\n');
   process.exit(minted.status || 1);
 }
-const token = (minted.stdout || '').trim();
+const token = minted.stdout.trim();
 if (!token) {
-  process.stderr.write('[bot-gh] mint-token.js returned empty stdout\n');
+  process.stderr.write('[bot-gh] mint-token.js returned empty token\n');
   process.exit(1);
 }
 

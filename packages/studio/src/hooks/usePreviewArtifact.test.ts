@@ -23,7 +23,12 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 
-vi.mock("@keyboard-studio/engine", () => ({
+// Spread the real module first via importOriginal() so pure re-exports this
+// hook's transitive dependencies rely on (e.g. browserPatternLibrary's
+// toPattern/rankPatterns, both node:fs-free) keep working; the fields below
+// still override the engine surface this test actually exercises.
+vi.mock("@keyboard-studio/engine", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@keyboard-studio/engine")>()),
   init: vi.fn(() => Promise.resolve()),
   isReady: vi.fn(() => true),
   compile: vi.fn(() => new Promise(() => { /* never settles in this test */ })),

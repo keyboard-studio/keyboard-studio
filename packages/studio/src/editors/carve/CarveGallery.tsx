@@ -274,84 +274,86 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
     // avoid listing the same removed character twice.
     const seenItemIds = new Set<string>();
 
-    nodes.forEach((node) => {
-      if (node.kind !== 'pattern' && node.kind !== 'group') return;
-      if (nodeState(node, isItemDeleted, isDeleted) === 'off') {
+    // Pattern/group nodes that are fully off
+    for (const node of nodes) {
+      if ((node.kind === 'pattern' || node.kind === 'group') && nodeState(node, isItemDeleted, isDeleted) === 'off') {
         fullOffIds.add(node.nodeId);
         list.push({ type: 'node', id: node.nodeId, kind: node.kind, label: node.name, count: node.glyphs?.length ?? 0, glyphIds: node.glyphs?.map((g) => g.gid) });
-      }
-    });
-    nodes.forEach((node) => {
-      if (node.kind !== 'store' && node.kind !== 'raw') return;
-      if (isDeleted(node.nodeId)) {
+      } else if ((node.kind === 'store' || node.kind === 'raw') && isDeleted(node.nodeId)) {
         list.push({ type: 'node', id: node.nodeId, kind: node.kind, label: node.name, count: 1 });
       }
-    });
-    nodes.forEach((node) => {
-      if (!node.glyphs) return;
-      if (fullOffIds.has(node.nodeId)) return;
-      node.glyphs.forEach((glyph) => {
-        if (!deletedItemIds.has(glyph.gid)) return;
-        seenItemIds.add(glyph.gid);
-        list.push({ type: 'item', id: glyph.gid, ch: glyph.ch, keys: glyph.keys, nodeName: node.name });
-      });
-    });
-    // Store per-character chips — skips whole-deleted stores (already listed
-    // above as a 'node' entry) and dedupes against ids already emitted by
-    // the pattern/group glyph pass.
-    nodes.forEach((node) => {
-      if (node.kind !== 'store' || !node.storeChips) return;
-      if (isDeleted(node.nodeId)) return;
-      node.storeChips.forEach((chip) => {
-        if (chip.action === 'disabled') return;
-        if (!deletedItemIds.has(chip.chipId)) return;
-        if (seenItemIds.has(chip.chipId)) return;
-        seenItemIds.add(chip.chipId);
-        list.push({ type: 'item', id: chip.chipId, ch: chip.ch, keys: [], nodeName: node.name });
-      });
-    });
+    }
+
+    // Partially-removed glyphs from pattern/group nodes
+    for (const node of nodes) {
+      if (!node.glyphs || fullOffIds.has(node.nodeId)) continue;
+      for (const glyph of node.glyphs) {
+        if (deletedItemIds.has(glyph.gid)) {
+          seenItemIds.add(glyph.gid);
+          list.push({ type: 'item', id: glyph.gid, ch: glyph.ch, keys: glyph.keys, nodeName: node.name });
+        }
+      }
+    }
+
+    // Store per-character chips — skips whole-deleted stores and dedupes
+    for (const node of nodes) {
+      if (node.kind !== 'store' || !node.storeChips || isDeleted(node.nodeId)) continue;
+      for (const chip of node.storeChips) {
+        if (chip.action !== 'disabled' && deletedItemIds.has(chip.chipId) && !seenItemIds.has(chip.chipId)) {
+          seenItemIds.add(chip.chipId);
+          list.push({ type: 'item', id: chip.chipId, ch: chip.ch, keys: [], nodeName: node.name });
+        }
+      }
+    }
     return list;
   }, [nodes, deletedItemIds, deletedNodeIds, isItemDeleted, isDeleted]);
 
   const handleRestore = useCallback((item: RemovedItem) => {
     if (item.type === 'item') { restoreItem(item.id); return; }
-    if (item.glyphIds) { item.glyphIds.forEach((gid) => restoreItem(gid)); restoreNode(item.id); }
-    else { restoreNode(item.id); }
+    item.glyphIds?.forEach((gid) => restoreItem(gid));
+    restoreNode(item.id);
   }, [restoreItem, restoreNode]);
 
   // DepBanner — orphaned patterns + newly-unused stores
   const { orphanedNodes, unusedStoreNodes } = useMemo(() => {
     const orphaned: DepNode[] = [];
     const unusedStores: DepNode[] = [];
-    nodes.forEach((node) => {
-      if ((node.kind === 'pattern' || node.kind === 'group') && !isDeleted(node.nodeId) && nodeState(node, isItemDeleted, isDeleted) === 'off') {
+
+    for (const node of nodes) {
+      const state = nodeState(node, isItemDeleted, isDeleted);
+
+      // Orphaned pattern/group — all glyphs removed but node itself not deleted
+      if ((node.kind === 'pattern' || node.kind === 'group') && !isDeleted(node.nodeId) && state === 'off') {
         orphaned.push({ nodeId: node.nodeId, name: node.name });
       }
-      if (node.kind === 'store' && node.referencedByNodeId !== undefined && !isDeleted(node.nodeId)) {
+
+      if (node.kind !== 'store' || isDeleted(node.nodeId)) continue;
+
+      // S-02 output stores — unused when their parent pattern is fully off
+      if (node.referencedByNodeId !== undefined) {
         const refNode = nodes.find((n) => n.nodeId === node.referencedByNodeId);
         if (refNode && nodeState(refNode, isItemDeleted, isDeleted) === 'off') {
           unusedStores.push({ nodeId: node.nodeId, name: node.name });
         }
+        continue;
       }
-      // Stores orphaned by any()/index() consumers — all referencing patterns AND groups are now off
-      if (
-        node.kind === 'store' &&
-        node.referencedByNodeId === undefined &&
-        !isDeleted(node.nodeId) &&
-        node.storeUsage !== undefined &&
-        (node.storeUsage.patternRefs.length > 0 || node.storeUsage.groupRefs.length > 0) &&
-        node.storeUsage.patternRefs.every((r) => {
-          const pNode = nodes.find((n) => n.nodeId === r.patternId);
-          return pNode ? nodeState(pNode, isItemDeleted, isDeleted) === 'off' : isDeleted(r.patternId);
-        }) &&
-        node.storeUsage.groupRefs.every((r) => {
-          const gNode = nodes.find((n) => n.nodeId === r.groupId);
-          return gNode ? nodeState(gNode, isItemDeleted, isDeleted) === 'off' : isDeleted(r.groupId);
-        })
-      ) {
-        unusedStores.push({ nodeId: node.nodeId, name: node.name });
+
+      // any()/index() stores — unused when ALL consumers are off
+      if (node.storeUsage && (node.storeUsage.patternRefs.length > 0 || node.storeUsage.groupRefs.length > 0)) {
+        const allConsumersOff =
+          node.storeUsage.patternRefs.every((r) => {
+            const pNode = nodes.find((n) => n.nodeId === r.patternId);
+            return pNode ? nodeState(pNode, isItemDeleted, isDeleted) === 'off' : isDeleted(r.patternId);
+          }) &&
+          node.storeUsage.groupRefs.every((r) => {
+            const gNode = nodes.find((n) => n.nodeId === r.groupId);
+            return gNode ? nodeState(gNode, isItemDeleted, isDeleted) === 'off' : isDeleted(r.groupId);
+          });
+        if (allConsumersOff) {
+          unusedStores.push({ nodeId: node.nodeId, name: node.name });
+        }
       }
-    });
+    }
     return { orphanedNodes: orphaned, unusedStoreNodes: unusedStores };
   }, [nodes, deletedItemIds, deletedNodeIds, isItemDeleted, isDeleted]);
 
@@ -532,24 +534,29 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       </div>
 
       {/* Cascade-delete confirmation dialog */}
-      {pendingCascade !== null && (
+      {pendingCascade !== null && (() => {
+        const isRestore = pendingCascade.mode === 'restore';
+        const hasActions = pendingCascade.actionCount > 0;
+        const title = isRestore
+          ? `Restore "${pendingCascade.targetChar}" everywhere?`
+          : hasActions
+            ? `Remove "${pendingCascade.targetChar}" everywhere?`
+            : `"${pendingCascade.targetChar}" can't be fully removed`;
+        const message = isRestore
+          ? 'This character was removed from several places. Restore it everywhere it was removed?'
+          : hasActions
+            ? 'This character appears in multiple places. Removing it everywhere keeps the keyboard consistent; removing it from just one place may leave broken references.'
+            : 'This character is produced by advanced rules that can\'t be removed automatically — see below.';
+        return (
         <ConfirmDialog
-          open={pendingCascade !== null}
-          title={pendingCascade.mode === 'restore'
-            ? `Restore "${pendingCascade.targetChar}" everywhere?`
-            : pendingCascade.actionCount > 0
-              ? `Remove "${pendingCascade.targetChar}" everywhere?`
-              : `"${pendingCascade.targetChar}" can't be fully removed`}
+          open={true}
+          title={title}
           body={
             <div>
               <p style={{ margin: '0 0 10px' }}>
-                {pendingCascade.mode === 'restore'
-                  ? 'This character was removed from several places. Restore it everywhere it was removed?'
-                  : pendingCascade.actionCount > 0
-                    ? 'This character appears in multiple places. Removing it everywhere keeps the keyboard consistent; removing it from just one place may leave broken references.'
-                    : 'This character is produced by advanced rules that can’t be removed automatically — see below.'}
+                {message}
               </p>
-              {pendingCascade.mode === 'remove' && pendingCascade.contributors.storeSlotIds.length > 0 && (
+              {!isRestore && pendingCascade.contributors.storeSlotIds.length > 0 && (
                 <p style={{ margin: '0 0 10px' }}>
                   Note: the key or sequence that triggers this character will still
                   exist, but will now produce nothing.
@@ -597,15 +604,11 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
               )}
             </div>
           }
-          primaryLabel={pendingCascade.mode === 'restore'
-            ? 'Yes, restore everywhere'
-            : pendingCascade.actionCount > 0 ? 'Yes, remove everywhere' : 'OK'}
-          onPrimary={(pendingCascade.mode === 'remove' && pendingCascade.actionCount === 0) ? handleCascadeCancel : handleCascadePrimary}
-          {...(pendingCascade.mode === 'remove' && pendingCascade.actionCount === 0
-            ? {}
-            : { secondaryLabel: 'Cancel', onSecondary: handleCascadeCancel })}
-        />
-      )}
+          primaryLabel={isRestore ? 'Yes, restore everywhere' : hasActions ? 'Yes, remove everywhere' : 'OK'}
+          onPrimary={!isRestore && !hasActions ? handleCascadeCancel : handleCascadePrimary}
+          {...(!isRestore && !hasActions ? {} : { secondaryLabel: 'Cancel', onSecondary: handleCascadeCancel })}
+        />);
+      })()}
 
       {/* Cross-reference web popup — the character's OTHER locations, each a link. */}
       {webPopup !== null && (

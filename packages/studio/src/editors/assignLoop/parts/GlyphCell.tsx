@@ -58,18 +58,18 @@ export const GlyphCell = memo(function GlyphCell({
   // Chip body and summary tags are SIBLINGS in this div (tags are their own
   // <button>s, never nested in the body <button>) so both stay independently
   // clickable. No fixed height — the grid row grows to fit the tags.
+  const cellStyle: React.CSSProperties = {
+    position: 'relative', display: 'flex', flexDirection: 'column',
+    width: '100%', borderRadius: 8,
+    border: `1px solid var(--app-border${off ? '' : '-strong'})`,
+    borderTop: `3px solid ${off ? 'var(--app-border-strong)' : color}`,
+    background: off ? 'var(--app-surface-2)' : 'var(--app-surface)',
+    opacity: off ? 0.6 : 1,
+    userSelect: 'none',
+  };
+
   return (
-    <div
-      style={{
-        position: 'relative', display: 'flex', flexDirection: 'column',
-        width: '100%', borderRadius: 8,
-        border: '1px solid ' + (off ? 'var(--app-border)' : 'var(--app-border-strong)'),
-        borderTop: '3px solid ' + (off ? 'var(--app-border-strong)' : color),
-        background: off ? 'var(--app-surface-2)' : 'var(--app-surface)',
-        opacity: off ? 0.6 : 1,
-        userSelect: 'none',
-      }}
-    >
+    <div style={cellStyle}>
       <button
         onClick={handleBodyActivate}
         onMouseEnter={() => setInfo(hoverInfo)}

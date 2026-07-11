@@ -78,7 +78,14 @@ const mockEngine = {
 };
 
 // Mock @keyboard-studio/engine so loadEngine() finds compile+fetchKeyboardSourceToVfs+init.
-vi.mock("@keyboard-studio/engine", () => mockEngine);
+// Spread the real module first via importOriginal() so pure re-exports this
+// hook's transitive dependencies rely on (e.g. browserPatternLibrary's
+// toPattern/rankPatterns, both node:fs-free) keep working; the mock fields
+// below still override the engine surface this test actually exercises.
+vi.mock("@keyboard-studio/engine", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@keyboard-studio/engine")>()),
+  ...mockEngine,
+}));
 
 // ---------------------------------------------------------------------------
 // Fixture

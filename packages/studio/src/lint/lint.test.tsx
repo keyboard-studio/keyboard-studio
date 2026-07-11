@@ -68,7 +68,6 @@ describe("LintChip — severity rendering", () => {
           : finding.message;
       expect(screen.getByText(expectedMessage)).toBeTruthy();
 
-      cleanup();
     },
   );
 });
@@ -175,7 +174,7 @@ describe("LintChip — navigateToLocation dispatch", () => {
 
     const events = await captureNavigateEvents(() => fireEvent.click(chipBody));
     expect(events).toHaveLength(1);
-    expect((events[0]! as CustomEvent).detail.location).toEqual(finding.location);
+    expect(events[0]!.detail.location).toEqual(finding.location);
   });
 
   it("does NOT dispatch navigateToLocation when location is undefined", async () => {

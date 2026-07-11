@@ -21,6 +21,21 @@ export type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement> & 
   error?: boolean;
 };
 
+const BASE_STYLE: React.CSSProperties = {
+  width: "100%",
+  padding: "8px 10px",
+  background: BG_PAGE,
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderRadius: 6,
+  color: TEXT_MAIN,
+  fontSize: 14,
+  fontFamily: FONT,
+  boxSizing: "border-box",
+  outline: "none",
+  resize: "vertical",
+};
+
 /**
  * Multi-line textarea primitive. Matches the `<textarea>` + `INPUT_STYLE`
  * with `resize: "vertical"` rendering in QuestionField.tsx exactly.
@@ -34,25 +49,13 @@ export function Textarea({
   style,
   ...rest
 }: TextareaProps): React.ReactElement {
-  const baseStyle: React.CSSProperties = {
-    width: "100%",
-    padding: "8px 10px",
-    background: BG_PAGE,
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: error ? ERROR_BORDER : BORDER,
-    borderRadius: 6,
-    color: TEXT_MAIN,
-    fontSize: 14,
-    fontFamily: FONT,
-    boxSizing: "border-box",
-    outline: "none",
-    resize: "vertical",
-  };
-
   return (
     <textarea
-      style={{ ...baseStyle, ...style }}
+      style={{
+        ...BASE_STYLE,
+        borderColor: error ? ERROR_BORDER : BORDER,
+        ...style,
+      }}
       {...rest}
     />
   );

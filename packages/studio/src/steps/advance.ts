@@ -121,20 +121,11 @@ export function nextSpineStepAfter(currentId: string): ActiveStepId {
     if (step === undefined) break;
     if (step.spine === false) continue;
     const id = step.id;
-    if (
-      id === "identity" ||
-      id === "choose_base" ||
-      id === "track" ||
-      id === "project_name" ||
-      id === "characters" ||
-      id === "carve" ||
-      id === "mechanisms" ||
-      id === "touch" ||
-      id === "help"
-    ) {
-      return id;
-    }
+    // "package" is the reserved terminal; reaching it means we're done.
     if (id === "package") return "done";
+    // All other spine step IDs are valid ActiveStepId values (terminals excluded).
+    // The manifest only contains valid step IDs, so no exhaustive check needed.
+    return id as ActiveStepId;
   }
   return "done";
 }

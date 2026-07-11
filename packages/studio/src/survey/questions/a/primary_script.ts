@@ -72,7 +72,11 @@ export const definition = {
 export function validate(
   value: string | string[] | undefined,
 ): ValidationResult {
-  const v = typeof value === "string" ? value : Array.isArray(value) ? value[0] ?? "" : "";
+  const v = typeof value === "string"
+    ? value
+    : Array.isArray(value)
+      ? value[0] ?? ""
+      : "";
 
   if (v.length === 0) {
     return { ok: false, code: "required", message: "Please select a writing system." };
@@ -100,13 +104,13 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-/** Normalize the answer to a single script subtag value. */
 function asScript(value: string | string[] | undefined): string {
-  return typeof value === "string"
-    ? value.trim()
+  const v = typeof value === "string"
+    ? value
     : Array.isArray(value)
-      ? (value[0] ?? "").trim()
+      ? value[0] ?? ""
       : "";
+  return v.trim();
 }
 
 /**
