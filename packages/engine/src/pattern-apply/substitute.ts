@@ -16,6 +16,12 @@ export interface SubstituteResult {
   unresolved: string[];
 }
 
+// Pattern: {{ followed by one or more word chars (no internal whitespace),
+// followed by }}. This matches the exact fixture style `{{triggerKey}}` etc.
+// Hoisted to module scope to avoid recompiling on every call; `lastIndex` is
+// reset before each use since the `g` flag makes exec() stateful.
+const TOKEN_RE = /\{\{(\w+)\}\}/g;
+
 /**
  * Replace every `{{slotId}}` token in `fragment` with the corresponding value
  * from `slotValues`.
@@ -41,14 +47,11 @@ export function substituteSlots(
   slotValues: Record<string, string>
 ): SubstituteResult {
   // Collect the distinct slot ids actually referenced in the fragment.
-  // Pattern: {{ followed by one or more word chars (no internal whitespace),
-  // followed by }}. This matches the exact fixture style `{{triggerKey}}` etc.
-  const TOKEN_RE = /\{\{(\w+)\}\}/g;
-
   const seen = new Set<string>();
   const unresolved: string[] = [];
 
   // First pass: find all distinct token ids and classify them.
+  TOKEN_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = TOKEN_RE.exec(fragment)) !== null) {
     const id = m[1] as string;

@@ -14,11 +14,10 @@ import type {
   KeyboardIR,
 } from "@keyboard-studio/contracts";
 import type { MissingCharSuggestions, CldrFullLoader } from "@keyboard-studio/engine";
-import { mockBaseBrowser, mockOutputService, mockScaffolder } from "@keyboard-studio/contracts/mocks";
+import { mockBaseBrowser, mockOutputService, mockPatternLibrary, mockScaffolder } from "@keyboard-studio/contracts/mocks";
 import { getBackendUrl } from "./githubOAuth.ts";
 import { localBaseBrowser, LOCAL_PROXY_BASE } from "./localBaseBrowser.ts";
 import { getPatternLibraryService as getBrowserPatternLibraryService } from "./browserPatternLibrary.ts";
-import { mockPatternLibrary } from "@keyboard-studio/contracts/mocks";
 
 export const USE_REAL = import.meta.env.VITE_USE_REAL_ENGINE !== "false";
 

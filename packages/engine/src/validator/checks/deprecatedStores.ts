@@ -19,10 +19,10 @@ export function checkDeprecatedStores(source: string): LintFinding[] {
 
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
     const line = lines[lineIdx] ?? "";
-    const re = new RegExp(SYSTEM_STORE_RE.source, "g");
+    SYSTEM_STORE_RE.lastIndex = 0;
     let match: RegExpExecArray | null;
 
-    while ((match = re.exec(line)) !== null) {
+    while ((match = SYSTEM_STORE_RE.exec(line)) !== null) {
       const rawName = match[1] ?? "";
       const tssName = DEPRECATED_STORES.get(rawName.toLowerCase());
       if (tssName !== undefined) {

@@ -38,7 +38,7 @@
 //   PlacementEntry.codepoint is "U+XXXX" (uppercase hex).
 //   We convert to the actual character via String.fromCodePoint.
 
-import type { PlacementMap, PlacementEntry, PlacementCandidate } from "@keyboard-studio/contracts";
+import type { PlacementMap, PlacementCandidate } from "@keyboard-studio/contracts";
 import { topCandidate, strategyForCandidate, parseUPlusNotation, toUPlusNotation } from "@keyboard-studio/contracts";
 import type { StrategyId } from "@keyboard-studio/contracts";
 

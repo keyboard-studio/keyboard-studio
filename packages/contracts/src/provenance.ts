@@ -14,6 +14,8 @@
 // serialized into the GitHub PR body and the package metadata at output time
 // (§12) for attribution and contact; it is NOT written into the `.kmn` source.
 
+import { stripUndefined } from "./utils/charUtils";
+
 /**
  * Contact details for a representative of the language community, captured
  * from the request form's "Contact Information for a Language Community
@@ -139,19 +141,6 @@ export interface KeyboardProvenance {
  * (see {@link BaseKeyboardInit}).
  */
 export type KeyboardProvenanceInit = KeyboardProvenance;
-
-/**
- * Drop keys whose value is `undefined` so the result satisfies
- * `exactOptionalPropertyTypes` (an explicit `key: undefined` is not assignable
- * to an optional field; an absent key is). Mirrors the conditional-spread
- * stripping in {@link makeBaseKeyboard}, generalized because provenance has
- * many more optional fields.
- */
-function stripUndefined<T extends object>(obj: T): T {
-  return Object.fromEntries(
-    Object.entries(obj).filter(([, v]) => v !== undefined)
-  ) as T;
-}
 
 /**
  * Construct a {@link KeyboardProvenance} from a {@link KeyboardProvenanceInit},

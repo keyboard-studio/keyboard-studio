@@ -252,6 +252,64 @@ const selectStyle: CSSProperties = {
   fontFamily: FONT,
 };
 
+// Static styles shared across MethodChooser renders — none depend on props or
+// state, so they are hoisted to module scope rather than recreated per render.
+const headerBtnStyle: CSSProperties = {
+  width: "100%",
+  padding: "10px 14px",
+  background: "transparent",
+  border: "none",
+  color: TEXT_MAIN,
+  fontSize: 13,
+  fontFamily: FONT,
+  cursor: "pointer",
+  textAlign: "left",
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+};
+
+const configStyle: CSSProperties = {
+  padding: "0 14px 12px",
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+};
+
+const inputStyle: CSSProperties = {
+  width: 52,
+  padding: "6px 8px",
+  background: BG_PAGE,
+  border: `1px solid ${BORDER}`,
+  borderRadius: 6,
+  color: TEXT_MAIN,
+  fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
+  fontSize: 20,
+  textAlign: "center",
+  boxSizing: "border-box",
+};
+
+// Static page-level styles shared by MechanismGallery's guard/content
+// branches — none depend on props or state.
+const pageStyle: CSSProperties = {
+  background: BG_PAGE,
+  height: "100%",
+  boxSizing: "border-box",
+  fontFamily: FONT,
+  color: TEXT_MAIN,
+};
+
+const ghostBtn: CSSProperties = {
+  padding: "8px 18px",
+  background: "transparent",
+  border: `1px solid ${BORDER}`,
+  borderRadius: 6,
+  color: TEXT_DIM,
+  fontSize: 13,
+  cursor: "pointer",
+  fontFamily: "inherit",
+};
+
 function MethodChooser({
   currentChar,
   method,
@@ -283,41 +341,6 @@ function MethodChooser({
     overflow: "hidden",
     transition: "border-color 120ms ease, background 120ms ease",
   });
-
-  const headerBtnStyle: CSSProperties = {
-    width: "100%",
-    padding: "10px 14px",
-    background: "transparent",
-    border: "none",
-    color: TEXT_MAIN,
-    fontSize: 13,
-    fontFamily: FONT,
-    cursor: "pointer",
-    textAlign: "left",
-    display: "flex",
-    flexDirection: "column",
-    gap: 4,
-  };
-
-  const configStyle: CSSProperties = {
-    padding: "0 14px 12px",
-    display: "flex",
-    flexDirection: "column",
-    gap: 8,
-  };
-
-  const inputStyle: CSSProperties = {
-    width: 52,
-    padding: "6px 8px",
-    background: BG_PAGE,
-    border: `1px solid ${BORDER}`,
-    borderRadius: 6,
-    color: TEXT_MAIN,
-    fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
-    fontSize: 20,
-    textAlign: "center",
-    boxSizing: "border-box",
-  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1335,25 +1358,6 @@ export function MechanismGallery({
   // ---------------------------------------------------------------------------
   // Shared styles
   // ---------------------------------------------------------------------------
-
-  const pageStyle: CSSProperties = {
-    background: BG_PAGE,
-    height: "100%",
-    boxSizing: "border-box",
-    fontFamily: FONT,
-    color: TEXT_MAIN,
-  };
-
-  const ghostBtn: CSSProperties = {
-    padding: "8px 18px",
-    background: "transparent",
-    border: `1px solid ${BORDER}`,
-    borderRadius: 6,
-    color: TEXT_DIM,
-    fontSize: 13,
-    cursor: "pointer",
-    fontFamily: "inherit",
-  };
 
   // ---------------------------------------------------------------------------
   // Guard: no base keyboard

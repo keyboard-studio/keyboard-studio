@@ -96,6 +96,35 @@ function FlowLegend() {
   );
 }
 
+/** Parse-failure banner shared by the drill-down and Library proposed-flow sections. */
+function ParseErrorBanner({ error }: { error: string }) {
+  return (
+    <div style={{ color: "#ff9492", fontFamily: MONO, fontSize: 12, padding: 12, border: "1px solid #763a3a", borderRadius: 6 }}>
+      Failed to parse: {error}
+    </div>
+  );
+}
+
+/** Dangling-goto-target warning shared by the drill-down and Library proposed-flow sections. */
+function DanglingTargetsWarning({ targets }: { targets: readonly string[] }) {
+  return (
+    <div
+      style={{
+        color: "#e3b341",
+        fontFamily: MONO,
+        fontSize: 12,
+        padding: "8px 12px",
+        marginBottom: 8,
+        border: "1px solid #9e6a03",
+        borderRadius: 6,
+        background: "#241c10",
+      }}
+    >
+      Dangling goto target(s): {targets.join(", ")}
+    </div>
+  );
+}
+
 function SectionTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
@@ -412,26 +441,9 @@ export function FlowMapView({ completeness, axisFills }: FlowMapViewProps) {
                         {graph !== null && ` · ${graph.flowId} · ${graph.nodes.length} questions · ${graph.edges.length} edges`}
                       </span>
                     </div>
-                    {error !== null && (
-                      <div style={{ color: "#ff9492", fontFamily: MONO, fontSize: 12, padding: 12, border: "1px solid #763a3a", borderRadius: 6 }}>
-                        Failed to parse: {error}
-                      </div>
-                    )}
+                    {error !== null && <ParseErrorBanner error={error} />}
                     {graph !== null && graph.danglingTargets.length > 0 && (
-                      <div
-                        style={{
-                          color: "#e3b341",
-                          fontFamily: MONO,
-                          fontSize: 12,
-                          padding: "8px 12px",
-                          marginBottom: 8,
-                          border: "1px solid #9e6a03",
-                          borderRadius: 6,
-                          background: "#241c10",
-                        }}
-                      >
-                        Dangling goto target(s): {graph.danglingTargets.join(", ")}
-                      </div>
+                      <DanglingTargetsWarning targets={graph.danglingTargets} />
                     )}
                     {graph !== null && <FlowGraphView graph={graph} />}
                   </section>
@@ -485,26 +497,9 @@ export function FlowMapView({ completeness, axisFills }: FlowMapViewProps) {
                     {graph !== null && ` · ${graph.nodes.length} questions · ${graph.edges.length} edges`}
                   </span>
                 </div>
-                {error !== null && (
-                  <div style={{ color: "#ff9492", fontFamily: MONO, fontSize: 12, padding: 12, border: "1px solid #763a3a", borderRadius: 6 }}>
-                    Failed to parse: {error}
-                  </div>
-                )}
+                {error !== null && <ParseErrorBanner error={error} />}
                 {graph !== null && graph.danglingTargets.length > 0 && (
-                  <div
-                    style={{
-                      color: "#e3b341",
-                      fontFamily: MONO,
-                      fontSize: 12,
-                      padding: "8px 12px",
-                      marginBottom: 8,
-                      border: "1px solid #9e6a03",
-                      borderRadius: 6,
-                      background: "#241c10",
-                    }}
-                  >
-                    Dangling goto target(s): {graph.danglingTargets.join(", ")}
-                  </div>
+                  <DanglingTargetsWarning targets={graph.danglingTargets} />
                 )}
                 {graph !== null && <FlowGraphView graph={graph} />}
               </section>

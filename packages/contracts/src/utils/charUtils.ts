@@ -3,6 +3,21 @@
 // parsing so every consumer (engine, studio) uses the same logic.
 // ---------------------------------------------------------------------------
 
+/**
+ * Drop keys whose value is `undefined` so the result satisfies
+ * `exactOptionalPropertyTypes` (an explicit `key: undefined` is not
+ * assignable to an optional field; an absent key is).
+ *
+ * Shared, top-level-only strip used by the package's several `makeX`
+ * factories (see provenance.ts, placementMap.ts, linguistInventory.ts) that
+ * each previously defined an identical private copy of this function.
+ */
+export function stripUndefined<T extends object>(obj: T): T {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v !== undefined)
+  ) as T;
+}
+
 /** Converts the first code point of `char` to a `U+XXXX` string.
  *  Precondition: `char` is a non-empty string; only the first code point is used. */
 export function toUPlusNotation(char: string): string {

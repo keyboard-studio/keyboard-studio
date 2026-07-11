@@ -44,43 +44,42 @@ const labelStyle: React.CSSProperties = {
   fontWeight: 700,
 };
 
-function githubButtonStyle(enabled: boolean): React.CSSProperties {
-  return {
-    alignSelf: "flex-start",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "8px 16px",
-    background: enabled ? "#238636" : "#161b22",
-    color: enabled ? "#e6edf3" : "#484f58",
-    border: "1px solid #2ea043",
-    borderRadius: 6,
-    fontSize: 13,
-    fontWeight: 600,
-    cursor: enabled ? "pointer" : "not-allowed",
-    fontFamily: FONT,
-    transition: "background 0.15s",
-  };
-}
+// Both provider buttons are always rendered enabled (no disabled call site
+// exists in this file), so these are plain style constants rather than
+// functions parameterized on an `enabled` flag that is never false.
+const githubButtonStyle: React.CSSProperties = {
+  alignSelf: "flex-start",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  padding: "8px 16px",
+  background: "#238636",
+  color: "#e6edf3",
+  border: "1px solid #2ea043",
+  borderRadius: 6,
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: "pointer",
+  fontFamily: FONT,
+  transition: "background 0.15s",
+};
 
-function googleButtonStyle(enabled: boolean): React.CSSProperties {
-  return {
-    alignSelf: "flex-start",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "8px 16px",
-    background: enabled ? "#1a73e8" : "#161b22",
-    color: enabled ? "#ffffff" : "#484f58",
-    border: enabled ? "1px solid #1a73e8" : "1px solid #283040",
-    borderRadius: 6,
-    fontSize: 13,
-    fontWeight: 600,
-    cursor: enabled ? "pointer" : "not-allowed",
-    fontFamily: FONT,
-    transition: "background 0.15s",
-  };
-}
+const googleButtonStyle: React.CSSProperties = {
+  alignSelf: "flex-start",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  padding: "8px 16px",
+  background: "#1a73e8",
+  color: "#ffffff",
+  border: "1px solid #1a73e8",
+  borderRadius: 6,
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: "pointer",
+  fontFamily: FONT,
+  transition: "background 0.15s",
+};
 
 const secondaryButtonStyle: React.CSSProperties = {
   padding: "6px 12px",
@@ -144,7 +143,7 @@ export function SignUpPanel() {
             type="button"
             onClick={() => { void github.connect("identity"); }}
             aria-label="Sign up with GitHub"
-            style={githubButtonStyle(true)}
+            style={githubButtonStyle}
           >
             <GitHubMark />
             Sign up with GitHub
@@ -160,7 +159,7 @@ export function SignUpPanel() {
             type="button"
             onClick={() => { void google.connect(); }}
             aria-label="Sign up with Google"
-            style={googleButtonStyle(true)}
+            style={googleButtonStyle}
           >
             <GoogleMark />
             Sign up with Google
@@ -198,7 +197,7 @@ export function SignUpPanel() {
         type="button"
         onClick={() => { void github.connect("identity"); }}
         aria-label="Sign up with GitHub"
-        style={githubButtonStyle(true)}
+        style={githubButtonStyle}
       >
         <GitHubMark />
         Sign up with GitHub
@@ -208,7 +207,7 @@ export function SignUpPanel() {
         type="button"
         onClick={() => { void google.connect(); }}
         aria-label="Sign up with Google"
-        style={googleButtonStyle(true)}
+        style={googleButtonStyle}
       >
         <GoogleMark />
         Sign up with Google

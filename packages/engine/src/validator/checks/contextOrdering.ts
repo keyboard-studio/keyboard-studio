@@ -7,7 +7,7 @@ import type { LintFinding } from "@keyboard-studio/contracts";
 //   3. No virtual keys [K_X] are allowed in context.
 
 // Matches virtual keys: [K_SOMETHING] (only K_ prefixed names are virtual keys)
-const VIRTUAL_KEY_RE = /\[[^\]]*\bK_[A-Za-z0-9_]+[^\]]*\]/;
+const VIRTUAL_KEY_RE = /\[[^\]]*\bK_[A-Za-z0-9_]+[^\]]*\]/g;
 
 // Matches guard/condition tokens: if(...), platform(...), baselayout(...)
 // NOTE: GUARD_TOKEN_RE is intentionally NOT used for stripping guard tokens —
@@ -16,6 +16,11 @@ const VIRTUAL_KEY_RE = /\[[^\]]*\bK_[A-Za-z0-9_]+[^\]]*\]/;
 
 // Matches nul keyword as a standalone word
 const NUL_RE = /\bnul\b/i;
+
+// Matches guard keyword calls: if(...), platform(...), baselayout(...) — shared by
+// stripGuardTokens() and the rule-2 scan below. Both manage `.lastIndex` explicitly
+// before each exec, so a single hoisted instance is safe to reuse.
+const GUARD_KW_RE = /\b(?:if|platform|baselayout)\s*\(/gi;
 
 // Matches content tokens (not guards, not nul):
 // dk(...), deadkey(...), context, any(...), index(...), U+XXXX, quoted strings.
@@ -54,22 +59,19 @@ function scanPastGuardArg(str: string, start: number): number {
  * handles ')' characters inside quoted store values, e.g. if(s = "a(b)").
  */
 function stripGuardTokens(ctx: string): string {
-  const GUARD_KW_RE = /\b(if|platform|baselayout)\s*\(/gi;
-  let result = ctx;
-
-  // We rebuild result character-by-character using a fresh scan to avoid
+  // We rebuild the result character-by-character using a fresh scan to avoid
   // RegExp-lastIndex complications after mutations.
   const out = ctx.split("");
   let searchFrom = 0;
   while (true) {
     GUARD_KW_RE.lastIndex = searchFrom;
-    const kwMatch = GUARD_KW_RE.exec(result);
+    const kwMatch = GUARD_KW_RE.exec(ctx);
     if (!kwMatch) break;
 
     const tokenStart = kwMatch.index;
     // kwMatch[0] ends with '(', so the arg starts right after it:
     const argStart = tokenStart + kwMatch[0].length;
-    const tokenEnd = scanPastGuardArg(result, argStart);
+    const tokenEnd = scanPastGuardArg(ctx, argStart);
 
     // Blank out the guard token in `out`.
     for (let i = tokenStart; i < tokenEnd; i++) {
@@ -125,9 +127,9 @@ export function checkContextOrdering(source: string): LintFinding[] {
     if (!ctx) continue;
 
     // --- Rule 3: no virtual keys [K_X] in context ---
-    const vkRe = new RegExp(VIRTUAL_KEY_RE.source, "g");
+    VIRTUAL_KEY_RE.lastIndex = 0;
     let vkMatch: RegExpExecArray | null;
-    while ((vkMatch = vkRe.exec(ctx)) !== null) {
+    while ((vkMatch = VIRTUAL_KEY_RE.exec(ctx)) !== null) {
       findings.push({
         code: "KM_ERROR_VIRTUAL_KEY_IN_CONTEXT",
         severity: "error",
@@ -164,10 +166,10 @@ export function checkContextOrdering(source: string): LintFinding[] {
     // Find the last guard end-position in the original ctx.
     // Use the same quote-aware scanner as stripGuardTokens() so ')' inside
     // quoted values does not truncate the measured extent of the guard.
-    const guardKwRe = /\b(?:if|platform|baselayout)\s*\(/gi;
+    GUARD_KW_RE.lastIndex = 0;
     let lastGuardEnd = -1;
     let guardKwMatch: RegExpExecArray | null;
-    while ((guardKwMatch = guardKwRe.exec(ctx)) !== null) {
+    while ((guardKwMatch = GUARD_KW_RE.exec(ctx)) !== null) {
       const argStart = guardKwMatch.index + guardKwMatch[0].length;
       const end = scanPastGuardArg(ctx, argStart);
       lastGuardEnd = Math.max(lastGuardEnd, end);
@@ -177,9 +179,9 @@ export function checkContextOrdering(source: string): LintFinding[] {
       // Search for content tokens in the STRIPPED context (guards removed).
       // A content token whose position in stripped context is before lastGuardEnd means
       // there was content before the last guard.
-      const contentRe = new RegExp(CONTENT_TOKEN_RE.source, "gi");
+      CONTENT_TOKEN_RE.lastIndex = 0;
       let contentMatch: RegExpExecArray | null;
-      while ((contentMatch = contentRe.exec(ctxStripped)) !== null) {
+      while ((contentMatch = CONTENT_TOKEN_RE.exec(ctxStripped)) !== null) {
         if (contentMatch.index < lastGuardEnd) {
           findings.push({
             code: "KM_ERROR_GUARD_AFTER_CONTENT",

@@ -19,10 +19,11 @@ export function checkIndexBounds(source: string): LintFinding[] {
   const findings: LintFinding[] = [];
   const declared = collectDeclaredStores(source);
   const lines = source.split("\n");
+  const re = new RegExp(INDEX_RE.source, "gi");
 
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
     const line = lines[lineIdx] ?? "";
-    const re = new RegExp(INDEX_RE.source, "gi");
+    re.lastIndex = 0;
     let match: RegExpExecArray | null;
 
     while ((match = re.exec(line)) !== null) {

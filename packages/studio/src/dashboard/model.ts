@@ -208,3 +208,36 @@ export interface StepGraph {
    */
   dataEdges: readonly StepGraphEdge[];
 }
+
+/** Minimal shape computeDataEdges needs from a node — satisfied by both
+ *  StepGraphNode and completeness.ts's inline minimal-graph node literal. */
+export interface DataEdgeNode {
+  id: string;
+  writePaths: readonly string[];
+  inputPaths: readonly string[];
+}
+
+/**
+ * Compute directed data edges: producer → consumer wherever producer.writePaths
+ * intersects consumer.inputPaths. Shared by buildStepGraph.ts's
+ * buildManifestStepGraph and completeness.ts's buildMinimalStepGraph, which
+ * cannot import from each other (would create a circular dependency through
+ * manifest.ts → registerEditorSteps → stores/ → completeness.ts).
+ */
+export function computeDataEdges(nodes: readonly DataEdgeNode[]): StepGraphEdge[] {
+  const dataEdges: StepGraphEdge[] = [];
+  for (const producer of nodes) {
+    if (producer.writePaths.length === 0) continue;
+    const writeSet = new Set(producer.writePaths);
+    for (const consumer of nodes) {
+      if (consumer.id === producer.id) continue;
+      for (const inputPath of consumer.inputPaths) {
+        if (writeSet.has(inputPath)) {
+          dataEdges.push({ from: producer.id, to: consumer.id, kind: "spine" }); // kind reused; data edges have no order-kind
+          break; // one data edge per (producer, consumer) pair
+        }
+      }
+    }
+  }
+  return dataEdges;
+}
