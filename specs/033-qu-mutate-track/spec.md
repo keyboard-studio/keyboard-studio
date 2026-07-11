@@ -10,14 +10,14 @@
 
 ## Input
 
-[docs/design-notes/question-unification-migration-plan.md](../../docs/design-notes/question-unification-migration-plan.md) §3.2 (`track` row in per-opaque-step breakup table), §5 spec #10 row, and §6 (open decisions Q2, resolved as Option A: modular gate question). Spec 023 (branch `km/decompose-wizard-questions`, PR pending) introduced the modular gate questions `track_choice`, `project_display_name`, `project_keyboard_id` and the thin flows `content/flows/track.modular.yaml` and `content/flows/project_name.modular.yaml`. This spec makes the YAML `next` rule the load-bearing fork, replacing the hand-coded fork in `StudioShell.handleTrackSelected` (packages/studio/src/StudioShell.tsx, lines 610–622).
+[docs/design-notes/question-unification-migration-plan.md](../../docs/design-notes/question-unification-migration-plan.md) §3.2 (`track` row in per-opaque-step breakup table), §5 spec #10 row, and §6 (open decisions Q2, resolved as Option A: modular gate question). Spec 023 (branch `km/decompose-wizard-questions`, PR pending) introduced the modular gate questions `track_choice`, `project_display_name`, `project_keyboard_id` and the thin flows `content/flows/track.modular.yaml` and `content/flows/project_name.modular.yaml`. This spec makes the YAML `next` rule the load-bearing fork, replacing the hand-coded fork in `StudioShell.handleTrackSelected` (packages/studio/src/StudioShell.tsx).
 
 **Current state (verified 2026-07-06)**:
-- The live fork today: `StudioShell.handleTrackSelected` (packages/studio/src/StudioShell.tsx:610–622) — `track === "copy"` → `setActiveStepId("project_name")`; else → `nextSpineStepAfter("track")`.
-- `handleProjectNameNext` (packages/studio/src/StudioShell.tsx:629–635) — writes `setScaffoldSpec` and `setStoreIdentity` directly.
+- The live fork today: `StudioShell.handleTrackSelected` (packages/studio/src/StudioShell.tsx) — `track === "copy"` → `setActiveStepId("project_name")`; else → `nextSpineStepAfter("track")`.
+- `handleProjectNameNext` (packages/studio/src/StudioShell.tsx) — writes `setScaffoldSpec` and `setStoreIdentity` directly.
 - Spec 023 (branch `km/decompose-wizard-questions`) — created the modular flow with YAML `next` rule (advisory metadata only in Phase 1).
 - The mutate seam (spec 014, SHIPPED) — `applyStepCompletion` in packages/studio/src/steps/reducer.ts dispatches side effects by step id; `isMutateSeamEnabled()` in packages/studio/src/flags/mutateFlag.ts gates execution.
-- Manifest (packages/studio/src/steps/manifest.ts:79–96) — `project_name` is `spine:false` with `joinTarget:"characters"`.
+- Manifest (packages/studio/src/steps/manifest.ts) — `project_name` is `spine:false` with `joinTarget:"characters"`.
 
 ---
 
@@ -52,7 +52,7 @@ When the copy-track path reaches `project_name`, the user enters display name + 
 - **FR-001**: The `next` rules in `track.modular.yaml` and `project_name.modular.yaml` (authored by spec 023) MUST become the load-bearing fork: the runner's resolved next-target drives step advancement via the existing pure routing functions (no hand-coded `if` in `StudioShell`).
 - **FR-002**: Track answer + project-name identity writes MUST route through `applyStepCompletion()` in the reducer (packages/studio/src/steps/reducer.ts), dispatching side effects keyed by step id.
 - **FR-003**: Identity writes (display name, keyboard ID to the IR header) MUST route through the `mutate()` seam where flag-gated (spec 014), honoring the writes already declared on the `project_name` registration — `writes: [irPath("header","name"), irPath("header","keyboardId")]` (see `registerEditorSteps.ts`); this spec makes the write path honor the declaration rather than adding it.
-- **FR-004**: `handleTrackSelected()` and `handleProjectNameNext()` (StudioShell.tsx:610–635) MUST be deleted or reduced to thin manifest-driven dispatch (calling `applyStepCompletion()` with the answer); no inline identity writes or manual `setActiveStepId()` calls for the fork.
+- **FR-004**: `handleTrackSelected()` and `handleProjectNameNext()` (StudioShell.tsx) MUST be deleted or reduced to thin manifest-driven dispatch (calling `applyStepCompletion()` with the answer); no inline identity writes or manual `setActiveStepId()` calls for the fork.
 - **FR-005**: Fork outcome MUST be byte-identical for both track choices — copy-track reaches `project_name` → characters; adapt-track reaches characters directly — exercised by existing integration tests.
 - **FR-006**: The manifest fork metadata (`project_name`: `spine:false`, `joinTarget:"characters"`) MUST remain the single source for the map; the drift guardrail (spec 016) MUST remain green.
 - **FR-007**: Parity flag decision — MUST specify whether the routing cutover itself is flag-gated (`VITE_KM_MUTATE_SEAM`), or unconditional since spec 023 already changed presentation. **Recommend**: routing is unconditional (pure `next` rule evaluation is side-effect-free); only the IR writes are seam-flag-gated. Justify the choice.

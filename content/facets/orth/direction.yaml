@@ -8,7 +8,8 @@ family: orth
 title: Writing direction
 description: >
   LTR, RTL, or mixed/bidirectional, derived from the primary script subtag
-  via a static table (the abjad script set in scriptAxes.ts is the seed).
+  via a static table keyed on ISO 15924 script directionality (Unicode
+  Bidi_Class of the script's representative characters).
   Prefills the direction questions and gates whether the RTL question branch
   and direction-mark proposals appear at all.
 valueType: enum
@@ -20,7 +21,7 @@ derivations:
   - kind: computed
     source: "planned:script-direction-table"
     sourceStatus: planned
-    notes: Trivial static map; the ABJAD set in packages/studio/src/lib/scriptAxes.ts already encodes most of it.
+    notes: Trivial static map; source is ISO 15924 script directionality, not the abjad script-class set — abjad does not equal RTL (Thaana, Adlam, N'Ko are RTL but not abjads).
   - kind: confirmed
     source: "question:writing_direction"
     sourceStatus: available

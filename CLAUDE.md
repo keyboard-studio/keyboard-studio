@@ -12,7 +12,7 @@ Package manager is **pnpm 9** (Node ≥ 20). Run from the repo root unless noted
 | Build everything | `pnpm build` (runs `prebuild` first — see below) |
 | Typecheck | `pnpm typecheck` |
 | Test everything | `pnpm test` (`pnpm -r test` → each package's vitest) |
-| Lint / format | `pnpm lint` (ESLint over `packages/*/src`, then `pnpm depcruise`) · `pnpm format` (Prettier) |
+| Lint / format | `pnpm lint` (ESLint over `packages/*/src`, then `pnpm depcruise`, then `pnpm crew-lint` ([utilities/crew-lint/index.js](utilities/crew-lint/index.js) — 7 checks over `.claude/**/km-*` crew files; also run by `pnpm lint`), then `pnpm run facet-lint` (plain-node checker over `content/facets/**` records; also run by `pnpm lint`)) · `pnpm format` (Prettier) |
 | Architecture boundaries | `pnpm depcruise` (dependency-cruiser fitness functions — cross-package layering/team-split/dependency-root rules in [.dependency-cruiser.cjs](.dependency-cruiser.cjs); also run by `pnpm lint`) |
 | Run the studio SPA | `pnpm dev` (builds `engine`, then runs `engine` watch + `studio` Vite dev server) |
 

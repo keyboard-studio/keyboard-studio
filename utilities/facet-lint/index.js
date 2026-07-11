@@ -135,8 +135,8 @@ function validateRecord(rec) {
   if (rec.relatedAxes !== undefined) {
     need(
       "relatedAxes",
-      Array.isArray(rec.relatedAxes) && rec.relatedAxes.every((a) => /^A[1-7]a?$/.test(a)),
-      "must be an array of axis ids (A1..A7, A3a, A7a)",
+      Array.isArray(rec.relatedAxes) && rec.relatedAxes.every((a) => /^(A[1-7]|A2a|A3a|A7a)$/.test(a)),
+      "must be an array of axis ids (A1..A7, A2a, A3a, A7a)",
     );
   }
   return problems;
