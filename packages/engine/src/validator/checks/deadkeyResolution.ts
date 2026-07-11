@@ -12,10 +12,11 @@ const DK_RE = /\b(?:dk|deadkey)\s*\(\s*([^)]*?)\s*\)/;
 export function checkDeadkeyResolution(source: string): LintFinding[] {
   const findings: LintFinding[] = [];
   const lines = source.split("\n");
+  const re = new RegExp(DK_RE.source, "gi");
 
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
     const line = lines[lineIdx] ?? "";
-    const re = new RegExp(DK_RE.source, "gi");
+    re.lastIndex = 0;
     let match: RegExpExecArray | null;
 
     while ((match = re.exec(line)) !== null) {

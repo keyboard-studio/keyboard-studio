@@ -15,6 +15,7 @@
 // that path ("No §5 change").  It never round-trips through
 // Pattern.kmnFragment.  See D-INT-1 in utilities/kbgen/INTEGRATION.md.
 
+import { stripUndefined } from "./utils/charUtils";
 
 // ---------------------------------------------------------------------------
 // Discriminated unions
@@ -214,19 +215,6 @@ export interface PlacementMap {
  * the `XInit` factory convention (see `provenance.ts`).
  */
 export type PlacementMapInit = PlacementMap;
-
-/**
- * Drop keys whose value is `undefined` so the result satisfies
- * `exactOptionalPropertyTypes` (an explicit `key: undefined` is not assignable
- * to an optional field; an absent key is).
- *
- * Mirrors the same helper in `provenance.ts`.
- */
-function stripUndefined<T extends object>(obj: T): T {
-  return Object.fromEntries(
-    Object.entries(obj).filter(([, v]) => v !== undefined)
-  ) as T;
-}
 
 /**
  * Construct a {@link PlacementMap} from a {@link PlacementMapInit}, stripping

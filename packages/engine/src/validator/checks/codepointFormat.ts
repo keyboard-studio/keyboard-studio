@@ -12,10 +12,11 @@ const UPLUS_RE = /\bU\+([0-9A-Fa-f]{1,6})\b/i;
 export function checkCodepointFormat(source: string): LintFinding[] {
   const findings: LintFinding[] = [];
   const lines = source.split("\n");
+  const re = new RegExp(UPLUS_RE.source, "gi");
 
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
     const line = lines[lineIdx] ?? "";
-    const re = new RegExp(UPLUS_RE.source, "gi");
+    re.lastIndex = 0;
     let match: RegExpExecArray | null;
 
     while ((match = re.exec(line)) !== null) {

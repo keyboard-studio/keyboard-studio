@@ -19,6 +19,7 @@ import {
   getLoadedLangtags,
   scriptToTargetOption,
 } from "../lib/langtagsDefaults.ts";
+import { answerString } from "./answerString.ts";
 
 import identityLiteRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
 
@@ -104,15 +105,6 @@ export function buildTargetBcp47(
   // rather than emit the malformed "lang-other".
   const scriptPart = script === "" || script === "other" ? "" : script;
   return [lang, scriptPart, reg].filter((p) => p !== "").join("-");
-}
-
-function answerString(result: SurveyPhaseResult, questionId: string): string {
-  const answer = result.answers.find((a) => a.questionId === questionId);
-  if (answer === undefined) return "";
-  if (answer.answerType === "text" || answer.answerType === "select") {
-    return String(answer.value);
-  }
-  return "";
 }
 
 /** Derive the typed identity-lite result from a completed flow. */

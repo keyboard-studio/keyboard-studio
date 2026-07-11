@@ -149,14 +149,6 @@ function getFirstGrapheme(s: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// addChars — pure helper: NFC-dedup-merge newChars into existing set
-// ---------------------------------------------------------------------------
-
-function addChars(prev: string[], incoming: string[]): string[] {
-  return nfcDedup(prev, incoming);
-}
-
-// ---------------------------------------------------------------------------
 // CharChipEditor — reusable type-in input + chip list (no state of its own)
 // ---------------------------------------------------------------------------
 
@@ -186,7 +178,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
     const tokens = trimmed.split(/\s+/).filter(Boolean);
     const newChars = tokens.map(getFirstGrapheme).filter(Boolean);
     if (newChars.length === 0) return;
-    onChange(addChars(chars, newChars));
+    onChange(nfcDedup(chars, newChars));
     setInputVal("");
     inputRef.current?.focus();
   }
@@ -356,7 +348,7 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
     if (chars.includes(nfc)) {
       onChange(chars.filter((x) => x !== nfc));
     } else {
-      onChange(addChars(chars, [nfc]));
+      onChange(nfcDedup(chars, [nfc]));
     }
   }
 

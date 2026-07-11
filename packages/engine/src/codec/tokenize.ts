@@ -76,6 +76,15 @@ const COMMENT_LINE_RE = /^\s*c(?:\s|$)/i;
 // line is optional.
 const TARGET_PREFIX_RE = /^\$(keyman|keymanweb|keymanonly):\s*/i;
 
+// Per-line classifier regexes (trimmed-line matchers), hoisted to module
+// scope like the patterns above rather than allocated on every loop iteration.
+const COMMENT_TRIMMED_RE = /^c(?:\s|$)/i;
+const BEGIN_RE = /^begin\s/i;
+const GROUP_RE = /^group\s*\(/i;
+const STORE_RE = /^store\s*\(/i;
+const MATCH_RE = /^match\s*>/i;
+const NOMATCH_RE = /^nomatch\s*>/i;
+
 /**
  * Tokenize .kmn source text into a flat Token array.
  *
@@ -140,36 +149,36 @@ export function tokenize(source: string): Token[] {
     };
 
     // Comment: starts with `c` followed by whitespace, or `c` alone
-    if (/^c(?:\s|$)/i.test(trimmed)) {
+    if (COMMENT_TRIMMED_RE.test(trimmed)) {
       const commentText = trimmed.slice(1).trim();
       pushToken("comment", commentText);
       continue;
     }
 
     // begin directive
-    if (/^begin\s/i.test(trimmed)) {
+    if (BEGIN_RE.test(trimmed)) {
       pushToken("begin", trimmed);
       continue;
     }
 
     // group declaration
-    if (/^group\s*\(/i.test(trimmed)) {
+    if (GROUP_RE.test(trimmed)) {
       pushToken("group", trimmed);
       continue;
     }
 
     // store declaration (system or user)
-    if (/^store\s*\(/i.test(trimmed)) {
+    if (STORE_RE.test(trimmed)) {
       pushToken("store", trimmed);
       continue;
     }
 
     // match / nomatch transition rules (no + prefix)
-    if (/^match\s*>/i.test(trimmed)) {
+    if (MATCH_RE.test(trimmed)) {
       pushToken("match", trimmed);
       continue;
     }
-    if (/^nomatch\s*>/i.test(trimmed)) {
+    if (NOMATCH_RE.test(trimmed)) {
       pushToken("nomatch", trimmed);
       continue;
     }

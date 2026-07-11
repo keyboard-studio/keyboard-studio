@@ -109,6 +109,18 @@ export function applyTouchAssignments(
     workingRows[pos.rowIdx]!.keys[pos.keyIdx] = updated;
   }
 
+  // Shared not-found path: every mechanism below looks up the host key and,
+  // when absent, emits the same warning shape and skips the assignment.
+  function getWorkingKeyOrWarn(hostKey: string, char: string): TouchKeyIR | undefined {
+    const key = getWorkingKey(hostKey);
+    if (!key) {
+      warnings.push(
+        `[touch-apply] host key "${hostKey}" not found in phone default layer — assignment for "${char}" skipped`
+      );
+    }
+    return key;
+  }
+
   // Process each assignment in order, applying EVERY mechanism it carries —
   // a single character may combine multiple touch methods (e.g. longpress +
   // multitap on the same host key).
@@ -125,13 +137,8 @@ export function applyTouchAssignments(
         const hostKey = slotValues?.["hostKey"] ?? "";
         const char = slotValues?.["char"] ?? "";
 
-        const key = getWorkingKey(hostKey);
-        if (!key) {
-          warnings.push(
-            `[touch-apply] host key "${hostKey}" not found in phone default layer — assignment for "${char}" skipped`
-          );
-          continue;
-        }
+        const key = getWorkingKeyOrWarn(hostKey, char);
+        if (!key) continue;
 
         const existingSk = key.sk ?? [];
         // Dedupe: skip if already present by text/output OR by U_ id (shared
@@ -168,13 +175,8 @@ export function applyTouchAssignments(
         const direction = slotValues?.["direction"] ?? "";
         const char = slotValues?.["char"] ?? "";
 
-        const key = getWorkingKey(hostKey);
-        if (!key) {
-          warnings.push(
-            `[touch-apply] host key "${hostKey}" not found in phone default layer — assignment for "${char}" skipped`
-          );
-          continue;
-        }
+        const key = getWorkingKeyOrWarn(hostKey, char);
+        if (!key) continue;
 
         const newFlickKey: TouchKeyIR = {
           nodeId: minter.mint("touchKey"),
@@ -203,13 +205,8 @@ export function applyTouchAssignments(
         const hostKey = slotValues?.["hostKey"] ?? "";
         const char = slotValues?.["char"] ?? "";
 
-        const key = getWorkingKey(hostKey);
-        if (!key) {
-          warnings.push(
-            `[touch-apply] host key "${hostKey}" not found in phone default layer — assignment for "${char}" skipped`
-          );
-          continue;
-        }
+        const key = getWorkingKeyOrWarn(hostKey, char);
+        if (!key) continue;
 
         const existingMt = key.multitap ?? [];
         // Dedupe: same predicate as longpress sk — covers id-only multitap entries.
@@ -238,13 +235,8 @@ export function applyTouchAssignments(
         const hostKey = slotValues?.["hostKey"] ?? "";
         const char = slotValues?.["char"] ?? "";
 
-        const key = getWorkingKey(hostKey);
-        if (!key) {
-          warnings.push(
-            `[touch-apply] host key "${hostKey}" not found in phone default layer — assignment for "${char}" skipped`
-          );
-          continue;
-        }
+        const key = getWorkingKeyOrWarn(hostKey, char);
+        if (!key) continue;
 
         // Destructure out any existing `output` field so the U_-id supersedes it.
         // Preserve all other properties: nodeId, geometry (pad, width, sp),

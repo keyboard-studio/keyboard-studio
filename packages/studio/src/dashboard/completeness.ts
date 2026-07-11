@@ -24,6 +24,7 @@
 import { formatIRPath } from "@keyboard-studio/contracts";
 import type { IRPath, LintFinding } from "@keyboard-studio/contracts";
 import type { Step } from "../steps/types.ts";
+import { computeDataEdges } from "./model.ts";
 import type { StepGraph, StepGraphEdge } from "./model.ts";
 
 // ---------------------------------------------------------------------------
@@ -545,23 +546,10 @@ function buildMinimalStepGraph(manifest: readonly Step[]): StepGraph {
 
   // Order edges (spine/fork/join) — not needed by the five checks, but required
   // by the StepGraph shape.
-  const edges: import("./model.ts").StepGraphEdge[] = [];
+  const edges: StepGraphEdge[] = [];
 
   // Data edges: producer → consumer where writePaths ∩ inputPaths ≠ ∅.
-  const dataEdges: import("./model.ts").StepGraphEdge[] = [];
-  for (const producer of nodes) {
-    if (producer.writePaths.length === 0) continue;
-    const writeSet = new Set(producer.writePaths);
-    for (const consumer of nodes) {
-      if (consumer.id === producer.id) continue;
-      for (const inputPath of consumer.inputPaths) {
-        if (writeSet.has(inputPath)) {
-          dataEdges.push({ from: producer.id, to: consumer.id, kind: "spine" });
-          break;
-        }
-      }
-    }
-  }
+  const dataEdges: StepGraphEdge[] = computeDataEdges(nodes);
 
   return { nodes, edges, dataEdges };
 }

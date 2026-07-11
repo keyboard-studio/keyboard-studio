@@ -10,15 +10,16 @@ const FIRST_ARG_RE = /\b(index|if)\s*\(\s*([^=,)]*)/;
 export function checkIdentifiers(source: string): LintFinding[] {
   const findings: LintFinding[] = [];
   const lines = source.split("\n");
+  const regexes = [
+    new RegExp(SINGLE_ARG_RE.source, "gi"),
+    new RegExp(FIRST_ARG_RE.source, "gi"),
+  ];
 
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
     const line = lines[lineIdx] ?? "";
-    const regexes = [
-      new RegExp(SINGLE_ARG_RE.source, "gi"),
-      new RegExp(FIRST_ARG_RE.source, "gi"),
-    ];
 
     for (const re of regexes) {
+      re.lastIndex = 0;
       let match: RegExpExecArray | null;
       while ((match = re.exec(line)) !== null) {
         const name = (match[2] ?? "").trim();
