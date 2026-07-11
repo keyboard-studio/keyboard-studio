@@ -36,7 +36,6 @@ import { OutputScreen } from "./components/OutputScreen.tsx";
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
 import { AccountControl } from "./components/AccountControl.tsx";
-import { navigateTo } from "./lib/navigate.ts";
 import { manifest } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { StepHost } from "./components/StepHost.tsx";
@@ -341,7 +340,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const setTouchLayoutJson = useWorkingCopyStore((s) => s.setTouchLayoutJson);
   const instantiateFromBase = useWorkingCopyStore((s) => s.instantiateFromBase);
   const instantiateFromExisting = useWorkingCopyStore((s) => s.instantiateFromExisting);
-  const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
   const setValidatorFindings = useWorkingCopyStore((s) => s.setValidatorFindings);
 
