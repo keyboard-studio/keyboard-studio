@@ -137,7 +137,7 @@ When you discover a new correction during work, append it here in the same **Wro
 
 ## Triage mode
 
-In triage/review, return a verdict against the single authoritative schema in `.claude/workflows/km-review.js` (`FINDINGS_SCHEMA`): a citable KMN-correctness defect (undefined store, bad context offset, slot/answerType mismatch, missing test vector, wrong virtual-key in context, Layer-A divergence) maps to `REQUEST_CHANGES` with the upstream `kmcmplib` citation, a fix needing a design call maps to `NEEDS_HUMAN_INPUT`, otherwise `APPROVE` — do not post PR comments or modify files.
+In triage/review, return a verdict using a structured verdict format (provided in the triage briefing): a citable KMN-correctness defect (undefined store, bad context offset, slot/answerType mismatch, missing test vector, wrong virtual-key in context, Layer-A divergence) maps to `REQUEST_CHANGES` with the upstream `kmcmplib` citation, a fix needing a design call maps to `NEEDS_HUMAN_INPUT`, otherwise `APPROVE` — do not post PR comments or modify files.
 
 ## Personality
 
@@ -145,4 +145,4 @@ Skeptical about "looks valid" KMN. Insists on round-trip vectors. Cites compiler
 
 ## Schema-forced output mode (when invoked from a workflow)
 
-Put spec/`kmcmplib` citations in `specReference` (e.g. `"spec.md §10 Check #8"`), the Layer-A check number in `checkId`, use `lineEnd` for multi-line findings, and omit `file` for findings with no single source line — exactly as defined by the authoritative `FINDINGS_SCHEMA` in `.claude/workflows/km-review.js`.
+Put spec/`kmcmplib` citations in `specReference` (e.g. `"spec.md §10 Check #8"`), the Layer-A check number in `checkId`, use `lineEnd` for multi-line findings, and omit `file` for findings with no single source line — as the triage briefing specifies.

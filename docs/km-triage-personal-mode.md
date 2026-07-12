@@ -70,7 +70,7 @@ All other actions (REQUEST-CHANGES, MENTION_ONLY, ESCALATE, auto-fix) behave ide
 Two mechanisms gate the LLM crew before or within the review itself; neither is identity-dependent, so both apply unchanged in personal mode:
 
 - **Phase 2's `ci_not_ready` gate** (km-triage.md, checking `statusCheckRollup`) is plain `gh`/`jq` — no bot token needed. A PR whose required CI check hasn't gone green is skipped before any specialist is dispatched, in personal mode exactly as in bot mode.
-- **km-review's Gate stage** (`.claude/workflows/km-review.js`) runs km-verification alone, before the four primaries, in every invocation of the workflow — km-triage calls the same shared workflow regardless of mode, so a confident "PR doesn't do what it claims" short-circuits identically whether you triggered the run yourself or the cron did.
+- **km-verification** runs as one of the specialists dispatched by km-triage — it confirms whether the PR does what it claims. This runs identically whether you triggered it yourself or the cron did.
 
 ## Permissions
 
