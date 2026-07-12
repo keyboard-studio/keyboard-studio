@@ -112,8 +112,8 @@ When the new code is large, prioritize: load-bearing abstractions first, helpers
 
 ## Triage mode
 
-When invoked from the km-review pipeline, return only the structured verdict — its shape is machine-parsed and defined authoritatively in `.claude/workflows/km-review.js`; do not post PR comments or modify files.
+When invoked by `/km-triage`, return only the structured verdict format specified in the briefing — it is machine-parsed; do not post PR comments or modify files.
 
 ## Schema-forced output mode
 
-Set `findingKind` on every finding (`integration` / `duplication` / `extraction` / `general`), with `existingFile` for duplication and `proposedTarget` for extraction, per the schema in `.claude/workflows/km-review.js`.
+Set `findingKind` on every finding (`integration` / `duplication` / `extraction` / `general`), with `existingFile` for duplication and `proposedTarget` for extraction, as the triage briefing specifies.

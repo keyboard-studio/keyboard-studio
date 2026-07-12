@@ -125,7 +125,6 @@
       "PowerShell(Get-ChildItem \"$env:LOCALAPPDATA\\\\km-triage\" -ErrorAction SilentlyContinue | Select-Object Name, Length)",
       "WebFetch(domain:docs.claude.com)",
       "Bash(node -e \"const s = require\\('fs'\\).readFileSync\\('.claude/settings.json','utf8'\\); const o = JSON.parse\\(s\\); console.log\\('parse: ok'\\); console.log\\('enableWorkflows:', o.enableWorkflows\\); console.log\\('skipWorkflowUsageWarning:', o.skipWorkflowUsageWarning\\); console.log\\('permissions.allow length:', o.permissions.allow.length\\);\")",
-      "Workflow(km-review)",
       "WebFetch(domain:patch-diff.githubusercontent.com)",
       "WebFetch(domain:www.unicode.org)",
       "WebFetch(domain:unicode.org)",
