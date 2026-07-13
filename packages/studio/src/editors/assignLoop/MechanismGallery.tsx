@@ -210,9 +210,16 @@ type Method = "sequence" | "deadkey" | "swap" | "ralt";
 type SwapLayer = "base" | "shift";
 
 // S-08 "layer + key" target combo. A list of up to four ModifierTokens
-// (SHIFT / CAPS / NCAPS / the alt family / the ctrl family), generalized
-// beyond the old binary 'ralt'|'shift-ralt' toggle (engine's modifierCombos.ts,
-// `modifier_as_layer_switch`). Unlike the S-01 Shift toggle, the layer combo
+// (SHIFT / CAPS / the alt family / the ctrl family — NCAPS is not offered,
+// see computeModifierPool), generalized beyond the old binary
+// 'ralt'|'shift-ralt' toggle (engine's modifierCombos.ts,
+// `modifier_as_layer_switch`). A ctrl-family + chiral-alt-family pick (e.g.
+// Ctrl+RAlt) unifies to the all-generic Ctrl+Alt at apply time
+// (modifierCombos.ts's canonicalizeCombo — a mixed generic+chiral combo is
+// kmcmplib-invalid and undeliverable by any real keypress, while the
+// all-generic form matches both a physical Ctrl+Alt press and a Windows
+// AltGr press via Keyman core's IsEquivalentShift).
+// Unlike the S-01 Shift toggle, the layer combo
 // is NOT gated on mnemonic layouts: `store(&mnemoniclayout)` changes only how
 // the base character of a key spec is resolved (base-layout character vs
 // physical position); a SHIFT flag inside the combo selects the shifted
@@ -233,7 +240,10 @@ const MAX_RALT_SLOTS = 4;
  *                  neither chiral form) -> offer ALT only; neither -> offer both.
  *   - ctrl family: RCTRL in use -> offer RCTRL only; otherwise -> offer CTRL only.
  * LCTRL is never offered (product decision — MODIFIER_EXCLUSIONS never lists
- * it as a chooseable token, only as an exclusion partner).
+ * it as a chooseable token, only as an exclusion partner). NCAPS is never
+ * offered either: a rule with no caps token already matches caps-off, so it
+ * is not a distinct selectable S-08 layer — modifierCombos.ts's
+ * canonicalizeCombo strips a bare NCAPS rather than modeling it as one.
  */
 function computeModifierPool(inUse: ReadonlySet<ModifierToken>): ModifierToken[] {
   const altFamily: ModifierToken[] =
@@ -243,7 +253,7 @@ function computeModifierPool(inUse: ReadonlySet<ModifierToken>): ModifierToken[]
         ? ["ALT"]
         : ["RALT", "LALT"];
   const ctrlFamily: ModifierToken[] = inUse.has("RCTRL") ? ["RCTRL"] : ["CTRL"];
-  return ["SHIFT", ...ctrlFamily, ...altFamily, "CAPS", "NCAPS"];
+  return ["SHIFT", ...ctrlFamily, ...altFamily, "CAPS"];
 }
 
 /**

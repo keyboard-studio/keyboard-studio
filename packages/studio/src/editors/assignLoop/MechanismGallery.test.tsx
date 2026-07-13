@@ -1206,7 +1206,44 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     );
   });
 
-  it("emits a canonically-ordered 3-layer combo (CTRL + RALT + CAPS)", async () => {
+  it("unifies an author's Ctrl + (chiral) Alt pick to the generic [CTRL ALT K_E] (#defect: AltGr not working)", async () => {
+    // The author picks slot 1 = Ctrl, slot 2 = an alt-family token — the
+    // exact "Ctrl+Alt" selection reported as not working. A mixed
+    // generic-ctrl + chiral-alt rule is kmcmplib-invalid
+    // (KM_WARNING_KMCMP_4202659) and can never be delivered by a real
+    // keypress either. The picker must emit the all-generic, functional
+    // [CTRL ALT K_X] rule instead.
+    instantiateWorkingCopy();
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    fireEvent.change(screen.getByLabelText(/Base key for layer-switch combo/i), {
+      target: { value: "K_E" },
+    });
+    fireEvent.change(screen.getByLabelText(/Layer 1 for layer-switch combo/i), {
+      target: { value: "CTRL" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    fireEvent.change(screen.getByLabelText(/Layer 2 for layer-switch combo/i), {
+      target: { value: "LALT" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for ε/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe("[CTRL ALT K_E]");
+  });
+
+  it("unifies a Ctrl + RAlt + Caps pick to the generic [CTRL ALT CAPS K_E] (chirality unification — mixed generic+chiral is kmcmplib-invalid)", async () => {
+    // Slot 1 defaults to RALT; adding CTRL alongside it is a generic-ctrl +
+    // chiral-alt pairing, which modifierCombos.ts's canonicalizeCombo
+    // unifies to all-generic CTRL+ALT (a mixed generic+chiral combo is
+    // kmcmplib-invalid and undeliverable by any real keypress). CAPS is
+    // preserved.
     instantiateWorkingCopy();
     seedInventory(["ε"]);
     await act(async () => {
@@ -1231,7 +1268,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
       .getState()
       .session.assignments.filter((a) => a.modality === "physical");
     expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
-      "[CTRL RALT CAPS K_E]",
+      "[CTRL ALT CAPS K_E]",
     );
   });
 
@@ -1274,7 +1311,11 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     expect(optionValues).not.toContain("RALT");
   });
 
-  it("excludes NCAPS from the next dropdown once CAPS is chosen in an earlier slot", async () => {
+  it("excludes CAPS from the next dropdown once CAPS is chosen in an earlier slot, and never offers NCAPS at all", async () => {
+    // NCAPS is not a distinct selectable S-08 layer (computeModifierPool
+    // never includes it) — a rule with no caps token already matches
+    // caps-off, so it must not appear in ANY slot's options, regardless of
+    // what an earlier slot holds.
     instantiateWorkingCopy();
     seedInventory(["ε"]);
     await act(async () => {
@@ -1285,6 +1326,9 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     const firstLayerSelect = screen.getByLabelText(
       /Layer 1 for layer-switch combo/i,
     ) as HTMLSelectElement;
+    const firstOptionValues = Array.from(firstLayerSelect.options).map((o) => o.value);
+    expect(firstOptionValues).not.toContain("NCAPS");
+
     fireEvent.change(firstLayerSelect, { target: { value: "CAPS" } });
     fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
     const secondLayerSelect = screen.getByLabelText(
@@ -1465,7 +1509,8 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     // null, so MechanismGallery's workingIr resolves to null even though
     // selectedBaseKeyboard is set. collectModifierTokensInUse must not be
     // called on a null IR; the pool must fall back to the documented
-    // defaults (SHIFT/CTRL/RALT/LALT/CAPS/NCAPS) rather than crashing.
+    // defaults (SHIFT/CTRL/RALT/LALT/CAPS — NCAPS is never offered) rather
+    // than crashing.
     seedInventory(["ε"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -1483,7 +1528,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
       .map((o) => o.value)
       .filter((v) => v !== "");
     expect(new Set(optionValues)).toEqual(
-      new Set(["SHIFT", "CTRL", "RALT", "LALT", "CAPS", "NCAPS"]),
+      new Set(["SHIFT", "CTRL", "RALT", "LALT", "CAPS"]),
     );
 
     // Applying still works end to end against the fallback pool.

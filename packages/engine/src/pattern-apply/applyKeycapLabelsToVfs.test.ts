@@ -610,7 +610,13 @@ describe("applyKeycapLabelsToVfs — S-08 generalized combos", () => {
     expect(xml).not.toContain("<usealtgr/>");
   });
 
-  it("synthesizes a new kvks layer WITH <usealtgr/> for a combo containing RALT", () => {
+  it("unifies a Ctrl+RAlt combo to generic Ctrl+Alt (chirality unification), synthesizing a plain shift=\"CA\" layer with no <usealtgr/>", () => {
+    // [CTRL RALT K_B] mixes a generic CTRL with a chiral RALT —
+    // modifierCombos.ts's chirality unification demotes RALT to ALT before
+    // this module ever sees it, since a mixed generic+chiral combo is
+    // kmcmplib-invalid (KM_WARNING_KMCMP_4202659) and undeliverable by any
+    // real keypress. The resulting all-generic [CTRL ALT] combo has no RALT
+    // token, so no <usealtgr/> hint is added — it is not an AltGr-only layer.
     const vfs = makeVfs([{ path: "source/test.kvks", content: KVKS_BASE }]);
 
     const { warnings } = applyKeycapLabelsToVfs(vfs, "test", [
@@ -619,11 +625,15 @@ describe("applyKeycapLabelsToVfs — S-08 generalized combos", () => {
 
     expect(warnings).toHaveLength(0);
     const xml = vfs.get("source/test.kvks")?.content as string;
-    expect(xml).toContain('<layer shift="CRA">');
-    expect(xml).toContain("<usealtgr/>");
+    expect(xml).toContain('<layer shift="CA">');
+    expect(xml).not.toContain('shift="RA"');
+    expect(xml).not.toContain("<usealtgr/>");
   });
 
-  it("patches the generalized touch layer id for a CTRL+ALT combo", () => {
+  it("leaves an already all-generic Ctrl+Alt combo as-is, patching the \"ctrl-alt\" touch layer (not \"rightalt\")", () => {
+    // [CTRL ALT K_A] has no chiral token, so chirality unification is a
+    // no-op — the touch layer id is the generic fallback "ctrl-alt", not the
+    // attested "rightalt" id (which is reserved for a pure RALT combo).
     const touchLayout = JSON.stringify({
       tablet: {
         layer: [

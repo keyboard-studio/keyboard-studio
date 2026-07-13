@@ -13,17 +13,46 @@
  * gallery even though the codec can parse `LCTRL` elsewhere.
  *
  * This module is the single place that:
- *   - validates/canonicalizes a combo (dedupe + stable order + exclusion check),
+ *   - validates/canonicalizes a combo (dedupe + stable order + exclusion
+ *     check + two normalizing folds — see below),
  *   - converts a combo to/from the `.kmn` `[TOK1 TOK2 K_X]` bracket notation,
  *   - maps a combo to its `.keyman-touch-layout` layer id (or `null` — touch
- *     has no CapsLock state, so any combo containing CAPS/NCAPS is
- *     desktop-only and must never be silently folded into another layer),
+ *     has no CapsLock state, so any combo containing CAPS is desktop-only
+ *     and must never be silently folded into another layer),
  *   - maps a combo to its `.kvks` `shift="..."` token (or `null`, same CAPS
  *     restriction),
  *   - scans a {@link KeyboardIR} for the modifier tokens / combos already in
  *     use, generalizing scaffoldTouchLayout.ts's `classifyModifiers` (which
  *     stays untouched — it buckets into the fixed 3-layer touch template and
  *     has its own callers).
+ *
+ * `canonicalizeCombo` applies two normalizing steps AFTER the exclusion
+ * check, so a combo that reaches either one is already guaranteed
+ * exclusion-consistent (at most one token per family):
+ *   - Chirality unification: a combo mixing a GENERIC ctrl-or-alt token
+ *     (CTRL/ALT) with a CHIRAL ctrl-or-alt token (RCTRL/RALT/LALT, plus raw
+ *     spellings LCTRL/LEFTCTRL/RIGHTCTRL/LEFTALT/RIGHTALT recognized before
+ *     the `ModifierToken` narrowing filter) is kmcmplib-invalid
+ *     (`KM_WARNING_KMCMP_4202659`: "contains Ctrl,Alt and
+ *     LCtrl,LAlt,RCtrl,RAlt sets of modifiers. Use only one or the other set
+ *     for web target") and can never be delivered by a physical keypress
+ *     either (hardware/OS delivers either all-chiral bits or the all-generic
+ *     K_CTRLFLAG/K_ALTFLAG pair, never a mix). On such a mix, every chiral
+ *     ctrl/alt token is demoted to its generic form — see
+ *     {@link unifyChiralityWords} — rather than picking one side, because the
+ *     resulting all-generic combo (e.g. `[CTRL ALT]`) matches BOTH a genuine
+ *     physical Ctrl+Alt press and a Windows AltGr ghost via Keyman core's
+ *     `IsEquivalentShift`. A combo carrying ONLY chiral tokens (no generic
+ *     CTRL/ALT present) — e.g. `[RALT]` alone or the valid all-chiral
+ *     `[LCTRL RALT]` — is left untouched.
+ *   - NCAPS collapse: NCAPS is not modeled as a first-class layer — a rule
+ *     with no caps token already matches caps-off, so `[X]` and
+ *     `[X NCAPS]` are functionally identical. A bare NCAPS token is
+ *     stripped outright (`["RALT","NCAPS"]` -> `["RALT"]`,
+ *     `["NCAPS"]` -> `[]`). CAPS (caps-lock-ON) is untouched — it is a
+ *     genuine distinct layer. The caps-ON/caps-OFF case-pair *quad* this
+ *     collapse is not about is built directly by `buildCasePairRuleLines`/
+ *     `buildBaseRuleLines` (shiftRules.ts), not through this function.
  */
 
 import type { KeyboardIR, IRRule, StoreItem } from "@keyboard-studio/contracts";
@@ -84,16 +113,81 @@ export const MODIFIER_EXCLUSIONS: Record<ModifierToken, readonly ModifierToken[]
 };
 
 // ---------------------------------------------------------------------------
+// Chirality unification — see module doc. A combo mixing a GENERIC ctrl/alt
+// token with a CHIRAL one is kmcmplib-invalid and physically undeliverable;
+// demote the chiral ctrl/alt tokens to generic so the combo becomes valid.
+// ---------------------------------------------------------------------------
+
+/** Generic ctrl/alt words — the family-neutral tokens a mix normalizes onto. */
+const GENERIC_CTRL_ALT_WORDS: ReadonlySet<string> = new Set(["CTRL", "ALT"]);
+
+/**
+ * Chiral ctrl-family words — deliberately broader than {@link ModifierToken}
+ * itself. LCTRL/LEFTCTRL/RIGHTCTRL are included even though only RCTRL is a
+ * chooseable `ModifierToken` (see module doc): the codec can still parse a
+ * hand-written `LCTRL` from `.kmn` text, and without recognizing it here a
+ * raw `[LCTRL ALT K_X]` rule would have its LCTRL silently dropped by
+ * `isModifierToken`/`normalizeModifierWord` BEFORE this normalization ever
+ * saw it, misreading a mixed rule as bare generic ALT.
+ */
+const CHIRAL_CTRL_WORDS: ReadonlySet<string> = new Set([
+  "LCTRL",
+  "RCTRL",
+  "LEFTCTRL",
+  "RIGHTCTRL",
+]);
+
+/** Chiral alt-family words — RIGHTALT/LEFTALT are the long-form spellings. */
+const CHIRAL_ALT_WORDS: ReadonlySet<string> = new Set(["LALT", "RALT", "LEFTALT", "RIGHTALT"]);
+
+function demoteChiralCtrlAltWord(word: string): string {
+  if (CHIRAL_CTRL_WORDS.has(word)) return "CTRL";
+  if (CHIRAL_ALT_WORDS.has(word)) return "ALT";
+  return word;
+}
+
+/**
+ * Demote every chiral ctrl/alt word to its generic form IF the combo mixes a
+ * generic ctrl/alt token (CTRL or ALT) with a chiral one — a no-op otherwise,
+ * in particular for a combo carrying ONLY chiral tokens (no generic present),
+ * which is left untouched (e.g. `[RALT]` alone, or the valid all-chiral
+ * `[LCTRL RALT]`). Operates on raw strings so it can run both on `.kmn`/IR
+ * text (before the `ModifierToken` narrowing filter drops an unrecognized
+ * LCTRL) and, via {@link unifyChirality}, on already-typed combos (the
+ * picker's path).
+ */
+function unifyChiralityWords(words: readonly string[]): string[] {
+  const hasGeneric = words.some((w) => GENERIC_CTRL_ALT_WORDS.has(w));
+  const hasChiral = words.some((w) => CHIRAL_CTRL_WORDS.has(w) || CHIRAL_ALT_WORDS.has(w));
+  if (!hasGeneric || !hasChiral) return [...words];
+  return words.map(demoteChiralCtrlAltWord);
+}
+
+/**
+ * Typed wrapper around {@link unifyChiralityWords} for `canonicalizeCombo`'s
+ * already-`ModifierToken[]` input. The cast is safe: the function only ever
+ * maps input members to other `ModifierToken` values (CTRL/ALT) or leaves
+ * them as-is.
+ */
+function unifyChirality(tokens: readonly ModifierToken[]): ModifierToken[] {
+  return unifyChiralityWords(tokens) as ModifierToken[];
+}
+
+// ---------------------------------------------------------------------------
 // Canonicalization
 // ---------------------------------------------------------------------------
 
 /**
- * Dedupe and order a modifier combo canonically (see {@link CANONICAL_ORDER}).
+ * Dedupe and order a modifier combo canonically (see {@link CANONICAL_ORDER}),
+ * after applying chirality unification and the NCAPS collapse (see module
+ * doc).
  *
  * @throws if two mutually-exclusive tokens (per {@link MODIFIER_EXCLUSIONS})
  *         are both present — this can only happen for a hand-built or
  *         corrupted combo; a combo produced by the mechanism gallery's own
- *         dropdown exclusion logic can never reach this state.
+ *         dropdown exclusion logic can never reach this state. Checked
+ *         BEFORE the normalization below, so a combo that reaches it is
+ *         already guaranteed to carry at most one token per family.
  */
 export function canonicalizeCombo(tokens: readonly ModifierToken[]): ModifierToken[] {
   const unique = [...new Set(tokens)];
@@ -107,7 +201,11 @@ export function canonicalizeCombo(tokens: readonly ModifierToken[]): ModifierTok
       }
     }
   }
-  return unique.sort(
+
+  const unified = [...new Set(unifyChirality(unique))];
+  const withoutNcaps = unified.filter((t) => t !== "NCAPS");
+
+  return withoutNcaps.sort(
     (a, b) => CANONICAL_ORDER.indexOf(a) - CANONICAL_ORDER.indexOf(b),
   );
 }
@@ -146,7 +244,13 @@ export function parseKeySpec(spec: string): { tokens: ModifierToken[]; vkey: str
   const vkey = parts[parts.length - 1] ?? "";
   if (!vkey) return null;
 
-  const rawTokens = parts.slice(0, -1).filter(isModifierToken);
+  // Unify a raw generic+chiral ctrl/alt mix (including a hand-written LCTRL —
+  // see unifyChiralityWords) BEFORE the ModifierToken narrowing filter below,
+  // which would otherwise silently drop an unrecognized LCTRL and misread
+  // the rule as bare generic ALT (or, for a pure-chiral pairing with no
+  // generic present, leave it alone — see module doc).
+  const rawWords = unifyChiralityWords(parts.slice(0, -1));
+  const rawTokens = rawWords.filter(isModifierToken);
   return { tokens: canonicalizeCombo(rawTokens), vkey };
 }
 
@@ -154,26 +258,7 @@ export function parseKeySpec(spec: string): { tokens: ModifierToken[]; vkey: str
 // Touch layer id mapping
 // ---------------------------------------------------------------------------
 
-/**
- * Attested corpus touch layer ids, keyed by canonical combo join-key. The
- * attested 2-token forms are NOT internally consistent about whether SHIFT
- * leads or trails ("rightalt-shift" vs "shift-ctrl") — they are corpus fact,
- * not a derivable rule, so they are looked up verbatim rather than computed.
- */
-const ATTESTED_TOUCH_LAYER_IDS: ReadonlyMap<string, string> = new Map([
-  [comboJoinKey([]), "default"],
-  [comboJoinKey(["SHIFT"]), "shift"],
-  [comboJoinKey(["RALT"]), "rightalt"],
-  [comboJoinKey(["ALT"]), "alt"],
-  [comboJoinKey(["LALT"]), "alt"],
-  [comboJoinKey(["SHIFT", "RALT"]), "rightalt-shift"],
-  [comboJoinKey(["CTRL"]), "ctrl"],
-  [comboJoinKey(["RCTRL"]), "rightctrl"],
-  [comboJoinKey(["SHIFT", "CTRL"]), "shift-ctrl"],
-  [comboJoinKey(["SHIFT", "RCTRL"]), "rightctrl-shift"],
-]);
-
-/** Per-token id fragment used by the fallback rule for unattested combos. */
+/** Per-token id fragment used to build a combo's touch layer id. */
 const TOUCH_ID_FRAGMENT: Partial<Record<ModifierToken, string>> = {
   SHIFT: "shift",
   CTRL: "ctrl",
@@ -184,29 +269,56 @@ const TOUCH_ID_FRAGMENT: Partial<Record<ModifierToken, string>> = {
 };
 
 /**
+ * Precedence order for joining a combo's tokens into a `.keyman-touch-layout`
+ * layer id — mirrors the LIVE embedded KeymanWeb engine's own navigable-
+ * layer-id construction, `Layouts.getLayerId` (vendored at
+ * simulator/vendor/keyman/engine/keyboard/keyboards/defaultLayouts.ts),
+ * which checks bit flags in ascending value order: LCTRLFLAG, RCTRLFLAG,
+ * LALTFLAG, RALTFLAG, K_SHIFTFLAG, K_CTRLFLAG, K_ALTFLAG. LCTRL is omitted
+ * below — it is not an offered {@link ModifierToken} (see module doc) — so
+ * the order here is RCTRL, LALT, RALT, SHIFT, CTRL, ALT.
+ *
+ * This is DELIBERATELY DIFFERENT from {@link CANONICAL_ORDER} (SHIFT, then
+ * the ctrl family, then the alt family), which governs the `.kmn` bracket
+ * notation and the `.kvks` shift token — both of those follow their own,
+ * separately-verified corpus convention (see comboToKvksShiftToken's doc),
+ * not the KMW runtime's bit order. The original bug was exactly this: the
+ * touch-layer-id builder used to reuse CANONICAL_ORDER instead of this order.
+ */
+const TOUCH_LAYER_PRECEDENCE_ORDER: readonly ModifierToken[] = [
+  "RCTRL",
+  "LALT",
+  "RALT",
+  "SHIFT",
+  "CTRL",
+  "ALT",
+];
+
+/**
  * Map a combo to its `.keyman-touch-layout` layer id.
  *
- * Returns `null` for any combo containing CAPS/NCAPS — touch has no
- * CapsLock state, so these combos are desktop-only; callers MUST treat
- * `null` as "no touch surface for this combo", never silently merge it into
- * another layer (e.g. plain shift).
+ * Returns `null` for any combo containing CAPS — touch has no CapsLock
+ * state, so a CAPS-bearing combo is desktop-only; callers MUST treat `null`
+ * as "no touch surface for this combo", never silently merge it into
+ * another layer (e.g. plain shift). NCAPS never reaches this check: it is
+ * stripped by {@link canonicalizeCombo} before this function ever sees it —
+ * a bare NCAPS combo collapses to the base/`"default"` layer, same as `[]`.
  *
- * Attested 1- and 2-token combos come from {@link ATTESTED_TOUCH_LAYER_IDS}.
- * Unattested 3-4 token stacks (and any 2-token stack not in the table, e.g.
- * CTRL+ALT) fall back to a documented, stable-but-arbitrary rule:
- * concatenate each token's {@link TOUCH_ID_FRAGMENT} in canonical order,
- * joined by `-`. The id is an opaque key — internal consistency (same combo
- * always yields the same id) matters more than matching the attested
- * exceptions' inconsistent ordering.
+ * Tokens are joined in {@link TOUCH_LAYER_PRECEDENCE_ORDER} order — every id
+ * this produces has been verified to reproduce the full set of ids this
+ * module used to hand-code as "attested corpus fact" (see
+ * modifierCombos.test.ts), so that lookup table has been removed as
+ * redundant; this is now the single source of truth for the id.
  */
 export function comboToTouchLayerId(tokens: readonly ModifierToken[]): string | null {
   const canon = canonicalizeCombo(tokens);
-  if (canon.includes("CAPS") || canon.includes("NCAPS")) return null;
+  if (canon.includes("CAPS")) return null;
+  if (canon.length === 0) return "default";
 
-  const attested = ATTESTED_TOUCH_LAYER_IDS.get(comboJoinKey(canon));
-  if (attested !== undefined) return attested;
-
-  return canon.map((t) => TOUCH_ID_FRAGMENT[t]).join("-");
+  const ordered = [...canon].sort(
+    (a, b) => TOUCH_LAYER_PRECEDENCE_ORDER.indexOf(a) - TOUCH_LAYER_PRECEDENCE_ORDER.indexOf(b),
+  );
+  return ordered.map((t) => TOUCH_ID_FRAGMENT[t]).join("-");
 }
 
 // ---------------------------------------------------------------------------
@@ -226,15 +338,20 @@ const KVKS_FRAGMENT: Partial<Record<ModifierToken, string>> = {
 /**
  * Map a combo to its `.kvks` `<layer shift="...">` token, e.g.
  * `["SHIFT","RALT"]` → `"SRA"` (matching the pre-existing hard-coded
- * RA/SRA convention exactly, since SHIFT always sorts before the alt family).
+ * RA/SRA convention exactly, since {@link CANONICAL_ORDER} sorts SHIFT
+ * before the ctrl family before the alt family — independently confirmed
+ * against shipped `.kvks` corpus data, e.g. `"SCA"`/`"SRCRA"`/`"SLA"`. Unlike
+ * {@link comboToTouchLayerId}, this does NOT follow the live KMW engine's
+ * bit-precedence order — the two surfaces use different conventions).
  *
- * Returns `null` for any combo containing CAPS/NCAPS — `.kvks` has no
+ * Returns `null` for any combo containing CAPS — `.kvks` has no
  * caps-lock-state layer; a CAPS-including combo has no distinct desktop OSK
- * keycap of its own (mirrors `parseS01RuleLine`'s CAPS-line skip).
+ * keycap of its own (mirrors `parseS01RuleLine`'s CAPS-line skip). NCAPS
+ * never reaches this check: it is stripped by {@link canonicalizeCombo} first.
  */
 export function comboToKvksShiftToken(tokens: readonly ModifierToken[]): string | null {
   const canon = canonicalizeCombo(tokens);
-  if (canon.includes("CAPS") || canon.includes("NCAPS")) return null;
+  if (canon.includes("CAPS")) return null;
 
   return canon.map((t) => KVKS_FRAGMENT[t]).join("");
 }
@@ -254,7 +371,11 @@ function extractRuleModifiers(rule: IRRule): ModifierToken[] {
   const found = new Set<ModifierToken>();
   for (const el of rule.context) {
     if (el.kind !== "vkey") continue;
-    for (const mod of el.modifiers) {
+    // Unify a raw generic+chiral ctrl/alt mix before the normalizeModifierWord
+    // narrowing below — same rationale as parseKeySpec: an existing
+    // hand-written `[LCTRL ALT K_X]` rule must not be misread as bare
+    // generic ALT once LCTRL is silently dropped.
+    for (const mod of unifyChiralityWords(el.modifiers)) {
       const token = normalizeModifierWord(mod);
       if (token) found.add(token);
     }
