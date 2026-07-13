@@ -59,6 +59,18 @@ const candidates = findKeyboardBaseCandidates(
 // each keyboard once. For a target with NO same-script relative and no fallback hit: [].
 ```
 
+**Validated pair (pinned Glottolog 5.3, commit `072ca0d`)** — recorded from a run of this
+scenario during Phase 6 (T029):
+
+- Target: **Xhosa** (`xho`, glottocode `xhos1239`), Latin script — no keyboard.
+- Closest relative: **Zulu** (`zul`, glottocode `zulu1248`), Latin script, `pathLength = 2`
+  (both under Nuclear Nguni). `relatedIsoCodes("xho")` ranks it first, ahead of Ndebele
+  (`nde`/`nbl`) and Swati (`ssw`) at `pathLength = 3`.
+- `findKeyboardBaseCandidates({ bcp47: "xho" }, …)` with a phonebook giving Zulu a Latin
+  keyboard returns exactly that keyboard at `tier: "genealogical"`, `closestRelative.distance = 2`.
+  A Cyrillic-script Zulu keyboard in the same phonebook is excluded (FR-017b); a phonebook
+  with **only** the wrong-script keyboard yields `[]`.
+
 ## Guardrails to verify manually
 
 - No runtime network / host-disk access (grep the package for `fetch`/`fs` in `src/` — only the `scripts/` build files touch I/O).
