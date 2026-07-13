@@ -31,12 +31,17 @@ import https from 'node:https';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
-const OUT_DIR = join(ROOT, 'packages', 'glottolog', 'data', 'glottolog');
+// OUT_DIR and the version file are overridable via env solely so the fetch-guard
+// test can exercise the fail-loud path hermetically (placeholder SHA → non-zero
+// exit, no partial write) against a throwaway pin + output dir. Production always
+// uses the defaults below.
+const OUT_DIR = process.env.GLOTTOLOG_OUT_DIR ?? join(ROOT, 'packages', 'glottolog', 'data', 'glottolog');
 const SOURCES_FILE = join(OUT_DIR, 'SOURCES.json');
+const VERSION_FILE = process.env.GLOTTOLOG_VERSION_FILE ?? join(__dirname, 'glottolog-version.json');
 
 const computeShaOnly = process.argv.includes('--compute-sha');
 
-const cfg = JSON.parse(readFileSync(join(__dirname, 'glottolog-version.json'), 'utf8'));
+const cfg = JSON.parse(readFileSync(VERSION_FILE, 'utf8'));
 const { commit, urlTemplate, files, notice } = cfg;
 
 if (!Array.isArray(files) || files.length === 0) {
