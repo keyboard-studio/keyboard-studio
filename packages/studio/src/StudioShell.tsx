@@ -47,6 +47,7 @@ import {
   startDraftAutosave,
   type DraftMeta,
 } from "./lib/draftAutosave.ts";
+import { hasVisited } from "./lib/firstVisit.ts";
 import { TEXT_MAIN, FONT } from "./survey/surveyStyles.ts";
 
 // Offer the resume banner only once per page load — on the first SurveyView
@@ -80,10 +81,21 @@ function isRouteId(v: string): v is RouteId {
 // useRoute — reads window.location.hash and reacts to hashchange events
 // ---------------------------------------------------------------------------
 
+// First-visit landing gate (proposal §9). Decides where an empty or unknown
+// hash lands. A genuine first-time visitor sees the welcome screen; a returning
+// visitor — or one with a resumable draft (the survey route surfaces the resume
+// banner) — goes straight into the survey. Internal navigation always sets a
+// valid hash, so this only governs the initial landing and stale-hash cases.
+function defaultLandingRoute(): RouteId {
+  if (hasVisited()) return "survey";
+  if (loadDraftMeta() !== null) return "survey";
+  return "welcome";
+}
+
 function useRoute(): RouteId {
   const hashToRoute = (): RouteId => {
     const raw = window.location.hash.slice(1);
-    return isRouteId(raw) ? raw : "survey";
+    return isRouteId(raw) ? raw : defaultLandingRoute();
   };
 
   const [route, setRoute] = useState<RouteId>(hashToRoute);

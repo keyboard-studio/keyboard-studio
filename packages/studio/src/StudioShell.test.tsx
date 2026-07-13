@@ -456,6 +456,10 @@ vi.mock("./components/OutputScreen.tsx", () => ({
   OutputScreen: () => <div data-testid="output-screen-root">output-screen</div>,
 }));
 
+vi.mock("./components/WelcomeScreen.tsx", () => ({
+  WelcomeScreen: () => <div data-testid="welcome-screen-root">welcome-screen</div>,
+}));
+
 // Shallow stub for DashboardView — only rendered in dev/VITE_SHOW_FLOWMAP builds.
 vi.mock("./dashboard/DashboardView.tsx", () => ({
   FlowMapView: () => <div data-testid="flow-map-view">flow-map</div>,
@@ -544,6 +548,9 @@ afterEach(() => {
   cleanup();
   useWorkingCopyStore.getState().reset();
   vi.clearAllMocks();
+  // The first-visit gate reads ks.visited / the ks.studio.draft key from
+  // localStorage; clear it so gate state can't leak between tests.
+  localStorage.clear();
 });
 
 // ---------------------------------------------------------------------------
@@ -752,6 +759,76 @@ describe("StudioShell — route: #output renders OutputScreen", () => {
     // PreviewScreen must NOT be present — these are distinct screens.
     expect(screen.queryByTestId("preview-screen-root")).toBeNull();
     expect(screen.queryByText(/coming soon/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// StudioShell first-visit landing gate (proposal §9). With no explicit hash:
+//   • a true first-time visitor lands on the WelcomeScreen;
+//   • a returning visitor (ks.visited) or one with a resumable draft skips
+//     welcome and lands in the survey.
+// An explicit valid hash (#preview/#output/#survey) always wins — see the
+// route regressions above.
+// ---------------------------------------------------------------------------
+
+describe("StudioShell — first-visit landing gate", () => {
+  it("mounts WelcomeScreen (not the survey) on a first visit with no hash", async () => {
+    window.location.hash = "";
+    localStorage.clear(); // pristine browser: never visited, no draft
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    // The survey wizard's first step must NOT be present.
+    expect(screen.queryByTestId("stage-identity")).toBeNull();
+  });
+
+  it("falls back to WelcomeScreen for an unknown hash on a first visit", async () => {
+    window.location.hash = "#does-not-exist";
+    localStorage.clear();
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+  });
+
+  it("skips welcome and lands in the survey for a returning visitor", async () => {
+    window.location.hash = "";
+    localStorage.clear();
+    localStorage.setItem("ks.visited", "1"); // browser has entered the app before
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("stage-identity")).toBeTruthy();
+    expect(screen.queryByTestId("welcome-screen-root")).toBeNull();
+  });
+
+  it("skips welcome and lands in the survey when a resumable draft exists", async () => {
+    window.location.hash = "";
+    localStorage.clear();
+    // A minimally-valid draft (version + savedAt + survey) so loadDraftMeta()
+    // returns non-null; the survey route surfaces the resume banner.
+    localStorage.setItem(
+      "ks.studio.draft",
+      JSON.stringify({
+        version: 1,
+        savedAt: Date.now(),
+        survey: { activeStepId: "identity", identityResult: null, scaffoldSpec: null },
+      }),
+    );
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("stage-identity")).toBeTruthy();
+    expect(screen.queryByTestId("welcome-screen-root")).toBeNull();
   });
 });
 
