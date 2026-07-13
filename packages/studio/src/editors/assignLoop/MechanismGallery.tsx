@@ -259,8 +259,10 @@ const MAX_RALT_SLOTS = 4;
  *                  already uses RCTRL or LCTRL — once either is in use,
  *                  offer LCTRL and RCTRL (no generic CTRL).
  * NCAPS is never offered: a rule with no caps token already matches caps-off,
- * so it is not a distinct selectable S-08 layer — modifierCombos.ts's
- * canonicalizeCombo strips a bare NCAPS rather than modeling it as one.
+ * so it is not a distinct selectable S-08 layer. (This is enforced here by the
+ * product rule below — the pool simply never includes NCAPS — independent of
+ * how modifierCombos.ts's scan path handles a NCAPS token found in an imported
+ * keyboard's own rules.)
  */
 function computeModifierPool(inUse: ReadonlySet<ModifierToken>): ModifierToken[] {
   // Alt: generic ALT only until the keyboard already uses a chiral alt
@@ -690,10 +692,25 @@ function MethodChooser({
             })();
           const raltIsDesktopOnly =
             filledRaltTokens.includes("CAPS") || filledRaltTokens.includes("NCAPS");
+          // Canonicalize once so the macOS-conflict note below keys off the
+          // RESULT of chirality unification, not the raw pre-canonicalization
+          // tokens: CTRL+RALT and CTRL+LALT both demote to the same generic
+          // [CTRL ALT] (see modifierCombos.ts's canonicalizeCombo doc), so
+          // neither should raise a RAlt-specific note, while a combo where
+          // RALT survives (e.g. [RALT] alone, or [SHIFT RALT]) still should.
+          // canonicalizeCombo only throws for a mutually-exclusive combo,
+          // which the dropdown's own exclusion logic (MODIFIER_EXCLUSIONS)
+          // already prevents from being constructed here.
+          let raltCanonicalTokens: ModifierToken[] = [];
+          try {
+            raltCanonicalTokens = canonicalizeCombo(filledRaltTokens);
+          } catch {
+            raltCanonicalTokens = filledRaltTokens;
+          }
           let raltPreviewSpec: string | null = null;
           if (selectedRaltKey !== "" && filledRaltTokens.length > 0) {
             try {
-              raltPreviewSpec = comboToKeySpec(canonicalizeCombo(filledRaltTokens), selectedRaltKey);
+              raltPreviewSpec = comboToKeySpec(raltCanonicalTokens, selectedRaltKey);
             } catch {
               raltPreviewSpec = null;
             }
@@ -803,7 +820,7 @@ function MethodChooser({
                   Desktop only — this layer will not appear on the touch layout.
                 </p>
               )}
-              {filledRaltTokens.includes("RALT") && (
+              {raltCanonicalTokens.includes("RALT") && (
                 <p style={{ margin: 0, fontSize: 11, color: "#d29922", fontFamily: FONT }}>
                   Note: RAlt may conflict with system shortcuts on macOS.
                 </p>

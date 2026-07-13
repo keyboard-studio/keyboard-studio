@@ -451,21 +451,22 @@ export function applyAssignments(
   }
 
   // Merge multiple modifier_as_layer_switch refs into one so that all
-  // RAlt assignments share a single store(altgrKeys)/store(altgrOutput) pair.
-  // Having multiple refs with the same patternId but different slots would
-  // produce duplicate store declarations → KMN compile error.
+  // layer-switch assignments (RAlt and any other generalized modifier combo —
+  // see modifierCombos.ts) share a single store(altgrKeys)/store(altgrOutput)
+  // pair. Having multiple refs with the same patternId but different slots
+  // would produce duplicate store declarations → KMN compile error.
   const LAYER_SWITCH_PATTERN = "modifier_as_layer_switch";
-  const raltRefs = [...seen.values()].filter((r) => r.patternId === LAYER_SWITCH_PATTERN);
-  if (raltRefs.length > 1) {
-    for (const r of raltRefs) seen.delete(mechanismKey(r));
+  const layerSwitchRefs = [...seen.values()].filter((r) => r.patternId === LAYER_SWITCH_PATTERN);
+  if (layerSwitchRefs.length > 1) {
+    for (const r of layerSwitchRefs) seen.delete(mechanismKey(r));
     const merged: MechanismRef = {
-      ...raltRefs[0]!,
+      ...layerSwitchRefs[0]!,
       slotValues: {
-        altgrKeyList: raltRefs
+        altgrKeyList: layerSwitchRefs
           .map((r) => r.slotValues?.["altgrKeyList"] ?? "")
           .filter(Boolean)
           .join(" "),
-        altgrOutputList: raltRefs
+        altgrOutputList: layerSwitchRefs
           .map((r) => r.slotValues?.["altgrOutputList"] ?? "")
           .join(""),
       },

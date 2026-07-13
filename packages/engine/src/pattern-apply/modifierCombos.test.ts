@@ -16,6 +16,8 @@ import {
 } from "./modifierCombos.js";
 import type { KeyboardIR, IRGroup, IRRule } from "@keyboard-studio/contracts";
 import { validateWithOracle } from "../validator/oracle.js";
+import { Layouts } from "keyman/engine/keyboard";
+import { ModifierKeyConstants } from "@keymanapp/common-types";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -193,20 +195,24 @@ describe("canonicalizeCombo — chirality unification (generic+chiral mix -> gen
 });
 
 // ---------------------------------------------------------------------------
-// canonicalizeCombo — NCAPS collapse
+// canonicalizeCombo — NCAPS is NOT stripped (purely mechanical function)
 // ---------------------------------------------------------------------------
 //
-// NCAPS is not a first-class layer: a rule with no caps token already
-// matches caps-off, so `[X]` and `[X NCAPS]` are functionally identical.
+// canonicalizeCombo no longer collapses a bare/combined NCAPS token — that
+// used to make a legitimately-imported standalone `[NCAPS K_X]` rule (no
+// CAPS sibling) silently reclassify as the base/default combo, a round-trip
+// defect. The case-pair-aware fold now lives in the sibling-aware
+// foldCasePairCombo, exercised via collectLayerCombosInUse/buildComboKeyMap
+// below (not through canonicalizeCombo itself).
 // ---------------------------------------------------------------------------
 
-describe("canonicalizeCombo — NCAPS collapse", () => {
-  it("strips a bare NCAPS token to the empty (base) combo", () => {
-    expect(canonicalizeCombo(["NCAPS"])).toEqual([]);
+describe("canonicalizeCombo — NCAPS is retained (mechanical only)", () => {
+  it("leaves a bare NCAPS token untouched", () => {
+    expect(canonicalizeCombo(["NCAPS"])).toEqual(["NCAPS"]);
   });
 
-  it("collapses [RALT, NCAPS] to [RALT]", () => {
-    expect(canonicalizeCombo(["RALT", "NCAPS"])).toEqual(["RALT"]);
+  it("leaves [RALT, NCAPS] untouched (dedupe + canonical order only)", () => {
+    expect(canonicalizeCombo(["RALT", "NCAPS"])).toEqual(["RALT", "NCAPS"]);
   });
 
   it("leaves CAPS alone — it is a genuine distinct layer", () => {
@@ -314,13 +320,13 @@ describe("comboToTouchLayerId", () => {
     expect(comboToTouchLayerId(["SHIFT", "CAPS"])).toBe("shift-caps");
   });
 
-  it("collapses a bare NCAPS combo to the base/default layer (NCAPS is stripped, not a distinct layer)", () => {
-    expect(comboToTouchLayerId(["NCAPS"])).toBe("default");
-    expect(comboToTouchLayerId(["RALT", "NCAPS"])).toBe("rightalt");
+  it("produces its own distinct id for a bare/combined NCAPS combo — NCAPS is no longer stripped by canonicalizeCombo", () => {
+    expect(comboToTouchLayerId(["NCAPS"])).toBe("ncaps");
+    expect(comboToTouchLayerId(["RALT", "NCAPS"])).toBe("rightalt-ncaps");
   });
 
-  it("unifies a Ctrl+RAlt+NCAPS pick down to the generic shift-ctrl-alt id (chirality unification + NCAPS strip combined)", () => {
-    expect(comboToTouchLayerId(["SHIFT", "RALT", "CTRL", "NCAPS"])).toBe("shift-ctrl-alt");
+  it("unifies a Ctrl+RAlt+NCAPS pick's chirality, keeping NCAPS as its own trailing fragment", () => {
+    expect(comboToTouchLayerId(["SHIFT", "RALT", "CTRL", "NCAPS"])).toBe("shift-ctrl-alt-ncaps");
   });
 
   it("falls back to a stable per-token concatenation ordered per the live KMW engine's getLayerId bit-precedence (defaultLayouts.ts), not CANONICAL_ORDER", () => {
@@ -371,14 +377,14 @@ describe("comboToKvksShiftToken", () => {
     expect(comboToKvksShiftToken(["CTRL", "ALT", "SHIFT"])).toBe("SCA");
   });
 
-  it("returns null only for a combo containing CAPS", () => {
+  it("returns null for a combo containing CAPS", () => {
     expect(comboToKvksShiftToken(["CAPS"])).toBeNull();
     expect(comboToKvksShiftToken(["SHIFT", "RALT", "CAPS"])).toBeNull();
   });
 
-  it("collapses a bare/combined NCAPS combo to its non-NCAPS token", () => {
-    expect(comboToKvksShiftToken(["NCAPS"])).toBe("");
-    expect(comboToKvksShiftToken(["RALT", "NCAPS"])).toBe("RA");
+  it("returns null for a bare/combined NCAPS combo too — same restriction as CAPS", () => {
+    expect(comboToKvksShiftToken(["NCAPS"])).toBeNull();
+    expect(comboToKvksShiftToken(["RALT", "NCAPS"])).toBeNull();
   });
 });
 
@@ -446,6 +452,45 @@ describe("collectLayerCombosInUse", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// collectLayerCombosInUse / buildComboKeyMap — foldCasePairCombo: a
+// standalone imported NCAPS rule (no CAPS sibling) surfaces as its own
+// distinct combo, while a genuine CAPS-handling case-pair quad still folds
+// down to the base combo (round-trip fidelity vs. pre-existing behavior).
+// ---------------------------------------------------------------------------
+
+describe("collectLayerCombosInUse / buildComboKeyMap — standalone NCAPS vs. case-pair fold", () => {
+  it("(a) a standalone [NCAPS K_X] rule with no CAPS sibling reports its own distinct combo", () => {
+    const ir = makeMinimalIR([makeGroup([makeRule("K_X", ["NCAPS"], "a")])]);
+
+    const combos = collectLayerCombosInUse(ir).map((c) => c.join("+"));
+    expect(combos).toEqual(["NCAPS"]);
+
+    expect(buildComboKeyMap(ir, []).has("K_X")).toBe(false);
+    expect(buildComboKeyMap(ir, ["NCAPS"]).get("K_X")).toBe("a");
+  });
+
+  it("(b) a genuine [NCAPS K_X]/[CAPS K_X] case-pair sibling still folds to the base combo", () => {
+    const ir = makeMinimalIR([
+      makeGroup([
+        makeRule("K_X", ["NCAPS"], "a"),
+        makeRule("K_X", ["CAPS"], "A"),
+      ]),
+    ]);
+
+    const combos = collectLayerCombosInUse(ir).map((c) => c.join("+"));
+    // The NCAPS rule folds to the base (no-modifier) combo, which is not
+    // itself reported as a distinct layer — same as any bare no-modifier
+    // rule. CAPS remains its own genuine distinct layer either way.
+    expect(combos).not.toContain("NCAPS");
+    expect(combos).toEqual(["CAPS"]);
+
+    // buildComboKeyMap(ir, []) resolves the folded base combo's key/char.
+    expect(buildComboKeyMap(ir, []).get("K_X")).toBe("a");
+    expect(buildComboKeyMap(ir, ["CAPS"]).get("K_X")).toBe("A");
+  });
+});
+
 describe("buildComboKeyMap", () => {
   it("builds a (vkey -> char) map for rules matching exactly the given combo", () => {
     const ir = makeMinimalIR([
@@ -509,4 +554,36 @@ describe("kmcmplib oracle — mixed generic+chiral modifier warning", () => {
     const codes = findings.map((f) => f.code);
     expect(codes.some((c) => c.includes("4202659"))).toBe(false);
   }, 15000);
+});
+
+// ---------------------------------------------------------------------------
+// comboToTouchLayerId — cross-checked against the LIVE vendored KMW engine's
+// own Layouts.getLayerId (simulator/vendor/keyman/engine/keyboard/keyboards/
+// defaultLayouts.ts), so TOUCH_LAYER_PRECEDENCE_ORDER's "confirmed via live
+// getLayerId" doc claim is test-backed rather than hand-derived.
+// ---------------------------------------------------------------------------
+
+describe("comboToTouchLayerId — cross-checked against the live vendored Layouts.getLayerId", () => {
+  it("agrees with getLayerId's own bit-precedence ordering for several multi-modifier combos", () => {
+    const cases: Array<[ModifierToken[], number]> = [
+      // SHIFT+ALT — both generic, no chirality involved.
+      [["SHIFT", "ALT"], ModifierKeyConstants.K_SHIFTFLAG | ModifierKeyConstants.K_ALTFLAG],
+      // CTRL+RAlt-family: canonicalizeCombo unifies the chiral RALT to
+      // generic ALT (mixed generic+chiral is kmcmplib-invalid), and a real
+      // physical Ctrl+RAlt press likewise delivers the all-generic bit pair
+      // (module doc) — so the equivalent live bitmask is generic CTRL+ALT.
+      [
+        canonicalizeCombo(["CTRL", "RALT"]),
+        ModifierKeyConstants.K_CTRLFLAG | ModifierKeyConstants.K_ALTFLAG,
+      ],
+      // RCTRL+SHIFT — chiral ctrl + generic shift, no unification triggered.
+      [["RCTRL", "SHIFT"], ModifierKeyConstants.RCTRLFLAG | ModifierKeyConstants.K_SHIFTFLAG],
+      // LCTRL+RALT — all-chiral, valid combo left untouched by unification.
+      [["LCTRL", "RALT"], ModifierKeyConstants.LCTRLFLAG | ModifierKeyConstants.RALTFLAG],
+    ];
+
+    for (const [combo, bitmask] of cases) {
+      expect(comboToTouchLayerId(combo)).toBe(Layouts.getLayerId(bitmask));
+    }
+  });
 });

@@ -13,8 +13,11 @@
 //     alone and SHIFT+RALT ("RA"/"SRA", "rightalt"/"rightalt-shift") are the
 //     two combos previously hard-coded here; any other combo now routes
 //     through the same lookup. Combos containing CAPS/NCAPS have no kvks
-//     token or touch layer (both return null) and are skipped for that
-//     surface — never an error, and never silently folded into another layer.
+//     token (comboToKvksShiftToken returns null — `.kvks` has no caps-lock
+//     layer) and are skipped for THAT surface only; they still get a real
+//     `.keyman-touch-layout` layer (comboToTouchLayerId never returns null —
+//     touch has its own genuine caps-lock-state layers) — never an error,
+//     and never silently folded into another layer.
 //
 // S-01's `kmnRules` slot value may hold MULTIPLE newline-separated rule
 // lines (e.g. a CAPS-handling case-pair quad — see shiftRules.ts's
@@ -55,7 +58,14 @@ interface KeycapTarget {
   kvksLayer: string | null;
   /**
    * `.keyman-touch-layout` layer id, e.g. "default" | "shift" | "rightalt" | ...
-   * `null` when the combo carries CAPS/NCAPS — touch has no caps-lock state.
+   * In practice this is never actually `null` for any target this module
+   * constructs — `parseS01RuleLine` only ever sets `"shift"`/`"default"`
+   * literals, and `comboToTouchLayerId` (S-08 path) no longer returns `null`
+   * for any combo, including CAPS/NCAPS-bearing ones (real shipped
+   * `.keyman-touch-layout` files ship genuine `caps`/`rightalt-caps` layers —
+   * touch has its own caps-lock-state layer, unlike `.kvks`). The field stays
+   * `string | null` defensively since `comboToTouchLayerId`'s own return type
+   * is still `string | null`.
    */
   touchLayer: string | null;
   /**
@@ -365,8 +375,10 @@ function patchTouchLayout(
   if (!data || typeof data !== "object") return;
 
   // Build a lookup: touchLayer → vkey → char
-  // CAPS/NCAPS combos have no touch layer at all (touchLayer === null) —
-  // skip this surface, not an error.
+  // touchLayer is never actually null for a target this module constructs
+  // (see KeycapTarget.touchLayer's doc — touch has its own caps-lock-state
+  // layer, unlike .kvks) — this guard is kept purely defensively since the
+  // field's declared type is still `string | null`.
   const patchMap = new Map<string, Map<string, string>>();
   for (const { vkey, char, touchLayer } of targets) {
     if (touchLayer === null) continue;

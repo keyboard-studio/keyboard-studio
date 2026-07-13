@@ -20,9 +20,11 @@
  *     longer treats CAPS as desktop-only — real shipped
  *     `.keyman-touch-layout` files ship genuine `caps`/`rightalt-caps`
  *     layers) and are synthesized/patched the same as any other combo. A
- *     bare NCAPS combo collapses to the base/`"default"` layer (NCAPS is
- *     stripped by `canonicalizeCombo`, not a distinct layer), so it never
- *     reaches this module as its own combo.
+ *     standalone NCAPS combo (no CAPS sibling in the same group — see
+ *     modifierCombos.ts's `foldCasePairCombo`, which `collectLayerCombosInUse`
+ *     uses) is now a genuinely distinct combo and gets its own touch layer
+ *     too (`comboToTouchLayerId(["NCAPS"])` -> `"ncaps"`); only a
+ *     case-pair-shaped NCAPS/CAPS sibling pair folds down to the base combo.
  *   - Every touch platform is processed except a literal `"desktop"` key
  *     (kept for the physical/kvks side, not a touch surface). Platforms with
  *     no `layer` array are skipped.
@@ -52,6 +54,7 @@
  *
  * @see applyTouchAssignmentsToRawJson.ts — sibling raw-JSON touch applier (Phase E).
  * @see modifierCombos.ts — combo canonicalization, touch-layer-id + kvks-token mapping, IR scanning.
+ * @see touch-layout-wire-format.ts — shared raw-JSON wire-format types (with applyTouchAssignmentsToRawJson.ts).
  */
 
 import type { KeyboardIR, MechanismAssignment } from "@keyboard-studio/contracts";
@@ -63,59 +66,13 @@ import {
   parseKeySpec,
   type ModifierToken,
 } from "./modifierCombos.js";
-
-// ---------------------------------------------------------------------------
-// Wire-format types (raw JSON shape — NOT the IR types)
-// ---------------------------------------------------------------------------
-
-interface RawSubKey {
-  id?: string;
-  text?: string;
-  output?: string;
-  nextlayer?: string;
-  [k: string]: unknown;
-}
-
-interface RawKey {
-  id: string;
-  text?: string;
-  output?: string;
-  nextlayer?: string;
-  sk?: RawSubKey[];
-  flick?: Record<string, RawSubKey>;
-  multitap?: RawSubKey[];
-  [k: string]: unknown;
-}
-
-interface RawRow {
-  id: number | string;
-  key: RawKey[];
-  [k: string]: unknown;
-}
-
-interface RawLayer {
-  id: string;
-  row: RawRow[];
-  [k: string]: unknown;
-}
-
-interface RawPlatform {
-  layer: RawLayer[];
-  [k: string]: unknown;
-}
-
-function isRawLayer(value: unknown): value is RawLayer {
-  return (
-    !!value &&
-    typeof value === "object" &&
-    typeof (value as RawLayer).id === "string" &&
-    Array.isArray((value as RawLayer).row)
-  );
-}
-
-function isRawPlatform(value: unknown): value is RawPlatform {
-  return !!value && typeof value === "object" && Array.isArray((value as RawPlatform).layer);
-}
+import {
+  isRawLayer,
+  isRawPlatform,
+  type RawKey,
+  type RawLayer,
+  type RawPlatform,
+} from "./touch-layout-wire-format.js";
 
 /**
  * Legacy touch-layer-id aliases, keyed by {@link comboToTouchLayerId}'s

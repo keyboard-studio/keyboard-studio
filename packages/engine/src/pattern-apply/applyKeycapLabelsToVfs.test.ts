@@ -32,8 +32,13 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { applyKeycapLabelsToVfs } from "./applyKeycapLabelsToVfs.js";
+import { propagateDesktopLayersToTouch } from "./propagateDesktopLayersToTouch.js";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import type { MechanismAssignment, VirtualFS } from "@keyboard-studio/contracts";
+import type {
+  KeyboardIR,
+  MechanismAssignment,
+  VirtualFS,
+} from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -656,7 +661,7 @@ describe("applyKeycapLabelsToVfs — S-08 generalized combos", () => {
     expect(data.tablet.layer[1].row[0].key[0].text).toBe("Z");
   });
 
-  it("skips both surfaces (no error, no write for that target) for a combo containing CAPS", () => {
+  it("skips the .kvks surface (no synthesis) for a combo containing CAPS; touch layout is untouched because no matching layer exists in this fixture (not because touchLayer is null)", () => {
     const touchLayout = JSON.stringify({
       tablet: { layer: [{ id: "default", row: [{ id: 1, key: [{ id: "K_A", text: "a" }] }] }] },
     });
@@ -673,8 +678,108 @@ describe("applyKeycapLabelsToVfs — S-08 generalized combos", () => {
     const xml = vfs.get("source/test.kvks")?.content as string;
     // No new layer synthesized — kvksLayer is null for a CAPS-bearing combo.
     expect(xml.match(/<layer\b/g)).toHaveLength(1);
+    // This module never synthesizes a MISSING touch layer (that's
+    // propagateDesktopLayersToTouch's job) — the fixture has only "default",
+    // so the ("ctrl-caps") patch target simply has nothing to match, not
+    // because comboToTouchLayerId returned null for the CAPS-bearing combo
+    // (it doesn't — see the dedicated pipeline-order test below).
     const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
     expect(data.tablet.layer[0].row[0].key[0].text).toBe("a"); // untouched
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Real pipeline order (studio's projectWorkingCopyVfs.ts step 2.5 then
+// 3.5): propagateDesktopLayersToTouch synthesizes a CAPS combo's touch
+// layer FIRST, then applyKeycapLabelsToVfs patches that layer's keycap —
+// exercised here with only the two engine functions, in that order.
+// ---------------------------------------------------------------------------
+
+function makeEmptyIR(): KeyboardIR {
+  return {
+    origin: "imported",
+    header: {
+      keyboardId: "test_kb",
+      name: "Test KB",
+      bcp47: [],
+      copyright: "",
+      version: "1.0",
+      targets: [],
+      storeDirectives: [],
+    },
+    stores: [],
+    groups: [],
+    comments: [],
+    raw: [],
+    recognizedPatterns: [],
+  };
+}
+
+describe("applyKeycapLabelsToVfs — real pipeline order with propagateDesktopLayersToTouch (CAPS combo)", () => {
+  it("patches the keycap onto the touch layer that propagateDesktopLayersToTouch just synthesized for a bare CAPS combo", () => {
+    // A combo recognized by BOTH engine functions: patternId
+    // "modifier_as_layer_switch" (propagateDesktopLayersToTouch's union step)
+    // and strategyId "S-08" (applyKeycapLabelsToVfs's keycap-target collection).
+    const assignment: MechanismAssignment = {
+      scope: "individual",
+      target: "A",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "modifier_as_layer_switch",
+          strategyId: "S-08",
+          slotValues: { altgrKeyList: "[CAPS K_A]" },
+        },
+      ],
+    };
+
+    const rawTouchJson = JSON.stringify({
+      tablet: {
+        layer: [
+          {
+            id: "default",
+            row: [
+              {
+                id: 1,
+                key: [
+                  { id: "K_A", text: "a" },
+                  { id: "K_LOPT", text: "*Menu*" }, // anchor key for the reachability switch
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    // Step 2.5 — synthesize the "caps" touch layer (no CAPS rule in the IR
+    // at all; the combo is sourced purely from the pending assignment).
+    const { json: propagatedJson, warnings: propagateWarnings } = propagateDesktopLayersToTouch(
+      rawTouchJson,
+      makeEmptyIR(),
+      [assignment],
+    );
+    expect(propagateWarnings).toHaveLength(0);
+    const propagatedData = JSON.parse(propagatedJson);
+    const capsLayer = propagatedData.tablet.layer.find((l: { id: string }) => l.id === "caps");
+    expect(capsLayer).toBeDefined();
+    expect(capsLayer.row[0].key[0].text).toBe(""); // blank — no output known to propagation yet
+
+    // Step 3.5 — patch the keycap onto the layer step 2.5 just synthesized.
+    const vfs = makeVfs([
+      { path: "source/test.kvks", content: KVKS_BASE },
+      { path: "source/test.keyman-touch-layout", content: propagatedJson },
+    ]);
+
+    const { warnings } = applyKeycapLabelsToVfs(vfs, "test", [assignment]);
+    expect(warnings).toHaveLength(0);
+
+    const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
+    const patchedCapsLayer = data.tablet.layer.find((l: { id: string }) => l.id === "caps");
+    expect(patchedCapsLayer.row[0].key[0].text).toBe("A");
+    expect(data.tablet.layer.find((l: { id: string }) => l.id === "default").row[0].key[0].text).toBe(
+      "a",
+    ); // default untouched
   });
 });
 

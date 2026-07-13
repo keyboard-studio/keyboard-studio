@@ -40,46 +40,13 @@
  * @see applyTouchAssignments.ts — IR-based applier for the generate-from-scratch path.
  * @see scaffoldTouchLayout.ts  — generates a phone layout when no touch layout exists.
  * @see touch-mechanism-shared.ts — shared deduplication predicate.
+ * @see touch-layout-wire-format.ts — shared raw-JSON wire-format types (with propagateDesktopLayersToTouch.ts).
  */
 
 import type { TouchAssignment } from "@keyboard-studio/contracts";
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import { isTouchSubKeyDuplicate } from "./touch-mechanism-shared.js";
-
-// ---------------------------------------------------------------------------
-// Wire-format types (raw JSON shape — NOT the IR types)
-// ---------------------------------------------------------------------------
-
-/** A single key object as it appears in the raw .keyman-touch-layout JSON. */
-interface RawKey {
-  id: string;
-  text?: string;
-  sk?: Array<{ id: string; text?: string; output?: string; [k: string]: unknown }>;
-  flick?: Record<string, { id: string; text?: string; output?: string; [k: string]: unknown }>;
-  multitap?: Array<{ id: string; text?: string; output?: string; [k: string]: unknown }>;
-  [k: string]: unknown;
-}
-
-/** A row object inside a layer. */
-interface RawRow {
-  id: number | string;
-  key: RawKey[];
-  [k: string]: unknown;
-}
-
-/** A layer object inside a platform. */
-interface RawLayer {
-  id: string;
-  row: RawRow[];
-  [k: string]: unknown;
-}
-
-/** A platform entry in the raw JSON (e.g. "tablet", "phone", "desktop"). */
-interface RawPlatform {
-  layer: RawLayer[];
-  defaultHint?: string;
-  [k: string]: unknown;
-}
+import type { RawKey, RawLayer, RawPlatform } from "./touch-layout-wire-format.js";
 
 /** The top-level raw .keyman-touch-layout JSON object. */
 type RawTouchLayout = Record<string, unknown>;

@@ -14,7 +14,7 @@
  *
  * This module is the single place that:
  *   - validates/canonicalizes a combo (dedupe + stable order + exclusion
- *     check + two normalizing folds — see below),
+ *     check + chirality-unification fold — see below),
  *   - converts a combo to/from the `.kmn` `[TOK1 TOK2 K_X]` bracket notation,
  *   - maps a combo to its `.keyman-touch-layout` layer id — CAPS is a
  *     genuine navigable touch layer (real shipped `.keyman-touch-layout`
@@ -27,8 +27,8 @@
  *     stays untouched — it buckets into the fixed 3-layer touch template and
  *     has its own callers).
  *
- * `canonicalizeCombo` applies two normalizing steps AFTER the exclusion
- * check, so a combo that reaches either one is already guaranteed
+ * `canonicalizeCombo` applies one normalizing step AFTER the exclusion
+ * check, so a combo that reaches it is already guaranteed
  * exclusion-consistent (at most one token per family):
  *   - Chirality unification: a combo mixing a GENERIC ctrl-or-alt token
  *     (CTRL/ALT) with a CHIRAL ctrl-or-alt token (RCTRL/RALT/LALT, plus raw
@@ -46,14 +46,20 @@
  *     `IsEquivalentShift`. A combo carrying ONLY chiral tokens (no generic
  *     CTRL/ALT present) — e.g. `[RALT]` alone or the valid all-chiral
  *     `[LCTRL RALT]` — is left untouched.
- *   - NCAPS collapse: NCAPS is not modeled as a first-class layer — a rule
- *     with no caps token already matches caps-off, so `[X]` and
- *     `[X NCAPS]` are functionally identical. A bare NCAPS token is
- *     stripped outright (`["RALT","NCAPS"]` -> `["RALT"]`,
- *     `["NCAPS"]` -> `[]`). CAPS (caps-lock-ON) is untouched — it is a
- *     genuine distinct layer. The caps-ON/caps-OFF case-pair *quad* this
- *     collapse is not about is built directly by `buildCasePairRuleLines`/
- *     `buildBaseRuleLines` (shiftRules.ts), not through this function.
+ * `canonicalizeCombo` itself is purely mechanical (dedupe -> exclusion check
+ * -> chirality unification -> sort) and never touches NCAPS: a bare `NCAPS`
+ * combo is a legitimately distinct combo now (`["NCAPS"]` stays `["NCAPS"]`,
+ * it does NOT collapse to `[]`). Folding a caps-pair-shaped `NCAPS` combo
+ * down to its non-caps combo — the behavior the picker/emitted-`.kmn` case
+ * still wants, since `buildBaseRuleLines`/`buildCasePairRuleLines`
+ * (shiftRules.ts) always emit an `NCAPS`/`CAPS` sibling pair with identical
+ * non-caps modifiers — is a SEPARATE, sibling-aware step: see
+ * {@link foldCasePairCombo}, used by the IR-scanning functions below
+ * (`collectLayerCombosInUse`/`buildComboKeyMap`) instead of calling
+ * `canonicalizeCombo` directly. A standalone imported `[NCAPS K_X]` rule
+ * with no `[CAPS K_X]` sibling is a real distinct combo (round-trip
+ * fidelity) rather than being silently reclassified as the base/default
+ * combo.
  */
 
 import type { KeyboardIR, IRRule, StoreItem } from "@keyboard-studio/contracts";
@@ -183,8 +189,10 @@ function unifyChirality(tokens: readonly ModifierToken[]): ModifierToken[] {
 
 /**
  * Dedupe and order a modifier combo canonically (see {@link CANONICAL_ORDER}),
- * after applying chirality unification and the NCAPS collapse (see module
- * doc).
+ * after applying chirality unification (see module doc). Purely mechanical —
+ * does NOT fold or strip NCAPS; a bare `["NCAPS"]` combo is returned as-is.
+ * Callers that need the case-pair-aware NCAPS fold (IR scanning) use
+ * {@link foldCasePairCombo} instead.
  *
  * @throws if two mutually-exclusive tokens (per {@link MODIFIER_EXCLUSIONS})
  *         are both present — this can only happen for a hand-built or
@@ -207,9 +215,8 @@ export function canonicalizeCombo(tokens: readonly ModifierToken[]): ModifierTok
   }
 
   const unified = [...new Set(unifyChirality(unique))];
-  const withoutNcaps = unified.filter((t) => t !== "NCAPS");
 
-  return withoutNcaps.sort(
+  return unified.sort(
     (a, b) => CANONICAL_ORDER.indexOf(a) - CANONICAL_ORDER.indexOf(b),
   );
 }
@@ -272,6 +279,14 @@ const TOUCH_ID_FRAGMENT: Partial<Record<ModifierToken, string>> = {
   RALT: "rightalt",
   LALT: "alt",
   CAPS: "caps",
+  // NCAPS can now reach this function directly (canonicalizeCombo no longer
+  // strips it — see module doc / foldCasePairCombo) for a standalone
+  // imported `[NCAPS K_X]` rule with no CAPS sibling. No corpus-attested
+  // ".keyman-touch-layout" ever ships an NCAPS-only layer (there is no
+  // caps-off-only touch surface distinct from "default"), so this fragment
+  // is unattested but needed so such a combo still produces a stable,
+  // non-undefined id instead of joining an `undefined` fragment.
+  NCAPS: "ncaps",
 };
 
 /**
@@ -295,6 +310,12 @@ const TOUCH_ID_FRAGMENT: Partial<Record<ModifierToken, string>> = {
  * separately-verified corpus convention (see comboToKvksShiftToken's doc),
  * not the KMW runtime's bit order. The original bug was exactly this: the
  * touch-layer-id builder used to reuse CANONICAL_ORDER instead of this order.
+ *
+ * NCAPS is appended LAST, after CAPS — same rationale (not part of
+ * `getLayerId`'s bit computation at all) and same family position as CAPS in
+ * {@link CANONICAL_ORDER}. Unattested in any real corpus fixture (see
+ * TOUCH_ID_FRAGMENT's doc) but needed for stable ordering of a standalone
+ * NCAPS-bearing combo mixed with other tokens (e.g. `["RALT","NCAPS"]`).
  */
 const TOUCH_LAYER_PRECEDENCE_ORDER: readonly ModifierToken[] = [
   "LCTRL",
@@ -305,6 +326,7 @@ const TOUCH_LAYER_PRECEDENCE_ORDER: readonly ModifierToken[] = [
   "CTRL",
   "ALT",
   "CAPS",
+  "NCAPS",
 ];
 
 /**
@@ -318,10 +340,11 @@ const TOUCH_LAYER_PRECEDENCE_ORDER: readonly ModifierToken[] = [
  * CAPS-bearing combo produces a real id here, never `null`. (An earlier
  * version of this function treated CAPS as desktop-only and returned
  * `null` — that was the bug: it made a CAPS layer's character functional on
- * desktop but invisible in the touch/OSK preview.) NCAPS never reaches
- * this function's own logic: it is stripped by {@link canonicalizeCombo}
- * before this function ever sees it — a bare NCAPS combo collapses to the
- * base/`"default"` layer, same as `[]`.
+ * desktop but invisible in the touch/OSK preview.) NCAPS is NOT stripped by
+ * {@link canonicalizeCombo} (see module doc) — a standalone NCAPS-bearing
+ * combo (no CAPS sibling to fold against, per {@link foldCasePairCombo})
+ * produces its own distinct id here (e.g. `["NCAPS"]` -> `"ncaps"`) rather
+ * than collapsing to `"default"`.
  *
  * Tokens are joined in {@link TOUCH_LAYER_PRECEDENCE_ORDER} order — every id
  * this produces has been verified to reproduce the full set of ids this
@@ -372,14 +395,16 @@ const KVKS_FRAGMENT: Partial<Record<ModifierToken, string>> = {
  * {@link comboToTouchLayerId}, this does NOT follow the live KMW engine's
  * bit-precedence order — the two surfaces use different conventions).
  *
- * Returns `null` for any combo containing CAPS — `.kvks` has no
- * caps-lock-state layer; a CAPS-including combo has no distinct desktop OSK
- * keycap of its own (mirrors `parseS01RuleLine`'s CAPS-line skip). NCAPS
- * never reaches this check: it is stripped by {@link canonicalizeCombo} first.
+ * Returns `null` for any combo containing CAPS OR NCAPS — `.kvks` has no
+ * caps-lock-state layer (on OR off) of its own; a CAPS/NCAPS-including combo
+ * has no distinct desktop OSK keycap of its own (mirrors `parseS01RuleLine`'s
+ * CAPS-line skip). Unlike {@link comboToTouchLayerId}, NCAPS is never a
+ * genuine distinct `.kvks` layer either way, so this guard nulls it out
+ * rather than assigning it its own token.
  */
 export function comboToKvksShiftToken(tokens: readonly ModifierToken[]): string | null {
   const canon = canonicalizeCombo(tokens);
-  if (canon.includes("CAPS")) return null;
+  if (canon.includes("CAPS") || canon.includes("NCAPS")) return null;
 
   return canon.map((t) => KVKS_FRAGMENT[t]).join("");
 }
@@ -423,6 +448,64 @@ function firstRuleCharOutput(rule: IRRule): string | undefined {
     if (el.kind === "char") return el.value;
   }
   return undefined;
+}
+
+/**
+ * Resolve a rule's canonicalized combo for IR-scanning purposes, folding an
+ * NCAPS-bearing combo down to its non-caps form when — and only when — a
+ * sibling rule in the SAME group targets the SAME vkey with the identical
+ * non-caps modifier set plus CAPS: the exact shape `buildBaseRuleLines`/
+ * `buildCasePairRuleLines` (shiftRules.ts) emit for a CAPS-handling
+ * case-pair quad (e.g. `+ [NCAPS K_E] > ...` alongside `+ [CAPS K_E] > ...`).
+ * This preserves the pre-existing case-pair reporting behavior (the two
+ * rules are two states of one logical "layer", not two distinct ones).
+ *
+ * When no such sibling exists, the standalone NCAPS combo is a legitimately
+ * DISTINCT combo — e.g. an imported keyboard with only `[NCAPS K_X]` and no
+ * `[CAPS K_X]` counterpart — and is returned with NCAPS retained (round-trip
+ * fidelity; see module doc).
+ *
+ * Returns `[]` for a rule whose raw modifiers are internally
+ * exclusion-inconsistent (cannot come from a `.kmn` source kmcmplib would
+ * have accepted) rather than throwing, matching this module's other
+ * defensive IR-scan skips.
+ *
+ * @param rule       The rule whose combo is being resolved.
+ * @param groupRules The rules of the SAME group as `rule` (sibling visibility).
+ */
+function foldCasePairCombo(
+  rule: IRRule,
+  groupRules: readonly IRRule[],
+): ModifierToken[] {
+  let combo: ModifierToken[];
+  try {
+    combo = canonicalizeCombo(extractRuleModifiers(rule));
+  } catch {
+    return [];
+  }
+  if (!combo.includes("NCAPS")) return combo;
+
+  const vkey = extractRuleVkey(rule);
+  if (vkey === undefined) return combo;
+
+  // CAPS sits immediately before NCAPS in CANONICAL_ORDER, so replacing
+  // NCAPS with CAPS in an already-canonical combo stays canonically ordered.
+  const nonCapsCombo = combo.filter((t) => t !== "NCAPS");
+  const expectedSiblingKey = comboJoinKey([...nonCapsCombo, "CAPS"]);
+
+  const hasCapsSibling = groupRules.some((sibling) => {
+    if (sibling === rule) return false;
+    if (extractRuleVkey(sibling) !== vkey) return false;
+    let siblingCombo: ModifierToken[];
+    try {
+      siblingCombo = canonicalizeCombo(extractRuleModifiers(sibling));
+    } catch {
+      return false;
+    }
+    return comboJoinKey(siblingCombo) === expectedSiblingKey;
+  });
+
+  return hasCapsSibling ? nonCapsCombo : combo;
 }
 
 // ---------------------------------------------------------------------------
@@ -535,10 +618,16 @@ export function collectModifierTokensInUse(ir: KeyboardIR): Set<ModifierToken> {
  *
  * Rules whose raw modifier set is internally exclusion-inconsistent (which
  * cannot come from a `.kmn` source kmcmplib would have accepted) are skipped
- * defensively rather than thrown on during this read-only scan. Also reports
- * combos that exist only inside `any(store) > index(store, N)` rules — the
+ * defensively rather than thrown on during this read-only scan ({@link
+ * foldCasePairCombo} already returns `[]` for those). Also reports combos
+ * that exist only inside `any(store) > index(store, N)` rules — the
  * store-indirection form the production S-08 pattern uses (see
  * {@link resolveAnyIndexEntries}) — not just direct per-key rules.
+ *
+ * Uses {@link foldCasePairCombo} (not `canonicalizeCombo` directly) for
+ * direct per-key rules so a standalone imported NCAPS combo is reported as
+ * its own distinct combo, while a CAPS-handling case-pair quad still folds
+ * to one combo (see that function's doc).
  */
 export function collectLayerCombosInUse(ir: KeyboardIR): ModifierToken[][] {
   const seen = new Set<string>();
@@ -554,14 +643,8 @@ export function collectLayerCombosInUse(ir: KeyboardIR): ModifierToken[][] {
   for (const group of ir.groups) {
     if (group.readonly) continue;
     for (const rule of group.rules) {
-      const raw = extractRuleModifiers(rule);
-      if (raw.length > 0) {
-        try {
-          addCombo(canonicalizeCombo(raw));
-        } catch {
-          // Internally exclusion-inconsistent — skip defensively.
-        }
-      }
+      const combo = foldCasePairCombo(rule, group.rules);
+      if (combo.length > 0) addCombo(combo);
 
       for (const entry of resolveAnyIndexEntries(ir, rule)) {
         if (entry.tokens.length === 0) continue; // no-modifier entry is not a "layer" combo
@@ -585,6 +668,11 @@ export function collectLayerCombosInUse(ir: KeyboardIR): ModifierToken[][] {
  * across several combos (e.g. some RALT-only, some SHIFT+RALT), so each
  * entry's own combo is checked against `combo` individually.
  *
+ * Uses {@link foldCasePairCombo} (not `canonicalizeCombo` directly) for
+ * direct per-key rules, so a `combo` requested with NCAPS retained (a
+ * standalone imported NCAPS rule) or without it (a folded case-pair combo)
+ * both resolve consistently with {@link collectLayerCombosInUse}'s reporting.
+ *
  * @param combo Canonicalized combo (as returned by {@link collectLayerCombosInUse}
  *              or {@link parseKeySpec}).
  */
@@ -600,13 +688,7 @@ export function buildComboKeyMap(
     for (const rule of group.rules) {
       const vkey = extractRuleVkey(rule);
       if (vkey) {
-        const raw = extractRuleModifiers(rule);
-        let canon: ModifierToken[];
-        try {
-          canon = canonicalizeCombo(raw);
-        } catch {
-          continue;
-        }
+        const canon = foldCasePairCombo(rule, group.rules);
         if (comboJoinKey(canon) !== targetKey) continue;
 
         const char = firstRuleCharOutput(rule);
