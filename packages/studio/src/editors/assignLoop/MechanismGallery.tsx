@@ -619,7 +619,8 @@ function MethodChooser({
           </span>
           {method !== "sequence" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              Typing this after a preceding character (or characters) produces {currentChar}
+              Sequences are handled separately, in a dedicated step after this
+              gallery
             </span>
           )}
         </button>
@@ -1999,8 +2000,12 @@ export function MechanismGallery({
         bullets={[
           <>You&rsquo;ll go character by character through the list from your survey.</>,
           <>
-            Pick a method &mdash; type a sequence, use a dead key, swap a key, or
-            use AltGr &mdash; or Skip characters you don&rsquo;t need.
+            Pick a method &mdash; use a dead key, swap a key, or use AltGr
+            &mdash; or Skip characters you don&rsquo;t need.
+          </>,
+          <>
+            Sequences get their own dedicated part of the flow, right after
+            this gallery.
           </>,
           <>Phones and tablets come later, in the Touch gallery.</>,
         ]}
@@ -2022,7 +2027,7 @@ export function MechanismGallery({
 
   // ---------------------------------------------------------------------------
   // Forward-button cluster — exactly one of three states applies: the
-  // locked-forward-escape ("Continue to touch layout"), the empty-diff
+  // locked-forward-escape ("Continue"), the empty-diff
   // completion ("Done" when there is nothing to add), or the per-character
   // Next/Done advance. Computed once as a single spec so the JSX below
   // renders one <button>, rather than three near-identical button blocks
@@ -2056,10 +2061,10 @@ export function MechanismGallery({
   const forwardButton: ForwardButtonSpec | null =
     locked && onComplete !== undefined
       ? {
-          label: "Continue to touch layout →",
+          label: "Continue →",
           onClick: onComplete,
           testId: "mechanisms-continue",
-          ariaLabel: "Continue to touch layout (desktop layout locked)",
+          ariaLabel: "Continue (desktop layout locked)",
           disabled: false,
           style: alwaysEnabledForwardStyle,
         }

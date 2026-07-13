@@ -60,8 +60,8 @@ describe("M5 — all step ids are unique", () => {
 // M2 — spine order
 //
 // FR-012: Identity → choose_base → track → Characters → Carve → Mechanisms →
-//         (lock:physical on mechanisms) → touch carve+add → (lock:touch) →
-//         Help → Package
+//         (lock:physical on mechanisms) → Sequences (placeholder) →
+//         touch carve+add → (lock:touch) → Help → Package
 //
 // track is a real spine step (P0 fix). project_name is spine:false (CYOA fork).
 // ---------------------------------------------------------------------------
@@ -73,6 +73,7 @@ const EXPECTED_SPINE_ORDER = [
   "characters",
   "carve",
   "mechanisms",
+  "sequences",
   "touch",
   "help",
   "package",
@@ -103,6 +104,12 @@ describe("M2 — spine order matches FR-012", () => {
 
   it("'mechanisms' appears before 'touch' on the spine", () => {
     assertStepOrder(spineSteps(manifest), "mechanisms", "touch");
+  });
+
+  it("'sequences' (placeholder) sits between 'mechanisms' and 'touch' on the spine", () => {
+    const spine = spineSteps(manifest);
+    assertStepOrder(spine, "mechanisms", "sequences");
+    assertStepOrder(spine, "sequences", "touch");
   });
 
   it("'carve' appears before 'mechanisms' on the spine", () => {
@@ -152,6 +159,11 @@ describe("M3 — exactly one lock:physical then one lock:touch", () => {
   it("lock:touch is on the 'touch' step", () => {
     const touchLockStep = manifest.find((s) => s.lock === "touch");
     expect(touchLockStep?.id).toBe("touch");
+  });
+
+  it("'sequences' (placeholder) carries no lock", () => {
+    const sequencesStep = manifest.find((s) => s.id === "sequences");
+    expect(sequencesStep?.lock).toBeUndefined();
   });
 
   it("lock:physical appears before lock:touch in the manifest array", () => {
@@ -275,14 +287,14 @@ describe("Off-spine step inventory", () => {
 // ---------------------------------------------------------------------------
 // Layout declarations (spec 024 Stage 0)
 //
-// Exactly {carve, mechanisms, touch} must declare layout:"full".
+// Exactly {carve, mechanisms, sequences, touch} must declare layout:"full".
 // All other steps must have layout:"pane" or omit the field (implicit "pane").
 // ---------------------------------------------------------------------------
 
-const FULL_LAYOUT_IDS = ["carve", "mechanisms", "touch"] as const;
+const FULL_LAYOUT_IDS = ["carve", "mechanisms", "sequences", "touch"] as const;
 
 describe("layout declarations (spec 024 Stage 0)", () => {
-  it("exactly three steps declare layout:'full'", () => {
+  it("exactly four steps declare layout:'full'", () => {
     const fullSteps = manifest.filter((s) => s.layout === "full");
     const fullIds = fullSteps.map((s) => s.id).sort();
     expect(fullIds).toEqual([...FULL_LAYOUT_IDS].sort());
@@ -301,6 +313,11 @@ describe("layout declarations (spec 024 Stage 0)", () => {
   it("touch declares layout:'full'", () => {
     const touch = manifest.find((s) => s.id === "touch");
     expect(touch?.layout).toBe("full");
+  });
+
+  it("sequences declares layout:'full'", () => {
+    const sequences = manifest.find((s) => s.id === "sequences");
+    expect(sequences?.layout).toBe("full");
   });
 
   it("all other steps have layout:'pane' or omit layout (implicit pane)", () => {

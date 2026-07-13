@@ -27,6 +27,7 @@ import { CarveAdapter } from "../editors/adapters/carveAdapter.tsx";
 import { AddPhysicalAdapter } from "../editors/adapters/addPhysicalAdapter.tsx";
 import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
 import { TouchSeedSourcePanel } from "../editors/touchSeedSource/TouchSeedSourcePanel.tsx";
+import { SequencesAdapter } from "../editors/adapters/sequencesAdapter.tsx";
 import {
   BaseResolutionAdapter,
   IdentityLiteAdapter,
@@ -147,6 +148,22 @@ export const mechanismsStep: EditorStep = step({
 });
 
 /**
+ * Sequences step: placeholder for the upcoming Sequence Gallery (S-03
+ * multi-key sequences), positioned after Mechanisms and before the touch
+ * fork. Not yet implemented — the component is a stub that renders a
+ * "coming soon" panel and advances without writing anything. Carries no
+ * lock (only "physical" and "touch" locks exist, M3).
+ * inputs stays [] (step() default): the placeholder writes nothing and has
+ * no upstream dependency, so it carries no completeness-graph edges.
+ */
+export const sequencesStep: EditorStep = step({
+  id: "sequences",
+  title: "Sequences",
+  layout: "full",
+  component: SequencesAdapter,
+});
+
+/**
  * Touch seed source step: off-spine fork for choosing touch surface seed.
  * Rejoins the spine at the touch carve+add step (FR-013, M4).
  * Renders TouchSeedSourcePanel (T014, spec 035 contracts/seed-source-fork.md) —
@@ -223,6 +240,7 @@ export const registeredEditorSteps: readonly EditorStep[] = [
   projectNameStep,
   carveStep,
   mechanismsStep,
+  sequencesStep,
   touchSeedSourceStep,
   touchStep,
   helpStep,

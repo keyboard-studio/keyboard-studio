@@ -205,6 +205,17 @@ async function confirmMechanismsEmpty(page: Page): Promise<void> {
 }
 
 /**
+ * sequences step — placeholder step inserted between mechanisms and the
+ * touch fork (S-03 sequences now have their own dedicated part of the flow,
+ * authored separately, after the mechanism gallery). The placeholder writes
+ * nothing and always shows a single "Continue" forward control.
+ */
+async function driveSequencesPlaceholder(page: Page): Promise<void> {
+  await expect(page.getByText("Sequence Gallery")).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Continue (sequences placeholder)" }).click();
+}
+
+/**
  * touch step — same one-character inventory as Phase B (TouchGallery reads
  * the raw confirmedInventory, not the base-diffed lettersToAdd). Dismiss the
  * one-time intro splash, then Skip the single character to reach the
@@ -268,8 +279,8 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     await buildOneCharacterList(page);
 
     // Manifest spine order (StudioShell.tsx) is characters -> carve ->
-    // mechanisms -> touch -> help; carve comes immediately after Phase B,
-    // BEFORE mechanisms/touch.
+    // mechanisms -> sequences (placeholder) -> touch -> help; carve comes
+    // immediately after Phase B, BEFORE mechanisms/sequences/touch.
 
     // ---------------------------------------------------------------------
     // Carve gallery
@@ -306,9 +317,10 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     await page.getByTestId("carve-continue").click();
 
     // ---------------------------------------------------------------------
-    // Remaining spine steps: mechanisms, touch, help.
+    // Remaining spine steps: mechanisms, sequences (placeholder), touch, help.
     // ---------------------------------------------------------------------
     await confirmMechanismsEmpty(page);
+    await driveSequencesPlaceholder(page);
     await driveTouchGallery(page);
     await driveHelpPhase(page);
 
@@ -373,6 +385,7 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     await page.getByTestId("carve-continue").click();
 
     await confirmMechanismsEmpty(page);
+    await driveSequencesPlaceholder(page);
     await driveTouchGallery(page);
     await driveHelpPhase(page);
 
