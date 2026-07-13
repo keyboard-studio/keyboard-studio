@@ -1,0 +1,4 @@
+# Raw glottolog-cldf dataset — build input, reproducibly fetched by scripts/fetch-glottolog.mjs.
+# Run `pnpm run fetch-glottolog` to download.
+# SOURCES.json and LICENSE are committed; the raw data file is not.
+languages.csv
