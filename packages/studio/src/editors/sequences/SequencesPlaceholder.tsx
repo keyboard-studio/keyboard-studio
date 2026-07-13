@@ -9,6 +9,8 @@
 // the step is visible on the spine ahead of the real authoring UI landing.
 
 import type { CSSProperties } from "react";
+import { toUPlusNotation } from "@keyboard-studio/contracts";
+import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import {
   BG_PAGE, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
 } from "../../lib/galleryTheme.ts";
@@ -56,6 +58,7 @@ const continueBtn: CSSProperties = {
  * Matches MechanismGallery's header pattern (title + modality tag).
  */
 export function SequencesPlaceholder({ onComplete, onBack }: SequencesPlaceholderProps) {
+  const sequenceFlaggedChars = useWorkingCopyStore((s) => s.sequenceFlaggedChars);
   return (
     <div style={pageStyle}>
       {/* Header bar — title + modality label, matching MechanismGallery. */}
@@ -115,6 +118,47 @@ export function SequencesPlaceholder({ onComplete, onBack }: SequencesPlaceholde
           Sequence authoring is coming soon and is not yet implemented in this
           build.
         </p>
+
+        {sequenceFlaggedChars.length > 0 ? (
+          <div style={{ textAlign: "left" }}>
+            <p style={{ margin: "0 0 6px", fontSize: 13, color: TEXT_MAIN }}>
+              Characters you flagged for sequences ({sequenceFlaggedChars.length}):
+            </p>
+            <ul
+              style={{
+                margin: 0,
+                padding: 0,
+                listStyle: "none",
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 6,
+              }}
+            >
+              {sequenceFlaggedChars.map((c) => (
+                <li
+                  key={c}
+                  title={toUPlusNotation(c)}
+                  aria-label={`${toUPlusNotation(c)} ${c}`}
+                  style={{
+                    padding: "4px 8px",
+                    background: "#1c2a3a",
+                    border: "1px solid #58a6ff",
+                    borderRadius: 6,
+                    color: "#58a6ff",
+                    fontSize: 13,
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {c}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p style={{ margin: 0, fontSize: 13, color: TEXT_DIM }}>
+            No characters flagged yet.
+          </p>
+        )}
       </div>
 
       <div

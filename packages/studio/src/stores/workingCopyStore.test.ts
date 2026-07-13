@@ -595,6 +595,14 @@ describe("workingCopyStore — reset", () => {
     expect(s.desktopLocked).toBe(false);
   });
 
+  it("reset clears sequenceFlaggedChars", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á"]);
+
+    useWorkingCopyStore.getState().reset();
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual([]);
+  });
+
   it("isInstantiated returns false after reset (from instantiateFromBase)", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
@@ -1194,5 +1202,51 @@ describe("workingCopyStore — base-derived A3a seeding (spec §7.2 rule 3a, #92
     const vfs = createVirtualFS([]);
     useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: postfixBaseIr() });
     expect(useWorkingCopyStore.getState().session.axes.markInputOrder).toBe("prefix");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sequenceFlaggedChars — S-03 flag tracking (Sequence Gallery deferral)
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — sequenceFlaggedChars", () => {
+  it("starts empty", () => {
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual([]);
+  });
+
+  it("flagCharForSequence adds a char, preserving insertion order", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    useWorkingCopyStore.getState().flagCharForSequence("é");
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á", "é"]);
+  });
+
+  it("flagCharForSequence is idempotent — flagging the same char twice does not duplicate it", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á"]);
+  });
+
+  it("unflagCharForSequence removes a char", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    useWorkingCopyStore.getState().flagCharForSequence("é");
+    useWorkingCopyStore.getState().unflagCharForSequence("á");
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["é"]);
+  });
+
+  it("unflagCharForSequence on a char not in the list is a no-op", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    useWorkingCopyStore.getState().unflagCharForSequence("z");
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á"]);
+  });
+
+  it("instantiateFromBase clears sequenceFlaggedChars on a genuine base switch", () => {
+    const vfs = createVirtualFS([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á"]);
+
+    const otherKeyboard = { ...basicKbdus, id: "other_keyboard_id" };
+    useWorkingCopyStore.getState().instantiateFromBase(otherKeyboard, { vfs, ir: makeTestIR([]) });
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual([]);
   });
 });

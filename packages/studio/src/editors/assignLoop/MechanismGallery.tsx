@@ -109,34 +109,14 @@ export const PATTERN_DEADKEY = "deadkey_single_tap"; // S-02
 export const PATTERN_SWAP = "simple_swap"; // S-01
 export const PATTERN_RALT = "modifier_as_layer_switch"; // S-08
 
-// seqFirst / seqSecond / deadkeyBaseLetter are each substituted directly
-// into a single-quoted KMN string literal with no escaping (substituteSlots
-// in @keyboard-studio/engine/pattern-apply), so all three block the ASCII
-// straight-quote delimiters and all three accept multi-token compose (e.g.
-// "U+006E U+0303" -> a single composed character) — see charInput.ts. They
-// differ on singleGrapheme:
-//
-// - seqFirst is the sequence's LEFT-CONTEXT ("firstLetterOut") — a
-//   digraph/trigraph left context (e.g. "ng", "gb") is valid .kmn, so it is
-//   the one box RELAXED to multiple graphemes.
-// - seqSecond is the KEYSTROKE side (after "+") — a single keystroke
-//   produces exactly one character, so it stays single-grapheme.
-// - deadkeyBaseLetter stays single-grapheme too — a multi-base deadkey
-//   needs a paired accented-output list, which is a separate future change
-//   (relaxing this alone is a hard compile error via Layer-A Check #9).
-const SEQ_FIRST_RESOLVE_OPTIONS: ResolveCharInputOptions = {
-  multiToken: true,
-  blockDelimiters: true,
-};
-
-const SEQ_SECOND_RESOLVE_OPTIONS: ResolveCharInputOptions = {
-  multiToken: true,
-  singleGrapheme: true,
-  blockDelimiters: true,
-  singleGraphemeReason:
-    "A single keystroke produces one character — enter one character (you can compose it from U+ parts).",
-};
-
+// deadkeyBaseLetter is substituted directly into a single-quoted KMN string
+// literal with no escaping (substituteSlots in
+// @keyboard-studio/engine/pattern-apply), so it blocks the ASCII
+// straight-quote delimiters and accepts multi-token compose (e.g.
+// "U+006E U+0303" -> a single composed character) — see charInput.ts.
+// deadkeyBaseLetter stays single-grapheme — a multi-base deadkey needs a
+// paired accented-output list, which is a separate future change (relaxing
+// this alone is a hard compile error via Layer-A Check #9).
 const DEADKEY_BASE_LETTER_RESOLVE_OPTIONS: ResolveCharInputOptions = {
   multiToken: true,
   singleGrapheme: true,
@@ -153,13 +133,13 @@ const TRIGGER_KEY_RESOLVE_OPTIONS: KeyPickerResolveOptions = {
   blockDelimiters: true,
 };
 
-// Fix 1 — a single, unobtrusive help line for the character boxes (seqFirst,
-// seqSecond, deadkeyBaseLetter), shown once near the method chooser rather
-// than as in-box placeholder text repeated under every box. KeyPickerField
-// carries its own version of this line, shown only while its custom-input
-// mode is active.
+// Fix 1 — a single, unobtrusive help line for the character boxes
+// (deadkeyBaseLetter), shown once near the method chooser rather than as
+// in-box placeholder text repeated under every box. KeyPickerField carries
+// its own version of this line, shown only while its custom-input mode is
+// active.
 const CHAR_BOX_HELP_TEXT =
-  "Type a character, or a Unicode value like U+00E9. The first (context) box accepts more than one character; combine parts with spaces, e.g. U+006E U+0303.";
+  "Type a character, or a Unicode value like U+00E9. Combine composed parts with spaces, e.g. U+006E U+0303.";
 
 /** Display label per ModifierToken for the S-08 covered-chip badge (methodLabel). */
 const MODIFIER_TOKEN_LABELS: Record<string, string> = {
@@ -177,8 +157,6 @@ const MODIFIER_TOKEN_LABELS: Record<string, string> = {
 function methodLabel(ref: { patternId: string; slotValues?: Record<string, string> }): string {
   const sv = ref.slotValues ?? {};
   switch (ref.patternId) {
-    case "multi_char_sequence":
-      return `Sequence: ${sv["firstLetterOut"] ?? "?"}+${sv["secondLetter"] ?? "?"}`;
     case "deadkey_single_tap":
       return `Deadkey: ${sv["triggerKey"] ?? "?"} + ${sv["baseLetters"] ?? "?"}`;
     case "simple_swap": {
@@ -366,10 +344,6 @@ interface MethodChooserProps {
   currentChar: string;
   method: Method;
   onMethodChange: (m: Method) => void;
-  seqFirst: string;
-  seqSecond: string;
-  onSeqFirstChange: (v: string) => void;
-  onSeqSecondChange: (v: string) => void;
   triggerKey: string;
   onTriggerKeyChange: (v: string) => void;
   triggerKeyCustomChar: string;
@@ -496,10 +470,6 @@ function MethodChooser({
   currentChar,
   method,
   onMethodChange,
-  seqFirst,
-  seqSecond,
-  onSeqFirstChange,
-  onSeqSecondChange,
   triggerKey,
   onTriggerKeyChange,
   triggerKeyCustomChar,
@@ -564,19 +534,6 @@ function MethodChooser({
     DEADKEY_BASE_LETTER_RESOLVE_OPTIONS,
   );
 
-  const seqFirstResolution = resolveCharInput(seqFirst, SEQ_FIRST_RESOLVE_OPTIONS);
-  const seqSecondResolution = resolveCharInput(seqSecond, SEQ_SECOND_RESOLVE_OPTIONS);
-  const seqFirstReflection = reflectCharInput(seqFirst, SEQ_FIRST_RESOLVE_OPTIONS);
-  const seqSecondReflection = reflectCharInput(seqSecond, SEQ_SECOND_RESOLVE_OPTIONS);
-  // Same lone-combining-mark caution as the deadkey base-letter box above —
-  // fires when the resolved value is exactly one bare combining mark (warn,
-  // do NOT block). seqFirst may now resolve to more than one grapheme, but
-  // the single-combining-mark case is still worth flagging when it happens.
-  const seqFirstIsLoneCombiningMark =
-    seqFirstResolution.ok && isLoneCombiningMark(seqFirstResolution.value);
-  const seqSecondIsLoneCombiningMark =
-    seqSecondResolution.ok && isLoneCombiningMark(seqSecondResolution.value);
-
   // Resolved vkey for the S-01/S-08 layer-preview lines below — a custom
   // selection still shows "Shift + <KEY>"/"Shift + RAlt + <KEY>" using the
   // resolved physical key, never the raw "__custom__" sentinel or unresolved
@@ -626,70 +583,14 @@ function MethodChooser({
         </button>
         {method === "sequence" && (
           <div style={configStyle}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 6, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT, alignSelf: "center" }}>
-                Type the preceding character(s), then this key:
-              </span>
-              <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <input
-                  type="text"
-                  value={seqFirst}
-                  onChange={(e) => onSeqFirstChange(e.target.value)}
-                  aria-label="First key in sequence (the preceding character or characters)"
-                  maxLength={16}
-                  style={inputStyle}
-                />
-                {seqFirstReflection.kind === "ok" && (
-                  <span role="status" aria-live="polite" style={{ fontSize: 10, color: TEXT_DIM, fontFamily: FONT }}>
-                    {seqFirstReflection.text}
-                  </span>
-                )}
-                {seqFirstReflection.kind === "error" && (
-                  <span role="alert" style={{ fontSize: 10, color: "#f85149", opacity: 0.85, fontFamily: FONT }}>
-                    {seqFirstReflection.reason}
-                  </span>
-                )}
-                {seqFirstIsLoneCombiningMark && (
-                  <span role="status" aria-live="polite" style={{ fontSize: 10, color: "#d29922", opacity: 0.9, fontFamily: FONT }}>
-                    That looks like a combining mark on its own.
-                  </span>
-                )}
-              </span>
-              <span style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT, alignSelf: "center" }}>
-                then
-              </span>
-              <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <input
-                  type="text"
-                  value={seqSecond}
-                  onChange={(e) => onSeqSecondChange(e.target.value)}
-                  aria-label="Second key in sequence"
-                  maxLength={16}
-                  style={inputStyle}
-                />
-                {seqSecondReflection.kind === "ok" && (
-                  <span role="status" aria-live="polite" style={{ fontSize: 10, color: TEXT_DIM, fontFamily: FONT }}>
-                    {seqSecondReflection.text}
-                  </span>
-                )}
-                {seqSecondReflection.kind === "error" && (
-                  <span role="alert" style={{ fontSize: 10, color: "#f85149", opacity: 0.85, fontFamily: FONT }}>
-                    {seqSecondReflection.reason}
-                  </span>
-                )}
-                {seqSecondIsLoneCombiningMark && (
-                  <span role="status" aria-live="polite" style={{ fontSize: 10, color: "#d29922", opacity: 0.9, fontFamily: FONT }}>
-                    That looks like a combining mark on its own.
-                  </span>
-                )}
-              </span>
-              <span style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT, alignSelf: "center" }}>
-                &rarr;{" "}
-                <span style={{ color: TEXT_MAIN, fontFamily: "monospace", fontSize: 16 }}>
-                  {currentChar}
-                </span>
-              </span>
-            </div>
+            <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
+              Check this to mark{" "}
+              <span style={{ color: TEXT_MAIN, fontFamily: "monospace", fontSize: 16 }}>
+                {currentChar}
+              </span>{" "}
+              as a sequence. You&apos;ll define the actual key sequence later,
+              in the Sequence Gallery.
+            </p>
           </div>
         )}
       </div>
@@ -1063,6 +964,9 @@ export function MechanismGallery({
   const markStale = useWorkingCopyStore((s) => s.markStale);
   const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
   const recordAssignments = useWorkingCopyStore((s) => s.recordAssignments);
+  const sequenceFlaggedChars = useWorkingCopyStore((s) => s.sequenceFlaggedChars);
+  const flagCharForSequence = useWorkingCopyStore((s) => s.flagCharForSequence);
+  const unflagCharForSequence = useWorkingCopyStore((s) => s.unflagCharForSequence);
   const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const axes = useWorkingCopyStore(
@@ -1199,7 +1103,6 @@ export function MechanismGallery({
         // explicitly so the preview transform can always resolve an applied
         // assignment.
         const ids = new Set<string>(ranked.map((m) => m.patternId));
-        ids.add(PATTERN_SEQUENCE);
         ids.add(PATTERN_DEADKEY);
         ids.add(PATTERN_SWAP);
         ids.add(PATTERN_RALT);
@@ -1257,8 +1160,6 @@ export function MechanismGallery({
   // ---------------------------------------------------------------------------
 
   const [method, setMethod] = useState<Method>("sequence");
-  const [seqFirst, setSeqFirst] = useState("");
-  const [seqSecond, setSeqSecond] = useState("");
   const [triggerKey, setTriggerKey] = useState("K_COLON");
   const [triggerKeyCustomChar, setTriggerKeyCustomChar] = useState("");
   const [deadkeyBaseLetter, setDeadkeyBaseLetter] = useState("");
@@ -1375,8 +1276,6 @@ export function MechanismGallery({
 
   const resetMethodState = useCallback(() => {
     setMethod("sequence");
-    setSeqFirst("");
-    setSeqSecond("");
     setTriggerKey("K_COLON");
     setTriggerKeyCustomChar("");
     setDeadkeyBaseLetter("");
@@ -1452,13 +1351,8 @@ export function MechanismGallery({
   const canApply = useMemo(() => {
     if (currentChar === null) return false;
     if (method === "sequence") {
-      // Both must resolve to a non-empty character (literal, or valid U+
-      // notation) — resolveCharInput rejects empty/whitespace-only and
-      // malformed U+ notation.
-      return (
-        resolveCharInput(seqFirst, SEQ_FIRST_RESOLVE_OPTIONS).ok &&
-        resolveCharInput(seqSecond, SEQ_SECOND_RESOLVE_OPTIONS).ok
-      );
+      // Flagging always has a valid target — no config to fill in.
+      return true;
     }
     if (method === "swap") {
       return resolvedVkeyOf(resolveKeyPickerSelection(selectedSwapKey, selectedSwapKeyCustomChar)) !== null;
@@ -1483,8 +1377,6 @@ export function MechanismGallery({
   }, [
     currentChar,
     method,
-    seqFirst,
-    seqSecond,
     deadkeyBaseLetter,
     triggerKey,
     triggerKeyCustomChar,
@@ -1531,33 +1423,18 @@ export function MechanismGallery({
   const handleApply = useCallback(() => {
     if (currentChar === null || !canApply) return;
 
+    if (method === "sequence") {
+      // No MechanismAssignment recorded — flag only. The Sequence Gallery
+      // resolves the actual key sequence later; recording an assignment here
+      // with no slot values would emit broken .kmn.
+      flagCharForSequence(currentChar);
+      resetMethodState();
+      return;
+    }
+
     let assignment: MechanismAssignment;
 
-    if (method === "sequence") {
-      // canApply already confirmed both resolve — re-resolve here (the read
-      // point) rather than trusting the raw typed text, so U+ notation
-      // collapses to the actual character before it lands in slotValues.
-      const first = resolveCharInput(seqFirst, SEQ_FIRST_RESOLVE_OPTIONS);
-      const second = resolveCharInput(seqSecond, SEQ_SECOND_RESOLVE_OPTIONS);
-      if (!first.ok || !second.ok) return;
-      assignment = {
-        scope: "individual",
-        target: currentChar,
-        modality: "physical",
-        mechanisms: [
-          {
-            patternId: PATTERN_SEQUENCE,
-            strategyId: "S-03",
-            slotValues: {
-              firstLetterOut: first.value,
-              secondLetter: second.value,
-              collapsedChar: currentChar,
-            },
-          },
-        ],
-        source: "user",
-      };
-    } else if (method === "deadkey") {
+    if (method === "deadkey") {
       const base = resolveCharInput(deadkeyBaseLetter, DEADKEY_BASE_LETTER_RESOLVE_OPTIONS);
       const triggerResolution = resolveKeyPickerSelection(
         triggerKey,
@@ -1721,8 +1598,7 @@ export function MechanismGallery({
     currentChar,
     canApply,
     method,
-    seqFirst,
-    seqSecond,
+    flagCharForSequence,
     triggerKey,
     triggerKeyCustomChar,
     deadkeyBaseLetter,
@@ -1837,7 +1713,9 @@ export function MechanismGallery({
   // gated here until it is actually applied.
   const canGoNext =
     currentChar !== null &&
-    (appliedForCurrentChar > 0 || coveredChars.has(currentChar));
+    (appliedForCurrentChar > 0 ||
+      coveredChars.has(currentChar) ||
+      sequenceFlaggedChars.includes(currentChar));
 
   // Skip is pure forward navigation — it records nothing, so it is identical
   // to handleNext (advance one position, or complete from the last
@@ -2434,10 +2312,6 @@ export function MechanismGallery({
                 currentChar={currentChar}
                 method={method}
                 onMethodChange={setMethod}
-                seqFirst={seqFirst}
-                seqSecond={seqSecond}
-                onSeqFirstChange={setSeqFirst}
-                onSeqSecondChange={setSeqSecond}
                 triggerKey={triggerKey}
                 onTriggerKeyChange={setTriggerKey}
                 triggerKeyCustomChar={triggerKeyCustomChar}
@@ -2574,6 +2448,40 @@ export function MechanismGallery({
                     })}
                 </div>
               )}
+              {currentChar !== null && sequenceFlaggedChars.includes(currentChar) && (
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}
+                >
+                  <span style={{ fontSize: 12, color: "#58a6ff", fontFamily: FONT }}>
+                    Flagged for sequence
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => unflagCharForSequence(currentChar)}
+                    disabled={locked}
+                    aria-label={`Remove sequence flag for ${toUPlusNotation(currentChar)} ${currentChar}`}
+                    title="click to remove"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      padding: "3px 8px",
+                      background: "#0d1f33",
+                      border: "1px solid #58a6ff",
+                      borderRadius: 12,
+                      color: "#58a6ff",
+                      fontSize: 11,
+                      fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
+                      cursor: locked ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    remove
+                    <span aria-hidden="true" style={{ fontSize: 10, opacity: 0.7 }}>
+                      {" ×"}
+                    </span>
+                  </button>
+                </div>
+              )}
               {/* Apply + Skip. Back and Next/Done live in the shared top
                   toolbar row above (see leftContent's top of pane) so the
                   forward-advance control is spatially separated from these
@@ -2665,6 +2573,60 @@ export function MechanismGallery({
                     <span
                       aria-hidden="true"
                       style={{ fontSize: 11, color: "#56d364", opacity: 0.7 }}
+                    >
+                      &times;
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Flagged-for-sequences chip row — deferred, not counted as added */}
+          {sequenceFlaggedChars.length > 0 && (
+            <div>
+              <p
+                style={{
+                  margin: "0 0 6px",
+                  fontSize: 11,
+                  color: TEXT_DIM,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                Flagged for sequences
+              </p>
+              <div
+                role="group"
+                aria-label="Characters flagged for sequences — click to remove"
+                style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
+              >
+                {sequenceFlaggedChars.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => unflagCharForSequence(c)}
+                    aria-label={`Remove sequence flag for ${toUPlusNotation(c)} ${c}`}
+                    title={`${toUPlusNotation(c)} — click to remove`}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      padding: "4px 8px",
+                      background: "#1c2a3a",
+                      border: "1px solid #58a6ff",
+                      borderRadius: 16,
+                      color: "#58a6ff",
+                      fontSize: 13,
+                      fontFamily: "monospace",
+                      cursor: "pointer",
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {c}
+                    <span
+                      aria-hidden="true"
+                      style={{ fontSize: 11, color: "#58a6ff", opacity: 0.7 }}
                     >
                       &times;
                     </span>
