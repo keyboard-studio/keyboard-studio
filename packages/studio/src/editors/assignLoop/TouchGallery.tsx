@@ -1070,6 +1070,10 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
         method === "touch_key_replace"
       ) {
         setHostKey(keyId);
+        // Tapping a real key sets the picker to that key; clear the paired
+        // custom-char text so re-opening "Enter my own character..." starts
+        // clean instead of re-showing stale (possibly invalid) text.
+        setHostKeyCustomChar("");
       }
     },
     [method],

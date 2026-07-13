@@ -1602,10 +1602,16 @@ export function MechanismGallery({
       if (locked) return;
       if (method === "swap" && ALL_PICKABLE_KEYS.has(keyId)) {
         setSelectedSwapKey(keyId);
+        // Tapping a real key sets the picker to that key; clear the paired
+        // custom-char text so re-opening "Enter my own character..." starts
+        // clean instead of re-showing stale (possibly invalid) text.
+        setSelectedSwapKeyCustomChar("");
       } else if (method === "ralt" && ALL_PICKABLE_KEYS.has(keyId)) {
         setSelectedRaltKey(keyId);
+        setSelectedRaltKeyCustomChar("");
       } else if (method === "deadkey" && VALID_DEADKEY_TRIGGER_KEYS.has(keyId)) {
         setTriggerKey(keyId);
+        setTriggerKeyCustomChar("");
       }
       // method === "sequence" or unrecognised key: ignore
     },

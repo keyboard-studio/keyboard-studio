@@ -159,13 +159,36 @@ describe("resolveCharInput — single-grapheme guard (P1, opt-in via singleGraph
     expect(r).toEqual({ ok: true, value: "é", wasNotation: false });
   });
 
-  it("accepts a base+combining sequence that did not precompose under NFC", () => {
-    // "n" + U+0303 COMBINING TILDE has no precomposed NFC form.
+  it("accepts a base+combining sequence with a precomposed NFC form (n + U+0303 -> ñ)", () => {
+    // "n" + U+0303 COMBINING TILDE DOES precompose under NFC, to the single
+    // code point U+00F1 (ñ) -- this case is already one grapheme even
+    // under naive code-point counting, so it does not exercise
+    // Intl.Segmenter on its own.
     const raw = "ñ";
     const r = resolveCharInput(raw, { singleGrapheme: true });
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.value).toBe(raw.normalize("NFC"));
+      expect(r.value).toBe("ñ");
+    }
+  });
+
+  it("accepts a base+combining sequence with NO precomposed NFC form (n + U+0302 -> n̂), via Intl.Segmenter", () => {
+    // "n" + U+0302 COMBINING CIRCUMFLEX ACCENT has no precomposed NFC form --
+    // normalize("NFC") leaves it as two code points. A naive
+    // [...value].length would wrongly count 2 characters here; this is the
+    // case Intl.Segmenter exists to handle correctly, counting 1 grapheme.
+    const raw = "n̂";
+    const normalized = raw.normalize("NFC");
+    expect(normalized.length).toBe(2); // stays 2 UTF-16 code units after NFC
+    expect([...normalized].length).toBe(2); // 2 code points -- naive counting would (wrongly) reject
+    const r = resolveCharInput(raw, { singleGrapheme: true });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value).toBe(normalized);
+      expect([...r.value].length).toBe(2); // 2 code points
+      const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+      expect([...segmenter.segment(r.value)].length).toBe(1); // 1 grapheme
     }
   });
 

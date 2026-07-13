@@ -56,8 +56,10 @@ function containsDelimiterUnsafeChar(value: string): boolean {
 
 // ---------------------------------------------------------------------------
 // Grapheme counting (P1) — used by the singleGrapheme option below. Prefers
-// Intl.Segmenter (correctly counts a base+combining sequence that did not
-// precompose under NFC, e.g. "n" + U+0303, as ONE grapheme); falls back to a
+// Intl.Segmenter (correctly counts a base+combining sequence that has NO
+// precomposed NFC form, e.g. "n" + U+0302 COMBINING CIRCUMFLEX -> "n̂", as
+// ONE grapheme even though it stays two code points after normalize("NFC");
+// a naive [...value].length would wrongly report 2). Falls back to a
 // code-point count where Intl.Segmenter is unavailable. Either path counts a
 // single astral/SMP character (UTF-16 length 2, one code point, e.g.
 // U+1D400) as ONE grapheme.

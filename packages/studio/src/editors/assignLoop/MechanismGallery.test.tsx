@@ -2244,7 +2244,7 @@ describe("MechanismGallery — custom key option (S-01 swap)", () => {
     expect((addBtn as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("tapping a key in the OSK preview while custom mode is active exits custom mode", async () => {
+  it("tapping a key in the OSK preview while custom mode is active exits custom mode and clears the stale custom text", async () => {
     seedInventory(["ẑ"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -2260,6 +2260,12 @@ describe("MechanismGallery — custom key option (S-01 swap)", () => {
       screen.getByLabelText(/Custom character for simple swap key/i),
     ).toBeTruthy();
 
+    // Type some (possibly-invalid) custom text before the tap — this is the
+    // stale state that must NOT survive a tap-to-select.
+    fireEvent.change(screen.getByLabelText(/Custom character for simple swap key/i), {
+      target: { value: "zz" },
+    });
+
     // The OSKFrame mock's "tap-K_E" button simulates an OSK key tap.
     fireEvent.click(screen.getByRole("button", { name: "tap-K_E" }));
 
@@ -2271,6 +2277,15 @@ describe("MechanismGallery — custom key option (S-01 swap)", () => {
     expect(
       (screen.getByLabelText(/Physical key for simple swap/i) as HTMLSelectElement).value,
     ).toBe("K_E");
+
+    // Re-opening "Enter my own character..." starts clean — the paired
+    // custom-char state was cleared by the tap, not left stale from before.
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    expect(
+      (screen.getByLabelText(/Custom character for simple swap key/i) as HTMLInputElement).value,
+    ).toBe("");
   });
 });
 
@@ -2563,13 +2578,14 @@ describe("MechanismGallery — single-grapheme guard on character boxes", () => 
     expect((addBtn as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("accepts a base+combining sequence that did not precompose under NFC in the deadkey base-letter box", async () => {
+  it("accepts a base+combining sequence with a precomposed NFC form (n + U+0303 -> ñ) in the deadkey base-letter box", async () => {
     seedInventory(["ā"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
-    // "n" + U+0303 COMBINING TILDE — no precomposed NFC form, but one grapheme.
+    // "n" + U+0303 COMBINING TILDE precomposes under NFC to the single code
+    // point U+00F1 (ñ) — one grapheme either way.
     fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
       target: { value: "ñ" },
     });
