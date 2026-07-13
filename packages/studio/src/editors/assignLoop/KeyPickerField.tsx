@@ -17,8 +17,17 @@
 
 import type { CSSProperties } from "react";
 import { CUSTOM_KEY_OPTION, CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
-import { resolveKeyPickerSelection } from "../../lib/charInput.ts";
+import {
+  resolveKeyPickerSelection,
+  reflectCharInput,
+  type KeyPickerResolveOptions,
+} from "../../lib/charInput.ts";
 import { BG_PAGE, BORDER, TEXT_MAIN, TEXT_DIM, FONT } from "../../lib/galleryTheme.ts";
+
+/** Shared one-line guidance shown only while a picker's custom-character
+ *  input is active — see Fix 1 (placeholders removed from every custom
+ *  input; guidance moved here instead of living inside the box). */
+const CUSTOM_INPUT_HELP_TEXT = "Type a character directly, or a Unicode value like U+00E9.";
 
 const selectStyle: CSSProperties = {
   background: BG_PAGE,
@@ -61,15 +70,6 @@ export interface KeyPickerFieldProps {
    * pickers, which resolve solely to a K_ vkey id. Default false.
    */
   blockDelimiters?: boolean;
-  /**
-   * Placeholder text for the custom-character input. Defaults to the
-   * accented-character example ("e.g. é or U+00E9") — appropriate for a
-   * picker whose custom character is itself the literal output (e.g. the
-   * S-02 deadkey trigger). A physical-key picker (SWAP/RALT/touch host-key,
-   * where any mappable ASCII char is typical) should pass a key-oriented
-   * example instead (e.g. "e.g. a or ;").
-   */
-  customPlaceholder?: string;
 }
 
 export function KeyPickerField({
@@ -81,14 +81,16 @@ export function KeyPickerField({
   selectAriaLabel,
   customInputAriaLabel,
   blockDelimiters,
-  customPlaceholder,
 }: KeyPickerFieldProps) {
   const isCustom = value === CUSTOM_KEY_OPTION_VALUE;
-  const resolution = resolveKeyPickerSelection(
-    value,
-    customChar,
-    blockDelimiters === true ? { blockDelimiters: true } : {},
-  );
+  const resolveOptions: KeyPickerResolveOptions =
+    blockDelimiters === true ? { blockDelimiters: true } : {};
+  const resolution = resolveKeyPickerSelection(value, customChar, resolveOptions);
+  // Bidirectional char <-> U+ reflection (Fix 2) — reflectCharInput handles
+  // only the character/notation side; the vkey is appended below so the
+  // success line still reads e.g. "; → U+003B → K_SEMI" or
+  // "U+0041 → A → K_A".
+  const reflection = reflectCharInput(customChar, resolveOptions);
 
   return (
     <span style={{ display: "inline-flex", flexDirection: "column", gap: 4 }}>
@@ -107,20 +109,20 @@ export function KeyPickerField({
       </select>
       {isCustom && (
         <span style={{ display: "inline-flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ fontSize: 10, color: TEXT_DIM, fontFamily: FONT }}>
+            {CUSTOM_INPUT_HELP_TEXT}
+          </span>
           <input
             type="text"
             value={customChar}
             onChange={(e) => onCustomCharChange(e.target.value)}
             aria-label={customInputAriaLabel}
-            placeholder={customPlaceholder ?? "e.g. é or U+00E9"}
             maxLength={8}
             style={customInputStyle}
           />
           {resolution.kind === "customOk" && (
             <span role="status" aria-live="polite" style={{ fontSize: 11, color: TEXT_DIM, fontFamily: FONT }}>
-              {resolution.wasNotation
-                ? `${customChar.trim()} → ${resolution.char} → ${resolution.vkey}`
-                : `→ ${resolution.vkey}`}
+              {reflection.kind === "ok" ? `${reflection.text} → ${resolution.vkey}` : `→ ${resolution.vkey}`}
             </span>
           )}
           {resolution.kind === "customError" && customChar.trim().length > 0 && (

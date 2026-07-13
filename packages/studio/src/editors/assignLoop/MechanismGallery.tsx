@@ -76,6 +76,7 @@ import {
   resolveKeyPickerSelection,
   resolvedVkeyOf,
   isLoneCombiningMark,
+  reflectCharInput,
   type ResolveCharInputOptions,
   type KeyPickerResolveOptions,
 } from "../../lib/charInput.ts";
@@ -118,6 +119,13 @@ const CHAR_BOX_RESOLVE_OPTIONS: ResolveCharInputOptions = {
 const TRIGGER_KEY_RESOLVE_OPTIONS: KeyPickerResolveOptions = {
   blockDelimiters: true,
 };
+
+// Fix 1 — a single, unobtrusive help line for the character boxes (seqFirst,
+// seqSecond, deadkeyBaseLetter), shown once near the method chooser rather
+// than as in-box placeholder text repeated under every box. KeyPickerField
+// carries its own version of this line, shown only while its custom-input
+// mode is active.
+const CHAR_BOX_HELP_TEXT = "Type a character directly, or a Unicode value like U+00E9.";
 
 function methodLabel(ref: { patternId: string; slotValues?: Record<string, string> }): string {
   const sv = ref.slotValues ?? {};
@@ -398,9 +406,15 @@ function MethodChooser({
   // rendered below the base-letter input.
   const deadkeyBaseLetterIsLoneCombiningMark =
     baseLetterResolution.ok && isLoneCombiningMark(baseLetterResolution.value);
+  // Bidirectional char <-> U+ reflection (Fix 2) — reflectCharInput reuses
+  // resolveCharInput with the SAME options as baseLetterResolution above, so
+  // the reflection line and canApply's own validity check never disagree.
+  const baseLetterReflection = reflectCharInput(deadkeyBaseLetter, CHAR_BOX_RESOLVE_OPTIONS);
 
   const seqFirstResolution = resolveCharInput(seqFirst, CHAR_BOX_RESOLVE_OPTIONS);
   const seqSecondResolution = resolveCharInput(seqSecond, CHAR_BOX_RESOLVE_OPTIONS);
+  const seqFirstReflection = reflectCharInput(seqFirst, CHAR_BOX_RESOLVE_OPTIONS);
+  const seqSecondReflection = reflectCharInput(seqSecond, CHAR_BOX_RESOLVE_OPTIONS);
   // Same lone-combining-mark caution as the deadkey base-letter box above —
   // the sequence boxes are equally single-character (warn, do NOT block).
   const seqFirstIsLoneCombiningMark =
@@ -433,6 +447,9 @@ function MethodChooser({
       <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
         How to type it:
       </p>
+      <p style={{ margin: 0, fontSize: 11, color: TEXT_DIM, fontFamily: FONT, opacity: 0.85 }}>
+        {CHAR_BOX_HELP_TEXT}
+      </p>
 
       {/* S-03 — always shown */}
       <div style={cardStyle(method === "sequence")}>
@@ -463,18 +480,17 @@ function MethodChooser({
                   value={seqFirst}
                   onChange={(e) => onSeqFirstChange(e.target.value)}
                   aria-label="First key in sequence"
-                  placeholder="e.g. é or U+00E9"
                   maxLength={8}
                   style={inputStyle}
                 />
-                {seqFirstResolution.ok && seqFirstResolution.wasNotation && (
+                {seqFirstReflection.kind === "ok" && (
                   <span role="status" aria-live="polite" style={{ fontSize: 10, color: TEXT_DIM, fontFamily: FONT }}>
-                    &rarr; {seqFirstResolution.value}
+                    {seqFirstReflection.text}
                   </span>
                 )}
-                {!seqFirstResolution.ok && seqFirst.trim().length > 0 && (
+                {seqFirstReflection.kind === "error" && (
                   <span role="alert" style={{ fontSize: 10, color: "#f85149", opacity: 0.85, fontFamily: FONT }}>
-                    {seqFirstResolution.reason}
+                    {seqFirstReflection.reason}
                   </span>
                 )}
                 {seqFirstIsLoneCombiningMark && (
@@ -492,18 +508,17 @@ function MethodChooser({
                   value={seqSecond}
                   onChange={(e) => onSeqSecondChange(e.target.value)}
                   aria-label="Second key in sequence"
-                  placeholder="e.g. é or U+00E9"
                   maxLength={8}
                   style={inputStyle}
                 />
-                {seqSecondResolution.ok && seqSecondResolution.wasNotation && (
+                {seqSecondReflection.kind === "ok" && (
                   <span role="status" aria-live="polite" style={{ fontSize: 10, color: TEXT_DIM, fontFamily: FONT }}>
-                    &rarr; {seqSecondResolution.value}
+                    {seqSecondReflection.text}
                   </span>
                 )}
-                {!seqSecondResolution.ok && seqSecond.trim().length > 0 && (
+                {seqSecondReflection.kind === "error" && (
                   <span role="alert" style={{ fontSize: 10, color: "#f85149", opacity: 0.85, fontFamily: FONT }}>
-                    {seqSecondResolution.reason}
+                    {seqSecondReflection.reason}
                   </span>
                 )}
                 {seqSecondIsLoneCombiningMark && (
@@ -584,18 +599,17 @@ function MethodChooser({
                   value={deadkeyBaseLetter}
                   onChange={(e) => onDeadkeyBaseLetterChange(e.target.value)}
                   aria-label="Base letter for deadkey"
-                  placeholder="e.g. é or U+00E9"
                   maxLength={8}
                   style={inputStyle}
                 />
-                {baseLetterResolution.ok && baseLetterResolution.wasNotation && (
+                {baseLetterReflection.kind === "ok" && (
                   <span role="status" aria-live="polite" style={{ fontSize: 10, color: TEXT_DIM, fontFamily: FONT }}>
-                    &rarr; {baseLetterResolution.value}
+                    {baseLetterReflection.text}
                   </span>
                 )}
-                {!baseLetterResolution.ok && deadkeyBaseLetter.trim().length > 0 && (
+                {baseLetterReflection.kind === "error" && (
                   <span role="alert" style={{ fontSize: 10, color: "#f85149", opacity: 0.85, fontFamily: FONT }}>
-                    {baseLetterResolution.reason}
+                    {baseLetterReflection.reason}
                   </span>
                 )}
                 {deadkeyBaseLetterIsLoneCombiningMark && (
@@ -653,7 +667,6 @@ function MethodChooser({
                 options={KEY_OPTIONS}
                 selectAriaLabel="Physical key for simple swap"
                 customInputAriaLabel="Custom character for simple swap key"
-                customPlaceholder="e.g. a or ;"
               />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -727,7 +740,6 @@ function MethodChooser({
                 options={KEY_OPTIONS}
                 selectAriaLabel="Base key for RAlt layer"
                 customInputAriaLabel="Custom character for RAlt base key"
-                customPlaceholder="e.g. a or ;"
               />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

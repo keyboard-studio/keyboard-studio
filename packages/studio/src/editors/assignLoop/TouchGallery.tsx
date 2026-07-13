@@ -285,7 +285,6 @@ function TouchMethodChooser({
                 options={KEY_OPTIONS}
                 selectAriaLabel="Host key for long-press"
                 customInputAriaLabel="Custom character for long-press host key"
-                customPlaceholder="e.g. a or ;"
               />
             </div>
           </div>
@@ -331,7 +330,6 @@ function TouchMethodChooser({
                 options={KEY_OPTIONS}
                 selectAriaLabel="Host key for flick"
                 customInputAriaLabel="Custom character for flick host key"
-                customPlaceholder="e.g. a or ;"
               />
             </div>
             <label
@@ -399,7 +397,6 @@ function TouchMethodChooser({
                 options={KEY_OPTIONS}
                 selectAriaLabel="Host key for multitap"
                 customInputAriaLabel="Custom character for multitap host key"
-                customPlaceholder="e.g. a or ;"
               />
             </div>
           </div>
@@ -445,7 +442,6 @@ function TouchMethodChooser({
                 options={KEY_OPTIONS}
                 selectAriaLabel="Host key to replace"
                 customInputAriaLabel="Custom character for the key to replace"
-                customPlaceholder="e.g. a or ;"
               />
             </div>
             <p style={{ margin: 0, fontSize: 11, color: TEXT_DIM, fontFamily: FONT }}>

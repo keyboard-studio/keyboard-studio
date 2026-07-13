@@ -1507,7 +1507,7 @@ describe("TouchGallery — custom host-key option", () => {
     expect((applyBtn as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("host-key custom-character inputs use a key-oriented placeholder, not the accented-character example", async () => {
+  it("the host-key custom-character input carries no placeholder attribute (Fix 1 — guidance moved out of the box)", async () => {
     seedStore({ withInventory: ["中"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
@@ -1515,7 +1515,35 @@ describe("TouchGallery — custom host-key option", () => {
     const hostKeySelect = screen.getByRole("combobox", { name: /host key for long-press/i });
     fireEvent.change(hostKeySelect, { target: { value: CUSTOM_KEY_OPTION_VALUE } });
     const customInput = screen.getByLabelText(/Custom character for long-press host key/i);
-    expect(customInput.getAttribute("placeholder")).toBe("e.g. a or ;");
+    expect(customInput.getAttribute("placeholder")).toBeNull();
+  });
+
+  it("shows the shared custom-input help line only once host-key custom mode is active", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    expect(
+      screen.queryByText("Type a character directly, or a Unicode value like U+00E9."),
+    ).toBeNull();
+    const hostKeySelect = screen.getByRole("combobox", { name: /host key for long-press/i });
+    fireEvent.change(hostKeySelect, { target: { value: CUSTOM_KEY_OPTION_VALUE } });
+    expect(
+      screen.getByText("Type a character directly, or a Unicode value like U+00E9."),
+    ).toBeTruthy();
+  });
+
+  it("reflects a literal custom host-key character bidirectionally (char → U+ → vkey)", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    const hostKeySelect = screen.getByRole("combobox", { name: /host key for long-press/i });
+    fireEvent.change(hostKeySelect, { target: { value: CUSTOM_KEY_OPTION_VALUE } });
+    fireEvent.change(screen.getByLabelText(/Custom character for long-press host key/i), {
+      target: { value: "b" },
+    });
+    expect(screen.getByText("b → U+0062 → K_B")).toBeTruthy();
   });
 });
 

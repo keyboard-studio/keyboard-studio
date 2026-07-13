@@ -295,7 +295,10 @@ describe("MechanismGallery — current character display", () => {
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
-    const status = screen.getByRole("status");
+    // Scoped by name: "á" is decomposable-accented, so the deadkey method's
+    // pre-filled base-letter box also renders its own (unrelated) status
+    // reflection — getByRole("status") alone would now match more than one.
+    const status = screen.getByRole("status", { name: "0 of 2 added" });
     expect(status.getAttribute("aria-label")).toBe("0 of 2 added");
   });
 });
@@ -570,8 +573,11 @@ describe("MechanismGallery — skip character", () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
 
-    // Coverage starts at 0 of 2.
-    expect(screen.getByRole("status").getAttribute("aria-label")).toBe("0 of 2 added");
+    // Coverage starts at 0 of 2. Scoped by name — see the note in "renders
+    // the coverage status line with initial 0-of-N count" above.
+    expect(
+      screen.getByRole("status", { name: "0 of 2 added" }).getAttribute("aria-label"),
+    ).toBe("0 of 2 added");
 
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     await waitFor(() => {
@@ -579,7 +585,9 @@ describe("MechanismGallery — skip character", () => {
     });
 
     // Skipping recorded nothing, so coverage is unchanged.
-    expect(screen.getByRole("status").getAttribute("aria-label")).toBe("0 of 2 added");
+    expect(
+      screen.getByRole("status", { name: "0 of 2 added" }).getAttribute("aria-label"),
+    ).toBe("0 of 2 added");
 
     // Navigating back to the skipped-over "á": it is NOT treated as resolved —
     // Next stays disabled until it is actually applied.
@@ -1464,9 +1472,12 @@ describe("MechanismGallery — intro splash", () => {
       await new Promise((r) => setTimeout(r, 0));
     });
 
-    // Gallery now visible; intro gone.
+    // Gallery now visible; intro gone. "á" is decomposable-accented, so more
+    // than one status region can legitimately be present (the coverage line
+    // plus the deadkey method's pre-filled base-letter reflection) — assert
+    // at least one rather than exactly one.
     expect(screen.queryByText(/Welcome to the Mechanism Gallery/i)).toBeNull();
-    expect(screen.queryByRole("status")).not.toBeNull();
+    expect(screen.getAllByRole("status").length).toBeGreaterThan(0);
   });
 
   it("does NOT show the intro on a return visit (intro already marked seen)", async () => {
@@ -1478,7 +1489,7 @@ describe("MechanismGallery — intro splash", () => {
     });
 
     expect(screen.queryByText(/Welcome to the Mechanism Gallery/i)).toBeNull();
-    expect(screen.queryByRole("status")).not.toBeNull();
+    expect(screen.getAllByRole("status").length).toBeGreaterThan(0);
   });
 });
 
@@ -2443,7 +2454,9 @@ describe("MechanismGallery — delimiter guard (straight quotes)", () => {
     fireEvent.change(screen.getByLabelText(/Custom character for simple swap key/i), {
       target: { value: "'" },
     });
-    expect(screen.getByText("→ K_QUOTE")).toBeTruthy();
+    // Bidirectional reflection (Fix 2): a literal custom key char now also
+    // shows its U+ value, ahead of the resolved vkey.
+    expect(screen.getByText("' → U+0027 → K_QUOTE")).toBeTruthy();
     const addBtn = screen.getByRole("button", { name: /Apply method for ẑ/i });
     expect((addBtn as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(addBtn);
@@ -2718,7 +2731,7 @@ describe("MechanismGallery — no sentinel leak in the deadkey preview line", ()
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — accessible live-region roles on validation feedback", () => {
-  it("marks a resolved U+ notation hint as a polite status region (sequence box)", async () => {
+  it("marks a resolved U+ notation reflection as a polite status region (sequence box)", async () => {
     seedInventory(["x"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -2727,7 +2740,7 @@ describe("MechanismGallery — accessible live-region roles on validation feedba
     fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
       target: { value: "U+0041" },
     });
-    const hint = screen.getByText("→ A");
+    const hint = screen.getByText("U+0041 → A");
     expect(hint.getAttribute("role")).toBe("status");
     expect(hint.getAttribute("aria-live")).toBe("polite");
   });
@@ -2761,7 +2774,7 @@ describe("MechanismGallery — accessible live-region roles on validation feedba
     expect(caution.getAttribute("aria-live")).toBe("polite");
   });
 
-  it("marks the KeyPickerField custom-resolution hint as a polite status region (SWAP custom key)", async () => {
+  it("marks the KeyPickerField custom-resolution reflection as a polite status region (SWAP custom key)", async () => {
     seedInventory(["ẑ"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -2773,7 +2786,9 @@ describe("MechanismGallery — accessible live-region roles on validation feedba
     fireEvent.change(screen.getByLabelText(/Custom character for simple swap key/i), {
       target: { value: "z" },
     });
-    const hint = screen.getByText("→ K_Z");
+    // Bidirectional reflection (Fix 2): a literal custom key char now also
+    // shows its U+ value, ahead of the resolved vkey.
+    const hint = screen.getByText("z → U+007A → K_Z");
     expect(hint.getAttribute("role")).toBe("status");
     expect(hint.getAttribute("aria-live")).toBe("polite");
   });
@@ -2798,13 +2813,34 @@ describe("MechanismGallery — accessible live-region roles on validation feedba
 });
 
 // ---------------------------------------------------------------------------
-// Context-specific custom-input placeholders (P2 QC finding) — the SWAP/RALT
-// physical-key pickers should show a key-oriented example, not the accented-
-// character example meant for character boxes / the deadkey trigger.
+// No in-box placeholders (Fix 1) — placeholder text was distracting inside
+// the character boxes and the KeyPickerField custom-character inputs.
+// Guidance now lives OUTSIDE the box: one caption near the method chooser
+// (character boxes) and one line inside KeyPickerField shown only while its
+// custom-input mode is active.
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — context-specific custom-input placeholders", () => {
-  it("shows a key-oriented placeholder for the SWAP custom key input", async () => {
+describe("MechanismGallery — no in-box placeholders (Fix 1)", () => {
+  it("the sequence boxes carry no placeholder attribute", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    expect(screen.getByLabelText(/First key in sequence/i).getAttribute("placeholder")).toBeNull();
+    expect(screen.getByLabelText(/Second key in sequence/i).getAttribute("placeholder")).toBeNull();
+  });
+
+  it("the deadkey base-letter box carries no placeholder attribute", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    expect(screen.getByLabelText(/Base letter for deadkey/i).getAttribute("placeholder")).toBeNull();
+  });
+
+  it("the SWAP custom key input carries no placeholder attribute", async () => {
     seedInventory(["ẑ"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -2814,10 +2850,10 @@ describe("MechanismGallery — context-specific custom-input placeholders", () =
       target: { value: CUSTOM_KEY_OPTION_VALUE },
     });
     const input = screen.getByLabelText(/Custom character for simple swap key/i);
-    expect(input.getAttribute("placeholder")).toBe("e.g. a or ;");
+    expect(input.getAttribute("placeholder")).toBeNull();
   });
 
-  it("shows a key-oriented placeholder for the RALT custom key input", async () => {
+  it("the RALT custom key input carries no placeholder attribute", async () => {
     seedInventory(["ẑ"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -2827,10 +2863,10 @@ describe("MechanismGallery — context-specific custom-input placeholders", () =
       target: { value: CUSTOM_KEY_OPTION_VALUE },
     });
     const input = screen.getByLabelText(/Custom character for RAlt base key/i);
-    expect(input.getAttribute("placeholder")).toBe("e.g. a or ;");
+    expect(input.getAttribute("placeholder")).toBeNull();
   });
 
-  it("keeps the accented-character placeholder for the deadkey trigger custom input", async () => {
+  it("the deadkey trigger custom input carries no placeholder attribute", async () => {
     seedInventory(["ā"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -2840,6 +2876,38 @@ describe("MechanismGallery — context-specific custom-input placeholders", () =
       target: { value: CUSTOM_KEY_OPTION_VALUE },
     });
     const input = screen.getByLabelText(/Custom trigger character for deadkey/i);
-    expect(input.getAttribute("placeholder")).toBe("e.g. é or U+00E9");
+    expect(input.getAttribute("placeholder")).toBeNull();
+  });
+
+  it("shows a single character-box help caption near the method chooser, not repeated per box", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    expect(
+      screen.getAllByText("Type a character directly, or a Unicode value like U+00E9."),
+    ).toHaveLength(1);
+  });
+
+  it("shows an EXTRA KeyPickerField custom-input help line only once custom mode is active (SWAP key)", async () => {
+    // The character-box caption at the top of the method chooser uses the
+    // same copy and stays rendered throughout, so assert on the COUNT of
+    // matches (it must go up by exactly one) rather than presence/absence.
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    const before = screen.getAllByText(
+      "Type a character directly, or a Unicode value like U+00E9.",
+    ).length;
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    const after = screen.getAllByText(
+      "Type a character directly, or a Unicode value like U+00E9.",
+    ).length;
+    expect(after).toBe(before + 1);
   });
 });

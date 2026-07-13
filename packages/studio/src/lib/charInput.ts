@@ -15,7 +15,7 @@
 // parseUPlusNotation itself is the single canonical U+ parser
 // (@keyboard-studio/contracts) — this module never re-implements it.
 
-import { parseUPlusNotation } from "@keyboard-studio/contracts";
+import { parseUPlusNotation, toUPlusNotation } from "@keyboard-studio/contracts";
 import { CUSTOM_KEY_OPTION_VALUE, charToVkey } from "./keyOptions.ts";
 
 // ---------------------------------------------------------------------------
@@ -145,6 +145,47 @@ export function resolveCharInput(
   }
 
   return { ok: true, value, wasNotation };
+}
+
+// ---------------------------------------------------------------------------
+// reflectCharInput — live "the other direction" reflection shown below a
+// character box or a key-picker's custom-character input.
+//
+// - A LITERAL character reflects to its Unicode value: "é" -> "é → U+00E9".
+// - U+ NOTATION reflects to the resolved character: "U+00E9" -> "U+00E9 → é"
+//   (the raw typed text is echoed, not a re-normalized "U+00E9" — matching
+//   the pre-existing KeyPickerField convention of echoing customChar.trim()
+//   for a notation entry).
+// - Empty input -> kind "empty" (render nothing).
+// - Anything resolveCharInput rejects (bad U+, blocked delimiter, multi-
+//   grapheme with singleGrapheme set) -> kind "error" with the SAME reason
+//   resolveCharInput produced, so a caller's reflection and its canApply
+//   gate can never disagree about what counts as invalid.
+//
+// Pure — callers decide where/how to render the result. KeyPickerField
+// appends " → <vkey>" itself to the "ok" text so its success line also shows
+// the mapped physical key (e.g. "; → U+003B → K_SEMI").
+// ---------------------------------------------------------------------------
+
+export type CharReflection =
+  | { kind: "empty" }
+  | { kind: "ok"; text: string }
+  | { kind: "error"; reason: string };
+
+export function reflectCharInput(
+  raw: string,
+  options: ResolveCharInputOptions = {},
+): CharReflection {
+  if (raw.trim().length === 0) {
+    return { kind: "empty" };
+  }
+  const resolved = resolveCharInput(raw, options);
+  if (!resolved.ok) {
+    return { kind: "error", reason: resolved.reason };
+  }
+  return resolved.wasNotation
+    ? { kind: "ok", text: `${raw.trim()} → ${resolved.value}` }
+    : { kind: "ok", text: `${resolved.value} → ${toUPlusNotation(resolved.value)}` };
 }
 
 // ---------------------------------------------------------------------------

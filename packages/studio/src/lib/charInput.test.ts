@@ -1,11 +1,13 @@
-// Unit tests for charInput.ts — resolveCharInput (character-box resolution)
-// and resolveKeyPickerSelection/resolvedVkeyOf (key-picker dropdown
-// resolution, shared by KeyPickerField.tsx and both galleries' canApply /
-// handleApply logic).
+// Unit tests for charInput.ts — resolveCharInput (character-box resolution),
+// reflectCharInput (bidirectional char <-> U+ reflection), and
+// resolveKeyPickerSelection/resolvedVkeyOf (key-picker dropdown resolution,
+// shared by KeyPickerField.tsx and both galleries' canApply / handleApply
+// logic).
 
 import { describe, it, expect } from "vitest";
 import {
   resolveCharInput,
+  reflectCharInput,
   resolveKeyPickerSelection,
   resolvedVkeyOf,
   isLoneCombiningMark,
@@ -194,6 +196,66 @@ describe("isLoneCombiningMark", () => {
 
   it("returns false for a base+combining pair (not lone)", () => {
     expect(isLoneCombiningMark("ñ")).toBe(false);
+  });
+});
+
+describe("reflectCharInput", () => {
+  it("returns kind 'empty' for empty input", () => {
+    expect(reflectCharInput("")).toEqual({ kind: "empty" });
+  });
+
+  it("returns kind 'empty' for whitespace-only input", () => {
+    expect(reflectCharInput("   ")).toEqual({ kind: "empty" });
+  });
+
+  it("reflects a literal character to its U+ notation", () => {
+    expect(reflectCharInput("é")).toEqual({ kind: "ok", text: "é → U+00E9" });
+  });
+
+  it("reflects U+ notation to its resolved character, echoing the raw typed text", () => {
+    expect(reflectCharInput("U+00E9")).toEqual({ kind: "ok", text: "U+00E9 → é" });
+  });
+
+  it("echoes the raw typed notation case/prefix as-is (not re-normalized)", () => {
+    expect(reflectCharInput("u+00e9")).toEqual({ kind: "ok", text: "u+00e9 → é" });
+  });
+
+  it("trims surrounding whitespace before building the reflection text", () => {
+    expect(reflectCharInput("  é  ")).toEqual({ kind: "ok", text: "é → U+00E9" });
+  });
+
+  it("reflects a multi-character literal (no singleGrapheme option) to the U+ of its first code point", () => {
+    expect(reflectCharInput("ab")).toEqual({ kind: "ok", text: "ab → U+0061" });
+  });
+
+  it("reports the malformed-U+ error reason instead of a reflection", () => {
+    const r = reflectCharInput("U+ZZZZ");
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") {
+      expect(r.reason).toMatch(/not a valid unicode value/i);
+    }
+  });
+
+  it("reports the single-grapheme error reason instead of a reflection, when singleGrapheme is set", () => {
+    const r = reflectCharInput("ab", { singleGrapheme: true });
+    expect(r).toEqual({ kind: "error", reason: "Enter one character only." });
+  });
+
+  it("reports the blocked-delimiter error reason instead of a reflection, when blockDelimiters is set", () => {
+    const r = reflectCharInput("'", { blockDelimiters: true });
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") {
+      expect(r.reason).toMatch(/straight quotes/i);
+    }
+  });
+
+  it("agrees with resolveCharInput's ok/error verdict for the same input and options", () => {
+    const options = { singleGrapheme: true, blockDelimiters: true } as const;
+    for (const raw of ["é", "ab", "'", "U+00E9", "U+ZZZZ", ""]) {
+      const resolved = resolveCharInput(raw, options);
+      const reflected = reflectCharInput(raw, options);
+      expect(reflected.kind === "ok").toBe(resolved.ok && raw.trim().length > 0);
+    }
   });
 });
 
