@@ -6,6 +6,7 @@
 import { useState, useMemo } from "react";
 import { slugifyKeyboardId, validateKeyboardId } from "@keyboard-studio/contracts";
 import { Button, TextField, Label } from "../../ui/index.ts";
+import { TEXT_DIM, ERROR_RED } from "../../ui/theme.ts";
 
 export interface ProjectNameStepProps {
   /** Default display name — autonym from identity_lite (il_language_autonym). */
@@ -24,23 +25,23 @@ const HEADING: React.CSSProperties = {
 const SUBTLE: React.CSSProperties = {
   margin: "0 0 20px 0",
   fontSize: 13,
-  color: "#8b949e",
+  color: TEXT_DIM,
 };
 
-// SLUG_LINE_VALID: #8b949e + monospace — kept inline; color does not match any
+// SLUG_LINE_VALID: TEXT_DIM + monospace — kept inline; color does not match any
 // ErrorText tone (hint = var(--app-text-muted) = #aebcd6).
 const SLUG_LINE_VALID: React.CSSProperties = {
   marginTop: 8,
   fontSize: 12,
-  color: "#8b949e",
+  color: TEXT_DIM,
   fontFamily: "monospace",
 };
 
-// one-off: slug-validation color #f85149 (research Decision 1)
+// one-off: slug-validation color ERROR_RED (research Decision 1)
 const SLUG_LINE_ERROR: React.CSSProperties = {
   marginTop: 8,
   fontSize: 12,
-  color: "#f85149",
+  color: ERROR_RED,
   fontFamily: "inherit",
 };
 
@@ -67,8 +68,8 @@ export function ProjectNameStep({
       </p>
 
       <div style={{ marginBottom: 20 }}>
-        {/* Label base color is #e6edf3; LABEL_STYLE used #8b949e — pass through. */}
-        <Label htmlFor="project-display-name" style={{ color: "#8b949e", fontWeight: "normal" }}>
+        {/* Label base color is #e6edf3; TEXT_DIM — pass through. */}
+        <Label htmlFor="project-display-name" style={{ color: TEXT_DIM, fontWeight: "normal" }}>
           Display name
         </Label>
         <TextField

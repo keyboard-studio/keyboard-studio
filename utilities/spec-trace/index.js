@@ -31,8 +31,12 @@ const REPO = process.env.SPEC_TRACE_REPO || '';
 // Spec parsing
 // ---------------------------------------------------------------------------
 
+function normalizeContent(content) {
+  return content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
 function parseSpecSections(content) {
-  const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  const lines = normalizeContent(content).split('\n');
   const sections = [];
   let current = null;
 
@@ -50,8 +54,7 @@ function parseSpecSections(content) {
 }
 
 function hashSection(content) {
-  const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  return 'sha256:' + crypto.createHash('sha256').update(normalized, 'utf8').digest('hex').slice(0, 16);
+  return 'sha256:' + crypto.createHash('sha256').update(normalizeContent(content), 'utf8').digest('hex').slice(0, 16);
 }
 
 // ---------------------------------------------------------------------------
@@ -75,27 +78,26 @@ function firstHeading(content, fallback) {
   return m ? m[1].trim() : fallback;
 }
 
-function collectFeatureSpecs() {
-  if (!fs.existsSync(SPECS_DIR)) return [];
+function collectDocs(entries) {
   const out = [];
-  for (const entry of fs.readdirSync(SPECS_DIR, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const f = path.join(SPECS_DIR, entry.name, 'spec.md');
-    if (!fs.existsSync(f)) continue;
-    const content = fs.readFileSync(f, 'utf8');
-    out.push({ id: 'specs/' + entry.name, title: firstHeading(content, entry.name), content });
+  for (const entry of entries) {
+    if (!fs.existsSync(entry.file)) continue;
+    const content = fs.readFileSync(entry.file, 'utf8');
+    out.push({ id: entry.id, title: firstHeading(content, entry.fallback || entry.id), content });
   }
   return out;
 }
 
+function collectFeatureSpecs() {
+  if (!fs.existsSync(SPECS_DIR)) return [];
+  const entries = fs.readdirSync(SPECS_DIR, { withFileTypes: true })
+    .filter(e => e.isDirectory())
+    .map(e => ({ file: path.join(SPECS_DIR, e.name, 'spec.md'), id: 'specs/' + e.name, fallback: e.name }));
+  return collectDocs(entries);
+}
+
 function collectExtraDocs() {
-  const out = [];
-  for (const d of EXTRA_DOCS) {
-    if (!fs.existsSync(d.file)) continue;
-    const content = fs.readFileSync(d.file, 'utf8');
-    out.push({ id: d.id, title: firstHeading(content, d.id), content });
-  }
-  return out;
+  return collectDocs(EXTRA_DOCS);
 }
 
 // All tracked units: monolith sections + extracted feature specs + extra docs.
@@ -159,11 +161,12 @@ function seed() {
       };
       added++;
     } else {
-      if (trace.sections[s.id].hash !== currentHash) {
+      const stored = trace.sections[s.id];
+      if (stored.hash !== currentHash) {
         console.log('[WARN] Hash updated for ' + s.id + ' (spec content changed since last seed)');
-        trace.sections[s.id].hash = currentHash;
+        stored.hash = currentHash;
       }
-      trace.sections[s.id].title = s.title;
+      stored.title = s.title;
     }
   }
 
@@ -176,17 +179,8 @@ function seed() {
 // check
 // ---------------------------------------------------------------------------
 
-async function check() {
-  const trace = loadTrace();
-  if (!trace) {
-    console.log('[WARN] docs/spec-trace.json not found. Run: node utilities/spec-trace seed');
-    return;
-  }
-
-  if (!fs.existsSync(SPEC_FILE)) { console.log('[ERROR] spec.md not found at ' + SPEC_FILE); return; }
-  const sections = collectUnits();
+function computeDrift(trace, sections) {
   const drifted = [];
-
   for (const s of sections) {
     const stored = trace.sections[s.id];
     const currentHash = hashSection(s.content);
@@ -196,6 +190,19 @@ async function check() {
       drifted.push({ id: s.id, title: s.title, reason: 'content-changed', previousHash: stored.hash, currentHash });
     }
   }
+  return drifted;
+}
+
+async function check() {
+  const trace = loadTrace();
+  if (!trace) {
+    console.log('[WARN] docs/spec-trace.json not found. Run: node utilities/spec-trace seed');
+    return;
+  }
+
+  if (!fs.existsSync(SPEC_FILE)) { console.log('[ERROR] spec.md not found at ' + SPEC_FILE); return; }
+  const sections = collectUnits();
+  const drifted = computeDrift(trace, sections);
 
   if (drifted.length === 0) {
     console.log('[OK] No spec drift detected (' + sections.length + ' sections clean)');
@@ -260,13 +267,10 @@ async function acknowledge(sectionId) {
   saveTrace(trace);
   console.log('[OK] Acknowledged ' + sectionId + ' -- hash updated');
 
-  // Close the matching open spec-drift Issue when a token is available; otherwise
-  // fall back to the manual reminder (the local-dev case, no token set).
   const token = process.env.GITHUB_TOKEN;
-  if (token && REPO) {
+  const hasToken = token && REPO;
+  if (hasToken) {
     await closeAcknowledgedIssue(sectionId, token);
-  }
-  if (token && REPO) {
     console.log('[INFO] Commit docs/spec-trace.json (spec-drift Issue was closed above)');
   } else {
     console.log('[INFO] Commit docs/spec-trace.json (the spec-drift Issue closes automatically in CI)');
@@ -283,14 +287,7 @@ function report() {
 
   if (!fs.existsSync(SPEC_FILE)) { console.log('[ERROR] spec.md not found at ' + SPEC_FILE); return; }
   const sections = collectUnits();
-  const drifted = [];
-
-  for (const s of sections) {
-    const stored = trace.sections[s.id];
-    if (!stored || stored.hash !== hashSection(s.content)) {
-      drifted.push({ id: s.id, title: s.title, stored: !!stored });
-    }
-  }
+  const drifted = computeDrift(trace, sections).map(d => ({ ...d, stored: true }));
 
   const byStatus = {};
   for (const data of Object.values(trace.sections)) {
@@ -309,7 +306,7 @@ function report() {
     console.log('[INFO] ');
     console.log('[WARN] Sections with unacknowledged changes (' + drifted.length + '):');
     for (const d of drifted) {
-      console.log('[WARN]   ' + d.id + ' - ' + d.title + (d.stored ? '' : ' [NEW]'));
+      console.log('[WARN]   ' + d.id + ' - ' + d.title + (d.reason === 'new-section' ? ' [NEW]' : ''));
     }
     console.log('[INFO] ');
     console.log('[INFO] Acknowledge: node utilities/spec-trace acknowledge <section-id>');
@@ -428,6 +425,14 @@ async function syncDriftIssues(drifted, token) {
   await closeReconciledIssues(drifted, token, owner, repo, existing);
 }
 
+function logIssueClose(res, issueNumber, sectionId) {
+  if (res.status && res.status < 300) {
+    console.log('[OK] Closed drift issue #' + issueNumber + ' (' + sectionId + ')');
+  } else {
+    console.log('[WARN] Failed to close #' + issueNumber + ': ' + JSON.stringify(res.body).slice(0, 120));
+  }
+}
+
 async function closeReconciledIssues(drifted, token, owner, repo, existing) {
   const driftedIds = new Set(drifted.map(d => d.id));
   for (const issue of existing) {
@@ -438,11 +443,7 @@ async function closeReconciledIssues(drifted, token, owner, repo, existing) {
       '`docs/spec-trace.json` now matches the current spec text. Auto-closing.\n\n' +
       '_Closed by the spec-trace CI check._';
     const res = await closeIssue(owner, repo, token, issue.number, comment);
-    if (res.status && res.status < 300) {
-      console.log('[OK] Closed reconciled drift issue #' + issue.number + ' (' + id + ')');
-    } else {
-      console.log('[WARN] Failed to close #' + issue.number + ': ' + JSON.stringify(res.body).slice(0, 120));
-    }
+    logIssueClose(res, issue.number, id);
   }
 }
 
@@ -460,11 +461,39 @@ async function closeAcknowledgedIssue(sectionId, token) {
     'spec-trace: acknowledged via `node utilities/spec-trace acknowledge ' + sectionId + '` -- ' +
     'hash updated to match the current spec text. Auto-closing.';
   const res = await closeIssue(owner, repo, token, issue.number, comment);
-  if (res.status && res.status < 300) {
-    console.log('[OK] Closed drift issue #' + issue.number + ' (' + sectionId + ')');
-  } else {
-    console.log('[WARN] Failed to close #' + issue.number + ': ' + JSON.stringify(res.body).slice(0, 120));
-  }
+  logIssueClose(res, issue.number, sectionId);
+}
+
+function buildDriftIssueBody(d) {
+  const ackSteps = [
+    '- [ ] Run `node utilities/spec-trace acknowledge ' + d.id + '`',
+    '- [ ] Commit `docs/spec-trace.json` (this issue auto-closes once the acknowledgement lands in CI)'
+  ];
+
+  return [
+    '**Section:** `' + d.id + '` ' + d.title,
+    '**Detected:** ' + new Date().toISOString().slice(0, 10),
+    '**Change type:** ' + d.reason,
+    '',
+    'The `spec.md` content for this section changed since the last trace acknowledgement.',
+    'Triage: decide which path applies, then action it.',
+    '',
+    '### Path A — code needs to catch up to the spec',
+    '- [ ] Identify which implementing files diverge from the revised spec text',
+    '- [ ] Open a `refactor` or `feat` issue (or work it directly) to close the gap',
+    ...ackSteps,
+    '',
+    '### Path B — spec needs an amendment',
+    '- [ ] Open a spec-revision issue citing the original decision and new evidence (per §18)',
+    '- [ ] Land the spec amendment via the review cycle in `docs/spec-signoff.md`',
+    ...ackSteps,
+    '',
+    '### Path C — no code change needed (reference/governance section only)',
+    '- [ ] Confirm no implementing files are affected',
+    ...ackSteps,
+    '',
+    '_Auto-created by the spec-trace CI check._'
+  ].join('\n');
 }
 
 async function createMissingIssues(drifted, token, owner, repo, existing) {
@@ -476,33 +505,7 @@ async function createMissingIssues(drifted, token, owner, repo, existing) {
     }
 
     const title = 'spec drift: ' + d.id + ' -- ' + d.title;
-    const body = [
-      '**Section:** `' + d.id + '` ' + d.title,
-      '**Detected:** ' + new Date().toISOString().slice(0, 10),
-      '**Change type:** ' + d.reason,
-      '',
-      'The `spec.md` content for this section changed since the last trace acknowledgement.',
-      'Triage: decide which path applies, then action it.',
-      '',
-      '### Path A — code needs to catch up to the spec',
-      '- [ ] Identify which implementing files diverge from the revised spec text',
-      '- [ ] Open a `refactor` or `feat` issue (or work it directly) to close the gap',
-      '- [ ] Run `node utilities/spec-trace acknowledge ' + d.id + '`',
-      '- [ ] Commit `docs/spec-trace.json` (this issue auto-closes once the acknowledgement lands in CI)',
-      '',
-      '### Path B — spec needs an amendment',
-      '- [ ] Open a spec-revision issue citing the original decision and new evidence (per §18)',
-      '- [ ] Land the spec amendment via the review cycle in `docs/spec-signoff.md`',
-      '- [ ] Run `node utilities/spec-trace acknowledge ' + d.id + '`',
-      '- [ ] Commit `docs/spec-trace.json` (this issue auto-closes once the acknowledgement lands in CI)',
-      '',
-      '### Path C — no code change needed (reference/governance section only)',
-      '- [ ] Confirm no implementing files are affected',
-      '- [ ] Run `node utilities/spec-trace acknowledge ' + d.id + '`',
-      '- [ ] Commit `docs/spec-trace.json` (this issue auto-closes once the acknowledgement lands in CI)',
-      '',
-      '_Auto-created by the spec-trace CI check._'
-    ].join('\n');
+    const body = buildDriftIssueBody(d);
 
     const res = await apiRequest({
       hostname: 'api.github.com',

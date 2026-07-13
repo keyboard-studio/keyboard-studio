@@ -9,6 +9,7 @@ import { LOCAL_PROXY_BASE, getScaffolderService } from "../lib/services.ts";
 export { LOCAL_PROXY_BASE };
 import { findKmnPath } from "../lib/findKmnPath.ts";
 import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
+import { readVfsText } from "../lib/vfsText.ts";
 
 interface EngineModule {
   compile: (fs: VirtualFS, keyboardId: string) => Promise<CompileResult>;
@@ -88,6 +89,56 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
         reject(e instanceof Error ? e : new Error(String(e)));
       },
     );
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Revoke a single blob URL ref if present. */
+function revokeBlobUrl(ref: React.MutableRefObject<string | null>): void {
+  if (ref.current !== null) {
+    URL.revokeObjectURL(ref.current);
+    ref.current = null;
+  }
+}
+
+/** Revoke all blob URLs in an array ref and clear the array. */
+function revokeBlobUrls(ref: React.MutableRefObject<string[]>): void {
+  for (const url of ref.current) URL.revokeObjectURL(url);
+  ref.current = [];
+}
+
+/**
+ * Build OSK font blob URL from VFS if an OSK font entry is present.
+ * Returns { url, family } when successful, or { url: null, family: null } when
+ * the font is absent or malformed.
+ */
+function buildFontBlobUrl(
+  fonts: KpsFontEntry[],
+  vfs: VirtualFS,
+): { url: string | null; family: string | null } {
+  const oskFontEntry = fonts.find((f) => f.isOskFont && f.family);
+  if (!oskFontEntry) return { url: null, family: null };
+
+  const fontFile = vfs.get(oskFontEntry.vfsPath);
+  if (!fontFile || !(fontFile.content instanceof Uint8Array)) {
+    return { url: null, family: null };
+  }
+
+  const blob = new Blob([fontFile.content.slice().buffer], { type: "font/ttf" });
+  return { url: URL.createObjectURL(blob), family: oskFontEntry.family ?? null };
+}
+
+/**
+ * Build keyboard CSS blob URLs from stylesheet entries.
+ * Returns an array of blob URLs (one per stylesheet).
+ */
+function buildCssBlobUrls(stylesheets: KpsStylesheetEntry[]): string[] {
+  return stylesheets.map((sheet) => {
+    const blob = new Blob([sheet.cssText], { type: "text/css" });
+    return URL.createObjectURL(blob);
   });
 }
 
@@ -278,11 +329,7 @@ export function useKeyboardArtifact(
   ): Promise<void> => {
     const engine = engineRef.current;
     const vfs = vfsRef.current;
-    if (engine === null || vfs === null) {
-      return;
-    }
-
-    if (runId.current !== thisRunId) {
+    if (engine === null || vfs === null || runId.current !== thisRunId) {
       return;
     }
 
@@ -305,7 +352,7 @@ export function useKeyboardArtifact(
     let parseWarning: string | null = null;
     try {
       const kmnPath = findKmnPath(vfs);
-      const kmnText = kmnPath ? (vfs.get(kmnPath)!.content as string) : "";
+      const kmnText = kmnPath ? (readVfsText(vfs, kmnPath) ?? "") : "";
 
       // Strip dangling packaging-asset references before compiling for preview.
       // If the base names a BITMAP / VISUALKEYBOARD / LAYOUTFILE that wasn't
@@ -324,7 +371,7 @@ export function useKeyboardArtifact(
         // may have its own dangling references even when kmnPath did not.
         const compilePath = `source/${compileId}.kmn`;
         if (compilePath !== kmnPath && vfs.get(compilePath) !== undefined) {
-          const compileEntry = vfs.get(compilePath)!.content as string;
+          const compileEntry = readVfsText(vfs, compilePath) ?? "";
           const { kmn: cleanedCompile, stripped: strippedCompile } =
             engine.stripDanglingAssetStores(compileEntry, vfs);
           if (strippedCompile.length > 0) {
@@ -358,10 +405,10 @@ export function useKeyboardArtifact(
             // the generated default remains the fallback.
             if (engine.parseTouchLayout && ir.touchLayout === undefined) {
               const touchPath = findTouchLayoutPath(vfs);
-              const touchEntry = touchPath ? vfs.get(touchPath) : undefined;
-              if (touchEntry && typeof touchEntry.content === "string") {
+              const touchText = touchPath ? readVfsText(vfs, touchPath) : undefined;
+              if (touchText !== undefined) {
                 try {
-                  ir = { ...ir, touchLayout: engine.parseTouchLayout(touchEntry.content) };
+                  ir = { ...ir, touchLayout: engine.parseTouchLayout(touchText) };
                 } catch (e) {
                   console.warn("[useKeyboardArtifact] parseTouchLayout failed, falling back to generated default:", e);
                   // Leave ir.touchLayout undefined; fall back to the generated default.
@@ -409,10 +456,7 @@ export function useKeyboardArtifact(
 
     const jsArtifact = result.artifacts.find((a) => a.filename.endsWith(".js"));
 
-    if (prevBlobUrl.current !== null) {
-      URL.revokeObjectURL(prevBlobUrl.current);
-      prevBlobUrl.current = null;
-    }
+    revokeBlobUrl(prevBlobUrl);
 
     let jsBlobUrl: string;
     if (jsArtifact) {
@@ -501,13 +545,9 @@ export function useKeyboardArtifact(
     // Reset any OSK-font and keyboard-CSS state carried over from a previous
     // selection. A fresh run rebuilds them from the fetched source (or leaves
     // them cleared if the .kps has no font / .css entries).
-    if (prevFontBlobUrl.current !== null) {
-      URL.revokeObjectURL(prevFontBlobUrl.current);
-      prevFontBlobUrl.current = null;
-    }
+    revokeBlobUrl(prevFontBlobUrl);
     fontFaceFamilyRef.current = null;
-    for (const url of prevKeyboardCssBlobUrls.current) URL.revokeObjectURL(url);
-    prevKeyboardCssBlobUrls.current = [];
+    revokeBlobUrls(prevKeyboardCssBlobUrls);
 
     try {
       if (scaffoldSpec != null) {
@@ -519,19 +559,10 @@ export function useKeyboardArtifact(
         scaffoldWarnings.push(...result.warnings);
         // Build font + CSS blob URLs from scaffold result — mirrors the open-base path below.
         // result.fonts / result.stylesheets forwarded by scaffold() from fetchKeyboardSourceToVfs.
-        const oskFontEntry = result.fonts.find((f) => f.isOskFont && f.family);
-        if (oskFontEntry) {
-          const fontFile = vfsRef.current.get(oskFontEntry.vfsPath);
-          if (fontFile && fontFile.content instanceof Uint8Array) {
-            const blob = new Blob([fontFile.content.slice().buffer], { type: "font/ttf" });
-            prevFontBlobUrl.current = URL.createObjectURL(blob);
-            fontFaceFamilyRef.current = oskFontEntry.family ?? null;
-          }
-        }
-        for (const sheet of result.stylesheets) {
-          const blob = new Blob([sheet.cssText], { type: "text/css" });
-          prevKeyboardCssBlobUrls.current.push(URL.createObjectURL(blob));
-        }
+        const fontBlob = buildFontBlobUrl(result.fonts, vfsRef.current);
+        prevFontBlobUrl.current = fontBlob.url;
+        fontFaceFamilyRef.current = fontBlob.family;
+        prevKeyboardCssBlobUrls.current = buildCssBlobUrls(result.stylesheets);
       } else if (engineRef.current) {
         // Open-base path — fetch existing keyboard source. Bounded by a
         // timeout so a stalled proxy/network request surfaces a retryable
@@ -546,25 +577,14 @@ export function useKeyboardArtifact(
         // Build a blob URL for the OSK font so the frame can inject an
         // @font-face rule before the keyboard JS executes. Stored in refs so
         // it survives recompile() (the font only changes on a new fetch).
-        const oskFontEntry = (fetchResult.fonts ?? []).find((f) => f.isOskFont && f.family);
-        if (oskFontEntry) {
-          const fontFile = vfs.get(oskFontEntry.vfsPath);
-          if (fontFile && fontFile.content instanceof Uint8Array) {
-            // .slice() copies into a fresh ArrayBuffer-backed view — byte-correct
-            // (respects byteOffset/length) and a valid BlobPart under the TS lib.
-            const blob = new Blob([fontFile.content.slice().buffer], { type: "font/ttf" });
-            prevFontBlobUrl.current = URL.createObjectURL(blob);
-            fontFaceFamilyRef.current = oskFontEntry.family ?? null;
-          }
-        }
+        const fontBlob = buildFontBlobUrl(fetchResult.fonts ?? [], vfs);
+        prevFontBlobUrl.current = fontBlob.url;
+        fontFaceFamilyRef.current = fontBlob.family;
         // Build a blob URL for each per-keyboard CSS file the .kps declared.
         // The OSK frame injects these as <style> tags so the keyboard's own
         // `.kmw-keyboard-<id>` rules (key colors, font-family bindings, etc.)
         // paint the preview the same way they paint a real install.
-        for (const sheet of fetchResult.stylesheets ?? []) {
-          const blob = new Blob([sheet.cssText], { type: "text/css" });
-          prevKeyboardCssBlobUrls.current.push(URL.createObjectURL(blob));
-        }
+        prevKeyboardCssBlobUrls.current = buildCssBlobUrls(fetchResult.stylesheets ?? []);
       }
     } catch (err: unknown) {
       if (runId.current !== thisRunId) return;
@@ -586,14 +606,16 @@ export function useKeyboardArtifact(
     // Snapshot the clean populated VFS before the transform mutates it.
     // The transformVersion effect restores this snapshot before each reapply
     // so that stale accumulated .kmn text never poisons rule ordering.
-    if (vfsRef.current !== null) {
-      baseVfsRef.current = createVirtualFS(vfsRef.current.entries());
+    const currentVfs = vfsRef.current;
+    if (currentVfs !== null) {
+      baseVfsRef.current = createVirtualFS(currentVfs.entries());
     }
 
-    if (vfsTransformRef.current !== null && vfsTransformRef.current !== undefined && vfsRef.current !== null) {
+    const transform = vfsTransformRef.current;
+    if (transform !== null && transform !== undefined && currentVfs !== null) {
       try {
         const keyboardId = scaffoldSpec?.keyboardId ?? kb.id;
-        const transformResult = vfsTransformRef.current(vfsRef.current, keyboardId);
+        const transformResult = transform(currentVfs, keyboardId);
         scaffoldWarnings.push(...transformResult.warnings);
         // Capture the rename (if any) so runCompile below reads
         // source/<effectiveKeyboardId>.kmn instead of the stale base id.
@@ -605,15 +627,11 @@ export function useKeyboardArtifact(
         // prevKeyboardCssBlobUrls) hold pre-rename cssText and would otherwise
         // ship the base id's wrapper class — which KMW wraps the runtime
         // keyboard in with the new id, so the rules never match.
-        const projectedVfs = vfsRef.current;
-        const cssPaths = projectedVfs
-          .list("")
-          .filter((p) => p.endsWith(".css"));
+        const cssPaths = currentVfs.list("").filter((p) => p.endsWith(".css"));
         if (cssPaths.length > 0) {
-          for (const url of prevKeyboardCssBlobUrls.current) URL.revokeObjectURL(url);
-          prevKeyboardCssBlobUrls.current = [];
+          revokeBlobUrls(prevKeyboardCssBlobUrls);
           for (const cssPath of cssPaths) {
-            const entry = projectedVfs.get(cssPath);
+            const entry = currentVfs.get(cssPath);
             if (entry === undefined || typeof entry.content !== "string") continue;
             const blob = new Blob([entry.content], { type: "text/css" });
             prevKeyboardCssBlobUrls.current.push(URL.createObjectURL(blob));
@@ -665,21 +683,18 @@ export function useKeyboardArtifact(
   // isFullRun=false: onInstantiate is NOT fired, so no "switching base
   // keyboards" confirmation dialog is triggered by assignment changes.
   useEffect(() => {
-    if (transformVersion === 0) {
-      return;
-    }
-    // hasFetchedRef is set to false synchronously inside run() before this
-    // effect fires. If it is false, a new fetch is in progress and the VFS
-    // is empty — skip recompile to avoid cancelling the in-flight run.
-    if (!hasFetchedRef.current) {
-      return;
-    }
-    if (baseKeyboard === null || vfsRef.current === null) {
+    if (
+      transformVersion === 0 ||
+      !hasFetchedRef.current ||
+      baseKeyboard === null ||
+      vfsRef.current === null
+    ) {
       return;
     }
 
     const keyboardId = scaffoldSpec?.keyboardId ?? baseKeyboard.id;
-    if (vfsTransformRef.current !== null && vfsTransformRef.current !== undefined) {
+    const transform = vfsTransformRef.current;
+    if (transform !== null && transform !== undefined) {
       // Restore the clean base VFS snapshot so the transform always starts from
       // the unmodified keyboard source, not an accumulated previous result.
       if (baseVfsRef.current !== null) {
@@ -694,7 +709,7 @@ export function useKeyboardArtifact(
       // bug class this hook exists to prevent.
       effectiveKeyboardIdRef.current = null;
       try {
-        const transformResult = vfsTransformRef.current(vfsRef.current, keyboardId);
+        const transformResult = transform(vfsRef.current, keyboardId);
         // Capture the rename (if any) so runCompile reads
         // source/<effectiveKeyboardId>.kmn instead of the stale base id.
         // The base VFS snapshot restore above means each reapply starts
@@ -719,16 +734,9 @@ export function useKeyboardArtifact(
 
   useEffect(() => {
     return () => {
-      if (prevBlobUrl.current !== null) {
-        URL.revokeObjectURL(prevBlobUrl.current);
-        prevBlobUrl.current = null;
-      }
-      if (prevFontBlobUrl.current !== null) {
-        URL.revokeObjectURL(prevFontBlobUrl.current);
-        prevFontBlobUrl.current = null;
-      }
-      for (const url of prevKeyboardCssBlobUrls.current) URL.revokeObjectURL(url);
-      prevKeyboardCssBlobUrls.current = [];
+      revokeBlobUrl(prevBlobUrl);
+      revokeBlobUrl(prevFontBlobUrl);
+      revokeBlobUrls(prevKeyboardCssBlobUrls);
     };
   }, []);
 

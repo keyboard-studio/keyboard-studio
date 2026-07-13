@@ -34,20 +34,13 @@ const REPO_ROOT = resolve(HERE, "..", "..");
 const KEYBOARDS_ROOT = resolve(REPO_ROOT, "..", "keyboards");
 const PROXY = "local:";
 
-/**
- * Known bases that exist in the local keymanapp/keyboards clone.
- * Built via makeBaseKeyboard() so the entries satisfy BaseKeyboard at the type
- * level (no casts) — in particular `targets` must be KeymanPlatformTarget[],
- * not the free-form "any" this fixture originally used.
- */
-const DESKTOP_AND_WEB = ["windows", "macosx", "linux", "web"] as const;
-
+/** Known bases that exist in the local keymanapp/keyboards clone. */
 const BASES: Record<string, BaseKeyboard> = {
   khmer_angkor: makeBaseKeyboard({
     id: "khmer_angkor",
     path: "release/k/khmer_angkor",
     script: "Khmr",
-    targets: [...DESKTOP_AND_WEB],
+    targets: ["windows", "macosx", "linux", "web"],
     displayName: "Khmer Angkor",
     version: "1.0",
   }),
@@ -56,19 +49,14 @@ const BASES: Record<string, BaseKeyboard> = {
     id: "akan",
     path: "release/a/akan",
     script: "Latn",
-    targets: [...DESKTOP_AND_WEB],
+    targets: ["windows", "macosx", "linux", "web"],
     displayName: "Akan",
     version: "1.0",
     languages: ["ak"],
   }),
 };
 
-/**
- * Map `${PROXY}/<path>` URLs to local reads under the keyboards clone.
- * The real loader's `init` (headers) is intentionally ignored — local-disk
- * reads have no use for them; flagged so a reviewer doesn't mistake the
- * single-arg signature for an oversight.
- */
+/** Map `${PROXY}/<path>` URLs to local reads under the keyboards clone. */
 const localFetch: FetchFn = async (url) => {
   const rel = url.startsWith(`${PROXY}/`) ? url.slice(`${PROXY}/`.length) : url;
   const abs = resolve(KEYBOARDS_ROOT, rel);
@@ -90,13 +78,13 @@ const localFetch: FetchFn = async (url) => {
   };
 };
 
-function arg(name: string, fallback: string): string {
-  const i = process.argv.indexOf(name);
-  return i !== -1 && process.argv[i + 1] ? String(process.argv[i + 1]) : fallback;
+function getArg(flag: string, fallback: string): string {
+  const i = process.argv.indexOf(flag);
+  return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 }
 
 async function main(): Promise<void> {
-  const baseId = arg("--base", "akan");
+  const baseId = getArg("--base", "akan");
   const base = BASES[baseId];
   if (!base) {
     console.error(`[ERROR] unknown --base ${baseId}. Known: ${Object.keys(BASES).join(", ")}`);
@@ -109,9 +97,8 @@ async function main(): Promise<void> {
 
   const keyboardId = `e2e_smoke_${baseId.replace(/^sil_/, "")}`;
   const displayName = `E2E Smoke ${base.displayName}`;
-  // Default lands in the scratch dir two levels above the repo (e.g. E:\Temp\
-  // when the repo is E:\Projects\keyboard-studio). Override with --out.
-  const outPath = resolve(arg("--out", resolve(REPO_ROOT, "..", "..", "Temp", `${keyboardId}.zip`)));
+  const defaultOut = resolve(REPO_ROOT, "..", "..", "Temp", `${keyboardId}.zip`);
+  const outPath = resolve(getArg("--out", defaultOut));
   console.error(`[INFO] output path: ${outPath}`);
 
   const svc = createScaffolderService({ proxyBase: PROXY, fetchImpl: localFetch });

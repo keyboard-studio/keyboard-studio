@@ -1,3 +1,3 @@
-export { loadPatterns, getPatterns, getById } from "./loader.js";
+export { loadPatterns, getPatterns, getById, toPattern } from "./loader.js";
 export type { PatternFilter, LoadReport } from "./types.js";
-export { filterFor } from "./filterFor.js";
+export { filterFor, rankPatterns } from "./filterFor.js";

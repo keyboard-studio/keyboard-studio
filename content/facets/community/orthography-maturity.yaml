@@ -1,0 +1,46 @@
+# community.orthography-maturity — a new or reforming orthography wants loud
+# constraint enforcement (A6, S-10) and touch hint characters; a long-
+# established one wants neither. Also sets the tone of the generated help docs.
+# The provenance block already collects the raw signal; nothing consumes it.
+
+id: community.orthography-maturity
+family: community
+title: Orthography maturity
+description: >
+  Whether the community's writing system is long-established, recently
+  standardized, or actively reforming. Seeded from the provenance answers
+  (language status, existing tools) and Ethnologue-class data; proposes the
+  constraint-enforcement posture and help-doc framing.
+valueType: enum
+values: [established, recent, reforming, unwritten-until-now]
+
+modality: both
+modalityNotes: On touch, low maturity strengthens the case for hint characters on keycaps.
+
+derivations:
+  - kind: confirmed
+    source: "question:provenance_language_status"
+    sourceStatus: available
+    notes: Currently blank free text nothing consumes; becomes this facet's seed.
+  - kind: corpus
+    source: "corpus:llm-labeled-maturity"
+    sourceStatus: planned
+
+consumers:
+  prefills:
+    - provenance_language_status
+    - pf_welcome_paragraph
+    - pf_usage_tip_1
+  proposes:
+    - "axis:A6"
+    - "touch:hint-character-inclusion"
+    - "help-docs:tone"
+
+relatedAxes: [A6]
+provenanceLabel: "your language-status answers"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: confirmed

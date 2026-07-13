@@ -4,6 +4,7 @@
 //
 // Access at: /?demo=lint in dev mode (see main.tsx conditional).
 
+import type { CSSProperties } from "react";
 import {
   layerAFindings,
   layerBFindings,
@@ -38,7 +39,17 @@ const demoFindings: LintFinding[] = [
 // This demonstrates the 50% opacity muted rendering.
 const upstreamFinding: LintFinding = {
   ...duplicateStoreError,
-  origin: "upstream" as const,
+  origin: "upstream",
+};
+
+// Shared style for demo section headings.
+const sectionHeadingStyle: CSSProperties = {
+  fontSize: "0.9rem",
+  textTransform: "uppercase",
+  letterSpacing: "0.08em",
+  color: "#9aa7b8",
+  fontWeight: 600,
+  margin: "0 0 12px",
 };
 
 export function LintDemo() {
@@ -69,16 +80,7 @@ export function LintDemo() {
         aria-label="LintSummary example"
         style={{ marginBottom: 32, maxWidth: 720 }}
       >
-        <h2
-          style={{
-            fontSize: "0.9rem",
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-            color: "#9aa7b8",
-            fontWeight: 600,
-            margin: "0 0 12px",
-          }}
-        >
+        <h2 style={sectionHeadingStyle}>
           LintSummary (6 findings, all severity levels)
         </h2>
         <LintSummary findings={demoFindings} />
@@ -89,16 +91,7 @@ export function LintDemo() {
         aria-label="LintSummary zero state"
         style={{ marginBottom: 32, maxWidth: 720 }}
       >
-        <h2
-          style={{
-            fontSize: "0.9rem",
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-            color: "#9aa7b8",
-            fontWeight: 600,
-            margin: "0 0 12px",
-          }}
-        >
+        <h2 style={sectionHeadingStyle}>
           LintSummary (zero state)
         </h2>
         <LintSummary findings={[]} />
@@ -109,16 +102,7 @@ export function LintDemo() {
         aria-label="Upstream-origin chip example"
         style={{ maxWidth: 720 }}
       >
-        <h2
-          style={{
-            fontSize: "0.9rem",
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-            color: "#9aa7b8",
-            fontWeight: 600,
-            margin: "0 0 12px",
-          }}
-        >
+        <h2 style={sectionHeadingStyle}>
           LintChip — upstream origin (muted at 50% opacity)
         </h2>
         <LintChip finding={upstreamFinding} />

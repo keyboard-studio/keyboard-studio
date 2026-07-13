@@ -4,6 +4,7 @@
 // Matches the editor-gutter colour contract in the agent profile.
 
 import type { CompilerDiagnostic } from "@keyboard-studio/contracts";
+import { BG_CARD, CARD_BORDER, FONT_MONO, SUCCESS_ACCENT, TEXT_MAIN } from "../ui/theme.ts";
 
 // ---------------------------------------------------------------------------
 // Severity label colours
@@ -24,12 +25,12 @@ export function DiagnosticsPanel({ diagnostics }: { diagnostics: CompilerDiagnos
         style={{
           marginTop: 12,
           padding: "10px 14px",
-          background: "#161b22",
-          border: "1px solid #283040",
+          background: BG_CARD,
+          border: `1px solid ${CARD_BORDER}`,
           borderRadius: 8,
           fontSize: 12,
-          color: "#7ee787",
-          fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
+          color: SUCCESS_ACCENT,
+          fontFamily: FONT_MONO,
         }}
       >
         No compiler diagnostics.
@@ -43,8 +44,8 @@ export function DiagnosticsPanel({ diagnostics }: { diagnostics: CompilerDiagnos
       style={{
         marginTop: 12,
         padding: "10px 14px",
-        background: "#161b22",
-        border: "1px solid #283040",
+        background: BG_CARD,
+        border: `1px solid ${CARD_BORDER}`,
         borderRadius: 8,
       }}
     >
@@ -79,7 +80,7 @@ export function DiagnosticsPanel({ diagnostics }: { diagnostics: CompilerDiagnos
               alignItems: "flex-start",
               gap: 8,
               fontSize: 12,
-              fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
+              fontFamily: FONT_MONO,
               lineHeight: 1.5,
             }}
           >
@@ -94,7 +95,7 @@ export function DiagnosticsPanel({ diagnostics }: { diagnostics: CompilerDiagnos
             >
               [{d.severity.toUpperCase()}]
             </span>
-            <span style={{ color: "#e6edf3" }}>
+            <span style={{ color: TEXT_MAIN }}>
               {d.location !== undefined
                 ? `${d.location.file}:${d.location.line} — `
                 : ""}

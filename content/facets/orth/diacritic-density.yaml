@@ -1,0 +1,43 @@
+# orth.diacritic-density — computed by NFD-decomposing the confirmed inventory:
+# how many characters carry marks, which marks, and how deep the stacks go.
+# Prefill for the whole accent-marks question cluster and the main proposer
+# for axis A4.
+
+id: orth.diacritic-density
+family: orth
+title: Diacritic density and stacking depth
+description: >
+  A computed profile of the inventory's combining-mark load: proportion of
+  marked characters, the specific marks in use (acute, grave, dot-below, tone
+  marks...), maximum stack depth, and whether marks combine across families.
+  Pure Unicode arithmetic over the inventory — no elicitation needed except
+  confirmation.
+valueType: vector
+
+modality: both
+modalityNotes: High density on touch argues for longpress accent groups over dedicated keys.
+
+derivations:
+  - kind: computed
+    source: "planned:nfd-density-profile"
+    sourceStatus: planned
+    notes: Straightforward NFD decomposition + CCC analysis over orth.inventory-delta's output.
+
+consumers:
+  prefills:
+    - pb_accent_marks_gate
+    - pb_diacritic_select
+    - pb_stacking_marks
+    - pb_capitals_marks
+  proposes:
+    - "axis:A4"
+    - "reorder:pattern-need"
+
+relatedAxes: [A4]
+provenanceLabel: "Unicode analysis of your character list"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed

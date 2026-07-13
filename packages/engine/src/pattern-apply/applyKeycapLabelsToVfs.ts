@@ -279,6 +279,7 @@ function patchKvks(
     typeof entry.content === "string"
       ? entry.content
       : new TextDecoder().decode(entry.content as Uint8Array);
+  const originalXml = xml;
 
   for (const { vkey, char, kvksLayer, combo } of targets) {
     // CAPS/NCAPS combos have no kvks layer at all — skip this surface, not an error.
@@ -328,7 +329,13 @@ function patchKvks(
     xml = xml.replace(layerPattern, fullLayerReplacement);
   }
 
-  vfs.set(kvksPath, xml, false);
+  // Write back only when a target actually changed the XML — mirrors
+  // applyCarveKeycapRemovalsToVfs, which gates its vfs.set on a `changed` flag.
+  // An unconditional set would churn the VFS (and any downstream mtime/dirty
+  // tracking) even when no keycap matched.
+  if (xml !== originalXml) {
+    vfs.set(kvksPath, xml, false);
+  }
 }
 
 /**
@@ -390,6 +397,7 @@ function patchTouchLayout(
     }
   }
 
+  let changed = false;
   for (const platform of platformObjects) {
     const layers = platform["layer"] as unknown[];
     for (const layer of layers) {
@@ -417,15 +425,21 @@ function patchTouchLayout(
           if (typeof keyId !== "string") continue;
 
           const newChar = vkeyMap.get(keyId);
-          if (newChar !== undefined) {
+          if (newChar !== undefined && keyObj["text"] !== newChar) {
             keyObj["text"] = newChar;
+            changed = true;
           }
         }
       }
     }
   }
 
-  vfs.set(touchPath, JSON.stringify(data, null, 2), false);
+  // Write back only when a keycap text actually changed — mirrors patchKvks and
+  // applyCarveKeycapRemovalsToVfs. A no-op re-serialize would also needlessly
+  // reformat the JSON (2-space) even when nothing matched.
+  if (changed) {
+    vfs.set(touchPath, JSON.stringify(data, null, 2), false);
+  }
 }
 
 /**

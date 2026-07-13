@@ -26,15 +26,6 @@ afterEach(() => {
   useHoverInfoStore.setState({ info: null });
 });
 
-function makeStoreNode(overrides: Partial<CarveNode> = {}): CarveNode {
-  return {
-    nodeId: 'store#s',
-    kind: 'store',
-    name: 'sX',
-    ...overrides,
-  };
-}
-
 const baseRailProps = {
   selectedId: null,
   onSelect: vi.fn(),
@@ -43,6 +34,15 @@ const baseRailProps = {
   onSetManyGlyphs: vi.fn(),
   onToggleNode: vi.fn(),
 };
+
+function makeStoreNode(overrides: Partial<CarveNode> = {}): CarveNode {
+  return {
+    nodeId: 'store#s',
+    kind: 'store',
+    name: 'sX',
+    ...overrides,
+  };
+}
 
 describe('Rail — store node keptN/total counts over toggleable chips only', () => {
   it('excludes a disabled chip from the denominator: 1 disabled + 2 toggleable (1 kept) shows "1/2", not "1/3"', () => {

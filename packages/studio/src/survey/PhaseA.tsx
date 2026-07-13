@@ -25,6 +25,7 @@ import {
   regionNameFor,
 } from "../lib/langtagsDefaults.ts";
 import { primarySubtag } from "../lib/suggestBase.ts";
+import { answerString } from "./answerString.ts";
 
 // Vite ?raw import — YAML source as a plain string, no network request.
 // Typed via the `*.yaml?raw` module declaration in src/vite-env.d.ts.
@@ -33,15 +34,6 @@ import phaseARaw from "../../../../content/flows/proposed/phase_a_identity.modul
 // ---------------------------------------------------------------------------
 // Answer extraction helpers (exported for callers)
 // ---------------------------------------------------------------------------
-
-function answerString(result: SurveyPhaseResult, questionId: string): string {
-  const answer = result.answers.find((a: { questionId: string }) => a.questionId === questionId);
-  if (answer === undefined) return "";
-  if (answer.answerType === "text" || answer.answerType === "select") {
-    return String(answer.value);
-  }
-  return "";
-}
 
 /**
  * Derive a partial KeyboardIdentity from a completed Phase A result.

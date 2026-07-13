@@ -348,11 +348,20 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Back navigation — within Phase E and first-step → onBack
+// Back/Next navigation — positional model, reported-bug regression coverage.
+//
+// The reported bug: implementing each character, moving on, and coming back
+// only showed the first character, and Next then skipped the others. Root
+// cause was a "search for next unconfigured" forward nav (advanceToNext) plus
+// a charHistory stack for Back (reset on remount). Both handleNext/handleBack
+// are now strictly positional (idx +/- 1 in inventory) — this suite asserts
+// Next never skips an already-configured character and Back walks every
+// character in reverse position, including configured ones, landing on
+// onBack only from the very first position.
 // ---------------------------------------------------------------------------
 
 describe("TouchGallery — back navigation", () => {
-  it("Back button on the first character calls onBack (history empty)", async () => {
+  it("Back button on the first character calls onBack", async () => {
     seedStore({ withInventory: ["ä"] });
     const onBack = vi.fn();
 
@@ -360,7 +369,7 @@ describe("TouchGallery — back navigation", () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={onBack} />);
     });
 
-    // Find and click the Back button. History is empty on first char so onBack fires.
+    // idx 0 has no prior position, so Back calls onBack immediately.
     const backBtns = screen.queryAllByRole("button", { name: /back/i });
     const backBtn = backBtns.find((b) => b.textContent?.includes("Back")) ?? null;
     expect(backBtn).not.toBeNull();
@@ -371,7 +380,7 @@ describe("TouchGallery — back navigation", () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
-  it("Back from character 2 returns to character 1 (history-based)", async () => {
+  it("Back from character 2 returns to character 1 (positional)", async () => {
     seedStore({ withInventory: ["ä", "ö"] });
     const onBack = vi.fn();
 
@@ -382,8 +391,7 @@ describe("TouchGallery — back navigation", () => {
     // Accept the suggestion for "ä" — this calls handleUseSuggestion (longpress)
     // or handleSuggestionAccept (already). Per regression 4 (stay-on-char after
     // accepting a suggestion), accepting no longer advances by itself —
-    // click "Next character →" afterward to push "ä" onto history and advance
-    // to "ö".
+    // click "Next character →" afterward to advance to "ö" (idx 1).
     const allButtons = screen.queryAllByRole("button");
     const acceptBtn = allButtons.find(
       (b) => b.textContent?.trim() === "Accept",
@@ -409,7 +417,8 @@ describe("TouchGallery — back navigation", () => {
       fireEvent.click(backBtn!);
     });
 
-    // onBack should NOT have been called — we went back within Phase E.
+    // onBack should NOT have been called — Back moved one position back
+    // within Phase E (idx 1 -> idx 0), purely positionally.
     expect(onBack).not.toHaveBeenCalled();
 
     // The "ä" character heading should now be visible (we returned to char 1).
@@ -436,45 +445,242 @@ describe("TouchGallery — back navigation", () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
-  it("Back from all-done state returns to the last visited character (non-null currentChar)", async () => {
-    // With a two-character inventory, skip "ä" then skip "ö" to reach the
-    // all-done state (currentChar becomes null via handleSkip's setCurrentChar(null)).
-    // Clicking Back should pop the history and restore currentChar to the last
-    // visited character.
-    seedStore({ withInventory: ["ä", "ö"] });
+  it("Next advances positionally over configured characters (never skips them); Back walks back through every character including configured ones; Back from the first character calls onBack; the last character's forward button reads Done and calls the completion handler", async () => {
+    // "中"/"日"/"月" have no Phase C desktop assignment, are not in the
+    // default touch layout, and are not decomposable accented letters, so
+    // suggestion kind = "none" for all three — the method chooser is shown
+    // directly (no Accept/Deny step to route around).
+    seedStore({ withInventory: ["中", "日", "月"] });
     const onBack = vi.fn();
+    const onComplete = vi.fn();
 
+    await act(async () => {
+      render(<TouchGallery onComplete={onComplete} onBack={onBack} />);
+    });
+
+    // --- Configure "中" (idx 0): pick a host key, Apply, then Next → "日" (idx 1). ---
+    expect(screen.getByLabelText(/^U\+4E2D 中$/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/Host key for long-press/i), {
+      target: { value: "K_A" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply touch method for/i }));
+    await waitFor(() => {
+      const nextBtn = screen.getByRole("button", { name: /Next character/i });
+      expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(nextBtn);
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+    });
+
+    // --- Configure "日" (idx 1), then Next → "月" (idx 2, the LAST character). ---
+    fireEvent.change(screen.getByLabelText(/Host key for long-press/i), {
+      target: { value: "K_B" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply touch method for/i }));
+    await waitFor(() => {
+      const nextBtn = screen.getByRole("button", { name: /Next character/i });
+      expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(nextBtn);
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+6708 月$/)).toBeTruthy();
+    });
+
+    // The last character's forward button already reads "Done" (not yet
+    // configured for "月", so it starts disabled).
+    const doneBtn = screen.getByRole("button", { name: "Done" });
+    expect((doneBtn as HTMLButtonElement).disabled).toBe(true);
+
+    // --- Back from "月" (idx 2) lands on "日" (idx 1) — configured, not skipped. ---
+    fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+    });
+    expect(onBack).not.toHaveBeenCalled();
+
+    // Revisiting the configured "日": Next is already enabled (no re-apply
+    // needed) and — critically — advances to "月" (idx 2), NOT past it. This
+    // is the regression the reported bug hit: Next used to search forward
+    // for the next *unconfigured* character and would jump straight to
+    // completion/an unrelated character from here.
+    const nextFrom日 = screen.getByRole("button", { name: /Next character/i });
+    expect((nextFrom日 as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(nextFrom日);
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+6708 月$/)).toBeTruthy();
+    });
+
+    // --- Back twice more: "月" → "日" → "中" (idx 0), both configured, neither skipped. ---
+    fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+4E2D 中$/)).toBeTruthy();
+    });
+    expect(onBack).not.toHaveBeenCalled();
+
+    // --- Back from "中" (idx 0) — first position — calls onBack, NOT "back to previous character". ---
+    fireEvent.click(screen.getByRole("button", { name: /back to mechanisms/i }));
+    expect(onBack).toHaveBeenCalledOnce();
+
+    // --- Forward to "月" (last) and configure it; Done calls the completion handler. ---
+    // (onBack fired above, but the component itself has no further reaction
+    // to onBack — currentChar stays put — so we can keep driving the same
+    // instance forward to exercise Done.)
+    fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+6708 月$/)).toBeTruthy();
+    });
+    fireEvent.change(screen.getByLabelText(/Host key for long-press/i), {
+      target: { value: "K_C" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply touch method for/i }));
+    await waitFor(() => {
+      const finishBtn = screen.getByRole("button", { name: "Done" });
+      expect((finishBtn as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(finishBtn);
+    });
+    expect(onComplete).toHaveBeenCalledOnce();
+  });
+});
+
+describe("TouchGallery — previous-character navigation", () => {
+  it("clicking '« Previous character' from an interior character moves to the immediately preceding character, ungated by intermediate configuration status", async () => {
+    const onBack = vi.fn();
+    seedStore({ withInventory: ["中", "日", "月"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={onBack} />);
     });
 
-    // Skip "ä" — advances to "ö".
-    const skipBtns1 = screen.queryAllByRole("button");
-    const skipBtn1 = skipBtns1.find((b) => b.textContent?.toLowerCase() === "skip") ?? null;
-    expect(skipBtn1).not.toBeNull();
-    await act(async () => { fireEvent.click(skipBtn1!); });
-
-    // Skip "ö" — all done, currentChar becomes null.
-    const skipBtns2 = screen.queryAllByRole("button");
-    const skipBtn2 = skipBtns2.find((b) => b.textContent?.toLowerCase() === "skip") ?? null;
-    expect(skipBtn2).not.toBeNull();
-    await act(async () => { fireEvent.click(skipBtn2!); });
-
-    // Now in all-done state — a Back button and Done button should be visible.
-    const allDoneBackBtn = screen.queryByRole("button", { name: /back to previous character/i });
-    expect(allDoneBackBtn).not.toBeNull();
-
-    await act(async () => {
-      fireEvent.click(allDoneBackBtn!);
+    // Advance to "日" (idx 1) via Skip — "月" stays untouched.
+    expect(screen.getByLabelText(/^U\+4E2D 中$/)).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", { name: /Skip this character/i }),
+    );
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
     });
 
-    // onBack must NOT have been called — we returned within Phase E.
-    expect(onBack).not.toHaveBeenCalled();
+    const prevBtn = screen.getByTestId("touch-prev-char");
+    expect(prevBtn.getAttribute("aria-label")).toBe("Previous character");
+    expect((prevBtn as HTMLButtonElement).disabled).toBe(false);
 
-    // currentChar is back to a known character — the per-char heading "Touch mapping"
-    // should reappear.
-    const headings = screen.queryAllByText(/Touch mapping/i);
-    expect(headings.length).toBeGreaterThan(0);
+    fireEvent.click(prevBtn);
+
+    // Landed back on "中" (idx 0) — the phase was NOT exited.
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+4E2D 中$/)).toBeTruthy();
+    });
+    expect(onBack).not.toHaveBeenCalled();
+  });
+
+  it("renders the previous-character button DISABLED on the first character", async () => {
+    seedStore({ withInventory: ["中", "日", "月"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    // Starting on "中" (idx 0) — nowhere further back to step.
+    const prevBtn = screen.getByTestId("touch-prev-char");
+    expect(prevBtn).toBeTruthy();
+    expect((prevBtn as HTMLButtonElement).disabled).toBe(true);
+
+    // Clicking a disabled button is a no-op — still on "中".
+    fireEvent.click(prevBtn);
+    expect(screen.getByLabelText(/^U\+4E2D 中$/)).toBeTruthy();
+  });
+
+  it("the previous-character button is enabled on later (non-first) characters", async () => {
+    seedStore({ withInventory: ["中", "日", "月"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // Advance to "日" (idx 1) via Skip (records nothing).
+    fireEvent.click(
+      screen.getByRole("button", { name: /Skip this character/i }),
+    );
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+    });
+    expect((screen.getByTestId("touch-prev-char") as HTMLButtonElement).disabled).toBe(false);
+
+    // Advance to "月" (idx 2, the last character) — still enabled there too.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Skip this character/i }),
+    );
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+6708 月$/)).toBeTruthy();
+    });
+    expect((screen.getByTestId("touch-prev-char") as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Skip — pure forward navigation; records nothing.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — skip character", () => {
+  it("skipping advances to the next char without recording an assignment", async () => {
+    // "中"/"日" have suggestion kind = "none" (see back-navigation suite above).
+    seedStore({ withInventory: ["中", "日"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+
+    // No assignment recorded.
+    expect(useWorkingCopyStore.getState().touchDraft?.charTouchEntries ?? []).toHaveLength(0);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+    });
+  });
+
+  it("skipping does not change the coverage count and does not mark the character configured", async () => {
+    seedStore({ withInventory: ["中", "日"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expect(screen.getByRole("status").getAttribute("aria-label")).toBe(
+      "0 of 2 characters configured",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+65E5 日$/)).toBeTruthy();
+    });
+
+    // Skipping recorded nothing, so coverage is unchanged.
+    expect(screen.getByRole("status").getAttribute("aria-label")).toBe(
+      "0 of 2 characters configured",
+    );
+
+    // Navigating back to the skipped-over "中": it is NOT treated as
+    // configured — Next stays disabled until it is actually applied.
+    fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+4E2D 中$/)).toBeTruthy();
+    });
+    const nextBtn = screen.getByRole("button", { name: /Next character/i });
+    expect((nextBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("skipping the only (last) character completes the phase via onComplete", async () => {
+    const onComplete = vi.fn();
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    expect(onComplete).toHaveBeenCalledOnce();
   });
 });
 
@@ -492,7 +698,9 @@ describe("TouchGallery — draft persistence across unmount/remount", () => {
     );
 
     // "ä" is decomposable and not in the default layout, so the suggestion is
-    // "longpress". Accept it — records "ä" in charTouch (stays on "ä"; regression 4, stay-on-char).
+    // "longpress". Accept it — records "ä" in charTouch and stays on "ä"
+    // (regression 4, stay-on-char); advancing to the next character is
+    // explicit via Next, not automatic.
     const allButtons = screen.queryAllByRole("button");
     const acceptBtn = allButtons.find(
       (b) => b.textContent?.trim() === "Accept",
@@ -661,17 +869,19 @@ describe("TouchGallery — accepting a suggestion stays on the same character", 
 });
 
 // ---------------------------------------------------------------------------
-// Back preserves history depth across remount (regression 2, back-button depth)
+// Back survives a remount without any persisted history (regression 2,
+// back-button depth — superseded by the positional navigation model)
 // ---------------------------------------------------------------------------
 
-describe("TouchGallery — Back preserves history depth across a remount", () => {
-  it("rehydrates charHistory from the store draft so Back steps to the previous character instead of calling onBack", async () => {
+describe("TouchGallery — Back survives a remount", () => {
+  it("steps to the previous character after remount purely from position, with no history to rehydrate", async () => {
     seedStore({ withInventory: ["ä", "ö"] });
 
-    // Simulate a prior mount that configured "ä", advanced to "ö" (pushing "ä"
-    // onto charHistory), and wrote the draft back to the store before
-    // unmounting — the exact state a real unmount/remount (back-nav to Phase C
-    // and returning) would leave behind.
+    // Simulate a prior mount that configured "ä" and advanced to "ö", then
+    // wrote the draft back to the store before unmounting — the exact state
+    // a real unmount/remount (back-nav to Phase C and returning) would leave
+    // behind. Note: no history stack is seeded here — the positional model
+    // (idx +/- 1 in inventory) needs none; only charTouchEntries persists.
     const configuredAssignment: MechanismAssignment = {
       scope: "individual",
       target: "ä",
@@ -681,8 +891,7 @@ describe("TouchGallery — Back preserves history depth across a remount", () =>
     };
     useWorkingCopyStore.getState().setTouchDraft({
       charTouchEntries: [["ä", configuredAssignment]],
-      skippedChars: [],
-      charHistory: ["ä"],
+      suggestionResolvedChars: [],
     });
 
     const onBack = vi.fn();
@@ -699,10 +908,11 @@ describe("TouchGallery — Back preserves history depth across a remount", () =>
       fireEvent.click(backBtn!);
     });
 
-    // The regression this guards: charHistory used to reset to [] on every
-    // mount, so Back always called onBack (exiting Phase E) regardless of how
-    // many characters had actually been visited. With charHistory rehydrated,
-    // Back must step back to "ä" instead.
+    // The regression this guards: the old history-stack model reset to []
+    // on every mount, so Back always called onBack (exiting Phase E)
+    // regardless of how many characters had actually been visited. The
+    // positional model derives Back purely from currentChar's index in
+    // inventory, so it steps back to "ä" (idx 0) with nothing to rehydrate.
     expect(onBack).not.toHaveBeenCalled();
     expect(screen.queryAllByText(/Touch mapping/i).length).toBeGreaterThan(0);
   });
@@ -857,6 +1067,58 @@ describe("TouchGallery — suggestion card variants", () => {
     // "a key" fallback the component shows when hostKey extraction fails.
     expect(screen.queryByText(/Suggested: long-press 4 to reach/i)).not.toBeNull();
     expect(screen.queryByText(/Suggested: long-press a key to reach/i)).toBeNull();
+  });
+
+  it("a suggestion card REAPPEARS after Skip (unlike Accept/Deny) — Skip resolves nothing", async () => {
+    // Same longpress-suggestion fixture as above, plus a second inventory
+    // character ("x", no desktop assignment → suggestion kind "none") so
+    // there is somewhere to Skip forward to and Back from. Skip is pure
+    // positional navigation and must not add "á" to suggestionResolved, so
+    // returning to it must show the suggestion card again.
+    const deadkeyAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "á",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "deadkey_single_tap",
+          strategyId: "S-02",
+          slotValues: {
+            triggerKey: "K_COLON",
+            deadkeyName: "dk_colon",
+            baseLetters: "a",
+            accentedForms: "á",
+            accentChar: ":",
+          },
+        },
+      ],
+      source: "user",
+    };
+    seedWithDesktopAssignment("á", deadkeyAssignment, ["x"]);
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // Suggestion card shows for "á".
+    expect(screen.queryByText(/Suggested: long-press/i)).not.toBeNull();
+
+    // Skip it — no accept/deny, no assignment recorded.
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+0078 x$/)).toBeTruthy();
+    });
+
+    // Navigate back to "á" without ever resolving its suggestion.
+    fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
+    });
+
+    // Unlike the accept/deny case above, the suggestion card for "á" MUST
+    // reappear — Skip resolved nothing. (If `skippedChars` were reintroduced
+    // to suppress the card, this assertion would fail.)
+    expect(screen.queryByText(/Suggested: long-press/i)).not.toBeNull();
   });
 });
 
@@ -1031,9 +1293,10 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
 
   it("dedupes a mechanism whose existing slotValues has a different key order (mechanismRefEquals must be order-independent)", async () => {
     // Two-character inventory: "y" is left unconfigured so the sync effect
-    // lands the initial currentChar there (not on the preconfigured "中"),
-    // and charHistory seeds a pending Back hop to "中" — mirroring how a
-    // real session would have visited "中" earlier, then moved on.
+    // lands the initial currentChar there (not on the preconfigured "中",
+    // idx 0). Back is purely positional (idx 1 -> idx 0), so no history needs
+    // seeding to land back on "中" — mirroring how a real session would have
+    // visited "中" earlier, then moved on.
     seedStore({ withInventory: ["中", "y"] });
 
     // Seed an existing mechanism for "中" whose slotValues key order is
@@ -1056,17 +1319,17 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
           },
         ],
       ],
-      skippedChars: [],
-      charHistory: ["中"],
+      suggestionResolvedChars: [],
     });
 
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
-    // Mount lands on "y" (first unconfigured char). Back pops "中" off the
-    // seeded charHistory, landing on the preconfigured character — "中" has
-    // no suggestion, so the chooser (not a suggestion card) shows directly.
+    // Mount lands on "y" (first unconfigured char, idx 1). Back moves one
+    // position back (idx 1 -> idx 0), landing on the preconfigured
+    // character — "中" has no suggestion, so the chooser (not a suggestion
+    // card) shows directly.
     const backBtn = screen.queryAllByRole("button", { name: /back/i }).find(
       (b) => b.textContent?.includes("Back"),
     ) ?? null;

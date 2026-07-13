@@ -13,9 +13,10 @@ import fs from 'node:fs';
 import { keyForChar } from './layout.ts';
 import type { Layout } from './layout.ts';
 import type { Placement } from './place.ts';
+import { codepointOf, isAsciiLetterCp } from './analyze.ts';
 
-const isAsciiLetter = (s: unknown): s is string => typeof s === 'string' && s.length === 1 && /[A-Za-z]/.test(s);
-const isSpecial = (s: unknown): s is string => typeof s === 'string' && [...s].length === 1 && (s.codePointAt(0) as number) > 0x7F && /\p{L}/u.test(s);
+const isAsciiLetter = (s: unknown): s is string => typeof s === 'string' && s.length === 1 && isAsciiLetterCp(codepointOf(s));
+const isSpecial = (s: unknown): s is string => typeof s === 'string' && [...s].length === 1 && codepointOf(s) > 0x7F && /\p{L}/u.test(s);
 
 export interface CorpusEntry {
   key: string | null;

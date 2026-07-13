@@ -7,6 +7,7 @@
 
 import type { VirtualFS } from "@keyboard-studio/contracts";
 import { findTouchLayoutPath } from "./findTouchLayoutPath.js";
+import { readVfsText } from "./vfsText.ts";
 
 /**
  * Resolve the base keyboard's shipped `.keyman-touch-layout` JSON string from
@@ -19,10 +20,8 @@ import { findTouchLayoutPath } from "./findTouchLayoutPath.js";
  * scratch) path should run instead of the Case B (faithful edit) path.
  */
 export function resolveBaseTouchJson(vfs: VirtualFS | null): string | undefined {
-  if (vfs === null) return undefined;
-  const p = findTouchLayoutPath(vfs);
-  if (p === undefined) return undefined;
-  const content = vfs.get(p)?.content;
-  // Guard against binary/Uint8Array entries — only return string content.
-  return typeof content === "string" ? content : undefined;
+  if (!vfs) return undefined;
+  const path = findTouchLayoutPath(vfs);
+  if (!path) return undefined;
+  return readVfsText(vfs, path);
 }

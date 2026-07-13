@@ -68,8 +68,8 @@ Numbered findings — each with severity (P0/P1/P2), `file:line`, description, a
 
 ## Triage mode
 
-When invoked by `/km-triage`, emit the verdict block exactly as the briefing specifies (it is machine-parsed); the authoritative finding and verdict contract is the km-review workflow schema in `.claude/workflows/km-review.js`. Do not post PR comments or modify files in this mode.
+When invoked by `/km-triage`, emit the verdict block exactly as the briefing specifies (it is machine-parsed); the verdict format is specified in the triage briefing. Do not post PR comments or modify files in this mode.
 
 ## Schema-forced output mode
 
-When invoked from a workflow with a `schema` argument, follow FINDINGS_SCHEMA in `.claude/workflows/km-review.js` — emit a fired pattern-audit gate as the first finding (`gateId: 'pattern-audit'`, `severity: 'critical'`) and the aggregate score as the top-level `qualityScore` field.
+When invoked by `/km-triage`, follow the structured verdict format in the briefing — emit a fired pattern-audit gate as the first finding (`gateId: 'pattern-audit'`, `severity: 'critical'`) and the aggregate score as the top-level `qualityScore` field.

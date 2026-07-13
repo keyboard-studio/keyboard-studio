@@ -9,9 +9,8 @@
 //   6. style override passes through (merges over base styles).
 //   7. className override passes through.
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import { afterEach } from "vitest";
 import { Textarea } from "./Textarea.tsx";
 
 // jsdom always normalizes hex colors to rgb() in inline styles.

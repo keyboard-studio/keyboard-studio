@@ -25,11 +25,10 @@
 //      redirect both asset paths away from the source/<keyboardId> default.
 //  13. Path resolution: no header stores -> falls back to
 //      source/<keyboardId>.<ext>.
-//  14. SUSPECTED BUG — both patchKvks and patchTouchLayout call vfs.set()
-//      unconditionally once a layer file is present, even when no target
-//      actually matched anything in it (no "changed" guard, unlike the
-//      sibling applyCarveKeycapRemovalsToVfs). Documented as current
-//      behavior, not fixed here.
+//  14. Change-gated write — patchKvks and patchTouchLayout only call vfs.set()
+//      when a target actually changed the file; when a layer file is present
+//      but nothing matched, the VFS entry is left untouched (a `changed` /
+//      identity guard, matching the sibling applyCarveKeycapRemovalsToVfs).
 
 import { describe, it, expect, vi } from "vitest";
 import { applyKeycapLabelsToVfs } from "./applyKeycapLabelsToVfs.js";
@@ -721,16 +720,14 @@ begin Unicode > use(main)
 // 14. Suspected bug — unconditional write, no "changed" guard
 // ---------------------------------------------------------------------------
 
-describe("applyKeycapLabelsToVfs — SUSPECTED BUG: unconditional write when nothing matched", () => {
-  it("calls vfs.set() for .kvks even when the target layer does not exist (content ends up byte-identical)", () => {
-    // KVKS_WITH_RA has no `shift=""`... it DOES have one; use a kvks with
-    // ONLY an RA layer so the S-01 (kvksLayer === "") lookup finds no layer
-    // and (unlike S-08) there is no synthesis fallback for "" — patchKvks
-    // falls straight through the loop with `xml` unchanged, yet still calls
-    // `vfs.set(kvksPath, xml, false)` unconditionally at the end of the
-    // function (no `changed` flag, unlike applyCarveKeycapRemovalsToVfs's
-    // clearKvksKeycaps, which gates its vfs.set on an explicit `changed`
-    // boolean). This is current behavior, documented — not fixed here.
+describe("applyKeycapLabelsToVfs — change-gated write when nothing matched", () => {
+  it("does not call vfs.set() for .kvks when the target layer does not exist", () => {
+    // Use a kvks with ONLY an RA layer so the S-01 (kvksLayer === "") lookup
+    // finds no layer and — unlike S-08 — there is no synthesis fallback for
+    // "": patchKvks falls straight through the loop with `xml` unchanged.
+    // patchKvks now gates its vfs.set on `xml !== originalXml` (matching the
+    // sibling applyCarveKeycapRemovalsToVfs's `changed` guard), so no write
+    // happens and the VFS entry is left untouched.
     const kvksOnlyRA = `<visualkeyboard><encoding name="unicode">
 <layer shift="RA">
 <key vkey="K_A">a-ra</key>
@@ -742,14 +739,14 @@ describe("applyKeycapLabelsToVfs — SUSPECTED BUG: unconditional write when not
     const { warnings } = applyKeycapLabelsToVfs(vfs, "test", [makeS01Assignment("Z", "K_A")]);
 
     expect(warnings).toHaveLength(0);
-    expect(setSpy).toHaveBeenCalledWith("source/test.kvks", kvksOnlyRA, false);
-    expect(vfs.get("source/test.kvks")?.content).toBe(kvksOnlyRA); // byte-identical, but still written
+    expect(setSpy).not.toHaveBeenCalledWith("source/test.kvks", kvksOnlyRA, false);
+    expect(vfs.get("source/test.kvks")?.content).toBe(kvksOnlyRA); // untouched
   });
 
-  it("calls vfs.set() for the touch layout even when no layer id matched a target", () => {
+  it("does not call vfs.set() for the touch layout when no layer id matched a target", () => {
     // touchLayer for S-01 is always "default"; give the file only a
     // "rightalt" layer so nothing in patchMap ever matches. patchTouchLayout
-    // still serializes and writes `data` unconditionally at the end.
+    // now gates its vfs.set on a `changed` flag, so it leaves the entry as-is.
     const touchRightaltOnly = JSON.stringify(
       { tablet: { layer: [{ id: "rightalt", row: [{ id: 1, key: [{ id: "K_A", text: "a-ra" }] }] }] } },
       null,
@@ -763,7 +760,7 @@ describe("applyKeycapLabelsToVfs — SUSPECTED BUG: unconditional write when not
     const { warnings } = applyKeycapLabelsToVfs(vfs, "test", [makeS01Assignment("Z", "K_A")]);
 
     expect(warnings).toHaveLength(1); // missing .kvks
-    expect(setSpy).toHaveBeenCalledWith(
+    expect(setSpy).not.toHaveBeenCalledWith(
       "source/test.keyman-touch-layout",
       touchRightaltOnly,
       false,

@@ -92,6 +92,12 @@ export interface FieldProps {
   className?: string;
 }
 
+const CONTAINER_BASE: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+};
+
 /**
  * Presentational field-row wrapper.
  *
@@ -112,23 +118,12 @@ export function Field({
   style,
   className,
 }: FieldProps): React.ReactElement {
-  const containerStyle: React.CSSProperties = {
-    display: "flex",
-    flexDirection: "column",
-    gap: 4,
-    ...style,
-  };
-
   return (
-    <div style={containerStyle} className={className}>
+    <div style={style ? { ...CONTAINER_BASE, ...style } : CONTAINER_BASE} className={className}>
       {label !== undefined && (
-        typeof label === "string" ? (
-          <Label htmlFor={fieldId} required={required}>
-            {label}
-          </Label>
-        ) : (
-          label
-        )
+        typeof label === "string"
+          ? <Label htmlFor={fieldId} required={required}>{label}</Label>
+          : label
       )}
 
       {help !== undefined && (

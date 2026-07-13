@@ -148,20 +148,24 @@ function parseDk(tok: string): number | null {
   return parseInt(m[1] ?? "0", 16);
 }
 
+// Recognised vkey-bracket modifier names (e.g. [SHIFT K_A]). Module-scoped so
+// parseVkeyBracket doesn't rebuild the Set on every call — it runs once per
+// bracket token across every store/context/output element parsed.
+const KNOWN_VKEY_MODIFIERS = new Set([
+  "SHIFT", "RALT", "LALT", "CTRL", "LCTRL", "RCTRL",
+  "ALT", "CAPS", "NCAPS", "RSHIFT",
+]);
+
 /** Parse a modifier+vkey bracket group like [K_A] or [SHIFT K_A] → {name, modifiers}. */
 function parseVkeyBracket(tok: string): { name: string; modifiers: string[] } | null {
   if (!tok.startsWith("[") || !tok.endsWith("]")) return null;
   const inner = tok.slice(1, -1).trim();
   const parts = inner.split(/\s+/);
   // The last part is the vkey name; everything before is modifiers.
-  const KNOWN_MODIFIERS = new Set([
-    "SHIFT", "RALT", "LALT", "CTRL", "LCTRL", "RCTRL",
-    "ALT", "CAPS", "NCAPS", "RSHIFT",
-  ]);
   const vkeyParts: string[] = [];
   const modParts: string[] = [];
   for (const p of parts) {
-    if (KNOWN_MODIFIERS.has(p.toUpperCase())) {
+    if (KNOWN_VKEY_MODIFIERS.has(p.toUpperCase())) {
       modParts.push(p.toUpperCase());
     } else {
       vkeyParts.push(p);
@@ -193,9 +197,14 @@ const parseAny = makeStoreParser("any");
 /** Parse notany(storeName) → storeName, or null. */
 const parseNotAny = makeStoreParser("notany");
 
+// Compiled once at module load — parseIndex runs on every context/output
+// token, so recompiling this regex per call would recompile it once per
+// token across the whole keyboard.
+const INDEX_RE = new RegExp(`^index\\s*\\(\\s*(${KMN_IDENT})\\s*,\\s*(\\d+)\\s*\\)$`, "i");
+
 /** Parse index(storeName, N) → {storeRef, offset}, or null. */
 function parseIndex(tok: string): { storeRef: string; offset: number } | null {
-  const m = new RegExp(`^index\\s*\\(\\s*(${KMN_IDENT})\\s*,\\s*(\\d+)\\s*\\)$`, "i").exec(tok);
+  const m = INDEX_RE.exec(tok);
   if (!m) return null;
   return { storeRef: m[1] ?? "", offset: parseInt(m[2] ?? "0", 10) };
 }
@@ -217,9 +226,13 @@ function parseBaselayout(tok: string): string | null {
 /** Parse outs(storeName) → storeName, or null. */
 const parseOuts = makeStoreParser("outs");
 
+// Compiled once — parseUse runs on every output token, same rationale as
+// INDEX_RE above.
+const USE_RE = new RegExp(`^use\\s*\\(\\s*(${KMN_IDENT})\\s*\\)$`, "i");
+
 /** Parse use(groupName) → groupName, or null. */
 function parseUse(tok: string): string | null {
-  const m = new RegExp(`^use\\s*\\(\\s*(${KMN_IDENT})\\s*\\)$`, "i").exec(tok);
+  const m = USE_RE.exec(tok);
   return m ? (m[1] ?? null) : null;
 }
 

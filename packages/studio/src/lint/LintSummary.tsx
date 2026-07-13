@@ -14,7 +14,7 @@ export interface LintSummaryProps {
 function labelFor(severity: LintSeverity, count: number): string {
   if (count === 1) return severity;
   // "info" is already a noun; all others take a plain -s suffix.
-  return severity === "info" ? "info" : `${severity}s`;
+  return severity === "info" ? severity : `${severity}s`;
 }
 
 export function LintSummary({ findings }: LintSummaryProps) {
@@ -88,7 +88,7 @@ export function LintSummary({ findings }: LintSummaryProps) {
           </span>
         ) : (
           activeSeverities.map((severity, idx) => {
-            const count = counts.get(severity) ?? 0;
+            const count = counts.get(severity)!;
             return (
               <span key={severity} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span

@@ -64,28 +64,23 @@ function getAuth(): AppAuth | undefined {
   const privateKeyB64 = (process.env["GITHUB_APP_PRIVATE_KEY"] ?? "").trim();
   const installationIdRaw = (process.env["GITHUB_APP_INSTALLATION_ID"] ?? "").trim();
 
-  if (!appIdRaw || !privateKeyB64 || !installationIdRaw) {
-    return undefined;
-  }
+  if (!appIdRaw || !privateKeyB64 || !installationIdRaw) return undefined;
 
   const appId = parseInt(appIdRaw, 10);
   const installationId = parseInt(installationIdRaw, 10);
 
   if (!Number.isFinite(appId) || !Number.isFinite(installationId)) {
-    // The vars are present but not parseable as integers — likely a typo in the
-    // App ID or installation ID. Warn so the operator sees this at startup rather
-    // than silently disabling the managed-PR route (mirrors server.ts partial-config warn).
     console.warn(
       "[WARN] managed submission is disabled: GITHUB_APP_ID and GITHUB_APP_INSTALLATION_ID must be parseable integers — at least one value is present but not a valid integer."
     );
     return undefined;
   }
 
-  // Decode the base64-encoded PEM. The decoded value is used in-memory only;
-  // it is never logged or included in any error message.
-  const privateKey = decodePem(privateKeyB64);
-
-  _auth = createAppAuth({ appId, privateKey, installationId });
+  _auth = createAppAuth({
+    appId,
+    privateKey: decodePem(privateKeyB64),
+    installationId,
+  });
   return _auth;
 }
 
@@ -124,4 +119,82 @@ export async function getInstallationToken(): Promise<string | undefined> {
  */
 export function _resetAuthCache(): void {
   _auth = undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Diagnostics (secret-safe) — supports the managed-PR self-test endpoint.
+// Reports WHICH App/installation the configured credentials actually resolve
+// to, so a deployment can tell a wrong-App-ID / wrong-installation / not-
+// installed-on-target misconfiguration apart from a healthy setup. Never
+// returns the private key or any minted token.
+// ---------------------------------------------------------------------------
+
+export interface AppIdentityProbe {
+  /** Present when the App JWT was accepted: the App the private key belongs to. */
+  app?: { slug: string; id: number };
+  /** HTTP status of the app-JWT `GET /app` call. */
+  appJwtStatus?: number;
+  /** Present when the installation token minted and listed its repositories. */
+  installation?: {
+    account: string;
+    repositorySelection: string;
+    repoCount: number;
+    /** Up to 100 full_name repos the installation token can access. */
+    repos: string[];
+  };
+  /** HTTP status of the `GET /installation/repositories` call. */
+  installationStatus?: number;
+  /** Set when the App is not configured, or a call threw. */
+  error?: string;
+}
+
+const GH_API = "https://api.github.com";
+const ghHeaders = (token: string): Record<string, string> => ({
+  Authorization: `Bearer ${token}`,
+  Accept: "application/vnd.github+json",
+  "X-GitHub-Api-Version": "2022-11-28",
+});
+
+/**
+ * Resolve the App identity + installation repo access for the configured
+ * credentials. Reuses the same `getAuth()` instance the real mint uses, so it
+ * exercises the identical key-decode path. Returns `{ error: "not_configured" }`
+ * when the App vars are absent/unparseable. Never returns a token.
+ */
+export async function probeAppIdentity(): Promise<AppIdentityProbe> {
+  const auth = getAuth();
+  if (auth === undefined) return { error: "not_configured" };
+
+  const out: AppIdentityProbe = {};
+  try {
+    const appJwt = (await auth({ type: "app" })).token;
+    const appRes = await fetch(`${GH_API}/app`, { headers: ghHeaders(appJwt) });
+    out.appJwtStatus = appRes.status;
+    if (appRes.ok) {
+      const a = (await appRes.json()) as { slug: string; id: number };
+      out.app = { slug: a.slug, id: a.id };
+    }
+
+    const instToken = (await auth({ type: "installation" })).token;
+    const repoRes = await fetch(`${GH_API}/installation/repositories?per_page=100`, {
+      headers: ghHeaders(instToken),
+    });
+    out.installationStatus = repoRes.status;
+    if (repoRes.ok) {
+      const j = (await repoRes.json()) as {
+        total_count: number;
+        repository_selection?: string;
+        repositories: Array<{ full_name: string; owner: { login: string } }>;
+      };
+      out.installation = {
+        account: j.repositories[0]?.owner.login ?? "(unknown)",
+        repositorySelection: j.repository_selection ?? "(unknown)",
+        repoCount: j.total_count,
+        repos: j.repositories.map((r) => r.full_name).slice(0, 100),
+      };
+    }
+  } catch (e) {
+    out.error = e instanceof Error ? e.message.slice(0, 200) : String(e).slice(0, 200);
+  }
+  return out;
 }

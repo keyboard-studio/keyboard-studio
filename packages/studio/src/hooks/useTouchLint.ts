@@ -21,18 +21,22 @@ export function useTouchLint(
     }
     let cancelled = false;
     setTouchLintRunning(true);
-    engine.lint(debouncedFs, keyboardId).then((findings: LintFinding[]) => {
-      if (!cancelled) { setTouchFindings(findings); setTouchLintRunning(false); }
-    }).catch((err: unknown) => {
-      // Guard: skip state injection after unmount/dep-change so we never set
-      // state on a torn-down effect.
-      if (!cancelled) {
+    engine
+      .lint(debouncedFs, keyboardId)
+      .then((findings: LintFinding[]) => {
+        if (cancelled) return;
+        setTouchFindings(findings);
+        setTouchLintRunning(false);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
         console.error("[useTouchLint]", err);
         setTouchFindings([LINT_ERROR_FINDING]);
         setTouchLintRunning(false);
-      }
-    });
-    return () => { cancelled = true; };
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [debouncedFs, keyboardId]);
   return { touchFindings, touchLintRunning };
 }

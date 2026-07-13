@@ -5,21 +5,18 @@ import { useState } from "react";
 import { validateKeyboardId } from "@keyboard-studio/contracts";
 import type { ScaffoldSpec } from "../../hooks/useKeyboardArtifact.ts";
 import { Button, TextField, Label, ErrorText } from "../../ui/index.ts";
+import { CARD_BORDER, TEXT_DIM, FONT_MONO } from "../../ui/theme.ts";
 
 export interface ScaffoldFormProps {
   /** Called when the user submits a valid (keyboardId, displayName) pair. */
   onSubmit: (spec: ScaffoldSpec) => void;
 }
 
-// Divergent label color — ScaffoldForm uses #9aa7b8; Label primitive default is #e6edf3.
-const SCAFFOLD_LABEL_STYLE: React.CSSProperties = { color: "#9aa7b8", fontSize: 12 };
+// Divergent label color — ScaffoldForm uses TEXT_DIM; Label primitive default is #e6edf3.
+const SCAFFOLD_LABEL_STYLE: React.CSSProperties = { color: TEXT_DIM, fontSize: 12 };
 
-// Divergent field border — ScaffoldForm uses #283040; TextField primitive default is #30363d.
-const SCAFFOLD_FIELD_BORDER: React.CSSProperties = { border: "1px solid #283040" };
-
-// Divergent mono font stack — original uses this literal; var(--app-font-mono) resolves
-// to a different stack. Preserved exactly via fontFamily style override on keyboard-id input.
-const SCAFFOLD_MONO_FONT = "ui-monospace, 'Cascadia Code', Consolas, monospace";
+// Divergent field border — ScaffoldForm uses CARD_BORDER; TextField primitive default is #30363d.
+const SCAFFOLD_FIELD_BORDER: React.CSSProperties = { border: `1px solid ${CARD_BORDER}` };
 
 export function ScaffoldForm({ onSubmit }: ScaffoldFormProps) {
   const [keyboardId, setKeyboardId] = useState("");
@@ -45,7 +42,7 @@ export function ScaffoldForm({ onSubmit }: ScaffoldFormProps) {
         gap: 12,
         padding: 16,
         background: "#161b22",
-        border: "1px solid #283040",
+        border: `1px solid ${CARD_BORDER}`,
         borderRadius: 12,
       }}
     >
@@ -63,12 +60,12 @@ export function ScaffoldForm({ onSubmit }: ScaffoldFormProps) {
 
       {/* Keyboard ID field row */}
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        {/* Label color #9aa7b8 diverges from primitive default #e6edf3 — style passthrough */}
+        {/* Label color TEXT_DIM diverges from primitive default #e6edf3 — style passthrough */}
         <Label htmlFor="scaffold-keyboard-id" style={SCAFFOLD_LABEL_STYLE}>
           Keyboard ID
         </Label>
         {/* TextField: error prop sets ERROR_BORDER #7a2a2a (matches original #7a2a2a exactly).
-            Normal border #283040 diverges from primitive default #30363d — style passthrough. */}
+            Normal border CARD_BORDER diverges from primitive default #30363d — style passthrough. */}
         <TextField
           id="scaffold-keyboard-id"
           value={keyboardId}
@@ -82,8 +79,8 @@ export function ScaffoldForm({ onSubmit }: ScaffoldFormProps) {
           error={showIdError}
           style={
             showIdError
-              ? { fontFamily: SCAFFOLD_MONO_FONT }
-              : { ...SCAFFOLD_FIELD_BORDER, fontFamily: SCAFFOLD_MONO_FONT }
+              ? { fontFamily: FONT_MONO }
+              : { ...SCAFFOLD_FIELD_BORDER, fontFamily: FONT_MONO }
           }
         />
         {/* ErrorText tone="error" renders role="alert" + #f0a0a0 — matches original exactly.
@@ -97,11 +94,11 @@ export function ScaffoldForm({ onSubmit }: ScaffoldFormProps) {
 
       {/* Display name field row */}
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        {/* Label color #9aa7b8 diverges from primitive default #e6edf3 — style passthrough */}
+        {/* Label color TEXT_DIM diverges from primitive default #e6edf3 — style passthrough */}
         <Label htmlFor="scaffold-display-name" style={SCAFFOLD_LABEL_STYLE}>
           Display name
         </Label>
-        {/* Border #283040 diverges from primitive default #30363d — style passthrough */}
+        {/* Border CARD_BORDER diverges from primitive default #30363d — style passthrough */}
         <TextField
           id="scaffold-display-name"
           value={displayName}
@@ -122,7 +119,7 @@ export function ScaffoldForm({ onSubmit }: ScaffoldFormProps) {
           padding: "7px 16px",
           background: isValid ? "#238636" : "#161b22",
           color: isValid ? "#e6edf3" : "#484f58",
-          border: "1px solid #283040",
+          border: `1px solid ${CARD_BORDER}`,
           borderRadius: 6,
           fontSize: 13,
           cursor: isValid ? "pointer" : "not-allowed",

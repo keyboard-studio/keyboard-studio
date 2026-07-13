@@ -2,23 +2,24 @@
 // language/script decoupling guarantee (spec §8/§9). refs #369.
 
 import { describe, it, expect } from "vitest";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import {
+  makeBaseKeyboard,
+  basicKbdus,
+  silEuroLatin,
+  silDevanagariPhonetic,
+} from "@keyboard-studio/contracts/fixtures";
 import { suggestBases } from "./suggestBase";
 
-const mk = (id: string, script: string, languages?: string[]): BaseKeyboard => ({
-  id,
-  script,
-  path: `release/x/${id}`,
+const devanagari = makeBaseKeyboard({
+  id: "sil_devanagari",
+  script: "Deva",
+  path: "release/sil/sil_devanagari",
   targets: ["windows"],
-  displayName: id,
+  displayName: "sil_devanagari",
   version: "1.0",
-  ...(languages !== undefined ? { languages } : {}),
 });
 
-const usqwerty = mk("basic_kbdus", "Latn");
-const eurolatin = mk("sil_euro_latin", "Latn");
-const devanagari = mk("sil_devanagari", "Deva");
-const bases = [usqwerty, eurolatin, devanagari];
+const bases = [basicKbdus, silEuroLatin, devanagari];
 
 describe("suggestBases", () => {
   it("returns script-matching bases for a Latin target, fallback last", () => {
@@ -55,7 +56,7 @@ describe("suggestBases", () => {
   });
 
   it("always offers the US-QWERTY fallback even when nothing matches the script", () => {
-    const out = suggestBases([usqwerty, devanagari], { script: "Ethi" });
+    const out = suggestBases([basicKbdus, devanagari], { script: "Ethi" });
     expect(out).toHaveLength(1);
     expect(out[0]?.base.id).toBe("basic_kbdus");
     expect(out[0]?.reason).toBe("us-qwerty-fallback");
@@ -67,7 +68,7 @@ describe("suggestBases", () => {
   });
 
   it("returns [] when no base matches and no fallback is present", () => {
-    expect(suggestBases([eurolatin, devanagari], { script: "Ethi" })).toEqual([]);
+    expect(suggestBases([silEuroLatin, devanagari], { script: "Ethi" })).toEqual([]);
   });
 
   it("suppresses language-cross-script when bcp47 includes an explicit script subtag", () => {
@@ -106,9 +107,25 @@ describe("suggestBases", () => {
     // sil_cameroon_qwerty and sil_cameroon_azerty as a <Language ID="ewo">.
     // With a Latn target both must rank as language-match (tier 1), above
     // the script-only and fallback options.
-    const cqwerty = mk("sil_cameroon_qwerty", "Latn", ["ewo", "agq", "bss"]);
-    const cazerty = mk("sil_cameroon_azerty", "Latn", ["ewo", "agq", "bss"]);
-    const allBases = [usqwerty, eurolatin, cqwerty, cazerty];
+    const cqwerty = makeBaseKeyboard({
+      id: "sil_cameroon_qwerty",
+      script: "Latn",
+      path: "release/sil/sil_cameroon_qwerty",
+      targets: ["windows"],
+      displayName: "sil_cameroon_qwerty",
+      version: "1.0",
+      languages: ["ewo", "agq", "bss"],
+    });
+    const cazerty = makeBaseKeyboard({
+      id: "sil_cameroon_azerty",
+      script: "Latn",
+      path: "release/sil/sil_cameroon_azerty",
+      targets: ["windows"],
+      displayName: "sil_cameroon_azerty",
+      version: "1.0",
+      languages: ["ewo", "agq", "bss"],
+    });
+    const allBases = [basicKbdus, silEuroLatin, cqwerty, cazerty];
     const languagesById = Object.fromEntries(
       allBases.map((b) => [b.id, b.languages ?? []] as const),
     );
@@ -132,8 +149,19 @@ describe("suggestBases", () => {
   it("uses base.languages to build languagesById when caller provides it", () => {
     // When the caller constructs languagesById from base.languages (the pattern
     // BaseResolution uses), language-match fires correctly.
-    const haBase = mk("hausa_latin", "Latn", ["ha", "ha-Latn"]);
-    const allBases = [usqwerty, eurolatin, haBase];
+    const haBase = makeBaseKeyboard({
+      id: "hausa_latin",
+      script: "Latn",
+      path: "release/x/hausa_latin",
+      targets: ["windows"],
+      displayName: "hausa_latin",
+      version: "1.0",
+      languages: ["ha", "ha-Latn"],
+    });
+    // silEuroLatin already covers "ha", which would tie with haBase at
+    // language-match and win by input order — use silDevanagariPhonetic (Deva
+    // script, no "ha") so haBase is the sole language-match for ha-Latn.
+    const allBases = [basicKbdus, silDevanagariPhonetic, haBase];
     const languagesById = Object.fromEntries(
       allBases.map((b) => [b.id, b.languages ?? []] as const),
     );

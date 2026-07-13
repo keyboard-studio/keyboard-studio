@@ -85,6 +85,12 @@ export interface ReducerDeps {
   lockDesktop: () => void;
   /** Persist the serialized touch layout JSON at Phase E completion (R2). */
   setTouchLayoutJson: (json: string | null) => void;
+  /**
+   * Clear a step's stale marker (removes it as a re-opened root and recomputes
+   * the staleness closure). Called at Touch completion (R2) so re-completing
+   * the touch step clears the re-review flag a prior Mechanisms edit set on it.
+   */
+  clearStale: (stepId: string) => void;
   /** Track 1 instantiation — copy from base, new identity. */
   instantiateFromBase: (
     base: BaseKeyboard,
@@ -249,9 +255,7 @@ export function applyStepCompletion(
     // Same Case-A/B logic and graceful degradation on error.
     case TOUCH_STEP_ID: {
       const payload = result as Partial<TouchCompleteResult>;
-      const assignments = payload.assignments ?? [];
-      const baseIr = payload.baseIr ?? null;
-      const baseVfs = payload.baseVfs ?? null;
+      const { assignments = [], baseIr = null, baseVfs = null } = payload;
 
       if (assignments.length === 0 || baseIr === null) {
         // No real assignments — clear the stored touch layout (KMW uses its native default).
@@ -274,6 +278,13 @@ export function applyStepCompletion(
           deps.setTouchLayoutJson(null);
         }
       }
+      // Re-completing the touch step resolves whatever re-review flag was set
+      // on it (e.g. by a Mechanisms edit after unlock — MechanismGallery marks
+      // "touch" stale directly, since the production manifest gives "touch"
+      // inputs: [] and a mechanisms→touch stale-propagation edge does not
+      // exist). Clearing here, not on entry, means the flag survives until
+      // the user has actually re-reviewed and re-completed the step.
+      deps.clearStale(TOUCH_STEP_ID);
       break;
     }
 
@@ -291,7 +302,11 @@ export function applyStepCompletion(
       const track = payload.track ?? null;
       const vfs = payload.vfs ?? null;
       const ir = payload.ir ?? null;
-      const removalCapabilities = payload.removalCapabilities;
+      const opts = {
+        vfs,
+        ir,
+        ...(payload.removalCapabilities !== undefined ? { removalCapabilities: payload.removalCapabilities } : {}),
+      };
 
       if (track === "adapt") {
         // Track 2: preserve existing keyboard identity.
@@ -299,18 +314,10 @@ export function applyStepCompletion(
           console.warn("[applyStepCompletion:choose_base] Track 2 skipped: no parsed IR (mock engine?)");
           break;
         }
-        deps.instantiateFromExisting(base, {
-          vfs,
-          ir,
-          ...(removalCapabilities !== undefined ? { removalCapabilities } : {}),
-        });
+        deps.instantiateFromExisting(base, { ...opts, vfs, ir });
       } else {
         // Track 1 (or null/default): new keyboard from base, with rebase guard.
-        deps.instantiateFromBaseIfConfirmed(base, {
-          vfs,
-          ir,
-          ...(removalCapabilities !== undefined ? { removalCapabilities } : {}),
-        });
+        deps.instantiateFromBaseIfConfirmed(base, opts);
       }
       break;
     }

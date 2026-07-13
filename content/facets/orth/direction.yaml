@@ -1,0 +1,43 @@
+# orth.direction — writing direction is a property of the script, already
+# knowable the moment primary_script is answered, yet writing_direction and
+# pb_rtl_direction_confirm both render blank today. A static script→direction
+# table closes both.
+
+id: orth.direction
+family: orth
+title: Writing direction
+description: >
+  LTR, RTL, or mixed/bidirectional, derived from the primary script subtag
+  via a static table keyed on ISO 15924 script directionality (Unicode
+  Bidi_Class of the script's representative characters).
+  Prefills the direction questions and gates whether the RTL question branch
+  and direction-mark proposals appear at all.
+valueType: enum
+values: [ltr, rtl, bidi-mixed]
+
+modality: both
+
+derivations:
+  - kind: computed
+    source: "planned:script-direction-table"
+    sourceStatus: planned
+    notes: Trivial static map; source is ISO 15924 script directionality, not the abjad script-class set — abjad does not equal RTL (Thaana, Adlam, N'Ko are RTL but not abjads).
+  - kind: confirmed
+    source: "question:writing_direction"
+    sourceStatus: available
+
+consumers:
+  prefills:
+    - writing_direction
+    - pb_rtl_direction_confirm
+    - pb_rtl_direction_marks
+  proposes:
+    - "routing:rtl-branch-gate"
+
+provenanceLabel: "your chosen script"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed

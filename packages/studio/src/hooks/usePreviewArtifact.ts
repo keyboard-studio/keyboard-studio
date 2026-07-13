@@ -68,43 +68,65 @@ export function usePreviewArtifact(): PreviewArtifact {
   const [pickerMode, setPickerMode] = useState<PickerMode>("open");
   const [scaffoldSpec, setScaffoldSpec] = useState<ScaffoldSpec | null>(null);
 
-  const handleBaseKeyboardChange = useCallback(
-    (kb: BaseKeyboard | null) => {
-      setBaseKeyboard(kb);
-      if (pickerMode === "open") {
-        setScaffoldSpec(null);
-      }
-    },
-    [pickerMode],
-  );
-
-  const handlePickerModeChange = useCallback((mode: PickerMode) => {
-    setPickerMode(mode);
+  // Helper: clear scaffoldSpec when entering "open" mode.
+  const clearScaffoldIfOpen = useCallback((mode: PickerMode) => {
     if (mode === "open") {
       setScaffoldSpec(null);
     }
   }, []);
+
+  const handleBaseKeyboardChange = useCallback(
+    (kb: BaseKeyboard | null) => {
+      setBaseKeyboard(kb);
+      clearScaffoldIfOpen(pickerMode);
+    },
+    [pickerMode, clearScaffoldIfOpen],
+  );
+
+  const handlePickerModeChange = useCallback((mode: PickerMode) => {
+    setPickerMode(mode);
+    clearScaffoldIfOpen(mode);
+  }, [clearScaffoldIfOpen]);
 
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadWarnings, setDownloadWarnings] = useState<string[]>([]);
   const zipBlobUrlRef = useRef<string | null>(null);
 
-  // Clean up any lingering zip blob URL on unmount.
-  useEffect(() => {
-    return () => {
-      if (zipBlobUrlRef.current !== null) {
-        URL.revokeObjectURL(zipBlobUrlRef.current);
-        zipBlobUrlRef.current = null;
-      }
-    };
+  // Helper: revoke and clear any lingering zip blob URL.
+  const revokeZipUrl = useCallback(() => {
+    if (zipBlobUrlRef.current !== null) {
+      URL.revokeObjectURL(zipBlobUrlRef.current);
+      zipBlobUrlRef.current = null;
+    }
   }, []);
+
+  // Clean up any lingering zip blob URL on unmount.
+  useEffect(() => revokeZipUrl, [revokeZipUrl]);
 
   // onInstantiate: explicit working-copy instantiation (spec §8 v1.3.0, Track 1).
   // Delegates to instantiateFromBaseIfConfirmed which reads live store state via
   // getState() so the stale-closure problem cannot arise even though this
   // callback is memoised.
+  //
+  // Re-instantiation guard: by the time these screens mount, the working copy is
+  // already a persistent singleton in the store — instantiated during the survey
+  // (Track 1 new-from-base OR Track 2 adapt-existing) with the author's carve
+  // deletions and survey answers. This screen runs its OWN decoupled compile
+  // pipeline (see the module comment), whose full run() fires onInstantiate on
+  // mount. Re-instantiating from that mount would pop the rebase-confirm dialog
+  // ("Switching base keyboards will discard your current edits…") over work that
+  // is already in the store, and confirming it is destructive: this path only
+  // knows Track 1 instantiateFromBase, so against a Track 2 store it is a
+  // same-id/different-mode "genuine switch" that resets phaseResults + irAxes —
+  // discarding the survey answers and leaving nothing valid to submit. So skip
+  // entirely when the store already holds a working copy for this same base;
+  // only genuinely NEW bases picked via this screen's own picker fall through to
+  // instantiate. Mirrors StudioShell's instantiatedRef gate, keyed on the store
+  // (survives this screen's own mount/unmount) rather than a per-mount ref.
   const onInstantiate = useCallback<OnInstantiateCallback>((base, { vfs, ir, removalCapabilities }) => {
+    const current = useWorkingCopyStore.getState().baseKeyboard;
+    if (current !== null && current.id === base.id) return;
     instantiateFromBaseIfConfirmed(base, { vfs, ir, removalCapabilities });
   }, []);
 
@@ -173,17 +195,11 @@ export function usePreviewArtifact(): PreviewArtifact {
 
       const { bytes } = result;
       // Coerce to ArrayBuffer to satisfy Blob constructor's strict BlobPart type.
-      const buf =
-        bytes.buffer instanceof ArrayBuffer
-          ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
-          : new Uint8Array(bytes).buffer;
-      const blob = new Blob([buf], { type: "application/zip" });
+      const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      const blob = new Blob([buf as ArrayBuffer], { type: "application/zip" });
 
       // Revoke previous zip URL before creating a new one.
-      if (zipBlobUrlRef.current !== null) {
-        URL.revokeObjectURL(zipBlobUrlRef.current);
-        zipBlobUrlRef.current = null;
-      }
+      revokeZipUrl();
 
       const url = URL.createObjectURL(blob);
       zipBlobUrlRef.current = url;
@@ -200,8 +216,7 @@ export function usePreviewArtifact(): PreviewArtifact {
         document.body.removeChild(a);
       } finally {
         // Revoke after the click tick so the browser has time to start the download.
-        URL.revokeObjectURL(url);
-        zipBlobUrlRef.current = null;
+        revokeZipUrl();
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Download failed";
@@ -209,7 +224,7 @@ export function usePreviewArtifact(): PreviewArtifact {
     } finally {
       setDownloading(false);
     }
-  }, [stage]);
+  }, [stage, revokeZipUrl]);
 
   return {
     baseKeyboard,

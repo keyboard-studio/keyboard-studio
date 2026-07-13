@@ -127,6 +127,11 @@ const iconWrap: React.CSSProperties = {
   alignItems: 'center',
 };
 
+const titleText: React.CSSProperties = {
+  font: '600 13px/1.3 var(--app-font)',
+  color: 'var(--app-text)',
+};
+
 const bodyArea: React.CSSProperties = {
   padding: '8px 16px 10px',
   fontSize: 13,
@@ -136,6 +141,18 @@ const bodyArea: React.CSSProperties = {
   flex: 1,
 };
 
+function InfoPanel({ title, body }: { title: React.ReactNode; body: React.ReactNode }) {
+  return (
+    <div role="note" aria-label="Item info" style={panelShell}>
+      <div style={titleBar}>
+        <span style={iconWrap}><InfoIcon size={16} /></span>
+        {typeof title === 'string' ? <span style={titleText}>{title}</span> : title}
+      </div>
+      <div style={bodyArea}>{body}</div>
+    </div>
+  );
+}
+
 // InfoView — no props. Sole subscriber of the hoverInfoStore `info` slice.
 // Fixed height so the layout never shifts regardless of content state.
 export function InfoView() {
@@ -143,75 +160,43 @@ export function InfoView() {
 
   if (info == null) {
     const c = infoFor(undefined);
-    return (
-      <div role="note" aria-label="Item info" style={panelShell}>
-        <div style={titleBar}>
-          <span style={iconWrap}><InfoIcon size={16} /></span>
-          <span style={{ font: '600 13px/1.3 var(--app-font)', color: 'var(--app-text)' }}>
-            {c.title}
-          </span>
-        </div>
-        <div style={bodyArea}>{c.body}</div>
-      </div>
-    );
+    return <InfoPanel title={c.title} body={c.body} />;
   }
 
   if (info.kind === 'key') {
     const isNotRemovable = info.capability.startsWith('not-removable:');
     const owningPattern = info.owners?.find((o) => o.kind === 'pattern');
-    return (
-      <div role="note" aria-label="Item info" style={panelShell}>
-        <div style={titleBar}>
-          <span style={iconWrap}><InfoIcon size={16} /></span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', font: '600 13px/1.3 var(--app-font)', color: 'var(--app-text)' }}>
-            <span style={{ fontSize: 11, color: 'var(--app-text-subtle)', fontWeight: 400 }}>Key</span>
-            <KeySeq keys={info.keys} />
-            <span style={{ color: 'var(--app-text-subtle)', fontSize: 11 }}>types</span>
-            <span style={{ font: "400 18px/1 'Lora', Georgia, serif", color: 'var(--app-text)' }}>
-              {displayChar(info.ch)}
-            </span>
-          </div>
-        </div>
-        <div style={bodyArea}>
-          <div style={{ marginBottom: 3 }}>{keyHint(info.off)}</div>
-          {isNotRemovable && owningPattern !== undefined && (
-            <div style={{ marginBottom: 3, fontSize: 12, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
-              Managed by the {owningPattern.label} pattern.
-            </div>
-          )}
-          <div style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
-            {capabilityHint(info.capability)}
-          </div>
-        </div>
+    const keyTitle = (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', font: '600 13px/1.3 var(--app-font)', color: 'var(--app-text)' }}>
+        <span style={{ fontSize: 11, color: 'var(--app-text-subtle)', fontWeight: 400 }}>Key</span>
+        <KeySeq keys={info.keys} />
+        <span style={{ color: 'var(--app-text-subtle)', fontSize: 11 }}>types</span>
+        <span style={{ font: "400 18px/1 'Lora', Georgia, serif", color: 'var(--app-text)' }}>
+          {displayChar(info.ch)}
+        </span>
       </div>
     );
+    const keyBody = (
+      <>
+        <div style={{ marginBottom: 3 }}>{keyHint(info.off)}</div>
+        {isNotRemovable && owningPattern !== undefined && (
+          <div style={{ marginBottom: 3, fontSize: 12, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
+            Managed by the {owningPattern.label} pattern.
+          </div>
+        )}
+        <div style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
+          {capabilityHint(info.capability)}
+        </div>
+      </>
+    );
+    return <InfoPanel title={keyTitle} body={keyBody} />;
   }
 
   if (info.kind === 'node') {
     const c = infoFor(info.node);
-    return (
-      <div role="note" aria-label="Item info" style={panelShell}>
-        <div style={titleBar}>
-          <span style={iconWrap}><InfoIcon size={16} /></span>
-          <span style={{ font: '600 13px/1.3 var(--app-font)', color: 'var(--app-text)' }}>
-            {c.title}
-          </span>
-        </div>
-        <div style={bodyArea}>{c.body}</div>
-      </div>
-    );
+    return <InfoPanel title={c.title} body={c.body} />;
   }
 
   // kind === 'text'
-  return (
-    <div role="note" aria-label="Item info" style={panelShell}>
-      <div style={titleBar}>
-        <span style={iconWrap}><InfoIcon size={16} /></span>
-        <span style={{ font: '600 13px/1.3 var(--app-font)', color: 'var(--app-text)' }}>
-          {info.title}
-        </span>
-      </div>
-      <div style={bodyArea}>{info.body}</div>
-    </div>
-  );
+  return <InfoPanel title={info.title} body={info.body} />;
 }

@@ -11,7 +11,6 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { TouchGallery } from "../assignLoop/TouchGallery.tsx";
 import type { TouchAssignment } from "@keyboard-studio/contracts";
-import type { TouchCompleteResult } from "../../steps/reducer.ts";
 
 /**
  * EditorStep adapter for the Touch Gallery (Phase E — touch key assignment
@@ -28,12 +27,10 @@ export function AddTouchAdapter({ onComplete, onBack }: EditorStepProps) {
   const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
 
   function handleComplete(assignments: TouchAssignment[]) {
-    const payload: TouchCompleteResult = { assignments, baseIr, baseVfs };
-    onComplete(payload);
+    onComplete({ assignments, baseIr, baseVfs });
   }
 
   // TouchGallery requires onBack — the manifest must supply it for this step.
   // If absent (misconfigured manifest), fall back to a no-op so the UI doesn't crash.
-  const handleBack = onBack ?? (() => undefined);
-  return <TouchGallery onComplete={handleComplete} onBack={handleBack} />;
+  return <TouchGallery onComplete={handleComplete} onBack={onBack ?? (() => undefined)} />;
 }

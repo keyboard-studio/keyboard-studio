@@ -21,6 +21,7 @@
 
 import { loadModularFlow } from "../survey/loadModularFlow.ts";
 import type { FlowDef, FlowQuestion, QuestionModule } from "../survey/types.ts";
+import { computeDataEdges } from "./model.ts";
 import type { FlowGraph, GraphEdge, GraphNode, NodeKind, NodeRegion, StepGraph, StepGraphEdge, StepGraphNode } from "./model.ts";
 import { ruleTarget } from "./flowUtils.ts";
 import { manifest } from "../steps/manifest.ts";
@@ -40,13 +41,8 @@ interface RawGotoRule {
 }
 
 /** prompt ?? label ?? id — the text the runner would surface. */
-function nodeLabel(q: FlowQuestion): string {
-  return q.prompt ?? q.label ?? q.id;
-}
-
-function optionCount(q: FlowQuestion): number {
-  return Array.isArray(q.options) ? q.options.length : 0;
-}
+const nodeLabel = (q: FlowQuestion) => q.prompt ?? q.label ?? q.id;
+const optionCount = (q: FlowQuestion) => Array.isArray(q.options) ? q.options.length : 0;
 
 export interface BuildGraphOptions {
   /** Kind to stamp on all question nodes. Defaults to "live". */
@@ -97,10 +93,9 @@ export function buildGraphFromQuestions(
   };
 
   for (const q of questions) {
-    const next = q.next;
-    if (next === undefined || next === null) {
-      continue; // terminal
-    }
+    const { next } = q;
+    if (!next) continue; // terminal
+
     if (typeof next === "string") {
       addEdge(q.id, next, "linear");
       continue;
@@ -109,11 +104,9 @@ export function buildGraphFromQuestions(
     for (const rule of next as RawGotoRule[]) {
       const target = ruleTarget(rule);
       if (target === null) continue; // terminal branch — no edge
-      if (rule.condition !== undefined) {
-        addEdge(q.id, target, "conditional", rule.condition);
-      } else {
-        addEdge(q.id, target, "default", "(else)");
-      }
+      const kind = rule.condition !== undefined ? "conditional" : "default";
+      const label = rule.condition !== undefined ? rule.condition : "(else)";
+      addEdge(q.id, target, kind, label);
     }
   }
 
@@ -200,9 +193,7 @@ function computeReserveNodes(
   const reserveIds = Object.keys(registry).filter((id) => !liveIds.has(id));
   return reserveIds.flatMap((id) => {
     const mod = registry[id];
-    // Belt-and-suspenders: registry[id] should always be defined for a registry key.
-    if (!mod) return [];
-    return [reserveNodeFor(mod, flow.flow_id, "not-yet-ordered")];
+    return mod ? [reserveNodeFor(mod, flow.flow_id, "not-yet-ordered")] : [];
   });
 }
 
@@ -306,13 +297,11 @@ export function buildLibraryReserveNodes(
   inAnyFlow: ReadonlySet<string>,
   flowId = "library",
 ): GraphNode[] {
-  return Object.keys(registry)
-    .filter((id) => !inAnyFlow.has(id))
-    .flatMap((id) => {
-      const mod = registry[id];
-      if (!mod) return [];
-      return [reserveNodeFor(mod, flowId, "library")];
-    });
+  const reserveIds = Object.keys(registry).filter((id) => !inAnyFlow.has(id));
+  return reserveIds.flatMap((id) => {
+    const mod = registry[id];
+    return mod ? [reserveNodeFor(mod, flowId, "library")] : [];
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -371,51 +360,25 @@ export function buildManifestStepGraph(): StepGraph {
     const step = manifest[i]!;
 
     if (step.spine === true) {
-      // Spine edge: connect to the next spine step (skipping off-spine steps
-      // that appear between them in the array).
-      let j = i + 1;
-      while (j < manifest.length && manifest[j]!.spine !== true) {
-        j++;
-      }
-      if (j < manifest.length) {
-        edges.push({ from: step.id, to: manifest[j]!.id, kind: "spine" });
+      // Spine edge: connect to the next spine step (skipping off-spine steps).
+      const nextSpineIdx = manifest.findIndex((s, idx) => idx > i && s.spine === true);
+      if (nextSpineIdx !== -1) {
+        edges.push({ from: step.id, to: manifest[nextSpineIdx]!.id, kind: "spine" });
       }
 
-      // Fork edges: from this spine step to any off-spine step that immediately
-      // follows it in the manifest array (and has this step as its implicit fork
-      // origin — i.e., it appears before the next spine step).
-      let k = i + 1;
-      while (k < manifest.length && manifest[k]!.spine !== true) {
+      // Fork edges: from this spine step to any off-spine step that immediately follows.
+      for (let k = i + 1; k < manifest.length && manifest[k]!.spine !== true; k++) {
         edges.push({ from: step.id, to: manifest[k]!.id, kind: "fork" });
-        k++;
       }
-    } else {
+    } else if (step.joinTarget !== undefined && idToIndex.has(step.joinTarget)) {
       // Off-spine join edge: from this step back to its joinTarget.
-      if (step.joinTarget !== undefined) {
-        const targetIdx = idToIndex.get(step.joinTarget);
-        if (targetIdx !== undefined) {
-          edges.push({ from: step.id, to: step.joinTarget, kind: "join" });
-        }
-      }
+      edges.push({ from: step.id, to: step.joinTarget, kind: "join" });
     }
   }
 
   // Data edges: from producer → consumer where producer.writePaths ∩ consumer.inputPaths ≠ ∅.
   // These power C1 (staleness fixpoint), C2 (cycle detection), C5 (orphan inputs).
-  const dataEdges: StepGraphEdge[] = [];
-  for (const producer of nodes) {
-    if (producer.writePaths.length === 0) continue;
-    const writeSet = new Set(producer.writePaths);
-    for (const consumer of nodes) {
-      if (consumer.id === producer.id) continue;
-      for (const inputPath of consumer.inputPaths) {
-        if (writeSet.has(inputPath)) {
-          dataEdges.push({ from: producer.id, to: consumer.id, kind: "spine" }); // kind reused; data edges have no order-kind
-          break; // one data edge per (producer, consumer) pair
-        }
-      }
-    }
-  }
+  const dataEdges: StepGraphEdge[] = computeDataEdges(nodes);
 
   return { nodes, edges, dataEdges };
 }

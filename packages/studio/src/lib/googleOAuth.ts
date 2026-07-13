@@ -23,7 +23,7 @@
 
 import { generatePkce } from "./pkce.ts";
 import type { GoogleIdentitySession } from "./identity.ts";
-import { getBackendUrl } from "./githubOAuth.ts";
+import { getBackendUrl, parseErrorCode, fetchWithNetworkError } from "./githubOAuth.ts";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -78,23 +78,37 @@ export function setStoredGoogleIdentity(identity: StoredGoogleIdentity): void {
   sessionStorage.setItem(IDENTITY_KEY, JSON.stringify(identity));
 }
 
+/**
+ * Validate that a partial identity object has all required non-empty string fields.
+ * Returns the validated identity or null if any field is missing/invalid/empty.
+ */
+function validateIdentityFields(
+  data: Partial<StoredGoogleIdentity>,
+): StoredGoogleIdentity | null {
+  if (
+    typeof data.sub !== "string" || data.sub === "" ||
+    typeof data.email !== "string" || data.email === "" ||
+    typeof data.name !== "string" || data.name === "" ||
+    typeof data.picture !== "string" || data.picture === ""
+  ) {
+    return null;
+  }
+  return {
+    sub: data.sub,
+    email: data.email,
+    emailVerified: data.emailVerified === true,
+    name: data.name,
+    picture: data.picture,
+  };
+}
+
 /** Read the stored Google identity, or null if absent / unparseable. */
 export function getStoredGoogleIdentity(): StoredGoogleIdentity | null {
   const raw = sessionStorage.getItem(IDENTITY_KEY);
   if (raw === null) return null;
   try {
     const parsed = JSON.parse(raw) as Partial<StoredGoogleIdentity>;
-    if (typeof parsed.sub !== "string") return null;
-    if (typeof parsed.email !== "string") return null;
-    if (typeof parsed.name !== "string") return null;
-    if (typeof parsed.picture !== "string") return null;
-    return {
-      sub: parsed.sub,
-      email: parsed.email,
-      emailVerified: parsed.emailVerified === true,
-      name: parsed.name,
-      picture: parsed.picture,
-    };
+    return validateIdentityFields(parsed);
   } catch {
     return null;
   }
@@ -243,9 +257,9 @@ export async function exchangeGoogleCode(
   codeVerifier: string,
 ): Promise<StoredGoogleIdentity> {
   const url = `${getBackendUrl()}/oauth/google/exchange`;
-  let res: Response;
-  try {
-    res = await fetch(url, {
+  const res = await fetchWithNetworkError(
+    url,
+    {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -253,19 +267,12 @@ export async function exchangeGoogleCode(
         code_verifier: codeVerifier,
         redirect_uri: getGoogleRedirectUri(),
       }),
-    });
-  } catch {
-    throw new GoogleOAuthExchangeError("network", "Network error during Google identity exchange.");
-  }
+    },
+    (msg) => new GoogleOAuthExchangeError("network", msg),
+  );
 
   if (!res.ok) {
-    let errorCode = "google_error";
-    try {
-      const body = (await res.json()) as { error?: unknown };
-      if (typeof body.error === "string") errorCode = body.error;
-    } catch {
-      // non-JSON error body — keep the default code
-    }
+    const errorCode = await parseErrorCode(res, "google_error");
     throw new GoogleOAuthExchangeError(errorCode, `Google identity exchange failed: ${errorCode}`);
   }
 
@@ -274,36 +281,20 @@ export async function exchangeGoogleCode(
   // Runtime guard: verify required identity fields are non-empty strings before
   // storing. A version-mismatch 200 could otherwise silently store undefined
   // values, making the user appear logged out on the next read.
-  if (typeof data.sub !== "string" || data.sub === "") {
-    throw new GoogleOAuthExchangeError(
-      "invalid-response",
-      "Google identity exchange returned a response missing the 'sub' field.",
-    );
-  }
-  if (typeof data.email !== "string" || data.email === "") {
-    throw new GoogleOAuthExchangeError(
-      "invalid-response",
-      "Google identity exchange returned a response missing the 'email' field.",
-    );
-  }
-  if (typeof data.name !== "string" || data.name === "") {
-    throw new GoogleOAuthExchangeError(
-      "invalid-response",
-      "Google identity exchange returned a response missing the 'name' field.",
-    );
-  }
-  if (typeof data.picture !== "string" || data.picture === "") {
-    throw new GoogleOAuthExchangeError(
-      "invalid-response",
-      "Google identity exchange returned a response missing the 'picture' field.",
-    );
-  }
-
-  return {
+  const identity = validateIdentityFields({
     sub: data.sub,
     email: data.email,
     emailVerified: data.email_verified,
     name: data.name,
     picture: data.picture,
-  };
+  });
+
+  if (identity === null) {
+    throw new GoogleOAuthExchangeError(
+      "invalid-response",
+      "Google identity exchange returned a response with missing or invalid required fields.",
+    );
+  }
+
+  return identity;
 }

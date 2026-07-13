@@ -181,7 +181,7 @@ const INITIAL_STATE = {
 // Store
 // ---------------------------------------------------------------------------
 
-export const useSurveySessionStore = create<SurveySessionState>((set, get) => ({
+export const useSurveySessionStore = create<SurveySessionState>((set) => ({
   ...INITIAL_STATE,
 
   advance: (stepId) =>

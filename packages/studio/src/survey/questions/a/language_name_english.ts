@@ -29,14 +29,7 @@ export const definition = {
 export function validate(
   value: string | string[] | undefined,
 ): ValidationResult {
-  const trimmed =
-    typeof value === "string"
-      ? value.trim()
-      : Array.isArray(value)
-        ? value.join("").trim()
-        : "";
-
-  if (trimmed.length === 0) {
+  if (asText(value).length === 0) {
     return { ok: false, code: "required", message: "English language name is required." };
   }
   return { ok: true };

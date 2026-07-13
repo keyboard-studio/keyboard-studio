@@ -241,6 +241,10 @@ export function BaseKeyboardPicker({
 
   const visibleRanked = ranked.slice(0, MAX_VISIBLE);
 
+  // Reset the option-ref array each render so stale refs from a previous,
+  // longer list can't linger past a re-render with fewer options.
+  optionRefs.current = [];
+
   // Clamp activeIndex so aria-* attributes never reference a non-existent option
   // when the deferred list resolves to fewer items than the current activeIndex.
   // Raw activeIndex stays in state and arrow-key math so clamping is only a derived read.
@@ -596,7 +600,7 @@ export function BaseKeyboardPicker({
                 overflowY: "auto",
               }}
             >
-              {(optionRefs.current = [], visibleRanked).map((rb: RankedBase, i: number) => {
+              {visibleRanked.map((rb: RankedBase, i: number) => {
                 const kb = rb.base;
                 const isActive = i === safeActiveIndex;
                 const importStatus = corpus.get(kb.id);

@@ -1,0 +1,38 @@
+# env.connectivity — the studio degrades differently offline (US-English-only
+# gallery fallback, no CLDR fetch, no LLM). This facet makes that degradation a
+# proposal input instead of a silent surprise: constrained connectivity should
+# steer pb_discovery_intro away from LLM-dependent paths and steer delivery
+# toward Option C (ZIP).
+
+id: env.connectivity
+family: env
+title: Connectivity posture
+description: >
+  Whether the authoring session can rely on network services (GitHub API
+  gallery, CLDR fetch, LLM assistance) or is constrained/offline. Inferred
+  from observed fetch failures in-session rather than asked.
+valueType: enum
+values: [online, constrained, offline]
+
+modality: both
+
+derivations:
+  - kind: computed
+    source: "session:observed-fetch-health"
+    sourceStatus: planned
+    notes: The base-browser and CLDR loaders already detect failures; surface them as a session facet.
+
+consumers:
+  prefills:
+    - pb_discovery_intro
+  proposes:
+    - "delivery:option-proposal"
+    - "gallery:offline-bundle-switch"
+
+provenanceLabel: "detected from this session's network access"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed

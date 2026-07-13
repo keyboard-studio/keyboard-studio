@@ -180,12 +180,12 @@ export function RadioGroup({
             name={name}
             optValue={opt.value}
             label={opt.label}
-            {...(opt.note !== undefined ? { note: opt.note } : {})}
+            note={opt.note}
             checked={value === opt.value}
             accentColor={resolvedAccent}
             onChange={onChange}
-            {...(opt.disabled !== undefined ? { disabled: opt.disabled } : {})}
-            {...(opt.title !== undefined ? { title: opt.title } : {})}
+            disabled={opt.disabled}
+            title={opt.title}
           />
         );
       })}

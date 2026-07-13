@@ -1,0 +1,42 @@
+# author.expertise — spec §3's persona ("a language expert, not a keyboard
+# developer") is currently an assumption baked into all question text at one
+# fixed verbosity. As a facet it becomes adjustable: a keyboard developer gets
+# terser questions and may see raw .kmn; a language expert never does.
+
+id: author.expertise
+family: author
+title: Author expertise
+description: >
+  What the person filling in the survey already knows: language expertise,
+  keyboard/Keyman development expertise, or both. Drives question verbosity,
+  whether technical escape hatches (raw .kmn view, opaque-fragment detail) are
+  surfaced, and how much terminology the UI may assume.
+valueType: enum
+values: [language-expert, keyboard-developer, both]
+
+modality: both
+
+derivations:
+  - kind: asked
+    source: "planned:expertise-question"
+    sourceStatus: planned
+    notes: One early Phase A question ("have you built a keyboard before?"), asked once, never re-asked.
+  - kind: computed
+    source: "session:track-and-answer-fluency"
+    sourceStatus: planned
+    notes: Track 2 imports and fluent use of K_-key names are strong keyboard-developer signals.
+
+consumers:
+  prefills: []
+  proposes:
+    - "ui:question-verbosity"
+    - "ui:kmn-visibility"
+    - "carve-gallery:opaque-fragment-detail"
+
+provenanceLabel: "your experience answer"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: asked

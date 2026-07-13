@@ -99,6 +99,7 @@ function makeHarness(initial: KeyboardIR): SpineHarness {
   const deps: ReducerDeps = {
     // Side-effect deps the spine entries below never trigger (mutate path only).
     lockDesktop: () => {},
+    clearStale: () => {},
     setTouchLayoutJson: () => {},
     instantiateFromBase: () => {},
     instantiateFromExisting: () => {},

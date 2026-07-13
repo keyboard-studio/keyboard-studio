@@ -1,19 +1,15 @@
 // useResizablePanes — drag-to-resize two-pane layout hook.
 //
 // Encapsulates the pointer-event drag logic shared by SurveyView and
-// PreviewShell: a container ref, left-pane percentage state, drag-handle
-// hover state, and the three pointer callbacks (down/move/up) plus cleanup.
+// PreviewShell: a container ref, left-pane percentage state, and the
+// three pointer callbacks (down/move/up) plus cleanup.
 //
 // Usage:
-//   const { containerRef, leftPct, handleHovered, onPointerDown,
-//           setHandleHovered } = useResizablePanes({ minPct, maxPct, initPct });
+//   const { containerRef, leftPct, onPointerDown } = useResizablePanes({ minPct, maxPct, initPct });
 //
 //   <div ref={containerRef} ...>
 //     <section style={{ flexBasis: `calc(${leftPct}% - ${DIVIDER/2}px)` }}>...</section>
-//     <div onPointerDown={onPointerDown}
-//          onMouseEnter={() => setHandleHovered(true)}
-//          onMouseLeave={() => setHandleHovered(false)}
-//          style={{ background: handleHovered ? "#3d5070" : "#283040" }} />
+//     <ResizeHandle onPointerDown={onPointerDown} />
 //     <section style={{ flexBasis: `calc(${100 - leftPct}% - ${DIVIDER/2}px)` }}>...</section>
 //   </div>
 
@@ -34,12 +30,8 @@ export interface ResizablePanesResult {
   containerRef: React.RefObject<HTMLDivElement>;
   /** Current left-pane percentage (0–100). */
   leftPct: number;
-  /** True while the drag handle is hovered. */
-  handleHovered: boolean;
   /** Pass as onPointerDown to the drag-handle div. */
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
-  /** Pass as onMouseEnter / onMouseLeave setter for the drag-handle. */
-  setHandleHovered: (hovered: boolean) => void;
 }
 
 export function useResizablePanes({
@@ -48,7 +40,6 @@ export function useResizablePanes({
   initPct,
 }: ResizablePanesOptions): ResizablePanesResult {
   const [leftPct, setLeftPct] = useState(initPct);
-  const [handleHovered, setHandleHovered] = useState(false);
 
   const dragRef = useRef<{ startX: number; startPct: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -91,5 +82,5 @@ export function useResizablePanes({
     };
   }, [onPointerMove, onPointerUp]);
 
-  return { containerRef, leftPct, handleHovered, onPointerDown, setHandleHovered };
+  return { containerRef, leftPct, onPointerDown };
 }

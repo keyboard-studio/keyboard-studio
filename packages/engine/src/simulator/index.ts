@@ -44,6 +44,10 @@ const NO_OP_STORE_SERIALIZER = {
   saveStore: (_kbdId: string, _storeName: string, _value: string): void => {},
 };
 
+/** Shared UTF-8 decoder — TextDecoder is stateless, so one instance can be reused
+ * across all `extractJsSource` calls instead of allocating one per call. */
+const UTF8_DECODER = new TextDecoder('utf-8');
+
 // ---------------------------------------------------------------------------
 // KeyEvent builder
 // ---------------------------------------------------------------------------
@@ -136,7 +140,7 @@ function extractJsSource(compiled: CompileResult): string {
         'Ensure the compiler populates CompileArtifact.data (it does in Node test runs).',
     );
   }
-  return new TextDecoder('utf-8').decode(jsArtifact.data);
+  return UTF8_DECODER.decode(jsArtifact.data);
 }
 
 /**

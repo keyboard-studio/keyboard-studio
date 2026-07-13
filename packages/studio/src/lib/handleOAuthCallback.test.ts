@@ -20,16 +20,15 @@ import {
   setGoogleOAuthScratch,
   getStoredGoogleIdentity,
 } from "./googleOAuth.ts";
+import { clearAllStorage } from "../test-setup.ts";
 
 beforeEach(() => {
-  sessionStorage.clear();
-  localStorage.clear();
+  clearAllStorage();
   vi.restoreAllMocks();
 });
 
 afterEach(() => {
-  sessionStorage.clear();
-  localStorage.clear();
+  clearAllStorage();
   vi.restoreAllMocks();
 });
 

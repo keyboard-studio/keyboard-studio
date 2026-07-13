@@ -21,9 +21,16 @@ import {
   ExchangeBodySchema,
   RefreshBodySchema,
 } from "../../utilities/oauth-backend/src/schemas.js";
+import {
+  googleExchange as googleExchangeCore,
+  type GoogleHandlerConfig,
+  type GoogleHandlerResult,
+} from "../../utilities/oauth-backend/src/google-handlers.js";
+import { GoogleExchangeBodySchema } from "../../utilities/oauth-backend/src/google-schemas.js";
 
 export { exchangeCore, refreshCore, ExchangeBodySchema, RefreshBodySchema };
-export type { HandlerConfig, HandlerResult };
+export { googleExchangeCore, GoogleExchangeBodySchema };
+export type { HandlerConfig, HandlerResult, GoogleHandlerConfig };
 
 // Adapt the global Web fetch to the utility's minimal OAuthFetchFn contract.
 const webFetch: OAuthFetchFn = async (url, init) => {
@@ -125,6 +132,73 @@ export async function runTokenHandler<T>(
   }
 
   const result = await core(parsed.data, config);
+  return result.ok
+    ? jsonResponse(200, result.data)
+    : jsonResponse(result.status, { error: result.error });
+}
+
+/**
+ * Build a GoogleHandlerConfig from environment, or return null when Google
+ * identity is not configured.
+ *
+ * Google identity is OPT-IN: a GitHub-only deployment leaves
+ * `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` unset and never needs them. Unlike
+ * the GitHub pair (which throws so a misconfigured deployment 500s), absent
+ * Google creds are not an error — {@link runGoogleHandler} maps a null config
+ * to a 503 `google_oauth_not_configured`, matching the "fail soft, not 500"
+ * shape of the managed-PR route when its org bot is unprovisioned.
+ *
+ * The standalone Fastify server (`server.ts`) gates the route on a separate
+ * `GOOGLE_OAUTH_ENABLED` flag at startup; serverless has no registration step,
+ * so the presence of both creds IS the gate. Do not couple this to
+ * `GOOGLE_OAUTH_ENABLED` — that would let creds be set yet the endpoint stay
+ * dark because a second flag was forgotten.
+ */
+export function googleEnvConfig(fetchFn: OAuthFetchFn = webFetch): GoogleHandlerConfig | null {
+  const googleClientId = (process.env["GOOGLE_CLIENT_ID"] ?? "").trim();
+  const googleClientSecret = (process.env["GOOGLE_CLIENT_SECRET"] ?? "").trim();
+  if (googleClientId === "" || googleClientSecret === "") {
+    return null;
+  }
+  return { googleClientId, googleClientSecret, fetch: fetchFn };
+}
+
+/**
+ * Run the Google identity-exchange endpoint: method guard → config →
+ * body validation → core call → status mapping. Mirrors {@link runTokenHandler}
+ * but for the identity-only Google flow, whose config type and success shape
+ * (identity claims, not a token) differ from the GitHub token handlers.
+ *
+ * `configOverride` lets tests inject a stub fetch + creds; production omits it
+ * and reads from env via {@link googleEnvConfig}. A null config (creds absent)
+ * yields 503 `google_oauth_not_configured`.
+ */
+export async function runGoogleHandler(
+  req: Request,
+  configOverride?: GoogleHandlerConfig,
+): Promise<Response> {
+  if (req.method !== "POST") {
+    return jsonResponse(405, { error: "method_not_allowed" }, { Allow: "POST" });
+  }
+
+  const config = configOverride ?? googleEnvConfig();
+  if (config === null) {
+    return jsonResponse(503, { error: "google_oauth_not_configured" });
+  }
+
+  let raw: unknown;
+  try {
+    raw = await req.json();
+  } catch {
+    return jsonResponse(400, { error: "invalid_request" });
+  }
+
+  const parsed = GoogleExchangeBodySchema.safeParse(raw);
+  if (!parsed.success) {
+    return jsonResponse(400, { error: "invalid_request" });
+  }
+
+  const result: GoogleHandlerResult = await googleExchangeCore(parsed.data, config);
   return result.ok
     ? jsonResponse(200, result.data)
     : jsonResponse(result.status, { error: result.error });

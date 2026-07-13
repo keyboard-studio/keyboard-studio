@@ -8,9 +8,8 @@
 //   5. style override passes through (merges over base styles).
 //   6. className override passes through.
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import { afterEach } from "vitest";
 import { TextField } from "./TextField.tsx";
 import { CSS_FONT_MONO } from "./theme.ts";
 

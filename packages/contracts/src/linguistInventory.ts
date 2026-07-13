@@ -35,6 +35,8 @@
 // The inventory is ALWAYS presented to the user for confirmation before it drives
 // Phase B — never trusted silently (consistent with the §8 discovery principle).
 
+import { stripUndefined } from "./utils/charUtils";
+
 /**
  * A bicameral letter set: matched lowercase / uppercase lists. For unicameral
  * scripts the two lists are equal (or `uppercase` repeats `lowercase`); the
@@ -181,16 +183,6 @@ export type LinguistInventoryInit = {
   flags?: InventoryFlag[];
   sources?: InventorySource[];
 };
-
-/**
- * Drop keys whose value is `undefined` so the result satisfies
- * `exactOptionalPropertyTypes`. Mirrors the helper in provenance.ts.
- */
-function stripUndefined<T extends object>(obj: T): T {
-  return Object.fromEntries(
-    Object.entries(obj).filter(([, v]) => v !== undefined)
-  ) as T;
-}
 
 /**
  * Construct a {@link LinguistInventory} from a {@link LinguistInventoryInit},

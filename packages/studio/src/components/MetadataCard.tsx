@@ -1,6 +1,7 @@
 // MetadataCard — displays selected base keyboard metadata and try-it hints.
 
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import { BG_CARD, CARD_BORDER, FONT_MONO, SUCCESS_ACCENT, TEXT_MAIN } from "../ui/theme.ts";
 
 // [TEMP] Per-fixture typing hints. Hardcoded until the Pattern schema's
 // `tests` field (spec §5) is wired into the UI to drive these automatically.
@@ -25,20 +26,16 @@ const TRY_HINTS: Record<string, { intro: string; examples: string[] }> = {
   },
 };
 
-export function MetadataCard({ kb }: { kb: BaseKeyboard }) {
-  const Row = ({ k, v }: { k: string; v: string }) => (
+function Row({ k, v }: { k: string; v: string }) {
+  return (
     <div style={{ display: "flex", gap: 8, fontSize: 13 }}>
       <span style={{ color: "#9aa7b8", minWidth: 90 }}>{k}</span>
-      <span
-        style={{
-          color: "#e6edf3",
-          fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
-        }}
-      >
-        {v}
-      </span>
+      <span style={{ color: TEXT_MAIN, fontFamily: FONT_MONO }}>{v}</span>
     </div>
   );
+}
+
+export function MetadataCard({ kb }: { kb: BaseKeyboard }) {
   const hint = TRY_HINTS[kb.id];
   return (
     <>
@@ -46,8 +43,8 @@ export function MetadataCard({ kb }: { kb: BaseKeyboard }) {
         style={{
           marginTop: 16,
           padding: 16,
-          background: "#161b22",
-          border: "1px solid #283040",
+          background: BG_CARD,
+          border: `1px solid ${CARD_BORDER}`,
           borderRadius: 12,
           display: "flex",
           flexDirection: "column",
@@ -59,7 +56,7 @@ export function MetadataCard({ kb }: { kb: BaseKeyboard }) {
             fontSize: 11,
             textTransform: "uppercase",
             letterSpacing: "0.08em",
-            color: "#7ee787",
+            color: SUCCESS_ACCENT,
             fontWeight: 700,
             marginBottom: 4,
           }}
@@ -80,8 +77,8 @@ export function MetadataCard({ kb }: { kb: BaseKeyboard }) {
           style={{
             marginTop: 12,
             padding: 16,
-            background: "#161b22",
-            border: "1px solid #283040",
+            background: BG_CARD,
+            border: `1px solid ${CARD_BORDER}`,
             borderRadius: 12,
           }}
         >
@@ -104,10 +101,10 @@ export function MetadataCard({ kb }: { kb: BaseKeyboard }) {
             style={{
               margin: 0,
               paddingLeft: 18,
-              color: "#e6edf3",
+              color: TEXT_MAIN,
               fontSize: 13,
               lineHeight: 1.7,
-              fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
+              fontFamily: FONT_MONO,
             }}
           >
             {hint.examples.map((ex) => (

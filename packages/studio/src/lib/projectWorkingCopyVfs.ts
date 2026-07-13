@@ -56,6 +56,7 @@ import {
 import { applyCarveMutate, applyAddGalleryMutate } from "../steps/editorMutate.ts";
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
+import { readVfsText } from "./vfsText.ts";
 
 /** Shared empty deletion set for the seam-path emit (the seam already filtered). */
 const EMPTY_DELETION_SET: ReadonlySet<string> = new Set<string>();
@@ -325,10 +326,10 @@ export function projectWorkingCopyVfs(
     // byte-identical to the flag-off path. Keycap-label / touch-layout projection
     // is deferred to US2.
     if (isMutateSeamEnabled()) {
-      const entry = vfs.get(`source/${keyboardId}.kmn`);
-      if (entry !== undefined && typeof entry.content === "string") {
+      const kmnText = readVfsText(vfs, `source/${keyboardId}.kmn`);
+      if (kmnText !== undefined) {
         try {
-          const assignedIr = parseKmn(entry.content, keyboardId).ir;
+          const assignedIr = parseKmn(kmnText, keyboardId).ir;
           // Route through the seam; a containment violation (M3) surfaces here.
           applyAddGalleryMutate(carveIr, assignedIr);
         } catch (err: unknown) {
@@ -448,10 +449,10 @@ export function projectWorkingCopyVfs(
   ) {
     effectiveKeyboardId = targetKeyboardId;
     const kmnPath = `source/${keyboardId}.kmn`;
-    const kmnEntry = vfs.get(kmnPath);
-    if (kmnEntry !== undefined && typeof kmnEntry.content === "string") {
+    const kmnText = readVfsText(vfs, kmnPath);
+    if (kmnText !== undefined) {
       try {
-        const parsed = parseKmn(kmnEntry.content, keyboardId);
+        const parsed = parseKmn(kmnText, keyboardId);
         resetIdentity(parsed.ir, {
           keyboardId: targetKeyboardId,
           displayName: identity?.displayName ?? parsed.ir.header.name ?? targetKeyboardId,

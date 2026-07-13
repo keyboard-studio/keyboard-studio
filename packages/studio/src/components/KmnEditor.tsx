@@ -2,10 +2,12 @@
 // Edits are written back to the VFS and trigger recompile via the 300 ms
 // debounce cycle (spec Decision D3).
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { VirtualFS } from "@keyboard-studio/contracts";
 import { useDebounce, DEBOUNCE_MS } from "../hooks/useDebounce.ts";
 import { findKmnPath } from "../lib/findKmnPath.ts";
+import { readVfsText } from "../lib/vfsText.ts";
+import { BG_CARD, CARD_BORDER, FONT_MONO, TEXT_MAIN } from "../ui/theme.ts";
 
 export interface KmnEditorProps {
   /** The live session VFS from the ready stage. */
@@ -18,7 +20,7 @@ export function KmnEditor({ vfs, onRecompile }: KmnEditorProps) {
   // Find the primary .kmn file once per render — exclude the tests/ directory.
   const kmnPath = findKmnPath(vfs);
   const initialContent = kmnPath !== undefined
-    ? (vfs.get(kmnPath)?.content as string | undefined) ?? ""
+    ? readVfsText(vfs, kmnPath) ?? ""
     : "";
 
   const [text, setText] = useState(initialContent);
@@ -31,7 +33,7 @@ export function KmnEditor({ vfs, onRecompile }: KmnEditorProps) {
   useEffect(() => {
     const path = findKmnPath(vfs);
     const content = path !== undefined
-      ? (vfs.get(path)?.content as string | undefined) ?? ""
+      ? readVfsText(vfs, path) ?? ""
       : "";
     setText(content);
     // Reset dirty flag so the fresh VFS seed doesn't trigger a recompile.
@@ -43,27 +45,23 @@ export function KmnEditor({ vfs, onRecompile }: KmnEditorProps) {
 
   // Write the debounced text back to the VFS and signal recompile — only when
   // the user has actually edited (dirtyRef guards the initial-mount no-op).
-  const handleDebouncedWrite = useCallback(() => {
+  useEffect(() => {
     if (kmnPath === undefined || !dirtyRef.current) return;
     vfs.set(kmnPath, debouncedText);
     onRecompile();
   }, [debouncedText, vfs, onRecompile, kmnPath]);
-
-  useEffect(() => {
-    handleDebouncedWrite();
-  }, [handleDebouncedWrite]);
 
   if (kmnPath === undefined) {
     return (
       <div
         style={{
           padding: "10px 14px",
-          background: "#161b22",
-          border: "1px solid #283040",
+          background: BG_CARD,
+          border: `1px solid ${CARD_BORDER}`,
           borderRadius: 8,
           fontSize: 12,
           color: "#9aa7b8",
-          fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
+          fontFamily: FONT_MONO,
         }}
       >
         No .kmn file found in the session VFS.
@@ -100,12 +98,12 @@ export function KmnEditor({ vfs, onRecompile }: KmnEditorProps) {
           width: "100%",
           boxSizing: "border-box",
           background: "#0d1117",
-          color: "#e6edf3",
-          border: "1px solid #283040",
+          color: TEXT_MAIN,
+          border: `1px solid ${CARD_BORDER}`,
           borderRadius: 8,
           padding: "10px 12px",
           fontSize: 12,
-          fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
+          fontFamily: FONT_MONO,
           lineHeight: 1.6,
           resize: "vertical",
           outline: "none",
@@ -115,7 +113,7 @@ export function KmnEditor({ vfs, onRecompile }: KmnEditorProps) {
         style={{
           fontSize: 11,
           color: "#484f58",
-          fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
+          fontFamily: FONT_MONO,
         }}
         aria-live="polite"
       >

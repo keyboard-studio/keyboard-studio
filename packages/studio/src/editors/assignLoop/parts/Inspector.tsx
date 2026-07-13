@@ -65,21 +65,20 @@ function LoadBearing() {
   );
 }
 
-const blurbStyle: React.CSSProperties = {
-  margin: '10px 0 0', fontSize: 12, color: 'var(--app-text-subtle)', lineHeight: 1.55,
-};
+
+const STORE_INTRO = "Stores are named character lists that rules in patterns and groups reference, not the rules themselves.";
 
 function storeBlurb(node: CarveNode): string {
   if (node.referencedByNodeId !== undefined)
-    return "Stores are named character lists that rules in patterns and groups reference, not the rules themselves. This store belongs to the pattern above; its removal is managed through that pattern.";
+    return `${STORE_INTRO} This store belongs to the pattern above; its removal is managed through that pattern.`;
   const u = node.storeUsage;
   if (!u)
-    return "Stores are named character lists that rules in patterns and groups reference, not the rules themselves. This one isn't referenced by any active rules, so it's likely safe to remove on its own.";
+    return `${STORE_INTRO} This one isn't referenced by any active rules, so it's likely safe to remove on its own.`;
   if (u.asSource && u.asOutput)
-    return "Stores are named character lists that rules in patterns and groups reference, not the rules themselves. This one is used on both sides: rules scan your input against it AND pick their output from it.";
+    return `${STORE_INTRO} This one is used on both sides: rules scan your input against it AND pick their output from it.`;
   if (u.asSource)
-    return "Stores are named character lists that rules in patterns and groups reference, not the rules themselves. Rules scan your input against this list; when a character matches, the rule fires.";
-  return "Stores are named character lists that rules in patterns and groups reference, not the rules themselves. Rules pick their output character from this list based on which key was pressed.";
+    return `${STORE_INTRO} Rules scan your input against this list; when a character matches, the rule fires.`;
+  return `${STORE_INTRO} Rules pick their output character from this list based on which key was pressed.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,7 +97,7 @@ function RawDetail({ node, isDeleted, onToggleNode }: RawDetailProps) {
 
   return (
     <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '20px 24px' }}>
-      <p style={{ ...blurbStyle, margin: '0 0 14px' }}>
+      <p style={{ margin: '0 0 14px', fontSize: 12, color: 'var(--app-text-subtle)', lineHeight: 1.55 }}>
         Advanced rules use syntax the tool can't model automatically: deadkey chains, context-sensitive substitutions, or platform-specific behaviour. They're kept exactly as written from the original keyboard.
       </p>
       <div style={{
@@ -176,18 +175,27 @@ interface StoreDetailProps {
    */
   onStoreCascade?: ((chipId: string, ch: string) => void) | undefined;
 }
+type RoleType = 'input' | 'output' | 'input+output';
+
+function RoleChip({ role }: { role: RoleType }) {
+  const styles = {
+    'input+output': { bg: 'color-mix(in srgb, #b8a0d8 18%, var(--app-surface))', border: '1px solid color-mix(in srgb, #b8a0d8 50%, transparent)', color: '#c8b0e8', label: 'in+out' },
+    'input': { bg: 'var(--app-accent-subtle)', border: '1px solid var(--app-border)', color: 'var(--app-accent-text)', label: 'input' },
+    'output': { bg: 'color-mix(in srgb, #7dbf8e 15%, var(--app-surface))', border: '1px solid color-mix(in srgb, #7dbf8e 40%, transparent)', color: '#7dbf8e', label: 'output' },
+  }[role];
+  return (
+    <span style={{ font: '600 10px/1 var(--app-font)', padding: '3px 7px', borderRadius: 5, background: styles.bg, border: styles.border, color: styles.color }}>
+      {styles.label}
+    </span>
+  );
+}
+
 function storeRoleChip(node: CarveNode): React.ReactNode {
   const u = node.storeUsage;
   if (!u) return null;
-  if (u.asSource && u.asOutput) return (
-    <span style={{ font: '600 10px/1 var(--app-font)', padding: '3px 7px', borderRadius: 5, background: 'color-mix(in srgb, #b8a0d8 18%, var(--app-surface))', border: '1px solid color-mix(in srgb, #b8a0d8 50%, transparent)', color: '#c8b0e8' }}>in+out</span>
-  );
-  if (u.asSource) return (
-    <span style={{ font: '600 10px/1 var(--app-font)', padding: '3px 7px', borderRadius: 5, background: 'var(--app-accent-subtle)', border: '1px solid var(--app-border)', color: 'var(--app-accent-text)' }}>input</span>
-  );
-  if (u.asOutput) return (
-    <span style={{ font: '600 10px/1 var(--app-font)', padding: '3px 7px', borderRadius: 5, background: 'color-mix(in srgb, #7dbf8e 15%, var(--app-surface))', border: '1px solid color-mix(in srgb, #7dbf8e 40%, transparent)', color: '#7dbf8e' }}>output</span>
-  );
+  if (u.asSource && u.asOutput) return <RoleChip role="input+output" />;
+  if (u.asSource) return <RoleChip role="input" />;
+  if (u.asOutput) return <RoleChip role="output" />;
   return null;
 }
 
@@ -316,7 +324,7 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
             {storeRoleChip(node)}
             {node.loadBearing === true && <LoadBearing />}
           </div>
-          <p style={{ ...blurbStyle, margin: 0 }}>
+          <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--app-text-subtle)', lineHeight: 1.55 }}>
             {storeBlurb(node)}
           </p>
         </div>
@@ -326,17 +334,14 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
           {node.storeRoleLine}
         </p>
       )}
-      {(() => {
-        const triggers = node.pairedStoreTriggers;
-        if (!triggers || triggers.length === 0) return null;
-        const distinct = [...new Set(triggers.filter((t): t is string => t !== undefined))];
-        if (distinct.length === 0) return null;
-        return (
+      {node.pairedStoreTriggers && (() => {
+        const distinct = [...new Set(node.pairedStoreTriggers.filter((t): t is string => t !== undefined))];
+        return distinct.length > 0 ? (
           <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--app-text-muted)', lineHeight: 1.45 }}>
             {'Triggered by: '}
             <b style={{ fontFamily: 'var(--app-font-mono)' }}>{distinct.join(', ')}</b>
           </p>
-        );
+        ) : null;
       })()}
       {chips.length > 0 && (
         <>
@@ -394,20 +399,12 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
           )}
         </>
       )}
-      {node.pairedStoreNames !== undefined && node.pairedStoreNames.length > 0 && (() => {
-        const descriptionText = storePairDescription(
-          node.storeUsage?.asSource ?? false,
-          node.storeUsage?.asOutput ?? false,
-          node.pairedStoreNames,
-        );
-        // Store-purple token — same hex used by KIND_COLOR.store in KindBadge/Rail
-        const storeColor = KIND_COLOR.store;
-        return (
+      {node.pairedStoreNames && node.pairedStoreNames.length > 0 && (
           <div
             style={{
               marginTop: 18, padding: '12px 15px', borderRadius: 10,
-              background: `color-mix(in srgb, ${storeColor} 7%, var(--app-surface))`,
-              border: `1px solid color-mix(in srgb, ${storeColor} 30%, transparent)`,
+              background: `color-mix(in srgb, ${KIND_COLOR.store} 7%, var(--app-surface))`,
+              border: `1px solid color-mix(in srgb, ${KIND_COLOR.store} 30%, transparent)`,
             }}
           >
             <div style={{ font: '600 10px/1 var(--app-font)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--app-text-subtle)', marginBottom: 8 }}>
@@ -426,27 +423,19 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
                     aria-label={`Go to store ${pname}`}
                     style={{
                       font: '600 11px/1 var(--app-font-mono)', padding: '3px 8px', borderRadius: 5,
-                      background: `color-mix(in srgb, ${storeColor} 14%, transparent)`,
-                      border: `1px solid color-mix(in srgb, ${storeColor} 38%, transparent)`,
-                      color: storeColor,
+                      background: `color-mix(in srgb, ${KIND_COLOR.store} 14%, transparent)`,
+                      border: `1px solid color-mix(in srgb, ${KIND_COLOR.store} 38%, transparent)`,
+                      color: KIND_COLOR.store,
                       cursor: pairedId !== undefined && onSelectNode !== undefined ? 'pointer' : 'default',
                       outline: 'none',
                     }}
-                    onFocus={(e) => { (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 0 0 2px color-mix(in srgb, ${storeColor} 40%, transparent)`; }}
+                    onFocus={(e) => { (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 0 0 2px color-mix(in srgb, ${KIND_COLOR.store} 40%, transparent)`; }}
                     onBlur={(e) => { (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none'; }}
                   >
                     {pname}
                   </button>
                   {/* Role chip — the paired store's own role (input/output/input+output) */}
-                  {role === 'input+output' && (
-                    <span style={{ font: '600 10px/1 var(--app-font)', padding: '3px 7px', borderRadius: 5, background: 'color-mix(in srgb, #b8a0d8 18%, var(--app-surface))', border: '1px solid color-mix(in srgb, #b8a0d8 50%, transparent)', color: '#c8b0e8' }}>in+out</span>
-                  )}
-                  {role === 'input' && (
-                    <span style={{ font: '600 10px/1 var(--app-font)', padding: '3px 7px', borderRadius: 5, background: 'var(--app-accent-subtle)', border: '1px solid var(--app-border)', color: 'var(--app-accent-text)' }}>input</span>
-                  )}
-                  {role === 'output' && (
-                    <span style={{ font: '600 10px/1 var(--app-font)', padding: '3px 7px', borderRadius: 5, background: 'color-mix(in srgb, #7dbf8e 15%, var(--app-surface))', border: '1px solid color-mix(in srgb, #7dbf8e 40%, transparent)', color: '#7dbf8e' }}>output</span>
-                  )}
+                  {role !== undefined && <RoleChip role={role} />}
                   {/* Trigger key */}
                   {trigger !== undefined && (
                     <span style={{ font: '600 10px/1 var(--app-font)', color: 'var(--app-text-subtle)', whiteSpace: 'nowrap' }}>
@@ -457,7 +446,11 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
               );
             })}
             <p style={{ margin: '4px 0 8px', fontSize: 12, color: 'var(--app-text-muted)', lineHeight: 1.55 }}>
-              {descriptionText}
+              {storePairDescription(
+                node.storeUsage?.asSource ?? false,
+                node.storeUsage?.asOutput ?? false,
+                node.pairedStoreNames,
+              )}
             </p>
             <p style={{ margin: 0, fontSize: 12, color: 'var(--app-text-subtle)', lineHeight: 1.55, fontStyle: 'italic' }}>
               {node.pairedStoreNames.length === 1
@@ -465,8 +458,7 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
                 : 'These stores work together as a set. Removing one without the others will break the mechanism.'}
             </p>
           </div>
-        );
-      })()}
+        )}
       {consumers.length > 0 && (
         <div
           style={{
@@ -536,12 +528,10 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
             </div>
           ))}
           <p style={{ margin: '8px 0 0', fontSize: 12, lineHeight: 1.5, color: allConsumersDead ? 'var(--sil-orange-dark)' : 'var(--app-text-subtle)' }}>
-            {allConsumersDead
-              ? 'All consumers removed. This store is now orphaned and safe to drop.'
-              : (() => {
-                  const total = node.storeUsage?.ruleCount ?? consumers.reduce((s, c) => s + c.ruleCount, 0);
-                  return `If this store is removed, the ${total} ${total === 1 ? 'rule' : 'rules'} above that depend on it will break at compile time.`;
-                })()}
+            {allConsumersDead ? 'All consumers removed. This store is now orphaned and safe to drop.' : (() => {
+              const total = node.storeUsage?.ruleCount ?? consumers.reduce((s, c) => s + c.ruleCount, 0);
+              return `If this store is removed, the ${total} ${total === 1 ? 'rule' : 'rules'} above that depend on it will break at compile time.`;
+            })()}
           </p>
         </div>
       )}
@@ -649,7 +639,7 @@ export function Inspector({ node, nodes, isItemDeleted, onToggleGlyph, onSetMany
             <KindBadge kind={node.kind} />
             {node.strategy !== undefined && <StrategyChip id={node.strategy} />}
           </div>
-          <p style={{ ...blurbStyle, margin: 0 }}>
+          <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--app-text-subtle)', lineHeight: 1.55 }}>
             {node.kind === 'pattern'
               ? 'A recognized pattern groups related key rules by purpose, for example "vowels with diacritics" or "base alphabet". The tiles below show rules with visible character output. The pattern may also own store-dependent rules that don\'t appear as tiles; those are shown in the relevant stores\' "Used by" panels. Removing this pattern removes all of it.'
               : 'A group is a block of key rules from the original keyboard that hasn\'t been recognized as a named pattern. The tiles below show rules with visible character output. The group may also contain store-dependent rules that don\'t appear as tiles; those are shown in the relevant stores\' "Used by" panels. Removing this group removes all of it.'}

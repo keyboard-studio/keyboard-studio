@@ -53,16 +53,33 @@ Backend (Vercel project env — server-side only, never exposed to the SPA):
 - `GITHUB_CLIENT_SECRET` = prod client secret
 - `OAUTH_ALLOWED_ORIGINS` — not required for same-origin co-location; only set it
   if you later split the backend to another origin.
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — **optional; only for "Sign up with
+  Google".** Set both to enable `/oauth/google/exchange`. Both absent (or either
+  one absent) → the endpoint returns `503 google_oauth_not_configured` and the
+  Google button is a no-op; GitHub sign-in is unaffected. Unlike the standalone
+  Fastify server there is **no `GOOGLE_OAUTH_ENABLED` flag** in the serverless
+  deploy — the presence of both creds is the gate. Register the client under
+  Google Cloud → APIs & Services → Credentials → OAuth client ID (Web), with
+  Authorized redirect URI `https://<prod-domain>/oauth/google/callback`.
 
 SPA (Vite build-time env):
 - `VITE_GITHUB_CLIENT_ID` = prod client id (public — safe in the bundle)
 - `VITE_OAUTH_BACKEND_URL` = _(leave empty — same origin)_
+- `VITE_GOOGLE_CLIENT_ID` = Google OAuth client id (public — safe in the bundle).
+  Only needed when the Google button should appear; leave empty for a
+  GitHub-only deployment.
 
 ### 4. Verify end-to-end in prod
 
 - `GET https://<prod-domain>/oauth/health` → `{ "status": "ok" }`.
 - In the SPA `#output` step → "Sign up with GitHub" → consent →
   `/oauth/callback` → signed-in state (token in tab `sessionStorage`).
+- (If Google enabled) "Sign up with Google" → consent → `/oauth/google/callback`
+  → signed-in state (identity claims in tab `sessionStorage`, key
+  `ks.google.identity`; no Google token stored). A quick negative check without
+  the browser: `curl -sX POST https://<prod-domain>/oauth/google/exchange -d '{}'
+  -H 'content-type: application/json'` → `400 invalid_request` when configured,
+  `503 google_oauth_not_configured` when the creds are unset.
 
 ### 5. Update [`docs/github_flow.md`](../../docs/github_flow.md) Status
 

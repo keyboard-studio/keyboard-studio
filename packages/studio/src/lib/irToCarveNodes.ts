@@ -129,28 +129,6 @@ const INVISIBLE_CHAR_LABELS: Record<string, string> = {
   '­': 'SOFT HYPHEN',
   '͏': 'COMBINING GRAPHEME JOINER',
   '᠎': 'MONGOLIAN VOWEL SEPARATOR',
-  '̀': 'COMBINING GRAVE ACCENT',
-  '́': 'COMBINING ACUTE ACCENT',
-  '̂': 'COMBINING CIRCUMFLEX ACCENT',
-  '̃': 'COMBINING TILDE',
-  '̄': 'COMBINING MACRON',
-  '̅': 'COMBINING OVERLINE',
-  '̆': 'COMBINING BREVE',
-  '̇': 'COMBINING DOT ABOVE',
-  '̈': 'COMBINING DIAERESIS',
-  '̉': 'COMBINING HOOK ABOVE',
-  '̊': 'COMBINING RING ABOVE',
-  '̋': 'COMBINING DOUBLE ACUTE ACCENT',
-  '̌': 'COMBINING CARON',
-  '̍': 'COMBINING VERTICAL LINE ABOVE',
-  '̏': 'COMBINING DOUBLE GRAVE ACCENT',
-  '̣': 'COMBINING DOT BELOW',
-  '̤': 'COMBINING DIAERESIS BELOW',
-  '̥': 'COMBINING RING BELOW',
-  '̧': 'COMBINING CEDILLA',
-  '̨': 'COMBINING OGONEK',
-  '̰': 'COMBINING TILDE BELOW',
-  '̱': 'COMBINING MACRON BELOW',
 };
 
 /** Returns a short label if the character is invisible/non-printing, otherwise null. */
@@ -232,26 +210,17 @@ export function contextToKeys(context: ContextElement[]): string[] {
 // ---------------------------------------------------------------------------
 
 export function outputToChar(output: OutputElement[]): string {
-  for (const el of output) {
-    switch (el.kind) {
-      case 'char':
-        return el.value;
-      case 'deadkey':
-        return '‹dk›';
-      case 'index':
-        return '…';
-      case 'outs':
-        return '…';
-      case 'beep':
-        return '🔔';
-      case 'useGroup':
-        // Control-flow jump to another group (#268) — not a glyph; no tile.
-        return '?';
-      case 'raw':
-        return '?';
-    }
+  const first = output[0];
+  if (!first) return '?';
+
+  switch (first.kind) {
+    case 'char': return first.value;
+    case 'deadkey': return '‹dk›';
+    case 'index':
+    case 'outs': return '…';
+    case 'beep': return '🔔';
+    default: return '?';  // useGroup, raw, or unknown
   }
-  return '?';
 }
 
 // ---------------------------------------------------------------------------
@@ -662,6 +631,20 @@ function precedingContextLabel(elements: ContextElement[]): string {
 
 const PLATFORM_GUARD_RE = /^\s*platform\s*\(\s*'(\w+)'\s*\)/i;
 
+function extractPlatformGuard(elements: ContextElement[]): { guard: string | null; filtered: ContextElement[] } {
+  let guard: string | null = null;
+  const filtered = elements.filter((el) => {
+    if (el.kind !== 'raw') return true;
+    const m = PLATFORM_GUARD_RE.exec(el.text);
+    if (m) {
+      guard = m[1] ?? null;
+      return false;
+    }
+    return true;
+  });
+  return { guard, filtered };
+}
+
 // Stays bespoke rather than consuming storeRefsOf: it needs the element
 // INDEX of the store ref (ctxRefIdx/outRefIdx) to compute isKeystroke via
 // the '+'/raw separator and to slice the preceding context — a positional
@@ -680,13 +663,7 @@ function describeRuleForStore(rule: IRRule, storeName: string): StoreRuleDetail 
   const preceding = ctxRefIdx > 0 ? rule.context.slice(0, ctxRefIdx) : [];
 
   // Strip platform() guards from preceding — they're rule-level platform restrictions, not character context
-  let platformGuard: string | null = null;
-  const precedingFiltered = preceding.filter((el) => {
-    if (el.kind !== 'raw') return true;
-    const m = PLATFORM_GUARD_RE.exec(el.text);
-    if (m) { platformGuard = m[1] ?? null; return false; }
-    return true;
-  });
+  const { guard: platformGuard, filtered: precedingFiltered } = extractPlatformGuard(preceding);
 
   const outRefIdx = rule.output.findIndex(
     (el) => (el.kind === 'index' || el.kind === 'outs') && el.storeRef === storeName,

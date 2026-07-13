@@ -139,4 +139,81 @@ describe("checkControlKeyDrift (18.4 KM_WARN_CONTROL_KEY_DRIFT)", () => {
     expect(findings[0]?.code).toBe("KM_WARN_CONTROL_KEY_DRIFT");
     expect(findings[0]?.message).toContain("row changed");
   });
+
+  // ---------------------------------------------------------------------
+  // Two-platform regression coverage: walkTouchKeys' baseline map must reset
+  // when the walk crosses from one platform to the next. A prior extraction
+  // introduced a `currentPlatform` guard inside checkControlKeyDrift's callback
+  // specifically to reset `baseline` on the platform boundary; these tests
+  // exercise that guard directly rather than trusting single-platform fixtures.
+  // ---------------------------------------------------------------------
+
+  /**
+   * Build a two-platform IR. Each platform has two layers ("default",
+   * "shifted") and a K_BKSP key positioned per that platform's opts (row/keyIndex
+   * padded with filler keys so the requested position is real, not just declared).
+   */
+  function makeTwoPlatformIR(
+    phoneOpts: { sp: number; width: number },
+    tabletDefaultOpts: { sp: number; width: number },
+    tabletShiftedOpts: { sp: number; width: number },
+  ): TouchLayoutIR {
+    function bkspRowAt(rowIdx: number, keyIdx: number, nodeId: string, opts: { sp: number; width: number }) {
+      const fillers = Array.from({ length: keyIdx }, (_, i) => ({
+        nodeId: `filler-${nodeId}-${i}`,
+        id: `K_FILLER_${i}`,
+      }));
+      return {
+        keys: [...fillers, { nodeId, id: "K_BKSP", sp: opts.sp, width: opts.width }],
+      };
+    }
+    function padRows(rowIdx: number, bkspRow: ReturnType<typeof bkspRowAt>) {
+      return Array.from({ length: Math.max(rowIdx + 1, 1) }, (_, i) =>
+        i === rowIdx ? bkspRow : { keys: [{ nodeId: `pad-${rowIdx}-${i}`, id: "K_FILLER" }] },
+      );
+    }
+
+    return {
+      platforms: [
+        {
+          id: "phone",
+          layers: [
+            { id: "default", rows: padRows(0, bkspRowAt(0, 0, "phone-default-bksp", phoneOpts)) },
+            { id: "shifted", rows: padRows(0, bkspRowAt(0, 0, "phone-shifted-bksp", phoneOpts)) },
+          ],
+        },
+        {
+          id: "tablet",
+          layers: [
+            { id: "default", rows: padRows(2, bkspRowAt(2, 3, "tablet-default-bksp", tabletDefaultOpts)) },
+            { id: "shifted", rows: padRows(2, bkspRowAt(2, 3, "tablet-shifted-bksp", tabletShiftedOpts)) },
+          ],
+        },
+      ],
+      nodeIds: [],
+    };
+  }
+
+  it("does not flag drift across a platform boundary when geometry legitimately differs per platform (no false positive)", () => {
+    // phone: sp=1/width=100/row0/keyIndex0 in both layers (internally consistent).
+    // tablet: sp=5/width=200/row2/keyIndex3 in both layers (internally consistent,
+    // but deliberately different from phone's baseline). If the baseline map
+    // were not reset at the platform boundary, tablet's first key would be
+    // compared against phone's stale baseline and spuriously flagged as drift.
+    const ir = makeTwoPlatformIR({ sp: 1, width: 100 }, { sp: 5, width: 200 }, { sp: 5, width: 200 });
+    expect(checkControlKeyDrift(ir, PATH)).toEqual([]);
+  });
+
+  it("still detects real drift within the second platform after the baseline reset (no false negative)", () => {
+    // phone: consistent (no drift). tablet: shifted layer's width diverges from
+    // tablet's own default layer. This proves the reset baseline is still being
+    // populated and compared correctly on the second platform, not simply
+    // disabled — exactly one finding, scoped to "tablet".
+    const ir = makeTwoPlatformIR({ sp: 1, width: 100 }, { sp: 5, width: 200 }, { sp: 5, width: 250 });
+    const findings = checkControlKeyDrift(ir, PATH);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.code).toBe("KM_WARN_CONTROL_KEY_DRIFT");
+    expect(findings[0]?.message).toContain("tablet");
+    expect(findings[0]?.message).toContain("width changed from 200");
+  });
 });

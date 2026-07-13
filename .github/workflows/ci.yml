@@ -1,7 +1,6 @@
-# CI — typecheck / test / build for the monorepo. See #2.
-# Minimal-by-design: matches what `pnpm test`/`pnpm build` do locally.
-# Extend later (lint, coverage, matrix across Node versions) as the
-# package set grows.
+# CI — typecheck / lint / test / build for the monorepo. See #2.
+# Minimal-by-design: matches what `pnpm test`/`pnpm build`/`pnpm lint` do locally.
+# Extend later (coverage, matrix across Node versions) as the package set grows.
 
 name: CI
 
@@ -51,6 +50,9 @@ jobs:
 
       - name: Typecheck (all packages)
         run: pnpm -r typecheck
+
+      - name: Lint (eslint + depcruise + crew-lint + facet-lint)
+        run: pnpm lint
 
       - name: Test (all packages)
         run: pnpm -r test

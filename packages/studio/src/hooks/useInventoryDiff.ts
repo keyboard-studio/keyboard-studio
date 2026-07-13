@@ -26,32 +26,12 @@ import { useMemo } from "react";
 import { buildProducedSet } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 
-// ---------------------------------------------------------------------------
-// Return type
-// ---------------------------------------------------------------------------
-
 export interface InventoryDiff {
-  /**
-   * Characters the author's keyboard must still produce — the mechanism gallery
-   * assigns mechanisms to these characters (and coverage is measured over them).
-   *
-   * Equals `confirmedInventory` when `baseIr` is null (not yet instantiated).
-   * Empty array when every inventory character is already produced by the base.
-   */
+  /** Characters still needing mechanism assignment (coverage measured over these). */
   lettersToAdd: string[];
-  /**
-   * Characters the base keyboard already produces — shown as an informational
-   * collapsed section "Already typed by the base keyboard (N): …"; they do not
-   * require mechanism assignment.
-   *
-   * Empty array when `baseIr` is null (fallback to full inventory).
-   */
+  /** Characters already produced by the base (informational display only). */
   alreadyProduced: string[];
 }
-
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
 
 /**
  * Derives the §8 inventory diff against the base keyboard's produced-glyph set.
@@ -69,18 +49,12 @@ export function useInventoryDiff(): InventoryDiff {
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
 
-  // Memoize the produced set on baseIr reference. buildProducedSet() iterates
-  // the full IR; caching it avoids re-running on every render.
   const producedSet = useMemo<Set<string>>(
     () => (baseIr !== null ? buildProducedSet(baseIr) : new Set<string>()),
     [baseIr],
   );
 
-  // Memoize the diff arrays on producedSet + inventory array reference.
-  // inventory is a value from Zustand; it changes reference only when the
-  // survey session is re-merged — primitive churn is not a concern here.
   return useMemo<InventoryDiff>(() => {
-    // Fallback: no base IR yet — the gallery targets the full inventory.
     if (baseIr === null) {
       return { lettersToAdd: inventory, alreadyProduced: [] };
     }

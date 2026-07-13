@@ -26,6 +26,25 @@ export interface SuggestTarget {
   bcp47?: string;
 }
 
+/** Primary language subtag of a BCP47 tag, lowercased (`"hi-Latn"` → `"hi"`). */
+export function primarySubtag(tag: string): string {
+  const first = tag.split("-")[0] ?? "";
+  return first.toLowerCase();
+}
+
+/**
+ * True when the BCP47 tag carries an explicit ISO 15924 script subtag (a
+ * 4-letter token after the primary language subtag, e.g. `hi-Latn` → true,
+ * `ewo` → false). When the author has *explicitly* picked a script, the
+ * language-cross-script tier must not surface bases on other scripts —
+ * that would defeat the romanization the author just chose (spec §8/§9
+ * decoupling). When the tag has no script subtag the choice is open and
+ * cross-script suggestions are useful.
+ */
+export function hasExplicitScriptSubtag(tag: string): boolean {
+  return tag.split("-").slice(1).some((part) => /^[A-Za-z]{4}$/.test(part));
+}
+
 export interface SuggestOptions {
   /**
    * Optional map of base-keyboard `id` → the BCP47 tags it supports (the
@@ -49,25 +68,6 @@ export interface BaseSuggestion {
 }
 
 const DEFAULT_FALLBACK_ID = "basic_kbdus";
-
-/** Primary language subtag of a BCP47 tag, lowercased (`"hi-Latn"` → `"hi"`). */
-export function primarySubtag(tag: string): string {
-  const first = tag.split("-")[0] ?? "";
-  return first.toLowerCase();
-}
-
-/**
- * True when the BCP47 tag carries an explicit ISO 15924 script subtag (a
- * 4-letter token after the primary language subtag, e.g. `hi-Latn` → true,
- * `ewo` → false). When the author has *explicitly* picked a script, the
- * language-cross-script tier must not surface bases on other scripts —
- * that would defeat the romanization the author just chose (spec §8/§9
- * decoupling). When the tag has no script subtag the choice is open and
- * cross-script suggestions are useful.
- */
-export function hasExplicitScriptSubtag(tag: string): boolean {
-  return tag.split("-").slice(1).some((part) => /^[A-Za-z]{4}$/.test(part));
-}
 
 const RANK: Record<SuggestReason, number> = {
   "language-match": 0,

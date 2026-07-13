@@ -25,6 +25,7 @@ Owned by `/km-doc`. Update this file whenever a doc is added, archived, or re-sc
 | [`docs/lint.md`](lint.md) | Linter check reference | New Layer-A/B/C checks; check reclassification | live |
 | [`docs/keyboard-design-principles.md`](keyboard-design-principles.md) | Keyboard design guidance | New design decisions ratified in spec | live |
 | [`docs/discus-principles-integration.md`](discus-principles-integration.md) | DISCUS principles integration notes | Changes to criteria.json DISCUS rows | live |
+| [`content/facets/**`](../content/facets/) + [`utilities/facet-lint/index.js`](../utilities/facet-lint/index.js) | Facet catalog (23 records) and its plain-node structural checker | New/changed facet record; facet-lint rule changes | live |
 | [`docs/working-agreement.md`](working-agreement.md) | Team working agreement | Team process changes | live |
 | [`docs/github_flow.md`](github_flow.md) | Delivery-option progress (Options A/B/C) | Scaffolder, VFS, or output-path work lands | live |
 
@@ -70,5 +71,5 @@ Owned by `/km-doc`. Update this file whenever a doc is added, archived, or re-sc
 
 ---
 
-**Last verified:** 2026-06-14
+**Last verified:** 2026-07-11
 **Manifest owner:** `/km-doc`

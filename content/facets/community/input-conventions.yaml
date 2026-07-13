@@ -1,0 +1,51 @@
+# community.input-conventions — the missing proposer behind pb_typing_approach,
+# the flow's central method-picker. Communities rarely choose an input method
+# from a menu; they already HAVE one (Telex/VNI for Vietnamese, ITRANS-style
+# for Indic, SMS-era ASCII workarounds like "c'" for ç). This facet is mined
+# from the corpus by an LLM pass over each keyboard's help docs + the
+# recognizer's strategy fingerprint — the flagship semantic (AI-labeled) facet.
+
+id: community.input-conventions
+family: community
+title: Established input conventions
+description: >
+  Input habits the community already practices: phonetic/mnemonic typing
+  schemes, sequence conventions, deadkey traditions, romanization workarounds.
+  Proposes the answer to "how would you like to type X" questions instead of
+  presenting a method menu, and biases strategy selection (S-05/S-03 vs S-02)
+  toward what the community already knows.
+valueType: set
+
+modality: both
+
+derivations:
+  - kind: corpus
+    source: "corpus:llm-labeled-conventions"
+    sourceStatus: planned
+    notes: >
+      LLM pass over corpus keyboards' welcome.htm/help text ("type aa for â")
+      plus recognizer strategy fingerprints; inter-run agreement calibrates
+      confidence. See lineage.strategy-fingerprint for the structural half.
+  - kind: confirmed
+    source: "question:pb_typing_approach"
+    sourceStatus: available
+    notes: The current method-picker becomes the confirmation of this facet's proposal.
+
+consumers:
+  prefills:
+    - pb_typing_approach
+    - pb_mark_input_order
+    - pb_indic_vowels_onset
+  proposes:
+    - "strategy:selection-bias"
+    - "axis:A3"
+    - "axis:A3a"
+
+relatedAxes: [A3, A3a]
+provenanceLabel: "how similar communities' keyboards work"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: corpus

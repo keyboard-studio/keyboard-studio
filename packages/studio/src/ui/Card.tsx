@@ -1,14 +1,3 @@
-// Card — replaces the CARD_BASE / CARD_SELECTED inline style pattern from
-// TrackStep.tsx.
-//
-// FR-005: renders the same <button> element + resolved styles as the inline
-// card buttons it replaces. No color is normalized in P1. Native style/className
-// pass-through ensures call-site overrides survive exactly (Decision 2).
-//
-// The source cards in TrackStep render as <button role="radio"> — callers that
-// need role="radio" + aria-checked must pass those as native HTML attributes
-// (the div passthrough variant is also supported when onClick is not provided).
-
 import React from "react";
 import {
   BG_CARD,
@@ -29,20 +18,15 @@ export type CardProps = React.HTMLAttributes<HTMLElement> & {
   as?: "button" | "div";
 };
 
-// ---------------------------------------------------------------------------
-// Style constants — verbatim copies of CARD_BASE / CARD_SELECTED from TrackStep.
-// ---------------------------------------------------------------------------
-
-/** Replicates CARD_BASE from TrackStep.tsx. */
 const STYLE_BASE: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 6,
   padding: "12px 16px",
-  background: BG_CARD,                    // #161b22
-  border: `1px solid ${BORDER}`,          // #30363d
+  background: BG_CARD,
+  border: `1px solid ${BORDER}`,
   borderRadius: 8,
-  color: TEXT_MAIN,                       // #e6edf3
+  color: TEXT_MAIN,
   fontSize: 14,
   cursor: "pointer",
   textAlign: "left",
@@ -52,10 +36,9 @@ const STYLE_BASE: React.CSSProperties = {
   transition: "border-color 120ms ease, background 120ms ease",
 };
 
-/** Replicates CARD_SELECTED from TrackStep.tsx. */
 const STYLE_SELECTED: React.CSSProperties = {
   ...STYLE_BASE,
-  border: `1px solid ${ACCENT}`,          // #6ea8fe
+  border: `1px solid ${ACCENT}`,
   background: "#0d1f38",
 };
 
@@ -86,8 +69,6 @@ export function Card({
     );
   }
 
-  // Cast: rest contains HTMLAttributes which are a superset of ButtonHTMLAttributes
-  // minus the conflicting ones (style is handled separately).
   return (
     <button
       type="button"

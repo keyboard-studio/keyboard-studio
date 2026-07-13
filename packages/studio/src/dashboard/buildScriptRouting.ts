@@ -40,21 +40,17 @@ const ID_TARGET_SCRIPT = "il_target_script";
 
 /** Minimal matcher for the `value == 'X'` (optionally `or`-joined) condition form. */
 function conditionMatches(condition: string | undefined, value: string): boolean {
-  if (condition === undefined) return true; // a default/fallthrough rule
-  return condition.split(" or ").some((clause) => {
-    const m = clause.trim().match(/^value\s*==\s*'([^']*)'$/);
-    return m !== null && m[1] === value;
-  });
+  if (!condition) return true; // a default/fallthrough rule
+  return condition.split(" or ").some((clause) =>
+    clause.trim().match(/^value\s*==\s*'([^']*)'$/)?.[1] === value
+  );
 }
 
 /** Resolve the goto target id for a given answer value, mirroring resolveNext. */
 function resolveGoto(next: FlowQuestion["next"], value: string): string | null {
-  if (next === undefined || next === null) return null;
-  if (typeof next === "string") return next;
-  for (const rule of next as FlowGotoRule[]) {
-    if (conditionMatches(rule.condition, value)) return ruleTarget(rule);
-  }
-  return null;
+  if (!next || typeof next === "string") return next ?? null;
+  const matchingRule = (next as FlowGotoRule[]).find((rule) => conditionMatches(rule.condition, value));
+  return matchingRule ? ruleTarget(matchingRule) : null;
 }
 
 /**

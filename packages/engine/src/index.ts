@@ -85,10 +85,15 @@ export type { ScaffolderServiceOptions } from "./scaffolder/index.js";
 export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffolder/scaffold-ir.js";
 
 // Issue #21 — Pattern-library loader.
-export { loadPatterns, getPatterns, getById } from "./pattern-library/index.js";
+export { loadPatterns, getPatterns, getById, toPattern } from "./pattern-library/index.js";
 export type { PatternFilter, LoadReport } from "./pattern-library/index.js";
 
-export { filterFor } from "./pattern-library/index.js";
+// toPattern/rankPatterns have no node:fs/node:path dependency (unlike
+// loadPatterns, whose fs/path use is behind a dynamic import()), so they are
+// safe to bundle for the browser — the studio's browser pattern library
+// reuses them instead of re-implementing the RawPattern->Pattern mapping and
+// the strategy-partition ranking.
+export { filterFor, rankPatterns } from "./pattern-library/index.js";
 
 // Strategy selector: §7.2 decision tree.
 export { selectStrategy } from "./strategy-selector/index.js";

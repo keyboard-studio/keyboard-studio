@@ -26,16 +26,19 @@ questions:
       Format: one per line, comma-separated: tone_name,unicode_codepoint
 
       Example for Thai:
-        mai_tho,U+0E48      (tone 2 — grave accent above)
-        mai_tri,U+0E49      (tone 3 — acute accent above)
-        mai_chatha,U+0E4A   (tone 4 — vertical line above)
-        mai_kham,U+0E4B     (tone 5 — circumflex above)
+        mai_ek,U+0E48        (tone 1 — low falling)
+        mai_tho,U+0E49       (tone 2 — falling)
+        mai_tri,U+0E4A       (tone 3 — high)
+        mai_chattawa,U+0E4B  (tone 4 — rising)
+        (the fifth Thai tone, mid/sà·màan, is the default and has no mark)
 
       Example for Lao:
-        mai_kho,U+0EC8      (tone 2)
-        mai_tho,U+0EC9      (tone 3)
-        mai_khang,U+0ECA    (tone 4)
-        mai_chantha,U+0ECB  (tone 5)
+        mai_ek,U+0EC8        (tone 1)
+        mai_tho,U+0EC9       (tone 2)
+        mai_ti,U+0ECA        (tone 3)
+        mai_catawa,U+0ECB    (tone 4)
+        (U+0ECC mai_kaan is a cancellation mark, distinct from tone marks
+        and not part of a tone store)
 
       Find codepoints at unicode.org or in the exemplar keyboard.
     answerType: text

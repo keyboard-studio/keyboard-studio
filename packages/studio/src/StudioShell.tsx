@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
+import { ResizeHandle } from "./components/ResizeHandle.tsx";
 import type { BaseKeyboard, Pattern } from "@keyboard-studio/contracts";
 import { buildTouchLayoutJson } from "./lib/buildTouchLayoutJson.ts";
 import { useWorkingCopyStore, bindManifest } from "./stores/workingCopyStore.ts";
@@ -35,7 +36,6 @@ import { OutputScreen } from "./components/OutputScreen.tsx";
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
 import { AccountControl } from "./components/AccountControl.tsx";
-import { navigateTo } from "./lib/navigate.ts";
 import { manifest } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { StepHost } from "./components/StepHost.tsx";
@@ -324,7 +324,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   }, []);
 
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
-  const { containerRef, leftPct, handleHovered, onPointerDown, setHandleHovered } =
+  const { containerRef, leftPct, onPointerDown } =
     useResizablePanes({ minPct: SURVEY_LEFT_MIN_PCT, maxPct: SURVEY_LEFT_MAX_PCT, initPct: SURVEY_LEFT_INIT_PCT });
 
   // Sync localBase when the prop changes (e.g. after a start-over that sets a new base).
@@ -337,10 +337,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Working-copy store actions needed by SurveyView (not delegated to StepHost).
   const resetSurvey = useWorkingCopyStore((s) => s.reset);
   const lockDesktop = useWorkingCopyStore((s) => s.lockDesktop);
+  const clearStale = useWorkingCopyStore((s) => s.clearStale);
   const setTouchLayoutJson = useWorkingCopyStore((s) => s.setTouchLayoutJson);
   const instantiateFromBase = useWorkingCopyStore((s) => s.instantiateFromBase);
   const instantiateFromExisting = useWorkingCopyStore((s) => s.instantiateFromExisting);
-  const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
   const setValidatorFindings = useWorkingCopyStore((s) => s.setValidatorFindings);
 
@@ -367,6 +367,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const reducerDeps: ReducerDeps = useMemo(
     () => ({
       lockDesktop,
+      clearStale,
       setTouchLayoutJson,
       instantiateFromBase,
       instantiateFromExisting,
@@ -389,7 +390,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     // Wrapper lambdas delegate to stable module imports — excluded from deps intentionally.
-    [lockDesktop, setTouchLayoutJson, instantiateFromBase, instantiateFromExisting],
+    [lockDesktop, clearStale, setTouchLayoutJson, instantiateFromBase, instantiateFromExisting],
   );
 
   // Keep reducerDepsRef current so the async onInstantiate callback always
@@ -557,22 +558,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       </section>
 
       {/* Drag handle */}
-      <div
-        role="separator"
-        aria-label="Resize panes"
-        aria-orientation="vertical"
-        onPointerDown={onPointerDown}
-        onMouseEnter={() => setHandleHovered(true)}
-        onMouseLeave={() => setHandleHovered(false)}
-        style={{
-          width: SURVEY_DIVIDER_WIDTH,
-          flexShrink: 0,
-          background: handleHovered ? "#3d5070" : "#283040",
-          cursor: "col-resize",
-          userSelect: "none",
-          transition: "background 120ms ease",
-        }}
-      />
+      <ResizeHandle onPointerDown={onPointerDown} />
 
       {/* Right pane: live OSK preview */}
       <section

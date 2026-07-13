@@ -69,9 +69,13 @@ function get(url: string, redirects = 0): Promise<FetchResult> {
 }
 
 async function pool<T, R>(items: T[], n: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const out: R[] = []; let i = 0;
+  const out: R[] = [];
+  let i = 0;
   const workers = Array.from({ length: Math.min(n, items.length) }, async () => {
-    while (i < items.length) { const idx = i++; out[idx] = await fn(items[idx]); }
+    while (i < items.length) {
+      const idx = i++;
+      out[idx] = await fn(items[idx]);
+    }
   });
   await Promise.all(workers);
   return out;
@@ -100,20 +104,33 @@ async function fetchUnicode(manifest: Record<string, FileManifest>) {
 
 async function fetchCldr(locales: string[]): Promise<string[]> {
   fs.mkdirSync(path.join(DATA, 'cldr'), { recursive: true });
-  let done = 0, ok = 0, missing = 0;
+  let done = 0;
+  let ok = 0;
+  let missing = 0;
   const succeeded: string[] = [];
+
   await pool(locales, CONCURRENCY, async (loc: string) => {
     let r: FetchResult;
-    try { r = await get(cldrUrl(loc)); } catch { r = { status: 0, buffer: Buffer.alloc(0) }; }
+    try {
+      r = await get(cldrUrl(loc));
+    } catch {
+      r = { status: 0, buffer: Buffer.alloc(0) };
+    }
+
     if (r.status === 200) {
       fs.writeFileSync(path.join(DATA, 'cldr', `${loc}.json`), r.buffer);
-      succeeded.push(loc); ok++;
-    } else { missing++; }
+      succeeded.push(loc);
+      ok++;
+    } else {
+      missing++;
+    }
+
     done++;
     if (done % 50 === 0 || done === locales.length) {
       process.stdout.write(`\r  ${done}/${locales.length} attempted  (${ok} fetched, ${missing} without characters.json)`);
     }
   });
+
   process.stdout.write('\n');
   return succeeded.sort();
 }
