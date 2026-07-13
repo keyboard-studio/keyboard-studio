@@ -81,11 +81,10 @@ Ordering: `direct` first, then `genealogical` by closeness, then `script-fallbac
 |-------|-------|-------|
 | `source` | pin | `https://github.com/glottolog/glottolog-cldf` |
 | `commit` / `tag` | pin | Pinned release. |
-| `urlTemplate` | pin | Raw-file URL with `{commit}` placeholder. |
-| `path` | pin | `cldf/languages.csv`. |
-| `sha256` | pin | Verified on fetch; placeholder fails loudly (FR-002). |
+| `urlTemplate` | pin | Raw-file URL with `{commit}` + `{path}` placeholders. |
+| `files[]` | pin | The pinned CLDF files, each `{ path, sha256 }`. This release needs **two**: `languages.csv` (name/level/ISO) and `values.csv` (the `classification` tree — `languages.csv` has no `Parent_ID`; see research.md D1). Each is SHA-256-verified; a placeholder/mismatch fails loudly and writes nothing (FR-002). |
 | `license` / `notice` | pin | CC-BY-4.0 + Glottolog attribution. |
-| `bytes`, `recordCount`, `url` | manifest | Recorded provenance after fetch. |
+| `files[].{bytes,recordCount,url}` | manifest | Per-file provenance recorded after fetch. |
 
 ## Entity: Curated pseudo-family set
 

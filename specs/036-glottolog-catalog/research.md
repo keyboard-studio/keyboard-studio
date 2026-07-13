@@ -4,9 +4,9 @@ All `NEEDS CLARIFICATION` are resolved here. Decisions marked **(clarified)** we
 
 ## D1 — Data source: glottolog-cldf release (clarified)
 
-**Decision**: Pin a `glottolog/glottolog-cldf` release (GitHub tag or Zenodo archive) by tag/commit + SHA-256. Consume the CLDF `cldf/languages.csv` table.
+**Decision**: Pin a `glottolog/glottolog-cldf` release (GitHub tag or Zenodo archive) by tag/commit + SHA-256. Consume the CLDF `cldf/languages.csv` **and** `cldf/values.csv` tables.
 
-**Rationale**: `languages.csv` is one structured, tabular file carrying every field we need: `ID` (Glottocode), `Name`, `Glottocode`, `ISO639P3code`, `Family_ID`, `Parent_ID`, `Level`, `Macroarea`. The full classification tree reconstructs from `Parent_ID` alone. This is the smallest, most stable slice of Glottolog for our purpose and maps 1:1 onto the langtags fetch/codegen discipline.
+**Rationale**: `languages.csv` carries `ID` (Glottocode), `Name`, `ISO639P3code`, `Level`, and `Family_ID`. **Implementation correction (Glottolog 5.3 pin):** the pinned release's `languages.csv` has *no* `Parent_ID` column, so the full classification tree does **not** reconstruct from it alone. The tree lives in `cldf/values.csv` under the `classification` parameter — a root-first, slash-separated path of ancestor glottocodes (excluding the languoid itself; NULL for a top-level family/isolate). Codegen therefore reads both files (name/level/ISO from `languages.csv`; parent/family edges from `values.csv` `classification`) and still maps onto the langtags fetch/codegen discipline (both files are pinned + SHA-256-verified). `values.csv` also carries a `category` parameter marking `Pseudo_Family` nodes, which was used to confirm the D6 curated set (see D6).
 
 **Alternatives considered**: (a) raw `glottolog/glottolog` repo (one `md.ini` per languoid) — full fidelity but thousands of files, heavy to fetch and parse, and more than we need; (b) the CLDF Newick `.trees` file alone — smallest, but loses ISO/name metadata that the join requires. Rejected both.
 
@@ -14,9 +14,9 @@ All `NEEDS CLARIFICATION` are resolved here. Decisions marked **(clarified)** we
 
 ## D2 — Tree + level from `languages.csv` (new)
 
-**Decision**: Reconstruct the tree from `Parent_ID` (a languoid whose `Parent_ID` is empty is a family root). Carry `Level` (`family` / `language` / `dialect`) from the CLDF column. If a given release does not expose `Level` directly in `languages.csv`, derive it (has children ⇒ non-leaf group; leaf with an ISO code ⇒ language; leaf under a language ⇒ dialect) and pin the derivation in codegen.
+**Decision**: Reconstruct the tree from the `values.csv` `classification` path (see D1). `parentId` = the last glottocode of the path (empty path ⇒ family root); `familyId` = the first glottocode (empty ⇒ self, resolved at load). Carry `Level` (`family` / `language` / `dialect`) from the `languages.csv` column. If a release does not expose `Level`, derive it (has children ⇒ non-leaf group; childless with an ISO code ⇒ language; else dialect) and pin the derivation in codegen.
 
-**Rationale**: `Parent_ID` is the authoritative genealogical edge; `Family_ID` is a convenience denormalisation of the root and is stored too (it lets `relatedLanguages` cheaply pre-filter to a family). `Level` lets consumers decide whether a dialect-level relative is an acceptable base (FR-010).
+**Rationale**: `classification` is the authoritative root-first genealogical path; deriving `parentId`/`familyId` from it keeps the generated `LanguoidRecord` shape (data-model.md) unchanged while walking the `parentId` chain at load reproduces the exact `ancestors()` path. `familyId` is the cheap same-family pre-filter for `relatedLanguages`. `Level` lets consumers decide whether a dialect-level relative is an acceptable base (FR-010). *(Original plan assumed a `Parent_ID` column in `languages.csv`; corrected in D1 — the tree comes from `values.csv`.)*
 
 ## D3 — Relatedness metric (clarified)
 
