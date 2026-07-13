@@ -280,14 +280,18 @@ describe("propagateDesktopLayersToTouch — combo sourcing", () => {
     expect(data.phone.layer.find((l: { id: string }) => l.id === "ctrl")).toBeDefined();
   });
 
-  it("skips a combo containing CAPS/NCAPS — no touch layer synthesized", () => {
+  it("synthesizes a touch layer for a combo containing CAPS — CAPS is a genuine navigable touch layer, not desktop-only", () => {
     const ir = makeMinimalIR([]);
     const rawJson = makeDefaultOnlyTouchJson();
     const assignments = [makeAltgrAssignment("Q", "[CAPS CTRL K_A]")];
 
     const { json, warnings } = propagateDesktopLayersToTouch(rawJson, ir, assignments);
     const data = JSON.parse(json);
-    expect(data.phone.layer).toHaveLength(2); // default + numeric only, unchanged
+    // canonicalizeCombo(["CAPS","CTRL"]) -> ["CTRL","CAPS"]; touch-layer-id
+    // precedence order joins them as "ctrl-caps".
+    const capsLayer = data.phone.layer.find((l: { id: string }) => l.id === "ctrl-caps");
+    expect(capsLayer).toBeDefined();
+    expect(data.phone.layer).toHaveLength(3); // default + numeric + ctrl-caps
     expect(warnings).toHaveLength(0);
   });
 

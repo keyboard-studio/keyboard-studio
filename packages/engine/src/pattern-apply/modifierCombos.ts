@@ -5,20 +5,21 @@
  * A combo is a set of up to four {@link ModifierToken}s, at most one drawn
  * from each of four mutually-exclusive families (see {@link MODIFIER_EXCLUSIONS}):
  *   - SHIFT (no exclusions besides itself)
- *   - the ctrl family:  CTRL, RCTRL
+ *   - the ctrl family:  CTRL, RCTRL, LCTRL
  *   - the alt family:   ALT, RALT, LALT
  *   - the caps family:  CAPS, NCAPS
- * LCTRL is intentionally excluded from {@link ModifierToken} by product
- * decision — chiral-left-ctrl combos are not offered in the mechanism
- * gallery even though the codec can parse `LCTRL` elsewhere.
+ * LCTRL is a first-class chooseable token (mechanism-gallery product
+ * decision — the picker offers it once the working keyboard already uses
+ * chiral ctrl; see `computeModifierPool` in MechanismGallery.tsx).
  *
  * This module is the single place that:
  *   - validates/canonicalizes a combo (dedupe + stable order + exclusion
  *     check + two normalizing folds — see below),
  *   - converts a combo to/from the `.kmn` `[TOK1 TOK2 K_X]` bracket notation,
- *   - maps a combo to its `.keyman-touch-layout` layer id (or `null` — touch
- *     has no CapsLock state, so any combo containing CAPS is desktop-only
- *     and must never be silently folded into another layer),
+ *   - maps a combo to its `.keyman-touch-layout` layer id — CAPS is a
+ *     genuine navigable touch layer (real shipped `.keyman-touch-layout`
+ *     files ship `caps`/`rightalt-caps`/`symbol-caps`; see
+ *     `comboToTouchLayerId`'s doc), so no combo returns `null` here,
  *   - maps a combo to its `.kvks` `shift="..."` token (or `null`, same CAPS
  *     restriction),
  *   - scans a {@link KeyboardIR} for the modifier tokens / combos already in
@@ -69,7 +70,8 @@ export type ModifierToken =
   | "RALT"
   | "LALT"
   | "CTRL"
-  | "RCTRL";
+  | "RCTRL"
+  | "LCTRL";
 
 /**
  * Canonical emission order (spec-confirmed, compiler-irrelevant but must be
@@ -83,6 +85,7 @@ const CANONICAL_ORDER: readonly ModifierToken[] = [
   "SHIFT",
   "CTRL",
   "RCTRL",
+  "LCTRL",
   "ALT",
   "RALT",
   "LALT",
@@ -108,8 +111,9 @@ export const MODIFIER_EXCLUSIONS: Record<ModifierToken, readonly ModifierToken[]
   ALT: ["ALT", "RALT", "LALT"],
   RALT: ["RALT", "LALT", "ALT"],
   LALT: ["LALT", "RALT", "ALT"],
-  CTRL: ["CTRL", "RCTRL"],
-  RCTRL: ["RCTRL", "CTRL"],
+  CTRL: ["CTRL", "RCTRL", "LCTRL"],
+  RCTRL: ["RCTRL", "CTRL", "LCTRL"],
+  LCTRL: ["LCTRL", "CTRL", "RCTRL"],
 };
 
 // ---------------------------------------------------------------------------
@@ -122,13 +126,13 @@ export const MODIFIER_EXCLUSIONS: Record<ModifierToken, readonly ModifierToken[]
 const GENERIC_CTRL_ALT_WORDS: ReadonlySet<string> = new Set(["CTRL", "ALT"]);
 
 /**
- * Chiral ctrl-family words — deliberately broader than {@link ModifierToken}
- * itself. LCTRL/LEFTCTRL/RIGHTCTRL are included even though only RCTRL is a
- * chooseable `ModifierToken` (see module doc): the codec can still parse a
- * hand-written `LCTRL` from `.kmn` text, and without recognizing it here a
- * raw `[LCTRL ALT K_X]` rule would have its LCTRL silently dropped by
- * `isModifierToken`/`normalizeModifierWord` BEFORE this normalization ever
- * saw it, misreading a mixed rule as bare generic ALT.
+ * Chiral ctrl-family words — deliberately broader than the canonical
+ * `ModifierToken` spellings alone: LEFTCTRL/RIGHTCTRL are long-form raw
+ * spellings the codec can parse from `.kmn` text even though only
+ * LCTRL/RCTRL are the canonical chooseable tokens. Recognizing the long
+ * forms here (before `isModifierToken`/`normalizeModifierWord` would
+ * otherwise silently drop them) prevents a raw `[LEFTCTRL ALT K_X]` rule
+ * from misreading as bare generic ALT.
  */
 const CHIRAL_CTRL_WORDS: ReadonlySet<string> = new Set([
   "LCTRL",
@@ -263,9 +267,11 @@ const TOUCH_ID_FRAGMENT: Partial<Record<ModifierToken, string>> = {
   SHIFT: "shift",
   CTRL: "ctrl",
   RCTRL: "rightctrl",
+  LCTRL: "leftctrl",
   ALT: "alt",
   RALT: "rightalt",
   LALT: "alt",
+  CAPS: "caps",
 };
 
 /**
@@ -274,9 +280,14 @@ const TOUCH_ID_FRAGMENT: Partial<Record<ModifierToken, string>> = {
  * layer-id construction, `Layouts.getLayerId` (vendored at
  * simulator/vendor/keyman/engine/keyboard/keyboards/defaultLayouts.ts),
  * which checks bit flags in ascending value order: LCTRLFLAG, RCTRLFLAG,
- * LALTFLAG, RALTFLAG, K_SHIFTFLAG, K_CTRLFLAG, K_ALTFLAG. LCTRL is omitted
- * below — it is not an offered {@link ModifierToken} (see module doc) — so
- * the order here is RCTRL, LALT, RALT, SHIFT, CTRL, ALT.
+ * LALTFLAG, RALTFLAG, K_SHIFTFLAG, K_CTRLFLAG, K_ALTFLAG — so the KMW-derived
+ * order here is LCTRL, RCTRL, LALT, RALT, SHIFT, CTRL, ALT. CAPS is appended
+ * LAST: it isn't part of `getLayerId`'s bit-flag computation at all (caps is
+ * entered via an explicit `nextlayer:'caps'` switch, not a modifier-state
+ * number — see defaultLayouts.ts's `dfltShiftToCaps`), but real shipped
+ * `.keyman-touch-layout` corpus data attests CAPS trailing every other
+ * fragment (`rightalt-caps`, never `caps-rightalt`) — see
+ * applyTouchAssignmentsToRawJson.test.ts's sil_cameroon_qwerty fixture.
  *
  * This is DELIBERATELY DIFFERENT from {@link CANONICAL_ORDER} (SHIFT, then
  * the ctrl family, then the alt family), which governs the `.kmn` bracket
@@ -286,23 +297,31 @@ const TOUCH_ID_FRAGMENT: Partial<Record<ModifierToken, string>> = {
  * touch-layer-id builder used to reuse CANONICAL_ORDER instead of this order.
  */
 const TOUCH_LAYER_PRECEDENCE_ORDER: readonly ModifierToken[] = [
+  "LCTRL",
   "RCTRL",
   "LALT",
   "RALT",
   "SHIFT",
   "CTRL",
   "ALT",
+  "CAPS",
 ];
 
 /**
  * Map a combo to its `.keyman-touch-layout` layer id.
  *
- * Returns `null` for any combo containing CAPS — touch has no CapsLock
- * state, so a CAPS-bearing combo is desktop-only; callers MUST treat `null`
- * as "no touch surface for this combo", never silently merge it into
- * another layer (e.g. plain shift). NCAPS never reaches this check: it is
- * stripped by {@link canonicalizeCombo} before this function ever sees it —
- * a bare NCAPS combo collapses to the base/`"default"` layer, same as `[]`.
+ * CAPS is a genuine navigable touch layer — real shipped
+ * `.keyman-touch-layout` files ship `caps`/`rightalt-caps`/`symbol-caps` as
+ * distinct layers (KMW `defaultLayouts.ts`'s `dfltShiftToCaps`,
+ * `nextlayer:'caps'`; corpus fixture
+ * applyTouchAssignmentsToRawJson.test.ts's sil_cameroon_qwerty), so a
+ * CAPS-bearing combo produces a real id here, never `null`. (An earlier
+ * version of this function treated CAPS as desktop-only and returned
+ * `null` — that was the bug: it made a CAPS layer's character functional on
+ * desktop but invisible in the touch/OSK preview.) NCAPS never reaches
+ * this function's own logic: it is stripped by {@link canonicalizeCombo}
+ * before this function ever sees it — a bare NCAPS combo collapses to the
+ * base/`"default"` layer, same as `[]`.
  *
  * Tokens are joined in {@link TOUCH_LAYER_PRECEDENCE_ORDER} order — every id
  * this produces has been verified to reproduce the full set of ids this
@@ -312,7 +331,6 @@ const TOUCH_LAYER_PRECEDENCE_ORDER: readonly ModifierToken[] = [
  */
 export function comboToTouchLayerId(tokens: readonly ModifierToken[]): string | null {
   const canon = canonicalizeCombo(tokens);
-  if (canon.includes("CAPS")) return null;
   if (canon.length === 0) return "default";
 
   const ordered = [...canon].sort(
@@ -325,11 +343,21 @@ export function comboToTouchLayerId(tokens: readonly ModifierToken[]): string | 
 // .kvks shift-token mapping
 // ---------------------------------------------------------------------------
 
-/** Per-token `.kvks` `shift="..."` fragment. */
+/**
+ * Per-token `.kvks` `shift="..."` fragment.
+ *
+ * `LCTRL: "LC"` follows the established L-prefix symmetric convention
+ * (`LALT` → `"LA"`, itself corpus-attested — see comboToKvksShiftToken's
+ * doc) rather than an independently corpus-attested value: LCTRL was not
+ * previously an offered `ModifierToken`, so no shipped `.kvks` file was
+ * scanned for it. Needed so a combo carrying LCTRL never joins an
+ * `undefined` fragment into the token string.
+ */
 const KVKS_FRAGMENT: Partial<Record<ModifierToken, string>> = {
   SHIFT: "S",
   CTRL: "C",
   RCTRL: "RC",
+  LCTRL: "LC",
   ALT: "A",
   RALT: "RA",
   LALT: "LA",

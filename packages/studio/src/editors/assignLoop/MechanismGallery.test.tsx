@@ -1213,7 +1213,9 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     // (KM_WARNING_KMCMP_4202659) and can never be delivered by a real
     // keypress either. The picker must emit the all-generic, functional
     // [CTRL ALT K_X] rule instead.
-    instantiateWorkingCopy();
+    // LALT must already be "in use" for the pool to offer it under the new
+    // gating rule (computeModifierPool).
+    instantiateWithModifiersInUse("K_W", ["LALT"]);
     seedInventory(["ε"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -1293,7 +1295,10 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
   });
 
   it("excludes LALT from the next dropdown once RALT is chosen in an earlier slot", async () => {
-    instantiateWorkingCopy();
+    // LALT must already be "in use" for the pool to offer it at all under the
+    // new gating rule (computeModifierPool) — seed it so this test still
+    // exercises the exclusion (not just the gating) behavior.
+    instantiateWithModifiersInUse("K_W", ["LALT"]);
     seedInventory(["ε"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -1509,8 +1514,8 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     // null, so MechanismGallery's workingIr resolves to null even though
     // selectedBaseKeyboard is set. collectModifierTokensInUse must not be
     // called on a null IR; the pool must fall back to the documented
-    // defaults (SHIFT/CTRL/RALT/LALT/CAPS — NCAPS is never offered) rather
-    // than crashing.
+    // defaults (SHIFT/CTRL/ALT/RALT/CAPS — no LALT/LCTRL/RCTRL since nothing
+    // is "in use", NCAPS is never offered) rather than crashing.
     seedInventory(["ε"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -1528,7 +1533,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
       .map((o) => o.value)
       .filter((v) => v !== "");
     expect(new Set(optionValues)).toEqual(
-      new Set(["SHIFT", "CTRL", "RALT", "LALT", "CAPS"]),
+      new Set(["SHIFT", "CTRL", "ALT", "RALT", "CAPS"]),
     );
 
     // Applying still works end to end against the fallback pool.
@@ -1541,6 +1546,97 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
       .getState()
       .session.assignments.filter((a) => a.modality === "physical");
     expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe("[RALT K_E]");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeModifierPool — pool-gating scenarios (product rule: default to
+// generic only; chiral L/R options appear only once the keyboard already
+// uses them; RALT/AltGr is the always-on exception).
+// ---------------------------------------------------------------------------
+
+/** Build a `main` group with a single rule under the given vkey/modifiers. */
+function groupWithModifiers(vkey: string, modifiers: string[]): IRGroup {
+  return {
+    nodeId: "g-main",
+    name: "main",
+    usingKeys: true,
+    readonly: false,
+    rules: [
+      {
+        nodeId: `r-${vkey}-${modifiers.join("-")}`,
+        context: [{ kind: "vkey", name: vkey, modifiers }],
+        output: [{ kind: "char", value: "x" }],
+      },
+    ],
+  };
+}
+
+function instantiateWithModifiersInUse(vkey: string, modifiers: string[]): void {
+  const seedVfs = createVirtualFS([
+    { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+  ]);
+  const ir = makeTestIR([groupWithModifiers(vkey, modifiers)], []);
+  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: seedVfs, ir });
+}
+
+async function firstLayerOptionValues(): Promise<Set<string>> {
+  fireEvent.click(screen.getByText(/Layer \+ key/i));
+  const firstLayerSelect = screen.getByLabelText(
+    /Layer 1 for layer-switch combo/i,
+  ) as HTMLSelectElement;
+  return new Set(
+    Array.from(firstLayerSelect.options)
+      .map((o) => o.value)
+      .filter((v) => v !== ""),
+  );
+}
+
+describe("MechanismGallery — computeModifierPool gating", () => {
+  it("(i) no alt/ctrl in use: alt pool is [ALT,RALT] (no LALT), ctrl pool is [CTRL] (no LCTRL/RCTRL)", async () => {
+    instantiateWorkingCopy();
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const options = await firstLayerOptionValues();
+    expect(options).toEqual(new Set(["SHIFT", "CTRL", "ALT", "RALT", "CAPS"]));
+  });
+
+  it("(ii) LALT in use: alt pool gains LALT", async () => {
+    instantiateWithModifiersInUse("K_W", ["LALT"]);
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const options = await firstLayerOptionValues();
+    expect(options).toEqual(new Set(["SHIFT", "CTRL", "ALT", "RALT", "LALT", "CAPS"]));
+  });
+
+  it("(iii) RCTRL in use: ctrl pool gains LCTRL and RCTRL", async () => {
+    instantiateWithModifiersInUse("K_W", ["RCTRL"]);
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const options = await firstLayerOptionValues();
+    expect(options).toEqual(
+      new Set(["SHIFT", "CTRL", "LCTRL", "RCTRL", "ALT", "RALT", "CAPS"]),
+    );
+  });
+
+  it("(iv) only RALT (AltGr) in use: alt pool stays [ALT,RALT] — RALT-in-use does not also trigger LALT", async () => {
+    instantiateWithModifiersInUse("K_W", ["RALT"]);
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const options = await firstLayerOptionValues();
+    expect(options).toEqual(new Set(["SHIFT", "CTRL", "ALT", "RALT", "CAPS"]));
   });
 });
 

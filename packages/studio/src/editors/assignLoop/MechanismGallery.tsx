@@ -96,6 +96,7 @@ const MODIFIER_TOKEN_LABELS: Record<string, string> = {
   SHIFT: "Shift",
   CTRL: "Ctrl",
   RCTRL: "RCtrl",
+  LCTRL: "LCtrl",
   ALT: "Alt",
   RALT: "RAlt",
   LALT: "LAlt",
@@ -235,24 +236,30 @@ const MAX_RALT_SLOTS = 4;
 
 /**
  * Per-family dropdown option pool, derived once per keyboard from the
- * modifier tokens already in use elsewhere in the IR:
- *   - alt family:  RALT or LALT in use -> offer both; generic ALT in use (and
- *                  neither chiral form) -> offer ALT only; neither -> offer both.
- *   - ctrl family: RCTRL in use -> offer RCTRL only; otherwise -> offer CTRL only.
- * LCTRL is never offered (product decision — MODIFIER_EXCLUSIONS never lists
- * it as a chooseable token, only as an exclusion partner). NCAPS is never
- * offered either: a rule with no caps token already matches caps-off, so it
- * is not a distinct selectable S-08 layer — modifierCombos.ts's
+ * modifier tokens already in use elsewhere in the IR. Product rule: default
+ * to GENERIC only; show chiral L/R options ONLY when the keyboard already
+ * uses them — EXCEPT AltGr (RALT), which is always available (near-universal
+ * key; authoring a new AltGr layer is a core S-08 use case).
+ *   - alt family:  generic ALT and RALT (AltGr) are always offered. LALT is
+ *                  offered only once the keyboard already uses it
+ *                  (inUse.has("LALT")) — RALT-in-use does NOT also trigger
+ *                  LALT, so an AltGr keyboard doesn't sprout a spurious
+ *                  Left-Alt option.
+ *   - ctrl family: generic CTRL is always offered. LCTRL/RCTRL are offered
+ *                  only once the keyboard already uses chiral ctrl
+ *                  (inUse.has("LCTRL") or inUse.has("RCTRL")).
+ * NCAPS is never offered: a rule with no caps token already matches caps-off,
+ * so it is not a distinct selectable S-08 layer — modifierCombos.ts's
  * canonicalizeCombo strips a bare NCAPS rather than modeling it as one.
  */
 function computeModifierPool(inUse: ReadonlySet<ModifierToken>): ModifierToken[] {
-  const altFamily: ModifierToken[] =
-    inUse.has("RALT") || inUse.has("LALT")
-      ? ["RALT", "LALT"]
-      : inUse.has("ALT")
-        ? ["ALT"]
-        : ["RALT", "LALT"];
-  const ctrlFamily: ModifierToken[] = inUse.has("RCTRL") ? ["RCTRL"] : ["CTRL"];
+  // RALT stays first so the pre-filled slot-1 default (AltGr) is preserved —
+  // see raltDefaultToken, which picks the first alt-family token in this pool.
+  const altFamily: ModifierToken[] = inUse.has("LALT")
+    ? ["RALT", "ALT", "LALT"]
+    : ["RALT", "ALT"];
+  const ctrlFamily: ModifierToken[] =
+    inUse.has("LCTRL") || inUse.has("RCTRL") ? ["CTRL", "LCTRL", "RCTRL"] : ["CTRL"];
   return ["SHIFT", ...ctrlFamily, ...altFamily, "CAPS"];
 }
 

@@ -86,12 +86,13 @@ describe("MODIFIER_EXCLUSIONS", () => {
     expect(new Set(MODIFIER_EXCLUSIONS.ALT)).toEqual(new Set(["ALT", "RALT", "LALT"]));
     expect(new Set(MODIFIER_EXCLUSIONS.RALT)).toEqual(new Set(["RALT", "LALT", "ALT"]));
     expect(new Set(MODIFIER_EXCLUSIONS.LALT)).toEqual(new Set(["LALT", "RALT", "ALT"]));
-    expect(new Set(MODIFIER_EXCLUSIONS.CTRL)).toEqual(new Set(["CTRL", "RCTRL"]));
-    expect(new Set(MODIFIER_EXCLUSIONS.RCTRL)).toEqual(new Set(["RCTRL", "CTRL"]));
+    expect(new Set(MODIFIER_EXCLUSIONS.CTRL)).toEqual(new Set(["CTRL", "RCTRL", "LCTRL"]));
+    expect(new Set(MODIFIER_EXCLUSIONS.RCTRL)).toEqual(new Set(["RCTRL", "CTRL", "LCTRL"]));
+    expect(new Set(MODIFIER_EXCLUSIONS.LCTRL)).toEqual(new Set(["LCTRL", "CTRL", "RCTRL"]));
   });
 
-  it("does not include LCTRL as a token (excluded by product decision)", () => {
-    expect(ALL_TOKENS).not.toContain("LCTRL");
+  it("includes LCTRL as a first-class chooseable token (mechanism-gallery product decision)", () => {
+    expect(ALL_TOKENS).toContain("LCTRL");
   });
 });
 
@@ -256,11 +257,15 @@ describe("comboToKeySpec / parseKeySpec round-trip", () => {
   });
 
   it("drops unrecognized modifier words instead of rejecting", () => {
-    expect(parseKeySpec("[LCTRL K_A]")).toEqual({ tokens: [], vkey: "K_A" });
+    expect(parseKeySpec("[XYZZY K_A]")).toEqual({ tokens: [], vkey: "K_A" });
   });
 
-  it("leaves a raw all-chiral LCTRL+RALT pairing alone — no generic CTRL/ALT is present, so LCTRL is simply dropped as unrecognized (unchanged behavior)", () => {
-    expect(parseKeySpec("[LCTRL RALT K_A]")).toEqual({ tokens: ["RALT"], vkey: "K_A" });
+  it("recognizes LCTRL as a first-class token now that it is a chooseable ModifierToken", () => {
+    expect(parseKeySpec("[LCTRL K_A]")).toEqual({ tokens: ["LCTRL"], vkey: "K_A" });
+  });
+
+  it("leaves a raw all-chiral LCTRL+RALT pairing alone (no generic CTRL/ALT present, so no unification applies)", () => {
+    expect(parseKeySpec("[LCTRL RALT K_A]")).toEqual({ tokens: ["LCTRL", "RALT"], vkey: "K_A" });
   });
 
   it("unifies a raw LCTRL + generic ALT pairing to generic CTRL+ALT instead of dropping LCTRL and losing the chiral-ctrl intent", () => {
@@ -288,6 +293,7 @@ describe("comboToTouchLayerId", () => {
     expect(comboToTouchLayerId(["LALT"])).toBe("alt");
     expect(comboToTouchLayerId(["CTRL"])).toBe("ctrl");
     expect(comboToTouchLayerId(["RCTRL"])).toBe("rightctrl");
+    expect(comboToTouchLayerId(["LCTRL"])).toBe("leftctrl");
   });
 
   it("matches the attested (inconsistent-ordering) 2-token combos verbatim", () => {
@@ -296,9 +302,16 @@ describe("comboToTouchLayerId", () => {
     expect(comboToTouchLayerId(["SHIFT", "RCTRL"])).toBe("rightctrl-shift");
   });
 
-  it("returns null only for a combo containing CAPS", () => {
-    expect(comboToTouchLayerId(["CAPS"])).toBeNull();
-    expect(comboToTouchLayerId(["SHIFT", "CAPS"])).toBeNull();
+  it("produces a real touch layer id for a CAPS-bearing combo — CAPS is a genuine navigable touch layer, not desktop-only", () => {
+    // Corpus fact (applyTouchAssignmentsToRawJson.test.ts's sil_cameroon_qwerty
+    // fixture): shipped .keyman-touch-layout files carry "caps" and
+    // "rightalt-caps" as real layer ids.
+    expect(comboToTouchLayerId(["CAPS"])).toBe("caps");
+    expect(comboToTouchLayerId(["RALT", "CAPS"])).toBe("rightalt-caps");
+    // SHIFT+CAPS is unattested in the sil_cameroon_qwerty fixture, but CAPS
+    // is appended last per TOUCH_LAYER_PRECEDENCE_ORDER, same as the
+    // attested rightalt-caps case.
+    expect(comboToTouchLayerId(["SHIFT", "CAPS"])).toBe("shift-caps");
   });
 
   it("collapses a bare NCAPS combo to the base/default layer (NCAPS is stripped, not a distinct layer)", () => {
@@ -396,9 +409,14 @@ describe("collectModifierTokensInUse", () => {
     expect(collectModifierTokensInUse(ir)).toEqual(new Set(["RALT"]));
   });
 
-  it("drops unrecognized modifier words (e.g. LCTRL)", () => {
-    const ir = makeMinimalIR([makeGroup([makeRule("K_A", ["LCTRL"], "a")])]);
+  it("drops genuinely unrecognized modifier words", () => {
+    const ir = makeMinimalIR([makeGroup([makeRule("K_A", ["XYZZY"], "a")])]);
     expect(collectModifierTokensInUse(ir)).toEqual(new Set());
+  });
+
+  it("recognizes LCTRL as a first-class token now that it is a chooseable ModifierToken", () => {
+    const ir = makeMinimalIR([makeGroup([makeRule("K_A", ["LCTRL"], "a")])]);
+    expect(collectModifierTokensInUse(ir)).toEqual(new Set(["LCTRL"]));
   });
 
   it("unifies a raw LCTRL + generic ALT rule to CTRL+ALT instead of dropping LCTRL and reporting bare ALT in use", () => {

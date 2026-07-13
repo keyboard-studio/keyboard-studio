@@ -16,8 +16,13 @@
  *     combos parsed from `assignments`' `modifier_as_layer_switch` mechanisms
  *     (covers a combo the caller is about to author but that isn't reflected
  *     in `ir` yet).
- *   - Combos containing CAPS/NCAPS have no touch layer (`comboToTouchLayerId`
- *     returns `null`) and are skipped entirely — touch has no CapsLock state.
+ *   - CAPS-bearing combos DO get a touch layer (`comboToTouchLayerId` no
+ *     longer treats CAPS as desktop-only — real shipped
+ *     `.keyman-touch-layout` files ship genuine `caps`/`rightalt-caps`
+ *     layers) and are synthesized/patched the same as any other combo. A
+ *     bare NCAPS combo collapses to the base/`"default"` layer (NCAPS is
+ *     stripped by `canonicalizeCombo`, not a distinct layer), so it never
+ *     reaches this module as its own combo.
  *   - Every touch platform is processed except a literal `"desktop"` key
  *     (kept for the physical/kvks side, not a touch surface). Platforms with
  *     no `layer` array are skipped.
@@ -195,7 +200,9 @@ export function propagateDesktopLayersToTouch(
       layerId: comboToTouchLayerId(combo),
       keyMap: buildComboKeyMap(ir, combo),
     }))
-    // CAPS/NCAPS combos have no touch layer — touch has no caps-lock state.
+    // comboToTouchLayerId no longer returns null for any combo (including
+    // CAPS-bearing ones) — the filter is kept defensively since its return
+    // type is still `string | null`.
     .filter((e): e is { combo: ModifierToken[]; layerId: string; keyMap: Map<string, string> } =>
       e.layerId !== null,
     );
