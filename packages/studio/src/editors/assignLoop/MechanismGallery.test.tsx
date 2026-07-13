@@ -33,6 +33,7 @@ import type { PatternMatch } from "@keyboard-studio/contracts";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import type { MechanismAssignment, IRGroup, IRRule, IRStore } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
 
 // ---------------------------------------------------------------------------
 // vi.hoisted() — variables referenced inside vi.mock() factory closures.
@@ -363,7 +364,7 @@ describe("MechanismGallery — sequence method chooser", () => {
       target: { value: "a" },
     });
     fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
-      target: { value: "'" },
+      target: { value: "z" },
     });
     const addBtn = screen.getByRole("button", { name: /Apply method for á/i });
     expect((addBtn as HTMLButtonElement).disabled).toBe(false);
@@ -428,7 +429,7 @@ describe("MechanismGallery — apply (sequence)", () => {
       target: { value: "a" },
     });
     fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
-      target: { value: "'" },
+      target: { value: "z" },
     });
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
 
@@ -451,7 +452,7 @@ describe("MechanismGallery — apply (sequence)", () => {
       target: { value: "a" },
     });
     fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
-      target: { value: "'" },
+      target: { value: "z" },
     });
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
 
@@ -460,7 +461,7 @@ describe("MechanismGallery — apply (sequence)", () => {
       .session.assignments.filter((a) => a.modality === "physical")[0];
     expect(assignment?.mechanisms[0]?.slotValues).toMatchObject({
       firstLetterOut: "a",
-      secondLetter: "'",
+      secondLetter: "z",
       collapsedChar: "á",
     });
   });
@@ -500,7 +501,7 @@ describe("MechanismGallery — advance after apply", () => {
       target: { value: "a" },
     });
     fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
-      target: { value: "'" },
+      target: { value: "z" },
     });
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
     // Apply records but stays on á; click Next to advance.
@@ -526,7 +527,7 @@ describe("MechanismGallery — advance after apply", () => {
       target: { value: "a" },
     });
     fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
-      target: { value: "'" },
+      target: { value: "z" },
     });
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
 
@@ -2123,5 +2124,722 @@ describe("MechanismGallery — companion proposal bcp47 plumbing", () => {
     }).not.toThrow();
 
     expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// "Enter my own character..." custom key option + U+ notation in character
+// boxes — feature coverage for the key-picker dropdowns (S-01 swap, S-08
+// ralt, S-02 deadkey trigger) and the seqFirst/seqSecond/deadkeyBaseLetter
+// character boxes.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — custom key option (S-01 swap)", () => {
+  it("selecting 'Enter my own character...' reveals a custom text input", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    expect(
+      screen.getByLabelText(/Custom character for simple swap key/i),
+    ).toBeTruthy();
+  });
+
+  it("a custom literal character resolves to a vkey and Apply records the mapped key", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    fireEvent.change(screen.getByLabelText(/Custom character for simple swap key/i), {
+      target: { value: "z" },
+    });
+    const addBtn = screen.getByRole("button", { name: /Apply method for ẑ/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(addBtn);
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["kmnRules"]).toBe(
+      "+ [K_Z] > U+1E91",
+    );
+  });
+
+  it("custom U+ notation resolves through to the mapped key and shows the resolved character", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    fireEvent.change(screen.getByLabelText(/Custom character for simple swap key/i), {
+      target: { value: "U+007A" },
+    });
+    // Feedback line shows the raw notation, the resolved char, and the vkey.
+    expect(screen.getByText("U+007A → z → K_Z")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for ẑ/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["kmnRules"]).toBe(
+      "+ [K_Z] > U+1E91",
+    );
+  });
+
+  it("an unmappable custom character shows an error and blocks Apply", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    fireEvent.change(screen.getByLabelText(/Custom character for simple swap key/i), {
+      target: { value: "é" },
+    });
+    expect(
+      screen.getByText(/Cannot map 'é' to a physical key — pick a key from the list instead\./i),
+    ).toBeTruthy();
+    const addBtn = screen.getByRole("button", { name: /Apply method for ẑ/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("invalid U+ notation blocks Apply", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    fireEvent.change(screen.getByLabelText(/Custom character for simple swap key/i), {
+      target: { value: "U+ZZZZ" },
+    });
+    expect(screen.getByText(/Not a valid Unicode value/i)).toBeTruthy();
+    const addBtn = screen.getByRole("button", { name: /Apply method for ẑ/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("tapping a key in the OSK preview while custom mode is active exits custom mode", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      // Flush the patterns-loading microtasks so GalleryPreviewWithPatterns
+      // (and the mocked OSKFrame's tap button) mounts.
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    expect(
+      screen.getByLabelText(/Custom character for simple swap key/i),
+    ).toBeTruthy();
+
+    // The OSKFrame mock's "tap-K_E" button simulates an OSK key tap.
+    fireEvent.click(screen.getByRole("button", { name: "tap-K_E" }));
+
+    // Custom mode is exited — the select now shows K_E and the custom input
+    // is gone.
+    expect(
+      screen.queryByLabelText(/Custom character for simple swap key/i),
+    ).toBeNull();
+    expect(
+      (screen.getByLabelText(/Physical key for simple swap/i) as HTMLSelectElement).value,
+    ).toBe("K_E");
+  });
+});
+
+describe("MechanismGallery — custom key option (S-02 deadkey trigger)", () => {
+  it("a custom trigger character maps to its vkey, and deadkeyName/accentChar never fall back to 'dead0'", async () => {
+    // "a" is not one of the 4 built-in DEADKEY_OPTIONS trigger keys, so this
+    // exercises the custom-trigger path exclusively — deadkeyNameFor(triggerKey)
+    // would otherwise return the "dead0" fallback for an unrecognised key id.
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Trigger key for deadkey/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    fireEvent.change(screen.getByLabelText(/Custom trigger character for deadkey/i), {
+      target: { value: "a" },
+    });
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "a" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for ā/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    const slotValues = assignments[0]?.mechanisms[0]?.slotValues;
+    expect(slotValues?.["triggerKey"]).toBe("K_A");
+    expect(slotValues?.["deadkeyName"]).toBe("0061");
+    expect(slotValues?.["accentChar"]).toBe("a");
+    expect(slotValues?.["deadkeyName"]).not.toBe("dead0");
+  });
+});
+
+describe("MechanismGallery — U+ notation in character boxes (S-03 sequence)", () => {
+  it("U+ notation typed into a sequence key box resolves to the actual character on Apply", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "U+0041" },
+    });
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
+      target: { value: "b" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for x/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues).toMatchObject({
+      firstLetterOut: "A",
+      secondLetter: "b",
+    });
+  });
+
+  it("invalid U+ notation in a sequence key box blocks Apply", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "U+ZZZZ" },
+    });
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
+      target: { value: "b" },
+    });
+    const addBtn = screen.getByRole("button", { name: /Apply method for x/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Delimiter guard (P0) — ASCII straight quotes can't be resolved output
+// characters in seqFirst/seqSecond/deadkeyBaseLetter or the deadkey-trigger
+// custom character (all substitute into an unescaped KMN string literal or
+// JSON block). The SWAP/RALT custom-character key pickers are unaffected —
+// they resolve only to a K_ vkey id.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — delimiter guard (straight quotes)", () => {
+  it("blocks Apply and shows the steer-to-U+02BC message when a sequence box resolves to a straight apostrophe", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "a" },
+    });
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
+      target: { value: "'" },
+    });
+    expect(
+      screen.getByText(/Straight quotes \(' or "\) can't be typed here\. For a glottal stop or saltillo, use U\+02BC or U\+2019\./i),
+    ).toBeTruthy();
+    const addBtn = screen.getByRole("button", { name: /Apply method for x/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("blocks Apply when a sequence box resolves to a straight double quote", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: '"' },
+    });
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
+      target: { value: "b" },
+    });
+    const addBtn = screen.getByRole("button", { name: /Apply method for x/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("does not block a glottal stop written as U+02BC", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "U+02BC" },
+    });
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
+      target: { value: "b" },
+    });
+    const addBtn = screen.getByRole("button", { name: /Apply method for x/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("blocks Apply when the deadkey base-letter box resolves to a straight apostrophe", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "'" },
+    });
+    const addBtn = screen.getByRole("button", { name: /Apply method for ā/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("blocks Apply and shows the steer-to-U+02BC message when the deadkey CUSTOM TRIGGER character resolves to a straight quote", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Trigger key for deadkey/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    fireEvent.change(screen.getByLabelText(/Custom trigger character for deadkey/i), {
+      target: { value: '"' },
+    });
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "a" },
+    });
+    expect(
+      screen.getByText(/Straight quotes \(' or "\) can't be typed here\. For a glottal stop or saltillo, use U\+02BC or U\+2019\./i),
+    ).toBeTruthy();
+    const addBtn = screen.getByRole("button", { name: /Apply method for ā/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("a straight apostrophe in the SWAP custom-character picker still maps to K_QUOTE and is NOT blocked", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    fireEvent.change(screen.getByLabelText(/Custom character for simple swap key/i), {
+      target: { value: "'" },
+    });
+    expect(screen.getByText("→ K_QUOTE")).toBeTruthy();
+    const addBtn = screen.getByRole("button", { name: /Apply method for ẑ/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(addBtn);
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["kmnRules"]).toBe(
+      "+ [K_QUOTE] > U+1E91",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// NFC normalization (P1) — a decomposed paste collapses to its precomposed
+// form before it lands in slotValues, matching the deadkey patterns' NFC
+// convention.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — NFC normalization of character boxes", () => {
+  it("normalizes a decomposed sequence-box paste to its precomposed stored value", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    // "e" + U+0301 COMBINING ACUTE ACCENT — decomposed input.
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "é" },
+    });
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
+      target: { value: "b" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for x/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["firstLetterOut"]).toBe("é");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Single-grapheme guard (P1) — seqFirst/seqSecond/deadkeyBaseLetter accept
+// exactly one grapheme cluster.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — single-grapheme guard on character boxes", () => {
+  it("accepts a single astral (SMP) character in a sequence box", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "\u{1D400}" }, // MATHEMATICAL BOLD CAPITAL A — one code point
+    });
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
+      target: { value: "b" },
+    });
+    const addBtn = screen.getByRole("button", { name: /Apply method for x/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("rejects a two-character literal paste in a sequence box with 'Enter one character only.'", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "ab" },
+    });
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
+      target: { value: "c" },
+    });
+    expect(screen.getByText("Enter one character only.")).toBeTruthy();
+    const addBtn = screen.getByRole("button", { name: /Apply method for x/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("rejects a two-character literal paste in the deadkey base-letter box", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "ab" },
+    });
+    expect(screen.getByText("Enter one character only.")).toBeTruthy();
+    const addBtn = screen.getByRole("button", { name: /Apply method for ā/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("accepts a base+combining sequence that did not precompose under NFC in the deadkey base-letter box", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    // "n" + U+0303 COMBINING TILDE — no precomposed NFC form, but one grapheme.
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "ñ" },
+    });
+    const addBtn = screen.getByRole("button", { name: /Apply method for ā/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Lone-combining-mark caution (P1) — warns but does not block.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — lone combining mark caution on the deadkey base-letter box", () => {
+  it("shows a caution (does not block Apply) when the base letter is a bare combining mark", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "́" }, // bare COMBINING ACUTE ACCENT
+    });
+    expect(
+      screen.getByText(
+        /That looks like a combining mark on its own — the base letter is usually a plain letter\./i,
+      ),
+    ).toBeTruthy();
+    const addBtn = screen.getByRole("button", { name: /Apply method for ā/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("does not show the caution for a plain base letter", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "a" },
+    });
+    expect(
+      screen.queryByText(/That looks like a combining mark on its own/i),
+    ).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Lone-combining-mark caution on the SEQUENCE boxes (P2 QC finding — the
+// caution was previously wired only to deadkeyBaseLetter; seqFirst/seqSecond
+// are equally single-character boxes).
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — lone combining mark caution on the sequence boxes", () => {
+  it("shows a caution (does not block Apply) when the first sequence key resolves to a bare combining mark", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "́" }, // bare COMBINING ACUTE ACCENT
+    });
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
+      target: { value: "b" },
+    });
+    expect(
+      screen.getByText(/That looks like a combining mark on its own\./i),
+    ).toBeTruthy();
+    const addBtn = screen.getByRole("button", { name: /Apply method for x/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("shows a caution (does not block Apply) when the second sequence key resolves to a bare combining mark", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "a" },
+    });
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
+      target: { value: "́" }, // bare COMBINING ACUTE ACCENT
+    });
+    expect(
+      screen.getByText(/That looks like a combining mark on its own\./i),
+    ).toBeTruthy();
+    const addBtn = screen.getByRole("button", { name: /Apply method for x/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("does not show the caution for a plain sequence key", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "a" },
+    });
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
+      target: { value: "b" },
+    });
+    expect(
+      screen.queryByText(/That looks like a combining mark on its own/i),
+    ).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sentinel leak in preview text (P1 QC finding) — the raw "__custom__"
+// sentinel must never be interpolated into "Press X, then Y" when the
+// deadkey trigger picker is in custom mode but not yet resolved.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — no sentinel leak in the deadkey preview line", () => {
+  it("shows a neutral placeholder instead of the raw '__custom__' sentinel when custom trigger mode is unresolved", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Trigger key for deadkey/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    // No custom character typed yet — customChar is empty, so
+    // resolveKeyPickerSelection resolves to customError, not customOk.
+    expect(screen.queryByText(/__custom__/)).toBeNull();
+    expect(screen.getByText(/Press \[trigger key\], then/i)).toBeTruthy();
+  });
+
+  it("shows a neutral placeholder when the custom trigger character is unmappable (customError)", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Trigger key for deadkey/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    fireEvent.change(screen.getByLabelText(/Custom trigger character for deadkey/i), {
+      target: { value: "é" },
+    });
+    expect(screen.queryByText(/__custom__/)).toBeNull();
+    expect(screen.getByText(/Press \[trigger key\], then/i)).toBeTruthy();
+  });
+
+  it("shows the resolved character (not the sentinel or placeholder) once the custom trigger resolves", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Trigger key for deadkey/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    fireEvent.change(screen.getByLabelText(/Custom trigger character for deadkey/i), {
+      target: { value: "a" },
+    });
+    expect(screen.queryByText(/__custom__/)).toBeNull();
+    expect(screen.queryByText(/\[trigger key\]/)).toBeNull();
+    expect(screen.getByText(/Press a, then/i)).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Accessible feedback — live-region roles on custom-input validation
+// feedback (P1 QC finding). Screen-reader users must hear an error/success
+// hint when it appears while focus stays in the input.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — accessible live-region roles on validation feedback", () => {
+  it("marks a resolved U+ notation hint as a polite status region (sequence box)", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "U+0041" },
+    });
+    const hint = screen.getByText("→ A");
+    expect(hint.getAttribute("role")).toBe("status");
+    expect(hint.getAttribute("aria-live")).toBe("polite");
+  });
+
+  it("marks an invalid-input error as an alert region (sequence box)", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "ab" },
+    });
+    const error = screen.getByText("Enter one character only.");
+    expect(error.getAttribute("role")).toBe("alert");
+  });
+
+  it("marks the lone-combining-mark caution as a polite status region (deadkey base-letter box)", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "́" }, // bare COMBINING ACUTE ACCENT
+    });
+    const caution = screen.getByText(
+      /That looks like a combining mark on its own — the base letter is usually a plain letter\./i,
+    );
+    expect(caution.getAttribute("role")).toBe("status");
+    expect(caution.getAttribute("aria-live")).toBe("polite");
+  });
+
+  it("marks the KeyPickerField custom-resolution hint as a polite status region (SWAP custom key)", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    fireEvent.change(screen.getByLabelText(/Custom character for simple swap key/i), {
+      target: { value: "z" },
+    });
+    const hint = screen.getByText("→ K_Z");
+    expect(hint.getAttribute("role")).toBe("status");
+    expect(hint.getAttribute("aria-live")).toBe("polite");
+  });
+
+  it("marks the KeyPickerField custom-resolution error as an alert region (SWAP custom key)", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    fireEvent.change(screen.getByLabelText(/Custom character for simple swap key/i), {
+      target: { value: "é" },
+    });
+    const error = screen.getByText(
+      /Cannot map 'é' to a physical key — pick a key from the list instead\./i,
+    );
+    expect(error.getAttribute("role")).toBe("alert");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Context-specific custom-input placeholders (P2 QC finding) — the SWAP/RALT
+// physical-key pickers should show a key-oriented example, not the accented-
+// character example meant for character boxes / the deadkey trigger.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — context-specific custom-input placeholders", () => {
+  it("shows a key-oriented placeholder for the SWAP custom key input", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    const input = screen.getByLabelText(/Custom character for simple swap key/i);
+    expect(input.getAttribute("placeholder")).toBe("e.g. a or ;");
+  });
+
+  it("shows a key-oriented placeholder for the RALT custom key input", async () => {
+    seedInventory(["ẑ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/RAlt \+ key/i));
+    fireEvent.change(screen.getByLabelText(/Base key for RAlt layer/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    const input = screen.getByLabelText(/Custom character for RAlt base key/i);
+    expect(input.getAttribute("placeholder")).toBe("e.g. a or ;");
+  });
+
+  it("keeps the accented-character placeholder for the deadkey trigger custom input", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Trigger key for deadkey/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    const input = screen.getByLabelText(/Custom trigger character for deadkey/i);
+    expect(input.getAttribute("placeholder")).toBe("e.g. é or U+00E9");
   });
 });

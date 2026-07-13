@@ -11,12 +11,13 @@
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
-import { TouchGallery } from "./TouchGallery.tsx";
+import { TouchGallery, buildTouchMechanismRef } from "./TouchGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import type { VirtualFS, MechanismAssignment } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
+import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
 
 // ---------------------------------------------------------------------------
 // vi.hoisted() — refs shared across mock closures and test bodies.
@@ -1403,5 +1404,155 @@ describe("TouchGallery — lint error finding surfaces in LintSummary (AC#3)", (
 
     const lintSummary = screen.getByTestId("lint-summary");
     expect(lintSummary.querySelectorAll("[data-finding-code]")).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// "Enter my own character..." custom host-key option + U+ notation —
+// feature coverage for the shared host-key picker (longpress / flick /
+// multitap / replace all share the same `hostKey` state).
+//
+// "中" has no Phase C desktop assignment, is not in the default touch
+// layout, and is not decomposable-accented, so suggestion.kind === "none"
+// and the method chooser is shown directly (see the
+// "no suggestion goes straight to chooser" suite above) — no Deny click
+// needed before reaching the host-key picker.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — custom host-key option", () => {
+  it("selecting 'Enter my own character...' reveals a custom text input", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    const hostKeySelect = screen.getByRole("combobox", { name: /host key for long-press/i });
+    fireEvent.change(hostKeySelect, { target: { value: CUSTOM_KEY_OPTION_VALUE } });
+    expect(
+      screen.getByLabelText(/Custom character for long-press host key/i),
+    ).toBeTruthy();
+  });
+
+  it("a custom literal character resolves to a vkey and Apply records it as slotValues.hostKey", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    const hostKeySelect = screen.getByRole("combobox", { name: /host key for long-press/i });
+    fireEvent.change(hostKeySelect, { target: { value: CUSTOM_KEY_OPTION_VALUE } });
+    fireEvent.change(screen.getByLabelText(/Custom character for long-press host key/i), {
+      target: { value: "b" },
+    });
+    const applyBtn = screen.getByRole("button", { name: /Apply touch method/i });
+    expect((applyBtn as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(applyBtn);
+
+    await waitFor(() => {
+      const draft = useWorkingCopyStore.getState().touchDraft;
+      const entry = draft?.charTouchEntries.find(([c]) => c === "中");
+      expect(entry?.[1]?.mechanisms[0]?.patternId).toBe("longpress_alternates");
+      expect(entry?.[1]?.mechanisms[0]?.slotValues?.["hostKey"]).toBe("K_B");
+    });
+  });
+
+  it("custom U+ notation resolves through to the mapped key", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    const hostKeySelect = screen.getByRole("combobox", { name: /host key for long-press/i });
+    fireEvent.change(hostKeySelect, { target: { value: CUSTOM_KEY_OPTION_VALUE } });
+    fireEvent.change(screen.getByLabelText(/Custom character for long-press host key/i), {
+      target: { value: "U+0062" },
+    });
+    expect(screen.getByText("U+0062 → b → K_B")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /Apply touch method/i }));
+
+    await waitFor(() => {
+      const draft = useWorkingCopyStore.getState().touchDraft;
+      const entry = draft?.charTouchEntries.find(([c]) => c === "中");
+      expect(entry?.[1]?.mechanisms[0]?.slotValues?.["hostKey"]).toBe("K_B");
+    });
+  });
+
+  it("an unmappable custom character shows an error and blocks Apply", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    const hostKeySelect = screen.getByRole("combobox", { name: /host key for long-press/i });
+    fireEvent.change(hostKeySelect, { target: { value: CUSTOM_KEY_OPTION_VALUE } });
+    fireEvent.change(screen.getByLabelText(/Custom character for long-press host key/i), {
+      target: { value: "é" },
+    });
+    expect(
+      screen.getByText(/Cannot map 'é' to a physical key — pick a key from the list instead\./i),
+    ).toBeTruthy();
+    const applyBtn = screen.getByRole("button", { name: /Apply touch method/i });
+    expect((applyBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("invalid U+ notation blocks Apply", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    const hostKeySelect = screen.getByRole("combobox", { name: /host key for long-press/i });
+    fireEvent.change(hostKeySelect, { target: { value: CUSTOM_KEY_OPTION_VALUE } });
+    fireEvent.change(screen.getByLabelText(/Custom character for long-press host key/i), {
+      target: { value: "U+ZZZZ" },
+    });
+    expect(screen.getByText(/Not a valid Unicode value/i)).toBeTruthy();
+    const applyBtn = screen.getByRole("button", { name: /Apply touch method/i });
+    expect((applyBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("host-key custom-character inputs use a key-oriented placeholder, not the accented-character example", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    const hostKeySelect = screen.getByRole("combobox", { name: /host key for long-press/i });
+    fireEvent.change(hostKeySelect, { target: { value: CUSTOM_KEY_OPTION_VALUE } });
+    const customInput = screen.getByLabelText(/Custom character for long-press host key/i);
+    expect(customInput.getAttribute("placeholder")).toBe("e.g. a or ;");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildTouchMechanismRef — resolved-vkey invariant (P1 QC finding).
+//
+// buildMechanismRef (the component-internal closure) is a thin wrapper over
+// this exported pure function — unit-testing it directly here avoids relying
+// on the disabled Apply button as the sole proof the invariant holds (a
+// disabled button never fires its onClick in jsdom, so driving this through
+// the UI cannot exercise the null-resolvedHostKey branch at all).
+// ---------------------------------------------------------------------------
+
+describe("buildTouchMechanismRef — resolved-vkey invariant", () => {
+  it("returns null when resolvedHostKey is null, for every method", () => {
+    expect(buildTouchMechanismRef("longpress_alternates", null, "", "中")).toBeNull();
+    expect(buildTouchMechanismRef("flick_gestures", null, "n", "中")).toBeNull();
+    expect(buildTouchMechanismRef("multitap", null, "", "中")).toBeNull();
+    expect(buildTouchMechanismRef("touch_key_replace", null, "", "中")).toBeNull();
+  });
+
+  it("builds the expected mechanism ref for each method when resolvedHostKey is a real vkey", () => {
+    expect(buildTouchMechanismRef("longpress_alternates", "K_B", "", "中")).toEqual({
+      patternId: "longpress_alternates",
+      slotValues: { hostKey: "K_B", char: "中" },
+    });
+    expect(buildTouchMechanismRef("flick_gestures", "K_B", "n", "中")).toEqual({
+      patternId: "flick_gestures",
+      slotValues: { hostKey: "K_B", direction: "n", char: "中" },
+    });
+    expect(buildTouchMechanismRef("multitap", "K_B", "", "中")).toEqual({
+      patternId: "multitap",
+      slotValues: { hostKey: "K_B", char: "中" },
+    });
+    expect(buildTouchMechanismRef("touch_key_replace", "K_B", "", "中")).toEqual({
+      patternId: "touch_key_replace",
+      slotValues: { hostKey: "K_B", char: "中" },
+    });
   });
 });

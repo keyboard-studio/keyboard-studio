@@ -70,8 +70,17 @@ import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts"
 import { useInventoryDiff } from "../../hooks/useInventoryDiff.ts";
 import type { PlacementSeedEntry } from "../../survey/placementSeeds.ts";
 import { getSuggestionForChar } from "../../survey/placementSeeds.ts";
-import { KEY_OPTIONS, ALL_PICKABLE_KEYS } from "../../lib/keyOptions.ts";
+import { KEY_OPTIONS, ALL_PICKABLE_KEYS, CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
+import {
+  resolveCharInput,
+  resolveKeyPickerSelection,
+  resolvedVkeyOf,
+  isLoneCombiningMark,
+  type ResolveCharInputOptions,
+  type KeyPickerResolveOptions,
+} from "../../lib/charInput.ts";
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
+import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { RadioGroup } from "../../ui/RadioGroup.tsx";
@@ -91,6 +100,24 @@ export const PATTERN_SEQUENCE = "multi_char_sequence"; // S-03
 export const PATTERN_DEADKEY = "deadkey_single_tap"; // S-02
 export const PATTERN_SWAP = "simple_swap"; // S-01
 export const PATTERN_RALT = "modifier_as_layer_switch"; // S-08
+
+// seqFirst / seqSecond / deadkeyBaseLetter are strictly one output character
+// each, substituted directly into a single-quoted KMN string literal with no
+// escaping (substituteSlots in @keyboard-studio/engine/pattern-apply) — so
+// each box both rejects >1 grapheme cluster and blocks the ASCII straight-
+// quote delimiters (P0/P1 character-box guards; see charInput.ts).
+const CHAR_BOX_RESOLVE_OPTIONS: ResolveCharInputOptions = {
+  singleGrapheme: true,
+  blockDelimiters: true,
+};
+
+// The S-02 deadkey trigger's resolved custom character is reused as
+// `accentChar` — the deadkey's own literal output — so it needs the same
+// delimiter guard as the character boxes above, unlike the SWAP/RALT/touch
+// host-key pickers (which resolve solely to a K_ vkey id).
+const TRIGGER_KEY_RESOLVE_OPTIONS: KeyPickerResolveOptions = {
+  blockDelimiters: true,
+};
 
 function methodLabel(ref: { patternId: string; slotValues?: Record<string, string> }): string {
   const sv = ref.slotValues ?? {};
@@ -217,12 +244,18 @@ interface MethodChooserProps {
   onSeqSecondChange: (v: string) => void;
   triggerKey: string;
   onTriggerKeyChange: (v: string) => void;
+  triggerKeyCustomChar: string;
+  onTriggerKeyCustomCharChange: (v: string) => void;
   deadkeyBaseLetter: string;
   onDeadkeyBaseLetterChange: (v: string) => void;
   selectedSwapKey: string;
   onSwapKeyChange: (v: string) => void;
+  selectedSwapKeyCustomChar: string;
+  onSwapKeyCustomCharChange: (v: string) => void;
   selectedRaltKey: string;
   onRaltKeyChange: (v: string) => void;
+  selectedRaltKeyCustomChar: string;
+  onRaltKeyCustomCharChange: (v: string) => void;
   /** S-01 target layer — 'base' (default) or 'shift' (shift+key). */
   swapLayer: SwapLayer;
   onSwapLayerChange: (v: SwapLayer) => void;
@@ -249,16 +282,6 @@ const DEADKEY_OPTIONS = [
 const VALID_DEADKEY_TRIGGER_KEYS: ReadonlySet<string> = new Set(
   DEADKEY_OPTIONS.map((o) => o.value),
 );
-
-const selectStyle: CSSProperties = {
-  background: BG_PAGE,
-  border: `1px solid ${BORDER}`,
-  borderRadius: 4,
-  color: TEXT_MAIN,
-  fontSize: 12,
-  padding: "4px 8px",
-  fontFamily: FONT,
-};
 
 // Static styles shared across MethodChooser renders — none depend on props or
 // state, so they are hoisted to module scope rather than recreated per render.
@@ -328,18 +351,73 @@ function MethodChooser({
   onSeqSecondChange,
   triggerKey,
   onTriggerKeyChange,
+  triggerKeyCustomChar,
+  onTriggerKeyCustomCharChange,
   deadkeyBaseLetter,
   onDeadkeyBaseLetterChange,
   selectedSwapKey,
   onSwapKeyChange,
+  selectedSwapKeyCustomChar,
+  onSwapKeyCustomCharChange,
   selectedRaltKey,
   onRaltKeyChange,
+  selectedRaltKeyCustomChar,
+  onRaltKeyCustomCharChange,
   swapLayer,
   onSwapLayerChange,
   raltLayer,
   onRaltLayerChange,
   shiftLayerDisabled,
 }: MethodChooserProps) {
+
+  // Resolved display values for the deadkey preview line — resolve at this
+  // read point (not just canApply/handleApply) so a custom trigger character
+  // or U+ base-letter notation shows the actual character in "Press X, then
+  // Y -> Z" rather than the raw typed text or the "__custom__" sentinel.
+  const triggerResolution = resolveKeyPickerSelection(
+    triggerKey,
+    triggerKeyCustomChar,
+    TRIGGER_KEY_RESOLVE_OPTIONS,
+  );
+  // Never interpolate the raw "__custom__" sentinel into the preview text —
+  // when custom mode is active but not yet resolved (customError/empty), fall
+  // back to a neutral placeholder instead of the sentinel or unresolved typed
+  // text.
+  const triggerKeyDisplay =
+    triggerResolution.kind === "customOk"
+      ? triggerResolution.char
+      : triggerKey === CUSTOM_KEY_OPTION_VALUE
+        ? "[trigger key]"
+        : triggerKey;
+  const baseLetterResolution = resolveCharInput(deadkeyBaseLetter, CHAR_BOX_RESOLVE_OPTIONS);
+  const deadkeyBaseLetterDisplay = baseLetterResolution.ok
+    ? baseLetterResolution.value
+    : deadkeyBaseLetter;
+  // Warn (do NOT block) when the resolved base letter is a bare combining
+  // mark on its own (e.g. U+0301) — canApply stays true; see the caution
+  // rendered below the base-letter input.
+  const deadkeyBaseLetterIsLoneCombiningMark =
+    baseLetterResolution.ok && isLoneCombiningMark(baseLetterResolution.value);
+
+  const seqFirstResolution = resolveCharInput(seqFirst, CHAR_BOX_RESOLVE_OPTIONS);
+  const seqSecondResolution = resolveCharInput(seqSecond, CHAR_BOX_RESOLVE_OPTIONS);
+  // Same lone-combining-mark caution as the deadkey base-letter box above —
+  // the sequence boxes are equally single-character (warn, do NOT block).
+  const seqFirstIsLoneCombiningMark =
+    seqFirstResolution.ok && isLoneCombiningMark(seqFirstResolution.value);
+  const seqSecondIsLoneCombiningMark =
+    seqSecondResolution.ok && isLoneCombiningMark(seqSecondResolution.value);
+
+  // Resolved vkey for the S-01/S-08 layer-preview lines below — a custom
+  // selection still shows "Shift + <KEY>"/"Shift + RAlt + <KEY>" using the
+  // resolved physical key, never the raw "__custom__" sentinel or unresolved
+  // typed text.
+  const swapVkeyForDisplay = resolvedVkeyOf(
+    resolveKeyPickerSelection(selectedSwapKey, selectedSwapKeyCustomChar),
+  );
+  const raltVkeyForDisplay = resolvedVkeyOf(
+    resolveKeyPickerSelection(selectedRaltKey, selectedRaltKeyCustomChar),
+  );
 
   // Each method is one card: transparent header button + inline config when selected.
   const cardStyle = (active: boolean): CSSProperties => ({
@@ -375,28 +453,66 @@ function MethodChooser({
         </button>
         {method === "sequence" && (
           <div style={configStyle}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 6, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT, alignSelf: "center" }}>
                 Type these two keys:
               </span>
-              <input
-                type="text"
-                value={seqFirst}
-                onChange={(e) => onSeqFirstChange(e.target.value)}
-                aria-label="First key in sequence"
-                maxLength={2}
-                style={inputStyle}
-              />
-              <span style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT }}>then</span>
-              <input
-                type="text"
-                value={seqSecond}
-                onChange={(e) => onSeqSecondChange(e.target.value)}
-                aria-label="Second key in sequence"
-                maxLength={2}
-                style={inputStyle}
-              />
-              <span style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT }}>
+              <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <input
+                  type="text"
+                  value={seqFirst}
+                  onChange={(e) => onSeqFirstChange(e.target.value)}
+                  aria-label="First key in sequence"
+                  placeholder="e.g. é or U+00E9"
+                  maxLength={8}
+                  style={inputStyle}
+                />
+                {seqFirstResolution.ok && seqFirstResolution.wasNotation && (
+                  <span role="status" aria-live="polite" style={{ fontSize: 10, color: TEXT_DIM, fontFamily: FONT }}>
+                    &rarr; {seqFirstResolution.value}
+                  </span>
+                )}
+                {!seqFirstResolution.ok && seqFirst.trim().length > 0 && (
+                  <span role="alert" style={{ fontSize: 10, color: "#f85149", opacity: 0.85, fontFamily: FONT }}>
+                    {seqFirstResolution.reason}
+                  </span>
+                )}
+                {seqFirstIsLoneCombiningMark && (
+                  <span role="status" aria-live="polite" style={{ fontSize: 10, color: "#d29922", opacity: 0.9, fontFamily: FONT }}>
+                    That looks like a combining mark on its own.
+                  </span>
+                )}
+              </span>
+              <span style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT, alignSelf: "center" }}>
+                then
+              </span>
+              <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <input
+                  type="text"
+                  value={seqSecond}
+                  onChange={(e) => onSeqSecondChange(e.target.value)}
+                  aria-label="Second key in sequence"
+                  placeholder="e.g. é or U+00E9"
+                  maxLength={8}
+                  style={inputStyle}
+                />
+                {seqSecondResolution.ok && seqSecondResolution.wasNotation && (
+                  <span role="status" aria-live="polite" style={{ fontSize: 10, color: TEXT_DIM, fontFamily: FONT }}>
+                    &rarr; {seqSecondResolution.value}
+                  </span>
+                )}
+                {!seqSecondResolution.ok && seqSecond.trim().length > 0 && (
+                  <span role="alert" style={{ fontSize: 10, color: "#f85149", opacity: 0.85, fontFamily: FONT }}>
+                    {seqSecondResolution.reason}
+                  </span>
+                )}
+                {seqSecondIsLoneCombiningMark && (
+                  <span role="status" aria-live="polite" style={{ fontSize: 10, color: "#d29922", opacity: 0.9, fontFamily: FONT }}>
+                    That looks like a combining mark on its own.
+                  </span>
+                )}
+              </span>
+              <span style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT, alignSelf: "center" }}>
                 &rarr;{" "}
                 <span style={{ color: TEXT_MAIN, fontFamily: "monospace", fontSize: 16 }}>
                   {currentChar}
@@ -421,14 +537,14 @@ function MethodChooser({
           {method !== "deadkey" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
               Trigger &rarr;{" "}
-              {deadkeyBaseLetter || "[base]"} &rarr;{" "}
+              {deadkeyBaseLetterDisplay || "[base]"} &rarr;{" "}
               {currentChar}
             </span>
           )}
         </button>
         {method === "deadkey" && (
           <div style={configStyle}>
-            <label
+            <div
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -436,43 +552,62 @@ function MethodChooser({
                 fontSize: 12,
                 color: TEXT_DIM,
                 fontFamily: FONT,
+                flexWrap: "wrap",
               }}
             >
-              Trigger key:
-              <select
+              <span>Trigger key:</span>
+              <KeyPickerField
                 value={triggerKey}
-                onChange={(e) => onTriggerKeyChange(e.target.value)}
-                aria-label="Trigger key for deadkey"
-                style={selectStyle}
-              >
-                {DEADKEY_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </label>
-            <label
+                onChange={onTriggerKeyChange}
+                customChar={triggerKeyCustomChar}
+                onCustomCharChange={onTriggerKeyCustomCharChange}
+                options={DEADKEY_OPTIONS}
+                selectAriaLabel="Trigger key for deadkey"
+                customInputAriaLabel="Custom trigger character for deadkey"
+                blockDelimiters
+              />
+            </div>
+            <div
               style={{
                 display: "flex",
-                alignItems: "center",
+                alignItems: "flex-start",
                 gap: 8,
                 fontSize: 12,
                 color: TEXT_DIM,
                 fontFamily: FONT,
               }}
             >
-              Base letter:
-              <input
-                type="text"
-                value={deadkeyBaseLetter}
-                onChange={(e) => onDeadkeyBaseLetterChange(e.target.value)}
-                aria-label="Base letter for deadkey"
-                maxLength={2}
-                style={inputStyle}
-              />
-            </label>
+              <span style={{ alignSelf: "center" }}>Base letter:</span>
+              <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <input
+                  type="text"
+                  value={deadkeyBaseLetter}
+                  onChange={(e) => onDeadkeyBaseLetterChange(e.target.value)}
+                  aria-label="Base letter for deadkey"
+                  placeholder="e.g. é or U+00E9"
+                  maxLength={8}
+                  style={inputStyle}
+                />
+                {baseLetterResolution.ok && baseLetterResolution.wasNotation && (
+                  <span role="status" aria-live="polite" style={{ fontSize: 10, color: TEXT_DIM, fontFamily: FONT }}>
+                    &rarr; {baseLetterResolution.value}
+                  </span>
+                )}
+                {!baseLetterResolution.ok && deadkeyBaseLetter.trim().length > 0 && (
+                  <span role="alert" style={{ fontSize: 10, color: "#f85149", opacity: 0.85, fontFamily: FONT }}>
+                    {baseLetterResolution.reason}
+                  </span>
+                )}
+                {deadkeyBaseLetterIsLoneCombiningMark && (
+                  <span role="status" aria-live="polite" style={{ fontSize: 10, color: "#d29922", opacity: 0.9, fontFamily: FONT }}>
+                    That looks like a combining mark on its own — the base letter is usually a plain letter.
+                  </span>
+                )}
+              </span>
+            </div>
             <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-              Press {triggerKey}, then{" "}
-              {deadkeyBaseLetter || "[base letter]"} &rarr;{" "}
+              Press {triggerKeyDisplay}, then{" "}
+              {deadkeyBaseLetterDisplay || "[base letter]"} &rarr;{" "}
               <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentChar}</span>
             </p>
           </div>
@@ -498,7 +633,7 @@ function MethodChooser({
         </button>
         {method === "swap" && (
           <div style={configStyle}>
-            <label
+            <div
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -506,20 +641,21 @@ function MethodChooser({
                 fontSize: 12,
                 color: TEXT_DIM,
                 fontFamily: FONT,
+                flexWrap: "wrap",
               }}
             >
-              Key:
-              <select
+              <span>Key:</span>
+              <KeyPickerField
                 value={selectedSwapKey}
-                onChange={(e) => onSwapKeyChange(e.target.value)}
-                aria-label="Physical key for simple swap"
-                style={selectStyle}
-              >
-                {KEY_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </label>
+                onChange={onSwapKeyChange}
+                customChar={selectedSwapKeyCustomChar}
+                onCustomCharChange={onSwapKeyCustomCharChange}
+                options={KEY_OPTIONS}
+                selectAriaLabel="Physical key for simple swap"
+                customInputAriaLabel="Custom character for simple swap key"
+                customPlaceholder="e.g. a or ;"
+              />
+            </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span id="swap-layer-label" style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
                 Layer:
@@ -542,9 +678,9 @@ function MethodChooser({
                 ]}
               />
             </div>
-            {swapLayer === "shift" && selectedSwapKey !== "" && (
+            {swapLayer === "shift" && swapVkeyForDisplay !== null && (
               <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-                Shift + {selectedSwapKey.replace(/^K_/, "")} &rarr;{" "}
+                Shift + {swapVkeyForDisplay.replace(/^K_/, "")} &rarr;{" "}
                 <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentChar}</span>
               </p>
             )}
@@ -571,7 +707,7 @@ function MethodChooser({
         </button>
         {method === "ralt" && (
           <div style={configStyle}>
-            <label
+            <div
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -579,20 +715,21 @@ function MethodChooser({
                 fontSize: 12,
                 color: TEXT_DIM,
                 fontFamily: FONT,
+                flexWrap: "wrap",
               }}
             >
-              Base key:
-              <select
+              <span>Base key:</span>
+              <KeyPickerField
                 value={selectedRaltKey}
-                onChange={(e) => onRaltKeyChange(e.target.value)}
-                aria-label="Base key for RAlt layer"
-                style={selectStyle}
-              >
-                {KEY_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </label>
+                onChange={onRaltKeyChange}
+                customChar={selectedRaltKeyCustomChar}
+                onCustomCharChange={onRaltKeyCustomCharChange}
+                options={KEY_OPTIONS}
+                selectAriaLabel="Base key for RAlt layer"
+                customInputAriaLabel="Custom character for RAlt base key"
+                customPlaceholder="e.g. a or ;"
+              />
+            </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span id="ralt-layer-label" style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
                 Layer:
@@ -608,9 +745,9 @@ function MethodChooser({
                 ]}
               />
             </div>
-            {raltLayer === "shift-ralt" && selectedRaltKey !== "" && (
+            {raltLayer === "shift-ralt" && raltVkeyForDisplay !== null && (
               <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-                Shift + RAlt + {selectedRaltKey.replace(/^K_/, "")} &rarr;{" "}
+                Shift + RAlt + {raltVkeyForDisplay.replace(/^K_/, "")} &rarr;{" "}
                 <span style={{ fontFamily: "monospace", color: TEXT_MAIN, fontSize: 16 }}>{currentChar}</span>
               </p>
             )}
@@ -849,9 +986,12 @@ export function MechanismGallery({
   const [seqFirst, setSeqFirst] = useState("");
   const [seqSecond, setSeqSecond] = useState("");
   const [triggerKey, setTriggerKey] = useState("K_COLON");
+  const [triggerKeyCustomChar, setTriggerKeyCustomChar] = useState("");
   const [deadkeyBaseLetter, setDeadkeyBaseLetter] = useState("");
   const [selectedSwapKey, setSelectedSwapKey] = useState("");
+  const [selectedSwapKeyCustomChar, setSelectedSwapKeyCustomChar] = useState("");
   const [selectedRaltKey, setSelectedRaltKey] = useState("");
+  const [selectedRaltKeyCustomChar, setSelectedRaltKeyCustomChar] = useState("");
   const [swapLayer, setSwapLayer] = useState<SwapLayer>("base");
   const [raltLayer, setRaltLayer] = useState<RaltLayer>("ralt");
 
@@ -945,9 +1085,12 @@ export function MechanismGallery({
     setSeqFirst("");
     setSeqSecond("");
     setTriggerKey("K_COLON");
+    setTriggerKeyCustomChar("");
     setDeadkeyBaseLetter("");
     setSelectedSwapKey("");
+    setSelectedSwapKeyCustomChar("");
     setSelectedRaltKey("");
+    setSelectedRaltKeyCustomChar("");
     setSwapLayer("base");
     setRaltLayer("ralt");
   }, []);
@@ -1016,18 +1159,41 @@ export function MechanismGallery({
   const canApply = useMemo(() => {
     if (currentChar === null) return false;
     if (method === "sequence") {
-      // Both must be single graphemes (non-empty).
-      return seqFirst.trim().length > 0 && seqSecond.trim().length > 0;
+      // Both must resolve to a non-empty character (literal, or valid U+
+      // notation) — resolveCharInput rejects empty/whitespace-only and
+      // malformed U+ notation.
+      return (
+        resolveCharInput(seqFirst, CHAR_BOX_RESOLVE_OPTIONS).ok &&
+        resolveCharInput(seqSecond, CHAR_BOX_RESOLVE_OPTIONS).ok
+      );
     }
     if (method === "swap") {
-      return selectedSwapKey !== "";
+      return resolvedVkeyOf(resolveKeyPickerSelection(selectedSwapKey, selectedSwapKeyCustomChar)) !== null;
     }
     if (method === "ralt") {
-      return selectedRaltKey !== "";
+      return resolvedVkeyOf(resolveKeyPickerSelection(selectedRaltKey, selectedRaltKeyCustomChar)) !== null;
     }
-    // deadkey: triggerKey always has a value; base letter must be non-empty.
-    return deadkeyBaseLetter.trim().length > 0;
-  }, [currentChar, method, seqFirst, seqSecond, deadkeyBaseLetter, selectedSwapKey, selectedRaltKey]);
+    // deadkey: trigger key must resolve to a physical key (real selection or
+    // a custom character that maps to one); base letter must resolve to a
+    // non-empty character.
+    return (
+      resolvedVkeyOf(
+        resolveKeyPickerSelection(triggerKey, triggerKeyCustomChar, TRIGGER_KEY_RESOLVE_OPTIONS),
+      ) !== null && resolveCharInput(deadkeyBaseLetter, CHAR_BOX_RESOLVE_OPTIONS).ok
+    );
+  }, [
+    currentChar,
+    method,
+    seqFirst,
+    seqSecond,
+    deadkeyBaseLetter,
+    triggerKey,
+    triggerKeyCustomChar,
+    selectedSwapKey,
+    selectedSwapKeyCustomChar,
+    selectedRaltKey,
+    selectedRaltKeyCustomChar,
+  ]);
 
   const handleApply = useCallback(() => {
     if (currentChar === null || !canApply) return;
@@ -1035,6 +1201,12 @@ export function MechanismGallery({
     let assignment: MechanismAssignment;
 
     if (method === "sequence") {
+      // canApply already confirmed both resolve — re-resolve here (the read
+      // point) rather than trusting the raw typed text, so U+ notation
+      // collapses to the actual character before it lands in slotValues.
+      const first = resolveCharInput(seqFirst, CHAR_BOX_RESOLVE_OPTIONS);
+      const second = resolveCharInput(seqSecond, CHAR_BOX_RESOLVE_OPTIONS);
+      if (!first.ok || !second.ok) return;
       assignment = {
         scope: "individual",
         target: currentChar,
@@ -1044,8 +1216,8 @@ export function MechanismGallery({
             patternId: PATTERN_SEQUENCE,
             strategyId: "S-03",
             slotValues: {
-              firstLetterOut: seqFirst.trim(),
-              secondLetter: seqSecond.trim(),
+              firstLetterOut: first.value,
+              secondLetter: second.value,
               collapsedChar: currentChar,
             },
           },
@@ -1053,11 +1225,31 @@ export function MechanismGallery({
         source: "user",
       };
     } else if (method === "deadkey") {
-      const base = deadkeyBaseLetter.trim();
-      // accentChar: the character emitted when the trigger key is pressed twice.
-      // Always use the trigger key's literal character (e.g. ';' for K_COLON)
-      // so that pressing trigger+trigger escapes back to the bare character.
-      const accentChar = TRIGGER_KEY_CHARS[triggerKey] ?? "";
+      const base = resolveCharInput(deadkeyBaseLetter, CHAR_BOX_RESOLVE_OPTIONS);
+      const triggerResolution = resolveKeyPickerSelection(
+        triggerKey,
+        triggerKeyCustomChar,
+        TRIGGER_KEY_RESOLVE_OPTIONS,
+      );
+      const resolvedTriggerVkey = resolvedVkeyOf(triggerResolution);
+      if (!base.ok || resolvedTriggerVkey === null) return;
+      // accentChar: the character emitted when the trigger key is pressed
+      // twice. For the 4 built-in trigger keys, always use the key's literal
+      // character (e.g. ';' for K_COLON) so trigger+trigger escapes back to
+      // the bare character. For a custom trigger character, the resolved
+      // custom character itself IS that literal — deadkeyName follows the
+      // same convention as deadkeyNameFor (the character's codepoint hex,
+      // padded to 4), never the "dead0" fallback deadkeyNameFor uses for an
+      // unrecognised built-in key id.
+      let deadkeyName: string;
+      let accentChar: string;
+      if (triggerResolution.kind === "customOk") {
+        deadkeyName = triggerResolution.char.codePointAt(0)!.toString(16).padStart(4, "0");
+        accentChar = triggerResolution.char;
+      } else {
+        deadkeyName = deadkeyNameFor(triggerKey);
+        accentChar = TRIGGER_KEY_CHARS[triggerKey] ?? "";
+      }
       assignment = {
         scope: "individual",
         target: currentChar,
@@ -1067,9 +1259,9 @@ export function MechanismGallery({
             patternId: PATTERN_DEADKEY,
             strategyId: "S-02",
             slotValues: {
-              triggerKey,
-              deadkeyName: deadkeyNameFor(triggerKey),
-              baseLetters: base,
+              triggerKey: resolvedTriggerVkey,
+              deadkeyName,
+              baseLetters: base.value,
               accentedForms: currentChar,
               accentChar,
             },
@@ -1078,6 +1270,10 @@ export function MechanismGallery({
         source: "user",
       };
     } else if (method === "swap") {
+      const resolvedSwapVkey = resolvedVkeyOf(
+        resolveKeyPickerSelection(selectedSwapKey, selectedSwapKeyCustomChar),
+      );
+      if (resolvedSwapVkey === null) return;
       // S-01: simple_swap — kmnFragment uses {{kmnRules}}.
       // Guard against a stale "shift" selection surviving a mid-flow mnemonic
       // transition (e.g. base keyboard swap) — never emit a SHIFT-flagged rule
@@ -1090,11 +1286,11 @@ export function MechanismGallery({
       // compute it once and reuse for both the base and shift branches below.
       const capsHandling =
         workingIr !== null
-          ? planShiftAssignment(workingIr, "main", selectedSwapKey).capsHandling
+          ? planShiftAssignment(workingIr, "main", resolvedSwapVkey).capsHandling
           : false;
       let kmnRules: string;
       if (effectiveLayer === "shift") {
-        kmnRules = buildShiftRuleLines(selectedSwapKey, currentChar, {
+        kmnRules = buildShiftRuleLines(resolvedSwapVkey, currentChar, {
           capsHandling,
         }).join("\n");
       } else {
@@ -1103,7 +1299,7 @@ export function MechanismGallery({
         // a CAPS-handling key would shadow that key's pre-existing CAPS/NCAPS
         // pair, since applyAssignments splices new lines before existing
         // ones (first-match-wins).
-        kmnRules = buildBaseRuleLines(selectedSwapKey, currentChar, {
+        kmnRules = buildBaseRuleLines(resolvedSwapVkey, currentChar, {
           capsHandling,
         }).join("\n");
       }
@@ -1139,7 +1335,7 @@ export function MechanismGallery({
           setPendingCompanion({
             originalChar: currentChar,
             counterpart: counterpart.counterpart,
-            vkey: selectedSwapKey,
+            vkey: resolvedSwapVkey,
             capsHandling,
             baseAssignment: assignment,
           });
@@ -1147,6 +1343,10 @@ export function MechanismGallery({
       }
     } else {
       // method === "ralt"
+      const resolvedRaltVkey = resolvedVkeyOf(
+        resolveKeyPickerSelection(selectedRaltKey, selectedRaltKeyCustomChar),
+      );
+      if (resolvedRaltVkey === null) return;
       // S-08: modifier_as_layer_switch — kmnFragment uses {{altgrKeyList}} and {{altgrOutputList}}.
       // Build a single-entry held-layer rule for this character.
       assignment = {
@@ -1160,8 +1360,8 @@ export function MechanismGallery({
             slotValues: {
               altgrKeyList:
                 raltLayer === "shift-ralt"
-                  ? `[SHIFT RALT ${selectedRaltKey}]`
-                  : `[RALT ${selectedRaltKey}]`,
+                  ? `[SHIFT RALT ${resolvedRaltVkey}]`
+                  : `[RALT ${resolvedRaltVkey}]`,
               altgrOutputList: currentChar,
             },
           },
@@ -1179,9 +1379,12 @@ export function MechanismGallery({
     seqFirst,
     seqSecond,
     triggerKey,
+    triggerKeyCustomChar,
     deadkeyBaseLetter,
     selectedSwapKey,
+    selectedSwapKeyCustomChar,
     selectedRaltKey,
+    selectedRaltKeyCustomChar,
     swapLayer,
     raltLayer,
     shiftLayerAllowed,
@@ -1882,12 +2085,18 @@ export function MechanismGallery({
                 onSeqSecondChange={setSeqSecond}
                 triggerKey={triggerKey}
                 onTriggerKeyChange={setTriggerKey}
+                triggerKeyCustomChar={triggerKeyCustomChar}
+                onTriggerKeyCustomCharChange={setTriggerKeyCustomChar}
                 deadkeyBaseLetter={deadkeyBaseLetter}
                 onDeadkeyBaseLetterChange={setDeadkeyBaseLetter}
                 selectedSwapKey={selectedSwapKey}
                 onSwapKeyChange={setSelectedSwapKey}
+                selectedSwapKeyCustomChar={selectedSwapKeyCustomChar}
+                onSwapKeyCustomCharChange={setSelectedSwapKeyCustomChar}
                 selectedRaltKey={selectedRaltKey}
                 onRaltKeyChange={setSelectedRaltKey}
+                selectedRaltKeyCustomChar={selectedRaltKeyCustomChar}
+                onRaltKeyCustomCharChange={setSelectedRaltKeyCustomChar}
                 swapLayer={swapLayer}
                 onSwapLayerChange={setSwapLayer}
                 raltLayer={raltLayer}
