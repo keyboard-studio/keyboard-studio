@@ -8,30 +8,35 @@
 import { useEffect, useMemo, useState } from "react";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { getBaseBrowserService } from "../../lib/services.ts";
+import { suggestBases, type SuggestTarget } from "../../lib/suggestBase.ts";
 import {
-  suggestBases,
-  type SuggestReason,
-  type SuggestTarget,
-} from "../../lib/suggestBase.ts";
+  applyGenealogicalTier,
+  makeResolveLanguage,
+  type ResolvedReason,
+} from "../../lib/genealogyTier.ts";
+import { getLoadedLangtags, loadLangtags } from "../../lib/langtagsDefaults.ts";
 import { BaseKeyboardPicker } from "../../components/BaseKeyboardPicker.tsx";
 import { Badge, Button } from "../../ui/index.ts";
 import type { BadgeTone } from "../../ui/Badge.tsx";
 
-const REASON_LABEL: Record<SuggestReason, string> = {
+const REASON_LABEL: Record<ResolvedReason, string> = {
   "language-match": "Already supports your language",
+  genealogical: "Related language, same script",
   "script-match": "Matches your script",
   "language-cross-script": "Supports your language, different script",
   "us-qwerty-fallback": "Start blank (US QWERTY)",
 };
 
-// Token-mapped reason tones for Badge (exact CSS-var match verified):
+// Token-mapped reason tones for Badge, in descending strength:
 //   language-match       → Badge "success"  (var(--sil-green))
-//   script-match         → Badge "accent"   (var(--app-accent))
+//   genealogical         → Badge "accent"   (var(--app-accent))
+//   script-match         → Badge "default"  (neutral) — weaker than a relative
 //   language-cross-script→ Badge "warn"     (var(--sil-orange-dark))
 //   us-qwerty-fallback   → Badge "subtle"   (var(--app-text-subtle))
-const REASON_TONE: Record<SuggestReason, BadgeTone> = {
+const REASON_TONE: Record<ResolvedReason, BadgeTone> = {
   "language-match": "success",
-  "script-match": "accent",
+  genealogical: "accent",
+  "script-match": "default",
   "language-cross-script": "warn",
   "us-qwerty-fallback": "subtle",
 };
@@ -55,6 +60,11 @@ export function BaseResolution({
   // What the top search bar looks through: the suggested bases (default) or
   // the full catalog. Widened via the toggle or the picker's zero-match action.
   const [searchScope, setSearchScope] = useState<"suggested" | "all">("suggested");
+  // Langtags backs the genealogical tier's resolveLanguage. It loads lazily (a
+  // separate chunk), so the genealogical tier is additive: until it resolves, we
+  // rank with plain suggestBases and re-rank once it lands. `tick` re-renders
+  // when the async load settles.
+  const [langtagsTick, setLangtagsTick] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -78,6 +88,24 @@ export function BaseResolution({
     };
   }, []);
 
+  // Kick off the lazy langtags load once; bump the tick when it resolves so the
+  // genealogical tier re-ranks. Safe if already loaded (idempotent).
+  useEffect(() => {
+    let live = true;
+    loadLangtags().then(
+      () => {
+        if (live) setLangtagsTick((t) => t + 1);
+      },
+      () => {
+        /* langtags unavailable → genealogical tier stays off, ranking degrades
+           gracefully to plain suggestBases. */
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+
   // Build the phonebook from the loaded bases' .languages arrays so the caller
   // need not thread a separate map. Each base's languages field (populated from
   // its .kps <Languages> block) is used as-is; bases without languages degrade
@@ -90,10 +118,21 @@ export function BaseResolution({
     [bases],
   );
 
-  const suggestions = useMemo(
-    () => suggestBases(bases, target, { languagesById }),
-    [bases, target, languagesById],
-  );
+  const suggestions = useMemo(() => {
+    const ranked = suggestBases(bases, target, { languagesById });
+    // Promote same-script bases that also support a close relative of the target
+    // language into the genealogical tier (spec 036 US2). Only when langtags has
+    // loaded; otherwise the plain script/language ranking stands.
+    const langtags = getLoadedLangtags();
+    if (!langtags) {
+      return ranked.map((s) => ({ base: s.base, reason: s.reason }));
+    }
+    return applyGenealogicalTier(ranked, target, {
+      resolveLanguage: makeResolveLanguage(langtags.getLanguageDefaults),
+      languagesById,
+    });
+    // langtagsTick forces a re-rank once the lazy langtags module resolves.
+  }, [bases, target, languagesById, langtagsTick]);
 
   const suggestedIds = useMemo(
     () => new Set(suggestions.map((s) => s.base.id)),

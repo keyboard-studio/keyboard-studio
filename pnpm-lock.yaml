@@ -139,6 +139,9 @@ importers:
       '@keyboard-studio/engine':
         specifier: workspace:*
         version: link:../engine
+      '@keyboard-studio/glottolog':
+        specifier: workspace:*
+        version: link:../glottolog
       '@keymanapp/keyboard-lint':
         specifier: workspace:*
         version: link:../keyboard-lint
