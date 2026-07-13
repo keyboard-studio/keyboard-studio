@@ -2500,8 +2500,11 @@ describe("MechanismGallery — NFC normalization of character boxes", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Single-grapheme guard (P1) — seqFirst/seqSecond/deadkeyBaseLetter accept
-// exactly one grapheme cluster.
+// Single-grapheme guard (P1) — seqSecond/deadkeyBaseLetter accept exactly
+// one grapheme cluster; seqFirst (the sequence's left-context box) was
+// RELAXED to accept multiple graphemes (a digraph/trigraph left context is
+// valid .kmn) — see the "relaxed multi-character context" describe block
+// below for seqFirst's acceptance and the multi-token compose cases.
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — single-grapheme guard on character boxes", () => {
@@ -2521,24 +2524,28 @@ describe("MechanismGallery — single-grapheme guard on character boxes", () => 
     expect((addBtn as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("rejects a two-character literal paste in a sequence box with 'Enter one character only.'", async () => {
+  it("rejects a two-grapheme literal paste in the SECOND sequence box (the keystroke side)", async () => {
     seedInventory(["x"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
     fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
-      target: { value: "ab" },
+      target: { value: "a" },
     });
     fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
-      target: { value: "c" },
+      target: { value: "bc" },
     });
-    expect(screen.getByText("Enter one character only.")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "A single keystroke produces one character — enter one character (you can compose it from U+ parts).",
+      ),
+    ).toBeTruthy();
     const addBtn = screen.getByRole("button", { name: /Apply method for x/i });
     expect((addBtn as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("rejects a two-character literal paste in the deadkey base-letter box", async () => {
+  it("rejects a two-character literal paste in the deadkey base-letter box with the 'coming later' reason", async () => {
     seedInventory(["ā"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -2547,7 +2554,11 @@ describe("MechanismGallery — single-grapheme guard on character boxes", () => 
     fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
       target: { value: "ab" },
     });
-    expect(screen.getByText("Enter one character only.")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Enter one base character. (Covering several base letters with one dead key is coming later.)",
+      ),
+    ).toBeTruthy();
     const addBtn = screen.getByRole("button", { name: /Apply method for ā/i });
     expect((addBtn as HTMLButtonElement).disabled).toBe(true);
   });
@@ -2564,6 +2575,113 @@ describe("MechanismGallery — single-grapheme guard on character boxes", () => 
     });
     const addBtn = screen.getByRole("button", { name: /Apply method for ā/i });
     expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Relaxed multi-character context (the headline feature) — seqFirst accepts
+// several graphemes (a digraph/trigraph left context, e.g. "ng", "gb"), and
+// all three character boxes accept space-separated multi-token compose (each
+// token independently resolved, then concatenated + NFC-normalized).
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — relaxed multi-character context (seqFirst) and multi-token compose", () => {
+  it("accepts a two-character context in seqFirst and records it verbatim in firstLetterOut", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "ng" },
+    });
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
+      target: { value: "b" },
+    });
+    const addBtn = screen.getByRole("button", { name: /Apply method for x/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(addBtn);
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues).toMatchObject({
+      firstLetterOut: "ng",
+      secondLetter: "b",
+    });
+  });
+
+  it("resolves a space-separated multi-token compose in seqFirst (context box)", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "U+006E U+0303" }, // "n" + combining tilde -> NFC -> "n with tilde"
+    });
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
+      target: { value: "b" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for x/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["firstLetterOut"]).toBe("ñ");
+  });
+
+  it("accepts a U+-composed single grapheme in the seqSecond box (keystroke side)", async () => {
+    seedInventory(["x"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+      target: { value: "a" },
+    });
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
+      target: { value: "U+006E U+0303" }, // composes to one grapheme: "n with tilde"
+    });
+    const addBtn = screen.getByRole("button", { name: /Apply method for x/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(addBtn);
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["secondLetter"]).toBe("ñ");
+  });
+
+  it("accepts a U+-composed single grapheme in the deadkey base-letter box", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "U+006E U+0303" }, // composes to one grapheme: "n with tilde"
+    });
+    const addBtn = screen.getByRole("button", { name: /Apply method for ā/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("rejects a two-token compose that does NOT collapse to one grapheme in the deadkey base-letter box", async () => {
+    seedInventory(["ā"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
+    fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
+      target: { value: "a b" }, // two independent tokens, two graphemes
+    });
+    expect(
+      screen.getByText(
+        "Enter one base character. (Covering several base letters with one dead key is coming later.)",
+      ),
+    ).toBeTruthy();
+    const addBtn = screen.getByRole("button", { name: /Apply method for ā/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(true);
   });
 });
 
@@ -2751,10 +2869,14 @@ describe("MechanismGallery — accessible live-region roles on validation feedba
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
-    fireEvent.change(screen.getByLabelText(/First key in sequence/i), {
+    // seqFirst (context) now accepts more than one grapheme — exercise the
+    // still-single-grapheme seqSecond (keystroke) box instead.
+    fireEvent.change(screen.getByLabelText(/Second key in sequence/i), {
       target: { value: "ab" },
     });
-    const error = screen.getByText("Enter one character only.");
+    const error = screen.getByText(
+      "A single keystroke produces one character — enter one character (you can compose it from U+ parts).",
+    );
     expect(error.getAttribute("role")).toBe("alert");
   });
 
@@ -2886,28 +3008,32 @@ describe("MechanismGallery — no in-box placeholders (Fix 1)", () => {
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
     expect(
-      screen.getAllByText("Type a character directly, or a Unicode value like U+00E9."),
+      screen.getAllByText(
+        "Type a character, or a Unicode value like U+00E9. The first (context) box accepts more than one character; combine parts with spaces, e.g. U+006E U+0303.",
+      ),
     ).toHaveLength(1);
   });
 
-  it("shows an EXTRA KeyPickerField custom-input help line only once custom mode is active (SWAP key)", async () => {
-    // The character-box caption at the top of the method chooser uses the
-    // same copy and stays rendered throughout, so assert on the COUNT of
-    // matches (it must go up by exactly one) rather than presence/absence.
+  it("shows the unrelated KeyPickerField custom-input help line only once custom mode is active (SWAP key)", async () => {
+    // Fix 1's method-chooser caption (CHAR_BOX_HELP_TEXT) and KeyPickerField's
+    // own custom-input help line (CUSTOM_INPUT_HELP_TEXT) are two DIFFERENT
+    // constants with different copy since the sequence/deadkey character
+    // boxes were relaxed to multi-token/multi-character — only the
+    // KeyPickerField line (unaffected: the key-picker custom-char path stays
+    // single-character) should appear once custom mode activates.
     seedInventory(["ẑ"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Assign to a key/i));
-    const before = screen.getAllByText(
-      "Type a character directly, or a Unicode value like U+00E9.",
-    ).length;
+    expect(
+      screen.queryByText("Type a character directly, or a Unicode value like U+00E9."),
+    ).toBeNull();
     fireEvent.change(screen.getByLabelText(/Physical key for simple swap/i), {
       target: { value: CUSTOM_KEY_OPTION_VALUE },
     });
-    const after = screen.getAllByText(
-      "Type a character directly, or a Unicode value like U+00E9.",
-    ).length;
-    expect(after).toBe(before + 1);
+    expect(
+      screen.getAllByText("Type a character directly, or a Unicode value like U+00E9."),
+    ).toHaveLength(1);
   });
 });

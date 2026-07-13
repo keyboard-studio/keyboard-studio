@@ -83,18 +83,68 @@ export function isLoneCombiningMark(value: string): boolean {
 export interface ResolveCharInputOptions {
   /**
    * Reject a resolved value that is more than one grapheme cluster — for the
-   * strictly-one-character boxes (seqFirst, seqSecond, deadkeyBaseLetter).
-   * Opt-in only: the key-picker custom-char path is unaffected (it is
-   * already constrained by charToVkey's single-character lookup).
+   * strictly-one-grapheme boxes (seqSecond, deadkeyBaseLetter — a single
+   * keystroke/base letter). NOT set for seqFirst, which is the sequence's
+   * left-context box and may legitimately hold several graphemes (a
+   * digraph/trigraph collapse, e.g. "ng"). Opt-in only: the key-picker
+   * custom-char path is unaffected (it is already constrained by
+   * charToVkey's single-character lookup). Checked against the FINAL
+   * concatenated+NFC value when multiToken is also set.
    */
   singleGrapheme?: boolean;
+  /**
+   * Override the default "Enter one character only." rejection reason when
+   * singleGrapheme rejects a value — lets each character box surface a
+   * message specific to what it actually needs (e.g. seqSecond vs
+   * deadkeyBaseLetter). Ignored when singleGrapheme is not set or does not
+   * reject.
+   */
+  singleGraphemeReason?: string;
   /**
    * Reject the ASCII straight-quote delimiter characters (see
    * DELIMITER_UNSAFE above). Opt-in only: does NOT apply to the custom
    * SWAP/RALT/touch host-key characters, which resolve only to a K_ vkey id
-   * and are never emitted as a literal.
+   * and are never emitted as a literal. Checked per TOKEN when multiToken is
+   * also set (before concatenation).
    */
   blockDelimiters?: boolean;
+  /**
+   * Split the trimmed input on whitespace into independent tokens, resolve
+   * EACH token via the same single-token logic below (a "U+XXXX" token to
+   * its codepoint char; anything else as a literal token), concatenate the
+   * resolved values in order, then NFC-normalize the whole result. A single
+   * token with no internal whitespace resolves identically to the
+   * non-multiToken path (splitting on whitespace when there is none is a
+   * no-op). Lets an author compose one output from several parts — e.g.
+   * "U+006E U+0303" -> "n" + combining tilde -> NFC -> "n with tilde", or a
+   * plain literal digraph like "ng" (already one token, unaffected by
+   * splitting) typed straight into the box.
+   */
+  multiToken?: boolean;
+}
+
+const DEFAULT_SINGLE_GRAPHEME_REASON = "Enter one character only.";
+
+/**
+ * Resolve ONE token (no internal whitespace) to its character and whether it
+ * came from U+ notation — the shared core both the single-token path and
+ * each iteration of the multiToken path delegate to, so there is exactly one
+ * place that knows how to tell U+ notation from a literal token.
+ */
+function resolveSingleToken(
+  token: string,
+): { ok: true; value: string; wasNotation: boolean } | { ok: false; reason: string } {
+  if (UPLUS_PREFIX.test(token)) {
+    const resolved = parseUPlusNotation(token);
+    if (resolved === null) {
+      return {
+        ok: false,
+        reason: "Not a valid Unicode value (use U+ followed by 4-6 hex digits)",
+      };
+    }
+    return { ok: true, value: resolved.normalize("NFC"), wasNotation: true };
+  }
+  return { ok: true, value: token.normalize("NFC"), wasNotation: false };
 }
 
 /**
@@ -110,6 +160,14 @@ export interface ResolveCharInputOptions {
  * path) BEFORE the singleGrapheme/blockDelimiters checks below, so a
  * decomposed paste (e.g. "e" + U+0301) collapses to its precomposed form
  * ("é") to match the deadkey patterns' stated NFC convention.
+ *
+ * When `options.multiToken` is set, the above applies PER TOKEN (splitting
+ * `raw` on whitespace) — each token independently resolved (a "U+XXXX"
+ * token to its codepoint char, anything else literal), then concatenated
+ * and NFC-normalized as a whole. `blockDelimiters` is checked per token
+ * (before concatenation); `singleGrapheme` is checked once, against the
+ * final concatenated+normalized value. A single token with no internal
+ * whitespace resolves identically to the non-multiToken path.
  */
 export function resolveCharInput(
   raw: string,
@@ -120,31 +178,43 @@ export function resolveCharInput(
     return { ok: false, reason: "Enter a character or a U+ Unicode value." };
   }
 
-  let value: string;
-  let wasNotation: boolean;
-  if (UPLUS_PREFIX.test(trimmed)) {
-    const resolved = parseUPlusNotation(trimmed);
-    if (resolved === null) {
-      return {
-        ok: false,
-        reason: "Not a valid Unicode value (use U+ followed by 4-6 hex digits)",
-      };
+  if (options.multiToken === true) {
+    // Split on whitespace, resolve each token independently, concatenate,
+    // then NFC-normalize the whole thing. A single token (no internal
+    // whitespace) reduces to exactly one loop iteration, so this path is a
+    // strict superset of the non-multiToken path below — never a behavior
+    // fork for the no-space case.
+    const tokens = trimmed.split(/\s+/);
+    let concatenated = "";
+    let anyNotation = false;
+    for (const token of tokens) {
+      const resolvedToken = resolveSingleToken(token);
+      if (!resolvedToken.ok) return resolvedToken;
+      if (options.blockDelimiters === true && containsDelimiterUnsafeChar(resolvedToken.value)) {
+        return { ok: false, reason: DELIMITER_UNSAFE_REASON };
+      }
+      concatenated += resolvedToken.value;
+      if (resolvedToken.wasNotation) anyNotation = true;
     }
-    value = resolved.normalize("NFC");
-    wasNotation = true;
-  } else {
-    value = trimmed.normalize("NFC");
-    wasNotation = false;
+    const value = concatenated.normalize("NFC");
+    if (options.singleGrapheme === true && countGraphemes(value) > 1) {
+      return { ok: false, reason: options.singleGraphemeReason ?? DEFAULT_SINGLE_GRAPHEME_REASON };
+    }
+    return { ok: true, value, wasNotation: anyNotation };
   }
 
+  const resolved = resolveSingleToken(trimmed);
+  if (!resolved.ok) return resolved;
+  const value = resolved.value;
+
   if (options.singleGrapheme === true && countGraphemes(value) > 1) {
-    return { ok: false, reason: "Enter one character only." };
+    return { ok: false, reason: options.singleGraphemeReason ?? DEFAULT_SINGLE_GRAPHEME_REASON };
   }
   if (options.blockDelimiters === true && containsDelimiterUnsafeChar(value)) {
     return { ok: false, reason: DELIMITER_UNSAFE_REASON };
   }
 
-  return { ok: true, value, wasNotation };
+  return { ok: true, value, wasNotation: resolved.wasNotation };
 }
 
 // ---------------------------------------------------------------------------
@@ -183,9 +253,21 @@ export function reflectCharInput(
   if (!resolved.ok) {
     return { kind: "error", reason: resolved.reason };
   }
-  return resolved.wasNotation
-    ? { kind: "ok", text: `${raw.trim()} → ${resolved.value}` }
-    : { kind: "ok", text: `${resolved.value} → ${toUPlusNotation(resolved.value)}` };
+  if (resolved.wasNotation) {
+    return { kind: "ok", text: `${raw.trim()} → ${resolved.value}` };
+  }
+  if (options.multiToken === true) {
+    // multiToken boxes may resolve to more than one code point (a literal
+    // digraph like "ng", or a composed-but-non-precomposing sequence) — show
+    // every code point's U+ value, not just the first, so the reflection
+    // never silently drops part of the composed result.
+    const codePoints = [...resolved.value];
+    if (codePoints.length > 1) {
+      const uplusList = codePoints.map((cp) => toUPlusNotation(cp)).join(" ");
+      return { kind: "ok", text: `${resolved.value} → ${uplusList}` };
+    }
+  }
+  return { kind: "ok", text: `${resolved.value} → ${toUPlusNotation(resolved.value)}` };
 }
 
 // ---------------------------------------------------------------------------

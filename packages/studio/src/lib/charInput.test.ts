@@ -175,6 +175,113 @@ describe("resolveCharInput — single-grapheme guard (P1, opt-in via singleGraph
     const r = resolveCharInput("éb", { singleGrapheme: true });
     expect(r).toEqual({ ok: false, reason: "Enter one character only." });
   });
+
+  it("supports a custom singleGraphemeReason override", () => {
+    const r = resolveCharInput("ab", {
+      singleGrapheme: true,
+      singleGraphemeReason: "custom reason text",
+    });
+    expect(r).toEqual({ ok: false, reason: "custom reason text" });
+  });
+});
+
+describe("resolveCharInput — multiToken compose (space-separated tokens)", () => {
+  it("resolves a single token with no spaces identically to the non-multiToken path", () => {
+    const withOption = resolveCharInput("e", { multiToken: true });
+    const withoutOption = resolveCharInput("e");
+    expect(withOption).toEqual(withoutOption);
+  });
+
+  it("composes two U+ tokens into their concatenated, NFC-normalized character", () => {
+    // "n" + U+0303 COMBINING TILDE -> NFC precomposes to U+00F1.
+    const r = resolveCharInput("U+006E U+0303", { multiToken: true });
+    expect(r).toEqual({ ok: true, value: "ñ", wasNotation: true });
+  });
+
+  it("composes a literal token followed by a U+ token", () => {
+    const r = resolveCharInput("a U+0301", { multiToken: true });
+    expect(r).toEqual({ ok: true, value: "á", wasNotation: true });
+  });
+
+  it("treats a literal digraph typed with no spaces as one literal token", () => {
+    const r = resolveCharInput("ng", { multiToken: true });
+    expect(r).toEqual({ ok: true, value: "ng", wasNotation: false });
+  });
+
+  it("collapses more than two whitespace-separated tokens", () => {
+    const r = resolveCharInput("U+0067 U+0062", { multiToken: true });
+    expect(r).toEqual({ ok: true, value: "gb", wasNotation: true });
+  });
+
+  it("tolerates multiple spaces between tokens", () => {
+    const r = resolveCharInput("U+006E   U+0303", { multiToken: true });
+    expect(r).toEqual({ ok: true, value: "ñ", wasNotation: true });
+  });
+
+  it("rejects a malformed U+ token within a multiToken input", () => {
+    const r = resolveCharInput("a U+ZZZZ", { multiToken: true });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.reason).toMatch(/not a valid unicode value/i);
+    }
+  });
+
+  describe("multiToken + singleGrapheme (checked against the final concatenated value)", () => {
+    it("rejects a genuine two-grapheme value composed from two independent tokens", () => {
+      const r = resolveCharInput("a b", { multiToken: true, singleGrapheme: true });
+      expect(r).toEqual({ ok: false, reason: "Enter one character only." });
+    });
+
+    it("ACCEPTS a multi-token-composed value that collapses to a single grapheme", () => {
+      // "n" + U+0303 composes (via NFC) to the single precomposed grapheme.
+      const r = resolveCharInput("U+006E U+0303", { multiToken: true, singleGrapheme: true });
+      expect(r).toEqual({ ok: true, value: "ñ", wasNotation: true });
+    });
+
+    it("rejects with a custom singleGraphemeReason when supplied", () => {
+      const r = resolveCharInput("a b", {
+        multiToken: true,
+        singleGrapheme: true,
+        singleGraphemeReason: "custom multiToken reason",
+      });
+      expect(r).toEqual({ ok: false, reason: "custom multiToken reason" });
+    });
+
+    it("accepts a single literal digraph (no spaces) when singleGrapheme is set to false (seqFirst-style)", () => {
+      const r = resolveCharInput("ng", { multiToken: true, singleGrapheme: false });
+      expect(r).toEqual({ ok: true, value: "ng", wasNotation: false });
+    });
+  });
+
+  describe("multiToken + blockDelimiters (checked PER TOKEN, before concatenation)", () => {
+    it("blocks a straight apostrophe appearing as its own token", () => {
+      const r = resolveCharInput("a '", { multiToken: true, blockDelimiters: true });
+      expect(r.ok).toBe(false);
+      if (!r.ok) {
+        expect(r.reason).toMatch(/straight quotes/i);
+      }
+    });
+
+    it("blocks a straight quote resolved via a U+ token", () => {
+      const r = resolveCharInput("a U+0027", { multiToken: true, blockDelimiters: true });
+      expect(r.ok).toBe(false);
+    });
+
+    it("does not block the string-safe U+02BC apostrophe as a token", () => {
+      const r = resolveCharInput("a ʼ", { multiToken: true, blockDelimiters: true });
+      expect(r).toEqual({ ok: true, value: "aʼ", wasNotation: false });
+    });
+
+    it("without blockDelimiters, a straight quote token resolves normally", () => {
+      const r = resolveCharInput("a '", { multiToken: true });
+      expect(r).toEqual({ ok: true, value: "a'", wasNotation: false });
+    });
+  });
+
+  it("concatenates tokens without re-inserting the whitespace that separated them", () => {
+    const r = resolveCharInput("n g", { multiToken: true });
+    expect(r).toEqual({ ok: true, value: "ng", wasNotation: false });
+  });
 });
 
 describe("isLoneCombiningMark", () => {
@@ -226,6 +333,43 @@ describe("reflectCharInput", () => {
 
   it("reflects a multi-character literal (no singleGrapheme option) to the U+ of its first code point", () => {
     expect(reflectCharInput("ab")).toEqual({ kind: "ok", text: "ab → U+0061" });
+  });
+
+  describe("reflectCharInput — multiToken path", () => {
+    it("reflects a multi-grapheme literal as space-separated U+ per code point", () => {
+      expect(reflectCharInput("ng", { multiToken: true })).toEqual({
+        kind: "ok",
+        text: "ng → U+006E U+0067",
+      });
+    });
+
+    it("reflects a single-code-point literal exactly as the non-multiToken path", () => {
+      expect(reflectCharInput("a", { multiToken: true })).toEqual({ kind: "ok", text: "a → U+0061" });
+    });
+
+    it("reflects a multi-token U+ compose using the notation -> char direction, echoing the raw text", () => {
+      expect(reflectCharInput("U+006E U+0303", { multiToken: true })).toEqual({
+        kind: "ok",
+        text: "U+006E U+0303 → ñ",
+      });
+    });
+
+    it("reflects a mixed literal+U+ compose using the notation -> char direction", () => {
+      expect(reflectCharInput("a U+0301", { multiToken: true })).toEqual({
+        kind: "ok",
+        text: "a U+0301 → á",
+      });
+    });
+
+    it("keeps the singleGrapheme rejection reason accurate for a genuine multi-grapheme multiToken value", () => {
+      const r = reflectCharInput("a b", { multiToken: true, singleGrapheme: true });
+      expect(r).toEqual({ kind: "error", reason: "Enter one character only." });
+    });
+
+    it("does not error for a multiToken-composed single grapheme even when singleGrapheme is set", () => {
+      const r = reflectCharInput("U+006E U+0303", { multiToken: true, singleGrapheme: true });
+      expect(r).toEqual({ kind: "ok", text: "U+006E U+0303 → ñ" });
+    });
   });
 
   it("reports the malformed-U+ error reason instead of a reflection", () => {

@@ -102,14 +102,40 @@ export const PATTERN_DEADKEY = "deadkey_single_tap"; // S-02
 export const PATTERN_SWAP = "simple_swap"; // S-01
 export const PATTERN_RALT = "modifier_as_layer_switch"; // S-08
 
-// seqFirst / seqSecond / deadkeyBaseLetter are strictly one output character
-// each, substituted directly into a single-quoted KMN string literal with no
-// escaping (substituteSlots in @keyboard-studio/engine/pattern-apply) — so
-// each box both rejects >1 grapheme cluster and blocks the ASCII straight-
-// quote delimiters (P0/P1 character-box guards; see charInput.ts).
-const CHAR_BOX_RESOLVE_OPTIONS: ResolveCharInputOptions = {
+// seqFirst / seqSecond / deadkeyBaseLetter are each substituted directly
+// into a single-quoted KMN string literal with no escaping (substituteSlots
+// in @keyboard-studio/engine/pattern-apply), so all three block the ASCII
+// straight-quote delimiters and all three accept multi-token compose (e.g.
+// "U+006E U+0303" -> a single composed character) — see charInput.ts. They
+// differ on singleGrapheme:
+//
+// - seqFirst is the sequence's LEFT-CONTEXT ("firstLetterOut") — a
+//   digraph/trigraph left context (e.g. "ng", "gb") is valid .kmn, so it is
+//   the one box RELAXED to multiple graphemes.
+// - seqSecond is the KEYSTROKE side (after "+") — a single keystroke
+//   produces exactly one character, so it stays single-grapheme.
+// - deadkeyBaseLetter stays single-grapheme too — a multi-base deadkey
+//   needs a paired accented-output list, which is a separate future change
+//   (relaxing this alone is a hard compile error via Layer-A Check #9).
+const SEQ_FIRST_RESOLVE_OPTIONS: ResolveCharInputOptions = {
+  multiToken: true,
+  blockDelimiters: true,
+};
+
+const SEQ_SECOND_RESOLVE_OPTIONS: ResolveCharInputOptions = {
+  multiToken: true,
   singleGrapheme: true,
   blockDelimiters: true,
+  singleGraphemeReason:
+    "A single keystroke produces one character — enter one character (you can compose it from U+ parts).",
+};
+
+const DEADKEY_BASE_LETTER_RESOLVE_OPTIONS: ResolveCharInputOptions = {
+  multiToken: true,
+  singleGrapheme: true,
+  blockDelimiters: true,
+  singleGraphemeReason:
+    "Enter one base character. (Covering several base letters with one dead key is coming later.)",
 };
 
 // The S-02 deadkey trigger's resolved custom character is reused as
@@ -125,7 +151,8 @@ const TRIGGER_KEY_RESOLVE_OPTIONS: KeyPickerResolveOptions = {
 // than as in-box placeholder text repeated under every box. KeyPickerField
 // carries its own version of this line, shown only while its custom-input
 // mode is active.
-const CHAR_BOX_HELP_TEXT = "Type a character directly, or a Unicode value like U+00E9.";
+const CHAR_BOX_HELP_TEXT =
+  "Type a character, or a Unicode value like U+00E9. The first (context) box accepts more than one character; combine parts with spaces, e.g. U+006E U+0303.";
 
 function methodLabel(ref: { patternId: string; slotValues?: Record<string, string> }): string {
   const sv = ref.slotValues ?? {};
@@ -397,7 +424,10 @@ function MethodChooser({
       : triggerKey === CUSTOM_KEY_OPTION_VALUE
         ? "[trigger key]"
         : triggerKey;
-  const baseLetterResolution = resolveCharInput(deadkeyBaseLetter, CHAR_BOX_RESOLVE_OPTIONS);
+  const baseLetterResolution = resolveCharInput(
+    deadkeyBaseLetter,
+    DEADKEY_BASE_LETTER_RESOLVE_OPTIONS,
+  );
   const deadkeyBaseLetterDisplay = baseLetterResolution.ok
     ? baseLetterResolution.value
     : deadkeyBaseLetter;
@@ -409,14 +439,19 @@ function MethodChooser({
   // Bidirectional char <-> U+ reflection (Fix 2) — reflectCharInput reuses
   // resolveCharInput with the SAME options as baseLetterResolution above, so
   // the reflection line and canApply's own validity check never disagree.
-  const baseLetterReflection = reflectCharInput(deadkeyBaseLetter, CHAR_BOX_RESOLVE_OPTIONS);
+  const baseLetterReflection = reflectCharInput(
+    deadkeyBaseLetter,
+    DEADKEY_BASE_LETTER_RESOLVE_OPTIONS,
+  );
 
-  const seqFirstResolution = resolveCharInput(seqFirst, CHAR_BOX_RESOLVE_OPTIONS);
-  const seqSecondResolution = resolveCharInput(seqSecond, CHAR_BOX_RESOLVE_OPTIONS);
-  const seqFirstReflection = reflectCharInput(seqFirst, CHAR_BOX_RESOLVE_OPTIONS);
-  const seqSecondReflection = reflectCharInput(seqSecond, CHAR_BOX_RESOLVE_OPTIONS);
+  const seqFirstResolution = resolveCharInput(seqFirst, SEQ_FIRST_RESOLVE_OPTIONS);
+  const seqSecondResolution = resolveCharInput(seqSecond, SEQ_SECOND_RESOLVE_OPTIONS);
+  const seqFirstReflection = reflectCharInput(seqFirst, SEQ_FIRST_RESOLVE_OPTIONS);
+  const seqSecondReflection = reflectCharInput(seqSecond, SEQ_SECOND_RESOLVE_OPTIONS);
   // Same lone-combining-mark caution as the deadkey base-letter box above —
-  // the sequence boxes are equally single-character (warn, do NOT block).
+  // fires when the resolved value is exactly one bare combining mark (warn,
+  // do NOT block). seqFirst may now resolve to more than one grapheme, but
+  // the single-combining-mark case is still worth flagging when it happens.
   const seqFirstIsLoneCombiningMark =
     seqFirstResolution.ok && isLoneCombiningMark(seqFirstResolution.value);
   const seqSecondIsLoneCombiningMark =
@@ -464,7 +499,7 @@ function MethodChooser({
           </span>
           {method !== "sequence" && (
             <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              Two keys in a row produce {currentChar}
+              Typing this after a preceding character (or characters) produces {currentChar}
             </span>
           )}
         </button>
@@ -472,15 +507,15 @@ function MethodChooser({
           <div style={configStyle}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 6, flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT, alignSelf: "center" }}>
-                Type these two keys:
+                Type the preceding character(s), then this key:
               </span>
               <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <input
                   type="text"
                   value={seqFirst}
                   onChange={(e) => onSeqFirstChange(e.target.value)}
-                  aria-label="First key in sequence"
-                  maxLength={8}
+                  aria-label="First key in sequence (the preceding character or characters)"
+                  maxLength={16}
                   style={inputStyle}
                 />
                 {seqFirstReflection.kind === "ok" && (
@@ -508,7 +543,7 @@ function MethodChooser({
                   value={seqSecond}
                   onChange={(e) => onSeqSecondChange(e.target.value)}
                   aria-label="Second key in sequence"
-                  maxLength={8}
+                  maxLength={16}
                   style={inputStyle}
                 />
                 {seqSecondReflection.kind === "ok" && (
@@ -599,7 +634,7 @@ function MethodChooser({
                   value={deadkeyBaseLetter}
                   onChange={(e) => onDeadkeyBaseLetterChange(e.target.value)}
                   aria-label="Base letter for deadkey"
-                  maxLength={8}
+                  maxLength={16}
                   style={inputStyle}
                 />
                 {baseLetterReflection.kind === "ok" && (
@@ -1175,8 +1210,8 @@ export function MechanismGallery({
       // notation) — resolveCharInput rejects empty/whitespace-only and
       // malformed U+ notation.
       return (
-        resolveCharInput(seqFirst, CHAR_BOX_RESOLVE_OPTIONS).ok &&
-        resolveCharInput(seqSecond, CHAR_BOX_RESOLVE_OPTIONS).ok
+        resolveCharInput(seqFirst, SEQ_FIRST_RESOLVE_OPTIONS).ok &&
+        resolveCharInput(seqSecond, SEQ_SECOND_RESOLVE_OPTIONS).ok
       );
     }
     if (method === "swap") {
@@ -1191,7 +1226,7 @@ export function MechanismGallery({
     return (
       resolvedVkeyOf(
         resolveKeyPickerSelection(triggerKey, triggerKeyCustomChar, TRIGGER_KEY_RESOLVE_OPTIONS),
-      ) !== null && resolveCharInput(deadkeyBaseLetter, CHAR_BOX_RESOLVE_OPTIONS).ok
+      ) !== null && resolveCharInput(deadkeyBaseLetter, DEADKEY_BASE_LETTER_RESOLVE_OPTIONS).ok
     );
   }, [
     currentChar,
@@ -1216,8 +1251,8 @@ export function MechanismGallery({
       // canApply already confirmed both resolve — re-resolve here (the read
       // point) rather than trusting the raw typed text, so U+ notation
       // collapses to the actual character before it lands in slotValues.
-      const first = resolveCharInput(seqFirst, CHAR_BOX_RESOLVE_OPTIONS);
-      const second = resolveCharInput(seqSecond, CHAR_BOX_RESOLVE_OPTIONS);
+      const first = resolveCharInput(seqFirst, SEQ_FIRST_RESOLVE_OPTIONS);
+      const second = resolveCharInput(seqSecond, SEQ_SECOND_RESOLVE_OPTIONS);
       if (!first.ok || !second.ok) return;
       assignment = {
         scope: "individual",
@@ -1237,7 +1272,7 @@ export function MechanismGallery({
         source: "user",
       };
     } else if (method === "deadkey") {
-      const base = resolveCharInput(deadkeyBaseLetter, CHAR_BOX_RESOLVE_OPTIONS);
+      const base = resolveCharInput(deadkeyBaseLetter, DEADKEY_BASE_LETTER_RESOLVE_OPTIONS);
       const triggerResolution = resolveKeyPickerSelection(
         triggerKey,
         triggerKeyCustomChar,
