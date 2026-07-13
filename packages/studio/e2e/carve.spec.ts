@@ -205,14 +205,16 @@ async function confirmMechanismsEmpty(page: Page): Promise<void> {
 }
 
 /**
- * sequences step — placeholder step inserted between mechanisms and the
- * touch fork (S-03 sequences now have their own dedicated part of the flow,
- * authored separately, after the mechanism gallery). The placeholder writes
- * nothing and always shows a single "Continue" forward control.
+ * sequences step — the interim Sequence Gallery, inserted between mechanisms
+ * and the touch fork (S-03 sequences have their own dedicated part of the
+ * flow, authored separately, after the mechanism gallery). This fixture's
+ * empty-diff path (confirmMechanismsEmpty) never flags a character for
+ * sequences, so the gallery's empty state always shows here — a single
+ * "Continue (sequence gallery)" forward control that records/emits nothing.
  */
-async function driveSequencesPlaceholder(page: Page): Promise<void> {
+async function driveSequenceGallery(page: Page): Promise<void> {
   await expect(page.getByText("Sequence Gallery")).toBeVisible({ timeout: 15_000 });
-  await page.getByRole("button", { name: "Continue (sequences placeholder)" }).click();
+  await page.getByRole("button", { name: "Continue (sequence gallery)" }).click();
 }
 
 /**
@@ -320,7 +322,7 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     // Remaining spine steps: mechanisms, sequences (placeholder), touch, help.
     // ---------------------------------------------------------------------
     await confirmMechanismsEmpty(page);
-    await driveSequencesPlaceholder(page);
+    await driveSequenceGallery(page);
     await driveTouchGallery(page);
     await driveHelpPhase(page);
 
@@ -385,7 +387,7 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     await page.getByTestId("carve-continue").click();
 
     await confirmMechanismsEmpty(page);
-    await driveSequencesPlaceholder(page);
+    await driveSequenceGallery(page);
     await driveTouchGallery(page);
     await driveHelpPhase(page);
 

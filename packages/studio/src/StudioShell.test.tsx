@@ -348,8 +348,8 @@ vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => ({
   },
 }));
 
-vi.mock("./editors/sequences/SequencesPlaceholder.tsx", () => ({
-  SequencesPlaceholder: ({ onComplete, onBack }: { onComplete?: () => void; onBack?: () => void }) => {
+vi.mock("./editors/sequences/SequenceGallery.tsx", () => ({
+  SequenceGallery: ({ onComplete, onBack }: { onComplete?: () => void; onBack?: () => void }) => {
     _mockSeqDoneRef.current = onComplete ?? null;
     _mockSeqBackRef.current = onBack ?? null;
     return (

@@ -148,13 +148,17 @@ export const mechanismsStep: EditorStep = step({
 });
 
 /**
- * Sequences step: placeholder for the upcoming Sequence Gallery (S-03
- * multi-key sequences), positioned after Mechanisms and before the touch
- * fork. Not yet implemented — the component is a stub that renders a
- * "coming soon" panel and advances without writing anything. Carries no
- * lock (only "physical" and "touch" locks exist, M3).
- * inputs stays [] (step() default): the placeholder writes nothing and has
- * no upstream dependency, so it carries no completeness-graph edges.
+ * Sequences step: the interim Sequence Gallery (S-03 multi-key sequences),
+ * positioned after Mechanisms and before the touch fork. Cycles the
+ * characters flagged for sequences (sequenceFlaggedChars, set by the
+ * Mechanism Gallery's S-03 FLAG card) and shows a visual-only sequence box
+ * plus a live preview of the working copy — the box is typeable but records
+ * nothing yet (no MechanismAssignment, no multi_char_sequence pattern
+ * application); full sequence authoring is forthcoming. Carries no lock
+ * (only "physical" and "touch" locks exist, M3).
+ * inputs stays [] (step() default): sequenceFlaggedChars is studio UI state,
+ * not an IRPath, so this step has no upstream IR dependency and carries no
+ * completeness-graph edges.
  */
 export const sequencesStep: EditorStep = step({
   id: "sequences",

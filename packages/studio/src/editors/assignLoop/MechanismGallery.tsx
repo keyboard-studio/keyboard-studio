@@ -95,19 +95,15 @@ import { RadioGroup } from "../../ui/RadioGroup.tsx";
 import {
   BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
 } from "../../lib/galleryTheme.ts";
+import { PATTERN_SEQUENCE, PATTERN_DEADKEY, PATTERN_SWAP, PATTERN_RALT } from "./patternIds.ts";
+
+// Re-exported for existing importers that reach the pattern id constants via
+// this module; the canonical declarations now live in ./patternIds.ts.
+export { PATTERN_SEQUENCE, PATTERN_DEADKEY, PATTERN_SWAP, PATTERN_RALT };
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-// Pattern IDs as they exist in the browser pattern library (content/patterns/).
-// These MUST match the `id:` fields in the YAML — a mismatch means getById()
-// returns undefined, the assignment can't resolve, and the live preview never
-// reflects the added key.
-export const PATTERN_SEQUENCE = "multi_char_sequence"; // S-03
-export const PATTERN_DEADKEY = "deadkey_single_tap"; // S-02
-export const PATTERN_SWAP = "simple_swap"; // S-01
-export const PATTERN_RALT = "modifier_as_layer_switch"; // S-08
 
 // deadkeyBaseLetter is substituted directly into a single-quoted KMN string
 // literal with no escaping (substituteSlots in
