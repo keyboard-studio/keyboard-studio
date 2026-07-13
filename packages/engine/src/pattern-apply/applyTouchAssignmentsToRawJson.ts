@@ -46,7 +46,7 @@
 import type { TouchAssignment } from "@keyboard-studio/contracts";
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import { isTouchSubKeyDuplicate } from "./touch-mechanism-shared.js";
-import type { RawKey, RawLayer, RawPlatform } from "./touch-layout-wire-format.js";
+import type { RawKey, RawPlatform } from "./touch-layout-wire-format.js";
 
 /** The top-level raw .keyman-touch-layout JSON object. */
 type RawTouchLayout = Record<string, unknown>;
