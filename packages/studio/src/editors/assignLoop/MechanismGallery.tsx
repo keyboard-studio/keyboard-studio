@@ -230,36 +230,38 @@ type SwapLayer = "base" | "shift";
 // `[RALT SHIFT '<'] > U+00AB`.
 //
 // A slot value of "" means "not yet chosen" — only valid for a freshly-added
-// slot (index > 0); the first slot always defaults to a non-empty token so
-// the card still reads as the AltGr method by default.
+// slot (index > 0); the first slot always defaults to a non-empty token
+// (generic ALT, or RALT once the keyboard already uses a chiral alt token —
+// see raltDefaultToken) so the card still reads as a layer-combo method by
+// default.
 const MAX_RALT_SLOTS = 4;
 
 /**
  * Per-family dropdown option pool, derived once per keyboard from the
  * modifier tokens already in use elsewhere in the IR. Product rule: default
- * to GENERIC only; show chiral L/R options ONLY when the keyboard already
- * uses them — EXCEPT AltGr (RALT), which is always available (near-universal
- * key; authoring a new AltGr layer is a core S-08 use case).
- *   - alt family:  generic ALT and RALT (AltGr) are always offered. LALT is
- *                  offered only once the keyboard already uses it
- *                  (inUse.has("LALT")) — RALT-in-use does NOT also trigger
- *                  LALT, so an AltGr keyboard doesn't sprout a spurious
- *                  Left-Alt option.
- *   - ctrl family: generic CTRL is always offered. LCTRL/RCTRL are offered
- *                  only once the keyboard already uses chiral ctrl
- *                  (inUse.has("LCTRL") or inUse.has("RCTRL")).
+ * to GENERIC ONLY for a family until the keyboard already distinguishes
+ * chirality for that family — once a chiral token (L/R) is in use, offer
+ * BOTH chiral options and drop the generic. There is no always-on exception
+ * for AltGr (RALT): it is offered only once the keyboard already uses a
+ * chiral alt token.
+ *   - alt family:  generic ALT only, until the keyboard already uses RALT or
+ *                  LALT — once either is in use, offer RALT and LALT (no
+ *                  generic ALT).
+ *   - ctrl family: mirrors alt — generic CTRL only, until the keyboard
+ *                  already uses RCTRL or LCTRL — once either is in use,
+ *                  offer LCTRL and RCTRL (no generic CTRL).
  * NCAPS is never offered: a rule with no caps token already matches caps-off,
  * so it is not a distinct selectable S-08 layer — modifierCombos.ts's
  * canonicalizeCombo strips a bare NCAPS rather than modeling it as one.
  */
 function computeModifierPool(inUse: ReadonlySet<ModifierToken>): ModifierToken[] {
-  // RALT stays first so the pre-filled slot-1 default (AltGr) is preserved —
-  // see raltDefaultToken, which picks the first alt-family token in this pool.
-  const altFamily: ModifierToken[] = inUse.has("LALT")
-    ? ["RALT", "ALT", "LALT"]
-    : ["RALT", "ALT"];
+  // Alt: generic ALT only until the keyboard already uses a chiral alt
+  // token; once RALT or LALT is in use, offer both chiral options.
+  const altFamily: ModifierToken[] =
+    inUse.has("RALT") || inUse.has("LALT") ? ["RALT", "LALT"] : ["ALT"];
+  // Ctrl mirrors Alt.
   const ctrlFamily: ModifierToken[] =
-    inUse.has("LCTRL") || inUse.has("RCTRL") ? ["CTRL", "LCTRL", "RCTRL"] : ["CTRL"];
+    inUse.has("RCTRL") || inUse.has("LCTRL") ? ["LCTRL", "RCTRL"] : ["CTRL"];
   return ["SHIFT", ...ctrlFamily, ...altFamily, "CAPS"];
 }
 
@@ -1072,9 +1074,9 @@ export function MechanismGallery({
     () => computeModifierPool(modifierTokensInUse),
     [modifierTokensInUse],
   );
-  // First-slot default — the alt-family entry the pool leads with, so the
-  // card still reads as the AltGr method by default (ALT when that's the
-  // only alt-family token on offer, else RALT).
+  // First-slot default — the alt-family entry the pool leads with: generic
+  // ALT until the keyboard already uses a chiral alt token, at which point
+  // the pool leads with RALT (computeModifierPool's ["RALT","LALT"] order).
   const raltDefaultToken = useMemo<ModifierToken>(() => {
     const altFamily = modifierPool.find((t) => t === "ALT" || t === "RALT" || t === "LALT");
     return altFamily ?? "RALT";
