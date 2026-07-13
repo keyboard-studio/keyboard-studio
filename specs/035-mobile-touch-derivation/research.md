@@ -401,3 +401,46 @@ preview, lint, and output agree):
   session flag; it has no applyStepCompletion effect).
 - **Update set**: `advance.test.ts` (`mechanisms → touch` walk becomes conditional), the
   golden-walk oracle, and the Flow Map render of the fork step.
+
+---
+
+## R13 — Seam reconciliation: one artifact writer (resolves the km-triage escalation on PR #1088)
+
+**Question escalated**: should the 035 replay and spec-014's `repropagate`/`touchSuggest`
+merge into one propagation mechanism, or is one inert while the other is live?
+
+**Decision — single artifact writer; the seam stays IR-scoped**:
+- The 035 stateless derivation (`buildTouchLayoutJson` under the R11 matrix) is the **only
+  writer** of the `touchLayoutJson` side-car / VFS artifact, in **both** flag states.
+- The spec-014 seam keeps its IR-level job — maintaining `ir.touchLayout` + provenance on
+  the working IR (which `promoteOnManualEdit` and the flag-on preview rely on) — but
+  **loses its side-car write**: remove `setTouchLayoutJson` from `RepropagateDeps`, the
+  emit at [repropagate.ts:163-165](../../packages/studio/src/steps/repropagate.ts), and
+  its injection at the reducer's mechanisms-completion call site
+  ([reducer.ts:248](../../packages/studio/src/steps/reducer.ts)).
+- The two mechanisms are **not merged**: `touchSuggest` remains the flag-gated mutate-seam
+  propagation over the working IR; unifying it with `applyDesktopModifications` is
+  spec-014-scope work with no 035 acceptance criterion behind it.
+
+**Rationale**: the seam's side-car write was an issue-#831-era patch for a world where
+nothing re-serialized the artifact after re-propagation. Under 035 the artifact is always
+re-derived from seed + mods + assignments at the touch stage, so the write is redundant at
+best — and **flag-on it is harmful**: it emits via `emitTouchLayout(ir.touchLayout)`, an IR
+round-trip that violates the R9 verbatim guarantee whenever the base ships a touch layout,
+and it bypasses the R11 emission matrix. The mutate flag defaults **off**
+(`VITE_KM_MUTATE_SEAM` must be exactly `"1"`, no live toggle), so the removal is a no-op
+for every default build; it MUST land before the flag is ever enabled on a 035-bearing
+build.
+
+**Consequence for tasks.md**: T024 is a **small real refactor** (one dep + one write
+removed, flagParity test + docstrings updated), not a documentation task. Phase 5 timing
+is safe *only because* the flag defaults off; the task carries the before-flag-on
+constraint explicitly.
+
+**Alternatives considered**: (a) *Route the seam's flag-on write through
+`buildTouchLayoutJson`* — rejected: re-propagation fires at mechanisms-completion, before
+the seed-source choice exists, so it cannot evaluate the R11 matrix; the touch stage
+re-derives moments later anyway. (b) *Full merger of `touchSuggest` into the replay* —
+rejected for 035: default-off seam, no acceptance criterion behind it, and T021's
+provenance tagging in `scaffoldTouchLayout` already removes most of the duplication
+pressure; revisit inside spec-014's own rollout.

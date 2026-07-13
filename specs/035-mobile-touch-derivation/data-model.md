@@ -57,7 +57,11 @@ interface DesktopModifications {
   original rules" diff — `baseIr` is set once at instantiation and `lockDesktop()` only
   sets a flag, so that diff is always empty (R3). The produced-*character* diff also
   handles carve's nul-fill: carved slots keep a `nul` rule, so the char disappears from
-  the produced set even though the rule survives.
+  the produced set even though the rule survives. NFC caveat: `buildProducedSet`
+  run-merges consecutive char elements and NFC-normalizes on flush, so a carved
+  base+combining (NFD-emitting) sequence surfaces as its precomposed codepoint in the
+  diff — the derivation tests must pin that this is the removal the replay applies
+  (tasks.md T010).
 - `placements`: from `TouchGallery.desktopAssignments` (physical + `scope:"individual"`),
   the same source the current per-character suggestion logic reads.
 

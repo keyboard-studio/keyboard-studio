@@ -113,7 +113,7 @@ Layer C check). See [research.md](research.md) and [data-model.md](data-model.md
 ```text
 specs/035-mobile-touch-derivation/
 ├── plan.md              # This file (/speckit-plan output)
-├── research.md          # Phase 0 output — decisions R1–R12
+├── research.md          # Phase 0 output — decisions R1–R13
 ├── data-model.md        # Phase 1 output — entities + derivation flow
 ├── quickstart.md        # Phase 1 output — validation scenarios (US1/US2)
 ├── contracts/           # Phase 1 output — function/UI contracts
@@ -145,8 +145,10 @@ packages/studio/src/
 ├── steps/
 │   ├── advance.ts                      # (EDIT) mechanisms → touch_seed_source (when unchosen) → touch;
 │   │                                   #   AdvanceContext gains touchSeedSource (FR-006, R12)
-│   ├── repropagate.ts                  # (RECONCILE) spec-014 seam must not become a second propagation
-│   │                                   #   path alongside the replay (see seed-derivation contract)
+│   ├── repropagate.ts                  # (EDIT — R13) remove the seam's touchLayoutJson side-car write;
+│   │                                   #   buildTouchLayoutJson is the single artifact writer
+│   ├── reducer.ts                      # (EDIT — R13) drop setTouchLayoutJson injection at the
+│   │                                   #   mechanisms-completion repropagate call
 │   └── registerEditorSteps.ts          # (EDIT) touch_seed_source step gets the chooser component
 ├── editors/assignLoop/
 │   └── TouchGallery.tsx                # (EDIT) rewrite stale seed comment; consume derived seed;

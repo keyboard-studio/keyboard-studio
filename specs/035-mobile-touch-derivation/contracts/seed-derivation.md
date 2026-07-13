@@ -120,15 +120,23 @@ must pass the new `opts` shape **in the same change**; the previous positional
 `baseTouchJson?` arg is folded into `opts`. This is an internal studio helper, not a locked
 contract — no version bump.
 
-**Adjacent-seam note**: the spec-014 flag-gated repropagation seam
+**Adjacent-seam decision (R13 — pinned, resolves the PR #1088 km-triage escalation)**: the
+spec-014 flag-gated repropagation seam
 ([repropagate.ts](../../../packages/studio/src/steps/repropagate.ts) +
 [touchSuggest.ts](../../../packages/studio/src/editors/touchSuggest/touchSuggest.ts))
-already derives touch from physical decisions and writes the `touchLayoutJson` side-car.
-This feature's replay must not become a second, parallel propagation path: `touchSuggest`
-stays the mutate-seam (flag-on) propagation; `applyDesktopModifications` is the
-seed-derivation replay inside `buildTouchLayoutJson`. A task must reconcile the two
-(shared placement logic or an explicit ordering rule) rather than leaving two writers of
-the touch layout.
+also derives touch from physical decisions and, flag-on, writes the `touchLayoutJson`
+side-car via `emitTouchLayout(ir.touchLayout)` (repropagate.ts:163-165). Resolution —
+**single artifact writer**: `buildTouchLayoutJson` (under the R11 matrix) is the only
+writer of the side-car / VFS artifact in both flag states. The seam keeps its IR-scoped
+provenance job (`ir.touchLayout` maintenance for `promoteOnManualEdit` / flag-on preview)
+but its side-car write is **removed** — `setTouchLayoutJson` comes out of
+`RepropagateDeps`, the emit comes out of `repropagate()`, and its injection comes out of
+the reducer's mechanisms-completion call site (reducer.ts:248). Flag-on, that write is an
+IR round-trip that violates this contract's R9 verbatim guarantee on shipped base layouts
+and bypasses the R11 matrix (it fires at mechanisms-completion, before the seed-source
+choice exists). The mechanisms are **not** merged — `touchSuggest` unification is
+spec-014-scope work. See research R13; implemented by tasks.md T024, which must land
+before `VITE_KM_MUTATE_SEAM=1` is ever enabled on a 035-bearing build.
 
 ## Acceptance mapping
 
