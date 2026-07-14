@@ -40,6 +40,7 @@ Package manager is **pnpm 9** (Node ≥ 20). Run from the repo root unless noted
 - **`@keyboard-studio/engine`** — the real engine. Subsystems under `packages/engine/src/`: `codec` (.kmn ↔ KeyboardIR), `scaffolder`, `output` (VirtualFS → zip), `validator`, `compiler` (kmcmplib wrapper), `simulator`, `recognizer` (+ generated rules), `pattern-apply`, `pattern-library`, `strategy-selector`, `character-discovery`, `inventory`, `loader`, `base-browser`, `stub-mutator`, `langtags` (SIL langtags slim-index lookup; exposed as `@keyboard-studio/engine/langtags`).
 - **`@keymanapp/keyboard-lint`** — Layer C hygiene lint engine (`lintEngine.ts`, `checks/`, `parsers/`).
 - **`@keyboard-studio/llm`** — pluggable LLM client (`backends/`) for prompt-driven assistance.
+- **`@keyboard-studio/glottolog`** — offline, pinned copy of Glottolog's language-classification tree (checked-in generated index derived from `glottolog-cldf` via `fetch-glottolog`/`codegen-glottolog`) plus the relatedness catalog and the keyboard-base bridge (`./bridge`) that turns "language X has no keyboard" into ranked bases from close relatives. Contracts-only edge (the bridge takes injected deps; no engine/studio import). See [specs/036-glottolog-catalog/](specs/036-glottolog-catalog/).
 - **`@keyboard-studio/studio`** — the React + Vite SPA (three-pane gallery / editor / preview; working-copy spine).
 - **`packages/compiler`** — holds only the fetched `kmcmplib.wasm` (no TS `package.json`); the service wrapping it lives in `engine/src/compiler`.
 

@@ -57,7 +57,8 @@ export interface SuggestOptions {
 }
 
 export type SuggestReason =
-  | "language-match"
+  | "language-match-monolingual"
+  | "language-match-multilingual"
   | "script-match"
   | "language-cross-script"
   | "us-qwerty-fallback";
@@ -70,19 +71,37 @@ export interface BaseSuggestion {
 const DEFAULT_FALLBACK_ID = "basic_kbdus";
 
 const RANK: Record<SuggestReason, number> = {
-  "language-match": 0,
-  "script-match": 1,
-  "language-cross-script": 2,
-  "us-qwerty-fallback": 3,
+  "language-match-monolingual": 0,
+  "language-match-multilingual": 1,
+  "script-match": 2,
+  "language-cross-script": 3,
+  "us-qwerty-fallback": 4,
 };
+
+/**
+ * Alphabetical tie-break within a tier: case-insensitive by display name, then
+ * by id for determinism. Used to order the same-script tier alphabetically.
+ */
+export function byDisplayName(a: BaseKeyboard, b: BaseKeyboard): number {
+  return (
+    a.displayName.localeCompare(b.displayName, undefined, {
+      sensitivity: "base",
+    }) || a.id.localeCompare(b.id)
+  );
+}
 
 /**
  * Rank base keyboards for the target (language, script) pair, best-first.
  *
- * - **language-match** — the base's `script` equals the target script AND the
- *   base supports a BCP47 tag whose primary language subtag matches the target's
- *   (requires `opts.languagesById`).
- * - **script-match** — the base's `script` equals the target script.
+ * - **language-match-monolingual** — the base's `script` equals the target
+ *   script AND the base's *only* declared language is the target language (its
+ *   declared tags resolve to a single distinct primary subtag). A keyboard built
+ *   for exactly this language is the strongest starting point.
+ * - **language-match-multilingual** — same script + target-language match, but
+ *   the base also declares other languages. Still a genuine match, ranked just
+ *   below a dedicated single-language keyboard.
+ * - **script-match** — the base's `script` equals the target script. Ordered
+ *   alphabetically by display name within the tier.
  * - **language-cross-script** — the base supports the target language but its
  *   script differs from the target (requires `opts.languagesById`). Surfaces
  *   keyboards a language already has, on other writing systems.
@@ -90,8 +109,9 @@ const RANK: Record<SuggestReason, number> = {
  *   offered last if present in `bases`, even when nothing else matches (this is
  *   the "blank" keyboard, which *is* US QWERTY).
  *
- * Each base appears once, under its best reason. Stable within a rank (input
- * order, which `BaseBrowserService` returns sorted by id).
+ * Each base appears once, under its best (first-matching) reason. Stable within
+ * a rank (input order, which `BaseBrowserService` returns sorted by id) except
+ * the alphabetical script-match tier.
  *
  * @param bases   Candidate base keyboards (from `BaseBrowserService.listAll`).
  * @param target  The chosen (language, script) pair from identity-lite.
@@ -110,13 +130,21 @@ export function suggestBases(
 
   const reasonFor = (base: BaseKeyboard): SuggestReason | null => {
     const scriptMatch = base.script === target.script;
+    const declaredLangs = langs[base.id] ?? [];
     const languageDeclared =
       targetLang !== undefined &&
-      (langs[base.id] ?? []).some((tag) => primarySubtag(tag) === targetLang);
+      declaredLangs.some((tag) => primarySubtag(tag) === targetLang);
     const langAndScriptMatch = scriptMatch && languageDeclared;
     // A genuine language+script match is the strongest signal — surface it even
-    // for the fallback base (e.g. basic_kbdus genuinely covers English).
-    if (langAndScriptMatch) return "language-match";
+    // for the fallback base (e.g. basic_kbdus genuinely covers English). Split
+    // monolingual (dedicated to just this language) from multilingual so a
+    // single-language keyboard is offered ahead of a broader one.
+    if (langAndScriptMatch) {
+      const distinctLangs = new Set(declaredLangs.map(primarySubtag));
+      return distinctLangs.size <= 1
+        ? "language-match-monolingual"
+        : "language-match-multilingual";
+    }
     // Otherwise the US-QWERTY fallback is always the generic "blank" option,
     // ranked below script and language-cross-script — a more specific base
     // should win.
@@ -137,6 +165,13 @@ export function suggestBases(
 
   return suggestions
     .map((s, i) => ({ s, i }))
-    .sort((a, b) => RANK[a.s.reason] - RANK[b.s.reason] || a.i - b.i)
+    .sort((a, b) => {
+      const rankDelta = RANK[a.s.reason] - RANK[b.s.reason];
+      if (rankDelta !== 0) return rankDelta;
+      // Same-script languages are ordered alphabetically; every other tier keeps
+      // input order (stable), which BaseBrowserService returns sorted by id.
+      if (a.s.reason === "script-match") return byDisplayName(a.s.base, b.s.base);
+      return a.i - b.i;
+    })
     .map(({ s }) => s);
 }
