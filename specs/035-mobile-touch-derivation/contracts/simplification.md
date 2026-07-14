@@ -33,20 +33,43 @@ export function touchCoverage(
    (`sp:8`/`sp:10`) are not char producers.
 2. **Pure** — no mutation, no I/O.
 3. **Extraction** — this traversal is exactly the `detectedChars` walk currently inline in
-   [TouchGallery.tsx:634-663](../../packages/studio/src/editors/assignLoop/TouchGallery.tsx);
-   that inline set is replaced by a call to `touchCoverage` so gallery and lint agree.
+   [TouchGallery.tsx](../../../packages/studio/src/editors/assignLoop/TouchGallery.tsx)
+   (the `detectedChars` memo); that inline set is replaced by a call to `touchCoverage` so
+   gallery and lint agree. Two preservation requirements: the extracted walk must be fed
+   the **derived seed for the chosen seed source** (today it walks
+   `scaffoldTouchLayout(baseIr)` unconditionally — wrong for Case B), and the "already in
+   layout" suggestion behavior it powers (Accept → `touch_inherited`) must survive the
+   extraction unchanged.
 
-## New: Layer C touch check 18.6 (coverage)
+## Extended: criterion 18.6 gains a touch-side check (`KM_LINT_TOUCH_UNCOVERED`)
 
-`packages/keyboard-lint/src/checks/` — register a check that runs `touchCoverage(layout,
-inventory)` and emits **one error finding per uncovered char** ("`U+XXXX` <char> has no touch
-mechanism"). Surfaced through the existing
-[useTouchLint](../../packages/studio/src/hooks/useTouchLint.ts) hook alongside 18.1–18.5 — **no
-new debounce timer** (Constitution IV).
+Criterion **18.6 already has a shipped check** —
+[check-18-6-inventory-coverage.ts](../../../packages/keyboard-lint/src/checks/check-18-6-inventory-coverage.ts)
+(`KM_LINT_INVENTORY_UNCOVERED`): desktop-rule coverage via `buildProducedSet(ir)`, warning
+severity, scope-guarded to `ir.origin === "scaffolded"` with no raw fragments, runnable only
+through `lintWithContext()` (needs `keyboardIR` + `inventory`). This feature does **not**
+register a second 18.6 rubric; it adds a **sibling check code** for the touch surface.
+
+`packages/keyboard-lint/src/checks/check-18-6-touch-coverage.ts` — a check that runs
+`touchCoverage(layout, inventory)` and emits **one finding per uncovered char**
+("`U+XXXX` <char> has no touch mechanism"), code `KM_LINT_TOUCH_UNCOVERED`, mapped to the
+**existing** criterion row `18.6-inventory-fully-covered`. **No new criteria.json row** —
+the criteria count (148) is test-enforced (the 18.13 addition was reverted for this).
 
 **Contract**:
-- Severity **error** (blocks a clean touch stage), consistent with the FR-008 "MUST NOT" and
-  the criterion 18.6 coverage requirement.
+- **Scope guard differs from the sibling**: do **not** copy `origin === "scaffolded"` —
+  imported bases (Case B) are this feature's primary audience; the raw-fragment skip does
+  not apply because this check walks the touch layout, not IR rules.
+- **Severity/gating (R5)**: **warning** while editing in the gallery (a sparse imported
+  seed legitimately starts with many not-yet-configured inventory chars; a wall of errors
+  at stage entry is noise). **Blocking at stage completion**: `handlePhaseEComplete` (or
+  the stage-exit gate) re-runs `touchCoverage` and refuses to finalize the touch stage
+  while `uncovered` is non-empty — this is FR-008's "MUST NOT" enforcement point.
+- **Wiring**: [useTouchLint](../../../packages/studio/src/hooks/useTouchLint.ts) currently
+  calls plain `engine.lint(fs, keyboardId)`, which cannot run context-dependent checks.
+  Extend the hook to accept optional context (the derived layout + confirmed inventory) and
+  route through `lintWithContext` — same debounced effect, **no new debounce timer**
+  (Constitution IV).
 - Runs on the same projected/edited VFS the preview uses (`editedVfsForLint`) so lint,
   preview, and output agree.
 

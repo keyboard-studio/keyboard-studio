@@ -1,0 +1,20 @@
+{
+  "commit": "072ca0d0410039fb8b779be8fc165bac575d2cda",
+  "notice": "Glottolog 5.3 by Hammarström, Harald & Forkel, Robert & Haspelmath, Martin & Bank, Sebastian. Leipzig: Max Planck Institute for Evolutionary Anthropology. https://glottolog.org (CC-BY-4.0)",
+  "files": [
+    {
+      "path": "languages.csv",
+      "sha256": "1a50a393bc81568b656f9522be18aa4f80f38e94309ba6c863d583234adfbb89",
+      "url": "https://raw.githubusercontent.com/glottolog/glottolog-cldf/072ca0d0410039fb8b779be8fc165bac575d2cda/cldf/languages.csv",
+      "bytes": 2477017,
+      "recordCount": 27177
+    },
+    {
+      "path": "values.csv",
+      "sha256": "a8601cb04ccc6a310538217f772d2461853aa0ea49e3bfe24c7396570fc4ea25",
+      "url": "https://raw.githubusercontent.com/glottolog/glottolog-cldf/072ca0d0410039fb8b779be8fc165bac575d2cda/cldf/values.csv",
+      "bytes": 21447242,
+      "recordCount": 145145
+    }
+  ]
+}
