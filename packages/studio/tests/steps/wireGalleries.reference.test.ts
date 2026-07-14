@@ -147,6 +147,7 @@ describe("spec 021 T007 — physical (R1) REFERENCE: lockDesktop() fires uncondi
 
 describe("spec 021 T008 — touch (R2) REFERENCE: buildTouchLayoutJson/setTouchLayoutJson run unconditionally (FR-007/FR-012/SC-004)", () => {
   const assignments = [{ key: "a" }] as unknown as TouchCompleteResult["assignments"];
+  const EMPTY_MODS = { removals: [], placements: [] };
 
   function runTouch(flag: "" | "1") {
     vi.stubEnv("VITE_KM_MUTATE_SEAM", flag);
@@ -160,14 +161,20 @@ describe("spec 021 T008 — touch (R2) REFERENCE: buildTouchLayoutJson/setTouchL
 
   it("Case A (no shipped layout): builds from IR and persists via setTouchLayoutJson — flag OFF", () => {
     const { deps, baseIr } = runTouch("");
-    // resolveBaseTouchJson → undefined ⇒ Case A: build with undefined baseTouchJson.
-    expect(deps.buildTouchLayoutJson).toHaveBeenCalledWith(baseIr, assignments, undefined);
+    // resolveBaseTouchJson → undefined ⇒ Case A: build with baseTouchJson omitted.
+    expect(deps.buildTouchLayoutJson).toHaveBeenCalledWith(baseIr, assignments, {
+      mods: EMPTY_MODS,
+      seedSource: null,
+    });
     expect(deps.setTouchLayoutJson).toHaveBeenCalledWith('{"built":true}');
   });
 
   it("Case A: builds + persists IDENTICALLY with the flag ON (R2 is unconditional — flag-independent)", () => {
     const { deps, baseIr } = runTouch("1");
-    expect(deps.buildTouchLayoutJson).toHaveBeenCalledWith(baseIr, assignments, undefined);
+    expect(deps.buildTouchLayoutJson).toHaveBeenCalledWith(baseIr, assignments, {
+      mods: EMPTY_MODS,
+      seedSource: null,
+    });
     expect(deps.setTouchLayoutJson).toHaveBeenCalledWith('{"built":true}');
   });
 
@@ -183,10 +190,14 @@ describe("spec 021 T008 — touch (R2) REFERENCE: buildTouchLayoutJson/setTouchL
 
     // The #831 side-car is the input the touch build edits faithfully (Case B).
     expect(deps.resolveBaseTouchJson).toHaveBeenCalledTimes(1);
-    expect(deps.buildTouchLayoutJson).toHaveBeenCalledWith(baseIr, assignments, shipped);
+    expect(deps.buildTouchLayoutJson).toHaveBeenCalledWith(baseIr, assignments, {
+      baseTouchJson: shipped,
+      mods: EMPTY_MODS,
+      seedSource: null,
+    });
   });
 
-  it("empty assignments → clears the stored touch layout (setTouchLayoutJson(null)); no build", () => {
+  it("empty assignments no longer short-circuits the reducer (spec 035 R11 — gating moved to the injected dep)", () => {
     vi.stubEnv("VITE_KM_MUTATE_SEAM", "");
     const { deps } = makeHarness();
     const result: TouchCompleteResult = {
@@ -197,8 +208,11 @@ describe("spec 021 T008 — touch (R2) REFERENCE: buildTouchLayoutJson/setTouchL
 
     applyStepCompletion(TOUCH_STEP_ID, result, deps);
 
-    expect(deps.setTouchLayoutJson).toHaveBeenCalledWith(null);
-    expect(deps.buildTouchLayoutJson).not.toHaveBeenCalled();
+    // makeHarness's buildTouchLayoutJson mock always returns non-null json —
+    // the reducer no longer gates on assignments emptiness itself, so it
+    // calls the dep and persists whatever the dep decided.
+    expect(deps.buildTouchLayoutJson).toHaveBeenCalled();
+    expect(deps.setTouchLayoutJson).toHaveBeenCalledWith('{"built":true}');
   });
 
   it("graceful degradation: a build throw still persists setTouchLayoutJson(null), never throws (advance proceeds)", () => {

@@ -49,11 +49,15 @@ function deferred<T>(): Deferred<T> {
 // ---------------------------------------------------------------------------
 
 const lintSpy = vi.fn<() => Promise<unknown>>();
+const lintWithContextSpy = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 
 vi.mock("@keymanapp/keyboard-lint", () => ({
   KeyboardLintEngine: class {
     lint(..._args: unknown[]) {
       return lintSpy();
+    }
+    lintWithContext(...args: unknown[]) {
+      return lintWithContextSpy(...args);
     }
   },
 }));
@@ -170,5 +174,74 @@ describe("useTouchLint — cancelled guard", () => {
     // The result is frozen at unmount-time; touchFindings must still be [] (the initial state).
     expect(result.current.touchFindings).toEqual([]);
     expect(result.current.touchFindings.find((f) => f.code === "KM_WARN_LINT_ERROR")).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3. Optional touch-coverage context (spec 035 T009) — routes through
+//    engine.lintWithContext when supplied, engine.lint (unchanged) when not.
+// ---------------------------------------------------------------------------
+
+const STUB_LAYOUT = {
+  platforms: [{ id: "phone" as const, layers: [] }],
+  nodeIds: [],
+};
+
+describe("useTouchLint — optional touch-coverage context (spec 035 T009)", () => {
+  it("context absent (2-arg call): routes through engine.lint, not lintWithContext", async () => {
+    lintSpy.mockResolvedValue([]);
+
+    const { useTouchLint } = await import("./useTouchLint.ts");
+    const fs = makeStableFs();
+    const { result } = renderHook(() => useTouchLint(fs, "test"));
+
+    await waitFor(() => {
+      expect(result.current.touchLintRunning).toBe(false);
+    });
+
+    expect(lintSpy).toHaveBeenCalledTimes(1);
+    expect(lintWithContextSpy).not.toHaveBeenCalled();
+    expect(result.current.touchFindings).toEqual([]);
+  });
+
+  it("context present: routes through engine.lintWithContext with touchLayout/touchInventory, findings merged", async () => {
+    const touchUncoveredFinding = {
+      code: "KM_LINT_TOUCH_UNCOVERED",
+      severity: "warning" as const,
+      layer: "C" as const,
+      message: 'Inventory character U+007A "z" has no touch mechanism.',
+      location: { file: "source/test.keyman-touch-layout", line: 1 },
+    };
+    lintWithContextSpy.mockResolvedValue([touchUncoveredFinding]);
+
+    const { useTouchLint } = await import("./useTouchLint.ts");
+    const fs = makeStableFs();
+    const context = { layout: STUB_LAYOUT, inventory: ["a", "z"] };
+    const { result } = renderHook(() => useTouchLint(fs, "test", context));
+
+    await waitFor(() => {
+      expect(result.current.touchLintRunning).toBe(false);
+    });
+
+    expect(lintWithContextSpy).toHaveBeenCalledTimes(1);
+    expect(lintSpy).not.toHaveBeenCalled();
+    const [, , ctxArg] = lintWithContextSpy.mock.calls[0]!;
+    expect(ctxArg).toEqual({ touchLayout: STUB_LAYOUT, touchInventory: ["a", "z"] });
+    expect(result.current.touchFindings).toEqual([touchUncoveredFinding]);
+  });
+
+  it("context === null (explicit): behaves identically to context omitted", async () => {
+    lintSpy.mockResolvedValue([]);
+
+    const { useTouchLint } = await import("./useTouchLint.ts");
+    const fs = makeStableFs();
+    const { result } = renderHook(() => useTouchLint(fs, "test", null));
+
+    await waitFor(() => {
+      expect(result.current.touchLintRunning).toBe(false);
+    });
+
+    expect(lintSpy).toHaveBeenCalledTimes(1);
+    expect(lintWithContextSpy).not.toHaveBeenCalled();
   });
 });

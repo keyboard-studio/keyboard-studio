@@ -76,6 +76,10 @@ vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () => ({
   TouchGallery: () => <div data-testid="stub-TouchGallery" />,
 }));
 
+vi.mock("../../src/editors/touchSeedSource/TouchSeedSourcePanel.tsx", () => ({
+  TouchSeedSourcePanel: () => <div data-testid="stub-TouchSeedSourcePanel" />,
+}));
+
 vi.mock("../../src/components/UnsupportedScriptStub.tsx", () => ({
   UnsupportedScriptStub: ({ script }: { script: string }) => (
     <div data-testid="stub-UnsupportedScriptStub" data-script={script} />
@@ -252,7 +256,7 @@ const editorSteps = manifest.filter(
 //   charactersStep    → CharactersStep                    → stub-CharactersStep
 //   carveStep         → CarveAdapter                      → CarveGallery stub
 //   mechanismsStep    → AddPhysicalAdapter                → MechanismGallery stub
-//   touchSeedSourceStep → AddTouchAdapter                 → TouchGallery stub
+//   touchSeedSourceStep → TouchSeedSourcePanel            → TouchSeedSourcePanel stub
 //   touchStep         → AddTouchAdapter                   → TouchGallery stub
 //   helpStep          → PhaseFStepFactoryComponent        → FlowStepHost stub (flow_id=phase_f_helpdocs)
 //   packageStep       → PhaseFStepFactoryComponent        → FlowStepHost stub (flow_id=phase_f_helpdocs)
@@ -264,7 +268,7 @@ const STEP_TO_EXPECTED_STUB: Record<string, string> = {
   characters: "stub-CharactersStep",
   carve: "stub-CarveGallery",
   mechanisms: "stub-MechanismGallery",
-  touch_seed_source: "stub-TouchGallery",
+  touch_seed_source: "stub-TouchSeedSourcePanel",
   touch: "stub-TouchGallery",
   help: "stub-FlowStepHost-phase_f_helpdocs",
   package: "stub-FlowStepHost-phase_f_helpdocs",

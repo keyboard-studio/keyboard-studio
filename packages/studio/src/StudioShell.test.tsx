@@ -21,6 +21,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
 
 // ---------------------------------------------------------------------------
 // vi.hoisted — must precede vi.mock() calls
@@ -361,6 +362,52 @@ vi.mock("./editors/assignLoop/TouchGallery.tsx", () => ({
   },
 }));
 
+// TouchSeedSourcePanel mock (spec 035 T014/T012) — registerEditorSteps.ts now
+// renders this for the "touch_seed_source" step (the "touch" step keeps the
+// TouchGallery mock above, unchanged). Two confirm buttons let R11 emission
+// tests pick either fork choice; each mirrors the real component's behavior
+// of setting surveySessionStore.touchSeedSource BEFORE calling onComplete.
+vi.mock("./editors/touchSeedSource/TouchSeedSourcePanel.tsx", () => ({
+  TouchSeedSourcePanel: ({
+    onComplete,
+    onBack,
+  }: {
+    onComplete: (result: unknown) => void;
+    onBack?: () => void;
+  }) => {
+    const setTouchSeedSource = useSurveySessionStore((s) => s.setTouchSeedSource);
+    return (
+      <div data-testid="stage-seed-source">
+        <button
+          type="button"
+          data-testid="seed-source-complete"
+          onClick={() => {
+            setTouchSeedSource("import-adapt");
+            onComplete(undefined);
+          }}
+        >
+          seed-source-complete
+        </button>
+        <button
+          type="button"
+          data-testid="seed-source-reseed-complete"
+          onClick={() => {
+            setTouchSeedSource("reseed-from-desktop");
+            onComplete(undefined);
+          }}
+        >
+          seed-source-reseed-complete
+        </button>
+        {onBack !== undefined && (
+          <button type="button" data-testid="seed-source-back" onClick={onBack}>
+            seed-source-back
+          </button>
+        )}
+      </div>
+    );
+  },
+}));
+
 vi.mock("./components/UnsupportedScriptStub.tsx", () => ({
   UnsupportedScriptStub: ({ script }: { script: string }) => (
     <div data-testid="stage-unsupported">{script}</div>
@@ -532,8 +579,11 @@ function advanceToMechanisms() {
 function advanceToF() {
   advanceToMechanisms();
   fireEvent.click(screen.getByTestId("mechanisms-complete"));
-  // Stage E (TouchGallery) is now inserted between mechanisms and F.
-  fireEvent.click(screen.getByTestId("e-complete"));
+  // touch_seed_source fork (spec 035 R4/R12, no choice recorded yet on a fresh
+  // walk) renders the mocked TouchSeedSourcePanel chooser; confirming it lands
+  // on the real "touch" step (mocked TouchGallery stub, "e-complete").
+  fireEvent.click(screen.getByTestId("seed-source-complete")); // touch_seed_source -> touch
+  fireEvent.click(screen.getByTestId("e-complete")); // touch -> F
 }
 
 // ---------------------------------------------------------------------------
@@ -619,10 +669,16 @@ describe("SurveyView — mechanisms → F transition", () => {
     advanceToMechanisms();
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
-    // mechanisms → E (TouchGallery) → F
+    // mechanisms → touch_seed_source fork (spec 035 R4/R12) → touch → F
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
-    expect(screen.getByTestId("stage-E")).toBeTruthy();
+    expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
     expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
+
+    // Confirming the fork (no choice recorded yet on a fresh walk) lands on
+    // the real "touch" step (mocked TouchGallery stub, stage-E).
+    fireEvent.click(screen.getByTestId("seed-source-complete"));
+    expect(screen.getByTestId("stage-E")).toBeTruthy();
+    expect(screen.queryByTestId("stage-seed-source")).toBeNull();
 
     fireEvent.click(screen.getByTestId("e-complete"));
 
@@ -781,29 +837,52 @@ describe("SurveyView — PhaseF done navigates to #output", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Back from Phase E returns to "mechanisms" stage
+// Back from Phase E (touch) returns to the touch_seed_source chooser
+// (spec 035 R12 re-entry path) — NOT directly to mechanisms.
 // ---------------------------------------------------------------------------
 
-describe("SurveyView — Phase E back-navigation returns to mechanisms", () => {
-  it("onBack passed to TouchGallery sets stage to mechanisms", async () => {
+describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R12)", () => {
+  it("onBack passed to TouchGallery sets stage to touch_seed_source, not mechanisms", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    // Advance to Phase E.
+    // Advance to the fork, confirm it, then reach Phase E (touch).
     advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
+    expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("seed-source-complete"));
     expect(screen.getByTestId("stage-E")).toBeTruthy();
 
     // Click the back button in the Phase E mock.
     fireEvent.click(screen.getByTestId("e-back"));
 
-    // Should be back at mechanisms.
-    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
+    // Should resurface the seed-source chooser (R12), NOT mechanisms directly.
+    expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
     expect(screen.queryByTestId("stage-E")).toBeNull();
+    expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
   });
 
-  it("after returning to mechanisms from E, can advance to E again", async () => {
+  it("the chooser's own Back reaches mechanisms (locked/read-only)", async () => {
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
+    advanceToMechanisms();
+    fireEvent.click(screen.getByTestId("mechanisms-complete"));
+    expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("seed-source-complete"));
+    fireEvent.click(screen.getByTestId("e-back"));
+    expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
+
+    // The chooser's own Back (not TouchGallery's) reaches mechanisms.
+    fireEvent.click(screen.getByTestId("seed-source-back"));
+
+    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
+    expect(screen.queryByTestId("stage-seed-source")).toBeNull();
+  });
+
+  it("after returning to the fork from E, can re-confirm to reach E again", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -811,16 +890,17 @@ describe("SurveyView — Phase E back-navigation returns to mechanisms", () => {
     // Advance to Phase E.
     advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
+    fireEvent.click(screen.getByTestId("seed-source-complete"));
     expect(screen.getByTestId("stage-E")).toBeTruthy();
 
-    // Go back to mechanisms.
+    // Go back — lands on the seed-source chooser (R12), not mechanisms.
     fireEvent.click(screen.getByTestId("e-back"));
-    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
+    expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
 
-    // Advance forward again — the mechanisms "Complete" button still calls onComplete.
-    fireEvent.click(screen.getByTestId("mechanisms-complete"));
+    // Re-confirm — reaches Phase E again.
+    fireEvent.click(screen.getByTestId("seed-source-complete"));
     expect(screen.getByTestId("stage-E")).toBeTruthy();
-    expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
+    expect(screen.queryByTestId("stage-seed-source")).toBeNull();
   });
 });
 
@@ -926,13 +1006,18 @@ describe("SurveyView — adapt-track carve → B back-navigation (SC-002 parity)
 // ---------------------------------------------------------------------------
 //
 // handlePhaseEComplete must call setTouchLayoutJson with JSON derived from
-// buildTouchLayoutJson(baseIr, assignments) — NOT scaffoldTouchLayout(ir)
+// buildTouchLayoutJson(baseIr, assignments, opts) — NOT scaffoldTouchLayout(ir)
 // with the assignments ignored. We seed baseIr into the store, emit a
 // longpress assignment from the TouchGallery mock, and assert the stored
 // touchLayoutJson contains the assignment data.
+//
+// Spec 035 R11 update: emission is no longer gated on "assignments non-empty"
+// alone — the three rows below pin the matrix: import-adapt + a real edit
+// emits; import-adapt + no edit + empty mods emits nothing; reseed-from-
+// desktop ALWAYS emits, even with zero edits.
 
 describe("SurveyView — handlePhaseEComplete applies assignments to output (Defect B)", () => {
-  it("setTouchLayoutJson is called with JSON containing the emitted assignment", async () => {
+  it("import-adapt + a real edit: setTouchLayoutJson is called with JSON containing the emitted assignment", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -959,12 +1044,19 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     };
     _mockTouchEAssignmentsRef.current = [longpressAssignment];
 
-    // Navigate to stage E and fire the TouchGallery complete button.
+    // Navigate to the fork, confirm it, then fire the TouchGallery complete button.
     advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
-    // Stage E is now shown.
+    // The touch_seed_source chooser is shown first (spec 035 R4/R12, no choice
+    // recorded on a fresh walk) — NOT the real "touch" step, so
+    // applyStepCompletion("touch") has not fired yet.
+    expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("seed-source-complete"));
+    });
+    // Confirming the fork lands on the real touch step and triggers
+    // buildTouchLayoutJson on completion.
     expect(screen.getByTestId("stage-E")).toBeTruthy();
-
     await act(async () => {
       fireEvent.click(screen.getByTestId("e-complete"));
     });
@@ -977,7 +1069,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     expect(stored).toContain("K_A");
   });
 
-  it("setTouchLayoutJson(null) when baseIr is null (no real edits possible)", async () => {
+  it("baseIr null: setTouchLayoutJson(null) regardless of seedSource (the one gate the reducer still owns)", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -989,6 +1081,12 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
 
+    // Confirming touch_seed_source (spec 035 R4/R12 fork; no choice recorded
+    // on a fresh walk) lands on the real "touch" step; completing it fires
+    // applyStepCompletion("touch").
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("seed-source-complete"));
+    });
     await act(async () => {
       fireEvent.click(screen.getByTestId("e-complete"));
     });
@@ -997,7 +1095,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     expect(useWorkingCopyStore.getState().touchLayoutJson).toBeNull();
   });
 
-  it("setTouchLayoutJson(null) when assignments is empty even with baseIr set", async () => {
+  it("import-adapt + no edits + empty mods: setTouchLayoutJson(null) (truly-untouched no-op)", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -1018,6 +1116,12 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
 
+    // Confirming touch_seed_source (spec 035 R4/R12 fork; no choice recorded
+    // on a fresh walk) lands on the real "touch" step; completing it fires
+    // applyStepCompletion("touch").
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("seed-source-complete"));
+    });
     await act(async () => {
       fireEvent.click(screen.getByTestId("e-complete"));
     });
@@ -1025,6 +1129,41 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     // No real edits → touchLayoutJson must be null so serializeWorkingCopy
     // leaves the VFS untouched and KMW uses its native default.
     expect(useWorkingCopyStore.getState().touchLayoutJson).toBeNull();
+  });
+
+  it("reseed-from-desktop: setTouchLayoutJson is called (non-null) even with zero Phase E edits", async () => {
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+
+    const fakeIr = makeTestIR([]);
+    act(() => {
+      useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+        vfs: createVirtualFS([]),
+        ir: fakeIr,
+      });
+    });
+
+    // Zero Phase E edits — the row that would emit nothing under import-adapt.
+    _mockTouchEAssignmentsRef.current = [];
+
+    advanceToMechanisms();
+    fireEvent.click(screen.getByTestId("mechanisms-complete"));
+    expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
+
+    // Pick "Reseed from desktop" instead of the default import-adapt button.
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("seed-source-reseed-complete"));
+    });
+    expect(screen.getByTestId("stage-E")).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("e-complete"));
+    });
+
+    // R11: reseed-from-desktop ALWAYS emits (SC-002) — the mocked
+    // buildTouchLayoutJson always returns non-null JSON, so a non-null stored
+    // value here proves the emission gate let the build through.
+    expect(useWorkingCopyStore.getState().touchLayoutJson).not.toBeNull();
   });
 });
 
@@ -1136,8 +1275,12 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     fireEvent.click(screen.getByTestId("carve-complete"));
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
-    // → touch (stage-E)
+    // → touch_seed_source fork (stage-seed-source; spec 035 R4/R12, no choice recorded yet)
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
+    expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
+
+    // touch_seed_source → touch (joinTarget hop; mocked TouchGallery stub, stage-E)
+    fireEvent.click(screen.getByTestId("seed-source-complete"));
     expect(screen.getByTestId("stage-E")).toBeTruthy();
 
     // → help (stage-F)
