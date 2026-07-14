@@ -778,6 +778,17 @@ describe("StudioShell — route: #output renders OutputScreen", () => {
 // ---------------------------------------------------------------------------
 
 describe("StudioShell — first-visit landing gate", () => {
+  function seedResumableDraft() {
+    localStorage.setItem(
+      "ks.studio.draft",
+      JSON.stringify({
+        version: 1,
+        savedAt: Date.now(),
+        survey: { activeStepId: "identity", identityResult: null, scaffoldSpec: null },
+      }),
+    );
+  }
+
   it("mounts WelcomeScreen (not the survey) on a first visit with no hash", async () => {
     window.location.hash = "";
     localStorage.clear(); // pristine browser: never visited, no draft
@@ -820,14 +831,7 @@ describe("StudioShell — first-visit landing gate", () => {
     localStorage.clear();
     // A minimally-valid draft (version + savedAt + survey) so loadDraftMeta()
     // returns non-null; the survey route surfaces the resume banner.
-    localStorage.setItem(
-      "ks.studio.draft",
-      JSON.stringify({
-        version: 1,
-        savedAt: Date.now(),
-        survey: { activeStepId: "identity", identityResult: null, scaffoldSpec: null },
-      }),
-    );
+    seedResumableDraft();
 
     await act(async () => {
       render(<StudioShell />);
@@ -896,14 +900,7 @@ describe("StudioShell — first-visit landing gate", () => {
     localStorage.clear(); // never visited...
     // ...but a resumable draft lifts the newcomer gate. Same minimally-valid
     // draft shape used by the "resumable draft exists" test above.
-    localStorage.setItem(
-      "ks.studio.draft",
-      JSON.stringify({
-        version: 1,
-        savedAt: Date.now(),
-        survey: { activeStepId: "identity", identityResult: null, scaffoldSpec: null },
-      }),
-    );
+    seedResumableDraft();
 
     await act(async () => {
       render(<StudioShell />);
