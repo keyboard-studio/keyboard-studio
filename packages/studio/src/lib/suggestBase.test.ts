@@ -155,7 +155,8 @@ describe("suggestBases", () => {
     // spec 034 T006b / FR-003, AS-2: for a proven-script language the base step
     // returns a ranked list with an exact-or-family (language+script) tier AND
     // the guaranteed US-QWERTY fallback — proving the proven set is not
-    // Latin-only. Russian (ru) on a Cyrillic base is the language-match tier.
+    // Latin-only. Russian (ru) on a Cyrillic base declaring only "ru" is the
+    // top (language-match-monolingual) tier.
     const russianCyrl = makeBaseKeyboard({
       id: "russian_mnemonic_r",
       script: "Cyrl",
@@ -170,9 +171,10 @@ describe("suggestBases", () => {
       allBases.map((b) => [b.id, b.languages ?? []] as const),
     );
     const out = suggestBases(allBases, { script: "Cyrl", bcp47: "ru-Cyrl" }, { languagesById });
-    // Tier 1: the Cyrillic Russian base is a genuine language+script match.
+    // Tier 1: the Cyrillic Russian base is a genuine language+script match;
+    // it declares only "ru", so it ranks at the monolingual language-match tier.
     expect(out[0]?.base.id).toBe("russian_mnemonic_r");
-    expect(out[0]?.reason).toBe("language-match");
+    expect(out[0]?.reason).toBe("language-match-monolingual");
     // The US-QWERTY fallback is always offered (last), even for a non-Latin target.
     expect(out.find((s) => s.base.id === "basic_kbdus")?.reason).toBe("us-qwerty-fallback");
     // The Latin-only base does not cross into a Cyrillic target.
