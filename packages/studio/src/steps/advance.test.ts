@@ -21,7 +21,7 @@ import { manifest, validateManifestShape } from "./manifest.ts";
 
 type WalkStep =
   | "identity" | "choose_base" | "track" | "project_name" | "characters"
-  | "carve" | "mechanisms" | "touch" | "help" | "done" | "unsupported";
+  | "carve" | "mechanisms" | "touch_seed_source" | "touch" | "help" | "done" | "unsupported";
 
 function walkSpine(
   ctx: { selectedTrack: "copy" | "adapt" | null; identitySupported: boolean },
@@ -114,11 +114,13 @@ describe("nextSpineStepAfter", () => {
 // ---------------------------------------------------------------------------
 
 describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
-  it("SR-1/SR-2 copy track: identity -> choose_base -> track -> project_name -> characters -> carve -> mechanisms -> touch -> help -> done", () => {
+  it("SR-1/SR-2 copy track: identity -> choose_base -> track -> project_name -> characters -> carve -> mechanisms -> touch_seed_source -> touch -> help -> done", () => {
     const { sequence, navigateAtEnd } = walkSpine(copyCtx);
+    // Spec 035 R4/R12: with no recorded fork choice (copyCtx.touchSeedSource === null),
+    // mechanisms routes through the off-spine touch_seed_source fork before touch.
     expect(sequence).toEqual([
       "identity", "choose_base", "track", "project_name", "characters",
-      "carve", "mechanisms", "touch", "help", "done",
+      "carve", "mechanisms", "touch_seed_source", "touch", "help", "done",
     ]);
     // "... -> done -> output": help -> done carries navigate:"output".
     expect(navigateAtEnd).toBe("output");
@@ -128,7 +130,7 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
     const { sequence, navigateAtEnd } = walkSpine(adaptCtx);
     expect(sequence).toEqual([
       "identity", "choose_base", "track", "characters",
-      "carve", "mechanisms", "touch", "help", "done",
+      "carve", "mechanisms", "touch_seed_source", "touch", "help", "done",
     ]);
     expect(sequence).not.toContain("project_name");
     expect(navigateAtEnd).toBe("output");
@@ -152,13 +154,16 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
 
 describe("spec 034 SR-3 — mechanisms advances to touch, never past it", () => {
   // lockDesktop() firing at mechanisms completion is covered by reducer.test.ts
-  // R1; here we pin the advance half: mechanisms goes to touch and NOT beyond,
-  // and touch is a genuinely-visited step (never skipped) that then reaches help.
-  it("advance(mechanisms) is exactly 'touch' (not 'help'/'done' — touch is not skipped)", () => {
+  // R1; here we pin the advance half: mechanisms enters the touch_seed_source
+  // fork (spec 035 R4/R12) which joins straight to touch — touch is a
+  // genuinely-visited step (never skipped past to help/done) that then reaches help.
+  it("advance(mechanisms) enters the touch_seed_source fork, never skipping touch to help/done", () => {
     const outcome = advance("mechanisms", undefined, copyCtx);
-    expect(outcome.next).toBe("touch");
+    expect(outcome.next).toBe("touch_seed_source");
     expect(outcome.next).not.toBe("help");
     expect(outcome.next).not.toBe("done");
+    // The off-spine fork joins straight to touch — touch is still reached.
+    expect(advance("touch_seed_source", undefined, copyCtx).next).toBe("touch");
   });
 
   it("touch is reached and advances onward to help (never bypassed)", () => {
