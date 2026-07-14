@@ -20,7 +20,8 @@ import { Badge, Button } from "../../ui/index.ts";
 import type { BadgeTone } from "../../ui/Badge.tsx";
 
 const REASON_LABEL: Record<ResolvedReason, string> = {
-  "language-match": "Already supports your language",
+  "language-match-monolingual": "Dedicated to your language",
+  "language-match-multilingual": "Already supports your language",
   genealogical: "Related language, same script",
   "script-match": "Matches your script",
   "language-cross-script": "Supports your language, different script",
@@ -28,13 +29,15 @@ const REASON_LABEL: Record<ResolvedReason, string> = {
 };
 
 // Token-mapped reason tones for Badge, in descending strength:
-//   language-match       → Badge "success"  (var(--sil-green))
-//   genealogical         → Badge "accent"   (var(--app-accent))
-//   script-match         → Badge "default"  (neutral) — weaker than a relative
-//   language-cross-script→ Badge "warn"     (var(--sil-orange-dark))
-//   us-qwerty-fallback   → Badge "subtle"   (var(--app-text-subtle))
+//   language-match-monolingual  → Badge "success" (var(--sil-green)) — dedicated
+//   language-match-multilingual → Badge "success" (var(--sil-green)) — covers it too
+//   genealogical                → Badge "accent"  (var(--app-accent))
+//   script-match                → Badge "default" (neutral) — weaker than a relative
+//   language-cross-script       → Badge "warn"    (var(--sil-orange-dark))
+//   us-qwerty-fallback          → Badge "subtle"  (var(--app-text-subtle))
 const REASON_TONE: Record<ResolvedReason, BadgeTone> = {
-  "language-match": "success",
+  "language-match-monolingual": "success",
+  "language-match-multilingual": "success",
   genealogical: "accent",
   "script-match": "default",
   "language-cross-script": "warn",

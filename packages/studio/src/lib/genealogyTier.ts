@@ -15,6 +15,7 @@
 import type { BaseKeyboard, LanguageDefaults } from "@keyboard-studio/contracts";
 import { findKeyboardBaseCandidates } from "@keyboard-studio/glottolog/bridge";
 import {
+  byDisplayName,
   primarySubtag,
   type BaseSuggestion,
   type SuggestReason,
@@ -29,13 +30,14 @@ export interface ResolvedSuggestion {
   reason: ResolvedReason;
 }
 
-/** Genealogical slots between language-match and script-match (contract §6). */
+/** Genealogical slots between the language-match tiers and script-match (contract §6). */
 const RESOLVED_RANK: Record<ResolvedReason, number> = {
-  "language-match": 0,
-  genealogical: 1,
-  "script-match": 2,
-  "language-cross-script": 3,
-  "us-qwerty-fallback": 4,
+  "language-match-monolingual": 0,
+  "language-match-multilingual": 1,
+  genealogical: 2,
+  "script-match": 3,
+  "language-cross-script": 4,
+  "us-qwerty-fallback": 5,
 };
 
 /** Resolver over a langtags-style defaults lookup, matching BridgeDeps. */
@@ -96,9 +98,10 @@ export interface GenealogyDeps {
  *
  * A `script-match` base that also supports a genealogically-close relative of the
  * target is promoted to `genealogical` and ranked ahead of the remaining pure
- * script-matches (closest relative first). All other tiers are preserved and
- * re-sorted under the extended precedence. `language-match` is never downgraded —
- * the target's own language is a stronger signal than a relative.
+ * script-matches (closest relative first; the leftover script-matches stay
+ * alphabetical). All other tiers are preserved and re-sorted under the extended
+ * precedence. The `language-match-*` tiers are never downgraded — the target's
+ * own language is a stronger signal than a relative.
  *
  * Pure and total: with an empty phonebook or a target that resolves to no ISO,
  * it returns the input suggestions unchanged (no genealogical promotions).
@@ -137,6 +140,8 @@ export function applyGenealogicalTier(
           (genealogicalOrder.get(b.s.base.id) ?? 0)
         );
       }
+      // Same-script languages are alphabetical; every other tier stays stable.
+      if (a.s.reason === "script-match") return byDisplayName(a.s.base, b.s.base);
       return a.i - b.i; // stable within a tier
     })
     .map(({ s }) => s);

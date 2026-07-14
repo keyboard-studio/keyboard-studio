@@ -99,7 +99,7 @@ describe("applyGenealogicalTier — integration over real relatedness", () => {
       languagesById: byId,
     });
     expect(resolved.map((s) => [s.base.id, s.reason])).toEqual([
-      ["english_kbd", "language-match"],
+      ["english_kbd", "language-match-monolingual"], // only "en" declared
       ["german_kbd", "genealogical"],
     ]);
   });
