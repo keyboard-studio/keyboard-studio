@@ -9,6 +9,9 @@
 // in toZip / compile / the Layer A/B checks fails HERE, decoupled from the SPA.
 
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import { unzipSync } from "fflate";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { VirtualFS } from "@keyboard-studio/contracts";
@@ -18,17 +21,13 @@ import { runAllChecks } from "../validator/index.js";
 
 const KEYBOARD_ID = "t009_working_copy";
 
-// A minimal-but-real, kmcmplib-compilable .kmn (mirrors compiler/__fixtures__/minimal.kmn).
-const KMN = [
-  "store(&NAME) 'T009 Working Copy'",
-  "store(&VERSION) '14.0'",
-  "store(&KEYBOARDVERSION) '1.0'",
-  "store(&TARGETS) 'any'",
-  "begin Unicode > use(main)",
-  "group(main) using keys",
-  "+ 'a' > 'A'",
-  "",
-].join("\n");
+const here = dirname(fileURLToPath(import.meta.url));
+const minimalKmnPath = resolve(here, "..", "compiler", "__fixtures__", "minimal.kmn");
+
+// A minimal-but-real, kmcmplib-compilable .kmn — reuses the proven-compilable
+// compiler/__fixtures__/minimal.kmn fixture (see compile.test.ts) rather than
+// retyping it, so the two copies can't silently drift apart.
+const KMN = readFileSync(minimalKmnPath, "utf8").replace("Minimal", "T009 Working Copy");
 
 // Minimal well-formed .kvks (visual keyboard) and .kps (package) — content need
 // only be present + non-empty for the archive assertions; compile reads the .kmn.
