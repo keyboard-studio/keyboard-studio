@@ -8,7 +8,7 @@
  * @see applyDesktopModificationsToRawJson.ts — raw-JSON desktop-modification replay
  */
 
-import { charToUnicodeKeyId, unicodeKeyIdToChar } from "../shared/touch-ids.js";
+import { unicodeKeyIdToChar } from "../shared/touch-ids.js";
 
 /**
  * Return `true` when an existing sub-key (sk[] or multitap[] entry) already
@@ -26,10 +26,14 @@ export function isTouchSubKeyDuplicate(
   existing: { text?: string; output?: string; id?: string },
   char: string,
 ): boolean {
-  return (
-    (existing.text ?? existing.output) === char ||
-    existing.id === charToUnicodeKeyId(char)
-  );
+  const target = char.normalize("NFC");
+  const existingText = existing.text ?? existing.output;
+  if (existingText !== undefined && existingText.normalize("NFC") === target) {
+    return true;
+  }
+  const decodedId =
+    existing.id !== undefined ? unicodeKeyIdToChar(existing.id) : undefined;
+  return decodedId !== undefined && decodedId.normalize("NFC") === target;
 }
 
 /**

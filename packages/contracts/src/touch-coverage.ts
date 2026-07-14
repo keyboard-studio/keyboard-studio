@@ -56,6 +56,10 @@ export function decodeUnicodeKeyId(id: string): string | undefined {
     if (!Number.isFinite(codePoint) || codePoint < 0 || codePoint > 0x10ffff) {
       return undefined;
     }
+    // Surrogate code points (0xD800-0xDFFF) are not valid Unicode scalar
+    // values; String.fromCodePoint would otherwise emit an ill-formed
+    // UTF-16 unit.
+    if (codePoint >= 0xd800 && codePoint <= 0xdfff) return undefined;
     decoded += String.fromCodePoint(codePoint);
   }
   return decoded;
