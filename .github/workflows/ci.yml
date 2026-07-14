@@ -57,6 +57,12 @@ jobs:
       - name: Test (all packages)
         run: pnpm -r test
 
+      # The co-located Vercel functions under /api are intentionally outside the
+      # pnpm workspace, so `pnpm -r test` does not cover them. Run their standalone
+      # vitest config explicitly — otherwise these tests can rot unnoticed.
+      - name: Test (api functions)
+        run: npx vitest run --config api/vitest.config.ts
+
       # Non-blocking: warns in CI log and opens GitHub Issues for any spec
       # sections whose content changed since the last acknowledgement.
       # Never fails the build — drift is a backlog item, not a blocker.

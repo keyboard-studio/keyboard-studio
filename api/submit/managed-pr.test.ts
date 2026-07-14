@@ -38,9 +38,9 @@ function postReq(body: unknown): Request {
 
 /**
  * Build a stub ManagedPRPipelineConfig whose fetch function returns the given
- * sequence of responses in order (one per pipeline step). For success tests we
- * need ~8 responses covering fork-check, master-ref, parent-commit, tree,
- * commit, branch-ref, PR.
+ * sequence of responses in order (one per pipeline step). Under the same-repo
+ * staging model there is no fork-check step, so a success run makes 6 calls:
+ * master-ref, parent-commit, tree, commit, branch-ref, PR.
  */
 function stubConfig(
   responses: Array<Partial<GitHubPipelineFetchResponse> & { body?: unknown }>,
@@ -65,22 +65,20 @@ function stubConfig(
   };
 }
 
-/** Full happy-path sequence: fork present, ref, parent commit, tree, commit, branch, PR. */
+/** Full happy-path sequence: ref, parent commit, tree, commit, branch, PR. */
 function successResponses() {
   return [
-    // 1. Fork exists (GET /repos/test-org/keyboards)
-    { ok: true, status: 200, body: { name: "keyboards" } },
-    // 2. Master ref
+    // 1. Master ref
     { ok: true, status: 200, body: { object: { sha: "aaaa1111" } } },
-    // 3. Parent commit
+    // 2. Parent commit
     { ok: true, status: 200, body: { tree: { sha: "bbbb2222" } } },
-    // 4. Create tree
+    // 3. Create tree
     { ok: true, status: 201, body: { sha: "cccc3333" } },
-    // 5. Create commit
+    // 4. Create commit
     { ok: true, status: 201, body: { sha: "dddd4444dddd444" } },
-    // 6. Create branch ref
+    // 5. Create branch ref
     { ok: true, status: 201, body: {} },
-    // 7. Create PR
+    // 6. Create PR
     { ok: true, status: 201, body: { html_url: "https://github.com/keymanapp/keyboards/pull/99" } },
   ];
 }
@@ -220,9 +218,7 @@ describe("runManagedPRHandler — error mapping", () => {
   it("returns 429 with Retry-After header when GitHub rate-limits", async () => {
     const retryAfterHeaders = { get: (name: string) => (name === "Retry-After" ? "30" : null) };
     const responses = [
-      // Fork check succeeds
-      { ok: true, status: 200, body: { name: "keyboards" } },
-      // Master ref triggers 429
+      // Master ref triggers 429 (first pipeline call)
       { ok: false, status: 429, statusText: "Too Many Requests", headers: retryAfterHeaders, body: {} },
     ];
     const res = await runManagedPRHandler(postReq(validBody()), stubConfig(responses));
@@ -235,8 +231,8 @@ describe("runManagedPRHandler — error mapping", () => {
   it("returns 409 with branchName when branch already exists", async () => {
     // Patch the 6th call (create branch ref) to return 422.
     const responses = successResponses();
-    // index 5 = create branch ref
-    responses[5] = { ok: false, status: 422, statusText: "Unprocessable Entity", body: {} };
+    // index 4 = create branch ref (5th of the 6 same-repo pipeline calls)
+    responses[4] = { ok: false, status: 422, statusText: "Unprocessable Entity", body: {} };
     const res = await runManagedPRHandler(postReq(validBody()), stubConfig(responses));
     expect(res.status).toBe(409);
     const json = (await res.json()) as { error: string; branchName: string };
