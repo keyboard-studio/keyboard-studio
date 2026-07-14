@@ -31,6 +31,11 @@ import {
   applyWorkingCopySnapshot,
   type WorkingCopySnapshot,
 } from "./persistWorkingCopy.ts";
+import {
+  saveServerDraft,
+  saveServerDraftBeacon,
+  type ServerDraftMeta,
+} from "./serverDraftStore.ts";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -60,28 +65,32 @@ const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
  */
 const AUTOSAVE_DEBOUNCE_MS = 1000;
 
+/**
+ * Debounce window for the signed-in cloud-sync writes (ms). Much coarser than
+ * the 1 s localStorage autosave: localStorage is the instant local-first cache
+ * (free, synchronous), while the server push is a durable backup that only
+ * needs to be eventually-consistent, so we batch aggressively to keep request
+ * volume (and cost) low. Checkpoints (tab hidden, page unload) flush sooner.
+ */
+const CLOUD_SYNC_DEBOUNCE_MS = 20_000;
+
+/**
+ * Client-side ceiling on a cloud-synced draft (bytes), mirroring the server's
+ * MAX_DRAFT_BYTES. A draft above this is kept in localStorage but NOT pushed —
+ * the server would 413 it anyway. We log rather than silently drop so an
+ * oversized draft is diagnosable instead of appearing to sync.
+ */
+const MAX_CLOUD_DRAFT_BYTES = 4 * 1024 * 1024;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/** The persisted draft record. */
-interface StudioDraft {
-  version: number;
-  /** Epoch ms when the draft was written (Date.now()). */
-  savedAt: number;
-  survey: SurveySessionSnapshot;
-  /** Working copy, or null when the survey hasn't instantiated one yet. */
-  workingCopy: WorkingCopySnapshot | null;
-}
-
-/** Lightweight peek at a stored draft, for the resume banner. */
-export interface DraftMeta {
-  savedAt: number;
-  /** Current step the draft was on (e.g. "carve"). */
-  activeStepId: SurveySessionSnapshot["activeStepId"];
-  /** Best-effort human label for the in-progress keyboard, or null. */
-  label: string | null;
-}
+// StudioDraft / DraftMeta live in draftTypes.ts (a shared leaf) so serverDraftStore
+// can reference them without a dependency cycle back into this module. Re-exported
+// here so existing importers (StudioShell, ResumeDraftBanner) are unaffected.
+export type { StudioDraft, DraftMeta } from "./draftTypes.ts";
+import type { StudioDraft, DraftMeta } from "./draftTypes.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -163,6 +172,38 @@ function readDraft(): StudioDraft | null {
 // ---------------------------------------------------------------------------
 
 /**
+ * Capture the current survey + working copy as a StudioDraft, or null when
+ * there's no meaningful progress to persist. Shared by the localStorage
+ * autosave and the signed-in cloud sync so both serialize identically.
+ */
+export function buildStudioDraft(): StudioDraft | null {
+  const survey = surveySnapshot();
+  const workingCopy = captureWorkingCopySnapshot();
+
+  if (!hasMeaningfulProgress(survey, workingCopy)) return null;
+
+  return {
+    version: DRAFT_VERSION,
+    savedAt: Date.now(),
+    survey,
+    workingCopy,
+  };
+}
+
+/** Derive the server metadata row (resume-banner fields) from a draft. */
+export function buildServerMeta(draft: StudioDraft): ServerDraftMeta {
+  return {
+    savedAt: draft.savedAt,
+    activeStepId: draft.survey.activeStepId,
+    label: deriveLabel(draft),
+    // keyboardId is reserved for the future multi-project "My keyboards" key;
+    // the single-draft model doesn't need it, so it stays null for now.
+    keyboardId: null,
+    schemaVersion: draft.version,
+  };
+}
+
+/**
  * Capture the current survey + working copy and write it to localStorage.
  * No-op when there's no meaningful progress or storage is unavailable. Quota /
  * private-mode failures are swallowed so authoring never breaks on a failed save.
@@ -170,17 +211,8 @@ function readDraft(): StudioDraft | null {
 export function saveDraft(): void {
   if (!storageAvailable()) return;
 
-  const survey = surveySnapshot();
-  const workingCopy = captureWorkingCopySnapshot();
-
-  if (!hasMeaningfulProgress(survey, workingCopy)) return;
-
-  const draft: StudioDraft = {
-    version: DRAFT_VERSION,
-    savedAt: Date.now(),
-    survey,
-    workingCopy,
-  };
+  const draft = buildStudioDraft();
+  if (draft === null) return;
 
   try {
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
@@ -225,6 +257,26 @@ export function loadDraftMeta(): DraftMeta | null {
 export function applyDraft(): boolean {
   const draft = readDraft();
   if (draft === null) return false;
+  return applyStudioDraft(draft);
+}
+
+/**
+ * Restore both stores from an explicit StudioDraft object (rather than reading
+ * localStorage). Used by the cloud-restore path, where the draft arrives from
+ * the server. Validates the record shape/version before applying — a stale or
+ * malformed cloud draft is rejected (returns false) rather than hydrating the
+ * stores at the wrong shape. The working copy is applied first so the survey's
+ * restored activeStepId lands on a step whose working copy already exists.
+ */
+export function applyStudioDraft(draft: StudioDraft | null): boolean {
+  if (
+    draft == null ||
+    typeof draft !== "object" ||
+    draft.version !== DRAFT_VERSION ||
+    draft.survey == null
+  ) {
+    return false;
+  }
 
   if (draft.workingCopy !== null) {
     const applied = applyWorkingCopySnapshot(draft.workingCopy);
@@ -273,9 +325,113 @@ export function startDraftAutosave(): () => void {
   };
 }
 
+/**
+ * Start mirroring the in-progress draft to the server for a signed-in user.
+ * Runs ALONGSIDE startDraftAutosave (localStorage stays the instant local
+ * cache); this adds the durable server backup.
+ *
+ * `getToken` returns the current GitHub access token or null — read lazily on
+ * each flush so signing in mid-session begins syncing without restarting the
+ * subscription, and signing out stops it. Guests (token null) never push.
+ *
+ * Sync fires on a coarse debounce (CLOUD_SYNC_DEBOUNCE_MS) and on two
+ * checkpoints — the tab becoming hidden and page unload (keepalive fetch) — so
+ * a close or navigation doesn't lose up to a full debounce window. A content
+ * hash suppresses redundant pushes when nothing changed since the last one, and
+ * an oversized draft is kept local-only (logged, not silently dropped).
+ *
+ * Returns an unsubscribe that removes the listeners and cancels any pending timer.
+ */
+export function startCloudSync(getToken: () => string | null): () => void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let lastPushedHash: string | null = null;
+  let disposed = false;
+
+  const flush = (viaBeacon: boolean): void => {
+    const token = getToken();
+    if (token === null || token === "") return;
+
+    const draft = buildStudioDraft();
+    if (draft === null) return;
+
+    const body = JSON.stringify(draft);
+    if (new TextEncoder().encode(body).length > MAX_CLOUD_DRAFT_BYTES) {
+      // Kept in localStorage by the sibling autosave; skip the server push.
+      console.warn("[cloudSync] draft exceeds server size limit; keeping local copy only");
+      return;
+    }
+
+    const hash = simpleHash(body);
+    if (hash === lastPushedHash) return; // nothing changed since the last push
+
+    const meta = buildServerMeta(draft);
+    if (viaBeacon) {
+      // Unload path: fire-and-forget; assume it lands so we don't re-push.
+      saveServerDraftBeacon(token, meta, draft);
+      lastPushedHash = hash;
+    } else {
+      void saveServerDraft(token, meta, draft).then((ok) => {
+        if (ok) lastPushedHash = hash;
+      });
+    }
+  };
+
+  const schedule = (): void => {
+    if (disposed) return;
+    if (timer !== null) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      flush(false);
+    }, CLOUD_SYNC_DEBOUNCE_MS);
+  };
+
+  const onVisibilityChange = (): void => {
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      flush(false);
+    }
+  };
+  const onBeforeUnload = (): void => flush(true);
+
+  const unsubSurvey = useSurveySessionStore.subscribe(schedule);
+  const unsubWorkingCopy = useWorkingCopyStore.subscribe(schedule);
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", onVisibilityChange);
+  }
+  if (typeof window !== "undefined") {
+    window.addEventListener("beforeunload", onBeforeUnload);
+  }
+
+  return () => {
+    disposed = true;
+    if (timer !== null) clearTimeout(timer);
+    unsubSurvey();
+    unsubWorkingCopy();
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    }
+    if (typeof window !== "undefined") {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    }
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Internal — pull the serializable survey slots out of the store.
 // ---------------------------------------------------------------------------
+
+/**
+ * Small, fast, non-cryptographic string hash (djb2). Used only to detect
+ * "did the serialized draft change since the last successful push?" so we skip
+ * redundant cloud writes — never for integrity or security.
+ */
+function simpleHash(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) + h) ^ s.charCodeAt(i);
+  }
+  // >>> 0 → unsigned; base36 keeps it short.
+  return (h >>> 0).toString(36);
+}
 
 function surveySnapshot(): SurveySessionSnapshot {
   const s = useSurveySessionStore.getState();

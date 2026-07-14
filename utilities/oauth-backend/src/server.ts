@@ -47,6 +47,14 @@ import {
   type GitHubPipelineFetchFn,
 } from "./github-pipeline.js";
 import { getInstallationToken } from "./installation-token.js";
+import {
+  buildDraftConfig,
+  getDraftContent,
+  getDraftMeta,
+  putDraft,
+  deleteDraft,
+} from "./draft-handlers.js";
+import { MemoryDraftStore } from "./draft-store.js";
 
 // ---------------------------------------------------------------------------
 // Startup validation — fail fast if secrets are absent
@@ -245,7 +253,7 @@ export async function buildServer(opts: {
         cb(null, false);
       }
     },
-    methods: ["GET", "POST", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   });
@@ -404,6 +412,43 @@ export async function buildServer(opts: {
       });
     }
     return reply.status(200).send(result.data);
+  });
+
+  // -------------------------------------------------------------------------
+  // /drafts — server-side draft persistence (dev parity with api/drafts/*).
+  //
+  // The deployed Vercel functions back this with Blob + Postgres; the dev
+  // server uses an in-memory store (non-durable, restarts empty) so the client
+  // cloud-sync path can be exercised locally without provisioning storage.
+  // Identity is verified against GitHub /user via the injected nodeFetch, so a
+  // real signed-in token is required exactly as in production.
+  // -------------------------------------------------------------------------
+  const draftConfig = buildDraftConfig(new MemoryDraftStore(), nodeFetch);
+  const authHeaderOf = (req: { headers: Record<string, unknown> }): string | null => {
+    const h = req.headers["authorization"];
+    return typeof h === "string" ? h : null;
+  };
+
+  app.get("/drafts", async (req, reply) => {
+    const r = await getDraftMeta(authHeaderOf(req), draftConfig);
+    return r.ok ? reply.status(r.status).send(r.data) : reply.status(r.status).send({ error: r.error });
+  });
+
+  app.get("/drafts/content", async (req, reply) => {
+    const r = await getDraftContent(authHeaderOf(req), draftConfig);
+    return r.ok ? reply.status(r.status).send(r.data) : reply.status(r.status).send({ error: r.error });
+  });
+
+  app.put("/drafts", { bodyLimit: MANAGED_PR_BODY_LIMIT }, async (req, reply) => {
+    // Fastify has already JSON-parsed the body; re-stringify to feed putDraft's
+    // raw-text size guard (it re-parses). Close enough for the dev size check.
+    const r = await putDraft(authHeaderOf(req), JSON.stringify(req.body ?? null), draftConfig);
+    return r.ok ? reply.status(r.status).send(r.data) : reply.status(r.status).send({ error: r.error });
+  });
+
+  app.delete("/drafts", async (req, reply) => {
+    const r = await deleteDraft(authHeaderOf(req), draftConfig);
+    return r.ok ? reply.status(r.status).send(r.data) : reply.status(r.status).send({ error: r.error });
   });
 
   return app;

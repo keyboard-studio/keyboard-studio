@@ -32,6 +32,8 @@ import { useCallback, useEffect, useId, useState } from "react";
 import type { PublishManagedPRError } from "@keyboard-studio/contracts";
 import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
 import { clearDraft } from "../lib/draftAutosave.ts";
+import { clearServerDraft } from "../lib/serverDraftStore.ts";
+import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { getManagedPROutputService, getManagedPRProxyEndpoint } from "../lib/services.ts";
 import {
   publishManagedPRErrorMessage,
@@ -188,6 +190,10 @@ export function ManagedPRSubmitPanel({
   const [emailBlurred, setEmailBlurred] = useState(false);
   const [submitState, setSubmitState] = useState<SubmitState>({ kind: "idle" });
 
+  // Signed-in submitters also have a server-backed draft; clear it on success
+  // so a later sign-in doesn't offer to restore an already-shipped keyboard.
+  const { token: githubToken } = useGitHubAuth();
+
   // When the prefill values change (e.g. user signs in after the panel mounts),
   // update the inputs — but only if the user has not manually edited them yet
   // (i.e. the field is still at its initial empty value).
@@ -258,8 +264,11 @@ export function ManagedPRSubmitPanel({
       });
       setSubmitState({ kind: "success", prUrl: result.prUrl });
       // The keyboard shipped — discard the resumable draft so a later reload
-      // doesn't offer to resume an already-submitted survey.
+      // doesn't offer to resume an already-submitted survey. Clear both the
+      // local (localStorage) and, for signed-in submitters, the server copy.
       clearDraft();
+      const accessToken = githubToken?.accessToken ?? null;
+      if (accessToken !== null) void clearServerDraft(accessToken);
     } catch (err: unknown) {
       let message: string;
       if (isPublishManagedPRError(err)) {
@@ -272,7 +281,7 @@ export function ManagedPRSubmitPanel({
       }
       setSubmitState({ kind: "error", message });
     }
-  }, [submitEnabled, authorName, email]);
+  }, [submitEnabled, authorName, email, githubToken]);
 
   // ---------------------------------------------------------------------------
   // Success state — show PR link, no git jargon.

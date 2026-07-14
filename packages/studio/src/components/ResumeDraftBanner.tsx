@@ -79,25 +79,36 @@ const discardButton: CSSProperties = {
 export function ResumeDraftBanner({ meta, onResume, onDiscard }: ResumeDraftBannerProps) {
   const stepLabel = STEP_LABELS[meta.activeStepId] ?? meta.activeStepId;
   const name = meta.label !== null ? `"${meta.label}"` : "your keyboard";
+  const isCloud = meta.source === "cloud";
 
   return (
     <div
       role="region"
-      aria-label="Resume unfinished survey"
+      aria-label={isCloud ? "Restore keyboard from your account" : "Resume unfinished survey"}
       data-testid="resume-draft-banner"
+      data-source={meta.source ?? "local"}
       style={bannerStyle}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, marginBottom: 2 }}>
-          Resume {name}?
+          {isCloud ? `Restore ${name} from your account?` : `Resume ${name}?`}
         </div>
         <div style={{ color: TEXT_DIM, fontSize: 13 }}>
-          You have an unfinished survey (last saved {relativeTime(meta.savedAt)}, on the{" "}
-          {stepLabel} step).
+          {isCloud ? (
+            <>
+              You have an in-progress keyboard saved to your account (last saved{" "}
+              {relativeTime(meta.savedAt)}, on the {stepLabel} step).
+            </>
+          ) : (
+            <>
+              You have an unfinished survey (last saved {relativeTime(meta.savedAt)}, on the{" "}
+              {stepLabel} step).
+            </>
+          )}
         </div>
       </div>
       <button type="button" data-testid="resume-draft" style={primaryButton} onClick={onResume}>
-        Resume
+        {isCloud ? "Restore" : "Resume"}
       </button>
       <button type="button" data-testid="discard-draft" style={discardButton} onClick={onDiscard}>
         Discard

@@ -43,10 +43,20 @@ import { ResumeDraftBanner } from "./components/ResumeDraftBanner.tsx";
 import {
   loadDraftMeta,
   applyDraft,
+  applyStudioDraft,
+  buildStudioDraft,
   clearDraft,
   startDraftAutosave,
+  startCloudSync,
   type DraftMeta,
 } from "./lib/draftAutosave.ts";
+import { useGitHubAuth } from "./hooks/useGitHubAuth.ts";
+import {
+  loadServerDraftMeta,
+  loadServerDraftContent,
+  clearServerDraft,
+  serverMetaToDraftMeta,
+} from "./lib/serverDraftStore.ts";
 import { hasVisited } from "./lib/firstVisit.ts";
 import { TEXT_MAIN, FONT } from "./survey/surveyStyles.ts";
 
@@ -351,6 +361,17 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const sessionReset = useSurveySessionStore((s) => s.reset);
   const setLocalBase = useSurveySessionStore((s) => s.setLocalBase);
 
+  // GitHub auth — signed-in users get a durable server-backed backup of the
+  // draft on top of the localStorage cache; guests use localStorage only.
+  // githubTokenRef lets the cloud-sync loop read the current token lazily, so
+  // signing in mid-session starts syncing without restarting the subscription.
+  const { token: githubToken } = useGitHubAuth();
+  const githubTokenRef = useRef(githubToken);
+  useEffect(() => {
+    githubTokenRef.current = githubToken;
+  }, [githubToken]);
+  const currentAccessToken = (): string | null => githubTokenRef.current?.accessToken ?? null;
+
   // Derive whether the active step declares layout:"full" (load-bearing per Stage 5,
   // FR-002, R4). SurveyView uses this to skip the two-pane shell for full-screen steps.
   const activeStepIsFullScreen = useMemo(() => {
@@ -392,6 +413,14 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     resumeOfferConsumed ? null : loadDraftMeta(),
   );
 
+  // Cloud-restore offer (signed-in only): a server-backed draft found on load —
+  // e.g. a new tab or a different device. Kept separate from the local
+  // resumeMeta so the local draft always wins when both exist; the cloud offer
+  // is only surfaced when there is no local draft to resume. Set at most once
+  // per mount (cloudRestoreCheckedRef).
+  const [cloudResume, setCloudResume] = useState<DraftMeta | null>(null);
+  const cloudRestoreCheckedRef = useRef(false);
+
   // Mark the one-per-page-load resume offer as consumed after commit (idempotent
   // under StrictMode's mount/cleanup/mount). Subsequent same-session SurveyView
   // remounts (route away + back = a fresh wizard) then read the flag and skip the
@@ -402,9 +431,42 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   }, []);
 
   useEffect(() => {
-    if (resumeMeta !== null) return; // wait for the author's Resume/Discard choice
-    return startDraftAutosave();
-  }, [resumeMeta]);
+    // Wait for the author's Resume/Discard choice on either banner before
+    // autosaving, so a pending decision can't overwrite the draft being offered.
+    if (resumeMeta !== null || cloudResume !== null) return;
+    const stopLocal = startDraftAutosave();
+    // Cloud sync runs alongside localStorage autosave; it self-gates on the
+    // token (guests never push) and on meaningful progress, so starting it here
+    // for everyone is safe — a guest or pristine session pushes nothing.
+    const stopCloud = startCloudSync(currentAccessToken);
+    return () => {
+      stopLocal();
+      stopCloud();
+    };
+  }, [resumeMeta, cloudResume]);
+
+  // Cloud-restore check (signed-in only). On the first render where a GitHub
+  // token is present, look for a server-backed draft. Offer it only when there
+  // is no local draft already being offered (local wins) and the author hasn't
+  // started meaningful work — otherwise a fresh session's cloud backup would
+  // pop an unexpected restore. Runs at most once per mount.
+  useEffect(() => {
+    if (cloudRestoreCheckedRef.current) return;
+    const accessToken = githubToken?.accessToken ?? null;
+    if (accessToken === null) return; // guest, or token not yet verified — wait
+    cloudRestoreCheckedRef.current = true;
+    if (resumeMeta !== null) return; // a local draft is offered — prefer it
+    let cancelled = false;
+    void loadServerDraftMeta(accessToken).then((serverMeta) => {
+      if (cancelled || serverMeta === null) return;
+      // Don't surprise an author who began working while the fetch was in flight.
+      if (buildStudioDraft() !== null) return;
+      setCloudResume(serverMetaToDraftMeta(serverMeta));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [githubToken, resumeMeta]);
 
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
   const { containerRef, leftPct, onPointerDown } =
@@ -571,7 +633,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // "prefill" (spec 027 Stage 4 — the store slot is the authoritative owner).
     // Discard any saved draft — start-over is an explicit "throw it away".
     clearDraft();
+    const accessToken = currentAccessToken();
+    if (accessToken !== null) void clearServerDraft(accessToken);
     setResumeMeta(null);
+    setCloudResume(null);
   }
 
   // ---------------------------------------------------------------------------
@@ -585,15 +650,35 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Either way, clearing resumeMeta hides the banner and starts autosave.
   // ---------------------------------------------------------------------------
   function handleResumeDraft() {
+    const active = resumeMeta ?? cloudResume;
+    if (active?.source === "cloud") {
+      // Fetch the full payload from the server, then apply it. applyStudioDraft
+      // validates the record shape/version before hydrating the stores.
+      const accessToken = currentAccessToken();
+      if (accessToken !== null) {
+        void loadServerDraftContent(accessToken).then((draft) => {
+          if (applyStudioDraft(draft)) {
+            instantiatedRef.current = true;
+          }
+          setResumeMeta(null);
+          setCloudResume(null);
+        });
+        return;
+      }
+    }
     if (applyDraft()) {
       instantiatedRef.current = true;
     }
     setResumeMeta(null);
+    setCloudResume(null);
   }
 
   function handleDiscardDraft() {
     clearDraft();
+    const accessToken = currentAccessToken();
+    if (accessToken !== null) void clearServerDraft(accessToken);
     setResumeMeta(null);
+    setCloudResume(null);
   }
 
   // ---------------------------------------------------------------------------
@@ -659,9 +744,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     >
       {/* Left pane: survey questions (StepHost renders pane content) */}
       <section aria-label="Survey questions" style={questionsPaneStyle}>
-        {resumeMeta !== null && (
+        {(resumeMeta ?? cloudResume) !== null && (
           <ResumeDraftBanner
-            meta={resumeMeta}
+            meta={(resumeMeta ?? cloudResume)!}
             onResume={handleResumeDraft}
             onDiscard={handleDiscardDraft}
           />
