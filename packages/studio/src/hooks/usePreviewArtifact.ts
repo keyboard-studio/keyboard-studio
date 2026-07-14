@@ -88,6 +88,32 @@ export function usePreviewArtifact(): PreviewArtifact {
     clearScaffoldIfOpen(mode);
   }, [clearScaffoldIfOpen]);
 
+  // Late-instantiation adoption: the lazy init above reads the store exactly
+  // once, at mount, on the assumption that SurveyView's onInstantiate has
+  // already settled by the time the author navigates to Preview/Output. That
+  // assumption can race — SurveyView's own compile pipeline (StudioShell's
+  // onInstantiate, fired from useKeyboardArtifact's async fetch/compile/parse
+  // run) can still be in flight at the exact moment this screen mounts, so the
+  // lazy init reads null even though the working copy finishes instantiating a
+  // few hundred ms later. Without this, THIS screen's local baseKeyboard stays
+  // permanently null (no picker value, no download affordance) even after the
+  // store settles, because the lazy-init form never re-reads.
+  //
+  // This effect closes that race by adopting the store's baseKeyboard the
+  // moment it FIRST transitions to non-null — but only while this screen's own
+  // local baseKeyboard is still null. Once the author (or the mount-time lazy
+  // init) has set a local baseKeyboard, this guard permanently closes, so a
+  // later, unrelated store change (e.g. a different screen re-instantiating)
+  // can never fight handleBaseKeyboardChange's picker updates on this screen —
+  // preserving the original lazy-init contract for every case except this one
+  // race at mount.
+  const storeBaseKeyboardForLateAdopt = useWorkingCopyStore((s) => s.baseKeyboard);
+  useEffect(() => {
+    if (baseKeyboard === null && storeBaseKeyboardForLateAdopt !== null) {
+      setBaseKeyboard(storeBaseKeyboardForLateAdopt);
+    }
+  }, [baseKeyboard, storeBaseKeyboardForLateAdopt]);
+
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadWarnings, setDownloadWarnings] = useState<string[]>([]);
