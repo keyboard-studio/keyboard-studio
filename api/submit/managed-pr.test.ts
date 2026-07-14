@@ -45,7 +45,7 @@ function postReq(body: unknown): Request {
 function stubConfig(
   responses: Array<Partial<GitHubPipelineFetchResponse> & { body?: unknown }>,
   tokenOverride = "tok_test",
-): ManagedPRPipelineConfig {
+): ManagedPRPipelineConfig & { getCallCount: () => number } {
   let callIndex = 0;
   return {
     getInstallationToken: () => Promise.resolve(tokenOverride),
@@ -62,6 +62,7 @@ function stubConfig(
         text: () => Promise.resolve(JSON.stringify(body)),
       };
     },
+    getCallCount: () => callIndex,
   };
 }
 
@@ -202,11 +203,13 @@ describe("runManagedPRHandler — body validation", () => {
 
 describe("runManagedPRHandler — success", () => {
   it("returns 200 with prUrl and commitSha on a happy-path request", async () => {
-    const res = await runManagedPRHandler(postReq(validBody()), stubConfig(successResponses()));
+    const config = stubConfig(successResponses());
+    const res = await runManagedPRHandler(postReq(validBody()), config);
     expect(res.status).toBe(200);
     const json = (await res.json()) as { prUrl: string; commitSha: string };
     expect(json.prUrl).toBe("https://github.com/keymanapp/keyboards/pull/99");
     expect(json.commitSha).toBe("dddd4444dddd444");
+    expect(config.getCallCount()).toBe(successResponses().length);
   });
 });
 
@@ -229,7 +232,7 @@ describe("runManagedPRHandler — error mapping", () => {
   });
 
   it("returns 409 with branchName when branch already exists", async () => {
-    // Patch the 6th call (create branch ref) to return 422.
+    // Patch the 5th call (create branch ref) to return 422.
     const responses = successResponses();
     // index 4 = create branch ref (5th of the 6 same-repo pipeline calls)
     responses[4] = { ok: false, status: 422, statusText: "Unprocessable Entity", body: {} };
