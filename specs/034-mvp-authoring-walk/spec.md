@@ -139,7 +139,7 @@ An author (guest or logged-in) holds more than one in-progress keyboard project 
 
 ### Functional Requirements
 
-- **FR-001**: The MVP walk MUST run the existing live spine `identity -> choose_base -> track -> [project_name] -> characters -> carve -> mechanisms -> touch -> help -> output` with no reordering of the locked physical->touch->docs tail.
+- **FR-001**: The MVP walk MUST run the existing live spine `identity -> choose_base -> track -> [project_name] -> characters -> carve -> mechanisms -> touch -> help -> done -> output` with no reordering of the locked physical->touch->docs tail.
 - **FR-002**: Language identity MUST be proposed via langtags autosuggest (propose-then-confirm), never a blank BCP47 form.
 - **FR-003**: The base step MUST present ranked suggestions covering at least an exact (language+script) match where one exists, family/related bases, and the US-QWERTY fallback.
 - **FR-004**: Both Track 1 (copy under new identity) and Track 2 (adapt in place) MUST work against the real engine; Track 2 MUST NOT silently no-op.
