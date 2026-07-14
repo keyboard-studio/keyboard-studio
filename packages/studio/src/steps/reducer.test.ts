@@ -100,6 +100,13 @@ describe("R1 — lockDesktop fires at the mechanisms step", () => {
 
 // ---------------------------------------------------------------------------
 // R2 — touch-layout build with Case-A / Case-B + graceful degradation
+//
+// Spec 035 R11 update: the reducer no longer gates the build on "assignments
+// is empty" — that decision (the R11 emission matrix) moved into the injected
+// deps.buildTouchLayoutJson (constructed in StudioShell.tsx, which may import
+// lib/touchEmission.ts; this reducer may not). The reducer's own contract is
+// now: always call the dep when baseIr is present, passing mods/seedSource
+// through unchanged; the dep decides null vs a built json string.
 // ---------------------------------------------------------------------------
 
 describe("R2 — touch-layout build at the touch step", () => {
@@ -107,16 +114,20 @@ describe("R2 — touch-layout build at the touch step", () => {
   const baseIr = makeKeyboardIR();
   const baseVfs = makeVirtualFS();
   const assignments = makeTouchAssignments();
+  const EMPTY_MODS = { removals: [], placements: [] };
 
   beforeEach(() => { deps = makeDepsMock(); });
 
   // --- Case A: base ships no touch layout (resolveBaseTouchJson returns undefined) ---
 
-  it("Case A: calls buildTouchLayoutJson with undefined baseTouchJson when base has no layout", () => {
+  it("Case A: calls buildTouchLayoutJson with baseTouchJson OMITTED when base has no layout", () => {
     (deps.resolveBaseTouchJson as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
     const result: TouchCompleteResult = { assignments, baseIr, baseVfs };
     applyStepCompletion(TOUCH_STEP_ID, result, deps);
-    expect(deps.buildTouchLayoutJson).toHaveBeenCalledWith(baseIr, assignments, undefined);
+    expect(deps.buildTouchLayoutJson).toHaveBeenCalledWith(baseIr, assignments, {
+      mods: EMPTY_MODS,
+      seedSource: null,
+    });
   });
 
   it("Case A: calls setTouchLayoutJson with the built json string", () => {
@@ -134,19 +145,47 @@ describe("R2 — touch-layout build at the touch step", () => {
     (deps.resolveBaseTouchJson as ReturnType<typeof vi.fn>).mockReturnValue(shippedJson);
     const result: TouchCompleteResult = { assignments, baseIr, baseVfs };
     applyStepCompletion(TOUCH_STEP_ID, result, deps);
-    expect(deps.buildTouchLayoutJson).toHaveBeenCalledWith(baseIr, assignments, shippedJson);
+    expect(deps.buildTouchLayoutJson).toHaveBeenCalledWith(baseIr, assignments, {
+      baseTouchJson: shippedJson,
+      mods: EMPTY_MODS,
+      seedSource: null,
+    });
   });
 
-  // --- Empty assignments → clear stored layout ---
+  // --- mods / seedSource pass through unchanged (R11 gating lives in the dep) ---
 
-  it("sets touchLayoutJson to null when assignments array is empty", () => {
+  it("passes mods and seedSource through to the dep unchanged", () => {
+    const mods = { removals: ["x"], placements: [{ char: "y", hostKey: "K_Y" }] };
+    const result: TouchCompleteResult = {
+      assignments,
+      baseIr,
+      baseVfs,
+      mods,
+      seedSource: "reseed-from-desktop",
+    };
+    applyStepCompletion(TOUCH_STEP_ID, result, deps);
+    expect(deps.buildTouchLayoutJson).toHaveBeenCalledWith(baseIr, assignments, {
+      mods,
+      seedSource: "reseed-from-desktop",
+    });
+  });
+
+  // --- Empty assignments no longer short-circuits the reducer itself ---
+
+  it("still calls buildTouchLayoutJson even when assignments is empty (gating moved to the injected dep)", () => {
     const result: TouchCompleteResult = { assignments: [], baseIr, baseVfs };
     applyStepCompletion(TOUCH_STEP_ID, result, deps);
-    expect(deps.setTouchLayoutJson).toHaveBeenCalledWith(null);
-    expect(deps.buildTouchLayoutJson).not.toHaveBeenCalled();
+    expect(deps.buildTouchLayoutJson).toHaveBeenCalledWith(baseIr, [], {
+      mods: EMPTY_MODS,
+      seedSource: null,
+    });
+    // makeDepsMock's default buildTouchLayoutJson mock returns non-null json,
+    // so with empty assignments the reducer still persists whatever the dep
+    // decided (here: the mock's default, non-null, json).
+    expect(deps.setTouchLayoutJson).toHaveBeenCalledWith('{"k":"v"}');
   });
 
-  it("sets touchLayoutJson to null when baseIr is null (no IR available)", () => {
+  it("sets touchLayoutJson to null when baseIr is null — the one gate the reducer still owns", () => {
     const result: TouchCompleteResult = { assignments, baseIr: null, baseVfs };
     applyStepCompletion(TOUCH_STEP_ID, result, deps);
     expect(deps.setTouchLayoutJson).toHaveBeenCalledWith(null);
@@ -345,11 +384,15 @@ describe("R6 — behavior parity with pre-refactor inline handlers", () => {
     expect(deps.lockDesktop).toHaveBeenCalledExactlyOnceWith();
   });
 
-  // Pre-refactor handlePhaseEComplete: if assignments.length === 0 or baseIr === null →
-  // setTouchLayoutJson(null); else try { build... setTouchLayoutJson(json) } catch { setTouchLayoutJson(null) }.
-  it("touch step: empty assignments → setTouchLayoutJson(null)", () => {
+  // Spec 035 R11 superseded the old "assignments.length === 0 → null"
+  // short-circuit: the reducer now always calls the injected
+  // buildTouchLayoutJson dep when baseIr is present, and the dep (not this
+  // reducer) decides null vs a built json string via the R11 emission
+  // matrix. The one gate this reducer still owns unconditionally is
+  // baseIr === null.
+  it("touch step: empty assignments with baseIr present still calls the build dep (gating moved to R11)", () => {
     applyStepCompletion(TOUCH_STEP_ID, { assignments: [], baseIr: makeKeyboardIR(), baseVfs: null }, deps);
-    expect(deps.setTouchLayoutJson).toHaveBeenCalledWith(null);
+    expect(deps.buildTouchLayoutJson).toHaveBeenCalled();
   });
 
   it("touch step: null baseIr → setTouchLayoutJson(null)", () => {

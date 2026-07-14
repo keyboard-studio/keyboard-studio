@@ -26,6 +26,13 @@ import type { IdentityLiteResult } from "../survey/index.ts";
 import type { SurveyContext } from "../survey/types.ts";
 import type { Track } from "../survey/index.ts";
 import type { ScaffoldSpec } from "../hooks/useKeyboardArtifact.ts";
+// Runtime import of the sibling store (one-directional: workingCopyStore.ts
+// does NOT import this module, so this does not create a circular dependency
+// per depcruise's no-circular rule). Used only inside setTouchSeedSource to
+// clear the stale touchDraft when the seed source actually changes (spec 035
+// R12) — the getState() escape-hatch idiom already used elsewhere in this
+// file (see the trailing comment) for cross-store reads/writes.
+import { useWorkingCopyStore } from "./workingCopyStore.ts";
 
 // ---------------------------------------------------------------------------
 // CharactersSubStage — internal substage for the characters manifest step.
@@ -36,6 +43,15 @@ import type { ScaffoldSpec } from "../hooks/useKeyboardArtifact.ts";
 // ---------------------------------------------------------------------------
 
 export type CharactersSubStage = "prefill" | "B";
+
+// ---------------------------------------------------------------------------
+// TouchSeedSource — the author's choice at the touch_seed_source fork
+// (spec 035 FR-006 / contracts/seed-source-fork.md): Import & adapt the
+// base's shipped touch layout, vs reseed a fresh phone projection from the
+// desktop work. Null means no choice has been recorded yet (fork memory, R12).
+// ---------------------------------------------------------------------------
+
+export type TouchSeedSource = "import-adapt" | "reseed-from-desktop";
 
 // ---------------------------------------------------------------------------
 // ActiveStepId — the set of manifest step ids the runtime advances through,
@@ -53,6 +69,7 @@ export type ActiveStepId =
   | "characters"
   | "carve"
   | "mechanisms"
+  | "touch_seed_source"
   | "touch"
   | "help"
   | "done"
@@ -116,6 +133,17 @@ export interface SurveySessionState {
    */
   charactersSubStage: CharactersSubStage;
 
+  /**
+   * The author's choice at the touch_seed_source fork (spec 035 FR-006).
+   * Null means no choice recorded yet — advance() routes into the chooser
+   * step whenever this is null (fork memory, R12). Cleared back to null on a
+   * genuine base re-instantiation (see reducer.ts CHOOSE_BASE_STEP_ID case,
+   * which injects setTouchSeedSource as a ReducerDep so workingCopyStore does
+   * not need to import this store — avoids a circular dependency since
+   * setTouchSeedSource itself reaches into workingCopyStore to clear touchDraft).
+   */
+  touchSeedSource: TouchSeedSource | null;
+
   // --- actions ---
 
   /**
@@ -130,6 +158,30 @@ export interface SurveySessionState {
    * No-op when history is empty (guards the identity/first step).
    */
   popHistory: () => void;
+
+  /**
+   * Special-case back-navigation for the touch step's "Back from the very
+   * first character" affordance (spec 035 R12 re-entry path). The generic
+   * `popHistory` follows the walked-history stack, which lands on
+   * "mechanisms" whenever the seed-source fork was SKIPPED this pass (a
+   * recorded, non-stale `touchSeedSource` routes advance() straight from
+   * "mechanisms" to "touch" — R12 fork memory) — that would make the choice
+   * unreachable after the first pass (violates US2-AS4). This action always
+   * resurfaces the "touch_seed_source" chooser instead:
+   *
+   *   - If "touch_seed_source" is already the top of history (the fork was
+   *     NOT skipped this pass — normal forward path pushed it), this behaves
+   *     exactly like popHistory: consumes that entry so the chooser's own
+   *     Back still reaches "mechanisms" next.
+   *   - Otherwise (fork was skipped — history still ends in "mechanisms" from
+   *     the direct mechanisms -> touch hop), this sets activeStepId WITHOUT
+   *     touching history, so "mechanisms" stays on top for the chooser's own
+   *     Back to land on.
+   *
+   * Either way, the chooser's own onBack (generic popHistory) always reaches
+   * "mechanisms" next — this action never disturbs that invariant.
+   */
+  backToTouchSeedSource: () => void;
 
   /** Reset every slot to initial (start-over). Includes clearing history. */
   reset: () => void;
@@ -154,6 +206,15 @@ export interface SurveySessionState {
 
   /** Plain setter — characters step internal substage (spec 027 Stage 4). */
   setCharactersSubStage: (s: CharactersSubStage) => void;
+
+  /**
+   * Setter — the touch_seed_source fork choice (spec 035 R12).
+   * Setting a value DIFFERENT from the current one clears the working-copy
+   * `touchDraft` (its `charTouch` entries reference host keys of the other
+   * seed and would half-apply — see workingCopyStore.touchDraft docstring).
+   * A no-op re-set of the same value does not clear the draft.
+   */
+  setTouchSeedSource: (s: TouchSeedSource | null) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -170,11 +231,13 @@ const INITIAL_STATE = {
   scaffoldSpec: null,
   localBase: null,
   charactersSubStage: "prefill" as CharactersSubStage,
+  touchSeedSource: null as TouchSeedSource | null,
 } as const satisfies Omit<
   SurveySessionState,
-  | "advance" | "popHistory" | "reset"
+  | "advance" | "popHistory" | "backToTouchSeedSource" | "reset"
   | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
   | "setSelectedTrack" | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
+  | "setTouchSeedSource"
 >;
 
 // ---------------------------------------------------------------------------
@@ -201,6 +264,21 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
       };
     }),
 
+  backToTouchSeedSource: () =>
+    set((s) => {
+      const top = s.history[s.history.length - 1];
+      if (top === "touch_seed_source") {
+        return {
+          activeStepId: "touch_seed_source",
+          history: s.history.slice(0, -1),
+        };
+      }
+      // Fork was skipped this pass — jump without consuming history so
+      // "mechanisms" (or whatever is actually on top) stays there for the
+      // chooser's own Back.
+      return { activeStepId: "touch_seed_source" };
+    }),
+
   reset: () =>
     set({
       ...INITIAL_STATE,
@@ -215,6 +293,18 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
   setScaffoldSpec: (s) => set({ scaffoldSpec: s }),
   setLocalBase: (b) => set({ localBase: b }),
   setCharactersSubStage: (s) => set({ charactersSubStage: s }),
+
+  setTouchSeedSource: (s) =>
+    set((state) => {
+      // A genuine change of seed source invalidates any in-progress touch
+      // draft — its charTouch entries reference host keys of the OTHER seed
+      // and would half-apply with warnings (R12). A no-op re-set (same value,
+      // including null -> null) leaves the draft untouched.
+      if (s !== state.touchSeedSource) {
+        useWorkingCopyStore.getState().setTouchDraft(null);
+      }
+      return { touchSeedSource: s };
+    }),
 }));
 
 // Ensure the store's getState() escape hatch is available for imperative reads

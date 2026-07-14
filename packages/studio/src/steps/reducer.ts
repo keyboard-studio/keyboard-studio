@@ -24,10 +24,21 @@
 import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import type { BaseKeyboard, RemovalCapability } from "@keyboard-studio/contracts";
 import type { MutateContext } from "../survey/types.ts";
+// DesktopModifications is a type from the engine package (a workspace
+// dependency, not an internal studio/src/ layer) — the steps-layer boundary
+// forbids steps/ -> lib/stores/dashboard/components, not other packages.
+import type { DesktopModifications } from "@keyboard-studio/engine";
 import { applyMutatePatch } from "./mutateApply.ts";
 import { repropagate } from "./repropagate.ts";
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
+
+/**
+ * The empty/no-op DesktopModifications — used as the TOUCH_STEP_ID case's
+ * default when a caller's payload omits `mods` (defensive; every real caller
+ * — AddTouchAdapter — always supplies it).
+ */
+const EMPTY_DESKTOP_MODIFICATIONS: DesktopModifications = { removals: [], placements: [] };
 
 // ---------------------------------------------------------------------------
 // Step ids that carry side effects (keyed constants — never inline strings)
@@ -70,6 +81,22 @@ export interface TouchCompleteResult {
   baseIr: KeyboardIR | null;
   /** The base VFS (for resolving the shipped .keyman-touch-layout, if any). */
   baseVfs: VirtualFS | null;
+  /**
+   * Desktop modifications to replay onto the touch seed (spec 035 R3) — carve
+   * removals + Phase C individual letter placements. Computed by the touch
+   * step's adapter (AddTouchAdapter) via deriveDesktopModifications so this
+   * reducer (steps/) never imports lib/ or stores/ directly. Optional so
+   * existing/mocked callers that don't care about the replay can omit it —
+   * the reducer defaults to the empty (no-op) modifications.
+   */
+  mods?: DesktopModifications;
+  /**
+   * The author's raw touch_seed_source fork choice (spec 035 FR-006), or null
+   * if the fork was never recorded (defensive — the R11 Entity-5 default is
+   * applied inside the injected buildTouchLayoutJson dep, not here). Optional
+   * for the same reason as `mods`.
+   */
+  seedSource?: "import-adapt" | "reseed-from-desktop" | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -101,17 +128,43 @@ export interface ReducerDeps {
     base: BaseKeyboard,
     opts: { vfs: VirtualFS; ir: KeyboardIR; removalCapabilities?: Map<string, RemovalCapability> },
   ) => void;
+  /**
+   * Clear the recorded touch_seed_source fork choice (spec 035 R12: a genuine
+   * base re-instantiation invalidates it). Injected as a surveySessionStore
+   * action so this reducer.ts (steps/) does not import stores/ directly, and
+   * so workingCopyStore does not need to import surveySessionStore (which
+   * would create a circular dependency with surveySessionStore's own
+   * setTouchSeedSource reaching into workingCopyStore to clear touchDraft).
+   * Optional so tests that don't care about the fork can omit it.
+   */
+  setTouchSeedSource?: (v: "import-adapt" | "reseed-from-desktop" | null) => void;
 
   // --- Lib helpers (from lib/buildTouchLayoutJson + lib/resolveBaseTouchJson) ---
   /**
-   * Derive the .keyman-touch-layout JSON string from a base IR + assignments.
-   * Two paths: Case A (generate from scratch) and Case B (faithful edit onto
-   * shipped layout). Returns { json, warnings }; json is null on error.
+   * Derive (and, per the spec 035 R11 emission matrix, decide whether to
+   * emit) the .keyman-touch-layout JSON string from a base IR + assignments.
+   * Two derivation paths: Case A (generate from scratch, replaying `mods`)
+   * and Case B (faithful edit onto the shipped layout, replaying `mods`
+   * first). Returns { json, warnings }; json is null when the R11 matrix says
+   * "don't emit" OR the emit pipeline failed — the reducer treats both
+   * identically (omit the stored layout).
+   *
+   * THIS is the one call site (injected from StudioShell.tsx, which may
+   * import lib/touchEmission.ts) that applies the R11 matrix for the output
+   * path — this reducer (steps/) may not import lib/ directly, so the
+   * gating logic lives inside the injected implementation, not here.
    */
   buildTouchLayoutJson: (
     baseIr: KeyboardIR,
     assignments: ReadonlyArray<TouchAssignment>,
-    baseTouchJson?: string,
+    opts: {
+      /** Present ⇒ the base ships a shipped touch layout to adapt (Case B candidate). */
+      baseTouchJson?: string;
+      /** Desktop modifications to replay onto the seed (spec 035 R3). */
+      mods: DesktopModifications;
+      /** Raw fork choice — may be null; the dep resolves the R11 default. */
+      seedSource: "import-adapt" | "reseed-from-desktop" | null;
+    },
   ) => { json: string | null; warnings: string[] };
 
   /**
@@ -251,25 +304,39 @@ export function applyStepCompletion(
       break;
     }
 
-    // R2 — touch-layout build: mirrors StudioShell.tsx handlePhaseEComplete (lines 380-410).
-    // Same Case-A/B logic and graceful degradation on error.
+    // R2 — touch-layout build: mirrors StudioShell.tsx handlePhaseEComplete.
+    // Spec 035 R11: the reducer no longer gates the build on "assignments is
+    // empty" — that decision (the R11 emission matrix) now lives inside the
+    // injected deps.buildTouchLayoutJson (constructed in StudioShell.tsx,
+    // which may import lib/touchEmission.ts; this reducer may not). The one
+    // gate this reducer still owns is baseIr === null (nothing to build from).
     case TOUCH_STEP_ID: {
       const payload = result as Partial<TouchCompleteResult>;
-      const { assignments = [], baseIr = null, baseVfs = null } = payload;
+      const {
+        assignments = [],
+        baseIr = null,
+        baseVfs = null,
+        mods = EMPTY_DESKTOP_MODIFICATIONS,
+        seedSource = null,
+      } = payload;
 
-      if (assignments.length === 0 || baseIr === null) {
-        // No real assignments — clear the stored touch layout (KMW uses its native default).
+      if (baseIr === null) {
+        // No working IR to derive from — clear the stored touch layout (KMW
+        // uses its native default).
         deps.setTouchLayoutJson(null);
       } else {
         try {
-          // Case B: base ships a touch layout → apply faithfully onto raw JSON copy.
-          // Case A: no shipped touch layout → IR-based generate-from-scratch path.
           const baseTouchJson = deps.resolveBaseTouchJson(baseVfs);
-          const { json, warnings } = deps.buildTouchLayoutJson(baseIr, assignments, baseTouchJson);
+          const { json, warnings } = deps.buildTouchLayoutJson(baseIr, assignments, {
+            ...(baseTouchJson !== undefined ? { baseTouchJson } : {}),
+            mods,
+            seedSource,
+          });
           if (warnings.length > 0) {
             console.error("[applyStepCompletion:touch] buildTouchLayoutJson warnings:", warnings);
           }
-          // json is null when the emit pipeline threw — omit rather than injecting null/empty.
+          // json is null when the R11 matrix said "don't emit" OR the emit
+          // pipeline threw — omit rather than injecting null/empty either way.
           deps.setTouchLayoutJson(json);
         } catch (err) {
           console.error("[applyStepCompletion:touch] buildTouchLayoutJson threw unexpectedly:", err);
@@ -329,9 +396,18 @@ export function applyStepCompletion(
           break;
         }
         deps.instantiateFromExisting(base, { ...opts, vfs, ir });
+        // spec 035 R12: a genuine (re-)instantiation invalidates any previously
+        // recorded touch_seed_source choice — the fork must be re-asked.
+        deps.setTouchSeedSource?.(null);
       } else {
         // Track 1 (or null/default): new keyboard from base, with rebase guard.
-        deps.instantiateFromBaseIfConfirmed(base, opts);
+        // instantiateFromBaseIfConfirmed no-ops (returns false) on a redundant
+        // re-fire or a user-cancelled rebase confirm — only clear the fork
+        // choice when instantiation actually proceeded.
+        const instantiated = deps.instantiateFromBaseIfConfirmed(base, opts);
+        if (instantiated) {
+          deps.setTouchSeedSource?.(null);
+        }
       }
       break;
     }

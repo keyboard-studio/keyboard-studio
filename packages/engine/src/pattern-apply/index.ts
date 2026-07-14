@@ -37,6 +37,15 @@ export type { ApplyTouchAssignmentsResult } from "./applyTouchAssignments.js";
 export { applyTouchAssignmentsToRawJson } from "./applyTouchAssignmentsToRawJson.js";
 export type { ApplyTouchAssignmentsToRawJsonResult } from "./applyTouchAssignmentsToRawJson.js";
 
+export { applyDesktopModifications } from "./applyDesktopModifications.js";
+export type {
+  DesktopModifications,
+  ApplyDesktopModificationsResult,
+} from "./applyDesktopModifications.js";
+
+export { applyDesktopModificationsToRawJson } from "./applyDesktopModificationsToRawJson.js";
+export type { ApplyDesktopModificationsToRawJsonResult } from "./applyDesktopModificationsToRawJson.js";
+
 export { propagateDesktopLayersToTouch } from "./propagateDesktopLayersToTouch.js";
 export type { PropagateDesktopLayersToTouchResult } from "./propagateDesktopLayersToTouch.js";
 

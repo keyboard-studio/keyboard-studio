@@ -43,9 +43,9 @@ function walkSpine(
 // Context helpers
 // ---------------------------------------------------------------------------
 
-const copyCtx = { selectedTrack: "copy" as const, identitySupported: true };
-const adaptCtx = { selectedTrack: "adapt" as const, identitySupported: true };
-const unsupported = { selectedTrack: null, identitySupported: false };
+const copyCtx = { selectedTrack: "copy" as const, identitySupported: true, touchSeedSource: null };
+const adaptCtx = { selectedTrack: "adapt" as const, identitySupported: true, touchSeedSource: null };
+const unsupported = { selectedTrack: null, identitySupported: false, touchSeedSource: null };
 
 // ---------------------------------------------------------------------------
 // manifestIndexOf
@@ -282,8 +282,28 @@ describe("advance: spine hops", () => {
     expect(advance("carve", undefined, copyCtx).next).toBe("mechanisms");
   });
 
-  it("mechanisms → touch (skips touch_seed_source, spine:false)", () => {
-    expect(advance("mechanisms", undefined, copyCtx).next).toBe("touch");
+  it("mechanisms → touch_seed_source when no fork choice is recorded (spec 035 R4/R12)", () => {
+    expect(advance("mechanisms", undefined, copyCtx).next).toBe("touch_seed_source");
+  });
+
+  it("mechanisms → touch directly when a fork choice IS recorded (spec 035 R12 fork memory)", () => {
+    const withChoice = { ...copyCtx, touchSeedSource: "import-adapt" as const };
+    expect(advance("mechanisms", undefined, withChoice).next).toBe("touch");
+  });
+
+  it("mechanisms → touch directly for the other recorded choice too", () => {
+    const withChoice = { ...copyCtx, touchSeedSource: "reseed-from-desktop" as const };
+    expect(advance("mechanisms", undefined, withChoice).next).toBe("touch");
+  });
+
+  it("touch_seed_source → touch (joinTarget hop, spec 035 R4)", () => {
+    expect(advance("touch_seed_source", undefined, copyCtx).next).toBe("touch");
+  });
+
+  it("touch_seed_source → touch does NOT carry setCharactersSubStage or navigate", () => {
+    const outcome = advance("touch_seed_source", undefined, copyCtx);
+    expect(outcome.setCharactersSubStage).toBeUndefined();
+    expect(outcome.navigate).toBeUndefined();
   });
 
   it("touch → help", () => {
