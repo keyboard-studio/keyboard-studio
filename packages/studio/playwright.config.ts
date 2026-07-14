@@ -21,7 +21,11 @@ import { defineConfig } from "playwright/test";
 
 export default defineConfig({
   testDir: "e2e",
-  timeout: 120_000,
+  // Full authoring walks are long: the first test also pays a cold ../keyboards
+  // catalog enumeration (BaseResolution's listAll over the whole local clone) plus
+  // a kmcmplib WASM compile before download. 240s gives headroom; the dev server
+  // caches the catalog after the first request so later tests are much faster.
+  timeout: 240_000,
   use: {
     baseURL: "http://localhost:5273",
   },
@@ -29,6 +33,7 @@ export default defineConfig({
     command: "pnpm dev",
     port: 5273,
     reuseExistingServer: true,
-    timeout: 120_000,
+    // engine build + Vite cold start can exceed 120s on a fresh checkout.
+    timeout: 240_000,
   },
 });
