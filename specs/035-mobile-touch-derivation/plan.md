@@ -29,17 +29,28 @@ projection*; the missing engineering is smaller and more targeted than the spec 
 implies. This plan is scoped to the true gaps:
 
 1. **Desktop-modification replay** (FR-002/FR-004/FR-005): propagate desktop carve
-   removals + letter placements onto **both** paths — critically the Case B
-   (import-and-adapt of a shipped base layout) path, which today preserves the base
-   verbatim and drops the desktop work.
+   removals + letter placements onto **both** paths. Case B (import-and-adapt of a shipped
+   base layout) preserves the base verbatim and drops the desktop work; Case A is equally
+   broken because `baseIr` is the **pristine instantiation-time IR** — `lockDesktop()`
+   snapshots nothing (research R3, corrected), so the projection reflects neither carve
+   removals nor placements without the replay. Case B replays via a raw-JSON splice
+   (research R9 — never round-trip the shipped layout through the IR).
 2. **Seed-source fork wiring** (FR-006): revive `touch_seed_source` in
    [advance.ts](../../packages/studio/src/steps/advance.ts) so the author chooses, instead
-   of the current unconditional `mechanisms → touch` hop that skips it.
-3. **Coverage guard** (FR-008): a check that no inventory character becomes uncoverable
-   after simplification/replay, wired into the existing touch-lint surface.
-4. **Seed-comment / fallback correction** (FR-001): remove the stale "fixed minimal
-   QWERTY / desktop edits NOT transferred" behavior and its comment in
-   [TouchGallery.tsx](../../packages/studio/src/editors/assignLoop/TouchGallery.tsx).
+   of the current unconditional `mechanisms → touch` hop that skips it — with fork memory,
+   a re-entry path, and draft-staleness rules (research R12). Reseed must strip
+   `ir.touchLayout` before projecting (research R10).
+3. **Coverage guard** (FR-008): no inventory character becomes uncoverable after
+   simplification/replay — implemented as a **sibling check code under the existing
+   criterion 18.6** (`KM_LINT_TOUCH_UNCOVERED`; research R5, corrected — a shipped 18.6
+   check already exists), warning-severity while editing, blocking at stage completion,
+   wired into the existing touch-lint surface via `lintWithContext`.
+4. **Seed-comment / emission-policy correction** (FR-001): rewrite the stale "fixed minimal
+   QWERTY / desktop edits NOT transferred" comment in
+   [TouchGallery.tsx](../../packages/studio/src/editors/assignLoop/TouchGallery.tsx), and
+   change the emission policy so the derived seed reaches preview/lint/output even with
+   zero Phase E edits (research R11 — today "no real edits" emits nothing, which would
+   silently drop FR-004).
 
 ## Technical Context
 
@@ -102,7 +113,7 @@ Layer C check). See [research.md](research.md) and [data-model.md](data-model.md
 ```text
 specs/035-mobile-touch-derivation/
 ├── plan.md              # This file (/speckit-plan output)
-├── research.md          # Phase 0 output — decisions R1–R8
+├── research.md          # Phase 0 output — decisions R1–R13
 ├── data-model.md        # Phase 1 output — entities + derivation flow
 ├── quickstart.md        # Phase 1 output — validation scenarios (US1/US2)
 ├── contracts/           # Phase 1 output — function/UI contracts
@@ -120,32 +131,45 @@ This feature edits existing modules — **no new package, no new top-level direc
 packages/engine/src/
 ├── scaffolder/
 │   └── scaffoldTouchLayout.ts          # (exists) compact phone projection — reused as the US2 reseed base
+│                                       #   (callers strip ir.touchLayout for reseed — R10)
 ├── pattern-apply/
 │   ├── applyTouchAssignments.ts        # (exists) folds Phase E assignments into TouchLayoutIR
 │   ├── applyTouchAssignmentsToRawJson.ts  # (exists) Case B verbatim-preserve apply
-│   ├── applyDesktopModifications.ts    # (NEW) replay carve removals + letter placements onto a touch seed
+│   ├── applyDesktopModifications.ts    # (NEW) IR-path replay of carve removals + letter placements (Case A)
+│   ├── applyDesktopModificationsToRawJson.ts  # (NEW) raw-JSON splice replay (Case B — R9, verbatim guarantee)
 │   └── touchCoverage.ts                # (NEW) inventory-coverage computation (feeds FR-008 guard)
 └── codec/
     └── parse-touch.ts                  # (exists) .keyman-touch-layout → TouchLayoutIR
 
 packages/studio/src/
 ├── steps/
-│   ├── advance.ts                      # (EDIT) route mechanisms → touch_seed_source → touch (FR-006)
-│   └── registerEditorSteps.ts          # (EDIT, if needed) seed-source step gets a chooser surface
+│   ├── advance.ts                      # (EDIT) mechanisms → touch_seed_source (when unchosen) → touch;
+│   │                                   #   AdvanceContext gains touchSeedSource (FR-006, R12)
+│   ├── repropagate.ts                  # (EDIT — R13) remove the seam's touchLayoutJson side-car write;
+│   │                                   #   buildTouchLayoutJson is the single artifact writer
+│   ├── reducer.ts                      # (EDIT — R13) drop setTouchLayoutJson injection at the
+│   │                                   #   mechanisms-completion repropagate call
+│   └── registerEditorSteps.ts          # (EDIT) touch_seed_source step gets the chooser component
 ├── editors/assignLoop/
-│   └── TouchGallery.tsx                # (EDIT) drop stale QWERTY seed + comment; consume derived seed (FR-001)
+│   └── TouchGallery.tsx                # (EDIT) rewrite stale seed comment; consume derived seed;
+│                                       #   detectedChars → touchCoverage on the derived seed (FR-001)
 ├── editors/
 │   └── touchSeedSource/                # (NEW dir) the seed-source chooser panel (usable-vs-reseed)
+├── hooks/
+│   └── useTouchLint.ts                 # (EDIT) accept optional context → lintWithContext (18.6 touch check)
 └── lib/
-    └── buildTouchLayoutJson.ts         # (EDIT) route desktop-modification replay into both Case A and Case B
+    └── buildTouchLayoutJson.ts         # (EDIT) seed-source routing + replay in both cases + R11 emission
 
-packages/keyboard-lint/src/checks/     # (EDIT) touch coverage check 18.6 (FR-008)
+packages/keyboard-lint/src/checks/
+└── check-18-6-touch-coverage.ts        # (NEW) KM_LINT_TOUCH_UNCOVERED under EXISTING criterion 18.6
+                                        #   (sibling of check-18-6-inventory-coverage.ts; no criteria.json row)
 ```
 
 **Structure Decision**: Single monorepo, engine-owned. The projection engine already
 exists ([`scaffoldTouchLayout`](../../packages/engine/src/scaffolder/scaffoldTouchLayout.ts));
-new engine code is two small pure modules (`applyDesktopModifications`, `touchCoverage`).
-The only studio structural addition is the seed-source chooser panel; the fork itself is one
+new engine code is three small pure modules (`applyDesktopModifications`, its raw-JSON
+sibling `applyDesktopModificationsToRawJson`, and `touchCoverage`). The only studio
+structural addition is the seed-source chooser panel; the fork itself is one conditional
 branch in the existing pure `advance` policy. No new package is justified (Constitution — a
 new package would trip `pnpm -r` and add a dependency-root edge for zero benefit).
 
