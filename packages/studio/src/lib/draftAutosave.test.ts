@@ -104,6 +104,35 @@ describe("draftAutosave", () => {
     expect(useSurveySessionStore.getState().activeStepId).toBe("carve");
   });
 
+  it("applyDraft returns false and does not hydrate the survey when a present working copy fails to apply", () => {
+    // Survey store starts pristine (post-reset in beforeEach); capture it so we
+    // can confirm applyDraft left it untouched.
+    const preCall = useSurveySessionStore.getState();
+    const preActiveStepId = preCall.activeStepId;
+    const preHistory = [...preCall.history];
+
+    // Write a draft directly to localStorage (bypassing saveDraft, which never
+    // stores a workingCopy with a null instantiationMode) with a workingCopy
+    // whose instantiationMode is null — the exact condition under which
+    // applyWorkingCopySnapshot (persistWorkingCopy.ts) returns false.
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        version: 1,
+        savedAt: Date.now(),
+        survey: { activeStepId: "carve", history: ["identity", "choose_base"], identityResult: null },
+        workingCopy: { instantiationMode: null },
+      }),
+    );
+
+    expect(applyDraft()).toBe(false);
+
+    // Survey store was NOT hydrated — still at its pre-call state.
+    const post = useSurveySessionStore.getState();
+    expect(post.activeStepId).toBe(preActiveStepId);
+    expect(post.history).toEqual(preHistory);
+  });
+
   it("loadDraftMeta discards a draft older than the 7-day TTL", () => {
     const eightDaysAgo = Date.now() - 8 * 24 * 60 * 60 * 1000;
     localStorage.setItem(

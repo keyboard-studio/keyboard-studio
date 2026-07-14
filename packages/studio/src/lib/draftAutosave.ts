@@ -211,17 +211,24 @@ export function loadDraftMeta(): DraftMeta | null {
 }
 
 /**
- * Restore both stores from the stored draft. Returns true when a draft was
- * found and applied. The working copy is applied first so the survey's restored
- * activeStepId lands on a step whose working copy already exists. Does not clear
- * the draft — the caller keeps it until submit/start-over.
+ * Restore both stores from the stored draft. Returns true only when the resume
+ * fully applied: the working copy (when the draft has one) was applied
+ * successfully, or there was no working copy to apply, AND the survey session
+ * was hydrated. When a present working copy fails to apply (a corrupt
+ * snapshot), the survey store is NOT hydrated — hydrating it anyway would leave
+ * the wizard on the draft's activeStepId with no working copy behind it, a
+ * silent partial resume — and this returns false so the caller treats the
+ * resume as not instantiated. The working copy is applied first so the
+ * survey's restored activeStepId lands on a step whose working copy already
+ * exists. Does not clear the draft — the caller keeps it until submit/start-over.
  */
 export function applyDraft(): boolean {
   const draft = readDraft();
   if (draft === null) return false;
 
   if (draft.workingCopy !== null) {
-    applyWorkingCopySnapshot(draft.workingCopy);
+    const applied = applyWorkingCopySnapshot(draft.workingCopy);
+    if (!applied) return false;
   }
   useSurveySessionStore.getState().hydrate(draft.survey);
   return true;
