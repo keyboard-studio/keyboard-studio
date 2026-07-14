@@ -732,6 +732,7 @@ describe("SurveyView — mechanisms → carve back-navigation", () => {
 describe("StudioShell — route: #preview renders PreviewScreen", () => {
   it("mounts PreviewScreen (not RoutePlaceholder) when hash is #preview", async () => {
     window.location.hash = "#preview";
+    localStorage.setItem("ks.visited", "1"); // returning visitor: deep-link hash is honored
 
     await act(async () => {
       render(<StudioShell />);
@@ -749,6 +750,7 @@ describe("StudioShell — route: #preview renders PreviewScreen", () => {
 describe("StudioShell — route: #output renders OutputScreen", () => {
   it("mounts OutputScreen (not RoutePlaceholder) when hash is #output", async () => {
     window.location.hash = "#output";
+    localStorage.setItem("ks.visited", "1"); // returning visitor: deep-link hash is honored
 
     await act(async () => {
       render(<StudioShell />);
@@ -767,8 +769,11 @@ describe("StudioShell — route: #output renders OutputScreen", () => {
 //   • a true first-time visitor lands on the WelcomeScreen;
 //   • a returning visitor (ks.visited) or one with a resumable draft skips
 //     welcome and lands in the survey.
-// An explicit valid hash (#preview/#output/#survey) always wins — see the
-// route regressions above.
+// An explicit valid hash (#preview/#output/#survey) wins for a RETURNING
+// visitor or once a resumable draft exists — see the route regressions above
+// (both now set ks.visited to represent that case). A genuine first-time
+// visitor (never visited, no draft) always lands on WelcomeScreen first, even
+// on a deep-linked hash — see the two tests below.
 // ---------------------------------------------------------------------------
 
 describe("StudioShell — first-visit landing gate", () => {
@@ -829,6 +834,30 @@ describe("StudioShell — first-visit landing gate", () => {
 
     expect(screen.getByTestId("stage-identity")).toBeTruthy();
     expect(screen.queryByTestId("welcome-screen-root")).toBeNull();
+  });
+
+  it("forces WelcomeScreen for a first-time visitor arriving on a deep-linked #survey hash", async () => {
+    window.location.hash = "#survey";
+    localStorage.clear(); // pristine browser: never visited, no draft
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    expect(screen.queryByTestId("stage-identity")).toBeNull();
+  });
+
+  it("forces WelcomeScreen for a first-time visitor arriving on a deep-linked #preview hash", async () => {
+    window.location.hash = "#preview";
+    localStorage.clear(); // pristine browser: never visited, no draft
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    expect(screen.queryByTestId("preview-screen-root")).toBeNull();
   });
 });
 
