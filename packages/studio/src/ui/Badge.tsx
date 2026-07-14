@@ -16,6 +16,8 @@ export type BadgeProps = {
   style?: React.CSSProperties;
   /** Optional className forwarded to the rendered <span>. */
   className?: string;
+  /** Optional native tooltip text forwarded as the <span>'s title attribute. */
+  title?: string;
 };
 
 const TONE_COLOR: Record<BadgeTone, string> = {
@@ -26,7 +28,7 @@ const TONE_COLOR: Record<BadgeTone, string> = {
   default: CSS_TEXT_MUTED,
 };
 
-export function Badge({ tone = "default", children, style, className }: BadgeProps): React.ReactElement {
+export function Badge({ tone = "default", children, style, className, title }: BadgeProps): React.ReactElement {
   return (
     <span
       style={{
@@ -37,6 +39,7 @@ export function Badge({ tone = "default", children, style, className }: BadgePro
         ...style,
       }}
       className={className}
+      {...(title !== undefined ? { title } : {})}
     >
       {children}
     </span>

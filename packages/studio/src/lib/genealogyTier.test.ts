@@ -41,6 +41,7 @@ const plainLatin = makeBaseKeyboard({
 const DEFAULTS: Record<string, LanguageDefaults> = {
   en: { code: "en", iso639_3: "eng", defaultScript: "Latn", regions: [] },
   de: { code: "de", iso639_3: "deu", defaultScript: "Latn", regions: [] },
+  nl: { code: "nl", iso639_3: "nld", defaultScript: "Latn", regions: [] },
   fi: { code: "fi", iso639_3: "fin", defaultScript: "Latn", regions: [] },
 };
 const resolveLanguage: ResolveLanguage = makeResolveLanguage(
@@ -65,6 +66,45 @@ describe("applyGenealogicalTier — integration over real relatedness", () => {
       ["german_kbd", "genealogical"], // promoted + ranked first
       ["plain_latin", "script-match"], // unrelated, stays a plain match
     ]);
+
+    // The genealogical suggestion names the closest relative that ranked it
+    // (German, deu) and carries the numeric path-length distance for the UI.
+    const german = resolved[0]!;
+    expect(german.relative?.iso639p3).toBe("deu");
+    expect(german.relative?.name).toBeTruthy();
+    expect(german.relative?.distance).toBeGreaterThan(0);
+    // Pure script-matches carry no relative.
+    expect(resolved[1]!.relative).toBeUndefined();
+  });
+
+  it("orders genealogical bases by full both-legs distance (closer relative first)", () => {
+    // For an English target, Dutch and German share the same West-Germanic
+    // ancestor (equal up-leg) but Dutch sits on a shorter down-leg — so Dutch is
+    // the closer relative by TOTAL path length. The Dutch base must rank ahead
+    // of the German one, and its distance must be strictly smaller.
+    const dutchBase = makeBaseKeyboard({
+      id: "dutch_kbd",
+      script: "Latn",
+      path: "release/d/dutch_kbd",
+      targets: ["windows"],
+      displayName: "Dutch",
+      version: "1.0",
+    });
+    const target = { script: "Latn", bcp47: "en" };
+    const byId = { dutch_kbd: ["nl"], german_kbd: ["de"] };
+    const ranked = suggestBases([germanBase, dutchBase], target, {
+      languagesById: byId,
+    });
+    const resolved = applyGenealogicalTier(ranked, target, {
+      resolveLanguage,
+      languagesById: byId,
+    });
+    expect(resolved.map((s) => s.base.id)).toEqual(["dutch_kbd", "german_kbd"]);
+    const dutch = resolved[0]!.relative!;
+    const german = resolved[1]!.relative!;
+    expect(dutch.iso639p3).toBe("nld");
+    expect(german.iso639p3).toBe("deu");
+    expect(dutch.distance).toBeLessThan(german.distance); // both legs counted
   });
 
   it("leaves ranking unchanged when no base supports a relative", () => {

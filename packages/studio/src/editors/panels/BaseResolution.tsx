@@ -13,6 +13,7 @@ import {
   applyGenealogicalTier,
   makeResolveLanguage,
   type ResolvedReason,
+  type ResolvedSuggestion,
 } from "../../lib/genealogyTier.ts";
 import { getLoadedLangtags, loadLangtags } from "../../lib/langtagsDefaults.ts";
 import { BaseKeyboardPicker } from "../../components/BaseKeyboardPicker.tsx";
@@ -121,7 +122,7 @@ export function BaseResolution({
     [bases],
   );
 
-  const suggestions = useMemo(() => {
+  const suggestions = useMemo<ResolvedSuggestion[]>(() => {
     const ranked = suggestBases(bases, target, { languagesById });
     // Promote same-script bases that also support a close relative of the target
     // language into the genealogical tier (spec 036 US2). Only when langtags has
@@ -254,7 +255,7 @@ export function BaseResolution({
       <div style={{ borderTop: "1px solid var(--app-border)", paddingTop: 16 }}>
         <p style={{ ...subtle, marginBottom: 8 }}>Suggested for you:</p>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {suggestions.map(({ base, reason }) => (
+          {suggestions.map(({ base, reason, relative }) => (
             <Button
               key={base.id}
               variant="secondary"
@@ -280,7 +281,20 @@ export function BaseResolution({
                 <strong>{base.displayName}</strong>{" "}
                 <span style={{ color: "var(--app-text-muted)", fontSize: 12 }}>({base.id})</span>
               </span>
-              <Badge tone={REASON_TONE[reason]}>{REASON_LABEL[reason]}</Badge>
+              {/* Genealogical suggestions name their closest relative and expose
+                  the numeric distance as a hover tooltip. Distance is the full
+                  path length across both legs — levels up to the nearest common
+                  ancestor plus levels back down to the relative; smaller = closer. */}
+              {reason === "genealogical" && relative !== undefined ? (
+                <Badge
+                  tone={REASON_TONE[reason]}
+                  title={`Genealogical distance ${relative.distance} — total steps to ${relative.name} across both branches (up to the nearest common ancestor, then down); smaller is closer`}
+                >
+                  Related: {relative.name}
+                </Badge>
+              ) : (
+                <Badge tone={REASON_TONE[reason]}>{REASON_LABEL[reason]}</Badge>
+              )}
             </Button>
           ))}
         </div>

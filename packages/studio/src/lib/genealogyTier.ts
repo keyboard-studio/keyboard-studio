@@ -2,7 +2,8 @@
 // Glottolog keyboard-base bridge on top of the existing script/language ranking
 // in suggestBase.ts: a base that matches the target SCRIPT and also supports a
 // genealogically-close relative of the target LANGUAGE is promoted to a distinct
-// "genealogical" tier that slots between `language-match` and `script-match`.
+// "genealogical" tier that slots between the language-match tiers and
+// `script-match`, carrying the closest relative (name + distance) for display.
 //
 // The bridge is a pure function with injected deps (glottolog never imports
 // engine/studio, D8). Here we inject a langtags-backed `resolveLanguage` and the
@@ -14,6 +15,7 @@
 
 import type { BaseKeyboard, LanguageDefaults } from "@keyboard-studio/contracts";
 import { findKeyboardBaseCandidates } from "@keyboard-studio/glottolog/bridge";
+import { getLanguoid } from "@keyboard-studio/glottolog";
 import {
   byDisplayName,
   primarySubtag,
@@ -25,9 +27,27 @@ import {
 /** The `suggestBases` reasons plus the Glottolog-derived genealogical tier. */
 export type ResolvedReason = SuggestReason | "genealogical";
 
+/** The closest related language that promoted a base into the genealogical tier. */
+export interface ClosestRelative {
+  /** Human-readable language name (Glottolog languoid name), for display. */
+  name: string;
+  /** ISO 639-3 code of the relative. */
+  iso639p3: string;
+  /**
+   * Genealogical distance: edges between the target and this relative through
+   * their nearest common ancestor (the bridge's `pathLength`). Smaller = closer.
+   */
+  distance: number;
+}
+
 export interface ResolvedSuggestion {
   base: BaseKeyboard;
   reason: ResolvedReason;
+  /**
+   * The related language that ranked this base — present only on `genealogical`
+   * suggestions. Absent for every other tier.
+   */
+  relative?: ClosestRelative;
 }
 
 /** Genealogical slots between the language-match tiers and script-match (contract §6). */
@@ -116,18 +136,32 @@ export function applyGenealogicalTier(
     { resolveLanguage: deps.resolveLanguage, languagesById: deps.languagesById },
   );
 
-  // Bridge order within the genealogical tier is closest-relative-first; keep it
-  // as the intra-tier tie-break so a closer relative outranks a farther one.
-  const genealogicalOrder = new Map<string, number>();
-  candidates
-    .filter((c) => c.tier === "genealogical")
-    .forEach((c, i) => genealogicalOrder.set(c.keyboardId, i));
+  // Which bases the bridge places in the genealogical tier, plus each one's
+  // closest relative (name + both-legs distance) for the UI and for ordering.
+  const genealogicalIds = new Set<string>();
+  const relativeByBase = new Map<string, ClosestRelative>();
+  for (const c of candidates) {
+    if (c.tier !== "genealogical") continue;
+    genealogicalIds.add(c.keyboardId);
+    if (c.closestRelative !== null) {
+      const { iso639p3, glottocode, distance } = c.closestRelative;
+      // Glottolog languoid name for display; fall back to the ISO code.
+      const name = getLanguoid(glottocode)?.name ?? iso639p3.toUpperCase();
+      relativeByBase.set(c.keyboardId, { name, iso639p3, distance });
+    }
+  }
 
-  const resolved: ResolvedSuggestion[] = suggestions.map((s) =>
-    s.reason === "script-match" && genealogicalOrder.has(s.base.id)
-      ? { base: s.base, reason: "genealogical" }
-      : { base: s.base, reason: s.reason },
-  );
+  const resolved: ResolvedSuggestion[] = suggestions.map((s) => {
+    if (s.reason === "script-match" && genealogicalIds.has(s.base.id)) {
+      const relative = relativeByBase.get(s.base.id);
+      return {
+        base: s.base,
+        reason: "genealogical",
+        ...(relative !== undefined ? { relative } : {}),
+      };
+    }
+    return { base: s.base, reason: s.reason };
+  });
 
   return resolved
     .map((s, i) => ({ s, i }))
@@ -135,10 +169,16 @@ export function applyGenealogicalTier(
       const tierDelta = RESOLVED_RANK[a.s.reason] - RESOLVED_RANK[b.s.reason];
       if (tierDelta !== 0) return tierDelta;
       if (a.s.reason === "genealogical" && b.s.reason === "genealogical") {
-        return (
-          (genealogicalOrder.get(a.s.base.id) ?? 0) -
-          (genealogicalOrder.get(b.s.base.id) ?? 0)
-        );
+        // Order by the FULL genealogical distance — both legs of the path
+        // (levels up to the nearest common ancestor + levels back down to the
+        // relative), which is exactly the number the UI shows. A relative
+        // reached in fewer total steps is closer, even when two relatives share
+        // the same ancestor (equal up-leg) but differ on the down-leg. Ties
+        // break alphabetically, matching the script-match tier.
+        const da = a.s.relative?.distance ?? Number.POSITIVE_INFINITY;
+        const db = b.s.relative?.distance ?? Number.POSITIVE_INFINITY;
+        if (da !== db) return da - db;
+        return byDisplayName(a.s.base, b.s.base);
       }
       // Same-script languages are alphabetical; every other tier stays stable.
       if (a.s.reason === "script-match") return byDisplayName(a.s.base, b.s.base);
