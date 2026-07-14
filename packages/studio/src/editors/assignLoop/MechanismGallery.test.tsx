@@ -2786,6 +2786,47 @@ describe("MechanismGallery — custom key option (S-02 deadkey trigger)", () => 
   });
 });
 
+describe("MechanismGallery — custom key option (S-08 ralt)", () => {
+  it("a custom base character resolves to its vkey and Apply records the resolved key, never the '__custom__' sentinel", async () => {
+    // RALT must already be a chosen family option in the modifier pool for
+    // "Layer 1 for layer-switch combo" to offer it as a <select> value — see
+    // computeModifierPool. Seed a distinct vkey (K_Q) so it never collides
+    // with the K_W the custom character below resolves to.
+    instantiateWithModifiersInUse("K_Q", ["RALT"]);
+    seedInventory(["ŵ"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    fireEvent.click(screen.getByText(/Layer \+ key/i));
+    fireEvent.change(screen.getByLabelText(/Base key for layer-switch combo/i), {
+      target: { value: CUSTOM_KEY_OPTION_VALUE },
+    });
+    fireEvent.change(
+      screen.getByLabelText(/Custom character for layer-switch combo base key/i),
+      { target: { value: "w" } },
+    );
+    fireEvent.change(screen.getByLabelText(/Layer 1 for layer-switch combo/i), {
+      target: { value: "RALT" },
+    });
+
+    const addBtn = screen.getByRole("button", { name: /Apply method for ŵ/i });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(addBtn);
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.patternId).toBe("modifier_as_layer_switch");
+    const altgrKeyList = assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"];
+    // Non-vacuity: the resolved vkey for custom char "w" must appear (proving
+    // the assertion actually depends on resolution, not just that Apply
+    // fired), and the raw "__custom__" sentinel must never leak through —
+    // that leak is exactly the bug this regression test guards against.
+    expect(altgrKeyList).toBe("[RALT K_W]");
+    expect(altgrKeyList).not.toContain(CUSTOM_KEY_OPTION_VALUE);
+  });
+});
+
 describe("MechanismGallery — U+ notation in character boxes (S-03 sequence)", () => {
   it("U+ notation typed into a sequence key box resolves to the actual character on Apply", async () => {
     seedInventory(["x"]);
