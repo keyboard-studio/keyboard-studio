@@ -116,8 +116,8 @@ function hasMeaningfulProgress(
 /** Derive a human label for the draft from whatever identity/base info exists. */
 function deriveLabel(draft: StudioDraft): string | null {
   const id = draft.survey.identityResult;
-  if (id !== null && id.english.trim() !== "") return id.english;
-  if (id !== null && id.autonym.trim() !== "") return id.autonym;
+  if (id != null && id.english.trim() !== "") return id.english;
+  if (id != null && id.autonym.trim() !== "") return id.autonym;
   if (draft.survey.scaffoldSpec !== null) return draft.survey.scaffoldSpec.displayName;
   if (draft.workingCopy?.baseKeyboard != null) return draft.workingCopy.baseKeyboard.displayName;
   return null;
