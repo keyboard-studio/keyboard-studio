@@ -36,7 +36,7 @@ import { OutputScreen } from "./components/OutputScreen.tsx";
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
 import { AccountControl } from "./components/AccountControl.tsx";
-import { manifest } from "./steps/manifest.ts";
+import { manifest, validateManifestShape } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { StepHost } from "./components/StepHost.tsx";
 import { TEXT_MAIN, FONT } from "./survey/surveyStyles.ts";
@@ -196,86 +196,10 @@ const SURVEY_LEFT_INIT_PCT = 45;
 // owner). See stores/surveySessionStore.ts (research D-R1).
 // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// validateManifestShape — throw-on-mismatch structural guard (M2, M3, M4).
-// Called once at module load; a misshapen manifest is a hard error, not a
-// logged warning — fail fast so CI catches it before any render occurs.
-// ---------------------------------------------------------------------------
-
-function validateManifestShape(): void {
-  const ids = manifest.map((s) => s.id);
-  const spineIds = manifest.filter((s) => s.spine !== false).map((s) => s.id);
-
-  // M2 — spine order.
-  const expectedSpine = [
-    "identity", "choose_base", "track", "characters",
-    "carve", "mechanisms", "touch", "help", "package",
-  ];
-  for (let i = 0; i < expectedSpine.length; i++) {
-    const expected = expectedSpine[i];
-    if (expected === undefined) break;
-    const actual = spineIds[i];
-    if (actual !== expected) {
-      throw new Error(
-        `[SurveyView] manifest spine[${i}] expected "${expected}", got "${actual ?? "(none)"}"`,
-      );
-    }
-  }
-
-  // M3 — exactly one lock:physical and one lock:touch, in that order.
-  const locks = manifest.filter((s) => s.lock !== undefined).map((s) => s.lock);
-  if (locks[0] !== "physical" || locks[1] !== "touch" || locks.length !== 2) {
-    throw new Error(
-      `[SurveyView] manifest locks expected ["physical","touch"], got [${locks.join(",")}]`,
-    );
-  }
-
-  // M4 — touch_seed_source is spine:false with joinTarget "touch".
-  const seedSource = manifest.find((s) => s.id === "touch_seed_source");
-  if (seedSource === undefined || seedSource.spine !== false || seedSource.joinTarget !== "touch") {
-    throw new Error(`[SurveyView] manifest touch_seed_source missing or misconfigured`);
-  }
-
-  // M4b — project_name is spine:false with joinTarget "characters".
-  const projName = manifest.find((s) => s.id === "project_name");
-  if (projName === undefined || projName.spine !== false || projName.joinTarget !== "characters") {
-    throw new Error(`[SurveyView] manifest project_name missing or misconfigured (must be spine:false, joinTarget:"characters")`);
-  }
-
-  // M5 — unique ids.
-  const seen = new Set<string>();
-  for (const id of ids) {
-    if (seen.has(id)) {
-      throw new Error(`[SurveyView] manifest duplicate step id: "${id}"`);
-    }
-    seen.add(id);
-  }
-
-  // Layout guard (spec 028 Stage 5, T016): layout:"full" is now LOAD-BEARING —
-  // StepHost reads step.layout to select full-screen vs two-pane chrome (R4).
-  // EXACTLY {carve, mechanisms, touch} must declare layout:"full"; all others
-  // must be "pane" or omit layout. This assertion is retained (not removed) as
-  // a correctness gate: a mismatched layout would silently change the chrome.
-  const FULL_LAYOUT_IDS = new Set(["carve", "mechanisms", "touch"]);
-  for (const step of manifest) {
-    if (step.layout === "full") {
-      if (!FULL_LAYOUT_IDS.has(step.id)) {
-        throw new Error(
-          `[SurveyView] unexpected layout:"full" on step "${step.id}" — only carve/mechanisms/touch may be full-screen (spec 024 Stage 0)`,
-        );
-      }
-    }
-  }
-  for (const expectedId of FULL_LAYOUT_IDS) {
-    const step = manifest.find((s) => s.id === expectedId);
-    if (step?.layout !== "full") {
-      throw new Error(
-        `[SurveyView] step "${expectedId}" must declare layout:"full" (spec 024 Stage 0)`,
-      );
-    }
-  }
-}
-
+// validateManifestShape (M2/M3/M4/M4b/M5 structural guard) now lives in
+// steps/manifest.ts (exported, unit-tested by spec 034 T003). Still invoked
+// once here at module load so a misshapen manifest is a hard error before any
+// render — fail fast so CI catches it.
 validateManifestShape();
 
 // manifestIndexOf and nextSpineStepAfter have moved to steps/advance.ts
