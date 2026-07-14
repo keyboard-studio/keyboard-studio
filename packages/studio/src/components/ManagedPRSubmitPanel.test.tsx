@@ -322,6 +322,59 @@ describe("ManagedPRSubmitPanel — error states", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
+  // spec 034 T014 (FR-008, PP-2/PP-3): when the managed-PR backend is
+  // unreachable the panel shows an honest error and NEVER a fake success — the
+  // ZIP path (a separate control in OutputScreen, not gated on the backend)
+  // stays functional.
+  it("T014: backend unreachable → honest error, no success panel (never fakes success)", async () => {
+    mockedProject.mockResolvedValueOnce(makeProjectResult());
+    const svc = makeService({
+      publishManagedPR: vi.fn(async () => {
+        throw { kind: "proxy-unavailable", message: "backend down" };
+      }),
+    });
+    mockedGetService.mockResolvedValueOnce(svc);
+
+    render(<ManagedPRSubmitPanel canSubmit={true} />);
+    fillValidForm();
+    fireEvent.click(
+      screen.getByRole("button", { name: /submit keyboard to community repository/i }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toMatch(/temporarily unavailable/i);
+    });
+    // The success affordance must NOT appear on a failed submit.
+    expect(screen.queryByText(/your submission is being reviewed/i)).toBeNull();
+    expect(screen.queryByRole("link", { name: /view your keyboard submission/i })).toBeNull();
+  });
+
+  // spec 034 T015 (PP-4, Article III): the PR submit path serializes the SAME
+  // working copy the ZIP download serializes — both go through the single
+  // projectWorkingCopyForOutput() projector. Submitting must call it exactly
+  // once and hand its VFS straight to publishManagedPR — no second projection,
+  // no second working copy.
+  it("T015: submit projects the working copy once and submits that exact VFS (one working copy)", async () => {
+    const projectResult = makeProjectResult();
+    mockedProject.mockResolvedValueOnce(projectResult);
+    const svc = makeService();
+    mockedGetService.mockResolvedValueOnce(svc);
+
+    render(<ManagedPRSubmitPanel canSubmit={true} />);
+    fillValidForm();
+    fireEvent.click(
+      screen.getByRole("button", { name: /submit keyboard to community repository/i }),
+    );
+
+    await waitFor(() => {
+      expect(svc.publishManagedPR).toHaveBeenCalledTimes(1);
+    });
+    // Exactly one projection — the shared serializer the ZIP path also uses.
+    expect(mockedProject).toHaveBeenCalledTimes(1);
+    // The submitted VFS is the very object the projector returned (not a re-derived copy).
+    expect(svc.publishManagedPR.mock.calls[0]?.[0]).toBe(projectResult.vfs);
+  });
+
   it("null projectWorkingCopyForOutput shows a form-level error", async () => {
     mockedProject.mockResolvedValueOnce(null);
     mockedGetService.mockResolvedValueOnce(makeService());
