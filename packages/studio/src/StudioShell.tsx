@@ -104,7 +104,17 @@ function useRoute(): RouteId {
     // link, a stale bookmark). The gate lifts the moment they leave welcome
     // (markVisited) or once a resumable draft exists, after which the incoming
     // hash is honored normally.
-    if (landing === "welcome") return "welcome";
+    if (landing === "welcome") {
+      // Keep window.location.hash in sync with the forced route. Without this,
+      // a deep-linked hash (e.g. "#survey") is left in place while the route
+      // renders "welcome"; WelcomeScreen's "I'm new" button then calls
+      // navigateTo("survey"), a same-value hash assignment that fires zero
+      // hashchange events per spec, soft-locking the user on WelcomeScreen.
+      if (raw !== "welcome") {
+        window.history.replaceState(window.history.state, "", "#welcome");
+      }
+      return "welcome";
+    }
     return isRouteId(raw) ? raw : landing;
   };
 
