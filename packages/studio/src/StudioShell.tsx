@@ -18,6 +18,13 @@ import { shouldEmitTouchLayout, resolveTouchSeedSource } from "./lib/touchEmissi
 import { useWorkingCopyStore, bindManifest } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
 import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
+import {
+  deriveProjectKeyFromWorkingCopy,
+  discardActiveDraft,
+  installDraftAutosave,
+  replaceActiveDraftIfDifferentProject,
+  wasDraftRestoredThisBoot,
+} from "./lib/draftPersistence.ts";
 import { type RouteId } from "./lib/navigate.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
@@ -247,8 +254,19 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Without this reset the singleton would resume from stale prior state rather
   // than starting at "identity". Component-local useState used to give this
   // mount-fresh reset for free; this call restores that invariant for the store.
+  //
+  // DEVIATION 2 (spec 034 US3, research D4): a durable draft may have just been
+  // restored in main.tsx (BEFORE this component — or any component — mounted),
+  // patching both the working-copy AND survey-session stores so the author
+  // resumes at their last `activeStepId`. An unconditional reset() here would
+  // immediately clobber that restore. `wasDraftRestoredThisBoot()` reads the
+  // module-level flag draftPersistence.loadDraft() sets on success; it is
+  // stable across StrictMode's double-invoked mount effects because
+  // loadDraft() itself only ever runs once, pre-mount, in main.tsx.
   useEffect(() => {
-    useSurveySessionStore.getState().reset();
+    if (!wasDraftRestoredThisBoot()) {
+      useSurveySessionStore.getState().reset();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally empty: runs exactly once on mount
   }, []);
 
@@ -283,6 +301,21 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Gate: the R3 side effect fires exactly once per session; reset on start-over.
   // ---------------------------------------------------------------------------
   const instantiatedRef = useRef<boolean>(false);
+
+  // ---------------------------------------------------------------------------
+  // T023 (spec 034 US3): teardown fn for the durable-draft autosave, installed
+  // once the working copy is instantiated (see onInstantiate below) and torn
+  // down on unmount / start-over / a fresh re-instantiation for a new project.
+  // ---------------------------------------------------------------------------
+  const autosaveTeardownRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      autosaveTeardownRef.current?.();
+      autosaveTeardownRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- teardown-on-unmount only; the ref itself is stable
+  }, []);
 
   // ---------------------------------------------------------------------------
   // ReducerDeps — injected into applyStepCompletion (steps/reducer.ts).
@@ -366,6 +399,17 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     if (instantiatedRef.current) return;
     instantiatedRef.current = true;
 
+    // T025 (spec 034 US3, VR-5 / FR-009 / AS-4): a durable draft from a
+    // DIFFERENT project may already be active (e.g. the author abandoned an
+    // earlier in-progress keyboard without "start over" and picked a new
+    // base). This is the instantiation entry point, so it is where a genuine
+    // project switch first becomes visible — replace the prior project's
+    // draft now, BEFORE this instantiation's own autosave (below) starts
+    // writing under the new key. MVP policy: clean replace, never silent
+    // merge (a confirm-before-overwrite UX is the non-MVP alternative the
+    // contract also permits, deferred).
+    replaceActiveDraftIfDifferentProject(base.id);
+
     // Reads via getState() escape hatch (not a selector) to avoid a stale closure — the callback is memoised with empty deps.
     const track = useSurveySessionStore.getState().selectedTrack;
     applyStepCompletion(
@@ -373,6 +417,20 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       { base, vfs, ir, removalCapabilities, track: track ?? null },
       reducerDepsRef.current,
     );
+
+    // T023: install the durable-draft autosave now that the working copy is
+    // instantiated. `deriveProjectKeyFromWorkingCopy` reads the JUST-WRITTEN
+    // store state via getState() (identity.keyboardId falls back to
+    // baseKeyboard.id — see draftPersistence.ts) so this resolves immediately
+    // for both tracks, even before Track 1's Phase A sets a custom keyboardId.
+    // `instantiatedRef` above already guards this whole callback body to run
+    // at most once per mount, so `autosaveTeardownRef.current` is always null
+    // here; the `?.()` is defensive, not load-bearing.
+    const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
+    if (projectKey !== null) {
+      autosaveTeardownRef.current?.();
+      autosaveTeardownRef.current = installDraftAutosave(projectKey);
+    }
   }, []);
 
   // Pattern map for the working-copy transform — needed from Phase F onwards so
@@ -432,6 +490,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // guard is clear before any re-instantiation can fire (research D-R5).
   // ---------------------------------------------------------------------------
   function handleStartOver() {
+    // T024 (spec 034 US3, research D5, G-3): clear the durable draft (and the
+    // active-project pointer) BEFORE resetting the in-memory stores, so the
+    // NEXT boot does not immediately re-rehydrate the just-abandoned session.
+    discardActiveDraft();
+    autosaveTeardownRef.current?.();
+    autosaveTeardownRef.current = null;
+
     sessionReset();
     resetSurvey();
     instantiatedRef.current = false;

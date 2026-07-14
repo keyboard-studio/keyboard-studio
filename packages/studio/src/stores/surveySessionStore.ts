@@ -16,7 +16,12 @@
 //     No-op when history is empty (back disabled at the first step).
 //   - `reset()` clears every slot to initial (start-over).
 //   - Plain setters for the five value slots.
-//   - No host-disk writes. No persistence.
+//   - No host-disk writes. No persistence OF ITS OWN — this store never calls
+//     localStorage/sessionStorage directly. Spec 034 US3 adds a serialize/
+//     restore SEAM (`TraversalSnapshot`, `snapshotTraversal`,
+//     `applyTraversalSnapshot` below) that the durable-draft module
+//     (../lib/draftPersistence.ts) drives; the actual read/write of storage
+//     lives entirely in that module, not here.
 //   - Worker boundary upheld: WASM is not imported here.
 //   - All survey/hooks imports are type-only (depcruise / bundle hygiene, D-R2).
 
@@ -218,6 +223,41 @@ export interface SurveySessionState {
 }
 
 // ---------------------------------------------------------------------------
+// Data-field type (T017, spec 034 US3) — the non-action slots of
+// SurveySessionState, compiler-enforced via Omit exactly like
+// WorkingCopySnapshot/WorkingCopyData in persistWorkingCopy.ts /
+// workingCopyStore.ts. A new non-action field added to SurveySessionState
+// fails to compile here (both in `INITIAL_STATE`'s `satisfies` below and in
+// `snapshotTraversal`'s return-typed object literal) until it is accounted
+// for — no silent omission from the durable draft.
+//
+// DEVIATION 1 (spec 034 US3 task brief): the data-model.md TraversalSnapshot
+// field list predates spec 035, which added `touchSeedSource` to this store.
+// It is included here — a reload mid-touch that lost the seed-source fork
+// choice would silently re-ask a question the author already answered, or
+// worse, mis-resolve the R11/R12 default. `TraversalSnapshot` is exactly this
+// data-field type; see `snapshotTraversal`/`applyTraversalSnapshot` below.
+// ---------------------------------------------------------------------------
+
+type SurveySessionData = Omit<
+  SurveySessionState,
+  | "advance" | "popHistory" | "backToTouchSeedSource" | "reset"
+  | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
+  | "setSelectedTrack" | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
+  | "setTouchSeedSource"
+>;
+
+/**
+ * Serializable snapshot of the traversal state — "where am I in the walk"
+ * (data-model.md TraversalSnapshot, spec 034 US3). All fields are plain
+ * JSON-safe values already (no Set/binary, unlike WorkingCopySnapshot), so no
+ * encoding is needed beyond `JSON.stringify`/`JSON.parse`.
+ *
+ * Consumed by ../lib/draftPersistence.ts as the `traversal` envelope field.
+ */
+export type TraversalSnapshot = SurveySessionData;
+
+// ---------------------------------------------------------------------------
 // Initial state (extracted so reset() and the initializer share one source)
 // ---------------------------------------------------------------------------
 
@@ -232,13 +272,7 @@ const INITIAL_STATE = {
   localBase: null,
   charactersSubStage: "prefill" as CharactersSubStage,
   touchSeedSource: null as TouchSeedSource | null,
-} as const satisfies Omit<
-  SurveySessionState,
-  | "advance" | "popHistory" | "backToTouchSeedSource" | "reset"
-  | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
-  | "setSelectedTrack" | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
-  | "setTouchSeedSource"
->;
+} as const satisfies SurveySessionData;
 
 // ---------------------------------------------------------------------------
 // Store
@@ -310,3 +344,39 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
 // Ensure the store's getState() escape hatch is available for imperative reads
 // inside memoised callbacks (e.g. onInstantiate reads selectedTrack this way).
 // No extra export needed — zustand attaches getState() to the hook directly.
+
+// ---------------------------------------------------------------------------
+// TraversalSnapshot serialize/restore (T017, spec 034 US3)
+//
+// Mirrors the snapshotWorkingCopyData/applyWorkingCopySnapshot idiom in
+// ../lib/persistWorkingCopy.ts. The return type on `snapshotTraversal` is the
+// enforcement point: a new non-action field added to SurveySessionState (and
+// therefore SurveySessionData/TraversalSnapshot via the Omit above) makes the
+// object literal below fail to compile until it is listed here.
+// ---------------------------------------------------------------------------
+
+/** Build a serializable snapshot of the CURRENT traversal state. */
+export function snapshotTraversal(): TraversalSnapshot {
+  const s = useSurveySessionStore.getState();
+  return {
+    activeStepId: s.activeStepId,
+    history: s.history,
+    identityResult: s.identityResult,
+    identityPhaseResult: s.identityPhaseResult,
+    surveyContext: s.surveyContext,
+    selectedTrack: s.selectedTrack,
+    scaffoldSpec: s.scaffoldSpec,
+    localBase: s.localBase,
+    charactersSubStage: s.charactersSubStage,
+    touchSeedSource: s.touchSeedSource,
+  };
+}
+
+/**
+ * Patch a `TraversalSnapshot` directly into the survey-session store.
+ * `TraversalSnapshot` is exactly the non-action slice of `SurveySessionState`,
+ * so this is a direct `setState` — no field-by-field mapping needed.
+ */
+export function applyTraversalSnapshot(snapshot: TraversalSnapshot): void {
+  useSurveySessionStore.setState({ ...snapshot });
+}

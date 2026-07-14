@@ -13,6 +13,9 @@
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
 import { navigateTo } from "../lib/navigate.ts";
+import { discardActiveDraft } from "../lib/draftPersistence.ts";
+import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import {
   BG_PAGE,
   BG_CARD,
@@ -140,7 +143,19 @@ export function WelcomeScreen() {
 
           <button
             type="button"
-            onClick={() => navigateTo("survey")}
+            onClick={() => {
+              // T024 (spec 034 US3, research D5, G-3): "I'm new" is the
+              // WelcomeScreen's fresh-start entry point. A durable draft may
+              // already have been restored at boot (main.tsx's pre-mount
+              // loadDraft) before the author ever saw this screen — honoring
+              // "I'm new" means clearing that draft (and the active-project
+              // pointer) and resetting both stores, not silently keeping the
+              // restored state around for a later boot to re-surface.
+              discardActiveDraft();
+              useSurveySessionStore.getState().reset();
+              useWorkingCopyStore.getState().reset();
+              navigateTo("survey");
+            }}
             style={{
               ...providerButtonBase,
               background: "transparent",

@@ -527,3 +527,93 @@ test.describe("spec 034 proven-script walks + publish paths", () => {
     expect(await download.path()).not.toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// spec 034 US3 (T028) — durable localStorage draft: reload-and-resume.
+//
+// Advances several stages (identity -> ... -> Phase B "Done", which auto-
+// advances the traversal to "carve" per the manifest spine — see
+// steps/advance.test.ts SR-1/SR-2), hard-reloads, and confirms:
+//   - AS-1/SC-003: the working copy AND activeStepId are restored (the Carve
+//     gallery reappears directly; the identity panel never does) — NOT reset
+//     to identity.
+//   - FR-010: Back stays history-consistent after restore — Back leaves the
+//     Carve gallery, and Forward from there returns to it (a round-trip that
+//     would fail if the restored `history` stack were stale/inconsistent).
+//   - G-3/AS-3: the WelcomeScreen "I'm new" affordance (StudioShell's other
+//     start-over entry point, see draftPersistence.ts clearDraft callers)
+//     clears the persisted draft, and a SUBSEQUENT reload starts fresh at
+//     identity rather than re-resuming the abandoned draft.
+// ---------------------------------------------------------------------------
+
+test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays consistent, start-over clears it", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+  });
+
+  test("T028: hard reload resumes the working copy + step position; Back round-trips; 'I'm new' clears the draft", async ({
+    page,
+  }) => {
+    // Advance several stages (identity -> base -> track -> project_name ->
+    // prefill -> Phase B), mirroring the proven walkToOutput helper up to
+    // (not including) the Output-tab hop.
+    await fillIdentityLite(page);
+    await pickBaseKeyboard(page);
+    await chooseTrackCopy(page);
+    await acceptProjectName(page);
+    await confirmPrefill(page);
+    await completePhaseB(page); // "Done" advances the traversal to "carve".
+
+    await page.waitForSelector('[data-testid="carve-gallery"]', { timeout: 20_000 });
+
+    // Let the ~500ms autosave debounce (Article IV — independent of the 300ms
+    // validate cycle) commit the draft before reloading.
+    await page.waitForTimeout(1_500);
+
+    // --- Hard reload ---
+    await page.reload();
+
+    // AS-1/SC-003: NOT reset to identity. The Carve gallery reappears
+    // directly on this same reloaded boot; the identity panel never renders.
+    await page.waitForSelector('[data-testid="carve-gallery"]', { timeout: 30_000 });
+    await expect(page.getByTestId("identity-panel")).toHaveCount(0);
+
+    // FR-010: Back navigates away from Carve, back onto the restored `history`
+    // stack's Phase B entry (the IntroChooser, re-entered from the top of
+    // Phase B — same UX as any other Back into a completed phase) — proving
+    // the restored `history` stack is a real, walkable path, not just a bare
+    // `activeStepId` string. (BuildListView's typed-alphabet buffer is
+    // component-LOCAL `useState` — see survey/PhaseB.tsx — so it resets on
+    // this remount regardless of the draft feature; re-adding a character
+    // below mirrors completePhaseB's own steps, not a persistence regression.)
+    const carveGallery = page.getByTestId("carve-gallery");
+    await carveGallery.getByRole("button", { name: "← Back" }).click();
+    await expect(carveGallery).toHaveCount(0);
+    await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 20_000 });
+    await page.click('[data-testid="phase-b-intro-next"]');
+
+    await page.waitForSelector('[aria-label="Character to add"]', { timeout: 10_000 });
+    await page.fill('[aria-label="Character to add"]', FIXTURE.charToAdd);
+    await page.getByRole("button", { name: "+ Add" }).click();
+    await page.waitForSelector('[data-testid="phase-b-done"]:not([disabled])', { timeout: 10_000 });
+
+    // Forward again: Back + Forward round-trips back to Carve — confirms the
+    // history/back-nav stayed coherent across the reload+restore (not merely
+    // that the CURRENT step survived).
+    await page.click('[data-testid="phase-b-done"]');
+    await page.waitForSelector('[data-testid="carve-gallery"]', { timeout: 20_000 });
+
+    // G-3/AS-3: "I'm new" (WelcomeScreen's start-over entry point) clears the
+    // durable draft and resets both stores in-place (hash-only navigation —
+    // no reload yet).
+    await page.goto("/#welcome");
+    await page.getByRole("button", { name: "I’m new" }).click();
+    await page.waitForSelector('[data-testid="identity-panel"]', { timeout: 15_000 });
+
+    // A SUBSEQUENT reload must start fresh — the cleared draft must not
+    // resurrect the abandoned carve-stage session.
+    await page.reload();
+    await page.waitForSelector('[data-testid="identity-panel"]', { timeout: 30_000 });
+    await expect(page.getByTestId("carve-gallery")).toHaveCount(0);
+  });
+});
