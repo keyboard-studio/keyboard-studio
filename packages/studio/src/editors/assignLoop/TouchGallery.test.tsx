@@ -13,6 +13,7 @@ import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
 import { TouchGallery } from "./TouchGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import type { VirtualFS, MechanismAssignment } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
@@ -142,6 +143,15 @@ function seedStore(opts: { withInventory?: string[]; intro?: boolean } = {}) {
   if (!opts.intro) {
     useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
   }
+  // spec 035 R11: these fixtures ship no base .keyman-touch-layout, so the
+  // Entity-5 default (resolveTouchSeedSource) would resolve to
+  // "reseed-from-desktop" (which ALWAYS emits) if left null. Existing tests
+  // in this file pin the "import-adapt + empty mods + no real edit -> emit
+  // nothing" row, so seed the explicit choice — mirrors an author who picked
+  // Import & adapt from the fork chooser even though there is nothing to
+  // import onto (TouchSeedSourcePanel allows this; it starts from an empty
+  // layout).
+  useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
 }
 
 /** Invoke the captured vfsTransform with a fresh VFS and the given kbId. */
@@ -160,6 +170,7 @@ function runTransform(kbId: string) {
 afterEach(() => {
   cleanup();
   useWorkingCopyStore.getState().reset();
+  useSurveySessionStore.getState().reset();
   vi.clearAllMocks();
   capturedVfsTransformRef.current = null;
   // Reset useTouchLint mock to the default empty state between tests.
@@ -168,6 +179,7 @@ afterEach(() => {
 
 beforeEach(() => {
   useWorkingCopyStore.getState().reset();
+  useSurveySessionStore.getState().reset();
   touchLintResultRef.current = { touchFindings: [], touchLintRunning: false };
 });
 
@@ -344,6 +356,57 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     expect(callCount).toBeGreaterThan(0);
     // Defect A guarantee: injected JSON is non-null and contains assignment info.
     expect(String(entry?.content)).toContain("defectA");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R11 emission matrix — the row that USED TO return null: import-adapt with
+// non-empty desktop modifications (spec 035 R3 replay) must still emit even
+// when the author has made ZERO Phase E edits. Pre-035, the emission gate was
+// "has real edits" only; R11 adds "OR mods non-empty".
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — R11 emission: mods non-empty emits even with zero configured chars", () => {
+  it("injects the derived touch layout when desktop mods are non-empty, before any Phase E edit is made", async () => {
+    // A Phase C simple_swap assignment for "x" derives a non-empty
+    // mods.placements entry (deriveDesktopModifications extracts hostKey
+    // K_X) — seedWithDesktopAssignment also pins seedSource "import-adapt".
+    const swapAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "x",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "simple_swap",
+          strategyId: "S-01",
+          slotValues: { kmnRules: "+ [K_X] > U+0078" },
+        },
+      ],
+      source: "user",
+    };
+    seedWithDesktopAssignment("x", swapAssignment);
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // Zero Phase E edits made — charTouch stays empty for the whole test —
+    // yet the R11 matrix must still emit because import-adapt + mods
+    // non-empty is an emit row, independent of hasRealEdits.
+    const vfs = runTransform("basic_kbdus");
+    const entry = vfs.get("source/basic_kbdus.keyman-touch-layout");
+    expect(entry).not.toBeUndefined();
+    expect(buildTouchLayoutJsonSpy).toHaveBeenCalled();
+
+    const [, passedAssignments, opts] = buildTouchLayoutJsonSpy.mock.calls[0]! as [
+      unknown,
+      unknown[],
+      { mods: { removals: string[]; placements: unknown[] } },
+    ];
+    // No Phase E assignments were passed (empty charTouch).
+    expect(passedAssignments).toEqual([]);
+    // But mods.placements carries the Phase C-derived placement.
+    expect(opts.mods.placements.length).toBeGreaterThan(0);
   });
 });
 
@@ -963,6 +1026,9 @@ function seedWithDesktopAssignment(
   // Skip the first-entry intro splash (see seedStore) so these tests land
   // directly on the per-character gallery.
   useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
+  // spec 035 R11 — see seedStore's comment: pin the explicit import-adapt
+  // choice so these fixtures don't fall into the reseed-always-emits default.
+  useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
 }
 
 describe("TouchGallery — suggestion card variants", () => {

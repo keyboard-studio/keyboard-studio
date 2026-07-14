@@ -14,6 +14,7 @@ import { useResizablePanes } from "./hooks/useResizablePanes.ts";
 import { ResizeHandle } from "./components/ResizeHandle.tsx";
 import type { BaseKeyboard, Pattern } from "@keyboard-studio/contracts";
 import { buildTouchLayoutJson } from "./lib/buildTouchLayoutJson.ts";
+import { shouldEmitTouchLayout, resolveTouchSeedSource } from "./lib/touchEmission.ts";
 import { useWorkingCopyStore, bindManifest } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
 import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
@@ -304,6 +305,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Store actions needed by SurveyView (not delegated to StepHost).
   const sessionReset = useSurveySessionStore((s) => s.reset);
   const setLocalBase = useSurveySessionStore((s) => s.setLocalBase);
+  // Injected into reducerDeps (spec 035 R12) so reducer.ts can clear the
+  // touch_seed_source fork choice on a genuine base re-instantiation without
+  // steps/ importing stores/ directly.
+  const setTouchSeedSource = useSurveySessionStore((s) => s.setTouchSeedSource);
 
   // Derive whether the active step declares layout:"full" (load-bearing per Stage 5,
   // FR-002, R4). SurveyView uses this to skip the two-pane shell for full-screen steps.
@@ -371,8 +376,30 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       setTouchLayoutJson,
       instantiateFromBase,
       instantiateFromExisting,
-      buildTouchLayoutJson: (baseIrArg, assignments, baseTouchJson) =>
-        buildTouchLayoutJson(baseIrArg, assignments, baseTouchJson),
+      setTouchSeedSource,
+      // Spec 035 R11: this wrapper is the ONE call site (of the two — the
+      // other is TouchGallery's preview/lint memos) that applies the
+      // emission matrix for the output path. It resolves the Entity-5
+      // default seed source, decides whether to emit at all, and only then
+      // calls the real buildTouchLayoutJson — so reducer.ts (steps/, which
+      // may not import lib/) stays a thin pass-through.
+      buildTouchLayoutJson: (baseIrArg, assignments, opts) => {
+        const seedSource = resolveTouchSeedSource(opts.seedSource, opts.baseTouchJson !== undefined);
+        const hasRealEdits = assignments.length > 0;
+        if (!shouldEmitTouchLayout(seedSource, opts.mods, hasRealEdits)) {
+          return { json: null, warnings: [] };
+        }
+        return buildTouchLayoutJson(baseIrArg, assignments, {
+          // Reseed discards the shipped layout (R10) — never pass baseTouchJson
+          // through on that path, even though buildTouchLayoutJson's own Case A
+          // branch condition would ignore it anyway.
+          ...(seedSource !== "reseed-from-desktop" && opts.baseTouchJson !== undefined
+            ? { baseTouchJson: opts.baseTouchJson }
+            : {}),
+          mods: opts.mods,
+          seedSource,
+        });
+      },
       resolveBaseTouchJson: (vfs) => resolveBaseTouchJson(vfs),
       instantiateFromBaseIfConfirmed: (base, opts) =>
         instantiateFromBaseIfConfirmed(base, opts),
@@ -390,7 +417,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     // Wrapper lambdas delegate to stable module imports — excluded from deps intentionally.
-    [lockDesktop, clearStale, setTouchLayoutJson, instantiateFromBase, instantiateFromExisting],
+    [lockDesktop, clearStale, setTouchLayoutJson, instantiateFromBase, instantiateFromExisting, setTouchSeedSource],
   );
 
   // Keep reducerDepsRef current so the async onInstantiate callback always

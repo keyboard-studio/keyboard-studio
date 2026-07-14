@@ -26,13 +26,17 @@
 //     character configured.
 //   - Positional Back/Next/last-character navigation walks inventory by
 //     index; a skipped-over character is never treated as resolved.
-//   - Desktop edits are NOT transferred to mobile — the touch layout is
-//     seeded from a fixed minimal QWERTY layout, not derived from IR rules.
+//   - Desktop work (carve removals + Phase C letter placements) IS replayed
+//     onto the touch seed (spec 035 R3/R11): the touch layout is derived from
+//     scaffoldTouchLayout(baseIr) (reseed) or the shipped .keyman-touch-layout
+//     (import-adapt), with the locked desktop modifications applied on BOTH
+//     paths — see the `mods`/`touchLayoutJson` memos below.
 //
 // RIGHT pane: live phone-mode OSK preview.
 //   - useKeyboardArtifact + OSKFrame wiring. Runs exclusively in touch mode.
-//   - VFS transform injects a minimal hardcoded phone layout when the keyboard
-//     has no existing .keyman-touch-layout; existing touch files are left as-is.
+//   - VFS transform injects the derived touch layout per the spec 035 R11
+//     emission matrix (reseed always; import-adapt when mods/edits warrant
+//     it); a truly-untouched import-adapt leaves the shipped file verbatim.
 //   - "Touch preview" label matches MechanismGallery's "Live preview" label style.
 //
 // Touch lint (Layer C checks 18.1–18.5) stays below the character cards,
@@ -43,10 +47,14 @@
 import { useState, useEffect, useMemo, useCallback, type CSSProperties } from "react";
 import type { TouchAssignment, MechanismRef } from "@keyboard-studio/contracts";
 import { createVirtualFS, toUPlusNotation, isDecomposableAccented } from "@keyboard-studio/contracts";
-import { parseKeySpec } from "@keyboard-studio/engine";
+import type { DesktopModifications } from "@keyboard-studio/engine";
 import { buildTouchLayoutJson } from "../../lib/buildTouchLayoutJson.ts";
 import { resolveBaseTouchJson } from "../../lib/resolveBaseTouchJson.ts";
+import { deriveDesktopModifications } from "../../lib/deriveDesktopModifications.ts";
+import { extractMechanismHostKey } from "../../lib/extractMechanismHostKey.ts";
+import { shouldEmitTouchLayout, resolveTouchSeedSource } from "../../lib/touchEmission.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { promoteOnManualEdit } from "./touchBehavior.ts";
 import { isMutateSeamEnabled } from "../../flags/mutateFlag.ts";
 import { LintSummary } from "../../lint/index.ts";
@@ -65,6 +73,9 @@ import {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** The empty/no-op DesktopModifications — the mods memo's fallback when baseIr is null. */
+const EMPTY_MODS: DesktopModifications = { removals: [], placements: [] };
 
 /** Strip K_ prefix from a key id for user-facing display. */
 function hostKeyShortLabel(keyId: string): string {
@@ -426,8 +437,12 @@ export interface TouchGalleryProps {
   onComplete: (assignments: TouchAssignment[]) => void;
   /**
    * Called when the user clicks Back on the very first character (or from the
-   * empty-inventory guard). Should navigate back to Phase C ("mechanisms").
-   * Phase C will be in its locked/read-only state — no unlock is performed.
+   * empty-inventory guard). Spec 035 R12 (re-entry path): the host wires this
+   * to the "touch_seed_source" chooser step — NOT directly to "mechanisms" —
+   * so a returning author can reconsider Import vs Reseed even when the fork
+   * was skipped this pass (a recorded, non-stale choice routes straight from
+   * mechanisms to touch). The chooser's own Back is what reaches "mechanisms"
+   * (locked/read-only; no unlock is performed).
    */
   onBack: () => void;
 }
@@ -437,6 +452,15 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const identity = useWorkingCopyStore((s) => s.identity);
   const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
+
+  // spec 035 R3/R11 — the carve overlay + Phase C assignments feed
+  // deriveDesktopModifications (mods memo below); touchSeedSource feeds the
+  // R11 emission matrix. Read here (not inline in the memo) so the mods/
+  // emission memos below can depend on stable primitives.
+  const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
+  const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
+  const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
+  const touchSeedSourceStored = useSurveySessionStore((s) => s.touchSeedSource);
 
   // Character inventory — same source MechanismGallery uses.
   const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
@@ -493,10 +517,40 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     [charTouch],
   );
 
-  // Build applied touch layout JSON only when the author has made real (non-inherited)
-  // touch edits. When there are no such edits, return null so the VFS is left
-  // untouched and KMW renders its own polished native default (or the keyboard's
-  // shipped .keyman-touch-layout file is used verbatim).
+  // Stable primitive key so the mods memo only recomputes when the carve
+  // overlay or Phase C assignments actually change (the Set/array identities
+  // are replaced immutably on every mutation, so a size/length-based key is a
+  // cheap, correct proxy — same precedent as touchKey above).
+  const modsDepsKey = `${deletedNodeIds.size}:${deletedItemIds.size}:${phaseResults.length}`;
+
+  // Desktop modifications to replay onto the touch seed (spec 035 R3) — carve
+  // removals (Phase D) + Phase C individual letter placements. Fed to
+  // buildTouchLayoutJson on BOTH derivation paths and to the R11 emission
+  // matrix below (mods.length > 0 can trigger emission even with zero Phase E
+  // edits).
+  const mods = useMemo<DesktopModifications>(() => {
+    if (baseIr === null) return EMPTY_MODS;
+    return deriveDesktopModifications(baseIr, deletedNodeIds, deletedItemIds, phaseResults);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseIr, modsDepsKey]);
+
+  // Resolved seed-source choice (spec 035 R4/R11) — the raw store value may be
+  // null (defensive: author somehow reached touch without the fork); the
+  // Entity-5 default is applied here via resolveTouchSeedSource so preview,
+  // lint, and this component's own emission decision agree.
+  const resolvedSeedSource = useMemo(
+    () => resolveTouchSeedSource(touchSeedSourceStored, resolveBaseTouchJson(baseVfs) !== undefined),
+    [touchSeedSourceStored, baseVfs],
+  );
+
+  // Build the derived touch layout JSON per the spec 035 R11 emission matrix:
+  //   - "reseed-from-desktop" -> ALWAYS derive + emit (even with zero Phase E
+  //     edits and empty mods — SC-002 requires the file to exist).
+  //   - "import-adapt" AND (mods non-empty OR >=1 real Phase E edit) -> derive
+  //     + emit.
+  //   - "import-adapt" with empty mods and no real edit -> emit NOTHING (the
+  //     shipped file, if any, is used verbatim — a byte-preserving no-op).
+  //   - buildTouchLayoutJson returning null (engine failure) -> emit nothing.
   //
   // "Real edit" = an assignment with at least one mechanism whose patternId
   // !== "touch_inherited" (an assignment may carry several mechanisms — issue
@@ -506,22 +560,31 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     const appliedEdits = [...charTouch.values()].filter((a) =>
       a.mechanisms.some((m) => m.patternId !== "touch_inherited"),
     );
-    if (appliedEdits.length === 0) return null;
     if (baseIr === null) return null;
-    // Case B: base ships a touch layout → apply faithfully onto raw JSON copy.
-    // Case A: no shipped touch layout (or baseVfs not yet loaded) → IR-based path.
-    return buildTouchLayoutJson(baseIr, appliedEdits, resolveBaseTouchJson(baseVfs)).json;
+    if (!shouldEmitTouchLayout(resolvedSeedSource, mods, appliedEdits.length > 0)) return null;
+    // Case B: base ships a touch layout AND the author chose import-adapt →
+    // apply faithfully onto raw JSON copy. Case A (including reseed, which
+    // must NOT receive the shipped layout — R10 discards it): IR-based path.
+    const baseTouchJson =
+      resolvedSeedSource === "reseed-from-desktop" ? undefined : resolveBaseTouchJson(baseVfs);
+    return buildTouchLayoutJson(baseIr, appliedEdits, {
+      ...(baseTouchJson !== undefined ? { baseTouchJson } : {}),
+      mods,
+      seedSource: resolvedSeedSource,
+    }).json;
     // touchKey drives re-evaluation when charTouch changes (Map identity is
     // not stable; the key is). baseIr is a stable snapshot post-lockDesktop.
     // baseVfs is stable after instantiation but included for correctness.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseIr, touchKey, baseVfs]);
+  }, [baseIr, touchKey, baseVfs, mods, resolvedSeedSource]);
 
-  // VFS transform: inject the generated touch layout only when the author has
-  // made real (non-inherited) touch edits. When touchLayoutJson is null — either
-  // because no real edits exist or because the emit pipeline failed — leave the
-  // VFS untouched so KMW renders its own polished native default (or the
-  // keyboard's shipped .keyman-touch-layout file is used verbatim).
+  // VFS transform: inject the derived touch layout whenever touchLayoutJson
+  // is non-null (the R11 matrix above already decided emission — reseed
+  // always, import-adapt only when mods/edits warrant it). When
+  // touchLayoutJson is null — either the R11 matrix said "don't emit" or the
+  // emit pipeline failed — leave the VFS untouched so KMW renders its own
+  // polished native default (or the keyboard's shipped .keyman-touch-layout
+  // file is used verbatim, a byte-preserving no-op).
   const vfsTransform = useMemo<VfsTransform>(
     () => (vfs, kbId) => {
       if (touchLayoutJson !== null) {
@@ -621,8 +684,8 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // ---------------------------------------------------------------------------
   // Phase C desktop assignments + detected-chars from scaffoldTouchLayout
   // ---------------------------------------------------------------------------
-
-  const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
+  // (phaseResults is read near the top of the component alongside the other
+  // spec 035 R3 mods inputs — deletedNodeIds/deletedItemIds/touchSeedSource.)
 
   const desktopAssignments = useMemo(
     () =>
@@ -681,48 +744,11 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     if (da) {
       const m = da.mechanisms[0];
       if (!m) return { kind: "none" };
-      const pid = m.patternId;
-      const sid = m.strategyId ?? "";
-      const sv = m.slotValues ?? {};
-
-      // simple_swap / S-01 → replace suggestion
-      if (pid === "simple_swap" || sid === "S-01") {
-        const match = (sv["kmnRules"] ?? "").match(/\+\s*\[([A-Z0-9_]+)\]/);
-        const hk = match?.[1] ?? "";
-        return { kind: "replace", hostKey: hk };
-      }
-
-      // deadkey_single_tap / S-02 → longpress from baseLetters
-      if (pid === "deadkey_single_tap" || sid === "S-02") {
-        const baseLetters = sv["baseLetters"] ?? "";
-        const firstLetter = baseLetters[0];
-        let hk = "";
-        if (firstLetter && /^[a-zA-Z]$/.test(firstLetter)) {
-          hk = `K_${firstLetter.toUpperCase()}`;
-        }
-        return { kind: "longpress", hostKey: hk };
-      }
-
-      // modifier_as_layer_switch / S-08 → longpress from altgrKeyList
-      if (pid === "modifier_as_layer_switch" || sid === "S-08") {
-        const parsed = parseKeySpec(sv["altgrKeyList"] ?? "");
-        const hk = parsed?.vkey ?? "";
-        return { kind: "longpress", hostKey: hk };
-      }
-
-      // multi_char_sequence / S-03 → longpress best-effort
-      if (pid === "multi_char_sequence" || sid === "S-03") {
-        const firstOut = sv["firstLetterOut"] ?? "";
-        const firstChar = firstOut[0];
-        let hk = "";
-        if (firstChar && /^[a-zA-Z]$/.test(firstChar)) {
-          hk = `K_${firstChar.toUpperCase()}`;
-        }
-        return { kind: "longpress", hostKey: hk };
-      }
-
-      // Assignment exists but unrecognized pattern
-      return { kind: "none" };
+      // Shared host-key extraction (packages/studio/src/lib/extractMechanismHostKey.ts) —
+      // an unrecognized pattern/strategy returns undefined.
+      const result = extractMechanismHostKey(m);
+      if (!result) return { kind: "none" };
+      return result;
     }
 
     // No desktop assignment
@@ -1026,8 +1052,11 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   );
 
   // Projected VFS for lint — clones baseVfs and overwrites the touch layout path
-  // with the same touchLayoutJson the preview uses (lint, preview, output agree).
-  // When touchLayoutJson is null (baseIr not yet set) lint sees the raw baseVfs.
+  // with the same touchLayoutJson the preview uses (lint, preview, output agree
+  // per the spec 035 R11 emission matrix — see the touchLayoutJson memo above).
+  // When touchLayoutJson is null — baseIr not yet set, the R11 matrix said
+  // "don't emit", or the emit pipeline failed — lint sees the raw baseVfs
+  // (the shipped file, if any, stays verbatim — a byte-preserving no-op).
   // keyboardId in deps so the path key stays correct if the id changes.
   const editedVfsForLint = useMemo(() => {
     if (baseVfs === null) return null;

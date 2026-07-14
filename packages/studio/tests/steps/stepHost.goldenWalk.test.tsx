@@ -372,6 +372,37 @@ vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () => ({
   },
 }));
 
+// Mock the touch_seed_source chooser (spec 035 T014) — registerEditorSteps.ts
+// now renders TouchSeedSourcePanel for this step (the "touch" step keeps the
+// TouchGallery mock above). A single confirm button is all the golden-walk
+// oracle needs: the panel's onComplete carries no SurveyPhaseResult shape and
+// the step is not in STEPS_WITH_APPLY_COMPLETION, so the only recorded effect
+// is the "advance" session mutation (matches __fixtures__/goldenWalk/*.json).
+vi.mock("../../src/editors/touchSeedSource/TouchSeedSourcePanel.tsx", () => ({
+  TouchSeedSourcePanel: ({
+    onComplete,
+    onBack,
+  }: {
+    onComplete: (result: unknown) => void;
+    onBack?: () => void;
+  }) => (
+    <div data-testid="stage-seed-source">
+      <button
+        type="button"
+        data-testid="seed-source-complete"
+        onClick={() => onComplete(undefined)}
+      >
+        seed-source-complete
+      </button>
+      {onBack !== undefined && (
+        <button type="button" data-testid="seed-source-back" onClick={onBack}>
+          seed-source-back
+        </button>
+      )}
+    </div>
+  ),
+}));
+
 vi.mock("../../src/components/UnsupportedScriptStub.tsx", () => ({
   UnsupportedScriptStub: ({ script }: { script: string }) => (
     <div data-testid="stage-unsupported">{script}</div>
@@ -629,7 +660,15 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
 /**
  * Drive the full copy-track walk.
  * identity -> choose_base -> track(copy) -> project_name ->
- * characters(prefill->B) -> carve -> mechanisms -> touch -> help -> done
+ * characters(prefill->B) -> carve -> mechanisms -> touch_seed_source -> touch
+ * -> help -> done
+ *
+ * touch_seed_source (spec 035 R4/R12) is inserted between mechanisms and touch
+ * on a FRESH walk because touchSeedSource starts null — advance("mechanisms")
+ * routes into the fork instead of straight to "touch". The fork step renders
+ * the mocked TouchSeedSourcePanel stub (T014, registerEditorSteps.ts) — driven
+ * via its own "seed-source-complete" testid — before the real "touch" step
+ * (still the TouchGallery mock, "e-complete").
  */
 async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Promise<void> {
   await driveSteps(recorder, [
@@ -641,6 +680,7 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     { stepId: "characters/B", testId: "phaseB-complete" },
     { stepId: "carve", testId: "carve-complete" },
     { stepId: "mechanisms", testId: "mechanisms-complete" },
+    { stepId: "touch_seed_source", testId: "seed-source-complete", async: true },
     { stepId: "touch", testId: "e-complete", async: true },
     { stepId: "help", testId: "phaseF-complete", async: true },
   ]);
@@ -649,8 +689,10 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
 /**
  * Drive the full adapt-track walk.
  * identity -> choose_base -> track(adapt) ->
- * characters(prefill->B) -> carve -> mechanisms -> touch -> help -> done
- * project_name MUST NOT appear.
+ * characters(prefill->B) -> carve -> mechanisms -> touch_seed_source -> touch
+ * -> help -> done
+ * project_name MUST NOT appear. See driveCopyTrack's docstring for why
+ * touch_seed_source appears (spec 035 R4/R12 fork memory).
  */
 async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Promise<void> {
   await driveSteps(recorder, [
@@ -661,6 +703,7 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
     { stepId: "characters/B", testId: "phaseB-complete" },
     { stepId: "carve", testId: "carve-complete" },
     { stepId: "mechanisms", testId: "mechanisms-complete" },
+    { stepId: "touch_seed_source", testId: "seed-source-complete", async: true },
     { stepId: "touch", testId: "e-complete", async: true },
     { stepId: "help", testId: "phaseF-complete", async: true },
   ]);
