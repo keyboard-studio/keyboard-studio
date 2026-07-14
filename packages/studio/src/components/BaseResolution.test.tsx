@@ -29,7 +29,8 @@ describe("BaseResolution — language-match integration via suggestBases", () =>
     const first = suggestions[0];
     expect(first).toBeDefined();
     expect(first!.base.id).toBe("sil_euro_latin");
-    expect(first!.reason).toBe("language-match");
+    // sil_euro_latin declares many languages → multilingual match.
+    expect(first!.reason).toBe("language-match-multilingual");
   });
 
   it("hi-Deva target: sil_devanagari_phonetic ranks as language-match", () => {
@@ -42,7 +43,8 @@ describe("BaseResolution — language-match integration via suggestBases", () =>
     const first = suggestions[0];
     expect(first).toBeDefined();
     expect(first!.base.id).toBe("sil_devanagari_phonetic");
-    expect(first!.reason).toBe("language-match");
+    // ["hi", "mai", ...] → multilingual match.
+    expect(first!.reason).toBe("language-match-multilingual");
   });
 
   it("en target: basic_kbdus ranks as language-match (not just fallback)", () => {
@@ -54,7 +56,8 @@ describe("BaseResolution — language-match integration via suggestBases", () =>
 
     const enMatch = suggestions.find((s) => s.base.id === "basic_kbdus");
     expect(enMatch).toBeDefined();
-    expect(enMatch!.reason).toBe("language-match");
+    // basic_kbdus declares en/id/ms/ht/bi → multilingual match.
+    expect(enMatch!.reason).toBe("language-match-multilingual");
   });
 
   it("unknown language code degrades to script-match, not language-match", () => {
@@ -65,8 +68,8 @@ describe("BaseResolution — language-match integration via suggestBases", () =>
       { languagesById },
     );
 
-    const languageMatches = suggestions.filter(
-      (s) => s.reason === "language-match",
+    const languageMatches = suggestions.filter((s) =>
+      s.reason.startsWith("language-match"),
     );
     expect(languageMatches).toHaveLength(0);
   });
@@ -78,8 +81,8 @@ describe("BaseResolution — language-match integration via suggestBases", () =>
       { languagesById },
     );
 
-    const languageMatches = suggestions.filter(
-      (s) => s.reason === "language-match",
+    const languageMatches = suggestions.filter((s) =>
+      s.reason.startsWith("language-match"),
     );
     expect(languageMatches).toHaveLength(0);
     // script-match entries exist for Latin bases
