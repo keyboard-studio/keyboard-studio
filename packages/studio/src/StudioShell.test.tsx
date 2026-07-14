@@ -477,6 +477,7 @@ vi.mock("./lib/navigate.ts", () => ({
 
 import { SurveyView, StudioShell } from "./StudioShell.tsx";
 import { navigateTo } from "./lib/navigate.ts";
+import { markVisited } from "./lib/firstVisit.ts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 
@@ -777,6 +778,17 @@ describe("StudioShell — route: #output renders OutputScreen", () => {
 // ---------------------------------------------------------------------------
 
 describe("StudioShell — first-visit landing gate", () => {
+  function seedResumableDraft() {
+    localStorage.setItem(
+      "ks.studio.draft",
+      JSON.stringify({
+        version: 1,
+        savedAt: Date.now(),
+        survey: { activeStepId: "identity", identityResult: null, scaffoldSpec: null },
+      }),
+    );
+  }
+
   it("mounts WelcomeScreen (not the survey) on a first visit with no hash", async () => {
     window.location.hash = "";
     localStorage.clear(); // pristine browser: never visited, no draft
@@ -819,14 +831,7 @@ describe("StudioShell — first-visit landing gate", () => {
     localStorage.clear();
     // A minimally-valid draft (version + savedAt + survey) so loadDraftMeta()
     // returns non-null; the survey route surfaces the resume banner.
-    localStorage.setItem(
-      "ks.studio.draft",
-      JSON.stringify({
-        version: 1,
-        savedAt: Date.now(),
-        survey: { activeStepId: "identity", identityResult: null, scaffoldSpec: null },
-      }),
-    );
+    seedResumableDraft();
 
     await act(async () => {
       render(<StudioShell />);
@@ -858,6 +863,54 @@ describe("StudioShell — first-visit landing gate", () => {
 
     expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
     expect(screen.queryByTestId("preview-screen-root")).toBeNull();
+  });
+
+  it("lifts the gate on a live hashchange once the newcomer leaves welcome (no remount)", async () => {
+    window.location.hash = "#survey";
+    localStorage.clear(); // pristine browser: never visited, no draft
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    // A newcomer is forced onto welcome even on a deep-linked #survey hash, and
+    // that hash is normalized to #welcome. Without this normalization the
+    // WelcomeScreen "I'm new" button's navigateTo("survey") would be a
+    // same-value hash assignment that fires zero hashchange events, soft-locking
+    // the user on welcome.
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    expect(window.location.hash).toBe("#welcome");
+
+    // Leaving welcome marks the browser visited; the button then navigates to
+    // #survey. Drive that live transition on the SAME mount: the gate must lift
+    // and the route re-resolve to survey on the next hashchange, WITHOUT the
+    // component remounting (the test never re-renders StudioShell).
+    await act(async () => {
+      markVisited();
+      window.location.hash = "#survey";
+      window.dispatchEvent(new Event("hashchange"));
+    });
+
+    expect(screen.getByTestId("stage-identity")).toBeTruthy();
+    expect(screen.queryByTestId("welcome-screen-root")).toBeNull();
+  });
+
+  it("honors a deep-linked #preview hash for a never-visited browser once a resumable draft exists", async () => {
+    window.location.hash = "#preview";
+    localStorage.clear(); // never visited...
+    // ...but a resumable draft lifts the newcomer gate. Same minimally-valid
+    // draft shape used by the "resumable draft exists" test above.
+    seedResumableDraft();
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    // Gate lifted by the draft ⇒ the deep-linked hash is honored: land on
+    // preview, NOT forced onto welcome and NOT defaulted to survey.
+    expect(screen.getByTestId("preview-screen-root")).toBeTruthy();
+    expect(screen.queryByTestId("welcome-screen-root")).toBeNull();
+    expect(screen.queryByTestId("stage-identity")).toBeNull();
   });
 });
 
