@@ -84,8 +84,11 @@ function isRouteId(v: string): v is RouteId {
 // First-visit landing gate (proposal §9). Decides where an empty or unknown
 // hash lands. A genuine first-time visitor sees the welcome screen; a returning
 // visitor — or one with a resumable draft (the survey route surfaces the resume
-// banner) — goes straight into the survey. Internal navigation always sets a
-// valid hash, so this only governs the initial landing and stale-hash cases.
+// banner) — goes straight into the survey. A newcomer landing also overrides
+// an explicit deep-link hash (a shared #survey/#preview link, a stale
+// bookmark) — see hashToRoute below; internal navigation always sets a valid
+// hash, so beyond that this only governs the initial landing and stale-hash
+// cases.
 function defaultLandingRoute(): RouteId {
   if (hasVisited()) return "survey";
   if (loadDraftMeta() !== null) return "survey";
@@ -95,7 +98,14 @@ function defaultLandingRoute(): RouteId {
 function useRoute(): RouteId {
   const hashToRoute = (): RouteId => {
     const raw = window.location.hash.slice(1);
-    return isRouteId(raw) ? raw : defaultLandingRoute();
+    const landing = defaultLandingRoute();
+    // A genuine newcomer (never visited, no resumable draft) always lands on
+    // welcome first — even on a deep-linked hash (a shared #survey/#preview
+    // link, a stale bookmark). The gate lifts the moment they leave welcome
+    // (markVisited) or once a resumable draft exists, after which the incoming
+    // hash is honored normally.
+    if (landing === "welcome") return "welcome";
+    return isRouteId(raw) ? raw : landing;
   };
 
   const [route, setRoute] = useState<RouteId>(hashToRoute);
