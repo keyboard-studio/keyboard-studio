@@ -33,7 +33,15 @@ export function applyDesktopModifications(
 1. **Pure** — does not mutate `seed`; returns a new layout with structural sharing for
    untouched platforms/layers/keys.
 2. **Removals** — for every `char` in `mods.removals`, no key on any platform/layer produces
-   it via `text`/`output`/`U_…` id, nor via any `sk`/`flick`/`multitap` entry. Removal
+   it via `text`/`output`/`U_…` id, nor via any `sk`/`flick`/`multitap` entry.
+   **Matching is canonical**: `mods.removals` entries are NFC by construction
+   (`buildProducedSet` normalizes — R3), but the layout's own strings are **not**
+   guaranteed NFC (Case A reads `ir.groups` rule output; Case B is hand-authored shipped
+   JSON) — so every candidate string (`text`, `output`, the char decoded from a `U_…` id,
+   and each `sk`/`flick`/`multitap` `text`/`output`) MUST be NFC-normalized before
+   comparison. An NFD-stored occurrence of a carved char (base + combining mark) must be
+   matched and removed; naive string equality would let it survive the carve and violate
+   FR-004. Removal
    **never deletes a key object** (R9): a gesture entry is dropped, but a key whose
    *primary production* is the carved char becomes an inert placeholder (reserved
    non-producing `T_removed_<n>` id, `text` cleared, `output` removed, gesture entries for

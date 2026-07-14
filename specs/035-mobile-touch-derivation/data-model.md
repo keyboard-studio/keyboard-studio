@@ -61,7 +61,10 @@ interface DesktopModifications {
   run-merges consecutive char elements and NFC-normalizes on flush, so a carved
   base+combining (NFD-emitting) sequence surfaces as its precomposed codepoint in the
   diff — the derivation tests must pin that this is the removal the replay applies
-  (tasks.md T010).
+  (tasks.md T010). The **matching side is canonical too**: the replay NFC-normalizes
+  every layout candidate string before comparing against these NFC removals (see the
+  seed-derivation contract, Removals clause) — an NFD-stored occurrence in the layout
+  must still be matched and removed (tasks.md T005/T006).
 - `placements`: from `TouchGallery.desktopAssignments` (physical + `scope:"individual"`),
   the same source the current per-character suggestion logic reads.
 
