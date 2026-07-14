@@ -156,6 +156,21 @@ export function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: str
     vfs.set(`source/help/${keyboardId}.php`, helpEntry.content, helpEntry.isBinary);
   }
 
+  // Root-level `<baseId>.kpj` project file. Unlike the `source/` siblings above
+  // it lives at the VFS root (that is where fetchKeyboardSourceToVfs writes it,
+  // and where compile() looks it up as `<keyboardId>.kpj` for compiler flags).
+  // Without this rename the flags — CompilerWarningsAsErrors, WarnDeprecatedCode
+  // — are silently lost after an id change and the compile falls back to
+  // defaults. The modern `.kpj` names files by auto-discovery (an <Options>-only
+  // project), so the base id appears only in the filename, not the content: a
+  // plain move suffices, no content rewrite.
+  const oldKpj = `${baseId}.kpj`;
+  const kpjEntry = vfs.get(oldKpj);
+  if (kpjEntry !== undefined) {
+    vfs.delete(oldKpj);
+    vfs.set(`${keyboardId}.kpj`, kpjEntry.content, kpjEntry.isBinary);
+  }
+
   // Rewrite `.kmw-keyboard-<baseId>` selectors in every *.css entry.
   // Word-boundary anchor ensures we don't rewrite substrings that start with
   // the base id followed by additional alphanumerics (e.g. `base_id_extra`).

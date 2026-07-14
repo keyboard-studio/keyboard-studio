@@ -139,4 +139,47 @@ describe("renameFilesInVfs — scoped content rewriting", () => {
       expect(vfs.get("source/help/kb.css")).not.toBeUndefined();
     });
   });
+
+  describe("root-level .kpj project file (#1035)", () => {
+    const KPJ = [
+      `<?xml version="1.0" encoding="utf-8"?>`,
+      `<KeymanDeveloperProject><Options>`,
+      `<CompilerWarningsAsErrors>True</CompilerWarningsAsErrors>`,
+      `<WarnDeprecatedCode>False</WarnDeprecatedCode>`,
+      `</Options></KeymanDeveloperProject>`,
+    ].join("");
+
+    it("renames root-level <baseId>.kpj to <keyboardId>.kpj so compile() still finds its flags", () => {
+      const vfs = createVirtualFS();
+      vfs.set("base_id.kpj", KPJ);
+
+      renameFilesInVfs(vfs, "base_id", "my_keyboard");
+
+      expect(vfs.get("base_id.kpj")).toBeUndefined();
+      const renamed = vfs.get("my_keyboard.kpj");
+      expect(renamed).not.toBeUndefined();
+      // Content is carried over verbatim — the modern .kpj is <Options>-only, so
+      // the base id lives in the filename, not the body: nothing to rewrite.
+      expect(renamed!.content).toBe(KPJ);
+    });
+
+    it("does not fabricate a .kpj when the base had none", () => {
+      const vfs = createVirtualFS();
+      vfs.set("source/base_id.kmn", "store(&NAME) 'x'");
+      renameFilesInVfs(vfs, "base_id", "my_keyboard");
+      expect(vfs.get("my_keyboard.kpj")).toBeUndefined();
+      expect(vfs.get("base_id.kpj")).toBeUndefined();
+    });
+
+    it("only renames the root-level id-named .kpj, not a same-named file in source/", () => {
+      const vfs = createVirtualFS();
+      vfs.set("base_id.kpj", KPJ);
+      // A .kpj nested under source/ does not use the compile lookup path and
+      // must be left where it is (defensive: the rename is root-anchored).
+      vfs.set("source/base_id.kpj", KPJ);
+      renameFilesInVfs(vfs, "base_id", "my_keyboard");
+      expect(vfs.get("my_keyboard.kpj")).not.toBeUndefined();
+      expect(vfs.get("source/base_id.kpj")).not.toBeUndefined();
+    });
+  });
 });
