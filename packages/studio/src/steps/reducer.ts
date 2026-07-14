@@ -310,8 +310,22 @@ export function applyStepCompletion(
 
       if (track === "adapt") {
         // Track 2: preserve existing keyboard identity.
+        //
+        // spec 034 T005 / TI-2: under the REAL engine a codec-clean base always
+        // yields a parsed IR + VFS, so this null guard is UNREACHABLE in
+        // production — it fires only under the mock engine (which returns null
+        // ir/vfs). Treat a null here as a genuine failure, not a benign skip:
+        // adapt cannot proceed without a parsed IR, and silently doing nothing
+        // would strand the author with no working copy and no signal. Logging at
+        // error level (not warn) makes the no-op non-silent; we still `break`
+        // rather than throw so the mock-engine dev/test path degrades without
+        // crashing the survey.
         if (ir === null || vfs === null) {
-          console.warn("[applyStepCompletion:choose_base] Track 2 skipped: no parsed IR (mock engine?)");
+          console.error(
+            "[applyStepCompletion:choose_base] Track 2 (adapt) cannot instantiate: no parsed IR/VFS. " +
+            "This is unreachable under the real engine (codec-clean base always parses); " +
+            "it indicates the mock engine or a base the codec could not parse.",
+          );
           break;
         }
         deps.instantiateFromExisting(base, { ...opts, vfs, ir });

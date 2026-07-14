@@ -146,6 +146,34 @@ describe("suggestBases", () => {
     );
   });
 
+  it("proven non-Latin script (Cyrillic): language+script tier plus US-QWERTY fallback (T006b)", () => {
+    // spec 034 T006b / FR-003, AS-2: for a proven-script language the base step
+    // returns a ranked list with an exact-or-family (language+script) tier AND
+    // the guaranteed US-QWERTY fallback — proving the proven set is not
+    // Latin-only. Russian (ru) on a Cyrillic base is the language-match tier.
+    const russianCyrl = makeBaseKeyboard({
+      id: "russian_mnemonic_r",
+      script: "Cyrl",
+      path: "release/r/russian_mnemonic_r",
+      targets: ["windows"],
+      displayName: "russian_mnemonic_r",
+      version: "1.0",
+      languages: ["ru"],
+    });
+    const allBases = [basicKbdus, silEuroLatin, russianCyrl];
+    const languagesById = Object.fromEntries(
+      allBases.map((b) => [b.id, b.languages ?? []] as const),
+    );
+    const out = suggestBases(allBases, { script: "Cyrl", bcp47: "ru-Cyrl" }, { languagesById });
+    // Tier 1: the Cyrillic Russian base is a genuine language+script match.
+    expect(out[0]?.base.id).toBe("russian_mnemonic_r");
+    expect(out[0]?.reason).toBe("language-match");
+    // The US-QWERTY fallback is always offered (last), even for a non-Latin target.
+    expect(out.find((s) => s.base.id === "basic_kbdus")?.reason).toBe("us-qwerty-fallback");
+    // The Latin-only base does not cross into a Cyrillic target.
+    expect(out.map((s) => s.base.id)).not.toContain("sil_euro_latin");
+  });
+
   it("uses base.languages to build languagesById when caller provides it", () => {
     // When the caller constructs languagesById from base.languages (the pattern
     // BaseResolution uses), language-match fires correctly.
