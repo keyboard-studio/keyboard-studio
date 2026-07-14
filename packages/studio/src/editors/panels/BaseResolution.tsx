@@ -290,7 +290,7 @@ export function BaseResolution({
                   tone={REASON_TONE[reason]}
                   title={`Genealogical distance ${relative.distance} — total steps to ${relative.name} across both branches (up to the nearest common ancestor, then down); smaller is closer`}
                 >
-                  Related: {relative.name}
+                  Related: {relative.name}, same script
                 </Badge>
               ) : (
                 <Badge tone={REASON_TONE[reason]}>{REASON_LABEL[reason]}</Badge>
