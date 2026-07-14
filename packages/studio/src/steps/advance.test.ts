@@ -10,6 +10,34 @@
 
 import { describe, it, expect } from "vitest";
 import { advance, nextSpineStepAfter, manifestIndexOf } from "./advance.ts";
+import { manifest, validateManifestShape } from "./manifest.ts";
+
+// ---------------------------------------------------------------------------
+// walkSpine — drive advance() from "identity" to a terminal, collecting the
+// full ordered sequence of steps the host would visit (the starting "identity"
+// plus every `next` advance() returns). Used by the spec-034 SR-1/SR-2
+// full-walk assertions below. Guarded against a non-terminating manifest.
+// ---------------------------------------------------------------------------
+
+type WalkStep =
+  | "identity" | "choose_base" | "track" | "project_name" | "characters"
+  | "carve" | "mechanisms" | "touch_seed_source" | "touch" | "help" | "done" | "unsupported";
+
+function walkSpine(
+  ctx: { selectedTrack: "copy" | "adapt" | null; identitySupported: boolean },
+): { sequence: WalkStep[]; navigateAtEnd: "output" | undefined } {
+  const sequence: WalkStep[] = ["identity"];
+  let current: WalkStep = "identity";
+  let navigateAtEnd: "output" | undefined;
+  for (let guard = 0; guard < 50; guard++) {
+    const outcome = advance(current, undefined, ctx);
+    sequence.push(outcome.next as WalkStep);
+    if (outcome.navigate !== undefined) navigateAtEnd = outcome.navigate;
+    if (outcome.next === "done" || outcome.next === "unsupported") break;
+    current = outcome.next as WalkStep;
+  }
+  return { sequence, navigateAtEnd };
+}
 
 // ---------------------------------------------------------------------------
 // Context helpers
@@ -74,6 +102,93 @@ describe("nextSpineStepAfter", () => {
 
   it("help → done (package is reserved)", () => {
     expect(nextSpineStepAfter("help")).toBe("done");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 034 T003 — full ordered spine walk (SR-1, SR-2) + manifest shape (SR-5)
+//
+// The individual-hop tests above pin each edge; these pin the WHOLE sequence
+// advance() produces end-to-end, so a reorder of the tail (mechanisms -> touch
+// -> help) or an accidental project_name fork change is caught as one failure.
+// ---------------------------------------------------------------------------
+
+describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
+  it("SR-1/SR-2 copy track: identity -> choose_base -> track -> project_name -> characters -> carve -> mechanisms -> touch_seed_source -> touch -> help -> done", () => {
+    const { sequence, navigateAtEnd } = walkSpine(copyCtx);
+    // Spec 035 R4/R12: with no recorded fork choice (copyCtx.touchSeedSource === null),
+    // mechanisms routes through the off-spine touch_seed_source fork before touch.
+    expect(sequence).toEqual([
+      "identity", "choose_base", "track", "project_name", "characters",
+      "carve", "mechanisms", "touch_seed_source", "touch", "help", "done",
+    ]);
+    // "... -> done -> output": help -> done carries navigate:"output".
+    expect(navigateAtEnd).toBe("output");
+  });
+
+  it("SR-2 adapt track: same spine but project_name is skipped", () => {
+    const { sequence, navigateAtEnd } = walkSpine(adaptCtx);
+    expect(sequence).toEqual([
+      "identity", "choose_base", "track", "characters",
+      "carve", "mechanisms", "touch_seed_source", "touch", "help", "done",
+    ]);
+    expect(sequence).not.toContain("project_name");
+    expect(navigateAtEnd).toBe("output");
+  });
+
+  it("SR-5: the physical -> touch -> docs tail is never reordered (touch after mechanisms, before help)", () => {
+    const { sequence } = walkSpine(copyCtx);
+    const mech = sequence.indexOf("mechanisms");
+    const touch = sequence.indexOf("touch");
+    const help = sequence.indexOf("help");
+    expect(mech).toBeGreaterThan(-1);
+    expect(touch).toBeGreaterThan(mech); // touch strictly after mechanisms
+    expect(help).toBeGreaterThan(touch); // help (docs) strictly after touch
+  });
+
+  it("unsupported script terminates immediately at the unsupported terminal", () => {
+    const { sequence } = walkSpine(unsupported);
+    expect(sequence).toEqual(["identity", "unsupported"]);
+  });
+});
+
+describe("spec 034 SR-3 — mechanisms advances to touch, never past it", () => {
+  // lockDesktop() firing at mechanisms completion is covered by reducer.test.ts
+  // R1; here we pin the advance half: mechanisms enters the touch_seed_source
+  // fork (spec 035 R4/R12) which joins straight to touch — touch is a
+  // genuinely-visited step (never skipped past to help/done) that then reaches help.
+  it("advance(mechanisms) enters the touch_seed_source fork, never skipping touch to help/done", () => {
+    const outcome = advance("mechanisms", undefined, copyCtx);
+    expect(outcome.next).toBe("touch_seed_source");
+    expect(outcome.next).not.toBe("help");
+    expect(outcome.next).not.toBe("done");
+    // The off-spine fork joins straight to touch — touch is still reached.
+    expect(advance("touch_seed_source", undefined, copyCtx).next).toBe("touch");
+  });
+
+  it("touch is reached and advances onward to help (never bypassed)", () => {
+    expect(advance("touch", undefined, copyCtx).next).toBe("help");
+    expect(walkSpine(copyCtx).sequence).toContain("touch");
+    expect(walkSpine(adaptCtx).sequence).toContain("touch");
+  });
+});
+
+describe("spec 034 SR-5 — validateManifestShape structural guard", () => {
+  it("does not throw for the shipped manifest", () => {
+    expect(() => validateManifestShape()).not.toThrow();
+  });
+
+  it("declares exactly one physical lock then one touch lock, in that order (M3 tail)", () => {
+    const locks = manifest.filter((s) => s.lock !== undefined).map((s) => s.lock);
+    expect(locks).toEqual(["physical", "touch"]);
+  });
+
+  it("spine ids (spine !== false) are in the locked order", () => {
+    const spineIds = manifest.filter((s) => s.spine !== false).map((s) => s.id);
+    expect(spineIds).toEqual([
+      "identity", "choose_base", "track", "characters",
+      "carve", "mechanisms", "touch", "help", "package",
+    ]);
   });
 });
 

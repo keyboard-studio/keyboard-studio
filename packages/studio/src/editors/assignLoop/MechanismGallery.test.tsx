@@ -22,7 +22,12 @@ import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
 import { MechanismGallery, PATTERN_SEQUENCE, PATTERN_DEADKEY } from "./MechanismGallery.tsx";
 import { useWorkingCopyStore, bindManifest } from "../../stores/workingCopyStore.ts";
-import { MECHANISMS_STEP_ID, TOUCH_STEP_ID } from "../../steps/reducer.ts";
+import {
+  MECHANISMS_STEP_ID,
+  TOUCH_STEP_ID,
+  applyStepCompletion,
+  type ReducerDeps,
+} from "../../steps/reducer.ts";
 import type { EditorStep, Step } from "../../steps/types.ts";
 import type { PatternLibraryService, VirtualFS } from "@keyboard-studio/contracts";
 import { createVirtualFS, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
@@ -2600,6 +2605,127 @@ describe("MechanismGallery — companion proposal bcp47 plumbing", () => {
     }).not.toThrow();
 
     expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T008 (spec 034 MVP authoring walk, FR-006 / AS-5) — full-inventory
+// assignment coverage + desktop auto-lock on completion.
+//
+// Drives the gallery through every character in a small declared inventory
+// (S-02/S-03/S-01/S-08 are all available per character; the decomposable
+// accented fixture chars here default to S-02 deadkey per §3c), asserting:
+//   (a) every declared character ends up with at least one recorded
+//       MechanismAssignment(scope: "individual") — the "every alphabet
+//       character gets assigned to at least one key/mechanism" functional
+//       path, and
+//   (b) reaching the phase's completion (the final Done click) fires the
+//       real applyStepCompletion(MECHANISMS_STEP_ID) reducer path (R1),
+//       landing desktopLocked === true on the real store.
+//
+// NOTE: the explicit-gate UX affordance (a visible lock button) is
+// deliberately deferred — this suite asserts only the functional auto-lock
+// side effect via the reducer, never a lock-button UI element.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — full-inventory coverage + desktop auto-lock (T008)", () => {
+  it("assigns every declared character to a mechanism (S-02 default) and locks the desktop on completion", async () => {
+    const DECLARED_CHARS = ["á", "é", "í"];
+    seedInventory(DECLARED_CHARS);
+
+    let completionFired = false;
+    const onComplete = () => {
+      completionFired = true;
+      // Mirror the production wiring (SurveyView -> applyStepCompletion): the
+      // gallery's onComplete triggers the reducer's R1 lock gate. lockDesktop
+      // is bound to the REAL store action so this exercises the actual
+      // desktopLocked flip, not a mock.
+      const deps: ReducerDeps = {
+        lockDesktop: useWorkingCopyStore.getState().lockDesktop,
+        clearStale: vi.fn(),
+        setTouchLayoutJson: vi.fn(),
+        instantiateFromBase: vi.fn(),
+        instantiateFromExisting: vi.fn(),
+        buildTouchLayoutJson: vi.fn().mockReturnValue({ json: "{}", warnings: [] }),
+        resolveBaseTouchJson: vi.fn().mockReturnValue(undefined),
+        instantiateFromBaseIfConfirmed: vi.fn().mockReturnValue(true),
+      };
+      applyStepCompletion(MECHANISMS_STEP_ID, undefined, deps);
+    };
+
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />,
+      );
+    });
+
+    // Every non-last character: Apply (the deadkey method is pre-selected by
+    // default for a decomposable accented char, §3c default-fill — Apply is
+    // enabled immediately without further input) then Next.
+    for (const ch of DECLARED_CHARS.slice(0, -1)) {
+      const applyBtn = screen.getByRole("button", {
+        name: new RegExp(`Apply method for ${ch}`, "i"),
+      });
+      expect((applyBtn as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(applyBtn);
+      await waitFor(() => {
+        const nextBtn = screen.getByRole("button", { name: /Next character/i });
+        expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
+        fireEvent.click(nextBtn);
+      });
+    }
+
+    // The last character's forward button reads "Done" — Apply, then Done
+    // fires onComplete (which runs the real R1 lock reducer above).
+    const lastChar = DECLARED_CHARS[DECLARED_CHARS.length - 1]!;
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: new RegExp(`Apply method for ${lastChar}`, "i"),
+      }),
+    );
+    await waitFor(() => {
+      const doneBtn = screen.getByRole("button", { name: "Done" });
+      expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(doneBtn);
+    });
+
+    expect(completionFired).toBe(true);
+
+    // FR-006/AS-5 coverage: every declared character has at least one
+    // recorded individual-scope MechanismAssignment — the gallery does not
+    // silently leave a declared character unassigned.
+    const assignments = getPhaseCPhysicalAssignments();
+    for (const ch of DECLARED_CHARS) {
+      expect(
+        assignments.some((a) => a.scope === "individual" && a.target === ch),
+        `expected an individual-scope MechanismAssignment for declared character "${ch}"`,
+      ).toBe(true);
+    }
+
+    // AS-5 auto-lock: reaching completion locks the desktop layout. This is
+    // the FUNCTIONAL auto-lock only — no lock-button UI is asserted here (it
+    // is deliberately deferred).
+    expect(useWorkingCopyStore.getState().desktopLocked).toBe(true);
+  });
+
+  it("does NOT lock the desktop if completion is never reached (fewer than all declared characters assigned)", async () => {
+    const DECLARED_CHARS = ["á", "é"];
+    seedInventory(DECLARED_CHARS);
+    const onComplete = vi.fn();
+
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />,
+      );
+    });
+
+    // Apply only the first character; do not advance to / complete the last.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Apply method for á/i }),
+    );
+
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);
   });
 });
 
