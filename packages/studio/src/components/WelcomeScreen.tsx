@@ -13,6 +13,7 @@
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
 import { navigateTo } from "../lib/navigate.ts";
+import { markVisited } from "../lib/firstVisit.ts";
 import {
   BG_PAGE,
   BG_CARD,
@@ -54,6 +55,15 @@ const googleButtonStyle: React.CSSProperties = {
 export function WelcomeScreen() {
   const { connect: ghConnect, error: ghError } = useGitHubAuth();
   const { connect: googleConnect, error: googleError } = useGoogleAuth();
+
+  // Any of the three actions below leaves the welcome screen: sign in (which
+  // redirects out to a provider and back to the app root) or "I'm new". Mark
+  // the browser as visited synchronously first, so the first-visit gate does
+  // not bounce the author back here on the OAuth return or a later reload.
+  const leaveWelcome = (go: () => void) => {
+    markVisited();
+    go();
+  };
 
   return (
     <div
@@ -119,7 +129,7 @@ export function WelcomeScreen() {
           <button
             type="button"
             onClick={() => {
-              void ghConnect();
+              leaveWelcome(() => void ghConnect());
             }}
             style={githubButtonStyle}
           >
@@ -130,7 +140,7 @@ export function WelcomeScreen() {
           <button
             type="button"
             onClick={() => {
-              void googleConnect();
+              leaveWelcome(() => void googleConnect());
             }}
             style={googleButtonStyle}
           >
@@ -140,7 +150,7 @@ export function WelcomeScreen() {
 
           <button
             type="button"
-            onClick={() => navigateTo("survey")}
+            onClick={() => leaveWelcome(() => navigateTo("survey"))}
             style={{
               ...providerButtonBase,
               background: "transparent",

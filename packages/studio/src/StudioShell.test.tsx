@@ -456,6 +456,10 @@ vi.mock("./components/OutputScreen.tsx", () => ({
   OutputScreen: () => <div data-testid="output-screen-root">output-screen</div>,
 }));
 
+vi.mock("./components/WelcomeScreen.tsx", () => ({
+  WelcomeScreen: () => <div data-testid="welcome-screen-root">welcome-screen</div>,
+}));
+
 // Shallow stub for DashboardView — only rendered in dev/VITE_SHOW_FLOWMAP builds.
 vi.mock("./dashboard/DashboardView.tsx", () => ({
   FlowMapView: () => <div data-testid="flow-map-view">flow-map</div>,
@@ -544,6 +548,9 @@ afterEach(() => {
   cleanup();
   useWorkingCopyStore.getState().reset();
   vi.clearAllMocks();
+  // The first-visit gate reads ks.visited / the ks.studio.draft key from
+  // localStorage; clear it so gate state can't leak between tests.
+  localStorage.clear();
 });
 
 // ---------------------------------------------------------------------------
@@ -725,6 +732,7 @@ describe("SurveyView — mechanisms → carve back-navigation", () => {
 describe("StudioShell — route: #preview renders PreviewScreen", () => {
   it("mounts PreviewScreen (not RoutePlaceholder) when hash is #preview", async () => {
     window.location.hash = "#preview";
+    localStorage.setItem("ks.visited", "1"); // returning visitor: deep-link hash is honored
 
     await act(async () => {
       render(<StudioShell />);
@@ -742,6 +750,7 @@ describe("StudioShell — route: #preview renders PreviewScreen", () => {
 describe("StudioShell — route: #output renders OutputScreen", () => {
   it("mounts OutputScreen (not RoutePlaceholder) when hash is #output", async () => {
     window.location.hash = "#output";
+    localStorage.setItem("ks.visited", "1"); // returning visitor: deep-link hash is honored
 
     await act(async () => {
       render(<StudioShell />);
@@ -752,6 +761,211 @@ describe("StudioShell — route: #output renders OutputScreen", () => {
     // PreviewScreen must NOT be present — these are distinct screens.
     expect(screen.queryByTestId("preview-screen-root")).toBeNull();
     expect(screen.queryByText(/coming soon/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// StudioShell first-visit landing gate (proposal §9). With no explicit hash:
+//   • a true first-time visitor lands on the WelcomeScreen;
+//   • a returning visitor (ks.visited) or one with a resumable draft skips
+//     welcome and lands in the survey.
+// An explicit valid hash (#preview/#output/#survey) wins for a RETURNING
+// visitor or once a resumable draft exists — see the route regressions above
+// (both now set ks.visited to represent that case). A genuine first-time
+// visitor (never visited, no draft) always lands on WelcomeScreen first, even
+// on a deep-linked hash — see the two tests below.
+// ---------------------------------------------------------------------------
+
+describe("StudioShell — first-visit landing gate", () => {
+  it("mounts WelcomeScreen (not the survey) on a first visit with no hash", async () => {
+    window.location.hash = "";
+    localStorage.clear(); // pristine browser: never visited, no draft
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    // The survey wizard's first step must NOT be present.
+    expect(screen.queryByTestId("stage-identity")).toBeNull();
+  });
+
+  it("falls back to WelcomeScreen for an unknown hash on a first visit", async () => {
+    window.location.hash = "#does-not-exist";
+    localStorage.clear();
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+  });
+
+  it("skips welcome and lands in the survey for a returning visitor", async () => {
+    window.location.hash = "";
+    localStorage.clear();
+    localStorage.setItem("ks.visited", "1"); // browser has entered the app before
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("stage-identity")).toBeTruthy();
+    expect(screen.queryByTestId("welcome-screen-root")).toBeNull();
+  });
+
+  it("skips welcome and lands in the survey when a resumable draft exists", async () => {
+    window.location.hash = "";
+    localStorage.clear();
+    // A minimally-valid draft (version + savedAt + survey) so loadDraftMeta()
+    // returns non-null; the survey route surfaces the resume banner.
+    localStorage.setItem(
+      "ks.studio.draft",
+      JSON.stringify({
+        version: 1,
+        savedAt: Date.now(),
+        survey: { activeStepId: "identity", identityResult: null, scaffoldSpec: null },
+      }),
+    );
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("stage-identity")).toBeTruthy();
+    expect(screen.queryByTestId("welcome-screen-root")).toBeNull();
+  });
+
+  it("forces WelcomeScreen for a first-time visitor arriving on a deep-linked #survey hash", async () => {
+    window.location.hash = "#survey";
+    localStorage.clear(); // pristine browser: never visited, no draft
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    expect(screen.queryByTestId("stage-identity")).toBeNull();
+  });
+
+  it("forces WelcomeScreen for a first-time visitor arriving on a deep-linked #preview hash", async () => {
+    window.location.hash = "#preview";
+    localStorage.clear(); // pristine browser: never visited, no draft
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    expect(screen.queryByTestId("preview-screen-root")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// StudioShell — resume draft banner (ResumeDraftBanner.tsx, lib/draftAutosave.ts).
+//
+// The gap closed here: the "first-visit landing gate" tests above only assert
+// ROUTING (stage-identity present) when a resumable draft exists — none of them
+// assert that the banner itself renders, or that Resume/Discard actually
+// hydrate/clear state. This block does.
+//
+// Order-dependence hazard (StudioShell.tsx): the resume offer is gated by a
+// MODULE-LEVEL `resumeOfferConsumed` flag that flips to true on the first
+// SurveyView mount of the JS context (StrictMode-safe: read in the lazy
+// useState initializer, flipped in the mount effect so it survives double-
+// invocation). Many tests earlier in this file already mount SurveyView/
+// StudioShell, so by the time this block runs the flag is already true and a
+// plain `render(<StudioShell />)` would never show the banner regardless of
+// whether a draft exists. Each test below uses vi.resetModules() + a fresh
+// dynamic import of StudioShell.tsx to get a pristine module instance (flag
+// unconsumed), exactly like a real page load starting a new JS context. Same
+// technique already used for a different module-level singleton in
+// survey/SurveyRunner.pinChip.test.tsx (see importSurveyRunner() there).
+// ---------------------------------------------------------------------------
+
+describe("StudioShell — resume draft banner", () => {
+  /**
+   * Seed a well-formed resumable draft. activeStepId defaults to "choose_base"
+   * (not "identity") so a post-Resume hydration is independently observable:
+   * the wizard should show the BaseResolution stage ("stage-base") instead of
+   * staying on the "identity" stage the pre-Resume reset() puts it on.
+   */
+  function seedResumableDraft(activeStepId: string = "choose_base") {
+    localStorage.setItem(
+      "ks.studio.draft",
+      JSON.stringify({
+        version: 1,
+        savedAt: Date.now(),
+        survey: { activeStepId, identityResult: null, scaffoldSpec: null, history: [] },
+        // Explicit null (not omitted): applyDraft() only skips
+        // applyWorkingCopySnapshot when this is === null, so an omitted key
+        // (undefined after JSON.parse) would crash it on Resume.
+        workingCopy: null,
+      }),
+    );
+  }
+
+  /** Fresh StudioShell module instance (see order-dependence note above). */
+  async function renderFreshStudioShell() {
+    vi.resetModules();
+    const mod = await import("./StudioShell.tsx");
+    await act(async () => {
+      render(<mod.StudioShell />);
+    });
+  }
+
+  it("renders resume-draft-banner on the survey route when a resumable draft exists", async () => {
+    window.location.hash = "";
+    localStorage.clear();
+    seedResumableDraft();
+
+    await renderFreshStudioShell();
+
+    expect(screen.getByTestId("resume-draft-banner")).toBeTruthy();
+    // Confirms the landing gate (already covered above) and the banner agree.
+    expect(screen.queryByTestId("welcome-screen-root")).toBeNull();
+  });
+
+  it("Resume dismisses the banner and hydrates the survey to the draft's activeStepId", async () => {
+    window.location.hash = "";
+    localStorage.clear();
+    seedResumableDraft(); // draft.survey.activeStepId === "choose_base"
+
+    await renderFreshStudioShell();
+
+    // Pre-Resume: the mount-effect reset() has put the store back on
+    // "identity" (spec: reset does not touch the localStorage draft), and the
+    // banner is offered independently of that reset.
+    expect(screen.getByTestId("stage-identity")).toBeTruthy();
+    expect(screen.getByTestId("resume-draft-banner")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("resume-draft"));
+
+    // Banner dismissed.
+    expect(screen.queryByTestId("resume-draft-banner")).toBeNull();
+    // Observable hydration outcome: the wizard now reflects the draft's
+    // activeStepId ("choose_base" -> the BaseResolution stage), not "identity".
+    expect(screen.getByTestId("stage-base")).toBeTruthy();
+    expect(screen.queryByTestId("stage-identity")).toBeNull();
+  });
+
+  it("Discard dismisses the banner and clears the draft from localStorage", async () => {
+    window.location.hash = "";
+    localStorage.clear();
+    seedResumableDraft();
+
+    await renderFreshStudioShell();
+
+    expect(screen.getByTestId("resume-draft-banner")).toBeTruthy();
+    expect(localStorage.getItem("ks.studio.draft")).not.toBeNull();
+
+    fireEvent.click(screen.getByTestId("discard-draft"));
+
+    // Banner dismissed and the draft is gone from localStorage.
+    expect(screen.queryByTestId("resume-draft-banner")).toBeNull();
+    expect(localStorage.getItem("ks.studio.draft")).toBeNull();
+    // Discard does not hydrate — the wizard stays on "identity" (untouched).
+    expect(screen.getByTestId("stage-identity")).toBeTruthy();
   });
 });
 

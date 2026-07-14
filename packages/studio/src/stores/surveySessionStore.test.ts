@@ -106,6 +106,35 @@ describe("surveySessionStore", () => {
     expect(getStore().identityPhaseResult).toBeNull();
   });
 
+  // hydrate() bulk-restores every value slot from a serialized draft
+  it("hydrate() restores all value slots and copies the history array", () => {
+    const history = ["identity", "choose_base"] as const;
+    const snapshot = {
+      activeStepId: "track" as const,
+      history,
+      identityResult: null,
+      identityPhaseResult: null,
+      surveyContext: { targetScript: "Latn" } as never,
+      selectedTrack: "copy" as const,
+      scaffoldSpec: { keyboardId: "haus_latn", displayName: "Hausa" },
+      localBase: null,
+      charactersSubStage: "B" as const,
+    };
+
+    getStore().hydrate(snapshot);
+
+    const s = getStore();
+    expect(s.activeStepId).toBe("track");
+    expect(s.history).toEqual(["identity", "choose_base"]);
+    expect(s.selectedTrack).toBe("copy");
+    expect(s.scaffoldSpec).toEqual({ keyboardId: "haus_latn", displayName: "Hausa" });
+    expect(s.charactersSubStage).toBe("B");
+
+    // The restored history is a copy — advancing must not mutate the snapshot's array.
+    getStore().advance("project_name");
+    expect(snapshot.history).toEqual(["identity", "choose_base"]);
+  });
+
   // (d) double-advance idempotence — no stack corruption
   it("double-advance: advancing to the same step twice does not corrupt the stack", () => {
     const store = getStore();

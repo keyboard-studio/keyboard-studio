@@ -39,7 +39,22 @@ import { AccountControl } from "./components/AccountControl.tsx";
 import { manifest } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { StepHost } from "./components/StepHost.tsx";
+import { ResumeDraftBanner } from "./components/ResumeDraftBanner.tsx";
+import {
+  loadDraftMeta,
+  applyDraft,
+  clearDraft,
+  startDraftAutosave,
+  type DraftMeta,
+} from "./lib/draftAutosave.ts";
+import { hasVisited } from "./lib/firstVisit.ts";
 import { TEXT_MAIN, FONT } from "./survey/surveyStyles.ts";
+
+// Offer the resume banner only once per page load — on the first SurveyView
+// mount in this JS context, not on same-session route remounts (navigating away
+// and back is a fresh wizard, not a resume). A page reload resets this flag by
+// starting a new JS context.
+let resumeOfferConsumed = false;
 
 // Bind the manifest into the store's staleness actions.
 // Called once at module load; avoids a circular static import in the store
@@ -66,10 +81,41 @@ function isRouteId(v: string): v is RouteId {
 // useRoute — reads window.location.hash and reacts to hashchange events
 // ---------------------------------------------------------------------------
 
+// First-visit landing gate (proposal §9). Decides where an empty or unknown
+// hash lands. A genuine first-time visitor sees the welcome screen; a returning
+// visitor — or one with a resumable draft (the survey route surfaces the resume
+// banner) — goes straight into the survey. A newcomer landing also overrides
+// an explicit deep-link hash (a shared #survey/#preview link, a stale
+// bookmark) — see hashToRoute below; internal navigation always sets a valid
+// hash, so beyond that this only governs the initial landing and stale-hash
+// cases.
+function defaultLandingRoute(): RouteId {
+  if (hasVisited()) return "survey";
+  if (loadDraftMeta() !== null) return "survey";
+  return "welcome";
+}
+
 function useRoute(): RouteId {
   const hashToRoute = (): RouteId => {
     const raw = window.location.hash.slice(1);
-    return isRouteId(raw) ? raw : "survey";
+    const landing = defaultLandingRoute();
+    // A genuine newcomer (never visited, no resumable draft) always lands on
+    // welcome first — even on a deep-linked hash (a shared #survey/#preview
+    // link, a stale bookmark). The gate lifts the moment they leave welcome
+    // (markVisited) or once a resumable draft exists, after which the incoming
+    // hash is honored normally.
+    if (landing === "welcome") {
+      // Keep window.location.hash in sync with the forced route. Without this,
+      // a deep-linked hash (e.g. "#survey") is left in place while the route
+      // renders "welcome"; WelcomeScreen's "I'm new" button then calls
+      // navigateTo("survey"), a same-value hash assignment that fires zero
+      // hashchange events per spec, soft-locking the user on WelcomeScreen.
+      if (raw !== "welcome") {
+        window.history.replaceState(window.history.state, "", "#welcome");
+      }
+      return "welcome";
+    }
+    return isRouteId(raw) ? raw : landing;
   };
 
   const [route, setRoute] = useState<RouteId>(hashToRoute);
@@ -318,10 +364,47 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Without this reset the singleton would resume from stale prior state rather
   // than starting at "identity". Component-local useState used to give this
   // mount-fresh reset for free; this call restores that invariant for the store.
+  //
+  // Note: on a genuine page reload the store is already pristine (fresh JS
+  // context), so resetting over it is harmless. A saved draft lives in
+  // localStorage (not the store), so this reset does not touch it — the resume
+  // banner below reads it and only applyDraft() (on Resume) hydrates the store.
   useEffect(() => {
     useSurveySessionStore.getState().reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally empty: runs exactly once on mount
   }, []);
+
+  // ---------------------------------------------------------------------------
+  // Resume-draft banner + autosave (localStorage draft; lib/draftAutosave.ts).
+  //
+  // On the first SurveyView mount of a page load, peek at any saved draft and
+  // offer to resume it. Autosave does not start until the author decides, so a
+  // pending decision can't overwrite the very draft being offered. When there is
+  // no draft, autosave starts immediately.
+  // ---------------------------------------------------------------------------
+  // The initializer must be PURE: <StrictMode> (main.tsx) double-invokes lazy
+  // useState initializers in dev, and only the *second* return value is kept.
+  // A flag flipped inside the initializer would make invocation 1 consume the
+  // offer and invocation 2 (the kept value) see it already consumed → the banner
+  // would silently never appear in `pnpm dev` / e2e. So read the flag here and
+  // mark it consumed in the mount effect below instead.
+  const [resumeMeta, setResumeMeta] = useState<DraftMeta | null>(() =>
+    resumeOfferConsumed ? null : loadDraftMeta(),
+  );
+
+  // Mark the one-per-page-load resume offer as consumed after commit (idempotent
+  // under StrictMode's mount/cleanup/mount). Subsequent same-session SurveyView
+  // remounts (route away + back = a fresh wizard) then read the flag and skip the
+  // banner; a real page reload resets the module flag by starting a new JS context.
+  useEffect(() => {
+    // Runs once on mount; touches only the module-level flag, so no deps.
+    resumeOfferConsumed = true;
+  }, []);
+
+  useEffect(() => {
+    if (resumeMeta !== null) return; // wait for the author's Resume/Discard choice
+    return startDraftAutosave();
+  }, [resumeMeta]);
 
   const [oskMode, setOskMode] = useState<OskMode>("desktop");
   const { containerRef, leftPct, onPointerDown } =
@@ -486,6 +569,31 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     instantiatedRef.current = false;
     // sessionReset() calls reset() which already clears charactersSubStage to
     // "prefill" (spec 027 Stage 4 — the store slot is the authoritative owner).
+    // Discard any saved draft — start-over is an explicit "throw it away".
+    clearDraft();
+    setResumeMeta(null);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Resume banner handlers.
+  //
+  // Resume: restore both stores from the saved draft, then mark the working copy
+  // as already instantiated so the compile pipeline's onInstantiate does not
+  // re-run instantiateFromBase over the restored copy (which would pop the
+  // rebase-confirm dialog / risk discarding restored survey answers).
+  // Discard: drop the draft and continue fresh.
+  // Either way, clearing resumeMeta hides the banner and starts autosave.
+  // ---------------------------------------------------------------------------
+  function handleResumeDraft() {
+    if (applyDraft()) {
+      instantiatedRef.current = true;
+    }
+    setResumeMeta(null);
+  }
+
+  function handleDiscardDraft() {
+    clearDraft();
+    setResumeMeta(null);
   }
 
   // ---------------------------------------------------------------------------
@@ -551,6 +659,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     >
       {/* Left pane: survey questions (StepHost renders pane content) */}
       <section aria-label="Survey questions" style={questionsPaneStyle}>
+        {resumeMeta !== null && (
+          <ResumeDraftBanner
+            meta={resumeMeta}
+            onResume={handleResumeDraft}
+            onDiscard={handleDiscardDraft}
+          />
+        )}
         {globalFindings.length > 0 && (
           <LintSummary findings={globalFindings} />
         )}
