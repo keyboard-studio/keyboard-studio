@@ -192,15 +192,17 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
 }
 
 /**
- * Patch a `WorkingCopySnapshot` directly into the ONE working-copy store
- * (Article III — restore never constructs a second working copy).
- *
- * Re-derives the two dropped fields from their restored sources — see the
- * derived-field policy in the module header (`removalCapabilities` from
- * `baseIr`, `session` from `irAxes` + `phaseResults`) — exactly as the prior
- * inline `rehydrateWorkingCopyFromSession` body did.
+ * Build the working-copy store patch from a snapshot WITHOUT mutating the
+ * store. This is where all the FALLIBLE work lives — `deserializeEntry`'s
+ * `atob()` can throw on a corrupt Base64 VFS entry, and the re-derivation of
+ * the dropped fields runs here too (`removalCapabilities` from `baseIr`,
+ * `session` from `irAxes` + `phaseResults`; see the derived-field policy in the
+ * module header). Separated from the commit so a caller restoring MORE than one
+ * store (draftPersistence.loadDraft restores the working-copy AND survey-session
+ * stores) can do every throwing step BEFORE mutating anything — a throw then
+ * leaves both stores untouched rather than one patched and the other not.
  */
-export function applyWorkingCopySnapshot(snapshot: WorkingCopySnapshot): void {
+export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Partial<WorkingCopyData> {
   const baseVfs = createVirtualFS(snapshot.baseVfsEntries.map(deserializeEntry));
 
   const removalCapabilities =
@@ -210,7 +212,7 @@ export function applyWorkingCopySnapshot(snapshot: WorkingCopySnapshot): void {
 
   const session = mergePhaseResults(snapshot.irAxes, snapshot.phaseResults);
 
-  useWorkingCopyStore.setState({
+  return {
     instantiationMode: snapshot.instantiationMode,
     baseKeyboard: snapshot.baseKeyboard,
     baseVfs,
@@ -231,7 +233,17 @@ export function applyWorkingCopySnapshot(snapshot: WorkingCopySnapshot): void {
     staleSteps: new Set(snapshot.staleSteps),
     validatorFindings: snapshot.validatorFindings,
     axisFills: snapshot.axisFills,
-  });
+  };
+}
+
+/**
+ * Patch a `WorkingCopySnapshot` directly into the ONE working-copy store
+ * (Article III — restore never constructs a second working copy). Composes
+ * `prepareWorkingCopySnapshot` (fallible) with a single `setState` (pure), so a
+ * throw during preparation never mutates the store.
+ */
+export function applyWorkingCopySnapshot(snapshot: WorkingCopySnapshot): void {
+  useWorkingCopyStore.setState(prepareWorkingCopySnapshot(snapshot));
 }
 
 // ---------------------------------------------------------------------------

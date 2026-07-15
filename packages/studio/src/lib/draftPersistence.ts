@@ -15,7 +15,7 @@
 // validation path — see the comment on installDraftAutosave below.
 
 import {
-  applyWorkingCopySnapshot,
+  prepareWorkingCopySnapshot,
   snapshotWorkingCopyData,
   type WorkingCopySnapshot,
 } from "./persistWorkingCopy.ts";
@@ -233,6 +233,26 @@ export function wasDraftRestoredThisBoot(): boolean {
 }
 
 /**
+ * Discard an unusable draft record found during load (version-mismatched or
+ * corrupt) AND clear the active-project pointer when it names this key.
+ *
+ * `loadDraft` is always called with the key `main.tsx` resolved from the active
+ * pointer, so discarding just the record (bare `clearDraft`) would leave
+ * `ks.draft.active` dangling at a now-deleted record — every subsequent boot
+ * would resolve to a key with no record until the next instantiation happened
+ * to repoint it. Clearing the pointer here (only when it matches, so a future
+ * caller passing a non-active key can't wipe the real active project) keeps a
+ * bad draft from lingering as a dead pointer. VR-2 ("no real work") does NOT
+ * route through here — that record is intentionally left in place.
+ */
+function discardCorruptDraft(projectKey: string): void {
+  clearDraft(projectKey);
+  if (resolveActiveProjectKey() === projectKey) {
+    clearActiveProjectKey();
+  }
+}
+
+/**
  * Load `projectKey`'s durable draft (if any) and rehydrate both stores.
  *
  * - Returns false if no draft is stored under this key.
@@ -267,7 +287,7 @@ export function loadDraft(projectKey: string): boolean {
 
     if (envelope.version !== DRAFT_VERSION) {
       // VR-1: version mismatch — discard, do not attempt to migrate.
-      clearDraft(projectKey);
+      discardCorruptDraft(projectKey);
       return false;
     }
 
@@ -294,19 +314,27 @@ export function loadDraft(projectKey: string): boolean {
     // `applyWorkingCopySnapshot` so a bad record never partially patches the
     // stores.
     if (envelope.traversal === null || typeof envelope.traversal !== "object") {
-      clearDraft(projectKey);
+      discardCorruptDraft(projectKey);
       return false;
     }
 
-    applyWorkingCopySnapshot(envelope.workingCopy);
+    // Atomic multi-store restore: do ALL fallible work FIRST —
+    // `prepareWorkingCopySnapshot` is the only step that can throw (e.g.
+    // `atob()` on a corrupt Base64 VFS entry) — before mutating either store.
+    // The two commits below are pure (`setState` / object-spread) and cannot
+    // throw, so a failure can never leave the working-copy store patched while
+    // the survey-session store is not (or the boot flag half-set).
+    const workingCopyState = prepareWorkingCopySnapshot(envelope.workingCopy);
+    useWorkingCopyStore.setState(workingCopyState);
     applyTraversalSnapshot(envelope.traversal);
 
     _draftRestoredThisBoot = true;
     return true;
   } catch {
-    // VR-3: malformed/wrong-shaped/corrupt — remove and treat as absent so it
-    // doesn't loop or crash boot.
-    clearDraft(projectKey);
+    // VR-3: malformed/wrong-shaped/corrupt (or a throw from
+    // prepareWorkingCopySnapshot BEFORE any store was touched) — remove and
+    // treat as absent so it doesn't loop or crash boot.
+    discardCorruptDraft(projectKey);
     return false;
   }
 }
@@ -435,6 +463,35 @@ export function installDraftAutosave(projectKey: string): () => void {
       timer = null;
     }
   };
+}
+
+// ---------------------------------------------------------------------------
+// flushActiveDraft — synchronous pre-redirect save
+// ---------------------------------------------------------------------------
+
+/**
+ * Synchronously persist the active project's draft right now, bypassing the
+ * ~500ms autosave debounce.
+ *
+ * Called before an OAuth redirect (see useGitHubAuth / useGoogleAuth) so the
+ * durable draft is never STALER than the synchronous pre-redirect
+ * sessionStorage snapshot (`snapshotWorkingCopyToSession`). Without this, a
+ * sign-in within 500ms of a step advance would leave the durable draft holding
+ * the pre-advance working copy AND traversal while the OAuth snapshot holds the
+ * post-advance working copy; on return, loadDraft restores the stale traversal
+ * and the working-copy-only sessionStorage rehydrate then layers the fresher
+ * working copy on top — leaving `activeStepId` lagging the working copy by a
+ * step. Flushing here captures both stores at the same instant the OAuth
+ * snapshot is taken, so the two agree.
+ *
+ * No-op when there is no active project; `saveDraft`'s own VR-2 guard also
+ * applies (nothing written if the working copy is not instantiated).
+ */
+export function flushActiveDraft(): void {
+  const projectKey = resolveActiveProjectKey();
+  if (projectKey !== null) {
+    saveDraft(projectKey);
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -23,6 +23,7 @@ import {
 import { getGitHubOutputService } from "../lib/services.ts";
 import type { OAuthCallbackFailureReason } from "../lib/handleOAuthCallback.ts";
 import { snapshotWorkingCopyToSession } from "../lib/persistWorkingCopy.ts";
+import { flushActiveDraft } from "../lib/draftPersistence.ts";
 
 /**
  * Static, user-facing copy for each OAuth-callback failure reason. The boot-time
@@ -189,6 +190,11 @@ export function useGitHubAuth(): UseGitHubAuthResult {
     try {
       const url = await beginAuthorize(flow);
       snapshotWorkingCopyToSession();
+      // Flush the durable draft at the SAME instant as the sessionStorage
+      // snapshot so the two can't diverge across the redirect (see
+      // flushActiveDraft) — otherwise a sign-in <500ms after a step advance
+      // would resume with the walk position lagging the working copy.
+      flushActiveDraft();
       window.location.assign(url);
     } catch (err: unknown) {
       setError(formatError(err, "Failed to start GitHub sign-in."));

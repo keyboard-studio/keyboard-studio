@@ -39,6 +39,7 @@ import {
   replaceActiveDraftIfDifferentProject,
   deriveProjectKeyFromWorkingCopy,
   installDraftAutosave,
+  flushActiveDraft,
   wasDraftRestoredThisBoot,
   AUTOSAVE_DEBOUNCE_MS,
   type DurableDraft,
@@ -226,6 +227,42 @@ describe("draftPersistence", () => {
       expect(loadDraft(pk)).toBe(false);
       expect(localStorage.getItem(draftKey(pk))).toBeNull();
     });
+
+    it("discarding an unusable draft also clears the active-project pointer when it names that key (km-review #4 — no dangling pointer)", () => {
+      // main.tsx resolves the active pointer, then loadDraft(that key). If the
+      // record is unusable (version-mismatched here) and only the RECORD is
+      // cleared, `ks.draft.active` dangles at a now-deleted key and every
+      // subsequent boot resolves to a key with no record. The discard must
+      // clear the matching pointer too.
+      const pk = "vr1-dangling";
+      setActiveProjectKey(pk);
+      localStorage.setItem(
+        draftKey(pk),
+        JSON.stringify({ version: DRAFT_VERSION + 1, projectKey: pk, workingCopy: {}, traversal: {} }),
+      );
+
+      expect(loadDraft(pk)).toBe(false);
+      expect(localStorage.getItem(draftKey(pk))).toBeNull();
+      // The active pointer must not dangle at the deleted record.
+      expect(resolveActiveProjectKey()).toBeNull();
+    });
+
+    it("discarding a draft does NOT clear the active pointer when it names a DIFFERENT project (defensive)", () => {
+      // Guard: loadDraft is normally called with the active key, but a future
+      // caller passing a non-active key must not wipe the real active project.
+      const active = "vr1-active-other";
+      const stale = "vr1-stale";
+      setActiveProjectKey(active);
+      localStorage.setItem(
+        draftKey(stale),
+        JSON.stringify({ version: DRAFT_VERSION + 1, projectKey: stale, workingCopy: {}, traversal: {} }),
+      );
+
+      expect(loadDraft(stale)).toBe(false);
+      expect(localStorage.getItem(draftKey(stale))).toBeNull();
+      // The unrelated active pointer is left intact.
+      expect(resolveActiveProjectKey()).toBe(active);
+    });
   });
 
   describe("VR-3: malformed removal", () => {
@@ -371,6 +408,40 @@ describe("draftPersistence", () => {
       expect(localStorage.getItem(draftKey(pk))).toBeNull();
       // The working copy was NOT partially patched — stays fully reset.
       expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
+    });
+
+    it("a failed working-copy restore leaves BOTH stores untouched — atomic multi-store restore (km-review #5)", () => {
+      // Regression for the review finding: loadDraft prepares the (fallible)
+      // working-copy payload BEFORE mutating either store, so a throw can't
+      // leave the working-copy store patched while the survey-session store is
+      // not (or vice-versa). Guards against reordering the commits so that one
+      // store is mutated before the throwing preparation runs.
+      const pk = "atomic-both-stores";
+      const base = { id: pk, displayName: "Atomic Test", languages: [] } as unknown as BaseKeyboard;
+      const vfs = createVirtualFS([
+        { path: "source/icon.ico", content: new Uint8Array([9, 8, 7, 6]), isBinary: true },
+      ]);
+      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs, ir: makeMinimalIr() });
+      saveDraft(pk);
+
+      // Corrupt the (isBinary) VFS entry so prepareWorkingCopySnapshot's atob() throws.
+      const envelope = JSON.parse(localStorage.getItem(draftKey(pk))!) as DurableDraft;
+      const entries = (envelope.workingCopy as unknown as { baseVfsEntries: Array<{ isBinary: boolean; content: string }> })
+        .baseVfsEntries;
+      entries[0]!.content = "@@@not-base64@@@";
+      localStorage.setItem(draftKey(pk), JSON.stringify(envelope));
+
+      // Reset the working copy, then seed the survey store to a KNOWN non-initial
+      // step. A non-atomic restore that touched the survey store first would
+      // clobber this before the working-copy preparation threw.
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.setState({ activeStepId: "carve" });
+
+      expect(loadDraft(pk)).toBe(false);
+      // Working copy not restored...
+      expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
+      // ...and the survey-session store was never touched by the failed restore.
+      expect(useSurveySessionStore.getState().activeStepId).toBe("carve");
     });
   });
 
@@ -684,6 +755,37 @@ describe("draftPersistence", () => {
       // Track-1 scaffoldSpec.displayName wins over the base's own displayName.
       expect(rec.displayName).toBe("My Custom Keyboard");
       expect(rec.languageTag).toBe("yo-Latn");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // flushActiveDraft (km-review #3) — synchronous pre-OAuth-redirect save so the
+  // durable draft can't lag the sessionStorage snapshot across the redirect.
+  // ---------------------------------------------------------------------------
+  describe("flushActiveDraft: synchronous save of the active project (km-review #3)", () => {
+    it("persists the CURRENT store state immediately, with no debounce timer advance", () => {
+      vi.useFakeTimers();
+      const pk = "flush-current";
+      instantiateMinimal(pk);
+      setActiveProjectKey(pk);
+
+      // Mutate AFTER any prior save so the change is un-persisted until flushed.
+      useWorkingCopyStore.getState().lockDesktop();
+
+      // No timer advance at all — flush must write synchronously (unlike the
+      // 500ms autosave debounce).
+      flushActiveDraft();
+
+      const rec = JSON.parse(localStorage.getItem(draftKey(pk))!) as DurableDraft;
+      expect(rec.workingCopy.desktopLocked).toBe(true);
+    });
+
+    it("is a no-op (no throw, no write) when there is no active project", () => {
+      clearActiveProjectKey();
+      instantiateMinimal("flush-noactive");
+      // Active pointer is absent, so flush resolves nothing to save.
+      expect(() => flushActiveDraft()).not.toThrow();
+      expect(localStorage.getItem(draftKey("flush-noactive"))).toBeNull();
     });
   });
 
