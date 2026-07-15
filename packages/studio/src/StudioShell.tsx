@@ -44,6 +44,7 @@ import { OutputScreen } from "./components/OutputScreen.tsx";
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
 import { AccountControl } from "./components/AccountControl.tsx";
+import { hasVisited } from "./lib/firstVisit.ts";
 import { manifest, validateManifestShape } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { StepHost } from "./components/StepHost.tsx";
@@ -74,9 +75,32 @@ function isRouteId(v: string): v is RouteId {
 // useRoute — reads window.location.hash and reacts to hashchange events
 // ---------------------------------------------------------------------------
 
+// Where a visitor lands when the incoming hash does not dictate otherwise. A
+// genuine first-time visitor (this browser has never entered the app) sees the
+// WelcomeScreen; a returning visitor goes straight into the survey. The flag is
+// durable in localStorage (lib/firstVisit.ts) so it survives reloads and the
+// OAuth sign-in round trip. (main has no resumable-draft path yet, so unlike
+// the dev branch this gate keys on visited-ness alone.)
+function defaultLandingRoute(): RouteId {
+  return hasVisited() ? "survey" : "welcome";
+}
+
 function useRoute(): RouteId {
   const hashToRoute = (): RouteId => {
     const raw = window.location.hash.slice(1);
+    // A genuine newcomer always lands on welcome first — even on a deep-linked
+    // hash (a shared #survey/#preview link, a stale bookmark). The gate lifts
+    // the moment they leave welcome (markVisited), after which the incoming
+    // hash is honored normally.
+    if (defaultLandingRoute() === "welcome") {
+      // Keep window.location.hash in sync with the forced route, so that
+      // WelcomeScreen's navigateTo("welcome"→"survey") assignment fires a real
+      // hashchange rather than a same-value no-op that soft-locks welcome.
+      if (raw !== "welcome") {
+        window.history.replaceState(window.history.state, "", "#welcome");
+      }
+      return "welcome";
+    }
     return isRouteId(raw) ? raw : "survey";
   };
 
