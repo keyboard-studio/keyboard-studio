@@ -1,0 +1,11 @@
+{
+  "workflow": "speckit",
+  "specName": "036-keyboard-facet-index",
+  "branch": "036-keyboard-facet-index",
+  "selectedAt": "2026-07-14T21:21:55.307Z",
+  "currentStep": "plan",
+  "status": "planned",
+  "history": [
+    { "step": "plan", "at": "2026-07-14", "artifacts": ["plan.md", "research.md", "data-model.md", "contracts/", "quickstart.md"] }
+  ]
+}
