@@ -31,6 +31,14 @@
 //     scaffoldTouchLayout(baseIr) (reseed) or the shipped .keyman-touch-layout
 //     (import-adapt), with the locked desktop modifications applied on BOTH
 //     paths — see the `mods`/`touchLayoutJson` memos below.
+//   - The "already in touch layout" detection seed (`detectionSeedLayout`,
+//     powering the auto-detected "already" suggestion and the "already
+//     covered" chars in the coverage guard below) is SEED-SOURCE-AWARE
+//     (spec 035 contracts/simplification.md): import-adapt walks the shipped
+//     layout with desktop mods replayed, reseed walks a fresh scaffold with
+//     mods replayed — never the author's own Phase E edits (see
+//     `deriveSeedLayout` in buildTouchLayoutJson.ts, and the
+//     `detectionSeedLayout` memo below).
 //
 // RIGHT pane: live phone-mode OSK preview.
 //   - useKeyboardArtifact + OSKFrame wiring. Runs exclusively in touch mode.
@@ -39,16 +47,21 @@
 //     it); a truly-untouched import-adapt leaves the shipped file verbatim.
 //   - "Touch preview" label matches MechanismGallery's "Live preview" label style.
 //
-// Touch lint (Layer C checks 18.1–18.5) stays below the character cards,
-// same position as before.
+// Touch lint (Layer C checks 18.1–18.6, including the KM_LINT_TOUCH_UNCOVERED
+// coverage guard) stays below the character cards, same position as before.
+// FR-008 completion gate: handleContinue re-runs touchCoverage on the same
+// layout lint audits and refuses to complete (surfacing an inline message)
+// while any inventory char is unreachable — see `layoutForLintAndGate` and
+// `uncoveredMessage` below.
 //
 // Single 300 ms debounce contract upheld — no second timer introduced.
 
 import { useState, useEffect, useMemo, useCallback, type CSSProperties } from "react";
-import type { TouchAssignment, MechanismRef } from "@keyboard-studio/contracts";
-import { createVirtualFS, toUPlusNotation, isDecomposableAccented } from "@keyboard-studio/contracts";
+import type { TouchAssignment, MechanismRef, TouchLayoutIR } from "@keyboard-studio/contracts";
+import { createVirtualFS, toUPlusNotation, isDecomposableAccented, formatUncoveredTouchMessage } from "@keyboard-studio/contracts";
 import type { DesktopModifications } from "@keyboard-studio/engine";
-import { buildTouchLayoutJson } from "../../lib/buildTouchLayoutJson.ts";
+import { parseTouchLayout, touchCoverage } from "@keyboard-studio/engine";
+import { buildTouchLayoutJson, deriveSeedLayout } from "../../lib/buildTouchLayoutJson.ts";
 import { resolveBaseTouchJson } from "../../lib/resolveBaseTouchJson.ts";
 import { deriveDesktopModifications } from "../../lib/deriveDesktopModifications.ts";
 import { extractMechanismHostKey } from "../../lib/extractMechanismHostKey.ts";
@@ -61,7 +74,6 @@ import { LintSummary } from "../../lint/index.ts";
 import { useTouchLint } from "../../hooks/useTouchLint.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
 import type { ScaffoldSpec, VfsTransform } from "../../hooks/useKeyboardArtifact.ts";
-import { scaffoldTouchLayout } from "@keyboard-studio/engine";
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
@@ -617,6 +629,49 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseIr, touchKey, baseVfs, mods, resolvedSeedSource]);
 
+  // The seed layout for the chosen seed source, with desktop mods (spec 035
+  // R3) replayed but NO Phase E edits — via `deriveSeedLayout`
+  // (buildTouchLayoutJson.ts), the shared seed-derivation implementation
+  // also used by buildTouchLayoutJson's own Case A branch; do not duplicate
+  // the Case A/B branching inline here. Depends only on
+  // baseIr/baseVfs/mods/resolvedSeedSource (NOT touchKey/charTouch — the
+  // author's own edits are deliberately excluded, per spec 035
+  // simplification.md: "already in layout" means already in the SEED). null
+  // only when baseIr has not loaded yet.
+  const detectionSeedLayout = useMemo<TouchLayoutIR | null>(() => {
+    if (baseIr === null) return null;
+    try {
+      const baseTouchJson =
+        resolvedSeedSource === "reseed-from-desktop" ? undefined : resolveBaseTouchJson(baseVfs);
+      return deriveSeedLayout(baseIr, {
+        ...(baseTouchJson !== undefined ? { baseTouchJson } : {}),
+        mods,
+        seedSource: resolvedSeedSource,
+      }).layout;
+    } catch (err) {
+      console.error("[TouchGallery] detectionSeedLayout derivation failed:", err);
+      return null;
+    }
+  }, [baseIr, baseVfs, mods, resolvedSeedSource]);
+
+  // The layout the lint (18.6 touch-coverage guard) and the stage-completion
+  // gate (FR-008) both audit: the derived layout INCLUDING current Phase E
+  // edits when touchLayoutJson is non-null (the R11 matrix decided to emit),
+  // else the effective seed (detectionSeedLayout) — a truly-untouched
+  // import-adapt with a shipped layout still has a real layout to check
+  // coverage against even though nothing is emitted yet.
+  const layoutForLintAndGate = useMemo<TouchLayoutIR | null>(() => {
+    if (touchLayoutJson !== null) {
+      try {
+        return parseTouchLayout(touchLayoutJson);
+      } catch (err) {
+        console.error("[TouchGallery] layoutForLintAndGate derivation failed:", err);
+        return detectionSeedLayout;
+      }
+    }
+    return detectionSeedLayout;
+  }, [touchLayoutJson, detectionSeedLayout]);
+
   // VFS transform: inject the derived touch layout whenever touchLayoutJson
   // is non-null (the R11 matrix above already decided emission — reseed
   // always, import-adapt only when mods/edits warrant it). When
@@ -660,10 +715,33 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inventoryKey]);
 
+  // FR-008 completion gate: names of chars with no reachable touch mechanism
+  // on the final layout, formatted for display near the completion control.
+  // Set by handleContinue when it refuses to complete; cleared on the next
+  // edit (see the touchKey-keyed effect below) rather than left stale once
+  // the author starts fixing the gap.
+  const [uncoveredMessage, setUncoveredMessage] = useState<string | null>(null);
+
+  // Clear a stale gate message as soon as the author makes another edit —
+  // "cleared when coverage passes or edits change" (T016b): re-running
+  // handleContinue will re-surface the message if the edit didn't fix it.
+  // Deliberately keyed on touchKey only (not currentChar): the message lists
+  // ALL uncovered inventory chars at once, not per-character state, so simply
+  // navigating to a different character must NOT clear it — only an actual
+  // edit (or a fresh handleContinue re-check) should.
+  useEffect(() => {
+    setUncoveredMessage(null);
+  }, [touchKey]);
+
   // Completion — emit only explicitly-configured characters. Declared before
   // usePositionalCharNav below because the hook calls it directly when
   // forward navigation reaches the last character (the last character's
   // forward button IS the phase completion, not a further navigation step).
+  //
+  // FR-008 gate: before completing, re-run touchCoverage on the same layout
+  // lint audits (layoutForLintAndGate — includes current Phase E edits).
+  // While any inventory char is uncovered, refuse to call onComplete and
+  // surface an inline message naming the uncovered chars instead.
   const handleContinue = useCallback(() => {
     // Emit only chars where a real (non-inherited) or inherited assignment was
     // explicitly accepted — everything in charTouch was put there by the user.
@@ -673,8 +751,15 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     const assignments: TouchAssignment[] = [...charTouch.values()].filter((a) =>
       a.mechanisms.some((m) => m.patternId !== "touch_inherited"),
     );
+    if (layoutForLintAndGate !== null) {
+      const { uncovered } = touchCoverage(layoutForLintAndGate, inventory);
+      if (uncovered.length > 0) {
+        setUncoveredMessage(uncovered.map((c) => formatUncoveredTouchMessage(c)).join("; "));
+        return;
+      }
+    }
     onComplete(assignments);
-  }, [charTouch, onComplete]);
+  }, [charTouch, onComplete, layoutForLintAndGate, inventory]);
 
   // Positional Back/Next/Skip/Previous navigation + suggestion-dismissal
   // tracking — shared with MechanismGallery via usePositionalCharNav so the
@@ -721,10 +806,21 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   }, [charTouch, suggestionResolved]);
 
   // ---------------------------------------------------------------------------
-  // Phase C desktop assignments + detected-chars from scaffoldTouchLayout
+  // Phase C desktop assignments + detected-chars from the seed-source derivation
   // ---------------------------------------------------------------------------
   // (phaseResults is read near the top of the component alongside the other
   // spec 035 R3 mods inputs — deletedNodeIds/deletedItemIds/touchSeedSource.)
+  //
+  // detectedChars ("already in touch layout" — powers the "already" suggestion,
+  // Accept → touch_inherited) is derived from detectionSeedLayout (the chosen
+  // seed source + replayed desktop mods, see the `detectionSeedLayout` memo
+  // above) via the shared engine touchCoverage traversal, rather than an
+  // inline scaffoldTouchLayout(baseIr) walk — see spec 035
+  // contracts/simplification.md. touchCoverage's `uncovered` set is inverted
+  // against `inventory` (touchCoverage only ever answers "is this inventory
+  // char reachable", so a covered-set derived this way is a faithful
+  // replacement for the old any-char scaffold-walk set: the suggestion logic
+  // below only ever queries inventory chars).
 
   const desktopAssignments = useMemo(
     () =>
@@ -735,35 +831,18 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   );
 
   const detectedChars = useMemo<Set<string>>(() => {
-    if (baseIr === null) return new Set<string>();
+    if (detectionSeedLayout === null) return new Set<string>();
     try {
-      const layout = scaffoldTouchLayout(baseIr);
-      const set = new Set<string>();
-      const push = (t?: string) => {
-        if (t && t.length > 0 && !t.startsWith("*")) set.add(t);
-      };
-      for (const p of layout.platforms) {
-        for (const layer of p.layers) {
-          for (const row of layer.rows) {
-            for (const k of row.keys) {
-              push(k.text);
-              push(k.output);
-              (k.sk ?? []).forEach((s) => { push(s.text); push(s.output); });
-              (k.multitap ?? []).forEach((s) => { push(s.text); push(s.output); });
-              if (k.flick) {
-                Object.values(k.flick).forEach((s) => {
-                  if (s) { push(s.text); push(s.output); }
-                });
-              }
-            }
-          }
-        }
-      }
-      return set;
+      const { uncovered } = touchCoverage(detectionSeedLayout, inventory);
+      const uncoveredSet = new Set(uncovered);
+      return new Set(inventory.filter((c) => !uncoveredSet.has(c)));
     } catch {
       return new Set<string>();
     }
-  }, [baseIr]);
+    // inventoryKey is the stable primitive proxy for `inventory` (declared
+    // above, before this memo) — same precedent as touchKey/modsDepsKey.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detectionSeedLayout, inventoryKey]);
 
   // ---------------------------------------------------------------------------
   // Per-character suggestion computation
@@ -1121,9 +1200,21 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     return cloned;
   }, [baseVfs, touchLayoutJson, keyboardId]);
 
+  // Touch lint context (spec 035 FR-008/18.6) — feeds KM_LINT_TOUCH_UNCOVERED
+  // alongside 18.1–18.5. `layoutForLintAndGate` is the SAME layout the
+  // completion gate in handleContinue checks (edits included when
+  // touchLayoutJson is non-null, else the effective seed) so lint and the
+  // gate cannot drift. null when baseIr has not loaded — useTouchLint treats
+  // a null/undefined context as "run the context-free checks only".
+  const touchLintContext = useMemo(
+    () => (layoutForLintAndGate !== null ? { layout: layoutForLintAndGate, inventory } : null),
+    [layoutForLintAndGate, inventory],
+  );
+
   // Touch lint — runs on the projected (edited) VFS so checks 18.1–18.5 reflect
-  // Phase E edits. The existing 300ms debounce inside useTouchLint is unchanged.
-  const { touchFindings, touchLintRunning } = useTouchLint(editedVfsForLint, keyboardId);
+  // Phase E edits. The existing 300ms debounce inside useTouchLint is unchanged
+  // (fs + context are debounced together — Constitution IV, no second timer).
+  const { touchFindings, touchLintRunning } = useTouchLint(editedVfsForLint, keyboardId, touchLintContext);
 
   // ---------------------------------------------------------------------------
   // Shared styles — defined before guards so they can be referenced in guard renders
@@ -1349,6 +1440,24 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
               </button>
             </div>
           </div>
+
+          {/* FR-008 completion gate message — set by handleContinue when
+              touchCoverage finds an inventory char with no reachable touch
+              mechanism on the final layout; cleared on the next edit. */}
+          {uncoveredMessage !== null && (
+            <p
+              role="alert"
+              aria-live="polite"
+              style={{
+                margin: 0,
+                fontSize: 12,
+                color: "#f0883e",
+                fontFamily: FONT,
+              }}
+            >
+              Cannot finish yet — {uncoveredMessage}.
+            </p>
+          )}
 
           {/* Suggestion card (shown until accepted/dismissed; skipped entirely
               when there is no suggestion to offer) */}

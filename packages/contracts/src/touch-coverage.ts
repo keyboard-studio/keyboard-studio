@@ -23,6 +23,7 @@
  */
 
 import type { TouchLayoutIR, TouchKeyIR } from "./keyboard-ir.js";
+import { toUPlusNotation } from "./utils/charUtils.js";
 
 export interface TouchCoverageResult {
   /** Inventory chars with zero reachable touch mechanism. Empty means SC-003 is satisfied. */
@@ -99,6 +100,19 @@ function collectKeyChars(key: TouchKeyIR, covered: Set<string>): void {
       if (sub) collectKeyChars(sub, covered);
     }
   }
+}
+
+/**
+ * Format the FR-008/18.6 "uncovered character" message — the ratified spec
+ * 035 T008 format `U+XXXX <char> has no touch mechanism` (no trailing
+ * punctuation; callers append their own sentence-level punctuation). Shared
+ * between the `KM_LINT_TOUCH_UNCOVERED` lint check
+ * (check-18-6-touch-coverage.ts) and the studio TouchGallery FR-008
+ * completion-gate message so the two phrasings of "no reachable touch
+ * mechanism" cannot drift.
+ */
+export function formatUncoveredTouchMessage(char: string): string {
+  return `${toUPlusNotation(char)} ${char} has no touch mechanism`;
 }
 
 /**

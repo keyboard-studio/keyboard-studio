@@ -26,8 +26,10 @@ describe("checkTouchCoverage (18.6 touch, KM_LINT_TOUCH_UNCOVERED)", () => {
     expect(findings[0]?.code).toBe("KM_LINT_TOUCH_UNCOVERED");
     expect(findings[0]?.severity).toBe("warning");
     expect(findings[0]?.layer).toBe("C");
-    expect(findings[0]?.message).toContain("z");
-    expect(findings[0]?.message).toContain("U+007A");
+    // Ratified spec-035 T008 format (shared with TouchGallery's FR-008 gate
+    // message via formatUncoveredTouchMessage): `U+XXXX <char> has no touch
+    // mechanism`.
+    expect(findings[0]?.message).toBe("U+007A z has no touch mechanism.");
     expect(findings[0]?.location?.file).toBe(TOUCH_PATH);
   });
 

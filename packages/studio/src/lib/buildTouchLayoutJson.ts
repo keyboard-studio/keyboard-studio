@@ -32,8 +32,21 @@
 // This function always derives — it does not decide WHETHER the derived
 // layout should be emitted/injected. That gating (spec 035 R11's emission
 // matrix) lives at the call sites.
+//
+// `resolveSeedCase` (the Case A/B routing decision) and the Case A seed
+// builder are also exported as `deriveSeedLayout`, below, for callers that
+// need the seed BEFORE Phase E assignments are applied (e.g. TouchGallery's
+// "already in touch layout" detection and its lint/completion-gate fallback
+// layout) — both call sites share one implementation; do not duplicate the
+// Case A/B branching inline at a new call site. `deriveSeedLayout` cannot
+// replace this function's own Case B execution: R9 requires Case B's
+// EMISSION path to stay a raw-JSON splice (never round-tripped through the
+// IR), so buildTouchLayoutJson's Case B branch below calls
+// applyDesktopModificationsToRawJson directly rather than going through
+// deriveSeedLayout (which parses Case B's result into a TouchLayoutIR for
+// its own callers).
 
-import type { KeyboardIR, TouchAssignment } from "@keyboard-studio/contracts";
+import type { KeyboardIR, TouchAssignment, TouchLayoutIR } from "@keyboard-studio/contracts";
 import {
   applyDesktopModifications,
   applyDesktopModificationsToRawJson,
@@ -41,6 +54,7 @@ import {
   applyTouchAssignmentsToRawJson,
   scaffoldTouchLayout,
   emitTouchLayout,
+  parseTouchLayout,
   type DesktopModifications,
 } from "@keyboard-studio/engine";
 
@@ -77,6 +91,66 @@ export interface BuildTouchLayoutJsonOpts {
   seedSource: "import-adapt" | "reseed-from-desktop";
 }
 
+/** The Case A/B routing decision (spec 035 R4/R9/R10), narrowed so the raw
+ *  `baseTouchJson` is typed as a non-empty string on the Case B arm — the ONE
+ *  place this decision is made, shared by {@link buildTouchLayoutJson} and
+ *  {@link deriveSeedLayout} so the two cannot disagree on which case applies. */
+type SeedCase = { case: "A" } | { case: "B"; baseTouchJson: string };
+
+function resolveSeedCase(opts: BuildTouchLayoutJsonOpts): SeedCase {
+  const { baseTouchJson, seedSource } = opts;
+  if (seedSource === "import-adapt" && baseTouchJson) {
+    return { case: "B", baseTouchJson };
+  }
+  return { case: "A" };
+}
+
+/**
+ * Case A seed builder (reseed from desktop, or the import-adapt fallback when
+ * there is no shipped touch layout to adapt onto): strips any shipped
+ * `ir.touchLayout` first — R10, `scaffoldTouchLayout` preserves-and-augments
+ * an existing `ir.touchLayout` instead of discarding it, which would silently
+ * carry the base's own platforms into a "reseed" and violate US2-AS4 — then
+ * scaffolds and replays `mods`. Shared by `buildTouchLayoutJson`'s Case A
+ * branch and {@link deriveSeedLayout}.
+ */
+function buildCaseASeed(
+  baseIr: KeyboardIR,
+  mods: DesktopModifications,
+): { layout: TouchLayoutIR; warnings: string[] } {
+  const { touchLayout: _stripped, ...rest } = baseIr;
+  const seed = scaffoldTouchLayout(rest);
+  return applyDesktopModifications(seed, mods);
+}
+
+/**
+ * Derive the effective touch seed layout — the seed derivation up to and
+ * including the desktop-modification replay (spec 035 R3), but BEFORE any
+ * Phase E touch assignments are applied. Shared by callers that need the seed
+ * as a `TouchLayoutIR` rather than the final emitted JSON (e.g. TouchGallery's
+ * "already in touch layout" detection and its lint/completion-gate fallback
+ * layout) — both call sites share one implementation; do not duplicate the
+ * Case A/B branching inline at a new call site.
+ *
+ * Case B (`seedSource === "import-adapt"` with a shipped `baseTouchJson`)
+ * applies mods onto the raw JSON — never round-tripped through the IR on
+ * `buildTouchLayoutJson`'s own emission path (R9) — then parses the result
+ * into a `TouchLayoutIR` for this function's callers, who need the IR shape
+ * rather than a wire-format string. Case A (reseed, or the import-adapt
+ * fallback with no shipped layout) delegates to {@link buildCaseASeed}.
+ */
+export function deriveSeedLayout(
+  baseIr: KeyboardIR,
+  opts: BuildTouchLayoutJsonOpts,
+): { layout: TouchLayoutIR; warnings: string[] } {
+  const seedCase = resolveSeedCase(opts);
+  if (seedCase.case === "B") {
+    const { json, warnings } = applyDesktopModificationsToRawJson(seedCase.baseTouchJson, opts.mods);
+    return { layout: parseTouchLayout(json), warnings };
+  }
+  return buildCaseASeed(baseIr, opts.mods);
+}
+
 /**
  * Derive a `.keyman-touch-layout` JSON string from a base KeyboardIR plus an
  * array of Phase E touch assignments. Pure — no side-effects, no VFS writes.
@@ -94,14 +168,16 @@ export function buildTouchLayoutJson(
   opts: BuildTouchLayoutJsonOpts,
 ): BuildTouchLayoutJsonResult {
   try {
-    const { baseTouchJson, mods, seedSource } = opts;
+    const seedCase = resolveSeedCase(opts);
 
     // Case B — import & adapt: base ships a touch layout and the author chose
-    // to adapt it. Never round-tripped through the IR (R9).
-    if (seedSource === "import-adapt" && baseTouchJson) {
+    // to adapt it. Never round-tripped through the IR (R9) — stays on the raw
+    // JSON splice path, unlike deriveSeedLayout's Case B (which parses into an
+    // IR for its own callers).
+    if (seedCase.case === "B") {
       const { json: afterMods, warnings: modsWarnings } = applyDesktopModificationsToRawJson(
-        baseTouchJson,
-        mods,
+        seedCase.baseTouchJson,
+        opts.mods,
       );
       const { json, warnings: assignWarnings } = applyTouchAssignmentsToRawJson(
         afterMods,
@@ -111,16 +187,10 @@ export function buildTouchLayoutJson(
     }
 
     // Case A — reseed from desktop (explicit choice, or the import-adapt
-    // fallback when there is no shipped touch layout to adapt onto). The
-    // shipped touchLayout, if any, is STRIPPED before scaffolding — R10:
-    // scaffoldTouchLayout preserves-and-augments an existing ir.touchLayout
-    // instead of discarding it, which would silently carry the base's own
-    // platforms into a "reseed" and violate US2-AS4.
-    const { touchLayout: _stripped, ...rest } = baseIr;
-    const seed = scaffoldTouchLayout(rest);
-    const { layout: afterMods, warnings: modsWarnings } = applyDesktopModifications(seed, mods);
-    const { layout, warnings: assignWarnings } = applyTouchAssignments(afterMods, assignments);
-    return { json: emitTouchLayout(layout), warnings: [...modsWarnings, ...assignWarnings] };
+    // fallback when there is no shipped touch layout to adapt onto).
+    const { layout: seedLayout, warnings: seedWarnings } = buildCaseASeed(baseIr, opts.mods);
+    const { layout, warnings: assignWarnings } = applyTouchAssignments(seedLayout, assignments);
+    return { json: emitTouchLayout(layout), warnings: [...seedWarnings, ...assignWarnings] };
   } catch (err) {
     return {
       json: null,
