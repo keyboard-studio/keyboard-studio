@@ -662,20 +662,34 @@ function buildCanonicalPhoneLayers(
 }
 
 /**
- * Tag a carried-through touch key (and any of its carried sk[] sub-keys)
- * with `provenance: "base-derived"` when it has no existing provenance.
- * Keys that already carry an explicit provenance (e.g. an author-set
- * "hand-set") are left untouched — per R6 (research.md), content carried
- * through from an existing ir.touchLayout is base-derived, never
- * absent-provenance (contrast the general TouchKeyProvenance doc default of
- * "absent = hand-set", which applies elsewhere but not to this carry-through
- * path).
+ * Tag a carried-through touch key (and any of its carried sk[] / flick{} /
+ * multitap[] sub-keys) with `provenance: "base-derived"` when it has no
+ * existing provenance. Keys that already carry an explicit provenance (e.g.
+ * an author-set "hand-set") are left untouched — per R6 (research.md),
+ * content carried through from an existing ir.touchLayout is base-derived,
+ * never absent-provenance (contrast the general TouchKeyProvenance doc
+ * default of "absent = hand-set", which applies elsewhere but not to this
+ * carry-through path).
+ *
+ * `precomputedSk`, when provided, is used instead of re-deriving `sk` from
+ * `key.sk` — callers that already tagged `key.sk` themselves (e.g. the
+ * deadkey-augmentation pass, which walks `existingSk` to decide which
+ * successors are new) pass it through here rather than paying for a second
+ * identical walk.
  */
-function tagCarriedProvenance(key: TouchKeyIR): TouchKeyIR {
-  const sk = key.sk?.map(tagCarriedProvenance);
+function tagCarriedProvenance(key: TouchKeyIR, precomputedSk?: TouchKeyIR[]): TouchKeyIR {
+  const sk = precomputedSk ?? key.sk?.map((sub) => tagCarriedProvenance(sub));
+  const flick = key.flick === undefined
+    ? undefined
+    : Object.fromEntries(
+        Object.entries(key.flick).map(([dir, sub]) => [dir, tagCarriedProvenance(sub)]),
+      ) as TouchKeyIR["flick"];
+  const multitap = key.multitap?.map((sub) => tagCarriedProvenance(sub));
   return {
     ...key,
     ...(sk !== undefined ? { sk } : {}),
+    ...(flick !== undefined ? { flick } : {}),
+    ...(multitap !== undefined ? { multitap } : {}),
     provenance: key.provenance ?? "base-derived",
   };
 }
@@ -683,8 +697,8 @@ function tagCarriedProvenance(key: TouchKeyIR): TouchKeyIR {
 /**
  * Augment an existing phone platform's layers with sk[] from deadkey
  * successors (default layer only), leaving all other key properties intact.
- * Every carried-through key — on every layer, including sk[] sub-keys — is
- * tagged via {@link tagCarriedProvenance}.
+ * Every carried-through key — on every layer, including sk[] / flick{} /
+ * multitap[] sub-keys — is tagged via {@link tagCarriedProvenance}.
  */
 function augmentExistingPhoneLayers(
   platform: TouchLayoutIR["platforms"][number],
@@ -697,7 +711,7 @@ function augmentExistingPhoneLayers(
         const successors = layer.id === "default" ? deadkeySuccessors.get(key.id) : undefined;
         if (!successors || successors.length === 0) return tagCarriedProvenance(key);
 
-        const existingSk = (key.sk ?? []).map(tagCarriedProvenance);
+        const existingSk = (key.sk ?? []).map((sub) => tagCarriedProvenance(sub));
         const newSk: TouchKeyIR[] = successors
           .filter((ch) => !existingSk.some((s) => s.text === ch))
           .map((ch) => ({
@@ -711,7 +725,9 @@ function augmentExistingPhoneLayers(
             provenance: "physical-suggested",
           }));
 
-        if (newSk.length === 0) return tagCarriedProvenance(key);
+        if (newSk.length === 0) {
+          return tagCarriedProvenance(key, key.sk !== undefined ? existingSk : undefined);
+        }
 
         const augmented: TouchKeyIR = {
           ...key,

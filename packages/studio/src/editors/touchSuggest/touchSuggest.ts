@@ -9,10 +9,13 @@
 //   - "base-derived"       — a key carried UNCHANGED from the base keyboard's
 //     shipped touch layout (Case B: present in `ir.touchLayout` by id).
 //
-// It NEVER emits "hand-set": that provenance is owned by the author's manual
-// edits (touchBehavior.ts promotion, FR-014) and by the conservative default
-// for untagged keys. The no-clobber re-propagation gate (repropagate.ts, R2)
-// reads these tags to decide which keys it may overwrite.
+// It never STAMPS "hand-set" itself: that provenance is owned by the author's
+// manual edits (touchBehavior.ts promotion, FR-014) and by the conservative
+// default for untagged keys. Per R6 (research.md), an incoming key that
+// already carries an explicit "hand-set" tag (e.g. carried through by the
+// engine's scaffoldTouchLayout) is preserved untouched, not re-stamped. The
+// no-clobber re-propagation gate (repropagate.ts, R2) reads these tags to
+// decide which keys it may overwrite.
 //
 // Derivation is WIRED to the existing engine scaffolder (scaffoldTouchLayout):
 // touchSuggest does not re-implement physical→touch mapping — it adds the
@@ -86,9 +89,23 @@ function baseLayoutKeyIds(ir: KeyboardIR): ReadonlySet<string> {
 /**
  * Return a structural clone of `key` with its provenance stamped per the A2
  * discriminator: `base-derived` when the key id was present in the base
- * layout, `physical-suggested` otherwise. Never produces `hand-set`.
+ * layout, `physical-suggested` otherwise — UNLESS the incoming key already
+ * carries an explicit `"hand-set"` tag, in which case it is preserved as-is
+ * (R6 no-clobber: `scaffoldTouchLayout`'s carry-through deliberately keeps an
+ * author-set `"hand-set"` tag, and touchSuggest must not re-stamp over it).
+ * The refreshable tiers (`"base-derived"` / `"physical-suggested"` / absent)
+ * are re-derived every call, per R6.
+ *
+ * Does not walk `sk[]` / `flick{}` / `multitap[]` sub-keys — those are left
+ * as cloned by `structuredClone`, carrying whatever provenance the engine's
+ * `scaffoldTouchLayout` (via `tagCarriedProvenance`) already assigned them.
+ * There is nothing to re-derive here since `baseLayoutKeyIds` only indexes
+ * top-level `row.keys` ids, not sub-key ids.
  */
 function stampKey(key: TouchKeyIR, baseIds: ReadonlySet<string>): TouchKeyIR {
+  if (key.provenance === "hand-set") {
+    return structuredClone(key);
+  }
   const provenance: TouchKeyProvenance = baseIds.has(key.id)
     ? "base-derived"
     : "physical-suggested";
@@ -106,7 +123,9 @@ function stampKey(key: TouchKeyIR, baseIds: ReadonlySet<string>): TouchKeyIR {
  * mapping to the engine's {@link scaffoldTouchLayout}, then stamps each
  * produced key's `provenance` (A2): keys carried through from the base layout
  * are `base-derived`; keys generated/changed from physical decisions are
- * `physical-suggested`. The function never emits `hand-set`.
+ * `physical-suggested`. Per R6, a key that already arrives tagged `hand-set`
+ * (an author-set state the engine's carry-through preserves) is left as-is
+ * rather than re-stamped.
  *
  * The policy is merged for forward-compat; the engine scaffolder currently
  * carries the canonical defaults, so `_policy` is reserved here for the

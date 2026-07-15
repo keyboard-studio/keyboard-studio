@@ -79,6 +79,19 @@ export interface KeyChord {
  * `base-derived` and `physical-suggested` are the auto-managed states that
  * re-propagation may overwrite; `hand-set` (and any absent provenance, which
  * deserializes as `hand-set`) is never auto-clobbered.
+ *
+ * Carve-out (spec 035 R6): the rule above describes deserializing an
+ * author-persisted layout, where absent provenance means "this was never
+ * auto-tagged" and so is treated as `hand-set`. It does not describe the
+ * scaffolder's carry-through path (`scaffoldTouchLayout`'s augment step,
+ * `tagCarriedProvenance`): there, absent provenance on a key carried from an
+ * existing `ir.touchLayout` is normalized to `base-derived` at derivation
+ * time, since carried content is by definition base-derived, not an
+ * author's manual placement. An explicit `hand-set` tag already present on
+ * a carried key is still preserved untouched either way. So: absent-at-
+ * deserialize still means `hand-set` for author-persisted layouts; absent
+ * on generated/carried output is always resolved to an explicit tag before
+ * it is handed back.
  */
 export type TouchKeyProvenance =
   | "base-derived"

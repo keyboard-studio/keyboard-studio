@@ -1080,6 +1080,89 @@ describe("scaffoldTouchLayout", () => {
       }
     });
 
+    it("Case B: carried-through flick and multitap sub-keys with no existing provenance are tagged base-derived, and explicit tags are preserved", () => {
+      const existingKey = {
+        nodeId: freshId("key"),
+        id: "K_A",
+        text: "a",
+        output: "a",
+        flick: {
+          n: { nodeId: freshId("key"), id: "K_A_flick_n", text: "n" },
+          s: {
+            nodeId: freshId("key"),
+            id: "K_A_flick_s",
+            text: "s",
+            provenance: "hand-set" as const,
+          },
+        },
+        multitap: [
+          { nodeId: freshId("key"), id: "K_A_mt_0", text: "0" },
+          {
+            nodeId: freshId("key"),
+            id: "K_A_mt_1",
+            text: "1",
+            provenance: "hand-set" as const,
+          },
+        ],
+      };
+      const existingTouchLayout: TouchLayoutIR = {
+        platforms: [
+          {
+            id: "phone",
+            layers: [
+              {
+                id: "default",
+                rows: [{ keys: [existingKey] }],
+              },
+            ],
+          },
+        ],
+        nodeIds: [],
+      };
+
+      const ir = makeMinimalIR({ touchLayout: existingTouchLayout });
+      const result = scaffoldTouchLayout(ir);
+
+      const phone = result.platforms.find((p) => p.id === "phone")!;
+      const defaultLayer = phone.layers.find((l) => l.id === "default")!;
+      const carried = defaultLayer.rows.flatMap((r) => r.keys).find((k) => k.id === "K_A")!;
+
+      expect(carried.flick?.n?.provenance).toBe("base-derived");
+      expect(carried.flick?.s?.provenance).toBe("hand-set");
+      expect(carried.multitap?.[0]?.provenance).toBe("base-derived");
+      expect(carried.multitap?.[1]?.provenance).toBe("hand-set");
+    });
+
+    it("Case B: a carried-through key in a non-default layer (e.g. shift) with no existing provenance is tagged base-derived", () => {
+      const existingKey = {
+        nodeId: freshId("key"),
+        id: "K_A",
+        text: "A",
+        output: "A",
+      };
+      const existingTouchLayout: TouchLayoutIR = {
+        platforms: [
+          {
+            id: "phone",
+            layers: [
+              { id: "default", rows: [{ keys: [] }] },
+              { id: "shift", rows: [{ keys: [existingKey] }] },
+            ],
+          },
+        ],
+        nodeIds: [],
+      };
+
+      const ir = makeMinimalIR({ touchLayout: existingTouchLayout });
+      const result = scaffoldTouchLayout(ir);
+
+      const phone = result.platforms.find((p) => p.id === "phone")!;
+      const shiftLayer = phone.layers.find((l) => l.id === "shift")!;
+      const carried = shiftLayer.rows.flatMap((r) => r.keys).find((k) => k.id === "K_A");
+
+      expect(carried?.provenance).toBe("base-derived");
+    });
+
     it("emitted wire JSON contains no 'provenance' key anywhere", () => {
       const rule = makeCharRule("K_A", [], "a");
       const ir = makeMinimalIR({ groups: [makeGroup([rule])] });
