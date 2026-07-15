@@ -11,8 +11,20 @@
 // the source of the owner identity; we only carry the bearer token.
 //
 // All calls fail soft: a network error, 401, 502, or 503 resolves to a benign
-// result (null on read, false on write) so the local-first localStorage path
-// keeps working and authoring never breaks on a backend hiccup.
+// result (null on read, false on write, [] on list) so the local-first
+// localStorage path keeps working and authoring never breaks on a backend
+// hiccup.
+//
+// Multi-project ("My keyboards") note: every per-project call below threads a
+// `draftId` (the client's projectKey — see draftAutosave.ts) through to the
+// `?draftId=` query string, per spec.md specs/037-my-keyboards §"API contract".
+// The backend's PUT handler actually reads the routing id from `meta.draftId`
+// in the body (not the query string) — see api/drafts/index.ts putDraft — but
+// we still append it to the URL on PUT too, for symmetry with GET/DELETE and
+// because the spec describes all four as "gaining a draftId argument threaded
+// through to the query string." Omitting `draftId` (the pre-multi-draft call
+// shape) lands in the server's reserved single-slot default, unchanged from
+// today.
 
 import { getBackendUrl } from "./githubOAuth.ts";
 import type { StudioDraft, DraftMeta } from "./draftTypes.ts";
@@ -24,10 +36,21 @@ export interface ServerDraftMeta {
   label: string | null;
   keyboardId: string | null;
   schemaVersion: number;
+  /**
+   * The client's per-project key ("My keyboards"). Optional so a pre-existing
+   * caller shape (single-draft era) still type-checks; the server defaults an
+   * absent value to its reserved single-slot id.
+   */
+  draftId?: string;
+  /** Draft lifecycle; the server defaults this to "draft" when omitted. */
+  status?: "draft" | "submitted";
+  /** URL of the PR opened from this draft, once submitted, or null. */
+  prUrl?: string | null;
 }
 
-function draftsUrl(path = ""): string {
-  return `${getBackendUrl()}/drafts${path}`;
+function draftsUrl(path: string, draftId?: string): string {
+  const base = `${getBackendUrl()}/drafts${path}`;
+  return draftId !== undefined ? `${base}?draftId=${encodeURIComponent(draftId)}` : base;
 }
 
 function authHeaders(token: string): Record<string, string> {
@@ -45,17 +68,18 @@ export function serverMetaToDraftMeta(meta: ServerDraftMeta): DraftMeta {
 }
 
 /**
- * Upsert the caller's draft on the server. Returns true on success. Swallows
- * every failure (offline, quota/413, 401, 5xx) as false — the caller keeps the
- * local draft regardless.
+ * Upsert the caller's draft for one project on the server. Returns true on
+ * success. Swallows every failure (offline, quota/413, 401, 5xx) as false —
+ * the caller keeps the local draft regardless.
  */
 export async function saveServerDraft(
   token: string,
   meta: ServerDraftMeta,
   draft: StudioDraft,
+  draftId: string,
 ): Promise<boolean> {
   try {
-    const res = await fetch(draftsUrl(), {
+    const res = await fetch(draftsUrl("", draftId), {
       method: "PUT",
       headers: authHeaders(token),
       body: JSON.stringify({ meta, draft }),
@@ -75,9 +99,10 @@ export function saveServerDraftBeacon(
   token: string,
   meta: ServerDraftMeta,
   draft: StudioDraft,
+  draftId: string,
 ): void {
   try {
-    void fetch(draftsUrl(), {
+    void fetch(draftsUrl("", draftId), {
       method: "PUT",
       headers: authHeaders(token),
       body: JSON.stringify({ meta, draft }),
@@ -88,10 +113,13 @@ export function saveServerDraftBeacon(
   }
 }
 
-/** Fetch the server draft metadata (for the resume banner), or null. */
-export async function loadServerDraftMeta(token: string): Promise<ServerDraftMeta | null> {
+/** Fetch one project's server draft metadata (for the resume banner), or null. */
+export async function loadServerDraftMeta(
+  token: string,
+  draftId: string,
+): Promise<ServerDraftMeta | null> {
   try {
-    const res = await fetch(draftsUrl(), { method: "GET", headers: authHeaders(token) });
+    const res = await fetch(draftsUrl("", draftId), { method: "GET", headers: authHeaders(token) });
     if (!res.ok) return null;
     const body = (await res.json()) as { meta: ServerDraftMeta | null };
     return body.meta ?? null;
@@ -100,10 +128,33 @@ export async function loadServerDraftMeta(token: string): Promise<ServerDraftMet
   }
 }
 
-/** Fetch the full server draft payload (for Restore), or null. */
-export async function loadServerDraftContent(token: string): Promise<StudioDraft | null> {
+/**
+ * List every one of the caller's projects' server metadata ("My keyboards"),
+ * newest caller-side sort left to the consumer. Returns `[]` on any failure
+ * (network, 401, 502, 503) — the list screen falls back to the local project
+ * index rather than erroring the whole page.
+ */
+export async function listServerDrafts(token: string): Promise<ServerDraftMeta[]> {
   try {
-    const res = await fetch(draftsUrl("/content"), { method: "GET", headers: authHeaders(token) });
+    const res = await fetch(draftsUrl(""), { method: "GET", headers: authHeaders(token) });
+    if (!res.ok) return [];
+    const body = (await res.json()) as { drafts: ServerDraftMeta[] };
+    return Array.isArray(body.drafts) ? body.drafts : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Fetch one project's full server draft payload (for Restore), or null. */
+export async function loadServerDraftContent(
+  token: string,
+  draftId: string,
+): Promise<StudioDraft | null> {
+  try {
+    const res = await fetch(draftsUrl("/content", draftId), {
+      method: "GET",
+      headers: authHeaders(token),
+    });
     if (!res.ok) return null;
     const body = (await res.json()) as { draft: StudioDraft | null };
     return body.draft ?? null;
@@ -112,10 +163,10 @@ export async function loadServerDraftContent(token: string): Promise<StudioDraft
   }
 }
 
-/** Delete the caller's server draft. Best-effort; returns true on success. */
-export async function clearServerDraft(token: string): Promise<boolean> {
+/** Delete one project's server draft. Best-effort; returns true on success. */
+export async function clearServerDraft(token: string, draftId: string): Promise<boolean> {
   try {
-    const res = await fetch(draftsUrl(), { method: "DELETE", headers: authHeaders(token) });
+    const res = await fetch(draftsUrl("", draftId), { method: "DELETE", headers: authHeaders(token) });
     return res.ok;
   } catch {
     return false;

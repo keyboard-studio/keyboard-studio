@@ -1,9 +1,10 @@
 // /api/drafts — server-side draft persistence for signed-in users.
 // Reachable at /drafts via the vercel.json rewrite.
 //
-//   GET    /drafts   → metadata for the resume banner ({ meta } | { meta: null })
-//   PUT    /drafts   → upsert the caller's draft ({ meta, draft } → { savedAt })
-//   DELETE /drafts   → clear the caller's draft
+//   GET    /drafts                 → all drafts' metadata ({ drafts: DraftMeta[] })
+//   GET    /drafts?draftId=<id>    → metadata for one draft ({ meta } | { meta: null })
+//   PUT    /drafts                 → upsert a draft ({ meta, draft } → { savedAt }); draftId comes from meta
+//   DELETE /drafts                 → clear a draft (?draftId=<id>, default the single-draft slot)
 //
 // Every method is gated on a server-verified GitHub identity presented in the
 // Authorization header (Bearer <token>) — see draft-handlers.ts. This is the
@@ -22,12 +23,20 @@ import {
   buildDraftConfig,
   deleteDraft,
   getDraftMeta,
+  listDrafts,
   putDraft,
   type DraftHandlerConfig,
   type DraftResult,
 } from "../../utilities/oauth-backend/src/draft-handlers.js";
+import { DEFAULT_DRAFT_ID } from "../../utilities/oauth-backend/src/draft-schemas.js";
 import type { OAuthFetchFn } from "../../utilities/oauth-backend/src/handlers.js";
 import { VercelDraftStore } from "./_store.js";
+
+/** ?draftId query param, defaulting to the single-draft slot when absent. */
+export function draftIdOf(req: Request): string {
+  const raw = new URL(req.url).searchParams.get("draftId");
+  return raw !== null && raw.length > 0 ? raw : DEFAULT_DRAFT_ID;
+}
 
 // Adapt the global Web fetch to the utility's minimal OAuthFetchFn contract
 // (used only for the GitHub /user identity check). Mirrors _shared.ts.
@@ -80,12 +89,16 @@ export async function runDraftsHandler(
 
   try {
     switch (req.method) {
-      case "GET":
-        return mapResult(await getDraftMeta(auth, config));
+      case "GET": {
+        const draftId = new URL(req.url).searchParams.get("draftId");
+        return draftId === null
+          ? mapResult(await listDrafts(auth, config))
+          : mapResult(await getDraftMeta(auth, config, draftId));
+      }
       case "PUT":
         return mapResult(await putDraft(auth, await req.text(), config));
       case "DELETE":
-        return mapResult(await deleteDraft(auth, config));
+        return mapResult(await deleteDraft(auth, config, draftIdOf(req)));
       default:
         return jsonResponse(
           405,

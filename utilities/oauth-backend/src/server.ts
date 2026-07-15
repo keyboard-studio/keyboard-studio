@@ -51,9 +51,11 @@ import {
   buildDraftConfig,
   getDraftContent,
   getDraftMeta,
+  listDrafts,
   putDraft,
   deleteDraft,
 } from "./draft-handlers.js";
+import { DEFAULT_DRAFT_ID } from "./draft-schemas.js";
 import { MemoryDraftStore } from "./draft-store.js";
 
 // ---------------------------------------------------------------------------
@@ -428,14 +430,25 @@ export async function buildServer(opts: {
     const h = req.headers["authorization"];
     return typeof h === "string" ? h : null;
   };
+  // Query-string draftId, defaulting to the single-draft slot for an
+  // un-upgraded client that never sends one — mirrors api/drafts/index.ts.
+  const draftIdOf = (req: { query: unknown }): string => {
+    const q = req.query as Record<string, unknown>;
+    const raw = q["draftId"];
+    return typeof raw === "string" && raw.length > 0 ? raw : DEFAULT_DRAFT_ID;
+  };
 
   app.get("/drafts", async (req, reply) => {
-    const r = await getDraftMeta(authHeaderOf(req), draftConfig);
+    const q = req.query as Record<string, unknown>;
+    const r =
+      typeof q["draftId"] === "string"
+        ? await getDraftMeta(authHeaderOf(req), draftConfig, draftIdOf(req))
+        : await listDrafts(authHeaderOf(req), draftConfig);
     return r.ok ? reply.status(r.status).send(r.data) : reply.status(r.status).send({ error: r.error });
   });
 
   app.get("/drafts/content", async (req, reply) => {
-    const r = await getDraftContent(authHeaderOf(req), draftConfig);
+    const r = await getDraftContent(authHeaderOf(req), draftConfig, draftIdOf(req));
     return r.ok ? reply.status(r.status).send(r.data) : reply.status(r.status).send({ error: r.error });
   });
 
@@ -447,7 +460,7 @@ export async function buildServer(opts: {
   });
 
   app.delete("/drafts", async (req, reply) => {
-    const r = await deleteDraft(authHeaderOf(req), draftConfig);
+    const r = await deleteDraft(authHeaderOf(req), draftConfig, draftIdOf(req));
     return r.ok ? reply.status(r.status).send(r.data) : reply.status(r.status).send({ error: r.error });
   });
 

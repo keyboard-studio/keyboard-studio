@@ -8,7 +8,7 @@
 
 import { jsonResponse } from "../oauth/_shared.js";
 import { getDraftContent } from "../../utilities/oauth-backend/src/draft-handlers.js";
-import { envDraftConfig } from "./index.js";
+import { draftIdOf, envDraftConfig } from "./index.js";
 import type { DraftHandlerConfig } from "../../utilities/oauth-backend/src/draft-handlers.js";
 
 export async function runDraftContentHandler(
@@ -24,7 +24,7 @@ export async function runDraftContentHandler(
   if (config === null) return jsonResponse(503, { error: "draft_not_configured" });
 
   try {
-    const r = await getDraftContent(req.headers.get("authorization"), config);
+    const r = await getDraftContent(req.headers.get("authorization"), config, draftIdOf(req));
     return r.ok ? jsonResponse(r.status, r.data) : jsonResponse(r.status, { error: r.error });
   } catch {
     return jsonResponse(502, { error: "draft_unavailable" });

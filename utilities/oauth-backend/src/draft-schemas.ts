@@ -30,6 +30,14 @@ import { z } from "zod";
  */
 export const MAX_DRAFT_BYTES = 4 * 1024 * 1024;
 
+/**
+ * The slot a draft occupies when a user has no draftId of their own (an
+ * un-upgraded client, or the first draft before "My keyboards" existed). Every
+ * pre-multi-draft record lives here, so the single-draft client keeps working
+ * against the same slot after this change ships.
+ */
+export const DEFAULT_DRAFT_ID = "default";
+
 // ---------------------------------------------------------------------------
 // Draft metadata — the small denormalized row the resume banner reads without
 // fetching the full blob. The SPA derives these fields and sends them on save.
@@ -46,6 +54,16 @@ export const DraftMetaSchema = z.object({
   keyboardId: z.string().max(80).nullable(),
   /** Client draft schema version (StudioDraft.version), so a stale shape is detectable. */
   schemaVersion: z.number().int().nonnegative(),
+  /**
+   * The client's per-project key ("My keyboards" multi-draft). Optional so an
+   * un-upgraded single-draft client (which never sends this field) still
+   * validates — it lands in the {@link DEFAULT_DRAFT_ID} slot.
+   */
+  draftId: z.string().min(1).max(80).default(DEFAULT_DRAFT_ID),
+  /** Draft lifecycle; defaults to "draft" for clients that predate submission tracking. */
+  status: z.enum(["draft", "submitted"]).default("draft"),
+  /** URL of the PR opened from this draft, once submitted, or null. */
+  prUrl: z.string().url().nullable().default(null),
 });
 
 export type DraftMeta = z.infer<typeof DraftMetaSchema>;
@@ -88,3 +106,9 @@ export const PutDraftResponseSchema = z.object({
   savedAt: z.number().int().nonnegative(),
 });
 export type PutDraftResponse = z.infer<typeof PutDraftResponseSchema>;
+
+/** GET /drafts (list) — every draft's metadata, for the "My keyboards" list. */
+export const GetDraftListResponseSchema = z.object({
+  drafts: z.array(DraftMetaSchema),
+});
+export type GetDraftListResponse = z.infer<typeof GetDraftListResponseSchema>;

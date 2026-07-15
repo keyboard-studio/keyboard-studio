@@ -31,8 +31,7 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import type { PublishManagedPRError } from "@keyboard-studio/contracts";
 import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
-import { clearDraft } from "../lib/draftAutosave.ts";
-import { clearServerDraft } from "../lib/serverDraftStore.ts";
+import { recordProjectSubmission } from "../lib/draftAutosave.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { getManagedPROutputService, getManagedPRProxyEndpoint } from "../lib/services.ts";
 import {
@@ -263,12 +262,15 @@ export function ManagedPRSubmitPanel({
         proxyEndpoint: getManagedPRProxyEndpoint(),
       });
       setSubmitState({ kind: "success", prUrl: result.prUrl });
-      // The keyboard shipped — discard the resumable draft so a later reload
-      // doesn't offer to resume an already-submitted survey. Clear both the
-      // local (localStorage) and, for signed-in submitters, the server copy.
-      clearDraft();
+      // The keyboard shipped — transition the active project to "submitted"
+      // (specs/037-my-keyboards) rather than deleting its record outright:
+      // it keeps appearing in "My keyboards" with a link to its PR. Updates
+      // the local index entry and, for signed-in submitters, PUTs the same
+      // status/prUrl to the server; clears the active-project pointer (the
+      // survey session that just submitted is over) but keeps the project's
+      // stored draft + index row.
       const accessToken = githubToken?.accessToken ?? null;
-      if (accessToken !== null) void clearServerDraft(accessToken);
+      void recordProjectSubmission(result.prUrl, accessToken);
     } catch (err: unknown) {
       let message: string;
       if (isPublishManagedPRError(err)) {
