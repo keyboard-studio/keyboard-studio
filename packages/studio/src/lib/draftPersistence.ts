@@ -354,8 +354,13 @@ export function discardActiveDraft(): void {
 // installDraftAutosave (T021)
 // ---------------------------------------------------------------------------
 
-/** Debounce window for the autosave write — see the Article IV note below. */
-const AUTOSAVE_DEBOUNCE_MS = 500;
+/**
+ * Debounce window for the autosave write — see the Article IV note below. This
+ * is deliberately distinct from the validator's 300ms `DEBOUNCE_MS` (Decision
+ * D3): the autosave is a SEPARATE, lightweight timer, never a second validate
+ * cycle. Exported so a regression test can pin the two windows apart.
+ */
+export const AUTOSAVE_DEBOUNCE_MS = 500;
 
 /**
  * Subscribe to BOTH the working-copy store and the survey-session store; on

@@ -17,7 +17,11 @@
 // registry, so this ordering is sufficient without vi.resetModules().
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 import { createVirtualFS } from "@keyboard-studio/contracts";
+import { DEBOUNCE_MS } from "../hooks/useDebounce.ts";
 import type { BaseKeyboard, KeyboardIR, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
@@ -36,8 +40,11 @@ import {
   deriveProjectKeyFromWorkingCopy,
   installDraftAutosave,
   wasDraftRestoredThisBoot,
+  AUTOSAVE_DEBOUNCE_MS,
   type DurableDraft,
 } from "./draftPersistence.ts";
+
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -647,6 +654,65 @@ describe("draftPersistence", () => {
       // Track-1 scaffoldSpec.displayName wins over the base's own displayName.
       expect(rec.displayName).toBe("My Custom Keyboard");
       expect(rec.languageTag).toBe("yo-Latn");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // T029 — Article IV guard: the autosave subscription is a SEPARATE lightweight
+  // timer, NOT a second validation debounce cycle and NOT a parallel validation
+  // path. Two complementary assertions:
+  //   (1) by inspection — draftPersistence.ts imports no validator/oracle and
+  //       reuses no 300ms validate debounce; its own timer is the 500ms
+  //       autosave window, distinct from DEBOUNCE_MS (300).
+  //   (2) at runtime — a store mutation that fires the autosave performs exactly
+  //       one localStorage write (serialize + setItem) and no validation work.
+  // ---------------------------------------------------------------------------
+  describe("T029/Article IV: autosave is an independent lightweight timer, not a second validate cycle", () => {
+    it("draftPersistence.ts wires no validator/oracle and does not reuse the 300ms validate debounce (inspection)", () => {
+      const raw = readFileSync(path.join(currentDir, "draftPersistence.ts"), "utf-8");
+      // Strip comments first: the module's DOC PROSE deliberately names the
+      // validator/useValidator/DEBOUNCE_MS to explain what the autosave is NOT,
+      // so a raw text match would be a false positive. We assert against CODE.
+      const code = raw
+        .replace(/\/\*[\s\S]*?\*\//g, "") // block comments
+        .replace(/^[ \t]*\/\/.*$/gm, ""); // whole-line // comments
+
+      // No validation surface is imported or invoked from the persistence path.
+      expect(code).not.toMatch(/validateWithOracle|runAllChecks/);
+      expect(code).not.toMatch(/\buseValidator\b/);
+      // It does not reuse the validator's 300ms debounce hook/constant — the
+      // autosave timer is its OWN locally-declared 500ms window.
+      expect(code).not.toMatch(/\buseDebounce\b/);
+      expect(code).not.toMatch(/\bDEBOUNCE_MS\b/); // the 300ms validate constant
+      expect(code).toMatch(/AUTOSAVE_DEBOUNCE_MS\s*=\s*500/);
+    });
+
+    it("the autosave debounce window (500ms) is distinct from the single validate cycle (300ms)", () => {
+      // The validate cycle owns 300ms (Decision D3); the autosave owns 500ms.
+      // A regression that folded autosave into the validate timer would collapse
+      // these to one value — this pins them apart.
+      expect(AUTOSAVE_DEBOUNCE_MS).toBe(500);
+      expect(DEBOUNCE_MS).toBe(300);
+      expect(AUTOSAVE_DEBOUNCE_MS).not.toBe(DEBOUNCE_MS);
+    });
+
+    it("an autosaved mutation performs exactly one localStorage write and zero validation work", () => {
+      vi.useFakeTimers();
+      const pk = "t029-no-validate";
+      instantiateMinimal(pk);
+
+      const teardown = installDraftAutosave(pk); // one synchronous install-time save
+      const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+
+      useWorkingCopyStore.getState().lockDesktop(); // schedules the autosave
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS);
+
+      // The mutation produced a single draft write — no fan-out into a second
+      // (validation) timer that would re-enter and write again.
+      const draftWrites = setItemSpy.mock.calls.filter(([key]) => key === draftKey(pk));
+      expect(draftWrites).toHaveLength(1);
+
+      teardown();
     });
   });
 });
