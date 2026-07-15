@@ -11,12 +11,14 @@
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
-import { TouchGallery } from "./TouchGallery.tsx";
+import { TouchGallery, buildTouchMechanismRef } from "./TouchGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import type { VirtualFS, MechanismAssignment } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
+import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
 
 // ---------------------------------------------------------------------------
 // vi.hoisted() — refs shared across mock closures and test bodies.
@@ -142,6 +144,15 @@ function seedStore(opts: { withInventory?: string[]; intro?: boolean } = {}) {
   if (!opts.intro) {
     useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
   }
+  // spec 035 R11: these fixtures ship no base .keyman-touch-layout, so the
+  // Entity-5 default (resolveTouchSeedSource) would resolve to
+  // "reseed-from-desktop" (which ALWAYS emits) if left null. Existing tests
+  // in this file pin the "import-adapt + empty mods + no real edit -> emit
+  // nothing" row, so seed the explicit choice — mirrors an author who picked
+  // Import & adapt from the fork chooser even though there is nothing to
+  // import onto (TouchSeedSourcePanel allows this; it starts from an empty
+  // layout).
+  useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
 }
 
 /** Invoke the captured vfsTransform with a fresh VFS and the given kbId. */
@@ -160,6 +171,7 @@ function runTransform(kbId: string) {
 afterEach(() => {
   cleanup();
   useWorkingCopyStore.getState().reset();
+  useSurveySessionStore.getState().reset();
   vi.clearAllMocks();
   capturedVfsTransformRef.current = null;
   // Reset useTouchLint mock to the default empty state between tests.
@@ -168,6 +180,7 @@ afterEach(() => {
 
 beforeEach(() => {
   useWorkingCopyStore.getState().reset();
+  useSurveySessionStore.getState().reset();
   touchLintResultRef.current = { touchFindings: [], touchLintRunning: false };
 });
 
@@ -344,6 +357,57 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     expect(callCount).toBeGreaterThan(0);
     // Defect A guarantee: injected JSON is non-null and contains assignment info.
     expect(String(entry?.content)).toContain("defectA");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R11 emission matrix — the row that USED TO return null: import-adapt with
+// non-empty desktop modifications (spec 035 R3 replay) must still emit even
+// when the author has made ZERO Phase E edits. Pre-035, the emission gate was
+// "has real edits" only; R11 adds "OR mods non-empty".
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — R11 emission: mods non-empty emits even with zero configured chars", () => {
+  it("injects the derived touch layout when desktop mods are non-empty, before any Phase E edit is made", async () => {
+    // A Phase C simple_swap assignment for "x" derives a non-empty
+    // mods.placements entry (deriveDesktopModifications extracts hostKey
+    // K_X) — seedWithDesktopAssignment also pins seedSource "import-adapt".
+    const swapAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "x",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "simple_swap",
+          strategyId: "S-01",
+          slotValues: { kmnRules: "+ [K_X] > U+0078" },
+        },
+      ],
+      source: "user",
+    };
+    seedWithDesktopAssignment("x", swapAssignment);
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // Zero Phase E edits made — charTouch stays empty for the whole test —
+    // yet the R11 matrix must still emit because import-adapt + mods
+    // non-empty is an emit row, independent of hasRealEdits.
+    const vfs = runTransform("basic_kbdus");
+    const entry = vfs.get("source/basic_kbdus.keyman-touch-layout");
+    expect(entry).not.toBeUndefined();
+    expect(buildTouchLayoutJsonSpy).toHaveBeenCalled();
+
+    const [, passedAssignments, opts] = buildTouchLayoutJsonSpy.mock.calls[0]! as [
+      unknown,
+      unknown[],
+      { mods: { removals: string[]; placements: unknown[] } },
+    ];
+    // No Phase E assignments were passed (empty charTouch).
+    expect(passedAssignments).toEqual([]);
+    // But mods.placements carries the Phase C-derived placement.
+    expect(opts.mods.placements.length).toBeGreaterThan(0);
   });
 });
 
@@ -963,6 +1027,9 @@ function seedWithDesktopAssignment(
   // Skip the first-entry intro splash (see seedStore) so these tests land
   // directly on the per-character gallery.
   useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
+  // spec 035 R11 — see seedStore's comment: pin the explicit import-adapt
+  // choice so these fixtures don't fall into the reseed-always-emits default.
+  useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
 }
 
 describe("TouchGallery — suggestion card variants", () => {
@@ -1037,6 +1104,36 @@ describe("TouchGallery — suggestion card variants", () => {
 
     // Suggestion card should mention "long-press" for á.
     expect(screen.queryByText(/Suggested: long-press/i)).not.toBeNull();
+  });
+
+  it("shows a 'longpress' suggestion for a multi-token modifier_as_layer_switch combo (SHIFT+CTRL+RALT)", async () => {
+    // Regression: the host-key extraction previously hardcoded a
+    // /\[RALT\s+.../ regex, which silently produced no suggestion (empty
+    // hostKey) for any combo other than a bare RALT bracket. A three-token
+    // combo exercises the general parseKeySpec-based extraction.
+    const layerSwitchAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "€",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "modifier_as_layer_switch",
+          strategyId: "S-08",
+          slotValues: { altgrKeyList: "[SHIFT CTRL RALT K_4]", altgrOutputList: "€" },
+        },
+      ],
+      source: "user",
+    };
+    seedWithDesktopAssignment("€", layerSwitchAssignment);
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // The suggestion names the extracted host key ("4", from K_4) — not the
+    // "a key" fallback the component shows when hostKey extraction fails.
+    expect(screen.queryByText(/Suggested: long-press 4 to reach/i)).not.toBeNull();
+    expect(screen.queryByText(/Suggested: long-press a key to reach/i)).toBeNull();
   });
 
   it("a suggestion card REAPPEARS after Skip (unlike Accept/Deny) — Skip resolves nothing", async () => {
@@ -1403,5 +1500,183 @@ describe("TouchGallery — lint error finding surfaces in LintSummary (AC#3)", (
 
     const lintSummary = screen.getByTestId("lint-summary");
     expect(lintSummary.querySelectorAll("[data-finding-code]")).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// "Enter my own character..." custom host-key option + U+ notation —
+// feature coverage for the shared host-key picker (longpress / flick /
+// multitap / replace all share the same `hostKey` state).
+//
+// "中" has no Phase C desktop assignment, is not in the default touch
+// layout, and is not decomposable-accented, so suggestion.kind === "none"
+// and the method chooser is shown directly (see the
+// "no suggestion goes straight to chooser" suite above) — no Deny click
+// needed before reaching the host-key picker.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — custom host-key option", () => {
+  it("selecting 'Enter my own character...' reveals a custom text input", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    const hostKeySelect = screen.getByRole("combobox", { name: /host key for long-press/i });
+    fireEvent.change(hostKeySelect, { target: { value: CUSTOM_KEY_OPTION_VALUE } });
+    expect(
+      screen.getByLabelText(/Custom character for long-press host key/i),
+    ).toBeTruthy();
+  });
+
+  it("a custom literal character resolves to a vkey and Apply records it as slotValues.hostKey", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    const hostKeySelect = screen.getByRole("combobox", { name: /host key for long-press/i });
+    fireEvent.change(hostKeySelect, { target: { value: CUSTOM_KEY_OPTION_VALUE } });
+    fireEvent.change(screen.getByLabelText(/Custom character for long-press host key/i), {
+      target: { value: "b" },
+    });
+    const applyBtn = screen.getByRole("button", { name: /Apply touch method/i });
+    expect((applyBtn as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(applyBtn);
+
+    await waitFor(() => {
+      const draft = useWorkingCopyStore.getState().touchDraft;
+      const entry = draft?.charTouchEntries.find(([c]) => c === "中");
+      expect(entry?.[1]?.mechanisms[0]?.patternId).toBe("longpress_alternates");
+      expect(entry?.[1]?.mechanisms[0]?.slotValues?.["hostKey"]).toBe("K_B");
+    });
+  });
+
+  it("custom U+ notation resolves through to the mapped key", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    const hostKeySelect = screen.getByRole("combobox", { name: /host key for long-press/i });
+    fireEvent.change(hostKeySelect, { target: { value: CUSTOM_KEY_OPTION_VALUE } });
+    fireEvent.change(screen.getByLabelText(/Custom character for long-press host key/i), {
+      target: { value: "U+0062" },
+    });
+    expect(screen.getByText("U+0062 → b → K_B")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /Apply touch method/i }));
+
+    await waitFor(() => {
+      const draft = useWorkingCopyStore.getState().touchDraft;
+      const entry = draft?.charTouchEntries.find(([c]) => c === "中");
+      expect(entry?.[1]?.mechanisms[0]?.slotValues?.["hostKey"]).toBe("K_B");
+    });
+  });
+
+  it("an unmappable custom character shows an error and blocks Apply", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    const hostKeySelect = screen.getByRole("combobox", { name: /host key for long-press/i });
+    fireEvent.change(hostKeySelect, { target: { value: CUSTOM_KEY_OPTION_VALUE } });
+    fireEvent.change(screen.getByLabelText(/Custom character for long-press host key/i), {
+      target: { value: "é" },
+    });
+    expect(
+      screen.getByText(/Cannot map 'é' to a physical key — pick a key from the list instead\./i),
+    ).toBeTruthy();
+    const applyBtn = screen.getByRole("button", { name: /Apply touch method/i });
+    expect((applyBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("invalid U+ notation blocks Apply", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    const hostKeySelect = screen.getByRole("combobox", { name: /host key for long-press/i });
+    fireEvent.change(hostKeySelect, { target: { value: CUSTOM_KEY_OPTION_VALUE } });
+    fireEvent.change(screen.getByLabelText(/Custom character for long-press host key/i), {
+      target: { value: "U+ZZZZ" },
+    });
+    expect(screen.getByText(/Not a valid Unicode value/i)).toBeTruthy();
+    const applyBtn = screen.getByRole("button", { name: /Apply touch method/i });
+    expect((applyBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("the host-key custom-character input carries no placeholder attribute (Fix 1 — guidance moved out of the box)", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    const hostKeySelect = screen.getByRole("combobox", { name: /host key for long-press/i });
+    fireEvent.change(hostKeySelect, { target: { value: CUSTOM_KEY_OPTION_VALUE } });
+    const customInput = screen.getByLabelText(/Custom character for long-press host key/i);
+    expect(customInput.getAttribute("placeholder")).toBeNull();
+  });
+
+  it("shows the shared custom-input help line only once host-key custom mode is active", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    expect(
+      screen.queryByText("Type a character directly, or a Unicode value like U+00E9."),
+    ).toBeNull();
+    const hostKeySelect = screen.getByRole("combobox", { name: /host key for long-press/i });
+    fireEvent.change(hostKeySelect, { target: { value: CUSTOM_KEY_OPTION_VALUE } });
+    expect(
+      screen.getByText("Type a character directly, or a Unicode value like U+00E9."),
+    ).toBeTruthy();
+  });
+
+  it("reflects a literal custom host-key character bidirectionally (char → U+ → vkey)", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    const hostKeySelect = screen.getByRole("combobox", { name: /host key for long-press/i });
+    fireEvent.change(hostKeySelect, { target: { value: CUSTOM_KEY_OPTION_VALUE } });
+    fireEvent.change(screen.getByLabelText(/Custom character for long-press host key/i), {
+      target: { value: "b" },
+    });
+    expect(screen.getByText("b → U+0062 → K_B")).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildTouchMechanismRef — resolved-vkey invariant (P1 QC finding).
+//
+// buildMechanismRef (the component-internal closure) is a thin wrapper over
+// this exported pure function — unit-testing it directly here avoids relying
+// on the disabled Apply button as the sole proof the invariant holds (a
+// disabled button never fires its onClick in jsdom, so driving this through
+// the UI cannot exercise the null-resolvedHostKey branch at all).
+// ---------------------------------------------------------------------------
+
+describe("buildTouchMechanismRef — resolved-vkey invariant", () => {
+  it("returns null when resolvedHostKey is null, for every method", () => {
+    expect(buildTouchMechanismRef("longpress_alternates", null, "", "中")).toBeNull();
+    expect(buildTouchMechanismRef("flick_gestures", null, "n", "中")).toBeNull();
+    expect(buildTouchMechanismRef("multitap", null, "", "中")).toBeNull();
+    expect(buildTouchMechanismRef("touch_key_replace", null, "", "中")).toBeNull();
+  });
+
+  it("builds the expected mechanism ref for each method when resolvedHostKey is a real vkey", () => {
+    expect(buildTouchMechanismRef("longpress_alternates", "K_B", "", "中")).toEqual({
+      patternId: "longpress_alternates",
+      slotValues: { hostKey: "K_B", char: "中" },
+    });
+    expect(buildTouchMechanismRef("flick_gestures", "K_B", "n", "中")).toEqual({
+      patternId: "flick_gestures",
+      slotValues: { hostKey: "K_B", direction: "n", char: "中" },
+    });
+    expect(buildTouchMechanismRef("multitap", "K_B", "", "中")).toEqual({
+      patternId: "multitap",
+      slotValues: { hostKey: "K_B", char: "中" },
+    });
+    expect(buildTouchMechanismRef("touch_key_replace", "K_B", "", "中")).toEqual({
+      patternId: "touch_key_replace",
+      slotValues: { hostKey: "K_B", char: "中" },
+    });
   });
 });

@@ -24,6 +24,7 @@ import {
   type TouchCompleteResult,
 } from "./reducer.ts";
 import type { BaseKeyboard, KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 
 // ---------------------------------------------------------------------------
 // Minimal fixtures (all functions use unknown-shaped data; only the
@@ -99,6 +100,13 @@ describe("R1 — lockDesktop fires at the mechanisms step", () => {
 
 // ---------------------------------------------------------------------------
 // R2 — touch-layout build with Case-A / Case-B + graceful degradation
+//
+// Spec 035 R11 update: the reducer no longer gates the build on "assignments
+// is empty" — that decision (the R11 emission matrix) moved into the injected
+// deps.buildTouchLayoutJson (constructed in StudioShell.tsx, which may import
+// lib/touchEmission.ts; this reducer may not). The reducer's own contract is
+// now: always call the dep when baseIr is present, passing mods/seedSource
+// through unchanged; the dep decides null vs a built json string.
 // ---------------------------------------------------------------------------
 
 describe("R2 — touch-layout build at the touch step", () => {
@@ -106,16 +114,20 @@ describe("R2 — touch-layout build at the touch step", () => {
   const baseIr = makeKeyboardIR();
   const baseVfs = makeVirtualFS();
   const assignments = makeTouchAssignments();
+  const EMPTY_MODS = { removals: [], placements: [] };
 
   beforeEach(() => { deps = makeDepsMock(); });
 
   // --- Case A: base ships no touch layout (resolveBaseTouchJson returns undefined) ---
 
-  it("Case A: calls buildTouchLayoutJson with undefined baseTouchJson when base has no layout", () => {
+  it("Case A: calls buildTouchLayoutJson with baseTouchJson OMITTED when base has no layout", () => {
     (deps.resolveBaseTouchJson as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
     const result: TouchCompleteResult = { assignments, baseIr, baseVfs };
     applyStepCompletion(TOUCH_STEP_ID, result, deps);
-    expect(deps.buildTouchLayoutJson).toHaveBeenCalledWith(baseIr, assignments, undefined);
+    expect(deps.buildTouchLayoutJson).toHaveBeenCalledWith(baseIr, assignments, {
+      mods: EMPTY_MODS,
+      seedSource: null,
+    });
   });
 
   it("Case A: calls setTouchLayoutJson with the built json string", () => {
@@ -133,19 +145,47 @@ describe("R2 — touch-layout build at the touch step", () => {
     (deps.resolveBaseTouchJson as ReturnType<typeof vi.fn>).mockReturnValue(shippedJson);
     const result: TouchCompleteResult = { assignments, baseIr, baseVfs };
     applyStepCompletion(TOUCH_STEP_ID, result, deps);
-    expect(deps.buildTouchLayoutJson).toHaveBeenCalledWith(baseIr, assignments, shippedJson);
+    expect(deps.buildTouchLayoutJson).toHaveBeenCalledWith(baseIr, assignments, {
+      baseTouchJson: shippedJson,
+      mods: EMPTY_MODS,
+      seedSource: null,
+    });
   });
 
-  // --- Empty assignments → clear stored layout ---
+  // --- mods / seedSource pass through unchanged (R11 gating lives in the dep) ---
 
-  it("sets touchLayoutJson to null when assignments array is empty", () => {
+  it("passes mods and seedSource through to the dep unchanged", () => {
+    const mods = { removals: ["x"], placements: [{ char: "y", hostKey: "K_Y" }] };
+    const result: TouchCompleteResult = {
+      assignments,
+      baseIr,
+      baseVfs,
+      mods,
+      seedSource: "reseed-from-desktop",
+    };
+    applyStepCompletion(TOUCH_STEP_ID, result, deps);
+    expect(deps.buildTouchLayoutJson).toHaveBeenCalledWith(baseIr, assignments, {
+      mods,
+      seedSource: "reseed-from-desktop",
+    });
+  });
+
+  // --- Empty assignments no longer short-circuits the reducer itself ---
+
+  it("still calls buildTouchLayoutJson even when assignments is empty (gating moved to the injected dep)", () => {
     const result: TouchCompleteResult = { assignments: [], baseIr, baseVfs };
     applyStepCompletion(TOUCH_STEP_ID, result, deps);
-    expect(deps.setTouchLayoutJson).toHaveBeenCalledWith(null);
-    expect(deps.buildTouchLayoutJson).not.toHaveBeenCalled();
+    expect(deps.buildTouchLayoutJson).toHaveBeenCalledWith(baseIr, [], {
+      mods: EMPTY_MODS,
+      seedSource: null,
+    });
+    // makeDepsMock's default buildTouchLayoutJson mock returns non-null json,
+    // so with empty assignments the reducer still persists whatever the dep
+    // decided (here: the mock's default, non-null, json).
+    expect(deps.setTouchLayoutJson).toHaveBeenCalledWith('{"k":"v"}');
   });
 
-  it("sets touchLayoutJson to null when baseIr is null (no IR available)", () => {
+  it("sets touchLayoutJson to null when baseIr is null — the one gate the reducer still owns", () => {
     const result: TouchCompleteResult = { assignments, baseIr: null, baseVfs };
     applyStepCompletion(TOUCH_STEP_ID, result, deps);
     expect(deps.setTouchLayoutJson).toHaveBeenCalledWith(null);
@@ -240,10 +280,27 @@ describe("R3 — copy/adapt instantiation routing at choose_base", () => {
     expect(deps.instantiateFromExisting).toHaveBeenCalledWith(base, { vfs, ir, removalCapabilities });
   });
 
-  it("Track 2: warns and skips when ir is null (mock engine path)", () => {
+  it("Track 2: skips instantiation when ir is null (mock-engine path only)", () => {
     const result: InstantiateResult = { base, ir: null, vfs: null, track: "adapt" };
     applyStepCompletion(CHOOSE_BASE_STEP_ID, result, deps);
     expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
+  });
+
+  // spec 034 T005 / TI-2: the null-ir adapt path is a mock-only artifact and is
+  // unreachable under the real engine. When it IS hit, the reducer must NOT be
+  // silent — it logs at error level so the stranded-no-working-copy state is
+  // visible, rather than a benign warn that reads as "nothing to do".
+  it("Track 2: surfaces a non-silent error (console.error) when ir is null", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result: InstantiateResult = { base, ir: null, vfs: null, track: "adapt" };
+      applyStepCompletion(CHOOSE_BASE_STEP_ID, result, deps);
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(String(spy.mock.calls[0]?.[0])).toContain("cannot instantiate");
+      expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("Track 1 (null track): calls instantiateFromBaseIfConfirmed, not instantiateFromExisting", () => {
@@ -327,11 +384,15 @@ describe("R6 — behavior parity with pre-refactor inline handlers", () => {
     expect(deps.lockDesktop).toHaveBeenCalledExactlyOnceWith();
   });
 
-  // Pre-refactor handlePhaseEComplete: if assignments.length === 0 or baseIr === null →
-  // setTouchLayoutJson(null); else try { build... setTouchLayoutJson(json) } catch { setTouchLayoutJson(null) }.
-  it("touch step: empty assignments → setTouchLayoutJson(null)", () => {
+  // Spec 035 R11 superseded the old "assignments.length === 0 → null"
+  // short-circuit: the reducer now always calls the injected
+  // buildTouchLayoutJson dep when baseIr is present, and the dep (not this
+  // reducer) decides null vs a built json string via the R11 emission
+  // matrix. The one gate this reducer still owns unconditionally is
+  // baseIr === null.
+  it("touch step: empty assignments with baseIr present still calls the build dep (gating moved to R11)", () => {
     applyStepCompletion(TOUCH_STEP_ID, { assignments: [], baseIr: makeKeyboardIR(), baseVfs: null }, deps);
-    expect(deps.setTouchLayoutJson).toHaveBeenCalledWith(null);
+    expect(deps.buildTouchLayoutJson).toHaveBeenCalled();
   });
 
   it("touch step: null baseIr → setTouchLayoutJson(null)", () => {
@@ -386,5 +447,73 @@ describe("R6 — behavior parity with pre-refactor inline handlers", () => {
     expect(deps2.lockDesktop).toHaveBeenCalledTimes(1);
     // deps1.lockDesktop was not called by the deps2 invocation (no cross-contamination)
     expect(deps1.lockDesktop).not.toBe(deps2.lockDesktop);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 034 T006 (TI-1, TI-2) — integration against the REAL working-copy store
+//
+// The unit tests above inject mock instantiate actions. Here we wire the REAL
+// useWorkingCopyStore actions as the reducer deps and drive a choose_base
+// completion with a genuine (non-null) IR + VFS — i.e. what the real engine
+// delivers for a codec-clean base. Both tracks must land a live, mutable
+// working copy (non-null ir) with the correct instantiationMode, and neither
+// must hit the mock-only null-ir skip path (TI-2).
+// ---------------------------------------------------------------------------
+
+describe("spec 034 T006 — choose_base yields a live working copy via the real store", () => {
+  // A minimal-but-real IR: instantiate seeds axes via detectMarkInputOrderFromImport,
+  // which iterates ir.groups — so `groups` must exist (an empty group list is a
+  // valid codec-clean shape with no mark-order rules).
+  const realIr = { groups: [] } as unknown as KeyboardIR;
+  const realVfs = new Map() as VirtualFS;
+  const base = makeBaseKeyboard("copy_edit_base");
+
+  /** Reducer deps backed by the real store's instantiate actions. */
+  function realStoreDeps(): ReducerDeps {
+    const st = useWorkingCopyStore.getState();
+    return {
+      ...makeDepsMock(),
+      instantiateFromBase: st.instantiateFromBase,
+      instantiateFromExisting: st.instantiateFromExisting,
+      // Mirror the production Track-1 wrapper: only instantiate when the IR/VFS
+      // are present (the real-engine invariant), else report "skipped".
+      instantiateFromBaseIfConfirmed: (b, opts) => {
+        if (opts.ir === null || opts.vfs === null) return false;
+        st.instantiateFromBase(b, {
+          vfs: opts.vfs,
+          ir: opts.ir,
+          ...(opts.removalCapabilities !== undefined ? { removalCapabilities: opts.removalCapabilities } : {}),
+        });
+        return true;
+      },
+    };
+  }
+
+  beforeEach(() => {
+    useWorkingCopyStore.getState().reset();
+  });
+
+  it("TI-1 Track 1 (copy): instantiateFromBase yields a non-null ir + instantiationMode 'new-from-base'", () => {
+    applyStepCompletion(CHOOSE_BASE_STEP_ID, { base, ir: realIr, vfs: realVfs, track: "copy" }, realStoreDeps());
+    const st = useWorkingCopyStore.getState();
+    expect(st.ir).not.toBeNull();
+    expect(st.instantiationMode).toBe("new-from-base");
+    expect(st.isInstantiated()).toBe(true);
+  });
+
+  it("TI-1 Track 2 (adapt): instantiateFromExisting yields a non-null ir + instantiationMode 'adapt-existing'", () => {
+    applyStepCompletion(CHOOSE_BASE_STEP_ID, { base, ir: realIr, vfs: realVfs, track: "adapt" }, realStoreDeps());
+    const st = useWorkingCopyStore.getState();
+    expect(st.ir).not.toBeNull();
+    expect(st.instantiationMode).toBe("adapt-existing");
+    expect(st.isInstantiated()).toBe(true);
+  });
+
+  it("TI-2 Track 2 (adapt) preserves the loaded keyboard's identity (not reset)", () => {
+    applyStepCompletion(CHOOSE_BASE_STEP_ID, { base, ir: realIr, vfs: realVfs, track: "adapt" }, realStoreDeps());
+    const st = useWorkingCopyStore.getState();
+    // Track 2 keeps identity from the loaded keyboard (Track 1 would null it).
+    expect(st.identity?.keyboardId).toBe(base.id);
   });
 });

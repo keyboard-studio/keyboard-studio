@@ -3,7 +3,14 @@
   "specName": "034-mvp-authoring-walk",
   "branch": "034-mvp-authoring-walk",
   "selectedAt": "2026-07-13T16:50:45.385Z",
-  "currentStep": "specify",
-  "status": "draft",
-  "history": []
+  "currentStep": "taskstoissues",
+  "status": "issues-created",
+  "history": [
+    {
+      "step": "taskstoissues",
+      "at": "2026-07-13T21:26:23.000Z",
+      "epicIssue": 1102,
+      "phaseIssues": [1103, 1104, 1105, 1106, 1107, 1108]
+    }
+  ]
 }

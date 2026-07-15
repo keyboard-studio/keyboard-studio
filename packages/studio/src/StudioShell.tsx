@@ -14,9 +14,17 @@ import { useResizablePanes } from "./hooks/useResizablePanes.ts";
 import { ResizeHandle } from "./components/ResizeHandle.tsx";
 import type { BaseKeyboard, Pattern } from "@keyboard-studio/contracts";
 import { buildTouchLayoutJson } from "./lib/buildTouchLayoutJson.ts";
+import { shouldEmitTouchLayout, resolveTouchSeedSource } from "./lib/touchEmission.ts";
 import { useWorkingCopyStore, bindManifest } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
 import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
+import {
+  deriveProjectKeyFromWorkingCopy,
+  discardActiveDraft,
+  installDraftAutosave,
+  replaceActiveDraftIfDifferentProject,
+  wasDraftRestoredThisBoot,
+} from "./lib/draftPersistence.ts";
 import { type RouteId } from "./lib/navigate.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
@@ -36,7 +44,7 @@ import { OutputScreen } from "./components/OutputScreen.tsx";
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
 import { AccountControl } from "./components/AccountControl.tsx";
-import { manifest } from "./steps/manifest.ts";
+import { manifest, validateManifestShape } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { StepHost } from "./components/StepHost.tsx";
 import { TEXT_MAIN, FONT } from "./survey/surveyStyles.ts";
@@ -196,86 +204,10 @@ const SURVEY_LEFT_INIT_PCT = 45;
 // owner). See stores/surveySessionStore.ts (research D-R1).
 // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// validateManifestShape — throw-on-mismatch structural guard (M2, M3, M4).
-// Called once at module load; a misshapen manifest is a hard error, not a
-// logged warning — fail fast so CI catches it before any render occurs.
-// ---------------------------------------------------------------------------
-
-function validateManifestShape(): void {
-  const ids = manifest.map((s) => s.id);
-  const spineIds = manifest.filter((s) => s.spine !== false).map((s) => s.id);
-
-  // M2 — spine order.
-  const expectedSpine = [
-    "identity", "choose_base", "track", "characters",
-    "carve", "mechanisms", "touch", "help", "package",
-  ];
-  for (let i = 0; i < expectedSpine.length; i++) {
-    const expected = expectedSpine[i];
-    if (expected === undefined) break;
-    const actual = spineIds[i];
-    if (actual !== expected) {
-      throw new Error(
-        `[SurveyView] manifest spine[${i}] expected "${expected}", got "${actual ?? "(none)"}"`,
-      );
-    }
-  }
-
-  // M3 — exactly one lock:physical and one lock:touch, in that order.
-  const locks = manifest.filter((s) => s.lock !== undefined).map((s) => s.lock);
-  if (locks[0] !== "physical" || locks[1] !== "touch" || locks.length !== 2) {
-    throw new Error(
-      `[SurveyView] manifest locks expected ["physical","touch"], got [${locks.join(",")}]`,
-    );
-  }
-
-  // M4 — touch_seed_source is spine:false with joinTarget "touch".
-  const seedSource = manifest.find((s) => s.id === "touch_seed_source");
-  if (seedSource === undefined || seedSource.spine !== false || seedSource.joinTarget !== "touch") {
-    throw new Error(`[SurveyView] manifest touch_seed_source missing or misconfigured`);
-  }
-
-  // M4b — project_name is spine:false with joinTarget "characters".
-  const projName = manifest.find((s) => s.id === "project_name");
-  if (projName === undefined || projName.spine !== false || projName.joinTarget !== "characters") {
-    throw new Error(`[SurveyView] manifest project_name missing or misconfigured (must be spine:false, joinTarget:"characters")`);
-  }
-
-  // M5 — unique ids.
-  const seen = new Set<string>();
-  for (const id of ids) {
-    if (seen.has(id)) {
-      throw new Error(`[SurveyView] manifest duplicate step id: "${id}"`);
-    }
-    seen.add(id);
-  }
-
-  // Layout guard (spec 028 Stage 5, T016): layout:"full" is now LOAD-BEARING —
-  // StepHost reads step.layout to select full-screen vs two-pane chrome (R4).
-  // EXACTLY {carve, mechanisms, touch} must declare layout:"full"; all others
-  // must be "pane" or omit layout. This assertion is retained (not removed) as
-  // a correctness gate: a mismatched layout would silently change the chrome.
-  const FULL_LAYOUT_IDS = new Set(["carve", "mechanisms", "touch"]);
-  for (const step of manifest) {
-    if (step.layout === "full") {
-      if (!FULL_LAYOUT_IDS.has(step.id)) {
-        throw new Error(
-          `[SurveyView] unexpected layout:"full" on step "${step.id}" — only carve/mechanisms/touch may be full-screen (spec 024 Stage 0)`,
-        );
-      }
-    }
-  }
-  for (const expectedId of FULL_LAYOUT_IDS) {
-    const step = manifest.find((s) => s.id === expectedId);
-    if (step?.layout !== "full") {
-      throw new Error(
-        `[SurveyView] step "${expectedId}" must declare layout:"full" (spec 024 Stage 0)`,
-      );
-    }
-  }
-}
-
+// validateManifestShape (M2/M3/M4/M4b/M5 structural guard) now lives in
+// steps/manifest.ts (exported, unit-tested by spec 034 T003). Still invoked
+// once here at module load so a misshapen manifest is a hard error before any
+// render — fail fast so CI catches it.
 validateManifestShape();
 
 // manifestIndexOf and nextSpineStepAfter have moved to steps/advance.ts
@@ -304,6 +236,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Store actions needed by SurveyView (not delegated to StepHost).
   const sessionReset = useSurveySessionStore((s) => s.reset);
   const setLocalBase = useSurveySessionStore((s) => s.setLocalBase);
+  // Injected into reducerDeps (spec 035 R12) so reducer.ts can clear the
+  // touch_seed_source fork choice on a genuine base re-instantiation without
+  // steps/ importing stores/ directly.
+  const setTouchSeedSource = useSurveySessionStore((s) => s.setTouchSeedSource);
 
   // Derive whether the active step declares layout:"full" (load-bearing per Stage 5,
   // FR-002, R4). SurveyView uses this to skip the two-pane shell for full-screen steps.
@@ -318,8 +254,19 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Without this reset the singleton would resume from stale prior state rather
   // than starting at "identity". Component-local useState used to give this
   // mount-fresh reset for free; this call restores that invariant for the store.
+  //
+  // DEVIATION 2 (spec 034 US3, research D4): a durable draft may have just been
+  // restored in main.tsx (BEFORE this component — or any component — mounted),
+  // patching both the working-copy AND survey-session stores so the author
+  // resumes at their last `activeStepId`. An unconditional reset() here would
+  // immediately clobber that restore. `wasDraftRestoredThisBoot()` reads the
+  // module-level flag draftPersistence.loadDraft() sets on success; it is
+  // stable across StrictMode's double-invoked mount effects because
+  // loadDraft() itself only ever runs once, pre-mount, in main.tsx.
   useEffect(() => {
-    useSurveySessionStore.getState().reset();
+    if (!wasDraftRestoredThisBoot()) {
+      useSurveySessionStore.getState().reset();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally empty: runs exactly once on mount
   }, []);
 
@@ -356,6 +303,21 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const instantiatedRef = useRef<boolean>(false);
 
   // ---------------------------------------------------------------------------
+  // T023 (spec 034 US3): teardown fn for the durable-draft autosave, installed
+  // once the working copy is instantiated (see onInstantiate below) and torn
+  // down on unmount / start-over / a fresh re-instantiation for a new project.
+  // ---------------------------------------------------------------------------
+  const autosaveTeardownRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      autosaveTeardownRef.current?.();
+      autosaveTeardownRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- teardown-on-unmount only; the ref itself is stable
+  }, []);
+
+  // ---------------------------------------------------------------------------
   // ReducerDeps — injected into applyStepCompletion (steps/reducer.ts).
   // All store actions and lib helpers are injected here; the reducer itself has
   // no static imports from stores/ or lib/ (boundary compliance).
@@ -371,8 +333,30 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       setTouchLayoutJson,
       instantiateFromBase,
       instantiateFromExisting,
-      buildTouchLayoutJson: (baseIrArg, assignments, baseTouchJson) =>
-        buildTouchLayoutJson(baseIrArg, assignments, baseTouchJson),
+      setTouchSeedSource,
+      // Spec 035 R11: this wrapper is the ONE call site (of the two — the
+      // other is TouchGallery's preview/lint memos) that applies the
+      // emission matrix for the output path. It resolves the Entity-5
+      // default seed source, decides whether to emit at all, and only then
+      // calls the real buildTouchLayoutJson — so reducer.ts (steps/, which
+      // may not import lib/) stays a thin pass-through.
+      buildTouchLayoutJson: (baseIrArg, assignments, opts) => {
+        const seedSource = resolveTouchSeedSource(opts.seedSource, opts.baseTouchJson !== undefined);
+        const hasRealEdits = assignments.length > 0;
+        if (!shouldEmitTouchLayout(seedSource, opts.mods, hasRealEdits)) {
+          return { json: null, warnings: [] };
+        }
+        return buildTouchLayoutJson(baseIrArg, assignments, {
+          // Reseed discards the shipped layout (R10) — never pass baseTouchJson
+          // through on that path, even though buildTouchLayoutJson's own Case A
+          // branch condition would ignore it anyway.
+          ...(seedSource !== "reseed-from-desktop" && opts.baseTouchJson !== undefined
+            ? { baseTouchJson: opts.baseTouchJson }
+            : {}),
+          mods: opts.mods,
+          seedSource,
+        });
+      },
       resolveBaseTouchJson: (vfs) => resolveBaseTouchJson(vfs),
       instantiateFromBaseIfConfirmed: (base, opts) =>
         instantiateFromBaseIfConfirmed(base, opts),
@@ -390,7 +374,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     // Wrapper lambdas delegate to stable module imports — excluded from deps intentionally.
-    [lockDesktop, clearStale, setTouchLayoutJson, instantiateFromBase, instantiateFromExisting],
+    [lockDesktop, clearStale, setTouchLayoutJson, instantiateFromBase, instantiateFromExisting, setTouchSeedSource],
   );
 
   // Keep reducerDepsRef current so the async onInstantiate callback always
@@ -415,6 +399,17 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     if (instantiatedRef.current) return;
     instantiatedRef.current = true;
 
+    // T025 (spec 034 US3, VR-5 / FR-009 / AS-4): a durable draft from a
+    // DIFFERENT project may already be active (e.g. the author abandoned an
+    // earlier in-progress keyboard without "start over" and picked a new
+    // base). This is the instantiation entry point, so it is where a genuine
+    // project switch first becomes visible — replace the prior project's
+    // draft now, BEFORE this instantiation's own autosave (below) starts
+    // writing under the new key. MVP policy: clean replace, never silent
+    // merge (a confirm-before-overwrite UX is the non-MVP alternative the
+    // contract also permits, deferred).
+    replaceActiveDraftIfDifferentProject(base.id);
+
     // Reads via getState() escape hatch (not a selector) to avoid a stale closure — the callback is memoised with empty deps.
     const track = useSurveySessionStore.getState().selectedTrack;
     applyStepCompletion(
@@ -422,6 +417,20 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       { base, vfs, ir, removalCapabilities, track: track ?? null },
       reducerDepsRef.current,
     );
+
+    // T023: install the durable-draft autosave now that the working copy is
+    // instantiated. `deriveProjectKeyFromWorkingCopy` reads the JUST-WRITTEN
+    // store state via getState() (identity.keyboardId falls back to
+    // baseKeyboard.id — see draftPersistence.ts) so this resolves immediately
+    // for both tracks, even before Track 1's Phase A sets a custom keyboardId.
+    // `instantiatedRef` above already guards this whole callback body to run
+    // at most once per mount, so `autosaveTeardownRef.current` is always null
+    // here; the `?.()` is defensive, not load-bearing.
+    const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
+    if (projectKey !== null) {
+      autosaveTeardownRef.current?.();
+      autosaveTeardownRef.current = installDraftAutosave(projectKey);
+    }
   }, []);
 
   // Pattern map for the working-copy transform — needed from Phase F onwards so
@@ -481,6 +490,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // guard is clear before any re-instantiation can fire (research D-R5).
   // ---------------------------------------------------------------------------
   function handleStartOver() {
+    // T024 (spec 034 US3, research D5, G-3): clear the durable draft (and the
+    // active-project pointer) BEFORE resetting the in-memory stores, so the
+    // NEXT boot does not immediately re-rehydrate the just-abandoned session.
+    discardActiveDraft();
+    autosaveTeardownRef.current?.();
+    autosaveTeardownRef.current = null;
+
     sessionReset();
     resetSurvey();
     instantiatedRef.current = false;

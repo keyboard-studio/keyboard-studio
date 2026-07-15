@@ -81,6 +81,15 @@
     "navigateTo": []
   },
   {
+    "stepId": "touch_seed_source",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "navigateTo": []
+  },
+  {
     "stepId": "touch",
     "applyStepCompletion": [
       "touch"

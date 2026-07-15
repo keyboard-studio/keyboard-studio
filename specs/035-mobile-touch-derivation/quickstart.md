@@ -16,6 +16,7 @@ than restating implementation.
 ```bash
 # Engine: replay + coverage pure functions
 pnpm --filter @keyboard-studio/engine test src/pattern-apply/applyDesktopModifications.test.ts
+pnpm --filter @keyboard-studio/engine test src/pattern-apply/applyDesktopModificationsToRawJson.test.ts
 pnpm --filter @keyboard-studio/engine test src/pattern-apply/touchCoverage.test.ts
 # Engine: projection still emits the compact phone platform + replay in both cases
 pnpm --filter @keyboard-studio/engine test src/scaffolder/scaffoldTouchLayout.test.ts
@@ -49,7 +50,8 @@ inventory chars and empty when all reachable; `advance("mechanisms", …)` → `
 1. Start authoring from the base that ships **no** touch layout. Carve + place as in A.
 2. At **Touch Seed Source**: the default is **Reseed from desktop** (no base layout to import);
    confirm. *(Also verify US2-AS4: on the Scenario-A base, explicitly choosing Reseed discards
-   the base layout and uses the desktop projection.)*
+   the base layout — including any shipped tablet/desktop platforms, which the chooser warns
+   about — and uses the desktop projection.)*
 3. Finish the Touch gallery; emit; open the touch layout file.
 
 **Expected outcome (SC-002)**:
@@ -62,10 +64,11 @@ inventory chars and empty when all reachable; `advance("mechanisms", …)` → `
 1. In either scenario, carve a character that is the **sole realization** of an inventory
    letter (or contrive a placement whose host key was removed).
 
-**Expected outcome**: the Touch gallery lint summary shows a **check 18.6** error naming the
-uncovered char (`U+XXXX <char> has no touch mechanism`); it clears once the char is made
-reachable (e.g. via a longpress in the gallery). `touchCoverage(finalLayout, inventory)
-.uncovered` is empty before the stage is considered complete.
+**Expected outcome**: the Touch gallery lint summary shows a **`KM_LINT_TOUCH_UNCOVERED`**
+(criterion 18.6) warning naming the uncovered char (`U+XXXX <char> has no touch mechanism`);
+it clears once the char is made reachable (e.g. via a longpress in the gallery). Attempting
+to complete the touch stage while a char is uncovered is refused;
+`touchCoverage(finalLayout, inventory).uncovered` is empty before the stage completes.
 
 ## E2E (CI parity)
 
@@ -75,6 +78,8 @@ cd packages/studio && npx playwright test   # US1 + US2 touch-derivation walks
 
 **Expected**: both story specs pass, each asserting emitted-layout content (removals absent,
 placements present, not QWERTY) and a clean compile. See [research.md](research.md) R8.
+*(Local caveat: the Playwright CLI is unavailable on the primary dev machine — these specs
+are CI-first; verify locally via Node probes / headless-Chromium CDP.)*
 
 ## Constitution spot-checks
 
