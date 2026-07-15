@@ -1,0 +1,12 @@
+{
+  "_comment": "Pinned Unicode Character Database (UCD) files consumed by utilities/facet-index/ucd/codegen-ucd.mjs. Each file is SHA-256-verified against this pin before codegen runs.",
+  "unicodeVersion": "17.0.0",
+  "files": [
+    { "path": "lib/ucd/Scripts.txt", "sha256": "PLACEHOLDER" },
+    { "path": "lib/ucd/ScriptExtensions.txt", "sha256": "PLACEHOLDER" },
+    { "path": "lib/ucd/PropertyValueAliases.txt", "sha256": "PLACEHOLDER" },
+    { "path": "lib/ucd/Blocks.txt", "sha256": "PLACEHOLDER" }
+  ],
+  "license": "Unicode-DFS-2016 (Unicode, Inc. License Agreement)",
+  "notice": "Copyright (c) 1991-2025 Unicode, Inc. Used under the terms of the Unicode License v3 (https://www.unicode.org/license.txt)."
+}
