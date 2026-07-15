@@ -71,13 +71,13 @@ describe("buildIndex — dedicated fixture corpus (release/fixture/*)", () => {
     outPath: scratchOutPath("fixture"),
   });
 
-  it("produces exactly the 3 fixture keyboards", () => {
-    expect(Object.keys(index.keyboards).sort()).toEqual(["fx_arabic", "fx_broken", "fx_latin"]);
+  it("produces exactly the 4 fixture keyboards", () => {
+    expect(Object.keys(index.keyboards).sort()).toEqual(["fx_arabic", "fx_broken", "fx_latin", "fx_rootlayout"]);
   });
 
   it("every keyboard has a facets.script record (SC-001, X3)", () => {
     assertFullCoverage(index);
-    for (const id of ["fx_arabic", "fx_latin", "fx_broken"]) {
+    for (const id of ["fx_arabic", "fx_latin", "fx_broken", "fx_rootlayout"]) {
       expect(index.keyboards[id]?.facets.script, `${id} has no script record`).toBeDefined();
     }
   });
@@ -95,6 +95,18 @@ describe("buildIndex — dedicated fixture corpus (release/fixture/*)", () => {
 
   it("fx_latin classifies content-derived, dominant Latn", () => {
     const script = index.keyboards.fx_latin!.facets.script!;
+    expect(script.value).toBe("Latn");
+    expect(script.provenanceTier).toBe("content-derived");
+    expect(script.analysisOutcome).toBe("fully");
+  });
+
+  it("fx_rootlayout (.kps at the <id> folder root, no source/ segment) is discovered, not silently dropped", () => {
+    // docs/keyboard-index.md notes a few real corpus keyboards keep the .kps
+    // at the folder root; KPS_SCOPE_RE_ROOT covers that layout alongside the
+    // usual source/ layout so this keyboard isn't silently missing from the
+    // index (X3/SC-001 — a missing record is a loud build failure, never a
+    // silent gap).
+    const script = index.keyboards.fx_rootlayout!.facets.script!;
     expect(script.value).toBe("Latn");
     expect(script.provenanceTier).toBe("content-derived");
     expect(script.analysisOutcome).toBe("fully");

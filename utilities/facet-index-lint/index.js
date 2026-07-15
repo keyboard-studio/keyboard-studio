@@ -48,6 +48,10 @@ const CLOSED_SET_TYPES = ["enum", "set", "histogram"];
 const VALUE_TYPES = ["enum", "set", "scalar", "histogram"];
 const ARCHETYPES = ["character-content", "rule-structure", "declared-metadata"];
 const ID_RE = /^[a-z][a-z0-9-]*$/;
+// Mirrors the exported UNDETERMINED sentinel in utilities/facet-index/fallback.ts —
+// this plain-node checker has no build step so it can't import that TS module
+// directly; keep this string in sync with fallback.ts if it ever changes.
+const UNDETERMINED = "undetermined";
 
 const rel = (abs) => path.relative(REPO_ROOT, abs).replace(/\\/g, "/");
 
@@ -314,7 +318,7 @@ function main() {
       // Tally for X5 (mirror build-index bumpTierCounts).
       const t = tierTally[facetId];
       if (t) {
-        if (cat.value === "undetermined") t.undetermined += 1;
+        if (cat.value === UNDETERMINED) t.undetermined += 1;
         else if (cat.provenanceTier === "content-derived") t.content += 1;
         else if (cat.provenanceTier === "declared-metadata") t.declared += 1;
         else t.fallback += 1;

@@ -8,11 +8,18 @@
  *
  * SCOPE NOTE. base-browser.ts matches `release/<vendor>/<id>/<id>.kps` against
  * the GitHub *recursive-tree* API. The on-disk `../keyboards` checkout nests the
- * package under `source/`, so the concrete artifacts are
+ * package under `source/`, so the concrete artifacts are usually
  * `release/<vendor>/<id>/source/<id>.{kps,kmn}`. `KPS_SCOPE_RE` below is the
  * local-checkout analogue of that regex — same intent (one keyboard per `<id>`
  * directory, id = directory name), adapted to the `source/` layout. This is a
  * deliberate difference from base-browser's tree-scoped pattern, not a bug.
+ *
+ * A few keyboards in the corpus keep the `.kps` at the `<id>` folder root with
+ * no `source/` segment (docs/keyboard-index.md's phonebook recipe notes this
+ * explicitly). `KPS_SCOPE_RE_ROOT` covers that layout too — matching only the
+ * `source/` form would silently drop those keyboards from the index, which
+ * this tool's own invariant forbids (a missing record must be a loud build
+ * failure, never a silent gap: X3/SC-001).
  *
  * Modelled on utilities/supportability-scanner/scan.ts: a standalone tsx tool
  * that imports engine SOURCE directly (parseKmnHeaderStores) and walks the
@@ -39,6 +46,14 @@ export const DEFAULT_CORPUS_ROOT = resolve(REPO_ROOT, "..", "keyboards");
  * tree-scoped regex, plus the on-disk `source/` segment).
  */
 export const KPS_SCOPE_RE = /^release\/[^/]+\/([^/]+)\/source\/\1\.kps$/;
+
+/** Folder-root layout: `release/<vendor>/<id>/<id>.kps` (no `source/` segment). */
+export const KPS_SCOPE_RE_ROOT = /^release\/[^/]+\/([^/]+)\/\1\.kps$/;
+
+/** Matches either scoped layout, returning the captured `<id>` or null. */
+function matchKpsScope(relPath: string): string | null {
+  return KPS_SCOPE_RE.exec(relPath)?.[1] ?? KPS_SCOPE_RE_ROOT.exec(relPath)?.[1] ?? null;
+}
 
 /** Normalize Windows path separators to forward slashes for stable ids. */
 function toPosix(p: string): string {
@@ -105,7 +120,7 @@ function findScopedKps(corpusRoot: string): string[] {
         walk(full);
       } else if (e.isFile() && e.name.toLowerCase().endsWith(".kps")) {
         const relPath = toPosix(relative(corpusRoot, full));
-        if (KPS_SCOPE_RE.test(relPath)) out.push(relPath);
+        if (matchKpsScope(relPath) !== null) out.push(relPath);
       }
     }
   };
@@ -194,8 +209,7 @@ export function scanCorpus(opts: ScanOptions = {}): ScanResult {
   if (opts.limit != null) kpsPaths = kpsPaths.slice(0, opts.limit);
 
   const keyboards: ScannedKeyboard[] = kpsPaths.map((kpsPath) => {
-    const match = KPS_SCOPE_RE.exec(kpsPath);
-    const id = match?.[1] ?? basename(kpsPath, ".kps");
+    const id = matchKpsScope(kpsPath) ?? basename(kpsPath, ".kps");
 
     // Primary .kmn is the sibling source/<id>.kmn (may be absent for LDML/model keyboards).
     const kmnRel = toPosix(join(dirname(kpsPath), `${id}.kmn`));

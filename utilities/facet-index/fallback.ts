@@ -31,7 +31,8 @@ export interface DeclaredMetadata {
   declaredScript?: string | null;
 }
 
-const UNDETERMINED = "undetermined";
+/** The reserved sentinel value emitted at tier 3 (no eligible signal at all). */
+export const UNDETERMINED = "undetermined";
 
 function bareLanguageSubtag(tag: string): string {
   return (tag.split("-")[0] ?? tag).toLowerCase();

@@ -1,5 +1,5 @@
 store(&VERSION) '10.0'
-store(&NAME) 'Fixture Latin'
+store(&NAME) 'Fixture Root Layout'
 store(&TARGETS) 'any'
 store(&COPYRIGHT) '(c) 2026 Fixture'
 store(&KEYBOARDVERSION) '1.0'

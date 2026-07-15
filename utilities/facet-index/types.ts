@@ -68,7 +68,7 @@ export interface FacetDefinition {
   derivation: FacetDerivation;
   /** `content/facets/` ids whose `corpus:` derivation this feeds (FR-009). */
   feedsSessionFacets: string[];
-  /** Facet-specific extra dimensions (opaque to the index shell). */
+  /** Facet-specific extra dimensions (opaque to the index shell). (037) reserved — no classifier populates `Categorization.subProfile` from this yet. */
   subProfiles?: Record<string, unknown>;
   /** Bump forces recompute of this facet's records. */
   schemaVersion: number;

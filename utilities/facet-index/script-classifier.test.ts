@@ -31,6 +31,8 @@ store(&TARGETS) 'any'
 store(&COPYRIGHT) '(c) 2026 Test'
 store(&KEYBOARDVERSION) '1.0'
 
+begin Unicode > use(main)
+
 group(main) using keys
 
 + [K_A] > U+0627
@@ -52,6 +54,8 @@ store(&NAME) 'Test Neutral'
 store(&TARGETS) 'any'
 store(&COPYRIGHT) '(c) 2026 Test'
 store(&KEYBOARDVERSION) '1.0'
+
+begin Unicode > use(main)
 
 group(main) using keys
 
@@ -77,6 +81,8 @@ store(&NAME) 'Test Latin Plus Shared Mark'
 store(&TARGETS) 'any'
 store(&COPYRIGHT) '(c) 2026 Test'
 store(&KEYBOARDVERSION) '1.0'
+
+begin Unicode > use(main)
 
 group(main) using keys
 
@@ -162,5 +168,16 @@ describe("deriveScriptFallback (the unparseable-keyboard / no-content-analysis p
     const result = deriveScriptFallback(meta, SCRIPT_FACET_DEF);
     expect(result.provenanceTier).not.toBe("content-derived");
     expect(result.analysisOutcome).toBe("fallback-only");
+  });
+
+  it("out-of-limits declared script (e.g. a pseudo-code) falls through to the next tier rather than being emitted", () => {
+    // "Zzzz" is not in SCRIPT_FACET_DEF.limits.values, so tier 1 must reject it
+    // and fall through to tier 2, which resolves "ar"'s langtags default script.
+    const meta: DeclaredMetadata = { bcp47Tags: ["ar"], declaredScript: "Zzzz" };
+    const result = deriveScriptFallback(meta, SCRIPT_FACET_DEF);
+
+    expect(result.provenanceTier).toBe("default-fallback");
+    expect(result.provenanceTier).not.toBe("declared-metadata");
+    expect(result.value).toBe("Arab");
   });
 });

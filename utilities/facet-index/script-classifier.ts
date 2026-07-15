@@ -28,6 +28,13 @@
  *
  * Internal weighting/thresholds here are an MVP that proves the artifact
  * shape (spec 036 scope note); finer apportionment tuning is spec 037's job.
+ *
+ * Not wired here: `script.yaml`'s `subProfiles.latin` and the generated
+ * `latinProfileOf()` lookup (ucd/generated/scriptLookup.ts) exist so a future
+ * facet can classify Latin sub-profile (plain/extended/ipa), but this
+ * classifier never populates `Categorization.subProfile` — reserved for spec
+ * 037, not a gap in 036's scope (only the `script` facet's dominant-value +
+ * distribution ships here).
  */
 
 import { buildProducedSet } from "@keyboard-studio/contracts";

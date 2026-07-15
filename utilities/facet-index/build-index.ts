@@ -34,7 +34,7 @@ import {
 import { writeStable, writeTextIfChanged } from "./writeStable.js";
 import { renderCompanionMd } from "./companion.js";
 import { classifyScript } from "./script-classifier.js";
-import { deriveScriptFallback } from "./fallback.js";
+import { deriveScriptFallback, UNDETERMINED } from "./fallback.js";
 import type {
   Categorization,
   FacetDefinition,
@@ -214,7 +214,7 @@ function emptyTierCounts(): FacetTierCounts {
 }
 
 function bumpTierCounts(counts: FacetTierCounts, categorization: Categorization): void {
-  if (categorization.value === "undetermined") {
+  if (categorization.value === UNDETERMINED) {
     counts.undetermined += 1;
   } else if (categorization.provenanceTier === "content-derived") {
     counts.content += 1;
