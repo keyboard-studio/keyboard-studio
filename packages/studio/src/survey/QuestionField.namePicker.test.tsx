@@ -11,7 +11,7 @@
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup, waitFor, fireEvent, screen } from "@testing-library/react";
-import type { LanguageSummary } from "@keyboard-studio/contracts";
+import type { LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
 
 // Two distinct languages sharing the English name "Ainu" (ain / aib) — the
 // canonical homonym case — plus an unambiguous one.
@@ -53,6 +53,10 @@ let searchImpl: (q: string) => LanguageSummary[] = (q) =>
       l.code.toLowerCase().includes(q.toLowerCase()),
   );
 let listImpl: () => LanguageSummary[] = () => ALL;
+// Alternate English names live on LanguageDefaults, not the summary row, so the
+// alt-name resolution path (spec 030) reads them through getLanguageDefaults.
+// Default: no defaults (matches the pre-alt-name behavior); overridden per test.
+let defaultsImpl: (code: string) => LanguageDefaults | null = () => null;
 
 vi.mock("../lib/langtagsDefaults.ts", async (importOriginal) => {
   const original = await importOriginal<typeof import("../lib/langtagsDefaults.ts")>();
@@ -60,7 +64,7 @@ vi.mock("../lib/langtagsDefaults.ts", async (importOriginal) => {
     ...original,
     loadLangtags: () =>
       Promise.resolve({
-        getLanguageDefaults: () => null,
+        getLanguageDefaults: (code: string) => defaultsImpl(code),
         listLanguages: () => listImpl(),
         lookupByName: (q: string) => searchImpl(q),
       }),
@@ -86,6 +90,7 @@ afterEach(() => {
         l.code.toLowerCase().includes(q.toLowerCase()),
     );
   listImpl = () => ALL;
+  defaultsImpl = () => null;
 });
 
 async function renderPicker() {
@@ -161,6 +166,35 @@ describe("LangtagsNamePickerField (spec 030 US1)", () => {
     const { input, onEntryResolved } = await renderPicker();
     fireEvent.change(input, { target: { value: "Ainu" } });
     // Two exact "Ainu" matches → ambiguous → null until the author picks one.
+    await waitFor(() => expect(onEntryResolved).toHaveBeenLastCalledWith(null));
+  });
+
+  it("typing an alternate English name resolves the entry (spec 030 alt-name)", async () => {
+    // Ghotuo (aaa) is resolvable only by its alias "Otuo" — the primary name is
+    // "Ghotuo". lookupByName surfaces it; resolveTyped matches the alias via
+    // getLanguageDefaults(code).englishNames.
+    const GHOTUO: LanguageSummary = { code: "aaa", englishName: "Ghotuo" };
+    searchImpl = () => [GHOTUO];
+    defaultsImpl = (code) =>
+      code === "aaa" ? ({ code: "aaa", englishNames: ["Ghotuo", "Otuo"] } as LanguageDefaults) : null;
+    const { input, onEntryResolved } = await renderPicker();
+    fireEvent.change(input, { target: { value: "Otuo" } });
+    await waitFor(() => expect(onEntryResolved).toHaveBeenLastCalledWith(GHOTUO));
+  });
+
+  it("an alternate name shared by two entries stays ambiguous (null until pick)", async () => {
+    // Both entries list "Shared" among their alternate names → >1 match → null.
+    const ALPHA: LanguageSummary = { code: "xxa", englishName: "Alpha" };
+    const BETA: LanguageSummary = { code: "xxb", englishName: "Beta" };
+    searchImpl = () => [ALPHA, BETA];
+    defaultsImpl = (code) =>
+      code === "xxa"
+        ? ({ code, englishNames: ["Alpha", "Shared"] } as LanguageDefaults)
+        : code === "xxb"
+          ? ({ code, englishNames: ["Beta", "Shared"] } as LanguageDefaults)
+          : null;
+    const { input, onEntryResolved } = await renderPicker();
+    fireEvent.change(input, { target: { value: "Shared" } });
     await waitFor(() => expect(onEntryResolved).toHaveBeenLastCalledWith(null));
   });
 

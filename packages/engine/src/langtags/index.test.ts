@@ -107,6 +107,15 @@ describe("lookupByName", () => {
   it("C9 — empty query returns []", () => {
     expect(lookupByName("")).toStrictEqual([]);
   });
+
+  it("C11 — an alternate English name surfaces the entry (spec 030 alt-name resolution)", () => {
+    // ab (Abkhaz) carries the alternate name "Abkhazian" (pinned 99b856b); the
+    // primary englishName is "Abkhaz", so this can only match via englishNames[].
+    const results = lookupByName("Abkhazian");
+    expect(results.map((r) => r.code)).toContain("ab");
+    // Prefix of the alternate also surfaces it (English-prefix tier).
+    expect(lookupByName("Abkhazi").map((r) => r.code)).toContain("ab");
+  });
 });
 
 // ---------------------------------------------------------------------------

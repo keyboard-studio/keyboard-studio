@@ -39,14 +39,15 @@ export function listLanguages(): readonly LanguageSummary[] {
 }
 
 /**
- * Search languages by code, English name, or autonym (case-insensitive
+ * Search languages by code, English name (including langtags alternate English
+ * names — e.g. "Otuo" resolves Ghotuo), or autonym (case-insensitive
  * substring / prefix matching).
  *
  * Ordering:
  *   1. Exact code match
- *   2. English name prefix match
+ *   2. English name prefix match (primary or any alternate English name)
  *   3. Autonym prefix match
- *   4. Substring match (code, English name, or autonym)
+ *   4. Substring match (code, English name / alternate name, or autonym)
  *
  * Ties within a tier are broken alphabetically by `englishName`.
  *
@@ -75,11 +76,20 @@ export function lookupByName(query: string): readonly LanguageSummary[] {
       continue;
     }
 
-    const engPre = english.startsWith(q);
+    // Alternate English names (langtags aliases) live on LanguageDefaults, not
+    // the summary row; fold them into the English tiers so an alias resolves
+    // like the canonical name. englishNames[0] duplicates englishName, so this
+    // only adds the non-primary aliases. O(1) index lookup per row.
+    const altNames = getLanguageDefaults(lang.code)?.englishNames ?? [];
+    const altPre = altNames.some((n) => n.toLowerCase().startsWith(q));
+    const altSub = altNames.some((n) => n.toLowerCase().includes(q));
+
+    const engPre = english.startsWith(q) || altPre;
     const autPre = autonym.length > 0 && autonym.startsWith(q);
     const sub =
       code.includes(q) ||
       english.includes(q) ||
+      altSub ||
       (autonym.length > 0 && autonym.includes(q));
 
     if (engPre) {

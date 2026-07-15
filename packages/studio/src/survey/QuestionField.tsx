@@ -335,9 +335,19 @@ function LangtagsComboboxField({
       onResolved(null);
       return;
     }
-    const exact = results.filter(
-      (r) => (r.englishName ?? "").normalize("NFC").toLowerCase() === trimmed,
-    );
+    // Match the primary English name OR any alternate English name (langtags
+    // aliases, e.g. "Otuo" → Ghotuo) so a resolvable alias seeds downstream
+    // fields, not just the canonical name. Alternate names live on
+    // LanguageDefaults (getLanguageDefaults), not the LanguageSummary row, so
+    // read them through the loaded module. Ambiguous aliases (shared by >1
+    // entry) still resolve to null, same as ambiguous primary names.
+    const mod = modRef.current;
+    const matchesTyped = (r: LanguageSummary): boolean => {
+      if ((r.englishName ?? "").normalize("NFC").toLowerCase() === trimmed) return true;
+      const altNames = mod?.getLanguageDefaults(r.code)?.englishNames;
+      return altNames?.some((n) => n.normalize("NFC").toLowerCase() === trimmed) ?? false;
+    };
+    const exact = results.filter(matchesTyped);
     onResolved(exact.length === 1 ? exact[0]! : null);
   }
 
