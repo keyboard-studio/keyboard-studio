@@ -21,7 +21,7 @@
 // hygiene layer, spec §10).
 
 import type { LintFinding, TouchLayoutIR } from "@keyboard-studio/contracts";
-import { computeTouchCoverage } from "@keyboard-studio/contracts";
+import { computeTouchCoverage, formatUncoveredTouchMessage, toUPlusNotation } from "@keyboard-studio/contracts";
 import { makeLocation } from "./_shared.js";
 
 /**
@@ -45,14 +45,13 @@ export function checkTouchCoverage(
 
   for (const ch of uncovered) {
     const chNFC = ch.normalize("NFC");
-    const codePoint = chNFC.codePointAt(0)?.toString(16).toUpperCase().padStart(4, "0") ?? "?";
     findings.push({
       code: "KM_LINT_TOUCH_UNCOVERED",
       severity: "warning",
       layer: "C",
-      message: `Inventory character U+${codePoint} "${chNFC}" has no touch mechanism.`,
+      message: `${formatUncoveredTouchMessage(chNFC)}.`,
       location: makeLocation(touchLayoutPath),
-      hint: `Add "${chNFC}" (U+${codePoint}) to the touch layout — e.g. as a longpress (sk) option, a flick direction, or a multitap entry on a reachable key in the touch gallery.`,
+      hint: `Add "${chNFC}" (${toUPlusNotation(chNFC)}) to the touch layout — e.g. as a longpress (sk) option, a flick direction, or a multitap entry on a reachable key in the touch gallery.`,
     });
   }
 

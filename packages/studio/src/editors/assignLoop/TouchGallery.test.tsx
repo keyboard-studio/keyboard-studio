@@ -24,27 +24,54 @@ import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
 // vi.hoisted() — refs shared across mock closures and test bodies.
 // ---------------------------------------------------------------------------
 
-const { capturedVfsTransformRef, buildTouchLayoutJsonSpy, touchLintResultRef } = vi.hoisted(() => {
+const { capturedVfsTransformRef, buildTouchLayoutJsonSpy, defaultBuildTouchLayoutJsonImpl, touchLintResultRef } = vi.hoisted(() => {
   const capturedVfsTransformRef = {
     current: null as null | ((vfs: VirtualFS, kbId: string) => { warnings: string[] }),
   };
-  // Spy that returns deterministic JSON including the assignments so tests can
-  // assert the transform's injected content differs between edits.
-  const buildTouchLayoutJsonSpy = vi.fn(
-    (
-      _baseIr: unknown,
-      assignments: Array<{ target: string; mechanisms: Array<{ patternId: string }> }>,
-    ) => ({
-      json: JSON.stringify({ _mock: true, assignments }),
+  // Default spy implementation: deterministic JSON including the assignments so
+  // tests can assert the transform's injected content differs between edits.
+  // The `phone` platform below is real parseTouchLayout-shaped JSON — one key
+  // per assignment, `output` set to the assignment's target char — so the
+  // FR-008 completion gate (which parses this JSON via layoutForLintAndGate
+  // and runs touchCoverage against it) sees every explicitly-configured
+  // character as covered, matching what the real buildTouchLayoutJson would
+  // produce. Re-applied in beforeEach (see below) because vi.clearAllMocks()
+  // clears call history but NOT a custom .mockImplementation() a prior test
+  // installed — without the reset, a later test's coverage gate would see a
+  // stale non-covering implementation left over from an earlier test in this
+  // file (the bug this comment is guarding against).
+  function defaultBuildTouchLayoutJsonImpl(
+    _baseIr: unknown,
+    assignments: Array<{ target: string; mechanisms: Array<{ patternId: string }> }>,
+  ) {
+    return {
+      json: JSON.stringify({
+        _mock: true,
+        assignments,
+        phone: {
+          layer: [
+            {
+              id: "default",
+              row: [
+                {
+                  id: 1,
+                  key: assignments.map((a, i) => ({ id: `T_mock_${i}`, output: a.target })),
+                },
+              ],
+            },
+          ],
+        },
+      }),
       warnings: [] as string[],
-    }),
-  );
+    };
+  }
+  const buildTouchLayoutJsonSpy = vi.fn(defaultBuildTouchLayoutJsonImpl);
   // Configurable ref for useTouchLint mock — tests override .current to inject
   // specific findings (e.g. LINT_ERROR_FINDING for AC#3 coverage).
   const touchLintResultRef = {
     current: { touchFindings: [] as Array<{ code: string; severity: string; layer: string; message: string }>, touchLintRunning: false },
   };
-  return { capturedVfsTransformRef, buildTouchLayoutJsonSpy, touchLintResultRef };
+  return { capturedVfsTransformRef, buildTouchLayoutJsonSpy, defaultBuildTouchLayoutJsonImpl, touchLintResultRef };
 });
 
 // ---------------------------------------------------------------------------
@@ -63,12 +90,24 @@ vi.mock("../../hooks/useKeyboardArtifact.ts", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Mock buildTouchLayoutJson — deterministic, no real engine.
+// Mock buildTouchLayoutJson — deterministic, no real engine. `deriveSeedLayout`
+// is kept as the REAL implementation (via importOriginal, same pattern as the
+// @keyboard-studio/engine mock below) rather than stubbed out: TouchGallery's
+// detectionSeedLayout memo calls it directly to compute the "already in touch
+// layout" suggestion and the FR-008 completion-gate fallback layout, and
+// several tests in this file (the seed-source-aware detection suite, the
+// FR-008 refusal suite) assert on that real seed-derivation behavior. Only
+// `buildTouchLayoutJson` itself — the final emitted JSON, asserted via
+// buildTouchLayoutJsonSpy — is replaced with the deterministic mock.
 // ---------------------------------------------------------------------------
 
-vi.mock("../../lib/buildTouchLayoutJson.ts", () => ({
-  buildTouchLayoutJson: buildTouchLayoutJsonSpy,
-}));
+vi.mock("../../lib/buildTouchLayoutJson.ts", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../../lib/buildTouchLayoutJson.ts")>();
+  return {
+    ...original,
+    buildTouchLayoutJson: buildTouchLayoutJsonSpy,
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock engine helpers so no WASM is loaded.
@@ -80,7 +119,6 @@ vi.mock("@keyboard-studio/engine", async (importOriginal) => {
     ...original,
     // emitTouchLayout is used for minimalTouchJson; return a stable string.
     emitTouchLayout: vi.fn(() => '{"_minimal":true}'),
-    buildMinimalPhoneTouchLayout: vi.fn(() => ({ platforms: [] })),
   };
 });
 
@@ -182,6 +220,12 @@ beforeEach(() => {
   useWorkingCopyStore.getState().reset();
   useSurveySessionStore.getState().reset();
   touchLintResultRef.current = { touchFindings: [], touchLintRunning: false };
+  // vi.clearAllMocks() (afterEach, above) clears call history but NOT a
+  // custom .mockImplementation() a prior test installed via
+  // buildTouchLayoutJsonSpy.mockImplementation(...) — re-pin the covering
+  // default here so every test starts from known-good behavior under the
+  // FR-008 completion gate (layoutForLintAndGate parses this JSON).
+  buildTouchLayoutJsonSpy.mockImplementation(defaultBuildTouchLayoutJsonImpl);
 });
 
 // ---------------------------------------------------------------------------
@@ -408,6 +452,156 @@ describe("TouchGallery — R11 emission: mods non-empty emits even with zero con
     expect(passedAssignments).toEqual([]);
     // But mods.placements carries the Phase C-derived placement.
     expect(opts.mods.placements.length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Seed-source-aware detection (T015) + R11 injection from a SHIPPED layout
+// (T017) — every other fixture in this file ships NO base .keyman-touch-layout
+// (see seedStore's comment), so none of them can prove detection reads the
+// shipped layout rather than an unconditional scaffoldTouchLayout(baseIr)
+// walk. This suite ships a real touch-layout file in the base VFS.
+// ---------------------------------------------------------------------------
+
+/** Seed the store with a base that SHIPS a `.keyman-touch-layout` file (a
+ * phone platform whose default layer produces `shippedChar`), plus a Phase C
+ * desktop assignment (drives a non-empty `mods.placements` for the R11 check).
+ */
+function seedWithShippedTouchLayout(opts: {
+  shippedChar: string;
+  desktopAssignment: MechanismAssignment;
+}) {
+  const shippedLayoutJson = JSON.stringify({
+    phone: {
+      layer: [
+        {
+          id: "default",
+          row: [{ id: 1, key: [{ id: "T_shipped", output: opts.shippedChar }] }],
+        },
+      ],
+    },
+  });
+  const vfs = createVirtualFS([
+    { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    { path: "source/basic_kbdus.keyman-touch-layout", content: shippedLayoutJson, isBinary: false },
+  ]);
+  const ir = makeTestIR([]);
+  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+  useWorkingCopyStore.getState().recordPhase({
+    phase: "B",
+    answers: [],
+    confirmedInventory: [opts.desktopAssignment.target, opts.shippedChar],
+  });
+  useWorkingCopyStore.getState().recordPhase({
+    phase: "C",
+    answers: [],
+    assignments: [opts.desktopAssignment],
+  });
+  useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
+  // Explicit import-adapt choice — the shipped layout above is what makes
+  // this a genuine Case B (adapt the shipped file), not the reseed fallback.
+  useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
+}
+
+describe("TouchGallery — seed-source-aware detection reads the shipped layout (T015) and still injects under R11 with zero Phase E edits (T017)", () => {
+  it("detects a char present only in the SHIPPED touch layout as already-covered, and injects the derived seed via the R11 matrix before any Phase E edit", async () => {
+    const swapAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "x",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "simple_swap",
+          strategyId: "S-01",
+          slotValues: { kmnRules: "+ [K_X] > U+0078" },
+        },
+      ],
+      source: "user",
+    };
+    // "€" is planted only in the shipped phone layout — it is not part of a
+    // fresh QWERTY scaffold and is not a decomposable-accented letter, so a
+    // pre-T015 unconditional scaffoldTouchLayout(baseIr) walk would report it
+    // as undetected (suggestion "none") instead of "already".
+    seedWithShippedTouchLayout({ shippedChar: "€", desktopAssignment: swapAssignment });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // Inventory is ["x", "€"] — "x" (idx 0) carries the Phase C swap
+    // assignment ("replace" suggestion). Skip is pure positional navigation
+    // (records nothing) and works regardless of that suggestion's state.
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^U\+20AC €$/)).toBeTruthy();
+    });
+
+    // The seed-source-aware detection (T015) must surface the "already"
+    // suggestion for "€" because it reads the SHIPPED layout (with mods
+    // replayed), not a fresh scaffold.
+    expect(screen.queryByText(/is already on the touch keyboard/i)).not.toBeNull();
+
+    // R11 emission: import-adapt + non-empty mods (the "x" placement,
+    // derived from the Phase C assignment) injects the derived seed even
+    // though ZERO Phase E edits have been made yet.
+    const vfs = runTransform("basic_kbdus");
+    expect(vfs.get("source/basic_kbdus.keyman-touch-layout")).not.toBeUndefined();
+    expect(buildTouchLayoutJsonSpy).toHaveBeenCalled();
+    const [, passedAssignments, opts] = buildTouchLayoutJsonSpy.mock.calls[0]! as [
+      unknown,
+      unknown[],
+      { mods: { removals: string[]; placements: unknown[] }; baseTouchJson?: string },
+    ];
+    expect(passedAssignments).toEqual([]);
+    expect(opts.mods.placements.length).toBeGreaterThan(0);
+    // The shipped layout is what's passed through for the Case B path.
+    expect(opts.baseTouchJson).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// detectionSeedLayout / layoutForLintAndGate error-fallback branches — a
+// malformed shipped .keyman-touch-layout under import-adapt makes
+// deriveSeedLayout's real applyDesktopModificationsToRawJson call throw a
+// SyntaxError (invalid JSON); detectionSeedLayout's try/catch must swallow it
+// (logging via console.error) and fall back to null rather than crashing the
+// render. `deriveSeedLayout` is kept as the REAL implementation for this
+// suite (see the buildTouchLayoutJson.ts mock above) so the parse failure is
+// genuinely exercised rather than short-circuited by a mock.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — detectionSeedLayout/layoutForLintAndGate fallback on malformed shipped touch layout", () => {
+  it("renders without crashing when the shipped .keyman-touch-layout is malformed JSON, logging via console.error", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+      // Malformed JSON — deriveSeedLayout's Case B (applyDesktopModificationsToRawJson)
+      // throws SyntaxError when parsing this.
+      { path: "source/basic_kbdus.keyman-touch-layout", content: "{ not json", isBinary: false },
+    ]);
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "B",
+      answers: [],
+      confirmedInventory: ["a"],
+    });
+    useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
+    // import-adapt so detectionSeedLayout takes deriveSeedLayout's Case B
+    // (reads the malformed shipped file) instead of a fresh Case A scaffold.
+    useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // Fallback path taken: the gallery still renders the character card for
+    // "a" instead of crashing.
+    expect(screen.getByLabelText(/^U\+0061 a$/)).toBeTruthy();
+    expect(errorSpy).toHaveBeenCalled();
+
+    errorSpy.mockRestore();
   });
 });
 
@@ -738,13 +932,86 @@ describe("TouchGallery — skip character", () => {
   });
 
   it("skipping the only (last) character completes the phase via onComplete", async () => {
+    // "a" (not "中") — the FR-008 completion gate (T016b) re-runs touchCoverage
+    // on the final layout before calling onComplete, so the char left
+    // unconfigured by Skip must be one the underlying seed already covers
+    // (present in the default QWERTY scaffold) for the gate to pass. This
+    // still exercises the regression this test guards: Skip records no
+    // assignment yet completion still fires.
     const onComplete = vi.fn();
-    seedStore({ withInventory: ["中"] });
+    seedStore({ withInventory: ["a"] });
     await act(async () => {
       render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
     });
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     expect(onComplete).toHaveBeenCalledOnce();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FR-008 completion gate — refusal branch (T016b). "中" has suggestion kind
+// "none" (not present in the default scaffold, no Phase C desktop
+// assignment — see the back-navigation suite above), so it stays genuinely
+// uncovered until the author explicitly applies a method, unlike "a" (used
+// by the skip-completes test above) which the default scaffold already covers.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () => {
+  it("refuses to complete and surfaces an alert naming the uncovered char, without calling onComplete", async () => {
+    seedStore({ withInventory: ["中"] });
+    const onComplete = vi.fn();
+
+    await act(async () => {
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+    });
+
+    // "中" is the only (and therefore last) character — Skip is pure forward
+    // navigation, so from the last position it routes into handleContinue via
+    // usePositionalCharNav's onComplete, exercising the completion gate
+    // without requiring any prior configuration.
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+
+    // The gate refuses: "中" is not reachable on the derived seed layout.
+    expect(onComplete).not.toHaveBeenCalled();
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("has no touch mechanism");
+    expect(alert.textContent).toContain("中");
+  });
+
+  it("clears the alert and completes once a method covering the character is applied", async () => {
+    seedStore({ withInventory: ["中"] });
+    const onComplete = vi.fn();
+
+    await act(async () => {
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+    });
+
+    // Trigger the refusal first (mirrors the previous test).
+    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    expect(screen.getByRole("alert")).toBeTruthy();
+    expect(onComplete).not.toHaveBeenCalled();
+
+    // Cover "中": the method chooser is already showing (suggestion kind
+    // "none"), defaulted to "Long-press on a key" — pick a host key and apply.
+    fireEvent.change(screen.getByLabelText(/Host key for long-press/i), {
+      target: { value: "K_A" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Apply touch method for/i }));
+
+    // Applying the edit clears the stale alert immediately (touchKey-keyed
+    // effect), before Done is even clicked.
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    await waitFor(() => {
+      const doneBtn = screen.getByRole("button", { name: "Done" });
+      expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(doneBtn);
+    });
+
+    await waitFor(() => {
+      expect(onComplete).toHaveBeenCalledOnce();
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
 

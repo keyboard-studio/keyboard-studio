@@ -23,8 +23,9 @@
 //     → the inner try/catch returns { json: null, warnings: [...] }.
 
 import { describe, it, expect } from "vitest";
-import { buildTouchLayoutJson, type BuildTouchLayoutJsonOpts } from "./buildTouchLayoutJson";
+import { buildTouchLayoutJson, deriveSeedLayout, type BuildTouchLayoutJsonOpts } from "./buildTouchLayoutJson";
 import type { KeyboardIR, TouchAssignment, TouchLayoutIR } from "@keyboard-studio/contracts";
+import { touchCoverage } from "@keyboard-studio/engine";
 
 // ---------------------------------------------------------------------------
 // Minimal KeyboardIR for Case A (IR path) tests.
@@ -224,6 +225,184 @@ describe("buildTouchLayoutJson — Case B (router → raw path)", () => {
       expect(ksKey!["width"]).toBe("10");
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // T018 — multi-platform fixture exercising every producer kind (text/output/
+  // sk/flick/multitap) across TWO platforms in ONE build, plus the verbatim-
+  // sensitive fields emitTouchLayout would drop on the IR path (per-key
+  // `layer`, platform `displayUnderlying`/`font`/`fontsize`, string-form
+  // `sp`/`width`/`pad`) — spec 035 R9.
+  // ---------------------------------------------------------------------------
+
+  describe("multi-platform verbatim fixture (carve across all producer kinds + placement + preserved fields)", () => {
+    type RawTestKey = Record<string, unknown>;
+
+    const MULTI_PLATFORM_FIXTURE = {
+      phone: {
+        displayUnderlying: true,
+        font: "Gentium",
+        fontsize: "20",
+        layer: [
+          {
+            id: "default",
+            row: [
+              {
+                id: 1,
+                key: [
+                  // Primary `text` producer — carve target ("á").
+                  { id: "K_A", text: "á", layer: "default", sp: "1", width: "150", pad: "5" },
+                  // Placement host — non-empty text, so the placement lands as sk[].
+                  { id: "K_S", text: "s", layer: "default", width: "10" },
+                  // flick{} producer — carve target on a direction entry ("à").
+                  { id: "K_F", text: "f", flick: { n: { id: "T_flick_n", text: "à" } } },
+                  // multitap[] producer — carve target ("î").
+                  { id: "K_M", text: "m", multitap: [{ id: "T_multi_1", text: "î" }] },
+                ],
+              },
+            ],
+          },
+          {
+            // Untouched shift layer — no carved/placed chars anywhere in it —
+            // proves an entire layer survives byte-identical, `output` field
+            // and per-key `layer` included.
+            id: "shift",
+            row: [{ id: 1, key: [{ id: "K_A", output: "Á", layer: "shift" }] }],
+          },
+        ],
+      },
+      tablet: {
+        displayUnderlying: false,
+        font: "Awami",
+        fontsize: "18",
+        layer: [
+          {
+            id: "default",
+            row: [
+              {
+                id: 1,
+                key: [
+                  // sk[] producer on a DIFFERENT platform than the flick/multitap
+                  // carve targets — proves removal walks every platform.
+                  { id: "K_B", text: "b", sk: [{ id: "T_alt", text: "á" }] },
+                  // Primary `output` producer — carve target ("à").
+                  { id: "K_C", output: "à" },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const MULTI_PLATFORM_JSON = JSON.stringify(MULTI_PLATFORM_FIXTURE);
+
+    function buildMultiPlatform() {
+      return buildTouchLayoutJson(makeMinimalIR(), [], {
+        baseTouchJson: MULTI_PLATFORM_JSON,
+        mods: { removals: ["á", "à", "î"], placements: [{ char: "é", hostKey: "K_S" }] },
+        seedSource: "import-adapt",
+      });
+    }
+
+    function parseResult(result: ReturnType<typeof buildMultiPlatform>) {
+      expect(result.json).not.toBeNull();
+      return JSON.parse(result.json!) as {
+        phone: {
+          displayUnderlying: unknown;
+          font: unknown;
+          fontsize: unknown;
+          layer: Array<{ id: string; row: Array<{ key: RawTestKey[] }> }>;
+        };
+        tablet: {
+          displayUnderlying: unknown;
+          font: unknown;
+          fontsize: unknown;
+          layer: Array<{ id: string; row: Array<{ key: RawTestKey[] }> }>;
+        };
+      };
+    }
+
+    it("removes the carved chars from every producer kind (text/output/sk/flick/multitap) on both platforms", () => {
+      const result = buildMultiPlatform();
+
+      // Blunt whole-document check first — none of the carved chars survive anywhere.
+      expect(result.json).not.toContain('"á"');
+      expect(result.json).not.toContain('"à"');
+      expect(result.json).not.toContain('"î"');
+
+      const parsed = parseResult(result);
+      const phoneDefaultKeys = parsed.phone.layer[0]!.row[0]!.key;
+      const tabletDefaultKeys = parsed.tablet.layer[0]!.row[0]!.key;
+
+      // phone: primary `text` carved -> inert placeholder (id changed, text/output gone).
+      // Found by a field the carve never touches (`sp`), since its `id` changes.
+      const kaPlaceholder = phoneDefaultKeys.find((k) => k["sp"] === "1");
+      expect(kaPlaceholder).toBeDefined();
+      expect(kaPlaceholder!["id"]).not.toBe("K_A");
+      expect(kaPlaceholder!["text"]).toBeUndefined();
+      expect(kaPlaceholder!["output"]).toBeUndefined();
+
+      // phone: flick direction entry carved -> the direction key is dropped entirely.
+      const kf = phoneDefaultKeys.find((k) => k["id"] === "K_F")!;
+      expect((kf["flick"] as Record<string, unknown> | undefined)?.["n"]).toBeUndefined();
+
+      // phone: multitap entry carved -> filtered to empty.
+      const km = phoneDefaultKeys.find((k) => k["id"] === "K_M")!;
+      expect(km["multitap"]).toEqual([]);
+
+      // tablet: sk entry carved -> filtered to empty.
+      const kb = tabletDefaultKeys.find((k) => k["id"] === "K_B")!;
+      expect(kb["sk"]).toEqual([]);
+
+      // tablet: primary `output` carved -> inert placeholder (id changed, output gone).
+      const kcPlaceholder = tabletDefaultKeys.find((k) => k["id"] !== "K_B");
+      expect(kcPlaceholder).toBeDefined();
+      expect(kcPlaceholder!["id"]).not.toBe("K_C");
+      expect(kcPlaceholder!["output"]).toBeUndefined();
+    });
+
+    it("reflects the placement as a longpress alternate on the placement host key", () => {
+      const parsed = parseResult(buildMultiPlatform());
+      const phoneDefaultKeys = parsed.phone.layer[0]!.row[0]!.key;
+      const ks = phoneDefaultKeys.find((k) => k["id"] === "K_S")!;
+      const sk = (ks["sk"] as RawTestKey[]) ?? [];
+      expect(sk.some((s) => s["text"] === "é")).toBe(true);
+    });
+
+    it("preserves platform-level displayUnderlying/font/fontsize byte-identically on BOTH platforms", () => {
+      const parsed = parseResult(buildMultiPlatform());
+      expect(parsed.phone.displayUnderlying).toBe(true);
+      expect(parsed.phone.font).toBe("Gentium");
+      expect(parsed.phone.fontsize).toBe("20");
+      expect(parsed.tablet.displayUnderlying).toBe(false);
+      expect(parsed.tablet.font).toBe("Awami");
+      expect(parsed.tablet.fontsize).toBe("18");
+    });
+
+    it("preserves the untouched shift-layer key verbatim (per-key layer + output field, no carved/placed chars)", () => {
+      const parsed = parseResult(buildMultiPlatform());
+      const shiftKey = parsed.phone.layer[1]!.row[0]!.key[0];
+      expect(shiftKey).toEqual({ id: "K_A", output: "Á", layer: "shift" });
+    });
+
+    it("preserves string-form sp/width/pad on the carved placeholder and layer/width on the placement key", () => {
+      const parsed = parseResult(buildMultiPlatform());
+      const phoneDefaultKeys = parsed.phone.layer[0]!.row[0]!.key;
+
+      const kaPlaceholder = phoneDefaultKeys.find((k) => k["sp"] === "1")!;
+      expect(kaPlaceholder["sp"]).toBe("1");
+      expect(typeof kaPlaceholder["sp"]).toBe("string");
+      expect(kaPlaceholder["width"]).toBe("150");
+      expect(typeof kaPlaceholder["width"]).toBe("string");
+      expect(kaPlaceholder["pad"]).toBe("5");
+      expect(typeof kaPlaceholder["pad"]).toBe("string");
+      expect(kaPlaceholder["layer"]).toBe("default");
+
+      const ks = phoneDefaultKeys.find((k) => k["id"] === "K_S")!;
+      expect(ks["layer"]).toBe("default");
+      expect(ks["width"]).toBe("10");
+      expect(typeof ks["width"]).toBe("string");
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -371,5 +550,47 @@ describe("buildTouchLayoutJson — malformed baseTouchJson", () => {
       threw = true;
     }
     expect(threw).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deriveSeedLayout (Case B / parse path) + touchCoverage — a char reachable
+// ONLY via a flick direction on the shipped layout must be detected as
+// covered, not reported uncovered (parseTouchLayout previously dropped flick
+// entries entirely, which fed a false "uncovered" result into TouchGallery's
+// detection/lint/completion-gate call sites).
+// ---------------------------------------------------------------------------
+
+describe("deriveSeedLayout — Case B flick-only coverage (parse/detection path)", () => {
+  const SHIPPED_WITH_FLICK_ONLY_CHAR = JSON.stringify({
+    phone: {
+      layer: [
+        {
+          id: "default",
+          row: [
+            {
+              id: 1,
+              key: [
+                {
+                  id: "K_E",
+                  text: "e",
+                  flick: { ne: { id: "K_E_ne", text: "é", output: "é" } },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  it("touchCoverage reports no uncovered chars for an inventory char reachable only via a flick direction", () => {
+    const { layout } = deriveSeedLayout(makeMinimalIR(), {
+      baseTouchJson: SHIPPED_WITH_FLICK_ONLY_CHAR,
+      mods: NO_MODS,
+      seedSource: "import-adapt",
+    });
+    const result = touchCoverage(layout, ["é"]);
+    expect(result.uncovered).toEqual([]);
   });
 });
