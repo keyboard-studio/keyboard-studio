@@ -66,6 +66,7 @@ import { resolveBaseTouchJson } from "../../lib/resolveBaseTouchJson.ts";
 import { deriveDesktopModifications } from "../../lib/deriveDesktopModifications.ts";
 import { extractMechanismHostKey } from "../../lib/extractMechanismHostKey.ts";
 import { shouldEmitTouchLayout, resolveTouchSeedSource } from "../../lib/touchEmission.ts";
+import { ErrorText } from "../../ui/index.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { promoteOnManualEdit } from "./touchBehavior.ts";
@@ -1444,20 +1445,13 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
           {/* FR-008 completion gate message — set by handleContinue when
               touchCoverage finds an inventory char with no reachable touch
-              mechanism on the final layout; cleared on the next edit. */}
+              mechanism on the final layout; cleared on the next edit.
+              ErrorText tone="warning" renders role="alert" + the canonical
+              WARNING color (#d29922), matching other gate-message sites. */}
           {uncoveredMessage !== null && (
-            <p
-              role="alert"
-              aria-live="polite"
-              style={{
-                margin: 0,
-                fontSize: 12,
-                color: "#f0883e",
-                fontFamily: FONT,
-              }}
-            >
+            <ErrorText tone="warning">
               Cannot finish yet — {uncoveredMessage}.
-            </p>
+            </ErrorText>
           )}
 
           {/* Suggestion card (shown until accepted/dismissed; skipped entirely

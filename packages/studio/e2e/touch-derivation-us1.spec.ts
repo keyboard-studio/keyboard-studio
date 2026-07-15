@@ -43,30 +43,30 @@
 // Run (Playwright is the global CLI only — see playwright.config.ts header):
 //   cd packages/studio && npx playwright test touch-derivation-us1.spec.ts
 //
-// CAVEAT (loud, per instructions): the Playwright CLI is NOT runnable on the
-// authoring machine — `npx playwright test --list` reproduces the known local
-// gap (playwright.config.ts's own `import ... from "playwright/test"` fails
-// to resolve from npx's temp install; see docs memory "Playwright CLI
-// missing" / the quickstart's own "Local caveat" note). This spec is authored
-// CI-first and was NOT run end-to-end locally. Note also: e2e/** carries NO
-// tsconfig of its own and is explicitly EXCLUDED from both vitest and tsc in
-// this package (see playwright.config.ts's header) — there is no existing
-// "how the other live specs are typechecked" lane to match. What WAS verified
-// locally instead (see the PR/report for verbatim output):
-//   - a throwaway tsconfig + a hand-written ambient `declare module
-//     "playwright/test"` shim (since the real package isn't installed/
-//     resolvable here either) let `tsc --noEmit` type-check this file's own
-//     logic in isolation; fflate's `unzipSync`/`strFromU8` calls were checked
-//     against the REAL installed fflate types (not shimmed), which caught a
-//     real gap in the shim (`selectOption` was missing) on the first pass.
-//   - Every UI contract this spec depends on (data-testid values, aria-label
-//     formats, default-method/default-selection behavior, the Case B
-//     placement/removal semantics, the phone-platform requirement) was traced
-//     to source and cross-checked against MechanismGallery.test.tsx /
-//     TouchGallery.test.tsx / applyDesktopModificationsToRawJson.ts, and the
-//     bambara fixture's codec-cleanliness + phone-platform shipping were
-//     confirmed via throwaway vitest probes against packages/engine/src
-//     (parse() + recognizePatterns()) — not via Playwright.
+// SKIPPED — UNBLOCK RECIPE (same convention as import-improve.spec.ts):
+//   The Playwright lane itself is RUNNABLE again (global playwright CLI +
+//   browsers installed; `npx playwright test` boots the dev server and
+//   executes specs). Executing this spec surfaced a PRE-EXISTING, repo-wide
+//   breakage, not a defect in this walk: the survey prelude that all e2e
+//   specs share by copy (driveIdentityLite et al.) targets the OLD
+//   identity-lite first field (`#il_language_autonym`), but the app now
+//   opens with the 036 glottolog language-identify flow ("What is your
+//   language called in English?" combobox, "Step 1 of ~6"). carve.spec.ts
+//   — documented as live/passing — fails at the exact same locator, so the
+//   stale prelude predates spec 035 and blocks every walk-from-scratch spec.
+//   To un-skip:
+//     1. Update the survey prelude for the 036 language-identify flow —
+//        preferably by extracting the shared helpers into
+//        e2e/helpers/surveyFlow.ts (the acknowledged de-triplication
+//        follow-up) and fixing them ONCE for carve/copy-edit/this spec.
+//     2. Remove `.skip` from the describe below and run
+//        `cd packages/studio && npx playwright test touch-derivation-us1.spec.ts`.
+//   Everything downstream of the prelude (carve targets, seed-source
+//   default, touch-gallery walk, ZIP assertions) was traced to source and
+//   cross-checked against MechanismGallery.test.tsx / TouchGallery.test.tsx /
+//   applyDesktopModificationsToRawJson.ts; the bambara fixture's
+//   codec-cleanliness + phone-platform shipping were confirmed via vitest
+//   probes against packages/engine/src.
 
 import { test, expect, type Page } from "playwright/test";
 import { unzipSync, strFromU8 } from "fflate";
@@ -293,7 +293,8 @@ async function driveHelpPhase(page: Page): Promise<void> {
 // Spec
 // ---------------------------------------------------------------------------
 
-test.describe("Touch derivation US1 — import & adapt (spec 035 Scenario A)", () => {
+// .skip: blocked on the repo-wide stale survey prelude (see unblock recipe in the header).
+test.describe.skip("Touch derivation US1 — import & adapt (spec 035 Scenario A)", () => {
   test("carved characters vanish, placed letter lands, base layout survives, and the keyboard compiles", async ({
     page,
   }) => {

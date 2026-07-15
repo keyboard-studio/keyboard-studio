@@ -80,6 +80,13 @@ interface RawKey {
   [key: string]: unknown;
 }
 
+/**
+ * Known flick (directional gesture) keys. `TouchKeyIR["flick"]` is keyed by
+ * these compass directions only (contracts `keyboard-ir.ts`); an unrecognised
+ * wire key is dropped rather than cast into the union.
+ */
+const FLICK_DIRECTIONS = new Set(["n", "s", "e", "w", "ne", "nw", "se", "sw"]);
+
 interface RawRow {
   id?: number;
   key?: RawKey[];
@@ -140,7 +147,7 @@ function convertKey(raw: RawKey, minter: NodeIdMinter): TouchKeyIR {
   if (raw.flick && typeof raw.flick === "object" && !Array.isArray(raw.flick)) {
     const flick: TouchKeyIR["flick"] = {};
     for (const [dir, fk] of Object.entries(raw.flick)) {
-      if (fk && typeof fk === "object") {
+      if (fk && typeof fk === "object" && FLICK_DIRECTIONS.has(dir)) {
         flick[dir as "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw"] = convertKey(fk, minter);
       }
     }

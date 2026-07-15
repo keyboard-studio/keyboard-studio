@@ -560,6 +560,52 @@ describe("TouchGallery — seed-source-aware detection reads the shipped layout 
 });
 
 // ---------------------------------------------------------------------------
+// detectionSeedLayout / layoutForLintAndGate error-fallback branches — a
+// malformed shipped .keyman-touch-layout under import-adapt makes
+// deriveSeedLayout's real applyDesktopModificationsToRawJson call throw a
+// SyntaxError (invalid JSON); detectionSeedLayout's try/catch must swallow it
+// (logging via console.error) and fall back to null rather than crashing the
+// render. `deriveSeedLayout` is kept as the REAL implementation for this
+// suite (see the buildTouchLayoutJson.ts mock above) so the parse failure is
+// genuinely exercised rather than short-circuited by a mock.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — detectionSeedLayout/layoutForLintAndGate fallback on malformed shipped touch layout", () => {
+  it("renders without crashing when the shipped .keyman-touch-layout is malformed JSON, logging via console.error", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+      // Malformed JSON — deriveSeedLayout's Case B (applyDesktopModificationsToRawJson)
+      // throws SyntaxError when parsing this.
+      { path: "source/basic_kbdus.keyman-touch-layout", content: "{ not json", isBinary: false },
+    ]);
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "B",
+      answers: [],
+      confirmedInventory: ["a"],
+    });
+    useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
+    // import-adapt so detectionSeedLayout takes deriveSeedLayout's Case B
+    // (reads the malformed shipped file) instead of a fresh Case A scaffold.
+    useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    // Fallback path taken: the gallery still renders the character card for
+    // "a" instead of crashing.
+    expect(screen.getByLabelText(/^U\+0061 a$/)).toBeTruthy();
+    expect(errorSpy).toHaveBeenCalled();
+
+    errorSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Back/Next navigation — positional model, reported-bug regression coverage.
 //
 // The reported bug: implementing each character, moving on, and coming back

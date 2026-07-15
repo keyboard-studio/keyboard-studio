@@ -464,6 +464,38 @@ describe("parseTouchLayout - flick", () => {
     expect(key2?.flick?.sw?.id).toBe("U_0065_sw");
     expect(key2?.flick?.sw?.output).toBe("è");
   });
+
+  it("drops a flick entry keyed by an unknown/bogus direction, keeping valid ones", () => {
+    const json = JSON.stringify({
+      tablet: {
+        layer: [
+          {
+            id: "default",
+            row: [
+              {
+                id: 1,
+                key: [
+                  {
+                    id: "U_0065",
+                    text: "e",
+                    flick: {
+                      n: { id: "U_0065_n", text: "é", output: "é" },
+                      // bogus direction key — not in the compass-direction vocabulary
+                      xx: { id: "U_0065_xx", text: "?", output: "?" },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const ir = parseTouchLayout(json);
+    const key = ir.platforms[0]?.layers[0]?.rows[0]?.keys[0];
+    expect(key?.flick?.n?.id).toBe("U_0065_n");
+    expect(Object.keys(key?.flick ?? {})).toEqual(["n"]);
+  });
 });
 
 // ---------------------------------------------------------------------------
