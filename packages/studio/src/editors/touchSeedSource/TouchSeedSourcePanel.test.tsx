@@ -180,6 +180,31 @@ describe("TouchSeedSourcePanel — confirm", () => {
     expect(completed).toBe(true);
   });
 
+  it("explicit Reseed on a base that ships a layout shows the drop advisory and records reseed-from-desktop on confirm", () => {
+    seedBase(PHONE_AND_TABLET_JSON); // usable base layout -> default is Import & adapt
+    let completed = false;
+    render(
+      <TouchSeedSourcePanel
+        onComplete={() => {
+          completed = true;
+        }}
+        onBack={() => undefined}
+      />,
+    );
+
+    // The drop advisory is present on the Reseed card regardless of which
+    // choice is currently selected (it reflects the base's shipped platforms).
+    expect(screen.getByTestId("seed-source-reseed").textContent).toContain(
+      "discards the base's shipped tablet/desktop touch platforms",
+    );
+
+    fireEvent.click(screen.getByTestId("seed-source-reseed"));
+    fireEvent.click(screen.getByTestId("seed-source-confirm"));
+
+    expect(useSurveySessionStore.getState().touchSeedSource).toBe("reseed-from-desktop");
+    expect(completed).toBe(true);
+  });
+
   it("Back button calls the supplied onBack", () => {
     seedBase();
     let backCalled = false;
@@ -260,5 +285,26 @@ describe("TouchSeedSourcePanel — draft-discard warning (R12)", () => {
 
     expect(screen.queryByTestId("seed-source-draft-warning")).toBeNull();
     expect(screen.getByTestId("seed-source-confirm").textContent).toBe("Confirm");
+  });
+
+  it("confirming a changed selection past the warning records the new choice AND clears touchDraft", () => {
+    seedBase(PHONE_ONLY_JSON);
+    useSurveySessionStore.setState({ touchSeedSource: "import-adapt" });
+    useWorkingCopyStore.getState().setTouchDraft({
+      charTouchEntries: [["ä", fakeTouchAssignment]],
+      suggestionResolvedChars: [],
+    });
+    render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
+
+    fireEvent.click(screen.getByTestId("seed-source-reseed"));
+    expect(screen.getByTestId("seed-source-draft-warning")).toBeTruthy();
+
+    // Confirming past the warning is the wiring under test: the panel must
+    // call setTouchSeedSource with the NEW value, and that setter (R12,
+    // surveySessionStore.ts) is what actually clears touchDraft.
+    fireEvent.click(screen.getByTestId("seed-source-confirm"));
+
+    expect(useSurveySessionStore.getState().touchSeedSource).toBe("reseed-from-desktop");
+    expect(useWorkingCopyStore.getState().touchDraft).toBeNull();
   });
 });
