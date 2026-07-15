@@ -71,6 +71,13 @@
 import { test, expect, type Page } from "playwright/test";
 import { unzipSync, strFromU8 } from "fflate";
 import { readFile } from "node:fs/promises";
+import {
+  driveIdentityLite as driveIdentityLiteBase,
+  pickBaseKeyboard as pickBaseKeyboardBase,
+  chooseAdaptTrack,
+  confirmPrefill,
+  buildOneCharacterList,
+} from "./helpers/surveyFlow";
 
 // ---------------------------------------------------------------------------
 // Fixture constants
@@ -102,30 +109,21 @@ const KMN_ZIP_PATH = `source/${BASE_KEYBOARD_ID}.kmn`;
 const TOUCH_ZIP_PATH = `source/${BASE_KEYBOARD_ID}.keyman-touch-layout`;
 
 // ---------------------------------------------------------------------------
-// Page-object-lite helpers — mirrors carve.spec.ts's established conventions
-// (same survey-advance testid, same Adapt-track step shape).
+// Page-object helpers (touch-derivation-specific)
 // ---------------------------------------------------------------------------
 
-function surveyAdvance(page: Page) {
-  return page.getByTestId("survey-advance");
-}
-
-/** Identity-lite (Phase A). Latin script keeps routing through the ranked
- *  BaseResolution picker (not the §9 CJK/Ethiopic/Hangul stub, and not the
- *  plain "Base keyboard" combobox carve.spec.ts's "other"-script path uses). */
+/**
+ * Identity-lite for touch-derivation (spec 036 language-identify flow).
+ * Latin script keeps routing through the ranked BaseResolution picker
+ * (not the §9 CJK/Ethiopic/Hangul stub).
+ */
 async function driveIdentityLite(page: Page): Promise<void> {
-  await page.locator("#il_language_autonym").fill("Bamanankan");
-  await surveyAdvance(page).click();
-
-  await expect(page.locator("#il_language_english")).not.toHaveValue("");
-  await surveyAdvance(page).click();
-
-  await page.locator("#il_language_code").fill("bm");
-  await surveyAdvance(page).click();
-
-  await page.locator("#il_target_script").selectOption("Latn");
-  await surveyAdvance(page).click();
-
+  await driveIdentityLiteBase(page, {
+    english: "Test",
+    autonym: "Bamanankan",
+    script: "Latn",
+  });
+  // Additional wait for BaseResolution to render its picker (spec 035 may take longer)
   await expect(page.getByTestId("base-picker")).toBeVisible({ timeout: 15_000 });
 }
 
@@ -134,11 +132,11 @@ async function driveIdentityLite(page: Page): Promise<void> {
  * combobox (accessible name "Search keyboards" — BaseResolution overrides the
  * component's "Base keyboard" default label, see BaseKeyboardPicker.tsx).
  * Widens to the full catalog first so a specific low-profile id (bambara) is
- * searchable deterministically, rather than trusting the suggestion ranking
- * to surface it (the approach copy-edit.spec.ts's fallback-first-button path
- * takes, which would not reliably pick bambara specifically).
+ * searchable deterministically.
  */
 async function pickBaseKeyboard(page: Page, keyboardId: string): Promise<void> {
+  // Wait for base picker (cold server can take 20s+)
+  await page.waitForSelector('[data-testid="base-picker"]', { timeout: 90_000 });
   await page.getByTestId("search-scope-all").click();
 
   const combobox = page.getByRole("combobox", { name: "Search keyboards" });
@@ -151,18 +149,6 @@ async function pickBaseKeyboard(page: Page, keyboardId: string): Promise<void> {
   await page.getByTestId("base-confirm").click();
 }
 
-/** track step — Track 1 "Adapt" (keeps the base's own keyboardId, "bambara",
- *  and skips the project-name step entirely — same shape as carve.spec.ts). */
-async function chooseAdaptTrack(page: Page): Promise<void> {
-  await page.getByTestId("track-adapt").check();
-  await surveyAdvance(page).click();
-}
-
-/** characters step, prefill sub-stage — static confirmation, no inputs. */
-async function confirmPrefill(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Confirm and continue" }).click();
-}
-
 /**
  * characters step, Phase B sub-stage (build-list method) — adds exactly the
  * ONE placed character ("é"). Bambara produces no accented Latin letters at
@@ -173,12 +159,7 @@ async function confirmPrefill(page: Page): Promise<void> {
  * purposes.
  */
 async function addPlacedCharacterToInventory(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Continue" }).click();
-
-  await page.getByLabel("Character to add").fill(PLACED_CHAR);
-  await page.getByRole("button", { name: "+ Add" }).click();
-
-  await page.getByRole("button", { name: /^Done \(1 character\)$/ }).click();
+  await buildOneCharacterList(page, PLACED_CHAR);
 }
 
 /**
@@ -271,10 +252,12 @@ async function driveTouchGalleryAcceptPlacement(page: Page, char: string): Promi
 }
 
 /**
- * help (Phase F) step — bounded-loop driver identical to carve.spec.ts's
- * driveHelpPhase (Phase F's shape is keyboard-independent).
+ * help (Phase F) step — Phase F's shape is keyboard-independent, but we
+ * customize the welcome and usage text for Bambara.
  */
 async function driveHelpPhase(page: Page): Promise<void> {
+  const surveyAdvance = (p: Page) => p.getByTestId("survey-advance");
+
   await page.locator("#pf_welcome_paragraph").fill("Welcome to the Bambara keyboard.");
   await surveyAdvance(page).click();
 
@@ -293,8 +276,7 @@ async function driveHelpPhase(page: Page): Promise<void> {
 // Spec
 // ---------------------------------------------------------------------------
 
-// .skip: blocked on the repo-wide stale survey prelude (see unblock recipe in the header).
-test.describe.skip("Touch derivation US1 — import & adapt (spec 035 Scenario A)", () => {
+test.describe("Touch derivation US1 — import & adapt (spec 035 Scenario A)", () => {
   test("carved characters vanish, placed letter lands, base layout survives, and the keyboard compiles", async ({
     page,
   }) => {
