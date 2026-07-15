@@ -594,6 +594,7 @@ afterEach(() => {
   cleanup();
   useWorkingCopyStore.getState().reset();
   vi.clearAllMocks();
+  localStorage.clear(); // reset the first-visit gate (ks.visited) between tests
 });
 
 // ---------------------------------------------------------------------------
@@ -781,6 +782,7 @@ describe("SurveyView — mechanisms → carve back-navigation", () => {
 describe("StudioShell — route: #preview renders PreviewScreen", () => {
   it("mounts PreviewScreen (not RoutePlaceholder) when hash is #preview", async () => {
     window.location.hash = "#preview";
+    localStorage.setItem("ks.visited", "1"); // returning visitor: deep-link hash is honored
 
     await act(async () => {
       render(<StudioShell />);
@@ -798,6 +800,7 @@ describe("StudioShell — route: #preview renders PreviewScreen", () => {
 describe("StudioShell — route: #output renders OutputScreen", () => {
   it("mounts OutputScreen (not RoutePlaceholder) when hash is #output", async () => {
     window.location.hash = "#output";
+    localStorage.setItem("ks.visited", "1"); // returning visitor: deep-link hash is honored
 
     await act(async () => {
       render(<StudioShell />);
@@ -808,6 +811,34 @@ describe("StudioShell — route: #output renders OutputScreen", () => {
     // PreviewScreen must NOT be present — these are distinct screens.
     expect(screen.queryByTestId("preview-screen-root")).toBeNull();
     expect(screen.queryByText(/coming soon/i)).toBeNull();
+  });
+});
+
+describe("StudioShell — first-visit gate forces newcomers to welcome", () => {
+  it("forces WelcomeScreen for a never-visited browser arriving on a deep-linked #preview hash", async () => {
+    window.location.hash = "#preview";
+    localStorage.clear(); // pristine browser: never visited
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    // The deep-linked #preview is overridden — a genuine newcomer lands on welcome.
+    expect(screen.queryByTestId("preview-screen-root")).toBeNull();
+    expect(screen.getByText(/I’m new/i)).toBeTruthy();
+    // The hash is rewritten to #welcome so leaving welcome fires a real hashchange.
+    expect(window.location.hash).toBe("#welcome");
+  });
+
+  it("honors the deep-linked hash once the browser has visited", async () => {
+    window.location.hash = "#preview";
+    localStorage.setItem("ks.visited", "1"); // returning visitor
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("preview-screen-root")).toBeTruthy();
   });
 });
 
