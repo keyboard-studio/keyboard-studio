@@ -2,10 +2,22 @@
   "_comment": "Pinned Unicode Character Database (UCD) files consumed by utilities/facet-index/ucd/codegen-ucd.mjs. Each file is SHA-256-verified against this pin before codegen runs.",
   "unicodeVersion": "17.0.0",
   "files": [
-    { "path": "lib/ucd/Scripts.txt", "sha256": "PLACEHOLDER" },
-    { "path": "lib/ucd/ScriptExtensions.txt", "sha256": "PLACEHOLDER" },
-    { "path": "lib/ucd/PropertyValueAliases.txt", "sha256": "PLACEHOLDER" },
-    { "path": "lib/ucd/Blocks.txt", "sha256": "PLACEHOLDER" }
+    {
+      "path": "lib/ucd/Scripts.txt",
+      "sha256": "cc89684338c2afd95668e33b3f813387d4f026e4a1d695cdc06055a35b7682f6"
+    },
+    {
+      "path": "lib/ucd/ScriptExtensions.txt",
+      "sha256": "fe879108655e2e8e7ceb7443bdc78064a03d04db3f3373fba823b143da21ee74"
+    },
+    {
+      "path": "lib/ucd/PropertyValueAliases.txt",
+      "sha256": "8b5a9a40ca3bed11158f810d08922818941561d6bcb0706b43aa492a145b34e7"
+    },
+    {
+      "path": "lib/ucd/Blocks.txt",
+      "sha256": "6881254211622bda136745befc86ce9bdddc2c51b454dd73a7f8ed53d1a0eca2"
+    }
   ],
   "license": "Unicode-DFS-2016 (Unicode, Inc. License Agreement)",
   "notice": "Copyright (c) 1991-2025 Unicode, Inc. Used under the terms of the Unicode License v3 (https://www.unicode.org/license.txt)."
