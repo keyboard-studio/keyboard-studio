@@ -63,6 +63,7 @@ interface RawKey {
   output?: string;
   nextlayer?: string;
   sk?: RawKey[];
+  flick?: Record<string, RawKey>;
   multitap?: RawKey[];
   /** Wire format encodes sp as a JSON string (e.g. `"sp": "1"`); also accept a number for robustness. */
   sp?: string | number;
@@ -135,6 +136,15 @@ function convertKey(raw: RawKey, minter: NodeIdMinter): TouchKeyIR {
   if (Array.isArray(raw.multitap) && raw.multitap.length > 0) {
     const existingSk = key.sk ?? [];
     key.sk = [...existingSk, ...raw.multitap.map(mt => convertKey(mt, minter))];
+  }
+  if (raw.flick && typeof raw.flick === "object" && !Array.isArray(raw.flick)) {
+    const flick: TouchKeyIR["flick"] = {};
+    for (const [dir, fk] of Object.entries(raw.flick)) {
+      if (fk && typeof fk === "object") {
+        flick[dir as "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw"] = convertKey(fk, minter);
+      }
+    }
+    if (Object.keys(flick).length > 0) key.flick = flick;
   }
   return key;
 }

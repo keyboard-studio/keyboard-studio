@@ -404,6 +404,69 @@ describe("emitTouchLayout", () => {
 });
 
 // ---------------------------------------------------------------------------
+// flick — directional gesture map (previously dropped by convertKey)
+// ---------------------------------------------------------------------------
+
+const FLICK_TOUCH = JSON.stringify({
+  tablet: {
+    layer: [
+      {
+        id: "default",
+        row: [
+          {
+            id: 1,
+            key: [
+              {
+                id: "U_0065",
+                text: "e",
+                flick: {
+                  n: { id: "U_0065_n", text: "é", output: "é" },
+                  sw: { id: "U_0065_sw", text: "è", output: "è" },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+});
+
+describe("parseTouchLayout - flick", () => {
+  it("parses flick entries in >= 2 directions into TouchKeyIR.flick with text/output/id intact", () => {
+    const ir = parseTouchLayout(FLICK_TOUCH);
+    const key = ir.platforms[0]?.layers[0]?.rows[0]?.keys[0];
+    expect(key?.flick?.n?.id).toBe("U_0065_n");
+    expect(key?.flick?.n?.text).toBe("é");
+    expect(key?.flick?.n?.output).toBe("é");
+    expect(key?.flick?.sw?.id).toBe("U_0065_sw");
+    expect(key?.flick?.sw?.text).toBe("è");
+    expect(key?.flick?.sw?.output).toBe("è");
+  });
+
+  it("round-trips flick through emit -> reparse", () => {
+    const ir = parseTouchLayout(FLICK_TOUCH);
+    const emitted = emitTouchLayout(ir);
+    const reparsed = JSON.parse(emitted) as Record<
+      string,
+      { layer: Array<{ row: Array<{ key: Array<{ flick?: Record<string, { id: string; text?: string; output?: string }> }> }> }> }
+    >;
+    const wireKey = reparsed["tablet"]?.layer[0]?.row[0]?.key[0];
+    expect(wireKey?.flick?.["n"]?.id).toBe("U_0065_n");
+    expect(wireKey?.flick?.["n"]?.text).toBe("é");
+    expect(wireKey?.flick?.["sw"]?.id).toBe("U_0065_sw");
+    expect(wireKey?.flick?.["sw"]?.text).toBe("è");
+
+    const ir2 = parseTouchLayout(emitted);
+    const key2 = ir2.platforms[0]?.layers[0]?.rows[0]?.keys[0];
+    expect(key2?.flick?.n?.id).toBe("U_0065_n");
+    expect(key2?.flick?.n?.output).toBe("é");
+    expect(key2?.flick?.sw?.id).toBe("U_0065_sw");
+    expect(key2?.flick?.sw?.output).toBe("è");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Per-key provenance round-trip (spec-014 US3 / T028, FR-009/FR-010)
 // ---------------------------------------------------------------------------
 

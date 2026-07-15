@@ -23,8 +23,9 @@
 //     → the inner try/catch returns { json: null, warnings: [...] }.
 
 import { describe, it, expect } from "vitest";
-import { buildTouchLayoutJson, type BuildTouchLayoutJsonOpts } from "./buildTouchLayoutJson";
+import { buildTouchLayoutJson, deriveSeedLayout, type BuildTouchLayoutJsonOpts } from "./buildTouchLayoutJson";
 import type { KeyboardIR, TouchAssignment, TouchLayoutIR } from "@keyboard-studio/contracts";
+import { touchCoverage } from "@keyboard-studio/engine";
 
 // ---------------------------------------------------------------------------
 // Minimal KeyboardIR for Case A (IR path) tests.
@@ -549,5 +550,47 @@ describe("buildTouchLayoutJson — malformed baseTouchJson", () => {
       threw = true;
     }
     expect(threw).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deriveSeedLayout (Case B / parse path) + touchCoverage — a char reachable
+// ONLY via a flick direction on the shipped layout must be detected as
+// covered, not reported uncovered (parseTouchLayout previously dropped flick
+// entries entirely, which fed a false "uncovered" result into TouchGallery's
+// detection/lint/completion-gate call sites).
+// ---------------------------------------------------------------------------
+
+describe("deriveSeedLayout — Case B flick-only coverage (parse/detection path)", () => {
+  const SHIPPED_WITH_FLICK_ONLY_CHAR = JSON.stringify({
+    phone: {
+      layer: [
+        {
+          id: "default",
+          row: [
+            {
+              id: 1,
+              key: [
+                {
+                  id: "K_E",
+                  text: "e",
+                  flick: { ne: { id: "K_E_ne", text: "é", output: "é" } },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  it("touchCoverage reports no uncovered chars for an inventory char reachable only via a flick direction", () => {
+    const { layout } = deriveSeedLayout(makeMinimalIR(), {
+      baseTouchJson: SHIPPED_WITH_FLICK_ONLY_CHAR,
+      mods: NO_MODS,
+      seedSource: "import-adapt",
+    });
+    const result = touchCoverage(layout, ["é"]);
+    expect(result.uncovered).toEqual([]);
   });
 });

@@ -836,7 +836,8 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       const { uncovered } = touchCoverage(detectionSeedLayout, inventory);
       const uncoveredSet = new Set(uncovered);
       return new Set(inventory.filter((c) => !uncoveredSet.has(c)));
-    } catch {
+    } catch (err) {
+      console.error("[TouchGallery] detectedChars coverage failed", err);
       return new Set<string>();
     }
     // inventoryKey is the stable primitive proxy for `inventory` (declared
