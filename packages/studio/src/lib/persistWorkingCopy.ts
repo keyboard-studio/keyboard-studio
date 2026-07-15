@@ -36,7 +36,7 @@
 // and restores its `workingCopy` envelope field through this exact code — never
 // a second enumeration of the WorkingCopyData field list.
 
-import type { RemovalCapability, VirtualFSEntry } from "@keyboard-studio/contracts";
+import type { RemovalCapability, VirtualFS, VirtualFSEntry } from "@keyboard-studio/contracts";
 import { createVirtualFS, mergePhaseResults } from "@keyboard-studio/contracts";
 import { classifyRemovalCapabilities } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -133,6 +133,27 @@ export function deserializeEntry(raw: SerializedEntry): VirtualFSEntry {
 // second enumeration of the WorkingCopyData field list.
 // ---------------------------------------------------------------------------
 
+// Base-VFS serialization cache (efficiency): the base VFS is set once at
+// instantiation (workingCopyStore.instantiateFromBase/FromExisting) and never
+// mutated in place, so its Base64 serialization is invariant for the life of a
+// working copy. The durable-draft autosave calls snapshotWorkingCopyData on
+// every ~500ms debounced change during authoring, and re-encoding the whole
+// (potentially hundreds of KB) base file tree each time is pure wasted work.
+// Memoize on the baseVfs OBJECT REFERENCE: a cache hit while the same working
+// copy is active, an automatic recompute when a new instantiation replaces the
+// reference (or a reset sets it back to null).
+let _cachedBaseVfsRef: VirtualFS | null = null;
+let _cachedBaseVfsEntries: SerializedEntry[] = [];
+
+function serializeBaseVfsEntries(baseVfs: VirtualFS | null): SerializedEntry[] {
+  if (baseVfs === null) return [];
+  if (baseVfs !== _cachedBaseVfsRef) {
+    _cachedBaseVfsRef = baseVfs;
+    _cachedBaseVfsEntries = baseVfs.entries().map(serializeEntry);
+  }
+  return _cachedBaseVfsEntries;
+}
+
 /**
  * Build a serializable snapshot of the CURRENT working-copy store state.
  *
@@ -141,13 +162,17 @@ export function deserializeEntry(raw: SerializedEntry): VirtualFSEntry {
  * draftPersistence.saveDraft's VR-2 guard) check that themselves before
  * calling, since each caller's guard condition is otherwise identical and the
  * check is cheap to repeat at the call site rather than hide in here.
+ *
+ * The base-VFS serialization is memoized on the baseVfs reference (see
+ * `serializeBaseVfsEntries`) so the debounced autosave does not re-Base64 the
+ * immutable base file tree on every write.
  */
 export function snapshotWorkingCopyData(): WorkingCopySnapshot {
   const s = useWorkingCopyStore.getState();
   return {
     instantiationMode: s.instantiationMode,
     baseKeyboard: s.baseKeyboard,
-    baseVfsEntries: s.baseVfs !== null ? s.baseVfs.entries().map(serializeEntry) : [],
+    baseVfsEntries: serializeBaseVfsEntries(s.baseVfs),
     baseIr: s.baseIr,
     identity: s.identity,
     ir: s.ir,

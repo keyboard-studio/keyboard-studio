@@ -342,6 +342,36 @@ describe("draftPersistence", () => {
       // Never partially applied — the working copy stays reset, not half-restored.
       expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
     });
+
+    it("a version-matched record with a valid workingCopy but MALFORMED traversal is removed and never partially restores the working copy (km-review #2)", () => {
+      // Regression for the review finding: applyTraversalSnapshot's object-spread
+      // never THROWS on a non-object (`{...null}` = `{}`), so a broken `traversal`
+      // would otherwise slip past the catch, restore the working copy, and leave
+      // the walk position silently defaulted to "identity" — an inconsistent
+      // resume. The traversal-shape guard must reject it BEFORE any store patch.
+      const pk = "traversal-malformed";
+      instantiateMinimal(pk);
+      saveDraft(pk);
+
+      // Corrupt just the traversal field to a non-object; leave the (valid)
+      // workingCopy untouched so it passes the workingCopy guard.
+      const envelope = JSON.parse(localStorage.getItem(draftKey(pk))!) as Record<string, unknown>;
+      expect(envelope.workingCopy).not.toBeNull();
+      envelope.traversal = null;
+      localStorage.setItem(draftKey(pk), JSON.stringify(envelope));
+
+      useWorkingCopyStore.getState().reset();
+
+      let result: boolean | undefined;
+      expect(() => {
+        result = loadDraft(pk);
+      }).not.toThrow();
+      expect(result).toBe(false);
+      // VR-3: corrupt record removed (cannot self-heal), not left to re-fail every boot.
+      expect(localStorage.getItem(draftKey(pk))).toBeNull();
+      // The working copy was NOT partially patched — stays fully reset.
+      expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
+    });
   });
 
   describe("VR-4: quota-failure no-throw", () => {

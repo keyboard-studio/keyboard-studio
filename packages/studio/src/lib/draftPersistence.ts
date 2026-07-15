@@ -282,6 +282,22 @@ export function loadDraft(projectKey: string): boolean {
       return false;
     }
 
+    // VR-3 (traversal shape): a version-matched record with a valid working
+    // copy but a missing/malformed `traversal` is genuinely corrupt — but
+    // `applyTraversalSnapshot`'s object-spread never THROWS on a non-object
+    // (`{...null}`/`{...undefined}` = `{}`), so without this guard it would
+    // slip past the catch below, restore the working copy, and leave the walk
+    // position silently defaulted to the initial "identity" step — an
+    // inconsistent resume. Validate the traversal shape symmetrically with the
+    // workingCopy guard above and, since it can't self-heal, remove + treat as
+    // absent (VR-3), rather than resume broken. Placed BEFORE the first
+    // `applyWorkingCopySnapshot` so a bad record never partially patches the
+    // stores.
+    if (envelope.traversal === null || typeof envelope.traversal !== "object") {
+      clearDraft(projectKey);
+      return false;
+    }
+
     applyWorkingCopySnapshot(envelope.workingCopy);
     applyTraversalSnapshot(envelope.traversal);
 
