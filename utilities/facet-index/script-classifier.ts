@@ -38,7 +38,14 @@ import { scriptOf, scriptExtensionsOf } from "./ucd/generated/scriptLookup.js";
 import { mapImportStatus, computeAnalyzedCoverage } from "./outcome.js";
 import type { Categorization, ConfidenceClass, FacetDefinition } from "./types.js";
 
-const NEUTRAL_SCRIPTS = new Set(["Zyyy", "Zinh"]);
+// The special ISO-15924 pseudo-scripts that are NOT concrete script evidence and
+// so are never histogram-eligible (they are excluded from script.yaml's closed
+// limits.values). Zyyy (Common) / Zinh (Inherited) carry no script evidence on
+// their own; Zzzz (Unknown, `scriptOf`'s @missing default for an unranged/PUA
+// codepoint) and Zxxx (Unwritten) are the absence of a concrete script. Emitting
+// any of these as a distribution key would fail the build-time limits check (X1),
+// which is the point — they are dropped here rather than diluting a distribution.
+const NEUTRAL_SCRIPTS = new Set(["Zyyy", "Zinh", "Zzzz", "Zxxx"]);
 
 /** Confidence-class thresholds on the dominant value's distribution share. */
 function classifyConfidence(dominantShare: number): ConfidenceClass {
@@ -54,7 +61,9 @@ function classifyConfidence(dominantShare: number): ConfidenceClass {
  * `deriveScriptFallback` (fallback.ts) in that case.
  */
 export function classifyScript(ir: KeyboardIR, def: FacetDefinition): Categorization | null {
-  void def; // limits enforcement is deferred to build-index validation, Phase 4 (T025) — not yet wired
+  void def; // every code this emits is a concrete Scripts.txt script (neutrals dropped),
+  // which is within script.yaml's closed limits.values by construction; the build-time
+  // limits check (validate.ts, X1) is the enforcing gate on that invariant.
 
   const produced = buildProducedSet(ir);
   const histogram = new Map<string, number>();

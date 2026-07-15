@@ -51,21 +51,28 @@ function buildCategorization(value: string, tier: ProvenanceTier, confidenceClas
 }
 
 export function deriveScriptFallback(meta: DeclaredMetadata, def: FacetDefinition): Categorization {
-  void def; // limits enforcement is deferred to build-index validation, Phase 4 (T025) — not yet wired
+  // A fallback tier may only emit a value the facet's closed set actually admits
+  // (X1). A declared or default script that is not histogram-eligible — a special
+  // ISO-15924 pseudo-code (Zsym/Zmth/Zxxx/…) or any code outside limits.values —
+  // is not a usable script signal here, so we fall THROUGH to the next tier rather
+  // than emit an out-of-limits value. `undetermined` (the reserved sentinel) is
+  // always admitted, so tier 3 is always valid. An `open` facet admits anything.
+  const eligible = (script: string): boolean =>
+    def.limits.open === true || !Array.isArray(def.limits.values) || def.limits.values.includes(script);
 
   // Tier 1: declared-metadata.
-  if (meta.declaredScript) {
+  if (meta.declaredScript && eligible(meta.declaredScript)) {
     return buildCategorization(meta.declaredScript, "declared-metadata", "confident");
   }
 
   // Tier 2: default-fallback (langtags default script for the declared language).
   for (const tag of meta.bcp47Tags) {
     const defaults = getLanguageDefaults(bareLanguageSubtag(tag));
-    if (defaults?.defaultScript) {
+    if (defaults?.defaultScript && eligible(defaults.defaultScript)) {
       return buildCategorization(defaults.defaultScript, "default-fallback", "mixed");
     }
   }
 
-  // Tier 3: undetermined — no declared script and no resolvable language default.
+  // Tier 3: undetermined — no eligible declared script and no resolvable language default.
   return buildCategorization(UNDETERMINED, "default-fallback", "undetermined");
 }

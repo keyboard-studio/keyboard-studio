@@ -13,15 +13,16 @@
  * Summary) until 037 registers more classifiers here.
  */
 
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parse } from "../../packages/engine/src/codec/index.js";
 import { parseKps, extractScriptSubtag } from "../../packages/engine/src/base-browser/kps-parser.js";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
-import { parse as parseYaml } from "yaml";
 
+import { loadFacetDefs } from "./load-defs.js";
+import { validateCategorization } from "./validate.js";
 import { scanCorpus, type ScannedKeyboard } from "./scan.js";
 import {
   computeSourceHashes,
@@ -30,7 +31,8 @@ import {
   unicodeVersion,
   INDEX_SCHEMA_VERSION,
 } from "./freshness.js";
-import { writeStable } from "./writeStable.js";
+import { writeStable, writeTextIfChanged } from "./writeStable.js";
+import { renderCompanionMd } from "./companion.js";
 import { classifyScript } from "./script-classifier.js";
 import { deriveScriptFallback } from "./fallback.js";
 import type {
@@ -53,28 +55,17 @@ const LANGTAGS_PIN_PATH = resolve(REPO_ROOT, "scripts", "langtags-version.json")
 export const DEFAULT_OUT_PATH = resolve(REPO_ROOT, "docs", "keyboard-facet-index.json");
 
 // ---------------------------------------------------------------------------
-// Facet-definition loading (minimal — the full loader + validator is T024)
-// ---------------------------------------------------------------------------
-
-/**
- * Read every `content/keyboard-facets/*.yaml` definition. This is
- * intentionally minimal (no schema validation beyond what YAML parsing
- * itself enforces) — the full C1-C5-validating loader is T024's job. US1
- * only needs the fields build-index reads: `id`.
- */
-function loadFacetDefs(): FacetDefinition[] {
-  if (!existsSync(FACET_DEFS_DIR)) return [];
-  const files = readdirSync(FACET_DEFS_DIR).filter((f) => f.endsWith(".yaml"));
-  return files
-    .map((f) => parseYaml(readFileSync(join(FACET_DEFS_DIR, f), "utf8")) as FacetDefinition)
-    .sort((a, b) => a.id.localeCompare(b.id));
-}
-
-// ---------------------------------------------------------------------------
 // Classifier registry (US1: only `script` is wired)
 // ---------------------------------------------------------------------------
 
-interface ClassifierPair {
+/**
+ * One facet's derivation pair: `classify` reads the parsed IR (content-derived
+ * tier, may return null when there is no evidence); `fallback` derives from
+ * declared metadata / defaults when `classify` yields nothing. The build shell
+ * is facet-agnostic — it iterates `facetIds` and dispatches through this
+ * registry; nothing script-specific lives in the per-keyboard loop (T026).
+ */
+export interface ClassifierPair {
   classify: (ir: KeyboardIR, def: FacetDefinition) => Categorization | null;
   fallback: (kb: ScannedKeyboard, def: FacetDefinition) => Categorization;
 }
@@ -104,7 +95,12 @@ function extractDeclaredScript(bcp47Tags: string[]): string | null {
   return null;
 }
 
-const CLASSIFIERS: Record<string, ClassifierPair> = {
+/**
+ * The shipped classifier registry (US1: only `script` is wired; 037 registers
+ * more). Exported so tests can compose it with a demo facet to prove the shell
+ * is pure-addition extensible (T026/T022) without polluting the shipped set.
+ */
+export const DEFAULT_CLASSIFIERS: Record<string, ClassifierPair> = {
   script: { classify: classifyScript, fallback: scriptFallback },
 };
 
@@ -133,17 +129,21 @@ function parseIr(kb: ScannedKeyboard): ParseIrResult {
   }
 }
 
-function buildKeyboardRecord(kb: ScannedKeyboard, defs: FacetDefinition[]): KeyboardRecord {
+function buildKeyboardRecord(
+  kb: ScannedKeyboard,
+  defs: FacetDefinition[],
+  classifiers: Record<string, ClassifierPair>,
+): KeyboardRecord {
   const { ir, parseError } = parseIr(kb);
 
   const facets: Record<string, Categorization> = {};
   for (const def of defs) {
-    const pair = CLASSIFIERS[def.id];
+    const pair = classifiers[def.id];
     if (!pair) {
       throw new Error(
         `facet-index build: no classifier registered for facet id "${def.id}" ` +
           `(content/keyboard-facets/${def.id}.yaml exists but utilities/facet-index/build-index.ts ` +
-          `has no CLASSIFIERS entry for it)`,
+          `has no DEFAULT_CLASSIFIERS entry for it)`,
       );
     }
     const contentCategorization = ir ? pair.classify(ir, def) : null;
@@ -164,6 +164,21 @@ function buildKeyboardRecord(kb: ScannedKeyboard, defs: FacetDefinition[]): Keyb
   // loud here rather than downstream in the lint.
   if (Object.keys(facets).length !== defs.length) {
     throw new Error(`facet-index build: keyboard "${kb.id}" is missing a facet record (SC-001/X3)`);
+  }
+
+  // X1/X2/X4: validate every freshly-produced categorization at the point of
+  // production (T025; FR-008). A bad value — a classifier emitting outside its
+  // facet's limits, a malformed distribution — fails the build loud rather than
+  // being written (US2 acceptance 2). The repo lint (T032) re-checks the
+  // committed artifact as a second gate.
+  const problems: string[] = [];
+  for (const def of defs) {
+    for (const p of validateCategorization(kb.id, def, facets[def.id]!)) problems.push(p);
+  }
+  if (problems.length > 0) {
+    throw new Error(
+      `facet-index build: ${problems.length} record-validation failure(s):\n  ` + problems.join("\n  "),
+    );
   }
 
   return {
@@ -219,6 +234,10 @@ export interface BuildOptions {
   limit?: number | null;
   incremental?: boolean;
   outPath?: string;
+  /** Override the facet-definition dir (default `content/keyboard-facets`). Tests only. */
+  facetDefsDir?: string;
+  /** Override the classifier registry (default `DEFAULT_CLASSIFIERS`). Tests only. */
+  classifiers?: Record<string, ClassifierPair>;
 }
 
 /**
@@ -231,19 +250,27 @@ export function buildIndex(opts: BuildOptions = {}): FacetIndex {
   const outPath = opts.outPath ?? DEFAULT_OUT_PATH;
   const incremental = opts.incremental ?? false;
 
-  const defs = loadFacetDefs();
+  const defs = loadFacetDefs(opts.facetDefsDir ?? FACET_DEFS_DIR);
+  const classifiers = opts.classifiers ?? DEFAULT_CLASSIFIERS;
   const scanOpts: { corpusRoot?: string; limit?: number | null } = { limit: opts.limit ?? null };
   if (opts.corpusRoot !== undefined) scanOpts.corpusRoot = opts.corpusRoot;
   const scan = scanCorpus(scanOpts);
 
-  // US3's full incremental wiring is T030; this is the minimal pass-through
-  // so the `incremental` option is not silently ignored — carry forward a
-  // keyboard's prior record verbatim when its source hashes are unchanged and
-  // no version bump forces a full rescan.
+  // Incremental rescan (US3, T030): read the prior committed index and carry a
+  // keyboard's record forward verbatim when its source hashes are unchanged and
+  // no version bump forces a full recompute; only the dirty set re-analyzes.
+  const currentFacetIds = defs.map((d) => d.id).sort();
   let prior: FacetIndex | null = null;
   if (incremental && outPath && existsSync(outPath)) {
     try {
-      prior = JSON.parse(readFileSync(outPath, "utf8")) as FacetIndex;
+      const parsed = JSON.parse(readFileSync(outPath, "utf8")) as FacetIndex;
+      // A change to the facet SET (a facet added/removed since the prior build)
+      // reshapes every record — the prior records would be missing/carrying an
+      // extra facet key. Discard the prior so the build falls back to a full
+      // rescan rather than carrying forward stale-shaped records (which would
+      // trip the X3 coverage assert below with a confusing message).
+      const priorFacetIds = [...(parsed.manifest?.facetIds ?? [])].sort();
+      if (JSON.stringify(priorFacetIds) === JSON.stringify(currentFacetIds)) prior = parsed;
     } catch {
       prior = null;
     }
@@ -265,10 +292,10 @@ export function buildIndex(opts: BuildOptions = {}): FacetIndex {
       keyboards[kb.id] = priorRecord;
       continue;
     }
-    keyboards[kb.id] = buildKeyboardRecord(kb, defs);
+    keyboards[kb.id] = buildKeyboardRecord(kb, defs, classifiers);
   }
 
-  const facetIds = defs.map((d) => d.id).sort();
+  const facetIds = currentFacetIds;
   const facetCoverage: Record<string, FacetTierCounts> = {};
   for (const facetId of facetIds) facetCoverage[facetId] = emptyTierCounts();
   for (const record of Object.values(keyboards)) {
@@ -295,7 +322,11 @@ export function buildIndex(opts: BuildOptions = {}): FacetIndex {
 
   const index: FacetIndex = { manifest, keyboards };
 
-  if (outPath) writeStable(outPath, index);
+  if (outPath) {
+    writeStable(outPath, index);
+    // Companion audit md alongside the JSON (same stem, `.md`) — FR-007, T034.
+    writeTextIfChanged(outPath.replace(/\.json$/, ".md"), renderCompanionMd(index));
+  }
 
   return index;
 }

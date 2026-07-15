@@ -43,15 +43,24 @@ export function stableStringify(value: unknown): string {
  * the file was already up to date. Creates parent directories as needed.
  */
 export function writeStable(path: string, value: unknown): boolean {
-  const content = stableStringify(value);
+  return writeTextIfChanged(path, stableStringify(value));
+}
+
+/**
+ * Write raw `text` to `path`, but only if it differs from what is on disk (same
+ * write-only-if-changed discipline as `writeStable`, for the human-readable
+ * companion whose payload is already-canonical text rather than JSON). Returns
+ * `true` when a write happened.
+ */
+export function writeTextIfChanged(path: string, text: string): boolean {
   let existing = "";
   try {
     existing = readFileSync(path, "utf8");
   } catch {
     /* file does not exist yet — treat as changed */
   }
-  if (existing === content) return false;
+  if (existing === text) return false;
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, content, "utf8");
+  writeFileSync(path, text, "utf8");
   return true;
 }

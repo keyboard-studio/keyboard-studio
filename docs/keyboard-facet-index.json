@@ -4914,10 +4914,9 @@
           "confidence": null,
           "confidenceClass": "confident",
           "distribution": {
-            "Thai": 0.9873417721518988,
-            "Zzzz": 0.012658227848101266
+            "Thai": 1
           },
-          "evidenceSize": 79,
+          "evidenceSize": 78,
           "provenanceTier": "content-derived",
           "value": "Thai"
         }
@@ -4967,10 +4966,9 @@
           "confidence": null,
           "confidenceClass": "confident",
           "distribution": {
-            "Thai": 0.9873417721518988,
-            "Zzzz": 0.012658227848101266
+            "Thai": 1
           },
-          "evidenceSize": 79,
+          "evidenceSize": 78,
           "provenanceTier": "content-derived",
           "value": "Thai"
         }
@@ -7270,10 +7268,9 @@
           "confidence": null,
           "confidenceClass": "confident",
           "distribution": {
-            "Arab": 0.9895833333333334,
-            "Zzzz": 0.010416666666666666
+            "Arab": 1
           },
-          "evidenceSize": 96,
+          "evidenceSize": 95,
           "provenanceTier": "content-derived",
           "value": "Arab"
         }
@@ -10583,11 +10580,10 @@
           "confidence": null,
           "confidenceClass": "confident",
           "distribution": {
-            "Grek": 0.98,
-            "Hebr": 0.004,
-            "Zzzz": 0.016
+            "Grek": 0.9959349593495935,
+            "Hebr": 0.0040650406504065045
           },
-          "evidenceSize": 250,
+          "evidenceSize": 246,
           "provenanceTier": "content-derived",
           "value": "Grek"
         }
@@ -10665,11 +10661,10 @@
           "confidence": null,
           "confidenceClass": "confident",
           "distribution": {
-            "Grek": 0.018907563025210083,
-            "Latn": 0.9684873949579832,
-            "Zzzz": 0.012605042016806723
+            "Grek": 0.019148936170212766,
+            "Latn": 0.9808510638297873
           },
-          "evidenceSize": 238,
+          "evidenceSize": 235,
           "provenanceTier": "content-derived",
           "value": "Latn"
         }
@@ -11164,10 +11159,9 @@
           "confidence": null,
           "confidenceClass": "confident",
           "distribution": {
-            "Ethi": 0.9814814814814815,
-            "Zzzz": 0.018518518518518517
+            "Ethi": 1
           },
-          "evidenceSize": 270,
+          "evidenceSize": 265,
           "provenanceTier": "content-derived",
           "value": "Ethi"
         }
@@ -13392,11 +13386,10 @@
           "confidence": null,
           "confidenceClass": "confident",
           "distribution": {
-            "Grek": 0.018518518518518517,
-            "Latn": 0.9629629629629629,
-            "Zzzz": 0.018518518518518517
+            "Grek": 0.018867924528301886,
+            "Latn": 0.9811320754716981
           },
-          "evidenceSize": 54,
+          "evidenceSize": 53,
           "provenanceTier": "content-derived",
           "value": "Latn"
         }
@@ -13420,11 +13413,10 @@
           "confidence": null,
           "confidenceClass": "confident",
           "distribution": {
-            "Grek": 0.9464285714285714,
-            "Latn": 0.017857142857142856,
-            "Zzzz": 0.03571428571428571
+            "Grek": 0.9814814814814815,
+            "Latn": 0.018518518518518517
           },
-          "evidenceSize": 56,
+          "evidenceSize": 54,
           "provenanceTier": "content-derived",
           "value": "Grek"
         }
@@ -13683,10 +13675,9 @@
           "confidence": null,
           "confidenceClass": "confident",
           "distribution": {
-            "Laoo": 0.9759036144578314,
-            "Zzzz": 0.024096385542168676
+            "Laoo": 1
           },
-          "evidenceSize": 83,
+          "evidenceSize": 81,
           "provenanceTier": "content-derived",
           "value": "Laoo"
         }
@@ -16347,13 +16338,13 @@
           "analysisOutcome": "fallback-only",
           "analyzedCoverage": 0,
           "confidence": null,
-          "confidenceClass": "confident",
+          "confidenceClass": "undetermined",
           "distribution": {
-            "Zsym": 1
+            "undetermined": 1
           },
           "evidenceSize": 0,
-          "provenanceTier": "declared-metadata",
-          "value": "Zsym"
+          "provenanceTier": "default-fallback",
+          "value": "undetermined"
         }
       },
       "freshness": {
@@ -19134,10 +19125,9 @@
           "confidence": null,
           "confidenceClass": "confident",
           "distribution": {
-            "Ethi": 0.9958932238193019,
-            "Zzzz": 0.004106776180698152
+            "Ethi": 1
           },
-          "evidenceSize": 487,
+          "evidenceSize": 485,
           "provenanceTier": "content-derived",
           "value": "Ethi"
         }
@@ -19160,10 +19150,9 @@
           "confidence": null,
           "confidenceClass": "confident",
           "distribution": {
-            "Ethi": 0.9958932238193019,
-            "Zzzz": 0.004106776180698152
+            "Ethi": 1
           },
-          "evidenceSize": 487,
+          "evidenceSize": 485,
           "provenanceTier": "content-derived",
           "value": "Ethi"
         }
@@ -22917,10 +22906,9 @@
           "confidence": null,
           "confidenceClass": "confident",
           "distribution": {
-            "Tfng": 0.921875,
-            "Zzzz": 0.078125
+            "Tfng": 1
           },
-          "evidenceSize": 64,
+          "evidenceSize": 59,
           "provenanceTier": "content-derived",
           "value": "Tfng"
         }
@@ -23857,9 +23845,9 @@
     "facetCoverage": {
       "script": {
         "content": 893,
-        "declared": 14,
+        "declared": 13,
         "fallback": 10,
-        "undetermined": 1
+        "undetermined": 2
       }
     },
     "facetIds": [
