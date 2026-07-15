@@ -403,7 +403,7 @@ describe("emitTouchLayout", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Flick + multitap round-trip — regression guard (PR #592 / issue #354)
+  // Flick + multitap round-trip — regression guard for the parser consolidation
   //
   // The old engine parser merged multitap into sk on parse.  After the
   // canonical-parser consolidation the full cycle must be stable:

@@ -1,5 +1,5 @@
 /**
- * Canonical `.keyman-touch-layout` JSON parser (issue #354).
+ * Canonical `.keyman-touch-layout` JSON parser.
  *
  * The touch layout file is a JSON object with one or more platform keys
  * (desktop, tablet, phone). Each platform has a `layer` array; each layer has a
@@ -150,6 +150,10 @@ function convertKey(raw: RawKey, nextId: () => string): TouchKeyIR {
   if (raw.text !== undefined) key.text = raw.text;
   if (raw.output !== undefined) key.output = raw.output;
   if (raw.nextlayer !== undefined) key.nextlayer = raw.nextlayer;
+  // An empty-string hint is treated as absent (not carried onto the IR): it
+  // renders nothing at runtime, so `""` and unset are indistinguishable in
+  // behaviour. Unifies onto the engine parser's prior form (the old lint parser
+  // kept `""`); blast radius is nil today — no Layer C check reads `hint`.
   if (typeof raw.hint === "string" && raw.hint.length > 0) key.hint = raw.hint;
 
   const sp = toNumber(raw.sp);

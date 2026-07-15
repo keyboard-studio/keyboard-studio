@@ -2,7 +2,7 @@
  * .keyman-touch-layout codec — emitter, plus a re-export of the canonical parser.
  *
  * The parser ({@link parseTouchLayout}) is the shared implementation in
- * `@keyboard-studio/contracts` (issue #354), so the engine codec and the
+ * `@keyboard-studio/contracts`, so the engine codec and the
  * keyboard-lint package parse identically. The emitter is the codec's own
  * concern (lint never emits) and stays here as the inverse of that parser.
  */

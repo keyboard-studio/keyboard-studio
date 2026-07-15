@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { parseTouchLayoutString } from "./parseTouchLayout.js";
+import {
+  parseTouchLayoutString,
+  parseTouchLayoutFromVfs,
+  touchLayoutPath,
+} from "./parseTouchLayout.js";
+import { createVirtualFS } from "./virtualFS.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -294,5 +299,48 @@ describe("parseTouchLayoutString — error handling", () => {
 
   it("throws TypeError when JSON root is null", () => {
     expect(() => parseTouchLayoutString("null")).toThrow(TypeError);
+  });
+});
+
+describe("parseTouchLayoutString — hint narrowing", () => {
+  it("preserves a non-empty hint", () => {
+    const key = firstKey(makeLayout({ hint: "à" }));
+    expect(key.hint).toBe("à");
+  });
+
+  it("treats an empty-string hint as absent (not carried onto the IR)", () => {
+    const key = firstKey(makeLayout({ hint: "" }));
+    expect(key.hint).toBeUndefined();
+    expect("hint" in key).toBe(false);
+  });
+});
+
+describe("parseTouchLayoutFromVfs — VFS adapter (lenient entry point)", () => {
+  const kbId = "khmer_angkor";
+  const layoutJson = JSON.stringify({
+    tablet: {
+      layer: [{ id: "default", row: [{ id: 1, key: [{ id: "K_A", text: "a" }] }] }],
+    },
+  });
+
+  it("parses a present, valid layout file", () => {
+    const fs = createVirtualFS([
+      { path: touchLayoutPath(kbId), content: layoutJson, isBinary: false },
+    ]);
+    const ir = parseTouchLayoutFromVfs(fs, kbId);
+    expect(ir).toBeDefined();
+    expect(ir!.platforms[0]!.layers[0]!.rows[0]!.keys[0]!.id).toBe("K_A");
+  });
+
+  it("returns undefined (no throw) when the layout file is absent", () => {
+    const fs = createVirtualFS([]);
+    expect(parseTouchLayoutFromVfs(fs, kbId)).toBeUndefined();
+  });
+
+  it("returns undefined (no throw) when the layout file is malformed JSON", () => {
+    const fs = createVirtualFS([
+      { path: touchLayoutPath(kbId), content: "{ not valid json", isBinary: false },
+    ]);
+    expect(parseTouchLayoutFromVfs(fs, kbId)).toBeUndefined();
   });
 });

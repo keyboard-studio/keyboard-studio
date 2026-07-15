@@ -104,7 +104,7 @@ describe("parseTouchLayout — deterministic nodeIds (fix 2)", () => {
     const firstId1 = ir1!.platforms[0]!.layers[0]!.rows[0]!.keys[0]!.nodeId;
     const firstId2 = ir2!.platforms[0]!.layers[0]!.rows[0]!.keys[0]!.nodeId;
     expect(firstId1).toBe(firstId2);
-    // Canonical shared parser mints touchKey#<n> from a per-call counter (#354).
+    // Canonical shared parser mints touchKey#<n> from a per-call counter.
     expect(firstId1).toBe("touchKey#0");
   });
 });
