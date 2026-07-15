@@ -51,6 +51,8 @@ The load-bearing record. Lives inside the index under `keyboards[<id>].facets[<f
 | `analyzedCoverage` | number | yes | fraction of rule output analyzable (`1 − opaque share`); 037's coverage measure. |
 | `analysisOutcome` | `fully \| partially \| fallback-only` | yes | FR-010. Maps from `ImportStatus` (Clean / CleanWithOpaque / ParseFailure) — see research D5. |
 | `notes` | string | optional | e.g. declaration/artifact mismatch flag (target facet). |
+| `residue` | number | optional | **(037)** for facets whose `distribution` is over a **closed recognized-value keyspace** that may not cover all analyzable content (e.g. strategy-fingerprint): the share of analyzable content matching no recognized value. Absent for facets whose distribution is exhaustive over the value space (e.g. script). |
+| `subProfile` | `Record<string, unknown>` | optional | **(037)** per-record, facet-specific within-value sub-classification hint (e.g. script's Latin plain/extended/IPA profile). Opaque to 036's generic validation — the owning classifier defines its shape. Counterpart to Entity 1's definition-level `subProfiles` field (§ above): `subProfiles` declares the *possible* sub-dimensions a facet may report; `subProfile` is the *actual* per-keyboard value. |
 
 **Per-keyboard freshness** (shared across that keyboard's facets, stored once at
 `keyboards[<id>].freshness`, not per facet):
@@ -60,10 +62,15 @@ The load-bearing record. Lives inside the index under `keyboards[<id>].facets[<f
 | `sourceHashes` | `Record<path, sha256>` | the `.kmn` + sibling files the record set was derived from (FR-005). Gates incremental rescan. |
 | `analyzedAtScannerVersion` | string | the `scannerVersion` this record set was produced under. |
 
-**State/validation**: a value outside `limits` ⇒ **build fails** (never recorded). A `distribution` not
-summing to ~1 (tolerance ε) ⇒ build fails. `analysisOutcome: fallback-only` requires `provenanceTier ≠
-content-derived`. Every keyboard in scope MUST have a record for every defined facet (SC-001) — a missing
-facet record is a build failure, not a silent omission.
+**State/validation**: a value outside `limits` ⇒ **build fails** (never recorded). The distribution-sum
+invariant is **scoped by whether `residue` is present** (037): when `residue` is **absent**, `Σ distribution
+== 1 ± ε` (unchanged — the value space is exhaustive); when `residue` is **present**, `Σ distribution +
+residue == 1 ± ε` (the value space is a closed recognized subset and residue accounts for the remainder).
+Either way the sum-to-1 check still fails the build; it just adds `residue` into the sum when the field is
+present, so a legitimately residue-dominated record (e.g. a strategy-fingerprint record where most rules
+match no recognized strategy) validates rather than being rejected. `analysisOutcome: fallback-only`
+requires `provenanceTier ≠ content-derived`. Every keyboard in scope MUST have a record for every defined
+facet (SC-001) — a missing facet record is a build failure, not a silent omission.
 
 ---
 
