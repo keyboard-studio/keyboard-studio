@@ -1080,6 +1080,83 @@ describe("scaffoldTouchLayout", () => {
       }
     });
 
+    it("Case B: a carried-through key whose sk[] already covers every deadkey successor gains no duplicate entry, and its existing sk[] keeps original content with carry-through tagging", () => {
+      // Exercises the newSk.length === 0 branch of augmentExistingPhoneLayers:
+      // the deadkey successor ("ê") is already present in the shipped sk[], so
+      // the successor filter leaves nothing new to add and the key must come
+      // back with exactly its original sk[] entries — no duplicate — while
+      // still receiving the carry-through provenance normalization (untagged
+      // entries -> base-derived, explicit hand-set preserved).
+      const vkey = "K_E";
+      const successorChar = "ê";
+      const ownedNodeId = freshId("rule");
+
+      const shippedSuccessorSk = {
+        nodeId: freshId("key"),
+        id: "U_00EA",
+        text: successorChar,
+      };
+      const shippedHandSetSk = {
+        nodeId: freshId("key"),
+        id: "K_X",
+        text: "x",
+        provenance: "hand-set" as const,
+      };
+      const existingKey = {
+        nodeId: freshId("key"),
+        id: vkey,
+        text: "e",
+        output: "e",
+        sk: [shippedSuccessorSk, shippedHandSetSk],
+      };
+      const existingTouchLayout: TouchLayoutIR = {
+        platforms: [
+          {
+            id: "phone",
+            layers: [
+              {
+                id: "default",
+                rows: [{ keys: [existingKey] }],
+              },
+            ],
+          },
+        ],
+        nodeIds: [],
+      };
+
+      const deadkeyRule: IRRule = {
+        nodeId: ownedNodeId,
+        context: [
+          { kind: "deadkey", name: "dk1" } as never,
+          { kind: "vkey", name: vkey, modifiers: [] },
+        ],
+        output: [{ kind: "char", value: successorChar }],
+      };
+      const pattern = makeS02Pattern(vkey, successorChar, ownedNodeId);
+      const ir = makeMinimalIR({
+        groups: [makeGroup([deadkeyRule])],
+        recognizedPatterns: [pattern],
+        touchLayout: existingTouchLayout,
+      });
+
+      const result = scaffoldTouchLayout(ir);
+      const phone = result.platforms.find((p) => p.id === "phone")!;
+      const defaultLayer = phone.layers.find((l) => l.id === "default")!;
+      const targetKey = defaultLayer.rows.flatMap((r) => r.keys).find((k) => k.id === vkey)!;
+
+      expect(targetKey.provenance).toBe("base-derived");
+      // Exactly the two shipped entries — no duplicate for the already-covered successor.
+      expect(targetKey.sk).toHaveLength(2);
+      const successorEntry = targetKey.sk!.find((s) => s.text === successorChar)!;
+      expect(successorEntry.id).toBe(shippedSuccessorSk.id);
+      expect(successorEntry.nodeId).toBe(shippedSuccessorSk.nodeId);
+      // Untagged shipped entry receives the carry-through normalization...
+      expect(successorEntry.provenance).toBe("base-derived");
+      // ...while an explicit hand-set entry is preserved untouched.
+      const handSetEntry = targetKey.sk!.find((s) => s.text === "x")!;
+      expect(handSetEntry.provenance).toBe("hand-set");
+    });
+
     it("Case B: carried-through flick and multitap sub-keys with no existing provenance are tagged base-derived, and explicit tags are preserved", () => {
       const existingKey = {
         nodeId: freshId("key"),
