@@ -30,4 +30,15 @@ describe("matchKeyboardScopePath", () => {
   it("returns null for a bare directory path with no .kps file", () => {
     expect(matchKeyboardScopePath("release/b/basic_kbdus/source")).toBeNull();
   });
+
+  it("returns null for a non-canonical nested path (extra segment past source/)", () => {
+    // The `^...$` anchoring must reject a .kps buried below the canonical
+    // source/ depth (e.g. under extras/) rather than mis-extracting an id.
+    expect(
+      matchKeyboardScopePath("release/b/basic_kbdus/source/extras/basic_kbdus.kps")
+    ).toBeNull();
+    expect(
+      matchKeyboardScopePath("release/b/basic_kbdus/nested/basic_kbdus.kps")
+    ).toBeNull();
+  });
 });

@@ -6,11 +6,11 @@
  * is `release/**` only (research D6), and the keyboard `id` is the directory
  * name — matched by the shared corpus-scope helper below.
  *
- * SCOPE NOTE (#1126). The `release/<vendor>/<id>/[source/]<id>.kps` scope
+ * SCOPE NOTE. The `release/<vendor>/<id>/[source/]<id>.kps` scope
  * regexes are shared with base-browser.ts (which matches the same path shape
  * against the GitHub *recursive-tree* API rather than a local checkout) via
  * `@keyboard-studio/engine`'s `corpus-scope` module, so the two consumers
- * cannot diverge again the way they did in #1125 (base-browser had not yet
+ * cannot diverge again the way they once did (base-browser had not yet
  * been reconciled with the corpus's move to the `source/` layout).
  *
  * Modelled on utilities/supportability-scanner/scan.ts: a standalone tsx tool

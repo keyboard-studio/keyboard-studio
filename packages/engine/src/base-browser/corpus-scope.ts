@@ -6,19 +6,19 @@
 // `\1` back-reference.
 //
 // Two layouts exist in the live corpus:
-//   - Keyman 17+ "project format" (current default, 918/918 packages as of
-//     the #1125 audit): the package nests under a `source/` subfolder —
+//   - Keyman 17+ "project format" (the current default for essentially every
+//     package in the corpus): the package nests under a `source/` subfolder —
 //     `release/<vendor>/<id>/source/<id>.kps`.
 //   - Legacy flat-root layout (a residual handful of keyboards): the `.kps`
 //     sits directly in the `<id>` folder — `release/<vendor>/<id>/<id>.kps`.
 //
 // Callers that don't reconcile both layouts silently match zero (or a strict
 // subset of) keyboards depending on which layout the corpus favors at the
-// time — this happened to base-browser when the corpus migrated to `source/`
-// (#1125). `matchKeyboardScopePath` is the single place both layouts are
+// time — this happened to base-browser when the corpus migrated to `source/`.
+// `matchKeyboardScopePath` is the single place both layouts are
 // tried, so base-browser (remote GitHub git-tree paths) and
 // utilities/facet-index (local-checkout relative paths) can't diverge again
-// (#1126) — both consumers match the same `release/<vendor>/<id>/[source/]<id>.kps`
+// — both consumers match the same `release/<vendor>/<id>/[source/]<id>.kps`
 // path-string shape, only the path source (remote tree listing vs. local
 // filesystem walk) differs.
 

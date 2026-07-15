@@ -76,7 +76,7 @@ const RAW_BASE =
   "https://raw.githubusercontent.com/keyboard-studio/keyboards/master";
 
 // basic_kbdus and sil_devanagari_phonetic use the Keyman 17+ source/ layout
-// (the live corpus's current default, 918/918 packages per the #1125 audit);
+// (the live corpus's current default for essentially every package);
 // sil_euro_latin stays on the legacy flat-root layout to prove dual-layout
 // support is preserved.
 const KPS_RESPONSES: Record<string, string> = {
