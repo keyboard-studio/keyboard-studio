@@ -1,0 +1,12 @@
+store(&VERSION) '10.0'
+store(&NAME) 'Fixture Arabic'
+store(&TARGETS) 'any'
+store(&COPYRIGHT) '(c) 2026 Fixture'
+store(&KEYBOARDVERSION) '1.0'
+
+group(main) using keys
+
++ [K_A] > U+0627
++ [K_S] > U+0628
++ [K_D] > U+062C
++ [K_F] > U+062F

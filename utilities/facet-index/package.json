@@ -5,9 +5,11 @@
   "type": "module",
   "description": "Offline per-keyboard facet index build tool (spec 036). Imports @keyboard-studio/engine source (codec, langtags) plus the pinned UCD data (scripts/ucd-version.json) to classify each keyboard in the keymanapp/keyboards corpus against the content/keyboard-facets/ definitions, and emits docs/keyboard-facet-index.json — the offline read surface downstream consumers (base-browser, gallery) query instead of scanning the corpus live. No build step; run via tsx.",
   "scripts": {
-    "build": "tsx cli.ts"
+    "build": "tsx cli.ts",
+    "test": "vitest run --config vitest.config.ts"
   },
   "devDependencies": {
-    "tsx": "^4.19.0"
+    "tsx": "^4.19.0",
+    "vitest": "^4.1.6"
   }
 }
