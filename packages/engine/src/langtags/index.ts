@@ -78,8 +78,8 @@ export function lookupByName(query: string): readonly LanguageSummary[] {
 
     // Alternate English names (langtags aliases) live on LanguageDefaults, not
     // the summary row; fold them into the English tiers so an alias resolves
-    // like the canonical name. englishNames[0] duplicates englishName, so this
-    // only adds the non-primary aliases. O(1) index lookup per row.
+    // like the canonical name. englishNames[0] duplicates englishName, so
+    // matching it again here is redundant but harmless. O(1) index lookup per row.
     const altNames = getLanguageDefaults(lang.code)?.englishNames ?? [];
     const altPre = altNames.some((n) => n.toLowerCase().startsWith(q));
     const altSub = altNames.some((n) => n.toLowerCase().includes(q));

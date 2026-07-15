@@ -115,6 +115,10 @@ describe("lookupByName", () => {
     expect(results.map((r) => r.code)).toContain("ab");
     // Prefix of the alternate also surfaces it (English-prefix tier).
     expect(lookupByName("Abkhazi").map((r) => r.code)).toContain("ab");
+    // Mid-string fragment of the alternate surfaces it via the substring tier
+    // (altSub): "khazi" is inside "Abkhazian" but neither prefixes it nor
+    // appears in the primary "Abkhaz" (no "i"), so only altSub can match.
+    expect(lookupByName("khazi").map((r) => r.code)).toContain("ab");
   });
 });
 
