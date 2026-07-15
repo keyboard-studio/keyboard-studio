@@ -20,6 +20,7 @@ import {
 import type { GoogleIdentitySession } from "../lib/identity.ts";
 import type { OAuthCallbackFailureReason } from "../lib/handleOAuthCallback.ts";
 import { snapshotWorkingCopyToSession } from "../lib/persistWorkingCopy.ts";
+import { flushActiveDraft } from "../lib/draftPersistence.ts";
 
 /**
  * Static, user-facing copy for each Google OAuth-callback failure reason.
@@ -111,6 +112,9 @@ export function useGoogleAuth(): UseGoogleAuthResult {
     try {
       const url = await beginGoogleAuthorize();
       snapshotWorkingCopyToSession();
+      // Flush the durable draft in the same instant as the sessionStorage
+      // snapshot so they can't diverge across the redirect (see flushActiveDraft).
+      flushActiveDraft();
       window.location.assign(url);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to start Google sign-in.");
