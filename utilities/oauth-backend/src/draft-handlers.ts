@@ -11,10 +11,12 @@
  */
 
 import {
+  DEFAULT_DRAFT_ID,
   MAX_DRAFT_BYTES,
   PutDraftBodySchema,
   type DraftMeta,
   type GetDraftContentResponse,
+  type GetDraftListResponse,
   type GetDraftMetaResponse,
   type PutDraftResponse,
 } from "./draft-schemas.js";
@@ -70,12 +72,28 @@ async function authenticate(
 export async function getDraftMeta(
   authHeader: string | null | undefined,
   config: DraftHandlerConfig,
+  draftId: string = DEFAULT_DRAFT_ID,
 ): Promise<DraftResult<GetDraftMetaResponse>> {
   const user = await authenticate(authHeader, config);
   if (user === null) return { ok: false, status: 401, error: "unauthorized" };
 
-  const meta = await config.store.getMeta(user.id);
+  const meta = await config.store.getMeta(user.id, draftId);
   return { ok: true, status: 200, data: { meta } };
+}
+
+// ---------------------------------------------------------------------------
+// GET /drafts — list every draft's metadata ("My keyboards")
+// ---------------------------------------------------------------------------
+
+export async function listDrafts(
+  authHeader: string | null | undefined,
+  config: DraftHandlerConfig,
+): Promise<DraftResult<GetDraftListResponse>> {
+  const user = await authenticate(authHeader, config);
+  if (user === null) return { ok: false, status: 401, error: "unauthorized" };
+
+  const drafts = await config.store.listMeta(user.id);
+  return { ok: true, status: 200, data: { drafts } };
 }
 
 // ---------------------------------------------------------------------------
@@ -85,11 +103,12 @@ export async function getDraftMeta(
 export async function getDraftContent(
   authHeader: string | null | undefined,
   config: DraftHandlerConfig,
+  draftId: string = DEFAULT_DRAFT_ID,
 ): Promise<DraftResult<GetDraftContentResponse>> {
   const user = await authenticate(authHeader, config);
   if (user === null) return { ok: false, status: 401, error: "unauthorized" };
 
-  const stored = await config.store.getDraft(user.id);
+  const stored = await config.store.getDraft(user.id, draftId);
   if (stored === null) return { ok: true, status: 200, data: { draft: null, meta: null } };
   return { ok: true, status: 200, data: { draft: stored.draft, meta: stored.meta } };
 }
@@ -138,10 +157,11 @@ export async function putDraft(
 export async function deleteDraft(
   authHeader: string | null | undefined,
   config: DraftHandlerConfig,
+  draftId: string = DEFAULT_DRAFT_ID,
 ): Promise<DraftResult<{ ok: true }>> {
   const user = await authenticate(authHeader, config);
   if (user === null) return { ok: false, status: 401, error: "unauthorized" };
 
-  await config.store.deleteDraft(user.id);
+  await config.store.deleteDraft(user.id, draftId);
   return { ok: true, status: 200, data: { ok: true } };
 }

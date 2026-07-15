@@ -35,3 +35,32 @@ export interface DraftMeta {
    */
   source?: "local" | "cloud";
 }
+
+/**
+ * Lightweight per-project row for the "My keyboards" list — no working-copy
+ * payload, so the list can render fast without deserializing every project's
+ * full `StudioDraft`. One entry per `ks.studio.project.<projectKey>` record.
+ *
+ * Kept structurally close to the server's `DraftMeta` (draft-schemas.ts) on
+ * purpose — the two are the client/server mirrors of the same project row, so
+ * `buildServerMeta()`/`buildIndexEntry()` can map one from the other with a
+ * single function each, not two divergent shapes. `projectKey` and `langTag`
+ * are the two client-only additions (the server calls `projectKey` `draftId`;
+ * `langTag` is a display-only convenience the server doesn't need).
+ */
+export interface ProjectIndexEntry {
+  /** Stable per-project key — see deriveProjectKey() in draftAutosave.ts. */
+  projectKey: string;
+  /** Epoch ms the project was last saved. */
+  savedAt: number;
+  /** Current step the project was on (e.g. "carve"). */
+  activeStepId: SurveySessionSnapshot["activeStepId"];
+  /** Best-effort human label for the project, or null. */
+  label: string | null;
+  /** BCP47 language tag for the card badge, or null. */
+  langTag: string | null;
+  /** Draft lifecycle. "submitted" projects are read-only (no Resume). */
+  status: "draft" | "submitted";
+  /** PR URL, set only when status === "submitted". */
+  prUrl: string | null;
+}

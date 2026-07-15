@@ -778,15 +778,32 @@ describe("StudioShell — route: #output renders OutputScreen", () => {
 // ---------------------------------------------------------------------------
 
 describe("StudioShell — first-visit landing gate", () => {
+  // Seeds the NEW per-project scheme directly (specs/037-my-keyboards), rather
+  // than the legacy `ks.studio.draft` key: this describe block renders the
+  // statically-imported StudioShell (no vi.resetModules()), so the module-init
+  // migrateLegacyDraft() call already ran once for the whole file and will not
+  // re-run per test — a legacy-key seed here would never be adopted. The
+  // "resume draft banner" describe block below (which DOES re-import the
+  // module per test) is what exercises the legacy-key migration path itself.
   function seedResumableDraft() {
+    const projectKey = "__pending__";
+    const savedAt = Date.now();
     localStorage.setItem(
-      "ks.studio.draft",
+      `ks.studio.project.${projectKey}`,
       JSON.stringify({
         version: 1,
-        savedAt: Date.now(),
-        survey: { activeStepId: "identity", identityResult: null, scaffoldSpec: null },
+        savedAt,
+        survey: { activeStepId: "identity", identityResult: null, scaffoldSpec: null, history: [] },
+        workingCopy: null,
       }),
     );
+    localStorage.setItem(
+      "ks.studio.projects.index",
+      JSON.stringify([
+        { projectKey, savedAt, activeStepId: "identity", label: null, langTag: null, status: "draft", prUrl: null },
+      ]),
+    );
+    localStorage.setItem("ks.studio.activeProject", projectKey);
   }
 
   it("mounts WelcomeScreen (not the survey) on a first visit with no hash", async () => {
@@ -1010,13 +1027,24 @@ describe("StudioShell — resume draft banner", () => {
     await renderFreshStudioShell();
 
     expect(screen.getByTestId("resume-draft-banner")).toBeTruthy();
-    expect(localStorage.getItem("ks.studio.draft")).not.toBeNull();
+    // Migration (module-init migrateLegacyDraft(), re-run fresh here via
+    // vi.resetModules()) has already adopted the legacy draft into the new
+    // per-project scheme by the time StudioShell mounts — the legacy key is
+    // gone, and the project lives under its derived key ("__pending__", since
+    // this seeded draft has no working copy) with the active-project pointer
+    // set to it.
+    expect(localStorage.getItem("ks.studio.draft")).toBeNull();
+    expect(localStorage.getItem("ks.studio.activeProject")).toBe("__pending__");
+    expect(localStorage.getItem("ks.studio.project.__pending__")).not.toBeNull();
 
     fireEvent.click(screen.getByTestId("discard-draft"));
 
-    // Banner dismissed and the draft is gone from localStorage.
+    // Banner dismissed and the draft is gone: the active project's per-project
+    // record + index row are removed, and the active-project pointer is cleared.
     expect(screen.queryByTestId("resume-draft-banner")).toBeNull();
-    expect(localStorage.getItem("ks.studio.draft")).toBeNull();
+    expect(localStorage.getItem("ks.studio.project.__pending__")).toBeNull();
+    expect(localStorage.getItem("ks.studio.activeProject")).toBeNull();
+    expect(JSON.parse(localStorage.getItem("ks.studio.projects.index") ?? "[]")).toEqual([]);
     // Discard does not hydrate — the wizard stays on "identity" (untouched).
     expect(screen.getByTestId("stage-identity")).toBeTruthy();
   });

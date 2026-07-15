@@ -8,9 +8,9 @@
  * {@link MemoryDraftStore}. The standalone Fastify server therefore pulls in no
  * Vercel-specific dependencies.
  *
- * Single-draft model (v1): one draft per GitHub user, keyed by numeric user id.
- * A future multi-project "My keyboards" becomes an additional `draftId` on these
- * signatures without changing the handler contract.
+ * Multi-draft model ("My keyboards"): drafts are keyed by (userId, draftId).
+ * An un-upgraded client that never sends a draftId lands in the
+ * {@link DEFAULT_DRAFT_ID} slot, preserving the old single-draft behaviour.
  */
 
 import type { DraftMeta } from "./draft-schemas.js";
@@ -23,14 +23,16 @@ export interface StoredDraft {
 }
 
 export interface DraftStore {
-  /** Fetch the metadata row for a user, or null when none exists. Cheap (no payload). */
-  getMeta(userId: number): Promise<DraftMeta | null>;
+  /** Fetch the metadata row for a user's draft, or null when none exists. Cheap (no payload). */
+  getMeta(userId: number, draftId: string): Promise<DraftMeta | null>;
   /** Fetch the full stored draft for a user, or null when none exists. */
-  getDraft(userId: number): Promise<StoredDraft | null>;
-  /** Create or replace the user's draft (metadata + payload). */
+  getDraft(userId: number, draftId: string): Promise<StoredDraft | null>;
+  /** Create or replace one of the user's drafts (metadata + payload). */
   putDraft(userId: number, login: string, meta: DraftMeta, draft: unknown): Promise<void>;
-  /** Remove the user's draft (payload + metadata). Idempotent. */
-  deleteDraft(userId: number): Promise<void>;
+  /** Remove one of the user's drafts (payload + metadata). Idempotent. */
+  deleteDraft(userId: number, draftId: string): Promise<void>;
+  /** List metadata for every draft the user has. Empty array when none. */
+  listMeta(userId: number): Promise<DraftMeta[]>;
 }
 
 /**
@@ -38,23 +40,34 @@ export interface DraftStore {
  * across process restarts — never use in production.
  */
 export class MemoryDraftStore implements DraftStore {
-  private readonly rows = new Map<number, StoredDraft>();
+  private readonly rows = new Map<number, Map<string, StoredDraft>>();
 
-  getMeta(userId: number): Promise<DraftMeta | null> {
-    return Promise.resolve(this.rows.get(userId)?.meta ?? null);
+  getMeta(userId: number, draftId: string): Promise<DraftMeta | null> {
+    return Promise.resolve(this.rows.get(userId)?.get(draftId)?.meta ?? null);
   }
 
-  getDraft(userId: number): Promise<StoredDraft | null> {
-    return Promise.resolve(this.rows.get(userId) ?? null);
+  getDraft(userId: number, draftId: string): Promise<StoredDraft | null> {
+    return Promise.resolve(this.rows.get(userId)?.get(draftId) ?? null);
   }
 
   putDraft(userId: number, _login: string, meta: DraftMeta, draft: unknown): Promise<void> {
-    this.rows.set(userId, { meta, draft });
+    let userDrafts = this.rows.get(userId);
+    if (userDrafts === undefined) {
+      userDrafts = new Map<string, StoredDraft>();
+      this.rows.set(userId, userDrafts);
+    }
+    userDrafts.set(meta.draftId, { meta, draft });
     return Promise.resolve();
   }
 
-  deleteDraft(userId: number): Promise<void> {
-    this.rows.delete(userId);
+  deleteDraft(userId: number, draftId: string): Promise<void> {
+    this.rows.get(userId)?.delete(draftId);
     return Promise.resolve();
+  }
+
+  listMeta(userId: number): Promise<DraftMeta[]> {
+    const userDrafts = this.rows.get(userId);
+    if (userDrafts === undefined) return Promise.resolve([]);
+    return Promise.resolve(Array.from(userDrafts.values(), (row) => row.meta));
   }
 }

@@ -48,6 +48,11 @@ import {
   clearDraft,
   startDraftAutosave,
   startCloudSync,
+  migrateLegacyDraft,
+  getActiveProjectKey,
+  setActiveProject,
+  pinActiveProject,
+  PENDING_PROJECT_KEY,
   type DraftMeta,
 } from "./lib/draftAutosave.ts";
 import { useGitHubAuth } from "./hooks/useGitHubAuth.ts";
@@ -70,6 +75,18 @@ let resumeOfferConsumed = false;
 // Called once at module load; avoids a circular static import in the store
 // (stores/ → steps/manifest.ts → steps/registerEditorSteps.ts → editors/ → stores/).
 bindManifest(manifest);
+
+// One-shot, idempotent adoption of the legacy single-slot `ks.studio.draft`
+// into the per-project "My keyboards" scheme (specs/037-my-keyboards/spec.md
+// "Migration"). Called at module load (this file's existing idiom for
+// one-time setup, alongside bindManifest/validateManifestShape above/below) —
+// module evaluation runs strictly before any component mounts, so this always
+// completes before SurveyView's useEffect starts autosave/cloud-sync, exactly
+// as the spec requires ("Run once ... before autosave/cloud-sync start").
+// migrateLegacyDraft() self-guards on ks.studio.projects.index already
+// existing, so re-importing this module (e.g. tests using vi.resetModules())
+// re-runs it safely against whatever localStorage state is present then.
+migrateLegacyDraft();
 
 // The Flow Map is a developer aid. It shows automatically in `vite dev`; in
 // hosted builds (Vercel previews, future production) it is gated by
@@ -457,7 +474,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     cloudRestoreCheckedRef.current = true;
     if (resumeMeta !== null) return; // a local draft is offered — prefer it
     let cancelled = false;
-    void loadServerDraftMeta(accessToken).then((serverMeta) => {
+    // Multi-project note: this one-shot check only looks at the caller's
+    // currently-pinned active project (or the pending pre-instantiation slot
+    // on a genuinely fresh browser) — discovering OTHER cloud-backed projects
+    // from a browser with no local trace of them is the "My keyboards" list
+    // screen's job (next cycle, specs/037-my-keyboards), not this banner's.
+    const draftId = getActiveProjectKey() ?? PENDING_PROJECT_KEY;
+    void loadServerDraftMeta(accessToken, draftId).then((serverMeta) => {
       if (cancelled || serverMeta === null) return;
       // Don't surprise an author who began working while the fetch was in flight.
       if (buildStudioDraft() !== null) return;
@@ -560,6 +583,16 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     if (instantiatedRef.current) return;
     instantiatedRef.current = true;
 
+    // Pin the active-project pointer to this base's id the moment a working
+    // copy is instantiated (specs/037-my-keyboards/spec.md "Client data
+    // model" — projectKey = identity.keyboardId ?? baseKeyboard.id; the
+    // identity keyboardId, when Track 1 later sets one, isn't chosen yet at
+    // this point, so base.id is the correct starting key for both tracks).
+    // This ONLY repoints THIS session's active-project pointer — it does not
+    // touch any other project's stored record or index row, so starting a
+    // new keyboard never overwrites/wipes an already-in-flight project.
+    pinActiveProject(base.id);
+
     // Reads via getState() escape hatch (not a selector) to avoid a stale closure — the callback is memoised with empty deps.
     const track = useSurveySessionStore.getState().selectedTrack;
     applyStepCompletion(
@@ -632,9 +665,17 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // sessionReset() calls reset() which already clears charactersSubStage to
     // "prefill" (spec 027 Stage 4 — the store slot is the authoritative owner).
     // Discard any saved draft — start-over is an explicit "throw it away".
+    // Read the project key BEFORE clearDraft() (which clears the active
+    // pointer as part of removing the project) so the server call still knows
+    // which project to delete. clearDraft() only removes THIS ONE project's
+    // record + index row — every other in-flight "My keyboards" project is
+    // untouched (spec: start-over must not wipe the whole project index).
+    const projectKey = getActiveProjectKey();
     clearDraft();
-    const accessToken = currentAccessToken();
-    if (accessToken !== null) void clearServerDraft(accessToken);
+    if (projectKey !== null) {
+      const accessToken = currentAccessToken();
+      if (accessToken !== null) void clearServerDraft(accessToken, projectKey);
+    }
     setResumeMeta(null);
     setCloudResume(null);
   }
@@ -656,9 +697,15 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // validates the record shape/version before hydrating the stores.
       const accessToken = currentAccessToken();
       if (accessToken !== null) {
-        void loadServerDraftContent(accessToken).then((draft) => {
+        // Same draftId resolution as the cloud-restore check above — the
+        // window between that check and this click doesn't run autosave
+        // (gated on resumeMeta/cloudResume being null), so the active-project
+        // pointer can't have moved in between.
+        const draftId = getActiveProjectKey() ?? PENDING_PROJECT_KEY;
+        void loadServerDraftContent(accessToken, draftId).then((draft) => {
           if (applyStudioDraft(draft)) {
             instantiatedRef.current = true;
+            setActiveProject(draftId);
           }
           setResumeMeta(null);
           setCloudResume(null);
@@ -674,9 +721,12 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   }
 
   function handleDiscardDraft() {
+    const projectKey = getActiveProjectKey();
     clearDraft();
-    const accessToken = currentAccessToken();
-    if (accessToken !== null) void clearServerDraft(accessToken);
+    if (projectKey !== null) {
+      const accessToken = currentAccessToken();
+      if (accessToken !== null) void clearServerDraft(accessToken, projectKey);
+    }
     setResumeMeta(null);
     setCloudResume(null);
   }
