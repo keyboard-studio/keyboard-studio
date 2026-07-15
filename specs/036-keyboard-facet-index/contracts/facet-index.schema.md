@@ -87,7 +87,9 @@ Schema below; the lint additionally enforces the cross-checks.
         "evidenceSize":    { "type": "integer", "minimum": 0 },
         "analyzedCoverage":{ "type": "number", "minimum": 0, "maximum": 1 },
         "analysisOutcome": { "enum": ["fully", "partially", "fallback-only"] },
-        "notes":           { "type": "string" }
+        "notes":           { "type": "string" },
+        "residue":         { "type": "number", "minimum": 0, "maximum": 1 },
+        "subProfile":      { "type": "object" }
       }
     }
   }
@@ -98,7 +100,9 @@ Schema below; the lint additionally enforces the cross-checks.
 
 - **X1 limits**: every categorization `value` (and every `distribution` key) is within its facet
   definition's `limits`. **The single most important check** — FR-008's out-of-limits build failure. (`open: true` facets skip the closed-set check but still validate shape.)
-- **X2 distribution sums to ~1**: `histogram`/`enum` distributions sum to 1 ± ε. Loud failure otherwise.
+- **X2 distribution sums to ~1**: `histogram`/`enum` distributions sum to 1 ± ε **when `residue` is
+  absent**; when `residue` is present (037: facets over a closed recognized-value keyspace, e.g.
+  strategy-fingerprint), `distribution` + `residue` sums to 1 ± ε instead. Loud failure otherwise.
 - **X3 full coverage (SC-001)**: for every keyboard in `keyboards`, `facets` has a key for every id in
   `manifest.facetIds`. A missing facet is a failure, not a silent gap.
 - **X4 outcome↔tier consistency**: `analysisOutcome: fallback-only` ⇒ `provenanceTier ≠ content-derived`.

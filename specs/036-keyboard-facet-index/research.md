@@ -168,7 +168,9 @@ consistent.
 
 **Decision**:
 1. **Build-time**: `build-index.ts` fails loud (`process.exit(1)`) if any classifier emits a value outside
-   its facet definition's `limits`, or a distribution that does not sum to ~1 — never silently records it.
+   its facet definition's `limits`, or a distribution that does not sum to ~1 (or, when the record carries a
+   `residue` field — 037: facets over a closed recognized-value keyspace — `distribution` + `residue` does
+   not sum to ~1) — never silently records it.
 2. **Repo lint**: a new `utilities/facet-index-lint/index.js` (CommonJS, facet-lint style — named checks +
    an F7-style self-check that proves it rejects a known-bad and accepts a known-good record) validates the
    committed `docs/keyboard-facet-index.json` against `content/keyboard-facets/*.yaml`. Appended to the
