@@ -17,6 +17,7 @@ import {
 } from "./github-api.js";
 import { parseKps } from "./kps-parser.js";
 import { offlineKbdus } from "./offline-bundle.js";
+import { matchKeyboardScopePath } from "./corpus-scope.js";
 
 const OWNER = "keyboard-studio";
 const REPO = "keyboards";
@@ -24,10 +25,6 @@ const REF = "master";
 const RAW_BASE = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${REF}`;
 
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
-
-// Matches release/<subfolder>/<id>/<id>.kps — the subfolder is either a
-// single letter (e.g. "b") or a named group (e.g. "sil").
-const KPS_PATH_RE = /^release\/[^/]+\/([^/]+)\/\1\.kps$/;
 
 export interface BaseBrowserConfig {
   /** GitHub personal access token — raises rate limit from 60 to 5000 req/hr. */
@@ -157,15 +154,16 @@ export function createBaseBrowser(
     }
 
     const kpsPaths = items
-      .filter((item) => item.type === "blob" && KPS_PATH_RE.test(item.path))
+      .filter(
+        (item) => item.type === "blob" && matchKeyboardScopePath(item.path) !== null
+      )
       .map((item) => item.path);
 
     const keyboards: BaseKeyboard[] = [];
 
     await Promise.all(
       kpsPaths.map(async (kpsPath) => {
-        const match = KPS_PATH_RE.exec(kpsPath);
-        const id = match?.[1];
+        const id = matchKeyboardScopePath(kpsPath)?.id;
         if (id === undefined) return;
         // Folder path is the kps path without the filename
         const folderPath = kpsPath.slice(0, kpsPath.lastIndexOf("/"));

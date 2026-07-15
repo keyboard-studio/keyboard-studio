@@ -4,22 +4,14 @@
  * Enumerates every keyboard in a `keymanapp/keyboards` `release/` checkout and
  * reads the source bytes each classifier + the freshness plumbing need. Scope
  * is `release/**` only (research D6), and the keyboard `id` is the directory
- * name — matched by the local-checkout KPS scope regex below.
+ * name — matched by the shared corpus-scope helper below.
  *
- * SCOPE NOTE. base-browser.ts matches `release/<vendor>/<id>/<id>.kps` against
- * the GitHub *recursive-tree* API. The on-disk `../keyboards` checkout nests the
- * package under `source/`, so the concrete artifacts are usually
- * `release/<vendor>/<id>/source/<id>.{kps,kmn}`. `KPS_SCOPE_RE` below is the
- * local-checkout analogue of that regex — same intent (one keyboard per `<id>`
- * directory, id = directory name), adapted to the `source/` layout. This is a
- * deliberate difference from base-browser's tree-scoped pattern, not a bug.
- *
- * A few keyboards in the corpus keep the `.kps` at the `<id>` folder root with
- * no `source/` segment (docs/keyboard-index.md's phonebook recipe notes this
- * explicitly). `KPS_SCOPE_RE_ROOT` covers that layout too — matching only the
- * `source/` form would silently drop those keyboards from the index, which
- * this tool's own invariant forbids (a missing record must be a loud build
- * failure, never a silent gap: X3/SC-001).
+ * SCOPE NOTE (#1126). The `release/<vendor>/<id>/[source/]<id>.kps` scope
+ * regexes are shared with base-browser.ts (which matches the same path shape
+ * against the GitHub *recursive-tree* API rather than a local checkout) via
+ * `@keyboard-studio/engine`'s `corpus-scope` module, so the two consumers
+ * cannot diverge again the way they did in #1125 (base-browser had not yet
+ * been reconciled with the corpus's move to the `source/` layout).
  *
  * Modelled on utilities/supportability-scanner/scan.ts: a standalone tsx tool
  * that imports engine SOURCE directly (parseKmnHeaderStores) and walks the
@@ -32,6 +24,7 @@ import { join, dirname, basename, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseKmnHeaderStores } from "../../packages/engine/src/compiler/parseKmnHeaderStores.js";
+import { matchKeyboardScopePath } from "../../packages/engine/src/base-browser/corpus-scope.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..");
@@ -39,20 +32,9 @@ const REPO_ROOT = resolve(HERE, "..", "..");
 /** Default sibling corpus root — the keymanapp/keyboards checkout. */
 export const DEFAULT_CORPUS_ROOT = resolve(REPO_ROOT, "..", "keyboards");
 
-/**
- * Local-checkout keyboard scope: `release/<vendor>/<id>/source/<id>.kps`, id in
- * the capture group. The `\1` back-reference enforces that the package basename
- * equals its `<id>` directory name (the same discipline as base-browser's
- * tree-scoped regex, plus the on-disk `source/` segment).
- */
-export const KPS_SCOPE_RE = /^release\/[^/]+\/([^/]+)\/source\/\1\.kps$/;
-
-/** Folder-root layout: `release/<vendor>/<id>/<id>.kps` (no `source/` segment). */
-export const KPS_SCOPE_RE_ROOT = /^release\/[^/]+\/([^/]+)\/\1\.kps$/;
-
 /** Matches either scoped layout, returning the captured `<id>` or null. */
 function matchKpsScope(relPath: string): string | null {
-  return KPS_SCOPE_RE.exec(relPath)?.[1] ?? KPS_SCOPE_RE_ROOT.exec(relPath)?.[1] ?? null;
+  return matchKeyboardScopePath(relPath)?.id ?? null;
 }
 
 /** Normalize Windows path separators to forward slashes for stable ids. */

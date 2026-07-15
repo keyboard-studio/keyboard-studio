@@ -75,10 +75,14 @@ const TREE_URL =
 const RAW_BASE =
   "https://raw.githubusercontent.com/keyboard-studio/keyboards/master";
 
+// basic_kbdus and sil_devanagari_phonetic use the Keyman 17+ source/ layout
+// (the live corpus's current default, 918/918 packages per the #1125 audit);
+// sil_euro_latin stays on the legacy flat-root layout to prove dual-layout
+// support is preserved.
 const KPS_RESPONSES: Record<string, string> = {
-  "release/b/basic_kbdus/basic_kbdus.kps": KPS_BASIC_KBDUS,
+  "release/b/basic_kbdus/source/basic_kbdus.kps": KPS_BASIC_KBDUS,
   "release/s/sil_euro_latin/sil_euro_latin.kps": KPS_SIL_EURO_LATIN,
-  "release/s/sil_devanagari_phonetic/sil_devanagari_phonetic.kps":
+  "release/s/sil_devanagari_phonetic/source/sil_devanagari_phonetic.kps":
     KPS_SIL_DEVANAGARI,
 };
 
@@ -151,19 +155,21 @@ function createTruncatedFetch(): FetchFn {
       });
     }
     // release/b recursively (paths relative to the subfolder root).
+    // basic_kbdus uses the source/ layout (see the KPS_RESPONSES comment above).
     if (url === `${TREES_BASE}/bsha?recursive=1`) {
       return jsonOk({
         sha: "bsha", url: "", truncated: false,
-        tree: [treeItem("basic_kbdus/basic_kbdus.kps", "blob", "k1")],
+        tree: [treeItem("basic_kbdus/source/basic_kbdus.kps", "blob", "k1")],
       });
     }
-    // release/s recursively.
+    // release/s recursively. sil_euro_latin stays flat-root (legacy);
+    // sil_devanagari_phonetic uses source/ — both layouts exercised here too.
     if (url === `${TREES_BASE}/ssha?recursive=1`) {
       return jsonOk({
         sha: "ssha", url: "", truncated: false,
         tree: [
           treeItem("sil_euro_latin/sil_euro_latin.kps", "blob", "k2"),
-          treeItem("sil_devanagari_phonetic/sil_devanagari_phonetic.kps", "blob", "k3"),
+          treeItem("sil_devanagari_phonetic/source/sil_devanagari_phonetic.kps", "blob", "k3"),
         ],
       });
     }
