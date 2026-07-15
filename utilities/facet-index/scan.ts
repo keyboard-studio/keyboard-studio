@@ -84,7 +84,7 @@ export interface ScanResult {
   keyboards: ScannedKeyboard[];
 }
 
-/** Recursively collect corpus-relative paths of files matching `KPS_SCOPE_RE`. */
+/** Recursively collect corpus-relative paths of files matching `matchKeyboardScopePath`. */
 function findScopedKps(corpusRoot: string): string[] {
   const releaseDir = join(corpusRoot, "release");
   const out: string[] = [];
