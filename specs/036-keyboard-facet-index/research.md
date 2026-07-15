@@ -198,11 +198,12 @@ target/device-mix) can name concrete index fields as the source for these `plann
 This clears SC-005's "≥4 of the planned derivations name a concrete index field" — they flip
 `planned → available` in the follow-up wiring feature, not here.
 
-**Spec correction to flag (km-doc)**: the spec says "**fourteen** `corpus:` derivations… every one is
+**Spec correction (done — T035)**: the spec previously said "**fourteen** `corpus:` derivations… every one is
 `sourceStatus: planned`." The actual count in `content/facets/**` is **12** derivations whose `source:`
 begins `corpus:`, of which **10 are `planned` and 2 already `available`** (`lineage.siblings`,
-`lineage.placement-priors`). SC-005's threshold (≥4) holds under the corrected count; the prose "14 /
-all planned" needs a one-line fix. Non-blocking for this plan; recorded for the doc pass.
+`lineage.placement-priors`). SC-005's threshold (≥4) holds under the corrected count. The prose has been
+corrected in `spec.md` §Why and `plan.md` Summary; the four session facets that now name a concrete index
+field are tabulated above.
 
 ---
 

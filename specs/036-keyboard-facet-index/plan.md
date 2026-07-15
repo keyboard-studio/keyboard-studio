@@ -9,8 +9,8 @@
 Build an offline, deterministic, committed artifact that records — for every keyboard in the sibling
 corpus's `release/` subtree — its categorization along each declared **keyboard-level facet** (script
 first, then extensible), with a likelihood distribution, a provenance tier, and per-keyboard freshness
-stamps. The index is the substrate the wrong-script defect and the fourteen `planned` `corpus:`
-derivations in [content/facets/](../../content/facets/) are waiting on. This feature owns the **artifact
+stamps. The index is the substrate the wrong-script defect and the ten `planned` `corpus:`
+derivations (of twelve total) in [content/facets/](../../content/facets/) are waiting on. This feature owns the **artifact
 shape, its extensibility, its schema validation, and its freshness/rescan model** — the classifier
 algorithms that compute the values are [spec 037](../037-facet-classifiers/spec.md); the user-facing
 confirmations are [spec 038](../038-adaptation-questions/spec.md); wiring the index into studio

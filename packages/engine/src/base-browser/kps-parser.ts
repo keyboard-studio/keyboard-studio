@@ -54,6 +54,20 @@ function dedup(arr: string[]): string[] {
   return [...new Set(arr)];
 }
 
+/**
+ * Extract the four-letter ISO 15924 script subtag from a single BCP47 tag
+ * (e.g. "Deva" from "hi-Deva"), title-cased, or `null` when the tag carries
+ * no such subtag. Shared by {@link parseKps} (which defaults the result to
+ * "Latn" for display purposes) and the facet-index build orchestrator
+ * (utilities/facet-index/build-index.ts), which needs the null-preserving
+ * form to distinguish "no declared script" from "declared Latin".
+ */
+export function extractScriptSubtag(tag: string): string | null {
+  const seg = tag.split("-").find((p) => /^[A-Za-z]{4}$/.test(p));
+  if (seg === undefined) return null;
+  return seg.charAt(0).toUpperCase() + seg.slice(1).toLowerCase();
+}
+
 const VALID_TARGETS = new Set<string>([
   "windows",
   "macosx",
@@ -116,11 +130,9 @@ export function parseKps(xml: string): KpsMetadata {
     if (langId === undefined) continue;
     languages.push(langId);
     if (!scriptFound) {
-      const scriptPart = langId.split("-").find((p) => /^[A-Za-z]{4}$/.test(p));
-      if (scriptPart !== undefined) {
-        script =
-          scriptPart.charAt(0).toUpperCase() +
-          scriptPart.slice(1).toLowerCase();
+      const scriptPart = extractScriptSubtag(langId);
+      if (scriptPart !== null) {
+        script = scriptPart;
         scriptFound = true;
       }
     }

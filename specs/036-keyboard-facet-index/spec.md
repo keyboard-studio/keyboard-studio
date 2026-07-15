@@ -12,7 +12,7 @@
 
 ## Problem
 
-The studio's runtime keyboard catalog assigns every keyboard the script `Latn`, so onboarding suggests related-language keyboards in the wrong script (right language, wrong writing system). More broadly, the facet catalog under `content/facets/` declares fourteen `corpus:` derivations — signals to be "mined from the keyboards-corpus fingerprint scan" — and every one is `sourceStatus: planned` because no such scan exists. This feature creates the missing substrate: a committed, machine-readable index that records, for every keyboard in the corpus, its categorization along each **keyboard-level facet**, with a likelihood, a provenance trail, and a freshness stamp.
+The studio's runtime keyboard catalog assigns every keyboard the script `Latn`, so onboarding suggests related-language keyboards in the wrong script (right language, wrong writing system). More broadly, the facet catalog under `content/facets/` declares twelve `corpus:` derivations — signals to be "mined from the keyboards-corpus fingerprint scan" — of which ten are `sourceStatus: planned` (the remaining two, `lineage.siblings` and `lineage.placement-priors`, are already `available`) because no such scan exists for the planned ones. This feature creates the missing substrate: a committed, machine-readable index that records, for every keyboard in the corpus, its categorization along each **keyboard-level facet**, with a likelihood, a provenance trail, and a freshness stamp.
 
 ## User Scenarios & Testing *(mandatory)*
 
