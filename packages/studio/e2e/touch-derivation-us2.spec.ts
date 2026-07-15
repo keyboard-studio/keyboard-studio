@@ -106,7 +106,7 @@ import { readFile } from "node:fs/promises";
 //     groups for every produced character; the codec currently turns their
 //     entire rule body into RawKmnFragment nodes (probed: 36 and 15 raw
 //     fragments respectively, 0 typed IRRules) — disqualified outright.
-//   - pid_piaroa (Piaroa, Mande region... actually isolate, Venezuela — see
+//   - pid_piaroa (Piaroa, Salivan family, Venezuela — see
 //     docs/keyboard-index.md) probes CLEAN: 0 raw fragments, and 8 of its 9
 //     rules are exactly bambara-shaped — `+ [RALT K_X] > 'char'`, one rule per
 //     produced character, no store/index/any() dependency. (The 9th rule,
