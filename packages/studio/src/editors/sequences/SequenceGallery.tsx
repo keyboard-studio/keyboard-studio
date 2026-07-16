@@ -1,18 +1,40 @@
-// SequenceGallery — interim (visual-only) Sequence Gallery.
+// SequenceGallery — the Sequence Gallery (S-03 multi-key sequences).
 //
-// Product decision (this pass): the sequence box is VISUAL ONLY. It renders
-// and is typeable, but Apply/Next/Done never record a MechanismAssignment
-// and never re-emit anything — no multi_char_sequence pattern application
-// happens here. The two inputs are ephemeral component state, reset whenever
-// currentChar changes; they are never written to the working-copy store.
-// The live preview reflects the working copy exactly as it already stands
-// (base + prior-phase assignments) — unaffected by this box.
+// Records a real `multi_char_sequence` MechanismAssignment. Content is the
+// character(s) already typed that the sequence builds on (`firstLetterOut`);
+// Indicator is the single key typed right after the content that triggers
+// the collapse (`secondLetter`) — it must resolve to a PHYSICAL key on the
+// base layout (checked via charToVkey, the same lookup MechanismGallery's
+// trigger/swap/ralt key pickers use), since the emitted rule is a
+// `using keys` group whose rightmost item is the Indicator; the flagged
+// character being defined is the collapse target (`collapsedChar`). Apply
+// records/updates a `scope:"individual"` assignment for `currentChar` via
+// the working-copy store's `recordAssignments` — the same store call
+// MechanismGallery's deadkey/swap/ralt branches use — so the existing
+// useWorkingCopyTransform -> applyAssignmentsToVfs pipeline picks it up with
+// no engine changes: the live preview and the emitted .kmn both reflect it.
 //
 // Cycles through `sequenceFlaggedChars` (set by the Mechanism Gallery's S-03
-// FLAG card — see MechanismGallery's flagCharForSequence/unflagCharForSequence),
-// NOT lettersToAdd. Positional Back/Previous/Next/Done navigation reuses
-// usePositionalCharNav so this gallery cannot drift from MechanismGallery's/
-// TouchGallery's Back/Next/Skip semantics.
+// FLAG card — see MechanismGallery's flagCharForSequence/unflagCharForSequence;
+// unflagCharForSequence also strips this gallery's recorded assignment for
+// that char — see the store action's own doc comment), NOT lettersToAdd.
+// Positional Back/Previous/Next/Done navigation reuses usePositionalCharNav
+// so this gallery cannot drift from MechanismGallery's/TouchGallery's
+// Back/Next/Skip semantics.
+//
+// Apply/advance — mirrors MechanismGallery's canGoNext/Skip split exactly:
+// the top toolbar's "Next character →"/"Done" is gated on the current
+// character already having a recorded sequence assignment (so filled-but-
+// unapplied box content can never be silently discarded through that
+// control); an explicit, never-gated "Skip this character" button sits next
+// to Apply for an author who deliberately wants to move on without defining
+// a sequence for this character. Revisiting an already-recorded character
+// prefills Content/Indicator from its stored slotValues.
+//
+// Deferred (explicitly out of scope for this pass — see NOTE at handleApply):
+// rule-order/shadowing enforcement, indicator<->deadkey-trigger collision
+// detection, multi-codepoint-output smart-backspace companion rule, RTL box
+// mirroring, double-diacritic chaining, prefix (deadkey-first) direction.
 //
 // RIGHT pane: GalleryPreviewPane — live OSK preview. SequenceGallery owns the
 // single useKeyboardArtifact + useWorkingCopyTransform pipeline for this step
@@ -22,8 +44,8 @@
 // from a single owned pipeline here avoids a second concurrent WASM compile
 // (decision D3 / spec §8 — one 300 ms debounce cycle).
 
-import { useState, useEffect, useMemo, type CSSProperties } from "react";
-import type { BaseKeyboard, Pattern } from "@keyboard-studio/contracts";
+import { useState, useEffect, useMemo, useCallback, type CSSProperties } from "react";
+import type { BaseKeyboard, MechanismAssignment, Pattern } from "@keyboard-studio/contracts";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { getPatternLibraryService } from "../../lib/services.ts";
@@ -31,10 +53,41 @@ import { useKeyboardArtifact, type ScaffoldSpec } from "../../hooks/useKeyboardA
 import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
 import { GalleryPreviewPane } from "../assignLoop/PreviewPane.tsx";
 import { usePositionalCharNav } from "../assignLoop/usePositionalCharNav.ts";
-import { PATTERN_DEADKEY, PATTERN_SWAP, PATTERN_RALT } from "../assignLoop/patternIds.ts";
+import {
+  PATTERN_DEADKEY, PATTERN_SWAP, PATTERN_RALT, PATTERN_SEQUENCE,
+} from "../assignLoop/patternIds.ts";
+import {
+  resolveCharInput, reflectCharInput, type ResolveCharInputOptions,
+} from "../../lib/charInput.ts";
+import { charToVkey } from "../../lib/keyOptions.ts";
 import {
   BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
 } from "../../lib/galleryTheme.ts";
+
+// ---------------------------------------------------------------------------
+// Char-box resolve options — reuses the shared resolveCharInput/
+// reflectCharInput helper (packages/studio/src/lib/charInput.ts), whose own
+// doc comments already name these two boxes ("seqFirst"/"seqSecond") as the
+// intended consumers.
+// ---------------------------------------------------------------------------
+
+// Content ("seqFirst") — the sequence's left-context box. NOT singleGrapheme:
+// content may legitimately span several graphemes (a digraph/trigraph
+// collapse, e.g. "ng"), per domain guidance.
+const SEQ_CONTENT_RESOLVE_OPTIONS: ResolveCharInputOptions = {
+  multiToken: true,
+  blockDelimiters: true,
+};
+
+// Indicator ("seqSecond") — a single keystroke. singleGrapheme is
+// grapheme-aware (Intl.Segmenter), so a lone combining mark typed as the
+// indicator is NOT hard-rejected — only more than one grapheme is.
+const SEQ_INDICATOR_RESOLVE_OPTIONS: ResolveCharInputOptions = {
+  multiToken: true,
+  singleGrapheme: true,
+  blockDelimiters: true,
+  singleGraphemeReason: "Enter one indicator character.",
+};
 
 // ---------------------------------------------------------------------------
 // Shared styles — mirrors MechanismGallery's page/ghost/input styles so the
@@ -134,25 +187,143 @@ export function SequenceGallery({
   });
 
   // ---------------------------------------------------------------------------
-  // Visual-only sequence box state — ephemeral, reset per character. Never
-  // recorded: no MechanismAssignment, no store write, no re-emit. See file
-  // header — this is the interim, VISUAL-ONLY scope for this pass.
+  // Recorded sequence assignments — read directly from Phase C (like
+  // MechanismGallery's own sessionAssignments), so this gallery's Apply can
+  // find/replace the ONE multi_char_sequence assignment for currentChar
+  // without disturbing any other mechanism recorded for other characters.
+  // ---------------------------------------------------------------------------
+
+  const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
+  const recordAssignments = useWorkingCopyStore((s) => s.recordAssignments);
+
+  const sessionAssignments = useMemo(
+    () =>
+      (phaseResults.find((p) => p.phase === "C")?.assignments ?? []).filter(
+        (a) => a.modality === "physical",
+      ),
+    [phaseResults],
+  );
+
+  // The (at most one) existing multi_char_sequence assignment for currentChar
+  // — used both to prefill the boxes on revisit and to replace-not-duplicate
+  // on re-Apply.
+  const existingSequenceAssignment = useMemo(() => {
+    if (currentChar === null) return null;
+    return (
+      sessionAssignments.find(
+        (a) =>
+          a.scope === "individual" &&
+          a.target === currentChar &&
+          a.mechanisms.some((m) => m.patternId === PATTERN_SEQUENCE),
+      ) ?? null
+    );
+  }, [sessionAssignments, currentChar]);
+
+  // ---------------------------------------------------------------------------
+  // Sequence box state — Content ("seqFirst") / Indicator ("seqSecond").
+  // Reset on every currentChar change, then immediately prefilled from any
+  // already-recorded sequence assignment for the NEW currentChar (revisit
+  // case). Deliberately keyed on currentChar only (not on
+  // existingSequenceAssignment itself) — Apply mutates the store but must NOT
+  // clear/refill what the author is actively looking at; only navigating to a
+  // different character re-syncs the boxes.
   // ---------------------------------------------------------------------------
 
   const [content, setContent] = useState("");
   const [indicator, setIndicator] = useState("");
   useEffect(() => {
-    setContent("");
-    setIndicator("");
+    const seqMech = existingSequenceAssignment?.mechanisms.find(
+      (m) => m.patternId === PATTERN_SEQUENCE,
+    );
+    setContent(seqMech?.slotValues?.["firstLetterOut"] ?? "");
+    setIndicator(seqMech?.slotValues?.["secondLetter"] ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentChar]);
 
+  const contentResolved = resolveCharInput(content, SEQ_CONTENT_RESOLVE_OPTIONS);
+  const indicatorResolved = resolveCharInput(indicator, SEQ_INDICATOR_RESOLVE_OPTIONS);
+  const contentReflection = reflectCharInput(content, SEQ_CONTENT_RESOLVE_OPTIONS);
+  const indicatorReflection = reflectCharInput(indicator, SEQ_INDICATOR_RESOLVE_OPTIONS);
+
+  // Indicator vkey-resolvability (P1) — the emitted rule is a `using keys`
+  // group whose rightmost item is the Indicator; kmcmplib requires that item
+  // resolve to a PHYSICAL key on the base layout. resolveCharInput's
+  // singleGrapheme option only counts grapheme clusters — it says nothing
+  // about key-resolvability, so for a non-Latin/non-ASCII Indicator (common
+  // for S-03 target scripts) an ungated Apply would record a rule that later
+  // fails only at the WASM oracle, several steps downstream of this box. Uses
+  // the SAME charToVkey lookup MechanismGallery's trigger/swap/ralt key
+  // pickers resolve through (lib/keyOptions.ts, via
+  // resolveKeyPickerSelection in lib/charInput.ts) — deliberately reused
+  // rather than re-implemented, so the two galleries can never disagree about
+  // what counts as a resolvable key.
+  const indicatorVkey = indicatorResolved.ok ? charToVkey(indicatorResolved.value) : null;
+  const indicatorUnresolvable = indicatorResolved.ok && indicatorVkey === null;
+
+  const canApply = useMemo(
+    () => currentChar !== null && contentResolved.ok && indicatorResolved.ok && indicatorVkey !== null,
+    [currentChar, contentResolved.ok, indicatorResolved.ok, indicatorVkey],
+  );
+
   // ---------------------------------------------------------------------------
-  // Pattern loading — needed for patternMap (GalleryPreviewPane), so the live
-  // preview faithfully reflects PRIOR (Phase C) assignments. Mirrors
+  // Apply — records/updates the multi_char_sequence MechanismAssignment for
+  // currentChar. Filter-then-append (not a naive push) so repeated Apply
+  // clicks REPLACE this char's sequence assignment rather than accumulating
+  // duplicates — mirrors MechanismGallery's handleRemoveCovered/
+  // handleCompanionConfirm filter-then-record pattern.
+  //
+  // Deferred (NOT implemented here — see file header): rule-order/shadowing
+  // enforcement, indicator<->deadkey-trigger collision detection,
+  // multi-codepoint-output smart-backspace companion rule, RTL box mirroring,
+  // double-diacritic chaining, prefix (deadkey-first) direction.
+  // ---------------------------------------------------------------------------
+
+  const handleApply = useCallback(() => {
+    if (currentChar === null || !canApply) return;
+    const contentValue = resolveCharInput(content, SEQ_CONTENT_RESOLVE_OPTIONS);
+    const indicatorValue = resolveCharInput(indicator, SEQ_INDICATOR_RESOLVE_OPTIONS);
+    if (!contentValue.ok || !indicatorValue.ok) return;
+    // Re-check vkey resolvability here too (not just via canApply) — never
+    // silently record an Indicator that can't be wired to a physical key.
+    if (charToVkey(indicatorValue.value) === null) return;
+
+    const assignment: MechanismAssignment = {
+      scope: "individual",
+      target: currentChar,
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: PATTERN_SEQUENCE,
+          strategyId: "S-03",
+          slotValues: {
+            firstLetterOut: contentValue.value,
+            secondLetter: indicatorValue.value,
+            collapsedChar: currentChar.normalize("NFC"),
+          },
+        },
+      ],
+      source: "user",
+    };
+
+    const next = sessionAssignments.filter(
+      (a) =>
+        !(
+          a.scope === "individual" &&
+          a.target === currentChar &&
+          a.mechanisms.some((m) => m.patternId === PATTERN_SEQUENCE)
+        ),
+    );
+    recordAssignments([...next, assignment]);
+  }, [currentChar, canApply, content, indicator, sessionAssignments, recordAssignments]);
+
+  // ---------------------------------------------------------------------------
+  // Pattern loading — needed for patternMap (GalleryPreviewPane + the emit
+  // pipeline below), so the live preview faithfully reflects PRIOR (Phase C)
+  // assignments AND this gallery's own multi_char_sequence apply. Mirrors
   // MechanismGallery's pattern-loading effect: rank via filterFor, then make
-  // sure the three method patterns MechanismGallery can produce are always
-  // resolvable — no sequence pattern is ever loaded/applied here, since S-03
-  // is flag-only (see MechanismGallery.PATTERN_SEQUENCE / flagCharForSequence).
+  // sure the four method patterns either gallery can produce are always
+  // resolvable — PATTERN_SEQUENCE must be loaded here since this gallery now
+  // applies it directly, rather than only flagging.
   // ---------------------------------------------------------------------------
 
   const [patternMap, setPatternMap] = useState<Map<string, Pattern>>(new Map());
@@ -177,6 +348,7 @@ export function SequenceGallery({
         ids.add(PATTERN_DEADKEY);
         ids.add(PATTERN_SWAP);
         ids.add(PATTERN_RALT);
+        ids.add(PATTERN_SEQUENCE);
         return Promise.all([...ids].map((id) => svc.getById(id)));
       })
       .then((patterns) => {
@@ -368,11 +540,21 @@ export function SequenceGallery({
   }
 
   // ---------------------------------------------------------------------------
-  // Per-char forward control — exactly one control at a time: "Next
-  // character" mid-list, or the completion action ("Done") from the last
-  // flagged character. Never gated on the (visual-only, non-recording) box —
-  // the author can always advance.
+  // Per-char forward control — mirrors MechanismGallery's canGoNext/Skip
+  // split (MechanismGallery.tsx's canGoNext + its "Skip this character"
+  // button): the TOP toolbar's "Next character →"/"Done" is gated on the
+  // CURRENT character already having a recorded sequence assignment, so
+  // filled-but-unapplied box content can never be silently discarded via that
+  // control. The explicit "Skip this character" button (rendered next to
+  // Apply, below) is pure forward navigation — it records nothing and is
+  // never gated, exactly like MechanismGallery's Skip — so an author who
+  // deliberately wants to leave a character without a sequence still has a
+  // one-click way forward. Revisiting an already-recorded character always
+  // re-enables the top control, so Back-then-Next over a finished character
+  // never traps the author.
   // ---------------------------------------------------------------------------
+
+  const canGoNext = currentChar !== null && existingSequenceAssignment !== null;
 
   const forwardLabel = hasAnotherCharAfterCurrent ? "Next character →" : "Done";
   const forwardAriaLabel = hasAnotherCharAfterCurrent
@@ -453,8 +635,14 @@ export function SequenceGallery({
             type="button"
             data-testid="sequences-continue"
             onClick={handleNext}
+            disabled={!canGoNext}
             aria-label={forwardAriaLabel}
-            style={forwardBtnStyle}
+            style={{
+              ...forwardBtnStyle,
+              background: canGoNext ? BLUE_ACTION : "#21262d",
+              color: canGoNext ? "#e6edf3" : TEXT_DIM,
+              cursor: canGoNext ? "pointer" : "not-allowed",
+            }}
           >
             {forwardLabel}
           </button>
@@ -499,10 +687,10 @@ export function SequenceGallery({
             </div>
           </div>
 
-          {/* Visual-only sequence boxes — see file header: no Apply-to-record;
-              typing here never touches the working-copy store. Two explained
-              boxes model content (what you type first) + indicator (the
-              single trigger character that follows it) -> currentChar. */}
+          {/* Content / Indicator sequence box — Apply records a real
+              multi_char_sequence MechanismAssignment (see handleApply). Two
+              explained boxes model content (what you type first) + indicator
+              (the single trigger character that follows it) -> currentChar. */}
           <div
             style={{
               background: BG_CARD,
@@ -514,20 +702,34 @@ export function SequenceGallery({
               gap: 8,
             }}
           >
-            <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_MAIN, fontFamily: FONT }}>
+            <label
+              htmlFor="sequences-content-input"
+              style={{ fontSize: 13, fontWeight: 600, color: TEXT_MAIN, fontFamily: FONT }}
+            >
               Content
-            </span>
+            </label>
             <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
               The characters that come first — what you type before the indicator.
             </p>
             <input
+              id="sequences-content-input"
               type="text"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              aria-label="Content characters"
-              maxLength={8}
+              data-testid="sequences-content"
+              maxLength={24}
               style={{ ...inputStyle, width: 120, textAlign: "left" }}
             />
+            {contentReflection.kind === "ok" && (
+              <span role="status" aria-live="polite" style={{ fontSize: 10, color: TEXT_DIM, fontFamily: FONT }}>
+                {contentReflection.text}
+              </span>
+            )}
+            {contentReflection.kind === "error" && (
+              <span role="alert" style={{ fontSize: 10, color: "#f85149", opacity: 0.85, fontFamily: FONT }}>
+                {contentReflection.reason}
+              </span>
+            )}
           </div>
 
           <div
@@ -541,24 +743,44 @@ export function SequenceGallery({
               gap: 8,
             }}
           >
-            <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_MAIN, fontFamily: FONT }}>
+            <label
+              htmlFor="sequences-indicator-input"
+              style={{ fontSize: 13, fontWeight: 600, color: TEXT_MAIN, fontFamily: FONT }}
+            >
               Indicator
-            </span>
+            </label>
             <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
               The single character that triggers the combination — typing it after the
               content produces {currentChar}.
             </p>
             <input
+              id="sequences-indicator-input"
               type="text"
               value={indicator}
               onChange={(e) => setIndicator(e.target.value)}
-              aria-label="Indicator character"
+              data-testid="sequences-indicator"
               // maxLength 2 (not 1): one grapheme may be two UTF-16 code units
               // (surrogate pair / base+combining mark), matching the input caps
               // used by the MechanismGallery character boxes.
               maxLength={2}
               style={inputStyle}
             />
+            {indicatorReflection.kind === "ok" && !indicatorUnresolvable && (
+              <span role="status" aria-live="polite" style={{ fontSize: 10, color: TEXT_DIM, fontFamily: FONT }}>
+                {indicatorReflection.text}
+              </span>
+            )}
+            {indicatorReflection.kind === "error" && (
+              <span role="alert" style={{ fontSize: 10, color: "#f85149", opacity: 0.85, fontFamily: FONT }}>
+                {indicatorReflection.reason}
+              </span>
+            )}
+            {indicatorUnresolvable && (
+              <span role="alert" style={{ fontSize: 10, color: "#f85149", opacity: 0.85, fontFamily: FONT }}>
+                '{indicatorResolved.ok ? indicatorResolved.value : ""}' isn't a key on
+                this layout — pick a character that maps to a physical key.
+              </span>
+            )}
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
@@ -574,9 +796,55 @@ export function SequenceGallery({
             </span>
           </div>
 
-          <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-            More sequence options are coming soon.
-          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button
+              type="button"
+              data-testid="sequences-apply"
+              onClick={handleApply}
+              disabled={!canApply}
+              aria-label={`Apply sequence for ${toUPlusNotation(currentChar)} ${currentChar}`}
+              style={{
+                padding: "7px 16px",
+                background: canApply ? BLUE_ACTION : "#21262d",
+                border: "none",
+                borderRadius: 6,
+                color: canApply ? "#e6edf3" : TEXT_DIM,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: canApply ? "pointer" : "not-allowed",
+                fontFamily: FONT,
+              }}
+            >
+              Apply
+            </button>
+            <button
+              type="button"
+              data-testid="sequences-skip"
+              onClick={handleNext}
+              aria-label={`Skip this character (${toUPlusNotation(currentChar)} ${currentChar})`}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: TEXT_DIM,
+                fontSize: 12,
+                cursor: "pointer",
+                fontFamily: FONT,
+                padding: "4px 8px",
+                textDecoration: "underline",
+              }}
+            >
+              Skip this character
+            </button>
+            {existingSequenceAssignment !== null && (
+              <span
+                role="status"
+                aria-live="polite"
+                style={{ fontSize: 12, color: "#56d364", fontFamily: FONT }}
+              >
+                Sequence recorded
+              </span>
+            )}
+          </div>
         </>
       )}
 

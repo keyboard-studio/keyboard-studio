@@ -3,9 +3,14 @@
 // SequenceGallery requires selectedBaseKeyboard from the working-copy store,
 // same as addPhysicalAdapter (MechanismGallery). The adapter reads it
 // directly from the store so the step contract stays (onComplete, onBack,
-// ctx) and the manifest need not thread it through. Step id, manifest
-// position, and writes contract are unchanged by this repoint — only the
-// component behind the adapter changed.
+// ctx) and the manifest need not thread it through. Step id and manifest
+// position are unchanged by this repoint — only the component behind the
+// adapter changed. The writes contract is NOT unchanged: SequenceGallery
+// records a real multi_char_sequence MechanismAssignment on Apply (routed
+// through the same recordAssignments -> applyAssignmentsToVfs pipeline
+// mechanismsStep uses), so sequencesStep declares
+// writes: [...ADD_GALLERY_WRITES] in registerEditorSteps.ts, exactly like
+// mechanismsStep — see that file's sequencesStep doc comment.
 
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import type { EditorStepProps } from "../../steps/types.ts";

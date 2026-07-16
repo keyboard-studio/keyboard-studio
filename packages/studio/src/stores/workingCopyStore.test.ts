@@ -1239,6 +1239,63 @@ describe("workingCopyStore — sequenceFlaggedChars", () => {
     expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á"]);
   });
 
+  it("unflagCharForSequence also strips the char's recorded multi_char_sequence assignment (P0)", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("ŋ");
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ŋ",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: "multi_char_sequence",
+            strategyId: "S-03",
+            slotValues: { firstLetterOut: "n", secondLetter: "g", collapsedChar: "ŋ" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+    expect(
+      useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C")?.assignments,
+    ).toHaveLength(1);
+
+    useWorkingCopyStore.getState().unflagCharForSequence("ŋ");
+
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual([]);
+    expect(
+      useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C")?.assignments,
+    ).toEqual([]);
+  });
+
+  it("unflagCharForSequence leaves OTHER characters' assignments (including that char's own non-sequence mechanisms) untouched", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("ŋ");
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ŋ",
+        modality: "physical",
+        mechanisms: [{ patternId: "multi_char_sequence", strategyId: "S-03" }],
+        source: "user",
+      },
+      {
+        scope: "individual",
+        target: "ñ",
+        modality: "physical",
+        mechanisms: [{ patternId: "simple_swap", strategyId: "S-01" }],
+        source: "user",
+      },
+    ]);
+
+    useWorkingCopyStore.getState().unflagCharForSequence("ŋ");
+
+    const remaining = useWorkingCopyStore
+      .getState()
+      .phaseResults.find((p) => p.phase === "C")?.assignments;
+    expect(remaining).toHaveLength(1);
+    expect(remaining?.[0]?.target).toBe("ñ");
+  });
+
   it("instantiateFromBase clears sequenceFlaggedChars on a genuine base switch", () => {
     const vfs = createVirtualFS([]);
     useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });

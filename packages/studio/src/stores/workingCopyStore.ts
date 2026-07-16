@@ -31,6 +31,7 @@ import {
 } from "@keyboard-studio/contracts";
 import { computeStalenessFromManifest } from "../dashboard/completeness.ts";
 import type { Step } from "../steps/types.ts";
+import { PATTERN_SEQUENCE } from "../editors/assignLoop/patternIds.ts";
 
 // ---------------------------------------------------------------------------
 // Manifest binding — avoids a static import of steps/manifest.ts which would
@@ -862,11 +863,40 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         : { sequenceFlaggedChars: [...s.sequenceFlaggedChars, char] },
     ),
 
-  // Tracked for the Sequence Gallery only, never emitted.
+  // Tracked for the Sequence Gallery only, never emitted. ALSO strips any
+  // recorded individual-scope multi_char_sequence (PATTERN_SEQUENCE)
+  // assignment for `char` from Phase C — unflagging removes the char from
+  // sequenceFlaggedChars, which is the ONLY thing that makes a recorded
+  // sequence assignment reachable/editable from the UI (SequenceGallery keys
+  // everything off sequenceFlaggedChars membership). Leaving the assignment
+  // behind would keep emitting it into the .kmn while making it impossible
+  // to review or remove — done here, in the one store action, so every call
+  // site (both MechanismGallery chip-remove buttons) is covered without
+  // duplicating the filter at each call site.
   unflagCharForSequence: (char) =>
-    set((s) => ({
-      sequenceFlaggedChars: s.sequenceFlaggedChars.filter((c) => c !== char),
-    })),
+    set((s) => {
+      const phaseC = s.phaseResults.find((p) => p.phase === "C");
+      if (phaseC === undefined) {
+        return {
+          sequenceFlaggedChars: s.sequenceFlaggedChars.filter((c) => c !== char),
+        };
+      }
+      const strippedAssignments = (phaseC.assignments ?? []).filter(
+        (a) =>
+          !(
+            a.scope === "individual" &&
+            a.target === char &&
+            a.mechanisms.some((m) => m.patternId === PATTERN_SEQUENCE)
+          ),
+      );
+      const updatedPhaseResults = s.phaseResults.map((p) =>
+        p.phase === "C" ? { ...p, assignments: strippedAssignments } : p,
+      );
+      return {
+        sequenceFlaggedChars: s.sequenceFlaggedChars.filter((c) => c !== char),
+        ...remerge(s.irAxes, updatedPhaseResults),
+      };
+    }),
 
   reset: () => {
     // Clear the module-level re-opened roots so clearStale after reset is correct.
