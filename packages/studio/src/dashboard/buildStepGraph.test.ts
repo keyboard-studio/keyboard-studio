@@ -394,4 +394,28 @@ describe("buildManifestStepGraph — C8/C9 (T032)", () => {
       expect(joinEdge, `missing join edge from "${node.id}" to "${node.joinTarget}"`).toBeDefined();
     }
   });
+
+  // T025 (spec 035 polish): the generic tests above cover touch_seed_source only
+  // via aggregate/loop assertions. Pin the fork by name — mirrors the spec-018
+  // "track is branch-defining: fork -> project_name" test in trackRouting.test.ts
+  // — so a regression in the mechanisms/touch_seed_source/touch wiring fails a
+  // test that names the nodes, not just a count.
+  it("mechanisms is branch-defining: spine -> touch (direct), fork -> touch_seed_source, which joins back to touch (spec 035 FR-013/M4)", () => {
+    const fromMechanisms = graph.edges.filter((e) => e.from === "mechanisms");
+
+    const spineEdge = fromMechanisms.find((e) => e.kind === "spine");
+    expect(spineEdge?.to).toBe("touch");
+
+    const forkEdge = fromMechanisms.find((e) => e.kind === "fork");
+    expect(forkEdge?.to).toBe("touch_seed_source");
+
+    const seedSourceNode = graph.nodes.find((n) => n.id === "touch_seed_source");
+    expect(seedSourceNode?.spine).toBe(false);
+    expect(seedSourceNode?.joinTarget).toBe("touch");
+
+    const joinEdge = graph.edges.find(
+      (e) => e.from === "touch_seed_source" && e.kind === "join",
+    );
+    expect(joinEdge?.to).toBe("touch");
+  });
 });

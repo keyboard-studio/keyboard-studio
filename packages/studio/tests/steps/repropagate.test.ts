@@ -24,7 +24,6 @@ import {
   type RepropagateDeps,
 } from "../../src/steps/repropagate.ts";
 import { touchSuggest } from "../../src/editors/touchSuggest/touchSuggest.ts";
-import { emitTouchLayout, parseTouchLayout } from "@keyboard-studio/engine";
 import {
   allDerivedIR,
   irWithTouch,
@@ -221,59 +220,33 @@ describe("buildRepropagationPatch", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Issue #831 — re-propagated IR is serialized back into the shipped side-car
-// (touch divergence must NOT be preview-only).
+// Single-writer rule (T024) — repropagate() owns ir.touchLayout provenance
+// only; it never serializes the `.keyman-touch-layout` artifact. RepropagateDeps
+// carries no setTouchLayoutJson member (buildTouchLayoutJson is the sole writer).
 // ---------------------------------------------------------------------------
 
-describe("repropagate — issue #831 side-car serialization", () => {
-  it("persists the re-serialized touch layout into the side-car so the shipped artifact reflects re-propagation", () => {
+describe("repropagate — single-writer rule (T024)", () => {
+  it("RepropagateDeps rejects a setTouchLayoutJson member (compile-time pin)", () => {
     const ir = mixedProvenanceIR();
-    const { deps, getIr } = makeDeps(ir, ["touch"]);
-    const sideCarSpy = vi.fn<(json: string) => void>();
-
-    repropagate({ ...deps, setTouchLayoutJson: sideCarSpy });
-
-    // The side-car setter fired exactly once with the serialized merged layout.
-    expect(sideCarSpy).toHaveBeenCalledTimes(1);
-    const written = sideCarSpy.mock.calls[0]![0];
-    expect(typeof written).toBe("string");
-
-    // The persisted side-car equals emitTouchLayout(the merged preview IR) — i.e.
-    // the SHIPPED artifact is derived from the same re-propagated IR the preview shows.
-    const previewLayout = getIr()!.touchLayout!;
-    expect(written).toBe(emitTouchLayout(previewLayout));
-
-    // And it round-trips to the same key set the preview carries (sanity check
-    // that the side-car is not an empty / stale string).
-    const reparsed = parseTouchLayout(written);
-    const sideCarKeyIds = reparsed.platforms
-      .flatMap((p) => p.layers)
-      .flatMap((l) => l.rows)
-      .flatMap((r) => r.keys)
-      .map((k) => k.id)
-      .sort();
-    const previewKeyIds = previewLayout.platforms
-      .flatMap((p) => p.layers)
-      .flatMap((l) => l.rows)
-      .flatMap((r) => r.keys)
-      .map((k) => k.id)
-      .sort();
-    expect(sideCarKeyIds).toEqual(previewKeyIds);
-  });
-
-  it("does not touch the side-car on a no-op (empty staleness closure, R5)", () => {
-    const ir = mixedProvenanceIR();
-    const { deps } = makeDeps(ir, []);
-    const sideCarSpy = vi.fn<(json: string) => void>();
-    repropagate({ ...deps, setTouchLayoutJson: sideCarSpy });
-    expect(sideCarSpy).not.toHaveBeenCalled();
-  });
-
-  it("is a no-op for the side-car when no setter is injected (legacy preview-only behavior)", () => {
-    const ir = mixedProvenanceIR();
-    const { deps, setSpy } = makeDeps(ir, ["touch"]);
-    // No setTouchLayoutJson — the working-IR write still happens, no throw.
+    const { deps } = makeDeps(ir, ["touch"]);
+    // Excess-property check against the exported type (a fresh literal — no
+    // spread, which would suppress the check): if setTouchLayoutJson is ever
+    // re-added to RepropagateDeps, this literal stops erroring, the
+    // expect-error directive below turns unused, and the build fails — a
+    // genuine compile-time pin on the single-writer rule (unlike a runtime
+    // `in` check on a test-local object, which could never regress).
+    const regressed: RepropagateDeps = {
+      staleSteps: deps.staleSteps,
+      getWorkingIR: deps.getWorkingIR,
+      setWorkingIR: deps.setWorkingIR,
+      // setTouchLayoutJson was removed from RepropagateDeps —
+      // buildTouchLayoutJson is the sole writer of the touch-layout artifact.
+      // @ts-expect-error excess property must stay rejected (single-writer rule)
+      setTouchLayoutJson: (_json: string) => {},
+    };
+    void regressed;
+    // The runtime half: the reducer-side spy test (reducer.test.ts, T024
+    // block) pins that the live call site no longer injects the member.
     expect(() => repropagate(deps)).not.toThrow();
-    expect(setSpy).toHaveBeenCalledTimes(1);
   });
 });

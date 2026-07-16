@@ -21,6 +21,11 @@
 // touchSuggest does not re-implement physical→touch mapping — it adds the
 // provenance layer on top of the engine's derivation. The function is pure.
 //
+// Single-writer rule: this seam (and repropagate.ts, which consumes it)
+// produces `ir.touchLayout` provenance/merge only — it never serializes the
+// `.keyman-touch-layout` artifact. `buildTouchLayoutJson` is the single writer
+// of that artifact.
+//
 // Source of truth:
 //   specs/014-mutate-seam-touch-propagation/data-model.md § touchSuggest produced key
 //   specs/014-mutate-seam-touch-propagation/contracts/repropagation.contract.md (R1/R2)
