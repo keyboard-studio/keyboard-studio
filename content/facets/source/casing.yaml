@@ -1,0 +1,53 @@
+# source.casing — whether the target/source script has a cased distinction
+# at all. A script-derived gate fact: caseless scripts make
+# source.caps-handling not-applicable.
+
+id: source.casing
+family: source
+title: Source script casing
+description: >
+  Whether the script in play has an uppercase/lowercase distinction
+  (cased), no such distinction (caseless, e.g. Arabic, Devanagari), or the
+  base mixes cased and caseless scripts. Script-derived, not read from the
+  .kmn rules themselves. Gates whether source.caps-handling and any
+  caps-normalize transform apply at all.
+valueType: enum
+values: [cased, caseless, mixed]
+
+modality: both
+
+derivations:
+  - kind: computed
+    source: "planned:casing-of-script"
+    sourceStatus: planned
+    notes: >
+      Looks up the Unicode script property's casing behavior for the
+      base's script(s); mixed when the base spans both a cased and a
+      caseless script.
+
+consumers:
+  prefills: []
+  proposes:
+    - "base-eligibility:casing"
+    - "facet-input:source:caps-handling:applicability"
+
+provenanceLabel: "whether your source keyboard's script has uppercase/lowercase at all"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed
+
+notes: >
+  Caseless scripts (Arabic, Devanagari) make source.caps-handling
+  not-applicable — the classifier is planned, not available.
+
+transformImpactClass: gate
+houseTargetPolicy: null
+invertibility: one-way
+implications: >
+  This facet gates whether caps-handling questions and transforms apply at
+  all; it is a property of the script, not a switchable authoring choice.
+exceptionSites: []
+causePredicates: []

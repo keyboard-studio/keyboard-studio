@@ -20,6 +20,16 @@ The facet index (spec 036) needs values, and those values must be **deterministi
 | Strategy fingerprint | rule-structure-based | the input-method strategies its rules exhibit |
 | Target/device mix | package-metadata-based | what the package declares it supports |
 
+**Amendment (2026-07-16, grounding review):** the later **construction facets**
+(`source.*`, [docs/source-facets-design.md](../../docs/source-facets-design.md))
+are, with one exception, further **rule-structure-based** classifiers following
+this same archetype — no new *classifier* spec is needed for them (see Out of
+Scope). The exception: `source.touch-combo-mechanism` reads **touch-layout
+JSON**, not parsed `.kmn` rule structure — a distinct evidence source from the
+KMN-rule-structure recognizer this archetype otherwise reads, since touch
+mechanisms (longpress / flick / multitap) live entirely in that JSON and are
+invisible to the KMN recognizer.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Script classification with likelihood (Priority: P1)
@@ -79,6 +89,7 @@ The system determines, for every keyboard, which device classes it supports — 
 - **Presentation-form characters** (e.g. Arabic presentation forms): must count toward their script, not be dropped because they live in unusual blocks.
 - **Unassigned or unknown codepoints** (newer Unicode than the pinned data): count as unknown-script, reported distinctly, never crash.
 - **Pinned-data drift**: a Unicode data update may change classifications; determinism is defined *relative to the pinned versions*, and version bumps force recomputation (per spec 036 freshness rules).
+- **Amendment (2026-07-16, grounding review) — leaked fall-through character**: a non-Latin keyboard that fails to block a key (missing `[K_x] > nul`) leaks a stray base-layout character (e.g. a Latin `W` on an otherwise non-Latin keyboard) into its produced-character set. The classifier must count this leaked character as evidence rather than silently excluding it — the correct behaviour is for the script distribution to reflect the leak (a small off-script sliver), not to hide the keyboard's own blocking gap.
 
 ## Requirements *(mandatory)*
 
@@ -95,7 +106,7 @@ The system determines, for every keyboard, which device classes it supports — 
 
 **Script classifier**
 
-- **FR-007**: The script classifier MUST derive its primary evidence from the set of characters the keyboard can produce (the existing produced-characters analysis over the parsed keyboard), mapped to scripts via pinned Unicode script data.
+- **FR-007**: The script classifier MUST derive its primary evidence from the set of characters the keyboard can produce (the existing produced-characters analysis over the parsed keyboard), mapped to scripts via pinned Unicode script data. **Amendment (2026-07-16, grounding review):** "the characters the keyboard produces" MUST include un-blocked base-layout characters reached by **desktop** fall-through (the `[K_x] > nul` idiom is how a rule set blocks a key; an un-blocked key falls through). The base layout MUST be read from the keyboard's own `&baselayout` system store, not an assumed default (e.g. US QWERTY) — a default is used only when `&baselayout` is unset, and that default-vs-declared distinction is recorded per FR-002's provenance requirement. This is desktop-only: touch keys are explicit JSON with no base-layout fall-through underneath.
 - **FR-008**: Characters with script property Common or Inherited MUST be excluded from the denominator (neutral evidence). Characters with script extensions MUST count fractionally or wholly toward each extended script (exact weighting decided in planning; the requirement is that shared characters never count *against* the scripts that share them).
 - **FR-009**: The classifier MUST emit: the per-script distribution, the dominant script, a confidence, the count of concretely-scripted characters (evidence size), and the analyzed-coverage share (portion of rule output that was analyzable).
 - **FR-010**: For Latin-dominant keyboards, the classifier MUST additionally emit a sub-script profile distinguishing at minimum: plain/basic Latin, extended Latin, and IPA orientation, derived from character-range membership. (Named-orthography labels like "Ajami" are NOT emitted by this classifier: Ajami = Arab script + language identity, which is a join the consumer performs; same for romanization-vs-native distinctions.)

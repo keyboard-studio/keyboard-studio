@@ -34,7 +34,7 @@ const REPO_ROOT = path.resolve(__dirname, "../..");
 const FACETS_DIR = path.join(REPO_ROOT, "content", "facets");
 const QUESTIONS_DIR = path.join(REPO_ROOT, "packages", "studio", "src", "survey", "questions");
 
-const FAMILIES = ["env", "author", "community", "orth", "lineage", "dest"];
+const FAMILIES = ["env", "author", "community", "orth", "lineage", "dest", "source"];
 const VALUE_TYPES = ["enum", "boolean", "scalar", "vector", "set"];
 const MODALITIES = ["physical", "touch", "both"];
 const DERIVATION_KINDS = ["computed", "corpus", "confirmed", "asked"];

@@ -1,0 +1,27 @@
+# touch-symbol-layer — corpus counterpart of the session facet
+# source.touch-symbol-layer: whether a corpus keyboard's
+# .keyman-touch-layout defines a dedicated symbol layer.
+#
+# derivation.archetype note: as with touch-combo-mechanism, "rule-structure"
+# is the closest ARCHETYPES fit for a touch-layout scan.
+
+id: touch-symbol-layer
+title: Touch symbol layer presence
+description: >
+  Whether a corpus keyboard's .keyman-touch-layout defines a dedicated
+  symbol/punctuation layer reachable via a layer-switch key. Read from the
+  touch-layout JSON's layer list directly, independent of the desktop .kmn
+  source. Feeds the source.touch-symbol-layer session facet.
+valueType: enum
+limits:
+  values: [present, absent]
+  open: false
+likelihoodSemantics: >
+  the single classified value for the keyboard's touch layout; likelihood
+  is 1 for the classified value.
+derivation:
+  archetype: rule-structure
+  classifierId: planned
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: [source.touch-symbol-layer]
+schemaVersion: 1

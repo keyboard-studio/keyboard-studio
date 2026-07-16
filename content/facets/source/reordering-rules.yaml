@@ -1,0 +1,58 @@
+# source.reordering-rules — how the chosen base's .kmn reorders sequences
+# (e.g. mark-before-base visual-order swaps): none, a dedicated
+# group-reorder-swap structure, inline-swap rules interleaved with other
+# output rules, or a mix of both.
+
+id: source.reordering-rules
+family: source
+title: Source reordering rule shape
+description: >
+  Whether the chosen base's .kmn performs no sequence reordering, uses a
+  dedicated reorder group with context-swap rules, inlines swap rules
+  amongst its other output rules, or mixes both shapes. A construction-style
+  fact read off the base ahead of any adaptation — informs the reorder-style
+  axis proposal for the new keyboard rather than replacing it.
+
+valueType: enum
+values: [none, group-reorder-swap, inline-swap, mixed]
+
+modality: both
+
+derivations:
+  - kind: computed
+    source: "planned:reordering-rule-shape-of-kmn"
+    sourceStatus: planned
+    notes: >
+      Classifies whether reordering uses a dedicated reorder group with
+      context()-swap rules, inline swap rules interleaved with other output
+      rules, both, or neither is present at all.
+
+consumers:
+  prefills: []
+  proposes:
+    - "axis:reorder-style"
+
+provenanceLabel: "how your source keyboard already structures any reordering rules"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed
+
+transformImpactClass: output-changing
+houseTargetPolicy:
+  inputs: [lineage.strategy-fingerprint]
+  rules:
+    - when: "lineage.strategy-fingerprint favors dedicated reorder groups among the near neighbors"
+      target: group-reorder-swap
+    - when: default
+      target: inline-swap
+invertibility: one-way
+implications: >
+  Restructuring reordering rules changes the group/rule dispatch order
+  kmcmplib compiles, which can change which rule matches first for an
+  overlapping input sequence — a visible output change, not a pure
+  source-layout change.
+exceptionSites: []
+causePredicates: []

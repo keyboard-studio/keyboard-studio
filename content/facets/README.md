@@ -32,6 +32,9 @@ content/facets/
   orth/       computable facts about the target orthography (feed the axes)
   lineage/    corpus-relational — neighbors, siblings, priors
   dest/       where the output goes
+  source/     the source keyboard's own construction — how ITS .kmn/touch-layout
+              encodes, composes, reorders, and gates (feeds transform/gate proposals,
+              not the survey axes directly)
 ```
 
 The facet `id` is `<family>.<slug>` and must match its directory and filename
@@ -42,7 +45,7 @@ The facet `id` is `<family>.<slug>` and must match its directory and filename
 
 ```yaml
 id: orth.mark-composition-posture   # <family>.<slug>, matches path
-family: orth                        # env | author | community | orth | lineage | dest
+family: orth                        # env | author | community | orth | lineage | dest | source
 title: Short human title
 description: >
   What this facet captures, in plain language. Written for a future
@@ -83,6 +86,60 @@ metrics:                            # written by the evaluation harness, not by 
 notes: >                            # optional working notes
   Anything a future editor needs.
 ```
+
+### The `source/` family extension: transform-ready fields
+
+`source/` records (see [docs/source-facets-design.md](../../docs/source-facets-design.md)
+for the design brief) carry the same base schema above, plus additional fields
+that make a facet's value **actionable**, not just descriptive — a base's
+construction decisions may eventually be switched, and these fields carry what
+a switch would need to know:
+
+```yaml
+transformImpactClass: behavior-preserving   # behavior-preserving | ux-changing | output-changing | gate
+houseTargetPolicy:                          # decision-table: inputs -> target. null for gate/measure-only facets.
+  inputs: [orth.display-difficulty]         # facet ids this policy reads
+  rules:
+    - when: "orth.display-difficulty == poorly-supported"   # string predicate
+      target: u-notation
+    - when: default                         # default row, matches when nothing else does
+      target: quoted-literal
+exceptionSites:                             # enumerated deviations from the dominant value
+  - site: "K_M base char"
+    cause: principled-split                 # the predicate-fit cause tag (see design brief §4)
+causePredicates: [character-class, layer-capacity]   # the predicate library used to tag exceptionSites
+implications: >                             # prose for the propose-then-confirm UI (§3c)
+  What changes for the user if this facet's value is switched.
+invertibility: lossless                     # lossless | lossy | one-way (coarse hint only)
+```
+
+- **`transformImpactClass`** — behavior-preserving / ux-changing / output-changing / gate;
+  the axis a transform of this facet changes (design brief §3).
+- **`houseTargetPolicy`** — an ordered decision-table, not a scalar default:
+  `inputs` names the facet ids the policy reads, and `rules` is an ordered list
+  of `{ when, target }` pairs evaluated top-down, ending in a `when: default`
+  fallback row. `when` is a free-form string predicate (e.g. `"script != Latn"`),
+  not a structured expression — modeled on the spec §7.2 ordered-decision-table
+  *pattern*, not a literal reuse of the locked §7.2 tree or its
+  `StrategyRecommendation` / `PrimaryRuleNumber` types. `null` for gate or
+  measure-only facets. The string-predicate grammar is deliberately loose at
+  candidate stage; it may formalize into a structured expression form if/when
+  the `source/` family graduates out of empirical status.
+- **`exceptionSites`** — the enumerated deviations from the dominant value; each
+  carries a predicate-fit `cause` tag (`principled-split` / `capacity-forced` /
+  `gap-omission`). The committed keyboard-facet index stores only the summary;
+  the enumeration itself is deterministically recomputable.
+- **`causePredicates`** — the predicate library this facet's classifier used to
+  tag `exceptionSites` (e.g. `character-class`, `layer-capacity`).
+- **`implications`** — human-readable "what changes if you switch this," feeding
+  the §3c propose-then-confirm UI.
+- **`invertibility`** — a coarse hint (`lossless` / `lossy` / `one-way`); the
+  precise per-pair transition matrix and migration rules are owned by the
+  transform engine spec, not by this catalog.
+
+These fields are the **`source/` family extension**, empirical and
+`status: candidate` like every other facet in this catalog — **not** a locked
+`packages/contracts` type, and not required on the other five families.
 
 ### Derivation `source` conventions
 
