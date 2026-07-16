@@ -147,6 +147,62 @@ describe("ManagedPRSubmitPanel — form gating", () => {
     expect((btn as HTMLButtonElement).disabled).toBe(false);
   });
 
+  // Output-time staleness gate (a stale touch-layout side-car after a
+  // post-Touch-step mechanics edit): the panel must refuse to submit
+  // regardless of an otherwise-valid form and canSubmit=true.
+  it("Submit button is disabled when outputBlocked is true even with a valid form and canSubmit", () => {
+    render(
+      <ManagedPRSubmitPanel
+        canSubmit={true}
+        outputBlocked={true}
+        outputBlockedReason="the touch layout is out of date"
+      />,
+    );
+    fillValidForm();
+    const btn = screen.getByRole("button", { name: /submit unavailable.*touch layout is out of date/i });
+    expect((btn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("Submit button aria-label explains the block reason when outputBlocked is true", () => {
+    render(
+      <ManagedPRSubmitPanel
+        canSubmit={true}
+        outputBlocked={true}
+        outputBlockedReason="the touch layout is out of date"
+      />,
+    );
+    fillValidForm();
+    expect(
+      screen.getByRole("button", { name: /submit unavailable — the touch layout is out of date/i }),
+    ).toBeTruthy();
+  });
+
+  // Priority ordering (intentional, not incidental): when both outputBlocked
+  // and !canSubmit are simultaneously true, the aria-label must explain the
+  // outputBlocked reason, not the generic "submit unavailable until compile
+  // completes" canSubmit copy. See aria-label derivation in the component.
+  it("aria-label reflects outputBlocked reason when both outputBlocked and !canSubmit are true", () => {
+    render(
+      <ManagedPRSubmitPanel
+        canSubmit={false}
+        outputBlocked={true}
+        outputBlockedReason="the touch layout is out of date"
+      />,
+    );
+    fillValidForm();
+    const btn = screen.getByRole("button", {
+      name: /submit unavailable — the touch layout is out of date/i,
+    });
+    expect((btn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("Submit button is enabled when outputBlocked is false (control)", () => {
+    render(<ManagedPRSubmitPanel canSubmit={true} outputBlocked={false} />);
+    fillValidForm();
+    const btn = screen.getByRole("button", { name: /submit keyboard to community repository/i });
+    expect((btn as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it("shows name-required error after blurring an empty name field", () => {
     render(<ManagedPRSubmitPanel canSubmit={true} />);
     const nameInput = screen.getByRole("textbox", { name: /your name/i });
