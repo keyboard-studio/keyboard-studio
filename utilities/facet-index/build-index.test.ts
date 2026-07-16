@@ -71,13 +71,19 @@ describe("buildIndex — dedicated fixture corpus (release/fixture/*)", () => {
     outPath: scratchOutPath("fixture"),
   });
 
-  it("produces exactly the 4 fixture keyboards", () => {
-    expect(Object.keys(index.keyboards).sort()).toEqual(["fx_arabic", "fx_broken", "fx_latin", "fx_rootlayout"]);
+  it("produces exactly the 5 fixture keyboards", () => {
+    expect(Object.keys(index.keyboards).sort()).toEqual([
+      "fx_arabic",
+      "fx_broken",
+      "fx_dup",
+      "fx_latin",
+      "fx_rootlayout",
+    ]);
   });
 
   it("every keyboard has a facets.script record (SC-001, X3)", () => {
     assertFullCoverage(index);
-    for (const id of ["fx_arabic", "fx_latin", "fx_broken", "fx_rootlayout"]) {
+    for (const id of ["fx_arabic", "fx_latin", "fx_broken", "fx_rootlayout", "fx_dup"]) {
       expect(index.keyboards[id]?.facets.script, `${id} has no script record`).toBeDefined();
     }
   });
@@ -110,6 +116,17 @@ describe("buildIndex — dedicated fixture corpus (release/fixture/*)", () => {
     expect(script.value).toBe("Latn");
     expect(script.provenanceTier).toBe("content-derived");
     expect(script.analysisOutcome).toBe("fully");
+  });
+
+  it("fx_dup (transitional duplicate — id present under both layouts) yields exactly one record, from the source/ layout", () => {
+    // fx_dup/fx_dup.kps (flat, legacy, declares en-Latn) coexists with
+    // fx_dup/source/fx_dup.kps (source/, canonical, declares ar-Arab and
+    // classifies content-derived Arab from its .kmn). Only one record must
+    // land in the index, and it must be the source/ one, never the flat one.
+    expect(Object.keys(index.keyboards).filter((id) => id === "fx_dup")).toHaveLength(1);
+    const script = index.keyboards.fx_dup!.facets.script!;
+    expect(script.value).toBe("Arab");
+    expect(script.provenanceTier).toBe("content-derived");
   });
 
   it("fx_broken (unparseable .kmn) still gets a record, via the fallback chain, never omitted (Edge Case)", () => {
