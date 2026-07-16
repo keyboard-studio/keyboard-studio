@@ -71,6 +71,40 @@ const CONTINUATION_RE = /\\\s*$/;
 // below (`/^c(?:\s|$)/i`), but tests the untrimmed physical line.
 const COMMENT_LINE_RE = /^\s*c(?:\s|$)/i;
 
+/**
+ * True if `text` contains an unquoted `c` comment token — a `c`/`C` that is
+ * whitespace-preceded (or at line start) and whitespace-or-EOL-followed, and
+ * not inside a quoted string. In .kmn a standalone `c` is unambiguously the
+ * comment keyword and the comment runs to end-of-line, so any trailing
+ * backslash after it is NOT a line-continuation. This catches TRAILING
+ * comments (e.g. `... > 'b' c note \`) that COMMENT_LINE_RE — which only
+ * matches full-line comments — misses; without it the next line is silently
+ * swallowed into the comment. Mirrors kmcmplib, which does not honor a
+ * backslash inside a comment as a continuation.
+ */
+function hasCommentToken(text: string): boolean {
+  let quote: string | null = null;
+  for (let k = 0; k < text.length; k++) {
+    const ch = text[k];
+    if (quote !== null) {
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      quote = ch;
+      continue;
+    }
+    if (ch === "c" || ch === "C") {
+      const prev = text[k - 1];
+      const next = text[k + 1];
+      const prevIsWs = prev === undefined || prev === " " || prev === "\t";
+      const nextIsWsOrEol = next === undefined || next === " " || next === "\t";
+      if (prevIsWs && nextIsWsOrEol) return true;
+    }
+  }
+  return false;
+}
+
 // Target-selector prefix matchers (case-insensitive; kmcmplib uses u16nicmp).
 // The colon is required; whitespace between the prefix and the rest of the
 // line is optional.
@@ -103,6 +137,7 @@ export function tokenize(source: string): Token[] {
     while (
       CONTINUATION_RE.test(text) &&
       !COMMENT_LINE_RE.test(text) &&
+      !hasCommentToken(text) &&
       i + 1 < physicalLines.length
     ) {
       text = text.replace(CONTINUATION_RE, ""); // drop backslash + trailing ws

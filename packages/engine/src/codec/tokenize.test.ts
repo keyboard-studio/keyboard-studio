@@ -171,4 +171,48 @@ describe("tokenize", () => {
     const st = tokens.find(t => t.kind === "store");
     expect(st?.text).toContain('"any"');
   });
+
+  it("a TRAILING comment ending in a backslash does NOT swallow the next line", () => {
+    // A `c` comment runs to end-of-line, so a trailing `\` inside it is not a
+    // continuation. COMMENT_LINE_RE only guards full-line comments; a trailing
+    // comment (after a rule) previously joined the following line into the
+    // comment and dropped it silently. Here the store on line 2 must survive.
+    const tokens = tokenize("+ 'a' > 'b' c trailing note \\\nstore(kept) 'x'\n");
+    const rules = tokens.filter((t) => t.kind === "rule");
+    const store = tokens.find((t) => t.kind === "store");
+    expect(rules).toHaveLength(1);
+    expect(rules[0]?.line).toBe(1);
+    expect(store).toBeDefined();
+    expect(store?.line).toBe(2);
+    expect(store?.text).toContain("kept");
+  });
+
+  it("a real continuation with NO comment still joins (comment-detector must not over-fire)", () => {
+    // Guards against the trailing-comment fix wrongly classifying an ordinary
+    // continued line as a comment. No standalone `c` token here → must join.
+    const tokens = tokenize("store(&VERSION) \\\n  '10.0'\n");
+    const stores = tokens.filter((t) => t.kind === "store");
+    expect(stores).toHaveLength(1);
+    expect(stores[0]?.text).toContain("10.0");
+  });
+
+  it("a backslash after a QUOTED 'c' still continues (quote-aware detection)", () => {
+    // The `c` is inside a string literal, not a comment keyword, so the trailing
+    // `\` is a genuine continuation and the two lines must join.
+    const tokens = tokenize("+ 'x' > 'c' \\\n'y'\n");
+    const rules = tokens.filter((t) => t.kind === "rule");
+    expect(rules).toHaveLength(1);
+    expect(rules[0]?.text).toContain("'c'");
+    expect(rules[0]?.text).toContain("'y'");
+  });
+
+  it("a word merely starting with 'c' is not treated as a comment token", () => {
+    // `context`-like tokens and store names beginning with c are not the bare
+    // `c` comment keyword; the continuation must still join.
+    const tokens = tokenize("store(cedilla) \\\n  'x'\n");
+    const stores = tokens.filter((t) => t.kind === "store");
+    expect(stores).toHaveLength(1);
+    expect(stores[0]?.text).toContain("cedilla");
+    expect(stores[0]?.text).toContain("'x'");
+  });
 });
