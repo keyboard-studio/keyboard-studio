@@ -139,7 +139,7 @@ export const IRNodeRefSchema = z.object({
 // ---------------------------------------------------------------------------
 
 /** The conservative default provenance for an untagged/legacy touch key (FR-009). */
-const DEFAULT_TOUCH_PROVENANCE: TouchKeyProvenance = "hand-set";
+export const DEFAULT_TOUCH_PROVENANCE: TouchKeyProvenance = "hand-set";
 
 /**
  * Add `| undefined` to every optional (`?:`) property of `T`, recursively.

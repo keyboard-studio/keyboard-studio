@@ -1,224 +1,25 @@
 /**
- * .keyman-touch-layout JSON parser.
+ * .keyman-touch-layout codec — emitter, plus a re-export of the canonical parser.
  *
- * The touch layout file is a JSON object with one or more platform keys
- * (desktop, tablet, phone). Each platform has a `layer` array of layer
- * objects. Each layer has a `row` array of rows. Each row has a `key` array.
- *
- * Each platform (desktop, tablet, phone) is a separate entry in the output IR.
- * Keys within each layer row are recursively shaped into TouchKeyIR nodes,
- * including the `sk` (subkey) array.
+ * The parser ({@link parseTouchLayout}) is the shared implementation in
+ * `@keyboard-studio/contracts`, so the engine codec and the
+ * keyboard-lint package parse identically. The emitter is the codec's own
+ * concern (lint never emits) and stays here as the inverse of that parser.
  */
 
-import type {
-  TouchLayoutIR,
-  TouchKeyIR,
-  IRNodeRef,
-  TouchKeyProvenance,
-} from "@keyboard-studio/contracts";
-import { NodeIdMinter } from "../shared/node-ids.js";
-
-// ---------------------------------------------------------------------------
-// Provenance wire field (spec-014 US3 / T028, FR-010)
-// ---------------------------------------------------------------------------
-//
-// Per-key touch provenance (TouchKeyIR.provenance) must survive the codec
-// round-trip so the no-clobber re-propagation rule (US2) has a durable source.
-// The `.keyman-touch-layout` JSON key object does NOT reserve a `"p"` property
-// in the Keyman touch-layout schema, and kmcmplib's TouchLayoutFileReader
-// ignores properties it does not recognise (RawKey carries `[key: string]:
-// unknown`), so writing provenance under a short, non-colliding `"p"` key is a
-// NON-BREAKING addition: the standard Keyman parser tolerates and skips it.
-//
-// `convertKey` reads `p` back, validating it against the known provenance
-// vocabulary; an absent / legacy / out-of-vocabulary value defaults to
-// `"hand-set"` (FR-009 — conservative, never auto-clobbered).
-
-/** Wire-format property carrying per-key provenance in `.keyman-touch-layout`. */
-const PROVENANCE_WIRE_KEY = "p" as const;
-
-const PROVENANCE_VALUES: ReadonlySet<string> = new Set<TouchKeyProvenance>([
-  "base-derived",
-  "physical-suggested",
-  "hand-set",
-]);
-
-/**
- * Coerce a raw wire value to a {@link TouchKeyProvenance}. Absent, legacy, or
- * out-of-vocabulary values default to `"hand-set"` (FR-009).
- */
-function readProvenance(raw: unknown): TouchKeyProvenance {
-  return typeof raw === "string" && PROVENANCE_VALUES.has(raw)
-    ? (raw as TouchKeyProvenance)
-    : "hand-set";
-}
-
-// ---------------------------------------------------------------------------
-// Raw JSON shapes (non-exhaustive — only the fields we care about)
-// ---------------------------------------------------------------------------
-
-interface RawKey {
-  id?: string;
-  text?: string;
-  output?: string;
-  nextlayer?: string;
-  sk?: RawKey[];
-  flick?: Record<string, RawKey>;
-  multitap?: RawKey[];
-  /** Wire format encodes sp as a JSON string (e.g. `"sp": "1"`); also accept a number for robustness. */
-  sp?: string | number;
-  /** Wire format encodes width as a JSON string (e.g. `"width": "100"`); also accept a number for robustness. */
-  width?: string | number;
-  /** Wire format encodes pad as a JSON string (e.g. `"pad": "50"`); also accept a number for robustness. */
-  pad?: string | number;
-  hint?: string;
-  /**
-   * Per-key provenance (spec-014 FR-008/-010). Non-standard `.keyman-touch-layout`
-   * property; ignored by kmcmplib's reader. Absent/legacy ⇒ `"hand-set"`.
-   */
-  p?: string;
-  [key: string]: unknown;
-}
-
-/**
- * Known flick (directional gesture) keys. `TouchKeyIR["flick"]` is keyed by
- * these compass directions only (contracts `keyboard-ir.ts`); an unrecognised
- * wire key is dropped rather than cast into the union.
- */
-const FLICK_DIRECTIONS = new Set(["n", "s", "e", "w", "ne", "nw", "se", "sw"]);
-
-interface RawRow {
-  id?: number;
-  key?: RawKey[];
-}
-
-interface RawLayer {
-  id?: string;
-  row?: RawRow[];
-}
-
-interface RawPlatform {
-  layer?: RawLayer[];
-  displayUnderlying?: boolean;
-  font?: string;
-}
-
-type RawTouchLayout = Record<string, RawPlatform>;
-
-// ---------------------------------------------------------------------------
-// Key conversion
-// ---------------------------------------------------------------------------
-
-function convertKey(raw: RawKey, minter: NodeIdMinter): TouchKeyIR {
-  const nodeId = minter.mint("touchKey");
-  const key: TouchKeyIR = {
-    nodeId,
-    id: raw.id ?? "",
-    // Provenance is always materialised on deserialize: an absent/legacy/
-    // out-of-vocabulary wire value resolves to the conservative `"hand-set"`
-    // default (FR-009/T028), so the no-clobber rule always has a tag to read.
-    provenance: readProvenance(raw[PROVENANCE_WIRE_KEY]),
-  };
-  if (raw.text !== undefined) key.text = raw.text;
-  if (raw.output !== undefined) key.output = raw.output;
-  if (raw.nextlayer !== undefined) key.nextlayer = raw.nextlayer;
-  if (typeof raw.hint === "string" && raw.hint.length > 0) key.hint = raw.hint;
-  if (raw.sp !== undefined && raw.sp !== "") {
-    const spNum = typeof raw.sp === "number" ? raw.sp : Number(raw.sp);
-    if (Number.isFinite(spNum)) key.sp = spNum;
-  }
-  if (raw.width !== undefined && raw.width !== "") {
-    const widthNum = typeof raw.width === "number" ? raw.width : Number(raw.width);
-    if (Number.isFinite(widthNum)) key.width = widthNum;
-  }
-  if (raw.pad !== undefined && raw.pad !== "") {
-    const padNum = typeof raw.pad === "number" ? raw.pad : Number(raw.pad);
-    if (Number.isFinite(padNum)) key.pad = padNum;
-  }
-  if (Array.isArray(raw.sk) && raw.sk.length > 0) {
-    key.sk = raw.sk.map(sk => convertKey(sk, minter));
-  }
-  // multitap keys are absorbed into sk for v1 (they share the same visual
-  // mechanism). Log as raw-appended subkeys if present.
-  if (Array.isArray(raw.multitap) && raw.multitap.length > 0) {
-    const existingSk = key.sk ?? [];
-    key.sk = [...existingSk, ...raw.multitap.map(mt => convertKey(mt, minter))];
-  }
-  if (raw.flick && typeof raw.flick === "object" && !Array.isArray(raw.flick)) {
-    const flick: TouchKeyIR["flick"] = {};
-    for (const [dir, fk] of Object.entries(raw.flick)) {
-      if (fk && typeof fk === "object" && FLICK_DIRECTIONS.has(dir)) {
-        flick[dir as "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw"] = convertKey(fk, minter);
-      }
-    }
-    if (Object.keys(flick).length > 0) key.flick = flick;
-  }
-  return key;
-}
-
-// ---------------------------------------------------------------------------
-// Main parser
-// ---------------------------------------------------------------------------
+import type { TouchLayoutIR, TouchKeyIR } from "@keyboard-studio/contracts";
+import { parseTouchLayoutString, PROVENANCE_WIRE_KEY } from "@keyboard-studio/contracts";
 
 /**
  * Parse a .keyman-touch-layout JSON string into a TouchLayoutIR.
  *
- * Each platform (desktop, tablet, phone) is preserved as a separate entry in
- * `platforms`. Layer IDs within a platform are not deduplicated across platforms.
+ * Thin alias over the canonical {@link parseTouchLayoutString} in contracts.
  *
  * @throws SyntaxError if the input is not valid JSON.
  * @throws TypeError  if the JSON structure is clearly wrong (not an object).
  */
 export function parseTouchLayout(json: string): TouchLayoutIR {
-  const minter = new NodeIdMinter();
-
-  const raw = JSON.parse(json) as unknown;
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    throw new TypeError("Touch layout JSON must be an object");
-  }
-  const layout = raw as RawTouchLayout;
-
-  const platforms: TouchLayoutIR["platforms"] = [];
-  const nodeIds: Array<[string, IRNodeRef]> = [];
-
-  const PLATFORM_ORDER = ["desktop", "tablet", "phone"] as const;
-
-  for (const platform of PLATFORM_ORDER) {
-    const p = layout[platform];
-    if (!p || !Array.isArray(p.layer)) continue;
-
-    const platformLayers: TouchLayoutIR["platforms"][number]["layers"] = [];
-
-    for (const rawLayer of p.layer) {
-      const id = rawLayer.id ?? "default";
-      const rows: TouchLayoutIR["platforms"][number]["layers"][number]["rows"] = [];
-
-      for (const rawRow of rawLayer.row ?? []) {
-        const keys: TouchKeyIR[] = [];
-        for (const rawKey of rawRow.key ?? []) {
-          const key = convertKey(rawKey, minter);
-          keys.push(key);
-          nodeIds.push([`${platform}:${id}:${key.id}`, { kind: "touchKey", nodeId: key.nodeId }]);
-          if (key.sk) {
-            for (const sk of key.sk) {
-              nodeIds.push([`${platform}:${id}:${key.id}:sk:${sk.id}`, { kind: "touchKey", nodeId: sk.nodeId }]);
-            }
-          }
-        }
-        rows.push({ keys });
-      }
-
-      platformLayers.push({ id, rows });
-    }
-
-    platforms.push({
-      id: platform,
-      ...(p.font !== undefined ? { font: p.font } : {}),
-      layers: platformLayers,
-    });
-  }
-
-  return { platforms, nodeIds };
+  return parseTouchLayoutString(json);
 }
 
 // ---------------------------------------------------------------------------
@@ -230,7 +31,9 @@ type EmittedKey = Record<string, unknown>;
 function emitKey(key: TouchKeyIR): EmittedKey {
   const out: EmittedKey = { id: key.id };
   // Provenance round-trip (FR-010): write the tag to the non-standard `"p"`
-  // wire property so it survives emit → re-parse. kmcmplib ignores it.
+  // wire property so it survives emit → re-parse. The Keyman Developer
+  // touch-layout reader (kmc-kmn's TouchLayoutFileReader.read()) passes it
+  // through on the build path; see the wire-key note in the canonical parser.
   if (key.provenance !== undefined) out[PROVENANCE_WIRE_KEY] = key.provenance;
   if (key.text !== undefined) out["text"] = key.text;
   if (key.output !== undefined) out["output"] = key.output;
