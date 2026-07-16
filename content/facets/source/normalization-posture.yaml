@@ -58,7 +58,7 @@ houseTargetPolicy:
     - when: "orth.mark-composition-posture == combining"
       target: nfd
     - when: default
-      target: mixed
+      target: nfc
 invertibility: lossy
 implications: >
   NFC and NFD are canonically equivalent in Unicode, so no character

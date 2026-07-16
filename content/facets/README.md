@@ -110,7 +110,7 @@ exceptionSites:                             # enumerated deviations from the dom
 causePredicates: [character-class, layer-capacity]   # the predicate library used to tag exceptionSites
 implications: >                             # prose for the propose-then-confirm UI (§3c)
   What changes for the user if this facet's value is switched.
-invertibility: lossless                     # lossless | lossy | one-way (coarse hint only)
+invertibility: lossless                     # lossless | lossy | one-way | not-applicable (coarse hint only; not-applicable for gate facets)
 ```
 
 - **`transformImpactClass`** — behavior-preserving / ux-changing / output-changing / gate;
@@ -133,9 +133,10 @@ invertibility: lossless                     # lossless | lossy | one-way (coarse
   tag `exceptionSites` (e.g. `character-class`, `layer-capacity`).
 - **`implications`** — human-readable "what changes if you switch this," feeding
   the §3c propose-then-confirm UI.
-- **`invertibility`** — a coarse hint (`lossless` / `lossy` / `one-way`); the
-  precise per-pair transition matrix and migration rules are owned by the
-  transform engine spec, not by this catalog.
+- **`invertibility`** — a coarse hint (`lossless` / `lossy` / `one-way`, or
+  `not-applicable` for gate facets that propose no transform); the precise
+  per-pair transition matrix and migration rules are owned by the transform
+  engine spec, not by this catalog.
 
 These fields are the **`source/` family extension**, empirical and
 `status: candidate` like every other facet in this catalog — **not** a locked
