@@ -17,7 +17,7 @@ import {
 } from "./github-api.js";
 import { parseKps } from "./kps-parser.js";
 import { offlineKbdus } from "./offline-bundle.js";
-import { matchKeyboardScopePath } from "./corpus-scope.js";
+import { dedupeKpsPathsById, matchKeyboardScopePath } from "./corpus-scope.js";
 
 const OWNER = "keyboard-studio";
 const REPO = "keyboards";
@@ -153,11 +153,13 @@ export function createBaseBrowser(
       return [offlineKbdus];
     }
 
-    const kpsPaths = items
-      .filter(
-        (item) => item.type === "blob" && matchKeyboardScopePath(item.path) !== null
-      )
-      .map((item) => item.path);
+    // Dedupe transitional-duplicate ids (present under both the
+    // source/ and legacy flat-root layouts at once) to a single kps path per
+    // id, preferring source/, BEFORE fetching+parsing so a duplicate isn't
+    // even fetched twice.
+    const kpsPaths = dedupeKpsPathsById(
+      items.filter((item) => item.type === "blob").map((item) => item.path)
+    );
 
     const keyboards: BaseKeyboard[] = [];
 
