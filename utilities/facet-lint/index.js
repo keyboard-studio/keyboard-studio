@@ -42,6 +42,9 @@ const SOURCE_STATUSES = ["available", "planned"];
 const STATUSES = ["candidate", "validated", "active", "retired"];
 const ELICITATION_COSTS = ["computed", "corpus", "confirmed", "asked"];
 const SOURCE_PREFIXES = ["engine:", "corpus:", "question:", "oauth:", "session:", "planned:"];
+// source/ family extension (content/facets/README.md "The source/ family extension")
+const TRANSFORM_IMPACT_CLASSES = ["behavior-preserving", "ux-changing", "output-changing", "gate"];
+const INVERTIBILITIES = ["lossless", "lossy", "one-way", "not-applicable"];
 
 const rel = (abs) => path.relative(REPO_ROOT, abs);
 
@@ -138,6 +141,29 @@ function validateRecord(rec) {
       Array.isArray(rec.relatedAxes) && rec.relatedAxes.every((a) => /^(A[1-7]|A2a|A3a|A7a)$/.test(a)),
       "must be an array of axis ids (A1..A7, A2a, A3a, A7a)",
     );
+  }
+
+  // source/ family extension fields (README "The source/ family extension").
+  // Only source/ records carry these; guard so the other families are unaffected.
+  if (rec.family === "source") {
+    need(
+      "transformImpactClass",
+      TRANSFORM_IMPACT_CLASSES.includes(rec.transformImpactClass),
+      `must be one of ${TRANSFORM_IMPACT_CLASSES.join("|")}`,
+    );
+    need(
+      "invertibility",
+      INVERTIBILITIES.includes(rec.invertibility),
+      `must be one of ${INVERTIBILITIES.join("|")}`,
+    );
+    need("exceptionSites", Array.isArray(rec.exceptionSites), "required array (may be empty)");
+    need("causePredicates", Array.isArray(rec.causePredicates), "required array (may be empty)");
+    // houseTargetPolicy: null (gate/measure-only) OR a mapping with inputs[] + rules[].
+    const htp = rec.houseTargetPolicy;
+    if (htp !== null) {
+      const ok = htp !== undefined && typeof htp === "object" && !Array.isArray(htp) && Array.isArray(htp.inputs) && Array.isArray(htp.rules);
+      need("houseTargetPolicy", ok, "must be null or a mapping with inputs[] and rules[]");
+    }
   }
   return problems;
 }
