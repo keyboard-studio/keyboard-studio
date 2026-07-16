@@ -112,6 +112,27 @@ function rewriteKvksKbdname(xml: string, baseId: string, keyboardId: string): st
   );
 }
 
+/**
+ * Rewrite a Keyman project file (.kpj) so its per-file <Filename>/<Filepath>
+ * references to the id-basename source files (e.g. `<baseId>.kmn`,
+ * `source\<baseId>.kps`) point at the new id after a rename. Only the base-id
+ * *token* inside <Filename>/<Filepath> element text is rewritten (word-boundary
+ * anchored), so file GUIDs (<ID>id_…</ID>), display <Name>s, and files that do
+ * not use the id as their basename (HISTORY.md, LICENSE.md, README.md) are left
+ * untouched. The compiler flags the loader/compiler actually read
+ * (parseKpjFlags) are content-independent of this; the rewrite exists so the
+ * emitted project stays coherent when opened in Keyman Developer.
+ */
+function rewriteKpjFilePaths(xml: string, baseId: string, keyboardId: string): string {
+  const escaped = escapeForRegex(baseId);
+  const tokenRe = new RegExp(`(?<![\\w])${escaped}(?![\\w])`, "g");
+  return xml.replace(
+    /(<(Filename|Filepath)\b[^>]*>)([^<]*)(<\/\2>)/gi,
+    (_m, open: string, _tag: string, value: string, close: string) =>
+      `${open}${value.replace(tokenRe, keyboardId)}${close}`
+  );
+}
+
 /** @internal Exported for unit testing only. */
 export function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: string): void {
   // Sibling-file extensions that conventionally use the keyboard id as
@@ -154,6 +175,23 @@ export function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: str
   if (helpEntry !== undefined) {
     vfs.delete(oldHelp);
     vfs.set(`source/help/${keyboardId}.php`, helpEntry.content, helpEntry.isBinary);
+  }
+
+  // The .kpj project file lives at the VFS ROOT (`<baseId>.kpj`), not under
+  // source/, so the extension loop above never sees it. compile() looks it up
+  // as `<keyboardId>.kpj`; without this rename the file keeps the old id,
+  // compile() misses it, and the base keyboard's compiler flags are silently
+  // dropped (falls back to defaults). Rename it and rewrite its internal
+  // <Filename>/<Filepath> references so the emitted project stays coherent.
+  const oldKpj = `${baseId}.kpj`;
+  const kpjEntry = vfs.get(oldKpj);
+  if (kpjEntry !== undefined) {
+    vfs.delete(oldKpj);
+    let content = kpjEntry.content;
+    if (!kpjEntry.isBinary && typeof content === "string") {
+      content = rewriteKpjFilePaths(content, baseId, keyboardId);
+    }
+    vfs.set(`${keyboardId}.kpj`, content, kpjEntry.isBinary);
   }
 
   // Rewrite `.kmw-keyboard-<baseId>` selectors in every *.css entry.
