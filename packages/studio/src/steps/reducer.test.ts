@@ -13,7 +13,7 @@
 // Pre-refactor inline path: StudioShell.tsx handleMechanismsComplete (line 377),
 //   handlePhaseEComplete (lines 380-410), onInstantiate (lines 240-253).
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   applyStepCompletion,
   MECHANISMS_STEP_ID,
@@ -25,6 +25,11 @@ import {
 } from "./reducer.ts";
 import type { BaseKeyboard, KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { repropagate as mockRepropagate } from "./repropagate.ts";
+
+// T024 (single-writer rule): spy on repropagate() to assert the reducer no
+// longer injects setTouchLayoutJson into RepropagateDeps.
+vi.mock("./repropagate.ts", () => ({ repropagate: vi.fn() }));
 
 // ---------------------------------------------------------------------------
 // Minimal fixtures (all functions use unknown-shaped data; only the
@@ -447,6 +452,37 @@ describe("R6 — behavior parity with pre-refactor inline handlers", () => {
     expect(deps2.lockDesktop).toHaveBeenCalledTimes(1);
     // deps1.lockDesktop was not called by the deps2 invocation (no cross-contamination)
     expect(deps1.lockDesktop).not.toBe(deps2.lockDesktop);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T024 — single-writer rule: the mechanisms-completion repropagate() call no
+// longer injects setTouchLayoutJson (buildTouchLayoutJson is the sole writer
+// of the .keyman-touch-layout artifact; repropagate() owns ir.touchLayout
+// provenance/merge only).
+// ---------------------------------------------------------------------------
+
+describe("T024 — repropagate() call site no longer injects setTouchLayoutJson", () => {
+  let deps: ReducerDeps;
+
+  beforeEach(() => {
+    deps = makeDepsMock();
+    deps.getStaleSteps = vi.fn().mockReturnValue(new Set(["touch"]));
+    deps.getWorkingIR = vi.fn().mockReturnValue(makeKeyboardIR());
+    deps.setWorkingIR = vi.fn();
+    vi.stubEnv("VITE_KM_MUTATE_SEAM", "1");
+    (mockRepropagate as ReturnType<typeof vi.fn>).mockClear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("calls repropagate() with a deps object that has no setTouchLayoutJson member", () => {
+    applyStepCompletion(MECHANISMS_STEP_ID, undefined, deps);
+    expect(mockRepropagate).toHaveBeenCalledTimes(1);
+    const passedDeps = (mockRepropagate as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Record<string, unknown>;
+    expect("setTouchLayoutJson" in passedDeps).toBe(false);
   });
 });
 

@@ -295,10 +295,6 @@ export function applyStepCompletion(
           staleSteps: deps.getStaleSteps(),
           getWorkingIR: deps.getWorkingIR,
           setWorkingIR: deps.setWorkingIR,
-          // Issue #831 — persist the re-serialized side-car so the SHIPPED
-          // `.keyman-touch-layout` reflects re-propagation, not just the preview.
-          // `setTouchLayoutJson` is already a ReducerDep (R2 touch-step build).
-          setTouchLayoutJson: deps.setTouchLayoutJson,
         });
       }
       break;

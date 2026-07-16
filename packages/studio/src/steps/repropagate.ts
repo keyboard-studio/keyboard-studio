@@ -20,7 +20,6 @@
 //   specs/014-mutate-seam-touch-propagation/contracts/repropagation.contract.md
 
 import type { KeyboardIR, TouchKeyIR, TouchLayoutIR } from "@keyboard-studio/contracts";
-import { emitTouchLayout } from "@keyboard-studio/engine";
 import { touchSuggest } from "../editors/touchSuggest/touchSuggest.ts";
 import { applyMutatePatch } from "./mutateApply.ts";
 import { TOUCH_WRITES } from "./editorMutate.ts";
@@ -37,13 +36,6 @@ export interface RepropagateDeps {
   readonly getWorkingIR: () => KeyboardIR | null;
   /** Write the merged IR back to the working copy. */
   readonly setWorkingIR: (ir: KeyboardIR) => void;
-  /**
-   * Optional: persist the re-serialized `.keyman-touch-layout` side-car JSON
-   * so the shipped artifact reflects re-propagation, not just the OSK preview
-   * (issue #831). When absent, only the preview IR is updated; tests may omit
-   * it to assert the pure IR merge in isolation.
-   */
-  readonly setTouchLayoutJson?: (json: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -142,10 +134,9 @@ export function buildRepropagationPatch(
  * The merged layout is written through the single mutate() write path
  * (applyMutatePatch / TOUCH_WRITES).
  *
- * Side-car serialization (issue #831): when `setTouchLayoutJson` is injected,
- * the merged `touchLayout` IR is re-serialized via `emitTouchLayout` and
- * persisted into the side-car, so the SHIPPED `.keyman-touch-layout` reflects
- * re-propagation, not just the OSK preview.
+ * Single-writer rule: this seam owns `ir.touchLayout` provenance/merge only.
+ * It never serializes the `.keyman-touch-layout` artifact — `buildTouchLayoutJson`
+ * (steps/reducer.ts R2 touch-step build) is the single writer of that artifact.
  *
  * Idempotent: re-running against the merged result yields the same IR.
  */
@@ -159,8 +150,4 @@ export function repropagate(deps: RepropagateDeps): void {
   const patch = buildRepropagationPatch(base, suggested);
   const next = applyMutatePatch(base, patch, TOUCH_WRITES);
   deps.setWorkingIR(next);
-
-  if (deps.setTouchLayoutJson !== undefined && next.touchLayout !== undefined) {
-    deps.setTouchLayoutJson(emitTouchLayout(next.touchLayout));
-  }
 }
