@@ -18,7 +18,14 @@
       "url": "https://api.github.com/repos/keymanapp/keyboards/git/trees/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     },
     {
-      "path": "release/b/basic_kbdus/basic_kbdus.kmn",
+      "path": "release/b/basic_kbdus/source",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb1",
+      "url": "https://api.github.com/repos/keymanapp/keyboards/git/trees/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb1"
+    },
+    {
+      "path": "release/b/basic_kbdus/source/basic_kbdus.kmn",
       "mode": "100644",
       "type": "blob",
       "sha": "cccccccccccccccccccccccccccccccccccccccc",
@@ -26,7 +33,7 @@
       "url": "https://api.github.com/repos/keymanapp/keyboards/git/blobs/cccccccccccccccccccccccccccccccccccccccc"
     },
     {
-      "path": "release/b/basic_kbdus/basic_kbdus.kps",
+      "path": "release/b/basic_kbdus/source/basic_kbdus.kps",
       "mode": "100644",
       "type": "blob",
       "sha": "dddddddddddddddddddddddddddddddddddddddd",
@@ -64,7 +71,14 @@
       "url": "https://api.github.com/repos/keymanapp/keyboards/git/trees/2222222222222222222222222222222222222222"
     },
     {
-      "path": "release/s/sil_devanagari_phonetic/sil_devanagari_phonetic.kmn",
+      "path": "release/s/sil_devanagari_phonetic/source",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "22222222222222222222222222222222222222a1",
+      "url": "https://api.github.com/repos/keymanapp/keyboards/git/trees/22222222222222222222222222222222222222a1"
+    },
+    {
+      "path": "release/s/sil_devanagari_phonetic/source/sil_devanagari_phonetic.kmn",
       "mode": "100644",
       "type": "blob",
       "sha": "3333333333333333333333333333333333333333",
@@ -72,7 +86,7 @@
       "url": "https://api.github.com/repos/keymanapp/keyboards/git/blobs/3333333333333333333333333333333333333333"
     },
     {
-      "path": "release/s/sil_devanagari_phonetic/sil_devanagari_phonetic.kps",
+      "path": "release/s/sil_devanagari_phonetic/source/sil_devanagari_phonetic.kps",
       "mode": "100644",
       "type": "blob",
       "sha": "4444444444444444444444444444444444444444",
