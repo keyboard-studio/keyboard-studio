@@ -120,6 +120,22 @@ describe("lookupByName", () => {
     // appears in the primary "Abkhaz" (no "i"), so only altSub can match.
     expect(lookupByName("khazi").map((r) => r.code)).toContain("ab");
   });
+
+  it("C12 — an alternate-name prefix match ranks in the English-prefix tier, ahead of an autonym-prefix competitor", () => {
+    // Query "bosan" (pinned 99b856b):
+    //   - "ysl" (Serbian Sign Language) matches only via the alternate English
+    //     name "Bosanski znakovni jezik" -> English-prefix tier.
+    //   - "bs" (Bosnian) matches only via its autonym "bosanski" (its primary
+    //     name "Bosnian" and alias "Serbo-Croatian" do not prefix "bosan")
+    //     -> autonym-prefix tier.
+    // The English-prefix tier outranks the autonym-prefix tier, so the
+    // alternate-name match must sort ahead of the autonym match. This pins the
+    // deliberate design choice that alias prefixes fold into the English tier.
+    const codes = lookupByName("bosan").map((r) => r.code);
+    expect(codes).toContain("ysl");
+    expect(codes).toContain("bs");
+    expect(codes.indexOf("ysl")).toBeLessThan(codes.indexOf("bs"));
+  });
 });
 
 // ---------------------------------------------------------------------------
