@@ -1,0 +1,70 @@
+# source.normalization-posture — whether the chosen base's rule/store output
+# literals are NFC-precomposed, NFD-decomposed, or a mix. Meaningful only for
+# alphabetic scripts where both forms can exist (Latin/Cyrillic/Greek);
+# not-applicable for abugida/abjad output, which has no NFD decomposition to
+# choose between.
+
+id: source.normalization-posture
+family: source
+title: Source output normalization posture
+description: >
+  Whether the chosen base's rule/store output literals are NFC-precomposed,
+  NFD-decomposed, or mixed, for the alphabetic scripts (Latin, Cyrillic,
+  Greek) where both forms exist. Not meaningful for abugida/abjad output,
+  which has no competing decomposed form. Prefills pb_mark_style alongside
+  orth.mark-composition-posture, from the base's existing choice rather than
+  the target orthography's Unicode facts.
+
+valueType: enum
+values: [nfc, nfd, mixed]
+
+modality: both
+
+derivations:
+  - kind: computed
+    source: "planned:normalization-posture-of-kmn"
+    sourceStatus: planned
+    notes: >
+      Inspects rule/store output literals for NFC-precomposed vs
+      NFD-decomposed codepoint sequences; skipped (no value produced) when
+      the base's script is outside Latn/Cyrl/Grek, per the scope note below.
+
+consumers:
+  prefills:
+    - pb_mark_style
+  proposes:
+    - "transform-offer:normalization-migrate"
+
+relatedAxes: [A4]
+provenanceLabel: "the composition form your source keyboard's output already uses"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed
+
+notes: >
+  Meaningful only for alphabetic Latin/Cyrillic/Greek; not-applicable for
+  abugida/abjad, where the classifier should skip rather than force a value.
+
+transformImpactClass: output-changing
+houseTargetPolicy:
+  scope: "meaningful only when script is Latn, Cyrl, or Grek; skipped otherwise per notes"
+  inputs: [script, orth.mark-composition-posture]
+  rules:
+    - when: "orth.mark-composition-posture == precomposed"
+      target: nfc
+    - when: "orth.mark-composition-posture == combining"
+      target: nfd
+    - when: default
+      target: mixed
+invertibility: lossy
+implications: >
+  NFC and NFD are canonically equivalent in Unicode, so no character
+  semantics are lost by re-normalizing — but downstream consumers (search,
+  sort, other apps comparing byte sequences directly) do not always treat
+  the two forms as interchangeable, so a normalization migration can still
+  silently break an equality assumption a consumer relied on.
+exceptionSites: []
+causePredicates: []

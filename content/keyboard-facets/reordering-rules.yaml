@@ -1,0 +1,25 @@
+# reordering-rules — corpus counterpart of the session facet
+# source.reordering-rules: how a corpus keyboard's .kmn reorders sequences
+# (e.g. mark-before-base visual-order swaps).
+
+id: reordering-rules
+title: Reordering rule shape
+description: >
+  Whether a corpus keyboard's .kmn performs no sequence reordering, uses a
+  dedicated reorder group with context()-swap rules, inlines swap rules
+  amongst its other output rules, or mixes both shapes. Read from the
+  parsed .kmn rule structure directly. Feeds the source.reordering-rules
+  session facet.
+valueType: enum
+limits:
+  values: [none, group-reorder-swap, inline-swap, mixed]
+  open: false
+likelihoodSemantics: >
+  the single classified value for the keyboard's rule structure; likelihood
+  is 1 for the classified value.
+derivation:
+  archetype: rule-structure
+  classifierId: planned
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: [source.reordering-rules]
+schemaVersion: 1

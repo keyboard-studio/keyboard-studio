@@ -1,0 +1,31 @@
+# casing — corpus counterpart of the session facet source.casing: whether
+# the script(s) a keyboard produces have an uppercase/lowercase distinction
+# at all.
+#
+# derivation.archetype note: casing is a property of the script identity
+# itself (declared .kps language/script metadata or the langtags default
+# script), not something scanned out of rule structure or output character
+# content directly — "declared-metadata" is the closest ARCHETYPES fit.
+
+id: casing
+title: Script casing
+description: >
+  Whether the script(s) a corpus keyboard produces have an
+  uppercase/lowercase distinction (cased), no such distinction (caseless,
+  e.g. Arabic, Devanagari), or the keyboard spans both a cased and a
+  caseless script (mixed). Derived from the keyboard's script identity,
+  independent of its .kmn rule content. Feeds the source.casing session
+  facet.
+valueType: enum
+limits:
+  values: [cased, caseless, mixed]
+  open: false
+likelihoodSemantics: >
+  the single classified value for the keyboard's script(s); likelihood is
+  1 for the classified value.
+derivation:
+  archetype: declared-metadata
+  classifierId: planned
+  fallbackChain: [declared-metadata, undetermined]
+feedsSessionFacets: [source.casing]
+schemaVersion: 1

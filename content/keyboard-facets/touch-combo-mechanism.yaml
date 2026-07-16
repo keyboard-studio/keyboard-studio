@@ -1,0 +1,34 @@
+# touch-combo-mechanism — corpus counterpart of the session facet
+# source.touch-combo-mechanism: the mechanism distribution a corpus
+# keyboard's .keyman-touch-layout uses to expose a base+mark sequence.
+#
+# derivation.archetype note: the natural label for this evidence source is
+# "touch-layout scan", but ARCHETYPES (facet-index-lint / facet-index) is a
+# closed enum of [character-content, rule-structure, declared-metadata] and
+# does not (yet) have a touch-layout-specific member. "rule-structure" is
+# the closest fit — a .keyman-touch-layout JSON file is itself a declarative
+# rule structure (key -> mechanism), just not a .kmn rule. Flagging this as
+# a possible future ARCHETYPES addition rather than forcing a non-conforming
+# value through.
+
+id: touch-combo-mechanism
+title: Touch mark-composition mechanism
+description: >
+  The distribution of mechanisms a corpus keyboard's .keyman-touch-layout
+  uses to expose a base+mark sequence to a touch typist: a dedicated key, a
+  layer switch, a longpress popup, a flick gesture, or multitap. Read from
+  the touch-layout JSON directly, independent of the desktop .kmn
+  recognizer. Feeds the source.touch-combo-mechanism session facet.
+valueType: histogram
+limits:
+  values: [key, layer, longpress, flick, multitap]
+  open: false
+likelihoodSemantics: >
+  each mechanism's share of the touch-layout keys that expose a mark;
+  shares sum to 1.
+derivation:
+  archetype: rule-structure
+  classifierId: planned
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: [source.touch-combo-mechanism]
+schemaVersion: 1

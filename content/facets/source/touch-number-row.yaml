@@ -1,0 +1,56 @@
+# source.touch-number-row — whether the chosen base's .keyman-touch-layout
+# shows a top number row (row id "1", above the qwerty rows; the bottom row,
+# ~id "5", is the space/enter bar, not the number row), and whether that
+# row carries digits or is repurposed for letters. Read from the
+# touch-layout JSON directly.
+
+id: source.touch-number-row
+family: source
+title: Source touch number row
+description: >
+  Whether the top row (row id "1", above the qwerty letter rows) is present
+  on the chosen base's touch layout, and whether it carries digit
+  characters or is repurposed for letters (or mixes both across layers).
+  Read directly from the .keyman-touch-layout JSON's row/key layout,
+  independent of the desktop .kmn source.
+valueType: enum
+values: [absent, digits, letters, mixed]
+
+modality: touch
+
+derivations:
+  - kind: computed
+    source: "planned:touch-number-row-of-layout"
+    sourceStatus: planned
+    notes: >
+      Scans the base's .keyman-touch-layout JSON for the top row (row id
+      "1", above the qwerty letter rows) and classifies its keys as digit
+      characters, letter characters, or a mix across layers.
+
+consumers:
+  prefills: []
+  proposes:
+    - "mechanism-gallery:touch-number-row"
+
+provenanceLabel: "whether your source keyboard already shows a number row on touch"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed
+
+notes: >
+  Derived from a touch-layout scan; the classifier is planned, not available.
+  houseTargetPolicy deferred: measure-only at candidate stage; no default
+  proposed until predictive lift is measured.
+
+transformImpactClass: ux-changing
+houseTargetPolicy: null
+invertibility: one-way
+implications: >
+  Adding, removing, or repurposing the touch number row changes what the
+  typist sees and taps on the touch keyboard's top row; it has no effect on
+  the desktop side of the same keyboard.
+exceptionSites: []
+causePredicates: []

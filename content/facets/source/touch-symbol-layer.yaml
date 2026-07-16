@@ -1,0 +1,52 @@
+# source.touch-symbol-layer — whether the chosen base's
+# .keyman-touch-layout defines a dedicated symbol layer. Read from the
+# touch-layout JSON directly.
+
+id: source.touch-symbol-layer
+family: source
+title: Source touch symbol layer
+description: >
+  Whether the chosen base's touch layout defines a dedicated symbol layer
+  (reachable via a layer-switch key) or has none. Read directly from the
+  .keyman-touch-layout JSON's layer list, independent of the desktop .kmn
+  source.
+valueType: enum
+values: [present, absent]
+
+modality: touch
+
+derivations:
+  - kind: computed
+    source: "planned:touch-symbol-layer-of-layout"
+    sourceStatus: planned
+    notes: >
+      Scans the base's .keyman-touch-layout JSON's layer ids for a
+      symbol/punctuation layer reachable via a nextlayer key.
+
+consumers:
+  prefills: []
+  proposes:
+    - "mechanism-gallery:touch-symbol-layer"
+
+provenanceLabel: "whether your source keyboard already has a touch symbol layer"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed
+
+notes: >
+  Derived from a touch-layout scan; the classifier is planned, not available.
+  houseTargetPolicy deferred: measure-only at candidate stage; no default
+  proposed until predictive lift is measured.
+
+transformImpactClass: ux-changing
+houseTargetPolicy: null
+invertibility: one-way
+implications: >
+  Adding or removing the touch symbol layer changes how many taps/layer
+  switches the typist needs to reach punctuation and symbols on touch; it
+  has no effect on the desktop side of the same keyboard.
+exceptionSites: []
+causePredicates: []

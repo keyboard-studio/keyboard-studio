@@ -1,0 +1,49 @@
+# orth.display-difficulty — whether the target script/character set is well,
+# partially, or poorly supported by common fonts/rendering stacks, from
+# Unicode block first-assigned version (older/mainstream blocks are broadly
+# supported) plus PUA-usage-in-corpus (heavy PUA use signals no mainstream
+# font/rendering support at all). Feeds A4 and the source.encoding
+# houseTargetPolicy (whether base/combining store literals should prefer
+# \u-notation over literal characters an author's editor/terminal can't
+# render).
+
+id: orth.display-difficulty
+family: orth
+title: Script display-support difficulty
+description: >
+  How well common fonts/rendering stacks support the target script's
+  characters: well-supported (long-assigned Unicode block, no PUA use in
+  the corpus), partially-supported, or poorly-supported (recently-assigned
+  block and/or heavy reliance on PUA codepoints in the corpus, a signal that
+  even mainstream rendering can't be assumed). Computed from Unicode block
+  first-assigned version cross-referenced with PUA-usage-in-corpus.
+
+valueType: enum
+values: [well-supported, partially-supported, poorly-supported]
+
+modality: both
+
+derivations:
+  - kind: computed
+    source: "planned:display-difficulty-of-script"
+    sourceStatus: planned
+    notes: >
+      Unicode block first-assigned version (older/mainstream blocks are
+      broadly supported) cross-referenced with PUA-usage-in-corpus (heavy
+      PUA use signals poor mainstream font/rendering support even for a
+      long-assigned block, e.g. private orthography extensions).
+
+consumers:
+  prefills: []
+  proposes:
+    - "axis:A4"
+    - "facet-input:source:encoding:houseTargetPolicy"
+
+relatedAxes: [A4]
+provenanceLabel: "font/rendering support for your script's characters"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed

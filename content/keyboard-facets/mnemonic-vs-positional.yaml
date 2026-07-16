@@ -1,0 +1,31 @@
+# mnemonic-vs-positional — corpus counterpart of the session facet
+# source.mnemonic-vs-positional: whether a corpus keyboard's key-binding
+# model is mnemonic (&MNEMONICLAYOUT) or positional (bound by physical VK).
+#
+# derivation.archetype note: this reads the &MNEMONICLAYOUT store
+# declaration, a single declared metadata value, rather than measuring
+# structure across the rule set — "declared-metadata" is the closest
+# ARCHETYPES fit, not "rule-structure".
+
+id: mnemonic-vs-positional
+title: Mnemonic vs positional binding
+description: >
+  Whether a corpus keyboard's .kmn declares &MNEMONICLAYOUT (mnemonic:
+  key-binding by character rather than physical position), a positional
+  binding (rules keyed by VK code), or mixes both across rule groups. Read
+  from the &MNEMONICLAYOUT store declaration, cross-checked against rule
+  keystroke references. Feeds the source.mnemonic-vs-positional session
+  facet.
+valueType: enum
+limits:
+  values: [mnemonic, positional, mixed]
+  open: false
+likelihoodSemantics: >
+  the single classified value for the keyboard's key-binding model;
+  likelihood is 1 for the classified value.
+derivation:
+  archetype: declared-metadata
+  classifierId: planned
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: [source.mnemonic-vs-positional]
+schemaVersion: 1
