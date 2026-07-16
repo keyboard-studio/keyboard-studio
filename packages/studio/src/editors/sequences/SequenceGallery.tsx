@@ -139,11 +139,11 @@ export function SequenceGallery({
   // header — this is the interim, VISUAL-ONLY scope for this pass.
   // ---------------------------------------------------------------------------
 
-  const [firstKey, setFirstKey] = useState("");
-  const [secondKey, setSecondKey] = useState("");
+  const [content, setContent] = useState("");
+  const [indicator, setIndicator] = useState("");
   useEffect(() => {
-    setFirstKey("");
-    setSecondKey("");
+    setContent("");
+    setIndicator("");
   }, [currentChar]);
 
   // ---------------------------------------------------------------------------
@@ -499,47 +499,79 @@ export function SequenceGallery({
             </div>
           </div>
 
-          {/* Visual-only sequence box — see file header: no Apply-to-record;
-              typing here never touches the working-copy store. */}
+          {/* Visual-only sequence boxes — see file header: no Apply-to-record;
+              typing here never touches the working-copy store. Two explained
+              boxes model content (what you type first) + indicator (the
+              single trigger character that follows it) -> currentChar. */}
           <div
             style={{
               background: BG_CARD,
               border: `1px solid ${BORDER}`,
-              borderRadius: 8,
+              borderRadius: 10,
               padding: "12px 14px",
               display: "flex",
               flexDirection: "column",
               gap: 8,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
-                Type these two keys:
+            <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_MAIN, fontFamily: FONT }}>
+              Content
+            </span>
+            <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
+              The characters that come first — what you type before the indicator.
+            </p>
+            <input
+              type="text"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              aria-label="Content characters"
+              maxLength={8}
+              style={{ ...inputStyle, width: 120, textAlign: "left" }}
+            />
+          </div>
+
+          <div
+            style={{
+              background: BG_CARD,
+              border: `1px solid ${BORDER}`,
+              borderRadius: 10,
+              padding: "12px 14px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_MAIN, fontFamily: FONT }}>
+              Indicator
+            </span>
+            <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
+              The single character that triggers the combination — typing it after the
+              content produces {currentChar}.
+            </p>
+            <input
+              type="text"
+              value={indicator}
+              onChange={(e) => setIndicator(e.target.value)}
+              aria-label="Indicator character"
+              // maxLength 2 (not 1): one grapheme may be two UTF-16 code units
+              // (surrogate pair / base+combining mark), matching the input caps
+              // used by the MechanismGallery character boxes.
+              maxLength={2}
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <span style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT }}>
+              {content !== "" ? content : "[content]"}
+              {" + "}
+              {indicator !== "" ? indicator : "[indicator]"}
+              {" "}
+              &rarr;{" "}
+              <span style={{ color: TEXT_MAIN, fontFamily: "monospace", fontSize: 16 }}>
+                {currentChar}
               </span>
-              <input
-                type="text"
-                value={firstKey}
-                onChange={(e) => setFirstKey(e.target.value)}
-                aria-label="First key in sequence"
-                maxLength={2}
-                style={inputStyle}
-              />
-              <span style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT }}>then</span>
-              <input
-                type="text"
-                value={secondKey}
-                onChange={(e) => setSecondKey(e.target.value)}
-                aria-label="Second key in sequence"
-                maxLength={2}
-                style={inputStyle}
-              />
-              <span style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT }}>
-                &rarr;{" "}
-                <span style={{ color: TEXT_MAIN, fontFamily: "monospace", fontSize: 16 }}>
-                  {currentChar}
-                </span>
-              </span>
-            </div>
+            </span>
           </div>
 
           <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>

@@ -7,8 +7,10 @@
 //   - Cycles sequenceFlaggedChars (NOT lettersToAdd).
 //   - Empty state (no flagged chars): centered message + a single Continue
 //     control that fires onComplete; a Back control when onBack is given.
-//   - Per-char: heading (glyph + U+XXXX), the visual-only sequence box (two
-//     inputs), and the "coming soon" note.
+//   - Per-char: heading (glyph + U+XXXX), the two visual-only sequence boxes
+//     (Content, Indicator — each with a heading, an explanatory line, and an
+//     input), the content+indicator -> currentChar result line, and the
+//     "coming soon" note.
 //   - Next/Done never gate on the sequence box — the author can always
 //     advance. Advancing past the last flagged char fires onComplete.
 //   - Back from the first flagged char fires onBack.
@@ -120,13 +122,24 @@ describe("SequenceGallery — empty state", () => {
 // ---------------------------------------------------------------------------
 
 describe("SequenceGallery — populated cycle", () => {
-  it("shows the first flagged char heading, the sequence box, and the coming-soon note", () => {
+  it("shows the first flagged char heading, both explained boxes, and the coming-soon note", () => {
     seedFlagged(["á", "ñ"]);
     render(<SequenceGallery selectedBaseKeyboard={basicKbdus} />);
 
     expect(screen.getByLabelText(/^U\+00E1 á$/)).toBeTruthy();
-    expect(screen.getByLabelText("First key in sequence")).toBeTruthy();
-    expect(screen.getByLabelText("Second key in sequence")).toBeTruthy();
+
+    expect(screen.getByText("Content")).toBeTruthy();
+    expect(
+      screen.getByText(/the characters that come first/i),
+    ).toBeTruthy();
+    expect(screen.getByLabelText("Content characters")).toBeTruthy();
+
+    expect(screen.getByText("Indicator")).toBeTruthy();
+    expect(
+      screen.getByText(/the single character that triggers the combination/i),
+    ).toBeTruthy();
+    expect(screen.getByLabelText("Indicator character")).toBeTruthy();
+
     expect(screen.getByText(/More sequence options are coming soon\./i)).toBeTruthy();
   });
 
@@ -157,24 +170,49 @@ describe("SequenceGallery — populated cycle", () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
-  it("typing into the sequence box records nothing and resets on advance", () => {
+  it("the content and indicator boxes are independently editable", () => {
     seedFlagged(["á", "ñ"]);
     render(<SequenceGallery selectedBaseKeyboard={basicKbdus} />);
 
-    const first = screen.getByLabelText("First key in sequence") as HTMLInputElement;
-    const second = screen.getByLabelText("Second key in sequence") as HTMLInputElement;
-    fireEvent.change(first, { target: { value: "'" } });
-    fireEvent.change(second, { target: { value: "a" } });
-    expect(first.value).toBe("'");
-    expect(second.value).toBe("a");
+    const contentInput = screen.getByLabelText("Content characters") as HTMLInputElement;
+    const indicatorInput = screen.getByLabelText("Indicator character") as HTMLInputElement;
+    fireEvent.change(contentInput, { target: { value: "ae" } });
+    fireEvent.change(indicatorInput, { target: { value: "'" } });
+    expect(contentInput.value).toBe("ae");
+    expect(indicatorInput.value).toBe("'");
+  });
 
-    // Nothing is ever recorded onto the working copy for this box.
+  it("typing into either box records nothing onto the working copy", () => {
+    seedFlagged(["á", "ñ"]);
+    render(<SequenceGallery selectedBaseKeyboard={basicKbdus} />);
+
+    const contentInput = screen.getByLabelText("Content characters") as HTMLInputElement;
+    const indicatorInput = screen.getByLabelText("Indicator character") as HTMLInputElement;
+    fireEvent.change(contentInput, { target: { value: "a" } });
+    fireEvent.change(indicatorInput, { target: { value: "'" } });
+
+    // Nothing is ever recorded onto the working copy for these boxes: no
+    // MechanismAssignment, no Phase C result, and the flagged-char list is
+    // untouched by typing.
     expect(useWorkingCopyStore.getState().phaseResults).toEqual([]);
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á", "ñ"]);
+  });
+
+  it("both fields reset when advancing to the next flagged character", () => {
+    seedFlagged(["á", "ñ"]);
+    render(<SequenceGallery selectedBaseKeyboard={basicKbdus} />);
+
+    const contentInput = screen.getByLabelText("Content characters") as HTMLInputElement;
+    const indicatorInput = screen.getByLabelText("Indicator character") as HTMLInputElement;
+    fireEvent.change(contentInput, { target: { value: "ae" } });
+    fireEvent.change(indicatorInput, { target: { value: "'" } });
+    expect(contentInput.value).toBe("ae");
+    expect(indicatorInput.value).toBe("'");
 
     fireEvent.click(screen.getByTestId("sequences-continue"));
-    const firstAfter = screen.getByLabelText("First key in sequence") as HTMLInputElement;
-    const secondAfter = screen.getByLabelText("Second key in sequence") as HTMLInputElement;
-    expect(firstAfter.value).toBe("");
-    expect(secondAfter.value).toBe("");
+    const contentAfter = screen.getByLabelText("Content characters") as HTMLInputElement;
+    const indicatorAfter = screen.getByLabelText("Indicator character") as HTMLInputElement;
+    expect(contentAfter.value).toBe("");
+    expect(indicatorAfter.value).toBe("");
   });
 });
