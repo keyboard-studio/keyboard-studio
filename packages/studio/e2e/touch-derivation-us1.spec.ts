@@ -43,30 +43,14 @@
 // Run (Playwright is the global CLI only — see playwright.config.ts header):
 //   cd packages/studio && npx playwright test touch-derivation-us1.spec.ts
 //
-// SKIPPED — UNBLOCK RECIPE (same convention as import-improve.spec.ts):
-//   The Playwright lane itself is RUNNABLE again (global playwright CLI +
-//   browsers installed; `npx playwright test` boots the dev server and
-//   executes specs). Executing this spec surfaced a PRE-EXISTING, repo-wide
-//   breakage, not a defect in this walk: the survey prelude that all e2e
-//   specs share by copy (driveIdentityLite et al.) targets the OLD
-//   identity-lite first field (`#il_language_autonym`), but the app now
-//   opens with the 036 glottolog language-identify flow ("What is your
-//   language called in English?" combobox, "Step 1 of ~6"). carve.spec.ts
-//   — documented as live/passing — fails at the exact same locator, so the
-//   stale prelude predates spec 035 and blocks every walk-from-scratch spec.
-//   To un-skip:
-//     1. Update the survey prelude for the 036 language-identify flow —
-//        preferably by extracting the shared helpers into
-//        e2e/helpers/surveyFlow.ts (the acknowledged de-triplication
-//        follow-up) and fixing them ONCE for carve/copy-edit/this spec.
-//     2. Remove `.skip` from the describe below and run
-//        `cd packages/studio && npx playwright test touch-derivation-us1.spec.ts`.
-//   Everything downstream of the prelude (carve targets, seed-source
-//   default, touch-gallery walk, ZIP assertions) was traced to source and
-//   cross-checked against MechanismGallery.test.tsx / TouchGallery.test.tsx /
-//   applyDesktopModificationsToRawJson.ts; the bambara fixture's
-//   codec-cleanliness + phone-platform shipping were confirmed via vitest
-//   probes against packages/engine/src.
+// This spec drives the survey prelude via the shared helpers in
+// e2e/helpers/surveyFlow.ts (updated for the 036 glottolog language-identify
+// flow). Everything downstream of the prelude (carve targets, seed-source
+// default, touch-gallery walk, ZIP assertions) was traced to source and
+// cross-checked against MechanismGallery.test.tsx / TouchGallery.test.tsx /
+// applyDesktopModificationsToRawJson.ts; the bambara fixture's
+// codec-cleanliness + phone-platform shipping were confirmed via vitest
+// probes against packages/engine/src.
 
 import { test, expect, type Page } from "playwright/test";
 import { unzipSync, strFromU8 } from "fflate";
@@ -77,6 +61,7 @@ import {
   chooseAdaptTrack,
   confirmPrefill,
   buildOneCharacterList,
+  seedReturningVisitor,
 } from "./helpers/surveyFlow";
 
 // ---------------------------------------------------------------------------
@@ -198,6 +183,13 @@ async function carveCharacters(page: Page, chars: readonly string[]): Promise<vo
  * this step is what fires lockDesktop() (reducer.ts MECHANISMS_STEP_ID case)
  * — "the desktop locks at the end of Mechanisms" is this click, not a
  * separate assertable UI state.
+ *
+ * The forward button only carries data-testid="mechanisms-continue" in the
+ * "locked" / "nothing left to add" ForwardButtonSpec branches
+ * (MechanismGallery.tsx ~2074-2091) — the ordinary per-character branch (used
+ * here, since exactly one new character is being placed) sets no testId at
+ * all, just an aria-label of "Next character" or "Done". Select it by
+ * role/name instead.
  */
 async function driveMechanismsPlaceLetter(page: Page, char: string): Promise<void> {
   const startButton = page.getByRole("button", { name: "Start the mechanism gallery" });
@@ -206,7 +198,7 @@ async function driveMechanismsPlaceLetter(page: Page, char: string): Promise<voi
   }
 
   await page.getByRole("button", { name: `Apply method for ${char}` }).click();
-  await page.getByTestId("mechanisms-continue").click();
+  await page.getByRole("button", { name: /^(Next character|Done)$/ }).click();
 }
 
 /**
@@ -280,6 +272,9 @@ test.describe("Touch derivation US1 — import & adapt (spec 035 Scenario A)", (
   test("carved characters vanish, placed letter lands, base layout survives, and the keyboard compiles", async ({
     page,
   }) => {
+    // Seed the returning-visitor flag before navigation so this fresh
+    // browser context skips WelcomeScreen's first-visit gate.
+    await seedReturningVisitor(page);
     await page.goto("/");
 
     await driveIdentityLite(page);

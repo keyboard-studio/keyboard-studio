@@ -40,6 +40,7 @@ import {
   confirmMechanismsEmpty,
   driveTouchGallery,
   driveHelpPhase,
+  seedReturningVisitor,
 } from "./helpers/surveyFlow";
 
 // ---------------------------------------------------------------------------
@@ -76,7 +77,9 @@ declare global {
 test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn", () => {
   test("deleting rule#93 in the carve gallery removes it from the deleted-node IR state and from the emitted .kmn", async ({ page }) => {
     // ?e2e=1 is the runtime override for installE2eHook() (src/lib/e2eHook.ts)
-    // — no VITE_E2E build flag needed.
+    // — no VITE_E2E build flag needed. Seed the returning-visitor flag first
+    // so the fresh browser context skips WelcomeScreen (see seedReturningVisitor).
+    await seedReturningVisitor(page);
     await page.goto("/?e2e=1");
 
     await driveIdentityLite(page, {
@@ -168,6 +171,7 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
   // (e.g. a scaffold/base-resolution regression that silently drops raw
   // fragments before the carve step even runs).
   test("control: keeping rule#93 leaves its distinguishing token in the emitted .kmn", async ({ page }) => {
+    await seedReturningVisitor(page);
     await page.goto("/?e2e=1");
 
     await driveIdentityLite(page, {

@@ -33,6 +33,7 @@ import {
   buildOneCharacterList,
   navigateToOutput,
   triggerDownload,
+  seedReturningVisitor,
 } from "./helpers/surveyFlow";
 
 // ---------------------------------------------------------------------------
@@ -157,6 +158,10 @@ async function completePhaseB(page: Page, fx: WalkFixture = FIXTURE): Promise<vo
 
 test.describe("Track 1 (copy-edit) E2E", () => {
   test.beforeEach(async ({ page }) => {
+    // Seed the returning-visitor flag before navigation so a fresh browser
+    // context skips WelcomeScreen's first-visit gate (see seedReturningVisitor
+    // in helpers/surveyFlow.ts) and lands on the default hash-route ("survey").
+    await seedReturningVisitor(page);
     await page.goto("/");
     // The default hash-route is "survey" — we should land on the identity step.
   });
@@ -200,7 +205,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
   }) => {
     // Walk the full wizard and reach the Output screen.
     await fillIdentityLite(page);
-    await pickBaseKeyboard(page);
+    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
     await chooseTrackCopy(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
@@ -233,7 +238,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
   }) => {
     // Walk the wizard and download.
     await fillIdentityLite(page);
-    await pickBaseKeyboard(page);
+    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
     await chooseTrackCopy(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
@@ -295,6 +300,7 @@ async function walkToDownload(page: Page, fx: WalkFixture): Promise<Download> {
 
 test.describe("spec 034 proven-script walks + publish paths", () => {
   test.beforeEach(async ({ page }) => {
+    await seedReturningVisitor(page);
     await page.goto("/");
   });
 
@@ -393,6 +399,13 @@ test.describe("spec 034 proven-script walks + publish paths", () => {
 
 test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays consistent, start-over clears it", () => {
   test.beforeEach(async ({ page }) => {
+    // Seeded so the walk below starts at identity (not WelcomeScreen) — this
+    // is draft-safe (unlike WelcomeScreen's "I'm new") and does not prevent
+    // reaching WelcomeScreen later: StudioShell's router still honors an
+    // explicit `#welcome` hash (see the "I'm new" assertion below) once the
+    // first-visit gate is satisfied — the gate only forces the redirect for
+    // a genuine first-timer.
+    await seedReturningVisitor(page);
     await page.goto("/");
   });
 
@@ -403,7 +416,7 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
     // prefill -> Phase B), mirroring the proven walkToOutput helper up to
     // (not including) the Output-tab hop.
     await fillIdentityLite(page);
-    await pickBaseKeyboard(page);
+    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
     await chooseTrackCopy(page);
     await acceptProjectName(page);
     await confirmPrefill(page);

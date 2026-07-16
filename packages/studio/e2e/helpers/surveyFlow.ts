@@ -27,6 +27,36 @@ export function surveyAdvance(page: Page) {
 }
 
 /**
+ * Seed the durable "returning visitor" flag (`ks.visited` in localStorage,
+ * see src/lib/firstVisit.ts) BEFORE the page's first script runs, so
+ * StudioShell's first-visit gate (defaultLandingRoute() in StudioShell.tsx)
+ * skips WelcomeScreen and lands directly on the default route (the survey)
+ * for a fresh Playwright browser context — which always starts with empty
+ * localStorage and would otherwise be treated as a genuine first-time
+ * visitor on every test.
+ *
+ * MUST be called before `page.goto(...)` (it uses addInitScript, which only
+ * takes effect on documents created after it is registered) — it cannot live
+ * inside driveIdentityLite, which runs post-goto.
+ *
+ * This is draft-safe: it only sets the visited flag, unlike clicking
+ * WelcomeScreen's "I'm new" button, which additionally clears any resumable
+ * draft (see WelcomeScreen.tsx). Explicit navigation to `#welcome` still
+ * reaches the WelcomeScreen afterward — StudioShell's router honors an
+ * explicit `#welcome` hash for returning visitors; the gate only forces the
+ * redirect for genuine first-timers.
+ */
+export async function seedReturningVisitor(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem("ks.visited", "1");
+    } catch {
+      // Quota / private-mode — the welcome-gate fallback is harmless here too.
+    }
+  });
+}
+
+/**
  * Type free text into an autocomplete combobox (spec 030 identity-lite Q1-Q3/Q4
  * render as `role="combobox"` inputs), then close any suggestion list so the
  * subsequent survey-advance click lands on the button, not a highlighted option.
@@ -46,21 +76,49 @@ async function fillComboboxFreeText(
 }
 
 /**
+ * Poll for an optional/conditional question's field to appear within a short
+ * window, without blocking the whole helper if it never shows up. Used for
+ * identity-lite questions that IdentityLite's `getNextOverride` may skip
+ * entirely (see `driveIdentityLite`).
+ */
+async function isConditionalQuestionPresent(
+  page: Page,
+  selector: string,
+  timeout = 2_000,
+): Promise<boolean> {
+  return page
+    .waitForSelector(selector, { timeout, state: "visible" })
+    .then(() => true)
+    .catch(() => false);
+}
+
+/**
  * Drive the identity-lite step to completion (spec 036 language-identify flow).
  *
  * Question order (spec 030 US3, spec 036):
  *   1. il_language_english (autocomplete) — free text
- *   2. il_language_region (optional datalist) — free text or skip
- *   3. il_language_autonym (autocomplete) — free text
- *   4. il_language_code (optional autocomplete) — free text or skip
+ *   2. il_language_region (CONDITIONAL datalist) — only inserted by
+ *      IdentityLite's getNextOverride when the resolved langtags entry for
+ *      the English name is region-ambiguous (hasRegionVariants). The
+ *      deterministic free-text fixtures used by these specs never resolve to
+ *      a langtags entry, so this question is normally ABSENT and the flow
+ *      advances straight to il_language_autonym.
+ *   3. il_language_autonym (autocomplete) — free text, always present
+ *   4. il_language_code (optional-VALUE autocomplete) — always rendered
+ *      (its `next` is static, unconditional); the value itself may be left
+ *      blank.
  *   5. il_target_script (select) — choose a script
  *   6. il_script_not_supported (terminal notice, if CJK/Ethi/Hang)
  *
- * This helper:
+ * This helper detects presence rather than assuming the fixed sequence above,
+ * since il_language_region is conditional and may not render at all:
  *   - fills English name (arbitrary free text, e.g. "Test")
- *   - skips region (leaves blank — optional field)
- *   - fills autonym (arbitrary free text, e.g. "Test Autonym")
- *   - skips language code (leaves blank — optional field)
+ *   - if region shows up within a short poll, advances past it (leaves blank);
+ *     otherwise proceeds directly (it was skipped)
+ *   - fills autonym (arbitrary free text, e.g. "Test Autonym") — waited for
+ *     directly, since it is reliably the next field either way
+ *   - il_language_code is always rendered (unconditional `next`); advances
+ *     past it leaving it blank
  *   - selects target script "other" (keeps routing generic, avoids CJK/Ethiopic/Hangul stub)
  *   - advances through all questions
  *   - waits for the base-keyboard picker combobox to appear (phase boundary)
@@ -81,16 +139,24 @@ export async function driveIdentityLite(
   await fillComboboxFreeText(page, "#il_language_english", english);
   await surveyAdvance(page).click();
 
-  // Q2: Region (optional datalist) — skip by leaving blank
-  await page.waitForSelector("#il_language_region", { timeout: 10_000 });
-  await surveyAdvance(page).click();
+  // Q2: Region — CONDITIONAL. Only present when the English name resolved to
+  // a region-ambiguous langtags entry (see IdentityLite.getNextOverride).
+  // Detect presence with a short poll instead of assuming it always renders.
+  if (await isConditionalQuestionPresent(page, "#il_language_region")) {
+    await surveyAdvance(page).click();
+  }
 
-  // Q3: Autonym (autocomplete) — free text
+  // Q3: Autonym (autocomplete) — always present; free text
   await fillComboboxFreeText(page, "#il_language_autonym", autonym);
   await surveyAdvance(page).click();
 
-  // Q4: Language code (optional autocomplete) — skip by leaving blank
-  await page.waitForSelector("#il_language_code", { timeout: 10_000 });
+  // Q4: Language code — ALWAYS rendered (its `next` is static/unconditional;
+  // only the VALUE is optional). Interact with it unconditionally — a
+  // short-timeout presence poll here would misread a slow cold-server render
+  // (>2s) as "absent," silently skip the advance click, and desync the walk
+  // by one question instead of failing loudly. Wait with the same timeout
+  // used elsewhere and leave the field blank (the value is optional).
+  await page.waitForSelector("#il_language_code", { timeout: 15_000 });
   await surveyAdvance(page).click();
 
   // Q5: Target script (select) — required
@@ -100,8 +166,10 @@ export async function driveIdentityLite(
 
   // Robustness check for the phase boundary: identity-lite hands off
   // to the base keyboard picker. Wait on that landmark rather than trusting
-  // the question count above.
-  await expect(page.getByRole("combobox", { name: "Base keyboard" })).toBeVisible({
+  // the question count above. BaseResolution.tsx renders its root with
+  // data-testid="base-picker" (the visible field inside is a "Search
+  // keyboards" labeled input, not a role=combobox named "Base keyboard").
+  await expect(page.getByTestId("base-picker")).toBeVisible({
     timeout: 15_000,
   });
 }
@@ -250,24 +318,62 @@ export async function confirmMechanismsEmpty(page: Page): Promise<void> {
 }
 
 /**
- * Touch step — skip the single character and reach the all-done state.
+ * Touch step — first resolve the touch-layout starting point (seed source),
+ * then configure a touch mechanism for every character in the inventory.
  *
- * TouchGallery also has a one-time intro splash ("Start the touch gallery").
- * After dismissing it, skip the single character with a "Skip" button.
- * Once all characters are handled, click "touch-continue".
+ * Ahead of the per-character TouchGallery walk, TouchSeedSourcePanel.tsx
+ * asks the author to pick a touch-layout starting point ("Import & adapt"
+ * vs "Reseed from desktop" — data-testid="seed-source-import-adapt" /
+ * "seed-source-reseed") and click data-testid="seed-source-confirm". This
+ * helper accepts whichever option the panel defaults to (import-adapt when
+ * the base ships a usable touch layout, else reseed-from-desktop — see
+ * TouchSeedSourcePanel's `selected` default) rather than forcing a specific
+ * choice; callers that need the explicit reseed path use their own wrapper.
+ *
+ * TouchGallery walks the WHOLE inventory (not just the one newly added in
+ * Phase B; MechanismGallery's new-characters-only diff does not apply here).
+ * "Skip this character" is pure navigation and records nothing — it does
+ * NOT bypass the FR-008 completion gate (handleContinue in TouchGallery.tsx
+ * refuses to complete while any inventory character has no reachable touch
+ * mechanism), so skipping the final character alone hangs on an inline
+ * "Cannot finish yet" gate forever. Instead this helper actually configures
+ * the default "Long-press on a key" method (host key select, aria-label
+ * "Host key for long-press") + Apply for every character, then advances via
+ * "touch-continue" (which doubles as "Next character"/"Done").
+ *
+ * It also has a one-time intro splash ("Start the touch gallery"), dismissed
+ * first.
  */
 export async function driveTouchGallery(page: Page): Promise<void> {
+  const seedConfirm = page.getByTestId("seed-source-confirm");
+  if (await seedConfirm.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await seedConfirm.click();
+  }
+
   const startButton = page.getByRole("button", { name: "Start the touch gallery" });
   if (await startButton.isVisible().catch(() => false)) {
     await startButton.click();
   }
 
-  const skipButton = page.getByRole("button", { name: /^Skip / });
-  if (await skipButton.isVisible().catch(() => false)) {
-    await skipButton.click();
-  }
+  const continueButton = page.getByTestId("touch-continue");
+  const hostKeySelect = page.getByRole("combobox", { name: "Host key for long-press" });
+  const applyButton = page.getByRole("button", { name: /^Apply touch method for/ });
 
-  await page.getByTestId("touch-continue").click();
+  for (let guard = 0; guard < 200; guard++) {
+    const stillPresent = await continueButton.isVisible({ timeout: 2_000 }).catch(() => false);
+    if (!stillPresent) return;
+
+    // canGoNext (gates continueButton) requires the character to already be
+    // configured; a fresh character always starts disabled (method/hostKey
+    // reset on every currentChar change), so a disabled continueButton means
+    // this character still needs the default long-press method + Apply.
+    if (await continueButton.isDisabled()) {
+      await hostKeySelect.selectOption({ label: "K_A (A)" });
+      await applyButton.click();
+    }
+    await continueButton.click();
+  }
+  throw new Error("driveTouchGallery: did not complete within the expected character count");
 }
 
 /**
