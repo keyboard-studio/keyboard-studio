@@ -1,5 +1,5 @@
 import type { LintFinding } from "@keyboard-studio/contracts";
-import { forEachMatch } from "./_shared.js";
+import { forEachMatch, stripNonCodeSource } from "./_shared.js";
 
 // Deprecated system store IDs per DeprecationChecks.cpp:16-50 — illegal since Keyman v10.
 // Keys are lowercase KMN system-store names (without &); values are the C constant name.
@@ -17,7 +17,9 @@ const SYSTEM_STORE_RE = /&([A-Za-z_][A-Za-z0-9_]*)/g;
 export function checkDeprecatedStores(source: string): LintFinding[] {
   const findings: LintFinding[] = [];
 
-  forEachMatch(source, SYSTEM_STORE_RE, (match, lineIdx) => {
+  // Strip quoted-string and comment spans first so an `&store` in prose (a
+  // trailing `c` comment or a quoted doc value) is not read as a store ref.
+  forEachMatch(stripNonCodeSource(source), SYSTEM_STORE_RE, (match, lineIdx) => {
     const rawName = match[1] ?? "";
     const tssName = DEPRECATED_STORES.get(rawName.toLowerCase());
     if (tssName !== undefined) {

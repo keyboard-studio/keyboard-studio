@@ -110,4 +110,14 @@ describe("checkCodepointFormat", () => {
     const findings = checkCodepointFormat("+ U+D800 > U+0020");
     expect(findings[0]?.message).toContain("D800");
   });
+
+  // Regression — a U+ literal inside a comment or a quoted value is prose, not
+  // a codepoint, and must not be validated (false-positive guard).
+  it("ignores a U+ literal inside a trailing c comment", () => {
+    expect(checkCodepointFormat(`+ "a" > "b" c see U+110000 for reference`)).toEqual([]);
+  });
+
+  it("ignores a U+ literal inside a quoted value", () => {
+    expect(checkCodepointFormat(`store(s) "see U+110000 in docs"`)).toEqual([]);
+  });
 });

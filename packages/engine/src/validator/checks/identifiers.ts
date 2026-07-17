@@ -1,5 +1,5 @@
 import type { LintFinding } from "@keyboard-studio/contracts";
-import { INVALID_CHAR_RE } from "./_shared.js";
+import { INVALID_CHAR_RE, stripNonCodeSource } from "./_shared.js";
 
 // Single-arg keywords: full paren content is the identifier (stop at closing paren).
 const SINGLE_ARG_RE = /\b(group|store|dk|use|call|deadkey)\s*\(\s*([^)]*?)\s*\)/;
@@ -9,7 +9,10 @@ const FIRST_ARG_RE = /\b(index|if)\s*\(\s*([^=,)]*)/;
 
 export function checkIdentifiers(source: string): LintFinding[] {
   const findings: LintFinding[] = [];
-  const lines = source.split("\n");
+  // Strip quoted-string and comment spans first so a `dk( )`/`store( )` shape
+  // in prose (a trailing `c` comment or a quoted doc value) is not read as a
+  // real identifier declaration/use.
+  const lines = stripNonCodeSource(source).split("\n");
   const regexes = [
     new RegExp(SINGLE_ARG_RE.source, "gi"),
     new RegExp(FIRST_ARG_RE.source, "gi"),

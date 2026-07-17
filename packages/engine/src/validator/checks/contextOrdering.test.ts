@@ -96,4 +96,12 @@ describe("checkContextOrdering", () => {
     const findings = checkContextOrdering(source);
     expect(findings[0]?.location?.column).toBeGreaterThan(0);
   });
+
+  // Regression — a deadkey literally named "nul" used as a dk() argument is not
+  // the standalone nul context token, so it must not trigger NUL_NOT_FIRST.
+  it("does not produce NUL_NOT_FIRST for a deadkey named nul in dk(nul)", () => {
+    const source = 'dk(nul) + "a" > "b"';
+    const findings = checkContextOrdering(source);
+    expect(findings.filter((f) => f.code === "KM_ERROR_NUL_NOT_FIRST")).toHaveLength(0);
+  });
 });
