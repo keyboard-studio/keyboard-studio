@@ -120,4 +120,11 @@ describe("checkCodepointFormat", () => {
   it("ignores a U+ literal inside a quoted value", () => {
     expect(checkCodepointFormat(`store(s) "see U+110000 in docs"`)).toEqual([]);
   });
+
+  // Regression — kmcmplib treats a whitespace-delimited `c` on a store line as
+  // a trailing comment (matching the codec's own store-line comment handling),
+  // so keyword-shaped text after it is prose, not a codepoint literal.
+  it("ignores a U+ literal after a trailing c comment on a store line", () => {
+    expect(checkCodepointFormat(`store(s) 'abc' c mentions U+110000 in prose`)).toEqual([]);
+  });
 });

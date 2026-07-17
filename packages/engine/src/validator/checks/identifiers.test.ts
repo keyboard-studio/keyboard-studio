@@ -84,4 +84,8 @@ describe("checkIdentifiers", () => {
   it("ignores a dk( ) shape inside a quoted value", () => {
     expect(checkIdentifiers(`store(&NAME) "dk( ) bad doc text"`)).toEqual([]);
   });
+
+  it("ignores a dk( ) shape inside a trailing c comment", () => {
+    expect(checkIdentifiers(`+ [K_A] > "x" c see dk( ) bad doc text`)).toEqual([]);
+  });
 });

@@ -173,12 +173,16 @@ export function checkContextOrdering(source: string): LintFinding[] {
     const ctxStripped = stripGuardTokens(ctx);
 
     // --- Rule 1: nul must be the first token if present ---
-    // Blank the contents of every parenthesised group so a keyword-shaped
+    // Strip guard clauses first (stripGuardTokens erases the whole
+    // if()/platform()/baselayout() token so a guard preceding `nul` is not
+    // "content before nul" — guards are allowed before nul), THEN blank the
+    // contents of the remaining parenthesised groups so a keyword-shaped
     // argument (e.g. a deadkey named `nul` in `dk(nul)`) is not mistaken for a
-    // standalone `nul` context token. Length-preserving, so the match index is
-    // the accurate column. The call wrapper survives, so `dk(acute) nul` still
-    // has content before the bare `nul` and correctly reports NUL_NOT_FIRST.
-    const ctxForNul = blankParenContents(ctx);
+    // standalone `nul`. Both passes are length-preserving, so the match index
+    // is the accurate column. A non-guard call wrapper survives blanking, so
+    // `dk(acute) nul` still has content before the bare `nul` and correctly
+    // reports NUL_NOT_FIRST.
+    const ctxForNul = blankParenContents(stripGuardTokens(ctx));
     const nulMatch = NUL_RE.exec(ctxForNul);
     if (nulMatch) {
       const beforeNul = ctxForNul.slice(0, nulMatch.index).trim();

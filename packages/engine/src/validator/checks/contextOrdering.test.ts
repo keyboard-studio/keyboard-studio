@@ -104,4 +104,13 @@ describe("checkContextOrdering", () => {
     const findings = checkContextOrdering(source);
     expect(findings.filter((f) => f.code === "KM_ERROR_NUL_NOT_FIRST")).toHaveLength(0);
   });
+
+  // Regression — a guard clause is allowed before nul (nul is "first" among
+  // non-guard tokens), so a guard immediately preceding nul must NOT trigger
+  // NUL_NOT_FIRST. The nul-scan strips guards before blanking paren interiors.
+  it("does not produce NUL_NOT_FIRST when a guard precedes nul", () => {
+    const source = 'if(&platform = "hardware") nul + "a" > "b"';
+    const findings = checkContextOrdering(source);
+    expect(findings.filter((f) => f.code === "KM_ERROR_NUL_NOT_FIRST")).toHaveLength(0);
+  });
 });
