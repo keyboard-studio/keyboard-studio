@@ -22,6 +22,8 @@
 //   3. The copyright attestation checkbox is checked.
 //   4. A keyboard working copy is instantiated and the compile is ready.
 //   5. Submission is not already in flight.
+//   6. The output-time staleness gate (outputBlocked) is not tripped — e.g. a
+//      stale touch-layout side-car after a post-Touch-step mechanics edit.
 //
 // VFS acquisition: at submit time the panel calls projectWorkingCopyForOutput()
 // (the same helper handleDownload uses via serializeWorkingCopy) so the
@@ -145,6 +147,22 @@ export interface ManagedPRSubmitPanelProps {
    */
   canSubmit: boolean;
   /**
+   * Output-time staleness gate (e.g. a stale touch-layout side-car — a
+   * mechanics edit after the Touch step was completed re-opens touch
+   * staleness, and the emitted side-car would ship stale). When true the
+   * Submit button is force-disabled regardless of form validity or
+   * `canSubmit`. OutputScreen renders the explanatory banner above this
+   * panel; this panel only needs to explain itself via aria-label.
+   */
+  outputBlocked?: boolean;
+  /**
+   * Human-readable reason shown in the Submit button's aria-label when
+   * `outputBlocked` is true. Required in practice whenever `outputBlocked`
+   * is true, but kept optional so callers that never block don't need to
+   * pass it.
+   */
+  outputBlockedReason?: string;
+  /**
    * Prefill values from the established identity session.
    * Passed in from OutputScreen which reads the auth hooks; the panel reacts
    * to changes via useEffect so signing in after the panel mounts prefills
@@ -172,6 +190,8 @@ type SubmitState =
 
 export function ManagedPRSubmitPanel({
   canSubmit,
+  outputBlocked = false,
+  outputBlockedReason,
   prefill,
 }: ManagedPRSubmitPanelProps) {
   const nameId = useId();
@@ -208,7 +228,7 @@ export function ManagedPRSubmitPanel({
   const emailValid = isValidEmail(email);
   const formReady = nameValid && emailValid && copyrightChecked;
   const submitEnabled =
-    formReady && canSubmit && submitState.kind !== "submitting";
+    formReady && canSubmit && !outputBlocked && submitState.kind !== "submitting";
 
   const handleSubmit = useCallback(async () => {
     if (!submitEnabled) return;
@@ -417,11 +437,13 @@ export function ManagedPRSubmitPanel({
           void handleSubmit();
         }}
         aria-label={
-          !canSubmit
-            ? "Submit unavailable until the keyboard compile is complete"
-            : !formReady
-              ? "Fill in your name, email, and copyright confirmation to submit"
-              : "Submit keyboard to community repository"
+          outputBlocked
+            ? `Submit unavailable — ${outputBlockedReason ?? "output is currently blocked"}`
+            : !canSubmit
+              ? "Submit unavailable until the keyboard compile is complete"
+              : !formReady
+                ? "Fill in your name, email, and copyright confirmation to submit"
+                : "Submit keyboard to community repository"
         }
         style={submitButtonStyle(submitEnabled)}
       >
