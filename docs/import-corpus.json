@@ -13,11 +13,11 @@
   "opaqueFeatureTotals": [
     {
       "feature": "if-option-store",
-      "count": 40823
+      "count": 40827
     },
     {
       "feature": "named-deadkey",
-      "count": 5728
+      "count": 5767
     },
     {
       "feature": "smp-literal",
@@ -5489,7 +5489,7 @@
       "opaqueFeatureInventory": [],
       "recognizedRatio": 0,
       "i2": "structural-pass",
-      "ruleCount": 198,
+      "ruleCount": 200,
       "groupCount": 1,
       "rawFragmentCount": 0,
       "layerAPrime": {
@@ -6929,7 +6929,7 @@
       "opaqueFeatureInventory": [],
       "recognizedRatio": 0,
       "i2": "structural-pass",
-      "ruleCount": 317,
+      "ruleCount": 318,
       "groupCount": 2,
       "rawFragmentCount": 0,
       "layerAPrime": {
@@ -7057,18 +7057,18 @@
       "opaqueFeatureInventory": [
         {
           "feature": "if-option-store",
-          "count": 298
+          "count": 302
         },
         {
           "feature": "named-deadkey",
-          "count": 472
+          "count": 486
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-pass",
       "ruleCount": 183,
       "groupCount": 2,
-      "rawFragmentCount": 770,
+      "rawFragmentCount": 788,
       "layerAPrime": {
         "i1ParseComplete": true,
         "i3HeaderMissing": []
@@ -7086,14 +7086,14 @@
         },
         {
           "feature": "named-deadkey",
-          "count": 586
+          "count": 602
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-pass",
       "ruleCount": 191,
       "groupCount": 2,
-      "rawFragmentCount": 616,
+      "rawFragmentCount": 632,
       "layerAPrime": {
         "i1ParseComplete": true,
         "i3HeaderMissing": []
@@ -8556,7 +8556,7 @@
       ],
       "recognizedRatio": 0,
       "i2": "structural-pass",
-      "ruleCount": 180,
+      "ruleCount": 181,
       "groupCount": 2,
       "rawFragmentCount": 3,
       "layerAPrime": {
@@ -8875,14 +8875,14 @@
       "opaqueFeatureInventory": [
         {
           "feature": "named-deadkey",
-          "count": 19
+          "count": 21
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-pass",
       "ruleCount": 256,
       "groupCount": 1,
-      "rawFragmentCount": 19,
+      "rawFragmentCount": 21,
       "layerAPrime": {
         "i1ParseComplete": true,
         "i3HeaderMissing": []
@@ -9487,7 +9487,7 @@
       ],
       "recognizedRatio": 0,
       "i2": "structural-pass",
-      "ruleCount": 77,
+      "ruleCount": 78,
       "groupCount": 5,
       "rawFragmentCount": 31,
       "layerAPrime": {
@@ -9805,14 +9805,14 @@
       "opaqueFeatureInventory": [
         {
           "feature": "named-deadkey",
-          "count": 121
+          "count": 128
         }
       ],
       "recognizedRatio": 0,
       "i2": "structural-pass",
       "ruleCount": 208,
       "groupCount": 2,
-      "rawFragmentCount": 121,
+      "rawFragmentCount": 128,
       "layerAPrime": {
         "i1ParseComplete": true,
         "i3HeaderMissing": []
@@ -15537,9 +15537,9 @@
           "count": 122
         }
       ],
-      "recognizedRatio": 0.0048543689320388345,
+      "recognizedRatio": 0.004761904761904762,
       "i2": "structural-divergence",
-      "ruleCount": 206,
+      "ruleCount": 210,
       "groupCount": 2,
       "rawFragmentCount": 122,
       "layerAPrime": {

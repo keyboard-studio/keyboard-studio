@@ -206,6 +206,19 @@ describe("tokenize", () => {
     expect(rules[0]?.text).toContain("'y'");
   });
 
+  it("a store line with a trailing comment ending in a backslash does NOT swallow the next line", () => {
+    // Option A (restricting hasCommentToken to lines after `>`) would have
+    // reintroduced #1146 for store/group/begin lines, which have no `>`. This
+    // covers that exact case: a bare `c` comment trails a store() line.
+    const tokens = tokenize("store(foo) 'bar' c note \\\nstore(kept) 'x'\n");
+    const stores = tokens.filter((t) => t.kind === "store");
+    expect(stores).toHaveLength(2);
+    expect(stores[0]?.line).toBe(1);
+    expect(stores[0]?.text).toContain("foo");
+    expect(stores[1]?.line).toBe(2);
+    expect(stores[1]?.text).toContain("kept");
+  });
+
   it("a word merely starting with 'c' is not treated as a comment token", () => {
     // `context`-like tokens and store names beginning with c are not the bare
     // `c` comment keyword; the continuation must still join.

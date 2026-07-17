@@ -14,9 +14,20 @@
  * Comments: the `c` comment syntax has two forms:
  *   1. A line whose first non-whitespace text is `c` followed by whitespace or
  *      end-of-line (KMN column-0 convention).
- *   2. The tail of any logical line that follows the rule separator `>`, where
- *      a `c` preceded by whitespace starts a trailing comment (rare but valid).
- *      For simplicity we strip those at the rule-parsing stage, not here.
+ *   2. A whitespace-delimited standalone `c` appearing later in the SAME
+ *      logical line. kmcmplib starts an end-of-line comment there on ANY line
+ *      kind — store/group/begin/rule — not only on the tail of a rule after
+ *      the `>` separator. hasCommentToken() below recognizes this generically
+ *      across all line kinds so the continuation-join loop knows a trailing
+ *      `\` after such a `c` is inside the comment, not a line continuation.
+ *      This is comment RECOGNITION only (does a `c` token start a comment
+ *      here, for tokenizing purposes); it is distinct from the codec's
+ *      structured trailing-comment EXTRACTION (splitting a rule's trailing
+ *      `c <text>` into `IRRule.trailingComment`), which is deliberately
+ *      rule-only and lives in parse.ts (splitOnArrow / stripTrailingComment).
+ *      A trailing comment on a store/group/begin line is recognized here (so
+ *      it doesn't break continuation joining) but is not split into a typed
+ *      field elsewhere in the codec.
  */
 
 export type TokenKind =

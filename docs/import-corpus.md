@@ -22,8 +22,8 @@ Complete `RawKmnFragment` boundary list across `release/` — the input to #232 
 
 | Opaque feature | Total occurrences |
 | --- | ---: |
-| `if-option-store` | 40823 |
-| `named-deadkey` | 5728 |
+| `if-option-store` | 40827 |
+| `named-deadkey` | 5767 |
 | `smp-literal` | 2161 |
 | `outs-expansion` | 1257 |
 | `option-store-directive` | 129 |
@@ -472,8 +472,8 @@ Complete `RawKmnFragment` boundary list across `release/` — the input to #232 
 | `yiddish_hebrew` | clean | 0.00 | 0 | structural-pass | ✓ | ✓ | — |
 | `yidgha` | clean | 0.00 | 0 | structural-pass | ✓ | ✓ | — |
 | `younger_futhark_short_twig` | clean | 0.00 | 0 | structural-pass | ✓ | ✓ | — |
-| `armenian_mnemonic` | clean-with-opaque | 0.00 | 770 | structural-pass | ✓ | ✓ | if-option-store×298, named-deadkey×472 |
-| `armenian_mnemonic_r` | clean-with-opaque | 0.00 | 616 | structural-pass | ✓ | ✓ | if-option-store×30, named-deadkey×586 |
+| `armenian_mnemonic` | clean-with-opaque | 0.00 | 788 | structural-pass | ✓ | ✓ | if-option-store×302, named-deadkey×486 |
+| `armenian_mnemonic_r` | clean-with-opaque | 0.00 | 632 | structural-pass | ✓ | ✓ | if-option-store×30, named-deadkey×602 |
 | `basic_kbdadlm` | clean-with-opaque | 0.00 | 123 | structural-pass | ✓ | ✓ | smp-literal×123 |
 | `basic_kbdgthc` | clean-with-opaque | 0.00 | 28 | structural-pass | ✓ | ✓ | smp-literal×28 |
 | `basic_kbdosa` | clean-with-opaque | 0.00 | 100 | structural-pass | ✓ | ✓ | smp-literal×100 |
@@ -552,7 +552,7 @@ Complete `RawKmnFragment` boundary list across `release/` — the input to #232 
 | `libtralo` | clean-with-opaque | 0.00 | 69 | structural-pass | ✓ | ✓ | named-deadkey×69 |
 | `linear_b` | clean-with-opaque | 0.00 | 59 | structural-pass | ✓ | ✓ | smp-literal×59 |
 | `luri` | clean-with-opaque | 0.00 | 6 | structural-pass | ✗ | copyright (&COPYRIGHT) | if-option-store×3, option-store-directive×3 |
-| `malar_malayalam` | clean-with-opaque | 0.00 | 19 | structural-pass | ✓ | ✓ | named-deadkey×19 |
+| `malar_malayalam` | clean-with-opaque | 0.00 | 21 | structural-pass | ✓ | ✓ | named-deadkey×21 |
 | `malar_malayalam_inscript` | clean-with-opaque | 0.00 | 4 | structural-pass | ✓ | ✓ | named-deadkey×4 |
 | `malar_tirhuta` | clean-with-opaque | 0.00 | 142 | structural-pass | ✓ | ✓ | named-deadkey×21, smp-literal×121 |
 | `manichaean` | clean-with-opaque | 0.00 | 14 | structural-pass | ✓ | ✓ | smp-literal×14 |
@@ -594,7 +594,7 @@ Complete `RawKmnFragment` boundary list across `release/` — the input to #232 
 | `postmodern_english_us_dualstroke` | clean-with-opaque | 0.00 | 50 | structural-pass | ✓ | ✓ | named-deadkey×50 |
 | `postmodern_english_us_natural` | clean-with-opaque | 0.00 | 42 | structural-pass | ✓ | ✓ | named-deadkey×42 |
 | `psalter_pahlavi_phonetic` | clean-with-opaque | 0.00 | 3 | structural-pass | ✓ | ✓ | smp-literal×3 |
-| `russian_mnemonic_r` | clean-with-opaque | 0.00 | 121 | structural-pass | ✓ | ✓ | named-deadkey×121 |
+| `russian_mnemonic_r` | clean-with-opaque | 0.00 | 128 | structural-pass | ✓ | ✓ | named-deadkey×128 |
 | `sharada_inscript` | clean-with-opaque | 0.00 | 13 | structural-pass | ✓ | ✓ | smp-literal×13 |
 | `sil_arabic_phonetic` | clean-with-opaque | 0.00 | 13 | structural-pass | ✓ | ✓ | named-deadkey×13 |
 | `sil_busa` | clean-with-opaque | 0.00 | 2 | structural-pass | ✓ | ✓ | outs-expansion×2 |
