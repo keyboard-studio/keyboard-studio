@@ -247,7 +247,11 @@ function emitStoreItems(items: StoreItem[]): string {
 function emitStore(store: IRStore): string {
   const nameToken = store.isSystem ? `&${store.name}` : store.name;
   const items = emitStoreItems(store.items);
-  const line = `store(${nameToken}) ${items}`;
+  let line = `store(${nameToken}) ${items}`;
+  // Trailing `c <comment>` — same convention as emitRule.
+  if (store.trailingComment !== undefined) {
+    line = `${line} c ${store.trailingComment}`;
+  }
   // Target-selector prefix — same convention as emitRule.
   return store.targetSelector !== undefined
     ? `$${store.targetSelector}: ${line}`
@@ -526,12 +530,15 @@ export function emit(ir: KeyboardIR): string {
   const systemStores = ir.stores.filter(s => s.isSystem);
   const sysMap = new Map(systemStores.map(s => [s.name.toUpperCase(), s]));
 
+  // Look up by upper-cased key so mixed-case canonical names (e.g. "CasedKeys")
+  // match the upper-cased map keys and are emitted in their canonical slot.
   for (const name of SYSTEM_STORE_ORDER) {
-    const store = sysMap.get(name);
+    const key = name.toUpperCase();
+    const store = sysMap.get(key);
     if (store) {
       pushLeadingComments(store.nodeId, commentMap, lines);
       lines.push(emitStore(store));
-      sysMap.delete(name);
+      sysMap.delete(key);
     }
   }
   // Remaining system stores not in the canonical list, alphabetical.
@@ -632,6 +639,11 @@ export function emit(ir: KeyboardIR): string {
       const referencedStoreNames = referencedStoreNamesIn(group.rules);
       for (const store of ir.stores) {
         if (!store.isSystem && referencedStoreNames.has(store.name)) {
+          // Dedup across groups: a store referenced by rules in more than one
+          // group must be emitted only once (KMN store declarations are global;
+          // a duplicate `store(...)` is a kmcmplib error and breaks round-trip).
+          if (emittedStores.has(store.nodeId)) continue;
+          emittedStores.add(store.nodeId);
           pushLeadingComments(store.nodeId, commentMap, lines);
           lines.push(emitStore(store));
         }
