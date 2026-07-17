@@ -73,6 +73,21 @@ describe("parse", () => {
     expect(leading[0]?.text).toContain("This comment precedes");
   });
 
+  it("preserves whitespace-flanked c inside quoted RHS literals", () => {
+    const kmn = `${MINIMAL_KMN}+ 'x' > 'a c b' c note\n`;
+    const { ir } = parse(kmn, "test");
+    const rule = ir.groups[0]?.rules.at(-1);
+
+    expect(rule?.output).toEqual([
+      { kind: "char", value: "a" },
+      { kind: "char", value: " " },
+      { kind: "char", value: "c" },
+      { kind: "char", value: " " },
+      { kind: "char", value: "b" },
+    ]);
+    expect(rule?.trailingComment).toBe("note");
+  });
+
   it("populates stores array with system stores", () => {
     const { ir } = parse(MINIMAL_KMN, "test");
     const sys = ir.stores.filter(s => s.isSystem);

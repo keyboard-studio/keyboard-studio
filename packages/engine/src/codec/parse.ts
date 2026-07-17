@@ -591,13 +591,32 @@ function splitOnArrow(text: string): { lhs: string; rhs: string } | null {
  * Returns { rhs, trailingComment }.
  */
 function stripTrailingComment(rhs: string): { rhs: string; trailingComment: string | undefined } {
-  // Trailing comment: whitespace + `c` + (whitespace or end of string)
-  // We look from the end to find the last unquoted `c` preceded by whitespace.
-  // Simple approach: tokenize the rhs and see if the last token(s) start a comment.
-  const commentMatch = /\s+c(?:\s+(.*))?$/.exec(rhs);
-  if (commentMatch) {
-    const stripped = rhs.slice(0, commentMatch.index).trim();
-    const commentText = (commentMatch[1] ?? "").trim();
+  let inSingle = false;
+  let commentStart = -1;
+
+  for (let i = 0; i < rhs.length; i++) {
+    const ch = rhs[i] ?? "";
+    if (ch === "'") {
+      if (inSingle && rhs[i + 1] === "'") {
+        i++;
+      } else {
+        inSingle = !inSingle;
+      }
+      continue;
+    }
+    if (
+      !inSingle &&
+      ch === "c" &&
+      /\s/.test(rhs[i - 1] ?? "") &&
+      (i === rhs.length - 1 || /\s/.test(rhs[i + 1] ?? ""))
+    ) {
+      commentStart = i;
+    }
+  }
+
+  if (commentStart !== -1) {
+    const stripped = rhs.slice(0, commentStart).trim();
+    const commentText = rhs.slice(commentStart + 1).trim();
     return { rhs: stripped, trailingComment: commentText || undefined };
   }
   return { rhs, trailingComment: undefined };
