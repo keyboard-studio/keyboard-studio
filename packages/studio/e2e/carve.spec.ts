@@ -70,6 +70,30 @@ declare global {
 }
 
 // ---------------------------------------------------------------------------
+// Page-object-lite helpers (carve-specific)
+// ---------------------------------------------------------------------------
+//
+// The shared survey prelude (identity-lite, base picker, track choice,
+// prefill, character list, mechanism/touch galleries, help phase) now lives
+// in ./helpers/surveyFlow and is imported above. Only the Sequence Gallery
+// driver is carve-local: it is the interim empty-state driver for the S-03
+// sequences step (inserted between mechanisms and the touch fork), which the
+// shared prelude does not yet cover.
+
+/**
+ * sequences step — the interim Sequence Gallery, inserted between mechanisms
+ * and the touch fork (S-03 sequences have their own dedicated part of the
+ * flow, authored separately, after the mechanism gallery). This fixture's
+ * empty-diff path (confirmMechanismsEmpty) never flags a character for
+ * sequences, so the gallery's empty state always shows here — a single
+ * "Continue (sequence gallery)" forward control that records/emits nothing.
+ */
+async function driveSequenceGallery(page: Page): Promise<void> {
+  await expect(page.getByText("Sequence Gallery")).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Continue (sequence gallery)" }).click();
+}
+
+// ---------------------------------------------------------------------------
 // Spec
 // ---------------------------------------------------------------------------
 
@@ -92,8 +116,8 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     await buildOneCharacterList(page, "᙮");
 
     // Manifest spine order (StudioShell.tsx) is characters -> carve ->
-    // mechanisms -> touch -> help; carve comes immediately after Phase B,
-    // BEFORE mechanisms/touch.
+    // mechanisms -> sequences -> touch -> help; carve comes immediately after
+    // Phase B, BEFORE mechanisms/sequences/touch.
 
     // ---------------------------------------------------------------------
     // Carve gallery
@@ -130,9 +154,10 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     await page.getByTestId("carve-continue").click();
 
     // ---------------------------------------------------------------------
-    // Remaining spine steps: mechanisms, touch, help.
+    // Remaining spine steps: mechanisms, sequences, touch, help.
     // ---------------------------------------------------------------------
     await confirmMechanismsEmpty(page);
+    await driveSequenceGallery(page);
     await driveTouchGallery(page);
     await driveHelpPhase(page);
 
@@ -202,6 +227,7 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     await page.getByTestId("carve-continue").click();
 
     await confirmMechanismsEmpty(page);
+    await driveSequenceGallery(page);
     await driveTouchGallery(page);
     await driveHelpPhase(page);
 

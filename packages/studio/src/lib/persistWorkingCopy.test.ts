@@ -97,6 +97,7 @@ describe("persistWorkingCopy", () => {
       touchLayoutJson: null,
       touchDraft: null,
       galleryIntrosSeen: { mechanism: true, touch: false },
+      sequenceFlaggedChars: ["á", "ñ"],
     });
 
     snapshotWorkingCopyToSession();
@@ -120,6 +121,7 @@ describe("persistWorkingCopy", () => {
     expect(s.undoStack).toEqual([{ k: "n", id: "node-1" }]);
     expect(s.galleryIntrosSeen.mechanism).toBe(true);
     expect(s.galleryIntrosSeen.touch).toBe(false);
+    expect(s.sequenceFlaggedChars).toEqual(["á", "ñ"]);
 
     // Key must be cleared after consume.
     expect(sessionStorage.getItem("ks.working-copy.draft")).toBeNull();

@@ -31,6 +31,7 @@ import {
 } from "@keyboard-studio/contracts";
 import { computeStalenessFromManifest } from "../dashboard/completeness.ts";
 import type { Step } from "../steps/types.ts";
+import { PATTERN_SEQUENCE } from "../editors/assignLoop/patternIds.ts";
 
 // ---------------------------------------------------------------------------
 // Manifest binding — avoids a static import of steps/manifest.ts which would
@@ -202,6 +203,14 @@ export interface WorkingCopyState {
   session: SurveySession;
   /** Desktop layout lock — prevents further physical edits until unlocked. */
   desktopLocked: boolean;
+  /**
+   * De-duplicated, insertion-ordered list of characters the author has
+   * flagged (via the S-03 "Type a sequence" card) to be typed via a
+   * sequence, DEFERRED to the Sequence Gallery. Tracked here — never
+   * folded into a MechanismAssignment — so no sequence .kmn is emitted
+   * until the Sequence Gallery actually defines the key sequence.
+   */
+  sequenceFlaggedChars: string[];
   /**
    * Serialized JSON for the `.keyman-touch-layout` artifact, derived from
    * scaffoldTouchLayout(ir) at Phase E completion. Written into the cloned
@@ -383,6 +392,16 @@ export interface WorkingCopyState {
   ) => void;
   /** Mark a gallery's one-time intro splash as seen for this working-copy session. */
   markGalleryIntroSeen: (gallery: "mechanism" | "touch") => void;
+  /**
+   * Flag a character for later sequence assignment (idempotent add).
+   * Tracked-for-Sequence-Gallery only — never emitted as a MechanismAssignment.
+   */
+  flagCharForSequence: (char: string) => void;
+  /**
+   * Remove a character from the sequence-flagged list.
+   * Tracked-for-Sequence-Gallery only — never emitted as a MechanismAssignment.
+   */
+  unflagCharForSequence: (char: string) => void;
   /**
    * Reset the entire working copy to initial state. Clears all slots
    * including base keyboard, base VFS, base IR, identity, carve IR,
@@ -628,6 +647,7 @@ export type WorkingCopyData = Omit<
   | "recordPhase" | "recordAssignments"
   | "setIrAxes" | "lockDesktop" | "unlockDesktop"
   | "setTouchLayoutJson" | "setTouchDraft" | "markGalleryIntroSeen" | "reset"
+  | "flagCharForSequence" | "unflagCharForSequence"
   | "instantiateFromBase" | "instantiateFromExisting" | "setIdentity" | "isInstantiated"
   | "markStale" | "clearStale"
   | "setValidatorFindings"
@@ -651,6 +671,7 @@ const INITIAL_STATE: WorkingCopyData = {
   // survey slots
   ...INITIAL_SURVEY,
   desktopLocked: false,
+  sequenceFlaggedChars: [],
   touchLayoutJson: null,
   touchDraft: null,
   galleryIntrosSeen: { mechanism: false, touch: false },
@@ -834,6 +855,48 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       galleryIntrosSeen: { ...s.galleryIntrosSeen, [gallery]: true },
     })),
 
+  // Idempotent add — tracked for the Sequence Gallery only, never emitted.
+  flagCharForSequence: (char) =>
+    set((s) =>
+      s.sequenceFlaggedChars.includes(char)
+        ? s
+        : { sequenceFlaggedChars: [...s.sequenceFlaggedChars, char] },
+    ),
+
+  // Tracked for the Sequence Gallery only, never emitted. ALSO strips any
+  // recorded individual-scope multi_char_sequence (PATTERN_SEQUENCE)
+  // assignment for `char` from Phase C — unflagging removes the char from
+  // sequenceFlaggedChars, which is the ONLY thing that makes a recorded
+  // sequence assignment reachable/editable from the UI (SequenceGallery keys
+  // everything off sequenceFlaggedChars membership). Leaving the assignment
+  // behind would keep emitting it into the .kmn while making it impossible
+  // to review or remove — done here, in the one store action, so every call
+  // site (both MechanismGallery chip-remove buttons) is covered without
+  // duplicating the filter at each call site.
+  unflagCharForSequence: (char) => {
+    // Delegate the Phase C merge to recordAssignments — the single place that
+    // already knows how to splice a new assignments array back into
+    // phaseResults (preserving the existing Phase C's answers/
+    // selectedPatternIds) and remerge. Only touch Phase C when it already
+    // exists, matching the prior no-op behavior for an as-yet-unrecorded
+    // working copy.
+    const phaseC = get().phaseResults.find((p) => p.phase === "C");
+    if (phaseC !== undefined) {
+      const strippedAssignments = (phaseC.assignments ?? []).filter(
+        (a) =>
+          !(
+            a.scope === "individual" &&
+            a.target === char &&
+            a.mechanisms.some((m) => m.patternId === PATTERN_SEQUENCE)
+          ),
+      );
+      get().recordAssignments(strippedAssignments);
+    }
+    set((s) => ({
+      sequenceFlaggedChars: s.sequenceFlaggedChars.filter((c) => c !== char),
+    }));
+  },
+
   reset: () => {
     // Clear the module-level re-opened roots so clearStale after reset is correct.
     _reopenedRoots = new Set();
@@ -887,6 +950,10 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // runs when there is nothing to preserve.
       ...remerge(seedIrAxesFromBaseIr(ir, preservedIrAxes), preservedPhaseResults),
       desktopLocked: false,
+      // Reset unconditionally: a fresh/re-instantiated working copy has no
+      // flags, and flagging only happens in Phase C (well after instantiation
+      // settles), so no in-flight value can be lost here.
+      sequenceFlaggedChars: [],
       touchLayoutJson: null,
       touchDraft: null,
       galleryIntrosSeen: { mechanism: false, touch: false },
@@ -939,6 +1006,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // still in flight.
       ...remerge(seedIrAxesFromBaseIr(ir, preservedIrAxes), preservedPhaseResults),
       desktopLocked: false,
+      sequenceFlaggedChars: [],
       touchLayoutJson: null,
       touchDraft: null,
       galleryIntrosSeen: { mechanism: false, touch: false },

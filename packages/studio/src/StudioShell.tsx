@@ -3,7 +3,8 @@
 // Routes:
 //   #survey  (default)  — full authoring wizard: identity → base → track →
 //                         [project_name (copy)] → characters (prefill/B) →
-//                         carve → mechanisms → touch → help → done
+//                         carve → mechanisms → sequences →
+//                         touch → help → done
 //   #preview            — PreviewScreen: "try it" — OSK preview + diagnostics
 //                         (no Download button, no SignUpPanel)
 //   #output             — OutputScreen: "ship it" — Download .zip +
@@ -196,7 +197,8 @@ function NavBar({ active }: NavBarProps) {
 //
 // Manifest spine order (FR-012, M2):
 //   identity → choose_base → track → characters → carve →
-//   mechanisms[lock:physical] → touch[lock:touch] → help → package[reserved]
+//   mechanisms[lock:physical] → sequences →
+//   touch[lock:touch] → help → package[reserved]
 //
 // Off-spine (spine:false) steps in array order:
 //   project_name  — copy-track CYOA fork; joinTarget:"characters"
@@ -683,7 +685,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
   const rightPct = 100 - leftPct;
 
-  // Full-screen steps (carve/mechanisms/touch) bypass the two-pane layout.
+  // Full-screen steps (carve/mechanisms/sequences/touch) bypass the two-pane layout.
   // StepHost returns the full-screen container; SurveyView renders it directly.
   // This reproduces the pre-Stage-5 early-return pattern without per-step branches
   // in SurveyView — the decision is data-driven via step.layout (R4, FR-002).

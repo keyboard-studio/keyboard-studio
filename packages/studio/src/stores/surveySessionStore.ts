@@ -74,6 +74,7 @@ export type ActiveStepId =
   | "characters"
   | "carve"
   | "mechanisms"
+  | "sequences"
   | "touch_seed_source"
   | "touch"
   | "help"

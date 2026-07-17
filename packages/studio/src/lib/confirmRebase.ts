@@ -22,9 +22,15 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 
 export function confirmRebaseIfEdited(): boolean {
   const s = useWorkingCopyStore.getState();
+  // sequenceFlaggedChars: flagging a char (Mechanism Gallery S-03) is a real
+  // edit even though it records no MechanismAssignment — included here so
+  // rebasing away from it is confirmed, not silently discarded.
+  // deletedItemIds is a known separate gap, not addressed here.
   const hasEdits =
     s.isInstantiated() &&
-    (s.deletedNodeIds.size > 0 || s.phaseResults.length > 0);
+    (s.deletedNodeIds.size > 0 ||
+      s.phaseResults.length > 0 ||
+      s.sequenceFlaggedChars.length > 0);
 
   if (!hasEdits) return true;
 
