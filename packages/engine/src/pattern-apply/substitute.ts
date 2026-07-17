@@ -69,8 +69,11 @@ export function substituteSlots(
   for (const id of seen) {
     const value = slotValues[id];
     if (value === undefined) continue; // unresolved — leave as-is
-    // Replace ALL occurrences in one replaceAll call.
-    text = text.replaceAll(`{{${id}}}`, value);
+    // Replace ALL occurrences in one replaceAll call. Use a replacement
+    // FUNCTION, not the raw string: a string replacement makes replaceAll
+    // interpret `$`-sequences ($$, $&, $`, $') in the slot value, corrupting
+    // any value that contains a literal `$`. A function inserts it verbatim.
+    text = text.replaceAll(`{{${id}}}`, () => value);
   }
 
   return { text, unresolved };
