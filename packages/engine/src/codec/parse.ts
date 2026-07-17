@@ -591,21 +591,23 @@ function splitOnArrow(text: string): { lhs: string; rhs: string } | null {
  * Returns { rhs, trailingComment }.
  */
 function stripTrailingComment(rhs: string): { rhs: string; trailingComment: string | undefined } {
-  let inSingle = false;
+  let quote: "'" | '"' | undefined;
   let commentStart = -1;
 
   for (let i = 0; i < rhs.length; i++) {
     const ch = rhs[i] ?? "";
-    if (ch === "'") {
-      if (inSingle && rhs[i + 1] === "'") {
+    if (ch === "'" || ch === '"') {
+      if (quote === ch && rhs[i + 1] === ch) {
         i++;
-      } else {
-        inSingle = !inSingle;
+      } else if (quote === undefined) {
+        quote = ch;
+      } else if (quote === ch) {
+        quote = undefined;
       }
       continue;
     }
     if (
-      !inSingle &&
+      quote === undefined &&
       ch === "c" &&
       /\s/.test(rhs[i - 1] ?? "") &&
       (i === rhs.length - 1 || /\s/.test(rhs[i + 1] ?? ""))
