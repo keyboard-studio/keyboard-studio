@@ -353,7 +353,9 @@ function LangtagsComboboxField({
     // different entry. This keeps alias resolution strictly additive — it never
     // turns a query that previously auto-resolved (by primary name) into an
     // ambiguous null. Aliases decide only when no single primary name matches.
-    // Mirrors the engine-side primary-name precedence in lookupByName.
+    // This precedence is local to resolveTyped: lookupByName folds aliases into
+    // the same ranking tier as the primary name (it has no primary-over-alias
+    // precedence of its own), so there is nothing there to mirror.
     const primary = results.filter(primaryMatch);
     if (primary.length >= 1) {
       // >1 primary match is genuinely ambiguous by canonical name alone → null.
