@@ -198,6 +198,25 @@ describe("LangtagsNamePickerField (spec 030 US1)", () => {
     await waitFor(() => expect(onEntryResolved).toHaveBeenLastCalledWith(null));
   });
 
+  it("a unique PRIMARY-name match wins over an alias collision (alias resolution is additive)", async () => {
+    // "Zebra" is ALPHA's primary English name AND an alternate name of BETA.
+    // The old primary-only code auto-resolved "Zebra" to ALPHA; alias matching
+    // must not turn that into an ambiguous null just because BETA lists it as an
+    // alias. A unique primary-name match short-circuits before aliases.
+    const ALPHA: LanguageSummary = { code: "xxa", englishName: "Zebra" };
+    const BETA: LanguageSummary = { code: "xxb", englishName: "Beta" };
+    searchImpl = () => [ALPHA, BETA];
+    defaultsImpl = (code) =>
+      code === "xxa"
+        ? ({ code, englishNames: ["Zebra"] } as LanguageDefaults)
+        : code === "xxb"
+          ? ({ code, englishNames: ["Beta", "Zebra"] } as LanguageDefaults)
+          : null;
+    const { input, onEntryResolved } = await renderPicker();
+    fireEvent.change(input, { target: { value: "Zebra" } });
+    await waitFor(() => expect(onEntryResolved).toHaveBeenLastCalledWith(ALPHA));
+  });
+
   it("caps the suggestion list (never renders the full index)", async () => {
     listImpl = () => MANY;
     searchImpl = () => MANY;

@@ -339,16 +339,31 @@ function LangtagsComboboxField({
     // aliases, e.g. "Otuo" → Ghotuo) so a resolvable alias seeds downstream
     // fields, not just the canonical name. Alternate names live on
     // LanguageDefaults (getLanguageDefaults), not the LanguageSummary row, so
-    // read them through the loaded module. Ambiguous aliases (shared by >1
-    // entry) still resolve to null, same as ambiguous primary names.
+    // read them through the loaded module.
     const mod = modRef.current;
-    const matchesTyped = (r: LanguageSummary): boolean => {
-      if ((r.englishName ?? "").normalize("NFC").toLowerCase() === trimmed) return true;
+    const primaryMatch = (r: LanguageSummary): boolean =>
+      (r.englishName ?? "").normalize("NFC").toLowerCase() === trimmed;
+    const aliasMatch = (r: LanguageSummary): boolean => {
       const altNames = mod?.getLanguageDefaults(r.code)?.englishNames;
       return altNames?.some((n) => n.normalize("NFC").toLowerCase() === trimmed) ?? false;
     };
-    const exact = results.filter(matchesTyped);
-    onResolved(exact.length === 1 ? exact[0]! : null);
+
+    // The primary English name takes precedence over aliases: a *unique*
+    // primary-name match resolves even when the same text is also an alias of a
+    // different entry. This keeps alias resolution strictly additive — it never
+    // turns a query that previously auto-resolved (by primary name) into an
+    // ambiguous null. Aliases decide only when no single primary name matches.
+    // Mirrors the engine-side primary-name precedence in lookupByName.
+    const primary = results.filter(primaryMatch);
+    if (primary.length >= 1) {
+      // >1 primary match is genuinely ambiguous by canonical name alone → null.
+      onResolved(primary.length === 1 ? primary[0]! : null);
+      return;
+    }
+    // No primary-name match: fall back to aliases. An alias shared by >1 entry
+    // stays ambiguous (null), same as an ambiguous primary name.
+    const byAlias = results.filter(aliasMatch);
+    onResolved(byAlias.length === 1 ? byAlias[0]! : null);
   }
 
   function handleType(text: string): void {
