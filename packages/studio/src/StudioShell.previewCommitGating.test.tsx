@@ -316,6 +316,39 @@ describe("SurveyView — preview-before-commit capture-ref + commit gating", () 
     expect(instantiateSpy).not.toHaveBeenCalled();
   });
 
+  // Precise failure-sibling requested by km-triage (PR #1174, finding #1 — the
+  // "pending-while-confirmed -> error-after-commit" case): confirm while the
+  // compile is still PENDING (in-flight, no stage transition yet), THEN the
+  // pipeline settles into ERROR for that same base. `onInstantiate` never fires
+  // on the error path (useKeyboardArtifact.ts), so `pendingArtifactRef` never
+  // fills; the deferred commit must NEVER complete — no instantiation, no
+  // advance onto a broken working copy — even though the error stage landing
+  // re-runs the single-instantiation effect via its `artifactStage` dep. (In
+  // the real UI this is unreachable — the button is gated on
+  // previewStatus === "ready" — so this documents the effect's own defensive
+  // guarantee; see the file-header note.)
+  it("[effect-level defensive guarantee] baseConfirmed set while pending, then the compile ERRORS -> never instantiates", async () => {
+    await renderAtChooseBase();
+
+    fireEvent.click(screen.getByTestId("preview-b"));
+    // Confirm while B's compile is still in flight — no settleFor() yet.
+    fireEvent.click(screen.getByTestId("commit"));
+    expect(useSurveySessionStore.getState().baseConfirmed).toBe(true);
+    expect(instantiateSpy).not.toHaveBeenCalled();
+
+    // The pipeline then settles into ERROR (not ready) for base B AFTER the
+    // confirm — onInstantiate is never called, so pendingArtifactRef stays
+    // null. The effect re-runs on the artifactStage change but must not fire.
+    act(() => {
+      for (const set of hoisted.stageSetters) {
+        set({ kind: "error", step: "compile", message: "compile failed after confirm" });
+      }
+    });
+
+    expect(instantiateSpy).not.toHaveBeenCalled();
+    expect(useWorkingCopyStore.getState().baseKeyboard).toBeNull();
+  });
+
   it("preview without ever confirming never instantiates, regardless of how many settled artifacts arrive", async () => {
     await renderAtChooseBase();
 
