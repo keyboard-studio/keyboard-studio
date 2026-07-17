@@ -26,7 +26,6 @@
 //
 // Boundary: editors/adapters/ → stores/ and hooks/ is allowed by depcruise.
 
-import { useContext } from "react";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useValidatorFindings } from "../../hooks/useValidatorFindings.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
@@ -35,7 +34,7 @@ import type { ScaffoldSpec } from "../../hooks/useKeyboardArtifact.ts";
 import { TrackOneIdentityPanel } from "../panels/TrackOneIdentityPanel.tsx";
 import { BaseResolution } from "../panels/BaseResolution.tsx";
 import type { SuggestTarget } from "../../lib/suggestBase.ts";
-import { BasePreviewStatusContext } from "../basePreviewStatus.ts";
+import { useBasePreviewStatusStore } from "../../stores/basePreviewStatusStore.ts";
 import {
   IdentityLite,
   extractIdentityLite,
@@ -152,11 +151,9 @@ export function TrackOneIdentityPanelAdapter(_props: EditorStepProps) {
  * surveySessionStore's identityResult (written by IdentityLiteAdapter's
  * setIdentityResult before this step is reached).
  *
- * previewStatus is read from BasePreviewStatusContext (provided by
- * StudioShell's SurveyView around the step host) so this adapter never
- * imports useKeyboardArtifact or the compile pipeline directly. Falls back to
- * a localBase-derived guess when the context is absent (defensive — e.g. a
- * test that renders this adapter without the Provider).
+ * previewStatus is read from basePreviewStatusStore (published by
+ * StudioShell's SurveyView) so this adapter never imports useKeyboardArtifact
+ * or the compile pipeline directly.
  */
 export function BaseResolutionAdapter({ onComplete, onBack }: EditorStepProps) {
   const identityResult = useSurveySessionStore((s) => s.identityResult);
@@ -164,8 +161,7 @@ export function BaseResolutionAdapter({ onComplete, onBack }: EditorStepProps) {
   const setLocalBase = useSurveySessionStore((s) => s.setLocalBase);
   const setBaseConfirmed = useSurveySessionStore((s) => s.setBaseConfirmed);
 
-  const contextStatus = useContext(BasePreviewStatusContext);
-  const previewStatus = contextStatus ?? (localBase ? "ready" : "idle");
+  const previewStatus = useBasePreviewStatusStore((s) => s.status);
 
   // `||` not `??`: prefill.script can be "" (no script selected for an
   // unrecognized language), which must also fall back.

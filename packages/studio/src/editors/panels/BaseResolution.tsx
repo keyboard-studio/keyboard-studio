@@ -62,7 +62,7 @@ export interface BaseResolutionProps {
   onConfirm: () => void;
   /** The base currently shown in the right-pane preview, or null before any pick. */
   previewedBase: BaseKeyboard | null;
-  /** Coarse compile-pipeline status for `previewedBase` (see editors/basePreviewStatus.ts). */
+  /** Coarse compile-pipeline status for `previewedBase` (see stores/basePreviewStatusStore.ts). */
   previewStatus: "idle" | "loading" | "ready" | "error";
   onBack?: () => void;
 }
@@ -249,16 +249,18 @@ export function BaseResolution({
           onSearchAll={() => setSearchScope("all")}
         />
         {/*
-          The single commit button for the step. Disabled only when nothing is
-          previewed yet, or the preview run errored (nothing usable to commit).
-          A "loading" preview is deliberately still clickable — committing
-          mid-compile is allowed; StudioShell's pending-artifact ref captures
-          whichever compile settles and completes the commit once it does.
+          The single commit button for the step. Enabled ONLY once the
+          preview has compiled successfully (previewStatus === "ready") —
+          disabled while idle, loading, AND on error. This means an author can
+          only commit a keyboard they have actually been able to preview/test,
+          which makes the confirm-while-loading -> subsequent-compile-error
+          race structurally unreachable: there is no path from "clicked
+          confirm" to "advanced onto a base whose compile then fails".
         */}
         <Button
           variant="secondary"
           data-testid="base-confirm"
-          disabled={previewedBase === null || previewStatus === "error"}
+          disabled={previewedBase === null || previewStatus !== "ready"}
           onClick={onConfirm}
           style={{
             marginTop: 10,
@@ -268,11 +270,11 @@ export function BaseResolution({
             borderRadius: 6,
             color: previewedBase === null ? "var(--app-text-subtle)" : "var(--app-text)",
             fontSize: 13,
-            cursor: previewedBase === null || previewStatus === "error" ? "not-allowed" : "pointer",
+            cursor: previewedBase === null || previewStatus !== "ready" ? "not-allowed" : "pointer",
             fontFamily: "var(--app-font)",
           }}
         >
-          {previewStatus === "loading" ? "Preparing preview… Choose this keyboard" : "Choose this keyboard"}
+          {previewStatus === "loading" ? "Preparing preview…" : "Choose this keyboard"}
         </Button>
       </div>
 

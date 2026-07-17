@@ -260,7 +260,13 @@ describe("BaseResolution — preview-before-commit (suggestion cards)", () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
-  it("previewStatus='loading' shows the preparing affordance but keeps the button clickable", async () => {
+  // Follow-up fix on PR #1174: the confirm button is now gated on
+  // previewStatus === "ready" — DISABLED for idle, loading, AND error, so an
+  // author can only commit a base they have actually been able to
+  // preview/test. This closes the confirm-while-loading -> subsequent-
+  // compile-error race at the source: there is no path from "clicked
+  // confirm" to "advanced onto a base whose compile then fails".
+  it("previewStatus='loading' shows the preparing affordance and keeps the button DISABLED", async () => {
     const { onConfirm } = renderControlled({ previewStatus: "loading" });
     await waitForCombobox();
 
@@ -268,10 +274,39 @@ describe("BaseResolution — preview-before-commit (suggestion cards)", () => {
     fireEvent.click(card);
 
     const confirm = screen.getByTestId("base-confirm") as HTMLButtonElement;
-    await waitFor(() => expect(confirm.disabled).toBe(false));
+    // Disabled while loading — this is the guard that makes the
+    // mid-compile-commit race structurally unreachable via the UI.
+    await waitFor(() => expect(confirm.disabled).toBe(true));
     expect(confirm.textContent).toContain("Preparing preview");
 
     fireEvent.click(confirm);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("previewStatus='ready' enables the confirm button and clicking it fires onConfirm", async () => {
+    const { onConfirm } = renderControlled({ previewStatus: "ready" });
+    await waitForCombobox();
+
+    const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
+    fireEvent.click(card);
+
+    const confirm = screen.getByTestId("base-confirm") as HTMLButtonElement;
+    await waitFor(() => expect(confirm.disabled).toBe(false));
+    expect(confirm.textContent).toBe("Choose this keyboard");
+
+    fireEvent.click(confirm);
     expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("previewStatus='idle' (no preview yet) keeps the button disabled", async () => {
+    const { onConfirm } = renderControlled({ previewStatus: "idle" });
+    await waitForCombobox();
+
+    // No card clicked — previewedBase stays null, previewStatus stays "idle".
+    const confirm = screen.getByTestId("base-confirm") as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+
+    fireEvent.click(confirm);
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 });

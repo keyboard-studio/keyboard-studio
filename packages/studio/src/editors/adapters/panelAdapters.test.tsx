@@ -19,6 +19,7 @@ import {
 } from "@keyboard-studio/contracts/fixtures";
 
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useBasePreviewStatusStore } from "../../stores/basePreviewStatusStore.ts";
 import type { IdentityLiteResult } from "../../survey/IdentityLite.tsx";
 
 // ---------------------------------------------------------------------------
@@ -70,6 +71,10 @@ function makeIdentityResult(overrides: Partial<IdentityLiteResult>): IdentityLit
 afterEach(() => {
   cleanup();
   useSurveySessionStore.getState().reset();
+  // Reset the preview-status store between tests — it is a module-level
+  // singleton (Zustand), so a test that flips it to "ready" would otherwise
+  // leak into the next test's initial render.
+  useBasePreviewStatusStore.setState({ status: "idle" });
 });
 
 describe("BaseResolutionAdapter — suggest target sourced from surveySessionStore", () => {
@@ -150,6 +155,10 @@ describe("BaseResolutionAdapter — preview vs commit", () => {
     expect(onComplete).not.toHaveBeenCalled();
     // A fresh preview re-arms the commit gate — baseConfirmed stays false.
     expect(useSurveySessionStore.getState().baseConfirmed).toBe(false);
+    // basePreviewStatusStore stays at its default "idle" (nothing in this
+    // unit test publishes to it), so the confirm button stays disabled too —
+    // a preview alone can never reach the commit path.
+    expect((screen.getByTestId("base-confirm") as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("committing after a preview sets baseConfirmed BEFORE calling onComplete (R7 ordering)", async () => {
@@ -167,6 +176,13 @@ describe("BaseResolutionAdapter — preview vs commit", () => {
 
     const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
     fireEvent.click(card);
+
+    // Follow-up fix on PR #1174: the confirm button is now gated on
+    // previewStatus === "ready" (read from basePreviewStatusStore). This unit
+    // test has no StudioShell/SurveyView mounted to publish that status from
+    // the real compile pipeline, so drive it directly — mirroring what a
+    // settled preview compile would publish.
+    useBasePreviewStatusStore.getState().setStatus("ready");
 
     const confirm = await waitFor(() => {
       const btn = screen.getByTestId("base-confirm") as HTMLButtonElement;

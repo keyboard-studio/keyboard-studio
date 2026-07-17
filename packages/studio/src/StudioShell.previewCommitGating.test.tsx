@@ -16,6 +16,18 @@
 // button, mirroring the real BaseResolutionAdapter wiring under test (which
 // is NOT mocked — it is the code under test here, along with SurveyView's
 // capture-ref effect).
+//
+// Follow-up fix on PR #1174: the REAL BaseResolution now disables its
+// "Choose this keyboard" button unless previewStatus === "ready" (see
+// editors/panels/BaseResolution.tsx), which makes "confirm while the compile
+// is still pending/errored" unreachable through the actual UI. The mocked
+// BaseResolution below intentionally does NOT reproduce that gating — its fixed
+// `commit` button is disabled only on `previewedBase === null` — because the
+// scenarios that exercise it are testing SurveyView's own effect-level
+// defensive guarantees (the single-instantiation effect gated on
+// `baseConfirmed`/`artifactStage`), which exist independently of whatever UI
+// sits in front of them and must hold even if a future caller reaches this
+// effect through a different, less-gated component.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useState, useEffect } from "react";
@@ -235,7 +247,17 @@ describe("SurveyView — preview-before-commit capture-ref + commit gating", () 
     expect(useSurveySessionStore.getState().baseConfirmed).toBe(true);
   });
 
-  it("committing while the compile for the previewed base is still pending does NOT instantiate; instantiates once the pipeline later settles for that same base", async () => {
+  // NOTE (PR #1174 follow-up): via the REAL UI this scenario is now
+  // unreachable — BaseResolution disables "Choose this keyboard" until
+  // previewStatus === "ready", so a click can no longer land while the
+  // compile is still pending. The mocked commit button here does not
+  // reproduce that gating (see the file-header note above), so this test now
+  // documents a DEFENSIVE EFFECT-LEVEL guarantee rather than a user-reachable
+  // flow: if `baseConfirmed` is ever set before `pendingArtifactRef` is
+  // filled for the current base (e.g. a future caller with looser gating),
+  // the single-instantiation effect must still defer, not misfire, and must
+  // complete exactly once the pipeline later settles for that same base.
+  it("[effect-level defensive guarantee] baseConfirmed set before the pipeline settles defers doCommit; completes once it settles for that same base", async () => {
     await renderAtChooseBase();
 
     fireEvent.click(screen.getByTestId("preview-b"));
@@ -255,6 +277,43 @@ describe("SurveyView — preview-before-commit capture-ref + commit gating", () 
       expect.objectContaining({ id: BASE_B.id }),
       expect.anything(),
     );
+  });
+
+  // Error-path sibling of the guarantee above (PR #1174 follow-up, km-qc
+  // finding #2): if the previewed base's compile ERRORS rather than settling
+  // ready, `onInstantiate` never fires for it (see useKeyboardArtifact.ts —
+  // the callback only runs on the success path), so `pendingArtifactRef`
+  // never fills for that base. Even if `baseConfirmed` is set regardless
+  // (again: unreachable via the real gated button, but a defensive guarantee
+  // the effect itself must uphold), the single-instantiation effect must
+  // NEVER run doCommit for an errored base — no instantiation, no autosave
+  // install, no advance onto a broken working copy.
+  it("[effect-level defensive guarantee] baseConfirmed set while the previewed base's compile has ERRORED never instantiates", async () => {
+    await renderAtChooseBase();
+
+    fireEvent.click(screen.getByTestId("preview-b"));
+    // The compile pipeline errors for base B — onInstantiate is never called,
+    // so pendingArtifactRef stays null for this base.
+    act(() => {
+      for (const set of hoisted.stageSetters) {
+        set({ kind: "error", step: "compile", message: "compile failed" });
+      }
+    });
+
+    fireEvent.click(screen.getByTestId("commit"));
+    expect(useSurveySessionStore.getState().baseConfirmed).toBe(true);
+    expect(instantiateSpy).not.toHaveBeenCalled();
+    expect(useWorkingCopyStore.getState().baseKeyboard).toBeNull();
+
+    // The error stage is re-asserted (simulating a re-render/retry that still
+    // errors) — the effect re-runs on the artifactStage dependency but must
+    // still never instantiate, since pendingArtifactRef was never filled.
+    act(() => {
+      for (const set of hoisted.stageSetters) {
+        set({ kind: "error", step: "compile", message: "compile failed again" });
+      }
+    });
+    expect(instantiateSpy).not.toHaveBeenCalled();
   });
 
   it("preview without ever confirming never instantiates, regardless of how many settled artifacts arrive", async () => {

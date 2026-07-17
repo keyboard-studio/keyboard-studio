@@ -49,7 +49,7 @@ import { manifest, validateManifestShape } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { StepHost } from "./components/StepHost.tsx";
 import { TEXT_MAIN, FONT } from "./survey/surveyStyles.ts";
-import { BasePreviewStatusContext, type BasePreviewStatus } from "./editors/basePreviewStatus.ts";
+import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
 
 // Bind the manifest into the store's staleness actions.
 // Called once at module load; avoids a circular static import in the store
@@ -214,8 +214,10 @@ function NavBar({ active }: NavBarProps) {
 //
 // Double-instantiation guard (P1 fix):
 //   setScaffoldSpec() causes a second compile run whose onInstantiate callback
-//   would fire applyStepCompletion("choose_base", ...) a second time. An
-//   instantiatedRef flag prevents the R3 side effect from running more than once
+//   re-captures the artifact into pendingArtifactRef; the commit effect's
+//   doCommit (below) would then run the choose_base side effect
+//   (applyStepCompletion("choose_base", ...)) a second time. An
+//   instantiatedRef flag prevents that side effect from running more than once
 //   per session; it resets on start-over.
 // ---------------------------------------------------------------------------
 
@@ -545,12 +547,14 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   //   - the compile pipeline has actually settled for THAT SAME base
   //     (`pendingArtifactRef`, filled by `onInstantiate` above).
   //
-  // Either order is possible: the author may confirm before the pipeline
-  // settles (this effect re-runs when `artifactStage` transitions to "ready"
-  // and finds the ref populated), or the pipeline may settle before they
-  // confirm (this effect re-runs when `baseConfirmed` flips true and finds
-  // the ref already populated). The `art.base.id === lb.id` check guards
-  // against a stale ref from a PREVIOUS preview surviving a fast re-preview.
+  // Confirm is now gated on `previewStatus === "ready"` in BaseResolution's
+  // commit button, so in practice `baseConfirmed` only flips true once the
+  // pipeline has already settled — the ref is already populated by the time
+  // this effect sees `baseConfirmed`. The `artifactStage`-triggered re-run
+  // (waiting for the ref to be filled after confirm) is retained purely as a
+  // defensive fallback, not a load-bearing path. The `art.base.id === lb.id`
+  // check guards against a stale ref from a PREVIOUS preview surviving a fast
+  // re-preview.
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!baseConfirmed || instantiatedRef.current) return;
@@ -628,12 +632,12 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   };
 
   // ---------------------------------------------------------------------------
-  // BasePreviewStatusContext value — a coarse projection of `artifactStage`
-  // (see editors/basePreviewStatus.ts for the BasePreviewStatus union and why
-  // this is a context rather than a store slice). Consumed by
-  // BaseResolutionAdapter so the choose_base step's "Choose this keyboard"
-  // button can reflect the live preview state without importing
-  // useKeyboardArtifact directly.
+  // basePreviewStatusStore value — a coarse projection of `artifactStage` (see
+  // stores/basePreviewStatusStore.ts for the BasePreviewStatus union).
+  // Published to the store below so BaseResolutionAdapter (reached through
+  // StepHost while activeStepId === "choose_base") can read the live preview
+  // status without importing useKeyboardArtifact directly, and without a
+  // prop-drilling chain through StepHost's generic EditorStepProps.
   // ---------------------------------------------------------------------------
   const previewStatus: BasePreviewStatus = useMemo(() => {
     if (localBase === null) return "idle";
@@ -651,6 +655,11 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     }
   }, [localBase, artifactStage.kind]);
 
+  const setBasePreviewStatus = useBasePreviewStatusStore((s) => s.setStatus);
+  useEffect(() => {
+    setBasePreviewStatus(previewStatus);
+  }, [previewStatus, setBasePreviewStatus]);
+
   // ---------------------------------------------------------------------------
   // Render: StepHost drives all survey step rendering (spec 028 Stage 5, T012).
   //
@@ -662,21 +671,14 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // The host handles done/unsupported terminals and the unknown-id error panel.
   // SurveyView retains: resizable panes, OSK right pane, validator, oskMode,
   // pattern-map effect, instantiatedRef, onInstantiate (FR-009).
-  //
-  // Wrapped in BasePreviewStatusContext.Provider so BaseResolutionAdapter
-  // (reached through StepHost while activeStepId === "choose_base") can read
-  // the live preview status without a prop-drilling chain through StepHost's
-  // generic EditorStepProps.
   // ---------------------------------------------------------------------------
 
   const stepHost = (
-    <BasePreviewStatusContext.Provider value={previewStatus}>
-      <StepHost
-        reducerDeps={reducerDeps}
-        onStartOver={handleStartOver}
-        ctx={surveyContext}
-      />
-    </BasePreviewStatusContext.Provider>
+    <StepHost
+      reducerDeps={reducerDeps}
+      onStartOver={handleStartOver}
+      ctx={surveyContext}
+    />
   );
 
   const rightPct = 100 - leftPct;
