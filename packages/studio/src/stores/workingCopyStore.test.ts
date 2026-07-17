@@ -1268,6 +1268,41 @@ describe("workingCopyStore — sequenceFlaggedChars", () => {
     ).toEqual([]);
   });
 
+  it("unflagCharForSequence strips ALL recorded sequences when the assignment holds multiple PATTERN_SEQUENCE mechanisms", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("ŋ");
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ŋ",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: "multi_char_sequence",
+            strategyId: "S-03",
+            slotValues: { firstLetterOut: "n", secondLetter: "g", collapsedChar: "ŋ" },
+          },
+          {
+            patternId: "multi_char_sequence",
+            strategyId: "S-03",
+            slotValues: { firstLetterOut: "n", secondLetter: "y", collapsedChar: "ŋ" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+    expect(
+      useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C")?.assignments?.[0]
+        ?.mechanisms,
+    ).toHaveLength(2);
+
+    useWorkingCopyStore.getState().unflagCharForSequence("ŋ");
+
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual([]);
+    expect(
+      useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C")?.assignments,
+    ).toEqual([]);
+  });
+
   it("unflagCharForSequence leaves OTHER characters' assignments (including that char's own non-sequence mechanisms) untouched", () => {
     useWorkingCopyStore.getState().flagCharForSequence("ŋ");
     useWorkingCopyStore.getState().recordAssignments([

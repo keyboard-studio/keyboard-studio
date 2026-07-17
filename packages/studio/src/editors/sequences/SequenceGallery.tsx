@@ -1,40 +1,62 @@
 // SequenceGallery — the Sequence Gallery (S-03 multi-key sequences).
 //
-// Records a real `multi_char_sequence` MechanismAssignment. Content is the
-// character(s) already typed that the sequence builds on (`firstLetterOut`);
-// Indicator is the single key typed right after the content that triggers
-// the collapse (`secondLetter`) — it must resolve to a PHYSICAL key on the
-// base layout (checked via charToVkey, the same lookup MechanismGallery's
-// trigger/swap/ralt key pickers use), since the emitted rule is a
-// `using keys` group whose rightmost item is the Indicator; the flagged
-// character being defined is the collapse target (`collapsedChar`). Apply
-// records/updates a `scope:"individual"` assignment for `currentChar` via
-// the working-copy store's `recordAssignments` — the same store call
-// MechanismGallery's deadkey/swap/ralt branches use — so the existing
-// useWorkingCopyTransform -> applyAssignmentsToVfs pipeline picks it up with
-// no engine changes: the live preview and the emitted .kmn both reflect it.
+// A flagged character may hold MULTIPLE sequences (e.g. "á" reachable via
+// both "a"+"´" and "a"+"s"). Representation: ONE `scope:"individual"`
+// MechanismAssignment per character, whose `mechanisms` array holds MULTIPLE
+// `multi_char_sequence` MechanismRefs — one per distinct (content, indicator)
+// pair, each with its own `{ firstLetterOut, secondLetter, collapsedChar }`
+// slotValues. This is permitted by the contract (`MechanismAssignment.
+// mechanisms` is documented many-to-many — see
+// packages/contracts/src/assignmentMap.ts) and requires NO engine changes:
+// `applyAssignments` already flattens every assignment's mechanisms and
+// deduplicates by (patternId, serialized slotValues), so two distinct
+// sequence refs for the same char each emit their own `.kmn` rule, and an
+// identical (content, indicator) pair collapses to one.
+//
+// Content is the character(s) already typed that the sequence builds on
+// (`firstLetterOut`); Indicator is the single key typed right after the
+// content that triggers the collapse (`secondLetter`) — it must resolve to a
+// PHYSICAL key on the base layout (checked via charToVkey, the same lookup
+// MechanismGallery's trigger/swap/ralt key pickers use), since the emitted
+// rule is a `using keys` group whose rightmost item is the Indicator; the
+// flagged character being defined is the collapse target (`collapsedChar`).
+// Apply ADDS a new sequence ref to `currentChar`'s assignment (creating the
+// assignment on the first Apply) via the working-copy store's
+// `recordAssignments` — the same store call MechanismGallery's deadkey/swap/
+// ralt branches use — so the existing useWorkingCopyTransform ->
+// applyAssignmentsToVfs pipeline picks it up with no engine changes: the live
+// preview and the emitted .kmn both reflect every recorded sequence.
 //
 // Cycles through `sequenceFlaggedChars` (set by the Mechanism Gallery's S-03
 // FLAG card — see MechanismGallery's flagCharForSequence/unflagCharForSequence;
-// unflagCharForSequence also strips this gallery's recorded assignment for
-// that char — see the store action's own doc comment), NOT lettersToAdd.
-// Positional Back/Previous/Next/Done navigation reuses usePositionalCharNav
-// so this gallery cannot drift from MechanismGallery's/TouchGallery's
-// Back/Next/Skip semantics.
+// unflagCharForSequence still strips the WHOLE assignment (all recorded
+// sequences) for that char — see the store action's own doc comment), NOT
+// lettersToAdd. Positional Back/Previous/Next/Done navigation reuses
+// usePositionalCharNav so this gallery cannot drift from MechanismGallery's/
+// TouchGallery's Back/Next/Skip semantics.
 //
 // Apply/advance — mirrors MechanismGallery's canGoNext/Skip split exactly:
 // the top toolbar's "Next character →"/"Done" is gated on the current
-// character already having a recorded sequence assignment (so filled-but-
+// character already having AT LEAST ONE recorded sequence (so filled-but-
 // unapplied box content can never be silently discarded through that
 // control); an explicit, never-gated "Skip this character" button sits next
 // to Apply for an author who deliberately wants to move on without defining
-// a sequence for this character. Revisiting an already-recorded character
-// prefills Content/Indicator from its stored slotValues.
+// a sequence for this character. Apply always ADDS a sequence and then
+// CLEARS both boxes (so the author can immediately define another one for
+// the same char); the boxes are therefore never prefilled on revisit — the
+// already-recorded sequences for the current char are shown as a list below
+// the boxes, each with its own Remove control.
 //
 // Deferred (explicitly out of scope for this pass — see NOTE at handleApply):
 // rule-order/shadowing enforcement, indicator<->deadkey-trigger collision
 // detection, multi-codepoint-output smart-backspace companion rule, RTL box
 // mirroring, double-diacritic chaining, prefix (deadkey-first) direction.
+// Not an oversight of the multi-sequence model above: two sequences for the
+// SAME output char whose Content differs in length but shares an Indicator
+// (e.g. "a"+"´"->"á" vs "ba"+"´"->"bá") can shadow order-dependently at emit
+// time — this is the SAME class of concern as the deferred rule-order item,
+// just newly reachable now that one char can carry several sequence rules;
+// it is backstopped by the WASM oracle (Layer A Check #11), not enforced here.
 //
 // RIGHT pane: GalleryPreviewPane — live OSK preview. SequenceGallery owns the
 // single useKeyboardArtifact + useWorkingCopyTransform pipeline for this step
@@ -45,7 +67,7 @@
 // (decision D3 / spec §8 — one 300 ms debounce cycle).
 
 import { useState, useEffect, useMemo, useCallback, type CSSProperties } from "react";
-import type { BaseKeyboard, MechanismAssignment, Pattern } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, MechanismAssignment, MechanismRef, Pattern } from "@keyboard-studio/contracts";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { getPatternLibraryService } from "../../lib/services.ts";
@@ -143,6 +165,38 @@ const inputStyle: CSSProperties = {
 };
 
 // ---------------------------------------------------------------------------
+// partitionSequenceAssignment — the ONE place that knows the "does this
+// assignment belong to currentChar's PATTERN_SEQUENCE bucket?" predicate
+// (scope:"individual" + target === char + at least one PATTERN_SEQUENCE
+// mechanism). Every read site (the existing-sequences memo) and every write
+// site (handleApply's recompute + exclude-filter, handleRemoveSequence's
+// exclude-filter) derives from this single function so a future predicate
+// tweak (e.g. adding a modality check) can't miss one of the four call
+// sites. Returns BOTH halves of the partition: `mechs` (this char's
+// PATTERN_SEQUENCE refs, already flattened out of whichever assignment held
+// them) and `rest` (every other assignment, untouched) — write sites splice
+// their own rebuilt assignment back into `rest`; the read site only needs
+// `mechs`.
+// ---------------------------------------------------------------------------
+
+function partitionSequenceAssignment(
+  sessionAssignments: MechanismAssignment[],
+  char: string,
+): { mechs: MechanismRef[]; rest: MechanismAssignment[] } {
+  const isSequenceAssignmentForChar = (a: MechanismAssignment): boolean =>
+    a.scope === "individual" &&
+    a.target === char &&
+    a.mechanisms.some((m) => m.patternId === PATTERN_SEQUENCE);
+
+  const existing = sessionAssignments.find(isSequenceAssignmentForChar);
+  const mechs =
+    existing?.mechanisms.filter((m) => m.patternId === PATTERN_SEQUENCE) ?? [];
+  const rest = sessionAssignments.filter((a) => !isSequenceAssignmentForChar(a));
+
+  return { mechs, rest };
+}
+
+// ---------------------------------------------------------------------------
 // SequenceGallery — main component
 // ---------------------------------------------------------------------------
 
@@ -204,40 +258,31 @@ export function SequenceGallery({
     [phaseResults],
   );
 
-  // The (at most one) existing multi_char_sequence assignment for currentChar
-  // — used both to prefill the boxes on revisit and to replace-not-duplicate
-  // on re-Apply.
-  const existingSequenceAssignment = useMemo(() => {
-    if (currentChar === null) return null;
-    return (
-      sessionAssignments.find(
-        (a) =>
-          a.scope === "individual" &&
-          a.target === currentChar &&
-          a.mechanisms.some((m) => m.patternId === PATTERN_SEQUENCE),
-      ) ?? null
-    );
+  // All PATTERN_SEQUENCE refs recorded so far for currentChar — one per
+  // recorded sequence. Used to render the recorded-sequences list, to gate
+  // canGoNext, and as the append/remove target in
+  // handleApply/handleRemoveSequence. Derived via partitionSequenceAssignment
+  // (see above) so this memo can never disagree with the write sites about
+  // which assignment belongs to currentChar.
+  const existingSequenceMechanisms = useMemo(() => {
+    if (currentChar === null) return [];
+    return partitionSequenceAssignment(sessionAssignments, currentChar).mechs;
   }, [sessionAssignments, currentChar]);
 
   // ---------------------------------------------------------------------------
   // Sequence box state — Content ("seqFirst") / Indicator ("seqSecond").
-  // Reset on every currentChar change, then immediately prefilled from any
-  // already-recorded sequence assignment for the NEW currentChar (revisit
-  // case). Deliberately keyed on currentChar only (not on
-  // existingSequenceAssignment itself) — Apply mutates the store but must NOT
-  // clear/refill what the author is actively looking at; only navigating to a
-  // different character re-syncs the boxes.
+  // Reset (cleared) on every currentChar change AND after every successful
+  // Apply — the boxes are ALWAYS for composing the NEXT sequence to add, never
+  // a view onto an existing one (multi-sequence model: existing sequences for
+  // currentChar are rendered in the list below, each with its own Remove
+  // control, not prefilled back into these boxes).
   // ---------------------------------------------------------------------------
 
   const [content, setContent] = useState("");
   const [indicator, setIndicator] = useState("");
   useEffect(() => {
-    const seqMech = existingSequenceAssignment?.mechanisms.find(
-      (m) => m.patternId === PATTERN_SEQUENCE,
-    );
-    setContent(seqMech?.slotValues?.["firstLetterOut"] ?? "");
-    setIndicator(seqMech?.slotValues?.["secondLetter"] ?? "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setContent("");
+    setIndicator("");
   }, [currentChar]);
 
   const contentResolved = resolveCharInput(content, SEQ_CONTENT_RESOLVE_OPTIONS);
@@ -266,11 +311,12 @@ export function SequenceGallery({
   );
 
   // ---------------------------------------------------------------------------
-  // Apply — records/updates the multi_char_sequence MechanismAssignment for
-  // currentChar. Filter-then-append (not a naive push) so repeated Apply
-  // clicks REPLACE this char's sequence assignment rather than accumulating
-  // duplicates — mirrors MechanismGallery's handleRemoveCovered/
-  // handleCompanionConfirm filter-then-record pattern.
+  // Apply — ADDS a new sequence to currentChar's multi_char_sequence
+  // MechanismAssignment (creating the assignment on the first Apply for this
+  // char). If an identical (content, indicator) pair is already recorded,
+  // this is a no-op (no duplicate ref is created). On success, both boxes are
+  // cleared so the author can immediately define another sequence for the
+  // same character.
   //
   // Deferred (NOT implemented here — see file header): rule-order/shadowing
   // enforcement, indicator<->deadkey-trigger collision detection,
@@ -287,34 +333,79 @@ export function SequenceGallery({
     // silently record an Indicator that can't be wired to a physical key.
     if (charToVkey(indicatorValue.value) === null) return;
 
-    const assignment: MechanismAssignment = {
-      scope: "individual",
-      target: currentChar,
-      modality: "physical",
-      mechanisms: [
-        {
-          patternId: PATTERN_SEQUENCE,
-          strategyId: "S-03",
-          slotValues: {
-            firstLetterOut: contentValue.value,
-            secondLetter: indicatorValue.value,
-            collapsedChar: currentChar.normalize("NFC"),
-          },
-        },
-      ],
-      source: "user",
-    };
-
-    const next = sessionAssignments.filter(
-      (a) =>
-        !(
-          a.scope === "individual" &&
-          a.target === currentChar &&
-          a.mechanisms.some((m) => m.patternId === PATTERN_SEQUENCE)
-        ),
+    const { mechs: existingMechs, rest } = partitionSequenceAssignment(
+      sessionAssignments,
+      currentChar,
     );
-    recordAssignments([...next, assignment]);
+
+    // Dedup by (firstLetterOut, secondLetter) — an identical sequence is a
+    // no-op rather than a duplicate ref.
+    const alreadyRecorded = existingMechs.some(
+      (m) =>
+        m.slotValues?.["firstLetterOut"] === contentValue.value &&
+        m.slotValues?.["secondLetter"] === indicatorValue.value,
+    );
+
+    if (!alreadyRecorded) {
+      const newRef: MechanismRef = {
+        patternId: PATTERN_SEQUENCE,
+        strategyId: "S-03",
+        slotValues: {
+          firstLetterOut: contentValue.value,
+          secondLetter: indicatorValue.value,
+          collapsedChar: currentChar.normalize("NFC"),
+        },
+      };
+
+      const assignment: MechanismAssignment = {
+        scope: "individual",
+        target: currentChar,
+        modality: "physical",
+        mechanisms: [...existingMechs, newRef],
+        source: "user",
+      };
+
+      recordAssignments([...rest, assignment]);
+    }
+
+    // Clear the boxes either way — Apply always leaves them ready for the
+    // next sequence, whether or not this one was a new addition.
+    setContent("");
+    setIndicator("");
   }, [currentChar, canApply, content, indicator, sessionAssignments, recordAssignments]);
+
+  // ---------------------------------------------------------------------------
+  // Remove a single recorded sequence (by its index within
+  // existingSequenceMechanisms) — drops just that ref from currentChar's
+  // assignment. Removing the LAST recorded sequence removes the assignment
+  // entirely (the char goes back to having no recorded sequence, matching
+  // canGoNext's gate and unflagCharForSequence's own strip-the-assignment
+  // semantics).
+  // ---------------------------------------------------------------------------
+
+  const handleRemoveSequence = useCallback(
+    (idx: number) => {
+      if (currentChar === null) return;
+      const nextMechs = existingSequenceMechanisms.filter((_, i) => i !== idx);
+
+      const { rest } = partitionSequenceAssignment(sessionAssignments, currentChar);
+
+      if (nextMechs.length === 0) {
+        recordAssignments(rest);
+        return;
+      }
+
+      const assignment: MechanismAssignment = {
+        scope: "individual",
+        target: currentChar,
+        modality: "physical",
+        mechanisms: nextMechs,
+        source: "user",
+      };
+      recordAssignments([...rest, assignment]);
+    },
+    [currentChar, existingSequenceMechanisms, sessionAssignments, recordAssignments],
+  );
 
   // ---------------------------------------------------------------------------
   // Pattern loading — needed for patternMap (GalleryPreviewPane + the emit
@@ -554,7 +645,7 @@ export function SequenceGallery({
   // never traps the author.
   // ---------------------------------------------------------------------------
 
-  const canGoNext = currentChar !== null && existingSequenceAssignment !== null;
+  const canGoNext = currentChar !== null && existingSequenceMechanisms.length > 0;
 
   const forwardLabel = hasAnotherCharAfterCurrent ? "Next character →" : "Done";
   const forwardAriaLabel = hasAnotherCharAfterCurrent
@@ -835,16 +926,95 @@ export function SequenceGallery({
             >
               Skip this character
             </button>
-            {existingSequenceAssignment !== null && (
+            {existingSequenceMechanisms.length > 0 && (
               <span
                 role="status"
                 aria-live="polite"
                 style={{ fontSize: 12, color: "#56d364", fontFamily: FONT }}
               >
-                Sequence recorded
+                {existingSequenceMechanisms.length === 1
+                  ? "Sequence recorded"
+                  : `${existingSequenceMechanisms.length} sequences recorded`}
               </span>
             )}
           </div>
+
+          {/* Recorded sequences list — every PATTERN_SEQUENCE ref already
+              applied for currentChar (a character may hold several). Apply
+              always ADDS to this list (see handleApply); Remove drops just
+              that one entry, and dropping the last one clears currentChar's
+              assignment entirely (see handleRemoveSequence). */}
+          {existingSequenceMechanisms.length > 0 && (
+            <div
+              style={{
+                background: BG_CARD,
+                border: `1px solid ${BORDER}`,
+                borderRadius: 10,
+                padding: "10px 14px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 12,
+                  color: TEXT_DIM,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                Recorded sequences
+              </p>
+              {existingSequenceMechanisms.map((m, idx) => {
+                const seqContent = m.slotValues?.["firstLetterOut"] ?? "";
+                const seqIndicator = m.slotValues?.["secondLetter"] ?? "";
+                return (
+                  <div
+                    key={`${seqContent}\0${seqIndicator}`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      fontSize: 13,
+                      fontFamily: FONT,
+                    }}
+                  >
+                    <span style={{ color: TEXT_MAIN }}>
+                      {seqContent}
+                      {" + "}
+                      {seqIndicator}
+                      {" "}
+                      &rarr;{" "}
+                      <span style={{ fontFamily: "monospace", fontSize: 15 }}>
+                        {currentChar}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      data-testid={`sequences-remove-${idx}`}
+                      onClick={() => handleRemoveSequence(idx)}
+                      aria-label={`Remove sequence ${seqContent} + ${seqIndicator} for ${toUPlusNotation(currentChar)} ${currentChar}`}
+                      style={{
+                        background: "transparent",
+                        border: `1px solid ${BORDER}`,
+                        borderRadius: 6,
+                        color: TEXT_DIM,
+                        fontSize: 11,
+                        cursor: "pointer",
+                        fontFamily: FONT,
+                        padding: "3px 8px",
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </>
       )}
 

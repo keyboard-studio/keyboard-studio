@@ -11,20 +11,23 @@
 //   - Per-char: heading (glyph + U+XXXX), the two explained Content/Indicator
 //     boxes (heading, helper text, input), and the content+indicator ->
 //     currentChar result line.
-//   - Apply records a real multi_char_sequence MechanismAssignment
-//     (scope:"individual", modality:"physical") for currentChar via
-//     recordAssignments — the emit pipeline (useWorkingCopyTransform) is
-//     unaffected by this test file; only the store write is asserted.
+//   - A character may hold MULTIPLE recorded sequences. Apply ADDS a new
+//     multi_char_sequence MechanismRef to currentChar's ONE
+//     scope:"individual" MechanismAssignment (creating it on first Apply);
+//     an identical (content, indicator) pair is a no-op, not a duplicate.
+//     After a successful Apply, both boxes clear so the author can define
+//     another sequence right away — the boxes are NEVER prefilled from an
+//     existing assignment. Recorded sequences render as a list below the
+//     boxes, each with its own Remove control; removing the last one clears
+//     the character's assignment entirely.
 //   - Empty boxes: Apply is disabled and records nothing.
 //   - An Indicator that cannot resolve to a physical key (charToVkey returns
 //     null) blocks Apply and shows an inline role="alert" message, even
 //     though resolveCharInput itself accepted the value (P1 fix).
-//   - Revisiting an already-recorded character prefills Content/Indicator
-//     from its stored slotValues.
 //   - Forward gating mirrors MechanismGallery's canGoNext/Skip split (P1
 //     fix): the top "Next character →"/"Done" control (sequences-continue)
-//     is disabled until the CURRENT character has a recorded sequence
-//     assignment — clicking it while disabled advances nothing and discards
+//     is disabled until the CURRENT character has AT LEAST ONE recorded
+//     sequence — clicking it while disabled advances nothing and discards
 //     nothing. A separate, never-gated "Skip this character"
 //     (sequences-skip) button always advances and never records.
 //   - Back from the first flagged character fires onBack.
@@ -236,7 +239,7 @@ describe("SequenceGallery — recording", () => {
     expect(screen.getByText(/Sequence recorded/i)).toBeTruthy();
   });
 
-  it("re-Apply for the same character replaces (not duplicates) its sequence assignment", () => {
+  it("Apply ADDS a second sequence for the same character rather than replacing the first", () => {
     seedFlagged(["ŋ"]);
     render(<SequenceGallery selectedBaseKeyboard={basicKbdus} />);
 
@@ -244,6 +247,7 @@ describe("SequenceGallery — recording", () => {
     fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "g" } });
     fireEvent.click(screen.getByTestId("sequences-apply"));
 
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "n" } });
     fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "y" } });
     fireEvent.click(screen.getByTestId("sequences-apply"));
 
@@ -251,14 +255,33 @@ describe("SequenceGallery — recording", () => {
       .getState()
       .phaseResults.find((p) => p.phase === "C");
     expect(phaseC?.assignments).toHaveLength(1);
-    expect(phaseC?.assignments?.[0]?.mechanisms[0]?.slotValues).toEqual({
-      firstLetterOut: "n",
-      secondLetter: "y",
-      collapsedChar: "ŋ",
-    });
+    const mechanisms = phaseC?.assignments?.[0]?.mechanisms ?? [];
+    expect(mechanisms).toHaveLength(2);
+    expect(mechanisms.map((m) => m.slotValues)).toEqual([
+      { firstLetterOut: "n", secondLetter: "g", collapsedChar: "ŋ" },
+      { firstLetterOut: "n", secondLetter: "y", collapsedChar: "ŋ" },
+    ]);
   });
 
-  it("prefills Content/Indicator when revisiting an already-recorded character", () => {
+  it("Apply with an identical (content, indicator) pair already recorded is a no-op (no duplicate ref)", () => {
+    seedFlagged(["ŋ"]);
+    render(<SequenceGallery selectedBaseKeyboard={basicKbdus} />);
+
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "n" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "g" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
+
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "n" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "g" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
+
+    const phaseC = useWorkingCopyStore
+      .getState()
+      .phaseResults.find((p) => p.phase === "C");
+    expect(phaseC?.assignments?.[0]?.mechanisms).toHaveLength(1);
+  });
+
+  it("boxes clear after Apply (never prefilled from an existing assignment on revisit)", () => {
     seedFlagged(["ŋ", "ɲ"]);
     render(<SequenceGallery selectedBaseKeyboard={basicKbdus} />);
 
@@ -266,15 +289,87 @@ describe("SequenceGallery — recording", () => {
     fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "g" } });
     fireEvent.click(screen.getByTestId("sequences-apply"));
 
-    // Advance to the second char, then back to the first.
+    // Boxes clear immediately after Apply.
+    const contentImmediately = screen.getByTestId("sequences-content") as HTMLInputElement;
+    const indicatorImmediately = screen.getByTestId("sequences-indicator") as HTMLInputElement;
+    expect(contentImmediately.value).toBe("");
+    expect(indicatorImmediately.value).toBe("");
+
+    // Advance to the second char, then back to the first — still cleared,
+    // not prefilled from the recorded sequence.
     fireEvent.click(screen.getByTestId("sequences-continue"));
     expect(screen.getByLabelText(/^U\+0272 ɲ$/)).toBeTruthy();
     fireEvent.click(screen.getByTestId("sequences-prev-char"));
 
     const contentAfter = screen.getByTestId("sequences-content") as HTMLInputElement;
     const indicatorAfter = screen.getByTestId("sequences-indicator") as HTMLInputElement;
-    expect(contentAfter.value).toBe("n");
-    expect(indicatorAfter.value).toBe("g");
+    expect(contentAfter.value).toBe("");
+    expect(indicatorAfter.value).toBe("");
+  });
+
+  it("renders one list row per recorded sequence, with content + indicator -> char text", () => {
+    seedFlagged(["ŋ"]);
+    render(<SequenceGallery selectedBaseKeyboard={basicKbdus} />);
+
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "n" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "g" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
+
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "n" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "y" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
+
+    expect(screen.getByTestId("sequences-remove-0")).toBeTruthy();
+    expect(screen.getByTestId("sequences-remove-1")).toBeTruthy();
+    expect(screen.getByText(/2 sequences recorded/i)).toBeTruthy();
+  });
+
+  it("Remove drops one recorded sequence and keeps the others", () => {
+    seedFlagged(["ŋ"]);
+    render(<SequenceGallery selectedBaseKeyboard={basicKbdus} />);
+
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "n" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "g" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
+
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "n" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "y" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
+
+    fireEvent.click(screen.getByTestId("sequences-remove-0"));
+
+    const phaseC = useWorkingCopyStore
+      .getState()
+      .phaseResults.find((p) => p.phase === "C");
+    const mechanisms = phaseC?.assignments?.[0]?.mechanisms ?? [];
+    expect(mechanisms).toHaveLength(1);
+    expect(mechanisms[0]?.slotValues).toEqual({
+      firstLetterOut: "n",
+      secondLetter: "y",
+      collapsedChar: "ŋ",
+    });
+    expect(screen.getByText(/Sequence recorded/i)).toBeTruthy();
+  });
+
+  it("Removing the last recorded sequence clears the character's assignment entirely", () => {
+    seedFlagged(["ŋ"]);
+    render(<SequenceGallery selectedBaseKeyboard={basicKbdus} />);
+
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "n" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "g" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
+
+    fireEvent.click(screen.getByTestId("sequences-remove-0"));
+
+    const phaseC = useWorkingCopyStore
+      .getState()
+      .phaseResults.find((p) => p.phase === "C");
+    expect(phaseC?.assignments ?? []).toHaveLength(0);
+    expect(screen.queryByTestId("sequences-remove-0")).toBeNull();
+
+    // canGoNext gates back off with no recorded sequence.
+    const continueBtn = screen.getByTestId("sequences-continue") as HTMLButtonElement;
+    expect(continueBtn.disabled).toBe(true);
   });
 
   it("the gated Next/Done control cannot silently discard unapplied (filled) input", () => {
@@ -334,6 +429,101 @@ describe("SequenceGallery — recording", () => {
     fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "yz" } });
     const applyBtn = screen.getByTestId("sequences-apply") as HTMLButtonElement;
     expect(applyBtn.disabled).toBe(true);
+  });
+
+  it("removing the MIDDLE of 3+ recorded sequences keeps the correct two remaining, in order (pins index-based remove)", () => {
+    seedFlagged(["ŋ"]);
+    render(<SequenceGallery selectedBaseKeyboard={basicKbdus} />);
+
+    const applySeq = (contentVal: string, indicatorVal: string) => {
+      fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: contentVal } });
+      fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: indicatorVal } });
+      fireEvent.click(screen.getByTestId("sequences-apply"));
+    };
+
+    applySeq("n", "g");
+    applySeq("n", "y");
+    applySeq("n", "h");
+
+    // Remove index 1 — the MIDDLE sequence ("n"+"y").
+    fireEvent.click(screen.getByTestId("sequences-remove-1"));
+
+    const phaseC = useWorkingCopyStore
+      .getState()
+      .phaseResults.find((p) => p.phase === "C");
+    const mechanisms = phaseC?.assignments?.[0]?.mechanisms ?? [];
+    expect(mechanisms).toHaveLength(2);
+    expect(mechanisms.map((m) => m.slotValues)).toEqual([
+      { firstLetterOut: "n", secondLetter: "g", collapsedChar: "ŋ" },
+      { firstLetterOut: "n", secondLetter: "h", collapsedChar: "ŋ" },
+    ]);
+  });
+
+  it("each Remove button's accessible name identifies which sequence it removes (usable with 2+ rows)", () => {
+    seedFlagged(["ŋ"]);
+    render(<SequenceGallery selectedBaseKeyboard={basicKbdus} />);
+
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "n" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "g" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
+
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "n" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "y" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
+
+    // Each button's aria-label names its OWN sequence, not just a shared
+    // generic "Remove" — a screen-reader user tabbing through 2+ rows must
+    // be able to tell them apart without relying on visual position.
+    expect(
+      screen.getByRole("button", { name: /Remove sequence n \+ g for.*ŋ/i }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /Remove sequence n \+ y for.*ŋ/i }),
+    ).toBeTruthy();
+  });
+
+  it("Apply/Remove of a sequence does not disturb a non-sequence assignment recorded for the SAME character", () => {
+    // Seed a prior non-sequence assignment directly on the store (as
+    // MechanismGallery's simple_swap branch would record it) — the
+    // exclude-filter/partition in SequenceGallery must be scoped to
+    // PATTERN_SEQUENCE only, never to "any assignment targeting this char".
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ŋ",
+        modality: "physical",
+        mechanisms: [
+          { patternId: "simple_swap", strategyId: "S-01", slotValues: { kmnRules: "+ [K_G] > U+014B" } },
+        ],
+        source: "user",
+      },
+    ]);
+    seedFlagged(["ŋ"]);
+    render(<SequenceGallery selectedBaseKeyboard={basicKbdus} />);
+
+    fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "n" } });
+    fireEvent.change(screen.getByTestId("sequences-indicator"), { target: { value: "g" } });
+    fireEvent.click(screen.getByTestId("sequences-apply"));
+
+    let phaseC = useWorkingCopyStore
+      .getState()
+      .phaseResults.find((p) => p.phase === "C");
+    // Two DISTINCT assignments for the same target: the untouched
+    // simple_swap one, plus the new multi_char_sequence one.
+    expect(phaseC?.assignments).toHaveLength(2);
+    const swapAssignment = phaseC?.assignments?.find(
+      (a) => a.mechanisms[0]?.patternId === "simple_swap",
+    );
+    expect(swapAssignment?.mechanisms).toHaveLength(1);
+    expect(swapAssignment?.mechanisms[0]?.slotValues).toEqual({ kmnRules: "+ [K_G] > U+014B" });
+
+    // Remove the sequence — the swap assignment must survive untouched.
+    fireEvent.click(screen.getByTestId("sequences-remove-0"));
+
+    phaseC = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");
+    expect(phaseC?.assignments).toHaveLength(1);
+    expect(phaseC?.assignments?.[0]?.mechanisms[0]?.patternId).toBe("simple_swap");
+    expect(phaseC?.assignments?.[0]?.mechanisms[0]?.slotValues).toEqual({ kmnRules: "+ [K_G] > U+014B" });
   });
 
   it("an Indicator that can't map to a physical key blocks Apply and shows an inline alert (P1 fix)", () => {
