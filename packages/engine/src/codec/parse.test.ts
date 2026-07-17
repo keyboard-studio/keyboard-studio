@@ -262,3 +262,106 @@ group(deadkeys)
     expect(out2).toContainEqual({ kind: "useGroup", groupName: "deadkeys" });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Trailing `c <comment>` on store lines (kmcmplib treats it as a line comment,
+// not store content). Quote/bracket-aware stripping is shared with rule lines.
+// ---------------------------------------------------------------------------
+
+describe("trailing comment on store lines", () => {
+  const withStoreComment = `store(&VERSION) '10.0'
+store(&NAME) 'My Keyboard' c the display name
+store(&TARGETS) 'any'
+store(vowels) 'aeiou' c Latin vowels
+begin Unicode > use(main)
+group(main) using keys
++ [K_A] > any(vowels)
+`;
+
+  it("does not leak a trailing comment into a system-store header value", () => {
+    const { ir } = parse(withStoreComment, "sc");
+    expect(ir.header.name).toBe("My Keyboard");
+  });
+
+  it("does not leak a trailing comment into user-store items", () => {
+    const { ir } = parse(withStoreComment, "sc");
+    const vowels = ir.stores.find((s) => s.name === "vowels");
+    expect(vowels?.items.map((i) => (i as { value?: string }).value)).toEqual([
+      "a", "e", "i", "o", "u",
+    ]);
+  });
+
+  it("preserves the store trailing comment on emit (round-trips)", () => {
+    const { ir } = parse(withStoreComment, "sc");
+    const emitted = emit(ir);
+    expect(emitted).toContain("store(vowels) 'aeiou' c Latin vowels");
+    // Re-parsing keeps items clean and comment intact.
+    const { ir: ir2 } = parse(emitted, "sc");
+    const vowels2 = ir2.stores.find((s) => s.name === "vowels");
+    expect(vowels2?.items.length).toBe(5);
+    expect(vowels2?.trailingComment).toBe("Latin vowels");
+  });
+
+  it("does not mistake a `c` inside a quoted store value for a comment", () => {
+    const { ir } = parse(
+      `store(&VERSION) '10.0'\nstore(&NAME) 'T'\nstore(&TARGETS) 'any'\nstore(x) 'a c b'\nbegin Unicode > use(main)\ngroup(main) using keys\n+ [K_A] > any(x)\n`,
+      "q",
+    );
+    const x = ir.stores.find((s) => s.name === "x");
+    expect(x?.items.map((i) => (i as { value?: string }).value)).toEqual([
+      "a", " ", "c", " ", "b",
+    ]);
+    expect(x?.trailingComment).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Quote-aware trailing-comment stripping on rule output (a standalone `c`
+// inside a quoted output string must not be treated as a comment).
+// ---------------------------------------------------------------------------
+
+describe("trailing comment on rule lines is quote-aware", () => {
+  it("keeps a `c` inside a quoted output literal as output, not a comment", () => {
+    const { ir } = parse(
+      `store(&VERSION) '10.0'\nstore(&NAME) 'T'\nstore(&TARGETS) 'any'\nbegin Unicode > use(main)\ngroup(main) using keys\n+ [K_1] > 'a c b'\n`,
+      "rc",
+    );
+    const rule = ir.groups[0]?.rules[0];
+    expect(rule?.output.map((o) => (o as { value?: string }).value)).toEqual([
+      "a", " ", "c", " ", "b",
+    ]);
+    expect(rule?.trailingComment).toBeUndefined();
+  });
+
+  it("still strips a genuine trailing comment after a quoted output literal", () => {
+    const { ir } = parse(
+      `store(&VERSION) '10.0'\nstore(&NAME) 'T'\nstore(&TARGETS) 'any'\nbegin Unicode > use(main)\ngroup(main) using keys\n+ [K_1] > 'ab' c a real comment\n`,
+      "rc",
+    );
+    const rule = ir.groups[0]?.rules[0];
+    expect(rule?.output.map((o) => (o as { value?: string }).value)).toEqual(["a", "b"]);
+    expect(rule?.trailingComment).toBe("a real comment");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CasedKeys is emitted in its canonical SYSTEM_STORE_ORDER slot (case-insensitive
+// lookup) rather than falling through to the alphabetical remainder sweep.
+// ---------------------------------------------------------------------------
+
+describe("CasedKeys system store emission order", () => {
+  it("emits &CASEDKEYS in its canonical position, before other user output", () => {
+    const { ir } = parse(
+      `store(&VERSION) '10.0'\nstore(&NAME) 'T'\nstore(&TARGETS) 'any'\nstore(&CASEDKEYS) [K_A] [K_B]\nbegin Unicode > use(main)\ngroup(main) using keys\n+ [K_A] > U+0061\n`,
+      "ck",
+    );
+    const emitted = emit(ir);
+    // CasedKeys appears exactly once, and before the begin directive (i.e. in the
+    // canonical system-store block, not the trailing alphabetical sweep gap).
+    const casedIdx = emitted.indexOf("store(&CasedKeys)");
+    const beginIdx = emitted.indexOf("begin Unicode");
+    expect(casedIdx).toBeGreaterThanOrEqual(0);
+    expect(casedIdx).toBeLessThan(beginIdx);
+    expect(emitted.match(/store\(&CasedKeys\)/g)?.length).toBe(1);
+  });
+});

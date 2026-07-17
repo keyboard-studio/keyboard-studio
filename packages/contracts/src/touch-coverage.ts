@@ -33,6 +33,17 @@ export interface TouchCoverageResult {
 /** Key classes from .keyman-touch-layout `sp` that are spacers, never char producers. */
 const SPACER_SP_VALUES = new Set([8, 10]);
 
+/**
+ * True when a touch key's `sp` (key class) marks it as a spacer — sp:8 (spacer)
+ * or sp:10 (padding). Spacer keys occupy horizontal space but are neither char
+ * producers nor interactive keys, so both touch-coverage and the keys-per-row
+ * crowding check must exclude them. Canonical predicate — do not re-derive the
+ * literal set elsewhere.
+ */
+export function isSpacerKeyClass(sp: number | undefined): boolean {
+  return sp !== undefined && SPACER_SP_VALUES.has(sp);
+}
+
 /** A single `U_<HEX>` hex group: 4-6 hex digits. */
 const HEX_GROUP_RE = /^[0-9A-Fa-f]{4,6}$/;
 
@@ -81,7 +92,7 @@ function collectKeyNextLayers(key: TouchKeyIR, out: Set<string>): void {
 /** Recursively add every char produced by a key and its sk/multitap/flick sub-keys. */
 function collectKeyChars(key: TouchKeyIR, covered: Set<string>): void {
   // Spacer keys (sp:8/sp:10) are never char producers.
-  if (key.sp !== undefined && SPACER_SP_VALUES.has(key.sp)) return;
+  if (isSpacerKeyClass(key.sp)) return;
 
   const push = (text?: string) => {
     if (text !== undefined && text.length > 0 && !text.startsWith("*")) {

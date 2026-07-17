@@ -52,38 +52,32 @@
 // Run (Playwright is the global CLI only — see playwright.config.ts header):
 //   cd packages/studio && npx playwright test touch-derivation-us2.spec.ts
 //
-// SKIPPED — UNBLOCK RECIPE (same convention as touch-derivation-us1.spec.ts /
-// import-improve.spec.ts):
-//   The Playwright lane itself is RUNNABLE (global playwright CLI + browsers
-//   installed; `npx playwright test` boots the dev server and executes specs).
-//   Executing this spec surfaces the SAME pre-existing, repo-wide breakage as
-//   touch-derivation-us1.spec.ts: the survey prelude every e2e spec shares by
-//   copy (driveIdentityLite et al.) targets the OLD identity-lite first field
-//   (`#il_language_autonym`), but the app now opens with the 036 glottolog
-//   language-identify flow ("What is your language called in English?"
-//   combobox, "Step 1 of ~6"). carve.spec.ts — documented as live/passing —
-//   fails at the exact same locator, so this predates spec 035 and blocks
-//   every walk-from-scratch spec. Tracked in the open e2e-prelude bug (see
-//   the US1 sibling spec's unblock recipe / the PR body).
-//   To un-skip:
-//     1. Update the survey prelude for the 036 language-identify flow —
-//        preferably by extracting the shared helpers into
-//        e2e/helpers/surveyFlow.ts (the acknowledged de-triplication
-//        follow-up) and fixing them ONCE for carve/copy-edit/both touch specs.
-//     2. Remove `.skip` from both describe blocks below and run
-//        `cd packages/studio && npx playwright test touch-derivation-us2.spec.ts`.
-//   Everything downstream of the prelude (carve targets, seed-source default
-//   and explicit-choice paths, touch-gallery walk, ZIP assertions) was traced
-//   to source and cross-checked against TouchSeedSourcePanel.tsx /
-//   buildTouchLayoutJson.ts / scaffoldTouchLayout.ts; both fixtures'
-//   codec-cleanliness / touch-layout shipping were confirmed via throwaway
-//   vitest probes against packages/engine/src (parse() over each candidate's
-//   .kmn, deleted afterward) and a throwaway Node probe over bambara's raw
-//   .keyman-touch-layout JSON (also deleted afterward).
+// LIVE (un-skipped). This spec now consumes the shared survey-prelude helpers
+// from e2e/helpers/surveyFlow.ts (the de-triplication follow-up carve.spec.ts /
+// copy-edit.spec.ts / touch-derivation-us1.spec.ts already landed), fixed once
+// for the spec 036 glottolog language-identify flow ("What is your language
+// called in English?" combobox, "Step 1 of ~6"). Everything downstream of the
+// prelude (carve targets, seed-source default and explicit-choice paths,
+// touch-gallery walk, ZIP assertions) was traced to source and cross-checked
+// against TouchSeedSourcePanel.tsx / buildTouchLayoutJson.ts /
+// scaffoldTouchLayout.ts; both fixtures' codec-cleanliness / touch-layout
+// shipping were confirmed via throwaway vitest probes against
+// packages/engine/src (parse() over each candidate's .kmn, deleted afterward)
+// and a throwaway Node probe over bambara's raw .keyman-touch-layout JSON
+// (also deleted afterward).
 
 import { test, expect, type Page } from "playwright/test";
 import { unzipSync, strFromU8 } from "fflate";
 import { readFile } from "node:fs/promises";
+import {
+  driveIdentityLite as driveIdentityLiteBase,
+  pickBaseKeyboard,
+  chooseAdaptTrack,
+  confirmPrefill,
+  buildOneCharacterList,
+  driveHelpPhase,
+  seedReturningVisitor,
+} from "./helpers/surveyFlow";
 
 // ---------------------------------------------------------------------------
 // Fixture constants — Test 1 (Scenario B): Piaroa.
@@ -109,11 +103,17 @@ import { readFile } from "node:fs/promises";
 //   - pid_piaroa (Piaroa, Saliban family, Venezuela — see
 //     docs/keyboard-index.md) probes CLEAN: 0 raw fragments, and 8 of its 9
 //     rules are exactly bambara-shaped — `+ [RALT K_X] > 'char'`, one rule per
-//     produced character, no store/index/any() dependency. (The 9th rule,
-//     `any(vowel) + [RALT K_COMMA] > index(vowel,1) $Cedilla`, is the sole
-//     outlier — it produces no literal `char` output at all, so it never
-//     appears as a glyph chip and is irrelevant to this walk's carve/place
-//     targets.)
+//     produced character, no store/index/any() dependency in the rule body
+//     itself. (The 9th rule, `any(vowel) + [RALT K_COMMA] > index(vowel,1)
+//     $Cedilla`, is the sole outlier — it produces no literal `char` output at
+//     all, so it never appears as a glyph chip and is irrelevant to this
+//     walk's carve/place targets.) Codec-cleanliness is a separate layer from
+//     the recognizer's pattern-grouping, though: the recognizer groups
+//     CARVED_CHARS' rules into a recognized S-01 "Simple swap" pattern backed
+//     by an output store, so carving them fires a "Remove everywhere?"
+//     cascade confirm dialog in-app (see carveCharacters below) — the
+//     rule-body simplicity that makes the .kmn codec-clean does not predict
+//     cascade-free carving.
 //   - Its RALT-modified rules land in scaffoldTouchLayout's "altgr" layer
 //     (classifyModifiers: RALT-alone -> "altgr"), which is emitted as a FOURTH
 //     layer alongside default/shift/numeric whenever at least one key has an
@@ -127,10 +127,12 @@ const PIAROA_BASE_ID = "pid_piaroa";
 
 /** N (>=1; two chosen for parity with touch-derivation-us1.spec.ts's
  *  convention) carve targets — each produced by exactly ONE rule
- *  (`+ [RALT K_A] > 'ä'` / `+ [RALT K_O] > 'ö'`), so clicking their glyph chip
- *  plain-toggles (no cascade dialog). Carving these also removes K_A/K_O's
- *  "altgr" keyMap entries, so the derived touch layout's altgr layer must lose
- *  both characters too (asserted below). */
+ *  (`+ [RALT K_A] > 'ä'` / `+ [RALT K_O] > 'ö'`). The recognizer groups these
+ *  rules into a recognized S-01 "Simple swap" pattern with an output store, so
+ *  clicking their glyph chip opens a "Remove everywhere?" cascade confirm
+ *  dialog (handled in carveCharacters below), not a plain toggle. Carving
+ *  these also removes K_A/K_O's "altgr" keyMap entries, so the derived touch
+ *  layout's altgr layer must lose both characters too (asserted below). */
 const PIAROA_CARVED_CHARS = ["ä", "ö"] as const;
 
 /** The untouched, language-specific survivor — `+ [RALT K_N] > 'ñ'` is never
@@ -161,65 +163,34 @@ const BAMBARA_SURVIVOR_CHAR = "ɔ";
 const BAMBARA_TOUCH_ZIP_PATH = `source/${BAMBARA_BASE_ID}.keyman-touch-layout`;
 
 // ---------------------------------------------------------------------------
-// Page-object-lite helpers — reuses touch-derivation-us1.spec.ts's shapes
-// verbatim (same testids, same step order), parametrized where the two
-// fixtures' identity/carve/placement values differ. Deliberately NOT
-// extracted to a shared e2e/helpers module yet — see the unblock recipe
-// above; the shared-prelude fix is the place to de-triplicate this against
-// carve.spec.ts / copy-edit.spec.ts / touch-derivation-us1.spec.ts at once.
+// Page-object-lite helpers — the identity/base/track/prefill/build-list steps
+// now come from the shared e2e/helpers/surveyFlow.ts module (same de-
+// triplication carve.spec.ts / copy-edit.spec.ts / touch-derivation-us1.spec.ts
+// already landed); wrapped locally where this spec needs a parametrized shape
+// (two fixtures, two identities) or an extra readiness wait, mirroring
+// touch-derivation-us1.spec.ts's wrapper pattern exactly. The remaining
+// helpers below (carve/mechanisms/seed-source/touch-gallery/help/emit) are
+// touch-derivation-035-specific and stay local.
 // ---------------------------------------------------------------------------
 
-function surveyAdvance(page: Page) {
-  return page.getByTestId("survey-advance");
-}
-
 /** Identity-lite (Phase A), parametrized by language identity. Latin script
- *  keeps routing through the ranked BaseResolution picker (see
- *  touch-derivation-us1.spec.ts's identical, non-parametrized version). */
+ *  keeps routing through the ranked BaseResolution picker. Drops the stale
+ *  `code` fill (spec 036's il_language_code question is optional and skipped
+ *  by driveIdentityLiteBase, same as touch-derivation-us1.spec.ts) — base
+ *  selection below resolves by explicit id search, not by code-driven
+ *  ranking, so the walk still resolves without it. `identity.code` is kept in
+ *  the parameter shape purely so call sites below don't need to change. */
 async function driveIdentityLite(
   page: Page,
   identity: { autonym: string; code: string; script: string },
 ): Promise<void> {
-  await page.locator("#il_language_autonym").fill(identity.autonym);
-  await surveyAdvance(page).click();
-
-  await expect(page.locator("#il_language_english")).not.toHaveValue("");
-  await surveyAdvance(page).click();
-
-  await page.locator("#il_language_code").fill(identity.code);
-  await surveyAdvance(page).click();
-
-  await page.locator("#il_target_script").selectOption(identity.script);
-  await surveyAdvance(page).click();
-
+  await driveIdentityLiteBase(page, {
+    english: "Test",
+    autonym: identity.autonym,
+    script: identity.script,
+  });
+  // Additional wait for BaseResolution to render its picker (spec 035 may take longer)
   await expect(page.getByTestId("base-picker")).toBeVisible({ timeout: 15_000 });
-}
-
-/** Resolve the base keyboard via BaseResolution's embedded BaseKeyboardPicker
- *  combobox — identical to touch-derivation-us1.spec.ts's helper. */
-async function pickBaseKeyboard(page: Page, keyboardId: string): Promise<void> {
-  await page.getByTestId("search-scope-all").click();
-
-  const combobox = page.getByRole("combobox", { name: "Search keyboards" });
-  await combobox.click();
-  await combobox.fill(keyboardId);
-
-  const option = page.getByRole("option", { name: new RegExp(keyboardId) }).first();
-  await option.click();
-
-  await page.getByTestId("base-confirm").click();
-}
-
-/** track step — Track 1 "Adapt", identical to touch-derivation-us1.spec.ts. */
-async function chooseAdaptTrack(page: Page): Promise<void> {
-  await page.getByTestId("track-adapt").check();
-  await surveyAdvance(page).click();
-}
-
-/** characters step, prefill sub-stage — identical to
- *  touch-derivation-us1.spec.ts. */
-async function confirmPrefill(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Confirm and continue" }).click();
 }
 
 /** characters step, Phase B sub-stage (build-list method) — adds exactly ONE
@@ -227,20 +198,18 @@ async function confirmPrefill(page: Page): Promise<void> {
  *  helper (there it hardcodes PLACED_CHAR = "é"; both fixtures here use the
  *  same value, but the parameter keeps the helper honest about what it does). */
 async function addPlacedCharacterToInventory(page: Page, char: string): Promise<void> {
-  await page.getByRole("button", { name: "Continue" }).click();
-
-  await page.getByLabel("Character to add").fill(char);
-  await page.getByRole("button", { name: "+ Add" }).click();
-
-  await page.getByRole("button", { name: /^Done \(1 character\)$/ }).click();
+  await buildOneCharacterList(page, char);
 }
 
-/** Carve gallery — carve `chars`, leave `survivor` untouched. Identical
- *  reasoning to touch-derivation-us1.spec.ts: recognizedRatio 0 for Track 1
- *  adapt means both fixtures resolve to a single "main" group card with flat
- *  glyphs, and every carve target here is produced by exactly one rule with
- *  no store dependency, so clicking its glyph body plain-toggles (no cascade
- *  ConfirmDialog). */
+/** Carve gallery — carve `chars`, leave `survivor` untouched. Codec-clean and
+ *  recognizer pattern-grouping are separate layers: both fixtures' .kmn are
+ *  codec-clean (0 raw fragments, one rule per produced character), but that
+ *  does not predict whether the recognizer groups a given rule into a
+ *  pattern. Bambara's carve targets (touch-derivation-us1.spec.ts) resolve to
+ *  ungrouped glyphs and plain-toggle; pid_piaroa's carve targets here group
+ *  into a recognized S-01 "Simple swap" pattern with an output store, which
+ *  opens a "Remove everywhere?" cascade confirm dialog instead — handled
+ *  below by confirming the dialog when it appears. */
 async function carveCharacters(
   page: Page,
   chars: readonly string[],
@@ -252,6 +221,15 @@ async function carveCharacters(
     const glyph = page.getByRole("button", { name: new RegExp(`^${ch}\\s`, "u") });
     await expect(glyph).toBeVisible();
     await glyph.click();
+
+    // A character that belongs to a recognized pattern (e.g. an S-01 "Simple
+    // swap" with an associated output store) opens a "Remove everywhere?"
+    // cascade confirmation dialog instead of plain-toggling off — confirm it
+    // if present so the walk proceeds to the next carve target.
+    const confirmCascade = page.getByRole("button", { name: "Yes, remove everywhere" });
+    if (await confirmCascade.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await confirmCascade.click();
+    }
   }
 
   const survivorGlyph = page.getByRole("button", { name: new RegExp(`^${survivor}\\s`, "u") });
@@ -261,8 +239,15 @@ async function carveCharacters(
   await page.getByTestId("carve-continue").click();
 }
 
-/** Mechanisms gallery (Phase C, desktop) — place `char`. Identical to
- *  touch-derivation-us1.spec.ts's helper (already parametrized there). */
+/** Mechanisms gallery (Phase C, desktop) — place `char`.
+ *
+ * The forward button only carries data-testid="mechanisms-continue" in the
+ * "locked" / "nothing left to add" ForwardButtonSpec branches
+ * (MechanismGallery.tsx) — the ordinary per-character branch (used here,
+ * since exactly one new character is being placed) sets no testId at all,
+ * just an aria-label of "Next character" or "Done". Select it by role/name
+ * instead of the testid the "identical" touch-derivation-us1.spec.ts helper
+ * uses (same latent bug there, out of scope for this walk). */
 async function driveMechanismsPlaceLetter(page: Page, char: string): Promise<void> {
   const startButton = page.getByRole("button", { name: "Start the mechanism gallery" });
   if (await startButton.isVisible().catch(() => false)) {
@@ -270,7 +255,7 @@ async function driveMechanismsPlaceLetter(page: Page, char: string): Promise<voi
   }
 
   await page.getByRole("button", { name: `Apply method for ${char}` }).click();
-  await page.getByTestId("mechanisms-continue").click();
+  await page.getByRole("button", { name: /^(Next character|Done)$/ }).click();
 }
 
 /**
@@ -345,23 +330,6 @@ async function driveTouchGalleryAcceptPlacement(page: Page, char: string): Promi
   await page.getByTestId("touch-continue").click();
 }
 
-/** help (Phase F) step — bounded-loop driver, parametrized by welcome/tip
- *  text (identical shape to touch-derivation-us1.spec.ts's helper). */
-async function driveHelpPhase(page: Page, welcomeText: string, tipText: string): Promise<void> {
-  await page.locator("#pf_welcome_paragraph").fill(welcomeText);
-  await surveyAdvance(page).click();
-
-  await page.locator("#pf_usage_tip_1").fill(tipText);
-
-  for (let guard = 0; guard < 15; guard++) {
-    await surveyAdvance(page).click();
-    if (/#output$/.test(page.url())) {
-      return;
-    }
-  }
-  throw new Error("driveHelpPhase: did not reach #output within the expected question count");
-}
-
 /** Emits the ZIP via the download gate and returns its parsed entries —
  *  shared tail shared by both tests below. */
 async function emitAndUnzip(page: Page): Promise<Record<string, Uint8Array>> {
@@ -391,11 +359,13 @@ interface PhoneTouchJson {
 // Spec
 // ---------------------------------------------------------------------------
 
-// .skip: blocked on the repo-wide stale survey prelude (see unblock recipe in the header).
-test.describe.skip("Touch derivation US2 — reseed from desktop (spec 035 Scenario B)", () => {
+test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B)", () => {
   test("carved characters vanish, placed letter lands, layout is a compact phone projection, and the keyboard compiles", async ({
     page,
   }) => {
+    // Seed the returning-visitor flag before navigation so this fresh
+    // browser context skips WelcomeScreen's first-visit gate.
+    await seedReturningVisitor(page);
     await page.goto("/");
 
     await driveIdentityLite(page, { autonym: "Piaroa", code: "pid", script: "Latn" });
@@ -468,11 +438,13 @@ test.describe.skip("Touch derivation US2 — reseed from desktop (spec 035 Scena
   });
 });
 
-// .skip: blocked on the repo-wide stale survey prelude (see unblock recipe in the header).
-test.describe.skip("Touch derivation US2-AS4 — explicit reseed discards a shipped touch layout (spec 035)", () => {
+test.describe("Touch derivation US2-AS4 — explicit reseed discards a shipped touch layout (spec 035)", () => {
   test("choosing Reseed on a base that ships a touch layout still produces the desktop projection, not the shipped layout", async ({
     page,
   }) => {
+    // Seed the returning-visitor flag before navigation so this fresh
+    // browser context skips WelcomeScreen's first-visit gate.
+    await seedReturningVisitor(page);
     await page.goto("/");
 
     await driveIdentityLite(page, { autonym: "Bamanankan", code: "bm", script: "Latn" });

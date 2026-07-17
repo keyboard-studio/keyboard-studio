@@ -19,6 +19,7 @@ import {
 } from "@keyboard-studio/contracts/fixtures";
 
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useBasePreviewStatusStore } from "../../stores/basePreviewStatusStore.ts";
 import type { IdentityLiteResult } from "../../survey/IdentityLite.tsx";
 
 // ---------------------------------------------------------------------------
@@ -70,6 +71,10 @@ function makeIdentityResult(overrides: Partial<IdentityLiteResult>): IdentityLit
 afterEach(() => {
   cleanup();
   useSurveySessionStore.getState().reset();
+  // Reset the preview-status store between tests — it is a module-level
+  // singleton (Zustand), so a test that flips it to "ready" would otherwise
+  // leak into the next test's initial render.
+  useBasePreviewStatusStore.setState({ status: "idle" });
 });
 
 describe("BaseResolutionAdapter — suggest target sourced from surveySessionStore", () => {
@@ -121,6 +126,86 @@ describe("BaseResolutionAdapter — suggest target sourced from surveySessionSto
       expect(screen.getByText("Matches your script")).toBeDefined();
     });
     expect(screen.queryByText("Already supports your language")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// BaseResolutionAdapter — preview-before-commit split.
+//
+// Preview (every suggestion-card / search-result click) must write
+// setLocalBase WITHOUT calling onComplete (the wizard does not advance, the
+// working copy is not instantiated). Commit (the "Choose this keyboard"
+// button) must set baseConfirmed=true BEFORE calling onComplete (R7 ordering
+// — StudioShell's single-instantiation effect gates on baseConfirmed).
+// ---------------------------------------------------------------------------
+
+describe("BaseResolutionAdapter — preview vs commit", () => {
+  it("previewing a suggestion card writes setLocalBase and does NOT call onComplete", async () => {
+    useSurveySessionStore.getState().setIdentityResult(makeIdentityResult({}));
+    const onComplete = vi.fn();
+
+    render(<BaseResolutionAdapter onComplete={onComplete} />);
+
+    const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
+    fireEvent.click(card);
+
+    await waitFor(() => {
+      expect(useSurveySessionStore.getState().localBase?.id).toBe("sil_euro_latin");
+    });
+    expect(onComplete).not.toHaveBeenCalled();
+    // A fresh preview re-arms the commit gate — baseConfirmed stays false.
+    expect(useSurveySessionStore.getState().baseConfirmed).toBe(false);
+    // basePreviewStatusStore stays at its default "idle" (nothing in this
+    // unit test publishes to it), so the confirm button stays disabled too —
+    // a preview alone can never reach the commit path.
+    expect((screen.getByTestId("base-confirm") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("committing after a preview sets baseConfirmed BEFORE calling onComplete (R7 ordering)", async () => {
+    useSurveySessionStore.getState().setIdentityResult(makeIdentityResult({}));
+
+    // Spy on setBaseConfirmed via the store's setState escape hatch, wrapping
+    // the real action so both the spy AND the actual mutation fire — same
+    // pattern as the golden-walk oracle in tests/steps/stepHost.goldenWalk.test.tsx.
+    const originalSetBaseConfirmed = useSurveySessionStore.getState().setBaseConfirmed;
+    const setBaseConfirmedSpy = vi.fn((v: boolean) => originalSetBaseConfirmed(v));
+    useSurveySessionStore.setState({ setBaseConfirmed: setBaseConfirmedSpy });
+
+    const onComplete = vi.fn();
+    render(<BaseResolutionAdapter onComplete={onComplete} />);
+
+    const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
+    fireEvent.click(card);
+
+    // Follow-up fix on PR #1174: the confirm button is now gated on
+    // previewStatus === "ready" (read from basePreviewStatusStore). This unit
+    // test has no StudioShell/SurveyView mounted to publish that status from
+    // the real compile pipeline, so drive it directly — mirroring what a
+    // settled preview compile would publish.
+    useBasePreviewStatusStore.getState().setStatus("ready");
+
+    const confirm = await waitFor(() => {
+      const btn = screen.getByTestId("base-confirm") as HTMLButtonElement;
+      expect(btn.disabled).toBe(false);
+      return btn;
+    });
+    fireEvent.click(confirm);
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(onComplete).toHaveBeenCalledWith({
+      base: expect.objectContaining({ id: "sil_euro_latin" }),
+    });
+    expect(useSurveySessionStore.getState().baseConfirmed).toBe(true);
+
+    // setBaseConfirmed is called twice: (false) on preview, (true) on commit.
+    expect(setBaseConfirmedSpy.mock.calls.map((args) => args[0])).toEqual([false, true]);
+
+    // Call-order assertion: the COMMIT's setBaseConfirmed(true) call fires
+    // strictly before onComplete (R7 — "writes before advance").
+    const commitCallIdx = setBaseConfirmedSpy.mock.calls.findIndex((args) => args[0] === true);
+    const commitCallOrder = setBaseConfirmedSpy.mock.invocationCallOrder[commitCallIdx];
+    const onCompleteOrder = onComplete.mock.invocationCallOrder[0];
+    expect(commitCallOrder).toBeLessThan(onCompleteOrder!);
   });
 });
 
