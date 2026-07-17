@@ -4,6 +4,39 @@ installed:
 settings:
   auto_execute_hooks: true
 hooks:
+  # Branch-as-failsafe — cut a feature branch off fresh main BEFORE the spec is
+  # written, so every companion artifact and commit lands on an isolated branch and
+  # main is never touched directly. Delegated to km-archivist (the crew's git owner).
+  # Requires a clean working tree: the run HALTS on uncommitted changes rather than
+  # branching over them (project choice — "require clean tree"). Claude Code only; a
+  # host without /km-archivist skips it, and a hook failure never aborts the command.
+  before_specify:
+  - extension: km-crew
+    command: km-archivist
+    enabled: true
+    optional: false
+    priority: 5
+    description: Require a clean tree, fetch main, and cut the failsafe feature branch
+      before the spec is written.
+    condition: null
+    prompt: |
+      Companion branch-start. Run BEFORE the specify step writes anything.
+
+      1. If this is not a git repo, print `[companion] not a git repo - skipping
+         branch-start` and stop (do not fail the pipeline).
+      2. Require a CLEAN working tree: run `git status --porcelain`. If it prints ANY
+         line, STOP the whole pipeline and tell the user to commit or stash first, then
+         re-run. Do NOT branch over a dirty tree, do NOT stash for them — the clean-tree
+         gate is the project's chosen failsafe.
+      3. `git fetch origin`.
+      4. Derive the feature branch name with the SAME rule specify uses for the spec
+         dir: scan `specs/` for the highest `NNN-` prefix, take the next number, and a
+         2-4 word short-name from the feature description -> `<NNN>-<short-name>`. If the
+         invoker passed an explicit branch/dir, use that slug instead.
+      5. Cut it fresh from origin/main: `git checkout -b <NNN-short-name> origin/main`.
+         If already on that exact branch and it is based on latest origin/main, no-op.
+      6. Report the branch name. All companion commits target it; main is never written
+         directly. This branch is the failsafe — a broken run is discarded by deleting it.
   after_specify:
   - extension: agent-context
     command: speckit.agent-context.update
@@ -59,3 +92,69 @@ hooks:
     description: Per-task journaling on implement (currentStep=implement; status=implemented
       when all tasks checked)
     condition: null
+  # KM crew review — constitution "Authoring workflow" step 4/5 wired into the
+  # companion runtime. Fires ONE scoped km-lead review cycle after implement,
+  # before mark-complete. Efficiency lives in the prompt: km-lead right-sizes the
+  # specialist set to what the diff touched and self-throttles on trivial changes,
+  # so this is not a per-wave crew build. Set optional:true to make it a suggested
+  # manual step instead of auto-running (companion-auto / Ralph need optional:false
+  # to fire hands-off). Claude Code only — a host without /km-lead skips it, and a
+  # hook failure never aborts the implement command.
+  - extension: km-crew
+    command: km-lead
+    enabled: true
+    optional: false
+    priority: 20
+    description: One scoped km-lead review cycle over the just-shipped implementation
+      (right-sized to touched surface; P0 blocks a clean completion).
+    condition: null
+    prompt: |
+      Post-implement review for the spec just built by the companion pipeline.
+      This is ONE review cycle — NOT a per-wave crew build. Be efficient.
+
+      1. Read `.spec-context.json` (feature dir from `.specify/feature.json`), the
+         feature `tasks.md` + `spec.md`, and `git diff main...HEAD` to see exactly
+         what shipped.
+      2. Right-size the crew to the touched surface per your "Common cycle patterns"
+         — do NOT fire the full roster. Docs-only -> km-doc (+km-author if
+         upstream-facing). Pattern/.kmn -> km-domain + km-keyman. Engine/validator
+         -> km-verification + km-qc (+km-synthesis only if >1 file or a new helper).
+         Frontend -> km-frontend. If the change is tiny and localized, run a single
+         minimal check or a one-line PASS and stop.
+      3. Run the chosen specialists in ONE parallel cycle. Iterate only if a P0 lands.
+      4. Record findings via the writer script (never hand-edit .spec-context.json):
+         one `write-context.py --verified {...}` per real check, `--concern {...}`
+         per residual P1/P2, `--decision {...}` for any notable call.
+      5. On a P0: do NOT let the run complete cleanly — surface the blocker, dispatch
+         km-programmer to fix, re-verify, then pass. Otherwise emit your standard
+         final report (APPROVED / CONDITIONAL / REJECTED) and let mark-complete run.
+  # Open the PR — runs AFTER the km-lead review above (priority 30 > 20). Gates on
+  # green checks + a passing review, pushes the failsafe branch, and opens a
+  # squash-ready PR against main. The open PR is where CI and the human review happen;
+  # this step never merges. Delegated to km-archivist for AC reconciliation + the
+  # closes/refs closure policy. optional:false so companion-auto / Ralph open it
+  # hands-off; a P0 or a failing check leaves the branch pushed but opens no PR.
+  - extension: km-crew
+    command: km-archivist
+    enabled: true
+    optional: false
+    priority: 30
+    description: On a green review + passing checks, push the branch and open a
+      squash-ready PR against main (never merges).
+    condition: null
+    prompt: |
+      Companion PR step. The km-lead review (priority 20) has just run.
+
+      1. Read `.spec-context.json` (feature dir from `.specify/feature.json`). If the
+         review left an OPEN P0 concern, STOP — do NOT open a PR. Report the blocker and
+         leave the branch pushed (it is the failsafe).
+      2. Run the repo gate checks and capture each result: `pnpm typecheck`,
+         `pnpm -r test`, `pnpm lint`. If ANY fails, STOP, report the failure, and do NOT
+         open a PR — the pushed branch preserves the work; the human fixes forward.
+      3. Push the feature branch: `git push -u origin <branch>`.
+      4. Open a PR against `main` with `gh pr create`:
+         - squash-ready title `<prefix>(<area>): <description>` per the repo commit style;
+         - body reconciling the originating issue's AC checkboxes per the closure policy
+           (`closes #N` when every box is verified-done, else `refs #N` and leave it open).
+         - Do NOT merge and do NOT enable auto-merge. CI + human review live on the open PR.
+      5. Report the PR URL. mark-complete then writes status: completed.
