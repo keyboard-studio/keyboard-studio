@@ -1,0 +1,25 @@
+# caps-handling — corpus counterpart of the session facet
+# source.caps-handling: how a corpus keyboard's .kmn handles uppercase
+# variants of its rules.
+
+id: caps-handling
+title: Capitals handling
+description: >
+  Whether a corpus keyboard's .kmn handles uppercase variants of its rules
+  by duplicating each rule per case, folding case via any()/index() matching
+  against a single case-neutral store, has no caps-handling rules at all, or
+  mixes these across rule groups. Read from the parsed .kmn rule structure
+  directly. Feeds the source.caps-handling session facet.
+valueType: enum
+limits:
+  values: [per-rule-duplication, any-index-fold, no-caps-rules, mixed]
+  open: false
+likelihoodSemantics: >
+  the single classified value for the keyboard's rule structure; likelihood
+  is 1 for the classified value.
+derivation:
+  archetype: rule-structure
+  classifierId: planned
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: [source.caps-handling]
+schemaVersion: 1

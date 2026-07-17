@@ -1,0 +1,66 @@
+# source.fallback-posture — whether the chosen base's .kmn relies on
+# &baselayout to fall through to the OS default layout for keys it doesn't
+# rule itself, or blocks comprehensively with its own rule for every key.
+# Desktop-only: &baselayout has no touch-layout counterpart.
+
+id: source.fallback-posture
+family: source
+title: Source fallback posture
+description: >
+  Whether the chosen base .kmn relies on the &baselayout store to fall
+  through to the OS default layout for keys it leaves unruled, blocks
+  comprehensively by ruling every key itself, or mixes both across its
+  rule groups. Read directly from the base, before adaptation — a strong
+  prior for whether the adapted keyboard will inherit unhandled-key gaps.
+
+valueType: enum
+values: [relies-on, blocks-comprehensively, mixed]
+
+modality: physical
+modalityNotes: >
+  &baselayout fallback is a desktop .kmn concept only; there is no
+  touch-layout equivalent (touch layouts declare every key explicitly).
+
+derivations:
+  - kind: computed
+    source: "planned:fallback-posture-of-kmn"
+    sourceStatus: planned
+    notes: >
+      Reads the &baselayout store value and counts explicitly ruled physical
+      keys against the keyboard's declared key range to decide whether
+      unruled keys are the common case (relies-on) or the exception
+      (blocks-comprehensively).
+
+consumers:
+  prefills: []
+  proposes:
+    - "axis:fallback-block"
+    - "transform-offer:fallback-block"
+
+provenanceLabel: "how completely your source keyboard covers the keyboard, vs falling back to the OS layout"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed
+
+notes: >
+  Desktop-only per modalityNotes; reads &baselayout.
+
+transformImpactClass: ux-changing
+houseTargetPolicy:
+  inputs: [script]
+  rules:
+    - when: "script != Latn"
+      target: blocks-comprehensively
+    - when: default
+      target: relies-on
+invertibility: one-way
+implications: >
+  Moving from relies-on to blocks-comprehensively changes what happens when
+  the typist presses a key the base never ruled: instead of falling through
+  to the OS layout's own output, the adapted keyboard now produces its own
+  (possibly blank) output for that key.
+exceptionSites: []
+causePredicates: []

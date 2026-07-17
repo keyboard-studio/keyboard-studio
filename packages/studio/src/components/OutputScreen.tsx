@@ -17,6 +17,8 @@ import { useResizablePanes } from "../hooks/useResizablePanes.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { TOUCH_STEP_ID } from "../steps/reducer.ts";
 import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
 import { ScaffoldForm } from "../editors/panels/ScaffoldForm.tsx";
 import { KmnEditor } from "./KmnEditor.tsx";
@@ -26,6 +28,20 @@ import { SignUpPanel } from "./SignUpPanel.tsx";
 import { ManagedPRSubmitPanel } from "./ManagedPRSubmitPanel.tsx";
 import { ResizeHandle } from "./ResizeHandle.tsx";
 import { DIVIDER_WIDTH, LEFT_MIN_PCT, LEFT_MAX_PCT, LEFT_INIT_PCT } from "./previewOutputLayout.ts";
+
+// Shared amber "[WARN]" banner shell used by both the touch-staleness banner
+// and the download-projection-warnings banner below. Only the genuinely
+// shared visual properties live here — per-banner text color / layout
+// differences stay as local overrides at each call site.
+const warningBannerStyle: React.CSSProperties = {
+  marginTop: 4,
+  padding: "8px 12px",
+  background: "#2a1a00",
+  border: "1px solid #d29922",
+  borderRadius: 6,
+  fontSize: 12,
+  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+};
 
 export function OutputScreen() {
   // Each screen runs its own independent artifact pipeline — see usePreviewArtifact.ts module comment for why this is deliberate (do not "dedupe" across screens).
@@ -51,6 +67,15 @@ export function OutputScreen() {
   // name + email from the stored identity claims.
   const { login: ghLogin } = useGitHubAuth();
   const { identity: googleIdentity } = useGoogleAuth();
+
+  // Output-time staleness gate. staleSteps.has(TOUCH_STEP_ID) already implies
+  // the touch step was completed (a touchLayoutJson side-car was written) and
+  // has since been re-opened by a downstream mechanics edit (see
+  // MechanismGallery.handleUnlock) — so the emitted side-car would be stale.
+  // Refuse both output surfaces (zip download, managed-PR submit) rather than
+  // silently ship a stale on-screen-keyboard layout.
+  const staleSteps = useWorkingCopyStore((s) => s.staleSteps);
+  const touchStale = staleSteps.has(TOUCH_STEP_ID);
 
   // Derive prefill: Google identity takes precedence (has both name + email).
   // GitHub provides only the login handle as a name hint.
@@ -129,29 +154,43 @@ export function OutputScreen() {
             <button
               type="button"
               data-testid="emit-download"
-              disabled={!canDownload || downloading}
+              disabled={!canDownload || downloading || touchStale}
               onClick={() => { void handleDownload(); }}
               aria-label={
-                canDownload
-                  ? `Download keyboard ${pickerMode === "scaffold" && scaffoldSpec !== null ? scaffoldSpec.keyboardId : baseKeyboard.id} as zip`
-                  : "Download unavailable until compile completes"
+                touchStale
+                  ? "Download unavailable — the touch layout is out of date. Return to the Touch step and re-complete it before downloading."
+                  : canDownload
+                    ? `Download keyboard ${pickerMode === "scaffold" && scaffoldSpec !== null ? scaffoldSpec.keyboardId : baseKeyboard.id} as zip`
+                    : "Download unavailable until compile completes"
               }
               style={{
                 alignSelf: "flex-start",
                 marginTop: 4,
                 padding: "7px 16px",
-                background: canDownload && !downloading ? "#1f6feb" : "#161b22",
-                color: canDownload && !downloading ? "#e6edf3" : "#484f58",
+                background: canDownload && !downloading && !touchStale ? "#1f6feb" : "#161b22",
+                color: canDownload && !downloading && !touchStale ? "#e6edf3" : "#484f58",
                 border: "1px solid #283040",
                 borderRadius: 6,
                 fontSize: 13,
-                cursor: canDownload && !downloading ? "pointer" : "not-allowed",
+                cursor: canDownload && !downloading && !touchStale ? "pointer" : "not-allowed",
                 fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
                 transition: "background 0.15s",
               }}
             >
               {downloading ? "Downloading..." : "Download .zip"}
             </button>
+            {touchStale && (
+              <div
+                role="alert"
+                style={{ ...warningBannerStyle, color: "#d29922", lineHeight: 1.5 }}
+              >
+                [WARN] A mechanics change after the Touch step means the
+                on-screen (touch) keyboard layout is now out of date. Return
+                to the Touch step and re-complete it before downloading or
+                submitting — otherwise the shipped keyboard would include a
+                stale touch layout.
+              </div>
+            )}
             {downloadError !== null && (
               <div role="alert" style={{ fontSize: 11, color: "#f0a0a0", marginTop: 4 }}>
                 {downloadError}
@@ -162,15 +201,7 @@ export function OutputScreen() {
                 role="status"
                 aria-live="polite"
                 aria-label="Download projection warnings"
-                style={{
-                  marginTop: 4,
-                  padding: "8px 12px",
-                  background: "#2a1a00",
-                  border: "1px solid #d29922",
-                  borderRadius: 6,
-                  fontSize: 12,
-                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-                }}
+                style={warningBannerStyle}
               >
                 <div style={{ color: "#d29922", fontWeight: 600, marginBottom: 4 }}>
                   [WARN] Download completed with warnings:
@@ -229,6 +260,8 @@ export function OutputScreen() {
                 provider is active. */}
             <ManagedPRSubmitPanel
               canSubmit={canDownload}
+              outputBlocked={touchStale}
+              outputBlockedReason="the touch layout is out of date — return to the Touch step and re-complete it"
               prefill={submitPrefill}
             />
 

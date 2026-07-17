@@ -51,7 +51,30 @@ The schema is deliberately **not** a locked `packages/contracts` type. Per the s
 the graduation rule stated in [content/facets/README.md](../facets/README.md), it does not graduate
 there until it survives a full evaluation round.
 
+## Construction (`source.*`) facets
+
+A further batch of keyboard-facet definitions — the **construction facets**
+(design brief: [docs/source-facets-design.md](../../docs/source-facets-design.md))
+— measure how a base's source was *built* (encoding style, combo mechanism,
+normalization posture, reordering, caps handling, fall-through posture,
+rule/store compaction, mnemonic-vs-positional) rather than what orthography it
+targets. These feed the new `source/` session-facet family in
+[content/facets/README.md](../facets/README.md), the same `feedsSessionFacets`
+mechanism described above.
+
+Most construction facets are further **rule-structure** classifiers reading the
+same parsed-`.kmn` evidence as `strategy fingerprint` (see
+[specs/037-facet-classifiers](../../specs/037-facet-classifiers/spec.md)).
+**`source.touch-combo-mechanism` is the exception**: its classifier reads the
+keyboard's **touch-layout JSON**, a distinct evidence source from the
+KMN-rule-structure recognizer that feeds the other rule-structure classifiers —
+touch mechanisms (longpress / flick / multitap) live entirely in that JSON and
+are invisible to the KMN recognizer.
+
 ## Status
 
-No facet definitions exist in this directory yet. The first — `script.yaml` — lands in a later task
-(see [specs/036-keyboard-facet-index/](../../specs/036-keyboard-facet-index/)).
+The `script` facet (`script.yaml`, spec 036) and the `source.*` construction facets described above
+(encoding, casing, combo-mechanism, normalization, reordering, caps-handling, fall-through posture,
+rule/store compaction, mnemonic-vs-positional, and the touch-specific variants) now exist in this
+directory as candidate/planned classifiers — see [specs/036-keyboard-facet-index/](../../specs/036-keyboard-facet-index/)
+and [specs/037-facet-classifiers](../../specs/037-facet-classifiers/spec.md).

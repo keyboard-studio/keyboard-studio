@@ -24,7 +24,10 @@ import { join, dirname, basename, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseKmnHeaderStores } from "../../packages/engine/src/compiler/parseKmnHeaderStores.js";
-import { matchKeyboardScopePath } from "../../packages/engine/src/base-browser/corpus-scope.js";
+import {
+  dedupeKpsPathsById,
+  matchKeyboardScopePath,
+} from "../../packages/engine/src/base-browser/corpus-scope.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..");
@@ -107,7 +110,10 @@ function findScopedKps(corpusRoot: string): string[] {
     }
   };
   walk(releaseDir);
-  return out.sort();
+  // Collapse transitional-duplicate ids (present under both the
+  // source/ and legacy flat-root layouts at once) to a single kps path,
+  // preferring source/ — see corpus-scope.ts's dedupeKpsPathsById doc.
+  return dedupeKpsPathsById(out).sort();
 }
 
 /** Read a corpus-relative file's bytes, or null if it cannot be read. */

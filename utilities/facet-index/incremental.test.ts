@@ -17,9 +17,11 @@ import { fileURLToPath } from "node:url";
 import { buildIndex } from "./build-index.js";
 import { planRescan, scannerVersion, unicodeVersion } from "./freshness.js";
 import type { FacetIndex, KeyboardRecord } from "./types.js";
+import { classifiedDefsDir } from "./test-support.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_CORPUS_ROOT = resolve(__dir, "__fixtures__/corpus");
+const DEFS = classifiedDefsDir();
 
 function scratchOut(label: string): string {
   return join(mkdtempSync(join(tmpdir(), `facet-inc-${label}-`)), "index.json");
@@ -109,9 +111,9 @@ describe("planRescan (US3 acceptance 1-3)", () => {
 describe("buildIndex --incremental integration", () => {
   it("an unchanged-corpus incremental rebuild is byte-identical to the prior build", () => {
     const out = scratchOut("carry");
-    buildIndex({ corpusRoot: FIXTURE_CORPUS_ROOT, outPath: out }); // build 1 (full)
+    buildIndex({ corpusRoot: FIXTURE_CORPUS_ROOT, outPath: out, facetDefsDir: DEFS }); // build 1 (full)
     const build1 = readFileSync(out, "utf8");
-    buildIndex({ corpusRoot: FIXTURE_CORPUS_ROOT, outPath: out, incremental: true }); // build 2 (incremental)
+    buildIndex({ corpusRoot: FIXTURE_CORPUS_ROOT, outPath: out, incremental: true, facetDefsDir: DEFS }); // build 2 (incremental)
     expect(readFileSync(out, "utf8")).toBe(build1);
   });
 });

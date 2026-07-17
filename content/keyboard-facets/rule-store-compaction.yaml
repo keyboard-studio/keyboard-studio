@@ -1,0 +1,25 @@
+# rule-store-compaction — corpus counterpart of the session facet
+# source.rule-store-compaction: whether a corpus keyboard's .kmn inlines
+# repeated output literals per-rule, hoists them into shared stores
+# referenced via index()/any(), or mixes both.
+
+id: rule-store-compaction
+title: Rule/store compaction
+description: >
+  Whether a corpus keyboard's .kmn writes repeated output literals inline
+  in each rule, hoists them into shared stores referenced via index()/any(),
+  or mixes both across its rule groups. Read from the parsed .kmn rule
+  structure directly. Feeds the source.rule-store-compaction session facet.
+valueType: enum
+limits:
+  values: [inline-rules, consolidated-stores, mixed]
+  open: false
+likelihoodSemantics: >
+  the single classified value for the keyboard's rule structure; likelihood
+  is 1 for the classified value.
+derivation:
+  archetype: rule-structure
+  classifierId: planned
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: [source.rule-store-compaction]
+schemaVersion: 1

@@ -18,22 +18,22 @@ import { fileURLToPath } from "node:url";
 
 import { buildIndex, DEFAULT_CLASSIFIERS, type ClassifierPair } from "./build-index.js";
 import { stableStringify } from "./writeStable.js";
+import { classifiedDefsDir } from "./test-support.js";
 import type { Categorization } from "./types.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = resolve(__dir, "..", "..");
-const REAL_CONTENT_DIR = resolve(REPO_ROOT, "content", "keyboard-facets");
 const FIXTURE_CORPUS_ROOT = resolve(__dir, "__fixtures__/corpus");
+const DEFS = classifiedDefsDir();
 
 function scratchOut(label: string): string {
   return join(mkdtempSync(join(tmpdir(), `facet-ext-${label}-`)), "index.json");
 }
 
-/** Copy the shipped facet defs into a temp dir and add a demo-flag.yaml alongside. */
+/** Copy the classifier-backed facet defs into a temp dir and add a demo-flag.yaml alongside. */
 function defsDirWithDemo(): string {
   const dir = mkdtempSync(join(tmpdir(), "facet-defs-"));
-  for (const f of readdirSync(REAL_CONTENT_DIR).filter((n) => n.endsWith(".yaml"))) {
-    cpSync(join(REAL_CONTENT_DIR, f), join(dir, f));
+  for (const f of readdirSync(DEFS).filter((n) => n.endsWith(".yaml"))) {
+    cpSync(join(DEFS, f), join(dir, f));
   }
   writeFileSync(
     join(dir, "demo-flag.yaml"),
@@ -81,7 +81,7 @@ const demoPair: ClassifierPair = {
 };
 
 describe("facet-index extensibility (SC-003)", () => {
-  const before = buildIndex({ corpusRoot: FIXTURE_CORPUS_ROOT, outPath: scratchOut("before") });
+  const before = buildIndex({ corpusRoot: FIXTURE_CORPUS_ROOT, outPath: scratchOut("before"), facetDefsDir: DEFS });
   const after = buildIndex({
     corpusRoot: FIXTURE_CORPUS_ROOT,
     outPath: scratchOut("after"),

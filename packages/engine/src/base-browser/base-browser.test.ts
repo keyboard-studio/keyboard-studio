@@ -254,6 +254,85 @@ describe("createBaseBrowser", () => {
     expect(matches).toHaveLength(1);
   });
 
+  // -------------------------------------------------------------------------
+  // Transitional duplicate — same id under BOTH layouts at once
+  // -------------------------------------------------------------------------
+
+  it("listAll collapses a transitional duplicate (id present under both layouts) to a single entry, preferring source/", async () => {
+    const KPS_FLAT = `<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+  <Info>
+    <Name value="SIL Euro Latin (flat, legacy)"/>
+    <Version value="1.0"/>
+  </Info>
+  <Keyboards>
+    <Keyboard>
+      <Name>SIL Euro Latin (flat, legacy)</Name>
+      <ID>sil_euro_latin</ID>
+      <Version>1.0</Version>
+      <Languages>
+        <Language ID="en-Latn-001" Name="English (World)"/>
+      </Languages>
+      <Targets>windows</Targets>
+    </Keyboard>
+  </Keyboards>
+</Package>`;
+
+    const KPS_SOURCE = `<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+  <Info>
+    <Name value="SIL Euro Latin (source, canonical)"/>
+    <Version value="2.0"/>
+  </Info>
+  <Keyboards>
+    <Keyboard>
+      <Name>SIL Euro Latin (source, canonical)</Name>
+      <ID>sil_euro_latin</ID>
+      <Version>2.0</Version>
+      <Languages>
+        <Language ID="en-Latn-001" Name="English (World)"/>
+      </Languages>
+      <Targets>windows macosx linux web</Targets>
+    </Keyboard>
+  </Keyboards>
+</Package>`;
+
+    const dupTree = {
+      sha: "duptreesha",
+      truncated: false,
+      tree: [
+        treeItem("release/s/sil_euro_latin/sil_euro_latin.kps", "blob", "flatsha"),
+        treeItem(
+          "release/s/sil_euro_latin/source/sil_euro_latin.kps",
+          "blob",
+          "sourcesha"
+        ),
+      ],
+    };
+
+    const dupFetch: FetchFn = async (url) => {
+      if (url === TREE_URL) return jsonOk(dupTree);
+      if (url === `${RAW_BASE}/release/s/sil_euro_latin/sil_euro_latin.kps`) {
+        return { ok: true, status: 200, statusText: "OK", json: async () => ({}), text: async () => KPS_FLAT };
+      }
+      if (
+        url === `${RAW_BASE}/release/s/sil_euro_latin/source/sil_euro_latin.kps`
+      ) {
+        return { ok: true, status: 200, statusText: "OK", json: async () => ({}), text: async () => KPS_SOURCE };
+      }
+      return { ok: false, status: 404, statusText: "Not Found", json: async () => ({}), text: async () => "" };
+    };
+
+    const service = createBaseBrowser({ fetch: dupFetch });
+    const keyboards = await service.listAll();
+
+    const matches = keyboards.filter((k) => k.id === "sil_euro_latin");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]?.path).toBe("release/s/sil_euro_latin/source");
+    expect(matches[0]?.displayName).toBe("SIL Euro Latin (source, canonical)");
+    expect(matches[0]?.version).toBe("2.0");
+  });
+
   it("listAll falls back to offline bundle when API call throws", async () => {
     const errorFetch: FetchFn = async () => {
       throw new Error("Network unavailable");
