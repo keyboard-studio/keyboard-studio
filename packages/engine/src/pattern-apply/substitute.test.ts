@@ -116,4 +116,19 @@ describe("substituteSlots", () => {
     expect(unresolved).toEqual(["descriptionOfAccent"]);
     expect(text).toBe("c accent: {{descriptionOfAccent}}");
   });
+
+  // ---- $-sequences in the value are inserted verbatim --------------------
+  // A string replacement would make String.prototype.replaceAll interpret
+  // $-sequences ($$, $&, $`, $') in the value; a function replacement inserts
+  // it literally.
+
+  it("inserts a value containing $$ verbatim (no $$ -> $ collapse)", () => {
+    const { text } = substituteSlots("{{x}}", { x: "5$$0" });
+    expect(text).toBe("5$$0");
+  });
+
+  it("inserts a value containing $& verbatim (no matched-substring expansion)", () => {
+    const { text } = substituteSlots("a {{x}} b", { x: "$&" });
+    expect(text).toBe("a $& b");
+  });
 });

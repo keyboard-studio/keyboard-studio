@@ -210,6 +210,12 @@ export interface IRStore {
    * Absent for in-memory (scaffolded/synthesized) stores.
    */
   sourceLine?: number;
+  /**
+   * A trailing `c <comment>` on the store declaration line, captured so it
+   * round-trips. Non-semantic (ignored by the semantic round-trip comparison),
+   * but preserved on emit. Mirrors IRRule.trailingComment.
+   */
+  trailingComment?: string;
 }
 
 /** A KMN group (begin / group ... using keys). */
