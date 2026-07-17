@@ -4,7 +4,7 @@
   "branch": "037-facet-classifiers",
   "selectedAt": "2026-07-14T21:32:57.665Z",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "implemented",
   "history": [
     {
       "step": "analyze",
@@ -283,6 +283,29 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T22:17:57.857Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T22:18:53.698Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T22:18:53.698Z"
     }
   ],
   "verified": [
@@ -360,10 +383,13 @@
       "taskCount": 28
     }
   },
-  "currentTask": "T010",
+  "currentTask": "T028",
   "decisions": [
     {
       "decision": "Shipped committed index is built with --classified-only (scoped to facets that have a registered classifier: script, strategy-fingerprint, target-mix). Default full build still fails loud on 039 classifier-less defs (intentional guard preserved). Reproducible via the documented flag."
+    },
+    {
+      "decision": "T012 (desktop base-layout fall-through, FR-007 amendment) + the base-layout leak-edge sub-case of T010 EXCISED to new spec 040-desktop-base-layout-fallthrough (scope stub created). Rationale: base-layout fall-through is a Keyman Desktop-only concern requiring deeper desktop-processor modeling (base-layout resolution + [K_x]>nul blocking idiom); touch layouts are explicit JSON (no fall-through) and mobile assumes QWERTY with no per-keyboard base-layout setting. 037 closes on the three-classifier deliverable; script already at 97.3% content-tier without the amendment."
     }
   ]
 }
