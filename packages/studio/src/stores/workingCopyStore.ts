@@ -873,14 +873,15 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // to review or remove — done here, in the one store action, so every call
   // site (both MechanismGallery chip-remove buttons) is covered without
   // duplicating the filter at each call site.
-  unflagCharForSequence: (char) =>
-    set((s) => {
-      const phaseC = s.phaseResults.find((p) => p.phase === "C");
-      if (phaseC === undefined) {
-        return {
-          sequenceFlaggedChars: s.sequenceFlaggedChars.filter((c) => c !== char),
-        };
-      }
+  unflagCharForSequence: (char) => {
+    // Delegate the Phase C merge to recordAssignments — the single place that
+    // already knows how to splice a new assignments array back into
+    // phaseResults (preserving the existing Phase C's answers/
+    // selectedPatternIds) and remerge. Only touch Phase C when it already
+    // exists, matching the prior no-op behavior for an as-yet-unrecorded
+    // working copy.
+    const phaseC = get().phaseResults.find((p) => p.phase === "C");
+    if (phaseC !== undefined) {
       const strippedAssignments = (phaseC.assignments ?? []).filter(
         (a) =>
           !(
@@ -889,14 +890,12 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
             a.mechanisms.some((m) => m.patternId === PATTERN_SEQUENCE)
           ),
       );
-      const updatedPhaseResults = s.phaseResults.map((p) =>
-        p.phase === "C" ? { ...p, assignments: strippedAssignments } : p,
-      );
-      return {
-        sequenceFlaggedChars: s.sequenceFlaggedChars.filter((c) => c !== char),
-        ...remerge(s.irAxes, updatedPhaseResults),
-      };
-    }),
+      get().recordAssignments(strippedAssignments);
+    }
+    set((s) => ({
+      sequenceFlaggedChars: s.sequenceFlaggedChars.filter((c) => c !== char),
+    }));
+  },
 
   reset: () => {
     // Clear the module-level re-opened roots so clearStale after reset is correct.

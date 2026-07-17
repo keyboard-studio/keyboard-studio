@@ -91,7 +91,7 @@ describe("nextSpineStepAfter", () => {
     expect(nextSpineStepAfter("carve")).toBe("mechanisms");
   });
 
-  it("mechanisms → sequences (placeholder)", () => {
+  it("mechanisms → sequences", () => {
     expect(nextSpineStepAfter("mechanisms")).toBe("sequences");
   });
 

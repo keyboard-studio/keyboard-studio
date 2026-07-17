@@ -94,6 +94,10 @@ import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { RadioGroup } from "../../ui/RadioGroup.tsx";
 import {
   BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
+  galleryPageStyle as pageStyle,
+  galleryGhostBtn as ghostBtn,
+  galleryInputStyle as inputStyle,
+  galleryForwardBtnStyle as forwardBtnStyle,
 } from "../../lib/galleryTheme.ts";
 import { PATTERN_SEQUENCE, PATTERN_DEADKEY, PATTERN_SWAP, PATTERN_RALT } from "./patternIds.ts";
 
@@ -171,9 +175,52 @@ function methodLabel(ref: { patternId: string; slotValues?: Record<string, strin
       const prefix = parts.length > 0 ? parts.map((t) => MODIFIER_TOKEN_LABELS[t] ?? t).join("+") : "Layer";
       return `${prefix}: ${key}`;
     }
+    case "multi_char_sequence":
+      // Defensive fallback only — excludeSequenceMechanisms (below) keeps
+      // PATTERN_SEQUENCE mechanisms out of every badge list this label feeds,
+      // since sequences are owned by the Sequence Gallery. This branch exists
+      // so a raw patternId can never leak onto a badge if that exclusion is
+      // ever bypassed.
+      return "Multi-key sequence";
     default:
       return ref.patternId;
   }
+}
+
+// ---------------------------------------------------------------------------
+// excludeSequenceMechanisms — the Sequence Gallery owns multi_char_sequence
+// (PATTERN_SEQUENCE / S-03) mechanisms, even though they are recorded into
+// the SAME Phase C assignments array (scope: "individual") this gallery reads
+// via sessionAssignments. Without this filter, a char whose ONLY recorded
+// mechanism is a sequence (defined in the Sequence Gallery, then revisited
+// here via Back-nav) would show as "Added" in coveredChars/appliedForCurrentChar/
+// the "Applied methods" badge row, and its covered-char chip's Remove control
+// would silently delete the sequence work (the P1 this function fixes).
+//
+// An assignment made up ENTIRELY of PATTERN_SEQUENCE mechanisms is dropped
+// outright — it never surfaces in this gallery's covered/applied view. An
+// assignment that mixes a non-sequence mechanism with PATTERN_SEQUENCE
+// mechanism(s) on the same target (permitted by the MechanismAssignment
+// contract, though no current write path actually produces one — this
+// gallery always appends a NEW assignment object per apply, and
+// SequenceGallery's own partitionSequenceAssignment only ever touches the
+// sequence-only assignment for a char) keeps just its non-sequence
+// mechanisms, so a genuinely mechanism-covered char is never hidden merely
+// because it also carries a sequence.
+function excludeSequenceMechanisms(
+  assignments: MechanismAssignment[],
+): MechanismAssignment[] {
+  const result: MechanismAssignment[] = [];
+  for (const a of assignments) {
+    if (a.scope !== "individual") {
+      result.push(a);
+      continue;
+    }
+    const nonSequence = a.mechanisms.filter((m) => m.patternId !== PATTERN_SEQUENCE);
+    if (nonSequence.length === 0) continue;
+    result.push(nonSequence.length === a.mechanisms.length ? a : { ...a, mechanisms: nonSequence });
+  }
+  return result;
 }
 
 // Maps each DEADKEY_OPTIONS key value to the unshifted character it produces.
@@ -428,39 +475,9 @@ const configStyle: CSSProperties = {
   gap: 8,
 };
 
-const inputStyle: CSSProperties = {
-  width: 52,
-  padding: "6px 8px",
-  background: BG_PAGE,
-  border: `1px solid ${BORDER}`,
-  borderRadius: 6,
-  color: TEXT_MAIN,
-  fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
-  fontSize: 20,
-  textAlign: "center",
-  boxSizing: "border-box",
-};
-
-// Static page-level styles shared by MechanismGallery's guard/content
-// branches — none depend on props or state.
-const pageStyle: CSSProperties = {
-  background: BG_PAGE,
-  height: "100%",
-  boxSizing: "border-box",
-  fontFamily: FONT,
-  color: TEXT_MAIN,
-};
-
-const ghostBtn: CSSProperties = {
-  padding: "8px 18px",
-  background: "transparent",
-  border: `1px solid ${BORDER}`,
-  borderRadius: 6,
-  color: TEXT_DIM,
-  fontSize: 13,
-  cursor: "pointer",
-  fontFamily: "inherit",
-};
+// pageStyle, ghostBtn, and inputStyle are imported (aliased) from
+// ../../lib/galleryTheme.ts — shared byte-for-byte with SequenceGallery.tsx
+// (and, for pageStyle/ghostBtn, TouchGallery.tsx) rather than redefined here.
 
 function MethodChooser({
   currentChar,
@@ -986,16 +1003,29 @@ export function MechanismGallery({
     [phaseResults],
   );
 
-  // The covered set: chars in lettersToAdd that have at least one assignment.
+  // sessionAssignments with sequence assignments/mechanisms excluded — see
+  // excludeSequenceMechanisms above. This gallery's whole covered/applied view
+  // (coveredChars, appliedForCurrentChar, the "Applied methods" badge row)
+  // derives from THIS, never from sessionAssignments directly, so a
+  // Sequence-Gallery-owned assignment can never show as "Added" here nor be
+  // removed via this gallery's own controls.
+  const mechanismAssignments = useMemo(
+    () => excludeSequenceMechanisms(sessionAssignments),
+    [sessionAssignments],
+  );
+
+  // The covered set: chars in lettersToAdd that have at least one NON-sequence
+  // mechanism assignment (mechanismAssignments already excludes the
+  // sequence-owned dimension — see above).
   const coveredChars = useMemo(
     () =>
       new Set(
-        sessionAssignments
+        mechanismAssignments
           .filter((a) => a.scope === "individual")
           .map((a) => a.target)
           .filter((t) => lettersToAdd.includes(t)),
       ),
-    [sessionAssignments, lettersToAdd],
+    [mechanismAssignments, lettersToAdd],
   );
 
   // One-time intro splash — shown on first entry to the desktop gallery so the
@@ -1693,13 +1723,15 @@ export function MechanismGallery({
     setPendingCompanion(null);
   }, []);
 
-  // How many methods have already been applied to the current character.
+  // How many NON-sequence methods have already been applied to the current
+  // character (mechanismAssignments already excludes the sequence-owned
+  // dimension — see excludeSequenceMechanisms above).
   const appliedForCurrentChar = useMemo(
     () =>
-      sessionAssignments.filter(
+      mechanismAssignments.filter(
         (a) => a.scope === "individual" && a.target === currentChar,
       ).length,
-    [sessionAssignments, currentChar],
+    [mechanismAssignments, currentChar],
   );
   // Forward gate: an untouched character needs an explicit Apply before
   // Next/Done is enabled — revisiting an already-covered character always
@@ -1721,9 +1753,18 @@ export function MechanismGallery({
 
   const handleRemoveCovered = useCallback(
     (char: string) => {
-      const next = sessionAssignments.filter(
-        (a) => !(a.scope === "individual" && a.target === char),
-      );
+      // Own only the non-sequence mechanisms for `char` — a recorded
+      // multi_char_sequence assignment (or the sequence-mechanism dimension
+      // of a mixed assignment) belongs to the Sequence Gallery and must
+      // survive this "Added" chip's removal untouched (see
+      // excludeSequenceMechanisms above). An assignment left with zero
+      // mechanisms after this strip is dropped entirely; one that still
+      // holds sequence mechanisms is kept, narrowed to just those.
+      const next = sessionAssignments.flatMap((a) => {
+        if (!(a.scope === "individual" && a.target === char)) return [a];
+        const sequenceOnly = a.mechanisms.filter((m) => m.patternId === PATTERN_SEQUENCE);
+        return sequenceOnly.length > 0 ? [{ ...a, mechanisms: sequenceOnly }] : [];
+      });
       recordAssignments(next);
       // Finding 2 (P2): a pending case-pair companion refers to a specific
       // base assignment by identity. If that assignment no longer survives
@@ -1740,7 +1781,27 @@ export function MechanismGallery({
 
   const handleRemoveMechanism = useCallback(
     (assignment: MechanismAssignment) => {
-      const next = sessionAssignments.filter((a) => a !== assignment);
+      // `assignment` is usually the exact recorded object (from
+      // mechanismAssignments, unchanged when it carries no sequence
+      // mechanisms) — remove it outright by reference. If it isn't found,
+      // it must be a rebuilt exclusion-view of an underlying assignment that
+      // ALSO carries PATTERN_SEQUENCE mechanisms (see excludeSequenceMechanisms
+      // above); in that case drop only the mechanisms visible here, leaving
+      // the sequence mechanisms on the original — still owned by the
+      // Sequence Gallery — untouched.
+      let next: MechanismAssignment[];
+      if (sessionAssignments.includes(assignment)) {
+        next = sessionAssignments.filter((a) => a !== assignment);
+      } else {
+        const removed = new Set(assignment.mechanisms);
+        next = sessionAssignments
+          .map((a) =>
+            a.scope === assignment.scope && a.target === assignment.target
+              ? { ...a, mechanisms: a.mechanisms.filter((m) => !removed.has(m)) }
+              : a,
+          )
+          .filter((a) => a.mechanisms.length > 0);
+      }
       recordAssignments(next);
       // See handleRemoveCovered above — same proactive-dismissal rationale.
       if (pendingCompanion !== null && !next.includes(pendingCompanion.baseAssignment)) {
@@ -1908,17 +1969,9 @@ export function MechanismGallery({
   // that differ only in label/onClick/testId/style.
   // ---------------------------------------------------------------------------
 
-  const alwaysEnabledForwardStyle: CSSProperties = {
-    padding: "9px 20px",
-    background: BLUE_ACTION,
-    border: "none",
-    borderRadius: 6,
-    color: "#e6edf3",
-    fontSize: 13,
-    fontWeight: 600,
-    cursor: "pointer",
-    fontFamily: FONT,
-  };
+  // The always-enabled forward-button style is the shared `forwardBtnStyle`
+  // import (aliased from galleryTheme.ts's galleryForwardBtnStyle) — same
+  // object SequenceGallery uses for its own Next/Done button base.
 
   interface ForwardButtonSpec {
     label: string;
@@ -1940,7 +1993,7 @@ export function MechanismGallery({
           testId: "mechanisms-continue",
           ariaLabel: "Continue (desktop layout locked)",
           disabled: false,
-          style: alwaysEnabledForwardStyle,
+          style: forwardBtnStyle,
         }
       : lettersToAdd.length === 0
         ? {
@@ -1948,7 +2001,7 @@ export function MechanismGallery({
             onClick: onComplete,
             testId: "mechanisms-continue",
             disabled: false,
-            style: alwaysEnabledForwardStyle,
+            style: forwardBtnStyle,
           }
         : currentChar !== null
           ? {
@@ -2408,7 +2461,7 @@ export function MechanismGallery({
                   aria-label="Applied methods — click to remove"
                   style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 2 }}
                 >
-                  {sessionAssignments
+                  {mechanismAssignments
                     .filter((a) => a.scope === "individual" && a.target === currentChar)
                     .map((a, i) => {
                       const ref = a.mechanisms[0];

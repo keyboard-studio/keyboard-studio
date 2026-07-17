@@ -83,6 +83,8 @@ import { KEY_OPTIONS, VALID_HOST_KEYS } from "../../lib/keyOptions.ts";
 import { resolveKeyPickerSelection, resolvedVkeyOf } from "../../lib/charInput.ts";
 import {
   BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
+  galleryPageStyle as pageStyle,
+  galleryGhostBtn as ghostBtn,
 } from "../../lib/galleryTheme.ts";
 
 // ---------------------------------------------------------------------------
@@ -157,26 +159,9 @@ const configStyle: CSSProperties = {
   gap: 8,
 };
 
-// Static page-level styles shared by TouchGallery's guard/content branches —
-// none depend on props or state.
-const pageStyle: CSSProperties = {
-  background: BG_PAGE,
-  height: "100%",
-  boxSizing: "border-box",
-  fontFamily: FONT,
-  color: TEXT_MAIN,
-};
-
-const ghostBtn: CSSProperties = {
-  padding: "8px 18px",
-  background: "transparent",
-  border: `1px solid ${BORDER}`,
-  borderRadius: 6,
-  color: TEXT_DIM,
-  fontSize: 13,
-  cursor: "pointer",
-  fontFamily: "inherit",
-};
+// pageStyle and ghostBtn are imported (aliased) from ../../lib/galleryTheme.ts
+// — shared byte-for-byte with MechanismGallery.tsx/SequenceGallery.tsx rather
+// than redefined here.
 
 // ---------------------------------------------------------------------------
 // Touch method type

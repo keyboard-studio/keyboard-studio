@@ -8,7 +8,7 @@
 // SPINE ORDER (FR-012, M2):
 //   Identity → choose base → Track → [project_name (spine:false)] →
 //   Characters (Phase A/B questions) → Carve → Mechanisms → [lock: "physical"] →
-//   Sequences (placeholder) → touch_seed_source (spine:false) → touch →
+//   Sequences → touch_seed_source (spine:false) → touch →
 //   [lock: "touch"] → Help → Package (reserved)
 //
 // Side-trail steps (spine:false) in position order:
@@ -76,7 +76,7 @@ const charactersStep: Step = {
 //
 // Rules encoded here:
 //   M2 — spine order: Identity → choose_base → track → Characters → Carve →
-//         Mechanisms → (lock physical) → Sequences (placeholder) → touch →
+//         Mechanisms → (lock physical) → Sequences → touch →
 //         (lock touch) → Help → Package
 //   M3 — exactly one lock:"physical" and one lock:"touch", in that order.
 //   M4 — touch_seed_source is spine:false with joinTarget resolving to "touch".

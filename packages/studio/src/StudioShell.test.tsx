@@ -3,7 +3,7 @@
 // Coverage:
 //   T028 — manifest-driven SurveyView: forward and back transitions driven by the
 //           manifest step order (identity → choose_base → track → [project_name] →
-//           characters → carve → mechanisms → sequences (placeholder) → touch →
+//           characters → carve → mechanisms → sequences → touch →
 //           help → done). No SurveyStage union.
 //   T029 — no SurveyStage symbol; runtime step order matches manifest; applyStepCompletion
 //           is wired for side-effecting steps.
@@ -56,7 +56,7 @@ const {
   const mockPhaseBBackRef = { current: null as null | (() => void) };
   const mockMechDoneRef = { current: null as null | (() => void) };
   const mockMechBackRef = { current: null as null | (() => void) };
-  // Sequences placeholder mock (S-03 sequences now authored in a dedicated
+  // Sequences gallery mock (S-03 sequences are authored in a dedicated
   // step after mechanisms, between mechanisms and the touch fork).
   const mockSeqDoneRef = { current: null as null | (() => void) };
   const mockSeqBackRef = { current: null as null | (() => void) };
@@ -607,7 +607,7 @@ function advanceToMechanisms() {
   fireEvent.click(screen.getByTestId("carve-complete"));
 }
 
-/** Drive from "identity" to "sequences" (placeholder step). */
+/** Drive from "identity" to "sequences". */
 function advanceToSequences() {
   advanceToMechanisms();
   fireEvent.click(screen.getByTestId("mechanisms-complete"));
@@ -701,11 +701,11 @@ describe("SurveyView — carve → mechanisms transition", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Forward transition 4: mechanisms → sequences (placeholder)
+// Forward transition 4: mechanisms → sequences
 // ---------------------------------------------------------------------------
 
 describe("SurveyView — mechanisms → sequences transition", () => {
-  it("renders the sequences placeholder stage after MechanismGallery onComplete is called", async () => {
+  it("renders the sequences stage after MechanismGallery onComplete is called", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -713,7 +713,7 @@ describe("SurveyView — mechanisms → sequences transition", () => {
     advanceToMechanisms();
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
-    // mechanisms → sequences (placeholder)
+    // mechanisms → sequences
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
 
     expect(screen.getByTestId("stage-sequences")).toBeTruthy();
@@ -726,7 +726,7 @@ describe("SurveyView — mechanisms → sequences transition", () => {
 // ---------------------------------------------------------------------------
 
 describe("SurveyView — sequences → F transition", () => {
-  it("renders the F stage after the sequences placeholder onComplete is called", async () => {
+  it("renders the F stage after the sequences gallery onComplete is called", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -1000,11 +1000,11 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
 });
 
 // ---------------------------------------------------------------------------
-// Back-navigation: sequences → mechanisms (the placeholder step's own onBack)
+// Back-navigation: sequences → mechanisms (the sequences step's own onBack)
 // ---------------------------------------------------------------------------
 
 describe("SurveyView — sequences → mechanisms back-navigation", () => {
-  it("returns to mechanisms stage when the sequences placeholder onBack is called", async () => {
+  it("returns to mechanisms stage when the sequences gallery onBack is called", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -1356,7 +1356,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
 });
 
 describe("T029 — runtime step order matches manifest spine order", () => {
-  it("survey advances: identity → choose_base → track (manifest step) → project_name (copy, spine:false) → characters (prefill) → B → carve → mechanisms → sequences (placeholder) → touch → help", async () => {
+  it("survey advances: identity → choose_base → track (manifest step) → project_name (copy, spine:false) → characters (prefill) → B → carve → mechanisms → sequences → touch → help", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -1395,7 +1395,7 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     fireEvent.click(screen.getByTestId("carve-complete"));
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
-    // → sequences (placeholder)
+    // → sequences
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
     expect(screen.getByTestId("stage-sequences")).toBeTruthy();
 

@@ -60,7 +60,7 @@ describe("M5 — all step ids are unique", () => {
 // M2 — spine order
 //
 // FR-012: Identity → choose_base → track → Characters → Carve → Mechanisms →
-//         (lock:physical on mechanisms) → Sequences (placeholder) →
+//         (lock:physical on mechanisms) → Sequences →
 //         touch carve+add → (lock:touch) → Help → Package
 //
 // track is a real spine step (P0 fix). project_name is spine:false (CYOA fork).
@@ -106,7 +106,7 @@ describe("M2 — spine order matches FR-012", () => {
     assertStepOrder(spineSteps(manifest), "mechanisms", "touch");
   });
 
-  it("'sequences' (placeholder) sits between 'mechanisms' and 'touch' on the spine", () => {
+  it("'sequences' sits between 'mechanisms' and 'touch' on the spine", () => {
     const spine = spineSteps(manifest);
     assertStepOrder(spine, "mechanisms", "sequences");
     assertStepOrder(spine, "sequences", "touch");
@@ -161,7 +161,7 @@ describe("M3 — exactly one lock:physical then one lock:touch", () => {
     expect(touchLockStep?.id).toBe("touch");
   });
 
-  it("'sequences' (placeholder) carries no lock", () => {
+  it("'sequences' carries no lock", () => {
     const sequencesStep = manifest.find((s) => s.id === "sequences");
     expect(sequencesStep?.lock).toBeUndefined();
   });

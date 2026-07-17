@@ -559,6 +559,115 @@ describe("MechanismGallery — apply (sequence flag)", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Cross-gallery coexistence (P1 fix) — a REAL multi_char_sequence assignment
+// already recorded by the Sequence Gallery (not just the pre-recording
+// sequenceFlaggedChars flag exercised above) must not surface as "Added"/
+// covered here, and this gallery's removal controls must never be able to
+// delete it.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — coexistence with a Sequence-Gallery-recorded assignment (P1)", () => {
+  it("a char with a recorded multi_char_sequence assignment does not appear as Added/covered", async () => {
+    seedInventory(["ŋ", "x"]);
+    // Simulate the Sequence Gallery having already recorded a real sequence
+    // for "ŋ" (mirrors SequenceGallery.handleApply's own assignment shape).
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ŋ",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_SEQUENCE,
+            strategyId: "S-03",
+            slotValues: { firstLetterOut: "n", secondLetter: "g", collapsedChar: "ŋ" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    // Not counted as covered — the "Added characters" chip row never renders
+    // for a char whose only recorded assignment is sequence-owned.
+    expect(
+      screen.queryByRole("group", { name: /Added characters — click to remove/i }),
+    ).toBeNull();
+
+    // The coverage line excludes it: 0 of 2, not 1 of 2.
+    await waitFor(() => {
+      const status = screen.getByRole("status");
+      expect(status.getAttribute("aria-label")).toBe("0 of 2 added");
+    });
+
+    // The recorded sequence assignment itself is untouched by rendering this
+    // gallery.
+    const assignments = getPhaseCPhysicalAssignments();
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0]?.mechanisms[0]?.patternId).toBe(PATTERN_SEQUENCE);
+  });
+
+  it("a char with BOTH a non-sequence mechanism and a separately-recorded sequence assignment still shows as mechanism-covered, and removing its 'Added' chip leaves the sequence assignment untouched", async () => {
+    seedInventory(["ŋ", "x"]);
+    // Two SEPARATE MechanismAssignment objects for the same target — the
+    // shape MechanismGallery (non-sequence) and SequenceGallery (sequence)
+    // actually produce today (each always appends its own new assignment
+    // object rather than merging into one shared mechanisms array).
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ŋ",
+        modality: "physical",
+        mechanisms: [{ patternId: "simple_swap", strategyId: "S-01", slotValues: { kmnRules: "+ [K_N] > U+014B" } }],
+        source: "user",
+      },
+      {
+        scope: "individual",
+        target: "ŋ",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_SEQUENCE,
+            strategyId: "S-03",
+            slotValues: { firstLetterOut: "n", secondLetter: "g", collapsedChar: "ŋ" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    // Mechanism-covered: the "Added" chip row DOES render for "ŋ" — the
+    // sequence assignment must never hide a genuinely mechanism-covered char.
+    await waitFor(() => {
+      expect(screen.getByRole("group", { name: /Added characters/i })).toBeTruthy();
+    });
+    const addedChip = screen.getByLabelText(/Remove.*ŋ/);
+    expect(addedChip).toBeTruthy();
+
+    // Removing the "Added" chip strips only the non-sequence mechanism;
+    // the sequence assignment (owned by the Sequence Gallery) survives.
+    fireEvent.click(addedChip);
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("group", { name: /Added characters — click to remove/i }),
+      ).toBeNull();
+    });
+    const remaining = getPhaseCPhysicalAssignments();
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]?.target).toBe("ŋ");
+    expect(remaining[0]?.mechanisms.every((m) => m.patternId === PATTERN_SEQUENCE)).toBe(true);
+  });
+});
+
 describe("MechanismGallery — apply (deadkey)", () => {
   it("clicking Apply method with deadkey method records patternId deadkey_single_tap", async () => {
     seedInventory(["á"]);

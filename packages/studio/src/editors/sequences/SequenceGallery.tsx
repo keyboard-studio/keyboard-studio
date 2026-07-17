@@ -83,7 +83,11 @@ import {
 } from "../../lib/charInput.ts";
 import { charToVkey } from "../../lib/keyOptions.ts";
 import {
-  BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
+  BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
+  galleryPageStyle,
+  galleryGhostBtn as ghostBtn,
+  galleryInputStyle as inputStyle,
+  galleryForwardBtnStyle as forwardBtnStyle,
 } from "../../lib/galleryTheme.ts";
 
 // ---------------------------------------------------------------------------
@@ -112,56 +116,18 @@ const SEQ_INDICATOR_RESOLVE_OPTIONS: ResolveCharInputOptions = {
 };
 
 // ---------------------------------------------------------------------------
-// Shared styles — mirrors MechanismGallery's page/ghost/input styles so the
-// two galleries read as one authoring surface.
+// Shared styles — ghostBtn/inputStyle/forwardBtnStyle are imported (aliased)
+// from ../../lib/galleryTheme.ts, byte-for-byte shared with MechanismGallery.tsx
+// (and, for ghostBtn, TouchGallery.tsx) so the galleries can't drift apart.
+// pageStyle layers this gallery's flex-column page layout on top of the
+// shared galleryPageStyle base (MechanismGallery/TouchGallery use the base
+// as-is; only SequenceGallery needs the flex column).
 // ---------------------------------------------------------------------------
 
 const pageStyle: CSSProperties = {
-  background: BG_PAGE,
-  height: "100%",
-  boxSizing: "border-box",
-  fontFamily: FONT,
-  color: TEXT_MAIN,
+  ...galleryPageStyle,
   display: "flex",
   flexDirection: "column",
-};
-
-const ghostBtn: CSSProperties = {
-  padding: "8px 18px",
-  background: "transparent",
-  border: `1px solid ${BORDER}`,
-  borderRadius: 6,
-  color: TEXT_DIM,
-  fontSize: 13,
-  cursor: "pointer",
-  fontFamily: "inherit",
-};
-
-const forwardBtnStyle: CSSProperties = {
-  padding: "9px 20px",
-  background: BLUE_ACTION,
-  border: "none",
-  borderRadius: 6,
-  color: "#e6edf3",
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: "pointer",
-  fontFamily: FONT,
-};
-
-// Identical to MechanismGallery's inputStyle (the restored S-03 config box
-// used this exact styling before S-03 became a flag-only card).
-const inputStyle: CSSProperties = {
-  width: 52,
-  padding: "6px 8px",
-  background: BG_PAGE,
-  border: `1px solid ${BORDER}`,
-  borderRadius: 6,
-  color: TEXT_MAIN,
-  fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
-  fontSize: 20,
-  textAlign: "center",
-  boxSizing: "border-box",
 };
 
 // ---------------------------------------------------------------------------
@@ -326,6 +292,12 @@ export function SequenceGallery({
 
   const handleApply = useCallback(() => {
     if (currentChar === null || !canApply) return;
+    // Normalize ONCE — used for both the assignment's `target` (the identity
+    // key partitionSequenceAssignment and Mechanism Gallery lookups key off)
+    // and the sequence's own `collapsedChar` slot value, so the two can never
+    // diverge (a P1 in an earlier review: only collapsedChar was normalized,
+    // leaving `target` un-normalized).
+    const char = currentChar.normalize("NFC");
     const contentValue = resolveCharInput(content, SEQ_CONTENT_RESOLVE_OPTIONS);
     const indicatorValue = resolveCharInput(indicator, SEQ_INDICATOR_RESOLVE_OPTIONS);
     if (!contentValue.ok || !indicatorValue.ok) return;
@@ -335,7 +307,7 @@ export function SequenceGallery({
 
     const { mechs: existingMechs, rest } = partitionSequenceAssignment(
       sessionAssignments,
-      currentChar,
+      char,
     );
 
     // Dedup by (firstLetterOut, secondLetter) — an identical sequence is a
@@ -353,13 +325,13 @@ export function SequenceGallery({
         slotValues: {
           firstLetterOut: contentValue.value,
           secondLetter: indicatorValue.value,
-          collapsedChar: currentChar.normalize("NFC"),
+          collapsedChar: char,
         },
       };
 
       const assignment: MechanismAssignment = {
         scope: "individual",
-        target: currentChar,
+        target: char,
         modality: "physical",
         mechanisms: [...existingMechs, newRef],
         source: "user",

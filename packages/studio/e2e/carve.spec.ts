@@ -281,8 +281,8 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     await buildOneCharacterList(page);
 
     // Manifest spine order (StudioShell.tsx) is characters -> carve ->
-    // mechanisms -> sequences (placeholder) -> touch -> help; carve comes
-    // immediately after Phase B, BEFORE mechanisms/sequences/touch.
+    // mechanisms -> sequences -> touch -> help; carve comes immediately after
+    // Phase B, BEFORE mechanisms/sequences/touch.
 
     // ---------------------------------------------------------------------
     // Carve gallery
@@ -319,7 +319,7 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     await page.getByTestId("carve-continue").click();
 
     // ---------------------------------------------------------------------
-    // Remaining spine steps: mechanisms, sequences (placeholder), touch, help.
+    // Remaining spine steps: mechanisms, sequences, touch, help.
     // ---------------------------------------------------------------------
     await confirmMechanismsEmpty(page);
     await driveSequenceGallery(page);
