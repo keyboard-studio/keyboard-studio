@@ -22,11 +22,12 @@ function makeIR(platform: "phone" | "tablet" | "desktop", keyCount: number): Tou
   };
 }
 
-/** Build an IR with a mix of normal keys and spacer keys (sp===8). */
+/** Build an IR with a mix of normal keys and spacer keys (sp:8 or sp:10). */
 function makeIRWithSpacers(
   platform: "phone" | "tablet" | "desktop",
   normalCount: number,
-  spacerCount: number
+  spacerCount: number,
+  spacerSp: 8 | 10 = 8
 ): TouchLayoutIR {
   const normalKeys = Array.from({ length: normalCount }, (_, i) => ({
     nodeId: `k-${i}`,
@@ -35,7 +36,7 @@ function makeIRWithSpacers(
   const spacerKeys = Array.from({ length: spacerCount }, (_, i) => ({
     nodeId: `sp-${i}`,
     id: `K_SP_${i}`,
-    sp: 8 as const,
+    sp: spacerSp,
   }));
   return {
     platforms: [
@@ -95,5 +96,21 @@ describe("checkKeysPerRow (18.3 KM_WARN_TOUCH_KEYS_PER_ROW)", () => {
     expect(findings[0]?.code).toBe("KM_WARN_TOUCH_KEYS_PER_ROW");
     // The reported count reflects non-spacer keys only.
     expect(findings[0]?.message).toContain("11 key(s)");
+  });
+
+  it("passes for phone with 10 normal keys + 1 sp:10 padding key (sp:10 spacers excluded)", () => {
+    // A padding key (sp:10) is a spacer too; it must not push the row over the
+    // limit. Effective interactive count is 10, at the phone limit.
+    expect(checkKeysPerRow(makeIRWithSpacers("phone", 10, 1, 10), PATH)).toEqual([]);
+  });
+
+  it("does not miscount a mix of sp:8 and sp:10 spacers", () => {
+    // 10 normal keys + one sp:8 + one sp:10 = 12 in the array, 10 interactive.
+    const ir = makeIRWithSpacers("phone", 10, 0);
+    ir.platforms[0]!.layers[0]!.rows[0]!.keys.push(
+      { nodeId: "sp8", id: "K_SP8", sp: 8 },
+      { nodeId: "sp10", id: "K_SP10", sp: 10 },
+    );
+    expect(checkKeysPerRow(ir, PATH)).toEqual([]);
   });
 });
