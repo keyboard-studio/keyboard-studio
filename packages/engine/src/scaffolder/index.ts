@@ -72,6 +72,12 @@ function escapeForRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// Build a word-boundary-anchored matcher for a literal id token, so a base id
+// that is a prefix of another token (e.g. `base_id_extra`) is not over-rewritten.
+function buildIdTokenRegex(baseId: string): RegExp {
+  return new RegExp(`(?<![\\w])${escapeForRegex(baseId)}(?![\\w])`, "g");
+}
+
 /**
  * Rewrite file-path references in .kps XML text.
  * Mirrors kmc-copy's copyKpsSourceFile (../keyman/developer/src/kmc-copy/src/KeymanProjectCopier.ts):
@@ -82,7 +88,7 @@ function escapeForRegex(s: string): string {
  */
 function rewriteKpsFilePaths(xml: string, baseId: string, keyboardId: string): string {
   const escaped = escapeForRegex(baseId);
-  const tokenRe = new RegExp(`(?<![\\w])${escaped}(?![\\w])`, "g");
+  const tokenRe = buildIdTokenRegex(baseId);
   let out = xml.replace(
     /(<Name\b[^>]*>)([^<]*)(<\/Name>)/gi,
     (m, open: string, value: string, close: string) => {
@@ -124,8 +130,7 @@ function rewriteKvksKbdname(xml: string, baseId: string, keyboardId: string): st
  * emitted project stays coherent when opened in Keyman Developer.
  */
 function rewriteKpjFilePaths(xml: string, baseId: string, keyboardId: string): string {
-  const escaped = escapeForRegex(baseId);
-  const tokenRe = new RegExp(`(?<![\\w])${escaped}(?![\\w])`, "g");
+  const tokenRe = buildIdTokenRegex(baseId);
   return xml.replace(
     /(<(Filename|Filepath)\b[^>]*>)([^<]*)(<\/\2>)/gi,
     (_m, open: string, _tag: string, value: string, close: string) =>
