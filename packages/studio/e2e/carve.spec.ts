@@ -31,7 +31,6 @@ import { unzipSync, strFromU8 } from "fflate";
 import { readFile } from "node:fs/promises";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import {
-  surveyAdvance,
   driveIdentityLite,
   pickBaseKeyboard,
   chooseAdaptTrack,

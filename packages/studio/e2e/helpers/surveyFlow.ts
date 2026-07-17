@@ -170,7 +170,12 @@ export async function driveIdentityLite(
   // data-testid="base-picker" (the visible field inside is a "Search
   // keyboards" labeled input, not a role=combobox named "Base keyboard").
   await expect(page.getByTestId("base-picker")).toBeVisible({
-    timeout: 15_000,
+    // Cold-start guard: the base picker enumerates the entire ../keyboards
+    // clone from disk on first render, which can take well over 20s on a cold
+    // dev server. This wait is the single cold-start margin for every walk
+    // spec (all pass through driveIdentityLite before pickBaseKeyboard), so it
+    // stays at 90s rather than the 15s used for warm intra-survey transitions.
+    timeout: 90_000,
   });
 }
 
