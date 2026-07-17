@@ -240,6 +240,36 @@ python3 .specify/extensions/companion/scripts/write-context.py --feature-dir <fe
 After the fold, the spec sits at the **tasks** step with `status: ready-to-implement`; the developer triggers implement next. Do **not** write a `completed` status — the final completed gate stays a user action.
 
 
+<!-- km-phase-break:start (project) -->
+## Phase break — one conversation per phase (multi-phase features)
+
+**Project policy (see the constitution's "Authoring workflow"): a multi-phase feature is built one phase per conversation, to keep each conversation's context small.** This is a project addition on top of stock Companion; like the rest of the pipeline it is best-effort and must **never** fail the host command.
+
+1. **Detect the phase count.** You just wrote the spec's user stories — count the `### User Story N …` sections. `multiPhase` is true when there are **two or more** user stories. A `simple`/fast-path spec (size `simple`) is single-phase by definition — never multi-phase.
+2. **Record it** (from the repo root; skip silently if `python3` is unavailable):
+   ```bash
+   python3 .specify/extensions/companion/scripts/write-context.py --set multiPhase=<true|false>
+   python3 .specify/extensions/companion/scripts/write-context.py --set phaseCount=<n>
+   ```
+3. **Decide whether to halt before planning.** Read `unattended` from `.spec-context.json`:
+   - **`multiPhase` is false** → nothing to do; self-advance to `plan` as usual.
+   - **`multiPhase` is true AND `unattended` is not true (attended run)** → **HALT here. Do NOT self-advance to `plan`.** Record the breadcrumb, print the handoff, then stop the turn:
+     ```bash
+     python3 .specify/extensions/companion/scripts/write-context.py --set last_action="specify done — <n>-phase feature; awaiting a fresh conversation to plan"
+     ```
+     ```
+     [phase-break] This is a <n>-phase feature. Stopping after specify to keep context small.
+     Start a NEW conversation (/clear), then run /speckit.companion.resume to plan and build phase P1.
+     ```
+   - **`multiPhase` is true AND `unattended` is true (hands-off — auto / bypass run)** → do **not** halt: there is no human to open a new conversation, and a hard stop would wedge the run. Record the checkpoint and continue, per the unattended convention:
+     ```bash
+     python3 .specify/extensions/companion/scripts/write-context.py --set last_action="specify done — <n>-phase feature; continuing (unattended)"
+     ```
+     Log one line — `[phase-break] multi-phase; recorded checkpoint, continuing (unattended)` — and self-advance normally.
+
+This governs the specify→plan hand-off in the Self-advance section below: an attended multi-phase run stops here; every other case advances.
+<!-- km-phase-break:end -->
+
 <!-- speckit-companion:part timing -->
 ## Timing — keep `.spec-context.json` honest
 
@@ -284,6 +314,7 @@ These rules apply to every Companion profile command. The extension records life
 This is one step in the Companion pipeline. How the run continues depends on the environment you are running in; do not invoke a separate headless/deterministic run command for the everyday flow.
 
 - **On an agentic CLI that keeps acting after a step finishes:** once this step's work is complete, read the Companion workflow definition (`speckit-extension/workflows/speckit-companion.workflow.yml`) to learn which step comes next, then continue into it on your own — dispatch the next step's `/speckit.companion.*` command and keep going through the pipeline.
+- **Honor the project phase break (above) at the specify→plan hand-off.** Before advancing to `plan`, apply the "Phase break" section: an **attended** multi-phase run **STOPS here** for a fresh conversation; a single-phase run, or any `unattended` run, advances normally.
 - **Pause at every review gate.** Where the workflow marks a `gate` (e.g. review-spec, review-plan), stop and wait for approval rather than running past it. Only continue once the gate is approved.
 - **Terminal step after implement.** After the implementation step finishes (and any commit step), the workflow's final step is `mark-complete`. Run it so the spec lands at `status: completed`. That step writes `completed` only through `write-context.py --mark-complete`, which refuses unless the spec is already `implemented` — never introduce a second completed-writer.
 - **Degrade gracefully on a one-shot environment.** If your environment runs one step and then stops, the handoff simply does not fire: finish this step, record its progress, and stop. The run stays valid and resumable, and the next step is triggered manually (by the developer or the companion panel). Completion likewise stays a manual action there.

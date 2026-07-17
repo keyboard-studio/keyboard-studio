@@ -94,6 +94,37 @@ Execute `tasks.md` phase by phase in dependency order. Each phase is laid out as
    ```
    `tasks.md` is owned only through this `--materialize` call (the script flips the boxes), so it never diverges from the journal. Now move past the `⟶ Wait` line to the next wave.
 
+<!-- km-git-checkpoint:start (project) -->
+### Per-wave checkpoint commit — the branch is the failsafe
+
+**Project policy: commit and push a checkpoint after every wave.** The feature branch (cut at
+branch-start, see the `before_specify` hook) is a failsafe — a clean commit after each reconciled
+wave means a crashed or abandoned run never loses the chunks already proven good, and a `git reset`
+recovers cleanly. The PR is squash-merged, so checkpoint granularity and commit-message polish do not
+matter downstream — favor **frequent, cheap** commits over tidy ones. Best-effort; like the rest of
+the pipeline it must **never** fail the host command (no git / not a repo / nothing to commit -> skip
+silently and keep building).
+
+Run this the moment a wave's `--materialize` succeeds, and **always before starting a Polish,
+simplify, or revision wave** (so the pre-refactor state is captured):
+
+```bash
+git add -A && git commit -q -m "wip(<area>): <feature-slug> — <phase/wave, one line>" && git push -q
+```
+
+- Use a `wip(<area>):` title following the repo commit style (`<prefix>(<area>): <desc>`); `<area>` is
+  the smallest that locates the wave's edits. Squash cleans these up at PR time — do not agonize over them.
+- `git push` keeps the remote branch current after every wave ("push frequently"). If the upstream
+  is not yet set, use `git push -u origin HEAD` on the first push.
+- If the wave produced no file changes (journal/context-only), there is nothing to commit — skip.
+- Full km-archivist delegation per wave is intentionally NOT done here: a checkpoint is a cheap
+  squashed-away commit, not a crew action. The two git events that DO go to km-archivist are the
+  branch cut (`before_specify`) and the final PR (`after_implement`).
+
+This checkpoint is the per-wave counterpart to the phase-break below; both keep the branch a
+recoverable failsafe without waiting for the end of the run.
+<!-- km-git-checkpoint:end -->
+
 5. On completion, validate the result against the spec's **Functional Requirements** and **Success Criteria**, and report a short summary of what was built and anything left undone.
 
 6. **Capture what was verified and decided** — the audit trail a resume/handoff needs, recorded the moment validation ends (best-effort; JSON when you can, bare text when not; skip silently if `python3` is unavailable):
@@ -119,6 +150,26 @@ Execute `tasks.md` phase by phase in dependency order. Each phase is laid out as
      python3 .specify/extensions/companion/scripts/write-context.py --fold-living-spec --by ai
      ```
      It parses the feature spec for `## ADDED / MODIFIED / REMOVED / RENAMED Requirements` blocks and applies them to the resolved `capabilities/<name>/spec.md` (most-specific capability, unless a block carries a `<!-- capability: <name> -->` marker). Opt-in (only acts when `livingSpecs.enabled: true`), a clean no-op when there is no delta block, idempotent on re-run, and records the synced names onto `livingSpecs.synced`. Never fails the host command.
+<!-- km-phase-break:start (project) -->
+## Phase break — stop between user-story phases (multi-phase features)
+
+**Project policy (see the constitution's "Authoring workflow"): on a multi-phase feature, build one user-story phase per conversation** to keep each conversation's context small. Best-effort; like the rest of the pipeline it must **never** fail the host command.
+
+- **Applies only when `multiPhase` is true** in `.spec-context.json` (recorded at specify) **AND `unattended` is not true.** If `multiPhase` is false, or the run is `unattended` (auto / bypass — no human to open a new conversation), ignore this section and run every phase straight through as the Outline describes.
+- **Grouping.** Setup and Foundational ride with the **first** user-story phase (Foundational blocks every story). Polish rides with the **last** user-story phase.
+- **The stop.** After a user-story phase's last wave reconciles and you have run `--materialize`, check whether any **later** user-story phase still has unchecked tasks in `tasks.md`. If one does, **STOP — do not start the next user-story phase.** Record the breadcrumb, print the handoff, then stop the turn:
+  ```bash
+  python3 .specify/extensions/companion/scripts/write-context.py --set last_action="phase <Pn> done — awaiting a fresh conversation for <Pn+1>"
+  ```
+  ```
+  [phase-break] Phase <Pn> complete and materialized. Stopping to keep context small.
+  Start a NEW conversation (/clear), then run /speckit.companion.resume to build <Pn+1>.
+  ```
+  Do **not** run mark-complete — tasks remain unchecked, so completion is not due (mark-complete refuses until every task is checked anyway).
+- **Resuming.** A fresh conversation running `/speckit.companion.resume` re-enters implement; the checked-off `tasks.md` boxes mean you skip finished phases and continue at the first phase with unchecked tasks.
+- **Last phase.** When the phase you just finished is the final user-story phase (Polish included), there is nothing left to stop for — proceed to validation and mark-complete as usual.
+<!-- km-phase-break:end -->
+
 <!-- speckit-companion:part timing -->
 ## Timing — keep `.spec-context.json` honest
 
@@ -164,6 +215,7 @@ This is one step in the Companion pipeline. How the run continues depends on the
 
 - **On an agentic CLI that keeps acting after a step finishes:** once this step's work is complete, read the Companion workflow definition (`speckit-extension/workflows/speckit-companion.workflow.yml`) to learn which step comes next, then continue into it on your own — dispatch the next step's `/speckit.companion.*` command and keep going through the pipeline.
 - **Pause at every review gate.** Where the workflow marks a `gate` (e.g. review-spec, review-plan), stop and wait for approval rather than running past it. Only continue once the gate is approved.
+- **Honor the project phase break (above).** On an **attended** multi-phase run, STOP after each user-story phase per the "Phase break" section and only reach mark-complete after the **final** phase; a single-phase run, or any `unattended` run, advances straight through.
 - **Terminal step after implement.** After the implementation step finishes (and any commit step), the workflow's final step is `mark-complete`. Run it so the spec lands at `status: completed`. That step writes `completed` only through `write-context.py --mark-complete`, which refuses unless the spec is already `implemented` — never introduce a second completed-writer.
 - **Degrade gracefully on a one-shot environment.** If your environment runs one step and then stops, the handoff simply does not fire: finish this step, record its progress, and stop. The run stays valid and resumable, and the next step is triggered manually (by the developer or the companion panel). Completion likewise stays a manual action there.
 <!-- /speckit-companion:part self-advance -->
