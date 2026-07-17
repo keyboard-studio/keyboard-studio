@@ -115,10 +115,11 @@ export const manifest: readonly Step[] = [
     lock: "physical",
   } satisfies Step,
 
-  // --- Sequences (placeholder, Phase C follow-on: multi-key sequences) ---
+  // --- Sequences (Phase C follow-on: multi-key sequences, S-03) ---
   // S-03 sequences move out of the Mechanism Gallery's method chooser into
-  // their own dedicated part of the flow. Not yet implemented — placeholder
-  // component only. No lock (only "physical" and "touch" locks exist, M3).
+  // their own dedicated Sequence Gallery: it cycles the characters flagged
+  // for sequences and records a real multi_char_sequence MechanismAssignment
+  // per character on Apply. No lock (only "physical" and "touch" locks exist, M3).
   sequencesStep,
 
   // --- Touch seed source (off-spine fork, FR-013, M4) ---

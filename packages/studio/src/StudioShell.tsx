@@ -3,7 +3,7 @@
 // Routes:
 //   #survey  (default)  — full authoring wizard: identity → base → track →
 //                         [project_name (copy)] → characters (prefill/B) →
-//                         carve → mechanisms → sequences (placeholder) →
+//                         carve → mechanisms → sequences →
 //                         touch → help → done
 //   #preview            — PreviewScreen: "try it" — OSK preview + diagnostics
 //                         (no Download button, no SignUpPanel)
@@ -196,7 +196,7 @@ function NavBar({ active }: NavBarProps) {
 //
 // Manifest spine order (FR-012, M2):
 //   identity → choose_base → track → characters → carve →
-//   mechanisms[lock:physical] → sequences (placeholder) →
+//   mechanisms[lock:physical] → sequences →
 //   touch[lock:touch] → help → package[reserved]
 //
 // Off-spine (spine:false) steps in array order:
