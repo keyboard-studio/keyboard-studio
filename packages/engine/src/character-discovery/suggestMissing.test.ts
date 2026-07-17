@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { suggestMissingCharacters } from "./suggestMissing.js";
+import { suggestMissingCharacters, neededCharsForLanguage, isCharCoveredForLocale } from "./suggestMissing.js";
 import type { CldrFullLoader } from "./cldr.js";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup, IRRule } from "@keyboard-studio/contracts";
@@ -16,12 +16,14 @@ import type { IRGroup, IRRule } from "@keyboard-studio/contracts";
 // Fixture helpers
 // ---------------------------------------------------------------------------
 
-/** Build a loader that returns the supplied main+auxiliary pair for every locale. */
+/** Build a loader that returns the supplied main+auxiliary(+punctuation+numbers) tiers for every locale. */
 function makeLoader(
   main: string,
   auxiliary: string | null = null,
+  punctuation: string | null = null,
+  numbers: string | null = null,
 ): CldrFullLoader {
-  return async (_locale: string) => ({ main, auxiliary });
+  return async (_locale: string) => ({ main, auxiliary, punctuation, numbers });
 }
 
 /** Loader that returns null (locale not found). */
@@ -587,5 +589,137 @@ describe("suggestMissingCharacters — digraph clusters excluded from suggestion
     expect(result!.main).not.toContain("gb");
     // Single missing letter ọ MUST appear
     expect(result!.main).toContain("ọ");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 11. neededCharsForLanguage — full needed-set export (issue #525 items 2/4)
+// ---------------------------------------------------------------------------
+
+describe("neededCharsForLanguage — confidence gate (null)", () => {
+  const wouldFail: CldrFullLoader = async () => {
+    throw new Error("loader should not have been called when gate blocks");
+  };
+
+  it("returns null for 'und'", async () => {
+    const result = await neededCharsForLanguage({ bcp47: "und", loader: wouldFail });
+    expect(result).toBeNull();
+  });
+
+  it("returns null for script-only tag 'Latn'", async () => {
+    const result = await neededCharsForLanguage({ bcp47: "Latn", loader: wouldFail });
+    expect(result).toBeNull();
+  });
+
+  it("returns null for private-use tag 'qaa'", async () => {
+    const result = await neededCharsForLanguage({ bcp47: "qaa", loader: wouldFail });
+    expect(result).toBeNull();
+  });
+
+  it("returns null for bare macrolanguage 'zh' (no region/script)", async () => {
+    const result = await neededCharsForLanguage({ bcp47: "zh", loader: wouldFail });
+    expect(result).toBeNull();
+  });
+
+  it("returns null when the loader has no CLDR locale match", async () => {
+    const result = await neededCharsForLanguage({ bcp47: "yo", loader: nullLoader });
+    expect(result).toBeNull();
+  });
+
+  it("ms-MY (narrowed macrolanguage) passes the gate and returns non-null", async () => {
+    const loader = makeLoader("[a-z é]");
+    const result = await neededCharsForLanguage({ bcp47: "ms-MY", loader });
+    expect(result).not.toBeNull();
+  });
+});
+
+describe("neededCharsForLanguage — returns the full exemplar set (not just missing)", () => {
+  it("includes ASCII exemplar chars, unlike suggestMissingCharacters's letter-filtered fields", async () => {
+    // suggestMissingCharacters would drop the ASCII "a-z" range entirely (it only
+    // suggests non-ASCII gaps); neededCharsForLanguage must keep them — a Latin
+    // keyboard's own a-z ARE needed characters, not "produces-but-unwanted".
+    const loader = makeLoader("[a-z é]");
+    const result = await neededCharsForLanguage({ bcp47: "fr", loader });
+    expect(result).not.toBeNull();
+    expect(result!.has("a")).toBe(true);
+    expect(result!.has("z")).toBe(true);
+    expect(result!.has("é")).toBe(true);
+  });
+
+  it("includes auxiliary (loanword-tier) characters alongside main", async () => {
+    const loader = makeLoader("[ẹ]", "[ü]");
+    const result = await neededCharsForLanguage({ bcp47: "yo", loader });
+    expect(result).not.toBeNull();
+    expect(result!.has("ẹ")).toBe(true);
+    expect(result!.has("ü")).toBe(true);
+  });
+
+  it("returns an empty auxiliary contribution (not null) when CLDR has no auxiliary set", async () => {
+    const loader = makeLoader("[ẹ]", null);
+    const result = await neededCharsForLanguage({ bcp47: "yo", loader });
+    expect(result).not.toBeNull();
+    expect(result!.has("ẹ")).toBe(true);
+    expect(result!.size).toBe(1);
+  });
+
+  it("NFC-normalizes returned characters (decomposed CLDR input composes)", async () => {
+    // e + combining acute (NFD) in the CLDR string should compose to é (NFC)
+    // via parseUnicodeSet's per-character NFC normalization.
+    const loader = makeLoader("[é]"); // already composed source string; parseUnicodeSet NFC-normalizes each output char regardless
+    const result = await neededCharsForLanguage({ bcp47: "fr", loader });
+    expect(result).not.toBeNull();
+    expect(result!.has("é".normalize("NFC"))).toBe(true);
+  });
+
+  // #525 fix — over-removal: punctuation + numbers exemplar tiers must also
+  // count as "needed" (French guillemets, Persian Eastern-Arabic-Indic digits),
+  // not just the letter tiers, or a keyboard producing them gets flagged surplus.
+  it("includes punctuation exemplar characters (e.g. French guillemets)", async () => {
+    const loader = makeLoader("[a-z é]", null, "[« »]");
+    const result = await neededCharsForLanguage({ bcp47: "fr", loader });
+    expect(result).not.toBeNull();
+    expect(result!.has("«")).toBe(true);
+    expect(result!.has("»")).toBe(true);
+  });
+
+  it("includes numbers exemplar characters (e.g. Persian Eastern-Arabic-Indic digits)", async () => {
+    const loader = makeLoader("[ا ب ت]", null, null, "[۰ ۱ ۲]");
+    const result = await neededCharsForLanguage({ bcp47: "fa-IR", loader });
+    expect(result).not.toBeNull();
+    expect(result!.has("۰")).toBe(true);
+    expect(result!.has("۱")).toBe(true);
+    expect(result!.has("۲")).toBe(true);
+  });
+
+  it("returns only main+auxiliary when punctuation/numbers tiers are absent from CLDR", async () => {
+    const loader = makeLoader("[ẹ]", "[ü]");
+    const result = await neededCharsForLanguage({ bcp47: "yo", loader });
+    expect(result).not.toBeNull();
+    expect(result!.size).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 12. isCharCoveredForLocale — case-fold reuse for surplus detection (#525 fix)
+// ---------------------------------------------------------------------------
+
+describe("isCharCoveredForLocale — reuses isCovered's exception-aware fold", () => {
+  it("covers an uppercase accented letter against a lowercase-only CLDR set (French É vs é)", () => {
+    const needed = new Set(["a", "e", "é"]);
+    expect(isCharCoveredForLocale("É", needed, "fr")).toBe(true);
+  });
+
+  it("does not naively lowercase — Turkic dotted-I hazard is preserved (tr)", () => {
+    // Plain toLowerCase() would map "I" -> "i", but Turkish "I".toLowerCase()
+    // should be "ı" (dotless). isCovered suppresses the fold entirely for
+    // Latin-script Turkic locales, so an exact-mismatch stays uncovered.
+    const needed = new Set(["ı"]); // dotless i only
+    expect(isCharCoveredForLocale("I", needed, "tr")).toBe(false);
+    expect(isCharCoveredForLocale("ı", needed, "tr")).toBe(true); // exact match still works
+  });
+
+  it("Cyrillic-script Turkic (bare kk) still uses normal case fold", () => {
+    const needed = new Set(["и"]); // Cyrillic lowercase i
+    expect(isCharCoveredForLocale("И", needed, "kk")).toBe(true);
   });
 });

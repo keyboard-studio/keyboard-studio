@@ -14,11 +14,18 @@ export type { ApplyCarveToVfsOpts } from "./applyCarveToVfs.js";
 
 export { carveFilterIr } from "./carveFilterIr.js";
 
-export { applyStoreSlotRemovals, classifyStoreSlotEdit } from "./applyStoreSlotRemovals.js";
+export {
+  applyStoreSlotRemovals,
+  classifyStoreSlotEdit,
+  describeStorePairing,
+  analyzeStores,
+} from "./applyStoreSlotRemovals.js";
 export type {
   StoreSlotRemovalResult,
   StoreSlotEditMode,
   StoreSlotBlockReason,
+  StorePairingDescription,
+  StoreAnalysis,
 } from "./applyStoreSlotRemovals.js";
 
 export { parseSlotId } from "./slotId.js";

@@ -6,7 +6,6 @@ import { ToggleBox } from './ToggleBox.tsx';
 import { WarnIcon } from './carveShared.tsx';
 import type { MouseEvent } from 'react';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
-import { Badge } from '../../../ui/Badge.tsx';
 
 interface RailSection {
   label: string;
@@ -168,16 +167,6 @@ export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, on
                   {node.loadBearing === true && (
                     <span aria-label="load-bearing" style={{ color: 'var(--sil-orange)', display: 'inline-flex' }}>
                       <WarnIcon size={11} />
-                    </span>
-                  )}
-                  {node.recommendation === 'high' && (
-                    <span data-testid={`carve-suggested-removal-${node.nodeId}`} aria-label="Suggested removal">
-                      <Badge
-                        tone="accent"
-                        style={{ border: '1px solid currentColor', borderRadius: 3, padding: '1px 4px', textTransform: 'uppercase', letterSpacing: '.04em' }}
-                      >
-                        Suggested removal
-                      </Badge>
                     </span>
                   )}
                 </div>
