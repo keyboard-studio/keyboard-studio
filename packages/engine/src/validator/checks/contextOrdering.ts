@@ -107,9 +107,19 @@ function extractContext(line: string): { ctx: string; ctxStart: number } | null 
     if (ch === "(") { depth++; continue; }
     if (ch === ")") { depth = Math.max(0, depth - 1); continue; }
     if (depth > 0) continue;
-    if (ch === "+" && (i === 0 || line[i - 1] === " ") &&
-        (i + 1 >= line.length || line[i + 1] === " ")) {
-      return { ctx: line.slice(0, i).trim(), ctxStart: 0 };
+    if (ch === "+") {
+      const prev = line[i - 1];
+      const spaced =
+        (i === 0 || prev === " ") &&
+        (i + 1 >= line.length || line[i + 1] === " ");
+      // A spaceless `+` (e.g. `[K_X]+[K_A]`) is still the context/key separator
+      // when it directly follows a context-token terminator. A `U+hhhh` literal's
+      // `+` is preceded by `U`/`u`, never by one of these, so this cannot mistake
+      // a codepoint for the separator.
+      const afterToken = prev === "]" || prev === ")" || prev === "'" || prev === '"';
+      if (spaced || afterToken) {
+        return { ctx: line.slice(0, i).trim(), ctxStart: 0 };
+      }
     }
   }
   return null;
