@@ -328,7 +328,11 @@ describe("createBaseBrowser", () => {
 
     const matches = keyboards.filter((k) => k.id === "sil_euro_latin");
     expect(matches).toHaveLength(1);
-    expect(matches[0]?.path).toBe("release/s/sil_euro_latin/source");
+    // Dedup preferred the source/ layout (asserted via displayName/version
+    // below), but `path` is the keyboard ROOT with the trailing `/source`
+    // stripped — the loader appends `/source/` itself, so a `.../source` path
+    // would resolve to `.../source/source/<id>.kmn` (404).
+    expect(matches[0]?.path).toBe("release/s/sil_euro_latin");
     expect(matches[0]?.displayName).toBe("SIL Euro Latin (source, canonical)");
     expect(matches[0]?.version).toBe("2.0");
   });
