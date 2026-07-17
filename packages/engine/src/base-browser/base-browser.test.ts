@@ -231,6 +231,19 @@ describe("createBaseBrowser", () => {
     expect(kb?.sourceUrl).toBe(
       "https://github.com/keyboard-studio/keyboards/tree/master/release/s/sil_euro_latin"
     );
+
+    // Source/ layout (Keyman 17+): path must be the keyboard ROOT with the
+    // trailing "/source" stripped, so the loader's own "/source/" append
+    // resolves to a single source/ segment (not "source/source"). sourceUrl
+    // still points at the source/ folder that holds the files.
+    const kbdus = keyboards.find((k) => k.id === "basic_kbdus");
+    expect(kbdus?.path).toBe("release/b/basic_kbdus");
+    expect(kbdus?.sourceUrl).toBe(
+      "https://github.com/keyboard-studio/keyboards/tree/master/release/b/basic_kbdus/source"
+    );
+
+    const deva = keyboards.find((k) => k.id === "sil_devanagari_phonetic");
+    expect(deva?.path).toBe("release/s/sil_devanagari_phonetic");
   });
 
   it("listAll always includes offline fallback even when already in API results", async () => {
