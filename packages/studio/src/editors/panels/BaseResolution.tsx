@@ -48,19 +48,36 @@ const REASON_TONE: Record<ResolvedReason, BadgeTone> = {
 export interface BaseResolutionProps {
   /** The chosen (language, script) target from identity-lite. */
   target: SuggestTarget;
-  onResolved: (base: BaseKeyboard) => void;
+  /**
+   * Fired on every search-result / suggestion-card click. Drives the LIVE
+   * preview in the right pane WITHOUT advancing the wizard or instantiating
+   * the working copy (preview-before-commit). `null` when the picker's
+   * clear action (second Escape) fires.
+   */
+  onPreview: (base: BaseKeyboard | null) => void;
+  /**
+   * Fired by the single "Choose this keyboard" button — commits the
+   * currently-previewed base and advances the wizard.
+   */
+  onConfirm: () => void;
+  /** The base currently shown in the right-pane preview, or null before any pick. */
+  previewedBase: BaseKeyboard | null;
+  /** Coarse compile-pipeline status for `previewedBase` (see stores/basePreviewStatusStore.ts). */
+  previewStatus: "idle" | "loading" | "ready" | "error";
   onBack?: () => void;
 }
 
 export function BaseResolution({
   target,
-  onResolved,
+  onPreview,
+  onConfirm,
+  previewedBase,
+  previewStatus,
   onBack,
 }: BaseResolutionProps) {
   const [bases, setBases] = useState<BaseKeyboard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [picked, setPicked] = useState<BaseKeyboard | null>(null);
   // What the top search bar looks through: the suggested bases (default) or
   // the full catalog. Widened via the toggle or the picker's zero-match action.
   const [searchScope, setSearchScope] = useState<"suggested" | "all">("suggested");
@@ -224,51 +241,65 @@ export function BaseResolution({
           })}
         </div>
         <BaseKeyboardPicker
-          value={picked}
-          onChange={setPicked}
+          value={previewedBase}
+          onChange={onPreview}
           target={target}
           label="Search keyboards"
           scopeIds={searchScope === "suggested" ? suggestedIds : undefined}
           onSearchAll={() => setSearchScope("all")}
         />
+        {/*
+          The single commit button for the step. Enabled ONLY once the
+          preview has compiled successfully (previewStatus === "ready") —
+          disabled while idle, loading, AND on error. This means an author can
+          only commit a keyboard they have actually been able to preview/test,
+          which makes the confirm-while-loading -> subsequent-compile-error
+          race structurally unreachable: there is no path from "clicked
+          confirm" to "advanced onto a base whose compile then fails".
+        */}
         <Button
           variant="secondary"
           data-testid="base-confirm"
-          disabled={picked === null}
-          onClick={() => picked !== null && onResolved(picked)}
+          disabled={previewedBase === null || previewStatus !== "ready"}
+          onClick={onConfirm}
           style={{
             marginTop: 10,
             padding: "8px 18px",
-            background: picked === null ? "transparent" : "var(--app-accent)",
+            background: previewedBase === null ? "transparent" : "var(--app-accent)",
             border: "1px solid var(--app-border)",
             borderRadius: 6,
-            color: picked === null ? "var(--app-text-subtle)" : "var(--app-text)",
+            color: previewedBase === null ? "var(--app-text-subtle)" : "var(--app-text)",
             fontSize: 13,
-            cursor: picked === null ? "not-allowed" : "pointer",
+            cursor: previewedBase === null || previewStatus !== "ready" ? "not-allowed" : "pointer",
             fontFamily: "var(--app-font)",
           }}
         >
-          Use this keyboard
+          {previewStatus === "loading" ? "Preparing preview…" : "Choose this keyboard"}
         </Button>
       </div>
 
       <div style={{ borderTop: "1px solid var(--app-border)", paddingTop: 16 }}>
         <p style={{ ...subtle, marginBottom: 8 }}>Suggested for you:</p>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {suggestions.map(({ base, reason, relative }) => (
+          {suggestions.map(({ base, reason, relative }) => {
+            const isSelected = base.id === previewedBase?.id;
+            return (
             <Button
               key={base.id}
               variant="secondary"
               data-testid={`base-card-${base.id}`}
-              onClick={() => onResolved(base)}
+              // Preview only — does NOT advance the wizard or instantiate the
+              // working copy. Committing happens exclusively via the single
+              // "Choose this keyboard" button above.
+              onClick={() => onPreview(base)}
               style={{
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
                 gap: 12,
                 padding: "10px 14px",
-                background: "var(--app-surface)",
-                border: "1px solid var(--app-border)",
+                background: isSelected ? "var(--app-accent-subtle)" : "var(--app-surface)",
+                border: `1px solid ${isSelected ? "var(--app-accent)" : "var(--app-border)"}`,
                 borderRadius: 8,
                 color: "var(--app-text)",
                 fontSize: 14,
@@ -296,7 +327,8 @@ export function BaseResolution({
                 <Badge tone={REASON_TONE[reason]}>{REASON_LABEL[reason]}</Badge>
               )}
             </Button>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

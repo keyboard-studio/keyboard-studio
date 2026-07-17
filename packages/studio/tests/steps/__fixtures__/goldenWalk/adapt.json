@@ -16,7 +16,9 @@
     "stepId": "choose_base",
     "applyStepCompletion": [],
     "storeMutations": [
+      "setBaseConfirmed",
       "setLocalBase",
+      "setBaseConfirmed",
       "advance"
     ],
     "workingCopyMutations": [],
