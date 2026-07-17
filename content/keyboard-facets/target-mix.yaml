@@ -1,0 +1,42 @@
+# target-mix — spec 037 US3 (declared-metadata archetype).
+#
+# Device classes the keyboard supports — desktop, touch, web — derived from
+# package/project target declarations UNIONED with touch-layout artifact
+# presence. Artifact outranks declaration: a `.keyman-touch-layout` sibling adds
+# `touch` even when no declaration names a touch platform, and that
+# declaration/artifact mismatch is flagged in the record's `notes` (037 FR-014
+# AC1).
+#
+# There is no content-derived tier — the fingerprint is entirely from declared
+# metadata (.kps <Targets>, .kmn &TARGETS) and artifact presence, so the
+# fallbackChain starts at declared-metadata. When neither declaration is present
+# the classifier defaults to `windows`/desktop (FR-014 AC2), recorded at the
+# `default-fallback` tier so the defaulting is auditable.
+#
+# valueType is `set`: the value is the device-class membership set; per-source
+# provenance (declared vs artifact vs defaulted) is recorded in `notes` rather
+# than a distribution, since a set carries no per-member likelihood.
+id: target-mix
+title: Target device mix
+description: >
+  Device classes the keyboard supports — desktop, touch, web — from package
+  (.kps <Targets>) and rule-file (.kmn &TARGETS) declarations unioned with
+  touch-layout artifact presence; a touch-layout artifact outranks the
+  declaration and any declaration/artifact mismatch is flagged.
+valueType: set
+limits:
+  values:
+    - desktop
+    - touch
+    - web
+  open: false
+likelihoodSemantics: >
+  membership per device class (desktop / touch / web); no per-member likelihood
+  — the record's `notes` carries the per-source (declared vs artifact vs
+  defaulted) provenance and any declaration/artifact mismatch flag.
+derivation:
+  archetype: declared-metadata
+  classifierId: target-mix-classifier
+  fallbackChain: [declared-metadata, default-fallback]
+feedsSessionFacets: [env.device-mix]
+schemaVersion: 1

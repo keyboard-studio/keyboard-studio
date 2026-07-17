@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 
 import { parse } from "../../packages/engine/src/codec/index.js";
 import { parseKps, extractScriptSubtag } from "../../packages/engine/src/base-browser/kps-parser.js";
+import { recognizePatterns } from "../../packages/engine/src/recognizer/index.js";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 
 import { loadFacetDefs } from "./load-defs.js";
@@ -34,6 +35,8 @@ import {
 import { writeStable, writeTextIfChanged } from "./writeStable.js";
 import { renderCompanionMd } from "./companion.js";
 import { classifyScript } from "./script-classifier.js";
+import { classifyStrategyFingerprint, strategyFingerprintFallback } from "./strategy-fingerprint-classifier.js";
+import { classifyTargetMix, targetMixFallback } from "./target-mix-classifier.js";
 import { deriveScriptFallback, UNDETERMINED } from "./fallback.js";
 import type {
   Categorization,
@@ -96,12 +99,20 @@ function extractDeclaredScript(bcp47Tags: string[]): string | null {
 }
 
 /**
- * The shipped classifier registry (US1: only `script` is wired; 037 registers
- * more). Exported so tests can compose it with a demo facet to prove the shell
- * is pure-addition extensible (T026/T022) without polluting the shipped set.
+ * The shipped classifier registry, keyed by facet `id` (`def.id`) — NOT by
+ * `derivation.classifierId`, which is a free-form `<facet>-classifier`
+ * freshness/doc label. 036 landed `script`; 037 registers `strategy-fingerprint`
+ * (rule-structure) and `target-mix` (declared-metadata). Exported so tests can
+ * compose it with a demo facet to prove the shell is pure-addition extensible
+ * without polluting the shipped set.
  */
 export const DEFAULT_CLASSIFIERS: Record<string, ClassifierPair> = {
   script: { classify: classifyScript, fallback: scriptFallback },
+  "strategy-fingerprint": {
+    classify: classifyStrategyFingerprint,
+    fallback: strategyFingerprintFallback,
+  },
+  "target-mix": { classify: classifyTargetMix, fallback: targetMixFallback },
 };
 
 // ---------------------------------------------------------------------------
@@ -135,6 +146,15 @@ function buildKeyboardRecord(
   classifiers: Record<string, ClassifierPair>,
 ): KeyboardRecord {
   const { ir, parseError } = parseIr(kb);
+
+  // Run pattern recognition ONCE, centrally, before the classifier loop. The
+  // rule-structure classifier (strategy-fingerprint) reads recognition state off
+  // the IR; recognizing here (rather than lazily inside that one classifier)
+  // keeps the shared IR's mutation explicit and out of any classifier's body, so
+  // no classifier silently mutates state another might read (km-qc review, 037).
+  // recognizePatterns is idempotent and origin-blind, so a classifier that also
+  // calls it standalone (unit tests) still behaves identically.
+  if (ir) recognizePatterns(ir);
 
   const facets: Record<string, Categorization> = {};
   for (const def of defs) {
@@ -238,6 +258,15 @@ export interface BuildOptions {
   facetDefsDir?: string;
   /** Override the classifier registry (default `DEFAULT_CLASSIFIERS`). Tests only. */
   classifiers?: Record<string, ClassifierPair>;
+  /**
+   * Build only the facets that have a registered classifier, silently skipping
+   * definition-only YAMLs a later spec has landed ahead of its classifier
+   * (e.g. spec 039's construction facets). Off by default: the default build
+   * still fails loud on a classifier-less def (the intentional guard, commit
+   * 1169). This opt-in produces the shipped artifact scoped to the facets we can
+   * actually classify while cross-crew work lands the rest.
+   */
+  onlyClassifiedFacets?: boolean;
 }
 
 /**
@@ -250,8 +279,9 @@ export function buildIndex(opts: BuildOptions = {}): FacetIndex {
   const outPath = opts.outPath ?? DEFAULT_OUT_PATH;
   const incremental = opts.incremental ?? false;
 
-  const defs = loadFacetDefs(opts.facetDefsDir ?? FACET_DEFS_DIR);
   const classifiers = opts.classifiers ?? DEFAULT_CLASSIFIERS;
+  const allDefs = loadFacetDefs(opts.facetDefsDir ?? FACET_DEFS_DIR);
+  const defs = opts.onlyClassifiedFacets ? allDefs.filter((d) => classifiers[d.id]) : allDefs;
   const scanOpts: { corpusRoot?: string; limit?: number | null } = { limit: opts.limit ?? null };
   if (opts.corpusRoot !== undefined) scanOpts.corpusRoot = opts.corpusRoot;
   const scan = scanCorpus(scanOpts);

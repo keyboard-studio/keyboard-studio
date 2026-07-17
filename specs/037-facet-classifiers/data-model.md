@@ -18,7 +18,7 @@ declaration. See [contracts/classifier.contract.md](contracts/classifier.contrac
 
 | Property | Type | Notes |
 |---|---|---|
-| `id` | string | `script` / `strategy-fingerprint` / `target-mix`. Matches `derivation.classifierId` in the facet definition (036). |
+| `id` | string | `script` / `strategy-fingerprint` / `target-mix` — equals the **facet `id`** and is the `DEFAULT_CLASSIFIERS` registry key (`build-index.ts` looks up `classifiers[def.id]`). **Not** the same string as `derivation.classifierId`, which is the free-form `<facet>-classifier` freshness/doc label (e.g. `script-classifier`) and is never a registry key. |
 | `version` | string | bumped on any algorithm/data change; participates in 036 freshness (`scannerVersion`). FR-001. |
 | `archetype` | `character-content \| rule-structure \| declared-metadata` | FR-002. script=character-content, strategy-fingerprint=rule-structure, target-mix=declared-metadata. |
 | `fallbackChain` | ordered tier id list | FR-002/FR-011. script: `[content-derived, declared-metadata, default-fallback, undetermined]`; strategy: `[content-derived, undetermined]` (no metadata tier — research D7); target: `[declared-metadata, default-fallback]`. |
@@ -57,7 +57,7 @@ Fills 036 Entity 2 for facet `script`. `valueType: histogram`, `limits.values` =
 | `distribution` | `Record<ISO15924, number>` summing to ~1: each script's full-weight tally ÷ sum of all tallies (research D3). Keys sorted. |
 | `confidence` | dominant share (the histogram carries it). |
 | `confidenceClass` | dominant share ≥0.80 ⇒ `confident`; else `mixed`; no concrete evidence ⇒ `undetermined` (spec Assumptions, tunable). |
-| `provenanceTier` | which of the four tiers fired (research D5). |
+| `provenanceTier` | one of the **three** enum tiers `content-derived` / `declared-metadata` / `default-fallback` (research D5). The fallback chain's terminal `undetermined` step is **not** a fourth `provenanceTier` value: an undetermined outcome is recorded as `value: "undetermined"` (the reserved sentinel in `limits.values`) + `confidenceClass: "undetermined"`, with `provenanceTier` staying `default-fallback` (shipped `fallback.ts` `deriveScriptFallback` tier 3; the manifest's `undetermined` coverage bucket is keyed off `value === "undetermined"` in `build-index.ts`, not off a fourth tier). |
 | `evidenceSize` | count of distinct concretely-scripted produced scalars. |
 | `analyzedCoverage` | `1 − opaqueShare` (research D6). |
 | `analysisOutcome` | `fully`/`partially`/`fallback-only` from `ImportStatus` (research D9). |
@@ -126,7 +126,10 @@ Fills 036 Entity 2 for facet `target-mix`. `valueType: set`, `limits.values` = d
 ## Relationships
 
 - **Classifier → Categorization**: each classifier emits exactly one 036 Entity 2 record per keyboard for
-  its facet. The classifier *is* the `derivation.classifierId` the facet definition names.
+  its facet. Each classifier registers under its **facet `id`** — the shipped `DEFAULT_CLASSIFIERS` map in
+  `build-index.ts` is keyed by `def.id`, so `strategy-fingerprint`/`target-mix` register under exactly those
+  keys (matching the YAML `id`). `derivation.classifierId` (`<facet>-classifier`) is a documentation/freshness
+  label the definition carries, **not** the registry key.
 - **Reference pin → Categorization**: the pins' versions flow into 036's manifest and freshness; a UCD or
   langtags version bump forces recompute of content-derived script records (036 US3).
 - **Categorization → session facet** (036 D8 / FR-009): script → `community.multi-orthography`

@@ -41,7 +41,9 @@ interface ClassifierInputs {
 }
 
 interface Classifier {
-  readonly id: string;            // matches definition derivation.classifierId
+  readonly id: string;            // = the facet id; this is the DEFAULT_CLASSIFIERS registry key
+                                  // (build-index.ts keys by def.id). NOT derivation.classifierId,
+                                  // which is a free-form `<facet>-classifier` freshness/doc label.
   readonly version: string;       // participates in freshness (FR-001)
   readonly archetype: Archetype;
   readonly fallbackChain: string[];

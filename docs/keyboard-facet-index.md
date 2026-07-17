@@ -5,8 +5,8 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 ## Build inputs
 
 - **keyboards**: 918
-- **facets**: script
-- **scannerVersion**: `facet-index@1;schema@1;script@1`
+- **facets**: script, strategy-fingerprint, target-mix
+- **scannerVersion**: `facet-index@1;schema@1;script@2;strategy-fingerprint@1;target-mix@1`
 - **unicodeVersion**: 17.0.0
 - **corpusScope**: `release/**`
 - **corpusCommit**: `keymanapp/keyboards@9ca2b3cedf5cf42c10f9c5ef291450b73cbc6efe`
@@ -17,6 +17,8 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | facet | content-derived | declared-metadata | fallback | undetermined |
 | --- | ---: | ---: | ---: | ---: |
 | `script` | 893 | 13 | 10 | 2 |
+| `strategy-fingerprint` | 908 | 0 | 10 | 0 |
+| `target-mix` | 0 | 899 | 19 | 0 |
 
 ## Sample records — `script` (first 12 by id)
 
@@ -34,4 +36,38 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `arabic_izza` | Arab | content-derived | fully | 53 |
 | `arabic_w_o_dots` | Arab | content-derived | fully | 97 |
 | `aramaic_hebrew` | Syrc | content-derived | fully | 32 |
+
+## Sample records — `strategy-fingerprint` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | undefined | content-derived | fully | 1 |
+| `afghan_turkmen` | undefined | content-derived | fully | 103 |
+| `ahom_star` | undefined | content-derived | fully | 104 |
+| `akan` | undefined | content-derived | fully | 85 |
+| `akha_lahu` | undefined | content-derived | fully | 7 |
+| `aksarabali_panlex` | undefined | content-derived | partially | 101 |
+| `amazigh_latin` | undefined | content-derived | fully | 176 |
+| `anglo_furthorc_english` | undefined | content-derived | fully | 98 |
+| `anii` | undefined | content-derived | fully | 96 |
+| `arabic_izza` | undefined | content-derived | fully | 90 |
+| `arabic_w_o_dots` | undefined | content-derived | fully | 189 |
+| `aramaic_hebrew` | undefined | content-derived | fully | 33 |
+
+## Sample records — `target-mix` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | desktop+touch+web | declared-metadata | fully | 3 |
+| `afghan_turkmen` | desktop+touch+web | declared-metadata | fully | 3 |
+| `ahom_star` | desktop+touch+web | declared-metadata | fully | 3 |
+| `akan` | desktop+touch+web | declared-metadata | fully | 3 |
+| `akha_lahu` | desktop+touch+web | declared-metadata | fully | 3 |
+| `aksarabali_panlex` | desktop+touch+web | declared-metadata | fully | 3 |
+| `amazigh_latin` | desktop+touch+web | declared-metadata | fully | 3 |
+| `anglo_furthorc_english` | desktop+touch+web | declared-metadata | fully | 3 |
+| `anii` | desktop+touch+web | declared-metadata | fully | 3 |
+| `arabic_izza` | desktop+touch+web | declared-metadata | fully | 3 |
+| `arabic_w_o_dots` | desktop+touch+web | declared-metadata | fully | 3 |
+| `aramaic_hebrew` | desktop+touch+web | declared-metadata | fully | 3 |
 
