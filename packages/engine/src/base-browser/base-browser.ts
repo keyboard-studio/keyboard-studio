@@ -17,7 +17,7 @@ import {
 } from "./github-api.js";
 import { parseKps } from "./kps-parser.js";
 import { offlineKbdus } from "./offline-bundle.js";
-import { matchKeyboardScopePath } from "./corpus-scope.js";
+import { dedupeKpsPathsById, matchKeyboardScopePath } from "./corpus-scope.js";
 
 const OWNER = "keyboard-studio";
 const REPO = "keyboards";
@@ -153,11 +153,13 @@ export function createBaseBrowser(
       return [offlineKbdus];
     }
 
-    const kpsPaths = items
-      .filter(
-        (item) => item.type === "blob" && matchKeyboardScopePath(item.path) !== null
-      )
-      .map((item) => item.path);
+    // Dedupe transitional-duplicate ids (present under both the
+    // source/ and legacy flat-root layouts at once) to a single kps path per
+    // id, preferring source/, BEFORE fetching+parsing so a duplicate isn't
+    // even fetched twice.
+    const kpsPaths = dedupeKpsPathsById(
+      items.filter((item) => item.type === "blob").map((item) => item.path)
+    );
 
     const keyboards: BaseKeyboard[] = [];
 
@@ -165,19 +167,31 @@ export function createBaseBrowser(
       kpsPaths.map(async (kpsPath) => {
         const id = matchKeyboardScopePath(kpsPath)?.id;
         if (id === undefined) return;
-        // Folder path is the kps path without the filename
+        // The folder holding the .kps. For the Keyman 17+ "source/" layout this
+        // is `release/<vendor>/<id>/source`; for the legacy flat-root layout it
+        // is `release/<vendor>/<id>`.
         const folderPath = kpsPath.slice(0, kpsPath.lastIndexOf("/"));
+        // BaseKeyboard.path is the keyboard ROOT (contract: e.g.
+        // "release/b/basic_kbdus"). The loader appends "/source/" itself, so the
+        // trailing "/source" segment must be stripped here — otherwise the loader
+        // fetches ".../source/source/<id>.kmn" (404) and the base is silently
+        // dropped to a stub-only scaffold.
+        const keyboardRoot = folderPath.endsWith("/source")
+          ? folderPath.slice(0, -"/source".length)
+          : folderPath;
         try {
           const xml = await fetchRawText(`${RAW_BASE}/${kpsPath}`, clientOpts);
           const meta = parseKps(xml);
           keyboards.push(
             makeBaseKeyboard({
               id,
-              path: folderPath,
+              path: keyboardRoot,
               displayName: meta.displayName || id,
               version: meta.version,
               script: meta.script,
               targets: meta.targets,
+              // View-source link points at the folder that actually holds the
+              // source files (the source/ subfolder under the modern layout).
               sourceUrl: `https://github.com/${OWNER}/${REPO}/tree/${REF}/${folderPath}`,
               ...(meta.languages.length > 0 ? { languages: meta.languages } : {}),
             })

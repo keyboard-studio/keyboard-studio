@@ -4,6 +4,7 @@
 
 import type { LintFinding } from "@keyboard-studio/contracts";
 import type { TouchLayoutIR } from "@keyboard-studio/contracts";
+import { isSpacerKeyClass } from "@keyboard-studio/contracts";
 import { makeLocation } from "./_shared.js";
 
 const MAX_KEYS: Partial<Record<string, number>> = {
@@ -30,9 +31,10 @@ export function checkKeysPerRow(
 
     for (const layer of platform.layers) {
       layer.rows.forEach((row, rowIdx) => {
-        // sp===8 denotes spacer keys; they occupy horizontal space but do not add
-        // to the interactive key count that drives crowding on small screens.
-        const keyCount = row.keys.filter((k) => k.sp !== 8).length;
+        // Spacer keys (sp:8 spacer / sp:10 padding) occupy horizontal space but
+        // do not add to the interactive key count that drives crowding on small
+        // screens. Use the canonical predicate so sp:10 is not miscounted.
+        const keyCount = row.keys.filter((k) => !isSpacerKeyClass(k.sp)).length;
         if (keyCount > maxKeys) {
           findings.push({
             code: "KM_WARN_TOUCH_KEYS_PER_ROW",

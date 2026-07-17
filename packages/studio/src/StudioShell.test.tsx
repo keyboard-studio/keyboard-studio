@@ -284,9 +284,27 @@ vi.mock("./survey/index.ts", () => {
   };
 });
 
+// BaseResolution mock — preview-before-commit contract. Two separate buttons
+// mirror the two real user actions (a suggestion-card click fires onPreview;
+// the "Choose this keyboard" button fires onConfirm) as two SEPARATE click
+// events, not one — the real BaseResolutionAdapter's onConfirm closes over
+// the store's localBase from ITS OWN render, so a preview must be allowed to
+// flush (and the adapter re-render with the new onConfirm closure) before
+// confirm fires, exactly as two distinct user clicks would.
 vi.mock("./editors/panels/BaseResolution.tsx", () => ({
-  BaseResolution: ({ onResolved, onBack }: { onResolved: (base: unknown) => void; onBack?: () => void }) => {
-    _mockBaseResolvedRef.current = onResolved;
+  BaseResolution: ({
+    onPreview,
+    onConfirm,
+    previewedBase,
+    onBack,
+  }: {
+    onPreview: (base: unknown) => void;
+    onConfirm: () => void;
+    previewedBase: unknown;
+    previewStatus: string;
+    onBack?: () => void;
+  }) => {
+    _mockBaseResolvedRef.current = onConfirm;
     const fakeBase = {
       id: "basic_kbdus",
       path: "release/b/basic_kbdus",
@@ -297,8 +315,16 @@ vi.mock("./editors/panels/BaseResolution.tsx", () => ({
     };
     return (
       <div data-testid="stage-base">
-        <button type="button" data-testid="base-resolved" onClick={() => onResolved(fakeBase)}>
-          base-resolved
+        <button type="button" data-testid="base-preview" onClick={() => onPreview(fakeBase)}>
+          base-preview
+        </button>
+        <button
+          type="button"
+          data-testid="base-confirm"
+          disabled={previewedBase === null}
+          onClick={onConfirm}
+        >
+          base-confirm
         </button>
         {onBack !== undefined && (
           <button type="button" data-testid="base-back" onClick={onBack}>
@@ -564,10 +590,15 @@ function advanceToBase() {
   fireEvent.click(screen.getByTestId("identity-complete"));
 }
 
-/** Drive from "identity" to "track" (identity → base → track). */
+/**
+ * Drive from "identity" to "track" (identity → base → track).
+ * Two SEPARATE fireEvent.click calls (preview, then confirm) — mirrors two
+ * real user clicks with a render flush in between (preview-before-commit).
+ */
 function advanceToTrack() {
   advanceToBase();
-  fireEvent.click(screen.getByTestId("base-resolved"));
+  fireEvent.click(screen.getByTestId("base-preview"));
+  fireEvent.click(screen.getByTestId("base-confirm"));
 }
 
 /**
@@ -1369,8 +1400,10 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     expect(screen.getByTestId("stage-base")).toBeTruthy();
     expect(screen.queryByTestId("stage-identity")).toBeNull();
 
-    // → track (manifest step: copy vs adapt)
-    fireEvent.click(screen.getByTestId("base-resolved"));
+    // → track (manifest step: copy vs adapt). Preview then confirm — two
+    // separate clicks (preview-before-commit).
+    fireEvent.click(screen.getByTestId("base-preview"));
+    fireEvent.click(screen.getByTestId("base-confirm"));
     expect(screen.getByTestId("stage-track")).toBeTruthy();
     expect(screen.queryByTestId("stage-base")).toBeNull();
 

@@ -1,0 +1,25 @@
+# normalization-posture — corpus counterpart of the session facet
+# source.normalization-posture: whether a corpus keyboard's output literals
+# are NFC-precomposed, NFD-decomposed, or mixed. Meaningful only for
+# alphabetic Latin/Cyrillic/Greek keyboards.
+
+id: normalization-posture
+title: Output normalization posture
+description: >
+  Whether a corpus keyboard's rule/store output literals are
+  NFC-precomposed, NFD-decomposed, or mixed, for the alphabetic scripts
+  (Latin, Cyrillic, Greek) where both forms exist. Feeds the
+  source.normalization-posture session facet.
+valueType: enum
+limits:
+  values: [nfc, nfd, mixed]
+  open: false
+likelihoodSemantics: >
+  the single classified value for the keyboard's output literals;
+  likelihood is 1 for the classified value.
+derivation:
+  archetype: rule-structure
+  classifierId: planned
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: [source.normalization-posture]
+schemaVersion: 1

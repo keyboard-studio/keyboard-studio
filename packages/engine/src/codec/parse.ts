@@ -587,18 +587,41 @@ function splitOnArrow(text: string): { lhs: string; rhs: string } | null {
 }
 
 /**
- * Strip a trailing `c <comment>` from the RHS of a rule.
- * Returns { rhs, trailingComment }.
+ * Strip a trailing `c <comment>` (or bare `c`) from a KMN source value.
+ *
+ * kmcmplib's lexer treats a whitespace-delimited `c` token — outside of quotes
+ * and bracket groups — as the start of a line comment. This scan is quote- and
+ * bracket-aware so a `c` inside a quoted output string (e.g. `'a c b'`) or a
+ * key name (`[K_C]`) is not mistaken for a comment start. Used for both rule
+ * RHS values and store values (both can carry a trailing `c` comment).
+ *
+ * Returns { rhs, trailingComment } — `rhs` with the comment removed (trimmed),
+ * and the comment text (undefined when absent; an empty bare-`c` comment is
+ * normalized to undefined).
  */
 function stripTrailingComment(rhs: string): { rhs: string; trailingComment: string | undefined } {
-  // Trailing comment: whitespace + `c` + (whitespace or end of string)
-  // We look from the end to find the last unquoted `c` preceded by whitespace.
-  // Simple approach: tokenize the rhs and see if the last token(s) start a comment.
-  const commentMatch = /\s+c(?:\s+(.*))?$/.exec(rhs);
-  if (commentMatch) {
-    const stripped = rhs.slice(0, commentMatch.index).trim();
-    const commentText = (commentMatch[1] ?? "").trim();
-    return { rhs: stripped, trailingComment: commentText || undefined };
+  let inS = false;
+  let inD = false;
+  let depth = 0;
+  for (let i = 0; i < rhs.length; i++) {
+    const ch = rhs[i];
+    if (ch === "'" && !inD) { inS = !inS; continue; }
+    if (ch === '"' && !inS) { inD = !inD; continue; }
+    if (inS || inD) continue;
+    if (ch === "[") { depth++; continue; }
+    if (ch === "]") { depth--; continue; }
+    // A comment starts at an unquoted, depth-0 `c` bounded by whitespace on the
+    // left and by whitespace (or end-of-string) on the right.
+    if (
+      depth === 0 &&
+      ch === "c" &&
+      /\s/.test(rhs[i - 1] ?? "") &&
+      (i === rhs.length - 1 || /\s/.test(rhs[i + 1] ?? ""))
+    ) {
+      const stripped = rhs.slice(0, i).trim();
+      const commentText = rhs.slice(i + 1).trim();
+      return { rhs: stripped, trailingComment: commentText || undefined };
+    }
   }
   return { rhs, trailingComment: undefined };
 }
@@ -627,6 +650,7 @@ interface ParsedStore {
   name: string;
   isSystem: boolean;
   rawValue: string;
+  trailingComment: string | undefined;
 }
 
 /**
@@ -642,7 +666,11 @@ function parseStoreLine(text: string, line: number): ParsedStore {
   const isSystem = rawName.startsWith("&");
   const upper = rawName.slice(1).toUpperCase();
   const name = isSystem ? (CANONICAL_SYSTEM_STORE[upper] ?? upper) : rawName;
-  return { name, isSystem, rawValue: (m[2] ?? "").trim() };
+  // Strip a trailing `c <comment>`: kmcmplib treats it as a line comment, not
+  // store content, so it must not leak into store items or system-store header
+  // values. Quote/bracket-aware so a `c` inside a quoted value is preserved.
+  const { rhs: rawValue, trailingComment } = stripTrailingComment((m[2] ?? "").trim());
+  return { name, isSystem, rawValue, trailingComment };
 }
 
 // ---------------------------------------------------------------------------
@@ -806,6 +834,7 @@ export function parse(text: string, keyboardId: string): ParseResult {
             sourceLine: tok.line,
           };
           if (tok.targetSelector !== undefined) irStore.targetSelector = tok.targetSelector;
+          if (parsed.trailingComment !== undefined) irStore.trailingComment = parsed.trailingComment;
           stores.push(irStore);
         }
         break;

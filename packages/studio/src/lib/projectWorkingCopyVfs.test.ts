@@ -615,3 +615,47 @@ describe("projectWorkingCopyVfs — id rename (step 4)", () => {
     expect(result.effectiveKeyboardId).toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Id-rename (Track-1 copy) preserves the base keyboard release version.
+// Regression: resetIdentity previously defaulted &KEYBOARDVERSION to "1.0" on
+// the copy path while the .kps <Version> and zip filename kept the base
+// version, leaving the package internally inconsistent.
+// ---------------------------------------------------------------------------
+
+describe("projectWorkingCopyVfs — id rename preserves base version", () => {
+  const BASE_KMN = `store(&VERSION) '10.0'
+store(&NAME) 'Base KB'
+store(&TARGETS) 'any'
+store(&KEYBOARDVERSION) '2.3'
+
+begin Unicode > use(main)
+
+group(main) using keys
++ [K_A] > U+0061
+`;
+
+  it("keeps &KEYBOARDVERSION from the base when renaming to a new id", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const vfs = createVirtualFS([
+      { path: "source/base_kb.kmn", content: BASE_KMN, isBinary: false },
+    ]);
+    const result = projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "base_kb",
+      targetKeyboardId: "new_kb",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+
+    expect(result.effectiveKeyboardId).toBe("new_kb");
+    const renamed = vfs.entries().find((e) => e.path === "source/new_kb.kmn");
+    expect(renamed).toBeDefined();
+    const kmn = renamed?.content as string;
+    expect(kmn).toContain("store(&KEYBOARDVERSION) '2.3'");
+    expect(kmn).not.toContain("store(&KEYBOARDVERSION) '1.0'");
+  });
+});

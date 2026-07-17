@@ -132,6 +132,21 @@ export interface SurveySessionState {
   localBase: BaseKeyboard | null;
 
   /**
+   * Preview-before-commit gate for the "Choose a starting keyboard" step.
+   * `localBase` now drives a LIVE PREVIEW as soon as the author clicks a
+   * search result or suggestion card, without instantiating the working
+   * copy or advancing the wizard (so several bases can be tried). This flag
+   * is set true only when the author clicks the explicit "Choose this
+   * keyboard" commit button; StudioShell's single-instantiation effect
+   * gates the real `doCommit` call on it. False means "previewing, not yet
+   * committed". Cleared to false by reset() and by every subsequent preview
+   * click (a new preview always re-arms the gate). Persisting `true` in a
+   * restored draft is intentional — a draft that already passed choose_base
+   * must re-instantiate on restore exactly as it does today.
+   */
+  baseConfirmed: boolean;
+
+  /**
    * Internal substage for the characters manifest step (spec 027 Stage 4).
    * Persisted here (not in CharactersStep component state) so back-from-carve
    * re-enters at PhaseB after the component remounts. Initial value "prefill".
@@ -210,6 +225,9 @@ export interface SurveySessionState {
   /** Plain setter — local base driving the compile pipeline. */
   setLocalBase: (b: BaseKeyboard | null) => void;
 
+  /** Plain setter — the choose_base preview-before-commit gate. */
+  setBaseConfirmed: (v: boolean) => void;
+
   /** Plain setter — characters step internal substage (spec 027 Stage 4). */
   setCharactersSubStage: (s: CharactersSubStage) => void;
 
@@ -245,7 +263,7 @@ type SurveySessionData = Omit<
   | "advance" | "popHistory" | "backToTouchSeedSource" | "reset"
   | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
   | "setSelectedTrack" | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
-  | "setTouchSeedSource"
+  | "setTouchSeedSource" | "setBaseConfirmed"
 >;
 
 /**
@@ -271,6 +289,7 @@ const INITIAL_STATE = {
   selectedTrack: null,
   scaffoldSpec: null,
   localBase: null,
+  baseConfirmed: false,
   charactersSubStage: "prefill" as CharactersSubStage,
   touchSeedSource: null as TouchSeedSource | null,
 } as const satisfies SurveySessionData;
@@ -327,6 +346,7 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
   setSelectedTrack: (t) => set({ selectedTrack: t }),
   setScaffoldSpec: (s) => set({ scaffoldSpec: s }),
   setLocalBase: (b) => set({ localBase: b }),
+  setBaseConfirmed: (v) => set({ baseConfirmed: v }),
   setCharactersSubStage: (s) => set({ charactersSubStage: s }),
 
   setTouchSeedSource: (s) =>
@@ -368,6 +388,7 @@ export function snapshotTraversal(): TraversalSnapshot {
     selectedTrack: s.selectedTrack,
     scaffoldSpec: s.scaffoldSpec,
     localBase: s.localBase,
+    baseConfirmed: s.baseConfirmed,
     charactersSubStage: s.charactersSubStage,
     touchSeedSource: s.touchSeedSource,
   };

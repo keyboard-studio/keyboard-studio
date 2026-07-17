@@ -2,17 +2,17 @@
  * Independence-weighted aggregation of per-keyboard placement reports.
  *
  * Aggregation pipeline:
- *   1. Fork-collapse  — group reports by placementFingerprint; count one vote
- *      per fingerprint (multiple keyboards sharing the same placement map are
- *      the same fork tree and get one vote).
+ *   1. Fork-collapse + anti-pattern discard — group reports by
+ *      placementFingerprint (one vote per fork tree), and drop any whole
+ *      keyboard matching the "fill left-to-right" anti-pattern (its assigned
+ *      vkeys form a monotone QWERTY run of ≥5 consecutive keys with no
+ *      phonetic/decomposition basis) from the consensus pool. Both are
+ *      per-keyboard properties (spec §7.6).
  *   2. Aggregate by codepoint — collect all (vkey, modifiers, mechanism) tuples
  *      across surviving votes; sort by occurrence count descending.
  *   3. Standards-body bonus — multiply priorCount by caller-supplied multiplier
  *      for designated keyboards (content-team curated set).
- *   4. Anti-pattern discard — discard placements where the vkeys across surviving
- *      keyboards form a monotone left-to-right QWERTY run of ≥5 consecutive keys
- *      with no phonetic/decomposition basis ("fill left-to-right" keyboards).
- *   5. Confidence normalization — confidence = priorCount / maxPriorCount.
+ *   4. Confidence normalization — confidence = priorCount / maxPriorCount.
  *
  * NOTE: This module uses Node crypto (SHA-256) and MUST NOT be imported from
  * the SPA.  It is offline-only (supportability scanner, kbgen, CI pipelines).
@@ -80,6 +80,22 @@ function isMonotoneQwertyRun(keys: string[]): boolean {
   return false;
 }
 
+/**
+ * A keyboard exhibits the "free keys filled left-to-right" anti-pattern
+ * (spec §7.6) when the distinct vkeys it assigns across all target codepoints
+ * form a monotone consecutive QWERTY run of ≥5 keys — i.e. characters were
+ * dropped onto free keys in QWERTY order with no phonetic/decomposition basis.
+ * Such a keyboard carries no placement signal and is excluded from the
+ * consensus pool as a whole (per-keyboard), rather than per-codepoint.
+ */
+function isFillLeftToRightKeyboard(report: KeyboardPlacementReport): boolean {
+  const vkeys = new Set<string>();
+  for (const candidates of report.candidatesByCodepoint.values()) {
+    for (const c of candidates) vkeys.add(c.vkey);
+  }
+  return isMonotoneQwertyRun([...vkeys]);
+}
+
 // ---------------------------------------------------------------------------
 // Fingerprint computation (exported for the scanner's computeFingerprint)
 // ---------------------------------------------------------------------------
@@ -129,15 +145,20 @@ export function aggregatePlacements(
   const bonus = opts?.supplementBonus ?? {};
 
   // -------------------------------------------------------------------------
-  // Step 1 — Fork-collapse: one vote per unique placementFingerprint.
+  // Step 1 — Build the consensus pool:
+  //   (a) Fork-collapse — one vote per unique placementFingerprint (fork-copy
+  //       trees collapse to a single vote).
+  //   (b) Anti-pattern discard (spec §7.6) — a whole keyboard matching the
+  //       "free keys filled left-to-right" anti-pattern is excluded from the
+  //       pool. This is a per-KEYBOARD property, not per-codepoint.
   // -------------------------------------------------------------------------
   const seenFingerprints = new Set<string>();
   const survivingReports: KeyboardPlacementReport[] = [];
   for (const report of reports) {
-    if (!seenFingerprints.has(report.placementFingerprint)) {
-      seenFingerprints.add(report.placementFingerprint);
-      survivingReports.push(report);
-    }
+    if (seenFingerprints.has(report.placementFingerprint)) continue;
+    seenFingerprints.add(report.placementFingerprint);
+    if (isFillLeftToRightKeyboard(report)) continue;
+    survivingReports.push(report);
   }
 
   // -------------------------------------------------------------------------
@@ -191,18 +212,16 @@ export function aggregatePlacements(
   // Step 3 — Apply standards-body bonus to surviving entries.
   //          (Already applied per-candidate above via multiplier.)
   //
-  // Step 4 — Anti-pattern discard: if the vkeys for a given codepoint across
-  //          all candidates form a monotone QWERTY run of ≥5 consecutive keys,
-  //          this is a "fill left-to-right" keyboard and gets discarded.
+  // The "fill left-to-right" anti-pattern is handled per-keyboard in Step 1
+  // (spec §7.6), so there is deliberately no per-codepoint discard here — a
+  // codepoint that several keyboards happen to place on consecutive keys is a
+  // legitimate consensus signal, not an anti-pattern, and must be kept.
   // -------------------------------------------------------------------------
 
   const entries: Record<string, AggregatedEntry> = {};
   let maxPriorCount = 0;
 
   for (const [hexKey, slotMap] of cpMap.entries()) {
-    const vkeysForCp = [...slotMap.values()].map((v) => v.candidate.vkey);
-    if (isMonotoneQwertyRun(vkeysForCp)) continue; // anti-pattern discard
-
     // Build the sorted placement list for this codepoint.
     const placements: PlacementCandidate[] = [...slotMap.values()]
       .sort((a, b) => b.count - a.count)

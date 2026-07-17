@@ -20,7 +20,7 @@ The studio's runtime keyboard catalog assigns every keyboard the script `Latn`, 
 
 A studio subsystem (base suggestion ranking, a session-facet `corpus:` derivation, the glottolog relatedness bridge) or a content-team script looks up any corpus keyboard by id and reads its categorization for a facet — e.g. script — receiving the dominant value, the full likelihood distribution, the provenance tier that produced it, and the freshness stamp.
 
-**Why this priority**: This is the product of the feature. Everything else (schema extensibility, rescan) exists so this lookup is trustworthy. It directly unblocks fixing the wrong-script suggestion defect and un-planning the fourteen `corpus:` derivations.
+**Why this priority**: This is the product of the feature. Everything else (schema extensibility, rescan) exists so this lookup is trustworthy. It directly unblocks fixing the wrong-script suggestion defect and un-planning the ten `planned` `corpus:` derivations.
 
 **Independent Test**: With an index built for the sibling keyboards corpus, look up a known Arabic-script keyboard and a known Latin-script keyboard; verify each returns the correct dominant script, a likelihood distribution summing to 1, a named provenance tier, and a freshness stamp — with no studio code changes required.
 
@@ -101,7 +101,7 @@ After pulling new commits in the sibling keyboards checkout, a maintainer re-run
 - **SC-002**: For a hand-verified sample of at least 20 keyboards spanning at least 5 scripts, the script facet's dominant value matches the human judgment in at least 95% of cases (the remainder must be explainably ambiguous, e.g. genuinely dual-script keyboards).
 - **SC-003**: A new facet can be added and populated corpus-wide without any change to existing records (byte-diff clean for prior facets).
 - **SC-004**: An unchanged-corpus rebuild is byte-identical; a one-keyboard change rebuild touches only that keyboard's records plus the manifest.
-- **SC-005**: At least 4 of the 14 `planned` `corpus:` derivations in `content/facets/` can name a concrete field in the index as their source (they flip to `available` in the follow-up wiring feature, not this one).
+- **SC-005**: At least 4 of the 10 `planned` `corpus:` derivations in `content/facets/` (of 12 total; the other 2 are already `available`) can name a concrete field in the index as their source (they flip to `available` in the follow-up wiring feature, not this one).
 
 ## Assumptions
 

@@ -46,6 +46,52 @@ describe("checkContextOrdering", () => {
     expect(findings.some((f) => f.code === "KM_ERROR_VIRTUAL_KEY_IN_CONTEXT")).toBe(true);
   });
 
+  it("rejects a virtual key in the context when the + separator has no surrounding spaces", () => {
+    // `[K_X]+[K_A]` — the spaceless `+` (after a `]` terminator) is still the
+    // context/key separator, so the [K_X] in the context must be flagged.
+    const source = "[K_X]+[K_A] > 'a'";
+    const findings = checkContextOrdering(source);
+    expect(findings.some((f) => f.code === "KM_ERROR_VIRTUAL_KEY_IN_CONTEXT")).toBe(true);
+  });
+
+  it("rejects a virtual key in the context when the + separator directly follows a ')' terminator", () => {
+    // Context is `[K_A] dk(acute)` — the spaceless `+` after the `)` terminator
+    // (closing dk()'s call) is still the context/key separator, so the [K_A]
+    // vkey earlier in that same context must be flagged.
+    const source = "[K_A] dk(acute)+[K_B] > 'a'";
+    const findings = checkContextOrdering(source);
+    expect(findings.some((f) => f.code === "KM_ERROR_VIRTUAL_KEY_IN_CONTEXT")).toBe(true);
+  });
+
+  it("rejects a virtual key in the context when the + separator directly follows a '\"' terminator", () => {
+    // Context is `[K_A] "x"` — the spaceless `+` after the closing `"` is
+    // still the context/key separator, so the [K_A] vkey earlier in that same
+    // context must be flagged.
+    const source = "[K_A] \"x\"+[K_B] > 'a'";
+    const findings = checkContextOrdering(source);
+    expect(findings.some((f) => f.code === "KM_ERROR_VIRTUAL_KEY_IN_CONTEXT")).toBe(true);
+  });
+
+  it("rejects a virtual key in the context when the + separator has a space only before it", () => {
+    // `[K_A] +[K_B]` — space before `+`, none after, and the char before `+`
+    // is a space (not a terminator). The separator must still be recognized so
+    // the [K_A] vkey in the context is flagged.
+    const source = "[K_A] +[K_B] > 'a'";
+    const findings = checkContextOrdering(source);
+    expect(findings.some((f) => f.code === "KM_ERROR_VIRTUAL_KEY_IN_CONTEXT")).toBe(true);
+  });
+
+  it("does not treat a U+hhhh literal's + as the context/key separator", () => {
+    // Context is `U+0300 [K_A]` (a combining char followed by an illegal vkey);
+    // the real separator is the spaced ` + ` before [K_B]. If the `+` inside
+    // `U+0300` were mistaken for the separator, the context would collapse to a
+    // bare `U` and the [K_A] vkey error would be missed. Asserting the error
+    // still fires confirms the U+ literal's `+` was not split on.
+    const source = "U+0300 [K_A] + [K_B] > 'a'";
+    const findings = checkContextOrdering(source);
+    expect(findings.some((f) => f.code === "KM_ERROR_VIRTUAL_KEY_IN_CONTEXT")).toBe(true);
+  });
+
   // Failing cases — Rule 1: nul not first
   it("rejects nul when it is not the first context token", () => {
     const source = 'dk(acute) nul + "a" > "b"';

@@ -32,6 +32,12 @@ export const KPS_SCOPE_RE_ROOT = /^release\/[^/]+\/([^/]+)\/\1\.kps$/;
 export interface KeyboardScopeMatch {
   /** The keyboard id — the `<id>` path segment, equal to the `.kps` basename. */
   id: string;
+  /**
+   * Which layout the path matched. Callers that collapse a "transitional
+   * duplicate" (the same id present under both layouts) use this
+   * to prefer `"source"` (Keyman 17+ canonical) over `"flat"` (legacy).
+   */
+  layout: "source" | "flat";
 }
 
 /**
@@ -44,10 +50,38 @@ export interface KeyboardScopeMatch {
  */
 export function matchKeyboardScopePath(path: string): KeyboardScopeMatch | null {
   const sourceMatch = KPS_SCOPE_RE_SOURCE.exec(path);
-  if (sourceMatch?.[1] !== undefined) return { id: sourceMatch[1] };
+  if (sourceMatch?.[1] !== undefined) return { id: sourceMatch[1], layout: "source" };
 
   const rootMatch = KPS_SCOPE_RE_ROOT.exec(path);
-  if (rootMatch?.[1] !== undefined) return { id: rootMatch[1] };
+  if (rootMatch?.[1] !== undefined) return { id: rootMatch[1], layout: "flat" };
 
   return null;
+}
+
+/**
+ * Collapse a list of `release/`-relative candidate paths to one `.kps` path
+ * per keyboard id, matching each against {@link matchKeyboardScopePath} and
+ * discarding non-matches.
+ *
+ * A "transitional duplicate" — a keyboard id present under BOTH the
+ * `source/` and legacy flat-root layouts at once (a residual leftover from
+ * the corpus's ongoing migration to Keyman 17+ project format) — previously
+ * caused the id to be enumerated twice by every consumer that walked the
+ * `release/` tree. This is the single dedup pass both consumers
+ * (base-browser's GitHub tree walk and facet-index's local-checkout walk)
+ * share, so they can't diverge on the tie-break the way the two layout
+ * regexes once did. When both layouts are present for the same id, the
+ * `source/` entry wins (Keyman 17+ canonical).
+ */
+export function dedupeKpsPathsById(paths: string[]): string[] {
+  const bestById = new Map<string, { path: string; layout: "source" | "flat" }>();
+  for (const path of paths) {
+    const match = matchKeyboardScopePath(path);
+    if (match === null) continue;
+    const existing = bestById.get(match.id);
+    if (existing === undefined || (existing.layout === "flat" && match.layout === "source")) {
+      bestById.set(match.id, { path, layout: match.layout });
+    }
+  }
+  return [...bestById.values()].map((entry) => entry.path);
 }

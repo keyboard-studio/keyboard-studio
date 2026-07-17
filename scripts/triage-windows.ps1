@@ -22,6 +22,11 @@ $stateDir         = ".escalations"
 $auditLog         = "$stateDir\audit-log.jsonl"
 $maxIterations    = 3
 $sleepBetweenSec  = 45
+# Re-sweep triggers: an action that moved the head SHA warrants re-reviewing the
+# new head in the same tick. NOTE: with bot-mode auto-fix disabled (Phase 5.5
+# step 4 in .claude/commands/km-triage.md), neither auto_fix_only nor
+# fix_and_mention is produced by a scheduled sweep, so this loop is inert in bot
+# mode. Retained (not removed) so re-enabling auto-fix restores the behavior.
 $loopOnActions    = @("auto_fix_only","fix_and_mention")
 
 # Resolve the claude binary up front so Task Scheduler's restricted PATH gets an
@@ -34,15 +39,18 @@ $claude = if ($env:CLAUDE_BIN) { $env:CLAUDE_BIN }
 # Review specialists keep `model: sonnet` from their agent frontmatter; only the
 # orchestrator is set here. Personal/interactive runs use sonnet by convention —
 # see the Personal mode section in .claude/commands/km-triage.md.
-$model = if ($env:KM_TRIAGE_MODEL) { $env:KM_TRIAGE_MODEL } else { "opus" }
+$model = if ($env:KM_TRIAGE_MODEL) { $env:KM_TRIAGE_MODEL } else { "sonnet" }
 
-# pnpm (v9, matching the repo's packageManager pin) must be on PATH.
-# The auto-fix typecheck step runs `pnpm --filter ... typecheck`, and any
-# sanctioned manifest fix regenerates the lockfile via
-# `pnpm install --lockfile-only`. Without pnpm both steps fail silently.
+# pnpm (v9, matching the repo's packageManager pin) is only needed by the
+# auto-fix path (the typecheck step `pnpm --filter ... typecheck`, and the
+# sanctioned manifest-fix lockfile regen `pnpm install --lockfile-only`).
+# Auto-fix is DISABLED in bot mode (see Phase 5.5 step 4 in
+# .claude/commands/km-triage.md): the scheduled sweep never dispatches
+# km-programmer, so pnpm is not required for a bot-mode run — mechanical fixes
+# are described in a PR comment for the submitter to apply. Warn (don't fail)
+# if it's absent so a review-and-mention-only server can still run triage.
 if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
-  Write-Error "[ERROR] pnpm not found on PATH. Install pnpm v9 (https://pnpm.io/installation) and ensure it is visible in the Task Scheduler execution environment."
-  exit 1
+  Write-Warning "[WARN] pnpm not found on PATH. Bot-mode triage does not auto-fix, so this is non-fatal. Install pnpm v9 (https://pnpm.io/installation) only if auto-fix is re-enabled."
 }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

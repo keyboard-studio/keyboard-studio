@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
 import { ResizeHandle } from "./components/ResizeHandle.tsx";
-import type { BaseKeyboard, Pattern } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, Pattern, VirtualFS, KeyboardIR, RemovalCapability } from "@keyboard-studio/contracts";
 import { buildTouchLayoutJson } from "./lib/buildTouchLayoutJson.ts";
 import { shouldEmitTouchLayout, resolveTouchSeedSource } from "./lib/touchEmission.ts";
 import { useWorkingCopyStore, bindManifest } from "./stores/workingCopyStore.ts";
@@ -50,6 +50,7 @@ import { manifest, validateManifestShape } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { StepHost } from "./components/StepHost.tsx";
 import { TEXT_MAIN, FONT } from "./survey/surveyStyles.ts";
+import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
 
 // Bind the manifest into the store's staleness actions.
 // Called once at module load; avoids a circular static import in the store
@@ -215,8 +216,10 @@ function NavBar({ active }: NavBarProps) {
 //
 // Double-instantiation guard (P1 fix):
 //   setScaffoldSpec() causes a second compile run whose onInstantiate callback
-//   would fire applyStepCompletion("choose_base", ...) a second time. An
-//   instantiatedRef flag prevents the R3 side effect from running more than once
+//   re-captures the artifact into pendingArtifactRef; the commit effect's
+//   doCommit (below) would then run the choose_base side effect
+//   (applyStepCompletion("choose_base", ...)) a second time. An
+//   instantiatedRef flag prevents that side effect from running more than once
 //   per session; it resets on start-over.
 // ---------------------------------------------------------------------------
 
@@ -329,6 +332,21 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const instantiatedRef = useRef<boolean>(false);
 
   // ---------------------------------------------------------------------------
+  // Preview-before-commit (choose_base step): the compile pipeline may settle
+  // BEFORE the author clicks "Choose this keyboard" (they might preview
+  // several bases first). `onInstantiate` below only CAPTURES the settled
+  // artifact here; the actual instantiation (`doCommit`) is deferred until
+  // `baseConfirmed` flips true, via the effect that follows `onInstantiate`.
+  // Cleared alongside `instantiatedRef` on start-over.
+  // ---------------------------------------------------------------------------
+  const pendingArtifactRef = useRef<{
+    base: BaseKeyboard;
+    vfs: VirtualFS;
+    ir: KeyboardIR | null;
+    removalCapabilities: Map<string, RemovalCapability>;
+  } | null>(null);
+
+  // ---------------------------------------------------------------------------
   // T023 (spec 034 US3): teardown fn for the durable-draft autosave, installed
   // once the working copy is instantiated (see onInstantiate below) and torn
   // down on unmount / start-over / a fresh re-instantiation for a new project.
@@ -411,53 +429,84 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   }, [reducerDeps]);
 
   // ---------------------------------------------------------------------------
-  // onInstantiate — compile-pipeline callback (R3: choose_base side effect).
+  // doCommit — the actual choose_base instantiation side effect (R3).
   //
-  // Fires when the compile pipeline produces an IR + VFS for the chosen base.
-  // Dispatches applyStepCompletion("choose_base", ...) which routes Track 2 →
+  // Extracted verbatim from the pre-preview-before-commit `onInstantiate` body
+  // so its internals are unchanged; it is now invoked from the single-
+  // instantiation effect below (gated on `baseConfirmed`) rather than directly
+  // from the compile-pipeline callback. Dispatches
+  // applyStepCompletion("choose_base", ...), which routes Track 2 →
   // instantiateFromExisting, Track 1/default → instantiateFromBaseIfConfirmed.
   //
-  // instantiatedRef gates this to fire exactly once per session — a second
-  // compile triggered by setScaffoldSpec will not re-run the instantiate side
-  // effect (P1 fix).
+  // instantiatedRef still gates this to fire exactly once per session — a
+  // second compile triggered by setScaffoldSpec (or a second confirm click)
+  // will not re-run the instantiate side effect (P1 fix).
+  // ---------------------------------------------------------------------------
+  const doCommit = useCallback(
+    (
+      base: BaseKeyboard,
+      { vfs, ir, removalCapabilities }: { vfs: VirtualFS; ir: KeyboardIR | null; removalCapabilities: Map<string, RemovalCapability> },
+    ) => {
+      if (instantiatedRef.current) return;
+      instantiatedRef.current = true;
+
+      // T025 (spec 034 US3, VR-5 / FR-009 / AS-4): a durable draft from a
+      // DIFFERENT project may already be active (e.g. the author abandoned an
+      // earlier in-progress keyboard without "start over" and picked a new
+      // base). This is the instantiation entry point, so it is where a genuine
+      // project switch first becomes visible — replace the prior project's
+      // draft now, BEFORE this instantiation's own autosave (below) starts
+      // writing under the new key. MVP policy: clean replace, never silent
+      // merge (a confirm-before-overwrite UX is the non-MVP alternative the
+      // contract also permits, deferred).
+      replaceActiveDraftIfDifferentProject(base.id);
+
+      // Reads via getState() escape hatch (not a selector) to avoid a stale closure — the callback is memoised with empty deps.
+      const track = useSurveySessionStore.getState().selectedTrack;
+      applyStepCompletion(
+        "choose_base",
+        { base, vfs, ir, removalCapabilities, track: track ?? null },
+        reducerDepsRef.current,
+      );
+
+      // T023: install the durable-draft autosave now that the working copy is
+      // instantiated. `deriveProjectKeyFromWorkingCopy` reads the JUST-WRITTEN
+      // store state via getState() (identity.keyboardId falls back to
+      // baseKeyboard.id — see draftPersistence.ts) so this resolves immediately
+      // for both tracks, even before Track 1's Phase A sets a custom keyboardId.
+      // `instantiatedRef` above already guards this whole callback body to run
+      // at most once per mount, so `autosaveTeardownRef.current` is always null
+      // here; the `?.()` is defensive, not load-bearing.
+      const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
+      if (projectKey !== null) {
+        autosaveTeardownRef.current?.();
+        autosaveTeardownRef.current = installDraftAutosave(projectKey);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Same escape hatch as the pre-preview-before-commit onInstantiate: all
+    // reads are via getState()/reducerDepsRef.current (stable refs), not
+    // React state, so an empty dep array is intentional here too.
+    [],
+  );
+
+  // ---------------------------------------------------------------------------
+  // onInstantiate — compile-pipeline callback (R3: choose_base side effect).
+  //
+  // Preview-before-commit: fires whenever the compile pipeline produces an
+  // IR + VFS for the CURRENTLY PREVIEWED base (every preview click restarts
+  // the pipeline for its base). This callback ONLY captures the settled
+  // artifact — it does NOT instantiate the working copy or advance the
+  // wizard. `doCommit` (above) does that, invoked by the effect below once
+  // the author clicks "Choose this keyboard" (`baseConfirmed` flips true).
+  // This is what makes previewing several bases side-effect-free.
   // ---------------------------------------------------------------------------
   const onInstantiate = useCallback<OnInstantiateCallback>((base, { vfs, ir, removalCapabilities }) => {
-    if (instantiatedRef.current) return;
-    instantiatedRef.current = true;
-
-    // T025 (spec 034 US3, VR-5 / FR-009 / AS-4): a durable draft from a
-    // DIFFERENT project may already be active (e.g. the author abandoned an
-    // earlier in-progress keyboard without "start over" and picked a new
-    // base). This is the instantiation entry point, so it is where a genuine
-    // project switch first becomes visible — replace the prior project's
-    // draft now, BEFORE this instantiation's own autosave (below) starts
-    // writing under the new key. MVP policy: clean replace, never silent
-    // merge (a confirm-before-overwrite UX is the non-MVP alternative the
-    // contract also permits, deferred).
-    replaceActiveDraftIfDifferentProject(base.id);
-
-    // Reads via getState() escape hatch (not a selector) to avoid a stale closure — the callback is memoised with empty deps.
-    const track = useSurveySessionStore.getState().selectedTrack;
-    applyStepCompletion(
-      "choose_base",
-      { base, vfs, ir, removalCapabilities, track: track ?? null },
-      reducerDepsRef.current,
-    );
-
-    // T023: install the durable-draft autosave now that the working copy is
-    // instantiated. `deriveProjectKeyFromWorkingCopy` reads the JUST-WRITTEN
-    // store state via getState() (identity.keyboardId falls back to
-    // baseKeyboard.id — see draftPersistence.ts) so this resolves immediately
-    // for both tracks, even before Track 1's Phase A sets a custom keyboardId.
-    // `instantiatedRef` above already guards this whole callback body to run
-    // at most once per mount, so `autosaveTeardownRef.current` is always null
-    // here; the `?.()` is defensive, not load-bearing.
-    const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
-    if (projectKey !== null) {
-      autosaveTeardownRef.current?.();
-      autosaveTeardownRef.current = installDraftAutosave(projectKey);
-    }
+    pendingArtifactRef.current = { base, vfs, ir, removalCapabilities };
   }, []);
+
+  // Subscribed so the effect below re-checks whenever the author confirms.
+  const baseConfirmed = useSurveySessionStore((s) => s.baseConfirmed);
 
   // Pattern map for the working-copy transform — needed from Phase F onwards so
   // mechanism assignments are projected into the OSK preview.
@@ -490,6 +539,40 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Use localBase (immediately updated on selection) to drive the pipeline.
   // Pass scaffoldSpec so Track 1 routes through scaffold() instead of fetchKeyboardSourceToVfs.
   const { stage: artifactStage, retry } = useKeyboardArtifact(localBase, scaffoldSpec, workingCopyTransform, onInstantiate);
+
+  // ---------------------------------------------------------------------------
+  // Single-instantiation effect (preview-before-commit).
+  //
+  // Runs `doCommit` at most once, and only once BOTH are true:
+  //   - the author has confirmed (`baseConfirmed`, set by
+  //     BaseResolutionAdapter's onConfirm — see editors/adapters/panelAdapters.tsx)
+  //   - the compile pipeline has actually settled for THAT SAME base
+  //     (`pendingArtifactRef`, filled by `onInstantiate` above).
+  //
+  // Confirm is now gated on `previewStatus === "ready"` in BaseResolution's
+  // commit button, so in practice `baseConfirmed` only flips true once the
+  // pipeline has already settled — the ref is already populated by the time
+  // this effect sees `baseConfirmed`. The `artifactStage`-triggered re-run
+  // (waiting for the ref to be filled after confirm) is retained purely as a
+  // defensive fallback, not a load-bearing path. The `art.base.id === lb.id`
+  // check guards against a stale ref from a PREVIOUS preview surviving a fast
+  // re-preview.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!baseConfirmed || instantiatedRef.current) return;
+    const art = pendingArtifactRef.current;
+    const lb = useSurveySessionStore.getState().localBase;
+    if (art && lb && art.base.id === lb.id) {
+      doCommit(art.base, { vfs: art.vfs, ir: art.ir, removalCapabilities: art.removalCapabilities });
+    }
+    // else: compile still in flight for this base — onInstantiate will fill
+    // pendingArtifactRef and the "ready" artifactStage transition below will
+    // re-run this effect.
+    // doCommit is stable (empty-deps useCallback, see its own definition
+    // above) — omitted from deps to mirror the existing escape-hatch
+    // convention in this file (e.g. the reducerDeps memo above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseConfirmed, artifactStage]);
 
   // Derive KMN source from the working copy's base VFS for the validator.
   const kmnSource = useMemo(() => {
@@ -526,8 +609,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     sessionReset();
     resetSurvey();
     instantiatedRef.current = false;
+    pendingArtifactRef.current = null;
     // sessionReset() calls reset() which already clears charactersSubStage to
     // "prefill" (spec 027 Stage 4 — the store slot is the authoritative owner).
+    // sessionReset() also clears baseConfirmed back to false via INITIAL_STATE.
   }
 
   // ---------------------------------------------------------------------------
@@ -547,6 +632,35 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     color: TEXT_MAIN,
     fontFamily: FONT,
   };
+
+  // ---------------------------------------------------------------------------
+  // basePreviewStatusStore value — a coarse projection of `artifactStage` (see
+  // stores/basePreviewStatusStore.ts for the BasePreviewStatus union).
+  // Published to the store below so BaseResolutionAdapter (reached through
+  // StepHost while activeStepId === "choose_base") can read the live preview
+  // status without importing useKeyboardArtifact directly, and without a
+  // prop-drilling chain through StepHost's generic EditorStepProps.
+  // ---------------------------------------------------------------------------
+  const previewStatus: BasePreviewStatus = useMemo(() => {
+    if (localBase === null) return "idle";
+    switch (artifactStage.kind) {
+      case "fetching":
+      case "vfs-loading":
+      case "compiling":
+        return "loading";
+      case "ready":
+        return "ready";
+      case "error":
+        return "error";
+      default:
+        return "idle";
+    }
+  }, [localBase, artifactStage.kind]);
+
+  const setBasePreviewStatus = useBasePreviewStatusStore((s) => s.setStatus);
+  useEffect(() => {
+    setBasePreviewStatus(previewStatus);
+  }, [previewStatus, setBasePreviewStatus]);
 
   // ---------------------------------------------------------------------------
   // Render: StepHost drives all survey step rendering (spec 028 Stage 5, T012).

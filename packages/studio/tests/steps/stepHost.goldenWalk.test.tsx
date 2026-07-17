@@ -297,13 +297,36 @@ vi.mock("../../src/survey/index.ts", () => ({
   buildPrefillRows: () => [],
 }));
 
+// BaseResolution mock — preview-before-commit contract. A suggestion-card
+// click fires onPreview (setLocalBase, does not advance); the "Choose this
+// keyboard" button fires onConfirm (setBaseConfirmed(true), then advances).
+// Two separate testids/clicks reproduce the two real user actions.
 vi.mock("../../src/editors/panels/BaseResolution.tsx", () => ({
-  BaseResolution: ({ onResolved, onBack }: { onResolved: (base: unknown) => void; onBack?: () => void }) => {
-    mockRefs.baseResolved.current = onResolved;
+  BaseResolution: ({
+    onPreview,
+    onConfirm,
+    previewedBase,
+    onBack,
+  }: {
+    onPreview: (base: unknown) => void;
+    onConfirm: () => void;
+    previewedBase: unknown;
+    previewStatus: string;
+    onBack?: () => void;
+  }) => {
+    mockRefs.baseResolved.current = onConfirm;
     return (
       <div data-testid="stage-base">
-        <button type="button" data-testid="base-resolved" onClick={() => onResolved(fakeBase)}>
-          base-resolved
+        <button type="button" data-testid="base-preview" onClick={() => onPreview(fakeBase)}>
+          base-preview
+        </button>
+        <button
+          type="button"
+          data-testid="base-confirm"
+          disabled={previewedBase === null}
+          onClick={onConfirm}
+        >
+          base-confirm
         </button>
         {onBack !== undefined && (
           <button type="button" data-testid="base-back" onClick={onBack}>
@@ -525,6 +548,7 @@ const SESSION_MUTATOR_NAMES = [
   "setSelectedTrack",
   "setScaffoldSpec",
   "setLocalBase",
+  "setBaseConfirmed",
   "setCharactersSubStage",
 ] as const;
 
@@ -661,20 +685,32 @@ function createRecorder() {
 // Walk drivers
 // ---------------------------------------------------------------------------
 
-type StepAction = { stepId: string; testId: string; async?: boolean };
+/**
+ * `testId` — the common case, one click per step. `testIds` — for choose_base
+ * (preview-before-commit): TWO separate clicks (preview, then confirm) folded
+ * into the SAME recorder step window, so the fixture's single "choose_base"
+ * entry captures both setLocalBase (preview) and setBaseConfirmed (confirm)
+ * in real call order, exactly as the real two-click user flow produces them.
+ */
+type StepAction =
+  | { stepId: string; testId: string; async?: boolean }
+  | { stepId: string; testIds: string[]; async?: boolean };
 
 /**
  * Drive a sequence of step actions through the recorder.
  */
 async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: StepAction[]): Promise<void> {
-  for (const { stepId, testId, async: isAsync } of steps) {
-    recorder.beginStep(stepId);
-    if (isAsync) {
-      await act(async () => {
+  for (const step of steps) {
+    const testIds = "testIds" in step ? step.testIds : [step.testId];
+    recorder.beginStep(step.stepId);
+    for (const testId of testIds) {
+      if (step.async) {
+        await act(async () => {
+          fireEvent.click(screen.getByTestId(testId));
+        });
+      } else {
         fireEvent.click(screen.getByTestId(testId));
-      });
-    } else {
-      fireEvent.click(screen.getByTestId(testId));
+      }
     }
     recorder.endStep();
   }
@@ -696,7 +732,7 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
 async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Promise<void> {
   await driveSteps(recorder, [
     { stepId: "identity", testId: "identity-complete" },
-    { stepId: "choose_base", testId: "base-resolved" },
+    { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
     { stepId: "track", testId: "track-copy" },
     { stepId: "project_name", testId: "project-name-next" },
     { stepId: "characters/prefill", testId: "prefill-confirm" },
@@ -721,7 +757,7 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
 async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Promise<void> {
   await driveSteps(recorder, [
     { stepId: "identity", testId: "identity-complete" },
-    { stepId: "choose_base", testId: "base-resolved" },
+    { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
     { stepId: "track", testId: "track-adapt" },
     { stepId: "characters/prefill", testId: "prefill-confirm" },
     { stepId: "characters/B", testId: "phaseB-complete" },
