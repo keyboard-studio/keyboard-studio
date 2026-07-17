@@ -125,6 +125,75 @@ describe("BaseResolutionAdapter — suggest target sourced from surveySessionSto
 });
 
 // ---------------------------------------------------------------------------
+// BaseResolutionAdapter — preview-before-commit split.
+//
+// Preview (every suggestion-card / search-result click) must write
+// setLocalBase WITHOUT calling onComplete (the wizard does not advance, the
+// working copy is not instantiated). Commit (the "Choose this keyboard"
+// button) must set baseConfirmed=true BEFORE calling onComplete (R7 ordering
+// — StudioShell's single-instantiation effect gates on baseConfirmed).
+// ---------------------------------------------------------------------------
+
+describe("BaseResolutionAdapter — preview vs commit", () => {
+  it("previewing a suggestion card writes setLocalBase and does NOT call onComplete", async () => {
+    useSurveySessionStore.getState().setIdentityResult(makeIdentityResult({}));
+    const onComplete = vi.fn();
+
+    render(<BaseResolutionAdapter onComplete={onComplete} />);
+
+    const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
+    fireEvent.click(card);
+
+    await waitFor(() => {
+      expect(useSurveySessionStore.getState().localBase?.id).toBe("sil_euro_latin");
+    });
+    expect(onComplete).not.toHaveBeenCalled();
+    // A fresh preview re-arms the commit gate — baseConfirmed stays false.
+    expect(useSurveySessionStore.getState().baseConfirmed).toBe(false);
+  });
+
+  it("committing after a preview sets baseConfirmed BEFORE calling onComplete (R7 ordering)", async () => {
+    useSurveySessionStore.getState().setIdentityResult(makeIdentityResult({}));
+
+    // Spy on setBaseConfirmed via the store's setState escape hatch, wrapping
+    // the real action so both the spy AND the actual mutation fire — same
+    // pattern as the golden-walk oracle in tests/steps/stepHost.goldenWalk.test.tsx.
+    const originalSetBaseConfirmed = useSurveySessionStore.getState().setBaseConfirmed;
+    const setBaseConfirmedSpy = vi.fn((v: boolean) => originalSetBaseConfirmed(v));
+    useSurveySessionStore.setState({ setBaseConfirmed: setBaseConfirmedSpy });
+
+    const onComplete = vi.fn();
+    render(<BaseResolutionAdapter onComplete={onComplete} />);
+
+    const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
+    fireEvent.click(card);
+
+    const confirm = await waitFor(() => {
+      const btn = screen.getByTestId("base-confirm") as HTMLButtonElement;
+      expect(btn.disabled).toBe(false);
+      return btn;
+    });
+    fireEvent.click(confirm);
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(onComplete).toHaveBeenCalledWith({
+      base: expect.objectContaining({ id: "sil_euro_latin" }),
+    });
+    expect(useSurveySessionStore.getState().baseConfirmed).toBe(true);
+
+    // setBaseConfirmed is called twice: (false) on preview, (true) on commit.
+    expect(setBaseConfirmedSpy.mock.calls.map((args) => args[0])).toEqual([false, true]);
+
+    // Call-order assertion: the COMMIT's setBaseConfirmed(true) call fires
+    // strictly before onComplete (R7 — "writes before advance").
+    const commitCallIdx = setBaseConfirmedSpy.mock.calls.findIndex((args) => args[0] === true);
+    const commitCallOrder = setBaseConfirmedSpy.mock.invocationCallOrder[commitCallIdx];
+    const onCompleteOrder = onComplete.mock.invocationCallOrder[0];
+    expect(commitCallOrder).toBeLessThan(onCompleteOrder!);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // IdentityLiteAdapter — history-pop resume wiring (identityPhaseResult)
 // ---------------------------------------------------------------------------
 

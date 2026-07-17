@@ -5,10 +5,21 @@
 //
 // (The suggestBases() ranking itself is covered white-box in
 // components/BaseResolution.test.tsx.)
+//
+// Preview-before-commit contract (this change): BaseResolution is now a
+// CONTROLLED component. There is no `onResolved` — a suggestion-card / search
+// pick fires `onPreview(base)` and does NOT advance the wizard; the single
+// "Choose this keyboard" button fires `onConfirm()`. Because the previewed
+// base is a prop (`previewedBase`), most tests below render via a small
+// stateful wrapper that stores the previewed base from `onPreview` and feeds
+// it back in — mirroring how other controlled-component tests in this repo
+// (e.g. BaseKeyboardPicker.test.tsx) drive a controlled `value`/`onChange` pair.
 
 import { describe, it, expect, vi, afterEach, beforeAll, beforeEach } from "vitest";
+import { useState } from "react";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 
+import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { sampleBaseKeyboards } from "@keyboard-studio/contracts/fixtures";
 
 // jsdom does not implement scrollIntoView — stub it out globally.
@@ -23,7 +34,7 @@ vi.mock("../../lib/services.ts", () => ({
   USE_REAL: false,
 }));
 
-import { BaseResolution } from "./BaseResolution.tsx";
+import { BaseResolution, type BaseResolutionProps } from "./BaseResolution.tsx";
 import {
   _resetCorpusCacheForTesting,
   _setCorpusCacheForTesting,
@@ -46,10 +57,45 @@ afterEach(() => {
 // sil_devanagari_phonetic (script Deva, no "ha") is NOT suggested.
 const TARGET = { script: "Latn", bcp47: "ha-Latn" } as const;
 
-function renderStep() {
-  const onResolved = vi.fn();
-  render(<BaseResolution target={TARGET} onResolved={onResolved} />);
-  return { onResolved };
+type ControlledOverrides = Partial<
+  Omit<BaseResolutionProps, "target" | "onPreview" | "previewedBase">
+> & {
+  onPreview?: (base: BaseKeyboard | null) => void;
+};
+
+/**
+ * Stateful wrapper reproducing the real caller's controlled-prop wiring
+ * (BaseResolutionAdapter): `previewedBase` is owned by the wrapper, updated by
+ * `onPreview`, and fed back in. `onConfirm` and `previewStatus` default to
+ * spy/"ready" but are overridable per test (e.g. to assert the disabled states).
+ */
+function ControlledBaseResolution({
+  onConfirm = vi.fn(),
+  onPreview: onPreviewSpy,
+  previewStatus = "ready",
+  onBack,
+}: ControlledOverrides) {
+  const [previewedBase, setPreviewedBase] = useState<BaseKeyboard | null>(null);
+  return (
+    <BaseResolution
+      target={TARGET}
+      previewedBase={previewedBase}
+      onPreview={(base) => {
+        setPreviewedBase(base);
+        onPreviewSpy?.(base);
+      }}
+      onConfirm={onConfirm}
+      previewStatus={previewedBase === null ? "idle" : previewStatus}
+      {...(onBack ? { onBack } : {})}
+    />
+  );
+}
+
+function renderControlled(overrides: ControlledOverrides = {}) {
+  const onPreview = overrides.onPreview ?? vi.fn();
+  const onConfirm = overrides.onConfirm ?? vi.fn();
+  render(<ControlledBaseResolution {...overrides} onPreview={onPreview} onConfirm={onConfirm} />);
+  return { onPreview, onConfirm };
 }
 
 async function waitForCombobox() {
@@ -58,7 +104,7 @@ async function waitForCombobox() {
 
 describe("BaseResolution — search bar at the top", () => {
   it("renders the search combobox BEFORE the suggestion cards in document order", async () => {
-    renderStep();
+    renderControlled();
     const input = await waitForCombobox();
     const firstCard = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
     // input precedes firstCard in the DOM
@@ -68,7 +114,7 @@ describe("BaseResolution — search bar at the top", () => {
   });
 
   it("defaults the search scope to Suggested (aria-pressed)", async () => {
-    renderStep();
+    renderControlled();
     await waitForCombobox();
     expect(screen.getByTestId("search-scope-suggested").getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByTestId("search-scope-all").getAttribute("aria-pressed")).toBe("false");
@@ -76,7 +122,7 @@ describe("BaseResolution — search bar at the top", () => {
 
   it("renders the Back button at the top, BEFORE the search combobox", async () => {
     const onBack = vi.fn();
-    render(<BaseResolution target={TARGET} onResolved={vi.fn()} onBack={onBack} />);
+    renderControlled({ onBack });
     const input = await waitForCombobox();
     const back = screen.getByTestId("base-back");
     expect(
@@ -87,7 +133,7 @@ describe("BaseResolution — search bar at the top", () => {
   });
 
   it("renders no Back button when onBack is not provided", async () => {
-    renderStep();
+    renderControlled();
     await waitForCombobox();
     expect(screen.queryByTestId("base-back")).toBeNull();
   });
@@ -95,7 +141,7 @@ describe("BaseResolution — search bar at the top", () => {
 
 describe("BaseResolution — suggested scope vs all keyboards", () => {
   it("a non-suggested keyboard is not searchable until the scope is widened", async () => {
-    renderStep();
+    renderControlled();
     const input = await waitForCombobox();
 
     // sil_devanagari_phonetic is in the catalog but not suggested for ha-Latn
@@ -114,7 +160,7 @@ describe("BaseResolution — suggested scope vs all keyboards", () => {
   });
 
   it("the All keyboards toggle widens the scope directly", async () => {
-    renderStep();
+    renderControlled();
     const input = await waitForCombobox();
 
     fireEvent.click(screen.getByTestId("search-scope-all"));
@@ -127,8 +173,8 @@ describe("BaseResolution — suggested scope vs all keyboards", () => {
     });
   });
 
-  it("committing a search pick and confirming resolves the base", async () => {
-    const { onResolved } = renderStep();
+  it("committing a search pick previews it, then confirming fires onConfirm (not the pick itself)", async () => {
+    const { onPreview, onConfirm } = renderControlled();
     const input = await waitForCombobox();
 
     fireEvent.change(input, { target: { value: "euro" } });
@@ -139,11 +185,93 @@ describe("BaseResolution — suggested scope vs all keyboards", () => {
     expect(euroOption).toBeDefined();
     fireEvent.click(euroOption!);
 
+    // The pick previews — onConfirm has NOT fired yet.
+    expect(onPreview).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "sil_euro_latin" }),
+    );
+    expect(onConfirm).not.toHaveBeenCalled();
+
     const confirm = screen.getByTestId("base-confirm") as HTMLButtonElement;
     await waitFor(() => expect(confirm.disabled).toBe(false));
     fireEvent.click(confirm);
-    expect(onResolved).toHaveBeenCalledWith(
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("BaseResolution — preview-before-commit (suggestion cards)", () => {
+  it("clicking a suggestion card previews it (highlights + enables the button) without advancing", async () => {
+    const { onPreview, onConfirm } = renderControlled();
+    await waitForCombobox();
+
+    const confirm = screen.getByTestId("base-confirm") as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+
+    const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
+    fireEvent.click(card);
+
+    expect(onPreview).toHaveBeenCalledWith(
       expect.objectContaining({ id: "sil_euro_latin" }),
     );
+    // Preview alone never fires onConfirm / advances the wizard.
+    expect(onConfirm).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect((screen.getByTestId("base-confirm") as HTMLButtonElement).disabled).toBe(false);
+    });
+    // Selected card gets the highlight styling (accent border).
+    await waitFor(() => {
+      expect(screen.getByTestId("base-card-sil_euro_latin").style.border).toContain(
+        "var(--app-accent)",
+      );
+    });
+  });
+
+  it("the confirm button is disabled when nothing has been previewed", async () => {
+    renderControlled();
+    await waitForCombobox();
+    expect((screen.getByTestId("base-confirm") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("clicking the confirm button after a preview fires onConfirm exactly once", async () => {
+    const { onConfirm } = renderControlled();
+    await waitForCombobox();
+
+    const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
+    fireEvent.click(card);
+
+    const confirm = screen.getByTestId("base-confirm") as HTMLButtonElement;
+    await waitFor(() => expect(confirm.disabled).toBe(false));
+    fireEvent.click(confirm);
+
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("previewStatus='error' disables the confirm button even with a base previewed", async () => {
+    const { onConfirm } = renderControlled({ previewStatus: "error" });
+    await waitForCombobox();
+
+    const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
+    fireEvent.click(card);
+
+    const confirm = screen.getByTestId("base-confirm") as HTMLButtonElement;
+    await waitFor(() => expect(confirm.disabled).toBe(true));
+
+    fireEvent.click(confirm);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("previewStatus='loading' shows the preparing affordance but keeps the button clickable", async () => {
+    const { onConfirm } = renderControlled({ previewStatus: "loading" });
+    await waitForCombobox();
+
+    const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
+    fireEvent.click(card);
+
+    const confirm = screen.getByTestId("base-confirm") as HTMLButtonElement;
+    await waitFor(() => expect(confirm.disabled).toBe(false));
+    expect(confirm.textContent).toContain("Preparing preview");
+
+    fireEvent.click(confirm);
+    expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 });
