@@ -71,10 +71,11 @@ import { unzipSync, strFromU8 } from "fflate";
 import { readFile } from "node:fs/promises";
 import {
   driveIdentityLite as driveIdentityLiteBase,
-  pickBaseKeyboard as pickBaseKeyboardBase,
+  pickBaseKeyboard,
   chooseAdaptTrack,
   confirmPrefill,
   buildOneCharacterList,
+  driveHelpPhase,
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
 
@@ -172,10 +173,6 @@ const BAMBARA_TOUCH_ZIP_PATH = `source/${BAMBARA_BASE_ID}.keyman-touch-layout`;
 // touch-derivation-035-specific and stay local.
 // ---------------------------------------------------------------------------
 
-function surveyAdvance(page: Page) {
-  return page.getByTestId("survey-advance");
-}
-
 /** Identity-lite (Phase A), parametrized by language identity. Latin script
  *  keeps routing through the ranked BaseResolution picker. Drops the stale
  *  `code` fill (spec 036's il_language_code question is optional and skipped
@@ -194,23 +191,6 @@ async function driveIdentityLite(
   });
   // Additional wait for BaseResolution to render its picker (spec 035 may take longer)
   await expect(page.getByTestId("base-picker")).toBeVisible({ timeout: 15_000 });
-}
-
-/** Resolve the base keyboard via BaseResolution's embedded BaseKeyboardPicker
- *  combobox — identical to touch-derivation-us1.spec.ts's helper. */
-async function pickBaseKeyboard(page: Page, keyboardId: string): Promise<void> {
-  // Wait for base picker (cold server can take 20s+)
-  await page.waitForSelector('[data-testid="base-picker"]', { timeout: 90_000 });
-  await page.getByTestId("search-scope-all").click();
-
-  const combobox = page.getByRole("combobox", { name: "Search keyboards" });
-  await combobox.click();
-  await combobox.fill(keyboardId);
-
-  const option = page.getByRole("option", { name: new RegExp(keyboardId) }).first();
-  await option.click();
-
-  await page.getByTestId("base-confirm").click();
 }
 
 /** characters step, Phase B sub-stage (build-list method) — adds exactly ONE
@@ -348,23 +328,6 @@ async function driveTouchGalleryAcceptPlacement(page: Page, char: string): Promi
   await acceptButton.click();
 
   await page.getByTestId("touch-continue").click();
-}
-
-/** help (Phase F) step — bounded-loop driver, parametrized by welcome/tip
- *  text (identical shape to touch-derivation-us1.spec.ts's helper). */
-async function driveHelpPhase(page: Page, welcomeText: string, tipText: string): Promise<void> {
-  await page.locator("#pf_welcome_paragraph").fill(welcomeText);
-  await surveyAdvance(page).click();
-
-  await page.locator("#pf_usage_tip_1").fill(tipText);
-
-  for (let guard = 0; guard < 15; guard++) {
-    await surveyAdvance(page).click();
-    if (/#output$/.test(page.url())) {
-      return;
-    }
-  }
-  throw new Error("driveHelpPhase: did not reach #output within the expected question count");
 }
 
 /** Emits the ZIP via the download gate and returns its parsed entries —

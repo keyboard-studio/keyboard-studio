@@ -57,10 +57,11 @@ import { unzipSync, strFromU8 } from "fflate";
 import { readFile } from "node:fs/promises";
 import {
   driveIdentityLite as driveIdentityLiteBase,
-  pickBaseKeyboard as pickBaseKeyboardBase,
+  pickBaseKeyboard,
   chooseAdaptTrack,
   confirmPrefill,
   buildOneCharacterList,
+  driveHelpPhase,
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
 
@@ -110,28 +111,6 @@ async function driveIdentityLite(page: Page): Promise<void> {
   });
   // Additional wait for BaseResolution to render its picker (spec 035 may take longer)
   await expect(page.getByTestId("base-picker")).toBeVisible({ timeout: 15_000 });
-}
-
-/**
- * Resolve the base keyboard via BaseResolution's embedded BaseKeyboardPicker
- * combobox (accessible name "Search keyboards" — BaseResolution overrides the
- * component's "Base keyboard" default label, see BaseKeyboardPicker.tsx).
- * Widens to the full catalog first so a specific low-profile id (bambara) is
- * searchable deterministically.
- */
-async function pickBaseKeyboard(page: Page, keyboardId: string): Promise<void> {
-  // Wait for base picker (cold server can take 20s+)
-  await page.waitForSelector('[data-testid="base-picker"]', { timeout: 90_000 });
-  await page.getByTestId("search-scope-all").click();
-
-  const combobox = page.getByRole("combobox", { name: "Search keyboards" });
-  await combobox.click();
-  await combobox.fill(keyboardId);
-
-  const option = page.getByRole("option", { name: new RegExp(keyboardId) }).first();
-  await option.click();
-
-  await page.getByTestId("base-confirm").click();
 }
 
 /**
@@ -243,27 +222,6 @@ async function driveTouchGalleryAcceptPlacement(page: Page, char: string): Promi
   await page.getByTestId("touch-continue").click();
 }
 
-/**
- * help (Phase F) step — Phase F's shape is keyboard-independent, but we
- * customize the welcome and usage text for Bambara.
- */
-async function driveHelpPhase(page: Page): Promise<void> {
-  const surveyAdvance = (p: Page) => p.getByTestId("survey-advance");
-
-  await page.locator("#pf_welcome_paragraph").fill("Welcome to the Bambara keyboard.");
-  await surveyAdvance(page).click();
-
-  await page.locator("#pf_usage_tip_1").fill("Type ɛ, ɔ, and ŋ directly from the base layout.");
-
-  for (let guard = 0; guard < 15; guard++) {
-    await surveyAdvance(page).click();
-    if (/#output$/.test(page.url())) {
-      return;
-    }
-  }
-  throw new Error("driveHelpPhase: did not reach #output within the expected question count");
-}
-
 // ---------------------------------------------------------------------------
 // Spec
 // ---------------------------------------------------------------------------
@@ -289,7 +247,11 @@ test.describe("Touch derivation US1 — import & adapt (spec 035 Scenario A)", (
     await driveMechanismsPlaceLetter(page, PLACED_CHAR);
     await confirmImportAdaptDefault(page);
     await driveTouchGalleryAcceptPlacement(page, PLACED_CHAR);
-    await driveHelpPhase(page);
+    await driveHelpPhase(
+      page,
+      "Welcome to the Bambara keyboard.",
+      "Type ɛ, ɔ, and ŋ directly from the base layout.",
+    );
 
     await page.waitForURL(/#output$/, { timeout: 30_000 });
 
