@@ -171,6 +171,42 @@ describe("emit", () => {
     expect(out).toContain("store(myStore)");
   });
 
+  it("emits a user store referenced by rules in more than one group exactly once", () => {
+    // Fragment-free path (ir.raw is empty): the dedup guard on emittedStores
+    // must stop a store referenced from two different groups from being
+    // emitted twice (a duplicate store() declaration is a kmcmplib error).
+    const ir = makeIR();
+    ir.stores.push({
+      nodeId: "store#2",
+      name: "sharedStore",
+      items: [{ kind: "char", value: "a" }],
+      isSystem: false,
+    });
+    const secondGroup: IRGroup = {
+      nodeId: "group#1",
+      name: "second",
+      usingKeys: false,
+      readonly: false,
+      rules: [
+        {
+          nodeId: "rule#5",
+          context: [{ kind: "any", storeRef: "sharedStore" }],
+          output: [{ kind: "char", value: "b" }],
+        },
+      ],
+    };
+    ir.groups[0]?.rules.push({
+      nodeId: "rule#4",
+      context: [{ kind: "any", storeRef: "sharedStore" }],
+      output: [{ kind: "char", value: "c" }],
+    });
+    ir.groups.push(secondGroup);
+
+    const out = emit(ir);
+    const occurrences = out.split("\n").filter((line) => line.includes("store(sharedStore)"));
+    expect(occurrences).toHaveLength(1);
+  });
+
   it("emits RawKmnFragment sourceText verbatim", () => {
     const ir = makeIR();
     ir.raw.push({
