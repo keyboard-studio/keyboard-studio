@@ -58,3 +58,16 @@ export interface AdaptationEvidenceProvider {
   /** Assemble the evidence bundle for a (target language, base keyboard) pair. */
   evidenceFor(targetLanguage: string, baseId: string): AdaptationEvidence;
 }
+
+/**
+ * [key, share] of the largest entry in a distribution (["", 0] when empty).
+ * Shared by firing.ts (script classification) and posture.ts (default posture)
+ * so both readings of "what dominates this distribution" agree by construction.
+ */
+export function dominantEntry(dist: Record<string, number>): [string, number] {
+  let best: [string, number] = ["", 0];
+  for (const [key, share] of Object.entries(dist)) {
+    if (share > best[1]) best = [key, share];
+  }
+  return best;
+}

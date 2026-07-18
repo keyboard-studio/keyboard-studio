@@ -14,7 +14,7 @@ prefill:
   sessionFacet: community.input-conventions
 provenanceLabel: "the base keyboard's neutral-residue script conventions"
 consumers:
-  - "axis:A3"
+  - "axis:A4"
   - "strategy:selection-bias"
 noEvidenceDegradation: record-no-default
 scope: session

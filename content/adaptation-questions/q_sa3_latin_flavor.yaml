@@ -15,7 +15,7 @@ prefill:
 provenanceLabel: "the base keyboard's Latin sub-profile"
 consumers:
   - "placement:punctuation-defaults"
-  - "axis:A2"
+  - "axis:A4"
 noEvidenceDegradation: ask-plainly
 scope: session
 renders: true

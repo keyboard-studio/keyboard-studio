@@ -14,7 +14,7 @@ prefill:
 provenanceLabel: "scripts used by existing keyboards for related languages"
 consumers:
   - "base-suggestion:ranking"
-  - "axis:A5"
+  - "axis:A2"
 noEvidenceDegradation: ask-plainly
 scope: session
 renders: true

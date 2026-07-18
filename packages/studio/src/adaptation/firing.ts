@@ -17,6 +17,7 @@
 // question (Q-TP2).
 
 import type { AdaptationEvidence } from "./evidence.ts";
+import { dominantEntry } from "./evidence.ts";
 import type { TrustPolicy } from "./trustPolicy.ts";
 import { adaptationCatalog, type QuestionRecord } from "./catalog.ts";
 
@@ -40,15 +41,6 @@ export interface ScriptClassification {
   provenance: string;
 }
 
-/** [script, share] of the largest entry in a distribution ("" / 0 when empty). */
-function dominant(dist: Record<string, number>): [string, number] {
-  let best: [string, number] = ["", 0];
-  for (const [script, share] of Object.entries(dist)) {
-    if (share > best[1]) best = [script, share];
-  }
-  return best;
-}
-
 /**
  * Classify the base's script posture under the trust policy. Lowering the
  * threshold reclassifies a "mixed" base to "single-script" (and the provenance
@@ -58,7 +50,7 @@ export function classifyBaseScript(
   evidence: AdaptationEvidence,
   policy: TrustPolicy,
 ): ScriptClassification {
-  const [dominantScript, dominantShare] = dominant(evidence.baseScriptDistribution);
+  const [dominantScript, dominantShare] = dominantEntry(evidence.baseScriptDistribution);
   const posture = dominantShare >= policy.singleScriptThreshold ? "single-script" : "mixed";
   const pct = Math.round(policy.singleScriptThreshold * 100);
   const sharePct = Math.round(dominantShare * 100);

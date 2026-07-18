@@ -13,7 +13,7 @@
 // does not mutate the PostureEntry (posture.ts guarantees this) — this step
 // records only the governing posture decision.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { InheritancePosture, PostureEntry, PostureFacet } from "./posture.ts";
 import { recordConfirmation } from "./confirmationEvents.ts";
 import type { AdaptationEvidence } from "./evidence.ts";
@@ -71,6 +71,13 @@ export function InheritancePostureStep({
   const [choices, setChoices] = useState<Record<string, PostureEntry["posture"]>>(() =>
     Object.fromEntries(governed.map((e) => [e.facet, e.posture])),
   );
+
+  // Mid-session base switch: a re-rendered step with a new posture prop must
+  // not record stale choices seeded from the previous base's entries.
+  useEffect(() => {
+    setChoices(Object.fromEntries(governed.map((e) => [e.facet, e.posture])));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posture.baseId]);
 
   function confirm() {
     // Record exactly one event per governed facet (FR-007 / SC-006). The default

@@ -12,6 +12,8 @@
 // posture-entry mutator.
 
 import type { AdaptationEvidence } from "./evidence.ts";
+import { dominantEntry } from "./evidence.ts";
+import { TRUST_POLICY_DEFAULTS } from "./trustPolicy.ts";
 
 export type PostureFacet = "script" | "input-strategies" | "device-targets" | "script-conventions";
 
@@ -42,14 +44,16 @@ function fmtMix(mix: readonly string[]): string {
 export function buildPosture(evidence: AdaptationEvidence, baseId: string): InheritancePosture {
   const { distribution, residue } = evidence.strategyFingerprint;
   const hasFingerprint = residue < 1 && Object.keys(distribution).length > 0;
-  const [domScript, domShare] = topScript(evidence.baseScriptDistribution);
+  const [domScript, domShare] = dominantEntry(evidence.baseScriptDistribution);
   const deviceMatch = sameSet(evidence.baseTargetMix, evidence.statedDeviceMix);
 
   const entries: PostureEntry[] = [
     {
       facet: "script",
-      // Re-derive for the chosen target unless the base is cleanly single-script.
-      posture: domShare >= 0.999 ? "keep" : "propose",
+      // Re-derive for the chosen target unless the base is at or above the same
+      // single-script threshold classifyBaseScript (firing.ts) uses — the two
+      // paths must agree on what counts as "cleanly single-script".
+      posture: domShare >= TRUST_POLICY_DEFAULTS.singleScriptThreshold ? "keep" : "propose",
       source: "default",
       provenance: `base script: ${domScript || "unknown"} (${Math.round(domShare * 100)}% of rules)`,
     },
@@ -108,14 +112,6 @@ export function reconcilePostureOnBaseSwitch(
     return fresh;
   });
   return { baseId: newBaseId, entries };
-}
-
-function topScript(dist: Record<string, number>): [string, number] {
-  let best: [string, number] = ["", 0];
-  for (const [script, share] of Object.entries(dist)) {
-    if (share > best[1]) best = [script, share];
-  }
-  return best;
 }
 
 function sameSet(a: readonly string[], b: readonly string[]): boolean {
