@@ -85,6 +85,19 @@ three families — rejected as over-engineering for a v1 floor of 9 questions; t
 three families have genuinely different shapes (spread evidence vs per-facet
 lever vs policy dial).
 
+**Amendment (implementation) — reserve modules, no flow registration.** As shipped,
+the 9 survey question modules under `packages/studio/src/survey/questions/b/` are
+authored and lint-resolved but **not** registered in `registry.b.ts` and **not**
+listed in `content/flows/phase_b_characters.modular.yaml`. Flow-registering them
+would inject them into the Phase B walk unconditionally, breaking the SC-002/SC-003
+non-interruption bar (a clean single-script walk must add zero questions). The
+statement above that "Trust policy (US3) renders as ordinary radio/scalar questions
+in the flow" is superseded: US3 renders via `resolveTrustPolicy` + scope persistence,
+US1 via `firing.ts` + `Prefill.tsx`, and US2 via the standalone
+`InheritancePostureStep.tsx`. The reserve modules remain the authored source of the
+question copy and the future registration point. See the "Reserve-module decision"
+note in [tasks.md](tasks.md).
+
 ## Decision 3 — Firing conditions read the index behind a mockable seam
 
 **Decision**: A pure `evaluateFiringConditions(evidence, policy) → FiredQuestion[]`

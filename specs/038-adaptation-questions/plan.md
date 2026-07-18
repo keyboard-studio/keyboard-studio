@@ -74,13 +74,19 @@ content/adaptation-questions/                 # NEW (content) — the catalog da
 ├── q_tp2_fallback_tier_prefill.yaml
 └── q_tp3_orthography_join.yaml
 
-packages/studio/src/survey/questions/b/       # NEW (content) — rendered survey modules
-├── <q_sa1..q_ip3 renders:true modules>.ts    # + registry.b.ts entries + flow order
-                                              # (trust-policy dials render where the
-                                              #  workflow-defaults step lives)
+packages/studio/src/survey/questions/b/       # NEW (content) — RESERVE survey modules
+├── <q_sa1..q_tp3 modules>.ts                 # authored + lint-resolved, but deliberately
+                                              # NOT registered in registry.b.ts and NOT
+                                              # listed in the Phase B flow — see the
+                                              # "Reserve-module decision" note in tasks.md.
+                                              # Adaptation surfaces render via firing.ts +
+                                              # Prefill.tsx (US1), InheritancePostureStep.tsx
+                                              # (US2), and resolveTrustPolicy (US3), so a
+                                              # clean single-script walk adds zero questions
+                                              # (SC-002/SC-003).
 
-content/flows/phase_b_characters.modular.yaml # UPDATED (content) — ordered ids
-                                              # + inheritance-posture placement
+# registry.b.ts / content/flows/phase_b_characters.modular.yaml are NOT modified by this
+# feature (the reserve-module decision above supersedes the original flow-wiring plan).
 
 content/facets/                               # UPDATED (content) — consumers wiring (FR-008)
 ├── community/multi-orthography.yaml          # + Q-SA1, Q-TP3

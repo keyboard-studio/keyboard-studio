@@ -53,6 +53,21 @@ describe("buildPosture", () => {
     const p = buildPosture(evidence(), "base_x");
     expect(postureFor(p, "device-targets").posture).toBe("propose");
   });
+
+  it("threads the live TrustPolicy threshold for the script facet — agrees with classifyBaseScript", () => {
+    // A base whose dominant script is 70% straddles the default 0.80 threshold.
+    const ev = evidence({ baseScriptDistribution: { Latn: 0.7, Cyrl: 0.3 } });
+    // Default policy (0.80): 0.7 < 0.80 → propose.
+    expect(postureFor(buildPosture(ev, "base_x"), "script").posture).toBe("propose");
+    // Lowered policy (0.60), as answered at Q-TP1: 0.7 ≥ 0.60 → keep.
+    const lowered = buildPosture(ev, "base_x", {
+      singleScriptThreshold: 0.6,
+      allowFallbackTierPrefill: true,
+      orthographyJoins: [],
+      scope: "workflow",
+    });
+    expect(postureFor(lowered, "script").posture).toBe("keep");
+  });
 });
 
 describe("postureFor — en-masse read (SC-004 / FR-005)", () => {

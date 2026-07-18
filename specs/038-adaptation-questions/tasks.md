@@ -64,7 +64,7 @@
 
 **Wave 2 — independent (different files):**
 
-- [x] **T015** [P] [US1] Survey modules for `q_sa1`/`q_sa2`/`q_sa3` (definition + validate + fixtures), register in `registry.b.ts`, add ordered ids to the Phase B flow · packages/studio/src/survey/questions/b/q_sa1_target_script_spread.ts, .../q_sa2_base_script_mismatch.ts, .../q_sa3_latin_flavor.ts, packages/studio/src/survey/questions/b/registry.b.ts, content/flows/phase_b_characters.modular.yaml
+- [x] **T015** [P] [US1] Survey modules for `q_sa1`/`q_sa2`/`q_sa3` (definition + validate + fixtures), landed as **reserve modules** — resolved by lint but deliberately **not** registered in `registry.b.ts` nor listed in the Phase B flow, to preserve the SC-002/SC-003 non-interruption bar (a clean single-script walk must add zero questions). See the "Reserve-module decision" note below. · packages/studio/src/survey/questions/b/q_sa1_target_script_spread.ts, .../q_sa2_base_script_mismatch.ts, .../q_sa3_latin_flavor.ts
 - [x] **T016** [P] [US1] Extend `Prefill.tsx` with script-alignment confirmation rows (§3c: value + provenance chip naming the corpus evidence + tier) · packages/studio/src/survey/Prefill.tsx
 
 **⟶ Wait for Wave 2, then:**
@@ -102,7 +102,7 @@
 **Wave 3 — independent (different files):**
 
 - [x] **T024** [P] [US2] `InheritancePostureStep.tsx` — renders entries as §3c keep/propose/discard radios + provenance chips (Prefill component pattern) · packages/studio/src/adaptation/InheritancePostureStep.tsx
-- [x] **T025** [P] [US2] Survey modules for `q_ip1`/`q_ip2`/`q_ip3`, register in `registry.b.ts`, and place the inheritance-posture step in the Phase B flow · packages/studio/src/survey/questions/b/q_ip1_keep_strategies.ts, .../q_ip2_keep_device_targets.ts, .../q_ip3_keep_script_conventions.ts, packages/studio/src/survey/questions/b/registry.b.ts, content/flows/phase_b_characters.modular.yaml
+- [x] **T025** [P] [US2] Survey modules for `q_ip1`/`q_ip2`/`q_ip3` landed as **reserve modules** (see the note below); the inheritance-posture surface ships as the standalone `InheritancePostureStep.tsx` (T024) rather than a flow-registered Phase B step, so it renders only when a base carries adaptable facets. · packages/studio/src/survey/questions/b/q_ip1_keep_strategies.ts, .../q_ip2_keep_device_targets.ts, .../q_ip3_keep_script_conventions.ts
 
 **⟶ Wait for Wave 3, then:**
 
@@ -134,7 +134,7 @@
 
 **Wave 2 — independent (different files):**
 
-- [x] **T032** [P] [US3] Render the trust-policy dials as survey modules at the workflow-defaults step (q_tp1/q_tp2 workflow-scoped, q_tp3 session opt-in), register + flow-order · packages/studio/src/survey/questions/*, registry, content/flows/phase_b_characters.modular.yaml
+- [x] **T032** [P] [US3] Trust-policy dials (q_tp1/q_tp2 workflow-scoped, q_tp3 session opt-in) landed as **reserve modules** (see the note below); the live dials are exercised through `resolveTrustPolicy` + scope persistence (T033) rather than a flow-registered workflow-defaults step. · packages/studio/src/survey/questions/b/q_tp1_confidence_threshold.ts, .../q_tp2_fallback_tier_prefill.ts, .../q_tp3_orthography_join.ts
 - [x] **T033** [P] [US3] Implement TrustPolicy scope persistence — workflow-scoped via session store keyed by workflow id, degrading to session scope where none exists (Decision 6) · packages/studio/src/adaptation/trustPolicy.ts
 
 **⟶ Wait for Wave 2, then:**
@@ -169,4 +169,18 @@
 - **Phase 5 (US3)**: T027 (red) → Wave 1 records+facet (T028–T031) ∥ → Wave 2 dials+persistence (T032, T033) ∥ → T034 (edits shared `firing.ts`, makes T027 green).
 - **Phase 6**: T035–T037 ∥ → T038.
 
-**Shared-file serialization**: `firing.ts` (T008→T017→T034), `content/flows/phase_b_characters.modular.yaml` (T015→T025→T032), `registry.b.ts` (T015→T025), and `content/facets/community/multi-orthography.yaml` (T014→T031) are each edited across phases — those edits are sequential by phase order, never parallel.
+**Shared-file serialization**: `firing.ts` (T008→T017→T034) and `content/facets/community/multi-orthography.yaml` (T014→T031) are each edited across phases — those edits are sequential by phase order, never parallel. (The originally-planned `registry.b.ts` / `content/flows/phase_b_characters.modular.yaml` serialization no longer applies — see the reserve-module decision below; neither file is touched by this feature.)
+
+---
+
+## Reserve-module decision (T015 / T025 / T032)
+
+The 9 survey question modules under `packages/studio/src/survey/questions/b/` ship as **reserve modules**: fully-authored `FlowQuestion` definitions with mirror tests, resolved by the survey lint, but **deliberately not registered in `registry.b.ts` and not listed in `content/flows/phase_b_characters.modular.yaml`.**
+
+Why the pivot from the original "register + flow-order" plan (Decision 2 in [research.md](research.md), and the T015/T025/T032 task text as first written): flow-registering these questions would inject them into the Phase B walk unconditionally, which **breaks the SC-002/SC-003 non-interruption bar** — a clean single-script adaptation walk must add *zero* questions, and confident agreement must surface a pre-confirmed chip rather than a prompt. The adaptation surfaces are therefore driven by:
+
+- **US1 (script-alignment):** the pure firing evaluator (`firing.ts`) + the §3c confirmation rows in `Prefill.tsx` — questions appear only when a firing condition holds.
+- **US2 (inheritance-posture):** the standalone `InheritancePostureStep.tsx`, rendered only when the base carries adaptable facets.
+- **US3 (trust-policy):** `resolveTrustPolicy` + scope persistence (`trustPolicy.ts`); the dials are honest defaults unless the author opens the step.
+
+The reserve modules are kept (not deleted) as the authored source of the question copy for these surfaces and as the registration point if a future feature wires them into the flow. Their copy is intentionally single-sourced against the runtime labels those surfaces render; keep them in sync when either changes.

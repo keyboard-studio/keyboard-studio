@@ -13,7 +13,7 @@
 
 import type { AdaptationEvidence } from "./evidence.ts";
 import { dominantEntry } from "./evidence.ts";
-import { TRUST_POLICY_DEFAULTS } from "./trustPolicy.ts";
+import { TRUST_POLICY_DEFAULTS, type TrustPolicy } from "./trustPolicy.ts";
 
 export type PostureFacet = "script" | "input-strategies" | "device-targets" | "script-conventions";
 
@@ -41,7 +41,11 @@ function fmtMix(mix: readonly string[]): string {
  * `source: "default"` and a sensible §3c posture — never blank, so a skipped
  * step is a full set of defaults the author can accept en masse.
  */
-export function buildPosture(evidence: AdaptationEvidence, baseId: string): InheritancePosture {
+export function buildPosture(
+  evidence: AdaptationEvidence,
+  baseId: string,
+  policy: TrustPolicy = TRUST_POLICY_DEFAULTS,
+): InheritancePosture {
   const { distribution, residue } = evidence.strategyFingerprint;
   const hasFingerprint = residue < 1 && Object.keys(distribution).length > 0;
   const [domScript, domShare] = dominantEntry(evidence.baseScriptDistribution);
@@ -53,7 +57,7 @@ export function buildPosture(evidence: AdaptationEvidence, baseId: string): Inhe
       // Re-derive for the chosen target unless the base is at or above the same
       // single-script threshold classifyBaseScript (firing.ts) uses — the two
       // paths must agree on what counts as "cleanly single-script".
-      posture: domShare >= TRUST_POLICY_DEFAULTS.singleScriptThreshold ? "keep" : "propose",
+      posture: domShare >= policy.singleScriptThreshold ? "keep" : "propose",
       source: "default",
       provenance: `base script: ${domScript || "unknown"} (${Math.round(domShare * 100)}% of rules)`,
     },
@@ -101,8 +105,9 @@ export function reconcilePostureOnBaseSwitch(
   prev: InheritancePosture,
   evidence: AdaptationEvidence,
   newBaseId: string,
+  policy: TrustPolicy = TRUST_POLICY_DEFAULTS,
 ): InheritancePosture {
-  const rebuilt = buildPosture(evidence, newBaseId);
+  const rebuilt = buildPosture(evidence, newBaseId, policy);
   const entries = rebuilt.entries.map((fresh) => {
     const before = prev.entries.find((e) => e.facet === fresh.facet);
     // Unchanged evidence + an author decision worth preserving → keep it.

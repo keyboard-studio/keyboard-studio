@@ -21,7 +21,7 @@ const SA_CATALOG: QuestionRecord[] = [
     firingCondition: "sibling-script-spread > 1",
     prefill: { facets: ["script"], sessionFacet: "lineage.siblings" },
     provenanceLabel: "scripts used by existing keyboards for related languages",
-    consumers: ["base-suggestion:ranking", "axis:A5"],
+    consumers: ["base-suggestion:ranking", "axis:A2"],
     noEvidenceDegradation: "ask-plainly",
     scope: "session",
     renders: true,
