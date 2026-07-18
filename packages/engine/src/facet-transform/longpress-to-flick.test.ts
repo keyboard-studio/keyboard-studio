@@ -5,6 +5,7 @@ import { describe, it, expect } from "vitest";
 import type { KeyboardIR, TouchKeyIR } from "@keyboard-studio/contracts";
 import { proposeFacetTransform } from "./propose.js";
 import { applyFacetTransform } from "./verify.js";
+import { simulate } from "../simulator/index.js";
 import { makeMeasurement, makeExceptionSite } from "./__fixtures__/measurements.js";
 import {
   parseKeyboard,
@@ -56,7 +57,7 @@ describe("US2 longpress → flick — exception preservation (T020 / SC-004)", (
     expect(gap.defaultDisposition).toBe("fix-offered");
 
     // Commit with defaults (no opt-in): dominant converts, exceptions preserved.
-    const result = await applyFacetTransform(ir, p);
+    const result = await applyFacetTransform(ir, p, { simulate });
     expect(result.status).toBe("committed");
     if (result.status !== "committed") return;
 
@@ -91,7 +92,7 @@ describe("US2 partial acceptance (T021 / FR-012)", () => {
       if (s.siteId === splitId) s.userDisposition = "accepted";
     }
 
-    const result = await applyFacetTransform(ir, proposal);
+    const result = await applyFacetTransform(ir, proposal, { simulate });
     expect(result.status).toBe("committed");
     if (result.status !== "committed") return;
 

@@ -3,6 +3,7 @@
 import { describe, it, expect } from "vitest";
 import { proposeFacetTransform } from "./propose.js";
 import { applyFacetTransform } from "./verify.js";
+import { simulate } from "../simulator/index.js";
 import { makeMeasurement } from "./__fixtures__/measurements.js";
 import { parseKeyboard, NFD_WITH_BACKSPACE_KMN } from "./__fixtures__/keyboards.js";
 import type { TransformProposal } from "./types.js";
@@ -37,7 +38,7 @@ describe("US3 NFD → NFC — output diff + companion backspace rewrite (T027)",
       toValue: "nfc",
     }) as TransformProposal;
 
-    const result = await applyFacetTransform(ir, p);
+    const result = await applyFacetTransform(ir, p, { simulate });
     expect(result.status).toBe("committed");
     if (result.status !== "committed") return;
 

@@ -189,6 +189,8 @@ export type {
   CommitResult,
   TransformRequest,
   ProposeOptions,
+  ApplyFacetTransformOptions,
+  InjectedSimulate,
 } from "./facet-transform/index.js";
 
 // Inventory diff (spec §8): static extraction of a keyboard's produced glyph set.

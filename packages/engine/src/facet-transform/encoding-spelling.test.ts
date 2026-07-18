@@ -5,6 +5,7 @@ import { describe, it, expect } from "vitest";
 import { buildProducedSet } from "@keyboard-studio/contracts";
 import { proposeFacetTransform } from "./propose.js";
 import { applyFacetTransform } from "./verify.js";
+import { simulate } from "../simulator/index.js";
 import { foldSplitModifiersToNamed } from "./migrations/encoding-spelling.js";
 import { makeMeasurement } from "./__fixtures__/measurements.js";
 import {
@@ -37,7 +38,7 @@ describe("US1 encoding-spelling — parity + invertibility (T011 / SC-001)", () 
     // The commit gate runs parity (compile+simulate over the corpus) AND
     // invertibility (assertSemanticEquivalence). A `committed` result IS the
     // proof that both held (SC-001).
-    const result = await applyFacetTransform(ir, p);
+    const result = await applyFacetTransform(ir, p, { simulate });
     expect(result.status).toBe("committed");
     if (result.status !== "committed") return;
 

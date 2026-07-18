@@ -30,6 +30,37 @@ import type {
   TransformProposal,
 } from "./types.js";
 
+/**
+ * The headless `simulate()` dependency, injected rather than imported.
+ *
+ * The vendored Keyman engine behind `../simulator` uses compile-time-only
+ * tsconfig path aliases (e.g. `@keymanapp/common-types`) that survive into the
+ * emitted `dist` as bare specifiers no bundler — Node or Rollup — can resolve
+ * (issue #183; the package barrel omits `simulate` for the same reason). A
+ * static OR dynamic `import("../simulator/…")` here would pull that un-bundleable
+ * chain into the studio's browser build. So callers that CAN run the Node-only
+ * simulator (tests, CLI) inject it; the browser SPA omits it. Structural type —
+ * assignable-from the real `simulate` — keeps this file simulator-import-free.
+ */
+export type InjectedSimulate = (
+  compiled: Awaited<ReturnType<typeof compileIr>>,
+  keys: SimKeyInput[],
+) => { finalOutput: string };
+
+/** Options for {@link applyFacetTransform}. */
+export interface ApplyFacetTransformOptions {
+  /**
+   * Node-only headless `simulate()` (import from `@keyboard-studio/engine/simulator`
+   * and pass it in). When provided, behavior-preserving transforms additionally
+   * verify keystroke-output equivalence over the bounded corpus (research D6).
+   * When omitted (the browser SPA — simulate is not bundleable, plan.md §Technical
+   * Context guarantees only the WASM oracle in-browser), that corpus step is
+   * skipped; produced-set equality + compile-both + invertibility still gate the
+   * commit (SC-001 compile/round-trip parity).
+   */
+  simulate?: InjectedSimulate;
+}
+
 // ---------------------------------------------------------------------------
 // Corpus → simulator input conversion
 // ---------------------------------------------------------------------------
@@ -131,6 +162,7 @@ async function verifyBehaviorPreserving(
   before: KeyboardIR,
   candidate: KeyboardIR,
   inverse: ((ir: KeyboardIR) => KeyboardIR) | undefined,
+  simulate: InjectedSimulate | undefined,
 ): Promise<{ ok: true } | { ok: false; failure: CommitFailure }> {
   // (1) Fast necessary-condition pre-check: produced-set equality.
   if (producedSetChangedBetween(before, candidate)) {
@@ -163,27 +195,28 @@ async function verifyBehaviorPreserving(
     };
   }
 
-  // Dynamic import keeps the Node-only simulator vendor (which uses bare import
-  // specifiers Vite cannot resolve) OFF the studio's static bundle graph — the
-  // same reason the package barrel omits `simulate` from its main entry. The
-  // behavior-preserving branch is the only place simulate is needed.
-  const { simulate } = await import("../simulator/index.js");
-  const { corpus } = generateCorpus(before);
-  for (const sequence of corpus) {
-    const keys = sequence.map(chordToSim);
-    const outBefore = simulate(compiledBefore, keys).finalOutput;
-    const outAfter = simulate(compiledAfter, keys).finalOutput;
-    if (outBefore !== outAfter) {
-      return {
-        ok: false,
-        failure: {
-          cause: "parity-violation",
-          reason: "Behavior-preserving transform changed typing behaviour.",
-          detail: [
-            `input ${JSON.stringify(keys)}: before=${JSON.stringify(outBefore)} after=${JSON.stringify(outAfter)}`,
-          ],
-        },
-      };
+  // Keystroke-output parity over the bounded corpus (D6) — only when a caller
+  // injected the Node-only simulator. The browser SPA cannot bundle it (issue
+  // #183; see InjectedSimulate) and relies on the produced-set pre-check above
+  // plus the invertibility check below for compile/round-trip parity (SC-001).
+  if (simulate !== undefined) {
+    const { corpus } = generateCorpus(before);
+    for (const sequence of corpus) {
+      const keys = sequence.map(chordToSim);
+      const outBefore = simulate(compiledBefore, keys).finalOutput;
+      const outAfter = simulate(compiledAfter, keys).finalOutput;
+      if (outBefore !== outAfter) {
+        return {
+          ok: false,
+          failure: {
+            cause: "parity-violation",
+            reason: "Behavior-preserving transform changed typing behaviour.",
+            detail: [
+              `input ${JSON.stringify(keys)}: before=${JSON.stringify(outBefore)} after=${JSON.stringify(outAfter)}`,
+            ],
+          },
+        };
+      }
     }
   }
 
@@ -252,6 +285,7 @@ async function compileRegressionGate(
 export async function applyFacetTransform(
   workingCopyIr: KeyboardIR,
   proposal: TransformProposal,
+  options: ApplyFacetTransformOptions = {},
 ): Promise<CommitResult> {
   const rule = MIGRATION_RULES[proposal.migrationRuleId];
   if (rule === undefined) {
@@ -288,7 +322,12 @@ export async function applyFacetTransform(
 
   // (Gate 1) Impact-class verify.
   if (proposal.transformImpactClass === "behavior-preserving") {
-    const parity = await verifyBehaviorPreserving(workingCopyIr, candidate, rule.inverse);
+    const parity = await verifyBehaviorPreserving(
+      workingCopyIr,
+      candidate,
+      rule.inverse,
+      options.simulate,
+    );
     if (!parity.ok) {
       return { status: "commit-failed", failure: parity.failure };
     }

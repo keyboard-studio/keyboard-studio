@@ -4,6 +4,7 @@
 import { describe, it, expect } from "vitest";
 import { proposeFacetTransform } from "./propose.js";
 import { applyFacetTransform } from "./verify.js";
+import { simulate } from "../simulator/index.js";
 import { makeMeasurement } from "./__fixtures__/measurements.js";
 import {
   parseKeyboard,
@@ -28,7 +29,7 @@ describe("compile-regression guard (T033 / SC-006)", () => {
     }) as TransformProposal;
     expect(p.kind).toBe("proposal");
 
-    const result = await applyFacetTransform(ir, p);
+    const result = await applyFacetTransform(ir, p, { simulate });
     expect(result.status).toBe("commit-failed");
     if (result.status !== "commit-failed") return;
     expect(result.failure.cause).toBe("compile-regression");
@@ -56,7 +57,7 @@ describe("opaque-fragment integrity (T033 / SC-005)", () => {
     // The preview reports what the transform could not model (FR-009).
     expect(p.opaqueUntouched?.length).toBeGreaterThan(0);
 
-    const result = await applyFacetTransform(ir, p);
+    const result = await applyFacetTransform(ir, p, { simulate });
     expect(result.status).toBe("committed");
     if (result.status !== "committed") return;
     // Every opaque fragment survives verbatim.
@@ -87,7 +88,7 @@ describe("no-silent-transform structural guard (T038 / SC-002)", () => {
       preset: "house-style",
     }) as TransformProposal;
     expect(p.status).toBe("proposed");
-    const r = await applyFacetTransform(ir, p);
+    const r = await applyFacetTransform(ir, p, { simulate });
     expect(r.status).toBe("committed");
   }, 60_000);
 });

@@ -13,6 +13,7 @@ export { proposeFacetTransform } from "./propose.js";
 export type { ProposeOptions } from "./propose.js";
 
 export { applyFacetTransform, producedSetDelta, opaqueInventory } from "./verify.js";
+export type { ApplyFacetTransformOptions, InjectedSimulate } from "./verify.js";
 
 export {
   TRANSITION_MATRIX,
