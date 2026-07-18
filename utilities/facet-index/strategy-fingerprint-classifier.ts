@@ -25,7 +25,6 @@
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { ImportStatus } from "@keyboard-studio/contracts";
-import { recognizePatterns } from "../../packages/engine/src/recognizer/index.js";
 
 import { mapImportStatus, computeAnalyzedCoverage } from "./outcome.js";
 import type { Categorization, ConfidenceClass, FacetDefinition } from "./types.js";
@@ -49,11 +48,13 @@ export function classifyStrategyFingerprint(ir: KeyboardIR, def: FacetDefinition
   const totalRules = ir.groups.reduce((sum, g) => sum + g.rules.length, 0);
   if (totalRules === 0) return null; // no rule population to fingerprint — fall through.
 
-  // recognizePatterns mutates `ir` (stamps ownedByPattern) and is idempotent, so
-  // it is safe even if another pass already ran. It returns recognizedRatio, but
-  // we re-derive the recognized share from the owned-rule tally below so the
-  // distribution + residue sum is numerically exact for the build-time X2 check.
-  recognizePatterns(ir);
+  // Precondition: `ir.recognizedPatterns` is already populated. The build runs
+  // `recognizePatterns` ONCE, centrally, in `buildKeyboardRecord` before the
+  // classifier loop (build-index.ts) — recognizing there keeps the shared IR's
+  // mutation explicit and out of any classifier's body, and avoids recomputing
+  // recognition across the full corpus on every build. We re-derive the
+  // recognized share from the owned-rule tally below so the distribution +
+  // residue sum is numerically exact for the build-time X2 check.
 
   // Per-strategy owned-rule tally. Each recognized rule is owned by exactly one
   // pattern (ownership-consistency invariant), so summing per-pattern owned

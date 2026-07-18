@@ -102,4 +102,40 @@ describe("targetMixFallback", () => {
     const result = targetMixFallback(kb, TARGET_FACET_DEF);
     expect(result.value).toEqual(["desktop", "touch"]);
   });
+
+  // Regression (km-keyman review, 037): the `desktop` group sentinel and the
+  // device-specific mobile tokens are part of the real `&TARGETS` vocabulary and
+  // were previously dropped by deviceClassOf, misclassifying real corpus entries.
+
+  it("&TARGETS 'desktop' sentinel, no <Targets> -> ['desktop'], declared (no false default note) — pid_piaroa", () => {
+    // keyboards/release/p/pid_piaroa/source/pid_piaroa.kmn:2 declares
+    // `store(&TARGETS) 'desktop'` with no <Targets> in its .kps.
+    const kb = makeKb({ kps: kpsXml(""), kmn: "store(&TARGETS) 'desktop'\nbegin Unicode > use(main)\n" });
+    const result = targetMixFallback(kb, TARGET_FACET_DEF);
+    expect(result.value).toEqual(["desktop"]);
+    expect(result.provenanceTier).toBe("declared-metadata");
+    // The old bug fell through to the default branch and emitted a false note.
+    expect(result.notes ?? "").not.toMatch(/defaulted to desktop/i);
+  });
+
+  it("&TARGETS 'web desktop' keeps both classes — eastern_cham / meitei_legacy", () => {
+    // keyboards/.../eastern_cham.kmn:14 and meitei_legacy.kmn:6 declare
+    // `store(&TARGETS) 'web desktop'`; the `desktop` token must not be dropped.
+    const kb = makeKb({ kps: kpsXml(""), kmn: "store(&TARGETS) 'web desktop'\nbegin Unicode > use(main)\n" });
+    const result = targetMixFallback(kb, TARGET_FACET_DEF);
+    expect(result.value).toEqual(["desktop", "web"]);
+    expect(result.provenanceTier).toBe("declared-metadata");
+  });
+
+  it("device-specific &TARGETS mobile tokens (iphone/ipad/androidphone/androidtablet) map to 'touch'", () => {
+    // These device-specific tokens are `.kmn &TARGETS` vocabulary, not the
+    // `.kps <Targets>` set (windows|macosx|linux|web|mobile|tablet).
+    const kb = makeKb({
+      kps: kpsXml(""),
+      kmn: "store(&TARGETS) 'desktop iphone ipad androidphone androidtablet'\nbegin Unicode > use(main)\n",
+    });
+    const result = targetMixFallback(kb, TARGET_FACET_DEF);
+    expect(result.value).toEqual(["desktop", "touch"]);
+    expect(result.provenanceTier).toBe("declared-metadata");
+  });
 });

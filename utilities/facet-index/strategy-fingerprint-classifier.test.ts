@@ -10,12 +10,25 @@
 import { describe, it, expect } from "vitest";
 
 import { parse } from "../../packages/engine/src/codec/index.js";
+import { recognizePatterns } from "../../packages/engine/src/recognizer/index.js";
 import {
   classifyStrategyFingerprint,
   strategyFingerprintFallback,
 } from "./strategy-fingerprint-classifier.js";
 import type { FacetDefinition } from "./types.js";
 import type { ScannedKeyboard } from "./scan.js";
+
+/**
+ * Parse a `.kmn` and run pattern recognition, mirroring the build's central
+ * pre-pass (`buildKeyboardRecord` in build-index.ts). `classifyStrategyFingerprint`
+ * reads recognition state off the IR and no longer recognizes defensively, so
+ * every caller — the build and these tests — must satisfy that precondition.
+ */
+function parseAndRecognize(kmn: string, id: string) {
+  const { ir } = parse(kmn, id);
+  recognizePatterns(ir);
+  return ir;
+}
 
 const STRATEGY_FACET_DEF: FacetDefinition = {
   id: "strategy-fingerprint",
@@ -90,7 +103,7 @@ const NO_RULES_KMN = `${HEADER}`;
 
 describe("classifyStrategyFingerprint", () => {
   it("simple-swap keyboard -> dominant S-01, low residue, confident", () => {
-    const { ir } = parse(S01_KMN, "test-s01");
+    const ir = parseAndRecognize(S01_KMN, "test-s01");
     const result = classifyStrategyFingerprint(ir, STRATEGY_FACET_DEF)!;
 
     expect(result).not.toBeNull();
@@ -107,7 +120,7 @@ describe("classifyStrategyFingerprint", () => {
   });
 
   it("unrecognized structure -> high residue, value omitted, distribution names only recognized strategies", () => {
-    const { ir } = parse(RESIDUE_KMN, "test-residue");
+    const ir = parseAndRecognize(RESIDUE_KMN, "test-residue");
     const result = classifyStrategyFingerprint(ir, STRATEGY_FACET_DEF)!;
 
     expect(result).not.toBeNull();
@@ -124,7 +137,7 @@ describe("classifyStrategyFingerprint", () => {
   });
 
   it("partial recognition (S-01 covers half the rules) -> mixed, value still S-01, residue distinct", () => {
-    const { ir } = parse(MIXED_KMN, "test-mixed");
+    const ir = parseAndRecognize(MIXED_KMN, "test-mixed");
     const result = classifyStrategyFingerprint(ir, STRATEGY_FACET_DEF)!;
 
     expect(result).not.toBeNull();
@@ -139,14 +152,14 @@ describe("classifyStrategyFingerprint", () => {
   });
 
   it("no rules -> null (fall through to the undetermined fallback)", () => {
-    const { ir } = parse(NO_RULES_KMN, "test-no-rules");
+    const ir = parseAndRecognize(NO_RULES_KMN, "test-no-rules");
     expect(classifyStrategyFingerprint(ir, STRATEGY_FACET_DEF)).toBeNull();
   });
 
   it("is stable under comment/whitespace-only edits (FR-013 — function of parsed structure)", () => {
-    const { ir: irA } = parse(S01_KMN, "test-stable");
+    const irA = parseAndRecognize(S01_KMN, "test-stable");
     const commented = S01_KMN.replace("group(main) using keys", "c a comment\ngroup(main) using keys   ");
-    const { ir: irB } = parse(commented, "test-stable");
+    const irB = parseAndRecognize(commented, "test-stable");
     const a = classifyStrategyFingerprint(irA, STRATEGY_FACET_DEF)!;
     const b = classifyStrategyFingerprint(irB, STRATEGY_FACET_DEF)!;
     expect(a.value).toBe(b.value);

@@ -11943,10 +11943,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[desktop web]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -12097,10 +12098,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -12255,10 +12257,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -12302,10 +12305,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -12673,8 +12677,8 @@
           "confidence": null,
           "confidenceClass": "confident",
           "evidenceSize": 1,
-          "notes": "no <Targets>/&TARGETS declaration; defaulted to desktop (windows); sources: kmn:[desktop]",
-          "provenanceTier": "default-fallback",
+          "notes": "sources: kmn:[desktop]",
+          "provenanceTier": "declared-metadata",
           "value": [
             "desktop"
           ]
@@ -13207,10 +13211,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -14571,10 +14576,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -14619,10 +14625,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[desktop web]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -14880,10 +14887,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -14931,8 +14939,8 @@
           "confidence": null,
           "confidenceClass": "confident",
           "evidenceSize": 1,
-          "notes": "no <Targets>/&TARGETS declaration; defaulted to desktop (windows); sources: kmn:[desktop]",
-          "provenanceTier": "default-fallback",
+          "notes": "sources: kmn:[desktop]",
+          "provenanceTier": "declared-metadata",
           "value": [
             "desktop"
           ]
@@ -15033,10 +15041,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -21634,10 +21643,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -21740,10 +21750,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -22213,8 +22224,8 @@
           "confidence": null,
           "confidenceClass": "confident",
           "evidenceSize": 1,
-          "notes": "no <Targets>/&TARGETS declaration; defaulted to desktop (windows); sources: kmn:[desktop]",
-          "provenanceTier": "default-fallback",
+          "notes": "sources: kmn:[desktop]",
+          "provenanceTier": "declared-metadata",
           "value": [
             "desktop"
           ]
@@ -22781,8 +22792,8 @@
           "confidence": null,
           "confidenceClass": "confident",
           "evidenceSize": 1,
-          "notes": "no <Targets>/&TARGETS declaration; defaulted to desktop (windows); sources: kmn:[desktop]",
-          "provenanceTier": "default-fallback",
+          "notes": "sources: kmn:[desktop]",
+          "provenanceTier": "declared-metadata",
           "value": [
             "desktop"
           ]
@@ -22830,10 +22841,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -23862,10 +23874,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[desktop web]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -24919,10 +24932,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[desktop web]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -26388,10 +26402,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -26804,8 +26819,8 @@
           "confidence": null,
           "confidenceClass": "confident",
           "evidenceSize": 1,
-          "notes": "no <Targets>/&TARGETS declaration; defaulted to desktop (windows); sources: kmn:[desktop]",
-          "provenanceTier": "default-fallback",
+          "notes": "sources: kmn:[desktop]",
+          "provenanceTier": "declared-metadata",
           "value": [
             "desktop"
           ]
@@ -27431,10 +27446,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -27749,8 +27765,8 @@
           "confidence": null,
           "confidenceClass": "confident",
           "evidenceSize": 1,
-          "notes": "no <Targets>/&TARGETS declaration; defaulted to desktop (windows); sources: kmn:[desktop]",
-          "provenanceTier": "default-fallback",
+          "notes": "sources: kmn:[desktop]",
+          "provenanceTier": "declared-metadata",
           "value": [
             "desktop"
           ]
@@ -29884,10 +29900,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -30035,10 +30052,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -32145,10 +32163,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -32872,10 +32891,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -33285,10 +33305,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -33341,8 +33362,8 @@
           "confidence": null,
           "confidenceClass": "confident",
           "evidenceSize": 1,
-          "notes": "no <Targets>/&TARGETS declaration; defaulted to desktop (windows); sources: kmn:[desktop]",
-          "provenanceTier": "default-fallback",
+          "notes": "sources: kmn:[desktop]",
+          "provenanceTier": "declared-metadata",
           "value": [
             "desktop"
           ]
@@ -33772,10 +33793,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -33930,10 +33952,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -37608,8 +37631,8 @@
           "confidence": null,
           "confidenceClass": "confident",
           "evidenceSize": 1,
-          "notes": "no <Targets>/&TARGETS declaration; defaulted to desktop (windows); sources: kmn:[desktop]",
-          "provenanceTier": "default-fallback",
+          "notes": "sources: kmn:[desktop]",
+          "provenanceTier": "declared-metadata",
           "value": [
             "desktop"
           ]
@@ -37765,10 +37788,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[desktop web]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -37871,10 +37895,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -38302,10 +38327,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -38668,10 +38694,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -38716,10 +38743,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -38764,10 +38792,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -40550,10 +40579,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -40657,10 +40687,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -40760,10 +40791,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -40971,10 +41003,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -41022,10 +41055,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -41073,10 +41107,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -41226,10 +41261,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -41277,10 +41313,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -41331,10 +41368,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[web desktop]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -43211,8 +43249,8 @@
           "confidence": null,
           "confidenceClass": "confident",
           "evidenceSize": 1,
-          "notes": "no <Targets>/&TARGETS declaration; defaulted to desktop (windows); sources: kmn:[desktop]",
-          "provenanceTier": "default-fallback",
+          "notes": "sources: kmn:[desktop]",
+          "provenanceTier": "declared-metadata",
           "value": [
             "desktop"
           ]
@@ -43470,8 +43508,8 @@
           "confidence": null,
           "confidenceClass": "confident",
           "evidenceSize": 1,
-          "notes": "no <Targets>/&TARGETS declaration; defaulted to desktop (windows); sources: kmn:[desktop]",
-          "provenanceTier": "default-fallback",
+          "notes": "sources: kmn:[desktop]",
+          "provenanceTier": "declared-metadata",
           "value": [
             "desktop"
           ]
@@ -43785,10 +43823,11 @@
           "analyzedCoverage": 1,
           "confidence": null,
           "confidenceClass": "confident",
-          "evidenceSize": 1,
+          "evidenceSize": 2,
           "notes": "sources: kmn:[desktop web]",
           "provenanceTier": "declared-metadata",
           "value": [
+            "desktop",
             "web"
           ]
         }
@@ -43947,8 +43986,8 @@
           "confidence": null,
           "confidenceClass": "confident",
           "evidenceSize": 1,
-          "notes": "no <Targets>/&TARGETS declaration; defaulted to desktop (windows); sources: kmn:[desktop]",
-          "provenanceTier": "default-fallback",
+          "notes": "sources: kmn:[desktop]",
+          "provenanceTier": "declared-metadata",
           "value": [
             "desktop"
           ]
@@ -48241,8 +48280,8 @@
       },
       "target-mix": {
         "content": 0,
-        "declared": 899,
-        "fallback": 19,
+        "declared": 910,
+        "fallback": 8,
         "undetermined": 0
       }
     },

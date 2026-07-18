@@ -60,7 +60,12 @@ export function renderCompanionMd(index: FacetIndex): string {
     for (const id of ids.slice(0, SAMPLE_ROWS)) {
       const cat = keyboards[id]?.facets[facetId];
       if (!cat) continue;
-      const value = Array.isArray(cat.value) ? cat.value.join("+") : String(cat.value);
+      const value =
+        cat.value === undefined
+          ? "—"
+          : Array.isArray(cat.value)
+            ? cat.value.join("+")
+            : String(cat.value);
       lines.push(`| \`${id}\` | ${value} | ${cat.provenanceTier} | ${cat.analysisOutcome} | ${cat.evidenceSize} |`);
     }
     lines.push("");

@@ -35,11 +35,16 @@ function deviceClassOf(target: string): DeviceClass | null {
     case "windows":
     case "macosx":
     case "linux":
+    case "desktop":
       return "desktop";
     case "web":
       return "web";
     case "mobile":
     case "tablet":
+    case "iphone":
+    case "ipad":
+    case "androidphone":
+    case "androidtablet":
       return "touch";
     default:
       return null;

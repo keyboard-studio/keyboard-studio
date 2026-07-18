@@ -78,8 +78,9 @@ function classifyConfidence(dominantShare: number): ConfidenceClass {
  *
  * The `ipa` bar is deliberately higher than `extended` and must additionally
  * beat `extended` by a margin (km-domain review, 037): many everyday letters in
- * African Latin-script orthographies — ɛ U+025B, ɔ U+0254, ɖ U+0256, ɓ U+0253,
- * ɣ U+0263 (Ewe, Akan/Twi, Ga, Gbe) — live in the IPA Extensions block purely by
+ * African Latin-script orthographies — ɛ U+025B, ɔ U+0254, ɖ U+0256 (Ewe, Fon/Gbe,
+ * Akan/Twi, Ga), ɓ U+0253 (Fula, Hausa, Mandinka), ɣ U+0263 (Fon, Fula, Wolof,
+ * Tamazight) — live in the IPA Extensions block purely by
  * Unicode accident, not because the keyboard is for phonetic transcription. An
  * orthography keyboard that mixes those with true Latin-Extended letters (ŋ, ƒ)
  * must read as `extended`, not `ipa`; only a keyboard where IPA-block characters
