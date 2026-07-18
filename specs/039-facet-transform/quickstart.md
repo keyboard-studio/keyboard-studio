@@ -55,7 +55,7 @@ criteria. Details live in [data-model.md](data-model.md) and [contracts/](contra
 
 ## Scenario 4 — Honest declines + refusals (FR-004 · Edge Cases)
 
-1. Request `source.mnemonic-vs-positional` → **gate refusal** with explanation (never attempted).
+1. Request `source.mnemonic-vs-positional` **and** `source.casing` → **gate refusal** with explanation for each (never attempted; both gate facets per transition-matrix contract invariant #4).
 2. Request `source.encoding.input-match-kind` `key-ref → char-ref` → **permanent decline** with reason
    (semantic, not behavior-preserving).
 3. Request `source.normalization-posture` `nfc → nfd` → **deferred decline** with reason.

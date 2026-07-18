@@ -4,140 +4,131 @@ description: "Task list for Facet Transform Engine (spec 039)"
 
 # Tasks: Facet Transform Engine
 
-**Input**: Design documents from [specs/039-facet-transform/](.)
+**Input**: Design documents from [specs/039-facet-transform/](.) — [plan.md](plan.md), [spec.md](spec.md), [research.md](research.md), [data-model.md](data-model.md), [contracts/](contracts/), [quickstart.md](quickstart.md)
 
-**Prerequisites**: [plan.md](plan.md), [spec.md](spec.md), [research.md](research.md), [data-model.md](data-model.md), [contracts/](contracts/)
+**Prerequisites**: plan.md (tech stack + structure), spec.md (US1/US2/US3 + FR-001..FR-013 + SC-001..SC-006), data-model.md (5 entities), contracts/ (transition-matrix + transform-proposal), research.md (D1–D12)
 
-**Tests**: INCLUDED. The spec's Success Criteria (SC-001..SC-006) and the plan's Testing section explicitly require vitest fixture tests (parity, invertibility, cause-tag preservation, opaque integrity, compile-regression decline, decline-with-reason). Test tasks are therefore first-class here.
+**Tests**: INCLUDED — the feature explicitly requires fixture tests (spec Testing section, quickstart Scenarios 1–5, SC-001..SC-006). Test tasks are written to fail before the implementation that satisfies them.
 
-**Organization**: Tasks grouped by user story (US1 P1 → US2 P2 → US3 P3) so each transform class ships and tests independently.
+**Organization**: Grouped by user story (P1/P2/P3) so each transform class ships as an independently testable increment. Engine-owned code lives in `packages/engine/src/facet-transform/`; studio wiring in `packages/studio/`.
 
 ## Format: `[ID] [P?] [Story] Description`
 
-- **[P]**: Can run in parallel (different files, no dependencies on incomplete tasks)
-- **[Story]**: US1 / US2 / US3 (setup, foundational, and polish tasks carry no story label)
-- All paths are repo-relative. New engine module: `packages/engine/src/facet-transform/`
-
-## Path Conventions
-
-Engine module (working-copy mutation orchestration) per [plan.md](plan.md) Structure Decision:
-- Engine code + fixtures + vitest specs: `packages/engine/src/facet-transform/`
-- Package barrel re-export: `packages/engine/src/index.ts`
-- Studio wiring: `packages/studio/src/`
-- Docs: `docs/keyboard-index.md`
+- **[P]**: parallelizable (different files, no dependency on an incomplete task)
+- **[Story]**: US1 / US2 / US3 (Setup / Foundational / Polish carry no story label)
+- Every task names an exact file path.
 
 ---
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-**Purpose**: Create the module skeleton and the injected-measurement fixture harness so every later phase has a place to land.
+**Purpose**: Create the engine module skeleton and wire it into the package, plus the shared test-fixture scaffold.
 
-- [ ] T001 Create the module directory + empty barrel `packages/engine/src/facet-transform/index.ts` and the `packages/engine/src/facet-transform/migrations/` subfolder, per [plan.md](plan.md) Source Code layout.
-- [ ] T002 [P] Add module-scoped types file `packages/engine/src/facet-transform/types.ts` declaring `TransformImpactClass`, `LossProfile`, `CauseTag`, `PreviewKind`, and the `SourceFacetMeasurement` / `ExceptionSite` injected-input contract from [data-model.md](data-model.md) Entity 0.
-- [ ] T003 [P] Create the fixture harness `packages/engine/src/facet-transform/fixtures/index.ts` that loads corpus `.kmn` bases (via `parseKmn`) and pairs each with a hand-authored `SourceFacetMeasurement` fixture (037/036 output shape), per [quickstart.md](quickstart.md) Prerequisites.
-- [ ] T004 [P] Add a vitest smoke spec `packages/engine/src/facet-transform/module.test.ts` asserting the barrel exports resolve and the fixture harness loads at least one base + measurement (guards the module wiring before real logic lands).
+- [x] T001 Create the module directory and a placeholder curated barrel at `packages/engine/src/facet-transform/index.ts` (exports to be filled: `proposeFacetTransform`, `applyFacetTransform`, `TRANSITION_MATRIX`, types) per plan.md Project Structure.
+- [x] T002 [P] Re-export the facet-transform barrel from `packages/engine/src/index.ts`, placed immediately after the `pattern-apply` export block (plan.md Structure Decision).
+- [x] T003 [P] Create the fixture scaffold at `packages/engine/src/facet-transform/__fixtures__/measurements.ts` — a `SourceFacetMeasurement` builder (Entity 0 shape: `dominantValue`, `confidenceClass`, `consistency`, `exceptionSites[]` with `causeTag`, `evidenceSize`) used by every story's tests (quickstart Prerequisites, research D4). **D4 fixture-only guard**: the cause-tagged `source.*` exception-site schema (and `orth.display-difficulty`) are spec-037 outputs **not yet landed** — the engine is built and tested against these fixtures ONLY; do NOT wire it to live `docs/keyboard-facet-index.json` measurements until 037 ships the cause-tag schema.
 
 ---
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-**Purpose**: The transition matrix, entity types, engine surface skeleton, and common commit gate that ALL three user stories depend on.
+**Purpose**: The types, the owned transition matrix, the propose/refuse surface, and the shared commit gate — every user story depends on these.
 
-**⚠️ CRITICAL**: No user-story migration rule can be written until the matrix rows, the `MigrationRule`/`TransformProposal` types, and the common gate exist.
+**⚠️ CRITICAL**: No user-story transform can be implemented until this phase is complete.
 
-- [ ] T005 [P] Define `FacetTransition` and `MigrationRule` entity types in `packages/engine/src/facet-transform/types.ts` per [data-model.md](data-model.md) Entities 1–2 (natural key `(facetId, fromValue, toValue)`, sub-profile facet ids, `lossProfile`, `namedLosses`, `transformImpactClass`, `migrationRuleId`, `declineReason`).
-- [ ] T006 [P] Define `TransformProposal`, `AffectedSite`, `TransformRefusal`, and `CommitResult` types in `packages/engine/src/facet-transform/types.ts` per [data-model.md](data-model.md) Entity 3 and the [transform-proposal.contract.md](contracts/transform-proposal.contract.md) engine surface.
-- [ ] T007 [P] Define `HouseTargetPolicyRow` + `HouseTargetResolution` types in `packages/engine/src/facet-transform/types.ts` per [data-model.md](data-model.md) Entity 4 (ordered, first-match-wins; `isDefault`; provenance chip renders only when `isDefault === false`).
-- [ ] T008 Author the value-transition matrix `packages/engine/src/facet-transform/transition-matrix.ts` — the v1 supported rows AND the declined-with-reason rows from [transition-matrix.contract.md](contracts/transition-matrix.contract.md) (depends on T005). Every requestable pair has a row (supported → `migrationRuleId`; unsupported → `declineReason`).
-- [ ] T009 [P] Add the matrix invariant/drift-guard test `packages/engine/src/facet-transform/transition-matrix.test.ts` asserting the four matrix invariants from the contract: every requestable pair has a row, `lossless ⇒ behavior-preserving`, impact-class drift guard (row class equals sub-profile declared class), gate facets produce no rows (depends on T008).
-- [ ] T010 Implement the ordered house-target policy resolver `packages/engine/src/facet-transform/house-target-policy.ts` (first-match-wins on `{script, displayDifficulty}` → `HouseTargetResolution`), per [data-model.md](data-model.md) Entity 4 (depends on T007).
-- [ ] T011 Implement the common commit gate `packages/engine/src/facet-transform/verify.ts` — the class-dispatched `verify`, opaque-integrity diff of `ir.raw` (reusing the I4 `{feature,count}` inventory shape), and the one-shot undebounced `validateWithOracle`/`compile` regression check, per [transition-matrix.contract.md](contracts/transition-matrix.contract.md) "Common gate" and [transform-proposal.contract.md](contracts/transform-proposal.contract.md) "Commit gate" (depends on T005–T006). Imports `buildProducedSet`, `assertSemanticEquivalence`, `validateWithOracle`/`compile`, `simulate`, `generateCorpus` as black boxes.
-- [ ] T012 Implement `proposeFacetTransform` (pure) and `applyFacetTransform` shells in `packages/engine/src/facet-transform/propose.ts` per the [transform-proposal.contract.md](contracts/transform-proposal.contract.md) engine surface: matrix lookup, gate/undetermined/declined → `TransformRefusal`; cause-tag → `AffectedSite.defaultDisposition`; accepted-subset commit filter; delegates the rewrite to a `MigrationRule` looked up by id and runs the T011 gate (depends on T008, T010, T011). Migration rule bodies are stubbed until their story phase.
-- [ ] T013 Add a foundational spec `packages/engine/src/facet-transform/propose.test.ts` asserting the propose/refusal routing with a stub rule: gate facet → refusal, `undetermined` measurement → refusal, cause-tag → correct `defaultDisposition`, and no request→committed path skips a `TransformProposal` (SC-002 skeleton) (depends on T012).
+- [x] T004 [P] Define the engine types in `packages/engine/src/facet-transform/types.ts` — `SourceFacetMeasurement` + `ExceptionSite` (Entity 0), `FacetTransition` (Entity 1), `MigrationRule` (Entity 2), `TransformProposal` + `AffectedSite` (Entity 3), `HouseTargetPolicyRow` + `HouseTargetResolution` (Entity 4), plus `TransformRefusal` and `CommitResult`. Include the D5 disclaimer comment (does NOT import/extend `StrategyId`/`PrimaryRuleNumber`/§7.2 tree).
+- [x] T005 Implement the value-transition matrix in `packages/engine/src/facet-transform/transition-matrix.ts` — the v1 supported rows (4 pairs across 3 impact classes) AND every declined-with-reason row (permanent + deferred) from [contracts/transition-matrix.contract.md](contracts/transition-matrix.contract.md), keyed at the sub-profile level for `source.encoding` (data-model Sub-profile rule). Depends on T004.
+- [x] T006 [P] Matrix invariant + drift-guard test in `packages/engine/src/facet-transform/transition-matrix.test.ts` — assert invariants 1–5 (every requestable pair has a row; `lossless ⇒ behavior-preserving`; row `transformImpactClass` equals the facet's declared class; gate facets produce no rows; `mixed` is a valid `fromValue`). MUST fail before T005 is complete. Depends on T004.
+- [x] T007 Implement `proposeFacetTransform` skeleton + refusal paths in `packages/engine/src/facet-transform/propose.ts` — resolve the requested `(facetId, toValue|preset)` against the matrix; return a `TransformRefusal` (verbatim reason) for gate facets, `undetermined`/below-evidence-floor measurements, and declined-with-reason pairs; these never reach `proposed` (contracts transform-proposal §Engine surface, spec Edge Cases). Depends on T004, T005.
+- [x] T008 Implement the `AffectedSite` disposition builder in `packages/engine/src/facet-transform/propose.ts` — map cause tags to `defaultDisposition` (principled-split⇒`preserve`, capacity-forced⇒`consolidate-offered`, gap-omission⇒`fix-offered`, none⇒`apply`) per FR-005 / transform-proposal §Cause-tag disposition. Depends on T007.
+- [x] T009 Implement the shared commit gate + `applyFacetTransform` surface in `packages/engine/src/facet-transform/verify.ts` and the barrel — the `apply(ir, acceptedSiteIds[]) → candidateIr` (copy-return, partial-acceptance filter per data-model Commit rule) → `verify` dispatch by impact class → opaque-diff (FR-009, reuse I4 `{feature,count}` inventory) → one-shot undebounced `validateWithOracle`/`compile` (research D8/D9) → `{status:'committed', nextIr, producedSetChanged}` | `{status:'commit-failed', failure}`. Migration-rule bodies land per-story. Depends on T004, T007.
+- [x] T010 [P] Implement the `fallThroughImpact` producer + `producedSetChanged` computation in `packages/engine/src/facet-transform/verify.ts` — `buildProducedSet(before) != buildProducedSet(candidate)` drives FR-011 `producedCharacterSetDelta` and the FR-013 re-derive flag. Depends on T009.
 
-**Checkpoint**: Matrix, types, gate, and propose/apply routing exist and are tested; the three migration rules can now be built independently.
+**Checkpoint**: Matrix, types, propose/refuse, and the gate exist — user stories can now implement their migration rules in parallel.
 
 ---
 
-## Phase 3: User Story 1 - Behavior-preserving encoding normalization (Priority: P1) 🎯 MVP
+## Phase 3: User Story 1 - Behavior-preserving encoding normalization to house style (Priority: P1) 🎯 MVP
 
-**Goal**: Normalize a mixed-encoding base to house style with byte-identical output and identical typing behaviour; reversible; house-target provenance chip when a non-default target fires.
+**Goal**: Normalize a mixed-encoding base to house style with byte-identical output and identical typing behaviour; reversible; provenance chip only when a non-default house target fires.
 
-**Independent Test**: Run the encoding transform toward house style on a mixed-encoding fixture; assert produced-output + behaviour unchanged (compile/simulate parity), source now matches house-style per role, and the transform is reversible (`assertSemanticEquivalence`).
+**Independent Test**: Run the encoding transform toward house style on a mixed-encoding fixture; assert (a) produced-output + behaviour unchanged (compile/simulate parity), (b) source now matches house-style per role, (c) reversible (`assertSemanticEquivalence`).
 
-### Tests for User Story 1
+### Tests for User Story 1 ⚠️ (write first, ensure they FAIL)
 
-> Write these FIRST and confirm they FAIL before implementing the migration.
-
-- [ ] T014 [P] [US1] Parity + invertibility test `packages/engine/src/facet-transform/migrations/encoding-spelling.test.ts` (SC-001): `buildProducedSet` equality, `simulate` finalOutput equality over `generateCorpus`, and `assertSemanticEquivalence(before, inverse(after)).equivalent === true` for `quoted-literal ↔ u-notation` and `mixed → house-style` (depends on T003).
-- [ ] T015 [P] [US1] House-target provenance test `packages/engine/src/facet-transform/house-target-policy.test.ts` (US1 AC1): default target ⇒ no chip (`isDefault === true`); poorly-displaying-script fixture ⇒ `U+`-kept row fires with verbatim `explanation` and `isDefault === false` (depends on T010).
-- [ ] T016 [P] [US1] Modifier-fold precondition test in `packages/engine/src/facet-transform/migrations/encoding-spelling.test.ts`: `named-modifier → split-modifier` emits the `LSHIFT`+`RSHIFT` pair; `split → named` refuses per-site when `LSHIFT`/`RSHIFT` outputs differ (never silently collapsed) per [transition-matrix.contract.md](contracts/transition-matrix.contract.md).
+- [x] T011 [P] [US1] Parity + invertibility fixture test (SC-001) in `packages/engine/src/facet-transform/encoding-spelling.test.ts` — mixed-encoding fixture → `proposeFacetTransform` → `applyFacetTransform`; assert `buildProducedSet` unchanged, `simulate` output identical over `generateCorpus`, and `assertSemanticEquivalence(before, inverse(after)).equivalent === true` (US1 Independent Test, AC2/AC3).
+- [x] T012 [P] [US1] House-target provenance test (US1 AC1) in `packages/engine/src/facet-transform/house-target-policy.test.ts` — assert the resolved `HouseTargetResolution` and that the provenance chip renders ONLY when `isDefault === false` (e.g. `U+`-kept for a poorly-displaying script). MUST fail before T013/T014.
+- [x] T013 [P] [US1] Modifier-fold precondition test in `packages/engine/src/facet-transform/encoding-spelling.test.ts` — `named ↔ split` modifier fold is lossless only when the per-site precondition holds; sites failing it are refused per-site, never silently collapsed (contract `encoding-spelling` precondition).
 
 ### Implementation for User Story 1
 
-- [ ] T017 [US1] Implement the `encoding-spelling` migration rule `packages/engine/src/facet-transform/migrations/encoding-spelling.ts` — copy-return `apply(ir, acceptedSiteIds[])` rewriting output base/combining spelling (`'a' ↔ U+0061`) and within-kind input spelling; per-site modifier-fold precondition check; never touches the match-kind axis (depends on T012). Sets `verify` to the behavior-preserving path.
-- [ ] T018 [US1] Wire `preset: 'house-style'` in `proposeFacetTransform` to resolve via the house-target policy and populate `houseTargetProvenance` + `previewKind: 'source-diff'` with per-role before/after (depends on T017, T010).
-- [ ] T019 [US1] Register the `encoding-spelling` rule in the migration-rule lookup and export `proposeFacetTransform`/`applyFacetTransform`/`TRANSITION_MATRIX`/types from `packages/engine/src/facet-transform/index.ts` (depends on T017).
-- [ ] T020 [US1] Add the `source-diff` proposal preview + partial-acceptance (per-role/per-site disposition) to the studio proposal UI and wire the transform stage into `useWorkingCopyTransform` + a `setWorkingIR` commit write in `packages/studio/src/` per [plan.md](plan.md) (depends on T019).
+- [x] T014 [US1] Implement the house-target decision-table resolver in `packages/engine/src/facet-transform/house-target-policy.ts` — ordered, first-match-wins over `HouseTargetPolicyRow[]` (inputs: `script`, `orth.display-difficulty`), returning a `HouseTargetResolution` with `matchedRowOrder`/`explanation`/`isDefault` (Entity 4, D5 pattern-only). **`orth.display-difficulty` is an injected fixture input (spec-037 output, not yet landed — see T003 D4 guard)**, never read from a live index here. Depends on T004.
+- [x] T015 [US1] Implement the `encoding-spelling` migration in `packages/engine/src/facet-transform/migrations/encoding-spelling.ts` — `'a' ↔ U+0061` output/base/combining + within-kind char-ref + modifier fold with per-site precondition; copy-return; NEVER touches the match-kind axis (contract scope). Depends on T009, T014.
+- [x] T016 [US1] Implement the behavior-preserving `verify` branch in `packages/engine/src/facet-transform/verify.ts` — `buildProducedSet` equality pre-check → compile+`simulate` finalOutput equality over `generateCorpus` → invertibility via `assertSemanticEquivalence` (D6/D7). Depends on T009, T015.
+- [x] T017 [US1] Wire `previewKind: 'source-diff'` assembly (per-role before/after + `houseTargetProvenance`) into `packages/engine/src/facet-transform/propose.ts` for `preset: 'house-style'` requests. Depends on T007, T014.
+- [x] T018 [US1] Studio wiring: add the facet-transform stage to `packages/studio/src/hooks/useWorkingCopyTransform.ts` (or the current working-copy transform pipeline) — call `applyFacetTransform`, and on `committed` write `setWorkingIR(nextIr)` (research D1/D2). Depends on T009.
+- [x] T019 [US1] Studio proposal UI — the `source-diff` preview + explicit-confirm control in `packages/studio/src/components/facet-transform/` (per-role before/after, "behaviour unchanged" assurance, invertibility note, provenance chip when non-default). Depends on T017, T018.
 
-**Checkpoint**: US1 is fully functional and independently testable — the MVP (safest transform class establishes the propose→confirm→rewrite→verify pattern).
+**Checkpoint**: US1 is fully functional — the safest transform class sets the propose→preview→confirm→rewrite pattern (MVP).
 
 ---
 
-## Phase 4: User Story 2 - UX-changing mechanism switch (longpress → flick) (Priority: P2)
+## Phase 4: User Story 2 - UX-changing mechanism switch (longpress → flick) with exception preservation (Priority: P2)
 
 **Goal**: Switch dominant touch longpress to flick; preserve principled-split sites by default (named); surface gap-omission as a fix; refuse over-budget keys per-site; output unchanged.
 
-**Independent Test**: Run longpress→flick over a fixture with a known principled-split and a known gap; assert the dominant mechanism switched, principled-split preserved unless opted in, gap offered as a fix, over-budget key refused per-site, and emitted *output* unchanged.
+**Independent Test**: Run longpress→flick over a fixture with a known principled-split + gap; assert dominant switched, principled-split preserved unless opted in, gap offered, output unchanged.
 
-### Tests for User Story 2
+### Tests for User Story 2 ⚠️ (write first, ensure they FAIL)
 
-- [ ] T021 [P] [US2] Cause-tag disposition test `packages/engine/src/facet-transform/migrations/longpress-to-flick.test.ts` (SC-004): principled-split sites → `defaultDisposition: preserve` and named; gap-omission → `fix-offered`; both hold in 100% of fixture cases (depends on T003).
-- [ ] T022 [P] [US2] Output-unchanged + per-site-refusal test in `packages/engine/src/facet-transform/migrations/longpress-to-flick.test.ts`: `simulate` output identical after the switch (only input UX changed); a key whose subkey count exceeds the flick-direction budget is refused per-site with a reason, never truncated (depends on T003).
+- [x] T020 [P] [US2] Exception-preservation + gap + per-site-refusal test (SC-004) in `packages/engine/src/facet-transform/longpress-to-flick.test.ts` — assert principled-split sites `defaultDisposition: preserve` (named, not converted), gap-omission `fix-offered`, subkey-count-over-budget keys refused per-site with a reason, and `simulate` OUTPUT identical after commit (quickstart Scenario 2, US2 AC1/AC2/AC3).
+- [x] T021 [P] [US2] Partial-acceptance test (FR-012) in `packages/engine/src/facet-transform/longpress-to-flick.test.ts` — confirm dominant switch while leaving principled-split preserved; assert only the accepted subset is rewritten and the working copy stays consistent (data-model Commit rule).
 
 ### Implementation for User Story 2
 
-- [ ] T023 [US2] Implement the `longpress-to-flick` migration rule `packages/engine/src/facet-transform/migrations/longpress-to-flick.ts` — copy-return over `TouchLayoutIR`, rewrite `TouchKeyIR.sk` → `TouchKeyIR.flick` through `parseTouchLayout`/`emitTouchLayout`, set `TouchKeyProvenance` per rewritten key (never clobber hand-set), `derivesParameters: true` (compass direction per subkey), per-site over-budget refusal, `namedLosses: [discoverability]` (depends on T012).
-- [ ] T024 [US2] Populate the `ux-description` preview: every `namedLoss`, the derived flick-direction table for review, per-site refusals with reasons, and the preserve/offer disposition per exception site, per [transform-proposal.contract.md](contracts/transform-proposal.contract.md) (depends on T023).
-- [ ] T025 [US2] Register the `longpress-to-flick` rule in the lookup/barrel and add the `ux-description` + derived-parameter-review sub-step to the studio proposal UI (depends on T023, T020).
+- [x] T022 [US2] Implement the `longpress-to-flick` migration in `packages/engine/src/facet-transform/migrations/longpress-to-flick.ts` — rewrite `TouchKeyIR.sk` → `TouchKeyIR.flick` on `TouchLayoutIR` via `parseTouchLayout`/`emitTouchLayout`; set `TouchKeyProvenance` explicitly per rewritten key (never clobber hand-set — research D3); refuse over-flick-budget keys per-site with a reason (contract Bound). Depends on T009.
+- [x] T023 [US2] Implement derived flick-direction assignment (position-order → nearest available compass direction) surfaced as `derivedParameterReview` in `packages/engine/src/facet-transform/migrations/longpress-to-flick.ts`; derivation is NOT authoritative (spec Assumption). Depends on T022.
+- [x] T024 [US2] Implement the ux-changing `verify` branch in `packages/engine/src/facet-transform/verify.ts` — produced OUTPUT unchanged via compile+`simulate` (only input UX changes); assemble the UX description. Depends on T009, T022.
+- [x] T025 [US2] Wire `previewKind: 'ux-description'` assembly (every `namedLoss`, the derived-direction table, per-site refusals, preserved/offered sites with reasons) into `packages/engine/src/facet-transform/propose.ts`. Depends on T007, T023.
+- [x] T026 [US2] Studio UI: `ux-description` preview + the derived-flick-direction review sub-step + per-site disposition controls in `packages/studio/src/components/facet-transform/`. **Article IV / D9 caution**: if the flick-direction override field re-validates a live preview on keystroke, it MUST reuse `useDebounce`/`useValidator` — never a bespoke `setTimeout` (no second debounce timer). Depends on T019, T025.
 
-**Checkpoint**: US1 and US2 both work independently; cause-tag-aware preservation and derived-parameter review are exercised.
+**Checkpoint**: US1 AND US2 both work independently — the cause-tag-aware, lossy-direction transform is covered.
 
 ---
 
-## Phase 5: User Story 3 - Output-changing normalization (NFD → NFC) (Priority: P3)
+## Phase 5: User Story 3 - Output-changing normalization migration (NFD → NFC) with coordinated rule rewrite (Priority: P3)
 
-**Goal**: Migrate output NFD→NFC with the coordinated backspace-rule rewrite; present an output-level diff; require explicit confirmation; result still compiles.
+**Goal**: Migrate emitted output NFD→NFC and rewrite the matching backspace rules together; show an output-level diff and require explicit confirmation.
 
-**Independent Test**: Run NFD→NFC on a fixture with matching two-codepoint backspace overrides; assert output normalization changed, the now-unreachable backspace override was removed so single backspace deletes the composed codepoint, and an output diff was shown before commit.
+**Independent Test**: Run NFD→NFC on a fixture with backspace overrides; assert output normalization changed, backspace rules rewritten consistently, output diff shown before commit.
 
-### Tests for User Story 3
+### Tests for User Story 3 ⚠️ (write first, ensure they FAIL)
 
-- [ ] T026 [P] [US3] Coordinated-rewrite test `packages/engine/src/facet-transform/migrations/nfd-to-nfc.test.ts` (US3 AC1): output rules composed to precomposed codepoints AND the matching two-codepoint backspace override removed; the two stay mutually consistent; the working copy still compiles (depends on T003).
-- [ ] T027 [P] [US3] Output-diff + confirmation test in `packages/engine/src/facet-transform/migrations/nfd-to-nfc.test.ts` (US3 AC2): `previewKind: 'output-diff'` names the emitted-byte changes and the companion backspace rewrite; no commit without explicit confirmation (depends on T003).
+- [x] T027 [P] [US3] Output-diff + companion backspace-rewrite test (US3 AC1/AC2) in `packages/engine/src/facet-transform/nfd-to-nfc.test.ts` — assert `previewKind: 'output-diff'` shows emitted-byte changes AND the now-unreachable two-codepoint backspace override removal; single backspace deletes the composed codepoint; explicit confirmation required; still compiles (quickstart Scenario 3, SC-006).
 
 ### Implementation for User Story 3
 
-- [ ] T028 [US3] Implement the `nfd-to-nfc` migration rule `packages/engine/src/facet-transform/migrations/nfd-to-nfc.ts` — copy-return composing base+combining RHS → precomposed codepoints, with `companionRewrites` removing the now-unreachable two-codepoint backspace override (Check #11-adjacent unreachable-rule removal, not synthesized), per [transition-matrix.contract.md](contracts/transition-matrix.contract.md) (depends on T012).
-- [ ] T029 [US3] Implement the `output-diff` verify/preview path (emitted-byte diff; output is meant to change so not parity-checked, but must not break compile) and populate `TransformProposal.previewKind: 'output-diff'` (depends on T028).
-- [ ] T030 [US3] Register the `nfd-to-nfc` rule in the lookup/barrel and add the `output-diff` preview + explicit-confirmation gate to the studio proposal UI (depends on T028, T020).
+- [x] T028 [US3] Implement the `nfd-to-nfc` migration in `packages/engine/src/facet-transform/migrations/nfd-to-nfc.ts` — compose base+combining RHS → precomposed codepoints; copy-return (contract scope). Depends on T009.
+- [x] T029 [US3] Implement the companion backspace-rule rewrite (FR-008) in `packages/engine/src/facet-transform/migrations/nfd-to-nfc.ts` — detect + remove the now-unreachable `'a' U+0301 + [K_BKSP] > nul` override (Check #11-adjacent unreachable-rule removal, not synthesis). Depends on T028.
+- [x] T030 [US3] Implement the output-changing `verify` branch + `previewKind: 'output-diff'` assembly in `packages/engine/src/facet-transform/verify.ts` and `propose.ts` — produce the emitted-byte diff, list companion rewrites, require explicit confirm; not parity-checked but must not break compile. Depends on T009, T029.
+- [x] T031 [US3] Studio UI: `output-diff` preview (byte-level diff + companion-rewrite list) + explicit-confirmation gate in `packages/studio/src/components/facet-transform/`. Depends on T026, T030.
 
-**Checkpoint**: All three transform classes are independently functional and tested.
+**Checkpoint**: All three transform classes are independently functional.
 
 ---
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-**Purpose**: Cross-story invariants, the decline/refusal registry coverage, FR-013 re-derivation, opaque integrity, and docs.
+**Purpose**: The honest-decline path, the compile-regression/opaque guards, the produced-set re-derivation, and docs — cross-cutting across all stories.
 
-- [ ] T031 [P] Decline-with-reason + refusal test `packages/engine/src/facet-transform/refusals.test.ts` (FR-004, quickstart Scenario 4): gate facet, `input-match-kind key-ref→char-ref` (permanent), `nfc→nfd` (deferred), and `undetermined` measurement each return a `TransformRefusal` with the verbatim reason; none reaches `proposed`; none mutates the working copy (depends on T008, T012).
-- [ ] T032 [P] Opaque-integrity test `packages/engine/src/facet-transform/opaque.test.ts` (SC-005, quickstart Scenario 5): a transform over a fixture with `RawKmnFragment` regions drops/alters nothing and reports `opaqueUntouched` (depends on T011).
-- [ ] T033 [P] Compile-regression guard test `packages/engine/src/facet-transform/commit-gate.test.ts` (SC-006, quickstart Scenario 5): a transform that would produce an invalid working copy returns `status: 'commit-failed'`, leaves the working copy unchanged, and attributes the failure — with no second debounce timer (depends on T011, T012).
-- [ ] T034 [US2] Fall-through + FR-013 re-derivation: compute `fallThroughImpact.producedCharacterSetDelta` when a transition (un)blocks base-layout fall-through, and on commit re-seed discovery axes (`seedIrAxesFromBaseIr` → `setIrAxes`) when the produced set changed, per [transform-proposal.contract.md](contracts/transform-proposal.contract.md) commit step 4 (depends on T020).
-- [ ] T035 [P] Studio store test for FR-013 in `packages/studio/src/` asserting a produced-set-changing commit re-seeds the discovery-axis vector so strategy/gallery re-derive (depends on T034).
-- [ ] T036 [P] Add any newly-cited fixture keyboards to [docs/keyboard-index.md](../../docs/keyboard-index.md) (mandatory phonebook update — read each keyboard's `.kps` for name/BCP47/author).
-- [ ] T037 [P] Add the `facet-transform` module to the package inventory/architecture notes in [CLAUDE.md](../../CLAUDE.md) and confirm the barrel re-export lands after the `pattern-apply` block in `packages/engine/src/index.ts`.
-- [ ] T038 Run the [quickstart.md](quickstart.md) validation: `pnpm --filter @keyboard-studio/engine test src/facet-transform`, then `pnpm typecheck` and `pnpm lint` — confirm all five scenarios pass.
+- [x] T032 [P] Honest-decline + refusal test (FR-004, quickstart Scenario 4) in `packages/engine/src/facet-transform/decline.test.ts` — gate refusal (`source.mnemonic-vs-positional`, `source.casing`), permanent decline (`input-match-kind`, `os-compose`), deferred decline (`nfc → nfd`), and `undetermined` measurement; assert each returns a `TransformRefusal` with a verbatim reason, none reaches `proposed`, none mutates the working copy.
+- [x] T033 [P] Compile-regression + opaque-integrity test (SC-005/SC-006, quickstart Scenario 5) in `packages/engine/src/facet-transform/gate.test.ts` — a compile-breaking fixture ⇒ `status: 'commit-failed'`, working copy unchanged, failure attributed; a `RawKmnFragment` fixture ⇒ no fragment dropped/altered, `opaqueUntouched` reports the un-modellable region.
+- [x] T034 [US3] FR-013 produced-set re-derivation studio-store test in `packages/studio/src/hooks/useWorkingCopyTransform.test.ts` (or the store test) — a committed transform that changes the produced-character set re-seeds discovery axes (`seedIrAxesFromBaseIr` → `setIrAxes`) so strategy/gallery re-derive (research D11).
+- [x] T035 [P] Studio re-seed wiring in `packages/studio/src/hooks/useWorkingCopyTransform.ts` — on `committed` with `producedSetChanged`, invoke the axis re-seed (FR-013). Depends on T010, T018.
+- [x] T036 [P] Update `docs/keyboard-index.md` with a row for every newly-cited fixture keyboard used in the tests (mandatory phonebook rule — read each keyboard's `.kps` for name/BCP47/author).
+- [x] T038 [P] No-silent-transform structural test (SC-002) in `packages/engine/src/facet-transform/gate.test.ts` — assert there is NO code path from a transform request to `committed` that bypasses a `TransformProposal` + explicit confirmation, verified across all three impact classes (contract transform-proposal §Invariants SC-002).
+- [x] T039 [P] Preview-completeness + fall-through structural test (SC-003, FR-011) in `packages/engine/src/facet-transform/preview.test.ts` — assert each `previewKind` surfaces every `namedLoss`, every companion rewrite, and `opaqueUntouched`; and assert `fallThroughImpact.producedCharacterSetDelta` is populated whenever `producedSetChanged` (FR-011 is v1 scaffolding — no supported v1 transition (un)blocks fall-through since `source.fallback-posture` is deferred per research D10, so this test drives the delta path via a synthetic produced-set-changing fixture).
+- [x] T037 Run the quickstart validation — `pnpm --filter @keyboard-studio/engine test src/facet-transform` (Scenarios 1–5 green) + `pnpm typecheck` + `pnpm lint`; confirm all five quickstart scenarios pass (quickstart "What 'done' looks like"). **Run last** — after T038/T039.
 
 ---
 
@@ -145,48 +136,39 @@ Engine module (working-copy mutation orchestration) per [plan.md](plan.md) Struc
 
 ### Phase Dependencies
 
-- **Setup (Phase 1)**: No dependencies — start immediately.
-- **Foundational (Phase 2)**: Depends on Setup — BLOCKS all user stories. T008 (matrix) and T011 (gate) are the critical-path items.
-- **User Stories (Phase 3–5)**: All depend on Foundational (esp. T012 propose/apply shell). Given team capacity, US1/US2/US3 migration rules can then proceed in parallel (different files under `migrations/`).
-- **Polish (Phase 6)**: Depends on the user stories whose behaviour it exercises (T034/T035 depend on US1 studio wiring; T031 on the matrix + propose shell).
+- **Setup (Phase 1)**: no dependencies — start immediately.
+- **Foundational (Phase 2)**: depends on Setup — **blocks all user stories**.
+- **User Stories (Phase 3–5)**: all depend on Foundational. Independent of each other; can run in parallel (if staffed) or in priority order P1 → P2 → P3.
+- **Polish (Phase 6)**: depends on the stories whose behaviour it exercises (T034/T035 depend on US1 wiring + T010; T032/T033/T038 depend on the gate; T032 depends on the matrix; T039 depends on the gate + `fallThroughImpact` from T010). T037 validation runs after all others.
 
 ### User Story Dependencies
 
-- **US1 (P1)**: Only depends on Foundational. The MVP — establishes the propose→confirm→verify pattern.
-- **US2 (P2)**: Depends on Foundational; shares the studio proposal UI shell from US1 (T020) for its `ux-description` variant (T025).
-- **US3 (P3)**: Depends on Foundational; shares the studio proposal UI shell from US1 (T020) for its `output-diff` variant (T030).
+- **US1 (P1)**: after Foundational. No dependency on other stories (MVP).
+- **US2 (P2)**: after Foundational. Studio UI (T026) builds on the US1 proposal shell (T019) but the engine migration is independent.
+- **US3 (P3)**: after Foundational. Studio UI (T031) builds on the US2 shell (T026) but the engine migration is independent.
 
 ### Within Each User Story
 
-- Tests are written first and must FAIL before implementation.
-- Migration rule (`apply`) before its preview population before its barrel/studio registration.
+- Tests are written FIRST and must FAIL before implementation (spec Testing).
+- Migration rule → impact-class `verify` branch → `previewKind` assembly → studio wiring.
 
 ### Parallel Opportunities
 
-- Setup: T002, T003, T004 in parallel.
-- Foundational: T005, T006, T007 (type blocks) in parallel; T009 after T008.
-- Once T012 lands, the three migration rules (T017 / T023 / T028) sit in separate files under `migrations/` and can be built in parallel by different developers.
-- All `[P]` test tasks within a story run in parallel (distinct files, or additive specs).
-- Polish: T031, T032, T033, T035, T036, T037 in parallel.
+- Setup: T002, T003 in parallel (T001 first).
+- Foundational: T004 and T006 in parallel; T010 after T009.
+- US1 tests T011/T012/T013 in parallel; US2 tests T020/T021 in parallel.
+- Once Foundational is done, US1/US2/US3 engine migrations can proceed in parallel by different developers (different files under `migrations/`).
+- Polish: T032/T033/T035/T036/T038/T039 in parallel; T037 (validation) runs last.
 
 ---
 
-## Parallel Example: Foundational type blocks
+## Parallel Example: User Story 1
 
 ```bash
-# After T002 lands the file, these three additive type blocks can be authored together:
-Task: "Define FacetTransition + MigrationRule types (T005)"
-Task: "Define TransformProposal + AffectedSite + refusal/commit types (T006)"
-Task: "Define HouseTargetPolicyRow + HouseTargetResolution types (T007)"
-```
-
-## Parallel Example: migration rules after Foundational
-
-```bash
-# All three migration rules live in separate files under migrations/ — parallel-safe:
-Task: "Implement encoding-spelling migration (T017)"
-Task: "Implement longpress-to-flick migration (T023)"
-Task: "Implement nfd-to-nfc migration (T028)"
+# Launch all US1 tests together (write-first, expect FAIL):
+Task: "Parity + invertibility fixture test in packages/engine/src/facet-transform/encoding-spelling.test.ts"
+Task: "House-target provenance test in packages/engine/src/facet-transform/house-target-policy.test.ts"
+Task: "Modifier-fold precondition test in packages/engine/src/facet-transform/encoding-spelling.test.ts"
 ```
 
 ---
@@ -195,31 +177,25 @@ Task: "Implement nfd-to-nfc migration (T028)"
 
 ### MVP First (User Story 1 Only)
 
-1. Complete Phase 1: Setup.
-2. Complete Phase 2: Foundational (matrix + gate + propose shell — CRITICAL, blocks all stories).
-3. Complete Phase 3: US1 (behavior-preserving encoding normalization).
-4. **STOP and VALIDATE**: run the US1 fixture tests (SC-001 parity + invertibility) and the studio propose→confirm walk.
-5. Demo: the safest transform class end-to-end.
+1. Phase 1 Setup → Phase 2 Foundational (CRITICAL — blocks all stories).
+2. Phase 3 US1 (behavior-preserving encoding normalization).
+3. **STOP and VALIDATE**: run Scenario 1 — parity + invertibility + provenance chip.
+4. Demo the propose→preview→confirm→rewrite pattern on the safest class.
 
 ### Incremental Delivery
 
 1. Setup + Foundational → foundation ready.
-2. US1 → parity/invertibility verified → demo (MVP).
-3. US2 → cause-tag preservation + derived-parameter review → demo.
-4. US3 → output diff + coordinated backspace rewrite → demo.
-5. Polish → decline registry, opaque integrity, FR-013 re-derivation, docs.
-
-### Parallel Team Strategy
-
-1. Team completes Setup + Foundational together (T008 matrix and T011 gate are the long poles).
-2. Then split: Developer A → US1 (T014–T020), Developer B → US2 (T021–T025), Developer C → US3 (T026–T030), each owning a file under `migrations/` plus its tests; they converge on the shared studio proposal UI (US1 lands the shell in T020, US2/US3 extend it).
+2. US1 → validate → demo (MVP: behavior-preserving).
+3. US2 → validate → demo (ux-changing, cause-tag preservation).
+4. US3 → validate → demo (output-changing, coordinated migration).
+5. Polish: declines, gate guards, FR-013 re-derivation, docs, quickstart.
 
 ---
 
 ## Notes
 
-- [P] = different files, no dependency on an incomplete task.
-- Every migration is copy-return over `KeyboardIR`/`TouchLayoutIR` (the `carveFilterIr` precedent) — never in-place, never raw `.kmn` text (Article II).
-- The commit gate calls the EXISTING `validateWithOracle`/`compile` once, undebounced — no second debounce timer (Article IV, research D8/D9).
-- No transform commits without a `TransformProposal` + explicit confirmation (FR-002 / SC-002).
-- Console output uses `[OK]`/`[WARN]`/`[ERROR]`; no GitHub issue numbers in shipped code; `feat(engine)` commit style.
+- [P] = different files, no incomplete-task dependency.
+- Engine code is copy-return (never in-place) per the `carveFilterIr` precedent; the studio does all `setWorkingIR` writes (Article VI — engine stays free of studio state).
+- The pre-commit gate is a ONE-SHOT undebounced `validateWithOracle`/`compile` call — do NOT add a second timer (Article IV, research D9).
+- Gate facets (`source.mnemonic-vs-positional`, `source.casing`) are refused upstream — they never produce a matrix row.
+- Commit after each task or logical group; stop at any checkpoint to validate a story independently.

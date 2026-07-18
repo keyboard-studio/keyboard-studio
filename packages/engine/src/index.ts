@@ -141,6 +141,56 @@ export { caseCounterpart } from "./character-discovery/casePair.js";
 export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyDesktopModifications, applyDesktopModificationsToRawJson, propagateDesktopLayersToTouch, applyStoreSlotRemovals, classifyStoreSlotEdit, parseSlotId, collectCharContributors, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, buildBaseRuleLines, buildCasePairRuleLines, planShiftAssignment, MODIFIER_EXCLUSIONS, canonicalizeCombo, comboToKeySpec, parseKeySpec, comboToTouchLayerId, comboToKvksShiftToken, collectModifierTokensInUse, collectLayerCombosInUse, buildComboKeyMap } from "./pattern-apply/index.js";
 export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, DesktopModifications, ApplyDesktopModificationsResult, ApplyDesktopModificationsToRawJsonResult, PropagateDesktopLayersToTouchResult, ApplyCarveToVfsOpts, CarveKeycapRemovalInput, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason, CharContributors, ShiftAssignmentPlan, ModifierToken } from "./pattern-apply/index.js";
 
+// Facet-transform (spec 039): switch a base's source-construction facet value on
+// the working copy — propose-then-confirm, KeyboardIR copy-return, gated commit.
+export {
+  proposeFacetTransform,
+  applyFacetTransform,
+  TRANSITION_MATRIX,
+  GATE_FACETS,
+  FACET_IMPACT_CLASS,
+  findTransition,
+  isGateFacet,
+  DEFAULT_HOUSE_TARGET_POLICY,
+  resolveHouseTarget,
+  MIGRATION_RULES,
+  foldSplitModifiersToNamed,
+  renderSourceDiff,
+  composeOutputToNfc,
+  producedSetDelta,
+  opaqueInventory,
+} from "./facet-transform/index.js";
+export type {
+  TransformImpactClass,
+  LossProfile,
+  CauseTag,
+  ConfidenceClass,
+  PreviewKind,
+  DefaultDisposition,
+  UserDisposition,
+  ProposalStatus,
+  ExceptionSite,
+  SourceFacetMeasurement,
+  FacetTransition,
+  MigrationRule as FacetMigrationRule,
+  RewriteResult,
+  SiteLedgerEntry,
+  CompanionRewrite,
+  DerivedParameterReview,
+  HouseTargetPolicyRow,
+  HouseTargetResolution,
+  AffectedSite,
+  SourceDiffRow,
+  TransformPreview,
+  TransformProposal,
+  ProducedSetDelta,
+  TransformRefusal,
+  CommitFailure,
+  CommitResult,
+  TransformRequest,
+  ProposeOptions,
+} from "./facet-transform/index.js";
+
 // Inventory diff (spec §8): static extraction of a keyboard's produced glyph set.
 export { producedGlyphs, collectFromOutput } from "./inventory/producedGlyphs.js";
 export type { ProducedGlyphsOptions } from "./inventory/producedGlyphs.js";
