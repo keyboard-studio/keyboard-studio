@@ -30,11 +30,14 @@ const CONTENT_TOKEN_RE =
   /(?:\b(?:dk|deadkey|context|any|index)\s*\([^)]*\)|\bU\+[0-9A-Fa-f]{1,6}\b|"[^"]*"|'[^']*')/gi;
 
 /**
- * Scan `str` starting at `start` (which should be positioned just after the
- * opening `(` of a guard call) and return the index just past the matching `)`,
- * honouring nested parens and double/single-quoted strings.
+ * Scan `str` starting at `start` (which should be positioned just after an
+ * opening `(` of ANY parenthesised group — a guard call like `if(...)` or a
+ * content call like `dk(...)`/`index(...)`/`any(...)`) and return the index just
+ * past the matching `)`, honouring nested parens and double/single-quoted
+ * strings. Used by stripGuardTokens (guard groups) and blankParenContents (all
+ * groups); not guard-specific despite the historical name.
  */
-function scanPastGuardArg(str: string, start: number): number {
+function scanPastParenArg(str: string, start: number): number {
   let depth = 1;
   let inDouble = false;
   let inSingle = false;
@@ -71,7 +74,7 @@ function stripGuardTokens(ctx: string): string {
     const tokenStart = kwMatch.index;
     // kwMatch[0] ends with '(', so the arg starts right after it:
     const argStart = tokenStart + kwMatch[0].length;
-    const tokenEnd = scanPastGuardArg(ctx, argStart);
+    const tokenEnd = scanPastParenArg(ctx, argStart);
 
     // Blank out the guard token in `out`.
     for (let i = tokenStart; i < tokenEnd; i++) {
@@ -100,7 +103,7 @@ function blankParenContents(ctx: string): string {
   let i = 0;
   while (i < ctx.length) {
     if (ctx[i] === "(") {
-      const close = scanPastGuardArg(ctx, i + 1); // index just past matching ')'
+      const close = scanPastParenArg(ctx, i + 1); // index just past matching ')'
       for (let j = i + 1; j < close - 1; j++) out[j] = " ";
       i = close;
     } else {
@@ -219,7 +222,7 @@ export function checkContextOrdering(source: string): LintFinding[] {
     let guardKwMatch: RegExpExecArray | null;
     while ((guardKwMatch = GUARD_KW_RE.exec(ctx)) !== null) {
       const argStart = guardKwMatch.index + guardKwMatch[0].length;
-      const end = scanPastGuardArg(ctx, argStart);
+      const end = scanPastParenArg(ctx, argStart);
       lastGuardEnd = Math.max(lastGuardEnd, end);
     }
 
