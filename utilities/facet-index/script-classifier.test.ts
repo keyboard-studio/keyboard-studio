@@ -143,6 +143,90 @@ describe("classifyScript", () => {
   });
 });
 
+/** 5 Basic-Latin letters (A-E) — all in the `plain` Latin block. */
+const PLAIN_LATIN_KMN = `store(&VERSION) '10.0'
+store(&NAME) 'Test Plain Latin'
+store(&TARGETS) 'any'
+store(&COPYRIGHT) '(c) 2026 Test'
+store(&KEYBOARDVERSION) '1.0'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [K_A] > U+0041
++ [K_S] > U+0042
++ [K_D] > U+0043
++ [K_F] > U+0044
++ [K_G] > U+0045
+`;
+
+/** 4 IPA-Extensions letters + 1 plain — IPA share (0.8) clears the Latin floor. */
+const IPA_LATIN_KMN = `store(&VERSION) '10.0'
+store(&NAME) 'Test IPA'
+store(&TARGETS) 'any'
+store(&COPYRIGHT) '(c) 2026 Test'
+store(&KEYBOARDVERSION) '1.0'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [K_A] > U+0250
++ [K_S] > U+0251
++ [K_D] > U+0252
++ [K_F] > U+0254
++ [K_G] > U+0041
+`;
+
+/** 4 Latin-Extended-A letters + 1 plain — extended share clears the floor, no IPA. */
+const EXTENDED_LATIN_KMN = `store(&VERSION) '10.0'
+store(&NAME) 'Test Extended Latin'
+store(&TARGETS) 'any'
+store(&COPYRIGHT) '(c) 2026 Test'
+store(&KEYBOARDVERSION) '1.0'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [K_A] > U+0100
++ [K_S] > U+0101
++ [K_D] > U+0102
++ [K_F] > U+0103
++ [K_G] > U+0041
+`;
+
+describe("classifyScript — Latin sub-profile hint (FR-010)", () => {
+  it("plain Basic-Latin -> value 'Latn', subProfile.latin 'plain'", () => {
+    const { ir } = parse(PLAIN_LATIN_KMN, "test-plain");
+    const result = classifyScript(ir, SCRIPT_FACET_DEF)!;
+    expect(result.value).toBe("Latn");
+    expect(result.subProfile).toEqual({ latin: "plain" });
+  });
+
+  it("IPA-Extensions letters -> subProfile.latin 'ipa'", () => {
+    const { ir } = parse(IPA_LATIN_KMN, "test-ipa");
+    const result = classifyScript(ir, SCRIPT_FACET_DEF)!;
+    expect(result.value).toBe("Latn");
+    expect(result.subProfile).toEqual({ latin: "ipa" });
+  });
+
+  it("Latin-Extended-A letters -> subProfile.latin 'extended'", () => {
+    const { ir } = parse(EXTENDED_LATIN_KMN, "test-extended");
+    const result = classifyScript(ir, SCRIPT_FACET_DEF)!;
+    expect(result.value).toBe("Latn");
+    expect(result.subProfile).toEqual({ latin: "extended" });
+  });
+
+  it("non-Latin dominant -> no subProfile", () => {
+    const { ir } = parse(ARABIC_DOMINANT_KMN, "test-arabic-noprofile");
+    const result = classifyScript(ir, SCRIPT_FACET_DEF)!;
+    expect(result.value).toBe("Arab");
+    expect(result.subProfile).toBeUndefined();
+  });
+});
+
 describe("deriveScriptFallback (the unparseable-keyboard / no-content-analysis path)", () => {
   it("declared-metadata tier: a keyboard whose .kps declares a script directly", () => {
     const meta: DeclaredMetadata = { bcp47Tags: ["ar"], declaredScript: "Arab" };

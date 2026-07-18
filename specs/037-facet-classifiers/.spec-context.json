@@ -3,7 +3,400 @@
   "specName": "037-facet-classifiers",
   "branch": "037-facet-classifiers",
   "selectedAt": "2026-07-14T21:32:57.665Z",
-  "currentStep": "plan",
-  "status": "planned",
-  "history": []
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "analyze",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-17T20:18:40.121Z"
+    },
+    {
+      "step": "analyze",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-17T20:40:18.071Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-17T20:44:26.380Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-17T20:47:29.516Z"
+    },
+    {
+      "step": "analyze",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T20:52:02.996Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-17T20:54:09.179Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-17T20:57:31.493Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:15:01.262Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-17T21:15:01.264Z"
+    },
+    {
+      "step": "implement",
+      "substep": "run-tests",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-17T21:52:01.000Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T21:53:48.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T22:17:57.857Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T22:18:53.698Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T22:18:53.698Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T22:24:55.856Z"
+    }
+  ],
+  "verified": [
+    {
+      "what": "facet-index unit + fixture suite (all classifiers, determinism, extensibility, incremental)",
+      "command": "vitest run --config utilities/facet-index/vitest.config.ts",
+      "result": "62 tests passed (10 files)"
+    },
+    {
+      "what": "TypeScript typecheck of the standalone facet-index tool",
+      "command": "tsc --noEmit -p utilities/facet-index/tsconfig.json",
+      "result": "exit 0, no errors"
+    },
+    {
+      "what": "Full-corpus index rebuild scoped to classifier-backed facets; SC-002 script content-tier coverage",
+      "command": "tsx utilities/facet-index/cli.ts --classified-only",
+      "result": "918 keyboards, 3 facets; script content=97.3% (>=80%), strategy-fingerprint content=98.9%, target-mix declared=899"
+    },
+    {
+      "what": "Deterministic/reproducible artifact (SC-003)",
+      "command": "tsx utilities/facet-index/cli.ts --classified-only --check",
+      "result": "byte-identical, no diff"
+    },
+    {
+      "what": "Committed-artifact lint second gate (FR-008; X1-X7, C1-C5)",
+      "command": "pnpm run facet-index-lint",
+      "result": "16 defs, 918 keyboards, all checks GREEN"
+    },
+    {
+      "what": "Session-facet + criteria lint unaffected",
+      "command": "pnpm run facet-lint",
+      "result": "all checks GREEN"
+    },
+    {
+      "what": "KM crew scoped post-implement review (km-qc, km-synthesis, km-keyman, km-domain)",
+      "command": "Agent x4 parallel",
+      "result": "zero P0; km-qc PASS 91/100, km-keyman APPROVE, km-synthesis PARTIAL FIT, km-domain CONCERNS->resolved; 4 P1s fixed"
+    },
+    {
+      "what": "P1 fixes re-verified: Latin subProfile ipa/extended priority (African orthographies), targetsDeclared regex aligned to parseKps, recognizePatterns hoisted (purity), mixed-confidence test added",
+      "command": "vitest + tsx --classified-only --check + facet-index-lint",
+      "result": "63 tests pass; byte-identical rebuild; lint GREEN; ipa labels 225->5 extended-corrected"
+    }
+  ],
+  "step_summaries_implement_note": "Implementing 037 on branch 037-facet-classifiers. 036 harness landed; adding strategy-fingerprint + target-mix classifiers, US1 script tuning (Latin subProfile + 0.80 confidence threshold), facet YAMLs, fixtures, full-corpus index rebuild, lint wiring.",
+  "concerns": [
+    {
+      "note": "I1 HIGH: classifierId mismatch - data-model Entity 1 says classifier.id = strategy-fingerprint/target-mix and must equal derivation.classifierId, but sample YAMLs use strategy-fingerprint-classifier/target-mix-classifier suffix; violates T008/T015 invariant.",
+      "step": "analyze",
+      "resolution": "RESOLVED 2026-07-17: verified against shipped build-index.ts - the DEFAULT_CLASSIFIERS registry is keyed by FACET id (def.id = 'script'), NOT by derivation.classifierId. classifierId ('script-classifier') is a free-form freshness/doc label (types.ts:54), never a registry key. The invented 'id === classifierId' invariant was the bug, not the YAML suffix. Fixed data-model Entity 1 + Relationships, contract classifier.contract.md id comment, and tasks T008/T015 to state: registry keyed by facet id; classifierId = <facet>-classifier doc label. Sample YAMLs left as-is (correct)."
+    },
+    {
+      "note": "I2 MEDIUM: FR-008 cited with two meanings - 037 FR-008 = exclude Common/Inherited from denominator (T011), but plan L82, contract C2, T026 cite FR-008 for the value-within-limits/build-fails rule which is 036 FR-008/036 D7.",
+      "step": "analyze",
+      "resolution": "RESOLVED 2026-07-17: tasks T026 re-cited to '036 FR-008 / 036 D7' for the value-within-limits/build-fails rule, disambiguating from 037 FR-008 (exclude Common/Inherited)."
+    },
+    {
+      "note": "U1 MEDIUM: provenanceTier enum has 3 values but fallback chains list a 4th tier undetermined (Entity 3a says which of four tiers fired); undetermined outcome has no representable provenanceTier and value is unspecified when undetermined.",
+      "step": "analyze",
+      "resolution": "RESOLVED 2026-07-17: verified against shipped fallback.ts + build-index.ts - 'undetermined' is NOT a 4th provenanceTier. An undetermined outcome carries value:'undetermined' (reserved sentinel in script.yaml limits.values) + confidenceClass:'undetermined', with provenanceTier staying 'default-fallback' (deriveScriptFallback tier 3). The manifest 'undetermined' coverage bucket is keyed off value==='undetermined' (build-index.ts bumpTierCounts), not a tier. Enum keeps 3 values (037 contract already correct). Fixed data-model Entity 3a prose + tasks T014."
+    },
+    {
+      "note": "D1 HIGH execution risk: 036 harness (build-index.ts, UCD codegen, Entity 2 + facet-index-lint, script.yaml) not on disk/main; Phase 2 depends on it. Mitigated by T001 stub-reconcile but gates implement.",
+      "step": "analyze",
+      "resolution": "RESOLVED 2026-07-17: 036 harness has LANDED on main (build-index.ts, ucd/generated/scriptLookup.ts, types.ts, fallback.ts, outcome.ts, docs/keyboard-facet-index.json, facet-index-lint wired into pnpm lint, worked-example script-classifier.ts + script.yaml all present on disk). Flipped the tasks blocking-dependency section from 'unimplemented' to 'landed', rewrote T001 (confirm/consume, no stubs), T002/T003 (flat layout, consume shipped UCD - exports scriptOf/scriptExtensionsOf/latinProfileOf, no blockOf), and added a layout-reconciliation note: classifiers live FLAT under utilities/facet-index/ (not a classifiers/ subtree), US1 script classifier is already partly built (extend/tune, don't rebuild; reconcile 0.9/0.5 vs 0.80 confidence thresholds)."
+    },
+    {
+      "note": "P2 follow-ups (non-blocking): extract shared kmn-header-scan helper (parseKmnHeaderStores vs target-mix readKmnTargets); migrate classifiedDefsDir() tests to onlyClassifiedFacets; add onlyClassifiedFacets regression test; conditional notes for strategy-fingerprint; shared CONFIDENT_DOMINANT_SHARE constant. Plus deferred T012 base-layout fall-through + T010 leak-edge fixture (script still 97.3% content tier)."
+    }
+  ],
+  "telemetryInstanceId": "1f890bc1-5107-4bc3-8c6d-efcb89e01135",
+  "step_summaries": {
+    "tasks": {
+      "summary": "Regenerated/reconciled tasks.md: 28 tasks across 6 phases (Setup, Foundational, US1 script, US2 strategy-fingerprint, US3 target-mix, Polish). Tests-first per FR-006. Fixed analyze concern I2 (T026 FR-008 mis-citation -> 036 FR-008/D7) and flagged U1 (undetermined provenanceTier reconciliation) in T014.",
+      "taskCount": 28
+    }
+  },
+  "currentTask": "T028",
+  "decisions": [
+    {
+      "decision": "Shipped committed index is built with --classified-only (scoped to facets that have a registered classifier: script, strategy-fingerprint, target-mix). Default full build still fails loud on 039 classifier-less defs (intentional guard preserved). Reproducible via the documented flag."
+    },
+    {
+      "decision": "T012 (desktop base-layout fall-through, FR-007 amendment) + the base-layout leak-edge sub-case of T010 EXCISED to new spec 040-desktop-base-layout-fallthrough (scope stub created). Rationale: base-layout fall-through is a Keyman Desktop-only concern requiring deeper desktop-processor modeling (base-layout resolution + [K_x]>nul blocking idiom); touch layouts are explicit JSON (no fall-through) and mobile assumes QWERTY with no per-keyboard base-layout setting. 037 closes on the three-classifier deliverable; script already at 97.3% content-tier without the amendment."
+    }
+  ]
 }

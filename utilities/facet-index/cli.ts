@@ -30,12 +30,13 @@ interface Args {
   check: boolean;
   quiet: boolean;
   incremental: boolean;
+  classifiedOnly: boolean;
   out?: string;
   corpusRoot?: string;
 }
 
 function parseArgs(argv: string[]): Args {
-  const args: Args = { limit: null, check: false, quiet: false, incremental: false };
+  const args: Args = { limit: null, check: false, quiet: false, incremental: false, classifiedOnly: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--limit") {
@@ -50,6 +51,8 @@ function parseArgs(argv: string[]): Args {
       args.check = true;
     } else if (a === "--incremental") {
       args.incremental = true;
+    } else if (a === "--classified-only") {
+      args.classifiedOnly = true;
     } else if (a === "--quiet") {
       args.quiet = true;
     } else if (a === "--out") {
@@ -72,6 +75,9 @@ function printHelp(): void {
       "  --limit N          scan only the first N keyboards (dev/smoke use)",
       "  --check            compare against the on-disk artifact; write nothing; exit 1 if it would change",
       "  --incremental      re-analyze only keyboards whose source hashes changed vs the prior index",
+      "  --classified-only  build only facets that have a registered classifier, skipping",
+      "                     definition-only YAMLs a later spec landed ahead of its classifier",
+      "                     (default build fails loud on such a def — the intentional guard)",
       "  --quiet            suppress the [OK] summary line",
       "  --out <path>       override the write target (default docs/keyboard-facet-index.json)",
       "  --corpus-root <p>  override the sibling keymanapp/keyboards checkout path",
@@ -91,7 +97,11 @@ function summaryLine(index: FacetIndex): string {
 function main(): void {
   const args = parseArgs(process.argv.slice(2));
 
-  const buildOpts: BuildOptions = { limit: args.limit, incremental: args.incremental };
+  const buildOpts: BuildOptions = {
+    limit: args.limit,
+    incremental: args.incremental,
+    onlyClassifiedFacets: args.classifiedOnly,
+  };
   if (args.corpusRoot !== undefined) buildOpts.corpusRoot = args.corpusRoot;
 
   try {

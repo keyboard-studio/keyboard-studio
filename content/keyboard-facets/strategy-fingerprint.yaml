@@ -1,0 +1,52 @@
+# strategy-fingerprint — spec 037 US2 (rule-structure archetype).
+#
+# Distribution of recognized §7 input-method strategies over a keyboard's rules,
+# by owned-rule share, PLUS a distinct unrecognized-`residue` share. The residue
+# is a first-class Categorization field (036 Entity 2 `residue`), NEVER a
+# distribution key — the point of the facet is to never present partial
+# recognition as full coverage (037 FR-012).
+#
+# limits.values note: the closed StrategyId union S-01..S-13
+# (packages/contracts/src/strategy.ts). The classifier's recognizer covers only
+# S-01 (simple swap) and S-02 (deadkey single-tap) as of v1; every other
+# strategy present in a keyboard lands honestly in `residue`, not in a
+# fabricated distribution key. There is intentionally NO `undetermined` sentinel
+# in this set (unlike script.yaml): a keyboard the recognizer cannot fingerprint
+# at all (zero rules / parse failure) is recorded with the value omitted and
+# analysisOutcome `fallback-only`, not with an out-of-limits sentinel value.
+id: strategy-fingerprint
+title: Input-method strategy fingerprint
+description: >
+  Distribution of recognized spec-§7 input-method strategies over the keyboard's
+  rules, by owned-rule share, plus an unrecognized-residue share. Recognizer
+  covers S-01 (simple swap) and S-02 (deadkey single-tap) as of classifier v1;
+  unrecognized strategies land honestly in residue rather than being forced into
+  a recognized bucket.
+valueType: histogram
+limits:
+  values:
+    - S-01
+    - S-02
+    - S-03
+    - S-04
+    - S-05
+    - S-06
+    - S-07
+    - S-08
+    - S-09
+    - S-10
+    - S-11
+    - S-12
+    - S-13
+  open: false
+likelihoodSemantics: >
+  share of total rules attributed to each recognized strategy (owned-rule count
+  divided by total rule count); the distinct `residue` field carries
+  1 - recognizedRatio, so distribution shares plus residue sum to 1. `residue`
+  is recognizer-gap, NOT parse-opacity — that lives in `analyzedCoverage`.
+derivation:
+  archetype: rule-structure
+  classifierId: strategy-fingerprint-classifier
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: [lineage.strategy-fingerprint]
+schemaVersion: 1

@@ -89,13 +89,21 @@ describe("facet-index extensibility (SC-003)", () => {
     classifiers: { ...DEFAULT_CLASSIFIERS, "demo-flag": demoPair },
   });
 
+  // Baseline = the shipped, classifier-backed facet set. Derived from
+  // DEFAULT_CLASSIFIERS rather than hardcoded so the test auto-tracks as later
+  // specs register more classifiers (the commit-1169 philosophy).
+  const baselineFacetIds = Object.keys(DEFAULT_CLASSIFIERS).sort();
+  const withDemoFacetIds = [...baselineFacetIds, "demo-flag"].sort();
+
   it("adding a facet leaves every prior facet's record byte-identical", () => {
     for (const id of Object.keys(before.keyboards)) {
-      const priorScript = before.keyboards[id]!.facets.script!;
-      const afterScript = after.keyboards[id]!.facets.script!;
-      expect(stableStringify(afterScript), `keyboard '${id}' script record changed`).toBe(
-        stableStringify(priorScript),
-      );
+      for (const facetId of baselineFacetIds) {
+        const priorRecord = before.keyboards[id]!.facets[facetId]!;
+        const afterRecord = after.keyboards[id]!.facets[facetId]!;
+        expect(stableStringify(afterRecord), `keyboard '${id}' facet '${facetId}' record changed`).toBe(
+          stableStringify(priorRecord),
+        );
+      }
     }
   });
 
@@ -103,13 +111,13 @@ describe("facet-index extensibility (SC-003)", () => {
     for (const id of Object.keys(before.keyboards)) {
       const beforeKeys = Object.keys(before.keyboards[id]!.facets).sort();
       const afterKeys = Object.keys(after.keyboards[id]!.facets).sort();
-      expect(beforeKeys).toEqual(["script"]);
-      expect(afterKeys).toEqual(["demo-flag", "script"]);
+      expect(beforeKeys).toEqual(baselineFacetIds);
+      expect(afterKeys).toEqual(withDemoFacetIds);
     }
   });
 
   it("manifest.facetIds grows by exactly the new facet", () => {
-    expect(before.manifest.facetIds).toEqual(["script"]);
-    expect(after.manifest.facetIds).toEqual(["demo-flag", "script"]);
+    expect(before.manifest.facetIds).toEqual(baselineFacetIds);
+    expect(after.manifest.facetIds).toEqual(withDemoFacetIds);
   });
 });

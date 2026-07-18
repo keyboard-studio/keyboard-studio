@@ -41,7 +41,8 @@ import { buildProducedSet } from "@keyboard-studio/contracts";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { ImportStatus } from "@keyboard-studio/contracts";
 
-import { scriptOf, scriptExtensionsOf } from "./ucd/generated/scriptLookup.js";
+import { scriptOf, scriptExtensionsOf, latinProfileOf } from "./ucd/generated/scriptLookup.js";
+import type { LatinProfile } from "./ucd/generated/scriptLookup.js";
 import { mapImportStatus, computeAnalyzedCoverage } from "./outcome.js";
 import type { Categorization, ConfidenceClass, FacetDefinition } from "./types.js";
 
@@ -54,11 +55,79 @@ import type { Categorization, ConfidenceClass, FacetDefinition } from "./types.j
 // which is the point — they are dropped here rather than diluting a distribution.
 const NEUTRAL_SCRIPTS = new Set(["Zyyy", "Zinh", "Zzzz", "Zxxx"]);
 
-/** Confidence-class thresholds on the dominant value's distribution share. */
+/**
+ * Confidence-class thresholds on the dominant value's distribution share
+ * (data-model Entity 3a, tunable): a dominant script holding ≥80% of the
+ * concretely-scripted evidence reads as `confident`; a genuinely split
+ * distribution as `mixed`. `undetermined` is unreachable on the content tier
+ * (zero-evidence keyboards return null before this point and fall through to the
+ * fallback chain) but is kept defensively for the degenerate 0-share case.
+ */
+const CONFIDENT_DOMINANT_SHARE = 0.8;
+
 function classifyConfidence(dominantShare: number): ConfidenceClass {
-  if (dominantShare >= 0.9) return "confident";
-  if (dominantShare >= 0.5) return "mixed";
+  if (dominantShare >= CONFIDENT_DOMINANT_SHARE) return "confident";
+  if (dominantShare > 0) return "mixed";
   return "undetermined";
+}
+
+/**
+ * Latin-specific evidence floor (share of Latin-scripted produced characters
+ * carrying a richer profile) needed to promote the sub-profile hint from
+ * `plain`. A hint, not an orthography claim (data-model FR-010).
+ *
+ * The `ipa` bar is deliberately higher than `extended` and must additionally
+ * beat `extended` by a margin (km-domain review, 037): many everyday letters in
+ * African Latin-script orthographies — ɛ U+025B, ɔ U+0254, ɖ U+0256 (Ewe, Fon/Gbe,
+ * Akan/Twi, Ga), ɓ U+0253 (Fula, Hausa, Mandinka), ɣ U+0263 (Fon, Fula, Wolof,
+ * Tamazight) — live in the IPA Extensions block purely by
+ * Unicode accident, not because the keyboard is for phonetic transcription. An
+ * orthography keyboard that mixes those with true Latin-Extended letters (ŋ, ƒ)
+ * must read as `extended`, not `ipa`; only a keyboard where IPA-block characters
+ * genuinely dominate (a transcription keyboard) promotes to `ipa`.
+ */
+const LATIN_EXTENDED_FLOOR = 0.15;
+const LATIN_IPA_FLOOR = 0.3;
+/** `ipa` must beat `extended`'s share by at least this to win over the orthography reading. */
+const LATIN_IPA_MARGIN = 0.15;
+/** Below this many Latin-scripted produced chars, a richer-than-plain hint is just sample noise. */
+const LATIN_MIN_EVIDENCE = 4;
+
+/**
+ * Derive the Latin sub-profile hint {plain, extended, ipa} from the produced
+ * set, using the block-derived `latinProfileOf` lookup over the characters that
+ * resolve to the Latin script. Promotes to `ipa` only when IPA-block characters
+ * both clear their (higher) floor and outweigh Latin-Extended evidence by a
+ * margin — otherwise a keyboard carrying any beyond-Basic-Latin evidence reads
+ * as `extended`, and a plain keyboard as `plain`. Returns undefined only when
+ * the keyboard produced no Latin-scripted characters at all.
+ */
+function latinSubProfile(produced: Iterable<string>): LatinProfile | undefined {
+  let latinTotal = 0;
+  let ipa = 0;
+  let extended = 0;
+  for (const ch of produced) {
+    const cp = ch.codePointAt(0);
+    if (cp === undefined) continue;
+    if (scriptOf(cp) !== "Latn") continue;
+    const profile = latinProfileOf(cp);
+    if (profile === undefined) continue;
+    latinTotal += 1;
+    if (profile === "ipa") ipa += 1;
+    else if (profile === "extended") extended += 1;
+  }
+  if (latinTotal === 0) return undefined;
+  // Too little Latin evidence to promote past the safe `plain` default.
+  if (latinTotal < LATIN_MIN_EVIDENCE) return "plain";
+  const ipaShare = ipa / latinTotal;
+  const extShare = extended / latinTotal;
+  // `ipa` wins only when it dominates — clears the higher floor AND beats the
+  // orthographic (extended) reading by a margin.
+  if (ipaShare >= LATIN_IPA_FLOOR && ipaShare >= extShare + LATIN_IPA_MARGIN) return "ipa";
+  // Any meaningful beyond-Basic-Latin evidence (extended letters or IPA-block
+  // letters used orthographically) reads as `extended`.
+  if (ipaShare + extShare >= LATIN_EXTENDED_FLOOR) return "extended";
+  return "plain";
 }
 
 /**
@@ -139,6 +208,9 @@ export function classifyScript(ir: KeyboardIR, def: FacetDefinition): Categoriza
   // out-of-scope for this pass.
   const status = ir.raw.length > 0 ? ImportStatus.CleanWithOpaque : ImportStatus.Clean;
 
+  // Latin sub-profile hint (FR-010) — only meaningful when Latin is dominant.
+  const latin = dominantScript === "Latn" ? latinSubProfile(produced) : undefined;
+
   return {
     value: dominantScript,
     distribution,
@@ -148,5 +220,6 @@ export function classifyScript(ir: KeyboardIR, def: FacetDefinition): Categoriza
     evidenceSize,
     analyzedCoverage: computeAnalyzedCoverage(ir),
     analysisOutcome: mapImportStatus(status),
+    ...(latin !== undefined ? { subProfile: { latin } } : {}),
   };
 }
