@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { forEachMatch } from "./_shared.js";
+import { forEachMatch, stripNonCode, stripNonCodeSource } from "./_shared.js";
 
 // forEachMatch is the shared line-split + global-regex-clone + exec-loop
 // helper used by checkDeprecatedStores, checkIdentifiers, checkCodepointFormat,
@@ -81,5 +81,71 @@ describe("forEachMatch", () => {
       count++;
     });
     expect(count).toBe(0);
+  });
+});
+
+// stripNonCode / stripNonCodeSource blank the "not-code" spans of a line —
+// quoted-string contents and trailing `c` comments — with spaces, so a regex
+// scan never mistakes keyword-shaped prose for live syntax. Pinned directly
+// here (per this file's convention for shared helpers) rather than only via the
+// checks that consume them.
+
+describe("stripNonCode", () => {
+  it("blanks single-quoted content, length-preserving", () => {
+    const out = stripNonCode("store(s) 'abc'");
+    expect(out).toHaveLength("store(s) 'abc'".length);
+    expect(out.startsWith("store(s)")).toBe(true);
+    expect(out).not.toContain("abc");
+  });
+
+  it("blanks double-quoted content, length-preserving", () => {
+    const out = stripNonCode('x "U+110000" y');
+    expect(out).toHaveLength('x "U+110000" y'.length);
+    expect(out).not.toContain("U+110000");
+    expect(out.startsWith("x ")).toBe(true);
+    expect(out.endsWith(" y")).toBe(true);
+  });
+
+  it("blanks a trailing `c` comment to end of line, length-preserving", () => {
+    const out = stripNonCode('+ "a" > "b" c see U+110000 later');
+    expect(out).toHaveLength('+ "a" > "b" c see U+110000 later'.length);
+    expect(out).not.toContain("U+110000");
+    expect(out).not.toContain("see");
+  });
+
+  it("only treats a whitespace-bounded standalone `c` as a comment (not c-in-a-word)", () => {
+    // `c` bordered by non-whitespace is part of an identifier, not a comment.
+    expect(stripNonCode("context + 'a'")).toBe("context +    ");
+    expect(stripNonCode("abc def")).toBe("abc def");
+  });
+
+  it("does not treat a `c` inside parens as a comment (parens/brackets are code)", () => {
+    // dk(c): the `c` is bordered by `(`/`)`, not whitespace — left intact.
+    expect(stripNonCode("dk(c)")).toBe("dk(c)");
+    expect(stripNonCode("index(x, 1)")).toBe("index(x, 1)");
+  });
+
+  it("treats a `c` inside quotes as string content, not a comment start", () => {
+    expect(stripNonCode("'c'")).toBe("   ");
+  });
+
+  it("leaves a line with no quotes or comment untouched", () => {
+    expect(stripNonCode("+ [K_A] > U+0061")).toBe("+ [K_A] > U+0061");
+  });
+});
+
+describe("stripNonCodeSource", () => {
+  it("applies stripNonCode per line and preserves line structure + per-line length", () => {
+    const src = "a 'x'\nb c cmt";
+    const out = stripNonCodeSource(src);
+    const inLines = src.split("\n");
+    const outLines = out.split("\n");
+    expect(outLines).toHaveLength(2);
+    expect(outLines[0]).toHaveLength(inLines[0]!.length);
+    expect(outLines[1]).toHaveLength(inLines[1]!.length);
+    expect(out).not.toContain("x");
+    expect(out).not.toContain("cmt");
+    expect(outLines[0]!.startsWith("a ")).toBe(true);
+    expect(outLines[1]!.startsWith("b ")).toBe(true);
   });
 });

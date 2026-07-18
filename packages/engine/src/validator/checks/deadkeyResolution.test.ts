@@ -72,4 +72,14 @@ describe("checkDeadkeyResolution", () => {
     const findings = checkDeadkeyResolution(source);
     expect(findings).toHaveLength(2);
   });
+
+  // Regression — a dk(...) shape inside a comment or quoted value is prose, not
+  // a deadkey call, and must not be validated (false-positive guard).
+  it("ignores a dk(...) shape inside a trailing c comment", () => {
+    expect(checkDeadkeyResolution(`+ "a" > "b" c see dk(oops mismatched) later`)).toEqual([]);
+  });
+
+  it("ignores a dk(...) shape inside a quoted value", () => {
+    expect(checkDeadkeyResolution(`store(s) "dk(oops mismatched) in docs"`)).toEqual([]);
+  });
 });

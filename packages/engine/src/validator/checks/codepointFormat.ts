@@ -1,5 +1,5 @@
 import type { LintFinding } from "@keyboard-studio/contracts";
-import { forEachMatch } from "./_shared.js";
+import { forEachMatch, stripNonCodeSource } from "./_shared.js";
 
 // Codepoint validation — lint.md check #10 (Compiler.cpp:3746-3770).
 // U+XXXX literals must be in range 0..0x10FFFF and must not be:
@@ -13,7 +13,9 @@ const UPLUS_RE = /\bU\+([0-9A-Fa-f]{1,6})\b/i;
 export function checkCodepointFormat(source: string): LintFinding[] {
   const findings: LintFinding[] = [];
 
-  forEachMatch(source, new RegExp(UPLUS_RE.source, "gi"), (match, lineIdx) => {
+  // Strip quoted-string and comment spans first so a `U+hhhh` in prose (a
+  // trailing `c` comment or a quoted doc value) is not read as a codepoint.
+  forEachMatch(stripNonCodeSource(source), new RegExp(UPLUS_RE.source, "gi"), (match, lineIdx) => {
     const hex = match[1] ?? "";
     const cp = parseInt(hex, 16);
 

@@ -110,4 +110,21 @@ describe("checkCodepointFormat", () => {
     const findings = checkCodepointFormat("+ U+D800 > U+0020");
     expect(findings[0]?.message).toContain("D800");
   });
+
+  // Regression — a U+ literal inside a comment or a quoted value is prose, not
+  // a codepoint, and must not be validated (false-positive guard).
+  it("ignores a U+ literal inside a trailing c comment", () => {
+    expect(checkCodepointFormat(`+ "a" > "b" c see U+110000 for reference`)).toEqual([]);
+  });
+
+  it("ignores a U+ literal inside a quoted value", () => {
+    expect(checkCodepointFormat(`store(s) "see U+110000 in docs"`)).toEqual([]);
+  });
+
+  // Regression — kmcmplib treats a whitespace-delimited `c` on a store line as
+  // a trailing comment (matching the codec's own store-line comment handling),
+  // so keyword-shaped text after it is prose, not a codepoint literal.
+  it("ignores a U+ literal after a trailing c comment on a store line", () => {
+    expect(checkCodepointFormat(`store(s) 'abc' c mentions U+110000 in prose`)).toEqual([]);
+  });
 });

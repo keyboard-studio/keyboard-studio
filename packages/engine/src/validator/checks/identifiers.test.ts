@@ -78,4 +78,14 @@ describe("checkIdentifiers", () => {
     const findings = checkIdentifiers(source);
     expect(findings[0]?.location?.line).toBe(2);
   });
+
+  // Regression — a call shape inside a quoted value is prose, not a real
+  // identifier use, and must not be validated (false-positive guard).
+  it("ignores a dk( ) shape inside a quoted value", () => {
+    expect(checkIdentifiers(`store(&NAME) "dk( ) bad doc text"`)).toEqual([]);
+  });
+
+  it("ignores a dk( ) shape inside a trailing c comment", () => {
+    expect(checkIdentifiers(`+ [K_A] > "x" c see dk( ) bad doc text`)).toEqual([]);
+  });
 });

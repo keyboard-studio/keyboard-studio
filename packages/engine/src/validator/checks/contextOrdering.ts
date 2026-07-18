@@ -30,11 +30,14 @@ const CONTENT_TOKEN_RE =
   /(?:\b(?:dk|deadkey|context|any|index)\s*\([^)]*\)|\bU\+[0-9A-Fa-f]{1,6}\b|"[^"]*"|'[^']*')/gi;
 
 /**
- * Scan `str` starting at `start` (which should be positioned just after the
- * opening `(` of a guard call) and return the index just past the matching `)`,
- * honouring nested parens and double/single-quoted strings.
+ * Scan `str` starting at `start` (which should be positioned just after an
+ * opening `(` of ANY parenthesised group — a guard call like `if(...)` or a
+ * content call like `dk(...)`/`index(...)`/`any(...)`) and return the index just
+ * past the matching `)`, honouring nested parens and double/single-quoted
+ * strings. Used by stripGuardTokens (guard groups) and blankParenContents (all
+ * groups); not guard-specific despite the historical name.
  */
-function scanPastGuardArg(str: string, start: number): number {
+function scanPastParenArg(str: string, start: number): number {
   let depth = 1;
   let inDouble = false;
   let inSingle = false;
@@ -71,7 +74,7 @@ function stripGuardTokens(ctx: string): string {
     const tokenStart = kwMatch.index;
     // kwMatch[0] ends with '(', so the arg starts right after it:
     const argStart = tokenStart + kwMatch[0].length;
-    const tokenEnd = scanPastGuardArg(ctx, argStart);
+    const tokenEnd = scanPastParenArg(ctx, argStart);
 
     // Blank out the guard token in `out`.
     for (let i = tokenStart; i < tokenEnd; i++) {
@@ -79,6 +82,33 @@ function stripGuardTokens(ctx: string): string {
     }
 
     searchFrom = tokenEnd; // continue scanning after this guard
+  }
+  return out.join("");
+}
+
+/**
+ * Blank the CONTENTS of every parenthesised group (dk(...), index(...),
+ * any(...), if(...), etc.) with spaces, preserving the parens and surrounding
+ * tokens, so a keyword-shaped identifier used as a call ARGUMENT — e.g. a
+ * deadkey literally named `nul` in `dk(nul)` — is not mistaken for a standalone
+ * `nul` context token. Quote-aware (a ')' inside a quoted argument does not
+ * close the group early) and length-preserving (columns stay accurate).
+ *
+ * The wrapping call token is preserved (only the interior is blanked), so a
+ * legitimate content token that precedes a bare `nul` — e.g. `dk(acute) nul` —
+ * still registers as "content before nul" for the rule-1 check.
+ */
+function blankParenContents(ctx: string): string {
+  const out = ctx.split("");
+  let i = 0;
+  while (i < ctx.length) {
+    if (ctx[i] === "(") {
+      const close = scanPastParenArg(ctx, i + 1); // index just past matching ')'
+      for (let j = i + 1; j < close - 1; j++) out[j] = " ";
+      i = close;
+    } else {
+      i++;
+    }
   }
   return out.join("");
 }
@@ -159,18 +189,26 @@ export function checkContextOrdering(source: string): LintFinding[] {
     const ctxStripped = stripGuardTokens(ctx);
 
     // --- Rule 1: nul must be the first token if present ---
-    const nulInStripped = NUL_RE.exec(ctxStripped);
-    if (nulInStripped) {
-      const beforeNul = ctxStripped.slice(0, nulInStripped.index).trim();
+    // Strip guard clauses first (stripGuardTokens erases the whole
+    // if()/platform()/baselayout() token so a guard preceding `nul` is not
+    // "content before nul" — guards are allowed before nul), THEN blank the
+    // contents of the remaining parenthesised groups so a keyword-shaped
+    // argument (e.g. a deadkey named `nul` in `dk(nul)`) is not mistaken for a
+    // standalone `nul`. Both passes are length-preserving, so the match index
+    // is the accurate column. A non-guard call wrapper survives blanking, so
+    // `dk(acute) nul` still has content before the bare `nul` and correctly
+    // reports NUL_NOT_FIRST.
+    const ctxForNul = blankParenContents(stripGuardTokens(ctx));
+    const nulMatch = NUL_RE.exec(ctxForNul);
+    if (nulMatch) {
+      const beforeNul = ctxForNul.slice(0, nulMatch.index).trim();
       if (beforeNul.length > 0) {
-        // Find nul position in original ctx for accurate column
-        const nulOrig = NUL_RE.exec(ctx);
         findings.push({
           code: "KM_ERROR_NUL_NOT_FIRST",
           severity: "error",
           layer: "A",
           message: `"nul" must be the first token in the context`,
-          location: { file: "", line: lineIdx + 1, column: (nulOrig?.index ?? 0) + 1 },
+          location: { file: "", line: lineIdx + 1, column: nulMatch.index + 1 },
         });
       }
     }
@@ -184,7 +222,7 @@ export function checkContextOrdering(source: string): LintFinding[] {
     let guardKwMatch: RegExpExecArray | null;
     while ((guardKwMatch = GUARD_KW_RE.exec(ctx)) !== null) {
       const argStart = guardKwMatch.index + guardKwMatch[0].length;
-      const end = scanPastGuardArg(ctx, argStart);
+      const end = scanPastParenArg(ctx, argStart);
       lastGuardEnd = Math.max(lastGuardEnd, end);
     }
 
