@@ -1,0 +1,23 @@
+# Q-TP2 fallback-tier-prefill (spec 038 US3, trust-policy).
+# Whether a base classified only at the language-default (fallback) tier may
+# PREFILL, or must be asked plainly. Fallback-tier classifications stay visually
+# distinguishable wherever they prefill regardless of this dial (FR-006) — this
+# governs only whether the prefill value is offered or nulled to the ask form.
+# A policy dial fed by policy, not a facet; its honest default (allow) is its
+# no-evidence form.
+
+id: q_tp2_fallback_tier_prefill
+family: trust-policy
+elicits: >
+  Whether a base known only from a language-default (fallback) tier may prefill
+  its values, or must be surfaced as a plain ask.
+firingCondition: "any-base-classified-at-fallback-tier"
+prefill:
+  facets: []
+provenanceLabel: "whether fallback-tier bases may prefill (default: allowed, always marked)"
+consumers:
+  - "base-suggestion:ranking"
+noEvidenceDegradation: ask-plainly
+scope: workflow
+renders: true
+status: candidate

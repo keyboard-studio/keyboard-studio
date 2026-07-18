@@ -3,14 +3,30 @@
   "specName": "034-mvp-authoring-walk",
   "branch": "034-mvp-authoring-walk",
   "selectedAt": "2026-07-13T16:50:45.385Z",
-  "currentStep": "taskstoissues",
-  "status": "issues-created",
+  "currentStep": "specify",
+  "status": "completed",
   "history": [
     {
       "step": "taskstoissues",
       "at": "2026-07-13T21:26:23.000Z",
       "epicIssue": 1102,
-      "phaseIssues": [1103, 1104, 1105, 1106, 1107, 1108]
+      "phaseIssues": [
+        1103,
+        1104,
+        1105,
+        1106,
+        1107,
+        1108
+      ],
+      "kind": "start"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T02:04:28.674Z"
     }
-  ]
+  ],
+  "telemetryInstanceId": "5417f11b-64b6-450b-9d49-7afd5e6ec933"
 }

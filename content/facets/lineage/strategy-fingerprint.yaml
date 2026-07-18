@@ -26,6 +26,7 @@ derivations:
 consumers:
   prefills:
     - pb_typing_approach
+    - q_ip1_keep_strategies
   proposes:
     - "strategy:selection-bias"
     - "mechanism-gallery:method-ordering"

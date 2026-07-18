@@ -1,0 +1,21 @@
+# Q-SA2 base-script-mismatch (spec 038 US1, script-alignment).
+# Fires when the chosen base's dominant script disagrees with the target, or the
+# base is script-mixed under the trust threshold (Q-TP1). A base that already
+# agrees with the target is confirmed silently, never asked (SC-002).
+
+id: q_sa2_base_script_mismatch
+family: script-alignment
+elicits: >
+  Whether to retarget the base keyboard's script to the script you chose, when
+  the base's own script does not match.
+firingCondition: "dominant-script-disagreement OR base-script == mixed"
+prefill:
+  facets: [script]
+  sessionFacet: lineage.nearest-neighbors
+provenanceLabel: "the base keyboard's own script vs the script you chose"
+consumers:
+  - "base-suggestion:ranking"
+noEvidenceDegradation: ask-plainly
+scope: session
+renders: true
+status: candidate

@@ -3,7 +3,209 @@
   "specName": "038-adaptation-questions",
   "branch": "038-adaptation-questions",
   "selectedAt": "2026-07-14T21:34:06.697Z",
-  "currentStep": "specify",
-  "status": "draft",
-  "history": []
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "user",
+      "at": "2026-07-18T02:05:19.098Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-18T02:05:25.829Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T02:14:00.501Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T02:14:00.852Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T02:14:57.045Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-18T02:18:14.645Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T02:41:30.145Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T02:42:38.322Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-18T02:44:07.506Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:49:38.000Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T04:22:58.581Z"
+    }
+  ],
+  "telemetryInstanceId": "21b02e47-1cd6-4010-b288-73eb2f26bb4d",
+  "approach": "Deliver the adaptation-question catalog as content-owned YAML records under content/adaptation-questions/ (with a plain-node lint), rendered questions also as real survey modules so facet-lint passes, and update feeding facet records' consumers (FR-008). The one new engine surface is an inheritance-posture confirmation step; script-alignment reuses Prefill.tsx and trust policy renders as flow questions. Firing conditions read the 036/037 facet index behind an injected evidence seam so everything is walkable against a mocked index now.",
+  "decisions": [
+    {
+      "decision": "Catalog is a content-owned data set (content/adaptation-questions/) plus real survey modules for rendered questions",
+      "why": "FlowQuestion has no home for firing-condition/scope/no-evidence metadata; SC-001 requires facet-lint prefills to resolve to real ids; matches the facet-catalog convention the spec cites",
+      "rejected": "Fields on the survey module, extending facet records, or a spec-only paper enumeration"
+    },
+    {
+      "decision": "Firing conditions read the facet index behind an injected AdaptationEvidence seam",
+      "why": "036/037 land the index but live consumption/ranking wiring is an explicit follow-up feature; an injected seam makes US1-US3 authorable and unit-testable against a mocked index now, matching the glottolog-bridge/classifier injected-deps convention",
+      "rejected": "Reading docs/keyboard-facet-index.json directly (couples studio to artifact path, defeats mocked-index tests, pre-empts the wiring feature)"
+    },
+    {
+      "decision": "Only new engine surface is the inheritance-posture step; ban firingCondition:always via lint",
+      "why": "Assumptions name the posture step as the one likely-missing surface; SC-002/SC-003 make non-interruption the headline bar, so encode it as a lint invariant",
+      "rejected": "A generic reusable posture-matrix component; structured predicate AST at candidate stage"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Planned the 9-question adaptation catalog as content data + real survey modules, one new inheritance-posture engine surface, and an injected mockable evidence seam",
+      "key_finding": "facet-lint keys off real survey question ids, so the catalog cannot be paper-only; and the inheritance-posture confirmation surface is the sole engine touchpoint (grep confirms none exists today)"
+    },
+    "tasks": {
+      "summary": "38 tasks across 6 phases: Setup (catalog dir plus C1-C8 lint), Foundational (evidence seam, TrustPolicy, recordConfirmation, catalog loader, firing core), US1 script-alignment (P1/MVP), US2 inheritance-posture (P2), US3 trust-policy (P3), Polish; each story is red-test-first waves with shared-file serialization on firing.ts and the Phase B flow yaml"
+    }
+  },
+  "coverage": {
+    "FR-001": {
+      "title": "Every question record declares id, elicited preference, firing condition, prefill source, provenance-chip text, and consumers",
+      "tasks": [
+        "T001",
+        "T003",
+        "T011",
+        "T012",
+        "T013",
+        "T019",
+        "T020",
+        "T021",
+        "T028",
+        "T029",
+        "T030"
+      ]
+    },
+    "FR-002": {
+      "title": "Catalog covers script-alignment, inheritance-posture, and trust-policy families with at least 3 questions each",
+      "tasks": [
+        "T011",
+        "T012",
+        "T013",
+        "T019",
+        "T020",
+        "T021",
+        "T028",
+        "T029",
+        "T030"
+      ]
+    },
+    "FR-003": {
+      "title": "Every question is 3c-conformant: prefilled with provenance chip, never applied silently",
+      "tasks": [
+        "T016",
+        "T017",
+        "T024",
+        "T032"
+      ]
+    },
+    "FR-004": {
+      "title": "Every question has a defined no-evidence degradation (ask-plainly or record-no-default)",
+      "tasks": [
+        "T003",
+        "T011",
+        "T012",
+        "T013",
+        "T019",
+        "T020",
+        "T021",
+        "T028",
+        "T029",
+        "T030"
+      ]
+    },
+    "FR-005": {
+      "title": "Inheritance-posture answers consumable en masse; individual overrides do not silently rewrite the posture",
+      "tasks": [
+        "T018",
+        "T023",
+        "T026"
+      ]
+    },
+    "FR-006": {
+      "title": "Trust-policy answers scoped explicitly; fallback-tier classifications always visually distinguishable",
+      "tasks": [
+        "T005",
+        "T033",
+        "T034"
+      ]
+    },
+    "FR-007": {
+      "title": "Confirmations and overrides recorded in a form the facet evaluation harness can consume",
+      "tasks": [
+        "T006",
+        "T009",
+        "T026",
+        "T034"
+      ]
+    },
+    "FR-008": {
+      "title": "Session-facet records updated in the same change with consumer wiring",
+      "tasks": [
+        "T014",
+        "T022",
+        "T031"
+      ]
+    },
+    "FR-009": {
+      "title": "Named-orthography prescriptions only arise as an author-confirmed opt-in join",
+      "tasks": [
+        "T030",
+        "T034"
+      ]
+    }
+  }
 }

@@ -199,3 +199,13 @@ question id does not exist.
 Regional teams: facets are exactly where region-specific knowledge belongs —
 a community input-convention, a national reference layout, a regional digit
 preference. Ship the record; the evaluation harness decides promotion.
+
+## Related: the adaptation-question catalog
+
+Facets supply the *evidence*; the adaptation-question catalog
+([content/adaptation-questions/](../adaptation-questions/README.md), spec
+[038](../../specs/038-adaptation-questions/spec.md)) turns that evidence into the
+§3c confirmations that carry a base keyboard's classified values forward. A
+catalog record's `prefill.sessionFacet` points here, and this facet's
+`consumers.prefills` must name that question in return — a bijection
+`adaptation-catalog-lint` (C5) and `facet-lint` corroborate (FR-008).
