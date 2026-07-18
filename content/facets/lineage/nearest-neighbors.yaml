@@ -28,7 +28,8 @@ derivations:
       The scanner already parses every corpus keyboard and runs the recognizer.
 
 consumers:
-  prefills: []
+  prefills:
+    - q_sa2_base_script_mismatch
   proposes:
     - "gallery:base-ranking"
     - "gallery:similar-keyboards-shelf"

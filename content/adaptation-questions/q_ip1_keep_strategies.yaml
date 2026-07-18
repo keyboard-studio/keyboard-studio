@@ -1,0 +1,24 @@
+# Q-IP1 keep-strategies (spec 038 US2, inheritance-posture).
+# One keep/propose/discard answer governs EVERY input-strategy proposal site for
+# the session (the en-masse lever, FR-005). record-no-default: with no recognized
+# base fingerprint there is no honest default, so the posture is recorded blank
+# rather than guessed.
+
+id: q_ip1_keep_strategies
+family: inheritance-posture
+elicits: >
+  Whether to keep the base keyboard's input-method strategies wholesale, let the
+  studio re-propose them, or discard them — governing every strategy proposal in
+  the session at once.
+firingCondition: "base-has-strategy-fingerprint"
+prefill:
+  facets: [strategy-fingerprint]
+  sessionFacet: lineage.strategy-fingerprint
+provenanceLabel: "the base keyboard's recognized input-strategy fingerprint"
+consumers:
+  - "strategy:selection-bias"
+  - "mechanism-gallery:method-ordering"
+noEvidenceDegradation: record-no-default
+scope: session
+renders: true
+status: candidate

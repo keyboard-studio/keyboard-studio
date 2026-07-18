@@ -1,0 +1,21 @@
+# Q-SA1 target-script-vs-spread (spec 038 US1, script-alignment).
+# Fires only when related-language keyboards exist in more than one script, so a
+# clean single-script community is never interrupted (SC-002).
+
+id: q_sa1_target_script_spread
+family: script-alignment
+elicits: >
+  Which script community this keyboard serves, when related keyboards already
+  exist in more than one script.
+firingCondition: "sibling-script-spread > 1"
+prefill:
+  facets: [script]
+  sessionFacet: lineage.siblings
+provenanceLabel: "scripts used by existing keyboards for related languages"
+consumers:
+  - "base-suggestion:ranking"
+  - "axis:A5"
+noEvidenceDegradation: ask-plainly
+scope: session
+renders: true
+status: candidate
