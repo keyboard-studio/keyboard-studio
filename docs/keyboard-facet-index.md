@@ -4,21 +4,21 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 
 ## Build inputs
 
-- **keyboards**: 918
+- **keyboards**: 920
 - **facets**: script, strategy-fingerprint, target-mix
-- **scannerVersion**: `facet-index@1;schema@1;script@2;strategy-fingerprint@1;target-mix@1`
+- **scannerVersion**: `facet-index@1;schema@1;script@3;strategy-fingerprint@1;target-mix@1`
 - **unicodeVersion**: 17.0.0
 - **corpusScope**: `release/**`
-- **corpusCommit**: `keymanapp/keyboards@9ca2b3cedf5cf42c10f9c5ef291450b73cbc6efe`
-- **referencePins**: 5
+- **corpusCommit**: `keymanapp/keyboards@79e084f54985b458ac72315247719a8fabf3080f`
+- **referencePins**: 6
 
 ## Coverage by facet (provenance tier)
 
 | facet | content-derived | declared-metadata | fallback | undetermined |
 | --- | ---: | ---: | ---: | ---: |
-| `script` | 893 | 13 | 10 | 2 |
-| `strategy-fingerprint` | 908 | 0 | 10 | 0 |
-| `target-mix` | 0 | 910 | 8 | 0 |
+| `script` | 894 | 14 | 10 | 2 |
+| `strategy-fingerprint` | 910 | 0 | 10 | 0 |
+| `target-mix` | 0 | 912 | 8 | 0 |
 
 ## Sample records — `script` (first 12 by id)
 
@@ -27,15 +27,15 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `adiga_danef` | Latn | content-derived | fully | 36 |
 | `afghan_turkmen` | Arab | content-derived | fully | 68 |
 | `ahom_star` | Ahom | content-derived | fully | 58 |
-| `akan` | Latn | content-derived | fully | 46 |
+| `akan` | Latn | content-derived | fully | 49 |
 | `akha_lahu` | Latn | default-fallback | fallback-only | 0 |
-| `aksarabali_panlex` | Bali | content-derived | partially | 61 |
+| `aksarabali_panlex` | Bali | content-derived | partially | 78 |
 | `amazigh_latin` | Latn | content-derived | fully | 103 |
 | `anglo_furthorc_english` | Runr | content-derived | fully | 35 |
 | `anii` | Latn | content-derived | fully | 59 |
 | `arabic_izza` | Arab | content-derived | fully | 53 |
 | `arabic_w_o_dots` | Arab | content-derived | fully | 97 |
-| `aramaic_hebrew` | Syrc | content-derived | fully | 32 |
+| `aramaic_hebrew` | Syrc | content-derived | fully | 36 |
 
 ## Sample records — `strategy-fingerprint` (first 12 by id)
 

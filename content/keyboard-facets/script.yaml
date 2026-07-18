@@ -230,4 +230,11 @@ derivation:
 feedsSessionFacets: [community.multi-orthography]
 subProfiles:
   latin: [plain, extended, ipa]
-schemaVersion: 1
+# schemaVersion 2 (spec 040): the classifier now folds desktop base-layout
+# fall-through into the produced evidence — a base-layer physical key a keyboard
+# does not name falls through to the OS default layout (kbdus), so its un-blocked
+# Latin character surfaces as a minor, distribution-only sliver (never a
+# dominant-value flip). This changes affected desktop keyboards' `script`
+# records, hence the bump. NB: the freshness rescan is driven by the `script@N`
+# token in freshness.ts CLASSIFIER_VERSION, not by this field.
+schemaVersion: 2

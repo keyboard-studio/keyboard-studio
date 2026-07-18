@@ -19,7 +19,7 @@ import type { PlacementCandidate } from "@keyboard-studio/contracts";
  * Expected unshifted output for each letter vkey on a standard US keyboard.
  * This is the reference baseline used by hasNonUSBase to count deviations.
  */
-const US_UNSHIFTED: Record<string, string> = {
+export const US_UNSHIFTED: Record<string, string> = {
   K_Q: "q", K_W: "w", K_E: "e", K_R: "r", K_T: "t",
   K_Y: "y", K_U: "u", K_I: "i", K_O: "o", K_P: "p",
   K_A: "a", K_S: "s", K_D: "d", K_F: "f", K_G: "g",

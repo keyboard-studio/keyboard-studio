@@ -17,16 +17,19 @@ import { describe, it, expect } from "vitest";
 
 import { parse } from "../../packages/engine/src/codec/index.js";
 import { classifyScript } from "./script-classifier.js";
+import { resolveBaseLayout } from "./base-layout.js";
 import { deriveScriptFallback, type DeclaredMetadata } from "./fallback.js";
 import { SCRIPT_FACET_DEF } from "./__fixtures__/scriptDef.js";
 
 // ---------------------------------------------------------------------------
-// Fixtures
+// Shared fixture builders
 // ---------------------------------------------------------------------------
 
-/** 4 Arabic letters + 1 Latin letter -> Arab is dominant at an 0.8 share. */
-const ARABIC_DOMINANT_KMN = `store(&VERSION) '10.0'
-store(&NAME) 'Test Arabic'
+const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+function buildDesktopKmn(name: string, ruleLines: string[]): string {
+  return `store(&VERSION) '10.0'
+store(&NAME) '${name}'
 store(&TARGETS) 'any'
 store(&COPYRIGHT) '(c) 2026 Test'
 store(&KEYBOARDVERSION) '1.0'
@@ -35,12 +38,39 @@ begin Unicode > use(main)
 
 group(main) using keys
 
-+ [K_A] > U+0627
-+ [K_S] > U+0628
-+ [K_D] > U+062C
-+ [K_F] > U+062F
-+ [K_G] > U+0065
+${ruleLines.join("\n")}
 `;
+}
+
+/** Blocks every letter key with `> nul` except those in `skip`. */
+function nulRulesExcept(skip: Set<string>): string[] {
+  const rules: string[] = [];
+  for (const L of LETTERS) {
+    const vk = `K_${L}`;
+    if (skip.has(vk)) continue;
+    rules.push(`+ [${vk}] > nul`);
+  }
+  return rules;
+}
+
+// ---------------------------------------------------------------------------
+// Fixtures
+// ---------------------------------------------------------------------------
+
+/**
+ * 4 Arabic letters + 1 Latin letter -> Arab is dominant at an 0.8 share.
+ * Every other base-layer key is `> nul`-blocked so the spec-040 base-layout
+ * fall-through fold contributes nothing here (this fixture tests rule-produced
+ * apportionment, not fall-through — see the dedicated spec-040 suite below).
+ */
+const ARABIC_DOMINANT_KMN = buildDesktopKmn("Test Arabic", [
+  `+ [K_A] > U+0627`,
+  `+ [K_S] > U+0628`,
+  `+ [K_D] > U+062C`,
+  `+ [K_F] > U+062F`,
+  `+ [K_G] > U+0065`,
+  ...nulRulesExcept(new Set(["K_A", "K_S", "K_D", "K_F", "K_G"])),
+]);
 
 /**
  * Only Common (U+0020 SPACE) and Inherited (U+0301 COMBINING ACUTE ACCENT,
@@ -76,20 +106,14 @@ const UNPARSEABLE_KMN = "group(main using keys\n+ [K_A] > ???\n";
  * extension set names more than one script — it strengthens whichever
  * attested script(s) it intersects.
  */
-const LATIN_PLUS_SHARED_MARK_KMN = `store(&VERSION) '10.0'
-store(&NAME) 'Test Latin Plus Shared Mark'
-store(&TARGETS) 'any'
-store(&COPYRIGHT) '(c) 2026 Test'
-store(&KEYBOARDVERSION) '1.0'
-
-begin Unicode > use(main)
-
-group(main) using keys
-
-+ [K_A] > U+0041
-+ [K_S] > U+0053
-+ [K_D] > U+0301
-`;
+const LATIN_PLUS_SHARED_MARK_KMN = buildDesktopKmn("Test Latin Plus Shared Mark", [
+  `+ [K_A] > U+0041`,
+  `+ [K_S] > U+0053`,
+  `+ [K_D] > U+0301`,
+  // Block the rest so the spec-040 fall-through fold adds no leaked Latin here —
+  // this fixture isolates the two-pass apportionment of the shared mark.
+  ...nulRulesExcept(new Set(["K_A", "K_S", "K_D"])),
+]);
 
 describe("classifyScript", () => {
   it("Arabic-dominant produced set -> value 'Arab', distribution dominant on Arab, content-derived tier", () => {
@@ -263,5 +287,155 @@ describe("deriveScriptFallback (the unparseable-keyboard / no-content-analysis p
     expect(result.provenanceTier).toBe("default-fallback");
     expect(result.provenanceTier).not.toBe("declared-metadata");
     expect(result.value).toBe("Arab");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 040 — desktop base-layout fall-through (US1 leak sliver, US2 safety)
+// ---------------------------------------------------------------------------
+
+/** Rule lines for the 5 Arabic evidence keys shared by the leak fixtures. */
+const ARABIC_EVIDENCE: Record<string, string> = {
+  K_S: "U+0627",
+  K_D: "U+0628",
+  K_F: "U+062C",
+  K_G: "U+062F",
+  K_H: "U+0631",
+};
+
+/**
+ * A non-Latin (Arabic) desktop keyboard that remaps 5 keys to Arabic, blocks
+ * every other letter key with `> nul`, and leaves ONLY K_A un-named — so the
+ * single un-blocked key leaks its kbdus character 'a' as a minor Latn sliver.
+ */
+const ARABIC_LEAK_KA_KMN = buildDesktopKmn("Arabic leak K_A", [
+  ...Object.entries(ARABIC_EVIDENCE).map(([vk, out]) => `+ [${vk}] > ${out}`),
+  ...nulRulesExcept(new Set(["K_A", ...Object.keys(ARABIC_EVIDENCE)])),
+]);
+
+/**
+ * Same as above but with a base-layout branch guard (`baselayout('azerty')`) on
+ * K_J — exercises the `notes` `; branches-on: azerty` audit hint. K_J is named
+ * by the guarded rule so it does not leak; its Arabic output adds evidence.
+ */
+const ARABIC_LEAK_WITH_BRANCH_KMN = buildDesktopKmn("Arabic leak with branch", [
+  `baselayout('azerty') + [K_J] > U+0632`,
+  ...Object.entries(ARABIC_EVIDENCE).map(([vk, out]) => `+ [${vk}] > ${out}`),
+  ...nulRulesExcept(new Set(["K_A", "K_J", ...Object.keys(ARABIC_EVIDENCE)])),
+]);
+
+/**
+ * Same as above but with TWO distinct baselayout('...') guards (azerty on
+ * K_J, dvorak on K_K) — exercises the multi-value, sorted `branches-on` note.
+ */
+const ARABIC_LEAK_WITH_TWO_BRANCHES_KMN = buildDesktopKmn("Arabic leak with two branches", [
+  `baselayout('azerty') + [K_J] > U+0632`,
+  `baselayout('dvorak') + [K_K] > U+0633`,
+  ...Object.entries(ARABIC_EVIDENCE).map(([vk, out]) => `+ [${vk}] > ${out}`),
+  ...nulRulesExcept(new Set(["K_A", "K_J", "K_K", ...Object.keys(ARABIC_EVIDENCE)])),
+]);
+
+/**
+ * An Arabic keyboard that REMAPS K_A to an Arabic char and blocks every other
+ * letter key — every base-layer key is named, so nothing leaks (no Latin sliver
+ * for K_A or any other key).
+ */
+const ARABIC_REMAP_KA_NO_LEAK_KMN = buildDesktopKmn("Arabic remap K_A no leak", [
+  `+ [K_A] > U+0627`,
+  `+ [K_S] > U+0628`,
+  ...nulRulesExcept(new Set(["K_A", "K_S"])),
+]);
+
+/** Every base-layout key blocked with `> nul` (plus 2 Arabic evidence keys). */
+const ALL_NUL_KMN = buildDesktopKmn("All nul", [
+  `+ [K_A] > U+0627`,
+  `+ [K_S] > U+0628`,
+  ...nulRulesExcept(new Set(["K_A", "K_S"])),
+]);
+
+describe("classifyScript — desktop base-layout fall-through (spec 040 US1)", () => {
+  it("un-blocked K_A leaks a minor Latn distribution entry; dominant stays Arab (AS1)", () => {
+    const { ir } = parse(ARABIC_LEAK_KA_KMN, "test-leak-ka");
+    const result = classifyScript(ir, SCRIPT_FACET_DEF)!;
+
+    expect(result.value).toBe("Arab"); // dominant unchanged by the leak
+    expect(result.provenanceTier).toBe("content-derived");
+    const dist = result.distribution!;
+    expect(dist.Latn).toBeGreaterThan(0); // the leaked sliver is visible
+    expect(dist.Arab).toBeGreaterThan(dist.Latn!); // but minor vs the dominant
+    // 5 Arabic (rule-produced) + 1 leaked Latin = evidenceSize 6.
+    expect(result.evidenceSize).toBe(6);
+    const sum = Object.values(dist).reduce((a, b) => a + b, 0);
+    expect(sum).toBeCloseTo(1, 5);
+  });
+
+  it("notes carries `base-layout: kbdus (default)` and appends branches-on when a guard is present (AS2)", () => {
+    const plain = classifyScript(parse(ARABIC_LEAK_KA_KMN, "n1").ir, SCRIPT_FACET_DEF)!;
+    expect(plain.notes).toBe("base-layout: kbdus (default)");
+
+    const branched = classifyScript(
+      parse(ARABIC_LEAK_WITH_BRANCH_KMN, "n2").ir,
+      SCRIPT_FACET_DEF,
+    )!;
+    expect(branched.notes).toBe("base-layout: kbdus (default); branches-on: azerty");
+  });
+
+  it("two distinct baselayout guards render comma-joined and sorted in notes (AS2)", () => {
+    const { ir } = parse(ARABIC_LEAK_WITH_TWO_BRANCHES_KMN, "n3");
+    expect(resolveBaseLayout(ir).branchesOn).toEqual(["azerty", "dvorak"]);
+    const result = classifyScript(ir, SCRIPT_FACET_DEF)!;
+    expect(result.notes).toBe("base-layout: kbdus (default); branches-on: azerty,dvorak");
+  });
+
+  it("a keyboard remapping K_A to a non-Latin char adds no leaked Latin for K_A (AS3)", () => {
+    const { ir } = parse(ARABIC_REMAP_KA_NO_LEAK_KMN, "test-remap-ka");
+    const result = classifyScript(ir, SCRIPT_FACET_DEF)!;
+    expect(result.value).toBe("Arab");
+    // Every base-layer key is named -> no leak at all -> no Latin in the distribution.
+    expect(result.distribution!.Latn).toBeUndefined();
+  });
+});
+
+describe("classifyScript — leak safety guarantees (spec 040 US2)", () => {
+  it("an all-`> nul` keyboard produces zero leaked evidence (SC-003, AS1)", () => {
+    const { ir } = parse(ALL_NUL_KMN, "test-all-nul");
+    const result = classifyScript(ir, SCRIPT_FACET_DEF)!;
+    // Only the 2 Arabic rule-produced chars count; no leaked Latin.
+    expect(result.evidenceSize).toBe(2);
+    expect(result.distribution!.Latn).toBeUndefined();
+    expect(result.value).toBe("Arab");
+  });
+
+  it("folding the leak never flips the dominant value or worsens confidenceClass (SC-002)", () => {
+    // The leak fixture's dominant/confidence must equal the rule-only computation
+    // (a fully-blocked variant with the same Arabic evidence, no leak).
+    const withLeak = classifyScript(parse(ARABIC_LEAK_KA_KMN, "wl").ir, SCRIPT_FACET_DEF)!;
+    const ruleOnly = buildDesktopKmn("Arabic rule only", [
+      ...Object.entries(ARABIC_EVIDENCE).map(([vk, out]) => `+ [${vk}] > ${out}`),
+      ...nulRulesExcept(new Set(Object.keys(ARABIC_EVIDENCE))), // block K_A too -> no leak
+    ]);
+    const noLeak = classifyScript(parse(ruleOnly, "nl").ir, SCRIPT_FACET_DEF)!;
+
+    expect(withLeak.value).toBe(noLeak.value);
+    expect(withLeak.confidenceClass).toBe(noLeak.confidenceClass);
+    expect(noLeak.confidenceClass).toBe("confident"); // 5/5 Arabic, undiluted
+  });
+
+  it("a touch-only IR (no base-layer vkey rules) is unaffected — no leak folded (SC-004)", () => {
+    const touchOnly = buildDesktopKmn("Touch only", [`+ 'x' > U+0627`]);
+    const result = classifyScript(parse(touchOnly, "to").ir, SCRIPT_FACET_DEF)!;
+    // One Arabic char, no base-layer surface -> the full-alphabet leak is suppressed.
+    expect(result.value).toBe("Arab");
+    expect(result.distribution!.Latn).toBeUndefined();
+    expect(result.evidenceSize).toBe(1);
+    expect(result.notes).toBeUndefined();
+  });
+});
+
+describe("classifyScript — leak fold determinism (spec 040 US3, SC-005)", () => {
+  it("identical (IR, base-layouts.json) inputs yield a deep-equal Categorization", () => {
+    const a = classifyScript(parse(ARABIC_LEAK_KA_KMN, "d1").ir, SCRIPT_FACET_DEF);
+    const b = classifyScript(parse(ARABIC_LEAK_KA_KMN, "d2").ir, SCRIPT_FACET_DEF);
+    expect(b).toEqual(a); // no environment reads, no ordering nondeterminism
   });
 });
