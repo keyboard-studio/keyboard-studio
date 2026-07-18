@@ -319,6 +319,15 @@ export interface WorkingCopyState {
    * consume. Routing them through {@link setIR} silently wipes those deletions.
    */
   setWorkingIR: (ir: KeyboardIR) => void;
+  /**
+   * Commit a facet-transform result (spec 039). Writes the transform's `nextIr`
+   * via the overlay-preserving {@link setWorkingIR} seam, and — when the transform
+   * changed the produced-character set — re-seeds the IR-derived discovery axes so
+   * `session.axes` and downstream `selectStrategy()`/gallery reads re-derive
+   * against the new produced set (FR-013 / research D11). A no-op axis re-seed
+   * when `producedSetChanged` is false.
+   */
+  commitFacetTransform: (nextIr: KeyboardIR, producedSetChanged: boolean) => void;
   /** Clear the carve working IR and reset carve deletion state. */
   clearIR: () => void;
   /** Mark a node as deleted and push to undo stack. */
@@ -640,7 +649,7 @@ const INITIAL_SURVEY = remerge({}, []);
 export type WorkingCopyData = Omit<
   WorkingCopyState,
   // actions are excluded from the data snapshot
-  | "setIR" | "setWorkingIR" | "clearIR" | "deleteNode" | "undoDelete" | "restoreNode"
+  | "setIR" | "setWorkingIR" | "commitFacetTransform" | "clearIR" | "deleteNode" | "undoDelete" | "restoreNode"
   | "isDeleted" | "deleteItem" | "restoreItem" | "isItemDeleted" | "keepAll" | "restoreAll"
   | "cascadeDelete"
   | "cascadeRestore"
@@ -700,6 +709,19 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // untouched so the carve-deletion overlay survives a mutate-seam write.
   setWorkingIR: (ir) =>
     set({ ir }),
+
+  // spec 039 — commit a facet-transform result. Overlay-preserving write; when the
+  // produced-character set changed, re-derive the IR-seeded axes (markInputOrder)
+  // from the new IR so strategy/gallery picks do not go stale (FR-013 / D11).
+  commitFacetTransform: (nextIr, producedSetChanged) =>
+    set((s) => {
+      if (!producedSetChanged) return { ir: nextIr };
+      // Drop the cached IR-derived axis so seedIrAxesFromBaseIr re-derives it
+      // from the new IR; survey-derived axes (phaseResults) are re-merged as-is.
+      const { markInputOrder: _drop, ...preserved } = s.irAxes;
+      const reseeded = seedIrAxesFromBaseIr(nextIr, preserved);
+      return { ir: nextIr, ...remerge(reseeded, s.phaseResults) };
+    }),
 
   clearIR: () =>
     set({ ir: null, deletedNodeIds: new Set(), deletedItemIds: new Set(), undoStack: [] }),

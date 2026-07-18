@@ -69,7 +69,7 @@ The user's base emits NFD but the user wants NFC output. The studio proposes the
 
 ### Edge Cases
 
-- **Gate facets are never transformed.** A request to "switch" `source.mnemonic-vs-positional` MUST be refused with an explanation (mnemonic is a portability gate, not a switchable mechanism), not attempted.
+- **Gate facets are never transformed.** A request to "switch" a gate facet — `source.mnemonic-vs-positional` (mnemonic is a portability gate, not a switchable mechanism) or `source.casing` (casing is a fact about the target script, not a construction choice) — MUST be refused with an explanation, not attempted.
 - **Insufficient/undetermined measurement.** If the source facet for the base is `undetermined` or below the classifier's evidence floor, the transform MUST NOT run blind — it either declines or re-measures, never guesses.
 - **Opaque source fragments.** Constructs preserved as `RawKmnFragment` that a transform cannot model MUST NOT be silently rewritten or dropped (constitution Article II) — the transform reports what it could not touch.
 - **Fall-through interaction.** A mechanism or encoding transform MUST account for base-layout fall-through (design brief §7): changing or blocking a key can change which base-layout characters leak; the transform surfaces any change to the produced-character set.
@@ -123,6 +123,6 @@ The user's base emits NFD but the user wants NFC output. The studio proposes the
 - The classifiers and measurements themselves (spec 037) and the facet-index storage (spec 036).
 - The source-facet catalog and schema (design brief items 1–3) — authored as content data, not here.
 - The user-facing confirmation *question* design ([spec 038](../038-adaptation-questions/spec.md)) beyond this engine's propose-then-confirm obligation.
-- Gate facets (`source.mnemonic-vs-positional`) — measured and used to filter bases, never transformed.
+- Gate facets (`source.mnemonic-vs-positional`, `source.casing`) — measured and surfaced (mnemonic filters base eligibility; casing gates the `source.caps-handling` classifier's applicability), never transformed.
 - Multi-source merge, and any change to locked contracts, validator layers, or the recognizer's rule catalog (constitution Articles I, IV, VII).
 - The per-pair *implementation* of every transition (this spec defines the matrix + rules contract; `/speckit-plan` and `/speckit-tasks` schedule which land first).
