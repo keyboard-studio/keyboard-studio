@@ -39,7 +39,7 @@ export const US_UNSHIFTED: Record<string, string> = {
  * Shared by hasNonUSBase, detectBaseLayoutFamily, and hasInvertedNumberRow's
  * base-map read.
  */
-const isBaseLayer = (_vkey: string, modifiers: string[]): boolean =>
+export const isBaseLayer = (_vkey: string, modifiers: string[]): boolean =>
   !modifiers.some((m) => m !== "NCAPS");
 
 /**

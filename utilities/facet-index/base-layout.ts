@@ -35,6 +35,8 @@ import { dirname, resolve } from "node:path";
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 
+import { isBaseLayer } from "../../packages/engine/src/placement/filters.js";
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASE_LAYOUTS_PATH = resolve(HERE, "data", "base-layouts.json");
 
@@ -105,22 +107,6 @@ export function loadBaseLayoutTable(path?: string): BaseLayoutTable {
 }
 
 // ---------------------------------------------------------------------------
-// Base-layer predicate (re-expressed locally to keep this tool's
-// classification logic self-contained; see packages/engine/src/placement/
-// filters.ts's isBaseLayer for the engine's equivalent predicate)
-// ---------------------------------------------------------------------------
-
-/**
- * Accept predicate for the unshifted base layer: real keyboards encode it with
- * the NCAPS (caps-lock-off) modifier, so accept NCAPS-only alongside bare
- * rules; reject SHIFT/CAPS/AltGr layers. Mirrors `isBaseLayer` in the engine's
- * placement filters, re-expressed locally rather than imported.
- */
-function isBaseLayerModifiers(modifiers: string[]): boolean {
-  return !modifiers.some((m) => m !== "NCAPS");
-}
-
-// ---------------------------------------------------------------------------
 // Resolution + leak detection
 // ---------------------------------------------------------------------------
 
@@ -177,7 +163,7 @@ export function namedBaseLayerVkeys(ir: KeyboardIR): Set<string> {
   for (const group of ir.groups) {
     for (const rule of group.rules) {
       for (const el of rule.context) {
-        if (el.kind === "vkey" && isBaseLayerModifiers(el.modifiers)) {
+        if (el.kind === "vkey" && isBaseLayer(el.name, el.modifiers)) {
           named.add(el.name);
         }
       }
