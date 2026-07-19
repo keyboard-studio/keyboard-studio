@@ -74,7 +74,7 @@ describe("buildIndex — dedicated fixture corpus (release/fixture/*)", () => {
     facetDefsDir: DEFS,
   });
 
-  it("produces exactly the 8 fixture keyboards", () => {
+  it("produces exactly the 9 fixture keyboards", () => {
     expect(Object.keys(index.keyboards).sort()).toEqual([
       "fx_arabic",
       "fx_broken",
@@ -84,6 +84,7 @@ describe("buildIndex — dedicated fixture corpus (release/fixture/*)", () => {
       "fx_mnemonic",
       "fx_reorder",
       "fx_rootlayout",
+      "fx_touch",
     ]);
   });
 
@@ -110,6 +111,41 @@ describe("buildIndex — dedicated fixture corpus (release/fixture/*)", () => {
     expect(script.value).toBe("Latn");
     expect(script.provenanceTier).toBe("content-derived");
     expect(script.analysisOutcome).toBe("fully");
+  });
+
+  it("fx_touch classifies the four touch facets end-to-end through the real pipeline (US2)", () => {
+    // Exercises the actual wiring: DEFAULT_CLASSIFIERS id lookup → kb.sources
+    // discovery via the scanner → the canonical touch-layout parser — not just
+    // the per-classifier pure-function tests against synthetic ScannedKeyboards.
+    const f = index.keyboards.fx_touch!.facets;
+
+    const combo = f["touch-combo-mechanism"]!;
+    expect(combo.notApplicable).toBeUndefined();
+    expect(combo.provenanceTier).toBe("content-derived");
+    // fixture has longpress popups, a multitap, a flick, layer switches + plain keys.
+    expect(Object.keys(combo.distribution!)).toEqual(
+      expect.arrayContaining(["longpress", "layer"]),
+    );
+
+    expect(f["touch-number-row"]!.value).toBe("digits"); // top row is 1..5
+    expect(f["touch-symbol-layer"]!.value).toBe("present"); // fixture has a symbol layer
+    const mod = f["touch-modifier-layers"]!;
+    expect(mod.value).toBe("maps-desktop-modifiers"); // alt + rightalt reproduced
+    expect(mod.causeTagCounts).toEqual({ "capacity-forced": 2 });
+  });
+
+  it("a desktop-only fixture (no touch layout) is notApplicable for all four touch facets (SC-004)", () => {
+    for (const facetId of [
+      "touch-combo-mechanism",
+      "touch-number-row",
+      "touch-symbol-layer",
+      "touch-modifier-layers",
+    ]) {
+      const cat = index.keyboards.fx_latin!.facets[facetId]!;
+      expect(cat.notApplicable, `fx_latin ${facetId} should be notApplicable`).toBe(true);
+      expect(cat.value).toBeUndefined();
+      expect(cat.provenanceTier).toBe("content-derived");
+    }
   });
 
   it("fx_rootlayout (.kps at the <id> folder root, no source/ segment) is discovered, not silently dropped", () => {

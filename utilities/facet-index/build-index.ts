@@ -46,6 +46,10 @@ import { classifyMnemonicVsPositional, mnemonicVsPositionalFallback } from "./mn
 import { classifyNormalizationPosture, normalizationPostureFallback } from "./normalization-posture-classifier.js";
 import { classifyReorderingRules, reorderingRulesFallback } from "./reordering-rules-classifier.js";
 import { classifyRuleStoreCompaction, ruleStoreCompactionFallback } from "./rule-store-compaction-classifier.js";
+import { classifyTouchComboMechanism, touchComboMechanismFallback } from "./touch-combo-mechanism-classifier.js";
+import { classifyTouchNumberRow, touchNumberRowFallback } from "./touch-number-row-classifier.js";
+import { classifyTouchSymbolLayer, touchSymbolLayerFallback } from "./touch-symbol-layer-classifier.js";
+import { classifyTouchModifierLayers, touchModifierLayersFallback } from "./touch-modifier-layers-classifier.js";
 import { deriveScriptFallback, UNDETERMINED } from "./fallback.js";
 import type {
   Categorization,
@@ -150,6 +154,17 @@ export const DEFAULT_CLASSIFIERS: Record<string, ClassifierPair> = {
     classify: classifyRuleStoreCompaction,
     fallback: ruleStoreCompactionFallback,
   },
+  // spec 041 US2 — four touch-layout construction facets (.keyman-touch-layout).
+  "touch-combo-mechanism": {
+    classify: classifyTouchComboMechanism,
+    fallback: touchComboMechanismFallback,
+  },
+  "touch-number-row": { classify: classifyTouchNumberRow, fallback: touchNumberRowFallback },
+  "touch-symbol-layer": { classify: classifyTouchSymbolLayer, fallback: touchSymbolLayerFallback },
+  "touch-modifier-layers": {
+    classify: classifyTouchModifierLayers,
+    fallback: touchModifierLayersFallback,
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -210,8 +225,14 @@ function buildKeyboardRecord(
       const fallback = pair.fallback(kb, def);
       // Distinguish a genuine codec parse failure from "no .kmn at all" /
       // "parsed fine but no content evidence for this facet" — only the
-      // former gets a note (audit honesty, P1-A).
-      facets[def.id] = parseError ? { ...fallback, notes: `parse failure: ${parseError}` } : fallback;
+      // former gets a note (audit honesty, P1-A). Append rather than overwrite:
+      // a fallback that derived a real value from a non-.kmn source (e.g. the
+      // touch classifiers reading the touch layout) carries its own descriptive
+      // notes, which must survive the desktop parse-failure annotation.
+      const parseNote = `parse failure: ${parseError}`;
+      facets[def.id] = parseError
+        ? { ...fallback, notes: fallback.notes ? `${fallback.notes}; ${parseNote}` : parseNote }
+        : fallback;
     }
   }
 

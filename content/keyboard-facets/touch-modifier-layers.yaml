@@ -23,7 +23,7 @@ likelihoodSemantics: >
   is 1 for the classified value.
 derivation:
   archetype: rule-structure
-  classifierId: planned
+  classifierId: touch-modifier-layers-classifier
   fallbackChain: [content-derived, undetermined]
 feedsSessionFacets: [source.touch-modifier-layers]
 schemaVersion: 1

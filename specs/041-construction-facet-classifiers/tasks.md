@@ -90,17 +90,17 @@ description: "Task list for Construction Facet Classifiers"
 
 ### Fixtures for User Story 2
 
-- [ ] T022 [P] [US2] Add touch fixtures under `utilities/facet-index/__fixtures__/corpus/release/fixture/`: a `.keyman-touch-layout`-bearing keyboard with longpress popups + a 5th row + a symbol layer + reproduced ALT/RALT layers (`fx_touch`), and a desktop-only keyboard with no touch layout (reuse an existing desktop fixture) (research R6, AS-1/2/3).
+- [X] T022 [P] [US2] Add touch fixtures under `utilities/facet-index/__fixtures__/corpus/release/fixture/`: a `.keyman-touch-layout`-bearing keyboard with longpress popups + a 5th row + a symbol layer + reproduced ALT/RALT layers (`fx_touch`), and a desktop-only keyboard with no touch layout (reuse an existing desktop fixture) (research R6, AS-1/2/3).
 
 ### Implementation for User Story 2
 
-- [ ] T023 [US2] `utilities/facet-index/touch-layout.ts` (+ `.test.ts`): read + parse the `.keyman-touch-layout` JSON once from `kb.sources` (`collectSources` in `scan.ts` already carries the sibling); expose per-key combine mechanism, 5th-row presence/content, symbol-layer presence, and reproduced modifier layers (FR-020, data-model Entity 6). Absent file ⇒ signal callers to emit `notApplicable`.
-- [ ] T024 [P] [US2] `utilities/facet-index/touch-combo-mechanism-classifier.ts` (+ `.test.ts`): value ∈ `{key, layer, longpress, flick, multitap}` with distribution from `touch-layout.ts`; `notApplicable` when no touch layout (FR-021/022, AS-1). Register.
-- [ ] T025 [P] [US2] `utilities/facet-index/touch-number-row-classifier.ts` (+ `.test.ts`): value ∈ `{absent, digits, letters, mixed}`; `notApplicable` when no touch layout (FR-021/022). Register.
-- [ ] T026 [P] [US2] `utilities/facet-index/touch-symbol-layer-classifier.ts` (+ `.test.ts`): value ∈ `{present, absent}`; `notApplicable` when no touch layout (FR-021/022). Register.
-- [ ] T027 [P] [US2] `utilities/facet-index/touch-modifier-layers-classifier.ts` (+ `.test.ts`): value ∈ `{none, maps-desktop-modifiers, mixed}`; reproduced ALT/RALT sites carry the appropriate cause tag; `notApplicable` when no touch layout (FR-021/022, AS-3). Register.
-- [ ] T028 [US2] Flip `derivation.classifierId: planned → <real id>` in the four touch `content/keyboard-facets/*.yaml`: `touch-combo-mechanism`, `touch-number-row`, `touch-symbol-layer`, `touch-modifier-layers` (FR-040).
-- [ ] T029 [US2] Run `cd utilities/facet-index && npx vitest run` + `node utilities/facet-index-lint/index.js` — green; rebuild `--classified-only` and confirm the four touch facets against US2 acceptance (touch present vs `notApplicable`) (quickstart P2, FR-041, SC-004).
+- [X] T023 [US2] `utilities/facet-index/touch-layout.ts` (+ `.test.ts`): read + parse the `.keyman-touch-layout` JSON once from `kb.sources` (`collectSources` in `scan.ts` already carries the sibling); expose per-key combine mechanism, 5th-row presence/content, symbol-layer presence, and reproduced modifier layers (FR-020, data-model Entity 6). Absent file ⇒ signal callers to emit `notApplicable`.
+- [X] T024 [P] [US2] `utilities/facet-index/touch-combo-mechanism-classifier.ts` (+ `.test.ts`): value ∈ `{key, layer, longpress, flick, multitap}` with distribution from `touch-layout.ts`; `notApplicable` when no touch layout (FR-021/022, AS-1). Register.
+- [X] T025 [P] [US2] `utilities/facet-index/touch-number-row-classifier.ts` (+ `.test.ts`): value ∈ `{absent, digits, letters, mixed}`; `notApplicable` when no touch layout (FR-021/022). Register.
+- [X] T026 [P] [US2] `utilities/facet-index/touch-symbol-layer-classifier.ts` (+ `.test.ts`): value ∈ `{present, absent}`; `notApplicable` when no touch layout (FR-021/022). Register.
+- [X] T027 [P] [US2] `utilities/facet-index/touch-modifier-layers-classifier.ts` (+ `.test.ts`): value ∈ `{none, maps-desktop-modifiers, mixed}`; reproduced ALT/RALT sites carry the appropriate cause tag; `notApplicable` when no touch layout (FR-021/022, AS-3). Register.
+- [X] T028 [US2] Flip `derivation.classifierId: planned → <real id>` in the four touch `content/keyboard-facets/*.yaml`: `touch-combo-mechanism`, `touch-number-row`, `touch-symbol-layer`, `touch-modifier-layers` (FR-040).
+- [X] T029 [US2] Run `cd utilities/facet-index && npx vitest run` + `node utilities/facet-index-lint/index.js` — green; rebuild `--classified-only` and confirm the four touch facets against US2 acceptance (touch present vs `notApplicable`) (quickstart P2, FR-041, SC-004).
 
 **Checkpoint**: US1 + US2 both work independently. Stop and validate; resume P3 in a fresh conversation.
 

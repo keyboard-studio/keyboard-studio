@@ -74,7 +74,8 @@ export interface MeasurementInput {
   predicates?: readonly CausePredicate[];
 }
 
-const CONFIDENT_CONSISTENCY = 0.8;
+/** Consistency at/above which a single-value measurement reads `confident`. */
+export const CONFIDENT_CONSISTENCY = 0.8;
 
 /**
  * Plurality value over the analyzed sites; lexicographic tie-break for

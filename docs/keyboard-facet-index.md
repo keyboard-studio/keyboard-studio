@@ -5,7 +5,7 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 ## Build inputs
 
 - **keyboards**: 920
-- **facets**: caps-handling, casing, desktop-combo-mechanism, encoding, fallback-posture, mnemonic-vs-positional, normalization-posture, reordering-rules, rule-store-compaction, script, strategy-fingerprint, target-mix
+- **facets**: caps-handling, casing, desktop-combo-mechanism, encoding, fallback-posture, mnemonic-vs-positional, normalization-posture, reordering-rules, rule-store-compaction, script, strategy-fingerprint, target-mix, touch-combo-mechanism, touch-modifier-layers, touch-number-row, touch-symbol-layer
 - **scannerVersion**: `facet-index@1;schema@1;script@2;strategy-fingerprint@1;target-mix@1`
 - **unicodeVersion**: 17.0.0
 - **corpusScope**: `release/**`
@@ -28,6 +28,10 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `script` | 894 | 14 | 10 | 2 |
 | `strategy-fingerprint` | 910 | 0 | 10 | 0 |
 | `target-mix` | 0 | 912 | 8 | 0 |
+| `touch-combo-mechanism` | 920 | 0 | 0 | 0 |
+| `touch-modifier-layers` | 920 | 0 | 0 | 0 |
+| `touch-number-row` | 920 | 0 | 0 | 0 |
+| `touch-symbol-layer` | 920 | 0 | 0 | 0 |
 
 ## Sample records — `caps-handling` (first 12 by id)
 
@@ -232,4 +236,72 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `arabic_izza` | desktop+touch+web | declared-metadata | fully | 3 |
 | `arabic_w_o_dots` | desktop+touch+web | declared-metadata | fully | 3 |
 | `aramaic_hebrew` | desktop+touch+web | declared-metadata | fully | 3 |
+
+## Sample records — `touch-combo-mechanism` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | key | content-derived | fully | 126 |
+| `afghan_turkmen` | key | content-derived | fully | 100 |
+| `ahom_star` | key | content-derived | fully | 174 |
+| `akan` | key | content-derived | fully | 85 |
+| `akha_lahu` | key | content-derived | fully | 98 |
+| `aksarabali_panlex` | key | content-derived | fully | 85 |
+| `amazigh_latin` | longpress | content-derived | fully | 94 |
+| `anglo_furthorc_english` | key | content-derived | fully | 97 |
+| `anii` | key | content-derived | fully | 194 |
+| `arabic_izza` | key | content-derived | fully | 164 |
+| `arabic_w_o_dots` | key | content-derived | fully | 165 |
+| `aramaic_hebrew` | key | content-derived | fully | 70 |
+
+## Sample records — `touch-modifier-layers` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | none | content-derived | fully | 3 |
+| `afghan_turkmen` | none | content-derived | fully | 3 |
+| `ahom_star` | none | content-derived | fully | 3 |
+| `akan` | none | content-derived | fully | 2 |
+| `akha_lahu` | none | content-derived | fully | 2 |
+| `aksarabali_panlex` | none | content-derived | fully | 3 |
+| `amazigh_latin` | none | content-derived | fully | 3 |
+| `anglo_furthorc_english` | none | content-derived | fully | 2 |
+| `anii` | none | content-derived | fully | 3 |
+| `arabic_izza` | none | content-derived | fully | 3 |
+| `arabic_w_o_dots` | none | content-derived | fully | 5 |
+| `aramaic_hebrew` | none | content-derived | fully | 2 |
+
+## Sample records — `touch-number-row` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | mixed | content-derived | fully | 1 |
+| `afghan_turkmen` | digits | content-derived | fully | 1 |
+| `ahom_star` | digits | content-derived | fully | 1 |
+| `akan` | digits | content-derived | fully | 1 |
+| `akha_lahu` | digits | content-derived | fully | 1 |
+| `aksarabali_panlex` | digits | content-derived | fully | 1 |
+| `amazigh_latin` | digits | content-derived | fully | 1 |
+| `anglo_furthorc_english` | digits | content-derived | fully | 1 |
+| `anii` | digits | content-derived | fully | 1 |
+| `arabic_izza` | digits | content-derived | fully | 1 |
+| `arabic_w_o_dots` | digits | content-derived | fully | 1 |
+| `aramaic_hebrew` | digits | content-derived | fully | 1 |
+
+## Sample records — `touch-symbol-layer` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | absent | content-derived | fully | 1 |
+| `afghan_turkmen` | present | content-derived | fully | 1 |
+| `ahom_star` | absent | content-derived | fully | 1 |
+| `akan` | absent | content-derived | fully | 1 |
+| `akha_lahu` | absent | content-derived | fully | 1 |
+| `aksarabali_panlex` | absent | content-derived | fully | 1 |
+| `amazigh_latin` | absent | content-derived | fully | 1 |
+| `anglo_furthorc_english` | absent | content-derived | fully | 1 |
+| `anii` | absent | content-derived | fully | 1 |
+| `arabic_izza` | absent | content-derived | fully | 1 |
+| `arabic_w_o_dots` | present | content-derived | fully | 1 |
+| `aramaic_hebrew` | absent | content-derived | fully | 1 |
 

@@ -200,8 +200,95 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:00:21.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:00:21.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:00:21.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:00:21.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:00:21.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:00:21.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:00:21.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:00:21.467Z"
     }
   ],
   "telemetryInstanceId": "33c35304-c47c-4b63-a9eb-290098cee7a5",
-  "currentTask": "T022"
+  "currentTask": "T030",
+  "verified": [
+    {
+      "what": "US2 touch facets: full facet-index vitest suite 148/148 green (incl. end-to-end fx_touch pipeline assertions + desktop-only notApplicable)"
+    },
+    {
+      "what": "facet-index-lint GREEN (16 facet defs, 920 keyboards); --classified-only rebuild byte-identical (determinism); tool tsc clean"
+    },
+    {
+      "what": "Corpus acceptance: touch keyboards classified (khmer_angkor combo distribution + maps-desktop-modifiers/capacity-forced); desktop-only keyboards notApplicable (769 classified / 151 n/a)"
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Touch classifiers consume the canonical @keyboard-studio/contracts parseTouchLayoutString/TouchLayoutIR (dependency root) rather than a hand-rolled reader — km-qc/km-synthesis P1 duplication finding resolved"
+    }
+  ],
+  "concerns": [
+    {
+      "note": "P3 (display-difficulty T030-T032) + Polish (T033-T035) remain; feature not yet complete — resume in a fresh conversation per one-conversation-per-phase",
+      "kind": "P2",
+      "step": "implement"
+    }
+  ]
 }

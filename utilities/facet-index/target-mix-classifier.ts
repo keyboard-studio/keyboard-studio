@@ -24,6 +24,7 @@ import type { KeyboardIR } from "@keyboard-studio/contracts";
 import type { KeymanPlatformTarget } from "@keyboard-studio/contracts";
 import { parseKps } from "../../packages/engine/src/base-browser/kps-parser.js";
 
+import { findTouchLayoutSource } from "./touch-layout.js";
 import type { Categorization, ConfidenceClass, FacetDefinition } from "./types.js";
 import type { ScannedKeyboard } from "./scan.js";
 
@@ -101,8 +102,9 @@ export function targetMixFallback(kb: ScannedKeyboard, def: FacetDefinition): Ca
   const kmnDeclaresAny = kmnTargets.some((t) => t.toLowerCase() === "any");
 
   // Touch-layout artifact presence: a `.keyman-touch-layout` sibling collected by
-  // the scanner. Its presence is the highest-fidelity signal for `touch`.
-  const touchArtifactPresent = kb.sources.some((s) => /\.keyman-touch-layout$/i.test(s.path));
+  // the scanner. Its presence is the highest-fidelity signal for `touch`. Reuse
+  // the shared detector so the sibling-path regex has one home (spec 041).
+  const touchArtifactPresent = findTouchLayoutSource(kb) !== null;
 
   // ------ assemble device classes with per-source provenance ------
   const declared = new Set<DeviceClass>();
