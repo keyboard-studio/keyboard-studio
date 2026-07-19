@@ -3,7 +3,7 @@
   "specName": "Construction Facet Classifiers",
   "branch": "041-construction-facet-classifiers",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "implemented",
   "history": [
     {
       "step": "specify",
@@ -264,10 +264,65 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-07-19T23:00:21.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:32:30.122Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:32:30.122Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:32:30.122Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:32:30.122Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:32:30.122Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:32:30.122Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:32:30.123Z"
     }
   ],
   "telemetryInstanceId": "33c35304-c47c-4b63-a9eb-290098cee7a5",
-  "currentTask": "T030",
+  "currentTask": "T035",
   "verified": [
     {
       "what": "US2 touch facets: full facet-index vitest suite 148/148 green (incl. end-to-end fx_touch pipeline assertions + desktop-only notApplicable)"

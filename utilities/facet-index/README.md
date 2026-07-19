@@ -90,7 +90,7 @@ generated and committed, never fetched at build time:
 node utilities/facet-index/ucd/codegen-ucd.mjs
 ```
 
-This SHA-256-verifies `lib/ucd/{Scripts,ScriptExtensions,PropertyValueAliases,Blocks}.txt` against
+This SHA-256-verifies `lib/ucd/{Scripts,ScriptExtensions,PropertyValueAliases,Blocks,DerivedAge}.txt` against
 [`scripts/ucd-version.json`](../../scripts/ucd-version.json), then codegens
 [`ucd/generated/scriptLookup.ts`](ucd/generated/scriptLookup.ts) + [`data/SOURCES.json`](data/SOURCES.json).
 A hash mismatch (including the `PLACEHOLDER` sentinel) **fails loud and writes nothing partial** — corrupt
