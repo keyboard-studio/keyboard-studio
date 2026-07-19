@@ -332,11 +332,17 @@
     },
     {
       "what": "Corpus acceptance: touch keyboards classified (khmer_angkor combo distribution + maps-desktop-modifiers/capacity-forced); desktop-only keyboards notApplicable (769 classified / 151 n/a)"
+    },
+    {
+      "what": "km-lead review cycle APPROVED (no P0): km-verification all 6 claims PASS; km-domain APPROVE; km-qc PASS 94/100. One P1 (YAML<->TS param drift) + three P2 fixed and re-verified in 0ebec7f (9 display-difficulty tests + facet-lint green)."
     }
   ],
   "decisions": [
     {
       "decision": "Touch classifiers consume the canonical @keyboard-studio/contracts parseTouchLayoutString/TouchLayoutIR (dependency root) rather than a hand-rolled reader — km-qc/km-synthesis P1 duplication finding resolved"
+    },
+    {
+      "decision": "P3 block-age data gap (research R5 wrongly assumed the UCD block-age table already existed): pinned lib/ucd/DerivedAge.txt @ Unicode 17.0.0 and extended codegen-ucd.mjs to emit a per-script first-assigned-version table (firstVersionOfScript) into the generated scriptLookup.ts, rather than a hand-curated table."
     }
   ],
   "concerns": [
