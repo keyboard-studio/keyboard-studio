@@ -19,7 +19,7 @@ likelihoodSemantics: >
   is 1 for the classified value.
 derivation:
   archetype: rule-structure
-  classifierId: planned
+  classifierId: reordering-rules-classifier
   fallbackChain: [content-derived, undetermined]
 feedsSessionFacets: [source.reordering-rules]
 schemaVersion: 1

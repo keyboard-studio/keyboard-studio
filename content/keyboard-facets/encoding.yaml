@@ -29,7 +29,7 @@ likelihoodSemantics: >
   shares within a role sum to 1.
 derivation:
   archetype: rule-structure
-  classifierId: planned
+  classifierId: encoding-classifier
   fallbackChain: [content-derived, undetermined]
 feedsSessionFacets: [source.encoding]
 subProfiles:

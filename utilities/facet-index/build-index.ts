@@ -37,6 +37,15 @@ import { renderCompanionMd } from "./companion.js";
 import { classifyScript } from "./script-classifier.js";
 import { classifyStrategyFingerprint, strategyFingerprintFallback } from "./strategy-fingerprint-classifier.js";
 import { classifyTargetMix, targetMixFallback } from "./target-mix-classifier.js";
+import { classifyCasing, casingFallback } from "./casing-classifier.js";
+import { classifyCapsHandling, capsHandlingFallback } from "./caps-handling-classifier.js";
+import { classifyDesktopComboMechanism, desktopComboMechanismFallback } from "./desktop-combo-mechanism-classifier.js";
+import { classifyEncoding, encodingFallback } from "./encoding-classifier.js";
+import { classifyFallbackPosture, fallbackPostureFallback } from "./fallback-posture-classifier.js";
+import { classifyMnemonicVsPositional, mnemonicVsPositionalFallback } from "./mnemonic-vs-positional-classifier.js";
+import { classifyNormalizationPosture, normalizationPostureFallback } from "./normalization-posture-classifier.js";
+import { classifyReorderingRules, reorderingRulesFallback } from "./reordering-rules-classifier.js";
+import { classifyRuleStoreCompaction, ruleStoreCompactionFallback } from "./rule-store-compaction-classifier.js";
 import { deriveScriptFallback, UNDETERMINED } from "./fallback.js";
 import type {
   Categorization,
@@ -69,7 +78,13 @@ export const DEFAULT_OUT_PATH = resolve(REPO_ROOT, "docs", "keyboard-facet-index
  * registry; nothing script-specific lives in the per-keyboard loop (T026).
  */
 export interface ClassifierPair {
-  classify: (ir: KeyboardIR, def: FacetDefinition) => Categorization | null;
+  /**
+   * Content-derived tier. Reads the parsed IR and, for touch facets (spec 041),
+   * the scanned source set `kb` (the `.keyman-touch-layout` bytes live in
+   * `kb.sources`, not the IR — research R1). Desktop/script classifiers ignore
+   * `kb`. Additive: existing `(ir, def)` classifiers stay assignable.
+   */
+  classify: (ir: KeyboardIR, def: FacetDefinition, kb: ScannedKeyboard) => Categorization | null;
   fallback: (kb: ScannedKeyboard, def: FacetDefinition) => Categorization;
 }
 
@@ -113,6 +128,28 @@ export const DEFAULT_CLASSIFIERS: Record<string, ClassifierPair> = {
     fallback: strategyFingerprintFallback,
   },
   "target-mix": { classify: classifyTargetMix, fallback: targetMixFallback },
+  // spec 041 US1 — nine desktop construction facets (rule-structure / script identity).
+  casing: { classify: classifyCasing, fallback: casingFallback },
+  "caps-handling": { classify: classifyCapsHandling, fallback: capsHandlingFallback },
+  "desktop-combo-mechanism": {
+    classify: classifyDesktopComboMechanism,
+    fallback: desktopComboMechanismFallback,
+  },
+  encoding: { classify: classifyEncoding, fallback: encodingFallback },
+  "fallback-posture": { classify: classifyFallbackPosture, fallback: fallbackPostureFallback },
+  "mnemonic-vs-positional": {
+    classify: classifyMnemonicVsPositional,
+    fallback: mnemonicVsPositionalFallback,
+  },
+  "normalization-posture": {
+    classify: classifyNormalizationPosture,
+    fallback: normalizationPostureFallback,
+  },
+  "reordering-rules": { classify: classifyReorderingRules, fallback: reorderingRulesFallback },
+  "rule-store-compaction": {
+    classify: classifyRuleStoreCompaction,
+    fallback: ruleStoreCompactionFallback,
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -166,7 +203,7 @@ function buildKeyboardRecord(
           `has no DEFAULT_CLASSIFIERS entry for it)`,
       );
     }
-    const contentCategorization = ir ? pair.classify(ir, def) : null;
+    const contentCategorization = ir ? pair.classify(ir, def, kb) : null;
     if (contentCategorization) {
       facets[def.id] = contentCategorization;
     } else {

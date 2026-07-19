@@ -19,7 +19,7 @@ likelihoodSemantics: >
   is 1 for the classified value.
 derivation:
   archetype: rule-structure
-  classifierId: planned
+  classifierId: caps-handling-classifier
   fallbackChain: [content-derived, undetermined]
 feedsSessionFacets: [source.caps-handling]
 schemaVersion: 1
