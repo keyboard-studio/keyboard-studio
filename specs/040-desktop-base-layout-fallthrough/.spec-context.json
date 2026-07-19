@@ -1,0 +1,327 @@
+{
+  "workflow": "speckit",
+  "specName": "040-desktop-base-layout-fallthrough",
+  "branch": "040-desktop-base-layout-fallthrough",
+  "selectedAt": "2026-07-18T03:54:45.312Z",
+  "currentStep": "implement",
+  "status": "implemented",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "user",
+      "at": "2026-07-18T03:55:03.161Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "user",
+      "at": "2026-07-18T03:56:33.672Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-18T03:56:35.679Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T04:02:59.438Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T04:09:55.686Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T04:09:55.841Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-18T04:13:32.296Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "user",
+      "at": "2026-07-18T04:27:34.661Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-18T04:27:52.585Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T04:39:46.609Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-18T04:39:46.618Z"
+    },
+    {
+      "step": "analyze",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-18T04:43:09.888Z"
+    },
+    {
+      "step": "analyze",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T04:45:09.597Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-07-18T04:45:09.597Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T04:45:09.597Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T05:14:50.823Z"
+    }
+  ],
+  "telemetryInstanceId": "201af921-7564-4bca-9ee6-87ee5f6f478e",
+  "approach": "Fold un-blocked base-layout characters into the script classifier's produced evidence, entirely inside the tool-owned facet-index utility. Resolve the leak source to the environment-default kbdus table (pinned tool-owned JSON), enumerate base-layer vkeys named by no rule, and add each un-named key's Latin char as a distribution-only sliver that never flips the dominant script. No engine/IR/buildProducedSet change.",
+  "decisions": [
+    {
+      "decision": "Fold base-layout fall-through in the script classifier, not in buildProducedSet",
+      "why": "buildProducedSet is a shared contract (engine inventory diff + keyboard-lint coverage) meaning glyphs the rules produce; fall-through is a desktop-classification concern local to the script facet",
+      "rejected": "Extending buildProducedSet or the KeyboardIR/codec to model fall-through"
+    },
+    {
+      "decision": "Leaked base-layout evidence is distribution-only; dominant value selected from rule-produced histogram",
+      "why": "Spec requires a minor distribution sliver, never a dominant-value flip; evidence-only makes never-flips a guarantee not a probability",
+      "rejected": "Counting leaked chars as full evidence everywhere (could flip a passthrough non-Latin keyboard to Latn)"
+    },
+    {
+      "decision": "Leak source is always the environment default kbdus; baselayout() context guards recorded in notes only",
+      "why": "Verified in ../keyman: baselayout is a synonym for if(&baselayout), a context TEST against a host environment store (default kbdus.dll); a keyboard cannot declare its base layout, so the spec assumption of a settable &baselayout store is incorrect",
+      "rejected": "Treating a baselayout(azerty) guard as a declaration and leaking AZERTY chars (factually wrong + non-deterministic + needs out-of-scope tables)"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Plan folds un-blocked base-layout chars into the script classifier as a distribution-only sliver, tool-local, forcing a script schemaVersion bump + index recompute",
+      "key_finding": "Upstream ../keyman confirms baselayout is a context guard against a host-supplied environment store (default kbdus.dll), not a keyboard-settable declaration; corrects the spec assumption"
+    },
+    "tasks": {
+      "summary": "22 tasks across 6 phases, story-organized (US1 MVP leak sliver, US2 safety guarantees, US3 versioned deterministic recompute); all work tool-local to utilities/facet-index, no producedSet/IR/codec change",
+      "key_finding": "Classifier fold (T008-T013) all edits one file script-classifier.ts so must run sequentially; leaked evidence is distribution-only with dominant/confidence computed before the fold"
+    }
+  },
+  "concerns": [
+    {
+      "note": "T012 touch-only no-op relies on an undefined predicate: for a touch-only IR namedBaseLayerVkeys is empty so leakedChars returns the full A-Z alphabet (non-empty), so a leakedChars-empty guard fails to fire and would leak all 26 Latin letters, breaking SC-004/FR-010. Add an explicit has-base-layer-rule-surface predicate in base-layout.ts (T003/T004) and gate T012 on it.",
+      "step": "analyze"
+    }
+  ],
+  "currentTask": "T022"
+}

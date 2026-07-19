@@ -34,7 +34,7 @@ export const INDEX_SCHEMA_VERSION = 1;
  * Classifier stamp. 037 owns each classifier's internal algorithm; bump the
  * relevant token when a classifier's output could change for identical input.
  */
-export const CLASSIFIER_VERSION = "script@2;strategy-fingerprint@1;target-mix@1";
+export const CLASSIFIER_VERSION = "script@3;strategy-fingerprint@1;target-mix@1";
 
 /** Combined stamp recorded in the manifest; a change forces full recompute. */
 export const scannerVersion = `facet-index@${TOOL_VERSION};schema@${INDEX_SCHEMA_VERSION};${CLASSIFIER_VERSION}`;

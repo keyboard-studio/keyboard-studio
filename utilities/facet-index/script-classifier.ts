@@ -44,6 +44,11 @@ import { ImportStatus } from "@keyboard-studio/contracts";
 import { scriptOf, scriptExtensionsOf, latinProfileOf } from "./ucd/generated/scriptLookup.js";
 import type { LatinProfile } from "./ucd/generated/scriptLookup.js";
 import { mapImportStatus, computeAnalyzedCoverage } from "./outcome.js";
+import {
+  resolveBaseLayout,
+  hasBaseLayerRuleSurface,
+  leakedChars,
+} from "./base-layout.js";
 import type { Categorization, ConfidenceClass, FacetDefinition } from "./types.js";
 
 // The special ISO-15924 pseudo-scripts that are NOT concrete script evidence and
@@ -200,6 +205,52 @@ export function classifyScript(ir: KeyboardIR, def: FacetDefinition): Categoriza
     }
   }
 
+  // --- Dominant value + confidence class are the RULE-PRODUCED source of
+  // truth. They are frozen HERE, before the base-layout fall-through fold below,
+  // and are never re-derived from the post-fold histogram (spec 040 FR-004,
+  // contract §2.3): a distribution-only sliver must never vote for the dominant
+  // value or worsen the confidence class. Do not move these two after the fold.
+  const value = dominantScript;
+  const confidenceClass = classifyConfidence(dominantCount / total);
+
+  // --- Desktop base-layout fall-through fold (spec 040) ---------------------
+  // On desktop, a physical key the keyboard does not name falls through to the
+  // OS base layout (`kbdus`), emitting a small Latin sliver the rule-only
+  // histogram misses. Fold those leaked characters into the DISTRIBUTION only
+  // (dominant/confidence already frozen above). No-op when the IR has no
+  // base-layer rule surface (touch-only — where `leakedChars` would otherwise
+  // report the full alphabet) or when nothing leaks (fully remapped / all
+  // `> nul`), so those records stay byte-identical to the pre-040 baseline.
+  let distributionOut = distribution;
+  let evidenceSizeOut = evidenceSize;
+  let notes: string | undefined;
+  if (hasBaseLayerRuleSurface(ir)) {
+    const leaked = leakedChars(ir);
+    if (leaked.length > 0) {
+      const foldHist = new Map(histogram);
+      let foldEvidence = evidenceSize;
+      for (const ch of leaked) {
+        const cp = ch.codePointAt(0);
+        if (cp === undefined) continue;
+        const script = scriptOf(cp);
+        if (NEUTRAL_SCRIPTS.has(script)) continue; // defensive: a-z are all Latn
+        foldHist.set(script, (foldHist.get(script) ?? 0) + 1);
+        foldEvidence += 1;
+      }
+      const foldTotal = [...foldHist.values()].reduce((a, b) => a + b, 0);
+      const foldDist: Record<string, number> = {};
+      for (const [script, count] of foldHist) foldDist[script] = count / foldTotal;
+      distributionOut = foldDist;
+      evidenceSizeOut = foldEvidence;
+
+      const { branchesOn } = resolveBaseLayout(ir);
+      notes =
+        branchesOn.length > 0
+          ? `base-layout: kbdus (default); branches-on: ${branchesOn.join(",")}`
+          : "base-layout: kbdus (default)";
+    }
+  }
+
   // TODO(037): thread the real opaque signal from `ParseResult.opaqueFeatures`
   // instead of re-deriving it from `ir.raw.length` here. Doing so now would
   // widen `classifyScript`'s pinned signature (KeyboardIR -> ParseResult),
@@ -212,14 +263,15 @@ export function classifyScript(ir: KeyboardIR, def: FacetDefinition): Categoriza
   const latin = dominantScript === "Latn" ? latinSubProfile(produced) : undefined;
 
   return {
-    value: dominantScript,
-    distribution,
+    value,
+    distribution: distributionOut,
     confidence: null, // the distribution carries the likelihood
-    confidenceClass: classifyConfidence(dominantCount / total),
+    confidenceClass,
     provenanceTier: "content-derived",
-    evidenceSize,
+    evidenceSize: evidenceSizeOut,
     analyzedCoverage: computeAnalyzedCoverage(ir),
     analysisOutcome: mapImportStatus(status),
+    ...(notes !== undefined ? { notes } : {}),
     ...(latin !== undefined ? { subProfile: { latin } } : {}),
   };
 }

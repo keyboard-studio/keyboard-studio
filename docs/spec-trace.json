@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-07-13",
+  "lastUpdated": "2026-07-18",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -558,6 +558,14 @@
     "specs/035-mobile-touch-derivation": {
       "title": "Feature Specification: Mobile/touch layout derivation",
       "hash": "sha256:f41ade5918875aec",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/040-desktop-base-layout-fallthrough": {
+      "title": "Feature Specification: Desktop base-layout fall-through in the script facet",
+      "hash": "sha256:0fc200a6c3354ce9",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

@@ -16,6 +16,10 @@
     {
       "file": "lib/ucd/Scripts.txt",
       "sha256": "cc89684338c2afd95668e33b3f813387d4f026e4a1d695cdc06055a35b7682f6"
+    },
+    {
+      "file": "utilities/facet-index/data/base-layouts.json",
+      "sha256": "6fa7ef55dc950b8395421acecdf70ed3631ea2adf6fab5414a1f1ba26b25000f"
     }
   ]
 }

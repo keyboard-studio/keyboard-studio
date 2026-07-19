@@ -6,7 +6,11 @@ for every corpus keyboard, a categorization of each defined facet (dominant valu
 distribution, provenance tier, analysis outcome, and freshness). 036 landed exactly one facet — `script` —
 as the worked example that proves the artifact shape; [037](../../specs/037-facet-classifiers/) adds two
 more classifiers — `strategy-fingerprint` (rule-structure) and `target-mix` (declared-metadata) —,
-[038](../../specs/038-adaptation-questions/) surfaces them to users.
+[038](../../specs/038-adaptation-questions/) surfaces them to users. [040](../../specs/040-desktop-base-layout-fallthrough/)
+teaches the `script` classifier to fold **desktop base-layout fall-through**: a base-layer physical key a
+keyboard does not name falls through to the OS default layout (`kbdus`, the pinned
+[data/base-layouts.json](data/base-layouts.json)), so its un-blocked Latin character surfaces as a minor,
+**distribution-only** sliver — auditable in `notes` (`base-layout: kbdus (default)`), never a dominant-value flip.
 
 This is a `utilities/*` tool: it is deliberately **out of `pnpm -r`** (no build step), run via `tsx`, and
 imports engine source by relative path. Do not add it to `packages/*`.
