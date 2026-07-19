@@ -11,6 +11,15 @@ teaches the `script` classifier to fold **desktop base-layout fall-through**: a 
 keyboard does not name falls through to the OS default layout (`kbdus`, the pinned
 [data/base-layouts.json](data/base-layouts.json)), so its un-blocked Latin character surfaces as a minor,
 **distribution-only** sliver — auditable in `notes` (`base-layout: kbdus (default)`), never a dominant-value flip.
+[041](../../specs/041-construction-facet-classifiers/) adds the thirteen **construction** classifiers
+— nine desktop `.kmn`/script facets (`casing`, `caps-handling`, `desktop-combo-mechanism`, `encoding`,
+`fallback-posture`, `mnemonic-vs-positional`, `normalization-posture`, `reordering-rules`,
+`rule-store-compaction`) and four `.keyman-touch-layout` facets (`touch-combo-mechanism`,
+`touch-number-row`, `touch-symbol-layer`, `touch-modifier-layers`) — plus the shared shell they build on
+(`cause-predicates.ts`, `measurement.ts`, the `.keyman-touch-layout` reader `touch-layout.ts`) and the
+per-script input-facet derivation `display-difficulty.ts` (feeds `content/facets/orth/display-difficulty.yaml`
+via a `DerivedAge.txt` block-age join in the pinned UCD lookup; validated by `pnpm run facet-lint`, not the
+per-keyboard `facet-index-lint`).
 
 This is a `utilities/*` tool: it is deliberately **out of `pnpm -r`** (no build step), run via `tsx`, and
 imports engine source by relative path. Do not add it to `packages/*`.

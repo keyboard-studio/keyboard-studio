@@ -114,9 +114,9 @@ description: "Task list for Construction Facet Classifiers"
 
 ### Implementation for User Story 3
 
-- [ ] T030 [US3] `utilities/facet-index/display-difficulty.ts` (+ `.test.ts`): pure `displayDifficultyOfScript(script, { puaObserved }) → "well-supported" | "partially-supported" | "poorly-supported"`. Primary = UCD block first-assigned version from `utilities/facet-index/ucd/generated/`, split at the two era boundaries (≤ 5.x → well; 6.0–10.0 → partially; ≥ 11.0 → poorly); `puaObserved` (script-level) forces `poorly-supported` (FR-030/031, data-model Entity 7, AS-1/2).
-- [ ] T031 [US3] Edit `content/facets/orth/display-difficulty.yaml`: `sourceStatus: planned → available`; `source: → engine:displayDifficultyOfScript` (matching the `engine:detectBaseLayoutFamily` convention); record the two era-boundary values as derivation params (FR-030/031, data-model P3 row).
-- [ ] T032 [US3] Run `pnpm run facet-lint` (validates `content/facets/*.yaml`) and the `display-difficulty.test.ts` — both green; confirm US3 acceptance (Basic Latin → `well-supported`; PUA-using script → `poorly-supported`) (quickstart P3).
+- [X] T030 [US3] `utilities/facet-index/display-difficulty.ts` (+ `.test.ts`): pure `displayDifficultyOfScript(script, { puaObserved }) → "well-supported" | "partially-supported" | "poorly-supported"`. Primary = UCD block first-assigned version from `utilities/facet-index/ucd/generated/`, split at the two era boundaries (≤ 5.x → well; 6.0–10.0 → partially; ≥ 11.0 → poorly); `puaObserved` (script-level) forces `poorly-supported` (FR-030/031, data-model Entity 7, AS-1/2).
+- [X] T031 [US3] Edit `content/facets/orth/display-difficulty.yaml`: `sourceStatus: planned → available`; `source: → engine:displayDifficultyOfScript` (matching the `engine:detectBaseLayoutFamily` convention); record the two era-boundary values as derivation params (FR-030/031, data-model P3 row).
+- [X] T032 [US3] Run `pnpm run facet-lint` (validates `content/facets/*.yaml`) and the `display-difficulty.test.ts` — both green; confirm US3 acceptance (Basic Latin → `well-supported`; PUA-using script → `poorly-supported`) (quickstart P3).
 
 **Checkpoint**: All three stories independently functional.
 
@@ -126,9 +126,9 @@ description: "Task list for Construction Facet Classifiers"
 
 **Purpose**: Whole-feature acceptance and doc sync (SC-001..SC-005).
 
-- [ ] T033 Determinism gate: rebuild `--classified-only` twice and diff — byte-identical (SC-003, quickstart whole-feature block). Confirm zero `classifierId: planned` remain in `content/keyboard-facets/` and 16 keyboard facets appear per base (SC-001).
-- [ ] T034 [P] Update `utilities/facet-index/README.md` and the CLAUDE.md facet-index inventory line to list the 13 new classifiers + `display-difficulty.ts` + `touch-layout.ts` + `cause-predicates.ts` + `measurement.ts` (doc sync).
-- [ ] T035 Run the full `pnpm lint` (includes `facet-index-lint`) and `pnpm typecheck` to confirm no cross-package regression from the `types.ts` / `build-index.ts` shell changes (FR-043 — no `packages/*` contract touch).
+- [X] T033 Determinism gate: rebuild `--classified-only` twice and diff — byte-identical (SC-003, quickstart whole-feature block). Confirm zero `classifierId: planned` remain in `content/keyboard-facets/` and 16 keyboard facets appear per base (SC-001). (SC-003 byte-identical rebuild verified in-process by the passing `determinism.test.ts`; `classifierId: planned` count = 0; `facet-index-lint` reports 16 facet definitions per base; committed index is git-clean — P3 adds no keyboard-facet.)
+- [X] T034 [P] Update `utilities/facet-index/README.md` and the CLAUDE.md facet-index inventory line to list the 13 new classifiers + `display-difficulty.ts` + `touch-layout.ts` + `cause-predicates.ts` + `measurement.ts` (doc sync).
+- [X] T035 Run the full `pnpm lint` (includes `facet-index-lint`) and `pnpm typecheck` to confirm no cross-package regression from the `types.ts` / `build-index.ts` shell changes (FR-043 — no `packages/*` contract touch). (`pnpm lint` GREEN; `pnpm typecheck` clean for `contracts`/`llm` + the facet-index tool; the only failure is a pre-existing, unrelated `utilities/oauth-backend` missing-dep — no `packages/*` touched.)
 
 ---
 

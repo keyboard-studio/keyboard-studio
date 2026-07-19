@@ -236,6 +236,54 @@ for (const line of ucdText("Blocks.txt").split(/\r?\n/)) {
 const latinBlockRanges = coalesce(latinBlockRaw, (a, b) => a === b);
 
 // ---------------------------------------------------------------------------
+// DerivedAge.txt → per-script first-assigned Unicode version
+// ---------------------------------------------------------------------------
+// DerivedAge lists `RANGE ; MAJOR.MINOR` — when each codepoint was first
+// assigned. Joined against Scripts.txt, the MINIMUM version across a script's
+// assigned codepoints is that script's first-assigned version — the block-age
+// signal the orth.display-difficulty facet reads (spec 041 P3, FR-030/031).
+// Versions are tracked from 1.1 onwards; 1.0 predates the ISO 10646 merger.
+
+/** Parse `MAJOR.MINOR` → [major, minor]; null on malformed. */
+function parseVersion(field) {
+  const m = /^(\d+)\.(\d+)/.exec(field.trim());
+  return m ? [parseInt(m[1], 10), parseInt(m[2], 10)] : null;
+}
+
+/** True when version a is strictly older (earlier) than b. */
+function versionLt(a, b) {
+  return a[0] !== b[0] ? a[0] < b[0] : a[1] < b[1];
+}
+
+// [start, end, [major, minor]] — sorted by start for the overlap scan below.
+const ageRanges = [];
+for (const line of ucdText("DerivedAge.txt").split(/\r?\n/)) {
+  const stripped = line.split("#")[0].trim();
+  if (!stripped) continue;
+  const [rangeField, valueField] = stripped.split(";");
+  if (valueField === undefined) continue;
+  const range = parseCodepointRange(rangeField);
+  const version = parseVersion(valueField);
+  if (!range || !version) continue;
+  ageRanges.push([range[0], range[1], version]);
+}
+ageRanges.sort((a, b) => a[0] - b[0]);
+if (ageRanges.length === 0) fail("DerivedAge.txt parsed to zero ranges — wrong file?");
+
+// Join: minimum assigned version per canonical script short code. Pseudo-scripts
+// (Common/Inherited/Unknown) are joined too, but the facet never queries them.
+const scriptFirstVersion = new Map(); // canonical short code → [major, minor]
+for (const [s, e, script] of scriptRanges) {
+  for (const [as, ae, version] of ageRanges) {
+    if (ae < s) continue;
+    if (as > e) break; // ageRanges sorted by start — no later range can overlap
+    const prev = scriptFirstVersion.get(script);
+    if (!prev || versionLt(version, prev)) scriptFirstVersion.set(script, version);
+  }
+}
+if (!scriptFirstVersion.has("Latn")) fail("DerivedAge join produced no 'Latn' version — join broken?");
+
+// ---------------------------------------------------------------------------
 // Emit generated/scriptLookup.ts
 // ---------------------------------------------------------------------------
 
@@ -250,11 +298,15 @@ const scriptExtLines = scriptExtensionRanges
 const latinLines = latinBlockRanges
   .map(([s, e, v]) => `  [${hex(s)}, ${hex(e)}, ${JSON.stringify(v)}],`)
   .join("\n");
+const firstVersionLines = [...scriptFirstVersion.entries()]
+  .sort((a, b) => a[0].localeCompare(b[0]))
+  .map(([script, [maj, min]]) => `  ${JSON.stringify(script)}: [${maj}, ${min}],`)
+  .join("\n");
 
 const generated = `\
 // generated — do not edit
 // source:  utilities/facet-index/ucd/codegen-ucd.mjs
-// data:    lib/ucd/{Scripts,ScriptExtensions,PropertyValueAliases,Blocks}.txt
+// data:    lib/ucd/{Scripts,ScriptExtensions,PropertyValueAliases,Blocks,DerivedAge}.txt
 // unicode: ${pin.unicodeVersion}
 //
 // Slim per-codepoint script lookup for the facet-index script classifier
@@ -282,6 +334,12 @@ ${scriptExtLines}
 const latinBlockRanges: ReadonlyArray<readonly [number, number, LatinProfile]> = [
 ${latinLines}
 ];
+
+// canonicalScriptShortCode → [major, minor] first-assigned Unicode version
+// (minimum age across the script's assigned codepoints — DerivedAge.txt ⋈ Scripts.txt).
+const scriptFirstVersion: Readonly<Record<string, readonly [number, number]>> = {
+${firstVersionLines}
+};
 
 /** Binary-search the value of the range covering \`cp\`, or undefined. */
 function lookup<T>(ranges: ReadonlyArray<readonly [number, number, T]>, cp: number): T | undefined {
@@ -317,6 +375,16 @@ export function scriptExtensionsOf(cp: number): readonly string[] | undefined {
 /** Latin sub-profile (plain/extended/ipa) for a codepoint, or undefined. */
 export function latinProfileOf(cp: number): LatinProfile | undefined {
   return lookup(latinBlockRanges, cp);
+}
+
+/**
+ * First-assigned Unicode version \`[major, minor]\` for an ISO-15924 script
+ * short code (e.g. \`"Latn"\` → \`[1, 1]\`), or undefined for an unknown code.
+ * The minimum age across the script's assigned codepoints — the block-age
+ * signal the orth.display-difficulty facet reads (spec 041 P3).
+ */
+export function firstVersionOfScript(script: string): readonly [number, number] | undefined {
+  return scriptFirstVersion[script];
 }
 `;
 

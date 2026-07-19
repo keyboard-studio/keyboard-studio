@@ -25,13 +25,23 @@ modality: both
 
 derivations:
   - kind: computed
-    source: "planned:display-difficulty-of-script"
-    sourceStatus: planned
+    source: "engine:displayDifficultyOfScript"
+    sourceStatus: available
+    # Era boundaries (Unicode MAJOR version) that split the script's
+    # first-assigned block age into the three tiers. Mirror
+    # DISPLAY_DIFFICULTY_ERA_BOUNDARIES in
+    # utilities/facet-index/display-difficulty.ts (FR-031).
+    params:
+      wellSupportedThroughMajor: 5    # first assigned <= Unicode 5.x
+      partiallyFromMajor: 6           # 6.0 - 10.0
+      poorlyFromMajor: 11             # >= Unicode 11.0
     notes: >
       Unicode block first-assigned version (older/mainstream blocks are
       broadly supported) cross-referenced with PUA-usage-in-corpus (heavy
       PUA use signals poor mainstream font/rendering support even for a
-      long-assigned block, e.g. private orthography extensions).
+      long-assigned block, e.g. private orthography extensions). Primary
+      signal from the pinned UCD data (DerivedAge.txt join, script-level
+      minimum version); PUA usage overrides to poorly-supported.
 
 consumers:
   prefills: []
