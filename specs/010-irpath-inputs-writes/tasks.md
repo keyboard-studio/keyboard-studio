@@ -19,8 +19,8 @@
 
 **Purpose**: Net-new structure and the version-bump decision.
 
-- [ ] T001 [P] Create the mirror test root directories `packages/studio/tests/survey/questions/a/`, `.../b/`, `.../f/` (sibling of `src/`; net-new per plan §7.2)
-- [ ] T002 [P] Apply the `@keyboard-studio/contracts` breaking version bump in `packages/contracts/package.json` (**0.10.0 → 0.11.0** recommended per research R5; surface **1.0.0** as a user release call before finalizing) and add a CHANGELOG note for the breaking contract addition
+- [x] T001 [P] Create the mirror test root directories `packages/studio/tests/survey/questions/a/`, `.../b/`, `.../f/` (sibling of `src/`; net-new per plan §7.2)
+- [x] T002 [P] Apply the `@keyboard-studio/contracts` breaking version bump in `packages/contracts/package.json` (**0.10.0 → 0.11.0** recommended per research R5; surface **1.0.0** as a user release call before finalizing) and add a CHANGELOG note for the breaking contract addition
 
 ---
 
@@ -28,8 +28,8 @@
 
 **Purpose**: Plumbing every story needs. **No story work begins until this completes.**
 
-- [ ] T003 Ensure `packages/studio` vitest + tsconfig discover the new `packages/studio/tests/**` mirror tree (update the `include`/path globs in `packages/studio/vitest.config.ts` and `tsconfig.json` as needed) — blocks all mirror-move tasks
-- [ ] T004 Capture a green baseline (`pnpm typecheck && pnpm -r test`) before changes, so later regressions are attributable
+- [x] T003 Ensure `packages/studio` vitest + tsconfig discover the new `packages/studio/tests/**` mirror tree (update the `include`/path globs in `packages/studio/vitest.config.ts` and `tsconfig.json` as needed) — blocks all mirror-move tasks
+- [x] T004 Capture a green baseline (`pnpm typecheck && pnpm -r test`) before changes, so later regressions are attributable
 
 **Checkpoint**: Mirror tree resolvable by the test runner; baseline recorded.
 
@@ -41,10 +41,10 @@
 
 **Independent Test**: Construct a valid physical path and the deep touch path — both compile; a malformed path is a compile error (`ir-path.test.ts` + `pnpm typecheck`). *(This story precedes US1 because `inputs`/`writes` are typed against `IRPath`.)*
 
-- [ ] T005 [US2] Implement the `IRPath` derived key-path type over `KeyboardIR` in `packages/contracts/src/ir-path.ts` — cover physical (`header.*`, `stores[]`, `groups[].rules[].context|output`, `comments[]`, `raw[]`, `recognizedPatterns[]`) and touch (`touchLayout.platforms[].layers[].rows[].keys[]`), **bounded** — no recursion into `TouchKeyIR.sk`/`flick`/`multitap` (research R1/R3, data-model)
-- [ ] T006 [US2] Add the `irPath(...segments)` typed builder and `formatIRPath(path): string` stringifier (e.g. `groups[].rules[].output`) to `packages/contracts/src/ir-path.ts`
-- [ ] T007 [US2] Export `IRPath`, `irPath`, `formatIRPath` from `packages/contracts/src/index.ts` — this export **is** the named contract the P0 dashboard consumes (FR-012)
-- [ ] T008 [US2] Write type-level tests in `packages/contracts/src/ir-path.test.ts`: positive assignability for one physical + one deep-touch path; `// @ts-expect-error` negative cases (Design AC / G1); a drift case asserting a renamed `keyboard-ir.ts` field breaks the path (Drift AC / G2)
+- [x] T005 [US2] Implement the `IRPath` derived key-path type over `KeyboardIR` in `packages/contracts/src/ir-path.ts` — cover physical (`header.*`, `stores[]`, `groups[].rules[].context|output`, `comments[]`, `raw[]`, `recognizedPatterns[]`) and touch (`touchLayout.platforms[].layers[].rows[].keys[]`), **bounded** — no recursion into `TouchKeyIR.sk`/`flick`/`multitap` (research R1/R3, data-model)
+- [x] T006 [US2] Add the `irPath(...segments)` typed builder and `formatIRPath(path): string` stringifier (e.g. `groups[].rules[].output`) to `packages/contracts/src/ir-path.ts`
+- [x] T007 [US2] Export `IRPath`, `irPath`, `formatIRPath` from `packages/contracts/src/index.ts` — this export **is** the named contract the P0 dashboard consumes (FR-012)
+- [x] T008 [US2] Write type-level tests in `packages/contracts/src/ir-path.test.ts`: positive assignability for one physical + one deep-touch path; `// @ts-expect-error` negative cases (Design AC / G1); a drift case asserting a renamed `keyboard-ir.ts` field breaks the path (Drift AC / G2)
 
 **Checkpoint**: `IRPath` compiles, exported, type tests green. MVP foundation ready.
 
@@ -56,8 +56,8 @@
 
 **Independent Test**: Declare `inputs`/`writes` on one module — a valid path compiles, a bogus path fails typecheck — with no `mutate()` execution.
 
-- [ ] T009 [US1] Extend `QuestionModule` in `packages/studio/src/survey/types.ts` with `inputs?: IRPath[]` and `writes?: IRPath[]` (import `IRPath` from `@keyboard-studio/contracts`); both address the **same** `IRPath` space (clarification Q1); keep `mutate` the commented stub and refresh the doc comment to describe `inputs`/`writes`
-- [ ] T010 [US1] Prove the contract on one representative module (e.g. `packages/studio/src/survey/questions/b/pb_standard_letters.ts`): declare real `inputs`/`writes`, confirm a valid path compiles and a bogus path fails `pnpm typecheck` (single-module Design+Drift AC)
+- [x] T009 [US1] Extend `QuestionModule` in `packages/studio/src/survey/types.ts` with `inputs?: IRPath[]` and `writes?: IRPath[]` (import `IRPath` from `@keyboard-studio/contracts`); both address the **same** `IRPath` space (clarification Q1); keep `mutate` the commented stub and refresh the doc comment to describe `inputs`/`writes`
+- [x] T010 [US1] Prove the contract on one representative module (e.g. `packages/studio/src/survey/questions/b/pb_standard_letters.ts`): declare real `inputs`/`writes`, confirm a valid path compiles and a bogus path fails `pnpm typecheck` (single-module Design+Drift AC)
 
 **Checkpoint**: Contract live on `QuestionModule`; one module declares; `mutate` untouched (Constitution II).
 
@@ -71,22 +71,22 @@
 
 ### Mirror test tree (FR-009)
 
-- [ ] T011 [P] [US3] Move the 30 Phase A colocated tests `packages/studio/src/survey/questions/a/*.test.ts` → `packages/studio/tests/survey/questions/a/`, fixing relative import specifiers (keep explicit `.ts` extensions)
-- [ ] T012 [P] [US3] Move the 29 Phase B colocated tests `.../questions/b/*.test.ts` → `packages/studio/tests/survey/questions/b/` (fix import specifiers)
-- [ ] T013 [P] [US3] Move the 2 Phase F colocated tests `.../questions/f/*.test.ts` → `packages/studio/tests/survey/questions/f/` (fix import specifiers)
-- [ ] T014 [US3] **Backfill (net-new authoring, NOT a move)** the missing per-question tests so all 93 modules have a mirrored test — **~26 Phase B + ~6 Phase F = ~32 net-new specs** (Phase A already complete) — minimal `validate`/`fixtures` specs under `packages/studio/tests/survey/questions/<phase>/`. **Scope note:** each spec needs real valid/invalid fixtures, so this is genuine authoring effort distinct from the mechanical moves in T011–T013; it is the work that makes SC-001 (93/93) and the FR-009 mirror gate (T015) pass, and should be sized accordingly when staffing the cycle.
-- [ ] T015 [US3] Add the missing-mirrored-test directory-diff check as a vitest spec under `packages/studio/tests/` mapping each `src/survey/questions/<phase>/<id>` → `tests/survey/questions/<phase>/<id>.test.ts` (FR-009)
+- [x] T011 [P] [US3] Move the 30 Phase A colocated tests `packages/studio/src/survey/questions/a/*.test.ts` → `packages/studio/tests/survey/questions/a/`, fixing relative import specifiers (keep explicit `.ts` extensions)
+- [x] T012 [P] [US3] Move the 29 Phase B colocated tests `.../questions/b/*.test.ts` → `packages/studio/tests/survey/questions/b/` (fix import specifiers)
+- [x] T013 [P] [US3] Move the 2 Phase F colocated tests `.../questions/f/*.test.ts` → `packages/studio/tests/survey/questions/f/` (fix import specifiers)
+- [x] T014 [US3] **Backfill (net-new authoring, NOT a move)** the missing per-question tests so all 93 modules have a mirrored test — **~26 Phase B + ~6 Phase F = ~32 net-new specs** (Phase A already complete) — minimal `validate`/`fixtures` specs under `packages/studio/tests/survey/questions/<phase>/`. **Scope note:** each spec needs real valid/invalid fixtures, so this is genuine authoring effort distinct from the mechanical moves in T011–T013; it is the work that makes SC-001 (93/93) and the FR-009 mirror gate (T015) pass, and should be sized accordingly when staffing the cycle.
+- [x] T015 [US3] Add the missing-mirrored-test directory-diff check as a vitest spec under `packages/studio/tests/` mapping each `src/survey/questions/<phase>/<id>` → `tests/survey/questions/<phase>/<id>.test.ts` (FR-009)
 
 ### Populate declarations (FR-006, clarification Q2)
 
-- [ ] T016 [P] [US3] Populate `inputs`/`writes` on all 30 Phase A modules in `packages/studio/src/survey/questions/a/` — explicit arrays, `[]` where the question reads/writes nothing
-- [ ] T017 [P] [US3] Populate `inputs`/`writes` on all 55 Phase B modules in `.../questions/b/` (explicit empty arrays where applicable)
-- [ ] T018 [P] [US3] Populate `inputs`/`writes` on all 8 Phase F modules in `.../questions/f/` (explicit empty arrays where applicable)
+- [x] T016 [P] [US3] Populate `inputs`/`writes` on all 30 Phase A modules in `packages/studio/src/survey/questions/a/` — explicit arrays, `[]` where the question reads/writes nothing
+- [x] T017 [P] [US3] Populate `inputs`/`writes` on all 55 Phase B modules in `.../questions/b/` (explicit empty arrays where applicable)
+- [x] T018 [P] [US3] Populate `inputs`/`writes` on all 8 Phase F modules in `.../questions/f/` (explicit empty arrays where applicable)
 
 ### Gates (FR-006, FR-007)
 
-- [ ] T019 [US3] Add the coverage check as a vitest spec in `packages/studio` asserting every registered module (`questionRegistry`) has **present** `inputs` and `writes` fields — fails on an **absent** field, passes on an explicit empty array (FR-006 / G7)
-- [ ] T020 [US3] Add the **manifest-scoped** orphan-input lint as a vitest spec over `content/flows/phase_a_identity.modular.yaml`, `phase_b_characters.modular.yaml`, `phase_f_helpdocs.modular.yaml`: each manifest-referenced question's `inputs` ⊆ the union of upstream steps' `writes`; name any orphan; **exempt** questions referenced by no manifest (library/reserve §3.8) (FR-007)
+- [x] T019 [US3] Add the coverage check as a vitest spec in `packages/studio` asserting every registered module (`questionRegistry`) has **present** `inputs` and `writes` fields — fails on an **absent** field, passes on an explicit empty array (FR-006 / G7)
+- [x] T020 [US3] Add the **manifest-scoped** orphan-input lint as a vitest spec over `content/flows/phase_a_identity.modular.yaml`, `phase_b_characters.modular.yaml`, `phase_f_helpdocs.modular.yaml`: each manifest-referenced question's `inputs` ⊆ the union of upstream steps' `writes`; name any orphan; **exempt** questions referenced by no manifest (library/reserve §3.8) (FR-007)
 
 **Checkpoint**: 93/93 populated; coverage, orphan-input, and mirror checks green.
 
@@ -98,7 +98,7 @@
 
 **Independent Test**: For each strategy-bearing question whose §7.7 surface is available, `writes` equals that surface; questions without an available surface are skipped (gate passes for the available portion).
 
-- [ ] T021 [US4] Add the **conditional** write-surface test as a vitest spec in `packages/studio`: for each question whose `definition` links a `Pattern.strategyId`, assert declared `writes` == the strategy's §7.7 assignment-map write surface; **skip** questions whose surface is not yet exposed by §7.7 (clarification Q3 / FR-008). Document that the current population carries no `strategyId`, so the test passes vacuously today and is wired to grow as §7.7 lands
+- [x] T021 [US4] Add the **conditional** write-surface test as a vitest spec in `packages/studio`: for each question whose `definition` links a `Pattern.strategyId`, assert declared `writes` == the strategy's §7.7 assignment-map write surface; **skip** questions whose surface is not yet exposed by §7.7 (clarification Q3 / FR-008). Document that the current population carries no `strategyId`, so the test passes vacuously today and is wired to grow as §7.7 lands
 
 **Checkpoint**: Write-surface cross-check exists and is green against the available §7.7 surface; does not block on full §7.7.
 
@@ -113,8 +113,8 @@
 - [x] T022 [US5] Discovery: enumerate modules with companion artifacts (inline sample-text blocks, images, custom render components) across `packages/studio/src/survey/questions/**` (research R7); produce the conversion list (may be empty/small) and record it in this file
 
   Discovery result (2026-06-26): **NONE.** Scanned all 93 question modules across phases a/, b/, f/. Every module exports only `definition`, `validate` (where applicable), `fixtures`, and a default `QuestionModule` object. No module imports image/SVG/CSS/asset files, React/JSX components, or contains non-trivial co-located assets that would justify a folder-per-question layout. No subdirectories exist under any phase directory. The conversion list is empty — T023 and T024 are no-ops.
-- [ ] T023 [US5] Convert each identified module to `packages/studio/src/survey/questions/<phase>/<id>/index.ts` + `extras/`, updating its phase sub-registry import to `…/<id>/index.ts` (explicit extension); confirm `questionRegistry` resolves by `definition.id`
-- [ ] T024 [US5] Confirm the mirrored test path still resolves for each converted module (mirror path derives from the source path; the FR-009 check from T015 covers this)
+- [x] T023 [US5] Convert each identified module to `packages/studio/src/survey/questions/<phase>/<id>/index.ts` + `extras/`, updating its phase sub-registry import to `…/<id>/index.ts` (explicit extension); confirm `questionRegistry` resolves by `definition.id`
+- [x] T024 [US5] Confirm the mirrored test path still resolves for each converted module (mirror path derives from the source path; the FR-009 check from T015 covers this)
 
 **Checkpoint**: Companion-artifact modules in folder form; resolution and mirror invariants hold.
 
@@ -122,10 +122,10 @@
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T025 [P] Run the full gate: `pnpm typecheck && pnpm -r test && pnpm lint && pnpm depcruise` — all green; confirm `mutate()` is still a stub (Constitution II / FR-005)
-- [ ] T026 [P] Execute the 7 validation scenarios in `specs/010-irpath-inputs-writes/quickstart.md`
-- [ ] T027 Update the P2 status note in `docs/survey-modularity-cyoa-plan.md` and confirm the `IRPath`/`inputs`/`writes` contract is locked & exported for P0 consumption (FR-012)
-- [ ] T028 [P] Finalize the CHANGELOG entry for the `@keyboard-studio/contracts` breaking bump (area `contracts`); reconcile the chosen version (T002) once the user confirms 0.11.0 vs 1.0.0
+- [x] T025 [P] Run the full gate: `pnpm typecheck && pnpm -r test && pnpm lint && pnpm depcruise` — all green; confirm `mutate()` is still a stub (Constitution II / FR-005)
+- [x] T026 [P] Execute the 7 validation scenarios in `specs/010-irpath-inputs-writes/quickstart.md`
+- [x] T027 Update the P2 status note in `docs/survey-modularity-cyoa-plan.md` and confirm the `IRPath`/`inputs`/`writes` contract is locked & exported for P0 consumption (FR-012)
+- [x] T028 [P] Finalize the CHANGELOG entry for the `@keyboard-studio/contracts` breaking bump (area `contracts`); reconcile the chosen version (T002) once the user confirms 0.11.0 vs 1.0.0
 
 ---
 

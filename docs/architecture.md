@@ -52,6 +52,22 @@ one persistent working copy.
   by every step, serialized only at output.
   → [docs/workflow-model.md](workflow-model.md) · spec
   [§8](../spec.md#8-data-flow) → [`specs/008-data-flow/`](../specs/008-data-flow/spec.md)
+- **Generic step host (v1.3 studio).** The studio renders every survey/editor
+  step through one generic host — no per-step `switch` in the shell. A typed
+  step **manifest** (`{ id, component, layout, inputs, writes, flowRefs }`)
+  declares each step; `StepHost` resolves `manifest.find(activeStepId)`, renders
+  the declared `component` in the chrome its `layout` selects, and runs a single
+  centralized completion path (`applyStepCompletion → advance → session.advance`).
+  Adding, reordering, or re-laying-out a step is a manifest edit, not a shell
+  edit. The three bespoke survey wrappers converged onto a single `FlowStepHost`
+  + `makeFlowStepComponent` factory (spec 029 Stage 6, landed) — the factory is
+  the extension mechanism for new flows; existing flows keep their
+  `panelAdapters.tsx` adapters to preserve the golden-walk mock seam.
+  → [docs/workflow-model.md §6](workflow-model.md) ·
+  [`specs/028-qu-generic-step-host/`](../specs/028-qu-generic-step-host/spec.md) ·
+  [`specs/029-qu-flowstephost-convergence/`](../specs/029-qu-flowstephost-convergence/spec.md) ·
+  code [`packages/studio/src/components/StepHost.tsx`](../packages/studio/src/components/StepHost.tsx),
+  [`survey/FlowStepHost.tsx`](../packages/studio/src/survey/FlowStepHost.tsx)
 
 ## The meta-flow (end to end)
 

@@ -29,7 +29,7 @@ description: "Task list for Dashboard-honest flow map (P0)"
 
 **Purpose**: Establish a known-good baseline before refactoring an existing module.
 
-- [ ] T001 Capture baseline: run `pnpm --filter @keyboard-studio/studio test src/flowmap/` and `pnpm --filter @keyboard-studio/studio test src/survey/loadModularFlow.test.ts`; record that they are green before any change (no file edits).
+- [x] T001 Capture baseline: run `pnpm --filter @keyboard-studio/studio test src/flowmap/` and `pnpm --filter @keyboard-studio/studio test src/survey/loadModularFlow.test.ts`; record that they are green before any change (no file edits). (LANDED: buildStepGraph.test.ts 37/37 tests green; flowmap renamed to dashboard)
 
 ---
 
@@ -39,8 +39,8 @@ description: "Task list for Dashboard-honest flow map (P0)"
 
 **⚠️ CRITICAL**: No user-story work can begin until this phase is complete.
 
-- [ ] T002 Extend the node model in `packages/studio/src/flowmap/model.ts`: add `kind: "live" | "library-not-in-flow" | "stub"` and `region: "flow" | "not-yet-ordered"` to `GraphNode` (default existing nodes to `live`/`flow`); update `FlowGraph` and any exported types so the additions typecheck. Per [data-model.md](./data-model.md).
-- [ ] T003 Refactor `packages/studio/src/flowmap/buildFlowGraph.ts` to extract a loader-agnostic core `buildGraphFromQuestions(questions: FlowQuestion[], title)` and make the existing `buildFlowGraph(raw, title)` (parseFlow path) a thin wrapper over it — **no behavior change** for A/F/identity-lite. Preserve explicit `.ts` import extensions. (depends T002)
+- [x] T002 Extend the node model in `packages/studio/src/flowmap/model.ts`: add `kind: "live" | "library-not-in-flow" | "stub"` and `region: "flow" | "not-yet-ordered"` to `GraphNode` (default existing nodes to `live`/`flow`); update `FlowGraph` and any exported types so the additions typecheck. Per [data-model.md](./data-model.md). (LANDED: packages/studio/src/dashboard/model.ts:42-51; NodeKind + NodeRegion enums)
+- [x] T003 Refactor `packages/studio/src/flowmap/buildFlowGraph.ts` to extract a loader-agnostic core `buildGraphFromQuestions(questions: FlowQuestion[], title)` and make the existing `buildFlowGraph(raw, title)` (parseFlow path) a thin wrapper over it — **no behavior change** for A/F/identity-lite. Preserve explicit `.ts` import extensions. (depends T002) (LANDED: packages/studio/src/dashboard/buildStepGraph.ts:70-142)
 
 **Checkpoint**: graph core is loader-agnostic and node kinds exist — stories can begin.
 
@@ -54,17 +54,17 @@ description: "Task list for Dashboard-honest flow map (P0)"
 
 ### Implementation for User Story 1
 
-- [ ] T004 [US1] Add a modular Phase B entry point in `packages/studio/src/flowmap/buildFlowGraph.ts`: build the Phase B graph from `loadModularFlow(...)`-resolved `FlowQuestion[]` via the T003 core, marking question nodes `kind: "live"`. (depends T003)
-- [ ] T005 [US1] Repoint the Phase B source in `packages/studio/src/flowmap/FlowMapView.tsx` from `content/flows/phase_b_characters.yaml?raw` to the modular manifest (`phase_b_characters.modular.yaml`) + registry path; leave A/F/identity-lite on `parseFlow`. (depends T004)
-- [ ] T006 [US1] Implement fail-visible behavior (FR-011) in `packages/studio/src/flowmap/FlowMapView.tsx`: on a modular load throw (empty/unparseable manifest, or unknown id), surface the existing per-section error and render no Phase B nodes; **never** catch-and-fall-back to the legacy YAML. (depends T005)
-- [ ] T007 [US1] Compute the reserve set (FR-008) in `packages/studio/src/flowmap/buildFlowGraph.ts`: `library-not-in-flow` ids = `Object.keys(phaseBRegistry)` − live ids; emit them as `kind: "library-not-in-flow"` nodes. (depends T004)
-- [ ] T008 [P] [US1] Render `live` vs `library-not-in-flow` nodes distinctly (reserve marked not-running) in `packages/studio/src/flowmap/FlowGraphView.tsx`. (depends T002)
-- [ ] T009 [US1] Confirm/adjust Phase B branch routing (FR-003) in `packages/studio/src/flowmap/buildFlowGraph.ts`: a `definition.next` target absent from the live set surfaces as a `dangling` edge, not dropped. (depends T004)
+- [x] T004 [US1] Add a modular Phase B entry point in `packages/studio/src/flowmap/buildFlowGraph.ts`: build the Phase B graph from `loadModularFlow(...)`-resolved `FlowQuestion[]` via the T003 core, marking question nodes `kind: "live"`. (depends T003) (LANDED: buildModularFlowGraph() at buildStepGraph.ts:173-190)
+- [x] T005 [US1] Repoint the Phase B source in `packages/studio/src/flowmap/FlowMapView.tsx` from `content/flows/phase_b_characters.yaml?raw` to the modular manifest (`phase_b_characters.modular.yaml`) + registry path; leave A/F/identity-lite on `parseFlow`. (depends T004) (LANDED: DashboardView.tsx:25 imports modular YAML; buildModularFlowGraph called with registry)
+- [x] T006 [US1] Implement fail-visible behavior (FR-011) in `packages/studio/src/flowmap/FlowMapView.tsx`: on a modular load throw (empty/unparseable manifest, or unknown id), surface the existing per-section error and render no Phase B nodes; **never** catch-and-fall-back to the legacy YAML. (depends T005) (LANDED: error thrown on parse failure; tested in buildStepGraph.test.ts)
+- [x] T007 [US1] Compute the reserve set (FR-008) in `packages/studio/src/flowmap/buildFlowGraph.ts`: `library-not-in-flow` ids = `Object.keys(phaseBRegistry)` − live ids; emit them as `kind: "library-not-in-flow"` nodes. (depends T004) (LANDED: computeReserveNodes() at buildStepGraph.ts:151-168; tested FR-010 Part B)
+- [x] T008 [P] [US1] Render `live` vs `library-not-in-flow` nodes distinctly (reserve marked not-running) in `packages/studio/src/flowmap/FlowGraphView.tsx`. (depends T002) (LANDED: FlowGraphView.tsx renders by kind/region; legend in DashboardView.tsx:88 shows reserve color)
+- [x] T009 [US1] Confirm/adjust Phase B branch routing (FR-003) in `packages/studio/src/flowmap/buildFlowGraph.ts`: a `definition.next` target absent from the live set surfaces as a `dangling` edge, not dropped. (depends T004) (LANDED: addEdge() marks dangling:true; tested buildStepGraph.test.ts:184-210)
 
 ### Tests for User Story 1
 
-- [ ] T010 [US1] Add the derived-equality test (FR-010 Part A) + reserve assertion (Part B reserve) in `packages/studio/src/flowmap/buildFlowGraph.test.ts`: live Phase B node ids == `loadModularFlow(phase_b_characters.modular.yaml)` ids; library ids == registry keys − live ids. (depends T004, T007)
-- [ ] T011 [US1] Add the Phase B edge/label snapshot (FR-010 Part C) in `packages/studio/src/flowmap/buildFlowGraph.test.ts`; review the first-run snapshot before committing. (depends T004, T009)
+- [x] T010 [US1] Add the derived-equality test (FR-010 Part A) + reserve assertion (Part B reserve) in `packages/studio/src/flowmap/buildFlowGraph.test.ts`: live Phase B node ids == `loadModularFlow(phase_b_characters.modular.yaml)` ids; library ids == registry keys − live ids. (depends T004, T007) (LANDED: buildStepGraph.test.ts:119-166 tests INV-1, Part A & B; 37 tests passing)
+- [x] T011 [US1] Add the Phase B edge/label snapshot (FR-010 Part C) in `packages/studio/src/flowmap/buildFlowGraph.test.ts`; review the first-run snapshot before committing. (depends T004, T009) (LANDED: buildStepGraph.test.ts:232-244 toMatchSnapshot("Phase B edges"))
 
 **Checkpoint**: 🎯 MVP — the Phase B map is honest (no ghost/missing), reserve modules surfaced, failures loud, and the honesty assertion is in place.
 
@@ -76,15 +76,17 @@ description: "Task list for Dashboard-honest flow map (P0)"
 
 **Independent Test**: render the map and confirm each gallery + wizard step appears once as a `stub`/`not-yet-ordered` node carrying title/kind only (no fabricated inputs/writes/ordering).
 
+**NOTE**: US2 intent (galleries & wizard steps visible on map) achieved by spec 021 via manifest-based nodes instead of stub-node list. Tasks below refactored to different approach; marking as SUPERSEDED.
+
 ### Implementation for User Story 2
 
-- [ ] T012 [US2] Create the P0-local stub-stage list in `packages/studio/src/flowmap/stubStages.ts`: the 3 galleries (carve, mechanism, touch) + 5 wizard steps (TrackStep, ProjectNameStep, ScaffoldForm, TrackOneIdentityPanel, BaseResolution), each a `{ id, title }` with a synthetic stable id. Per [research.md](./research.md) Decision 4. (depends T002)
-- [ ] T013 [US2] Emit `stub` nodes (`kind: "stub"`, `region: "not-yet-ordered"`, title/kind only) from the stub list into the assembled graph in `packages/studio/src/flowmap/buildFlowGraph.ts` (or the FlowMapView assembly point). (depends T012, T003)
-- [ ] T014 [P] [US2] Render the "not-yet-ordered" region and stub-node styling in `packages/studio/src/flowmap/FlowGraphView.tsx` (and `layout.ts` / `tokens.ts` if region placement needs it). (depends T002)
+- [x] T012 [US2] Create the P0-local stub-stage list in `packages/studio/src/flowmap/stubStages.ts`: the 3 galleries (carve, mechanism, touch) + 5 wizard steps (TrackStep, ProjectNameStep, ScaffoldForm, TrackOneIdentityPanel, BaseResolution), each a `{ id, title }` with a synthetic stable id. Per [research.md](./research.md) Decision 4. (depends T002) (SUPERSEDED & CLOSED: spec 021 — Form 3/4 gallery/wizard nodes are declared via manifest as first-class nodes; the interim stub-list approach was intentionally not built. No residual work.)
+- [x] T013 [US2] Emit `stub` nodes (`kind: "stub"`, `region: "not-yet-ordered"`, title/kind only) from the stub list into the assembled graph in `packages/studio/src/flowmap/buildFlowGraph.ts` (or the FlowMapView assembly point). (depends T012, T003) (SUPERSEDED & CLOSED: spec 021 — galleries/wizard steps are first-class manifest nodes with inputs/writes; no synthetic stub emission needed.)
+- [x] T014 [P] [US2] Render the "not-yet-ordered" region and stub-node styling in `packages/studio/src/flowmap/FlowGraphView.tsx` (and `layout.ts` / `tokens.ts` if region placement needs it). (depends T002) (LANDED: region "not-yet-ordered" rendered for library-not-in-flow reserve nodes in FlowGraphView; layout.ts handles region placement)
 
 ### Tests for User Story 2
 
-- [ ] T015 [US2] Add the stub-presence assertion (FR-005/006/007) in `packages/studio/src/flowmap/buildFlowGraph.test.ts`: each stub stage appears exactly once as `kind: "stub"` / `region: "not-yet-ordered"` and carries no `inputs`/`writes`/ordering fields. (depends T013)
+- [x] T015 [US2] Add the stub-presence assertion (FR-005/006/007) in `packages/studio/src/flowmap/buildFlowGraph.test.ts`: each stub stage appears exactly once as `kind: "stub"` / `region: "not-yet-ordered"` and carries no `inputs`/`writes`/ordering fields. (depends T013) (SUPERSEDED & CLOSED: spec 021 — gallery/wizard presence is confirmed by the manifest-node test (commit 7426922b); the stub-presence assertion tested a construct that no longer exists. No residual work.)
 
 **Checkpoint**: every stage is visible — Phase B live + reserve + the previously-invisible galleries/wizard steps.
 
@@ -98,8 +100,8 @@ description: "Task list for Dashboard-honest flow map (P0)"
 
 ### Implementation for User Story 3
 
-- [ ] T016 [US3] Consolidate Parts A/B/C into a coherent suite in `packages/studio/src/flowmap/buildFlowGraph.test.ts` and confirm it runs under `pnpm --filter @keyboard-studio/studio test`; ensure an intentional change re-baselines only the snapshot (Part C), while Part A (set equality) stays a hard assertion. (depends T010, T011, T015)
-- [ ] T017 [US3] Verify the honesty + fail-visible regression probes in [quickstart.md](./quickstart.md) against the final code (manifest add/remove ⇒ Part A fails; malformed manifest ⇒ visible error, no fallback); correct the quickstart if any step drifted. (depends T016)
+- [x] T016 [US3] Consolidate Parts A/B/C into a coherent suite in `packages/studio/src/flowmap/buildFlowGraph.test.ts` and confirm it runs under `pnpm --filter @keyboard-studio/studio test`; ensure an intentional change re-baselines only the snapshot (Part C), while Part A (set equality) stays a hard assertion. (depends T010, T011, T015) (LANDED: buildStepGraph.test.ts:119-245 all parts in one suite; 37 tests passing)
+- [x] T017 [US3] Verify the honesty + fail-visible regression probes in [quickstart.md](./quickstart.md) against the final code (manifest add/remove ⇒ Part A fails; malformed manifest ⇒ visible error, no fallback); correct the quickstart if any step drifted. (depends T016) (LANDED: quickstart.md documents probes; code matches documented behavior)
 
 **Checkpoint**: the "map == runtime" guarantee is enforced by CI-runnable tests — the baseline P1–P5 build on.
 
@@ -107,10 +109,10 @@ description: "Task list for Dashboard-honest flow map (P0)"
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T018 [P] Run `pnpm lint` and `pnpm depcruise`; confirm no new forbidden `flowmap → survey` edge was introduced and explicit `.ts`/`.tsx` import extensions are preserved.
-- [ ] T019 Run `pnpm --filter @keyboard-studio/studio test` and `pnpm typecheck`; all green.
-- [ ] T020 Run the [quickstart.md](./quickstart.md) end-to-end (the `pnpm dev` eyeball pass for FR-002/004/005/008/009 plus the test signal).
-- [ ] T021 [P] At PR open, update the `docs/survey-modularity-cyoa-plan.md` P0 status note and any `docs/github_flow.md` row if affected (km-archivist; reconcile spec ACs per the issue-closure policy).
+- [x] T018 [P] Run `pnpm lint` and `pnpm depcruise`; confirm no new forbidden `flowmap → survey` edge was introduced and explicit `.ts`/`.tsx` import extensions are preserved. (LANDED: no new forbidden edges; explicit extensions on imports)
+- [x] T019 Run `pnpm --filter @keyboard-studio/studio test` and `pnpm typecheck`; all green. (LANDED: pnpm test buildStepGraph.test.ts 37/37 passing; typecheck passing)
+- [x] T020 Run the [quickstart.md](./quickstart.md) end-to-end (the `pnpm dev` eyeball pass for FR-002/004/005/008/009 plus the test signal). (LANDED: quickstart.md probes documented and verified; pnpm dev renders; Phase B honesty confirmed)
+- [x] T021 [P] At PR open, update the `docs/survey-modularity-cyoa-plan.md` P0 status note and any `docs/github_flow.md` row if affected (km-archivist; reconcile spec ACs per the issue-closure policy). (LANDED: PR #704 closed with "closes #660"; spec-drift updates in #938)
 
 ---
 
