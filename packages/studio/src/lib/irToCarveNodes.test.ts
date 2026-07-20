@@ -1565,7 +1565,7 @@ describe('annotateRemovalRecommendations', () => {
 
   it("marks a store 'none' via the dependency guard when its own chars are all out-of-inventory but a rule referencing it (any()) produces a confirmed-inventory character", () => {
     const ir = makeIR({
-      stores: [{ nodeId: 'store-1', name: 'composed', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }], isSystem: false } as any],
+      stores: [{ nodeId: 'store-1', name: 'composed', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }], isSystem: false } as IRStore],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
         rules: [{
@@ -1606,7 +1606,7 @@ describe('annotateRemovalRecommendations', () => {
   it("returns 'none' for every node when the confirmed inventory is empty (Phase B not completed)", () => {
     const ir = makeIR({
       groups: [makeGroup([makeCharOnlyRule()])],
-      stores: [{ nodeId: 'store-1', name: 'unused', items: [{ kind: 'char', value: 'z' }], isSystem: false } as any],
+      stores: [{ nodeId: 'store-1', name: 'unused', items: [{ kind: 'char', value: 'z' }], isSystem: false } as IRStore],
     });
     const nodes = toRailNodes(ir);
 
@@ -1630,8 +1630,8 @@ describe('annotateRemovalRecommendations', () => {
     // confirmedInventory — so BASE was wrongly recommended 'high'.
     const ir = makeIR({
       stores: [
-        { nodeId: 'store#comp_dia', name: 'comp_dia', items: [{ kind: 'char', value: 'à' }, { kind: 'char', value: 'á' }], isSystem: false } as any,
-        { nodeId: 'store#base_vowels', name: 'base_vowels', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'a' }], isSystem: false } as any,
+        { nodeId: 'store#comp_dia', name: 'comp_dia', items: [{ kind: 'char', value: 'à' }, { kind: 'char', value: 'á' }], isSystem: false } as IRStore,
+        { nodeId: 'store#base_vowels', name: 'base_vowels', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'a' }], isSystem: false } as IRStore,
       ],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
@@ -1658,8 +1658,8 @@ describe('annotateRemovalRecommendations', () => {
     // combining mark the author confirmed in Phase B.
     const ir = makeIR({
       stores: [
-        { nodeId: 'store#comp_dia', name: 'comp_dia', items: [{ kind: 'char', value: '̀' }, { kind: 'char', value: '́' }], isSystem: false } as any,
-        { nodeId: 'store#base_vowels', name: 'base_vowels', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'a' }], isSystem: false } as any,
+        { nodeId: 'store#comp_dia', name: 'comp_dia', items: [{ kind: 'char', value: '̀' }, { kind: 'char', value: '́' }], isSystem: false } as IRStore,
+        { nodeId: 'store#base_vowels', name: 'base_vowels', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'a' }], isSystem: false } as IRStore,
       ],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
@@ -1822,8 +1822,8 @@ describe('annotateRemovalRecommendations', () => {
   it("never flags a group 'high' when it contains a parallel-store fan-out rule (isParallelIndexFanOut), even under the language signal", () => {
     const ir = makeIR({
       stores: [
-        { nodeId: 'store#comp_dia', name: 'comp_dia', items: [{ kind: 'char', value: 'à' }], isSystem: false } as any,
-        { nodeId: 'store#base_vowels', name: 'base_vowels', items: [{ kind: 'char', value: 'a' }], isSystem: false } as any,
+        { nodeId: 'store#comp_dia', name: 'comp_dia', items: [{ kind: 'char', value: 'à' }], isSystem: false } as IRStore,
+        { nodeId: 'store#base_vowels', name: 'base_vowels', items: [{ kind: 'char', value: 'a' }], isSystem: false } as IRStore,
       ],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
@@ -1844,7 +1844,7 @@ describe('annotateRemovalRecommendations', () => {
 
   it("store-char producers remain eligible candidates under the language signal (guardrail excludes group/pattern/raw mechanisms, not stores)", () => {
     const ir = makeIR({
-      stores: [{ nodeId: 'store-1', name: 'unused', items: [{ kind: 'char', value: 'z' }], isSystem: false } as any],
+      stores: [{ nodeId: 'store-1', name: 'unused', items: [{ kind: 'char', value: 'z' }], isSystem: false } as IRStore],
     });
     const nodes = toRailNodes(ir);
 
@@ -2039,7 +2039,7 @@ describe('recommendedRemovalChars', () => {
     // index()-output target in the SAME rule is exactly what the pairing
     // graph was built to unblock.
     const ir = makeIR({
-      stores: [{ nodeId: 'store#fan', name: 'fan', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'y' }], isSystem: false } as any],
+      stores: [{ nodeId: 'store#fan', name: 'fan', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'y' }], isSystem: false } as IRStore],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
         rules: [{
@@ -2057,7 +2057,7 @@ describe('recommendedRemovalChars', () => {
 
   it('shields a surplus character produced through an UNRESOLVED index()-output store fan-out rule (offset does not resolve to an any() context source)', () => {
     const ir = makeIR({
-      stores: [{ nodeId: 'store#fan2', name: 'fan2', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'y' }], isSystem: false } as any],
+      stores: [{ nodeId: 'store#fan2', name: 'fan2', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'y' }], isSystem: false } as IRStore],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
         rules: [{
@@ -2075,7 +2075,7 @@ describe('recommendedRemovalChars', () => {
 
   it('shields a surplus character produced via a store slot with an unresolved index() pairing (blocked)', () => {
     const ir = makeIR({
-      stores: [{ nodeId: 'store#s', name: 'S', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'y' }], isSystem: false } as any],
+      stores: [{ nodeId: 'store#s', name: 'S', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'y' }], isSystem: false } as IRStore],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
         rules: [
@@ -2101,7 +2101,7 @@ describe('recommendedRemovalChars', () => {
       // element (self-pair) → classifyStoreSlotEdit returns 'drop', NOT
       // 'blocked' — this exercises the dependsOnNeeded branch specifically,
       // distinct from the still-blocked unresolved-pairing test above.
-      stores: [{ nodeId: 'store#s', name: 'S', items: [{ kind: 'char', value: 'y' }, { kind: 'char', value: 'q' }], isSystem: false } as any],
+      stores: [{ nodeId: 'store#s', name: 'S', items: [{ kind: 'char', value: 'y' }, { kind: 'char', value: 'q' }], isSystem: false } as IRStore],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
         rules: [
