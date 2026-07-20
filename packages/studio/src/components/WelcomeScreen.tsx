@@ -10,6 +10,7 @@
 // Deliberately plain: a centered card, a heading, three buttons. No gradients
 // or marketing chrome. Provider buttons mirror SignUpPanel's brand styling.
 
+import { Trans } from "@lingui/react/macro";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
 import { navigateTo } from "../lib/navigate.ts";
@@ -106,7 +107,7 @@ export function WelcomeScreen() {
             fontFamily: FONT,
           }}
         >
-          Welcome to Keyboard Studio
+          <Trans id="welcome.title">Welcome to Keyboard Studio</Trans>
         </h1>
 
         <p
@@ -118,7 +119,9 @@ export function WelcomeScreen() {
             fontFamily: FONT,
           }}
         >
-          Design and ship a Keyman keyboard, right in your browser.
+          <Trans id="welcome.tagline">
+            Design and ship a Keyman keyboard, right in your browser.
+          </Trans>
         </p>
 
         <div
@@ -137,7 +140,7 @@ export function WelcomeScreen() {
             style={githubButtonStyle}
           >
             <GitHubMark />
-            Sign in with GitHub
+            <Trans id="welcome.signIn.github">Sign in with GitHub</Trans>
           </button>
 
           <button
@@ -148,7 +151,7 @@ export function WelcomeScreen() {
             style={googleButtonStyle}
           >
             <GoogleMark />
-            Sign in with Google
+            <Trans id="welcome.signIn.google">Sign in with Google</Trans>
           </button>
 
           <button
@@ -173,7 +176,7 @@ export function WelcomeScreen() {
               color: TEXT_MAIN,
             }}
           >
-            I&rsquo;m new
+            <Trans id="welcome.imNew">I&rsquo;m new</Trans>
           </button>
         </div>
 
