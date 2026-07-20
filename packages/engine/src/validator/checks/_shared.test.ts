@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { forEachMatch, stripNonCode, stripNonCodeSource } from "./_shared.js";
+import {
+  forEachMatch,
+  stripComment,
+  stripCommentSource,
+  stripNonCode,
+  stripNonCodeSource,
+} from "./_shared.js";
 
 // forEachMatch is the shared line-split + global-regex-clone + exec-loop
 // helper used by checkDeprecatedStores, checkIdentifiers, checkCodepointFormat,
@@ -147,5 +153,77 @@ describe("stripNonCodeSource", () => {
     expect(out).not.toContain("cmt");
     expect(outLines[0]!.startsWith("a ")).toBe(true);
     expect(outLines[1]!.startsWith("b ")).toBe(true);
+  });
+});
+
+// stripComment / stripCommentSource blank only a trailing `c` comment (to end
+// of line) — unlike stripNonCode, they deliberately do NOT blank quoted-string
+// content, so callers that still need quoted content as tokens (e.g.
+// contextOrdering's CONTENT_TOKEN_RE) can strip the comment while keeping
+// quotes intact. Pinned directly here (per this file's convention for shared
+// helpers) rather than only via contextOrdering's fixtures.
+
+describe("stripComment", () => {
+  it("blanks a standalone `c` comment to end of line, length-preserving", () => {
+    const input = '"a" c this is a comment';
+    const out = stripComment(input);
+    expect(out).toHaveLength(input.length);
+    expect(out.startsWith('"a" ')).toBe(true);
+    expect(out).not.toContain("this is a comment");
+    expect(out.slice(4)).toBe(" ".repeat(input.length - 4));
+  });
+
+  it("preserves quoted-string content, unlike stripNonCode", () => {
+    const input = '"hello" + "x"';
+    expect(stripComment(input)).toBe(input);
+    // Contrast: stripNonCode blanks the same quoted content.
+    expect(stripNonCode(input)).not.toBe(input);
+  });
+
+  it("does not treat a standalone `c` inside quotes as a comment start", () => {
+    // The `c` in "a c b" is bordered by whitespace but is inside a quoted
+    // string, so the quote-aware guard must keep it from starting a comment.
+    const input = '"a c b" > "z"';
+    expect(stripComment(input)).toBe(input);
+  });
+
+  it("only treats a whitespace-bounded standalone `c` as a comment (not c-in-a-word)", () => {
+    // `context` starts with `c` but is not whitespace-bounded on the right,
+    // so it is not a comment start; the trailing quote is also left intact
+    // (unlike stripNonCode, which would blank it).
+    expect(stripComment("context + 'a'")).toBe("context + 'a'");
+    expect(stripComment("dk(acute)")).toBe("dk(acute)");
+  });
+
+  it("does not treat a `c` inside parens as a comment (parens/brackets are code)", () => {
+    expect(stripComment("dk(c)")).toBe("dk(c)");
+    expect(stripComment("index(x, 1)")).toBe("index(x, 1)");
+  });
+
+  it("leaves a line with no quotes or comment untouched", () => {
+    expect(stripComment("+ [K_A] > U+0061")).toBe("+ [K_A] > U+0061");
+  });
+});
+
+describe("stripCommentSource", () => {
+  it("applies stripComment per line and preserves line count + per-line length", () => {
+    const src = '"a" c cmt1\nb c cmt2';
+    const out = stripCommentSource(src);
+    const inLines = src.split("\n");
+    const outLines = out.split("\n");
+    expect(outLines).toHaveLength(2);
+    expect(outLines[0]).toHaveLength(inLines[0]!.length);
+    expect(outLines[1]).toHaveLength(inLines[1]!.length);
+    expect(out).not.toContain("cmt1");
+    expect(out).not.toContain("cmt2");
+    expect(outLines[0]!.startsWith('"a" ')).toBe(true);
+    expect(outLines[1]!.startsWith("b ")).toBe(true);
+  });
+
+  it("preserves quoted content across lines, unlike stripNonCodeSource", () => {
+    const src = '"hello" c note\n"world"';
+    const out = stripCommentSource(src);
+    expect(out).toContain('"hello"');
+    expect(out).toContain('"world"');
   });
 });
