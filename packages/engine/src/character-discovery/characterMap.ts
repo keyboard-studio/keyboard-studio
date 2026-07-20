@@ -23,6 +23,7 @@
  */
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
+import { isNoncharacterCodePoint } from "@keyboard-studio/contracts";
 import type { CldrFullLoader } from "./cldr.js";
 import { createFetchCldrFullLoader, loadExemplarsFromFull } from "./cldr.js";
 import { isBidiControlCodePoint } from "./CharacterDiscoveryServiceImpl.js";
@@ -117,12 +118,6 @@ function isPrivateUseCodePoint(cp: number): boolean {
     (cp >= 0xf0000 && cp <= 0xffffd) || // Supplementary PUA-A (plane 15)
     (cp >= 0x100000 && cp <= 0x10fffd) // Supplementary PUA-B (plane 16)
   );
-}
-
-function isNoncharacterCodePoint(cp: number): boolean {
-  if (cp >= 0xfdd0 && cp <= 0xfdef) return true;
-  // The last two codepoints of every plane (…FFFE, …FFFF) are noncharacters.
-  return (cp & 0xfffe) === 0xfffe;
 }
 
 /**
@@ -297,10 +292,13 @@ const SCRIPT_ALIAS_MAP: Record<string, string> = {
  * returns) across planes 0-2, split into the three category buckets used by
  * the block/digits/punctuation tiers. Guardrail-excluded codepoints (control,
  * PUA, noncharacter, unassigned, non-bidi-allowlisted format chars) never
- * enter any bucket. Digits use \p{Nd}, \p{No}, OR \p{Nl} — Ethiopic numerals
- * (U+1369-137C) are General_Category No, not Nd, and letter-numbers (e.g.
- * Roman numerals, Aegean/Cuneiform numerals) are Nl — either would otherwise
- * be silently dropped from the digits tier. `script` is mapped through
+ * enter any bucket. Digits use \p{Nd} OR \p{No} — Ethiopic numerals
+ * (U+1369-137C) are General_Category No, not Nd, and would otherwise be
+ * silently dropped from the digits tier. \p{Nl} (letter-numbers, e.g. Roman
+ * numerals U+2160-2188) is deliberately EXCLUDED — those are Script=Latin
+ * Nl codepoints that would otherwise pollute the digits tier for every
+ * Latin-script language; no modern orthography types them as digits.
+ * `script` is mapped through
  * SCRIPT_ALIAS_MAP before regex construction so ISO alias codes the
  * Unicode Script property doesn't recognize (Aran, Latf, Latg, Syre/Syrj/Syrn,
  * Hans/Hant/Jpan/Kore) still resolve instead of throwing; the try/catch
@@ -334,7 +332,7 @@ function categorizeScriptChars(script: string): ScriptCategorizedChars {
 
     if (/\p{L}/u.test(nfc) || isCombiningMarkChar(nfc)) {
       letters.push(nfc);
-    } else if (/[\p{Nd}\p{No}\p{Nl}]/u.test(nfc)) {
+    } else if (/[\p{Nd}\p{No}]/u.test(nfc)) {
       digits.push(nfc);
     } else if (/[\p{P}\p{S}]/u.test(nfc)) {
       punctuation.push(nfc);
@@ -399,12 +397,45 @@ const COMMON_PUNCTUATION_CHARS: readonly string[] = (() => {
 })();
 
 /**
+ * Codepoints U+02B0-02FF (the "Spacing Modifier Letters" block) that are
+ * Script=Common with NO Script_Extensions override to any specific script —
+ * so categorizeScriptChars()'s per-script \p{Script_Extensions=...}
+ * enumeration never matches them, and they are not punctuation either (they
+ * are \p{Lm}/\p{Sk}, not \p{P}/\p{S}), so they would otherwise appear in NO
+ * tier for ANY language. The concrete casualty: U+02BB MODIFIER LETTER
+ * TURNED COMMA, the Hawaiian/Polynesian ʻokina, a core orthographic letter.
+ * (Codepoints in this block that DO carry a script override — e.g. U+02BC,
+ * which has a Latn/Cyrl/etc. Script_Extensions override — fail the
+ * `\p{Script_Extensions=Common}` test below and are excluded here so they
+ * aren't double-folded; those are already surfaced by their own script's
+ * enumeration.) Computed once at module load, guardrail-filtered. Always
+ * folded into blockTierCandidates() regardless of the resolved script, same
+ * rationale as COMMON_DIGIT_CHARS/COMMON_PUNCTUATION_CHARS.
+ */
+const COMMON_MODIFIER_LETTER_CHARS: readonly string[] = (() => {
+  const out: string[] = [];
+  for (let cp = 0x02b0; cp <= 0x02ff; cp++) {
+    const ch = String.fromCodePoint(cp);
+    if (isGuardrailExcluded(ch)) continue;
+    if (!/\p{Script_Extensions=Common}/u.test(ch)) continue;
+    if (!/[\p{Lm}\p{Sk}]/u.test(ch)) continue;
+    out.push(ch);
+  }
+  return out;
+})();
+
+/**
  * Returns a defensive copy — never the live array cached inside
  * scriptCategorizedCache — since buildCharacterMap() sorts its result
- * in place.
+ * in place. The Common-scoped modifier-letter fold (COMMON_MODIFIER_LETTER_CHARS)
+ * is appended after, same pattern as digitsTierCandidates/punctuationTierCandidates,
+ * regardless of the resolved script.
  */
 function blockTierCandidates(script: string | undefined): string[] {
-  return script === undefined ? [] : [...categorizeScriptChars(script).letters];
+  return [
+    ...(script === undefined ? [] : categorizeScriptChars(script).letters),
+    ...COMMON_MODIFIER_LETTER_CHARS,
+  ];
 }
 
 /**

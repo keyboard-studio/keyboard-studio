@@ -120,15 +120,20 @@ describe("buildCharacterMap", () => {
     expect(mainChars).toContain("ɛ");
   });
 
-  it("degrades to only the Common digits/punctuation tiers when no bcp47 is resolvable and baseIr is null", async () => {
-    // main/auxiliary (no CLDR locale to resolve) and block (no script to
-    // resolve) stay empty, but the Common-scoped digits/punctuation tiers are
-    // script-agnostic — they populate for every case, including this one.
+  it("degrades to only the Common-scoped tiers when no bcp47 is resolvable and baseIr is null", async () => {
+    // main/auxiliary (no CLDR locale to resolve) stay empty. digits/
+    // punctuation are script-agnostic and always populate from their Common
+    // fold. block is ALSO script-agnostic now (COMMON_MODIFIER_LETTER_CHARS
+    // folds in regardless of resolved script, same as digits/punctuation) —
+    // it no longer needs a resolvable script to produce cells, though it
+    // only contains the Common-scoped modifier letters here, not any
+    // script-specific letters (there is no script to enumerate).
     const groups = await buildCharacterMap(null, undefined, undefined, bmLoader);
     const tiers = groups.map((g) => g.tier);
     expect(tiers).not.toContain("main");
     expect(tiers).not.toContain("auxiliary");
-    expect(tiers).not.toContain("block");
+    const blockChars = groups.filter((g) => g.tier === "block").flatMap((g) => g.cells.map((c) => c.char));
+    expect(blockChars).toContain("ʻ"); // U+02BB, the Common-scoped modifier-letter fold
     const digitChars = groups.filter((g) => g.tier === "digits").flatMap((g) => g.cells.map((c) => c.char));
     expect(digitChars).toContain("0");
     const punctChars = groups.filter((g) => g.tier === "punctuation").flatMap((g) => g.cells.map((c) => c.char));
@@ -184,6 +189,12 @@ describe("buildCharacterMap", () => {
     expect(digitChars).toContain("፩"); // U+1369 ETHIOPIC DIGIT ONE
     const digitNames = groups.filter((g) => g.tier === "digits").map((g) => g.block);
     expect(digitNames).toContain("Digits");
+  });
+
+  it("Ethiopic digits tier is unbroken for a bare Amharic ('am') tag after dropping \\p{Nl}", async () => {
+    const groups = await buildCharacterMap(makeIR(), "am", undefined, async () => null);
+    const digitChars = groups.filter((g) => g.tier === "digits").flatMap((g) => g.cells.map((c) => c.char));
+    expect(digitChars).toContain("፩"); // U+1369 ETHIOPIC DIGIT ONE
   });
 
   it("Ethiopic punctuation tier surfaces script punctuation", async () => {
@@ -265,6 +276,27 @@ describe("buildCharacterMap", () => {
     }
   });
 
+  it("surfaces U+02BB MODIFIER LETTER TURNED COMMA (the Hawaiian 'okina) in the block tier for an explicit-Latn Hawaiian tag", async () => {
+    // Fix: U+02BB is Script=Common with no Script_Extensions override, so no
+    // per-script scx enumeration ever matches it — it appeared in NO tier for
+    // ANY language before the Common-scoped modifier-letter fold.
+    const groups = await buildCharacterMap(makeIR(), "haw-Latn", undefined, async () => null);
+    const blockChars = groups.filter((g) => g.tier === "block").flatMap((g) => g.cells.map((c) => c.char));
+    expect(blockChars).toContain("ʻ"); // U+02BB MODIFIER LETTER TURNED COMMA
+  });
+
+  it("surfaces U+02BB in the block tier for a bare Hawaiian tag (script resolved via langtags default)", async () => {
+    const groups = await buildCharacterMap(makeIR(), "haw", undefined, async () => null);
+    const blockChars = groups.filter((g) => g.tier === "block").flatMap((g) => g.cells.map((c) => c.char));
+    expect(blockChars).toContain("ʻ");
+  });
+
+  it("surfaces U+02BB in the block tier for a plain Latin tag too (the fold applies regardless of resolved script)", async () => {
+    const groups = await buildCharacterMap(makeIR(), "xx-Latn", undefined, async () => null);
+    const blockChars = groups.filter((g) => g.tier === "block").flatMap((g) => g.cells.map((c) => c.char));
+    expect(blockChars).toContain("ʻ");
+  });
+
   it("an alias ISO 15924 script code (Aran) resolves via SCRIPT_ALIAS_MAP instead of throwing to empty tiers", async () => {
     // Fix 2: `\p{Script_Extensions=Aran}` throws (Aran isn't a Unicode
     // Script property value) — pre-fix, the swallowed throw left every tier
@@ -275,14 +307,21 @@ describe("buildCharacterMap", () => {
     expect(blockChars).toContain("ا"); // U+0627 ARABIC LETTER ALEF
   });
 
-  it("includes \\p{Nl} letter-numbers (e.g. Roman numerals) in the digits tier", async () => {
-    // Fix 4: Roman numerals (U+2160.., Script_Extensions=Latn) are
-    // General_Category Nl — neither the letters branch (\p{L}) nor the old
-    // digits branch (\p{Nd}/\p{No}) matched them, so they fell through every
-    // bucket and were silently dropped.
-    const groups = await buildCharacterMap(makeIR(), "xx-Latn", undefined, async () => null);
+  it("excludes \\p{Nl} letter-numbers (e.g. Roman numerals) from the digits tier", async () => {
+    // Roman numerals (U+2160.., Script_Extensions=Latn, General_Category Nl)
+    // are noise no modern orthography types as digits — including them (a
+    // prior fix) polluted the digits tier for every Latin-script language.
+    // Ethiopic numerals (General_Category No, NOT Nl) remain covered — see
+    // the dedicated Ethiopic digits test below.
+    const groups = await buildCharacterMap(makeIR(), "en-Latn", undefined, async () => null);
     const digitChars = groups.filter((g) => g.tier === "digits").flatMap((g) => g.cells.map((c) => c.char));
-    expect(digitChars).toContain("Ⅰ"); // U+2160 ROMAN NUMERAL ONE
+    expect(digitChars).not.toContain("Ⅰ"); // U+2160 ROMAN NUMERAL ONE
+  });
+
+  it("excludes Roman numerals from the digits tier for a bare 'en' tag too", async () => {
+    const groups = await buildCharacterMap(makeIR(), "en", undefined, async () => null);
+    const digitChars = groups.filter((g) => g.tier === "digits").flatMap((g) => g.cells.map((c) => c.char));
+    expect(digitChars).not.toContain("Ⅰ");
   });
 
   it("does not corrupt the per-script cache across repeated calls for the same script", async () => {

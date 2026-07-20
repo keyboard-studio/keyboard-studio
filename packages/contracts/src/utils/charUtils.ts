@@ -37,6 +37,25 @@ export function isDecomposableAccented(char: string): boolean {
 }
 
 /**
+ * True when `cp` is a Unicode noncharacter: the last two codepoints of every
+ * plane (…FFFE/…FFFF, via the `(cp & 0xfffe) === 0xfffe` bit test, which
+ * covers every plane 0-16, not just the BMP) plus the reserved Arabic-
+ * presentation-forms range U+FDD0–U+FDEF. These are permanently reserved by
+ * the Unicode standard and never valid for open interchange. Single
+ * canonical definition — shared by parseUPlusNotation() below and the
+ * character-map guardrail (characterMap.ts), where it was previously
+ * duplicated. NOTE: the Layer A codepoint-format lint check
+ * (validator/checks/codepointFormat.ts) intentionally keeps a NARROWER,
+ * non-equivalent check (BMP-only 0xFFFE/0xFFFF special-case, matching
+ * kmcmplib) and must NOT be swapped onto this all-plane helper — see the
+ * comment there.
+ */
+export function isNoncharacterCodePoint(cp: number): boolean {
+  if (cp >= 0xfdd0 && cp <= 0xfdef) return true;
+  return (cp & 0xfffe) === 0xfffe;
+}
+
+/**
  * Convert a U+XXXX codepoint string (or bare hex) to the actual Unicode
  * character.
  *
@@ -72,13 +91,8 @@ export function parseUPlusNotation(s: string): string | null {
   // Reject codepoints beyond the Unicode maximum.
   if (cp > 0x10ffff) return null;
 
-  // Reject noncharacters: the last two codepoints of every plane
-  // (…FFFE/…FFFF) plus the reserved Arabic-presentation-forms range
-  // U+FDD0–U+FDEF. These are permanently reserved by the Unicode standard
-  // and never valid for open interchange.
-  const isPlaneEndNoncharacter = (cp & 0xfffe) === 0xfffe;
-  const isArabicPresentationNoncharacter = cp >= 0xfdd0 && cp <= 0xfdef;
-  if (isPlaneEndNoncharacter || isArabicPresentationNoncharacter) return null;
+  // Reject noncharacters (see isNoncharacterCodePoint above).
+  if (isNoncharacterCodePoint(cp)) return null;
 
   try {
     return String.fromCodePoint(cp);
