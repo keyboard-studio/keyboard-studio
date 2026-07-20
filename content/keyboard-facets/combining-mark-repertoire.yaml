@@ -5,13 +5,13 @@
 # capability, not a session-transformable posture — so it has NO session mirror
 # and an empty feedsSessionFacets (FR-021, FR-006).
 #
-# GUARD (research Decision 7): combining marks are the alphabetic-script
-# mechanism for stacking diacritics. On abugida/abjad/syllabary/logographic
-# scripts the question does not apply, so the classifier records `notApplicable`
-# there (never a forced empty set) — the same script-family guard
-# normalization-posture uses. The guard's ISO-15924 -> family mapping is inline in
-# the US2 classifier (the durable keyboard.script-family facet lands in US3 and
-# the guard repoints at it).
+# GUARD (km-domain review): the facet measures inputtable Unicode
+# \p{M} combining marks, which are meaningful for alphabet accents, abjad
+# vowel-pointing (Arabic harakat, Hebrew niqqud, Syriac pointing), AND abugida
+# vowel signs/virama — all \p{M}. It records `notApplicable` only for SYLLABARY
+# and LOGOGRAPHIC scripts (whole-syllable/morpheme glyphs with no combining-mark
+# layer); every other family reports its (possibly empty) \p{M} set. The guard
+# consumes the durable keyboard.script-family facet (data/iso15924-script-family.json).
 #
 # valueType is `set` with `open: true`: the members are arbitrary combining-mark
 # characters (an open set), so membership is not enumerable in limits.values; the
@@ -21,9 +21,10 @@ id: combining-mark-repertoire
 title: Combining-mark repertoire
 description: >
   The set of Unicode combining marks the base can input, from its produced-set.
-  Records `notApplicable` on non-alphabetic scripts (abugida/abjad/syllabary/
-  logographic), guarded by the base's dominant script family — never a forced
-  empty set. Keyboard-index-only (no session mirror).
+  Records `notApplicable` only on syllabary/logographic scripts (whole-syllable/
+  morpheme glyphs with no combining-mark layer), guarded by the base's dominant
+  script family; alphabet/abjad/abugida report their (possibly empty) \p{M} set.
+  Keyboard-index-only (no session mirror).
 valueType: set
 limits:
   values:

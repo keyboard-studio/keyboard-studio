@@ -56,18 +56,36 @@ describe("classifyCombiningMarkRepertoire", () => {
     expect(result.notApplicable).toBeUndefined();
   });
 
-  it("abugida (Devanagari) base → not-applicable", () => {
-    const kmn = `${HEADER}\n+ [K_A] > U+0915\n+ [K_B] > U+0916\n`;
+  it("abugida (Devanagari) base → applicable; its matra set is reported", () => {
+    // Devanagari KA + AA-matra (U+093E, \p{M}) — the matra IS an inputtable combining mark.
+    const kmn = `${HEADER}\n+ [K_A] > U+0915\n+ [K_B] > U+093E\n`;
     const { ir } = parse(kmn, "deva");
+    const result = classifyCombiningMarkRepertoire(ir, DEF)!;
+    expect(result.notApplicable).toBeUndefined();
+    expect(result.value).toEqual(["ा"]);
+  });
+
+  it("abjad (Arabic) base → applicable; harakat are reported", () => {
+    // Arabic beh + fatha (U+064E, \p{M}) — vowel-pointing IS an inputtable combining mark.
+    const kmn = `${HEADER}\n+ [K_A] > U+0628\n+ [K_C] > U+064E\n`;
+    const { ir } = parse(kmn, "arab");
+    const result = classifyCombiningMarkRepertoire(ir, DEF)!;
+    expect(result.notApplicable).toBeUndefined();
+    expect(result.value).toEqual(["َ"]);
+  });
+
+  it("logographic (Han) base → not-applicable", () => {
+    const kmn = `${HEADER}\n+ [K_A] > U+4E00\n+ [K_B] > U+4E8C\n`;
+    const { ir } = parse(kmn, "han");
     const result = classifyCombiningMarkRepertoire(ir, DEF)!;
     expect(result.notApplicable).toBe(true);
     expect(result.value).toBeUndefined();
     expect(result.provenanceTier).toBe("content-derived");
   });
 
-  it("abjad (Arabic) base → not-applicable", () => {
-    const kmn = `${HEADER}\n+ [K_A] > U+0628\n+ [K_B] > U+062A\n`;
-    const { ir } = parse(kmn, "arab");
+  it("syllabary (Hiragana) base → not-applicable", () => {
+    const kmn = `${HEADER}\n+ [K_A] > U+3042\n+ [K_B] > U+3044\n`;
+    const { ir } = parse(kmn, "hira");
     const result = classifyCombiningMarkRepertoire(ir, DEF)!;
     expect(result.notApplicable).toBe(true);
   });

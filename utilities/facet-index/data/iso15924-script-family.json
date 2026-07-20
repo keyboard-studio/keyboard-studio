@@ -6,7 +6,7 @@
     "Osge": "alphabet", "Runr": "alphabet", "Ogam": "alphabet", "Goth": "alphabet",
     "Dsrt": "alphabet", "Shaw": "alphabet", "Vith": "alphabet", "Wcho": "alphabet",
     "Medf": "alphabet", "Gara": "alphabet", "Tfng": "alphabet", "Nkoo": "alphabet",
-    "Hang": "alphabet", "Bopo": "alphabet", "Mroo": "alphabet",
+    "Hang": "alphabet", "Bopo": "alphabet", "Mroo": "alphabet", "Thaa": "alphabet",
 
     "Deva": "abugida", "Beng": "abugida", "Guru": "abugida", "Gujr": "abugida",
     "Orya": "abugida", "Taml": "abugida", "Telu": "abugida", "Knda": "abugida",
@@ -21,7 +21,7 @@
     "Newa": "abugida", "Takr": "abugida", "Ahom": "abugida", "Mahj": "abugida",
     "Hano": "abugida",
 
-    "Arab": "abjad", "Hebr": "abjad", "Syrc": "abjad", "Thaa": "abjad",
+    "Arab": "abjad", "Hebr": "abjad", "Syrc": "abjad",
     "Samr": "abjad", "Mand": "abjad", "Phnx": "abjad", "Sogd": "abjad",
     "Phlp": "abjad", "Prti": "abjad", "Armi": "abjad", "Nbat": "abjad",
     "Palm": "abjad", "Hatr": "abjad", "Narb": "abjad", "Sarb": "abjad",

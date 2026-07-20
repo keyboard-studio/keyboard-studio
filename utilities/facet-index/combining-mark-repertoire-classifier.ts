@@ -7,18 +7,24 @@
  * describes the base's raw capability, not a session-transformable posture
  * (FR-021, data-model).
  *
- * GUARD (research Decision 7): combining marks are the alphabetic-script
- * mechanism for stacking diacritics. On an abugida/abjad/syllabary/logographic
- * script, "the set of inputtable combining marks" is not the right question — a
- * Devanagari base's matras are not free-standing combining diacritics in the same
- * sense — so the facet records `not-applicable` there (never a forced empty set),
- * exactly as `normalization-posture` guards on script family.
+ * GUARD (km-domain review): the facet measures the inputtable
+ * Unicode `\p{M}` combining-mark set, which is genuinely meaningful wherever a
+ * script uses combining marks — alphabet accents, abjad vowel-pointing (Arabic
+ * harakat, Hebrew niqqud, Syriac pointing), and abugida vowel signs/virama/tone
+ * marks are ALL `\p{M}` and inputtable. It is genuinely `not-applicable` only for
+ * SYLLABARY and LOGOGRAPHIC scripts, whose glyphs encode whole syllables/morphemes
+ * with no combining-mark layer. So the guard excludes only those two families;
+ * every other base reports its (possibly empty) `\p{M}` set — an empty set on an
+ * alphabet/abjad/abugida is an honest "no combining marks inputtable", never a
+ * forced not-applicable.
+ *
+ * (Earlier this guard excluded every non-alphabet family; that discarded the real
+ * harakat/niqqud/matra signal for the large Arabic/Hebrew/Indic slice of the
+ * corpus, contradicting the facet's own `\p{M}` contract — narrowed here.)
  *
  * The guard consumes the durable `keyboard.script-family` facet (FR-032) via
- * `deriveScriptFamily`: applicable iff the family is `alphabet`, else
- * `not-applicable`. US2 shipped this guard with an inline alphabetic-script list;
- * US3 (task T061) repointed it here so the ISO-15924 → family taxonomy lives in
- * one pinned table (`data/iso15924-script-family.json`).
+ * `deriveScriptFamily`. US2 shipped it with an inline alphabetic-script list; US3
+ * (task T061) repointed it at the pinned `data/iso15924-script-family.json`.
  */
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
@@ -32,6 +38,13 @@ import type { ScannedKeyboard } from "./scan.js";
 
 const COMBINING_MARK = /\p{M}/u;
 
+/**
+ * The script families for which a combining-mark repertoire does not apply: their
+ * glyphs encode whole syllables/morphemes, with no combining-mark layer to
+ * enumerate. Every other family (alphabet/abjad/abugida) reports its `\p{M}` set.
+ */
+const NOT_APPLICABLE_FAMILIES = new Set(["syllabary", "logographic"]);
+
 /** The sorted set of Unicode combining marks in the base's produced set. */
 function combiningMarksOf(ir: KeyboardIR): string[] {
   const marks = new Set<string>();
@@ -43,18 +56,19 @@ function combiningMarksOf(ir: KeyboardIR): string[] {
 
 /**
  * Content-derived combining-mark repertoire. Returns `not-applicable` for
- * non-alphabetic scripts (the script-family guard), the sorted mark set for
- * alphabetic ones, and null only when the dominant script family is undetermined
- * (no concretely-scripted output / unmapped script) so the caller falls through
- * to the undetermined fallback. Never throws.
+ * syllabary/logographic scripts (the script-family guard), the sorted `\p{M}` set
+ * for every other family (alphabet/abjad/abugida — possibly empty), and null only
+ * when the dominant script family is undetermined (no concretely-scripted output /
+ * unmapped script) so the caller falls through to the undetermined fallback.
+ * Never throws.
  */
 export function classifyCombiningMarkRepertoire(ir: KeyboardIR, def: FacetDefinition): Categorization | null {
   const family = deriveScriptFamily(ir, def);
   if (family === null) return null; // no determinable script family — fall through.
 
-  if (family !== "alphabet") {
+  if (NOT_APPLICABLE_FAMILIES.has(family)) {
     return notApplicableMeasurement(
-      `script family ${family} is not an alphabet; a free-standing combining-mark repertoire does not apply`,
+      `script family ${family} composes whole syllables/morphemes; a combining-mark repertoire does not apply`,
     );
   }
 
@@ -70,8 +84,8 @@ export function classifyCombiningMarkRepertoire(ir: KeyboardIR, def: FacetDefini
     consistency: 1,
     notes:
       marks.length > 0
-        ? `${marks.length} inputtable combining mark(s) on an alphabetic base`
-        : "alphabetic base with no inputtable combining marks",
+        ? `${marks.length} inputtable combining mark(s) on a ${family} base`
+        : `${family} base with no inputtable combining marks`,
   };
 }
 

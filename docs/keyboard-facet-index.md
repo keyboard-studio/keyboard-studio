@@ -102,17 +102,17 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | keyboard | value | tier | outcome | evidence |
 | --- | --- | --- | --- | ---: |
 | `adiga_danef` |  | content-derived | fully | 0 |
-| `afghan_turkmen` | — | content-derived | fully | 0 |
-| `ahom_star` | — | content-derived | fully | 0 |
+| `afghan_turkmen` | َ+ِ+ّ+ْ+ٔ+ٚ+ٛ+ٰ | content-derived | fully | 8 |
+| `ahom_star` | 𑜝+𑜞+𑜟+𑜠+𑜡+𑜢+𑜣+𑜤+𑜥+𑜦+𑜧+𑜨+𑜩+𑜪+𑜫 | content-derived | fully | 15 |
 | `akan` |  | content-derived | fully | 0 |
 | `akha_lahu` | — | default-fallback | fallback-only | 0 |
-| `aksarabali_panlex` | — | content-derived | fully | 0 |
+| `aksarabali_panlex` | ᬁ+ᬶ+ᬸ+ᬺ+ᬼ+ᬾ+ᭀ+ᭂ | content-derived | partially | 8 |
 | `amazigh_latin` | ̀+́+̄+̣+̱ | content-derived | fully | 5 |
 | `anglish` | ̅ | content-derived | fully | 1 |
 | `anglish_dvorak` | ̅ | content-derived | fully | 1 |
 | `anglo_furthorc_english` |  | content-derived | fully | 0 |
 | `anii` |  | content-derived | fully | 0 |
-| `arabic_flick` | — | content-derived | fully | 0 |
+| `arabic_flick` | ً+ٌ+ٍ+َ+ُ+ِ+ّ+ْ+ٚ+ٜ+ٰ | content-derived | fully | 11 |
 
 ## Sample records — `declared-bcp47-tags` (first 12 by id)
 
