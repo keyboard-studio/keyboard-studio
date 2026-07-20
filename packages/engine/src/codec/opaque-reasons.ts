@@ -15,6 +15,13 @@ export const OPAQUE_REASONS = {
   SMP_LITERAL: "smp-literal",
   NAMED_DEADKEY: "named-deadkey",
   UNKNOWN_PRE_BEGIN: "unknown-pre-begin",
+  // Store-body range notation (`X .. Y`, spec 042). A well-formed range is
+  // expanded eagerly into char items in parseStoreItems, but a range whose
+  // endpoints run backwards or don't decode can't be modelled faithfully, so
+  // the whole store is preserved opaque with one of these reasons rather than
+  // fabricating a wrong-direction interior or dropping data silently.
+  DESCENDING_RANGE: "descending-range",
+  MALFORMED_RANGE: "malformed-range",
 } as const;
 
 export type OpaqueReason = (typeof OPAQUE_REASONS)[keyof typeof OPAQUE_REASONS];

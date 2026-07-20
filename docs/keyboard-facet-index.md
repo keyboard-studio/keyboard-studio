@@ -17,7 +17,7 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | facet | content-derived | declared-metadata | fallback | undetermined |
 | --- | ---: | ---: | ---: | ---: |
 | `caps-handling` | 913 | 0 | 7 | 0 |
-| `casing` | 905 | 0 | 15 | 0 |
+| `casing` | 912 | 0 | 8 | 0 |
 | `desktop-combo-mechanism` | 908 | 0 | 12 | 0 |
 | `encoding` | 874 | 0 | 46 | 0 |
 | `fallback-posture` | 908 | 0 | 12 | 0 |
@@ -25,7 +25,7 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `normalization-posture` | 806 | 0 | 114 | 0 |
 | `reordering-rules` | 913 | 0 | 7 | 0 |
 | `rule-store-compaction` | 908 | 0 | 12 | 0 |
-| `script` | 894 | 14 | 10 | 2 |
+| `script` | 907 | 6 | 5 | 2 |
 | `strategy-fingerprint` | 910 | 0 | 10 | 0 |
 | `target-mix` | 0 | 912 | 8 | 0 |
 | `touch-combo-mechanism` | 920 | 0 | 0 | 0 |

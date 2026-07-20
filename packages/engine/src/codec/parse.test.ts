@@ -158,6 +158,182 @@ group(main) using keys
 });
 
 // ---------------------------------------------------------------------------
+// Store-body range notation (`X .. Y`, spec 042)
+// ---------------------------------------------------------------------------
+
+/** Build a minimal keyboard whose only user store is `storeLine`. */
+function kmnWithStore(storeLine: string): string {
+  return `store(&VERSION) '10.0'
+store(&NAME) 'Range Test'
+store(&TARGETS) 'any'
+${storeLine}
+begin Unicode > use(main)
+group(main) using keys
++ [K_A] > U+0061
+`;
+}
+
+/** Values of a store's char items, in order (non-char items throw). */
+function charValues(items: Array<{ kind: string; value?: string }>): string[] {
+  return items.map((it) => {
+    if (it.kind !== "char" || it.value === undefined) {
+      throw new Error(`expected char item, got ${it.kind}`);
+    }
+    return it.value;
+  });
+}
+
+describe("store-body range notation (spec 042)", () => {
+  describe("US1 — BMP range expansion", () => {
+    it("C1: U+0904 .. U+0914 expands to 17 inclusive char items in order, no raw '..' item", () => {
+      const { ir } = parse(kmnWithStore("store(svara) U+0904 .. U+0914"), "svara");
+      const store = ir.stores.find((s) => s.name === "svara");
+      expect(store).toBeDefined();
+      expect(store?.items).toHaveLength(17);
+      expect(store?.items.every((i) => i.kind === "char")).toBe(true);
+      expect(store?.items.some((i) => i.kind === "raw")).toBe(false);
+      const vals = charValues(store!.items);
+      expect(vals[0]).toBe(String.fromCodePoint(0x0904));
+      expect(vals[16]).toBe(String.fromCodePoint(0x0914));
+      // strictly ascending +1 across the whole run
+      for (let k = 0; k < 17; k++) {
+        expect(vals[k]).toBe(String.fromCodePoint(0x0904 + k));
+      }
+    });
+
+    it("C4: interleaved ranges and singletons resolve in source order", () => {
+      const { ir } = parse(
+        kmnWithStore("store(p) U+0591 .. U+05AF U+05BD .. U+05BF U+05C0 U+05C4"),
+        "p",
+      );
+      const store = ir.stores.find((s) => s.name === "p");
+      // 31 (U+0591..U+05AF) + 3 (U+05BD..U+05BF) + 2 singletons = 36
+      expect(store?.items).toHaveLength(36);
+      const vals = charValues(store!.items);
+      expect(vals[0]).toBe(String.fromCodePoint(0x0591));
+      expect(vals[30]).toBe(String.fromCodePoint(0x05af));
+      expect(vals[31]).toBe(String.fromCodePoint(0x05bd));
+      expect(vals[33]).toBe(String.fromCodePoint(0x05bf));
+      expect(vals[34]).toBe(String.fromCodePoint(0x05c0));
+      expect(vals[35]).toBe(String.fromCodePoint(0x05c4));
+    });
+
+    it("C2: single-char quoted endpoints, and mixed U+/quoted, are accepted", () => {
+      const quoted = parse(kmnWithStore("store(a) 'अ' .. 'ऐ'"), "a").ir.stores.find((s) => s.name === "a");
+      // 'अ' = U+0905, 'ऐ' = U+0910 → 12 inclusive codepoints
+      expect(quoted?.items).toHaveLength(12);
+      expect(charValues(quoted!.items)[0]).toBe(String.fromCodePoint(0x0905));
+      expect(charValues(quoted!.items)[11]).toBe(String.fromCodePoint(0x0910));
+
+      const mixed = parse(kmnWithStore("store(b) U+0905 .. 'ऐ'"), "b").ir.stores.find((s) => s.name === "b");
+      expect(mixed?.items).toHaveLength(12);
+      expect(charValues(mixed!.items)[0]).toBe(String.fromCodePoint(0x0905));
+      expect(charValues(mixed!.items)[11]).toBe(String.fromCodePoint(0x0910));
+    });
+
+    it("C3: whitespace variants (incl. no-space and hybrids) denote the same range", () => {
+      const forms = [
+        "U+0905 .. U+0910",
+        "U+0905..U+0910",
+        "U+0905 ..U+0910",
+        "U+0905.. U+0910",
+        "U+0905  ..  U+0910",
+      ];
+      for (const form of forms) {
+        const store = parse(kmnWithStore(`store(w) ${form}`), "w").ir.stores.find((s) => s.name === "w");
+        expect(store, form).toBeDefined();
+        expect(store?.items, form).toHaveLength(12);
+        expect(charValues(store!.items)[0], form).toBe(String.fromCodePoint(0x0905));
+        expect(charValues(store!.items)[11], form).toBe(String.fromCodePoint(0x0910));
+      }
+    });
+  });
+
+  describe("US2 — SMP / astral range expansion", () => {
+    it("C5: U+11680 .. U+11689 expands to 10 astral char items, store NOT opaque(smp-literal)", () => {
+      const { ir, opaqueFeatures } = parse(kmnWithStore("store(ConsU) U+11680 .. U+11689"), "smp");
+      const store = ir.stores.find((s) => s.name === "ConsU");
+      expect(store).toBeDefined();
+      expect(store?.items).toHaveLength(10);
+      const vals = charValues(store!.items);
+      expect(vals[0]).toBe(String.fromCodePoint(0x11680));
+      expect(vals[9]).toBe(String.fromCodePoint(0x11689));
+      // the store is expanded, not discarded to an smp-literal fragment
+      expect(ir.raw.some((f) => f.sourceText.includes("ConsU"))).toBe(false);
+      expect(opaqueFeatures.some((f) => f.feature === "smp-literal")).toBe(false);
+    });
+
+    it("C6: range straddling BMP↔SMP expands across the boundary", () => {
+      const { ir } = parse(kmnWithStore("store(x) U+FFFE .. U+10001"), "straddle");
+      const store = ir.stores.find((s) => s.name === "x");
+      expect(store?.items).toHaveLength(4);
+      expect(charValues(store!.items)).toEqual([
+        String.fromCodePoint(0xfffe),
+        String.fromCodePoint(0xffff),
+        String.fromCodePoint(0x10000),
+        String.fromCodePoint(0x10001),
+      ]);
+    });
+
+    it("C10: a standalone astral singleton keeps its existing smp-literal opaque handling", () => {
+      const { ir, opaqueFeatures } = parse(kmnWithStore("store(x) U+11680"), "single");
+      expect(ir.stores.some((s) => s.name === "x")).toBe(false);
+      const frag = ir.raw.find((f) => f.sourceText.includes("store(x)"));
+      expect(frag?.reason).toBe("smp-literal");
+      expect(opaqueFeatures).toContainEqual({ feature: "smp-literal", count: 1 });
+    });
+  });
+
+  describe("US3 — degenerate / malformed ranges fail safe", () => {
+    it("C7: single-codepoint range U+0905 .. U+0905 → exactly one char item (lenient)", () => {
+      const { ir } = parse(kmnWithStore("store(x) U+0905 .. U+0905"), "eq");
+      const store = ir.stores.find((s) => s.name === "x");
+      expect(store?.items).toHaveLength(1);
+      expect(charValues(store!.items)[0]).toBe(String.fromCodePoint(0x0905));
+    });
+
+    it("C8: descending range U+0910 .. U+0905 → opaque(descending-range), zero typed items", () => {
+      const { ir, opaqueFeatures } = parse(kmnWithStore("store(x) U+0910 .. U+0905"), "desc");
+      expect(ir.stores.some((s) => s.name === "x")).toBe(false);
+      const frag = ir.raw.find((f) => f.sourceText.includes("store(x)"));
+      expect(frag?.reason).toBe("descending-range");
+      expect(opaqueFeatures).toContainEqual({ feature: "descending-range", count: 1 });
+    });
+
+    it("C9: malformed ranges → opaque(malformed-range)", () => {
+      for (const body of ["U+0905 ..", "U+0905 .. foo", "'ab' .. U+0910"]) {
+        const { ir } = parse(kmnWithStore(`store(x) ${body}`), "mal");
+        expect(ir.stores.some((s) => s.name === "x"), body).toBe(false);
+        const frag = ir.raw.find((f) => f.sourceText.includes("store(x)"));
+        expect(frag?.reason, body).toBe("malformed-range");
+      }
+    });
+
+    it("a vkey-bracket range `[K_A]..[K_Z]` is NOT a codepoint range — store stays typed (no opaque)", () => {
+      // &CasedKeys uses a virtual-key range, not a codepoint range. Neither
+      // endpoint decodes as a codepoint, so the `..` must fall through to legacy
+      // per-token handling (vkey, raw `..`, vkey), NOT opaque the store.
+      // Regression guard for sil_cameroon_qwerty's `store(&CasedKeys) [K_A]..[K_Z]`.
+      const { ir } = parse(kmnWithStore("store(&CasedKeys) [K_A]..[K_Z]"), "vk");
+      expect(ir.raw.some((f) => f.sourceText.includes("CasedKeys"))).toBe(false);
+      const store = ir.stores.find((s) => s.name === "CasedKeys");
+      expect(store).toBeDefined();
+      expect(store?.items.map((it) => it.kind)).toEqual(["vkey", "raw", "vkey"]);
+    });
+
+    it("a mixed vkey/codepoint range `[K_A] .. U+0060` fails safe as opaque(malformed-range)", () => {
+      // One endpoint decodes (U+0060), one does not ([K_A]) → intended-but-broken
+      // codepoint range. Invalid Keyman, not in the corpus; the safe choice is to
+      // surface the whole store opaque with a diagnostic, not split it silently.
+      const { ir } = parse(kmnWithStore("store(x) [K_A] .. U+0060"), "mix");
+      expect(ir.stores.some((s) => s.name === "x")).toBe(false);
+      const frag = ir.raw.find((f) => f.sourceText.includes("store(x)"));
+      expect(frag?.reason).toBe("malformed-range");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Numeric store names (malar_braille fix — #412)
 //
 // kmcmplib's Validation::ValidateIdentifier does NOT reject leading digits, so
