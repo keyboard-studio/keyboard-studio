@@ -1,0 +1,108 @@
+# i18n spike — Lingui with explicit IDs (studio SPA)
+
+**Status:** spike / proof-of-concept on branch `km/i18n-lingui-spike`. Not wired to
+Crowdin yet; one view ([WelcomeScreen.tsx](../packages/studio/src/components/WelcomeScreen.tsx))
+is converted as the proof. Nothing here is a locked contract.
+
+## Why Lingui, and why explicit IDs
+
+We want **stable message IDs** so a translation stays bound to the same logical
+string even when the English is tweaked — but without losing the signal that the
+English *did* change (the trade-off raised in review). Lingui's macros give us
+both:
+
+```tsx
+import { Trans } from "@lingui/react/macro";
+
+<Trans id="welcome.title">Welcome to Keyboard Studio</Trans>
+```
+
+- `id` is the **stable identity** — never drifts when the copy is edited.
+- The child text is the **English source** — it lands in the catalog as the
+  *value*, so English drift is detectable (see below).
+
+The macro compiles to a runtime `<Trans id="welcome.title" message="Welcome to Keyboard Studio" />`,
+so the English is preserved as the fallback and the extractor can see it.
+
+## The drift signal is recovered on the *value*
+
+`pnpm --filter @keyboard-studio/studio messages:extract` produces flat JSON:
+
+```jsonc
+// src/locales/en/messages.json      (source locale — English is the value)
+{ "welcome.title": "Welcome to Keyboard Studio", ... }
+
+// src/locales/fr/messages.json      (target — same keys, empty until translated)
+{ "welcome.title": "", ... }
+```
+
+Because the English is the **value** under a stable **key**, Crowdin (which
+fingerprints the value for a key-value JSON file) sees an edit whenever the
+English changes under an unchanged id, and **resets that string's approvals to
+"needs review" while keeping the existing translation linked**. So:
+
+- stable ids → translations stay bound across English tweaks ✔
+- English-as-value → English drift still raises a review flag ✔
+
+`git diff` on `en/messages.json` is a second, repo-local drift detector (a PR that
+changes an English value but no target file is, by definition, introducing stale
+translations — easy to gate in review).
+
+> **Format choice, confirmed by the spike:** `@lingui/format-json` **`style: "minimal"`**
+> (flat `{ id: text }`) is the right catalog format here. The default `.po` /
+> `style: "lingui"` formats put the source in `msgid` / a nested field, which
+> muddies Crowdin's value-fingerprinting when ids are explicit. Minimal JSON keeps
+> the id as the Crowdin string key and the English as the fingerprinted value.
+
+## What the spike wired up
+
+| File | Change |
+|------|--------|
+| [lingui.config.ts](../packages/studio/lingui.config.ts) | `sourceLocale: en`, `locales: [en, fr]`, minimal-JSON formatter |
+| [vite.config.ts](../packages/studio/vite.config.ts) | `@lingui/babel-plugin-lingui-macro` on `react()` + `lingui()` plugin |
+| [vitest.config.ts](../packages/studio/vitest.config.ts) | same Lingui wiring so the macro transforms and `?lingui` resolves in tests |
+| [src/lib/i18n.ts](../packages/studio/src/lib/i18n.ts) | bootstrap: sync-load `en`, `activateLocale()` for lazy target locales |
+| [src/lingui.d.ts](../packages/studio/src/lingui.d.ts) | ambient module for `*.json?lingui` imports |
+| [StudioShell.tsx](../packages/studio/src/StudioShell.tsx) | owns the `I18nProvider` (covers the app **and** the ~40 direct-render tests) |
+| [WelcomeScreen.tsx](../packages/studio/src/components/WelcomeScreen.tsx) | 5 strings converted to `<Trans id=...>` (the proof) |
+| `package.json` | `messages:extract`, `messages:compile` scripts |
+
+Compiled catalogs (`messages.js`) are gitignored — the `?lingui` Vite plugin
+compiles the JSON at import time, so only the JSON sources are committed.
+
+## Verification
+
+- `pnpm --filter @keyboard-studio/studio typecheck` — clean.
+- `pnpm --filter @keyboard-studio/studio test src/StudioShell.test.tsx` — 35/35
+  pass, including the WelcomeScreen render tests, proving macro transform +
+  provider + `?lingui` all work end-to-end.
+  - **Local Node ≥22 caveat:** run with `NODE_OPTIONS="--localstorage-file=.ls-tmp.db"`
+    or the studio storage tests fail at `localStorage.clear()` in `beforeEach`
+    (native `localStorage` shadows jsdom's — environmental, CI on Node 22 is fine).
+
+## Crowdin wiring (step 1 — drafted)
+
+[crowdin.yml](../crowdin.yml) at the repo root:
+
+- **Tier A (Studio UI) — active.** Maps `packages/studio/src/locales/en/messages.json`
+  → `…/%two_letters_code%/messages.json`. Credentials come from env vars
+  (`CROWDIN_PROJECT_ID`, `CROWDIN_PERSONAL_TOKEN`) — never committed.
+- **Tier B (content strings) — deferred, commented scaffolding only.** Crowdin's
+  generic JSON/YAML parser translates every string value, so pointing it at the
+  raw content records would hand control fields (`id`, `answerType`, `default`,
+  `firingCondition`, BCP47 tags, `criteria.json` ids …) to translators. The
+  intended design is a build step that extracts translatable prose into flat
+  `{id: text}` sidecar catalogs (Tier A shape); `criteria.json` is further gated
+  by its zod schema + the 148-count test. Both are feature-spec decisions.
+
+**Verify once credentials are set:** `crowdin upload sources --dry-run -b main`
+(the CLI has no offline config validation — every command authenticates).
+
+## Not done (next steps if we adopt)
+- Locale switcher UI + persistence; browser-language detection.
+- Decide the extraction lint gate (fail CI if `en` changed without re-sync) and
+  where it sits relative to the km-triage merge gate.
+- Convert the rest of the UI chrome; agree the id namespace convention
+  (`area.component.thing`).
+- Team-boundary check: UI catalog lives under `packages/studio` (engine team);
+  content strings stay in `content/` + `packages/contracts` (content team, spec §12).

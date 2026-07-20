@@ -11,6 +11,8 @@
     "postbuild": "node scripts/build-keyboards-index.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "messages:extract": "lingui extract",
+    "messages:compile": "lingui compile",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest"
   },
@@ -19,6 +21,8 @@
     "@keyboard-studio/engine": "workspace:*",
     "@keyboard-studio/glottolog": "workspace:*",
     "@keymanapp/keyboard-lint": "workspace:*",
+    "@lingui/core": "^6.5.0",
+    "@lingui/react": "^6.5.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "yaml": "^2.9.0",
@@ -26,6 +30,10 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@lingui/babel-plugin-lingui-macro": "^6.5.0",
+    "@lingui/cli": "^6.5.0",
+    "@lingui/format-json": "^6.5.0",
+    "@lingui/vite-plugin": "^6.5.0",
     "@testing-library/react": "^16.0.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

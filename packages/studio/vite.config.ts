@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { lingui } from "@lingui/vite-plugin";
 import { fileURLToPath, URL } from "node:url";
 import { localKeyboardsPlugin } from "./vite-plugins/localKeyboards.ts";
 
@@ -15,7 +16,13 @@ const PATH_SHIM = fileURLToPath(
 
 export default defineConfig({
   plugins: [
-    react(),
+    // The Lingui macro transform runs via Babel; @vitejs/plugin-react only
+    // spins up Babel when given plugins, so this is the one place dev-server
+    // JSX goes through Babel instead of esbuild (acceptable for the spike).
+    react({
+      babel: { plugins: ["@lingui/babel-plugin-lingui-macro"] },
+    }),
+    lingui(),
     localKeyboardsPlugin({ keyboardsRepoRoot: KEYBOARDS_REPO_ROOT }),
   ],
   resolve: {
