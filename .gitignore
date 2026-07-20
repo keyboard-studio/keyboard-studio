@@ -88,3 +88,4 @@ lib/ucd/*
 !lib/ucd/PropertyValueAliases.txt
 !lib/ucd/Blocks.txt
 !lib/ucd/DerivedAge.txt
+!lib/ucd/UnicodeData.txt
