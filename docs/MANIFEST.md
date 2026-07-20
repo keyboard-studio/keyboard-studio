@@ -48,6 +48,21 @@ Owned by `/km-doc`. Update this file whenever a doc is added, archived, or re-sc
 | [`docs/keyboard-index.md`](keyboard-index.md) | Keyboard phonebook (BCP47, author, path per keyboard referenced) | Any keyboard cited or introduced in the repo | live |
 | [`docs/review-loop/STATUS.md`](review-loop/STATUS.md) | Automated review-loop iteration queue | New review-loop iterations | live |
 
+## Design notes (investigation / proposal records)
+
+Investigation write-ups and rework proposals — not spec changes themselves;
+promote to a `/speckit-specify` feature or a spec amendment before anything
+here is treated as ratified. Surfaced here because these three existed on
+disk but were not previously tracked in this manifest (a gap found while
+registering the fourth).
+
+| Doc | Purpose | Update Triggers | Status |
+|---|---|---|---|
+| [`docs/design-notes/question-unification-findings.md`](design-notes/question-unification-findings.md) | Root-cause trace + reachability matrix for the question-unification migration | Superseded once the migration plan fully lands | live |
+| [`docs/design-notes/question-unification-migration-plan.md`](design-notes/question-unification-migration-plan.md) | Migration plan for the question-unification rework | Migration phase changes | live |
+| [`docs/design-notes/mechanism-gallery-flow.md`](design-notes/mechanism-gallery-flow.md) | Mechanism gallery flow investigation | Mechanism gallery rework | live |
+| [`docs/design-notes/survey-flow-rework.md`](design-notes/survey-flow-rework.md) | Proposed 8-act rework of the studio survey flow (Discovery/Inventory/Approve-strategies split); `pb_*` → act ledger, strategy-card inputs/writes ledger, facet-catalog gaps | Survey manifest spine changes; `content/flows/phase_b_characters.modular.yaml` reorders; `orth.inventory-delta` wiring | live |
+
 ## Spec amendments
 
 | Doc | Purpose | Update Triggers | Status |
@@ -71,5 +86,5 @@ Owned by `/km-doc`. Update this file whenever a doc is added, archived, or re-sc
 
 ---
 
-**Last verified:** 2026-07-11
+**Last verified:** 2026-07-20
 **Manifest owner:** `/km-doc`
