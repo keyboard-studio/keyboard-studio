@@ -26,6 +26,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { characterMapGroups, type CharacterMapGroup } from "../lib/services.ts";
+import { prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import {
   BG_PAGE,
   BORDER,
@@ -57,8 +58,10 @@ type LoadState =
   | { status: "error" };
 
 // Combining marks render over a dotted circle so the mark is visible standalone
-// (Unicode's standard convention for showing a combining mark in isolation).
-const DOTTED_CIRCLE = "◌";
+// (Unicode's standard convention). The U+25CC prefixing is the shared
+// prefixCombiningMark() helper (irToCarveNodes.ts) — same formatter the carve
+// GlyphCell/InfoView/etc. use — parameterized here on cell.isCombiningMark
+// (Mn-or-Mc) rather than that helper's default Mn-only isCombining() test.
 
 // Visually-hidden but screen-reader-visible — standard clip-rect pattern.
 const visuallyHidden: CSSProperties = {
@@ -330,7 +333,7 @@ export function CharacterMapPane() {
                   {visibleCells.map((cell) => {
                     const selected = chars.includes(cell.char.normalize("NFC"));
                     const cp = toUPlusNotation(cell.char);
-                    const display = cell.isCombiningMark ? `${DOTTED_CIRCLE}${cell.char}` : cell.char;
+                    const display = prefixCombiningMark(cell.char, cell.isCombiningMark);
                     return (
                       <button
                         key={cell.char}

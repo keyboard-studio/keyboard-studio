@@ -134,9 +134,20 @@ export const isCombining = (ch: string) => {
   return /^\p{Mn}$/u.test(ch ?? '');
 };
 
+// Prefix a combining mark with U+25CC DOTTED CIRCLE so it's visible standalone
+// (Unicode's standard convention for showing a combining mark in isolation).
+// Parameterized on the caller's own combining-ness test rather than computing
+// it internally: displayChar() keys off isCombining() (Mn-only), while the
+// character-map pane keys off its cell.isCombiningMark (Mn-or-Mc, needed for
+// Devanagari matras) — the two callers disagree on what counts as combining,
+// so the boolean is theirs to decide.
+export function prefixCombiningMark(ch: string, isCombiningMark: boolean): string {
+  return isCombiningMark ? '◌' + ch : ch;
+}
+
 // Render-ready character: prefix combining marks with a dotted circle so they're visible standalone.
 export function displayChar(ch: string): string {
-  return isCombining(ch) ? '◌' + ch : ch;
+  return prefixCombiningMark(ch, isCombining(ch));
 }
 
 const INVISIBLE_CHAR_LABELS: Record<string, string> = {
