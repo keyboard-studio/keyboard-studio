@@ -154,3 +154,51 @@ describe("round-trip: ahom_star", () => {
     expect(true).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Semantic round-trip for store-body range notation (spec 042, C12 / SC-006)
+// ---------------------------------------------------------------------------
+
+/** Codepoint set of the char items in the named store. */
+function storeCodepointSet(ir: KeyboardIR, name: string): Set<string> {
+  const store = ir.stores.find((s) => s.name === name);
+  const set = new Set<string>();
+  for (const it of store?.items ?? []) {
+    if (it.kind === "char") set.add(it.value);
+  }
+  return set;
+}
+
+function kmnWithStore(name: string, body: string): string {
+  return `store(&VERSION) '10.0'
+store(&NAME) 'Range Test'
+store(&TARGETS) 'any'
+store(${name}) ${body}
+begin Unicode > use(main)
+group(main) using keys
++ [K_A] > U+0061
+`;
+}
+
+describe("round-trip: store-body ranges (spec 042)", () => {
+  const cases: Array<[string, string]> = [
+    ["svara", "U+0904 .. U+0914"],
+    ["hebrew", "U+0591 .. U+05AF U+05BD .. U+05BF U+05C0 U+05C4"],
+    ["smp", "U+11680 .. U+11689"],
+    ["straddle", "U+FFFE .. U+10001"],
+    ["quoted", "'अ' .. 'ऐ'"],
+    ["single", "U+0905 .. U+0905"],
+  ];
+
+  for (const [name, body] of cases) {
+    it(`parse→emit→re-parse preserves the codepoint set for ${body}`, () => {
+      const { ir: ir1 } = parse(kmnWithStore(name, body), "rt");
+      const emitted = emit(ir1);
+      const { ir: ir2 } = parse(emitted, "rt");
+      const set1 = storeCodepointSet(ir1, name);
+      const set2 = storeCodepointSet(ir2, name);
+      expect(set1.size).toBeGreaterThan(0);
+      expect([...set2].sort()).toEqual([...set1].sort());
+    });
+  }
+});
