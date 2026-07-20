@@ -92,6 +92,28 @@ describe("checkContextOrdering", () => {
     expect(findings.some((f) => f.code === "KM_ERROR_VIRTUAL_KEY_IN_CONTEXT")).toBe(true);
   });
 
+  it("checks a context whose spaceless + is preceded by a bareword (AC #1)", () => {
+    // `[K_X]nul+[K_A]` — the separator `+` is spaceless AND immediately preceded
+    // by a bareword (`l` of `nul`), not a terminator. Before the fix this fell
+    // through to `return null`, silently skipping the context checks. The context
+    // is `[K_X]nul`: the [K_X] vkey and the content-before-nul must both flag.
+    // (`[K_A]` after `+` is the KEY, not context — the AC's literal `nul+[K_A]`
+    // has a valid single-token `nul` context and would raise nothing; a vkey +
+    // misordered nul in the context is needed to exercise both codes.)
+    const source = "[K_X]nul+[K_A] > 'a'";
+    const findings = checkContextOrdering(source);
+    expect(findings.some((f) => f.code === "KM_ERROR_VIRTUAL_KEY_IN_CONTEXT")).toBe(true);
+    expect(findings.some((f) => f.code === "KM_ERROR_NUL_NOT_FIRST")).toBe(true);
+  });
+
+  it("produces no findings for a non-rule line (no unquoted >) regardless of + spacing (AC #2)", () => {
+    // `store(x) "a" +"b"` has a whitespace-preceded `+` but no `>` — it is not a
+    // key rule, so contextOrdering must not scan it as one. Without the rule-line
+    // (`>`) confirmation this was a latent false-positive class.
+    const source = 'store(x) "a" +"b"';
+    expect(checkContextOrdering(source)).toEqual([]);
+  });
+
   // Failing cases — Rule 1: nul not first
   it("rejects nul when it is not the first context token", () => {
     const source = 'dk(acute) nul + "a" > "b"';
@@ -158,5 +180,43 @@ describe("checkContextOrdering", () => {
     const source = 'if(&platform = "hardware") nul + "a" > "b"';
     const findings = checkContextOrdering(source);
     expect(findings.filter((f) => f.code === "KM_ERROR_NUL_NOT_FIRST")).toHaveLength(0);
+  });
+
+  // AC#1 literal example: nul+[K_A] is a clean single-token `nul` context
+  // (the [K_A] after `+` is the KEY, not context) — no findings.
+  it("produces no findings for the AC#1 literal example nul+[K_A] > 'a'", () => {
+    expect(checkContextOrdering("nul+[K_A] > 'a'")).toEqual([]);
+  });
+
+  // Comment-contamination regression: a trailing `c` comment containing a `>`
+  // must not make a non-rule line look like a confirmed rule.
+  it("does not treat a trailing comment's > as the rule separator", () => {
+    const source = 'store(x) "a" +"b" c note > here';
+    expect(checkContextOrdering(source)).toEqual([]);
+  });
+
+  // A trailing comment must not SUPPRESS a genuine finding either.
+  it("still flags a virtual key in context when the rule has a trailing comment", () => {
+    const source = '[K_A] + "a" > "b" c comment';
+    const findings = checkContextOrdering(source);
+    expect(findings.some((f) => f.code === "KM_ERROR_VIRTUAL_KEY_IN_CONTEXT")).toBe(true);
+  });
+
+  // Quote-preservation regression: contextOrdering strips only the trailing `c`
+  // comment (stripComment), not quoted content, so a quoted content token after
+  // a guard must still be visible to CONTENT_TOKEN_RE even with a trailing
+  // comment on the same line.
+  it("still flags guard-after-content when a quoted content token is followed by a trailing comment", () => {
+    const source = '"x" if(&layer = "default") + "a" > "b" c trailing note';
+    const findings = checkContextOrdering(source);
+    expect(findings.some((f) => f.code === "KM_ERROR_GUARD_AFTER_CONTENT")).toBe(true);
+  });
+
+  // A standalone `c` word inside a quoted string is not a comment start — quote
+  // state must still gate the comment-boundary test.
+  it("does not treat a standalone c word inside a quoted string as a comment", () => {
+    const source = '[K_A] + "a c b" > "z"';
+    const findings = checkContextOrdering(source);
+    expect(findings.some((f) => f.code === "KM_ERROR_VIRTUAL_KEY_IN_CONTEXT")).toBe(true);
   });
 });

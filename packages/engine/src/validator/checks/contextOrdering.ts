@@ -1,4 +1,5 @@
 import type { LintFinding } from "@keyboard-studio/contracts";
+import { stripCommentSource } from "./_shared.js";
 
 // Context statement ordering — lint.md check #11 (Compiler.cpp:1509-1520).
 // Rules for the context (LHS before +) of a key rule:
@@ -16,6 +17,10 @@ const VIRTUAL_KEY_RE = /\[[^\]]*\bK_[A-Za-z0-9_]+[^\]]*\]/g;
 
 // Matches nul keyword as a standalone word
 const NUL_RE = /\bnul\b/i;
+
+// Matches a single hex digit — used by extractContext to detect a `U+hhhh`
+// codepoint literal's `+` (which is never the context/key separator).
+const HEX_DIGIT_RE = /[0-9A-Fa-f]/;
 
 // Matches guard keyword calls: if(...), platform(...), baselayout(...) — shared by
 // stripGuardTokens() and the rule-2 scan below. Both manage `.lastIndex` explicitly
@@ -115,7 +120,10 @@ function blankParenContents(ctx: string): string {
 
 /**
  * Extract the context (LHS before the rule separator `+`) from a rule line.
- * Returns null if the line does not look like a key rule (no `+` separator).
+ * Returns null unless the line is a key rule — i.e. it has BOTH a context/key
+ * separator `+` and, after it, an unquoted `>` rule separator. Requiring the
+ * `>` confirmation stops a non-rule line with irregular spacing (e.g.
+ * `store(x) "a" +"b"`) from being mis-scanned as a rule.
  * Lines starting with `+` have no context (empty LHS).
  */
 function extractContext(line: string): { ctx: string; ctxStart: number } | null {
@@ -125,42 +133,51 @@ function extractContext(line: string): { ctx: string; ctxStart: number } | null 
     return null;
   }
 
-  // Scan for the first ` + ` separator, skipping quoted regions.
+  // Single quote/paren-aware scan that must find, in order:
+  //   (a) the context/key separator `+`, then
+  //   (b) an unquoted, depth-0 `>` rule separator after it.
   let inDouble = false;
   let inSingle = false;
-  let depth = 0; // paren depth — skip contents of function calls
+  let sepIndex = -1;
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
-    if (ch === '"' && !inSingle && depth === 0) { inDouble = !inDouble; continue; }
-    if (ch === "'" && !inDouble && depth === 0) { inSingle = !inSingle; continue; }
+    if (ch === '"' && !inSingle) { inDouble = !inDouble; continue; }
+    if (ch === "'" && !inDouble) { inSingle = !inSingle; continue; }
     if (inDouble || inSingle) continue;
-    if (ch === "(") { depth++; continue; }
-    if (ch === ")") { depth = Math.max(0, depth - 1); continue; }
-    if (depth > 0) continue;
-    if (ch === "+") {
+    if (ch === "(") { i = scanPastParenArg(line, i + 1) - 1; continue; }
+
+    if (sepIndex < 0 && ch === "+") {
+      // Any depth-0, unquoted `+` is the context/key separator — whether it is
+      // whitespace-, terminator- (`]` `)` `'` `"`), or bareword-preceded (e.g.
+      // `nul+[K_A]`). The one exception is a `U+hhhh` codepoint literal, whose
+      // `+` follows `U`/`u` and precedes a hex digit; that `+` is never the
+      // separator, so a later real `+` (or none) is used instead.
       const prev = line[i - 1];
-      // A spaceless `+` (e.g. `[K_X]+[K_A]`) is still the context/key separator
-      // when it directly follows a context-token terminator. A `U+hhhh` literal's
-      // `+` is preceded by `U`/`u`, never by one of these, so this cannot mistake
-      // a codepoint for the separator.
-      const afterToken = prev === "]" || prev === ")" || prev === "'" || prev === '"';
-      // The separator is recognized whenever whitespace or a terminator precedes
-      // it, regardless of what follows — this also catches the asymmetric case
-      // `[K_A] +[K_B]` (space before, none after). A `U+hhhh` literal's `+` is
-      // always preceded by `U`/`u`, never a space or one of the terminators
-      // above, so this still cannot mistake a codepoint for the separator.
-      const isSeparator = i === 0 || prev === " " || afterToken;
-      if (isSeparator) {
-        return { ctx: line.slice(0, i).trim(), ctxStart: 0 };
+      const next = line[i + 1];
+      const isCodepointPlus =
+        (prev === "U" || prev === "u") && next !== undefined && HEX_DIGIT_RE.test(next);
+      if (!isCodepointPlus) {
+        sepIndex = i;
       }
+      continue;
+    }
+
+    if (sepIndex >= 0 && ch === ">") {
+      // Confirmed rule: separator found and an unquoted `>` follows it.
+      return { ctx: line.slice(0, sepIndex).trim(), ctxStart: 0 };
     }
   }
+  // No separator, or no `>` after it — not a key rule.
   return null;
 }
 
 export function checkContextOrdering(source: string): LintFinding[] {
   const findings: LintFinding[] = [];
-  const lines = source.split("\n");
+  // Strip trailing `c` comments before scanning — quote-preserving, unlike
+  // stripNonCodeSource, since Rule 2's CONTENT_TOKEN_RE legitimately matches
+  // quoted-string content tokens. A comment containing `>`, `+`, `nul`, or
+  // `[K_X]` must not contaminate the rule scan (see stripCommentSource docs).
+  const lines = stripCommentSource(source).split("\n");
 
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
     const line = lines[lineIdx] ?? "";

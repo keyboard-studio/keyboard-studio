@@ -113,6 +113,55 @@ export function forEachMatch(
 }
 
 /**
+ * Whether the character at `line[i]` begins a standalone, unquoted `c`/`C`
+ * line comment: the token is `c` or `C`, preceded by line-start or whitespace,
+ * and followed by end-of-line or whitespace. This is only the boundary test —
+ * callers remain responsible for tracking quote state (which differs between
+ * {@link stripNonCode} and {@link stripComment}) before calling this.
+ */
+function isCommentStart(line: string, i: number): boolean {
+  const ch = line[i];
+  return (
+    (ch === "c" || ch === "C") &&
+    (i === 0 || /\s/.test(line[i - 1] ?? "")) &&
+    (i === line.length - 1 || /\s/.test(line[i + 1] ?? ""))
+  );
+}
+
+/**
+ * Blank a standalone, unquoted `c ...` line comment in `line` to end of line,
+ * length-preserving. A KMN `c` comment starts at a standalone, unquoted
+ * `c`/`C` token (at line start or preceded by whitespace, and followed by
+ * whitespace or end of line) and runs to end of line, mirroring the kmcmplib
+ * lexer. Unlike {@link stripNonCode}, this does NOT blank quoted-string
+ * contents — callers that still need quoted content as tokens (e.g.
+ * contextOrdering's CONTENT_TOKEN_RE, which matches `"..."`/`'...'`) can strip
+ * only the comment and keep quotes intact.
+ */
+export function stripComment(line: string): string {
+  const out = line.split("");
+  let inSingle = false;
+  let inDouble = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inSingle) { if (ch === "'") inSingle = false; continue; }
+    if (inDouble) { if (ch === '"') inDouble = false; continue; }
+    if (ch === "'") { inSingle = true; continue; }
+    if (ch === '"') { inDouble = true; continue; }
+    if (isCommentStart(line, i)) {
+      for (let j = i; j < line.length; j++) out[j] = " ";
+      break;
+    }
+  }
+  return out.join("");
+}
+
+/** Apply {@link stripComment} to every line of `source` (length-preserving). */
+export function stripCommentSource(source: string): string {
+  return source.split("\n").map(stripComment).join("\n");
+}
+
+/**
  * Blank the "non-code" spans of a single KMN source line — the contents of
  * quoted string literals (`'...'` / `"..."`) and any `c ...` line comment —
  * replacing them with spaces so a downstream regex scan never mistakes a
@@ -121,11 +170,8 @@ export function forEachMatch(
  * a quoted value). Length-preserving: every character keeps its column, so
  * match offsets — and therefore reported columns — stay accurate.
  *
- * A KMN `c` comment starts at a standalone, unquoted `c`/`C` token (at line
- * start or preceded by whitespace, and followed by whitespace or end of line)
- * and runs to end of line, mirroring the kmcmplib lexer. This intentionally
- * does NOT blank bracket/paren contents — the checks that consume it
- * legitimately match code inside `[...]` and `(...)`.
+ * This intentionally does NOT blank bracket/paren contents — the checks that
+ * consume it legitimately match code inside `[...]` and `(...)`.
  */
 export function stripNonCode(line: string): string {
   const out = line.split("");
@@ -137,11 +183,7 @@ export function stripNonCode(line: string): string {
     if (inDouble) { out[i] = " "; if (ch === '"') inDouble = false; continue; }
     if (ch === "'") { inSingle = true; out[i] = " "; continue; }
     if (ch === '"') { inDouble = true; out[i] = " "; continue; }
-    if (
-      (ch === "c" || ch === "C") &&
-      (i === 0 || /\s/.test(line[i - 1] ?? "")) &&
-      (i === line.length - 1 || /\s/.test(line[i + 1] ?? ""))
-    ) {
+    if (isCommentStart(line, i)) {
       for (let j = i; j < line.length; j++) out[j] = " ";
       break;
     }
