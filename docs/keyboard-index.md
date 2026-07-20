@@ -2,7 +2,7 @@
 
 A lookup table of the Keyman keyboards this project **references** — in [spec.md](../spec.md), the content scan reports, test fixtures, and tooling. Use it to find a keyboard by name, language, author, or where its source lives on disk.
 
-The keyboards themselves are **not** in this repo. They live in a sibling checkout of [keymanapp/keyboards](https://github.com/keymanapp/keyboards) at `../keyboards` (i.e. `<parent>/keyboards`). Every `Path` below is written relative to the keyboard-studio repo root.
+The keyboards themselves are **not** in this repo. They live in a sibling checkout at `../keyboards` (i.e. `<parent>/keyboards`), which tracks the [keyboard-studio/keyboards](https://github.com/keyboard-studio/keyboards) fork — a stable mirror of [keymanapp/keyboards](https://github.com/keymanapp/keyboards) and the project's canonical corpus for deterministic tests and facet-index builds. Point `../keyboards` at that fork's `master` (not upstream), or corpus-calibrated tests will drift. Every `Path` below is written relative to the keyboard-studio repo root.
 
 ## Keep this current
 
