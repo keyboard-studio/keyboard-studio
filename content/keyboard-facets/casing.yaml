@@ -2,10 +2,10 @@
 # the script(s) a keyboard produces have an uppercase/lowercase distinction
 # at all.
 #
-# derivation.archetype note: casing is a property of the script identity
-# itself (declared .kps language/script metadata or the langtags default
-# script), not something scanned out of rule structure or output character
-# content directly — "declared-metadata" is the closest ARCHETYPES fit.
+# derivation.archetype note: the classifier derives casing from the keyboard's
+# PRODUCED-character script identity (the script the output attests, reused from
+# the `script` classifier), so the honest archetype is "character-content" and
+# the tier is content-derived — not a declared-metadata read.
 
 id: casing
 title: Script casing
@@ -24,8 +24,8 @@ likelihoodSemantics: >
   the single classified value for the keyboard's script(s); likelihood is
   1 for the classified value.
 derivation:
-  archetype: declared-metadata
-  classifierId: planned
-  fallbackChain: [declared-metadata, undetermined]
+  archetype: character-content
+  classifierId: casing-classifier
+  fallbackChain: [content-derived, undetermined]
 feedsSessionFacets: [source.casing]
 schemaVersion: 1

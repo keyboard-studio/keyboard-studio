@@ -35,6 +35,45 @@ export type FacetValueType = "enum" | "set" | "scalar" | "histogram";
 export type DerivationArchetype = "character-content" | "rule-structure" | "declared-metadata";
 
 // ---------------------------------------------------------------------------
+// Construction-facet measurement model (spec 041, data-model Entities 2–4)
+// ---------------------------------------------------------------------------
+
+/**
+ * Why an exception site deviates from a facet's dominant value (spec 041 §4).
+ * `principled-split` / `capacity-forced` are assigned by a fitting cause
+ * predicate (cause-predicates.ts); `gap-omission` is the residue when no
+ * predicate fits (FR-002). Content-team-extensible via the predicate library.
+ */
+export type CauseTag = "principled-split" | "capacity-forced" | "gap-omission";
+
+/**
+ * One analyzed site whose value deviates from the dominant (build-time only,
+ * never serialized — only the aggregated `causeTagCounts` reaches the index,
+ * FR-005). `location` is a deterministic, human-auditable rule/store/layout
+ * locator.
+ */
+export interface ExceptionSite {
+  location: string;
+  observedValue: string;
+  causeTag: CauseTag;
+}
+
+/**
+ * Inputs the shared measurement assembly (measurement.ts) and the cause
+ * predicates read, so guards/fits and the not-applicable rules see the same
+ * script identity + coverage (data-model Entity 4). `scriptFamily` is the
+ * dominant ISO-15924 script code reused from the `script` classifier (not
+ * re-derived); `casing` gates `caps-handling` not-applicability (FR-013).
+ */
+export interface ClassifierContext {
+  /** Dominant ISO-15924 script code (e.g. "Latn"), or null when undetermined. */
+  scriptFamily: string | null;
+  casing: "cased" | "caseless" | "mixed";
+  /** Opaque-share-aware: exception enumeration excludes opaque regions (Edge Case). */
+  analyzedCoverage: number;
+}
+
+// ---------------------------------------------------------------------------
 // Entity 1 — Facet definition (content/keyboard-facets/<id>.yaml)
 // ---------------------------------------------------------------------------
 
@@ -99,6 +138,27 @@ export interface Categorization {
   residue?: number;
   /** (037) per-record facet-specific sub-classification hint (opaque here). */
   subProfile?: Record<string, unknown>;
+  /**
+   * (041) Share of analyzed sites matching the dominant `value` ∈ [0,1]. 1 =
+   * fully consistent (no exceptions). Distinct from `confidence`/`residue`
+   * (data-model Entity 1). Absent for facets that don't measure consistency.
+   */
+  consistency?: number;
+  /**
+   * (041) Summary of exception causes — count per `CauseTag` (FR-005). Omitted
+   * when `consistency === 1` (no exceptions to explain). Values sum to the
+   * exception-site count; the per-site enumeration is recomputed at build, never
+   * stored.
+   */
+  causeTagCounts?: Partial<Record<CauseTag, number>>;
+  /**
+   * (041) Set when the facet does not apply to this keyboard (caseless →
+   * caps-handling, abugida/abjad → normalization, no touch layout → touch
+   * facets). Emitted with `value: undefined`, `provenanceTier:
+   * "content-derived"`, and an explanatory `notes` — never a forced value or a
+   * `default-fallback` tier (data-model Entity 1, FR-013/014/022).
+   */
+  notApplicable?: true;
 }
 
 // ---------------------------------------------------------------------------

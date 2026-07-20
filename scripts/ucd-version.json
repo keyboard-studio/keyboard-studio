@@ -17,6 +17,10 @@
     {
       "path": "lib/ucd/Blocks.txt",
       "sha256": "6881254211622bda136745befc86ce9bdddc2c51b454dd73a7f8ed53d1a0eca2"
+    },
+    {
+      "path": "lib/ucd/DerivedAge.txt",
+      "sha256": "f8ecdf768bdc210f201abd271d9bc587825618a86a7046a8146cc816393f1998"
     }
   ],
   "license": "Unicode-DFS-2016 (Unicode, Inc. License Agreement)",

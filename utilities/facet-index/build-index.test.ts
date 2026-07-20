@@ -74,13 +74,17 @@ describe("buildIndex — dedicated fixture corpus (release/fixture/*)", () => {
     facetDefsDir: DEFS,
   });
 
-  it("produces exactly the 5 fixture keyboards", () => {
+  it("produces exactly the 9 fixture keyboards", () => {
     expect(Object.keys(index.keyboards).sort()).toEqual([
       "fx_arabic",
       "fx_broken",
       "fx_dup",
+      "fx_encoding_mixed",
       "fx_latin",
+      "fx_mnemonic",
+      "fx_reorder",
       "fx_rootlayout",
+      "fx_touch",
     ]);
   });
 
@@ -109,6 +113,41 @@ describe("buildIndex — dedicated fixture corpus (release/fixture/*)", () => {
     expect(script.analysisOutcome).toBe("fully");
   });
 
+  it("fx_touch classifies the four touch facets end-to-end through the real pipeline (US2)", () => {
+    // Exercises the actual wiring: DEFAULT_CLASSIFIERS id lookup → kb.sources
+    // discovery via the scanner → the canonical touch-layout parser — not just
+    // the per-classifier pure-function tests against synthetic ScannedKeyboards.
+    const f = index.keyboards.fx_touch!.facets;
+
+    const combo = f["touch-combo-mechanism"]!;
+    expect(combo.notApplicable).toBeUndefined();
+    expect(combo.provenanceTier).toBe("content-derived");
+    // fixture has longpress popups, a multitap, a flick, layer switches + plain keys.
+    expect(Object.keys(combo.distribution!)).toEqual(
+      expect.arrayContaining(["longpress", "layer"]),
+    );
+
+    expect(f["touch-number-row"]!.value).toBe("digits"); // top row is 1..5
+    expect(f["touch-symbol-layer"]!.value).toBe("present"); // fixture has a symbol layer
+    const mod = f["touch-modifier-layers"]!;
+    expect(mod.value).toBe("maps-desktop-modifiers"); // alt + rightalt reproduced
+    expect(mod.causeTagCounts).toEqual({ "capacity-forced": 2 });
+  });
+
+  it("a desktop-only fixture (no touch layout) is notApplicable for all four touch facets (SC-004)", () => {
+    for (const facetId of [
+      "touch-combo-mechanism",
+      "touch-number-row",
+      "touch-symbol-layer",
+      "touch-modifier-layers",
+    ]) {
+      const cat = index.keyboards.fx_latin!.facets[facetId]!;
+      expect(cat.notApplicable, `fx_latin ${facetId} should be notApplicable`).toBe(true);
+      expect(cat.value).toBeUndefined();
+      expect(cat.provenanceTier).toBe("content-derived");
+    }
+  });
+
   it("fx_rootlayout (.kps at the <id> folder root, no source/ segment) is discovered, not silently dropped", () => {
     // docs/keyboard-index.md notes a few real corpus keyboards keep the .kps
     // at the folder root; KPS_SCOPE_RE_ROOT covers that layout alongside the
@@ -130,6 +169,53 @@ describe("buildIndex — dedicated fixture corpus (release/fixture/*)", () => {
     const script = index.keyboards.fx_dup!.facets.script!;
     expect(script.value).toBe("Arab");
     expect(script.provenanceTier).toBe("content-derived");
+  });
+
+  // ---- spec 041 US1: nine desktop construction facets, per base ----
+
+  it("fx_latin → casing 'cased'; fx_arabic → casing 'caseless' (script-identity driven)", () => {
+    expect(index.keyboards.fx_latin!.facets.casing!.value).toBe("cased");
+    expect(index.keyboards.fx_arabic!.facets.casing!.value).toBe("caseless");
+  });
+
+  it("fx_arabic (caseless/abjad) → caps-handling + normalization-posture are notApplicable, never forced", () => {
+    const caps = index.keyboards.fx_arabic!.facets["caps-handling"]!;
+    expect(caps.notApplicable).toBe(true);
+    expect(caps.value).toBeUndefined();
+    expect(caps.provenanceTier).toBe("content-derived");
+    const norm = index.keyboards.fx_arabic!.facets["normalization-posture"]!;
+    expect(norm.notApplicable).toBe(true);
+    expect(norm.value).toBeUndefined();
+  });
+
+  it("fx_mnemonic → mnemonic-vs-positional 'mnemonic', tagged as a gate", () => {
+    const mvp = index.keyboards.fx_mnemonic!.facets["mnemonic-vs-positional"]!;
+    expect(mvp.value).toBe("mnemonic");
+    expect(mvp.notes).toMatch(/gate/i);
+    // fx_latin has no &MNEMONICLAYOUT → positional
+    expect(index.keyboards.fx_latin!.facets["mnemonic-vs-positional"]!.value).toBe("positional");
+  });
+
+  it("fx_encoding_mixed → encoding records both quoted-literal and u-notation with a distribution (AS-2)", () => {
+    const enc = index.keyboards.fx_encoding_mixed!.facets.encoding!;
+    expect(enc.value).toEqual(expect.arrayContaining(["quoted-literal", "u-notation"]));
+    expect(enc.distribution).toBeDefined();
+    expect(enc.provenanceTier).toBe("content-derived");
+  });
+
+  it("fx_reorder → reordering-rules 'group-reorder-swap' from the group(reorder) convention", () => {
+    expect(index.keyboards.fx_reorder!.facets["reordering-rules"]!.value).toBe("group-reorder-swap");
+    // fx_latin has no reorder shape → 'none'
+    expect(index.keyboards.fx_latin!.facets["reordering-rules"]!.value).toBe("none");
+  });
+
+  it("every classified construction value carries consistency or a distribution (SC-002)", () => {
+    for (const facetId of ["casing", "reordering-rules", "rule-store-compaction"]) {
+      const cat = index.keyboards.fx_latin!.facets[facetId]!;
+      if (cat.value !== undefined && !cat.notApplicable) {
+        expect(typeof cat.consistency === "number" || cat.distribution !== undefined).toBe(true);
+      }
+    }
   });
 
   it("fx_broken (unparseable .kmn) still gets a record, via the fallback chain, never omitted (Edge Case)", () => {

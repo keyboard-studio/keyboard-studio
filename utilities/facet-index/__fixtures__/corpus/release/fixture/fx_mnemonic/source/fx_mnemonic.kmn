@@ -1,0 +1,14 @@
+store(&VERSION) '10.0'
+store(&NAME) 'Fixture Mnemonic'
+store(&MNEMONICLAYOUT) '1'
+store(&TARGETS) 'any'
+store(&COPYRIGHT) '(c) 2026 Fixture'
+store(&KEYBOARDVERSION) '1.0'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [K_A] > U+0061
++ [K_S] > U+0073
++ [K_D] > U+0064

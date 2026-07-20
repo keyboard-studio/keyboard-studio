@@ -19,7 +19,7 @@ likelihoodSemantics: >
   likelihood is 1 for the classified value.
 derivation:
   archetype: rule-structure
-  classifierId: planned
+  classifierId: normalization-posture-classifier
   fallbackChain: [content-derived, undetermined]
 feedsSessionFacets: [source.normalization-posture]
 schemaVersion: 1

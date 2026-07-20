@@ -120,4 +120,31 @@ describe("facet-index extensibility (SC-003)", () => {
     expect(before.manifest.facetIds).toEqual(baselineFacetIds);
     expect(after.manifest.facetIds).toEqual(withDemoFacetIds);
   });
+
+  // spec 041 T020 / Edge Case: a facet definition with no registered classifier
+  // must fail the DEFAULT (non-`--classified-only`) build loud — never ship a
+  // silently-partial index. `--classified-only` is the opt-in that scopes the
+  // build to classifiable facets (how the shipped index is produced).
+  it("a def with no classifier fails the default build loud, but --classified-only skips it", () => {
+    const defsWithUnclassified = defsDirWithDemo(); // has demo-flag.yaml, but we DON'T register it
+    expect(() =>
+      buildIndex({
+        corpusRoot: FIXTURE_CORPUS_ROOT,
+        outPath: "",
+        facetDefsDir: defsWithUnclassified,
+        classifiers: DEFAULT_CLASSIFIERS, // no demo-flag entry
+      }),
+    ).toThrow(/no classifier registered for facet id "demo-flag"/);
+
+    // With onlyClassifiedFacets, the unclassifiable def is skipped, not fatal.
+    expect(() =>
+      buildIndex({
+        corpusRoot: FIXTURE_CORPUS_ROOT,
+        outPath: "",
+        facetDefsDir: defsWithUnclassified,
+        classifiers: DEFAULT_CLASSIFIERS,
+        onlyClassifiedFacets: true,
+      }),
+    ).not.toThrow();
+  });
 });

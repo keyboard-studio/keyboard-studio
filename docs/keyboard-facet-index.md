@@ -5,20 +5,186 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 ## Build inputs
 
 - **keyboards**: 920
-- **facets**: script, strategy-fingerprint, target-mix
+- **facets**: caps-handling, casing, desktop-combo-mechanism, encoding, fallback-posture, mnemonic-vs-positional, normalization-posture, reordering-rules, rule-store-compaction, script, strategy-fingerprint, target-mix, touch-combo-mechanism, touch-modifier-layers, touch-number-row, touch-symbol-layer
 - **scannerVersion**: `facet-index@1;schema@1;script@3;strategy-fingerprint@1;target-mix@1`
 - **unicodeVersion**: 17.0.0
 - **corpusScope**: `release/**`
 - **corpusCommit**: `keymanapp/keyboards@79e084f54985b458ac72315247719a8fabf3080f`
-- **referencePins**: 6
+- **referencePins**: 7
 
 ## Coverage by facet (provenance tier)
 
 | facet | content-derived | declared-metadata | fallback | undetermined |
 | --- | ---: | ---: | ---: | ---: |
+| `caps-handling` | 913 | 0 | 7 | 0 |
+| `casing` | 905 | 0 | 15 | 0 |
+| `desktop-combo-mechanism` | 908 | 0 | 12 | 0 |
+| `encoding` | 874 | 0 | 46 | 0 |
+| `fallback-posture` | 908 | 0 | 12 | 0 |
+| `mnemonic-vs-positional` | 913 | 0 | 7 | 0 |
+| `normalization-posture` | 806 | 0 | 114 | 0 |
+| `reordering-rules` | 913 | 0 | 7 | 0 |
+| `rule-store-compaction` | 908 | 0 | 12 | 0 |
 | `script` | 894 | 14 | 10 | 2 |
 | `strategy-fingerprint` | 910 | 0 | 10 | 0 |
 | `target-mix` | 0 | 912 | 8 | 0 |
+| `touch-combo-mechanism` | 920 | 0 | 0 | 0 |
+| `touch-modifier-layers` | 920 | 0 | 0 | 0 |
+| `touch-number-row` | 920 | 0 | 0 | 0 |
+| `touch-symbol-layer` | 920 | 0 | 0 | 0 |
+
+## Sample records — `caps-handling` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | any-index-fold | content-derived | fully | 1 |
+| `afghan_turkmen` | — | content-derived | fully | 0 |
+| `ahom_star` | — | content-derived | fully | 0 |
+| `akan` | no-caps-rules | content-derived | fully | 1 |
+| `akha_lahu` | — | content-derived | fully | 0 |
+| `aksarabali_panlex` | — | content-derived | fully | 0 |
+| `amazigh_latin` | mixed | content-derived | fully | 125 |
+| `anglo_furthorc_english` | — | content-derived | fully | 0 |
+| `anii` | no-caps-rules | content-derived | fully | 1 |
+| `arabic_izza` | — | content-derived | fully | 0 |
+| `arabic_w_o_dots` | — | content-derived | fully | 0 |
+| `aramaic_hebrew` | — | content-derived | fully | 0 |
+
+## Sample records — `casing` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | cased | content-derived | fully | 1 |
+| `afghan_turkmen` | caseless | content-derived | fully | 1 |
+| `ahom_star` | caseless | content-derived | fully | 1 |
+| `akan` | cased | content-derived | fully | 1 |
+| `akha_lahu` | caseless | content-derived | fully | 1 |
+| `aksarabali_panlex` | caseless | content-derived | partially | 1 |
+| `amazigh_latin` | cased | content-derived | fully | 1 |
+| `anglo_furthorc_english` | caseless | content-derived | fully | 1 |
+| `anii` | cased | content-derived | fully | 1 |
+| `arabic_izza` | caseless | content-derived | fully | 1 |
+| `arabic_w_o_dots` | caseless | content-derived | fully | 1 |
+| `aramaic_hebrew` | caseless | content-derived | fully | 1 |
+
+## Sample records — `desktop-combo-mechanism` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | context-match | content-derived | fully | 1 |
+| `afghan_turkmen` | direct-key | content-derived | fully | 103 |
+| `ahom_star` | direct-key | content-derived | fully | 104 |
+| `akan` | direct-key | content-derived | fully | 85 |
+| `akha_lahu` | context-match | content-derived | fully | 7 |
+| `aksarabali_panlex` | context-match | content-derived | partially | 101 |
+| `amazigh_latin` | direct-key | content-derived | fully | 174 |
+| `anglo_furthorc_english` | direct-key | content-derived | fully | 98 |
+| `anii` | direct-key | content-derived | fully | 96 |
+| `arabic_izza` | direct-key | content-derived | fully | 90 |
+| `arabic_w_o_dots` | direct-key | content-derived | fully | 189 |
+| `aramaic_hebrew` | direct-key | content-derived | fully | 33 |
+
+## Sample records — `encoding` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | — | default-fallback | fallback-only | 0 |
+| `afghan_turkmen` | bare-vk+named-modifier+split-modifier+u-notation | content-derived | fully | 208 |
+| `ahom_star` | bare-vk+named-modifier+quoted-literal+u-notation | content-derived | fully | 204 |
+| `akan` | bare-vk+named-modifier+quoted-literal | content-derived | fully | 170 |
+| `akha_lahu` | quoted-literal | content-derived | fully | 6 |
+| `aksarabali_panlex` | bare-vk+named-modifier+quoted-literal+split-modifier | content-derived | partially | 171 |
+| `amazigh_latin` | bare-vk+named-modifier+split-modifier+u-notation | content-derived | fully | 347 |
+| `anglo_furthorc_english` | bare-vk+named-modifier+quoted-literal+u-notation | content-derived | fully | 196 |
+| `anii` | bare-vk+named-modifier+quoted-literal | content-derived | fully | 192 |
+| `arabic_izza` | quoted-literal+u-notation | content-derived | fully | 90 |
+| `arabic_w_o_dots` | bare-vk+named-modifier+quoted-literal+split-modifier | content-derived | fully | 378 |
+| `aramaic_hebrew` | bare-vk+named-modifier+quoted-literal+u-notation | content-derived | fully | 66 |
+
+## Sample records — `fallback-posture` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | relies-on | content-derived | fully | 47 |
+| `afghan_turkmen` | blocks-comprehensively | content-derived | fully | 47 |
+| `ahom_star` | blocks-comprehensively | content-derived | fully | 47 |
+| `akan` | blocks-comprehensively | content-derived | fully | 47 |
+| `akha_lahu` | relies-on | content-derived | fully | 47 |
+| `aksarabali_panlex` | blocks-comprehensively | content-derived | partially | 47 |
+| `amazigh_latin` | blocks-comprehensively | content-derived | fully | 47 |
+| `anglo_furthorc_english` | blocks-comprehensively | content-derived | fully | 47 |
+| `anii` | blocks-comprehensively | content-derived | fully | 47 |
+| `arabic_izza` | blocks-comprehensively | content-derived | fully | 47 |
+| `arabic_w_o_dots` | blocks-comprehensively | content-derived | fully | 47 |
+| `aramaic_hebrew` | blocks-comprehensively | content-derived | fully | 47 |
+
+## Sample records — `mnemonic-vs-positional` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | positional | content-derived | fully | 1 |
+| `afghan_turkmen` | positional | content-derived | fully | 1 |
+| `ahom_star` | positional | content-derived | fully | 1 |
+| `akan` | positional | content-derived | fully | 1 |
+| `akha_lahu` | positional | content-derived | fully | 1 |
+| `aksarabali_panlex` | positional | content-derived | partially | 1 |
+| `amazigh_latin` | positional | content-derived | fully | 1 |
+| `anglo_furthorc_english` | positional | content-derived | fully | 1 |
+| `anii` | positional | content-derived | fully | 1 |
+| `arabic_izza` | positional | content-derived | fully | 1 |
+| `arabic_w_o_dots` | positional | content-derived | fully | 1 |
+| `aramaic_hebrew` | positional | content-derived | fully | 1 |
+
+## Sample records — `normalization-posture` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | — | default-fallback | fallback-only | 0 |
+| `afghan_turkmen` | — | content-derived | fully | 0 |
+| `ahom_star` | — | content-derived | fully | 0 |
+| `akan` | — | default-fallback | fallback-only | 0 |
+| `akha_lahu` | — | content-derived | fully | 0 |
+| `aksarabali_panlex` | — | content-derived | fully | 0 |
+| `amazigh_latin` | nfc | content-derived | fully | 20 |
+| `anglo_furthorc_english` | — | content-derived | fully | 0 |
+| `anii` | nfc | content-derived | fully | 3 |
+| `arabic_izza` | — | content-derived | fully | 0 |
+| `arabic_w_o_dots` | — | content-derived | fully | 0 |
+| `aramaic_hebrew` | — | content-derived | fully | 0 |
+
+## Sample records — `reordering-rules` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | none | content-derived | fully | 1 |
+| `afghan_turkmen` | none | content-derived | fully | 1 |
+| `ahom_star` | none | content-derived | fully | 1 |
+| `akan` | none | content-derived | fully | 1 |
+| `akha_lahu` | none | content-derived | fully | 1 |
+| `aksarabali_panlex` | none | content-derived | partially | 1 |
+| `amazigh_latin` | none | content-derived | fully | 1 |
+| `anglo_furthorc_english` | none | content-derived | fully | 1 |
+| `anii` | none | content-derived | fully | 1 |
+| `arabic_izza` | none | content-derived | fully | 1 |
+| `arabic_w_o_dots` | none | content-derived | fully | 1 |
+| `aramaic_hebrew` | none | content-derived | fully | 1 |
+
+## Sample records — `rule-store-compaction` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | consolidated-stores | content-derived | fully | 1 |
+| `afghan_turkmen` | inline-rules | content-derived | fully | 101 |
+| `ahom_star` | inline-rules | content-derived | fully | 100 |
+| `akan` | inline-rules | content-derived | fully | 85 |
+| `akha_lahu` | mixed | content-derived | fully | 7 |
+| `aksarabali_panlex` | mixed | content-derived | partially | 88 |
+| `amazigh_latin` | mixed | content-derived | fully | 174 |
+| `anglo_furthorc_english` | inline-rules | content-derived | fully | 98 |
+| `anii` | inline-rules | content-derived | fully | 96 |
+| `arabic_izza` | inline-rules | content-derived | fully | 90 |
+| `arabic_w_o_dots` | inline-rules | content-derived | fully | 189 |
+| `aramaic_hebrew` | inline-rules | content-derived | fully | 33 |
 
 ## Sample records — `script` (first 12 by id)
 
@@ -70,4 +236,72 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `arabic_izza` | desktop+touch+web | declared-metadata | fully | 3 |
 | `arabic_w_o_dots` | desktop+touch+web | declared-metadata | fully | 3 |
 | `aramaic_hebrew` | desktop+touch+web | declared-metadata | fully | 3 |
+
+## Sample records — `touch-combo-mechanism` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | key | content-derived | fully | 126 |
+| `afghan_turkmen` | key | content-derived | fully | 100 |
+| `ahom_star` | key | content-derived | fully | 174 |
+| `akan` | key | content-derived | fully | 85 |
+| `akha_lahu` | key | content-derived | fully | 98 |
+| `aksarabali_panlex` | key | content-derived | fully | 85 |
+| `amazigh_latin` | longpress | content-derived | fully | 94 |
+| `anglo_furthorc_english` | key | content-derived | fully | 97 |
+| `anii` | key | content-derived | fully | 194 |
+| `arabic_izza` | key | content-derived | fully | 164 |
+| `arabic_w_o_dots` | key | content-derived | fully | 165 |
+| `aramaic_hebrew` | key | content-derived | fully | 70 |
+
+## Sample records — `touch-modifier-layers` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | none | content-derived | fully | 3 |
+| `afghan_turkmen` | none | content-derived | fully | 3 |
+| `ahom_star` | none | content-derived | fully | 3 |
+| `akan` | none | content-derived | fully | 2 |
+| `akha_lahu` | none | content-derived | fully | 2 |
+| `aksarabali_panlex` | none | content-derived | fully | 3 |
+| `amazigh_latin` | none | content-derived | fully | 3 |
+| `anglo_furthorc_english` | none | content-derived | fully | 2 |
+| `anii` | none | content-derived | fully | 3 |
+| `arabic_izza` | none | content-derived | fully | 3 |
+| `arabic_w_o_dots` | none | content-derived | fully | 5 |
+| `aramaic_hebrew` | none | content-derived | fully | 2 |
+
+## Sample records — `touch-number-row` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | mixed | content-derived | fully | 1 |
+| `afghan_turkmen` | digits | content-derived | fully | 1 |
+| `ahom_star` | digits | content-derived | fully | 1 |
+| `akan` | digits | content-derived | fully | 1 |
+| `akha_lahu` | digits | content-derived | fully | 1 |
+| `aksarabali_panlex` | digits | content-derived | fully | 1 |
+| `amazigh_latin` | digits | content-derived | fully | 1 |
+| `anglo_furthorc_english` | digits | content-derived | fully | 1 |
+| `anii` | digits | content-derived | fully | 1 |
+| `arabic_izza` | digits | content-derived | fully | 1 |
+| `arabic_w_o_dots` | digits | content-derived | fully | 1 |
+| `aramaic_hebrew` | digits | content-derived | fully | 1 |
+
+## Sample records — `touch-symbol-layer` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | absent | content-derived | fully | 1 |
+| `afghan_turkmen` | present | content-derived | fully | 1 |
+| `ahom_star` | absent | content-derived | fully | 1 |
+| `akan` | absent | content-derived | fully | 1 |
+| `akha_lahu` | absent | content-derived | fully | 1 |
+| `aksarabali_panlex` | absent | content-derived | fully | 1 |
+| `amazigh_latin` | absent | content-derived | fully | 1 |
+| `anglo_furthorc_english` | absent | content-derived | fully | 1 |
+| `anii` | absent | content-derived | fully | 1 |
+| `arabic_izza` | absent | content-derived | fully | 1 |
+| `arabic_w_o_dots` | present | content-derived | fully | 1 |
+| `aramaic_hebrew` | absent | content-derived | fully | 1 |
 

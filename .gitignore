@@ -81,9 +81,10 @@ utilities/hermes/repo-map*.json
 utilities/hermes/.env
 
 # Vendored Unicode Character Database (UCD) raw dump — keep on disk, do not commit.
-# Only the 4 files the script classifier (spec 037) needs are tracked (negated below).
+# Only the files the facet-index classifiers need are tracked (negated below).
 lib/ucd/*
 !lib/ucd/Scripts.txt
 !lib/ucd/ScriptExtensions.txt
 !lib/ucd/PropertyValueAliases.txt
 !lib/ucd/Blocks.txt
+!lib/ucd/DerivedAge.txt

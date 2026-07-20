@@ -145,7 +145,7 @@ These fields are the **`source/` family extension**, empirical and
 
 | Prefix       | Meaning                                                      |
 | ------------ | ------------------------------------------------------------ |
-| `engine:`    | a named engine function (derivation registry)                 |
+| `engine:`    | a named engine-team-owned derivation function, regardless of package boundary — usually under `packages/engine/src/**` (e.g. `detectBaseLayoutFamily`), but also engine-team code in a standalone utility (e.g. `displayDifficultyOfScript` in `utilities/facet-index/`) |
 | `corpus:`    | a field mined from the keyboards-corpus fingerprint scan      |
 | `question:`  | a survey question (kind `asked` or `confirmed`)               |
 | `oauth:`     | a field from the authenticated identity                       |

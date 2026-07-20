@@ -2,10 +2,10 @@
 # source.mnemonic-vs-positional: whether a corpus keyboard's key-binding
 # model is mnemonic (&MNEMONICLAYOUT) or positional (bound by physical VK).
 #
-# derivation.archetype note: this reads the &MNEMONICLAYOUT store
-# declaration, a single declared metadata value, rather than measuring
-# structure across the rule set — "declared-metadata" is the closest
-# ARCHETYPES fit, not "rule-structure".
+# derivation.archetype note: the classifier reads the &MNEMONICLAYOUT system
+# store off the PARSED .kmn IR (via the engine's isMnemonicLayout), so the
+# honest archetype is "rule-structure" and the tier is content-derived — the
+# value is derived from the parsed keyboard, not read from package metadata.
 
 id: mnemonic-vs-positional
 title: Mnemonic vs positional binding
@@ -24,8 +24,8 @@ likelihoodSemantics: >
   the single classified value for the keyboard's key-binding model;
   likelihood is 1 for the classified value.
 derivation:
-  archetype: declared-metadata
-  classifierId: planned
+  archetype: rule-structure
+  classifierId: mnemonic-vs-positional-classifier
   fallbackChain: [content-derived, undetermined]
 feedsSessionFacets: [source.mnemonic-vs-positional]
 schemaVersion: 1

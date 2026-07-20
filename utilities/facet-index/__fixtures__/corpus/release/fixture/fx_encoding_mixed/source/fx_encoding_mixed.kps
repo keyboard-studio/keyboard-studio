@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+  <Info>
+    <Name value="Fixture fx_encoding_mixed"/>
+    <Version value="1.0"/>
+  </Info>
+  <Keyboards>
+    <Keyboard>
+      <Name>Fixture fx_encoding_mixed</Name>
+      <ID>fx_encoding_mixed</ID>
+      <Version>1.0</Version>
+      <Languages>
+        <Language ID="English" Name=""/>
+      </Languages>
+      <Targets>windows</Targets>
+    </Keyboard>
+  </Keyboards>
+</Package>

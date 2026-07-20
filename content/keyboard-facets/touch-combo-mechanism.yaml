@@ -28,7 +28,7 @@ likelihoodSemantics: >
   shares sum to 1.
 derivation:
   archetype: rule-structure
-  classifierId: planned
+  classifierId: touch-combo-mechanism-classifier
   fallbackChain: [content-derived, undetermined]
 feedsSessionFacets: [source.touch-combo-mechanism]
 schemaVersion: 1

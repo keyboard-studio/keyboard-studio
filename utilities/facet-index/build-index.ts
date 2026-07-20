@@ -37,6 +37,19 @@ import { renderCompanionMd } from "./companion.js";
 import { classifyScript } from "./script-classifier.js";
 import { classifyStrategyFingerprint, strategyFingerprintFallback } from "./strategy-fingerprint-classifier.js";
 import { classifyTargetMix, targetMixFallback } from "./target-mix-classifier.js";
+import { classifyCasing, casingFallback } from "./casing-classifier.js";
+import { classifyCapsHandling, capsHandlingFallback } from "./caps-handling-classifier.js";
+import { classifyDesktopComboMechanism, desktopComboMechanismFallback } from "./desktop-combo-mechanism-classifier.js";
+import { classifyEncoding, encodingFallback } from "./encoding-classifier.js";
+import { classifyFallbackPosture, fallbackPostureFallback } from "./fallback-posture-classifier.js";
+import { classifyMnemonicVsPositional, mnemonicVsPositionalFallback } from "./mnemonic-vs-positional-classifier.js";
+import { classifyNormalizationPosture, normalizationPostureFallback } from "./normalization-posture-classifier.js";
+import { classifyReorderingRules, reorderingRulesFallback } from "./reordering-rules-classifier.js";
+import { classifyRuleStoreCompaction, ruleStoreCompactionFallback } from "./rule-store-compaction-classifier.js";
+import { classifyTouchComboMechanism, touchComboMechanismFallback } from "./touch-combo-mechanism-classifier.js";
+import { classifyTouchNumberRow, touchNumberRowFallback } from "./touch-number-row-classifier.js";
+import { classifyTouchSymbolLayer, touchSymbolLayerFallback } from "./touch-symbol-layer-classifier.js";
+import { classifyTouchModifierLayers, touchModifierLayersFallback } from "./touch-modifier-layers-classifier.js";
 import { deriveScriptFallback, UNDETERMINED } from "./fallback.js";
 import type {
   Categorization,
@@ -69,7 +82,13 @@ export const DEFAULT_OUT_PATH = resolve(REPO_ROOT, "docs", "keyboard-facet-index
  * registry; nothing script-specific lives in the per-keyboard loop (T026).
  */
 export interface ClassifierPair {
-  classify: (ir: KeyboardIR, def: FacetDefinition) => Categorization | null;
+  /**
+   * Content-derived tier. Reads the parsed IR and, for touch facets (spec 041),
+   * the scanned source set `kb` (the `.keyman-touch-layout` bytes live in
+   * `kb.sources`, not the IR — research R1). Desktop/script classifiers ignore
+   * `kb`. Additive: existing `(ir, def)` classifiers stay assignable.
+   */
+  classify: (ir: KeyboardIR, def: FacetDefinition, kb: ScannedKeyboard) => Categorization | null;
   fallback: (kb: ScannedKeyboard, def: FacetDefinition) => Categorization;
 }
 
@@ -113,6 +132,39 @@ export const DEFAULT_CLASSIFIERS: Record<string, ClassifierPair> = {
     fallback: strategyFingerprintFallback,
   },
   "target-mix": { classify: classifyTargetMix, fallback: targetMixFallback },
+  // spec 041 US1 — nine desktop construction facets (rule-structure / script identity).
+  casing: { classify: classifyCasing, fallback: casingFallback },
+  "caps-handling": { classify: classifyCapsHandling, fallback: capsHandlingFallback },
+  "desktop-combo-mechanism": {
+    classify: classifyDesktopComboMechanism,
+    fallback: desktopComboMechanismFallback,
+  },
+  encoding: { classify: classifyEncoding, fallback: encodingFallback },
+  "fallback-posture": { classify: classifyFallbackPosture, fallback: fallbackPostureFallback },
+  "mnemonic-vs-positional": {
+    classify: classifyMnemonicVsPositional,
+    fallback: mnemonicVsPositionalFallback,
+  },
+  "normalization-posture": {
+    classify: classifyNormalizationPosture,
+    fallback: normalizationPostureFallback,
+  },
+  "reordering-rules": { classify: classifyReorderingRules, fallback: reorderingRulesFallback },
+  "rule-store-compaction": {
+    classify: classifyRuleStoreCompaction,
+    fallback: ruleStoreCompactionFallback,
+  },
+  // spec 041 US2 — four touch-layout construction facets (.keyman-touch-layout).
+  "touch-combo-mechanism": {
+    classify: classifyTouchComboMechanism,
+    fallback: touchComboMechanismFallback,
+  },
+  "touch-number-row": { classify: classifyTouchNumberRow, fallback: touchNumberRowFallback },
+  "touch-symbol-layer": { classify: classifyTouchSymbolLayer, fallback: touchSymbolLayerFallback },
+  "touch-modifier-layers": {
+    classify: classifyTouchModifierLayers,
+    fallback: touchModifierLayersFallback,
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -166,15 +218,21 @@ function buildKeyboardRecord(
           `has no DEFAULT_CLASSIFIERS entry for it)`,
       );
     }
-    const contentCategorization = ir ? pair.classify(ir, def) : null;
+    const contentCategorization = ir ? pair.classify(ir, def, kb) : null;
     if (contentCategorization) {
       facets[def.id] = contentCategorization;
     } else {
       const fallback = pair.fallback(kb, def);
       // Distinguish a genuine codec parse failure from "no .kmn at all" /
       // "parsed fine but no content evidence for this facet" — only the
-      // former gets a note (audit honesty, P1-A).
-      facets[def.id] = parseError ? { ...fallback, notes: `parse failure: ${parseError}` } : fallback;
+      // former gets a note (audit honesty, P1-A). Append rather than overwrite:
+      // a fallback that derived a real value from a non-.kmn source (e.g. the
+      // touch classifiers reading the touch layout) carries its own descriptive
+      // notes, which must survive the desktop parse-failure annotation.
+      const parseNote = `parse failure: ${parseError}`;
+      facets[def.id] = parseError
+        ? { ...fallback, notes: fallback.notes ? `${fallback.notes}; ${parseNote}` : parseNote }
+        : fallback;
     }
   }
 

@@ -19,7 +19,7 @@ likelihoodSemantics: >
   shares sum to 1.
 derivation:
   archetype: rule-structure
-  classifierId: planned
+  classifierId: desktop-combo-mechanism-classifier
   fallbackChain: [content-derived, undetermined]
 feedsSessionFacets: [source.desktop-combo-mechanism]
 schemaVersion: 1

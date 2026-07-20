@@ -21,7 +21,7 @@ likelihoodSemantics: >
   evidence to distribute over).
 derivation:
   archetype: rule-structure
-  classifierId: planned
+  classifierId: fallback-posture-classifier
   fallbackChain: [content-derived, undetermined]
 feedsSessionFacets: [source.fallback-posture]
 schemaVersion: 1

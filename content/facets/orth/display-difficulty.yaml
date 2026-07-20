@@ -25,13 +25,30 @@ modality: both
 
 derivations:
   - kind: computed
-    source: "planned:display-difficulty-of-script"
-    sourceStatus: planned
+    source: "engine:displayDifficultyOfScript"
+    sourceStatus: available
+    # The two era boundaries (Unicode MAJOR version) that split the script's
+    # first-assigned block age into the three tiers: well = major <
+    # partiallyFromMajor; partially = [partiallyFromMajor, poorlyFromMajor);
+    # poorly = major >= poorlyFromMajor. These MUST equal
+    # DISPLAY_DIFFICULTY_ERA_BOUNDARIES in
+    # utilities/facet-index/display-difficulty.ts — enforced by
+    # display-difficulty.test.ts, which parses these params and asserts the
+    # match (FR-031).
+    params:
+      partiallyFromMajor: 6           # first no-longer-well tier: 6.0 - 10.0
+      poorlyFromMajor: 11             # >= Unicode 11.0
     notes: >
       Unicode block first-assigned version (older/mainstream blocks are
       broadly supported) cross-referenced with PUA-usage-in-corpus (heavy
       PUA use signals poor mainstream font/rendering support even for a
-      long-assigned block, e.g. private orthography extensions).
+      long-assigned block, e.g. private orthography extensions). Primary
+      signal from the pinned UCD data (DerivedAge.txt join, script-level
+      minimum version); PUA usage overrides to poorly-supported. Block age
+      is a LOWER BOUND on real support, not an equivalence: some old blocks
+      still render poorly in mainstream stacks (e.g. Mongolian, Tifinagh),
+      so this is a cheap proxy, not a font-coverage measurement (a real
+      font-coverage database is deferred per the design brief).
 
 consumers:
   prefills: []

@@ -19,7 +19,7 @@ likelihoodSemantics: >
   is 1 for the classified value.
 derivation:
   archetype: rule-structure
-  classifierId: planned
+  classifierId: rule-store-compaction-classifier
   fallbackChain: [content-derived, undetermined]
 feedsSessionFacets: [source.rule-store-compaction]
 schemaVersion: 1
