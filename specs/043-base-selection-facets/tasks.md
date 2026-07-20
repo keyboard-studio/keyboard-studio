@@ -87,29 +87,29 @@ All work rides the standalone `utilities/facet-index/` tool (not a `packages/*` 
 
 ### Setup for User Story 2
 
-- [ ] T024 [US2] Add the pinned CLDR `exemplarCharacters` snapshot at `utilities/facet-index/data/cldr-exemplars.json` (BCP47/CLDR locale → exemplar char set) and record its version + sha256 in `utilities/facet-index/data/SOURCES.json` (Decision from research.md; FR-023, FR-004).
+- [x] T024 [US2] Add the pinned CLDR `exemplarCharacters` snapshot at `utilities/facet-index/data/cldr-exemplars.json` (BCP47/CLDR locale → exemplar char set) and record its version + sha256 in `utilities/facet-index/data/SOURCES.json` (Decision from research.md; FR-023, FR-004).
 
 ### Tests for User Story 2 ⚠️ (write first, ensure they fail)
 
-- [ ] T025 [P] [US2] `diacritic-mechanism` classifier test in `utilities/facet-index/diacritic-mechanism-classifier.test.ts` — multiple independent combining-mark stores → `stacking-combining`; overwriting/cycling deadkey store → `replacing-cycling` (FR-020; AS #1).
-- [ ] T026 [P] [US2] `combining-mark-repertoire` classifier test in `utilities/facet-index/combining-mark-repertoire-classifier.test.ts` — records the combining-mark set on alphabetic bases; `not-applicable` on abugida/abjad, gated by script-family (FR-021; AS #2).
-- [ ] T027 [P] [US2] `spare-key-budget` classifier test in `utilities/facet-index/spare-key-budget-classifier.test.ts` — `{many, ralt-only, fully-booked}` counting unbound key+modifier slots after excluding reserved combos (FR-022; AS #3).
-- [ ] T028 [P] [US2] `orthography-coverage-ratio` classifier test in `utilities/facet-index/orthography-coverage-ratio-classifier.test.ts` — 0.0–1.0 ratio + missing-char set vs the pinned CLDR set; `not-derivable` on no exemplar set (distinct from 0.0) (FR-023; AS #4, Edge Cases).
+- [x] T025 [P] [US2] `diacritic-mechanism` classifier test in `utilities/facet-index/diacritic-mechanism-classifier.test.ts` — multiple independent combining-mark stores → `stacking-combining`; overwriting/cycling deadkey store → `replacing-cycling` (FR-020; AS #1).
+- [x] T026 [P] [US2] `combining-mark-repertoire` classifier test in `utilities/facet-index/combining-mark-repertoire-classifier.test.ts` — records the combining-mark set on alphabetic bases; `not-applicable` on abugida/abjad, gated by script-family (FR-021; AS #2).
+- [x] T027 [P] [US2] `spare-key-budget` classifier test in `utilities/facet-index/spare-key-budget-classifier.test.ts` — `{many, ralt-only, fully-booked}` counting unbound key+modifier slots after excluding reserved combos (FR-022; AS #3).
+- [x] T028 [P] [US2] `orthography-coverage-ratio` classifier test in `utilities/facet-index/orthography-coverage-ratio-classifier.test.ts` — 0.0–1.0 ratio + missing-char set vs the pinned CLDR set; `not-derivable` on no exemplar set (distinct from 0.0) (FR-023; AS #4, Edge Cases).
 
 ### Implementation for User Story 2
 
-- [ ] T029 [P] [US2] Implement `utilities/facet-index/diacritic-mechanism-classifier.ts` — classify IR deadkey/store rewrite-rule shape into `{stacking-combining, replacing-cycling, multi-family, none}` (axis A4), following the spec-037 rule-structure classifier pattern (FR-020).
-- [ ] T030 [P] [US2] Implement `utilities/facet-index/combining-mark-repertoire-classifier.ts` — derive the inputtable combining-mark set from the produced-set; apply the script-family applicability guard (inline ISO 15924 derivation per plan sequencing note, superseded by the registered `script-family` facet in US3), emitting `not-applicable` for abugida/abjad (FR-021).
-- [ ] T031 [P] [US2] Implement `utilities/facet-index/spare-key-budget-classifier.ts` — count unbound key+modifier-plane slots in the base IR, excluding reserved system combos (axis A7) (FR-022).
-- [ ] T032 [P] [US2] Implement `utilities/facet-index/orthography-coverage-ratio-classifier.ts` — compare produced-set against `data/cldr-exemplars.json` for the declared BCP47 tag; emit ratio + missing-char set (exception data), `not-derivable` when no key exists (FR-023, T024).
-- [ ] T033 [P] [US2] Author `content/keyboard-facets/diacritic-mechanism.yaml` — enum `{stacking-combining, replacing-cycling, multi-family, none}`, real classifierId, `feedsSessionFacets: [construction.diacritic-mechanism]`.
-- [ ] T034 [P] [US2] Author `content/keyboard-facets/combining-mark-repertoire.yaml` — set valueType + `not-applicable` sentinel, real classifierId, **no** `feedsSessionFacets` (keyboard.*-only, FR-006).
-- [ ] T035 [P] [US2] Author `content/keyboard-facets/spare-key-budget.yaml` — enum `{many, ralt-only, fully-booked}`, real classifierId, `feedsSessionFacets: [construction.spare-key-budget]`.
-- [ ] T036 [P] [US2] Author `content/keyboard-facets/orthography-coverage-ratio.yaml` — scalar `0.0`–`1.0` + `not-derivable` sentinel, real classifierId, **no** `feedsSessionFacets` (keyboard.*-only).
-- [ ] T037 [P] [US2] Author session mirror `content/facets/construction/diacritic-mechanism.yaml` (construction/source-family mirror per spec-041 convention; create the `construction/` dir if absent).
-- [ ] T038 [P] [US2] Author session mirror `content/facets/construction/spare-key-budget.yaml` (same shape).
-- [ ] T039 [US2] Register the four US2 pairs in `DEFAULT_CLASSIFIERS` in `utilities/facet-index/build-index.ts` (depends on T029–T032).
-- [ ] T040 [US2] Rebuild with `--classified-only`, run the facet-index test suite + `pnpm run facet-lint` + `pnpm run facet-index-lint`, and regenerate `docs/keyboard-facet-index.json` (+ `.md`) (FR-040/FR-041; AS #5, SC-004).
+- [x] T029 [P] [US2] Implement `utilities/facet-index/diacritic-mechanism-classifier.ts` — classify IR deadkey/store rewrite-rule shape into `{stacking-combining, replacing-cycling, multi-family, none}` (axis A4), following the spec-037 rule-structure classifier pattern (FR-020).
+- [x] T030 [P] [US2] Implement `utilities/facet-index/combining-mark-repertoire-classifier.ts` — derive the inputtable combining-mark set from the produced-set; apply the script-family applicability guard (inline ISO 15924 derivation per plan sequencing note, superseded by the registered `script-family` facet in US3), emitting `not-applicable` for abugida/abjad (FR-021).
+- [x] T031 [P] [US2] Implement `utilities/facet-index/spare-key-budget-classifier.ts` — count unbound key+modifier-plane slots in the base IR, excluding reserved system combos (axis A7) (FR-022).
+- [x] T032 [P] [US2] Implement `utilities/facet-index/orthography-coverage-ratio-classifier.ts` — compare produced-set against `data/cldr-exemplars.json` for the declared BCP47 tag; emit ratio + missing-char set (exception data), `not-derivable` when no key exists (FR-023, T024).
+- [x] T033 [P] [US2] Author `content/keyboard-facets/diacritic-mechanism.yaml` — enum `{stacking-combining, replacing-cycling, multi-family, none}`, real classifierId, `feedsSessionFacets: [construction.diacritic-mechanism]`.
+- [x] T034 [P] [US2] Author `content/keyboard-facets/combining-mark-repertoire.yaml` — set valueType + `not-applicable` sentinel, real classifierId, **no** `feedsSessionFacets` (keyboard.*-only, FR-006).
+- [x] T035 [P] [US2] Author `content/keyboard-facets/spare-key-budget.yaml` — enum `{many, ralt-only, fully-booked}`, real classifierId, `feedsSessionFacets: [construction.spare-key-budget]`.
+- [x] T036 [P] [US2] Author `content/keyboard-facets/orthography-coverage-ratio.yaml` — scalar `0.0`–`1.0` + `not-derivable` sentinel, real classifierId, **no** `feedsSessionFacets` (keyboard.*-only).
+- [x] T037 [P] [US2] Author session mirror `content/facets/construction/diacritic-mechanism.yaml` (construction/source-family mirror per spec-041 convention; create the `construction/` dir if absent).
+- [x] T038 [P] [US2] Author session mirror `content/facets/construction/spare-key-budget.yaml` (same shape).
+- [x] T039 [US2] Register the four US2 pairs in `DEFAULT_CLASSIFIERS` in `utilities/facet-index/build-index.ts` (depends on T029–T032).
+- [x] T040 [US2] Rebuild with `--classified-only`, run the facet-index test suite + `pnpm run facet-lint` + `pnpm run facet-index-lint`, and regenerate `docs/keyboard-facet-index.json` (+ `.md`) (FR-040/FR-041; AS #5, SC-004).
 
 **Checkpoint**: US1 + US2 both independently functional; writing-system matching facets present with honest `not-applicable`/`not-derivable` sentinels.
 
@@ -123,34 +123,34 @@ All work rides the standalone `utilities/facet-index/` tool (not a `packages/*` 
 
 ### Setup for User Story 3
 
-- [ ] T041 [P] [US3] Add the known-license signature table at `utilities/facet-index/data/known-licenses.json` (`LICENSE.md` header signature → `{permissive, copyleft, proprietary-restricted}`); record it in `SOURCES.json` if treated as a pinned dataset (FR-030).
-- [ ] T042 [P] [US3] Add the ISO 15924 → script-family lookup at `utilities/facet-index/data/iso15924-script-family.json` (`{alphabet, abugida, abjad, syllabary, logographic}`) (FR-032).
+- [x] T041 [P] [US3] Add the known-license signature table at `utilities/facet-index/data/known-licenses.json` (`LICENSE.md` header signature → `{permissive, copyleft, proprietary-restricted}`); record it in `SOURCES.json` if treated as a pinned dataset (FR-030).
+- [x] T042 [P] [US3] Add the ISO 15924 → script-family lookup at `utilities/facet-index/data/iso15924-script-family.json` (`{alphabet, abugida, abjad, syllabary, logographic}`) (FR-032).
 
 ### Tests for User Story 3 ⚠️ (write first, ensure they fail)
 
-- [ ] T043 [P] [US3] `license-fork-eligibility` classifier test in `utilities/facet-index/license-fork-eligibility-classifier.test.ts` — known permissive header → `permissive`; missing/off-template → `unspecified`, never inferred (FR-030; AS #1, Edge Cases).
-- [ ] T044 [P] [US3] `directionality` classifier test in `utilities/facet-index/directionality-classifier.test.ts` — RTL produced script → `rtl`; both directions → `bidi-aware` (FR-031; AS #2).
-- [ ] T045 [P] [US3] `script-family` classifier test in `utilities/facet-index/script-family-classifier.test.ts` — ISO 15924 → family via lookup, and the value correctly guards `combining-mark-repertoire` (FR-032; AS #3).
-- [ ] T046 [P] [US3] `declared-bcp47-tags` classifier test in `utilities/facet-index/declared-bcp47-tags-classifier.test.ts` — surfaces `.kps` `<Languages>` claims and flags claim-vs-actual mismatch as an exception (FR-033; AS #4).
-- [ ] T047 [P] [US3] `package-completeness` classifier test in `utilities/facet-index/package-completeness-classifier.test.ts` — absorbs OSK `.kvks`, `welcome.htm`, `.model.ts`, icon presence into one checklist facet (FR-034; AS #5).
+- [x] T043 [P] [US3] `license-fork-eligibility` classifier test in `utilities/facet-index/license-fork-eligibility-classifier.test.ts` — known permissive header → `permissive`; missing/off-template → `unspecified`, never inferred (FR-030; AS #1, Edge Cases).
+- [x] T044 [P] [US3] `directionality` classifier test in `utilities/facet-index/directionality-classifier.test.ts` — RTL produced script → `rtl`; both directions → `bidi-aware` (FR-031; AS #2).
+- [x] T045 [P] [US3] `script-family` classifier test in `utilities/facet-index/script-family-classifier.test.ts` — ISO 15924 → family via lookup, and the value correctly guards `combining-mark-repertoire` (FR-032; AS #3).
+- [x] T046 [P] [US3] `declared-bcp47-tags` classifier test in `utilities/facet-index/declared-bcp47-tags-classifier.test.ts` — surfaces `.kps` `<Languages>` claims and flags claim-vs-actual mismatch as an exception (FR-033; AS #4).
+- [x] T047 [P] [US3] `package-completeness` classifier test in `utilities/facet-index/package-completeness-classifier.test.ts` — absorbs OSK `.kvks`, `welcome.htm`, `.model.ts`, icon presence into one checklist facet (FR-034; AS #5).
 
 ### Implementation for User Story 3
 
-- [ ] T048 [P] [US3] Implement `utilities/facet-index/license-fork-eligibility-classifier.ts` — match `LICENSE.md` header against `data/known-licenses.json` + `.kps` `<LicenseFile>` presence (via `kps-reader`); `unspecified` on no match (FR-030, T004, T041).
-- [ ] T049 [P] [US3] Implement `utilities/facet-index/directionality-classifier.ts` — from produced script set + RTL layout metadata; `bidi-aware` when both directions produced (FR-031).
-- [ ] T050 [P] [US3] Implement `utilities/facet-index/script-family-classifier.ts` — ISO 15924 code → family via `data/iso15924-script-family.json`; export the guard so `combining-mark-repertoire` consumes the registered facet (FR-032, T042).
-- [ ] T051 [P] [US3] Implement `utilities/facet-index/declared-bcp47-tags-classifier.ts` — read `.kps` `<Languages>` (via `kps-reader`) and cross-check claimed tags against produced characters, flagging mismatches as exceptions (FR-033, T004).
-- [ ] T052 [P] [US3] Implement `utilities/facet-index/package-completeness-classifier.ts` — checklist over OSK `.kvks`, `welcome.htm`, `.model.ts`, icon presence (via `kps-reader`) (FR-034, T004).
-- [ ] T053 [P] [US3] Author `content/keyboard-facets/license-fork-eligibility.yaml` — enum `{permissive, copyleft, proprietary-restricted, unspecified}`, real classifierId, `feedsSessionFacets: [env.license-fork-eligibility]`.
-- [ ] T054 [P] [US3] Author `content/keyboard-facets/directionality.yaml` — enum `{ltr, rtl, bidi-aware}`, real classifierId, **no** `feedsSessionFacets` (keyboard.*-only).
-- [ ] T055 [P] [US3] Author `content/keyboard-facets/script-family.yaml` — enum `{alphabet, abugida, abjad, syllabary, logographic}`, real classifierId, **no** `feedsSessionFacets` (keyboard.*-only).
-- [ ] T056 [P] [US3] Author `content/keyboard-facets/declared-bcp47-tags.yaml` — set valueType, real classifierId, `feedsSessionFacets: [source.declared-bcp47-tags]`.
-- [ ] T057 [P] [US3] Author `content/keyboard-facets/package-completeness.yaml` — set/checklist `{osk, help, predictive, icon}`, real classifierId, `feedsSessionFacets: [source.package-completeness]`.
-- [ ] T058 [P] [US3] Author session mirror `content/facets/env/license-fork-eligibility.yaml` (fallback-posture shape).
-- [ ] T059 [P] [US3] Author session mirror `content/facets/source/declared-bcp47-tags.yaml` (same shape).
-- [ ] T060 [P] [US3] Author session mirror `content/facets/source/package-completeness.yaml` (same shape).
-- [ ] T061 [US3] Register the five US3 pairs in `DEFAULT_CLASSIFIERS` in `utilities/facet-index/build-index.ts`; re-point `combining-mark-repertoire`'s guard at the now-registered `script-family` facet (depends on T048–T052, T030).
-- [ ] T062 [US3] Rebuild with `--classified-only`, run the facet-index test suite + `pnpm run facet-lint` + `pnpm run facet-index-lint`, and regenerate `docs/keyboard-facet-index.json` (+ `.md`) (FR-040/FR-041; AS #5).
+- [x] T048 [P] [US3] Implement `utilities/facet-index/license-fork-eligibility-classifier.ts` — match `LICENSE.md` header against `data/known-licenses.json` + `.kps` `<LicenseFile>` presence (via `kps-reader`); `unspecified` on no match (FR-030, T004, T041).
+- [x] T049 [P] [US3] Implement `utilities/facet-index/directionality-classifier.ts` — from produced script set + RTL layout metadata; `bidi-aware` when both directions produced (FR-031).
+- [x] T050 [P] [US3] Implement `utilities/facet-index/script-family-classifier.ts` — ISO 15924 code → family via `data/iso15924-script-family.json`; export the guard so `combining-mark-repertoire` consumes the registered facet (FR-032, T042).
+- [x] T051 [P] [US3] Implement `utilities/facet-index/declared-bcp47-tags-classifier.ts` — read `.kps` `<Languages>` (via `kps-reader`) and cross-check claimed tags against produced characters, flagging mismatches as exceptions (FR-033, T004).
+- [x] T052 [P] [US3] Implement `utilities/facet-index/package-completeness-classifier.ts` — checklist over OSK `.kvks`, `welcome.htm`, `.model.ts`, icon presence (via `kps-reader`) (FR-034, T004).
+- [x] T053 [P] [US3] Author `content/keyboard-facets/license-fork-eligibility.yaml` — enum `{permissive, copyleft, proprietary-restricted, unspecified}`, real classifierId, `feedsSessionFacets: [env.license-fork-eligibility]`.
+- [x] T054 [P] [US3] Author `content/keyboard-facets/directionality.yaml` — enum `{ltr, rtl, bidi-aware}`, real classifierId, **no** `feedsSessionFacets` (keyboard.*-only).
+- [x] T055 [P] [US3] Author `content/keyboard-facets/script-family.yaml` — enum `{alphabet, abugida, abjad, syllabary, logographic}`, real classifierId, **no** `feedsSessionFacets` (keyboard.*-only).
+- [x] T056 [P] [US3] Author `content/keyboard-facets/declared-bcp47-tags.yaml` — set valueType, real classifierId, `feedsSessionFacets: [source.declared-bcp47-tags]`.
+- [x] T057 [P] [US3] Author `content/keyboard-facets/package-completeness.yaml` — set/checklist `{osk, help, predictive, icon}`, real classifierId, `feedsSessionFacets: [source.package-completeness]`.
+- [x] T058 [P] [US3] Author session mirror `content/facets/env/license-fork-eligibility.yaml` (fallback-posture shape).
+- [x] T059 [P] [US3] Author session mirror `content/facets/source/declared-bcp47-tags.yaml` (same shape).
+- [x] T060 [P] [US3] Author session mirror `content/facets/source/package-completeness.yaml` (same shape).
+- [x] T061 [US3] Register the five US3 pairs in `DEFAULT_CLASSIFIERS` in `utilities/facet-index/build-index.ts`; re-point `combining-mark-repertoire`'s guard at the now-registered `script-family` facet (depends on T048–T052, T030).
+- [x] T062 [US3] Rebuild with `--classified-only`, run the facet-index test suite + `pnpm run facet-lint` + `pnpm run facet-index-lint`, and regenerate `docs/keyboard-facet-index.json` (+ `.md`) (FR-040/FR-041; AS #5).
 
 **Checkpoint**: All 13 facets present; SC-001 (13 new facets, zero `planned`) and SC-004 (sentinels hold) satisfiable.
 
@@ -158,11 +158,11 @@ All work rides the standalone `utilities/facet-index/` tool (not a `packages/*` 
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T063 Verify determinism (SC-003): rebuild `docs/keyboard-facet-index.json` twice against the same corpus commit and confirm byte-identical output; confirm no classifier reads git history or the network (FR-004).
-- [ ] T064 [P] Confirm every emitted value carries provenance tier + consistency + (consistency < 1) exception sites with cause tags across the corpus (SC-002); spot-check the `--classified-only` index for the P1/P2/P3 facets.
-- [ ] T065 [P] Confirm the default (non-`--classified-only`) build still fails loud on a `planned` def with no classifier (Edge Case) after all 13 defs carry real classifierIds.
-- [ ] T066 [P] Update `docs/keyboard-facet-index.md` prose companion and the facet-index README/CLAUDE.md architecture line if the facet count is quoted (16 → 29 keyboard-facets); keep the phonebook current if any new keyboard is referenced by fixtures.
-- [ ] T067 Full gate: `pnpm typecheck`, `pnpm -r test`, `pnpm lint` (which runs `facet-lint` + `facet-index-lint`) all green (FR-041; SC-003).
+- [x] T063 Verify determinism (SC-003): rebuild `docs/keyboard-facet-index.json` twice against the same corpus commit and confirm byte-identical output; confirm no classifier reads git history or the network (FR-004).
+- [x] T064 [P] Confirm every emitted value carries provenance tier + consistency + (consistency < 1) exception sites with cause tags across the corpus (SC-002); spot-check the `--classified-only` index for the P1/P2/P3 facets.
+- [x] T065 [P] Confirm the default (non-`--classified-only`) build still fails loud on a `planned` def with no classifier (Edge Case) after all 13 defs carry real classifierIds.
+- [x] T066 [P] Update `docs/keyboard-facet-index.md` prose companion and the facet-index README/CLAUDE.md architecture line if the facet count is quoted (16 → 29 keyboard-facets); keep the phonebook current if any new keyboard is referenced by fixtures.
+- [x] T067 Full gate: `pnpm typecheck`, `pnpm -r test`, `pnpm lint` (which runs `facet-lint` + `facet-index-lint`) all green (FR-041; SC-003).
 
 ---
 

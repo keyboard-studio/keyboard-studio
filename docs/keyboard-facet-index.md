@@ -5,12 +5,12 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 ## Build inputs
 
 - **keyboards**: 927
-- **facets**: added-char-count, caps-handling, casing, desktop-combo-mechanism, encoding, fallback-posture, font-dependency, mnemonic-vs-positional, normalization-posture, platform-coverage, primary-strategy, reordering-rules, rule-store-compaction, script, strategy-fingerprint, target-mix, touch-combo-mechanism, touch-modifier-layers, touch-number-row, touch-symbol-layer
+- **facets**: added-char-count, caps-handling, casing, combining-mark-repertoire, declared-bcp47-tags, desktop-combo-mechanism, diacritic-mechanism, directionality, encoding, fallback-posture, font-dependency, license-fork-eligibility, mnemonic-vs-positional, normalization-posture, orthography-coverage-ratio, package-completeness, platform-coverage, primary-strategy, reordering-rules, rule-store-compaction, script, script-family, spare-key-budget, strategy-fingerprint, target-mix, touch-combo-mechanism, touch-modifier-layers, touch-number-row, touch-symbol-layer
 - **scannerVersion**: `facet-index@1;schema@1;script@3;strategy-fingerprint@1;target-mix@1`
 - **unicodeVersion**: 17.0.0
 - **corpusScope**: `release/**`
 - **corpusCommit**: `keymanapp/keyboards@435f82d69bfc926eb03c2d8632571b41b6da3266`
-- **referencePins**: 7
+- **referencePins**: 10
 
 ## Coverage by facet (provenance tier)
 
@@ -19,17 +19,26 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `added-char-count` | 919 | 0 | 8 | 0 |
 | `caps-handling` | 920 | 0 | 7 | 0 |
 | `casing` | 919 | 0 | 8 | 0 |
+| `combining-mark-repertoire` | 845 | 0 | 82 | 0 |
+| `declared-bcp47-tags` | 0 | 927 | 0 | 0 |
 | `desktop-combo-mechanism` | 915 | 0 | 12 | 0 |
+| `diacritic-mechanism` | 917 | 0 | 10 | 0 |
+| `directionality` | 914 | 0 | 13 | 0 |
 | `encoding` | 881 | 0 | 46 | 0 |
 | `fallback-posture` | 915 | 0 | 12 | 0 |
 | `font-dependency` | 0 | 927 | 0 | 0 |
+| `license-fork-eligibility` | 0 | 927 | 0 | 0 |
 | `mnemonic-vs-positional` | 920 | 0 | 7 | 0 |
 | `normalization-posture` | 811 | 0 | 116 | 0 |
+| `orthography-coverage-ratio` | 919 | 0 | 8 | 0 |
+| `package-completeness` | 0 | 927 | 0 | 0 |
 | `platform-coverage` | 0 | 927 | 0 | 0 |
 | `primary-strategy` | 212 | 0 | 715 | 0 |
 | `reordering-rules` | 920 | 0 | 7 | 0 |
 | `rule-store-compaction` | 915 | 0 | 12 | 0 |
 | `script` | 914 | 6 | 5 | 2 |
+| `script-family` | 845 | 0 | 82 | 0 |
+| `spare-key-budget` | 577 | 0 | 350 | 0 |
 | `strategy-fingerprint` | 917 | 0 | 10 | 0 |
 | `target-mix` | 0 | 919 | 8 | 0 |
 | `touch-combo-mechanism` | 927 | 0 | 0 | 0 |
@@ -88,6 +97,40 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `anii` | cased | content-derived | fully | 1 |
 | `arabic_flick` | caseless | content-derived | fully | 1 |
 
+## Sample records — `combining-mark-repertoire` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` |  | content-derived | fully | 0 |
+| `afghan_turkmen` | — | content-derived | fully | 0 |
+| `ahom_star` | — | content-derived | fully | 0 |
+| `akan` |  | content-derived | fully | 0 |
+| `akha_lahu` | — | default-fallback | fallback-only | 0 |
+| `aksarabali_panlex` | — | content-derived | fully | 0 |
+| `amazigh_latin` | ̀+́+̄+̣+̱ | content-derived | fully | 5 |
+| `anglish` | ̅ | content-derived | fully | 1 |
+| `anglish_dvorak` | ̅ | content-derived | fully | 1 |
+| `anglo_furthorc_english` |  | content-derived | fully | 0 |
+| `anii` |  | content-derived | fully | 0 |
+| `arabic_flick` | — | content-derived | fully | 0 |
+
+## Sample records — `declared-bcp47-tags` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | ady-Latn | declared-metadata | fully | 1 |
+| `afghan_turkmen` | tk-Arab | declared-metadata | fully | 1 |
+| `ahom_star` | aho-Ahom | declared-metadata | fully | 1 |
+| `akan` | ak | declared-metadata | fully | 1 |
+| `akha_lahu` | ahk+lhu | declared-metadata | fully | 2 |
+| `aksarabali_panlex` | ban-Bali+kaw-Bali | declared-metadata | partially | 2 |
+| `amazigh_latin` | auj-Latn+cnu-Latn+gha-Latn+gho-Latn+gnc+grr-Latn+jbe-Latn+jbn-Latn+kab+mzb-Latn+oua-Latn+rif+sds-Latn+shi-Latn+shy+siz-Latn+sjs-Latn+swn-Latn+taq+tez-Latn+thv+thz+tia-Latn+tjo-Latn+tzm+zen-Latn+zgh-Latn | declared-metadata | fully | 27 |
+| `anglish` | ang | declared-metadata | fully | 1 |
+| `anglish_dvorak` | ang | declared-metadata | fully | 1 |
+| `anglo_furthorc_english` | en-Runr | declared-metadata | fully | 1 |
+| `anii` | blo-Latn | declared-metadata | fully | 1 |
+| `arabic_flick` | ar | declared-metadata | fully | 1 |
+
 ## Sample records — `desktop-combo-mechanism` (first 12 by id)
 
 | keyboard | value | tier | outcome | evidence |
@@ -104,6 +147,40 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `anglo_furthorc_english` | direct-key | content-derived | fully | 98 |
 | `anii` | direct-key | content-derived | fully | 96 |
 | `arabic_flick` | direct-key | content-derived | fully | 169 |
+
+## Sample records — `diacritic-mechanism` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | stacking-combining | content-derived | fully | 1 |
+| `afghan_turkmen` | stacking-combining | content-derived | fully | 9 |
+| `ahom_star` | stacking-combining | content-derived | fully | 15 |
+| `akan` | none | content-derived | fully | 0 |
+| `akha_lahu` | none | content-derived | fully | 0 |
+| `aksarabali_panlex` | stacking-combining | content-derived | partially | 10 |
+| `amazigh_latin` | stacking-combining | content-derived | fully | 6 |
+| `anglish` | stacking-combining | content-derived | fully | 2 |
+| `anglish_dvorak` | stacking-combining | content-derived | fully | 4 |
+| `anglo_furthorc_english` | none | content-derived | fully | 0 |
+| `anii` | none | content-derived | fully | 0 |
+| `arabic_flick` | stacking-combining | content-derived | fully | 11 |
+
+## Sample records — `directionality` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | ltr | content-derived | fully | 1 |
+| `afghan_turkmen` | rtl | content-derived | fully | 1 |
+| `ahom_star` | ltr | content-derived | fully | 1 |
+| `akan` | ltr | content-derived | fully | 1 |
+| `akha_lahu` | — | default-fallback | fallback-only | 0 |
+| `aksarabali_panlex` | ltr | content-derived | partially | 1 |
+| `amazigh_latin` | ltr | content-derived | fully | 1 |
+| `anglish` | ltr | content-derived | fully | 1 |
+| `anglish_dvorak` | ltr | content-derived | fully | 1 |
+| `anglo_furthorc_english` | ltr | content-derived | fully | 1 |
+| `anii` | ltr | content-derived | fully | 1 |
+| `arabic_flick` | rtl | content-derived | fully | 1 |
 
 ## Sample records — `encoding` (first 12 by id)
 
@@ -156,6 +233,23 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `anii` | self-contained | declared-metadata | fully | 1 |
 | `arabic_flick` | system-font-reliant | declared-metadata | fully | 1 |
 
+## Sample records — `license-fork-eligibility` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | permissive | declared-metadata | fully | 1 |
+| `afghan_turkmen` | permissive | declared-metadata | fully | 1 |
+| `ahom_star` | permissive | declared-metadata | fully | 1 |
+| `akan` | permissive | declared-metadata | fully | 1 |
+| `akha_lahu` | permissive | declared-metadata | fully | 1 |
+| `aksarabali_panlex` | permissive | declared-metadata | fully | 1 |
+| `amazigh_latin` | permissive | declared-metadata | fully | 1 |
+| `anglish` | permissive | declared-metadata | fully | 1 |
+| `anglish_dvorak` | permissive | declared-metadata | fully | 1 |
+| `anglo_furthorc_english` | permissive | declared-metadata | fully | 1 |
+| `anii` | permissive | declared-metadata | fully | 1 |
+| `arabic_flick` | permissive | declared-metadata | fully | 1 |
+
 ## Sample records — `mnemonic-vs-positional` (first 12 by id)
 
 | keyboard | value | tier | outcome | evidence |
@@ -189,6 +283,40 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `anglo_furthorc_english` | — | content-derived | fully | 0 |
 | `anii` | nfc | content-derived | fully | 3 |
 | `arabic_flick` | — | content-derived | fully | 0 |
+
+## Sample records — `orthography-coverage-ratio` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | not-derivable | content-derived | fully | 0 |
+| `afghan_turkmen` | not-derivable | content-derived | fully | 0 |
+| `ahom_star` | not-derivable | content-derived | fully | 0 |
+| `akan` | not-derivable | content-derived | fully | 0 |
+| `akha_lahu` | not-derivable | content-derived | fully | 0 |
+| `aksarabali_panlex` | not-derivable | content-derived | partially | 0 |
+| `amazigh_latin` | not-derivable | content-derived | fully | 0 |
+| `anglish` | not-derivable | content-derived | fully | 0 |
+| `anglish_dvorak` | not-derivable | content-derived | fully | 0 |
+| `anglo_furthorc_english` | 0 | content-derived | fully | 26 |
+| `anii` | not-derivable | content-derived | fully | 0 |
+| `arabic_flick` | not-derivable | content-derived | fully | 0 |
+
+## Sample records — `package-completeness` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | help+osk | declared-metadata | fully | 2 |
+| `afghan_turkmen` | help+osk | declared-metadata | fully | 2 |
+| `ahom_star` | help+osk | declared-metadata | fully | 2 |
+| `akan` | help+osk | declared-metadata | fully | 2 |
+| `akha_lahu` | help+osk | declared-metadata | fully | 2 |
+| `aksarabali_panlex` | help+osk | declared-metadata | fully | 2 |
+| `amazigh_latin` | help+osk | declared-metadata | fully | 2 |
+| `anglish` | help+osk | declared-metadata | fully | 2 |
+| `anglish_dvorak` | help+osk | declared-metadata | fully | 2 |
+| `anglo_furthorc_english` | help+osk | declared-metadata | fully | 2 |
+| `anii` | help+osk | declared-metadata | fully | 2 |
+| `arabic_flick` | help+osk | declared-metadata | fully | 2 |
 
 ## Sample records — `platform-coverage` (first 12 by id)
 
@@ -274,6 +402,40 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `anglo_furthorc_english` | Runr | content-derived | fully | 35 |
 | `anii` | Latn | content-derived | fully | 59 |
 | `arabic_flick` | Arab | content-derived | fully | 93 |
+
+## Sample records — `script-family` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | alphabet | content-derived | fully | 1 |
+| `afghan_turkmen` | abjad | content-derived | fully | 1 |
+| `ahom_star` | abugida | content-derived | fully | 1 |
+| `akan` | alphabet | content-derived | fully | 1 |
+| `akha_lahu` | — | default-fallback | fallback-only | 0 |
+| `aksarabali_panlex` | abugida | content-derived | partially | 1 |
+| `amazigh_latin` | alphabet | content-derived | fully | 1 |
+| `anglish` | alphabet | content-derived | fully | 1 |
+| `anglish_dvorak` | alphabet | content-derived | fully | 1 |
+| `anglo_furthorc_english` | alphabet | content-derived | fully | 1 |
+| `anii` | alphabet | content-derived | fully | 1 |
+| `arabic_flick` | abjad | content-derived | fully | 1 |
+
+## Sample records — `spare-key-budget` (first 12 by id)
+
+| keyboard | value | tier | outcome | evidence |
+| --- | --- | --- | --- | ---: |
+| `adiga_danef` | — | default-fallback | fallback-only | 0 |
+| `afghan_turkmen` | ralt-only | content-derived | fully | 26 |
+| `ahom_star` | ralt-only | content-derived | fully | 26 |
+| `akan` | ralt-only | content-derived | fully | 23 |
+| `akha_lahu` | — | default-fallback | fallback-only | 0 |
+| `aksarabali_panlex` | many | content-derived | partially | 2 |
+| `amazigh_latin` | ralt-only | content-derived | fully | 31 |
+| `anglish` | ralt-only | content-derived | fully | 26 |
+| `anglish_dvorak` | ralt-only | content-derived | fully | 26 |
+| `anglo_furthorc_english` | ralt-only | content-derived | fully | 26 |
+| `anii` | ralt-only | content-derived | fully | 26 |
+| `arabic_flick` | fully-booked | content-derived | fully | 52 |
 
 ## Sample records — `strategy-fingerprint` (first 12 by id)
 
