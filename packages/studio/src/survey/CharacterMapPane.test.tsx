@@ -240,6 +240,179 @@ describe("CharacterMapPane — short-circuit (no verified character list)", () =
 // Search filter — plain client-side array filter over already-loaded cells.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Raw U+XXXX entry — the "all options" escape hatch.
+// ---------------------------------------------------------------------------
+
+describe("CharacterMapPane — raw code point entry", () => {
+  it("adds a character by U+XXXX code point and clears the field on success", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    const input = screen.getByLabelText("Add a character by Unicode code point");
+    fireEvent.change(input, { target: { value: "U+0041" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(usePhaseBDraftStore.getState().chars).toContain("A");
+    expect((input as HTMLInputElement).value).toBe("");
+  });
+
+  it("accepts liberal hex forms (bare hex, lowercase u+) — canonical parser drops the 0x form", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    const input = screen.getByLabelText("Add a character by Unicode code point");
+    const addButton = screen.getByRole("button", { name: "Add" });
+
+    fireEvent.change(input, { target: { value: "u+0042" } });
+    fireEvent.click(addButton);
+    expect(usePhaseBDraftStore.getState().chars).toContain("B");
+
+    fireEvent.change(input, { target: { value: "0043" } });
+    fireEvent.click(addButton);
+    expect(usePhaseBDraftStore.getState().chars).toContain("C");
+  });
+
+  it("rejects an out-of-range code point and shows an inline error without mutating the store", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    const input = screen.getByLabelText("Add a character by Unicode code point");
+    fireEvent.change(input, { target: { value: "U+110000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(screen.getByRole("alert")).toBeTruthy();
+    expect(screen.getByText(/enter a valid code point/i)).toBeTruthy();
+    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+  });
+
+  it("rejects a surrogate-half code point", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    const input = screen.getByLabelText("Add a character by Unicode code point");
+    fireEvent.change(input, { target: { value: "U+D800" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(screen.getByText(/enter a valid code point/i)).toBeTruthy();
+    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+  });
+
+  it("rejects a noncharacter code point (plane-end and Arabic-presentation-forms range)", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    const input = screen.getByLabelText("Add a character by Unicode code point");
+    const addButton = screen.getByRole("button", { name: "Add" });
+
+    fireEvent.change(input, { target: { value: "U+FFFF" } });
+    fireEvent.click(addButton);
+    expect(screen.getByText(/enter a valid code point/i)).toBeTruthy();
+    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+
+    fireEvent.change(input, { target: { value: "U+FDD0" } });
+    fireEvent.click(addButton);
+    expect(screen.getByText(/enter a valid code point/i)).toBeTruthy();
+    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+  });
+
+  it("allows a PUA code point (the escape hatch's whole point)", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    const input = screen.getByLabelText("Add a character by Unicode code point");
+    fireEvent.change(input, { target: { value: "U+E000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(usePhaseBDraftStore.getState().chars).toContain("\u{E000}");
+  });
+
+  it("clears a stale error as soon as the field is edited again", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    const input = screen.getByLabelText("Add a character by Unicode code point");
+    fireEvent.change(input, { target: { value: "U+D800" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(screen.queryByRole("alert")).toBeTruthy();
+
+    fireEvent.change(input, { target: { value: "U+0041" } });
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("disables the Add button while the field is empty or whitespace-only", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+
+    const input = screen.getByLabelText("Add a character by Unicode code point");
+    const addButton = screen.getByRole("button", { name: "Add" }) as HTMLButtonElement;
+
+    expect(addButton.disabled).toBe(true);
+
+    fireEvent.change(input, { target: { value: "   " } });
+    expect(addButton.disabled).toBe(true);
+
+    fireEvent.change(input, { target: { value: "U+0041" } });
+    expect(addButton.disabled).toBe(false);
+
+    fireEvent.change(input, { target: { value: "" } });
+    expect(addButton.disabled).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// New tiers — digits & punctuation (engine's parallel-track extension).
+// ---------------------------------------------------------------------------
+
+describe("CharacterMapPane — digits & punctuation tiers", () => {
+  it("renders the digits and punctuation tier labels", async () => {
+    seedBaseAndLanguage();
+    getGroupsResult.set([
+      {
+        block: "Digits",
+        tier: "digits",
+        cells: [{ char: "0", isCombiningMark: false }],
+      },
+      {
+        block: "Punctuation",
+        tier: "punctuation",
+        cells: [{ char: ".", isCombiningMark: false }],
+      },
+    ]);
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Digits characters (Digits & numerals)")).toBeTruthy();
+    });
+    expect(screen.getByLabelText("Punctuation characters (Punctuation & symbols)")).toBeTruthy();
+  });
+});
+
 describe("CharacterMapPane — search filter", () => {
   it("filters cells by substring match, dropping groups with zero surviving cells", async () => {
     seedBaseAndLanguage();
@@ -274,4 +447,60 @@ describe("CharacterMapPane — search filter", () => {
     expect(screen.getByText(/No characters match "zzz-no-match"/i)).toBeTruthy();
     expect(screen.queryByLabelText("Latin characters (main)")).toBeNull();
   });
+});
+
+// ---------------------------------------------------------------------------
+// Per-group render cap (MAX_CELLS_PER_GROUP) — raised so a real one-group
+// script like Yi (~1,165 letters) renders in full; still caps anything larger.
+// ---------------------------------------------------------------------------
+
+// Synthetic cells built from a run of PUA code points — unique `char` values
+// (required, since `cell.char` is the React key) without depending on any
+// real script having exactly N assigned letters.
+function syntheticCells(count: number): CharacterMapGroup["cells"] {
+  return Array.from({ length: count }, (_, i) => ({
+    char: String.fromCodePoint(0xe000 + i),
+    isCombiningMark: false,
+  }));
+}
+
+describe("CharacterMapPane — per-group render cap", () => {
+  // Explicit 20s per-test timeout + matching waitFor margin: rendering 1000+
+  // DOM cells is CPU-bound and flakes past the default 5s only under full-suite
+  // parallel load (passes fast in isolation) — the margin absorbs contention.
+  it("renders a Yi-scale group (1,165 cells) in full — no 'Showing N of M' truncation note", async () => {
+    seedBaseAndLanguage();
+    getGroupsResult.set([
+      { block: "Synthetic", tier: "main", cells: syntheticCells(1165) },
+    ]);
+    render(<CharacterMapPane />);
+
+    await waitFor(
+      () => {
+        expect(screen.getByLabelText("Synthetic characters (main)")).toBeTruthy();
+      },
+      { timeout: 15000 },
+    );
+    const group = screen.getByLabelText("Synthetic characters (main)");
+    expect(within(group).getAllByRole("button")).toHaveLength(1165);
+    expect(screen.queryByText(/Showing \d+ of \d+ characters/i)).toBeNull();
+  }, 20000);
+
+  it("caps a group larger than MAX_CELLS_PER_GROUP and shows 'Showing N of M'", async () => {
+    seedBaseAndLanguage();
+    getGroupsResult.set([
+      { block: "Synthetic", tier: "main", cells: syntheticCells(3500) },
+    ]);
+    render(<CharacterMapPane />);
+
+    await waitFor(
+      () => {
+        expect(screen.getByLabelText("Synthetic characters (main)")).toBeTruthy();
+      },
+      { timeout: 15000 },
+    );
+    const group = screen.getByLabelText("Synthetic characters (main)");
+    expect(within(group).getAllByRole("button")).toHaveLength(3000);
+    expect(screen.getByText(/Showing 3000 of 3500 characters/i)).toBeTruthy();
+  }, 20000);
 });

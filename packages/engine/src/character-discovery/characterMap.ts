@@ -4,22 +4,27 @@
  *
  * Unlike pickerCandidates() (a flat list scoped to CLDR-or-single-script-block),
  * this returns the FULL candidate set an author can browse — CLDR main
- * exemplars, then CLDR auxiliary (loanword) exemplars, then the remaining
- * codepoints of the script's Unicode block(s) — grouped by human-readable
- * Unicode block name. It reuses the same CLDR loading/parsing path as
- * pickerCandidates (loadExemplarsFromFull / parseUnicodeSet in cldr.ts) rather
- * than re-implementing CLDR loading, and never mutates SCRIPT_BLOCKS or
- * scriptBlockChars — those stay picker-scoped and calibrated-test-stable.
+ * exemplars, then CLDR auxiliary (loanword) exemplars, then every other
+ * character belonging to the resolved script's Unicode Script_Extensions
+ * property, split into a "block" tier (letters + combining marks), a "digits"
+ * tier (\p{Nd}/\p{No}), and a "punctuation" tier (\p{P}/\p{S}) — grouped by
+ * human-readable Unicode block name where one is curated, or a generic
+ * per-tier label otherwise. Script coverage is universal (any script
+ * resolveScript() can name), not limited to a hardcoded list. It reuses the
+ * same CLDR loading/parsing path as pickerCandidates (loadExemplarsFromFull /
+ * parseUnicodeSet in cldr.ts) rather than re-implementing CLDR loading, and
+ * never mutates SCRIPT_BLOCKS or scriptBlockChars — those stay picker-scoped
+ * and calibrated-test-stable.
  *
  * Deduplication is GLOBAL across the whole return value (not per-tier, and
  * NOT against any user inventory — the UI itself marks already-selected
  * cells): each NFC grapheme appears in exactly one cell, in the first tier
- * that introduces it (main > auxiliary > block).
+ * that introduces it (main > auxiliary > block > digits > punctuation).
  */
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import type { CldrFullLoader } from "./cldr.js";
-import { createFetchCldrFullLoader, loadExemplarsFromFull, scriptBlockChars } from "./cldr.js";
+import { createFetchCldrFullLoader, loadExemplarsFromFull } from "./cldr.js";
 import { isBidiControlCodePoint } from "./CharacterDiscoveryServiceImpl.js";
 import { getLanguageDefaults } from "../langtags/index.js";
 
@@ -27,7 +32,7 @@ import { getLanguageDefaults } from "../langtags/index.js";
 // Public types
 // ---------------------------------------------------------------------------
 
-export type CharacterMapTier = "main" | "auxiliary" | "block";
+export type CharacterMapTier = "main" | "auxiliary" | "block" | "digits" | "punctuation";
 
 export interface CharacterMapCell {
   /** NFC grapheme the user can add to their alphabet. */
@@ -55,9 +60,13 @@ interface BlockDef {
 
 /**
  * SEPARATE from cldr.ts's SCRIPT_BLOCKS (which stays a single coarse range
- * per script, calibrated for pickerCandidates()). This table is for the
- * character-map "browse everything in the script" tier and carries multiple
- * named sub-blocks per script so the UI can show real section headers.
+ * per script, calibrated for pickerCandidates()). This table is a NAME
+ * OVERLAY for the character-map "browse everything in the script" tiers: it
+ * does not gate which characters are candidates (categorizeScriptChars()
+ * enumerates the full script via Script_Extensions for that), it only
+ * supplies real human-readable section headers for the codepoint ranges it
+ * covers. Scripts/codepoints with no entry here still get full coverage —
+ * they fall back to a generic per-tier label (see TIER_FALLBACK_LABEL).
  *
  * Ranges + names pinned against the Unicode block chart
  * (https://www.unicode.org/charts/, cross-checked against
@@ -197,11 +206,26 @@ function resolveScript(bcp47: string | undefined): string | undefined {
 // ---------------------------------------------------------------------------
 
 /**
- * Human-readable block name for a codepoint, given the resolved script. Falls
- * back to "Other" when the script has no CHARACTER_MAP_BLOCKS entry covering
- * the codepoint (including scripts absent from the table entirely).
+ * Generic label used when a codepoint falls outside every CHARACTER_MAP_BLOCKS
+ * range for its script (including scripts absent from the table entirely).
+ * "main"/"auxiliary" keep the pre-existing "Other" fallback; the three
+ * full-script tiers fall back to their own tier name so an uncurated script
+ * still gets a sensible section header instead of a meaningless "Other".
  */
-function blockNameFor(script: string | undefined, cp: number): string {
+const TIER_FALLBACK_LABEL: Record<CharacterMapTier, string> = {
+  main: "Other",
+  auxiliary: "Other",
+  block: "Letters",
+  digits: "Digits",
+  punctuation: "Punctuation",
+};
+
+/**
+ * Human-readable block name for a codepoint, given the resolved script and
+ * the tier it was found in. Prefers a curated CHARACTER_MAP_BLOCKS section
+ * name; falls back to TIER_FALLBACK_LABEL otherwise.
+ */
+function blockNameFor(script: string | undefined, cp: number, tier: CharacterMapTier): string {
   if (script !== undefined) {
     const defs = CHARACTER_MAP_BLOCKS[script];
     if (defs !== undefined) {
@@ -210,36 +234,197 @@ function blockNameFor(script: string | undefined, cp: number): string {
       }
     }
   }
-  return "Other";
+  return TIER_FALLBACK_LABEL[tier];
+}
+
+// ---------------------------------------------------------------------------
+// Full-script enumeration (block / digits / punctuation tiers)
+// ---------------------------------------------------------------------------
+
+/**
+ * Highest codepoint the full-script enumeration scans. Planes 0-2 (through
+ * U+2FFFF) cover every modern Unicode script block, including SMP-resident
+ * scripts (e.g. Adlam U+1E900, Osmanya U+10480, Bassa Vah U+16AD0) alongside
+ * BMP ones — scanning through U+2FFFF instead of sweeping the full 0x10FFFF
+ * range keeps a per-script enumeration to tens of milliseconds.
+ */
+const SCRIPT_ENUMERATION_END = 0x2ffff;
+
+interface ScriptCategorizedChars {
+  /** Letters (\p{L}) plus combining marks (Mn/Mc) — feeds the "block" tier. */
+  letters: string[];
+  /** Digits (\p{Nd} or \p{No}) — feeds the "digits" tier. */
+  digits: string[];
+  /** Punctuation/symbols (\p{P} or \p{S}) — feeds the "punctuation" tier. */
+  punctuation: string[];
+}
+
+const EMPTY_CATEGORIZED: ScriptCategorizedChars = { letters: [], digits: [], punctuation: [] };
+
+/**
+ * Per-script cache: the U+20..U+2FFFF scan only needs to run once per
+ * resolved script per process (this runs on language selection, not inside
+ * the 300ms validator debounce cycle), not once per buildCharacterMap() call.
+ */
+const scriptCategorizedCache = new Map<string, ScriptCategorizedChars>();
+
+/**
+ * ISO 15924 alias/collection codes that the ECMAScript Unicode
+ * Script_Extensions property does not recognize directly — `new
+ * RegExp('\\p{Script_Extensions=<code>}', 'u')` throws for these — mapped to
+ * the base Unicode Script value that carries their characters. Aran (Arabic,
+ * Nastaliq variant) -> Arab; Latf/Latg (Fraktur/Gaelic Latin variants) ->
+ * Latn; Syre/Syrj/Syrn (Estrangela/Western/Eastern Syriac) -> Syrc; the CJK
+ * ideograph collections Hans/Hant/Jpan -> Hani; Kore -> Hang (Jpan/Kore are
+ * routed to a "not yet supported" stub elsewhere, but must not throw here).
+ */
+const SCRIPT_ALIAS_MAP: Record<string, string> = {
+  Aran: "Arab",
+  Latf: "Latn",
+  Latg: "Latn",
+  Syre: "Syrc",
+  Syrj: "Syrc",
+  Syrn: "Syrc",
+  Hans: "Hani",
+  Hant: "Hani",
+  Jpan: "Hani",
+  Kore: "Hang",
+};
+
+/**
+ * Enumerates every codepoint whose Script_Extensions includes `script` (an
+ * ISO 15924 code, e.g. "Ethi", "Beng", "Latn" — exactly what resolveScript()
+ * returns) across planes 0-2, split into the three category buckets used by
+ * the block/digits/punctuation tiers. Guardrail-excluded codepoints (control,
+ * PUA, noncharacter, unassigned, non-bidi-allowlisted format chars) never
+ * enter any bucket. Digits use \p{Nd}, \p{No}, OR \p{Nl} — Ethiopic numerals
+ * (U+1369-137C) are General_Category No, not Nd, and letter-numbers (e.g.
+ * Roman numerals, Aegean/Cuneiform numerals) are Nl — either would otherwise
+ * be silently dropped from the digits tier. `script` is mapped through
+ * SCRIPT_ALIAS_MAP before regex construction so ISO alias codes the
+ * Unicode Script property doesn't recognize (Aran, Latf, Latg, Syre/Syrj/Syrn,
+ * Hans/Hant/Jpan/Kore) still resolve instead of throwing; the try/catch
+ * remains as a final safety net for any code neither the alias map nor the
+ * Unicode property database recognizes.
+ */
+function categorizeScriptChars(script: string): ScriptCategorizedChars {
+  const cached = scriptCategorizedCache.get(script);
+  if (cached !== undefined) return cached;
+
+  const scriptForEnumeration = SCRIPT_ALIAS_MAP[script] ?? script;
+  let scriptRe: RegExp;
+  try {
+    scriptRe = new RegExp(`\\p{Script_Extensions=${scriptForEnumeration}}`, "u");
+  } catch {
+    // Not a script code the ECMAScript Unicode property database
+    // recognizes — nothing to enumerate for it.
+    scriptCategorizedCache.set(script, EMPTY_CATEGORIZED);
+    return EMPTY_CATEGORIZED;
+  }
+
+  const letters: string[] = [];
+  const digits: string[] = [];
+  const punctuation: string[] = [];
+
+  for (let cp = 0x20; cp <= SCRIPT_ENUMERATION_END; cp++) {
+    const ch = String.fromCodePoint(cp);
+    if (!scriptRe.test(ch)) continue;
+    const nfc = ch.normalize("NFC");
+    if (isGuardrailExcluded(nfc)) continue;
+
+    if (/\p{L}/u.test(nfc) || isCombiningMarkChar(nfc)) {
+      letters.push(nfc);
+    } else if (/[\p{Nd}\p{No}\p{Nl}]/u.test(nfc)) {
+      digits.push(nfc);
+    } else if (/[\p{P}\p{S}]/u.test(nfc)) {
+      punctuation.push(nfc);
+    }
+  }
+
+  const result: ScriptCategorizedChars = { letters, digits, punctuation };
+  scriptCategorizedCache.set(script, result);
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Common-scoped tiers (script-agnostic)
+// ---------------------------------------------------------------------------
+
+/**
+ * ASCII decimal digits U+0030-0039. General_Category=Nd but Script=Common
+ * with NO Script_Extensions override to any specific script, so
+ * categorizeScriptChars()'s per-script \p{Script_Extensions=...} enumeration
+ * never matches them — every Latin/Cyrillic/etc. language would otherwise
+ * see an empty digits tier. Always folded into digitsTierCandidates()
+ * regardless of the resolved script.
+ */
+const COMMON_DIGIT_CHARS: readonly string[] = Array.from({ length: 10 }, (_, i) =>
+  String.fromCodePoint(0x30 + i),
+);
+
+/**
+ * Codepoint ranges scanned for the Common-scoped punctuation/symbol tier:
+ * Basic Latin, Latin-1 Supplement, General Punctuation, and Currency Symbols.
+ * Deliberately NOT the full Script=Common set (which also covers dingbats/emoji/
+ * technical symbols) — that long tail stays reachable only via the UI's U+XXXX
+ * escape hatch. These are the ranges where ordinary punctuation (`.` `,` `?`
+ * `!` `(` `)` `"` `'` `-` `:` `;` etc.) and currency signs (`€` `₦` `₵` `₹` — all
+ * `Script=Common`, so no script's Script_Extensions enumeration would surface
+ * them) actually live; currency signs are ordinary orthographic characters for
+ * many target languages, not exotic symbols.
+ */
+const COMMON_PUNCTUATION_RANGES: readonly BlockDef[] = [
+  { name: "Basic Latin", start: 0x0020, end: 0x007e },
+  { name: "Latin-1 Supplement", start: 0x00a0, end: 0x00ff },
+  { name: "General Punctuation", start: 0x2000, end: 0x206f },
+  { name: "Currency Symbols", start: 0x20a0, end: 0x20cf },
+];
+
+/**
+ * Computed once at module load (a ~350-codepoint scan, not per-call): every
+ * \p{P}/\p{S} codepoint in COMMON_PUNCTUATION_RANGES, guardrail-filtered.
+ * Always folded into punctuationTierCandidates() regardless of the resolved
+ * script, same rationale as COMMON_DIGIT_CHARS.
+ */
+const COMMON_PUNCTUATION_CHARS: readonly string[] = (() => {
+  const out: string[] = [];
+  for (const range of COMMON_PUNCTUATION_RANGES) {
+    for (let cp = range.start; cp <= range.end; cp++) {
+      const ch = String.fromCodePoint(cp);
+      if (isGuardrailExcluded(ch)) continue;
+      if (/[\p{P}\p{S}]/u.test(ch)) out.push(ch);
+    }
+  }
+  return out;
+})();
+
+/**
+ * Returns a defensive copy — never the live array cached inside
+ * scriptCategorizedCache — since buildCharacterMap() sorts its result
+ * in place.
+ */
+function blockTierCandidates(script: string | undefined): string[] {
+  return script === undefined ? [] : [...categorizeScriptChars(script).letters];
 }
 
 /**
- * Candidate codepoints for the "block" tier, ascending by codepoint. Uses the
- * multi-block CHARACTER_MAP_BLOCKS table when the script has an entry;
- * otherwise degrades gracefully to the existing single-range
- * scriptBlockChars() (cldr.ts) so unlisted scripts still produce something.
- * Restricted to letters (\p{L}) and combining marks (\p{Mn}/\p{Mc}) — a
- * character map is for building an alphabet, not for browsing digits/punctuation
- * incidentally present in a block's numeric range.
+ * Script-specific digits (a defensive copy, see blockTierCandidates) plus the
+ * Common-scoped ASCII digits, appended after — deduped globally downstream in
+ * buildCharacterMap().
  */
-function blockTierCandidates(script: string | undefined): string[] {
-  if (script === undefined) return [];
+function digitsTierCandidates(script: string | undefined): string[] {
+  const scriptDigits = script === undefined ? [] : categorizeScriptChars(script).digits;
+  return [...scriptDigits, ...COMMON_DIGIT_CHARS];
+}
 
-  const defs = CHARACTER_MAP_BLOCKS[script];
-  if (defs === undefined) {
-    return scriptBlockChars(script).filter((ch) => !isGuardrailExcluded(ch));
-  }
-
-  const chars: string[] = [];
-  for (const def of defs) {
-    for (let cp = def.start; cp <= def.end; cp++) {
-      const ch = String.fromCodePoint(cp).normalize("NFC");
-      if (isGuardrailExcluded(ch)) continue;
-      if (!(/\p{L}/u.test(ch) || isCombiningMarkChar(ch))) continue;
-      chars.push(ch);
-    }
-  }
-  return chars;
+/**
+ * Script-specific punctuation (a defensive copy, see blockTierCandidates)
+ * plus the Common-scoped punctuation, appended after — deduped globally
+ * downstream in buildCharacterMap().
+ */
+function punctuationTierCandidates(script: string | undefined): string[] {
+  const scriptPunctuation = script === undefined ? [] : categorizeScriptChars(script).punctuation;
+  return [...scriptPunctuation, ...COMMON_PUNCTUATION_CHARS];
 }
 
 // ---------------------------------------------------------------------------
@@ -261,7 +446,7 @@ function groupByBlock(
   const groups = new Map<string, CharacterMapCell[]>();
   for (const ch of chars) {
     const cp = ch.codePointAt(0) ?? 0;
-    const blockName = blockNameFor(script, cp);
+    const blockName = blockNameFor(script, cp, tier);
     const cell: CharacterMapCell = { char: ch, isCombiningMark: isCombiningMarkChar(ch) };
     const existing = groups.get(blockName);
     if (existing !== undefined) {
@@ -284,8 +469,9 @@ function byCodepointAscending(a: string, b: string): number {
 /**
  * Builds the tiered, browsable character-map candidate set for the character
  * map UI: CLDR main exemplars, then CLDR auxiliary exemplars, then the
- * remaining codepoints of the script's browsing block(s) — grouped by Unicode
- * block name, deduplicated globally (first tier to introduce a char wins).
+ * resolved script's remaining letters (+ combining marks), then its digits,
+ * then its punctuation/symbols — grouped by Unicode block name, deduplicated
+ * globally (first tier to introduce a char wins).
  *
  * @param baseIr      Parsed KeyboardIR of the working-copy base. When `bcp47`
  *                    is omitted, its first header.bcp47 tag is used to resolve
@@ -325,12 +511,17 @@ export async function buildCharacterMap(
     }
   }
   const blockRaw = blockTierCandidates(script);
+  const digitsRaw = digitsTierCandidates(script);
+  const punctuationRaw = punctuationTierCandidates(script);
 
   mainRaw.sort(byCodepointAscending);
   auxRaw.sort(byCodepointAscending);
   blockRaw.sort(byCodepointAscending);
+  digitsRaw.sort(byCodepointAscending);
+  punctuationRaw.sort(byCodepointAscending);
 
-  // Global dedupe: first tier to introduce a char wins (main > auxiliary > block).
+  // Global dedupe: first tier to introduce a char wins
+  // (main > auxiliary > block > digits > punctuation).
   const seen = new Set<string>();
   const dedupe = (chars: string[]): string[] => {
     const out: string[] = [];
@@ -345,10 +536,14 @@ export async function buildCharacterMap(
   const mainChars = dedupe(mainRaw);
   const auxChars = dedupe(auxRaw);
   const blockChars = dedupe(blockRaw);
+  const digitsChars = dedupe(digitsRaw);
+  const punctuationChars = dedupe(punctuationRaw);
 
   return [
     ...groupByBlock(mainChars, "main", script),
     ...groupByBlock(auxChars, "auxiliary", script),
     ...groupByBlock(blockChars, "block", script),
+    ...groupByBlock(digitsChars, "digits", script),
+    ...groupByBlock(punctuationChars, "punctuation", script),
   ];
 }

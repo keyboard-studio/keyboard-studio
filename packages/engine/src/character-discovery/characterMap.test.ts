@@ -120,9 +120,19 @@ describe("buildCharacterMap", () => {
     expect(mainChars).toContain("ɛ");
   });
 
-  it("degrades to an empty result when no bcp47 is resolvable and baseIr is null", async () => {
+  it("degrades to only the Common digits/punctuation tiers when no bcp47 is resolvable and baseIr is null", async () => {
+    // main/auxiliary (no CLDR locale to resolve) and block (no script to
+    // resolve) stay empty, but the Common-scoped digits/punctuation tiers are
+    // script-agnostic — they populate for every case, including this one.
     const groups = await buildCharacterMap(null, undefined, undefined, bmLoader);
-    expect(groups).toEqual([]);
+    const tiers = groups.map((g) => g.tier);
+    expect(tiers).not.toContain("main");
+    expect(tiers).not.toContain("auxiliary");
+    expect(tiers).not.toContain("block");
+    const digitChars = groups.filter((g) => g.tier === "digits").flatMap((g) => g.cells.map((c) => c.char));
+    expect(digitChars).toContain("0");
+    const punctChars = groups.filter((g) => g.tier === "punctuation").flatMap((g) => g.cells.map((c) => c.char));
+    expect(punctChars).toContain(".");
   });
 
   it("CHARACTER_MAP_BLOCKS is a separate table scoped to Latn/Cyrl/Arab/Deva", () => {
@@ -155,6 +165,67 @@ describe("buildCharacterMap", () => {
     expect(chars).toContain("a");
   });
 
+  it("Ethiopic (Ethi) block tier yields letters even with no curated CHARACTER_MAP_BLOCKS entry", async () => {
+    // Ethi is absent from CHARACTER_MAP_BLOCKS entirely — full-script
+    // enumeration must still produce letters via Script_Extensions.
+    const groups = await buildCharacterMap(makeIR(), "xx-Ethi", undefined, async () => null);
+    const blockChars = groups.filter((g) => g.tier === "block").flatMap((g) => g.cells.map((c) => c.char));
+    expect(blockChars).toContain("ሀ"); // U+1200 ETHIOPIC SYLLABLE HA
+    // No curated block name for Ethi, so it groups under the generic tier label.
+    const blockNames = groups.filter((g) => g.tier === "block").map((g) => g.block);
+    expect(blockNames).toContain("Letters");
+  });
+
+  it("Ethiopic digits tier surfaces \\p{No} numerals (not \\p{Nd})", async () => {
+    // Ethiopic numerals (U+1369-137C) are General_Category No, not Nd —
+    // a digit filter of \p{Nd} alone would silently drop this whole script.
+    const groups = await buildCharacterMap(makeIR(), "xx-Ethi", undefined, async () => null);
+    const digitChars = groups.filter((g) => g.tier === "digits").flatMap((g) => g.cells.map((c) => c.char));
+    expect(digitChars).toContain("፩"); // U+1369 ETHIOPIC DIGIT ONE
+    const digitNames = groups.filter((g) => g.tier === "digits").map((g) => g.block);
+    expect(digitNames).toContain("Digits");
+  });
+
+  it("Ethiopic punctuation tier surfaces script punctuation", async () => {
+    const groups = await buildCharacterMap(makeIR(), "xx-Ethi", undefined, async () => null);
+    const punctChars = groups.filter((g) => g.tier === "punctuation").flatMap((g) => g.cells.map((c) => c.char));
+    expect(punctChars).toContain("።"); // U+1362 ETHIOPIC FULL STOP
+  });
+
+  it("Bengali (Beng) block/digits/punctuation tiers all populate via full-script enumeration", async () => {
+    const groups = await buildCharacterMap(makeIR(), "xx-Beng", undefined, async () => null);
+    const byTier = (t: "block" | "digits" | "punctuation") =>
+      groups.filter((g) => g.tier === t).flatMap((g) => g.cells.map((c) => c.char));
+    expect(byTier("block")).toContain("ক"); // U+995 BENGALI LETTER KA
+    expect(byTier("digits")).toContain("০"); // U+9E6 BENGALI DIGIT ZERO
+    expect(byTier("punctuation")).toContain("।"); // U+964 DEVANAGARI DANDA (shared, Script_Extensions incl. Beng)
+  });
+
+  it("Thai (Thai) block/digits/punctuation tiers all populate via full-script enumeration", async () => {
+    const groups = await buildCharacterMap(makeIR(), "xx-Thai", undefined, async () => null);
+    const byTier = (t: "block" | "digits" | "punctuation") =>
+      groups.filter((g) => g.tier === t).flatMap((g) => g.cells.map((c) => c.char));
+    expect(byTier("block")).toContain("ก"); // U+E01 THAI CHARACTER KO KAI
+    expect(byTier("digits")).toContain("๐"); // U+E50 THAI DIGIT ZERO
+    expect(byTier("punctuation")).toContain("๏"); // U+E4F THAI CHARACTER FONGMAN
+  });
+
+  it("curated scripts (Latn/Cyrl/Arab/Deva) also gain digits/punctuation tiers now", async () => {
+    // Cyrl has no CLDR data wired here — script-only, matching the existing
+    // "Cyrl block tier surfaces..." test's pattern.
+    const groups = await buildCharacterMap(makeIR(), "xx-Cyrl", undefined, async () => null);
+    const tiers = new Set(groups.map((g) => g.tier));
+    expect(tiers.has("digits") || tiers.has("punctuation")).toBe(true);
+    const punctChars = groups.filter((g) => g.tier === "punctuation").flatMap((g) => g.cells.map((c) => c.char));
+    expect(punctChars).toContain("҂"); // U+482 CYRILLIC THOUSANDS SIGN
+  });
+
+  it("global dedupe still holds across all five tiers (main/aux/block/digits/punctuation)", async () => {
+    const groups = await buildCharacterMap(makeIR(), "xx-Ethi", undefined, async () => null);
+    const chars = allCells(groups).map((c) => c.char);
+    expect(new Set(chars).size).toBe(chars.length);
+  });
+
   it("format-char guardrail excludes soft hyphen but retains the bidi-allowlisted LRM", async () => {
     // Both U+00AD (SOFT HYPHEN) and U+200E (LRM) are General_Category Cf, so
     // this exercises the isBidiControlCodePoint allowlist branch of
@@ -170,5 +241,68 @@ describe("buildCharacterMap", () => {
     expect(chars).not.toContain(SOFT_HYPHEN);
     expect(chars).toContain(LRM);
     expect(chars).toContain("a");
+  });
+
+  it("a Latin language yields ASCII 0-9 in the digits tier and common punctuation in the punctuation tier", async () => {
+    // Fix 1: ASCII digits/ordinary punctuation are Script=Common with no
+    // Script_Extensions override, so the per-script scx enumeration alone
+    // (categorizeScriptChars) never surfaces them for a Latin-script
+    // language — the Common-scoped fold-in must.
+    const groups = await buildCharacterMap(makeIR(), "xx-Latn", undefined, async () => null);
+    const digitChars = groups.filter((g) => g.tier === "digits").flatMap((g) => g.cells.map((c) => c.char));
+    for (const digit of "0123456789") {
+      expect(digitChars).toContain(digit);
+    }
+    const punctChars = groups.filter((g) => g.tier === "punctuation").flatMap((g) => g.cells.map((c) => c.char));
+    for (const punct of [".", ",", "?", "!", "(", ")", '"', "'", "-", ":", ";"]) {
+      expect(punctChars).toContain(punct);
+    }
+    // Currency signs are Script=Common (no Script_Extensions override), so the
+    // Currency Symbols block must be folded in too — ordinary orthographic
+    // characters for many target languages (Naira, Cedi, Euro, Rupee).
+    for (const currency of ["€", "₦", "₵", "₹"]) {
+      expect(punctChars).toContain(currency);
+    }
+  });
+
+  it("an alias ISO 15924 script code (Aran) resolves via SCRIPT_ALIAS_MAP instead of throwing to empty tiers", async () => {
+    // Fix 2: `\p{Script_Extensions=Aran}` throws (Aran isn't a Unicode
+    // Script property value) — pre-fix, the swallowed throw left every tier
+    // empty. Aran maps to Arab.
+    const groups = await buildCharacterMap(makeIR(), "xx-Aran", undefined, async () => null);
+    const blockChars = groups.filter((g) => g.tier === "block").flatMap((g) => g.cells.map((c) => c.char));
+    expect(blockChars.length).toBeGreaterThan(0);
+    expect(blockChars).toContain("ا"); // U+0627 ARABIC LETTER ALEF
+  });
+
+  it("includes \\p{Nl} letter-numbers (e.g. Roman numerals) in the digits tier", async () => {
+    // Fix 4: Roman numerals (U+2160.., Script_Extensions=Latn) are
+    // General_Category Nl — neither the letters branch (\p{L}) nor the old
+    // digits branch (\p{Nd}/\p{No}) matched them, so they fell through every
+    // bucket and were silently dropped.
+    const groups = await buildCharacterMap(makeIR(), "xx-Latn", undefined, async () => null);
+    const digitChars = groups.filter((g) => g.tier === "digits").flatMap((g) => g.cells.map((c) => c.char));
+    expect(digitChars).toContain("Ⅰ"); // U+2160 ROMAN NUMERAL ONE
+  });
+
+  it("does not corrupt the per-script cache across repeated calls for the same script", async () => {
+    // Fix 3: the per-script cache accessors used to hand back the live
+    // cached arrays, which buildCharacterMap() then sorted in place. Two
+    // back-to-back calls for the same script must return equal, independent
+    // data — mutating the first call's result must not leak into the second.
+    const first = await buildCharacterMap(makeIR(), "xx-Cyrl", undefined, async () => null);
+    const second = await buildCharacterMap(makeIR(), "xx-Cyrl", undefined, async () => null);
+    expect(first).toEqual(second);
+
+    // Mutate the first call's result as destructively as possible.
+    for (const group of first) {
+      group.cells.push({ char: "MUTATED", isCombiningMark: false });
+      group.cells.reverse();
+    }
+
+    const third = await buildCharacterMap(makeIR(), "xx-Cyrl", undefined, async () => null);
+    expect(third).toEqual(second);
+    const thirdChars = third.flatMap((g) => g.cells.map((c) => c.char));
+    expect(thirdChars).not.toContain("MUTATED");
   });
 });
