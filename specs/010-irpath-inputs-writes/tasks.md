@@ -15,6 +15,16 @@
 
 ---
 
+> **Status note (2026-07-19, PR #1186).** The `[x]` flips below are **pre-existing
+> working-tree bookkeeping** — recorded in PR #1186 as spec-status, not authored or
+> individually re-verified in that change (see the PR's Scope note). The feature's
+> deliverables do exist on the branch — e.g. `IRPath` at
+> [packages/contracts/src/ir-path.ts](../../packages/contracts/src/ir-path.ts)
+> (+ `ir-path.test.ts`), and the declared `inputs`/`writes` step manifest at
+> [packages/studio/src/steps/manifest.ts](../../packages/studio/src/steps/manifest.ts).
+> This blanket note documents the flips' provenance rather than fabricating a
+> per-task `(LANDED: file:line)` citation that was not verified.
+
 ## Phase 1: Setup (Shared Infrastructure)
 
 **Purpose**: Net-new structure and the version-bump decision.

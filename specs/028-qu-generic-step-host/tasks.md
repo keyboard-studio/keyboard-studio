@@ -12,6 +12,16 @@ All paths are under `packages/studio/`.
 
 ---
 
+> **Status note (2026-07-19, PR #1186) — all tasks LANDED via spec 028 + the spec 029
+> FlowStepHost convergence.** Shipped deliverables (crew-verified in PR #1186):
+> the generic host [packages/studio/src/components/StepHost.tsx](../../packages/studio/src/components/StepHost.tsx),
+> the pure advance policy [packages/studio/src/steps/advance.ts](../../packages/studio/src/steps/advance.ts),
+> the manifest wiring [packages/studio/src/steps/registerEditorSteps.ts](../../packages/studio/src/steps/registerEditorSteps.ts),
+> the golden-walk parity oracle [packages/studio/tests/steps/stepHost.goldenWalk.test.tsx](../../packages/studio/tests/steps/stepHost.goldenWalk.test.tsx),
+> and the `FlowStepHost` factory [packages/studio/src/survey/FlowStepHost.tsx](../../packages/studio/src/survey/FlowStepHost.tsx).
+> Per-task notes are recorded on T009 (SUPERSEDED) and T023 (LANDED); this blanket
+> note covers the remaining checkboxes rather than re-annotating each line.
+
 ## Phase 1: Setup
 
 - [x] T001 Confirm branch `km/qu-028-generic-step-host` is forked from `main` with spec 027
