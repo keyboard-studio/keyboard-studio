@@ -1,0 +1,42 @@
+# env.license-fork-eligibility — whether the candidate base's license permits
+# forking-and-adapting. The hard eligibility gate for base selection: a
+# proprietary-restricted or unspecified license means the base cannot simply be
+# forked. Read from the base's LICENSE text before adaptation. Measurement ships
+# in spec 043's keyboard-facet-index; session consumption is planned.
+
+id: env.license-fork-eligibility
+family: env
+title: License fork eligibility
+description: >
+  Whether the candidate base's license permits forking-and-adapting —
+  permissive, copyleft, proprietary-restricted, or unspecified — matched from the
+  base's LICENSE text against a known-license signature table. The hard gate the
+  base-selection surface uses to rule out bases that cannot be legally forked;
+  `unspecified` is never inferred from author or copyright.
+valueType: enum
+values: [permissive, copyleft, proprietary-restricted, unspecified]
+
+modality: both
+
+derivations:
+  - kind: corpus
+    source: "corpus:license-fork-eligibility"
+    sourceStatus: planned
+    notes: >
+      Matches the base's LICENSE file text against the pinned known-license
+      signature table, produced by the keyboard-facet-index
+      license-fork-eligibility classifier (spec 043); session consumption of the
+      index is planned.
+
+consumers:
+  prefills: []
+  proposes:
+    - "gate:fork-eligibility"
+
+provenanceLabel: "whether your candidate base's license lets you fork and adapt it"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: corpus

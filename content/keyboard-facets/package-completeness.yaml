@@ -1,0 +1,33 @@
+# package-completeness — spec 043 US3 (declared-metadata archetype).
+#
+# A checklist of the optional package components the base ships, as a set over
+# {osk, help, predictive, icon} (FR-034): an on-screen-keyboard artifact
+# (.kvks/.kvk), a help/welcome page (welcome.htm / <WelcomeFile>), a predictive
+# model (.model.*), and a package icon (.ico). Read from the .kps via the shared
+# kps-reader. Feeds source.package-completeness.
+#
+# valueType is `set` (closed): membership over the four fixed component slots; an
+# empty set is a valid "ships none of them" reading.
+id: package-completeness
+title: Package completeness
+description: >
+  Which optional package components the base ships — on-screen keyboard, help
+  page, predictive model, icon — as a checklist set over {osk, help, predictive,
+  icon}, read from the .kps <Files>/<Options>.
+valueType: set
+limits:
+  values:
+    - osk
+    - help
+    - predictive
+    - icon
+  open: false
+likelihoodSemantics: >
+  set membership per present component; no per-member likelihood. The empty set
+  is a valid reading (the package ships none of the four optional components).
+derivation:
+  archetype: declared-metadata
+  classifierId: package-completeness-classifier
+  fallbackChain: [declared-metadata, default-fallback]
+feedsSessionFacets: [source.package-completeness]
+schemaVersion: 1

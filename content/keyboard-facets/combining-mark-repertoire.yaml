@@ -1,0 +1,41 @@
+# combining-mark-repertoire — spec 043 US2 (character-content archetype).
+#
+# The set of Unicode combining marks (\p{M}) the base can INPUT, derived from its
+# produced-character set. A keyboard.* facet: it describes the base's raw
+# capability, not a session-transformable posture — so it has NO session mirror
+# and an empty feedsSessionFacets (FR-021, FR-006).
+#
+# GUARD (research Decision 7): combining marks are the alphabetic-script
+# mechanism for stacking diacritics. On abugida/abjad/syllabary/logographic
+# scripts the question does not apply, so the classifier records `notApplicable`
+# there (never a forced empty set) — the same script-family guard
+# normalization-posture uses. The guard's ISO-15924 -> family mapping is inline in
+# the US2 classifier (the durable keyboard.script-family facet lands in US3 and
+# the guard repoints at it).
+#
+# valueType is `set` with `open: true`: the members are arbitrary combining-mark
+# characters (an open set), so membership is not enumerable in limits.values; the
+# lone `not-applicable` entry documents the guard sentinel and satisfies the
+# non-empty-values contract (C3).
+id: combining-mark-repertoire
+title: Combining-mark repertoire
+description: >
+  The set of Unicode combining marks the base can input, from its produced-set.
+  Records `notApplicable` on non-alphabetic scripts (abugida/abjad/syllabary/
+  logographic), guarded by the base's dominant script family — never a forced
+  empty set. Keyboard-index-only (no session mirror).
+valueType: set
+limits:
+  values:
+    - not-applicable
+  open: true
+likelihoodSemantics: >
+  membership is the set of inputtable combining marks (an open set); no
+  per-member likelihood. `notApplicable` marks a non-alphabetic base where the
+  repertoire question does not apply.
+derivation:
+  archetype: character-content
+  classifierId: combining-mark-repertoire-classifier
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: []
+schemaVersion: 1

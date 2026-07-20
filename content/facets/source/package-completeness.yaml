@@ -1,0 +1,49 @@
+# source.package-completeness — which optional package components the chosen
+# base ships (on-screen keyboard, help page, predictive model, icon). A read-only
+# signal for how much scaffolding the adaptation inherits vs must add. Measurement
+# ships in spec 043's keyboard-facet-index; session consumption is planned.
+
+id: source.package-completeness
+family: source
+title: Source package completeness
+description: >
+  Which optional package components the chosen base ships — an on-screen keyboard
+  (.kvks/.kvk), a help/welcome page, a predictive model (.model.*), and a package
+  icon — as a checklist over {osk, help, predictive, icon}, read from the .kps.
+  Lets the author see what scaffolding an adaptation inherits vs must add.
+
+valueType: set
+
+modality: both
+
+derivations:
+  - kind: computed
+    source: "planned:package-completeness-of-kps"
+    sourceStatus: planned
+    notes: >
+      Reads the .kps <Files>/<Options> for OSK, welcome, predictive-model, and
+      icon presence, produced by the keyboard-facet-index package-completeness
+      classifier (spec 043); session consumption is planned.
+
+consumers:
+  prefills: []
+  proposes:
+    - "gate:package-completeness"
+
+provenanceLabel: "which extras your source keyboard already ships (help, on-screen keyboard, prediction, icon)"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed
+
+transformImpactClass: gate
+houseTargetPolicy: null
+invertibility: not-applicable
+implications: >
+  A read-only inventory signal — it does not transform the keyboard; it reports
+  which optional components the base already provides so the author knows what an
+  adaptation would inherit versus have to build.
+exceptionSites: []
+causePredicates: []

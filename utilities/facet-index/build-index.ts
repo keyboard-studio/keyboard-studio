@@ -55,8 +55,14 @@ import { classifyAddedCharCount, addedCharCountFallback } from "./added-char-cou
 import { classifyPlatformCoverage, platformCoverageFallback } from "./platform-coverage-classifier.js";
 import { classifyFontDependency, fontDependencyFallback } from "./font-dependency-classifier.js";
 import { classifyDiacriticMechanism, diacriticMechanismFallback } from "./diacritic-mechanism-classifier.js";
+import { classifyCombiningMarkRepertoire, combiningMarkRepertoireFallback } from "./combining-mark-repertoire-classifier.js";
 import { classifySpareKeyBudget, spareKeyBudgetFallback } from "./spare-key-budget-classifier.js";
 import { classifyOrthographyCoverageRatio, orthographyCoverageRatioFallback } from "./orthography-coverage-ratio-classifier.js";
+import { classifyLicenseForkEligibility, licenseForkEligibilityFallback } from "./license-fork-eligibility-classifier.js";
+import { classifyDirectionality, directionalityFallback } from "./directionality-classifier.js";
+import { classifyScriptFamily, scriptFamilyFallback } from "./script-family-classifier.js";
+import { classifyDeclaredBcp47Tags, declaredBcp47TagsFallback } from "./declared-bcp47-tags-classifier.js";
+import { classifyPackageCompleteness, packageCompletenessFallback } from "./package-completeness-classifier.js";
 import { deriveScriptFallback, UNDETERMINED } from "./fallback.js";
 import type {
   Categorization,
@@ -177,13 +183,31 @@ export const DEFAULT_CLASSIFIERS: Record<string, ClassifierPair> = {
   "added-char-count": { classify: classifyAddedCharCount, fallback: addedCharCountFallback },
   "platform-coverage": { classify: classifyPlatformCoverage, fallback: platformCoverageFallback },
   "font-dependency": { classify: classifyFontDependency, fallback: fontDependencyFallback },
-  // spec 043 US2 — writing-system matching facets (combining-mark-repertoire
-  // lands with US3 below since its guard imports script-family).
+  // spec 043 US2 — four writing-system matching facets.
   "diacritic-mechanism": { classify: classifyDiacriticMechanism, fallback: diacriticMechanismFallback },
+  "combining-mark-repertoire": {
+    classify: classifyCombiningMarkRepertoire,
+    fallback: combiningMarkRepertoireFallback,
+  },
   "spare-key-budget": { classify: classifySpareKeyBudget, fallback: spareKeyBudgetFallback },
   "orthography-coverage-ratio": {
     classify: classifyOrthographyCoverageRatio,
     fallback: orthographyCoverageRatioFallback,
+  },
+  // spec 043 US3 — five eligibility / enricher facets.
+  "license-fork-eligibility": {
+    classify: classifyLicenseForkEligibility,
+    fallback: licenseForkEligibilityFallback,
+  },
+  directionality: { classify: classifyDirectionality, fallback: directionalityFallback },
+  "script-family": { classify: classifyScriptFamily, fallback: scriptFamilyFallback },
+  "declared-bcp47-tags": {
+    classify: classifyDeclaredBcp47Tags,
+    fallback: declaredBcp47TagsFallback,
+  },
+  "package-completeness": {
+    classify: classifyPackageCompleteness,
+    fallback: packageCompletenessFallback,
   },
 };
 

@@ -49,6 +49,12 @@ export interface KpsPackageInfo {
   licenseFilePath: string | null;
   /** True when a license file is declared or bundled. */
   hasLicenseFile: boolean;
+  /**
+   * The UTF-8 text of the collected LICENSE/COPYING file (from `kb.sources`, which
+   * `scan.ts` now populates with the `.kps`-named license), or null when none was
+   * collected. Feeds `license-fork-eligibility`'s header-signature match.
+   */
+  licenseText: string | null;
   /** On-screen-keyboard artifact present (a `.kvks`/`.kvk` among `<Files>`). */
   hasOsk: boolean;
   /** Help/welcome page present (`<WelcomeFile>` or a `welcome.htm` among `<Files>`). */
@@ -70,6 +76,7 @@ function emptyInfo(): KpsPackageInfo {
     oskFonts: [],
     licenseFilePath: null,
     hasLicenseFile: false,
+    licenseText: null,
     hasOsk: false,
     hasWelcome: false,
     hasModel: false,
@@ -81,6 +88,12 @@ function emptyInfo(): KpsPackageInfo {
 function readKpsXml(kb: ScannedKeyboard): string | null {
   const kpsSource = kb.sources.find((s) => s.path === kb.kpsPath);
   return kpsSource ? kpsSource.bytes.toString("utf8") : null;
+}
+
+/** The text of the collected LICENSE/COPYING source file, or null when none. */
+function readLicenseText(kb: ScannedKeyboard): string | null {
+  const src = kb.sources.find((s) => /(^|[\\/])(license|copying)(\.[^\\/]*)?$/i.test(s.path));
+  return src ? src.bytes.toString("utf8") : null;
 }
 
 /**
@@ -141,6 +154,7 @@ export function readKpsPackage(kb: ScannedKeyboard): KpsPackageInfo {
     oskFonts: fontRefs.oskFonts,
     licenseFilePath: bundledLicense,
     hasLicenseFile: bundledLicense !== null,
+    licenseText: readLicenseText(kb),
     hasOsk: fileExtensions.has(".kvks") || fileExtensions.has(".kvk"),
     hasWelcome,
     hasModel: fileExtensions.has(".model.ts") || fileExtensions.has(".model.js") || fileExtensions.has(".model.kmp"),

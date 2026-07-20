@@ -24,6 +24,19 @@
     {
       "file": "utilities/facet-index/data/base-layouts.json",
       "sha256": "6fa7ef55dc950b8395421acecdf70ed3631ea2adf6fab5414a1f1ba26b25000f"
+    },
+    {
+      "file": "utilities/facet-index/data/cldr-exemplars.json",
+      "sha256": "c618691e2bd1231310a288e20f832dd4d7af1e183cdbf6638a3027e08d2ff386",
+      "cldrVersion": "46"
+    },
+    {
+      "file": "utilities/facet-index/data/known-licenses.json",
+      "sha256": "24a1e428dbfa6f6d90ce0a00e60f9cb44401d1bf99d2b2eaef6e8ecaf46a7af4"
+    },
+    {
+      "file": "utilities/facet-index/data/iso15924-script-family.json",
+      "sha256": "28329e535b79edf3e5825f8233a2ed317db08eeb4cb01e917d3affce15e728cf"
     }
   ]
 }
