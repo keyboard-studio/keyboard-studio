@@ -159,10 +159,38 @@ describe("checkContextOrdering", () => {
     expect(vk?.location?.line).toBe(2);
   });
 
-  it("reports a column greater than 0 for virtual key error", () => {
+  it("reports the exact column for a non-indented virtual key error (ctxStart=0 baseline)", () => {
     const source = '[K_A] + "a" > "b"';
     const findings = checkContextOrdering(source);
-    expect(findings[0]?.location?.column).toBeGreaterThan(0);
+    // `[K_A]` begins at column 1; no leading whitespace, so ctxStart is 0.
+    expect(findings[0]?.location?.column).toBe(1);
+  });
+
+  // #1223 — a context with leading whitespace must report the column of the
+  // token in the ORIGINAL line, not in the trimmed context. extractContext
+  // returns ctxStart = the trimmed leading-whitespace width, and every finding
+  // adds it back into its column.
+  it("re-offsets the column by the leading indent for a virtual key error", () => {
+    const source = "    [K_A] + 'a' > 'b'"; // 4 leading spaces; `[` is at column 5
+    const findings = checkContextOrdering(source);
+    const vk = findings.find((f) => f.code === "KM_ERROR_VIRTUAL_KEY_IN_CONTEXT");
+    expect(vk?.location?.column).toBe(5);
+  });
+
+  it("re-offsets the column by the leading indent for a nul-not-first error", () => {
+    const source = '    dk(acute) nul + "a" > "b"'; // 4 leading spaces
+    const findings = checkContextOrdering(source);
+    const nul = findings.find((f) => f.code === "KM_ERROR_NUL_NOT_FIRST");
+    // Non-indented equivalent reports column 11; +4 for the indent = 15.
+    expect(nul?.location?.column).toBe(15);
+  });
+
+  it("re-offsets the column by the leading indent for a guard-after-content error", () => {
+    const source = '    dk(acute) if(&platform = "hardware") + "a" > "b"'; // 4 leading spaces
+    const findings = checkContextOrdering(source);
+    const guard = findings.find((f) => f.code === "KM_ERROR_GUARD_AFTER_CONTENT");
+    // Content token `dk(acute)` at column 1 non-indented; +4 for the indent = 5.
+    expect(guard?.location?.column).toBe(5);
   });
 
   // Regression — a deadkey literally named "nul" used as a dk() argument is not

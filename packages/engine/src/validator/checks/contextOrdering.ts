@@ -164,7 +164,11 @@ function extractContext(line: string): { ctx: string; ctxStart: number } | null 
 
     if (sepIndex >= 0 && ch === ">") {
       // Confirmed rule: separator found and an unquoted `>` follows it.
-      return { ctx: line.slice(0, sepIndex).trim(), ctxStart: 0 };
+      // ctxStart records the leading-whitespace width dropped by trim() so the
+      // caller can re-offset finding columns back to the original line (an
+      // indented rule's context otherwise reports a column shifted left).
+      const rawCtx = line.slice(0, sepIndex);
+      return { ctx: rawCtx.trim(), ctxStart: rawCtx.length - rawCtx.trimStart().length };
     }
   }
   // No separator, or no `>` after it — not a key rule.
@@ -183,7 +187,7 @@ export function checkContextOrdering(source: string): LintFinding[] {
     const line = lines[lineIdx] ?? "";
     const extracted = extractContext(line);
     if (!extracted) continue;
-    const { ctx } = extracted;
+    const { ctx, ctxStart } = extracted;
     if (!ctx) continue;
 
     // --- Rule 3: no virtual keys [K_X] in context ---
@@ -195,7 +199,7 @@ export function checkContextOrdering(source: string): LintFinding[] {
         severity: "error",
         layer: "A",
         message: `Virtual key "${vkMatch[0]}" is not allowed in the context (LHS) of a rule`,
-        location: { file: "", line: lineIdx + 1, column: vkMatch.index + 1 },
+        location: { file: "", line: lineIdx + 1, column: vkMatch.index + ctxStart + 1 },
       });
     }
 
@@ -225,7 +229,7 @@ export function checkContextOrdering(source: string): LintFinding[] {
           severity: "error",
           layer: "A",
           message: `"nul" must be the first token in the context`,
-          location: { file: "", line: lineIdx + 1, column: nulMatch.index + 1 },
+          location: { file: "", line: lineIdx + 1, column: nulMatch.index + ctxStart + 1 },
         });
       }
     }
@@ -256,7 +260,7 @@ export function checkContextOrdering(source: string): LintFinding[] {
             severity: "error",
             layer: "A",
             message: `if()/platform()/baselayout() must appear before other content tokens in the context`,
-            location: { file: "", line: lineIdx + 1, column: contentMatch.index + 1 },
+            location: { file: "", line: lineIdx + 1, column: contentMatch.index + ctxStart + 1 },
           });
           break; // one finding per line is sufficient
         }
