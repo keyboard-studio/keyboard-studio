@@ -17,18 +17,25 @@
  *   2. A whitespace-delimited standalone `c` appearing later in the SAME
  *      logical line. kmcmplib starts an end-of-line comment there on ANY line
  *      kind — store/group/begin/rule — not only on the tail of a rule after
- *      the `>` separator. hasCommentToken() below recognizes this generically
- *      across all line kinds so the continuation-join loop knows a trailing
- *      `\` after such a `c` is inside the comment, not a line continuation.
- *      This is comment RECOGNITION only (does a `c` token start a comment
- *      here, for tokenizing purposes); it is distinct from the codec's
- *      structured trailing-comment EXTRACTION (splitting a rule's trailing
- *      `c <text>` into `IRRule.trailingComment`), which is deliberately
- *      rule-only and lives in parse.ts (splitOnArrow / stripTrailingComment).
- *      A trailing comment on a store/group/begin line is recognized here (so
- *      it doesn't break continuation joining) but is not split into a typed
- *      field elsewhere in the codec.
+ *      the `>` separator. hasCommentToken() (./continuation.ts) recognizes
+ *      this generically across all line kinds so the continuation-join loop
+ *      knows a trailing `\` after such a `c` is inside the comment, not a
+ *      line continuation. This is comment RECOGNITION only (does a `c` token
+ *      start a comment here, for tokenizing purposes); it is distinct from
+ *      the codec's structured trailing-comment EXTRACTION (splitting a
+ *      rule's trailing `c <text>` into `IRRule.trailingComment`), which is
+ *      deliberately rule-only and lives in parse.ts (splitOnArrow /
+ *      stripTrailingComment). A trailing comment on a store/group/begin line
+ *      is recognized here (so it doesn't break continuation joining) but is
+ *      not split into a typed field elsewhere in the codec.
+ *
+ * The continuation join itself (backslash matching, comment guards, the
+ * per-segment physical-line map) lives in ./continuation.ts and is shared
+ * with the Layer-A validator (validator/index.ts) so the join logic exists
+ * in exactly one place.
  */
+
+import { joinContinuations } from "./continuation.js";
 
 export type TokenKind =
   | "comment"        // c <text>
@@ -68,53 +75,8 @@ function stripBom(text: string): string {
 
 // Module-scope regexes (compiled once; file convention after the COMMENT_LINE_RE
 // hoist — all single-use tokenizer patterns live here rather than inside
-// tokenize()).
-
-// A backslash at the end of a physical line — optionally followed by trailing
-// whitespace — joins the next physical line. The trailing whitespace is
-// tolerated because real keyboard sources sometimes ship `\ ` or `\  `
-// (e.g. basic_kbdoldit line 92, store(unused) continuation).
-const CONTINUATION_RE = /\\\s*$/;
-
-// A full-line `c` comment ends at the newline. kmcmplib does NOT honor a
-// trailing backslash inside a comment as a line-continuation, so a line like
-// `c \` must not swallow the following line. Mirrors the comment classifier
-// below (`/^c(?:\s|$)/i`), but tests the untrimmed physical line.
-const COMMENT_LINE_RE = /^\s*c(?:\s|$)/i;
-
-/**
- * True if `text` contains an unquoted `c` comment token — a `c`/`C` that is
- * whitespace-preceded (or at line start) and whitespace-or-EOL-followed, and
- * not inside a quoted string. In .kmn a standalone `c` is unambiguously the
- * comment keyword and the comment runs to end-of-line, so any trailing
- * backslash after it is NOT a line-continuation. This catches TRAILING
- * comments (e.g. `... > 'b' c note \`) that COMMENT_LINE_RE — which only
- * matches full-line comments — misses; without it the next line is silently
- * swallowed into the comment. Mirrors kmcmplib, which does not honor a
- * backslash inside a comment as a continuation.
- */
-function hasCommentToken(text: string): boolean {
-  let quote: string | null = null;
-  for (let k = 0; k < text.length; k++) {
-    const ch = text[k];
-    if (quote !== null) {
-      if (ch === quote) quote = null;
-      continue;
-    }
-    if (ch === "'" || ch === '"') {
-      quote = ch;
-      continue;
-    }
-    if (ch === "c" || ch === "C") {
-      const prev = text[k - 1];
-      const next = text[k + 1];
-      const prevIsWs = prev === undefined || prev === " " || prev === "\t";
-      const nextIsWsOrEol = next === undefined || next === " " || next === "\t";
-      if (prevIsWs && nextIsWsOrEol) return true;
-    }
-  }
-  return false;
-}
+// tokenize()). The continuation-join regexes/helpers live in ./continuation.ts
+// now (shared with the validator); see the import above.
 
 // Target-selector prefix matchers (case-insensitive; kmcmplib uses u16nicmp).
 // The colon is required; whitespace between the prefix and the rest of the
@@ -137,27 +99,12 @@ const NOMATCH_RE = /^nomatch\s*>/i;
  */
 export function tokenize(source: string): Token[] {
   const clean = stripBom(source);
-  const physicalLines = clean.split(/\r?\n/);
 
-  // Step 1: join continuation lines (CONTINUATION_RE, module scope above).
-  const logicalLines: Array<{ text: string; line: number }> = [];
-  let i = 0;
-  while (i < physicalLines.length) {
-    let text = physicalLines[i] ?? "";
-    const startLine = i + 1; // 1-based
-    while (
-      CONTINUATION_RE.test(text) &&
-      !COMMENT_LINE_RE.test(text) &&
-      !hasCommentToken(text) &&
-      i + 1 < physicalLines.length
-    ) {
-      text = text.replace(CONTINUATION_RE, ""); // drop backslash + trailing ws
-      i++;
-      text = text + (physicalLines[i] ?? "").trimStart();
-    }
-    logicalLines.push({ text, line: startLine });
-    i++;
-  }
+  // Step 1: join continuation lines (./continuation.ts, shared with the
+  // validator). tokenize only needs each logical line's joined `text` and
+  // its first physical `line`; the richer per-segment map is for consumers
+  // that need to translate a diagnostic back to a physical position.
+  const logicalLines = joinContinuations(clean);
 
   const tokens: Token[] = [];
 

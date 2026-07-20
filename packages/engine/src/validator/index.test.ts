@@ -121,3 +121,95 @@ describe("runAllChecks", () => {
     expect(all).toHaveLength(lexical.length + reference.length);
   });
 });
+
+// Issue #1221 — Layer A checks scan physical lines and never joined
+// `\`-terminated continuation lines, so a rule split across a continuation
+// was mis-analyzed (contextOrdering could skip it entirely). The entry
+// points here now join once (../codec/continuation.ts) and remap findings
+// back to physical positions; the checks themselves are unchanged.
+describe("continuation joining (issue #1221)", () => {
+  it("analyzes a context split across a continuation and reports the PHYSICAL line/column of the offending vkey", () => {
+    // Physical line 1: "dk(acute) \" (no `+` yet — a naive per-line scan sees
+    // no rule here at all). Physical line 2 continues the context with a
+    // virtual key, which is illegal in a rule's context (LHS).
+    const source = ['dk(acute) \\', '[K_X] + "a" > "b"'].join("\n");
+
+    const findings = runReferenceChecks(source);
+    const vk = findings.find((f) => f.code === "KM_ERROR_VIRTUAL_KEY_IN_CONTEXT");
+
+    expect(vk).toBeDefined();
+    // The [K_X] vkey physically lives on line 2, column 1 — not line 1
+    // (where a naive unjoined scan would have missed the rule entirely, and
+    // an unmapped joined scan would misreport it on line 1).
+    expect(vk?.location?.line).toBe(2);
+    expect(vk?.location?.column).toBe(1);
+  });
+
+  it("resolves an index() call whose closing paren is on a continuation line", () => {
+    // Physical line 1 ends mid-call — `index(missing,` has no closing paren
+    // or digit yet, so an unjoined scan's INDEX_RE cannot match this line at
+    // all and the undeclared-store warning is silently lost.
+    const source = ['any(s) + "x" > index(missing, \\', "1)"].join("\n");
+
+    const findings = runReferenceChecks(source);
+    const undeclared = findings.find(
+      (f) => f.code === "KM_WARN_INDEX_STORE_UNDECLARED"
+    );
+
+    expect(undeclared).toBeDefined();
+    expect(undeclared?.message).toContain("missing");
+    // The index(...) call starts on physical line 1.
+    expect(undeclared?.location?.line).toBe(1);
+  });
+
+  it("a trailing `c` comment ending in a backslash does NOT join the next rule (must not misattribute its finding)", () => {
+    // Line 1 is a store declaration with a trailing comment whose last
+    // character is a backslash — kmcmplib does NOT treat this as a
+    // continuation (the comment already ended the line). Line 2 is an
+    // unrelated rule with a vkey in its context.
+    const source = [
+      'store(s) "abc" c trailing note ends with backslash \\',
+      '[K_X] + "a" > "b"',
+    ].join("\n");
+
+    const findings = runReferenceChecks(source);
+    const vkFindings = findings.filter(
+      (f) => f.code === "KM_ERROR_VIRTUAL_KEY_IN_CONTEXT"
+    );
+
+    // Exactly one finding, correctly attributed to physical line 2 — if the
+    // comment guard were dropped, the two lines would wrongly join into one
+    // logical line and this would misreport (or duplicate) on line 1.
+    expect(vkFindings).toHaveLength(1);
+    expect(vkFindings[0]?.location?.line).toBe(2);
+    expect(vkFindings[0]?.location?.column).toBe(1);
+  });
+
+  it("remaps line AND column through a leadingTrim > 0 continuation segment", () => {
+    // Physical line 1: "dk(acute) \" (continuation). Physical line 2 is
+    // INDENTED by 3 spaces before the offending [K_X] vkey — the joined
+    // text is identical to the unindented case (leading whitespace on a
+    // continuation segment is trimmed before folding), so this only passes
+    // if remapFindings adds `leadingTrim` back in, not just `logicalStart`.
+    const source = ["dk(acute) \\", '   [K_X] + "a" > "b"'].join("\n");
+
+    const findings = runReferenceChecks(source);
+    const vk = findings.find((f) => f.code === "KM_ERROR_VIRTUAL_KEY_IN_CONTEXT");
+
+    expect(vk).toBeDefined();
+    expect(vk?.location?.line).toBe(2);
+    // Column 4: the 3 leading spaces (trimmed out of the join) plus 1.
+    expect(vk?.location?.column).toBe(4);
+  });
+
+  // km-qc P2 #4: remapFindings' no-column fallback (index.ts, the
+  // `loc.column !== undefined ? loc.column - 1 : 0` branch) is not covered
+  // by a dedicated test. Every current TS-portable check always sets
+  // `location.column` (see the check files under ./checks/), so there is no
+  // real finding that drives the column-less path, and remapFindings itself
+  // is an internal (unexported) helper of this module — there is no public
+  // seam to construct a minimal reproduction without adding test-only
+  // surface area. Per the instructions accompanying this change, the branch
+  // is documented in place instead (see the comment at the `offset =`
+  // fallback in index.ts) and this test is intentionally skipped.
+});
