@@ -1,7 +1,7 @@
 {
   "workflow": "speckit",
   "specName": "CLDR/SLDR exemplars",
-  "branch": "043-base-selection-facets",
+  "branch": "044-cldr-sldr-exemplars",
   "currentStep": "specify",
   "status": "specified",
   "history": [
