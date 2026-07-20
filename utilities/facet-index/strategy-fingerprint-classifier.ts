@@ -27,11 +27,10 @@ import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { ImportStatus } from "@keyboard-studio/contracts";
 
 import { mapImportStatus, computeAnalyzedCoverage } from "./outcome.js";
+import { CONFIDENT_DOMINANT_SHARE, strategyRuleTally } from "./strategy-tally.js";
 import type { Categorization, ConfidenceClass, FacetDefinition } from "./types.js";
 import type { ScannedKeyboard } from "./scan.js";
 
-/** A single strategy must reach this share of RECOGNIZED rules to read as `confident`. */
-const CONFIDENT_DOMINANT_SHARE = 0.8;
 /** Residue at or above this share means recognition is too partial to call a dominant strategy `confident`. */
 const CONFIDENT_MAX_RESIDUE = 0.2;
 /** Float tolerance so a distribution that sums to a hair over 1 does not trip the sum invariant. */
@@ -56,17 +55,11 @@ export function classifyStrategyFingerprint(ir: KeyboardIR, def: FacetDefinition
   // recognized share from the owned-rule tally below so the distribution +
   // residue sum is numerically exact for the build-time X2 check.
 
-  // Per-strategy owned-rule tally. Each recognized rule is owned by exactly one
-  // pattern (ownership-consistency invariant), so summing per-pattern owned
-  // rule counts grouped by strategy never double-counts a rule.
-  const strategyRuleCount = new Map<string, number>();
-  for (const pattern of ir.recognizedPatterns) {
-    const strategyId = pattern.strategyId;
-    if (strategyId === undefined) continue;
-    const owned = (pattern.ownedNodes ?? []).filter((n) => n.kind === "rule").length;
-    if (owned === 0) continue;
-    strategyRuleCount.set(strategyId, (strategyRuleCount.get(strategyId) ?? 0) + owned);
-  }
+  // Per-strategy owned-rule tally (shared with primary-strategy — see
+  // strategy-tally.ts). Each recognized rule is owned by exactly one pattern
+  // (ownership-consistency invariant), so summing per-pattern owned-rule counts
+  // grouped by strategy never double-counts a rule.
+  const strategyRuleCount = strategyRuleTally(ir);
 
   const distribution: Record<string, number> = {};
   let recognizedShare = 0;

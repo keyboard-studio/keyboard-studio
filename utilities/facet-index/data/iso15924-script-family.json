@@ -1,0 +1,36 @@
+{
+  "note": "ISO 15924 script code -> writing-system family for the script-family facet (spec 043 US3, FR-032), which also guards combining-mark-repertoire (T061). Families: alphabet (segmental, independent vowels), abugida (consonant+inherent-vowel, matra-modified), abjad (consonant-only core), syllabary (glyph = whole syllable), logographic (glyph = morpheme/word). A code absent here yields an undetermined script-family (never a guessed family). Deterministic in-repo table, no network (FR-004).",
+  "family": {
+    "Latn": "alphabet", "Cyrl": "alphabet", "Grek": "alphabet", "Armn": "alphabet",
+    "Geor": "alphabet", "Copt": "alphabet", "Glag": "alphabet", "Adlm": "alphabet",
+    "Osge": "alphabet", "Runr": "alphabet", "Ogam": "alphabet", "Goth": "alphabet",
+    "Dsrt": "alphabet", "Shaw": "alphabet", "Vith": "alphabet", "Wcho": "alphabet",
+    "Medf": "alphabet", "Gara": "alphabet", "Tfng": "alphabet", "Nkoo": "alphabet",
+    "Hang": "alphabet", "Bopo": "alphabet", "Mroo": "alphabet", "Thaa": "alphabet",
+
+    "Deva": "abugida", "Beng": "abugida", "Guru": "abugida", "Gujr": "abugida",
+    "Orya": "abugida", "Taml": "abugida", "Telu": "abugida", "Knda": "abugida",
+    "Mlym": "abugida", "Sinh": "abugida", "Thai": "abugida", "Laoo": "abugida",
+    "Tibt": "abugida", "Mymr": "abugida", "Khmr": "abugida", "Ethi": "abugida",
+    "Java": "abugida", "Bali": "abugida", "Sund": "abugida", "Batk": "abugida",
+    "Bugi": "abugida", "Tglg": "abugida", "Cham": "abugida", "Tale": "abugida",
+    "Talu": "abugida", "Lana": "abugida", "Saur": "abugida", "Rjng": "abugida",
+    "Kali": "abugida", "Mtei": "abugida", "Cakm": "abugida", "Brah": "abugida",
+    "Phag": "abugida", "Limb": "abugida", "Sylo": "abugida", "Kthi": "abugida",
+    "Modi": "abugida", "Tirh": "abugida", "Gran": "abugida", "Shrd": "abugida",
+    "Newa": "abugida", "Takr": "abugida", "Ahom": "abugida", "Mahj": "abugida",
+    "Hano": "abugida",
+
+    "Arab": "abjad", "Hebr": "abjad", "Syrc": "abjad",
+    "Samr": "abjad", "Mand": "abjad", "Phnx": "abjad", "Sogd": "abjad",
+    "Phlp": "abjad", "Prti": "abjad", "Armi": "abjad", "Nbat": "abjad",
+    "Palm": "abjad", "Hatr": "abjad", "Narb": "abjad", "Sarb": "abjad",
+
+    "Hira": "syllabary", "Kana": "syllabary", "Yiii": "syllabary", "Vaii": "syllabary",
+    "Cans": "syllabary", "Cher": "syllabary", "Linb": "syllabary", "Cprt": "syllabary",
+    "Bamu": "syllabary", "Nshu": "syllabary",
+
+    "Hani": "logographic", "Hans": "logographic", "Hant": "logographic",
+    "Egyp": "logographic", "Tang": "logographic"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "note": "Known-license header signatures for license-fork-eligibility (spec 043 US3, FR-030). Each entry maps distinctive text found in a LICENSE file to a fork-eligibility category. Matching is case-insensitive substring search over the license text, in array order (most specific first: AGPL/LGPL before GPL, ShareAlike before plain CC-BY, and the proprietary 'all rights reserved' catch LAST so a permissive/BSD license carrying that phrase is classified by its grant, not the phrase). No match anywhere -> `unspecified` (never inferred from author/copyright). Deterministic in-repo table, no network (FR-004).",
+  "licenses": [
+    { "id": "AGPL", "category": "copyleft", "match": ["GNU AFFERO GENERAL PUBLIC LICENSE"] },
+    { "id": "LGPL", "category": "copyleft", "match": ["GNU LESSER GENERAL PUBLIC LICENSE"] },
+    { "id": "GPL", "category": "copyleft", "match": ["GNU GENERAL PUBLIC LICENSE"] },
+    { "id": "MPL", "category": "copyleft", "match": ["Mozilla Public License"] },
+    { "id": "CC-BY-SA", "category": "copyleft", "match": ["Attribution-ShareAlike", "Attribution-Share Alike"] },
+    { "id": "CC-BY", "category": "permissive", "match": ["Creative Commons Attribution"] },
+    { "id": "Apache-2.0", "category": "permissive", "match": ["Apache License"] },
+    { "id": "BSD", "category": "permissive", "match": ["Redistribution and use in source and binary forms"] },
+    { "id": "ISC", "category": "permissive", "match": ["Permission to use, copy, modify, and/or distribute this software"] },
+    { "id": "MIT", "category": "permissive", "match": ["Permission is hereby granted, free of charge", "MIT License"] },
+    { "id": "OFL", "category": "permissive", "match": ["SIL OPEN FONT LICENSE"] },
+    { "id": "Unlicense", "category": "permissive", "match": ["This is free and unencumbered software released into the public domain"] },
+    { "id": "proprietary", "category": "proprietary-restricted", "match": ["All rights reserved", "Proprietary", "may not be redistributed"] }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "cldrVersion": "46",
+  "note": "Curated subset of CLDR main exemplarCharacters (the everyday orthographic letters of a locale), pinned in-repo for deterministic orthography-coverage-ratio derivation (spec 043 US2, research Decision 5). Main set only — auxiliary/punctuation/index sets excluded. Characters are NFC single-codepoint letters; the classifier NFC-normalizes the produced set before intersecting. A BCP47 tag whose language subtag is absent here yields the honest `not-derivable` sentinel (never a guessed ratio). Extend by adding a locale key with its CLDR main exemplar letters and re-pinning the sha256 in SOURCES.json.",
+  "locales": {
+    "en": ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"],
+    "fr": ["a","à","â","æ","b","c","ç","d","e","é","è","ê","ë","f","g","h","i","î","ï","j","k","l","m","n","o","ô","œ","p","q","r","s","t","u","ù","û","ü","v","w","x","y","ÿ","z"],
+    "de": ["a","ä","b","c","d","e","f","g","h","i","j","k","l","m","n","o","ö","p","q","r","s","ß","t","u","ü","v","w","x","y","z"],
+    "es": ["a","á","b","c","d","e","é","f","g","h","i","í","j","k","l","m","n","ñ","o","ó","p","q","r","s","t","u","ú","ü","v","w","x","y","z"],
+    "bm": ["a","b","c","d","e","ɛ","f","g","h","i","j","k","l","m","n","ɲ","ŋ","o","ɔ","p","r","s","t","u","w","y","z"]
+  }
+}

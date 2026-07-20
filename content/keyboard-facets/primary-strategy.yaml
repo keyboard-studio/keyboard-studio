@@ -1,0 +1,51 @@
+# primary-strategy — spec 043 US1 (rule-structure archetype).
+#
+# The base's OWN dominant spec-§7 input-method strategy: the mode (arg-max) of
+# the per-keyboard owned-rule tally over recognized StrategyIds — the same tally
+# strategy-fingerprint builds before aggregating into a distribution. Distinct
+# from lineage.strategy-fingerprint (the neighborhood-comparable full
+# distribution); this is the single dominant value the §7.2 selector ranks a
+# base by (SC-006). A tie across two or more top strategies is recorded honestly
+# as `mixed` with the tied set in the record's `notes`, never silently resolved
+# (FR-010).
+#
+# limits.values: the closed StrategyId union S-01..S-13
+# (packages/contracts/src/strategy.ts) plus the honest-tie sentinel `mixed`. The
+# recognizer covers S-01/S-02 as of v1; a base whose dominant strategy is
+# unrecognized has no owned-rule tally and lands at the undetermined fallback
+# tier (value omitted), not a forced value.
+id: primary-strategy
+title: Primary input-method strategy
+description: >
+  The base's own dominant spec-§7 input-method strategy — the mode of the
+  recognizer's per-keyboard owned-rule strategy tally. Distinct from the
+  neighborhood aggregate lineage.strategy-fingerprint; a tie is recorded as
+  `mixed` with the tied set noted, never silently resolved.
+valueType: enum
+limits:
+  values:
+    - S-01
+    - S-02
+    - S-03
+    - S-04
+    - S-05
+    - S-06
+    - S-07
+    - S-08
+    - S-09
+    - S-10
+    - S-11
+    - S-12
+    - S-13
+    - mixed
+  open: false
+likelihoodSemantics: >
+  the dominant strategy's share of recognized owned rules is carried in
+  `consistency` (1 = every recognized rule is the dominant strategy); a tie at
+  the top count yields the `mixed` value with the tied strategies in `notes`.
+derivation:
+  archetype: rule-structure
+  classifierId: primary-strategy-classifier
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: [lineage.primary-strategy]
+schemaVersion: 1

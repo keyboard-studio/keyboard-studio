@@ -169,6 +169,26 @@ function collectSources(
     }
   }
 
+  // The LICENSE file the .kps names (or the keymanapp-convention parent-dir
+  // LICENSE.md), so license-fork-eligibility (spec 043 US3) can read its text
+  // (research Decision 8: the license is reachable from ScannedKeyboard). Kept
+  // in the source set so it participates in freshness hashing like any other.
+  const kpsBytesForLicense = readBytes(corpusRoot, kpsPath);
+  if (kpsBytesForLicense) {
+    const kpsXml = kpsBytesForLicense.toString("utf8");
+    const declared = /<LicenseFile>\s*([^<]+?)\s*<\/LicenseFile>/i.exec(kpsXml)?.[1];
+    const candidates = declared ? [declared] : ["..\\LICENSE.md", "LICENSE.md", "..\\LICENSE", "LICENSE"];
+    for (const candidate of candidates) {
+      const abs = resolve(corpusRoot, sourceDir, candidate.replace(/\\/g, "/"));
+      const rel = toPosix(relative(corpusRoot, abs));
+      if (rel.startsWith("..")) continue; // outside the corpus — ignore
+      if (existsSync(join(corpusRoot, rel))) {
+        relPaths.add(rel);
+        break;
+      }
+    }
+  }
+
   return [...relPaths]
     .sort()
     .map((path) => {

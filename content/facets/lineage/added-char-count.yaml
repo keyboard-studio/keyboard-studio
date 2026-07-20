@@ -1,0 +1,41 @@
+# lineage.added-char-count — how far the candidate base sits from a stock
+# physical layout (spec-§7 axis A1, adaptation distance): the count of
+# characters it produces beyond stock kbdus, banded to axis A1. Lets the §7.2
+# selector rank bases by A1 distance (SC-006) instead of inferring it from the
+# neighborhood. Measurement ships in spec 043; session consumption is planned.
+
+id: lineage.added-char-count
+family: lineage
+title: Base adaptation distance (axis A1)
+description: >
+  The axis-A1 band (tiny/small/medium/large/massive) of how many characters the
+  candidate base produces beyond a stock physical layout — the produced-char set
+  (including the spec-040 fall-through fold) diffed against stock kbdus. The raw
+  count rides alongside the band. A direct A1 input for the §7.2 selector.
+valueType: enum
+values: [tiny, small, medium, large, massive]
+
+modality: both
+
+derivations:
+  - kind: corpus
+    source: "corpus:added-char-count"
+    sourceStatus: planned
+    notes: >
+      Produced-char set diffed against data/base-layouts.json's kbdus entry,
+      banded to axis A1, by the keyboard-facet-index added-char-count classifier
+      (spec 043); session consumption of the index is planned.
+
+consumers:
+  prefills: []
+  proposes:
+    - "axis:a1-adaptation-distance"
+
+relatedAxes: [A1]
+provenanceLabel: "how many new characters your candidate base adds beyond a standard keyboard"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: corpus
