@@ -6,11 +6,11 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 
 - **keyboards**: 920
 - **facets**: caps-handling, casing, desktop-combo-mechanism, encoding, fallback-posture, mnemonic-vs-positional, normalization-posture, reordering-rules, rule-store-compaction, script, strategy-fingerprint, target-mix, touch-combo-mechanism, touch-modifier-layers, touch-number-row, touch-symbol-layer
-- **scannerVersion**: `facet-index@1;schema@1;script@2;strategy-fingerprint@1;target-mix@1`
+- **scannerVersion**: `facet-index@1;schema@1;script@3;strategy-fingerprint@1;target-mix@1`
 - **unicodeVersion**: 17.0.0
 - **corpusScope**: `release/**`
 - **corpusCommit**: `keymanapp/keyboards@79e084f54985b458ac72315247719a8fabf3080f`
-- **referencePins**: 6
+- **referencePins**: 7
 
 ## Coverage by facet (provenance tier)
 
@@ -193,15 +193,15 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `adiga_danef` | Latn | content-derived | fully | 36 |
 | `afghan_turkmen` | Arab | content-derived | fully | 68 |
 | `ahom_star` | Ahom | content-derived | fully | 58 |
-| `akan` | Latn | content-derived | fully | 46 |
+| `akan` | Latn | content-derived | fully | 49 |
 | `akha_lahu` | Latn | default-fallback | fallback-only | 0 |
-| `aksarabali_panlex` | Bali | content-derived | partially | 61 |
+| `aksarabali_panlex` | Bali | content-derived | partially | 78 |
 | `amazigh_latin` | Latn | content-derived | fully | 103 |
 | `anglo_furthorc_english` | Runr | content-derived | fully | 35 |
 | `anii` | Latn | content-derived | fully | 59 |
 | `arabic_izza` | Arab | content-derived | fully | 53 |
 | `arabic_w_o_dots` | Arab | content-derived | fully | 97 |
-| `aramaic_hebrew` | Syrc | content-derived | fully | 32 |
+| `aramaic_hebrew` | Syrc | content-derived | fully | 36 |
 
 ## Sample records — `strategy-fingerprint` (first 12 by id)
 
