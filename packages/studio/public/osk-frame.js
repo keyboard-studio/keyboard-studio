@@ -40,6 +40,14 @@
   var pendingKeyboard = null;
   var currentOsk = null;
   var currentMode = "desktop";
+  // Monotonic token to supersede in-flight keyboard loads. Each loadKeyboard()
+  // call claims the next token; when its async addKeyboards/setActiveKeyboard
+  // chain settles, it bails if a newer load has since started. This prevents a
+  // superseded load (whose blob URL the host may have already revoked on the
+  // next recompile) from surfacing a spurious "Cannot find ... at blob:" error
+  // or stomping the newer keyboard's activation. Mirrors the host-side runId
+  // supersession in useKeyboardArtifact.ts.
+  var loadToken = 0;
 
   // [SCAFFOLD] Device profiles cribbed from Keyman Developer test.js.
   // Two entries (desktop + phone) cover the toggle; dimensions drive
@@ -278,22 +286,22 @@
     // executes.
     injectFontFace(fontFaceFamily, fontFaceUrl);
     injectKeyboardCss(keyboardCssUrls);
+    var myToken = ++loadToken;
     setStatus("registering keyboard: " + keyboardId);
     var kmwId = "Keyboard_" + keyboardId;
-    // Remove any stale registration before re-adding. KMW caches keyboards
-    // by ID — calling addKeyboards() again with the same ID but a new blob
-    // URL would be silently ignored, so the old compiled rules stay active.
-    // Deregistering first forces KMW to load fresh from the new URL.
+    // Remove any stale registration before re-adding. KMW caches keyboards by
+    // ID — addKeyboards() with the same ID but a new blob URL would be silently
+    // ignored, so the old (now-revoked) blob would stay active. Deregistering
+    // first forces a fresh load from the new URL.
     try {
       if (typeof window.keyman.removeKeyboards === "function") {
         window.keyman.removeKeyboards(kmwId);
       }
     } catch (_) {}
     // Use the keyboard's actual BCP47 (forwarded by the host) so the stub
-    // registers under and setActiveKeyboard activates the same tag the
-    // compiled .js declares. Falling back to "en" causes
-    // "Cannot find the <id> keyboard for English" on any non-English
-    // keyboard.
+    // registers under and setActiveKeyboard activates the same tag the compiled
+    // .js declares. Falling back to "en" causes "Cannot find the <id> keyboard
+    // for English" on any non-English keyboard.
     var languageCode = typeof bcp47 === "string" && bcp47.length > 0 ? bcp47 : "en";
     var stub = {
       id: keyboardId,
@@ -301,25 +309,33 @@
       languages: { id: languageCode, name: languageCode },
       filename: jsUrl,
     };
-    try {
-      window.keyman.addKeyboards(stub);
-    } catch (err) {
-      postError("addKeyboards threw: " + (err && err.message || err));
-      return;
-    }
-    setTimeout(function () {
-      try {
-        window.keyman.setActiveKeyboard(kmwId, languageCode).then(function () {
-          setStatus("active: " + keyboardId);
-          setOsk();
-          try { oskTarget.focus(); } catch (_) {}
-        }).catch(function (err) {
-          postError("setActiveKeyboard('" + kmwId + "') failed: " + (err && err.message || err));
-        });
-      } catch (err) {
-        postError("setActiveKeyboard threw: " + (err && err.message || err));
-      }
-    }, 50);
+    // Await addKeyboards() (it returns a Promise) BEFORE activating — the old
+    // fixed 50ms setTimeout raced the async stub registration. Guard every
+    // stage on myToken so a superseded load neither activates nor reports.
+    // Promise.resolve().then(...) — not redundant: it funnels a SYNCHRONOUS
+    // throw from addKeyboards into the .catch below (the old try/catch did this).
+    Promise.resolve()
+      .then(function () {
+        return window.keyman.addKeyboards(stub);
+      })
+      .then(function () {
+        if (myToken !== loadToken) return null; // superseded before activation
+        return window.keyman.setActiveKeyboard(kmwId, languageCode);
+      })
+      .then(function (result) {
+        if (myToken !== loadToken) return;        // superseded during activation — a newer load owns the frame
+        if (result === false) {                   // KMW resolves false (not throw) on a genuine activation failure
+          postError("setActiveKeyboard('" + kmwId + "') returned false for '" + languageCode + "'");
+          return;
+        }
+        setStatus("active: " + keyboardId);
+        setOsk();
+        try { oskTarget.focus(); } catch (_) {}
+      })
+      .catch(function (err) {
+        if (myToken !== loadToken) return;        // a superseded load's failure (e.g. a blob the host already revoked) — ignore
+        postError("keyboard load failed for '" + kmwId + "': " + (err && err.message || err));
+      });
   }
 
   function initEngine() {
