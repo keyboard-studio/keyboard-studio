@@ -21,6 +21,30 @@ group(main) using keys
 `;
 const ir = (body: string) => parse(HEADER + body, "fallback-test").ir;
 
+/** Builder for store-declaring keyboards (the any(store) remap archetypes). */
+const irStores = (stores: string, rules: string) =>
+  parse(
+    `store(&VERSION) '10.0'
+store(&NAME) 'T'
+store(&TARGETS) 'any'
+store(&COPYRIGHT) '(c) 2026'
+store(&KEYBOARDVERSION) '1.0'
+
+begin Unicode > use(main)
+
+${stores}
+group(main) using keys
+${rules}`,
+    "fallback-test",
+  ).ir;
+
+/** A vkey store listing every letter + digit key — a comprehensive any(store) universe. */
+const ALL_LETTER_DIGIT_KEYS =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    .split("")
+    .map((c) => `[K_${c}]`)
+    .join(" ");
+
 /** Rule every letter + digit (36 of the 47 standard keys) → comprehensive. */
 function comprehensiveBody(): string {
   const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
@@ -49,5 +73,26 @@ describe("classifyFallbackPosture", () => {
 
   it("no keystroke rules → null", () => {
     expect(classifyFallbackPosture(ir(""), DEF)).toBeNull();
+  });
+
+  // Regression: store-driven remaps + context-prefixed overlays used to drop to
+  // undetermined (ruleVkeys saw no positional vkeys). Now they classify.
+
+  it("context-prefixed overlay (adiga_danef) → relies-on, not undetermined", () => {
+    // The bare keystroke still falls through to the base; only ";" + key remaps.
+    const cat = classifyFallbackPosture(
+      irStores(`store(basekey) "abcdefghij"`, `";" + any(basekey) > U+0041\n`),
+      DEF,
+    )!;
+    expect(cat).not.toBeNull();
+    expect(cat.value).toBe("relies-on");
+  });
+
+  it("unconditional any(vkey-store) covering all letter+digit keys → blocks-comprehensively", () => {
+    const cat = classifyFallbackPosture(
+      irStores(`store(k) ${ALL_LETTER_DIGIT_KEYS}`, `+ any(k) > U+0041\n`),
+      DEF,
+    )!;
+    expect(cat.value).toBe("blocks-comprehensively");
   });
 });

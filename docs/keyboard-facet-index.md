@@ -20,7 +20,7 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `casing` | 905 | 0 | 15 | 0 |
 | `desktop-combo-mechanism` | 908 | 0 | 12 | 0 |
 | `encoding` | 874 | 0 | 46 | 0 |
-| `fallback-posture` | 812 | 0 | 108 | 0 |
+| `fallback-posture` | 908 | 0 | 12 | 0 |
 | `mnemonic-vs-positional` | 913 | 0 | 7 | 0 |
 | `normalization-posture` | 806 | 0 | 114 | 0 |
 | `reordering-rules` | 913 | 0 | 7 | 0 |
@@ -105,16 +105,16 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 
 | keyboard | value | tier | outcome | evidence |
 | --- | --- | --- | --- | ---: |
-| `adiga_danef` | — | default-fallback | fallback-only | 0 |
+| `adiga_danef` | relies-on | content-derived | fully | 47 |
 | `afghan_turkmen` | blocks-comprehensively | content-derived | fully | 47 |
 | `ahom_star` | blocks-comprehensively | content-derived | fully | 47 |
 | `akan` | blocks-comprehensively | content-derived | fully | 47 |
-| `akha_lahu` | — | default-fallback | fallback-only | 0 |
-| `aksarabali_panlex` | mixed | content-derived | partially | 47 |
+| `akha_lahu` | relies-on | content-derived | fully | 47 |
+| `aksarabali_panlex` | blocks-comprehensively | content-derived | partially | 47 |
 | `amazigh_latin` | blocks-comprehensively | content-derived | fully | 47 |
 | `anglo_furthorc_english` | blocks-comprehensively | content-derived | fully | 47 |
 | `anii` | blocks-comprehensively | content-derived | fully | 47 |
-| `arabic_izza` | — | default-fallback | fallback-only | 0 |
+| `arabic_izza` | blocks-comprehensively | content-derived | fully | 47 |
 | `arabic_w_o_dots` | blocks-comprehensively | content-derived | fully | 47 |
 | `aramaic_hebrew` | blocks-comprehensively | content-derived | fully | 47 |
 
