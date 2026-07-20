@@ -63,7 +63,7 @@ one persistent working copy.
   + `makeFlowStepComponent` factory (spec 029 Stage 6, landed) — the factory is
   the extension mechanism for new flows; existing flows keep their
   `panelAdapters.tsx` adapters to preserve the golden-walk mock seam.
-  → [docs/workflow-model.md §6](workflow-model.md) ·
+  → [docs/workflow-model.md §7](workflow-model.md#7-survey-wrapper-architecture-spec-029-stage-6--flowstephost-convergence) ·
   [`specs/028-qu-generic-step-host/`](../specs/028-qu-generic-step-host/spec.md) ·
   [`specs/029-qu-flowstephost-convergence/`](../specs/029-qu-flowstephost-convergence/spec.md) ·
   code [`packages/studio/src/components/StepHost.tsx`](../packages/studio/src/components/StepHost.tsx),

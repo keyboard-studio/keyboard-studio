@@ -143,7 +143,7 @@ hand-placement is replaced by the generic host + advance policy.
       Map drift guardrail test (must be unchanged — SC-006).
 - [x] T023 [P] Update `docs/architecture.md` / `docs/workflow-model.md` where they describe survey
       rendering to reflect the generic-host model; note Stage 6 (FlowStepHost factory) as the
-      remaining follow-up. Keep the master-plan file's Stage 5 line accurate. (DONE: docs/workflow-model.md §6 landed in spec 029; docs/architecture.md "Generic step host" spine bullet added — StepHost manifest model + FlowStepHost/makeFlowStepComponent convergence, cross-linked to specs 028/029. Stage 6 is landed, so recorded as complete rather than a pending follow-up.)
+      remaining follow-up. Keep the master-plan file's Stage 5 line accurate. (DONE: docs/workflow-model.md §7 landed in spec 029; docs/architecture.md "Generic step host" spine bullet added — StepHost manifest model + FlowStepHost/makeFlowStepComponent convergence, cross-linked to specs 028/029. Stage 6 is landed, so recorded as complete rather than a pending follow-up.)
 - [x] T024 Final review pass (km-qc / km-synthesis): confirm no dead code left in SurveyView,
       adapters are DRY, and the completion path matches per-handler behaviour one-to-one.
 
