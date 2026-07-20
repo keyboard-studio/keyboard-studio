@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-07-18",
+  "lastUpdated": "2026-07-20",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -566,6 +566,14 @@
     "specs/040-desktop-base-layout-fallthrough": {
       "title": "Feature Specification: Desktop base-layout fall-through in the script facet",
       "hash": "sha256:0fc200a6c3354ce9",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/042-store-range-notation": {
+      "title": "Feature Specification: KMN store range notation (`X .. Y`)",
+      "hash": "sha256:2aa572f95f2ac91f",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
