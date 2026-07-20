@@ -1,0 +1,270 @@
+{
+  "workflow": "speckit",
+  "specName": "Base-Selection & Strategy Facet Classifiers",
+  "branch": "043-base-selection-facets",
+  "currentStep": "implement",
+  "status": "implementing",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-20T05:21:00.243Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-20T05:37:46.917Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-20T05:37:46.926Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-20T05:43:41.078Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-20T05:45:55.180Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-20T05:45:55.985Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-20T05:46:58.465Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-20T05:50:47.219Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-20T05:55:39.119Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-20T05:55:39.131Z"
+    },
+    {
+      "step": "implement",
+      "substep": "run-tests",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-20T06:15:18.000Z"
+    }
+  ],
+  "phaseProgress": {
+    "policy": "one-conversation-per-phase (attended); unattended flag not set",
+    "completedPhases": [
+      "US1"
+    ],
+    "completedTasks": "T001-T023",
+    "nextPhase": "US2 (P2 writing-system matching facets) — resume in a fresh conversation via /speckit.companion.resume",
+    "note": "US1 (Setup + Foundational + P1 MVP) landed: 4 base-selection facets (primary-strategy, added-char-count, platform-coverage, font-dependency) + shared kps-reader. facet-index rebuilt --classified-only to 20 facets over 927 keyboards; facet-lint + facet-index-lint + full facet-index vitest (209) all GREEN. Stopped at the US1 phase boundary per the constitution phase-break."
+  },
+  "telemetryInstanceId": "4d5ec64f-97a1-4858-8d93-b8406400eb38",
+  "approach": "Add 13 new keyboard-facets (4 P1 + 4 P2 + 5 P3) to the standalone utilities/facet-index tool, each a spec-037 {classify,fallback} archetype registered in DEFAULT_CLASSIFIERS, plus real facet-def YAML and nine session mirrors. Measurement only (spec 039 owns transforms); deterministic from in-repo source, reusing buildProducedSet/base-layout.ts/cause-predicates. One new pinned dep: a CLDR exemplarCharacters snapshot for orthography-coverage-ratio.",
+  "decisions": [
+    {
+      "decision": "Pin a CLDR exemplarCharacters snapshot in-repo under utilities/facet-index/data with a SOURCES.json version pin",
+      "why": "orthography-coverage-ratio needs a deterministic reference inventory (FR-004/FR-023); matches how langtags/glottolog/DerivedAge.txt are already pinned",
+      "rejected": "Live CLDR fetch or npm dep resolved at build time - breaks byte-determinism, prohibited by FR-004"
+    },
+    {
+      "decision": "Session mirrors only for the nine family-named facets (lineage./source./env./construction.); the four keyboard.* facets are index-only",
+      "why": "FR-006 + the clarification pin this; keyboard.* names no session family so a mirror would fail lint contract C4",
+      "rejected": "Mirroring all 13 (keyboard.* four have no home family) or none (breaks the two-vocabulary model)"
+    },
+    {
+      "decision": "source.platform-coverage emits modality only (subset of desktop/web/touch) inferred from .kps <Files> extensions, never a <Targets> element",
+      "why": "this corpus .kps dialect has no <Targets> (verified vs bambara.kps); file presence cannot distinguish OSes",
+      "rejected": "Parsing an assumed <Targets>, or OS-level windows/mac/linux granularity - not derivable from file presence"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Planned 13 base-selection facet classifiers on utilities/facet-index reusing the spec-037/040/041 shell; measurement only, deterministic, one pinned CLDR dep",
+      "key_finding": "All char-derived facets reuse buildProducedSet + base-layout.ts; the only genuinely new build input is a pinned CLDR exemplarCharacters snapshot for orthography-coverage-ratio"
+    },
+    "tasks": {
+      "summary": "Generated 67 tasks across 6 phases for the 13 base-selection facet classifiers, organized by the three prioritized user stories with tests-first per repo convention",
+      "key_finding": "kps-reader is the one foundational blocker (5 source/env facets); script-family (P3) is the durable guard for combining-mark-repertoire (P2), wired inline in US2 then re-pointed at T061"
+    }
+  },
+  "coverage": {
+    "FR-010": {
+      "tasks": [
+        "T006",
+        "T010",
+        "T014",
+        "T022",
+        "T023"
+      ],
+      "tests": [
+        "primary-strategy-classifier.test.ts"
+      ]
+    },
+    "FR-011": {
+      "tasks": [
+        "T007",
+        "T011",
+        "T015",
+        "T022",
+        "T023"
+      ],
+      "tests": [
+        "added-char-count-classifier.test.ts"
+      ]
+    },
+    "FR-012": {
+      "tasks": [
+        "T008",
+        "T012",
+        "T016",
+        "T022",
+        "T023"
+      ],
+      "tests": [
+        "platform-coverage-classifier.test.ts"
+      ]
+    },
+    "FR-013": {
+      "tasks": [
+        "T009",
+        "T013",
+        "T017",
+        "T022",
+        "T023"
+      ],
+      "tests": [
+        "font-dependency-classifier.test.ts"
+      ]
+    },
+    "FR-020": {
+      "tasks": [
+        "T025",
+        "T029",
+        "T033",
+        "T039",
+        "T040"
+      ]
+    },
+    "FR-021": {
+      "tasks": [
+        "T026",
+        "T030",
+        "T034",
+        "T039",
+        "T040"
+      ]
+    },
+    "FR-022": {
+      "tasks": [
+        "T027",
+        "T031",
+        "T035",
+        "T039",
+        "T040"
+      ]
+    },
+    "FR-023": {
+      "tasks": [
+        "T024",
+        "T028",
+        "T032",
+        "T036",
+        "T039",
+        "T040"
+      ]
+    },
+    "FR-030": {
+      "tasks": [
+        "T041",
+        "T043",
+        "T048",
+        "T053",
+        "T061",
+        "T062"
+      ]
+    },
+    "FR-031": {
+      "tasks": [
+        "T044",
+        "T049",
+        "T054",
+        "T061",
+        "T062"
+      ]
+    },
+    "FR-032": {
+      "tasks": [
+        "T042",
+        "T045",
+        "T050",
+        "T055",
+        "T061",
+        "T062"
+      ]
+    },
+    "FR-033": {
+      "tasks": [
+        "T046",
+        "T051",
+        "T056",
+        "T061",
+        "T062"
+      ]
+    },
+    "FR-034": {
+      "tasks": [
+        "T047",
+        "T052",
+        "T057",
+        "T061",
+        "T062"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "facet-index unit suite incl. 4 US1 classifiers + kps-reader",
+      "command": "npx vitest run",
+      "result": "33 files / 209 tests passed"
+    },
+    {
+      "what": "index rebuilt --classified-only + both repo lints",
+      "command": "tsx cli.ts --classified-only; node facet-lint; node facet-index-lint",
+      "result": "20 facets / 927 keyboards; facet-lint + facet-index-lint GREEN"
+    }
+  ]
+}

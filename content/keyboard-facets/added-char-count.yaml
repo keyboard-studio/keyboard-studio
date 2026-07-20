@@ -1,0 +1,41 @@
+# added-char-count — spec 043 US1 (character-content archetype).
+#
+# Axis A1 (adaptation distance): how many characters the base produces BEYOND a
+# stock physical layout. Computed by diffing the base's produced-character set —
+# buildProducedSet(ir) unioned with the spec-040 base-layout fall-through fold —
+# against the stock `kbdus` char set from the pinned data/base-layouts.json
+# (FR-011). Reuses the same produced set the `script`/`target-mix` facets read;
+# no character walk is re-derived.
+#
+# valueType is `enum`: the emitted `value` is the axis-A1 BAND (tiny/small/
+# medium/large/massive); the RAW added-char count is carried in `evidenceSize`
+# (and echoed in `notes`), so both are surfaced. Band boundaries follow spec §7
+# axis A1 (tiny <5 / small 5-20 / medium 20-100 / large 100-300 / massive
+# 1000+); the bands are made CONTIGUOUS at 300 (every count >= 300 reads
+# `massive`) so no count is unbanded — deterministic and auditable.
+id: added-char-count
+title: Added character count (axis A1)
+description: >
+  How many characters the base produces beyond a stock physical layout, banded
+  to spec-§7 axis A1 (adaptation distance). The band is the `value`; the raw
+  count is in `evidenceSize`. Computed by diffing the produced-character set
+  (including the spec-040 base-layout fall-through fold) against the stock kbdus
+  char set from data/base-layouts.json.
+valueType: enum
+limits:
+  values:
+    - tiny
+    - small
+    - medium
+    - large
+    - massive
+  open: false
+likelihoodSemantics: >
+  the `value` is the axis-A1 band of a single keyboard-level count, so
+  `consistency` is 1 (a determinate band); the raw count is `evidenceSize`.
+derivation:
+  archetype: character-content
+  classifierId: added-char-count-classifier
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: [lineage.added-char-count]
+schemaVersion: 1

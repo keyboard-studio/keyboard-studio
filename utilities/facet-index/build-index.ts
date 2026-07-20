@@ -50,6 +50,10 @@ import { classifyTouchComboMechanism, touchComboMechanismFallback } from "./touc
 import { classifyTouchNumberRow, touchNumberRowFallback } from "./touch-number-row-classifier.js";
 import { classifyTouchSymbolLayer, touchSymbolLayerFallback } from "./touch-symbol-layer-classifier.js";
 import { classifyTouchModifierLayers, touchModifierLayersFallback } from "./touch-modifier-layers-classifier.js";
+import { classifyPrimaryStrategy, primaryStrategyFallback } from "./primary-strategy-classifier.js";
+import { classifyAddedCharCount, addedCharCountFallback } from "./added-char-count-classifier.js";
+import { classifyPlatformCoverage, platformCoverageFallback } from "./platform-coverage-classifier.js";
+import { classifyFontDependency, fontDependencyFallback } from "./font-dependency-classifier.js";
 import { deriveScriptFallback, UNDETERMINED } from "./fallback.js";
 import type {
   Categorization,
@@ -165,6 +169,11 @@ export const DEFAULT_CLASSIFIERS: Record<string, ClassifierPair> = {
     classify: classifyTouchModifierLayers,
     fallback: touchModifierLayersFallback,
   },
+  // spec 043 US1 — four base-selection / strategy-selector facets.
+  "primary-strategy": { classify: classifyPrimaryStrategy, fallback: primaryStrategyFallback },
+  "added-char-count": { classify: classifyAddedCharCount, fallback: addedCharCountFallback },
+  "platform-coverage": { classify: classifyPlatformCoverage, fallback: platformCoverageFallback },
+  "font-dependency": { classify: classifyFontDependency, fallback: fontDependencyFallback },
 };
 
 // ---------------------------------------------------------------------------

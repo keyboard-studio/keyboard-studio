@@ -1,0 +1,38 @@
+# font-dependency — spec 043 US1 (declared-metadata archetype).
+#
+# Whether the base depends on a bundled font to render (FR-013). Value:
+#   system-font-reliant  iff the .kps bundles a .ttf/.otf AND the font is wired
+#                        into rendering (a .kmn visual-keyboard store, or a .kps
+#                        <OSKFont>/<DisplayFont> reference)
+#   self-contained       otherwise
+# A base that bundles AND wires a specific font is signaling its script does not
+# render on default system fonts — it is reliant on that bundled font being
+# present, corroborating orth.display-difficulty. A base needing no bundled font
+# is self-contained (renders with system fonts). The condition -> value mapping
+# is the data-model's; only the condition is measured.
+#
+# No content tier is claimed: the deciding signal (a bundled package font) is
+# declared metadata. A missing/unreadable .kps defaults to self-contained at the
+# default-fallback tier (the conservative default when no bundled font is known).
+id: font-dependency
+title: Font dependency
+description: >
+  Whether the base depends on a bundled font to render — system-font-reliant
+  when it bundles a .ttf/.otf and wires it into rendering (a .kmn
+  visual-keyboard store or a .kps <OSKFont>/<DisplayFont>), else self-contained.
+  Corroborates orth.display-difficulty.
+valueType: enum
+limits:
+  values:
+    - self-contained
+    - system-font-reliant
+  open: false
+likelihoodSemantics: >
+  a single keyboard-level determination; the record's `notes` carries the
+  bundled-font and font-wiring signals the value was read from.
+derivation:
+  archetype: declared-metadata
+  classifierId: font-dependency-classifier
+  fallbackChain: [declared-metadata, default-fallback]
+feedsSessionFacets: [source.font-dependency]
+schemaVersion: 1
