@@ -518,6 +518,22 @@ describe("trailing comment on rule lines is quote-aware", () => {
     expect(rule?.output.map((o) => (o as { value?: string }).value)).toEqual(["a", "b"]);
     expect(rule?.trailingComment).toBe("a real comment");
   });
+
+  // Regression for #1171: an embedded whitespace-flanked `c` inside a quoted
+  // output literal must stay part of the literal even when a genuine trailing
+  // comment follows it — the quote-tracking must not stop at the first
+  // unquoted `c` candidate found while still inside the quotes.
+  it("keeps an embedded ` c ` inside a quoted output literal AND still strips a real trailing comment after it", () => {
+    const { ir } = parse(
+      `store(&VERSION) '10.0'\nstore(&NAME) 'T'\nstore(&TARGETS) 'any'\nbegin Unicode > use(main)\ngroup(main) using keys\n+ 'x' > 'a c b' c note\n`,
+      "rc",
+    );
+    const rule = ir.groups[0]?.rules[0];
+    expect(rule?.output.map((o) => (o as { value?: string }).value)).toEqual([
+      "a", " ", "c", " ", "b",
+    ]);
+    expect(rule?.trailingComment).toBe("note");
+  });
 });
 
 // ---------------------------------------------------------------------------
