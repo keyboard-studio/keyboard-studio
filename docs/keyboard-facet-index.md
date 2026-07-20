@@ -4,34 +4,34 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 
 ## Build inputs
 
-- **keyboards**: 920
+- **keyboards**: 927
 - **facets**: caps-handling, casing, desktop-combo-mechanism, encoding, fallback-posture, mnemonic-vs-positional, normalization-posture, reordering-rules, rule-store-compaction, script, strategy-fingerprint, target-mix, touch-combo-mechanism, touch-modifier-layers, touch-number-row, touch-symbol-layer
 - **scannerVersion**: `facet-index@1;schema@1;script@3;strategy-fingerprint@1;target-mix@1`
 - **unicodeVersion**: 17.0.0
 - **corpusScope**: `release/**`
-- **corpusCommit**: `keymanapp/keyboards@79e084f54985b458ac72315247719a8fabf3080f`
+- **corpusCommit**: `keymanapp/keyboards@435f82d69bfc926eb03c2d8632571b41b6da3266`
 - **referencePins**: 7
 
 ## Coverage by facet (provenance tier)
 
 | facet | content-derived | declared-metadata | fallback | undetermined |
 | --- | ---: | ---: | ---: | ---: |
-| `caps-handling` | 913 | 0 | 7 | 0 |
-| `casing` | 912 | 0 | 8 | 0 |
-| `desktop-combo-mechanism` | 908 | 0 | 12 | 0 |
-| `encoding` | 874 | 0 | 46 | 0 |
-| `fallback-posture` | 908 | 0 | 12 | 0 |
-| `mnemonic-vs-positional` | 913 | 0 | 7 | 0 |
-| `normalization-posture` | 806 | 0 | 114 | 0 |
-| `reordering-rules` | 913 | 0 | 7 | 0 |
-| `rule-store-compaction` | 908 | 0 | 12 | 0 |
-| `script` | 907 | 6 | 5 | 2 |
-| `strategy-fingerprint` | 910 | 0 | 10 | 0 |
-| `target-mix` | 0 | 912 | 8 | 0 |
-| `touch-combo-mechanism` | 920 | 0 | 0 | 0 |
-| `touch-modifier-layers` | 920 | 0 | 0 | 0 |
-| `touch-number-row` | 920 | 0 | 0 | 0 |
-| `touch-symbol-layer` | 920 | 0 | 0 | 0 |
+| `caps-handling` | 920 | 0 | 7 | 0 |
+| `casing` | 919 | 0 | 8 | 0 |
+| `desktop-combo-mechanism` | 915 | 0 | 12 | 0 |
+| `encoding` | 881 | 0 | 46 | 0 |
+| `fallback-posture` | 915 | 0 | 12 | 0 |
+| `mnemonic-vs-positional` | 920 | 0 | 7 | 0 |
+| `normalization-posture` | 811 | 0 | 116 | 0 |
+| `reordering-rules` | 920 | 0 | 7 | 0 |
+| `rule-store-compaction` | 915 | 0 | 12 | 0 |
+| `script` | 914 | 6 | 5 | 2 |
+| `strategy-fingerprint` | 917 | 0 | 10 | 0 |
+| `target-mix` | 0 | 919 | 8 | 0 |
+| `touch-combo-mechanism` | 927 | 0 | 0 | 0 |
+| `touch-modifier-layers` | 927 | 0 | 0 | 0 |
+| `touch-number-row` | 927 | 0 | 0 | 0 |
+| `touch-symbol-layer` | 927 | 0 | 0 | 0 |
 
 ## Sample records — `caps-handling` (first 12 by id)
 
@@ -44,11 +44,11 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `akha_lahu` | — | content-derived | fully | 0 |
 | `aksarabali_panlex` | — | content-derived | fully | 0 |
 | `amazigh_latin` | mixed | content-derived | fully | 125 |
+| `anglish` | per-rule-duplication | content-derived | fully | 192 |
+| `anglish_dvorak` | per-rule-duplication | content-derived | fully | 192 |
 | `anglo_furthorc_english` | — | content-derived | fully | 0 |
 | `anii` | no-caps-rules | content-derived | fully | 1 |
-| `arabic_izza` | — | content-derived | fully | 0 |
-| `arabic_w_o_dots` | — | content-derived | fully | 0 |
-| `aramaic_hebrew` | — | content-derived | fully | 0 |
+| `arabic_flick` | — | content-derived | fully | 0 |
 
 ## Sample records — `casing` (first 12 by id)
 
@@ -61,11 +61,11 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `akha_lahu` | caseless | content-derived | fully | 1 |
 | `aksarabali_panlex` | caseless | content-derived | partially | 1 |
 | `amazigh_latin` | cased | content-derived | fully | 1 |
+| `anglish` | cased | content-derived | fully | 1 |
+| `anglish_dvorak` | cased | content-derived | fully | 1 |
 | `anglo_furthorc_english` | caseless | content-derived | fully | 1 |
 | `anii` | cased | content-derived | fully | 1 |
-| `arabic_izza` | caseless | content-derived | fully | 1 |
-| `arabic_w_o_dots` | caseless | content-derived | fully | 1 |
-| `aramaic_hebrew` | caseless | content-derived | fully | 1 |
+| `arabic_flick` | caseless | content-derived | fully | 1 |
 
 ## Sample records — `desktop-combo-mechanism` (first 12 by id)
 
@@ -78,11 +78,11 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `akha_lahu` | context-match | content-derived | fully | 7 |
 | `aksarabali_panlex` | context-match | content-derived | partially | 101 |
 | `amazigh_latin` | direct-key | content-derived | fully | 174 |
+| `anglish` | direct-key | content-derived | fully | 192 |
+| `anglish_dvorak` | direct-key | content-derived | fully | 192 |
 | `anglo_furthorc_english` | direct-key | content-derived | fully | 98 |
 | `anii` | direct-key | content-derived | fully | 96 |
-| `arabic_izza` | direct-key | content-derived | fully | 90 |
-| `arabic_w_o_dots` | direct-key | content-derived | fully | 189 |
-| `aramaic_hebrew` | direct-key | content-derived | fully | 33 |
+| `arabic_flick` | direct-key | content-derived | fully | 169 |
 
 ## Sample records — `encoding` (first 12 by id)
 
@@ -95,11 +95,11 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `akha_lahu` | quoted-literal | content-derived | fully | 6 |
 | `aksarabali_panlex` | bare-vk+named-modifier+quoted-literal+split-modifier | content-derived | partially | 171 |
 | `amazigh_latin` | bare-vk+named-modifier+split-modifier+u-notation | content-derived | fully | 347 |
+| `anglish` | named-modifier+quoted-literal+split-modifier+u-notation | content-derived | fully | 384 |
+| `anglish_dvorak` | named-modifier+quoted-literal+split-modifier+u-notation | content-derived | fully | 384 |
 | `anglo_furthorc_english` | bare-vk+named-modifier+quoted-literal+u-notation | content-derived | fully | 196 |
 | `anii` | bare-vk+named-modifier+quoted-literal | content-derived | fully | 192 |
-| `arabic_izza` | quoted-literal+u-notation | content-derived | fully | 90 |
-| `arabic_w_o_dots` | bare-vk+named-modifier+quoted-literal+split-modifier | content-derived | fully | 378 |
-| `aramaic_hebrew` | bare-vk+named-modifier+quoted-literal+u-notation | content-derived | fully | 66 |
+| `arabic_flick` | bare-vk+named-modifier+quoted-literal+split-modifier+u-notation | content-derived | fully | 338 |
 
 ## Sample records — `fallback-posture` (first 12 by id)
 
@@ -112,11 +112,11 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `akha_lahu` | relies-on | content-derived | fully | 47 |
 | `aksarabali_panlex` | blocks-comprehensively | content-derived | partially | 47 |
 | `amazigh_latin` | blocks-comprehensively | content-derived | fully | 47 |
+| `anglish` | blocks-comprehensively | content-derived | fully | 47 |
+| `anglish_dvorak` | blocks-comprehensively | content-derived | fully | 47 |
 | `anglo_furthorc_english` | blocks-comprehensively | content-derived | fully | 47 |
 | `anii` | blocks-comprehensively | content-derived | fully | 47 |
-| `arabic_izza` | blocks-comprehensively | content-derived | fully | 47 |
-| `arabic_w_o_dots` | blocks-comprehensively | content-derived | fully | 47 |
-| `aramaic_hebrew` | blocks-comprehensively | content-derived | fully | 47 |
+| `arabic_flick` | blocks-comprehensively | content-derived | fully | 47 |
 
 ## Sample records — `mnemonic-vs-positional` (first 12 by id)
 
@@ -129,11 +129,11 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `akha_lahu` | positional | content-derived | fully | 1 |
 | `aksarabali_panlex` | positional | content-derived | partially | 1 |
 | `amazigh_latin` | positional | content-derived | fully | 1 |
+| `anglish` | positional | content-derived | fully | 1 |
+| `anglish_dvorak` | positional | content-derived | fully | 1 |
 | `anglo_furthorc_english` | positional | content-derived | fully | 1 |
 | `anii` | positional | content-derived | fully | 1 |
-| `arabic_izza` | positional | content-derived | fully | 1 |
-| `arabic_w_o_dots` | positional | content-derived | fully | 1 |
-| `aramaic_hebrew` | positional | content-derived | fully | 1 |
+| `arabic_flick` | positional | content-derived | fully | 1 |
 
 ## Sample records — `normalization-posture` (first 12 by id)
 
@@ -146,11 +146,11 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `akha_lahu` | — | content-derived | fully | 0 |
 | `aksarabali_panlex` | — | content-derived | fully | 0 |
 | `amazigh_latin` | nfc | content-derived | fully | 20 |
+| `anglish` | — | default-fallback | fallback-only | 0 |
+| `anglish_dvorak` | — | default-fallback | fallback-only | 0 |
 | `anglo_furthorc_english` | — | content-derived | fully | 0 |
 | `anii` | nfc | content-derived | fully | 3 |
-| `arabic_izza` | — | content-derived | fully | 0 |
-| `arabic_w_o_dots` | — | content-derived | fully | 0 |
-| `aramaic_hebrew` | — | content-derived | fully | 0 |
+| `arabic_flick` | — | content-derived | fully | 0 |
 
 ## Sample records — `reordering-rules` (first 12 by id)
 
@@ -163,11 +163,11 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `akha_lahu` | none | content-derived | fully | 1 |
 | `aksarabali_panlex` | none | content-derived | partially | 1 |
 | `amazigh_latin` | none | content-derived | fully | 1 |
+| `anglish` | none | content-derived | fully | 1 |
+| `anglish_dvorak` | none | content-derived | fully | 1 |
 | `anglo_furthorc_english` | none | content-derived | fully | 1 |
 | `anii` | none | content-derived | fully | 1 |
-| `arabic_izza` | none | content-derived | fully | 1 |
-| `arabic_w_o_dots` | none | content-derived | fully | 1 |
-| `aramaic_hebrew` | none | content-derived | fully | 1 |
+| `arabic_flick` | none | content-derived | fully | 1 |
 
 ## Sample records — `rule-store-compaction` (first 12 by id)
 
@@ -180,11 +180,11 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `akha_lahu` | mixed | content-derived | fully | 7 |
 | `aksarabali_panlex` | mixed | content-derived | partially | 88 |
 | `amazigh_latin` | mixed | content-derived | fully | 174 |
+| `anglish` | inline-rules | content-derived | fully | 192 |
+| `anglish_dvorak` | inline-rules | content-derived | fully | 192 |
 | `anglo_furthorc_english` | inline-rules | content-derived | fully | 98 |
 | `anii` | inline-rules | content-derived | fully | 96 |
-| `arabic_izza` | inline-rules | content-derived | fully | 90 |
-| `arabic_w_o_dots` | inline-rules | content-derived | fully | 189 |
-| `aramaic_hebrew` | inline-rules | content-derived | fully | 33 |
+| `arabic_flick` | inline-rules | content-derived | fully | 169 |
 
 ## Sample records — `script` (first 12 by id)
 
@@ -197,11 +197,11 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `akha_lahu` | Latn | default-fallback | fallback-only | 0 |
 | `aksarabali_panlex` | Bali | content-derived | partially | 78 |
 | `amazigh_latin` | Latn | content-derived | fully | 103 |
+| `anglish` | Latn | content-derived | fully | 51 |
+| `anglish_dvorak` | Latn | content-derived | fully | 51 |
 | `anglo_furthorc_english` | Runr | content-derived | fully | 35 |
 | `anii` | Latn | content-derived | fully | 59 |
-| `arabic_izza` | Arab | content-derived | fully | 53 |
-| `arabic_w_o_dots` | Arab | content-derived | fully | 97 |
-| `aramaic_hebrew` | Syrc | content-derived | fully | 36 |
+| `arabic_flick` | Arab | content-derived | fully | 93 |
 
 ## Sample records — `strategy-fingerprint` (first 12 by id)
 
@@ -214,11 +214,11 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `akha_lahu` | — | content-derived | fully | 7 |
 | `aksarabali_panlex` | — | content-derived | partially | 101 |
 | `amazigh_latin` | — | content-derived | fully | 176 |
+| `anglish` | — | content-derived | fully | 192 |
+| `anglish_dvorak` | — | content-derived | fully | 192 |
 | `anglo_furthorc_english` | — | content-derived | fully | 98 |
 | `anii` | — | content-derived | fully | 96 |
-| `arabic_izza` | — | content-derived | fully | 90 |
-| `arabic_w_o_dots` | — | content-derived | fully | 189 |
-| `aramaic_hebrew` | — | content-derived | fully | 33 |
+| `arabic_flick` | — | content-derived | fully | 169 |
 
 ## Sample records — `target-mix` (first 12 by id)
 
@@ -231,11 +231,11 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `akha_lahu` | desktop+touch+web | declared-metadata | fully | 3 |
 | `aksarabali_panlex` | desktop+touch+web | declared-metadata | fully | 3 |
 | `amazigh_latin` | desktop+touch+web | declared-metadata | fully | 3 |
+| `anglish` | desktop+touch+web | declared-metadata | fully | 3 |
+| `anglish_dvorak` | desktop+touch+web | declared-metadata | fully | 3 |
 | `anglo_furthorc_english` | desktop+touch+web | declared-metadata | fully | 3 |
 | `anii` | desktop+touch+web | declared-metadata | fully | 3 |
-| `arabic_izza` | desktop+touch+web | declared-metadata | fully | 3 |
-| `arabic_w_o_dots` | desktop+touch+web | declared-metadata | fully | 3 |
-| `aramaic_hebrew` | desktop+touch+web | declared-metadata | fully | 3 |
+| `arabic_flick` | desktop+touch+web | declared-metadata | fully | 3 |
 
 ## Sample records — `touch-combo-mechanism` (first 12 by id)
 
@@ -248,11 +248,11 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `akha_lahu` | key | content-derived | fully | 98 |
 | `aksarabali_panlex` | key | content-derived | fully | 85 |
 | `amazigh_latin` | longpress | content-derived | fully | 94 |
+| `anglish` | key | content-derived | fully | 117 |
+| `anglish_dvorak` | key | content-derived | fully | 126 |
 | `anglo_furthorc_english` | key | content-derived | fully | 97 |
 | `anii` | key | content-derived | fully | 194 |
-| `arabic_izza` | key | content-derived | fully | 164 |
-| `arabic_w_o_dots` | key | content-derived | fully | 165 |
-| `aramaic_hebrew` | key | content-derived | fully | 70 |
+| `arabic_flick` | key | content-derived | fully | 194 |
 
 ## Sample records — `touch-modifier-layers` (first 12 by id)
 
@@ -265,11 +265,11 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `akha_lahu` | none | content-derived | fully | 2 |
 | `aksarabali_panlex` | none | content-derived | fully | 3 |
 | `amazigh_latin` | none | content-derived | fully | 3 |
+| `anglish` | none | content-derived | fully | 4 |
+| `anglish_dvorak` | none | content-derived | fully | 4 |
 | `anglo_furthorc_english` | none | content-derived | fully | 2 |
 | `anii` | none | content-derived | fully | 3 |
-| `arabic_izza` | none | content-derived | fully | 3 |
-| `arabic_w_o_dots` | none | content-derived | fully | 5 |
-| `aramaic_hebrew` | none | content-derived | fully | 2 |
+| `arabic_flick` | none | content-derived | fully | 6 |
 
 ## Sample records — `touch-number-row` (first 12 by id)
 
@@ -282,11 +282,11 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `akha_lahu` | digits | content-derived | fully | 1 |
 | `aksarabali_panlex` | digits | content-derived | fully | 1 |
 | `amazigh_latin` | digits | content-derived | fully | 1 |
+| `anglish` | digits | content-derived | fully | 1 |
+| `anglish_dvorak` | digits | content-derived | fully | 1 |
 | `anglo_furthorc_english` | digits | content-derived | fully | 1 |
 | `anii` | digits | content-derived | fully | 1 |
-| `arabic_izza` | digits | content-derived | fully | 1 |
-| `arabic_w_o_dots` | digits | content-derived | fully | 1 |
-| `aramaic_hebrew` | digits | content-derived | fully | 1 |
+| `arabic_flick` | digits | content-derived | fully | 1 |
 
 ## Sample records — `touch-symbol-layer` (first 12 by id)
 
@@ -299,9 +299,9 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | `akha_lahu` | absent | content-derived | fully | 1 |
 | `aksarabali_panlex` | absent | content-derived | fully | 1 |
 | `amazigh_latin` | absent | content-derived | fully | 1 |
+| `anglish` | absent | content-derived | fully | 1 |
+| `anglish_dvorak` | absent | content-derived | fully | 1 |
 | `anglo_furthorc_english` | absent | content-derived | fully | 1 |
 | `anii` | absent | content-derived | fully | 1 |
-| `arabic_izza` | absent | content-derived | fully | 1 |
-| `arabic_w_o_dots` | present | content-derived | fully | 1 |
-| `aramaic_hebrew` | absent | content-derived | fully | 1 |
+| `arabic_flick` | present | content-derived | fully | 1 |
 
