@@ -10,7 +10,7 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 - **unicodeVersion**: 17.0.0
 - **corpusScope**: `release/**`
 - **corpusCommit**: `keymanapp/keyboards@79e084f54985b458ac72315247719a8fabf3080f`
-- **referencePins**: 5
+- **referencePins**: 6
 
 ## Coverage by facet (provenance tier)
 
@@ -18,7 +18,7 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 | --- | ---: | ---: | ---: | ---: |
 | `caps-handling` | 913 | 0 | 7 | 0 |
 | `casing` | 905 | 0 | 15 | 0 |
-| `desktop-combo-mechanism` | 812 | 0 | 108 | 0 |
+| `desktop-combo-mechanism` | 908 | 0 | 12 | 0 |
 | `encoding` | 874 | 0 | 46 | 0 |
 | `fallback-posture` | 812 | 0 | 108 | 0 |
 | `mnemonic-vs-positional` | 913 | 0 | 7 | 0 |
@@ -71,16 +71,16 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 
 | keyboard | value | tier | outcome | evidence |
 | --- | --- | --- | --- | ---: |
-| `adiga_danef` | — | default-fallback | fallback-only | 0 |
+| `adiga_danef` | context-match | content-derived | fully | 1 |
 | `afghan_turkmen` | direct-key | content-derived | fully | 103 |
 | `ahom_star` | direct-key | content-derived | fully | 104 |
 | `akan` | direct-key | content-derived | fully | 85 |
-| `akha_lahu` | — | default-fallback | fallback-only | 0 |
-| `aksarabali_panlex` | context-match | content-derived | partially | 83 |
+| `akha_lahu` | context-match | content-derived | fully | 7 |
+| `aksarabali_panlex` | context-match | content-derived | partially | 101 |
 | `amazigh_latin` | direct-key | content-derived | fully | 174 |
 | `anglo_furthorc_english` | direct-key | content-derived | fully | 98 |
 | `anii` | direct-key | content-derived | fully | 96 |
-| `arabic_izza` | — | default-fallback | fallback-only | 0 |
+| `arabic_izza` | direct-key | content-derived | fully | 90 |
 | `arabic_w_o_dots` | direct-key | content-derived | fully | 189 |
 | `aramaic_hebrew` | direct-key | content-derived | fully | 33 |
 

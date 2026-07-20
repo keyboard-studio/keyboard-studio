@@ -22,7 +22,7 @@ import { ImportStatus } from "@keyboard-studio/contracts";
 
 import { mapImportStatus, computeAnalyzedCoverage } from "./outcome.js";
 import { undeterminedFallback } from "./measurement.js";
-import { eachRule, isKeystrokeRule } from "./ir-scan.js";
+import { eachRule, isKeystrokeRule, ruleContextPrefix } from "./ir-scan.js";
 import type { Categorization, ConfidenceClass, FacetDefinition } from "./types.js";
 import type { ScannedKeyboard } from "./scan.js";
 
@@ -37,13 +37,16 @@ function mechanismOf(rule: IRRule): string {
     (el) => el.kind === "vkey" && el.modifiers.some((m) => CHORD_MODIFIERS.has(m)),
   );
   if (hasChord) return "modifier-key";
-  // context-match: the rule matches something BEYOND the triggering key — a
-  // preceding char/deadkey literal, a context()/any()/index()/notany() ref. A
-  // `baselayout(...)` element is layout-scoping, not a compose context, so it
-  // does not by itself make a rule context-match.
-  const hasVkey = rule.context.some((el) => el.kind === "vkey");
-  const hasContextPrefix = rule.context.some((el) => el.kind !== "vkey" && el.kind !== "baselayout");
-  if (hasVkey && hasContextPrefix) return "context-match";
+  // context-match: the rule matches something BEFORE the struck key — a
+  // preceding char/deadkey literal, a context()/any()/index()/notany() ref. The
+  // struck key is the last context element (the token after the final `+`), so
+  // "context prefix" is every earlier element. A `baselayout(...)` element is
+  // layout-scoping, not a compose context, so it alone does not make a rule
+  // context-match. This handles both `"x" + [K_Y]` (vkey key) and `";" +
+  // any(store)` (store-driven key) uniformly — the pre-fix check required a
+  // vkey and so missed the store-driven remaps entirely.
+  const prefix = ruleContextPrefix(rule);
+  if (prefix.some((el) => el.kind !== "baselayout")) return "context-match";
   return "direct-key";
 }
 
@@ -57,8 +60,8 @@ export function classifyDesktopComboMechanism(ir: KeyboardIR, def: FacetDefiniti
 
   const counts = new Map<string, number>();
   let total = 0;
-  for (const { rule } of eachRule(ir)) {
-    if (!isKeystrokeRule(rule)) continue;
+  for (const { rule, group } of eachRule(ir)) {
+    if (!isKeystrokeRule(rule, group)) continue;
     const mech = mechanismOf(rule);
     counts.set(mech, (counts.get(mech) ?? 0) + 1);
     total += 1;
