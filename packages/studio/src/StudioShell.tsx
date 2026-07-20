@@ -50,6 +50,7 @@ import { manifest, validateManifestShape } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { StepHost } from "./components/StepHost.tsx";
 import { TEXT_MAIN, FONT } from "./survey/surveyStyles.ts";
+import { CharacterMapPane } from "./survey/CharacterMapPane.tsx";
 import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
 
 // Bind the manifest into the store's staleness actions.
@@ -276,6 +277,19 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     const step = manifest.find((s) => s.id === activeStepId);
     return step?.layout === "full";
   }, [activeStepId]);
+
+  // Derived the same way as activeStepIsFullScreen: which right-pane content
+  // the active step declares (default "preview" — the live OSK). Used below
+  // to swap in CharacterMapPane for the Phase B build-list screen only, gated
+  // further on discoveryMethod === "build-list" (the IntroChooser and the
+  // manual step-by-step path keep the OSK preview — see steps/types.ts's
+  // rightPane field and steps/manifest.ts's "characters" step).
+  const activeRightPane = useMemo(() => {
+    const step = manifest.find((s) => s.id === activeStepId);
+    return step?.rightPane ?? "preview";
+  }, [activeStepId]);
+  const discoveryMethod = useSurveySessionStore((s) => s.discoveryMethod);
+  const showCharacterMap = activeRightPane === "character-map" && discoveryMethod === "build-list";
 
   // Reset the session store on mount — the store is a module-level singleton that
   // persists across React tree unmounts/remounts (e.g. navigating away from the
@@ -716,9 +730,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       {/* Drag handle */}
       <ResizeHandle onPointerDown={onPointerDown} />
 
-      {/* Right pane: live OSK preview */}
+      {/* Right pane: live OSK preview, OR (Phase B build-list only) the
+          interactive character map — see activeRightPane/showCharacterMap
+          above. The mechanism gallery and every other full-screen step render
+          their own preview and are unaffected (they never reach this branch:
+          activeStepIsFullScreen returns early above). */}
       <section
-        aria-label="Keyboard preview"
+        aria-label={showCharacterMap ? "Character map" : "Keyboard preview"}
         style={{
           flexBasis: `calc(${rightPct}% - ${SURVEY_DIVIDER_WIDTH / 2}px)`,
           flexGrow: 1,
@@ -734,7 +752,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           fontFamily: FONT,
         }}
       >
-        {localBase === null ? (
+        {showCharacterMap ? (
+          <CharacterMapPane />
+        ) : localBase === null ? (
           <div
             style={{
               flex: 1,

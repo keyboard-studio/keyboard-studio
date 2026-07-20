@@ -6,6 +6,14 @@ import { forEachMatch, stripNonCodeSource } from "./_shared.js";
 //   - Surrogates:    0xD800–0xDFFF
 //   - Non-chars:     0xFDD0–0xFDEF
 //   - Specials:      0xFFFE, 0xFFFF
+//
+// NOT swapped onto the shared `isNoncharacterCodePoint` (@keyboard-studio/
+// contracts, charUtils.ts) despite the overlapping range test: that helper's
+// `(cp & 0xfffe) === 0xfffe` check flags plane-end noncharacters for EVERY
+// plane (e.g. U+1FFFE, U+2FFFE), whereas this check below only special-cases
+// the BMP pair 0xFFFE/0xFFFF explicitly. Swapping would change this lint's
+// findings for supplementary-plane U+XXXXXX literals — a behavior change,
+// not a pure dedup, so left as-is here.
 
 // Matches U+XXXX or U+XXXXXX (1–6 hex digits). Case-insensitive so u+0041 is caught.
 const UPLUS_RE = /\bU\+([0-9A-Fa-f]{1,6})\b/i;

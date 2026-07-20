@@ -13,7 +13,7 @@ import type {
   VirtualFS,
   KeyboardIR,
 } from "@keyboard-studio/contracts";
-import type { MissingCharSuggestions, CldrFullLoader } from "@keyboard-studio/engine";
+import type { MissingCharSuggestions, CldrFullLoader, CharacterMapGroup } from "@keyboard-studio/engine";
 import { mockBaseBrowser, mockOutputService, mockPatternLibrary, mockScaffolder } from "@keyboard-studio/contracts/mocks";
 import { getBackendUrl } from "./githubOAuth.ts";
 import { localBaseBrowser, LOCAL_PROXY_BASE } from "./localBaseBrowser.ts";
@@ -190,6 +190,36 @@ export async function suggestMissingChars(
 
 // Re-export the type so callers can use it without a direct engine import.
 export type { MissingCharSuggestions };
+
+// characterMapGroups — Phase B right-pane character map data source
+// (CharacterMapPane.tsx). When USE_REAL is false returns [] (deterministic,
+// no network) so tests render the pane's empty state without real CLDR
+// traffic. When real, lazy-imports buildCharacterMap from the engine; caches
+// the function after first import so subsequent calls skip the dynamic
+// import entirely (mirrors suggestMissingChars above).
+//
+// NOTE: buildCharacterMap is a parallel-track engine deliverable (character
+// discovery, spec §8 Phase B) — the import below is written against its
+// locked signature and resolves once the engine export lands.
+let characterMapEngineCache:
+  | ((baseIr: KeyboardIR | null, bcp47?: string, languageName?: string) => Promise<CharacterMapGroup[]>)
+  | null = null;
+export async function characterMapGroups(
+  baseIr: KeyboardIR | null,
+  bcp47?: string,
+  languageName?: string,
+): Promise<CharacterMapGroup[]> {
+  if (!USE_REAL) return [];
+  if (characterMapEngineCache === null) {
+    const { buildCharacterMap } = await import(/* @vite-ignore */ "@keyboard-studio/engine");
+    characterMapEngineCache = buildCharacterMap;
+  }
+  return characterMapEngineCache(baseIr, bcp47, languageName);
+}
+
+// Re-export the type so callers (CharacterMapPane.tsx) can use it without a
+// direct engine import.
+export type { CharacterMapGroup };
 
 // neededCharsForLanguage — the full CLDR needed-char set for a target BCP47
 // language (issue #525 items 2/4, language-driven surplus). Mirrors

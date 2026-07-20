@@ -2,7 +2,10 @@
 //
 // Two discovery methods are offered:
 //   build-list  — unified "add your whole alphabet": tick CLDR suggestions, type
-//                 the rest of the alphabet, see grid placeholder (DEFAULT)
+//                 the rest of the alphabet, browse+toggle the right-pane
+//                 character map (CharacterMapPane.tsx, rendered by StudioShell's
+//                 SurveyView — see stores/phaseBDraftStore.ts for the shared
+//                 alphabet the two panes both mutate) (DEFAULT)
 //   manual      — step-by-step questions via SurveyRunner
 //
 // On completion, extractInventory() scans the Phase B answers for the question
@@ -18,6 +21,8 @@ import { loadModularFlow } from "./loadModularFlow.ts";
 import type { SurveyContext, FlowDef } from "./types.ts";
 import { buildPlacementSeeds } from "./placementSeeds.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useSurveySessionStore, type DiscoveryMethod } from "../stores/surveySessionStore.ts";
+import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { nfcDedup } from "./charNormUtils.ts";
 import { suggestMissingChars } from "../lib/services.ts";
 import type { MissingCharSuggestions } from "../lib/services.ts";
@@ -28,7 +33,6 @@ import {
   TEXT_DIM,
   TEXT_MAIN,
   FONT,
-  CHIP_GLYPH_ACCENT,
   ERROR_RED,
   phaseContainer,
   phaseHeading,
@@ -42,6 +46,9 @@ import {
   charChip,
   chipGlyph,
   chipCodepoint,
+  chipIndicator,
+  chipIndicatorText,
+  chipIndicatorColor,
 } from "./surveyStyles.ts";
 
 // Vite ?raw import — typed via the `*.yaml?raw` declaration in src/vite-env.d.ts.
@@ -112,8 +119,6 @@ export function parseSpacedChars(input: string): string[] {
 // ---------------------------------------------------------------------------
 // PhaseB state — intercept non-manual discovery choices
 // ---------------------------------------------------------------------------
-
-type DiscoveryMethod = "manual" | "build-list" | null;
 
 type LoadState =
   | { status: "idle" }
@@ -265,7 +270,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false }: CharChipEditorPr
                 <span style={chipCodepoint}>
                   {toUPlusNotation(c)}
                 </span>
-                <span style={{ fontSize: 10, color: ERROR_RED }}>x</span>
+                <span style={chipIndicator(ERROR_RED)}>x</span>
               </button>
             ))}
           </div>
@@ -299,8 +304,8 @@ function SuggestionChip({ char, checked, onToggle }: SuggestionChipProps) {
         {char}
       </span>
       <span style={chipCodepoint}>{cp}</span>
-      <span style={{ fontSize: 10, color: checked ? CHIP_GLYPH_ACCENT : TEXT_DIM }}>
-        {checked ? "[x]" : "+"}
+      <span style={chipIndicator(chipIndicatorColor(checked))}>
+        {chipIndicatorText(checked)}
       </span>
     </button>
   );
@@ -475,29 +480,13 @@ function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
 }
 
 // ---------------------------------------------------------------------------
-// GridPlaceholder — coming-soon grid section
-// ---------------------------------------------------------------------------
-
-function GridPlaceholder() {
-  return (
-    <div
-      style={{
-        padding: 16,
-        border: `1px solid ${BORDER}`,
-        borderRadius: 6,
-        color: TEXT_DIM,
-      }}
-    >
-      <strong style={{ color: TEXT_MAIN }}>Browse a character grid</strong>
-      <p style={{ margin: "8px 0 0 0", fontSize: 13 }}>
-        Visual character grid — coming soon.
-      </p>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // BuildListView — unified "add your whole alphabet" method
+//
+// The alphabet accumulated here is shared with CharacterMapPane (the right-pane
+// character map, rendered independently by StudioShell's SurveyView) via
+// phaseBDraftStore — both panes toggle the SAME chars array. See
+// stores/phaseBDraftStore.ts for the lifecycle contract (reset on substage
+// entry, not on every render).
 // ---------------------------------------------------------------------------
 
 interface BuildListViewProps {
@@ -507,7 +496,8 @@ interface BuildListViewProps {
 }
 
 function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
-  const [chars, setChars] = useState<string[]>([]);
+  const chars = usePhaseBDraftStore((s) => s.chars);
+  const setAll = usePhaseBDraftStore((s) => s.setAll);
   const doneDisabled = chars.length === 0;
 
   return (
@@ -562,7 +552,7 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         <h3 style={sectionHeading}>
           Suggested characters
         </h3>
-        <SuggestionPanel context={context} chars={chars} onChange={setChars} />
+        <SuggestionPanel context={context} chars={chars} onChange={setAll} />
       </section>
 
       {/* Divider */}
@@ -577,16 +567,11 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
           Type the rest of your alphabet here, putting a space between each
           character (for example: a b c ŋ ɛ), then press Enter or + Add.
         </p>
-        <CharChipEditor chars={chars} onChange={setChars} autoFocus={false} />
+        <CharChipEditor chars={chars} onChange={setAll} autoFocus={false} />
       </section>
 
-      {/* Divider */}
-      <hr style={divider} />
-
-      {/* Section 3: Grid placeholder */}
-      <section aria-label="Character grid (coming soon)">
-        <GridPlaceholder />
-      </section>
+      {/* Section 3 (character grid) has moved to the right pane —
+          see CharacterMapPane.tsx, rendered by StudioShell's SurveyView. */}
 
       {/* Footer: Done */}
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -639,7 +624,12 @@ export interface PhaseBProps {
 
 export function PhaseB({ context = {}, onComplete, onBack, findingsByQuestionId, placementMap }: PhaseBProps) {
   const flow = useMemo(() => loadModularFlow(phaseBModularRaw as string), []);
-  const [discoveryMethod, setDiscoveryMethod] = useState<DiscoveryMethod>(null);
+  // discoveryMethod lives in surveySessionStore (not component state) so
+  // StudioShell's SurveyView can gate the right-pane character map on it —
+  // the map only shows for the build-list path (see steps/manifest.ts's
+  // rightPane:"character-map" on the characters step).
+  const discoveryMethod = useSurveySessionStore((s) => s.discoveryMethod);
+  const setDiscoveryMethod = useSurveySessionStore((s) => s.setDiscoveryMethod);
   // manualFlow is memoized here (before any early returns) to satisfy React's
   // rules of hooks — useMemo must not be called after a conditional return.
   const manualFlow = useMemo(() => makeManualOnlyFlow(flow), [flow]);
@@ -719,13 +709,13 @@ interface IntroChooserProps {
   onBack?: () => void;
 }
 
-const METHODS: Array<{ value: Exclude<DiscoveryMethod, null>; label: string }> = [
+const METHODS: Array<{ value: DiscoveryMethod; label: string }> = [
   { value: "build-list", label: "Add your whole alphabet — type every character your language uses and tick suggested ones" },
   { value: "manual", label: "Step by step — I will answer the questions below" },
 ];
 
 function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
-  const [selected, setSelected] = useState<Exclude<DiscoveryMethod, null>>("build-list");
+  const [selected, setSelected] = useState<DiscoveryMethod>("build-list");
 
   const languageName = context["language_name"] ?? context["detected_group"] ?? "your language";
 

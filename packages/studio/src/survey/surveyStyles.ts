@@ -186,6 +186,35 @@ export const chipCodepoint: CSSProperties = {
   fontFamily: "monospace",
 };
 
+/**
+ * The chip's non-color selected-indicator span shell — `fontSize: 10` plus a
+ * caller-supplied `color`, colorblind-safe alongside a text marker (never
+ * color alone). Extracted (P2 synthesis) from three duplicated inline spans
+ * that shared this exact shape but not always the same color/text: the
+ * SuggestionChip toggle chip and the CharChipEditor delete chip in
+ * PhaseB.tsx, and CharacterMapPane's cell. The color/text stay call-site
+ * parameters (rather than folded into a `selected: boolean` signature) so
+ * CharChipEditor's ERROR_RED "x" — a fixed, non-toggle visual state, per its
+ * own inline comment — round-trips through this helper unchanged, alongside
+ * the two real toggles' CHIP_GLYPH_ACCENT/TEXT_DIM "[x]"/"+" pair.
+ */
+export function chipIndicator(color: string): CSSProperties {
+  return {
+    fontSize: 10,
+    color,
+  };
+}
+
+/** The two real toggle chips' (SuggestionChip / CharacterMapPane) indicator text — `"[x]"` selected, `"+"` not. */
+export function chipIndicatorText(selected: boolean): string {
+  return selected ? "[x]" : "+";
+}
+
+/** The two real toggle chips' indicator color — `selected` picks the accent, otherwise dim. */
+export function chipIndicatorColor(selected: boolean): string {
+  return selected ? CHIP_GLYPH_ACCENT : TEXT_DIM;
+}
+
 // ---------------------------------------------------------------------------
 // QuestionField help text (formerly QuestionField.tsx's local HELP_STYLE)
 // ---------------------------------------------------------------------------

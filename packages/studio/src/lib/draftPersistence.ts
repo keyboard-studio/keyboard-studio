@@ -27,6 +27,12 @@ import {
   useSurveySessionStore,
   type TraversalSnapshot,
 } from "../stores/surveySessionStore.ts";
+import {
+  applyPhaseBDraftSnapshot,
+  snapshotPhaseBDraft,
+  usePhaseBDraftStore,
+  type PhaseBDraftSnapshot,
+} from "../stores/phaseBDraftStore.ts";
 
 // ---------------------------------------------------------------------------
 // Key scheme (T004) — per-project, versioned localStorage keys.
@@ -77,6 +83,20 @@ const ACTIVE_PROJECT_KEY = "ks.draft.active" as const;
  * `workingCopy` and `traversal` are the two sub-entities defined in
  * data-model.md, reused verbatim from persistWorkingCopy.ts (working copy) and
  * surveySessionStore.ts (traversal) — see T017/T018.
+ *
+ * `phaseBDraft` (P0 fix, post-data-model.md addition) folds in the Phase B
+ * build-list screen's in-progress typed/toggled alphabet
+ * (../stores/phaseBDraftStore.ts) — NOT part of the original data-model.md
+ * envelope because that store didn't exist yet. Without it, a reload/OAuth
+ * return mid-build-list restored `traversal.discoveryMethod` /
+ * `traversal.charactersSubStage` (already covered by TraversalSnapshot) but
+ * landed the author back on the build-list screen with an EMPTY alphabet,
+ * silently discarding everything they'd added — this studio-internal
+ * persistence type is not the locked Pattern/Criterion contract, so extending
+ * it is fine. Optional (`?`) rather than a DRAFT_VERSION bump: a
+ * pre-this-change record simply has no `phaseBDraft` field, and `loadDraft`
+ * treats that as "no draft alphabet yet" (`chars: []`) rather than discarding
+ * an otherwise-good record — see the `envelope.phaseBDraft ??` fallback below.
  */
 export interface DurableDraft {
   version: number;
@@ -90,6 +110,8 @@ export interface DurableDraft {
   languageTag: string | null;
   workingCopy: WorkingCopySnapshot;
   traversal: TraversalSnapshot;
+  /** The Phase B build-list draft alphabet — see the doc comment above. */
+  phaseBDraft?: PhaseBDraftSnapshot;
 }
 
 // ---------------------------------------------------------------------------
@@ -207,6 +229,7 @@ export function saveDraft(projectKey: string): void {
     languageTag,
     workingCopy: snapshotWorkingCopyData(),
     traversal: snapshotTraversal(),
+    phaseBDraft: snapshotPhaseBDraft(),
   };
 
   try {
@@ -328,6 +351,16 @@ export function loadDraft(projectKey: string): boolean {
     useWorkingCopyStore.setState(workingCopyState);
     applyTraversalSnapshot(envelope.traversal);
 
+    // phaseBDraft (P0 fix): optional/additive field — a pre-this-change record
+    // has none, and a malformed one (non-array `chars`) is tolerated rather
+    // than discarding an otherwise-good record, since it's not load-bearing
+    // for working-copy/traversal correctness the way `traversal`'s shape is.
+    // Either case restores to an empty alphabet, same as today's behaviour.
+    const restoredChars = Array.isArray(envelope.phaseBDraft?.chars)
+      ? envelope.phaseBDraft.chars
+      : [];
+    applyPhaseBDraftSnapshot({ chars: restoredChars });
+
     _draftRestoredThisBoot = true;
     return true;
   } catch {
@@ -407,20 +440,24 @@ export function discardActiveDraft(): void {
 export const AUTOSAVE_DEBOUNCE_MS = 500;
 
 /**
- * Subscribe to BOTH the working-copy store and the survey-session store; on
- * any change, debounce ~500ms then write this project's durable draft.
+ * Subscribe to the working-copy store, the survey-session store, AND the
+ * phase-B draft store (P0 fix — the build-list alphabet must autosave the
+ * same way the other two traversal-relevant stores already do); on any
+ * change, debounce ~500ms then write this project's durable draft.
  *
  * Article IV (critical): this debounce timer is an INDEPENDENT, lightweight
  * `setTimeout` — it is NOT the 300ms validator/WASM-oracle debounce cycle
  * (owned by useValidator/km-validator's single-cycle contract) and it starts
- * no second validation path. It only decides when to persist the two stores'
+ * no second validation path. It only decides when to persist the three stores'
  * already-computed state to localStorage. Do not fold this into the validator
- * debounce, and do not add a THIRD timer alongside it for some other concern
- * without going through km-validator first.
+ * debounce, and do not add a THIRD (or fourth) debounce timer alongside it for
+ * some other concern without going through km-validator first — the phase-B
+ * draft store's changes route through this SAME existing debounce/subscribe
+ * mechanism rather than introducing a new one.
  *
- * Returns a teardown function that unsubscribes both stores and clears any
- * pending timer. Call it on app unmount (and before installing a new autosave
- * for a different project).
+ * Returns a teardown function that unsubscribes all three stores and clears
+ * any pending timer. Call it on app unmount (and before installing a new
+ * autosave for a different project).
  *
  * P1 fix (G-1 gap): performs ONE synchronous `saveDraft(projectKey)` here, at
  * install time — not just the active-pointer write — so a draft RECORD exists
@@ -454,10 +491,12 @@ export function installDraftAutosave(projectKey: string): () => void {
 
   const unsubscribeWorkingCopy = useWorkingCopyStore.subscribe(scheduleSave);
   const unsubscribeSurveySession = useSurveySessionStore.subscribe(scheduleSave);
+  const unsubscribePhaseBDraft = usePhaseBDraftStore.subscribe(scheduleSave);
 
   return () => {
     unsubscribeWorkingCopy();
     unsubscribeSurveySession();
+    unsubscribePhaseBDraft();
     if (timer !== null) {
       clearTimeout(timer);
       timer = null;

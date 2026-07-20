@@ -25,6 +25,7 @@ import { DEBOUNCE_MS } from "../hooks/useDebounce.ts";
 import type { BaseKeyboard, KeyboardIR, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import type { IdentityLiteResult } from "../survey/index.ts";
 import {
   DRAFT_KEY_PREFIX,
@@ -124,6 +125,7 @@ beforeEach(() => {
   localStorage.clear();
   useWorkingCopyStore.getState().reset();
   useSurveySessionStore.getState().reset();
+  usePhaseBDraftStore.getState().reset();
 });
 
 afterEach(() => {
@@ -582,6 +584,66 @@ describe("draftPersistence", () => {
       expect(session.touchSeedSource).toBe("import-adapt");
 
       expect(wasDraftRestoredThisBoot()).toBe(true);
+    });
+  });
+
+  describe("P0 fix: phaseBDraftStore.chars folds into the durable draft round-trip", () => {
+    it("restores the in-progress build-list alphabet on load, not an empty array (km-review P0 — no silent discard of the author's typed/toggled chars)", () => {
+      const pk = "phaseb-draft-project";
+      instantiateMinimal(pk);
+      useSurveySessionStore.getState().setDiscoveryMethod("build-list");
+      useSurveySessionStore.getState().setCharactersSubStage("B");
+      usePhaseBDraftStore.getState().setAll(["a", "b", "ɛ"]);
+
+      saveDraft(pk);
+
+      // Cold reset ALL THREE stores — nothing left to inherit from.
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+      usePhaseBDraftStore.getState().reset();
+      expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+
+      expect(loadDraft(pk)).toBe(true);
+
+      // The build-list screen substage/discoveryMethod resume as before...
+      const session = useSurveySessionStore.getState();
+      expect(session.discoveryMethod).toBe("build-list");
+      expect(session.charactersSubStage).toBe("B");
+      // ...AND the alphabet the author had already built is intact, not blanked.
+      expect(usePhaseBDraftStore.getState().chars).toEqual(["a", "b", "ɛ"]);
+    });
+
+    it("a pre-fix record with no phaseBDraft field restores to an empty alphabet (backward compat — additive optional field, not a version bump)", () => {
+      const pk = "phaseb-draft-legacy";
+      instantiateMinimal(pk);
+      saveDraft(pk);
+
+      // Simulate a record written before this field existed.
+      const envelope = JSON.parse(localStorage.getItem(draftKey(pk))!) as Record<string, unknown>;
+      delete envelope.phaseBDraft;
+      localStorage.setItem(draftKey(pk), JSON.stringify(envelope));
+
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+      usePhaseBDraftStore.getState().setAll(["stale"]); // must be cleared by restore, not left dangling
+
+      expect(loadDraft(pk)).toBe(true);
+      expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    });
+
+    it("installDraftAutosave also debounce-saves a phaseBDraftStore mutation (same 500ms window, no new timer)", () => {
+      vi.useFakeTimers();
+      const pk = "phaseb-draft-autosave";
+      instantiateMinimal(pk);
+
+      const teardown = installDraftAutosave(pk);
+      usePhaseBDraftStore.getState().add("q");
+
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS);
+      const saved = JSON.parse(localStorage.getItem(draftKey(pk))!) as DurableDraft;
+      expect(saved.phaseBDraft?.chars).toEqual(["q"]);
+
+      teardown();
     });
   });
 
