@@ -53,6 +53,19 @@ The construction classifiers read the parsed `KeyboardIR`. Several were only rec
 
 **`encoding` (46) + `casing` (15) together** — highest leverage, reuses `key-map.ts`, likely ~60 recovered. Then a **`strategy-fingerprint` audit** (confirm the 709 are deliberate). Leave the low-priority small sets and the 12 residue for a per-keyboard pass once the big wins are in.
 
+## Known limitation + a requested capability: glyph multi-path reachability
+
+**Limitation found (touch-combo-mechanism).** Its distribution is **occurrence-based, not a key partition.** `keyMechanisms` (touch-layout.ts) tags a key with *every* affordance it offers (`longpress` if `sk`, `layer` if `nextlayer`, plus `flick`/`multitap`); only `key` (direct) is exclusive. `comboMechanismCounts` sums occurrences, so a key with both a longpress popup and a layer switch is counted in **both** buckets. Consequence: the shares summing to 1.0 does **not** mean the mechanisms are disjoint — the metric **cannot express affordance co-occurrence**. (Worked example: `ahom_star` has 25 longpress keys and 7 layer keys with **0** overlap, so its distribution happens to be a clean partition — but a keyboard that put a longpress popup on a layer-switch key would look identical in the shares while being materially different.)
+
+**Requested capability (owner ask): tell me when a glyph — or a class of glyphs — is reachable by more than one input path.** This is a NEW analysis, not an `undetermined` fix; the current facets classify mechanism *distribution*, never per-glyph reachability. Sketch of what it needs:
+
+- **Build a reachability map: output glyph → set of input paths.** Enumerate every path that can produce a glyph:
+  - desktop `.kmn` — each rule's output glyph(s) via its key path (direct key, modifier chord, deadkey sequence, context-match); resolve `index(store,n)` / `outs(store)` outputs against the matched-key store so store-driven remaps expand to concrete glyphs (reuse `key-map.ts` + store resolution).
+  - touch `.keyman-touch-layout` — each key's base `text`, plus its `sk` longpress popups, `multitap`, `flick`, and layer-reached variants (walk `iterKeys` + the sub-affordance arrays in touch-layout.ts).
+- **Flag glyphs with ≥2 distinct paths** (e.g. a character available both as a desktop deadkey sequence and a touch longpress, or via both a longpress and a layer). Report per glyph AND aggregated by **glyph class** — by Unicode block / script (reuse `ucd/generated/scriptLookup.ts`), or by combining-class / base-vs-mark — so "all combining marks are reachable two ways" surfaces as one finding, not N.
+- **Shape:** likely its own artifact/facet rather than bolting onto `touch-combo-mechanism` (which stays a per-keyboard mechanism histogram). Cross-references `encoding` (per-role glyph spelling) and the touch facets. Determinism + provenance rules apply as elsewhere.
+- **Why it matters:** redundant input paths are a design signal (discoverability vs. clutter; touch/desktop parity), and single-path glyphs for a whole class flag a coverage gap. Keep it a *measurement* (surface reachability) — do not auto-"fix" redundancy.
+
 ## How to work (environment)
 
 **Running the CLI (bash `tsx`/`npx tsx` are broken here — not on PATH):**
