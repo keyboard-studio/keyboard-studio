@@ -54,6 +54,9 @@ import { classifyPrimaryStrategy, primaryStrategyFallback } from "./primary-stra
 import { classifyAddedCharCount, addedCharCountFallback } from "./added-char-count-classifier.js";
 import { classifyPlatformCoverage, platformCoverageFallback } from "./platform-coverage-classifier.js";
 import { classifyFontDependency, fontDependencyFallback } from "./font-dependency-classifier.js";
+import { classifyDiacriticMechanism, diacriticMechanismFallback } from "./diacritic-mechanism-classifier.js";
+import { classifySpareKeyBudget, spareKeyBudgetFallback } from "./spare-key-budget-classifier.js";
+import { classifyOrthographyCoverageRatio, orthographyCoverageRatioFallback } from "./orthography-coverage-ratio-classifier.js";
 import { deriveScriptFallback, UNDETERMINED } from "./fallback.js";
 import type {
   Categorization,
@@ -174,6 +177,14 @@ export const DEFAULT_CLASSIFIERS: Record<string, ClassifierPair> = {
   "added-char-count": { classify: classifyAddedCharCount, fallback: addedCharCountFallback },
   "platform-coverage": { classify: classifyPlatformCoverage, fallback: platformCoverageFallback },
   "font-dependency": { classify: classifyFontDependency, fallback: fontDependencyFallback },
+  // spec 043 US2 — writing-system matching facets (combining-mark-repertoire
+  // lands with US3 below since its guard imports script-family).
+  "diacritic-mechanism": { classify: classifyDiacriticMechanism, fallback: diacriticMechanismFallback },
+  "spare-key-budget": { classify: classifySpareKeyBudget, fallback: spareKeyBudgetFallback },
+  "orthography-coverage-ratio": {
+    classify: classifyOrthographyCoverageRatio,
+    fallback: orthographyCoverageRatioFallback,
+  },
 };
 
 // ---------------------------------------------------------------------------

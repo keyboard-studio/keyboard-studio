@@ -1,0 +1,56 @@
+# source.spare-key-budget — how much room the chosen base has to place more
+# characters (axis A7): many, ralt-only, or fully-booked, from SHIFT/AltGr-plane
+# saturation over the stock physical key set. A read-only capacity signal the
+# §7.2 selector uses to weigh whether a candidate base can absorb the target's
+# extra characters without displacing existing bindings. Measurement ships in
+# spec 043's keyboard-facet-index; session consumption is planned. Construction
+# facet mirrored under the source family, matching spec 041's construction facets.
+
+id: source.spare-key-budget
+family: source
+title: Source spare-key budget
+description: >
+  How much room the chosen base has to place more characters — many, ralt-only,
+  or fully-booked — read from how saturated its SHIFT and AltGr planes are over
+  the stock physical key set (reserved Ctrl/Alt chords excluded). Lets the
+  selector gate whether a candidate base can absorb the target orthography's
+  extra characters (A7).
+
+valueType: enum
+values: [many, ralt-only, fully-booked]
+
+modality: physical
+
+derivations:
+  - kind: computed
+    source: "planned:spare-key-budget-of-kmn"
+    sourceStatus: planned
+    notes: >
+      Counts distinct stock keys the base binds in the SHIFT and AltGr planes;
+      SHIFT less than half-bound -> many; SHIFT bound but AltGr free -> ralt-only;
+      both bound -> fully-booked. Produced by the keyboard-facet-index
+      spare-key-budget classifier (spec 043); session consumption is planned.
+
+consumers:
+  prefills: []
+  proposes:
+    - "strategy:spare-key-fit"
+
+relatedAxes: [A7]
+provenanceLabel: "how much room your source keyboard has left for more characters"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed
+
+transformImpactClass: gate
+houseTargetPolicy: null
+invertibility: not-applicable
+implications: >
+  A read-only capacity signal — it does not itself transform the keyboard; it
+  gates whether the target orthography's extra characters fit on the base's spare
+  key+modifier slots or would displace existing bindings.
+exceptionSites: []
+causePredicates: []
