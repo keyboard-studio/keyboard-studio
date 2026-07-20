@@ -1,0 +1,16 @@
+{
+  "workflow": "speckit",
+  "specName": "CLDR/SLDR exemplars",
+  "branch": "043-base-selection-facets",
+  "currentStep": "specify",
+  "status": "specified",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-20T05:29:27.025Z"
+    }
+  ]
+}
