@@ -147,28 +147,49 @@ export function parseKps(xml: string): KpsMetadata {
   };
 }
 
+/** One `<Files><File>` entry: its `<Name>` and its (lowercased) `<FileType>`. */
+export interface KpsFileEntry {
+  /** The `<Name>` value, backslashes intact as they appear in the XML. */
+  name: string;
+  /** The `<FileType>` value lowercased (e.g. ".ttf"), or "" when the block has none. */
+  fileType: string;
+}
+
 /**
- * Walk the <File> blocks in the .kps XML and collect font and stylesheet
- * paths into typed buckets.  A <File> block is included when its
- * <FileType> child is ".ttf", ".otf", or ".css".
+ * Walk every `<File>` block in the .kps XML and yield its `<Name>` + `<FileType>`.
+ * The single `<File>`-block walker shared by {@link extractFileBlocks} (which
+ * filters by font/stylesheet type) and the facet-index reader (which needs the
+ * full name list regardless of type). Blocks with no `<Name>` are skipped; a
+ * block with no `<FileType>` yields `fileType: ""`.
+ */
+export function parseKpsFiles(xml: string): KpsFileEntry[] {
+  const fileBlockRe = /<File\s*>([\s\S]*?)<\/File>/gi;
+  const entries: KpsFileEntry[] = [];
+  let blockMatch: RegExpExecArray | null;
+  while ((blockMatch = fileBlockRe.exec(xml)) !== null) {
+    const block = blockMatch[1] ?? "";
+    const nameMatch = /<Name\s*>([^<]*)<\/Name>/i.exec(block);
+    if (nameMatch === null) continue;
+    const name = (nameMatch[1] ?? "").trim();
+    if (name.length === 0) continue;
+    const typeMatch = /<FileType\s*>([^<]*)<\/FileType>/i.exec(block);
+    const fileType = (typeMatch?.[1] ?? "").trim().toLowerCase();
+    entries.push({ name, fileType });
+  }
+  return entries;
+}
+
+/**
+ * Collect font and stylesheet paths into typed buckets.  A `<File>` block is
+ * included when its `<FileType>` child is ".ttf", ".otf", or ".css".
  */
 function extractFileBlocks(xml: string): {
   fileFonts: string[];
   stylesheetPaths: string[];
 } {
-  const fileBlockRe = /<File\s*>([\s\S]*?)<\/File>/gi;
   const fileFonts: string[] = [];
   const stylesheetPaths: string[] = [];
-  let blockMatch: RegExpExecArray | null;
-  while ((blockMatch = fileBlockRe.exec(xml)) !== null) {
-    const block = blockMatch[1] ?? "";
-    const typeMatch = /<FileType\s*>([^<]*)<\/FileType>/i.exec(block);
-    if (typeMatch === null) continue;
-    const fileType = (typeMatch[1] ?? "").trim().toLowerCase();
-    const nameMatch = /<Name\s*>([^<]*)<\/Name>/i.exec(block);
-    if (nameMatch === null) continue;
-    const name = (nameMatch[1] ?? "").trim();
-    if (name.length === 0) continue;
+  for (const { name, fileType } of parseKpsFiles(xml)) {
     if (fileType === ".ttf" || fileType === ".otf") {
       fileFonts.push(name);
     } else if (fileType === ".css") {

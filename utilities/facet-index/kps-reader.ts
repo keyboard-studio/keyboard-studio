@@ -22,7 +22,7 @@
 
 import { basename, extname } from "node:path";
 
-import { parseKps, parseKpsFontRefs } from "../../packages/engine/src/base-browser/kps-parser.js";
+import { parseKps, parseKpsFiles, parseKpsFontRefs } from "../../packages/engine/src/base-browser/kps-parser.js";
 
 import type { ScannedKeyboard } from "./scan.js";
 
@@ -32,8 +32,9 @@ export interface KpsPackageInfo {
   present: boolean;
   /**
    * Lowercased file extensions of every `<Files><File><Name>` entry, e.g.
-   * `.kmx`, `.js`, `.kvk`, `.ttf`. Derived from the file name, falling back to
-   * the `<FileType>` child. The modality source for `platform-coverage`.
+   * `.kmx`, `.js`, `.kvk`, `.ttf`. Derived from the file name only (the
+   * `<FileType>` child is not consulted). The modality source for
+   * `platform-coverage`.
    */
   fileExtensions: Set<string>;
   /** Raw file names from the `<Files>` list (forward/back slashes intact). */
@@ -82,20 +83,6 @@ function readKpsXml(kb: ScannedKeyboard): string | null {
   return kpsSource ? kpsSource.bytes.toString("utf8") : null;
 }
 
-/** Extract the file name of every `<File>` block, preferring `<Name>`. */
-function extractFileNames(xml: string): string[] {
-  const names: string[] = [];
-  const fileBlockRe = /<File\s*>([\s\S]*?)<\/File>/gi;
-  let block: RegExpExecArray | null;
-  while ((block = fileBlockRe.exec(xml)) !== null) {
-    const body = block[1] ?? "";
-    const nameMatch = /<Name\s*>([^<]*)<\/Name>/i.exec(body);
-    const name = (nameMatch?.[1] ?? "").trim();
-    if (name.length > 0) names.push(name);
-  }
-  return names;
-}
-
 /**
  * The lowercased extension of a package file name. `.model.ts`/`.model.js` keep
  * their compound extension so predictive-model files are distinguishable from a
@@ -123,7 +110,7 @@ export function readKpsPackage(kb: ScannedKeyboard): KpsPackageInfo {
   const xml = readKpsXml(kb);
   if (xml === null || xml.trim().length === 0) return emptyInfo();
 
-  const fileNames = extractFileNames(xml);
+  const fileNames = parseKpsFiles(xml).map((f) => f.name);
   const fileExtensions = new Set<string>();
   for (const name of fileNames) {
     const ext = extensionOf(name);

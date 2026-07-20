@@ -4,8 +4,8 @@
  * Value ∈ `{self-contained, system-font-reliant}` (FR-013, data-model):
  *
  *   system-font-reliant  iff the `.kps` bundles a `.ttf`/`.otf` AND the keyboard
- *                        wires that font into rendering (a `.kmn` visual-keyboard
- *                        / font store, or a `.kps` <OSKFont>/<DisplayFont> ref)
+ *                        wires that font into rendering (a `.kps`
+ *                        <OSKFont>/<DisplayFont> reference)
  *   self-contained       otherwise
  *
  * A base that bundles AND wires a specific font is signaling its script does not
@@ -15,11 +15,18 @@
  * bundled font is `self-contained`. The mapping (condition → value) is the
  * data-model's; only the condition is measured here.
  *
- * No content-derived tier is claimed: the deciding signal (a bundled font file)
- * is package metadata, so `classifyFontDependency` returns null and the build
- * routes every base through `fontDependencyFallback`. The `.kmn` corroboration
- * is read from the raw `.kmn` text (a visual-keyboard/font store declaration),
- * which is available on the scanned keyboard without re-parsing.
+ * The wiring signal is `<OSKFont>`/`<DisplayFont>` in the `.kps` — the only
+ * declaration that actually names a font. The `.kmn` header stores
+ * `&VISUALKEYBOARD`/`&LAYOUTFILE` are NOT used: they name the `.kvks`/touch-
+ * layout file, not a font, and are present on nearly every keyboard shipping an
+ * OSK, so treating them as font-wiring evidence yielded false-positive
+ * `system-font-reliant` reads. (Correlating the linked `.kvks`'s
+ * `<encoding fontname>` against the bundled fonts would raise recall; left to a
+ * follow-up.)
+ *
+ * No content-derived tier is claimed: the deciding signal (a bundled font file
+ * plus a `.kps` font reference) is package metadata, so `classifyFontDependency`
+ * returns null and the build routes every base through `fontDependencyFallback`.
  */
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
@@ -27,17 +34,6 @@ import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { readKpsPackage } from "./kps-reader.js";
 import type { Categorization, FacetDefinition } from "./types.js";
 import type { ScannedKeyboard } from "./scan.js";
-
-/**
- * Does the `.kmn` wire a visual-keyboard / font store? Matches the header stores
- * that bind an on-screen font or visual keyboard: `&VISUALKEYBOARD` (the `.kvks`
- * link) and `&LAYOUTFILE` (the touch/on-screen layout). Read from the raw text
- * so the fallback path needs no parsed IR (mirrors target-mix reading &TARGETS).
- */
-function kmnWiresFontStore(kmnText: string | null): boolean {
-  if (kmnText === null) return false;
-  return /store\s*\(\s*&(VISUALKEYBOARD|LAYOUTFILE)\s*\)/i.test(kmnText);
-}
 
 /**
  * Content tier is intentionally empty — the deciding signal is a bundled package
@@ -60,7 +56,7 @@ export function fontDependencyFallback(kb: ScannedKeyboard, def: FacetDefinition
 
   const pkg = readKpsPackage(kb);
   const bundlesFont = pkg.fontFiles.length > 0 || pkg.fileExtensions.has(".ttf") || pkg.fileExtensions.has(".otf");
-  const fontWired = pkg.oskFonts.length > 0 || kmnWiresFontStore(kb.kmnText);
+  const fontWired = pkg.oskFonts.length > 0;
 
   const systemFontReliant = bundlesFont && fontWired;
   const value = systemFontReliant ? "system-font-reliant" : "self-contained";
@@ -68,7 +64,7 @@ export function fontDependencyFallback(kb: ScannedKeyboard, def: FacetDefinition
   const provenanceTier: Categorization["provenanceTier"] = pkg.present ? "declared-metadata" : "default-fallback";
 
   const notes = systemFontReliant
-    ? `bundles a font (${pkg.fontFiles.join(", ") || ".ttf/.otf in <Files>"}) wired via ${pkg.oskFonts.length > 0 ? "<OSKFont>/<DisplayFont>" : "a .kmn visual-keyboard store"}`
+    ? `bundles a font (${pkg.fontFiles.join(", ") || ".ttf/.otf in <Files>"}) wired via <OSKFont>/<DisplayFont>`
     : bundlesFont
       ? "bundles a font but does not wire it into rendering; treated as self-contained"
       : pkg.present

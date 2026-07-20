@@ -21,31 +21,12 @@ import type { KeyboardIR } from "@keyboard-studio/contracts";
 
 import { undeterminedFallback } from "./measurement.js";
 import { computeAnalyzedCoverage } from "./outcome.js";
+import { CONFIDENT_DOMINANT_SHARE, strategyRuleTally } from "./strategy-tally.js";
 import type { Categorization, ConfidenceClass, FacetDefinition } from "./types.js";
 import type { ScannedKeyboard } from "./scan.js";
 
-/** Dominant-share threshold at/above which a single strategy reads `confident`. */
-const CONFIDENT_DOMINANT_SHARE = 0.8;
 /** The honest tie value when two or more strategies share the top owned-rule count. */
 const MIXED = "mixed";
-
-/**
- * The per-keyboard owned-rule tally over recognized strategies. Each recognized
- * rule is owned by exactly one pattern (ownership-consistency invariant), so
- * summing per-pattern owned-rule counts grouped by strategy never double-counts.
- * `recognizePatterns` has already run centrally in `buildKeyboardRecord`.
- */
-function strategyRuleCounts(ir: KeyboardIR): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const pattern of ir.recognizedPatterns) {
-    const strategyId = pattern.strategyId;
-    if (strategyId === undefined) continue;
-    const owned = (pattern.ownedNodes ?? []).filter((n) => n.kind === "rule").length;
-    if (owned === 0) continue;
-    counts.set(strategyId, (counts.get(strategyId) ?? 0) + owned);
-  }
-  return counts;
-}
 
 /**
  * Content-derived primary strategy, or `null` when no rule is recognized as any
@@ -54,7 +35,7 @@ function strategyRuleCounts(ir: KeyboardIR): Map<string, number> {
 export function classifyPrimaryStrategy(ir: KeyboardIR, def: FacetDefinition): Categorization | null {
   void def; // every emitted value is a StrategyId (recognizer output) or `mixed`, within limits by construction.
 
-  const counts = strategyRuleCounts(ir);
+  const counts = strategyRuleTally(ir);
   if (counts.size === 0) return null; // nothing recognized — fall through.
 
   const recognizedTotal = [...counts.values()].reduce((sum, c) => sum + c, 0);

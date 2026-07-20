@@ -2,9 +2,10 @@
  * Font-dependency classifier unit tests (spec 043 US1; FR-013; AS #4).
  *
  * `system-font-reliant` iff the `.kps` bundles a `.ttf`/`.otf` AND the font is
- * wired into rendering (a `.kps` <OSKFont>/<DisplayFont> or a `.kmn`
- * visual-keyboard store); `self-contained` otherwise. Exercised through the
- * fallback path with synthetic `.kps` XML + optional `.kmn` text.
+ * wired into rendering via a `.kps` <OSKFont>/<DisplayFont>; `self-contained`
+ * otherwise. The `.kmn` `&VISUALKEYBOARD`/`&LAYOUTFILE` stores name a file, not
+ * a font, so they are NOT wiring evidence. Exercised through the fallback path
+ * with synthetic `.kps` XML.
  */
 
 import { describe, it, expect } from "vitest";
@@ -49,11 +50,12 @@ describe("fontDependencyFallback", () => {
     expect(result.provenanceTier).toBe("declared-metadata");
   });
 
-  it("bundles a .ttf AND the .kmn wires a visual keyboard -> system-font-reliant", () => {
+  it("bundles a .ttf but only the .kmn wires a visual keyboard (no <OSKFont>) -> self-contained", () => {
+    // `&VISUALKEYBOARD` names the .kvks, not a font, so it is not wiring evidence.
     const kps = `<?xml version="1.0"?><Package><Files>${FONT_FILE}</Files></Package>`;
     const kmn = "store(&VISUALKEYBOARD) 'test.kvks'\nbegin Unicode > use(main)\n";
     const result = fontDependencyFallback(makeKb({ kps, kmn }), DEF);
-    expect(result.value).toBe("system-font-reliant");
+    expect(result.value).toBe("self-contained");
   });
 
   it("bundles a font but does not wire it -> self-contained", () => {
