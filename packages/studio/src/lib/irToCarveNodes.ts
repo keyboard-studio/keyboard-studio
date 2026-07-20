@@ -12,7 +12,7 @@ import type {
   StoreItem,
 } from '@keyboard-studio/contracts';
 import { buildProducedSet } from '@keyboard-studio/contracts';
-import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, isCharCoveredForLocale, collectCharContributors } from '@keyboard-studio/engine';
+import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, isCharCoveredForLocale, collectCharContributors, isPlusSeparator } from '@keyboard-studio/engine';
 import type { StoreSlotBlockReason, StoreAnalysis, CharContributors } from '@keyboard-studio/engine';
 export type CardKind = 'pattern' | 'group' | 'store' | 'raw';
 
@@ -685,7 +685,7 @@ function describeRuleForStore(rule: IRRule, storeName: string): StoreRuleDetail 
   );
 
   // The raw('+') element marks the keystroke boundary — refs after it are the active keypress
-  const plusIdx = rule.context.findIndex((el) => el.kind === 'raw' && el.text.trim() === '+');
+  const plusIdx = rule.context.findIndex(isPlusSeparator);
   // ctxRefIdx === -1 means store is output-only (not a keystroke trigger)
   const isKeystroke = ctxRefIdx !== -1 && (plusIdx === -1 || ctxRefIdx > plusIdx);
 
@@ -980,7 +980,7 @@ export function vkeyLabel(name: string): string | undefined {
  * Returns a human-readable string or undefined when no trigger is present.
  */
 export function triggerKeyLabel(context: ContextElement[]): string | undefined {
-  const plusIdx = context.findIndex((el) => el.kind === 'raw' && el.text.trim() === '+');
+  const plusIdx = context.findIndex(isPlusSeparator);
   if (plusIdx === -1) return undefined;
   const triggerEl = context[plusIdx + 1];
   if (!triggerEl) return undefined;
@@ -1017,7 +1017,7 @@ export function triggerKeyLabel(context: ContextElement[]): string | undefined {
 export function crossPairTrigger(storeName: string, partnerName: string, ir: KeyboardIR): string | undefined {
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      const effectiveContext = rule.context.filter((el) => !(el.kind === 'raw' && el.text.trim() === '+'));
+      const effectiveContext = rule.context.filter((el) => !isPlusSeparator(el));
       for (const el of rule.output) {
         if (el.kind !== 'index') continue;
         const target = effectiveContext[el.offset - 1];

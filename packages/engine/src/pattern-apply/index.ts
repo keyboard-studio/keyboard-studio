@@ -30,6 +30,8 @@ export type {
 
 export { parseSlotId } from "./slotId.js";
 
+export { isPlusSeparator } from "../shared/rule-shape.js";
+
 export { applyKeycapLabelsToVfs } from "./applyKeycapLabelsToVfs.js";
 
 export {
