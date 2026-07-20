@@ -27,9 +27,14 @@
 
 import { create } from "zustand";
 import type { BaseKeyboard, SurveyPhaseResult } from "@keyboard-studio/contracts";
-import type { IdentityLiteResult } from "../survey/index.ts";
-import type { SurveyContext } from "../survey/types.ts";
-import type { Track } from "../survey/index.ts";
+// Imported directly from the leaf modules (IdentityLite.tsx / types.ts), NOT
+// from the survey/index.ts barrel — that barrel re-exports PhaseB.tsx at
+// runtime, and PhaseB.tsx now imports this store at runtime too (the Phase B
+// character-map pane work), so a type-only import from the barrel here would
+// close a runtime dependency cycle (depcruise no-circular). See survey/types.ts's
+// Track docstring for the full story.
+import type { IdentityLiteResult } from "../survey/IdentityLite.tsx";
+import type { SurveyContext, Track } from "../survey/types.ts";
 import type { ScaffoldSpec } from "../hooks/useKeyboardArtifact.ts";
 // Runtime import of the sibling store (one-directional: workingCopyStore.ts
 // does NOT import this module, so this does not create a circular dependency
@@ -57,6 +62,18 @@ export type CharactersSubStage = "prefill" | "B";
 // ---------------------------------------------------------------------------
 
 export type TouchSeedSource = "import-adapt" | "reseed-from-desktop";
+
+// ---------------------------------------------------------------------------
+// DiscoveryMethod — the Phase B character-discovery method the author picked
+// at the IntroChooser (build-list "add your whole alphabet" vs manual
+// step-by-step). Lifted out of PhaseB.tsx local state (spec character-map
+// pane work) so SurveyView can gate the right-pane character map on it — the
+// map only ever shows for the build-list path; the manual path and the
+// not-yet-chosen state keep the live OSK preview. Null means no method chosen
+// yet (still on the IntroChooser).
+// ---------------------------------------------------------------------------
+
+export type DiscoveryMethod = "manual" | "build-list";
 
 // ---------------------------------------------------------------------------
 // ActiveStepId — the set of manifest step ids the runtime advances through,
@@ -165,6 +182,15 @@ export interface SurveySessionState {
    */
   touchSeedSource: TouchSeedSource | null;
 
+  /**
+   * The author's choice at the Phase B IntroChooser (spec character-map pane
+   * work). Null while the chooser hasn't been answered yet. Cleared to null
+   * by reset(). NOT cleared by charactersSubStage transitions — going back
+   * from PhaseB's build-list view to its own IntroChooser re-shows the
+   * chooser without losing the manifest-level "characters" substage.
+   */
+  discoveryMethod: DiscoveryMethod | null;
+
   // --- actions ---
 
   /**
@@ -239,6 +265,9 @@ export interface SurveySessionState {
    * A no-op re-set of the same value does not clear the draft.
    */
   setTouchSeedSource: (s: TouchSeedSource | null) => void;
+
+  /** Plain setter — the Phase B IntroChooser discovery-method choice. */
+  setDiscoveryMethod: (m: DiscoveryMethod | null) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -263,7 +292,7 @@ type SurveySessionData = Omit<
   | "advance" | "popHistory" | "backToTouchSeedSource" | "reset"
   | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
   | "setSelectedTrack" | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
-  | "setTouchSeedSource" | "setBaseConfirmed"
+  | "setTouchSeedSource" | "setBaseConfirmed" | "setDiscoveryMethod"
 >;
 
 /**
@@ -292,6 +321,7 @@ const INITIAL_STATE = {
   baseConfirmed: false,
   charactersSubStage: "prefill" as CharactersSubStage,
   touchSeedSource: null as TouchSeedSource | null,
+  discoveryMethod: null as DiscoveryMethod | null,
 } as const satisfies SurveySessionData;
 
 // ---------------------------------------------------------------------------
@@ -360,6 +390,8 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
       }
       return { touchSeedSource: s };
     }),
+
+  setDiscoveryMethod: (m) => set({ discoveryMethod: m }),
 }));
 
 // Ensure the store's getState() escape hatch is available for imperative reads
@@ -391,6 +423,7 @@ export function snapshotTraversal(): TraversalSnapshot {
     baseConfirmed: s.baseConfirmed,
     charactersSubStage: s.charactersSubStage,
     touchSeedSource: s.touchSeedSource,
+    discoveryMethod: s.discoveryMethod,
   };
 }
 

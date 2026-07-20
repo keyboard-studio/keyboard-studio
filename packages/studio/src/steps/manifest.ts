@@ -69,6 +69,11 @@ const charactersStep: Step = {
   component: CharactersStep,
   // phase_b_characters runs inside the characters step (spec 024, Stage 1).
   flowRefs: ["phase_b_characters"],
+  // Right pane swaps from the live OSK preview to the interactive character
+  // map for the Phase B build-list screen only (SurveyView further gates this
+  // on discoveryMethod === "build-list" — the manual step-by-step path and the
+  // IntroChooser keep the OSK preview).
+  rightPane: "character-map",
 } as const;
 
 // ---------------------------------------------------------------------------

@@ -16,6 +16,7 @@ import type { ComponentType } from "react";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import type { EditorStepProps } from "../steps/types.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { useValidatorFindings } from "../hooks/useValidatorFindings.ts";
 import { Prefill, PhaseB } from "./index.ts";
 
@@ -36,6 +37,7 @@ const CharactersStep: ComponentType<EditorStepProps> = ({
   const surveyContext = useSurveySessionStore((s) => s.surveyContext);
   const charactersSubStage = useSurveySessionStore((s) => s.charactersSubStage);
   const setCharactersSubStage = useSurveySessionStore((s) => s.setCharactersSubStage);
+  const resetPhaseBDraft = usePhaseBDraftStore((s) => s.reset);
 
   const findingsByQuestionId = useValidatorFindings();
 
@@ -49,7 +51,13 @@ const CharactersStep: ComponentType<EditorStepProps> = ({
       <Prefill
         identity={identityResult}
         base={localBase}
-        onConfirm={() => setCharactersSubStage("B")}
+        onConfirm={() => {
+          // Fresh draft alphabet each time the build-list screen is (re)entered
+          // (spec character-map pane work) — NOT on every BuildListView/
+          // CharacterMapPane render, only on this prefill -> B transition.
+          resetPhaseBDraft();
+          setCharactersSubStage("B");
+        }}
         onBack={() => onBack?.()}
       />
     );

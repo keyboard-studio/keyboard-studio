@@ -101,8 +101,12 @@ export function buildLinguistPrompt(languageName: string, bcp47: string, orthogr
  *   U+2066–U+2069  (isolate controls)
  *   U+061C         (ARABIC LETTER MARK)
  *   U+FEFF         (ZERO WIDTH NO-BREAK SPACE / BOM)
+ *
+ * Exported for reuse by characterMap.ts, which allowlists the same bidi
+ * codepoints against its otherwise-blanket Cf (format char) guardrail rather
+ * than re-deriving these ranges.
  */
-function isBidiControlCodePoint(cp: number): boolean {
+export function isBidiControlCodePoint(cp: number): boolean {
   return (
     (cp >= 0x200b && cp <= 0x200f) ||
     (cp >= 0x202a && cp <= 0x202e) ||

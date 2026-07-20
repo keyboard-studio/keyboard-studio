@@ -4,6 +4,21 @@
 
 import type { IRPath, KeyboardIR } from "@keyboard-studio/contracts";
 
+/**
+ * The two authoring tracks (spec §8 v1.3.0).
+ *
+ * Canonical location: was declared in survey/index.ts (post spec-029 barrel
+ * convergence, after phaseWrappers.tsx/PhaseTrack.tsx were deleted) so that
+ * stores/surveySessionStore.ts's type-only import kept resolving. Moved here
+ * (a leaf types module with no runtime imports of its own) so
+ * surveySessionStore.ts can import it WITHOUT going through survey/index.ts —
+ * that barrel re-exports PhaseB.tsx at runtime, and PhaseB.tsx now imports
+ * surveySessionStore.ts at runtime too (the Phase B character-map pane work),
+ * which would otherwise close a runtime dependency cycle. index.ts re-exports
+ * this type for existing external consumers.
+ */
+export type Track = "copy" | "adapt";
+
 /** Rendering-level question type as declared in the YAML flow. */
 export type FlowQuestionType =
   | "text"
