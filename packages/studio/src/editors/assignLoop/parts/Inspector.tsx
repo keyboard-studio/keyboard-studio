@@ -288,14 +288,6 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
     allCharsCovered &&
     chipsState === 'off' &&
     (node.storeUsage?.ruleCount ?? 0) > 0;
-  // classifyStoreSlotEdit classifies once per store, so every toggleable
-  // chip in a store shares the same action — the first chip's action tells
-  // us which second-line copy applies. Only nul-fill and drop stores can
-  // ever have toggleable chips (blocked stores are all-disabled and never
-  // reach chipsState === 'off' via toggleable chips), so this is exhaustive
-  // for the banner's audience.
-  const banneredChipAction = toggleableChips[0]?.action;
-
   // Build combined consumer list from patternRefs + groupRefs for the dependency chain
   const consumers = [
     ...(node.storeUsage?.patternRefs ?? []).map((r) => ({
@@ -390,9 +382,7 @@ function StoreDetail({ node, nodes, isDeleted, isItemDeleted, onToggleNode, onSe
                   This will empty the store — the mechanism depending on it will stop working
                 </span>
                 <span style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
-                  {banneredChipAction === 'nul-fill'
-                    ? "Each removed character's slot outputs nothing (nul) in the built keyboard; the mechanism stays but produces no output."
-                    : "To keep the keyboard buildable, the built keyboard keeps this store's characters until at least one stays active — remove the whole store instead if you no longer need it."}
+                  To keep the keyboard buildable, the built keyboard keeps this store's characters until at least one stays active — remove the whole store instead if you no longer need it.
                 </span>
               </span>
             </div>

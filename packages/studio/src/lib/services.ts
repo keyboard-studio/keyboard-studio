@@ -190,3 +190,29 @@ export async function suggestMissingChars(
 
 // Re-export the type so callers can use it without a direct engine import.
 export type { MissingCharSuggestions };
+
+// neededCharsForLanguage — the full CLDR needed-char set for a target BCP47
+// language (issue #525 items 2/4, language-driven surplus). Mirrors
+// suggestMissingChars's lazy-import + cache pattern above. When USE_REAL is
+// false returns null (deterministic, no network — matches suggestMissingChars's
+// test-mode contract). When real, lazy-imports neededCharsForLanguage +
+// createFetchCldrFullLoader from the engine and caches both together.
+type NeededCharsEngineCache = {
+  fn: (opts: { bcp47: string; loader: CldrFullLoader }) => Promise<Set<string> | null>;
+  loader: CldrFullLoader;
+};
+let neededCharsEngineCache: NeededCharsEngineCache | null = null;
+export async function neededCharsForLanguage(bcp47: string): Promise<Set<string> | null> {
+  if (!USE_REAL) return null;
+  if (neededCharsEngineCache !== null) {
+    return neededCharsEngineCache.fn({ bcp47, loader: neededCharsEngineCache.loader });
+  }
+  const { neededCharsForLanguage: engineNeededCharsForLanguage, createFetchCldrFullLoader } = await import(
+    /* @vite-ignore */ "@keyboard-studio/engine"
+  );
+  neededCharsEngineCache = {
+    fn: engineNeededCharsForLanguage,
+    loader: createFetchCldrFullLoader(),
+  };
+  return neededCharsEngineCache.fn({ bcp47, loader: neededCharsEngineCache.loader });
+}

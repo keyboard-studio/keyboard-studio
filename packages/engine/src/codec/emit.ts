@@ -44,6 +44,7 @@ import type {
   OutputElement,
   StoreItem,
 } from "@keyboard-studio/contracts";
+import { isPlusSeparator } from "../shared/rule-shape.js";
 
 // ---------------------------------------------------------------------------
 // Codepoint formatting
@@ -147,9 +148,7 @@ function emitRule(rule: IRRule, groupUsingKeys: boolean): string {
   } else if (!groupUsingKeys) {
     line = `${ctx} > ${out}`;
   } else {
-    const hasInlinePlus = rule.context.some(
-      (el) => el.kind === "raw" && el.text.trim() === "+",
-    );
+    const hasInlinePlus = rule.context.some(isPlusSeparator);
     line = hasInlinePlus ? `${ctx} > ${out}` : `+ ${ctx} > ${out}`;
   }
   if (rule.trailingComment !== undefined) {

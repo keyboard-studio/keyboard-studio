@@ -35,17 +35,23 @@ const NO_PHASE_RESULTS: readonly SurveyPhaseResult[] = [];
 // ---------------------------------------------------------------------------
 
 describe("deriveDesktopModifications — removals", () => {
-  it("a nul-filled carve slot surfaces its character in removals (rule survives)", () => {
-    // Store "dkt" is an output target (referenced by index() in a rule's
-    // output), so applyStoreSlotRemovals classifies it as nul-fill.
+  it("a self-paired carve slot surfaces its character in removals (rule survives, splice not nul-fill)", () => {
+    // Store "dkt" is BOTH an any() context source and an index() output
+    // target in the SAME rule (self-paired, the Cameroon word/final idiom —
+    // see applyStoreSlotRemovals.ts's pairing-graph doc comment), so
+    // applyStoreSlotRemovals resolves the pairing and classifies it as a
+    // coordinated "drop" (splice), not nul-fill. The rule itself survives
+    // untouched; only the spliced character disappears from the produced set.
     const dkt: IRStore = makeCharStore("store#dkt", "dkt", "xy");
-    const rule = makeVkeyRule("rule#0", "K_B", [
-      { kind: "index", storeRef: "dkt", offset: 2 },
-    ]);
+    const rule: IRRule = {
+      nodeId: "rule#0",
+      context: [{ kind: "any", storeRef: "dkt" }],
+      output: [{ kind: "index", storeRef: "dkt", offset: 1 }],
+    };
     const group = makeGroup("group#main", "main", [rule]);
     const baseIr = makeTestIR([group], [dkt]);
 
-    // Slot id "<storeNodeId>#<itemsIndex>" — carve item 0 ("x") to nul.
+    // Slot id "<storeNodeId>#<itemsIndex>" — carve item 0 ("x"), spliced out.
     const result = deriveDesktopModifications(
       baseIr,
       new Set(),

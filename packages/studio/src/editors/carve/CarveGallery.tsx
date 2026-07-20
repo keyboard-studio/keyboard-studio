@@ -1,12 +1,13 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
-import { toRailNodes, nodeState, buildCharWeb } from '../../lib/irToCarveNodes.ts';
-import type { CarveNode, CharLocation } from '../../lib/irToCarveNodes.ts';
+import { toRailNodes, nodeState, buildCharWeb, annotateRemovalRecommendations, recommendedRemovalChars } from '../../lib/irToCarveNodes.ts';
+import type { CarveNode, CharLocation, RecommendedRemovalChar } from '../../lib/irToCarveNodes.ts';
 import { KIND_COLOR } from '../assignLoop/parts/KindBadge.tsx';
 import { StatusBar } from '../assignLoop/parts/StatusBar.tsx';
 import type { RemovedItem } from '../assignLoop/parts/StatusBar.tsx';
 import { DepBanner } from '../assignLoop/parts/DepBanner.tsx';
 import type { DepNode } from '../assignLoop/parts/DepBanner.tsx';
+import { RemovalBanner } from '../assignLoop/parts/RemovalBanner.tsx';
 import { Rail } from '../assignLoop/parts/Rail.tsx';
 import { Inspector } from '../assignLoop/parts/Inspector.tsx';
 import { InfoView, capabilityHint } from '../assignLoop/parts/InfoView.tsx';
@@ -16,6 +17,7 @@ import { useHoverInfoStore } from '../../stores/hoverInfoStore.ts';
 import { collectCharContributors } from '@keyboard-studio/engine';
 import type { CharContributors } from '@keyboard-studio/engine';
 import type { KeyboardIR, RemovalCapability } from '@keyboard-studio/contracts';
+import { neededCharsForLanguage } from '../../lib/services.ts';
 
 /** Pending cascade state — set when the user clicks a cross-wired chip. */
 interface PendingCascade {
@@ -112,6 +114,41 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   const ir = useWorkingCopyStore((s) => s.ir);
   const removalCapabilities = useWorkingCopyStore((s) => s.removalCapabilities);
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
+  // #525 FOUNDATION slice — the confirmed Phase B inventory drives removal
+  // recommendations. session.confirmedInventory is a deduped, NFC-normalized
+  // string[] union across survey phases (see contracts/src/surveySession.ts);
+  // built into a Set here purely for annotateRemovalRecommendations() lookups.
+  const confirmedInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
+  const confirmedInventorySet = useMemo(
+    () => new Set(confirmedInventory.map((ch) => ch.normalize('NFC'))),
+    [confirmedInventory],
+  );
+
+  // #525 items 2/4 — language-driven surplus signal. Resolved ASYNCHRONOUSLY
+  // here (CLDR is a network fetch) and passed as an already-resolved Set into
+  // the pure annotateRemovalRecommendations() pass below — that function never
+  // does I/O itself. Null means "not yet resolved" or "CLDR unavailable for
+  // this language" (und/script-only/private-use/un-narrowed macrolang/no CLDR
+  // locale match) — annotateRemovalRecommendations treats null the same as
+  // "not supplied," falling back to inventory-only behavior (item 5's
+  // graceful-fallback requirement).
+  const identityBcp47 = useWorkingCopyStore((s) => s.identity?.bcp47);
+  const [neededChars, setNeededChars] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    // Reset synchronously BEFORE kicking off the new fetch (or bailing when
+    // there's no bcp47) — otherwise, while a fetch for the previous language
+    // is still in flight, neededChars keeps holding that stale language's
+    // set and surplus gets computed against the wrong language until the
+    // new fetch resolves. Degrading to inventory-only for that pending
+    // window is the safe fallback (same contract null already carries).
+    setNeededChars(null);
+    if (!identityBcp47) return;
+    let cancelled = false;
+    neededCharsForLanguage(identityBcp47)
+      .then((result) => { if (!cancelled) setNeededChars(result); })
+      .catch(() => { if (!cancelled) setNeededChars(null); });
+    return () => { cancelled = true; };
+  }, [identityBcp47]);
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const isDeleted = useWorkingCopyStore((s) => s.isDeleted);
@@ -134,6 +171,53 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
   const nodes = useMemo(() => (ir ? toRailNodes(ir, removalCapabilities) : []), [ir, removalCapabilities]);
 
+  // #525 FOUNDATION slice + items 2/4 (language-driven surplus) — non-destructive
+  // removal-recommendation annotation, kept as a SEPARATE pass over `nodes`
+  // (toRailNodes stays pure/unchanged). Skipped entirely (nodes pass through
+  // unannotated) when instantiationMode is null (working copy not yet
+  // instantiated) or there is no signal at all — inventory empty AND no CLDR
+  // needed-set resolved — both cases have no signal to recommend from.
+  // TODO(#525): Track-1 default filtering hooks in here too — a Track 1
+  // (new-from-base) author gets different defaults than Track 2 (adapt-existing).
+  const recommendedNodes = useMemo(
+    () => (instantiationMode !== null && (confirmedInventorySet.size > 0 || neededChars !== null) && ir
+      ? annotateRemovalRecommendations(nodes, ir, confirmedInventorySet, neededChars, identityBcp47)
+      : nodes),
+    [nodes, ir, instantiationMode, confirmedInventorySet, neededChars, identityBcp47],
+  );
+
+  // #525 BANNER slice — character-level companion to recommendedNodes above,
+  // driving the green removal-recommendation banner's flat checklist. `needed`
+  // is the SAME neededChars ∪ confirmedInventory union annotateRemovalRecommendations
+  // computes internally, pre-unioned here so recommendedRemovalChars (a pure
+  // character-granularity pass) doesn't need to know about the two-signal shape.
+  const neededSet = useMemo(
+    () => (neededChars ? new Set([...neededChars, ...confirmedInventorySet]) : confirmedInventorySet),
+    [neededChars, confirmedInventorySet],
+  );
+  const recommendedChars = useMemo(
+    () => (instantiationMode !== null && (confirmedInventorySet.size > 0 || neededChars !== null) && ir
+      ? recommendedRemovalChars({ ir, needed: neededSet, bcp47: identityBcp47 })
+      : []),
+    [ir, instantiationMode, confirmedInventorySet, neededChars, neededSet, identityBcp47],
+  );
+
+  // Bulk removal from the banner checklist deliberately skips the per-removal
+  // ConfirmDialog that handleCascadeDelete/handleStoreChipCascade open below —
+  // the checklist itself (every row pre-checked, individually uncheckable
+  // before the author clicks "Remove all selected") IS the confirmation for
+  // this batch, so a second per-character dialog would be redundant.
+  const handleRemoveSelectedRecommended = useCallback((selected: RecommendedRemovalChar[]) => {
+    const ruleNodeIds: string[] = [];
+    const storeSlotIds: string[] = [];
+    for (const { contributors } of selected) {
+      ruleNodeIds.push(...contributors.ruleNodeIds);
+      storeSlotIds.push(...contributors.storeSlotIds);
+    }
+    if (ruleNodeIds.length === 0 && storeSlotIds.length === 0) return;
+    cascadeDelete(ruleNodeIds, storeSlotIds);
+  }, [cascadeDelete]);
+
   // Cross-reference web: character → all the group/pattern/store cards it lives in.
   // Built ONCE per node set (not per glyph). Powers the summary tags on each card.
   const charWeb = useMemo(() => buildCharWeb(nodes), [nodes]);
@@ -143,6 +227,10 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   //   2. No recognised patterns, user stores, or raw fragments — nothing complex to carve.
   //   3. At most one plain group AND that group has ≤ 20 displayable glyphs — a truly small keyboard.
   //      Arabic / Ethiopic / CJK keyboards with hundreds of rules in "main" must go to the full carver.
+  // TODO(#525): once removal recommendations are trustworthy enough, this gate should
+  // also consider whether any 'high'-recommendation nodes exist ("Your rules look good"
+  // is a poor message when the tool has active suggestions to show) — deferred out of
+  // this FOUNDATION slice; do not change the gate predicate here yet.
   const isSimple = useMemo(() => {
     if (instantiationMode === 'adapt-existing') return false;
     if (nodes.some((n) => n.kind === 'pattern' || n.kind === 'store' || n.kind === 'raw')) return false;
@@ -156,8 +244,8 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
   const [selectedId, setSelectedId] = useState<string | null>(() => null);
   const selectedNode = useMemo<CarveNode | undefined>(
-    () => nodes.find((n) => n.nodeId === selectedId) ?? nodes[0],
-    [nodes, selectedId],
+    () => recommendedNodes.find((n) => n.nodeId === selectedId) ?? recommendedNodes[0],
+    [recommendedNodes, selectedId],
   );
 
   // -- Cascade-delete state ----------------------------------------------------
@@ -487,6 +575,15 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
         </button>
       </div>
 
+      {/* Removal-recommendation banner (#525 BANNER slice) — the single surface
+          for the character-level removal signal; replaces the old per-node
+          "Suggested removal" Rail badge (see Rail.tsx). */}
+      <RemovalBanner
+        recommended={recommendedChars}
+        languageLabel={identityBcp47 ?? 'your target language'}
+        onRemoveSelected={handleRemoveSelectedRecommended}
+      />
+
       {/* Status bar */}
       <StatusBar
         kept={kept}
@@ -506,7 +603,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       {/* Two-panel body */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <Rail
-          nodes={nodes}
+          nodes={recommendedNodes}
           selectedId={selectedNode?.nodeId ?? null}
           onSelect={setSelectedId}
           isItemDeleted={isItemDeleted}
@@ -517,7 +614,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <Inspector
             node={selectedNode}
-            nodes={nodes}
+            nodes={recommendedNodes}
             isItemDeleted={isItemDeleted}
             onToggleGlyph={handleToggleGlyph}
             onSetManyGlyphs={handleSetManyGlyphs}

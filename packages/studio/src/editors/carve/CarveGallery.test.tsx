@@ -37,9 +37,20 @@ beforeAll(() => {
   }
 });
 
-const { collectCharContributorsMock } = vi.hoisted(() => ({
-  collectCharContributorsMock: vi.fn(),
-}));
+const { collectCharContributorsMock, neededCharsResult, neededCharsPerBcp47 } = vi.hoisted(() => {
+  let _needed: Set<string> | null = null;
+  return {
+    collectCharContributorsMock: vi.fn(),
+    neededCharsResult: {
+      get: () => _needed,
+      set: (v: Set<string> | null) => { _needed = v; },
+    },
+    // Review fix 8 — per-bcp47 deferred overrides, for tests that need to
+    // control resolution ORDER across a bcp47 change (the stale-language
+    // race). Empty by default — falls through to neededCharsResult above.
+    neededCharsPerBcp47: new Map<string, Promise<Set<string> | null>>(),
+  };
+});
 
 vi.mock('@keyboard-studio/engine', async () => {
   const actual = await vi.importActual<typeof import('@keyboard-studio/engine')>('@keyboard-studio/engine');
@@ -49,9 +60,32 @@ vi.mock('@keyboard-studio/engine', async () => {
   };
 });
 
+// #525 items 2/4 — neededCharsForLanguage does a real CLDR network fetch when
+// unmocked; stub it so the suite stays deterministic/offline. Defaults to
+// null (no CLDR signal) so existing tests keep their inventory-only behavior;
+// individual tests can set neededCharsResult to exercise the surplus signal,
+// or register a per-bcp47 deferred promise (deferNeededChars below) to control
+// resolution order.
+vi.mock('../../lib/services.ts', () => ({
+  neededCharsForLanguage: async (bcp47: string) => {
+    const deferred = neededCharsPerBcp47.get(bcp47);
+    return deferred !== undefined ? deferred : neededCharsResult.get();
+  },
+}));
+
+/** Registers a pending neededCharsForLanguage(bcp47) call; returns the resolver. */
+function deferNeededChars(bcp47: string): (result: Set<string> | null) => void {
+  let resolve!: (v: Set<string> | null) => void;
+  const promise = new Promise<Set<string> | null>((r) => { resolve = r; });
+  neededCharsPerBcp47.set(bcp47, promise);
+  return resolve;
+}
+
 afterEach(() => {
   cleanup();
   collectCharContributorsMock.mockReset();
+  neededCharsResult.set(null);
+  neededCharsPerBcp47.clear();
 });
 
 beforeEach(() => {
@@ -481,5 +515,172 @@ describe('CarveGallery — store-chip cascade (#523)', () => {
 
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(useWorkingCopyStore.getState().isItemDeleted('store#s#0')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 12. Review fix 5 — component-level test for the CLDR-driven 'high' path.
+// #525 BANNER slice update: the per-node Rail badge this test originally
+// exercised is retired; the assertions now target the green RemovalBanner
+// (the single surface for the character-level recommendation signal).
+// ---------------------------------------------------------------------------
+
+describe('CarveGallery — language-driven surplus recommendation (removal banner)', () => {
+  it('lists a character surplus under the resolved CLDR needed-set in the banner checklist, but not a character that is needed', async () => {
+    const ir = makeIR([
+      makeGroup('g-main', 'main', [makeSimpleRule('r-z', 'K_Z', 'z')]),
+      makeGroup('g-second', 'second', [makeSimpleRule('r-q', 'K_Q', 'q')]),
+    ]);
+    const caps = new Map<string, RemovalCapability>([
+      ['r-z', 'removable:simple'],
+      ['r-q', 'removable:simple'],
+    ]);
+    // recommendedRemovalChars resolves producers via collectCharContributors —
+    // map each character to the rule that actually produces it so the
+    // allowlist (isSimpleRemovableRule) can see a real, simple producer.
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => {
+      if (ch === 'z') return { ...emptyContributors(ch), ruleNodeIds: ['r-z'] };
+      if (ch === 'q') return { ...emptyContributors(ch), ruleNodeIds: ['r-q'] };
+      return emptyContributors(ch);
+    });
+    neededCharsResult.set(new Set(['q']));
+
+    renderGallery(ir, caps);
+
+    // 'z' is absent from the resolved needed-set — surplus, banner shows and
+    // lists exactly one character.
+    await screen.findByText(/We recommend removing 1 character/);
+    fireEvent.click(screen.getByRole('button', { expanded: false }));
+    expect(screen.getByRole('checkbox', { name: 'Remove U+007A' })).not.toBeNull();
+    // 'q' IS in the resolved needed-set — never listed.
+    expect(screen.queryByRole('checkbox', { name: 'Remove U+0071' })).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 13. Review fix 8/4 — stale-language race: an in-flight fetch for the OLD
+// bcp47 resolving AFTER the bcp47 changes must not overwrite the newer
+// language's result (the cancelled-guard in the useEffect). #525 BANNER
+// slice update: assertions retargeted from the retired Rail badge to the
+// RemovalBanner summary text.
+// ---------------------------------------------------------------------------
+
+describe('CarveGallery — stale-language race (cancelled-guard)', () => {
+  it('an older in-flight fetch resolving out of order does not overwrite the newer bcp47 result', async () => {
+    const ir = makeIR([makeGroup('g-main', 'main', [makeSimpleRule('r-z', 'K_Z', 'z')])]);
+    const caps = new Map<string, RemovalCapability>([['r-z', 'removable:simple']]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) =>
+      ch === 'z' ? { ...emptyContributors(ch), ruleNodeIds: ['r-z'] } : emptyContributors(ch),
+    );
+
+    // basicKbdus.languages[0] === 'en' — instantiateFromExisting seeds identity.bcp47 with it.
+    const resolveOld = deferNeededChars('en');
+    renderGallery(ir, caps);
+
+    // Old fetch still pending — no recommendation signal yet.
+    expect(screen.queryByText(/We recommend removing/)).toBeNull();
+
+    // Language changes mid-flight, before the 'en' fetch resolves.
+    const resolveNew = deferNeededChars('fr');
+    useWorkingCopyStore.getState().setIdentity({ bcp47: 'fr' });
+
+    // Newer ('fr') fetch resolves first, WITHOUT 'z' — surplus, banner shows.
+    resolveNew(new Set(['q']));
+    await screen.findByText(/We recommend removing 1 character/);
+
+    // Older ('en') fetch resolves LATER, WITH 'z' — if the cancelled-guard
+    // didn't hold, this would overwrite neededChars and the banner would
+    // disappear (since 'z' would suddenly be "needed").
+    resolveOld(new Set(['z']));
+    await Promise.resolve();
+    expect(screen.getByText(/We recommend removing 1 character/)).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 14. #525 BANNER slice — RemovalBanner show/hide, expand, and
+// "Remove all selected" (checked-subset cascade removal).
+// ---------------------------------------------------------------------------
+
+describe('CarveGallery — removal banner (#525 BANNER slice)', () => {
+  it('is hidden when there is no recommendation signal at all (no confirmed inventory, no CLDR needed-set)', () => {
+    const ir = makeIR([makeGroup('g-main', 'main', [makeSimpleRule('r-z', 'K_Z', 'z')])]);
+    const caps = new Map<string, RemovalCapability>([['r-z', 'removable:simple']]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => emptyContributors(ch));
+
+    renderGallery(ir, caps);
+
+    expect(screen.queryByText(/We recommend removing/)).toBeNull();
+  });
+
+  it('shows the correct count and, once expanded, checklist entries for every surplus character — a needed character never appears', async () => {
+    const ir = makeIR([
+      makeGroup('g-main', 'main', [
+        makeSimpleRule('r-a', 'K_A', 'a'),
+        makeSimpleRule('r-b', 'K_B', 'b'),
+        makeSimpleRule('r-q', 'K_Q', 'q'),
+      ]),
+    ]);
+    const caps = new Map<string, RemovalCapability>([
+      ['r-a', 'removable:simple'],
+      ['r-b', 'removable:simple'],
+      ['r-q', 'removable:simple'],
+    ]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => {
+      if (ch === 'a') return { ...emptyContributors(ch), ruleNodeIds: ['r-a'] };
+      if (ch === 'b') return { ...emptyContributors(ch), ruleNodeIds: ['r-b'] };
+      return emptyContributors(ch);
+    });
+    neededCharsResult.set(new Set(['q'])); // only 'q' is needed — 'a' and 'b' are surplus
+
+    renderGallery(ir, caps);
+
+    await screen.findByText(/We recommend removing 2 characters/);
+
+    // Collapsed by default — the checklist isn't in the DOM yet.
+    expect(screen.queryByRole('checkbox', { name: 'Remove U+0061' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { expanded: false }));
+
+    expect(screen.getByRole('checkbox', { name: 'Remove U+0061' })).not.toBeNull(); // 'a'
+    expect(screen.getByRole('checkbox', { name: 'Remove U+0062' })).not.toBeNull(); // 'b'
+    // 'q' is needed — never listed, regardless of expansion state.
+    expect(screen.queryByRole('checkbox', { name: 'Remove U+0071' })).toBeNull();
+  });
+
+  it('"Remove all selected" removes only the still-checked characters, leaving an unchecked one untouched', async () => {
+    const ir = makeIR([
+      makeGroup('g-main', 'main', [
+        makeSimpleRule('r-a', 'K_A', 'a'),
+        makeSimpleRule('r-b', 'K_B', 'b'),
+      ]),
+    ]);
+    const caps = new Map<string, RemovalCapability>([
+      ['r-a', 'removable:simple'],
+      ['r-b', 'removable:simple'],
+    ]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => {
+      if (ch === 'a') return { ...emptyContributors(ch), ruleNodeIds: ['r-a'] };
+      if (ch === 'b') return { ...emptyContributors(ch), ruleNodeIds: ['r-b'] };
+      return emptyContributors(ch);
+    });
+    neededCharsResult.set(new Set(['q'])); // neither 'a' nor 'b' is needed
+
+    renderGallery(ir, caps);
+    await screen.findByText(/We recommend removing 2 characters/);
+    fireEvent.click(screen.getByRole('button', { expanded: false }));
+
+    // Both pre-checked by default.
+    const checkboxA = screen.getByRole('checkbox', { name: 'Remove U+0061' });
+    const checkboxB = screen.getByRole('checkbox', { name: 'Remove U+0062' });
+    expect((checkboxA as HTMLInputElement).checked).toBe(true);
+    expect((checkboxB as HTMLInputElement).checked).toBe(true);
+
+    // Uncheck 'a' — only 'b' should be removed.
+    fireEvent.click(checkboxA);
+    fireEvent.click(screen.getByRole('button', { name: /Remove all selected \(1\)/ }));
+
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(false);
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-b')).toBe(true);
   });
 });

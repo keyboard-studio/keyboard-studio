@@ -33,6 +33,17 @@ export function capabilityHint(capability: RemovalCapability): string {
   }
 }
 
+/**
+ * #525 FOUNDATION slice — the single suggestion-reason sentence appended to a
+ * node's info body when recommendation === 'high'. Slice-1 has exactly one
+ * signal (absence from the confirmed inventory), so the text is written out
+ * directly rather than dispatched through a reason-code switch.
+ * TODO(#525): once the Unicode-block and Phase-C mechanism-not-enabled
+ * signals land, this needs to become a per-reason lookup (mirroring
+ * capabilityHint above) rather than a single fixed sentence.
+ */
+const SUGGESTED_REMOVAL_HINT = "Suggested to remove — none of the characters it produces are in your confirmed inventory.";
+
 export function infoFor(node: CarveNode | undefined): InfoContent {
   if (node === undefined) {
     return {
@@ -41,6 +52,14 @@ export function infoFor(node: CarveNode | undefined): InfoContent {
     };
   }
 
+  const content = infoForNode(node);
+  if (node.recommendation === 'high') {
+    return { ...content, body: `${content.body} ${SUGGESTED_REMOVAL_HINT}` };
+  }
+  return content;
+}
+
+function infoForNode(node: CarveNode): InfoContent {
   if (node.kind === 'pattern') {
     return {
       title: `Pattern: ${node.name}`,
