@@ -131,7 +131,7 @@ export type { LLMCompleter } from "./character-discovery/CharacterDiscoveryServi
 export type { CldrLoader, CldrFullLoader, ExemplarResult } from "./character-discovery/cldr.js";
 export { createFetchCldrLoader, createFetchCldrFullLoader } from "./character-discovery/cldr.js";
 // Phase B high-confidence missing-character suggestions (CLDR-grounded, no LLM).
-export { suggestMissingCharacters } from "./character-discovery/suggestMissing.js";
+export { suggestMissingCharacters, neededCharsForLanguage, isCharCoveredForLocale } from "./character-discovery/suggestMissing.js";
 export type { MissingCharSuggestions } from "./character-discovery/suggestMissing.js";
 // Case-pair proposal helper for the shift-layer studio feature (bidirectional;
 // distinct from suggestMissing's isCovered coverage check — see casePair.ts docstring).
@@ -143,8 +143,8 @@ export { buildCharacterMap, CHARACTER_MAP_BLOCKS } from "./character-discovery/c
 export type { CharacterMapTier, CharacterMapCell, CharacterMapGroup } from "./character-discovery/characterMap.js";
 
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.
-export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyDesktopModifications, applyDesktopModificationsToRawJson, propagateDesktopLayersToTouch, applyStoreSlotRemovals, classifyStoreSlotEdit, parseSlotId, collectCharContributors, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, buildBaseRuleLines, buildCasePairRuleLines, planShiftAssignment, MODIFIER_EXCLUSIONS, canonicalizeCombo, comboToKeySpec, parseKeySpec, comboToTouchLayerId, comboToKvksShiftToken, collectModifierTokensInUse, collectLayerCombosInUse, buildComboKeyMap } from "./pattern-apply/index.js";
-export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, DesktopModifications, ApplyDesktopModificationsResult, ApplyDesktopModificationsToRawJsonResult, PropagateDesktopLayersToTouchResult, ApplyCarveToVfsOpts, CarveKeycapRemovalInput, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason, CharContributors, ShiftAssignmentPlan, ModifierToken } from "./pattern-apply/index.js";
+export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyDesktopModifications, applyDesktopModificationsToRawJson, propagateDesktopLayersToTouch, applyStoreSlotRemovals, classifyStoreSlotEdit, describeStorePairing, analyzeStores, parseSlotId, collectCharContributors, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, buildBaseRuleLines, buildCasePairRuleLines, planShiftAssignment, MODIFIER_EXCLUSIONS, canonicalizeCombo, comboToKeySpec, parseKeySpec, comboToTouchLayerId, comboToKvksShiftToken, collectModifierTokensInUse, collectLayerCombosInUse, buildComboKeyMap, isPlusSeparator } from "./pattern-apply/index.js";
+export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, DesktopModifications, ApplyDesktopModificationsResult, ApplyDesktopModificationsToRawJsonResult, PropagateDesktopLayersToTouchResult, ApplyCarveToVfsOpts, CarveKeycapRemovalInput, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason, StorePairingDescription, StoreAnalysis, CharContributors, ShiftAssignmentPlan, ModifierToken } from "./pattern-apply/index.js";
 
 // Facet-transform (spec 039): switch a base's source-construction facet value on
 // the working copy — propose-then-confirm, KeyboardIR copy-return, gated commit.

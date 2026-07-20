@@ -237,3 +237,54 @@ describe('Rail — store node fallback whole-node toggle', () => {
     expect(onToggleNode).toHaveBeenCalledWith('store#s', false);
   });
 });
+
+describe('Rail — removal-recommendation badge retired (#525 BANNER slice)', () => {
+  // The per-node "Suggested removal" badge (originally added in the #525
+  // FOUNDATION slice) is retired — the green removal-recommendation banner
+  // (CarveGallery's RemovalBanner) is now the SINGLE surface for this signal.
+  // `recommendation` itself is left intact on CarveNode (annotateRemovalRecommendations
+  // still computes it — see irToCarveNodes.test.ts) so Rail must simply never
+  // render anything for it, regardless of value.
+  function makePatternNode(overrides: Partial<CarveNode> = {}): CarveNode {
+    return {
+      nodeId: 'pattern#p',
+      kind: 'pattern',
+      name: 'Grave accent',
+      ...overrides,
+    };
+  }
+
+  it('never renders a "Suggested removal" badge for a node with recommendation "high"', () => {
+    const node = makePatternNode({ recommendation: 'high' });
+    render(<Rail {...baseRailProps} nodes={[node]} />);
+
+    expect(screen.queryByTestId('carve-suggested-removal-pattern#p')).toBeNull();
+    expect(screen.queryByText('Suggested removal')).toBeNull();
+  });
+
+  it('does not render anything for a node with recommendation "none"', () => {
+    const node = makePatternNode({ recommendation: 'none' });
+    render(<Rail {...baseRailProps} nodes={[node]} />);
+
+    expect(screen.queryByTestId('carve-suggested-removal-pattern#p')).toBeNull();
+    expect(screen.queryByText('Suggested removal')).toBeNull();
+  });
+
+  it('does not render anything for a node with recommendation undefined (unannotated)', () => {
+    const node = makePatternNode();
+    render(<Rail {...baseRailProps} nodes={[node]} />);
+
+    expect(screen.queryByTestId('carve-suggested-removal-pattern#p')).toBeNull();
+    expect(screen.queryByText('Suggested removal')).toBeNull();
+  });
+
+  it('renders no badge for either node when a "high" node is rendered alongside a "none" node', () => {
+    const highNode = makePatternNode({ nodeId: 'pattern#high', recommendation: 'high' });
+    const noneNode = makePatternNode({ nodeId: 'pattern#none', name: 'Cedilla', recommendation: 'none' });
+    render(<Rail {...baseRailProps} nodes={[highNode, noneNode]} />);
+
+    expect(screen.queryByTestId('carve-suggested-removal-pattern#high')).toBeNull();
+    expect(screen.queryByTestId('carve-suggested-removal-pattern#none')).toBeNull();
+    expect(screen.queryAllByText('Suggested removal')).toHaveLength(0);
+  });
+});

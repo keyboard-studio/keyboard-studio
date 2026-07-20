@@ -39,7 +39,7 @@
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { buildProducedSet } from "@keyboard-studio/contracts";
 import type { CldrFullLoader } from "./cldr.js";
-import { loadExemplarsFromFull } from "./cldr.js";
+import { loadExemplarsFromFull, parseUnicodeSet } from "./cldr.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -230,6 +230,40 @@ function isCovered(ch: string, produced: Set<string>, isTurkic: boolean): boolea
   return false;
 }
 
+/**
+ * Returns true when case-fold matching must be suppressed for `bcp47`
+ * (the Turkic dotted-I hazard — see the module docstring). Exposed so
+ * callers outside this module (e.g. the studio's surplus-recommendation
+ * pass, #525 items 2/4) can reuse the exact same exception-aware fold that
+ * `isCovered`/`suggestMissingCharacters` already use, rather than
+ * re-deriving a naive `toLowerCase()` comparison that would mis-handle
+ * Turkic i/İ/ı/I.
+ */
+export function isTurkicCaseFoldSuppressed(bcp47: string): boolean {
+  const primary = primarySubtag(bcp47);
+  return TURKIC_LOCALES.has(primary) && effectiveScriptIsLatin(bcp47, primary);
+}
+
+/**
+ * Returns true when `ch` is covered by `coveringSet` under the same
+ * exception-aware case fold `isCovered` uses internally — exact NFC match,
+ * or (for non-Turkic-Latin locales) its uppercase/lowercase counterpart.
+ *
+ * Exported for the studio's language-driven surplus signal (#525 items 2/4):
+ * a keyboard-produced character should count as "needed" if it case-folds
+ * to a CLDR exemplar, even though CLDR exemplars are lowercase-only (e.g.
+ * French keyboard produces "É"; CLDR needed-set has "é"). Reuses `isCovered`
+ * directly rather than re-deriving the fold, so the Turkic exception stays
+ * in exactly one place.
+ */
+export function isCharCoveredForLocale(
+  ch: string,
+  coveringSet: ReadonlySet<string>,
+  bcp47: string,
+): boolean {
+  return isCovered(ch, coveringSet as Set<string>, isTurkicCaseFoldSuppressed(bcp47));
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -300,4 +334,64 @@ export async function suggestMissingCharacters(args: {
     main: missingMain,
     auxiliary: missingAux,
   };
+}
+
+/**
+ * Returns the full set of characters a target language needs, per CLDR —
+ * i.e. the exemplar characters themselves (main + auxiliary tiers), not the
+ * subset missing from any particular keyboard. This is the "needed" signal
+ * for language-driven surplus detection (issue #525 items 2/4): a keyboard
+ * character NOT in this set (and not otherwise confirmed by the author) is a
+ * candidate for removal.
+ *
+ * Reuses cldr.ts's existing fetch/parse (loadExemplarsFromFull) rather than
+ * re-deriving CLDR access — sibling to suggestMissingCharacters, which reuses
+ * the same loader for the complementary "what's missing" question.
+ *
+ * Unlike suggestMissingCharacters's `main`/`auxiliary` fields (which are
+ * filtered to non-ASCII \p{L} "specials" — the letter-suggestion audience),
+ * this returns the RAW exemplar sets (ExemplarResult.used + .auxiliary),
+ * which for most scripts already include the ASCII range (e.g. Latin
+ * "a-z") — the full inventory a language actually needs, not just the
+ * gap-filling suggestions.
+ *
+ * Returns null on the same confidence-gate conditions suggestMissingCharacters
+ * uses for its first four gates — und/script-only tag, ISO 639-3 private-use
+ * primary (qaa-qtz), un-narrowed macrolanguage (bare "ms"/"zh"/"ar"/"fa"), or
+ * no CLDR locale match for the tag. (The fifth gate — empty main exemplar set
+ * after \p{L}-filtering — is specific to the letter-suggestion audience and
+ * does not apply here: the raw exemplar set legitimately covers ASCII-only
+ * scripts.) All characters are NFC-normalized, matching the rest of this module.
+ */
+export async function neededCharsForLanguage(args: {
+  bcp47: string;
+  loader: CldrFullLoader;
+}): Promise<Set<string> | null> {
+  const { bcp47, loader } = args;
+
+  if (failsConfidenceGate(bcp47)) return null;
+
+  // Fetch the raw pair directly (rather than going through
+  // loadExemplarsFromFull, which only parses main+auxiliary) so the
+  // punctuation/numbers tiers below don't require a second network round
+  // trip for the same locale.
+  const pair = await loader(bcp47);
+  if (pair === null) return null;
+
+  const needed = new Set(parseUnicodeSet(pair.main).used);
+  if (pair.auxiliary !== null) {
+    for (const ch of parseUnicodeSet(pair.auxiliary).used) needed.add(ch);
+  }
+  // Punctuation + numbers exemplar tiers (#525 fix — over-removal): locale
+  // punctuation (French "« »") and locale digits (Persian Eastern-Arabic-Indic
+  // "۰۱۲…") are needed characters too, not just the letter tiers, so they
+  // must be protected from the language-driven surplus signal.
+  if (pair.punctuation !== null) {
+    for (const ch of parseUnicodeSet(pair.punctuation).used) needed.add(ch);
+  }
+  if (pair.numbers !== null) {
+    for (const ch of parseUnicodeSet(pair.numbers).used) needed.add(ch);
+  }
+
+  return needed;
 }

@@ -13,7 +13,10 @@
 //       body rule still present; input store unchanged.
 // AC#2: One slot id + one whole-rule nodeId together → rule removed AND slot nulled.
 // AC#3: baseIr not mutated.
-// AC#4: A slot id whose left part is an input-only store → warning, no crash, store unchanged.
+// AC#4: A slot id on an input-only store that resolves to a coordinated
+//       cross-pair (#931) → succeeds as a drop on BOTH paired stores, no warning.
+// AC#4b: A slot id on a store whose positions are read by index() in a rule's
+//        CONTEXT → still blocked (context-index-aligned) → warning, no crash.
 
 import { describe, it, expect } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
@@ -229,10 +232,13 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
   });
 
   // ---------------------------------------------------------------------------
-  // AC#4: Input-only store slot id → warning, no crash, emitted store unchanged
+  // AC#4: Input-only store slot id, resolved cross-pair → coordinated drop
+  // (#931 NET UNLOCK — this dkfX/dktX shape was blocked "paired-input" under
+  // the old contract; the pairing graph now resolves it and splices both
+  // stores at the same position instead of refusing the edit).
   // ---------------------------------------------------------------------------
 
-  it("AC#4: input-only store slot id triggers warning; no crash; emitted dkfX unchanged", () => {
+  it("AC#4: input-only store slot id whose pairing resolves succeeds as a coordinated drop on both stores; no warning", () => {
     const ir = makeParallelIr();
     const vfs = makeVfs("test_kb");
 
@@ -241,25 +247,64 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
       keyboardId: "test_kb",
       baseIr: ir,
       deletedNodeIds: new Set(),
-      // store#dkf is the INPUT store — not an output target
+      // store#dkf is the INPUT store, cross-paired with dktX via
+      // `dk(003b) any(dkfX) > index(dktX, 2)` — dropping its slot 0 ("a")
+      // coordinates a drop of dktX's slot 0 ("À") too.
       deletedItemIds: new Set(["store#dkf#0"]),
       assignments: [],
       getPattern: () => undefined,
       identity: null,
     });
 
-    // A warning must be emitted about the input-only store
+    expect(warnings).toHaveLength(0);
+
+    const content = vfs.get("source/test_kb.kmn")?.content as string;
+    expect(typeof content).toBe("string");
+
+    // "a" spliced out of dkfX entirely — no nul filler, char gone.
+    const inputStoreLine = content.split("\n").find((l) => l.includes("store(dkfX)"));
+    expect(inputStoreLine).toBeDefined();
+    expect(inputStoreLine).not.toContain("nul");
+    expect(inputStoreLine).not.toMatch(/['"]a[^'"]*['"]/);
+
+    // "À" spliced out of the paired output store dktX at the SAME position —
+    // 'ε' (was position 1) is now the alignment partner's surviving char.
+    const outputStoreLine = content.split("\n").find((l) => l.includes("store(dktX)"));
+    expect(outputStoreLine).toBeDefined();
+    expect(outputStoreLine).not.toMatch(/À|U\+00C0/);
+    expect(outputStoreLine).toMatch(/ε|U\+03B5/);
+  });
+
+  it("AC#4b: a store referenced by index() in a rule's CONTEXT is still blocked (context-index-aligned) — warning, no crash, store unchanged", () => {
+    const ctxIndexStore = makeInputStore("store#ctxidx", "ctxIdxX", ["p", "q"]);
+    const ctxIndexRule: IRRule = {
+      nodeId: "rule#ctxidx",
+      context: [{ kind: "index", storeRef: "ctxIdxX", offset: 1 }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group = makeGroup("group#main", "main", [ctxIndexRule]);
+    const ir = makeTestIR([group], [ctxIndexStore]);
+    const vfs = makeVfs("test_kb");
+
+    const { warnings } = projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: ir,
+      deletedNodeIds: new Set(),
+      deletedItemIds: new Set(["store#ctxidx#0"]),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+
     expect(warnings.length).toBeGreaterThan(0);
     expect(warnings.some((w) => w.includes("store-slot"))).toBe(true);
 
-    // The VFS is still written (forceEmit fires because slotIds.size > 0 after
-    // partition — but the nul was not applied so the store is unmodified).
-    // Key assertion: no crash + input store line does not contain nul.
     const content = vfs.get("source/test_kb.kmn")?.content;
     if (typeof content === "string") {
-      const inputStoreLine = content.split("\n").find((l) => l.includes("store(dkfX)"));
-      if (inputStoreLine !== undefined) {
-        expect(inputStoreLine).not.toContain("nul");
+      const storeLine = content.split("\n").find((l) => l.includes("store(ctxIdxX)"));
+      if (storeLine !== undefined) {
+        expect(storeLine).toContain("p");
       }
     }
     // The test must not throw — reaching here confirms no crash.
@@ -268,8 +313,9 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
   // ---------------------------------------------------------------------------
   // #523: drop-class chip id — an UNPAIRED any()-source store (no positional
   // contract to preserve) splices the targeted char out of items[] entirely,
-  // rather than nul-filling it. This is distinct from AC#4's dkfX, which is
-  // PAIRED with an output index() in the same rule and is therefore blocked.
+  // rather than nul-filling it. This is distinct from AC#4's dkfX/dktX, which
+  // ARE positionally paired (via the SAME rule's index()/any() pairing) but
+  // are now a coordinated DROP, not a block.
   // ---------------------------------------------------------------------------
 
   it("#523 drop-class: an unpaired any()-source store's chip id removal drops the char from the emitted store line", () => {

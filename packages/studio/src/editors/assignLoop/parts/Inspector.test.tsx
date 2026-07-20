@@ -838,16 +838,11 @@ describe('Inspector — StoreDetail onStoreCascade wiring', () => {
 
 describe('Inspector — StoreDetail AC6 "empties the store" warning banner', () => {
   const AC6_TEXT = 'This will empty the store — the mechanism depending on it will stop working';
-  // Drop-class stores are the only class that can still show this banner:
-  // classifyStoreSlotEdit's "drop" mode is exactly any()-referenced-unpaired
-  // or unreferenced, and applyStoreSlotRemovals refuses to empty the
-  // any()-referenced sub-case — matching this second line.
+  // Drop is the only remaining toggleable action (nul-fill mode was removed
+  // from the engine contract — coordinated pair-set drops still splice, they
+  // never nul-fill), so this is the only second-line copy left to show.
   const AC6_DROP_TEXT =
     "To keep the keyboard buildable, the built keyboard keeps this store's characters until at least one stays active — remove the whole store instead if you no longer need it.";
-  // Nul-fill class stores never actually shrink items[] — the second line
-  // reflects that the mechanism keeps working, just producing no output.
-  const AC6_NUL_FILL_TEXT =
-    "Each removed character's slot outputs nothing (nul) in the built keyboard; the mechanism stays but produces no output.";
 
   it('shows the drop-class second line when all toggleable chips are off, they cover every char item, and the store has rule dependents', () => {
     const chips: StoreCharChip[] = [
@@ -865,24 +860,6 @@ describe('Inspector — StoreDetail AC6 "empties the store" warning banner', () 
     // Second line: explains the engine's refusal-to-empty guard so authors
     // understand why the store keeps one character until they delete it outright.
     expect(screen.getByText(AC6_DROP_TEXT)).toBeDefined();
-    expect(screen.queryByText(AC6_NUL_FILL_TEXT)).toBeNull();
-  });
-
-  it('shows the nul-fill-class second line when all toggleable chips are off on a nul-fill store', () => {
-    const chips: StoreCharChip[] = [
-      { chipId: 'store#s#0', ch: 'a', itemsIndex: 0, action: 'nul-fill' },
-      { chipId: 'store#s#1', ch: 'b', itemsIndex: 1, action: 'nul-fill' },
-    ];
-    const node = makeStoreNode({
-      storeChips: chips,
-      storeUsage: { ruleCount: 2, asSource: false, asOutput: true, groupNames: ['main'], patternRefs: [], groupRefs: [] },
-    });
-    const isItemDeleted = () => true; // all chips off
-    render(<Inspector {...baseInspectorProps} node={node} nodes={[node]} isItemDeleted={isItemDeleted} />);
-
-    expect(screen.getByText(AC6_TEXT)).toBeDefined();
-    expect(screen.getByText(AC6_NUL_FILL_TEXT)).toBeDefined();
-    expect(screen.queryByText(AC6_DROP_TEXT)).toBeNull();
   });
 
   it('does NOT show the banner when some toggleable chips are still on (not fully off)', () => {
