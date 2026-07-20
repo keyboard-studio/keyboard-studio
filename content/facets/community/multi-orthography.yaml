@@ -30,6 +30,8 @@ derivations:
 consumers:
   prefills:
     - pb_additional_methods
+    - q_sa1_target_script_spread
+    - q_tp3_orthography_join
   proposes:
     - "axis:A5"
     - "strategy:S-11-consideration"

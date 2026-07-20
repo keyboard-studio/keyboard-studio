@@ -1,0 +1,42 @@
+# encoding — corpus counterpart of the session facet source.encoding: how
+# each corpus keyboard's own .kmn encodes each role (input VK matching,
+# base-store literals, combining-store literals). See
+# content/facets/source/encoding.yaml for the session-facet consumer side.
+
+id: encoding
+title: Base/combining/input encoding style
+description: >
+  How a corpus keyboard's own .kmn source encodes each role: whether store
+  literals for base/combining output use quoted characters or \u-notation,
+  and for input matching, whether each rule's LHS token is a key-reference
+  (further split into bare-vk / named-modifier / split-modifier spelling)
+  or a char-reference (further split into quoted-literal / u-notation
+  spelling), or mixes both kinds. Read independently per role; feeds the
+  source.encoding session facet.
+valueType: set
+limits:
+  values:
+    - bare-vk
+    - named-modifier
+    - split-modifier
+    - quoted-literal
+    - u-notation
+    - mixed
+  open: false
+likelihoodSemantics: >
+  each observed encoding tag's share of the rules/store-lines it was found
+  in, read independently per subProfile role (input, base, combining);
+  shares within a role sum to 1.
+derivation:
+  archetype: rule-structure
+  classifierId: encoding-classifier
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: [source.encoding]
+subProfiles:
+  input:
+    matchKind: [key-ref, char-ref, mixed]
+    keyRefSpelling: [bare-vk, named-modifier, split-modifier]
+    charRefSpelling: [quoted-literal, u-notation]
+  base: [quoted-literal, u-notation, mixed]
+  combining: [quoted-literal, u-notation, mixed]
+schemaVersion: 1

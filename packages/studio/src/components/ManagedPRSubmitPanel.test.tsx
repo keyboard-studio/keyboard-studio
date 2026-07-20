@@ -147,6 +147,62 @@ describe("ManagedPRSubmitPanel — form gating", () => {
     expect((btn as HTMLButtonElement).disabled).toBe(false);
   });
 
+  // Output-time staleness gate (a stale touch-layout side-car after a
+  // post-Touch-step mechanics edit): the panel must refuse to submit
+  // regardless of an otherwise-valid form and canSubmit=true.
+  it("Submit button is disabled when outputBlocked is true even with a valid form and canSubmit", () => {
+    render(
+      <ManagedPRSubmitPanel
+        canSubmit={true}
+        outputBlocked={true}
+        outputBlockedReason="the touch layout is out of date"
+      />,
+    );
+    fillValidForm();
+    const btn = screen.getByRole("button", { name: /submit unavailable.*touch layout is out of date/i });
+    expect((btn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("Submit button aria-label explains the block reason when outputBlocked is true", () => {
+    render(
+      <ManagedPRSubmitPanel
+        canSubmit={true}
+        outputBlocked={true}
+        outputBlockedReason="the touch layout is out of date"
+      />,
+    );
+    fillValidForm();
+    expect(
+      screen.getByRole("button", { name: /submit unavailable — the touch layout is out of date/i }),
+    ).toBeTruthy();
+  });
+
+  // Priority ordering (intentional, not incidental): when both outputBlocked
+  // and !canSubmit are simultaneously true, the aria-label must explain the
+  // outputBlocked reason, not the generic "submit unavailable until compile
+  // completes" canSubmit copy. See aria-label derivation in the component.
+  it("aria-label reflects outputBlocked reason when both outputBlocked and !canSubmit are true", () => {
+    render(
+      <ManagedPRSubmitPanel
+        canSubmit={false}
+        outputBlocked={true}
+        outputBlockedReason="the touch layout is out of date"
+      />,
+    );
+    fillValidForm();
+    const btn = screen.getByRole("button", {
+      name: /submit unavailable — the touch layout is out of date/i,
+    });
+    expect((btn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("Submit button is enabled when outputBlocked is false (control)", () => {
+    render(<ManagedPRSubmitPanel canSubmit={true} outputBlocked={false} />);
+    fillValidForm();
+    const btn = screen.getByRole("button", { name: /submit keyboard to community repository/i });
+    expect((btn as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it("shows name-required error after blurring an empty name field", () => {
     render(<ManagedPRSubmitPanel canSubmit={true} />);
     const nameInput = screen.getByRole("textbox", { name: /your name/i });
@@ -320,6 +376,59 @@ describe("ManagedPRSubmitPanel — error states", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  // spec 034 T014 (FR-008, PP-2/PP-3): when the managed-PR backend is
+  // unreachable the panel shows an honest error and NEVER a fake success — the
+  // ZIP path (a separate control in OutputScreen, not gated on the backend)
+  // stays functional.
+  it("T014: backend unreachable → honest error, no success panel (never fakes success)", async () => {
+    mockedProject.mockResolvedValueOnce(makeProjectResult());
+    const svc = makeService({
+      publishManagedPR: vi.fn(async () => {
+        throw { kind: "proxy-unavailable", message: "backend down" };
+      }),
+    });
+    mockedGetService.mockResolvedValueOnce(svc);
+
+    render(<ManagedPRSubmitPanel canSubmit={true} />);
+    fillValidForm();
+    fireEvent.click(
+      screen.getByRole("button", { name: /submit keyboard to community repository/i }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toMatch(/temporarily unavailable/i);
+    });
+    // The success affordance must NOT appear on a failed submit.
+    expect(screen.queryByText(/your submission is being reviewed/i)).toBeNull();
+    expect(screen.queryByRole("link", { name: /view your keyboard submission/i })).toBeNull();
+  });
+
+  // spec 034 T015 (PP-4, Article III): the PR submit path serializes the SAME
+  // working copy the ZIP download serializes — both go through the single
+  // projectWorkingCopyForOutput() projector. Submitting must call it exactly
+  // once and hand its VFS straight to publishManagedPR — no second projection,
+  // no second working copy.
+  it("T015: submit projects the working copy once and submits that exact VFS (one working copy)", async () => {
+    const projectResult = makeProjectResult();
+    mockedProject.mockResolvedValueOnce(projectResult);
+    const svc = makeService();
+    mockedGetService.mockResolvedValueOnce(svc);
+
+    render(<ManagedPRSubmitPanel canSubmit={true} />);
+    fillValidForm();
+    fireEvent.click(
+      screen.getByRole("button", { name: /submit keyboard to community repository/i }),
+    );
+
+    await waitFor(() => {
+      expect(svc.publishManagedPR).toHaveBeenCalledTimes(1);
+    });
+    // Exactly one projection — the shared serializer the ZIP path also uses.
+    expect(mockedProject).toHaveBeenCalledTimes(1);
+    // The submitted VFS is the very object the projector returned (not a re-derived copy).
+    expect(svc.publishManagedPR.mock.calls[0]?.[0]).toBe(projectResult.vfs);
   });
 
   it("null projectWorkingCopyForOutput shows a form-level error", async () => {

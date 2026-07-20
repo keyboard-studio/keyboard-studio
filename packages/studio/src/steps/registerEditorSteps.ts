@@ -26,6 +26,8 @@ import { CARVE_WRITES, ADD_GALLERY_WRITES, TOUCH_WRITES } from "./editorMutate.t
 import { CarveAdapter } from "../editors/adapters/carveAdapter.tsx";
 import { AddPhysicalAdapter } from "../editors/adapters/addPhysicalAdapter.tsx";
 import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
+import { TouchSeedSourcePanel } from "../editors/touchSeedSource/TouchSeedSourcePanel.tsx";
+import { SequencesAdapter } from "../editors/adapters/sequencesAdapter.tsx";
 import {
   BaseResolutionAdapter,
   IdentityLiteAdapter,
@@ -146,16 +148,45 @@ export const mechanismsStep: EditorStep = step({
 });
 
 /**
+ * Sequences step: the Sequence Gallery (S-03 multi-key sequences),
+ * positioned after Mechanisms and before the touch fork. Cycles the
+ * characters flagged for sequences (sequenceFlaggedChars, set by the
+ * Mechanism Gallery's S-03 FLAG card) and records a real
+ * `multi_char_sequence` MechanismAssignment per character on Apply — routed
+ * through the same recordAssignments -> applyAssignmentsToVfs pipeline
+ * mechanismsStep uses, so it writes groups[]/stores[] exactly like
+ * mechanismsStep does. Carries no lock (only "physical" and "touch" locks
+ * exist, M3).
+ * inputs stays [] (step() default): sequenceFlaggedChars is studio UI state,
+ * not an IRPath, so this step has no upstream IR dependency and carries no
+ * completeness-graph edges — but writes[] must still be declared, since it
+ * DOES mutate groups[]/stores[] (self-read/self-write, same shape as
+ * mechanismsStep above; not to be confused with R13 (steps/repropagate.ts),
+ * which governs ir.touchLayout, a different artifact entirely).
+ * ADD_GALLERY_WRITES: groups[] / stores[] (editorMutate.ts).
+ */
+export const sequencesStep: EditorStep = step({
+  id: "sequences",
+  title: "Sequences",
+  layout: "full",
+  component: SequencesAdapter,
+  writes: [...ADD_GALLERY_WRITES],
+});
+
+/**
  * Touch seed source step: off-spine fork for choosing touch surface seed.
  * Rejoins the spine at the touch carve+add step (FR-013, M4).
+ * Renders TouchSeedSourcePanel (T014, spec 035 contracts/seed-source-fork.md) —
+ * a bespoke chooser panel, NOT the surface-parameterized carve/add shell, so
+ * `surface` is omitted (that field only describes the AddPhysicalAdapter /
+ * AddTouchAdapter shell pattern the touch step below still uses).
  */
 export const touchSeedSourceStep: EditorStep = step({
   id: "touch_seed_source",
   title: "Touch Seed Source",
   spine: false,
   joinTarget: "touch",
-  component: AddTouchAdapter,
-  surface: "touch",
+  component: TouchSeedSourcePanel,
 });
 
 /**
@@ -219,6 +250,7 @@ export const registeredEditorSteps: readonly EditorStep[] = [
   projectNameStep,
   carveStep,
   mechanismsStep,
+  sequencesStep,
   touchSeedSourceStep,
   touchStep,
   helpStep,

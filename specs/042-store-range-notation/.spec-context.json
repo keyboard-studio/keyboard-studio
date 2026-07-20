@@ -1,0 +1,155 @@
+{
+  "workflow": "speckit",
+  "specName": "042-store-range-notation",
+  "branch": "042-store-range-notation",
+  "selectedAt": "2026-07-20T02:00:06.174Z",
+  "currentStep": "implement",
+  "status": "implementing",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-20T02:04:40.759Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-20T02:06:49.692Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-20T02:06:49.702Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-20T02:08:30.000Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-20T02:16:39.000Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-20T02:19:55.620Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-20T02:19:55.631Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-20T02:25:05.813Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-20T02:25:05.825Z"
+    },
+    {
+      "step": "implement",
+      "substep": "run-tests",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-20T03:23:55.000Z"
+    }
+  ],
+  "telemetryInstanceId": "eb7fe81f-c459-4fdf-b0b6-f8e5b92e0989",
+  "approach": "Codec-only fix: expand X..Y ranges eagerly into {kind:char} store items in parseStoreItems (range check before the SMP early-bail so astral ranges expand too); emit re-collapses ascending runs (len>=3) back to X..Y. No @keyboard-studio/contracts change (IR option A). Descending/malformed ranges preserve-opaque with new descending-range/malformed-range reasons, mirroring kmcmplib; equal-endpoint stays lenient (one item) per user, oracle backstops. buildProducedSet and all consumers inherit the fix unchanged.",
+  "verified": [
+    {
+      "what": "engine codec suite (parse/emit/roundtrip + 20 new range tests)",
+      "command": "pnpm --filter @keyboard-studio/engine test src/codec",
+      "result": "212 passed"
+    },
+    {
+      "what": "full engine suite",
+      "command": "pnpm --filter @keyboard-studio/engine test",
+      "result": "1738 passed, 1 pre-existing recognizer/integration fail (NCAPS modifier, corpus-version, unrelated to ranges - confirmed failing at baseline via stash)"
+    },
+    {
+      "what": "contracts + keyboard-lint suites",
+      "command": "pnpm --filter @keyboard-studio/contracts test; pnpm --filter @keymanapp/keyboard-lint test",
+      "result": "408 + 82 passed"
+    },
+    {
+      "what": "corpus round-trip over 506 range-store lines (SC-006/SC-003)",
+      "command": "temp codec test over ../keyboards",
+      "result": "0 semantic mismatches; 0 codepoint-range raw dot-dot items (108 remaining raw are all vkey ranges, out of scope)"
+    },
+    {
+      "what": "facet-index recovery + determinism (SC-002/SC-004)",
+      "command": "tsx cli.ts --classified-only; facet-index-lint",
+      "result": "casing undetermined 15->8 (7 historic-script range keyboards incl takri_inscript now content-derived); encoding 46 unchanged (non-range adiga_danef case, tracked separately); byte-identical rebuilds; lint GREEN"
+    },
+    {
+      "what": "km-lead post-implement review (verification/qc/synthesis)",
+      "command": "Agent km-verification + km-qc + km-synthesis",
+      "result": "km-verification PASS; km-synthesis FITS (no blockers, no contracts change); km-qc PASS 95/100 no P0. P1 doc-drift + P2 mixed-endpoint FIXED; residual P2 (4 near-identical decode blocks) left as-is"
+    }
+  ],
+  "coverage": {
+    "FR-001": {
+      "tests": [
+        "parse.test.ts:C1 U+0904..U+0914->17 items"
+      ]
+    },
+    "FR-005": {
+      "tests": [
+        "parse.test.ts:C5 U+11680..U+11689->10 astral items",
+        "not opaque"
+      ]
+    },
+    "FR-006": {
+      "tests": [
+        "parse.test.ts:C7/C8/C9 single/descending/malformed fail-safe"
+      ]
+    },
+    "FR-008": {
+      "tests": [
+        "emit.test.ts:C11 re-collapse; roundtrip.test.ts:C12 semantic"
+      ]
+    },
+    "FR-011": {
+      "tests": [
+        "producedSet.test.ts:C13 index() interior inheritance"
+      ]
+    }
+  },
+  "decisions": [
+    {
+      "decision": "{\"what\":\"emit re-collapse skips all-printable-ASCII ascending runs\",\"why\":\"the raw >=3 ascending+1 rule would mangle dictionary/&word stores (existing store(word) abc test) and ASCII alphabet stores into codepoint ranges, contradicting FR-008 human-legible goal; all concrete contract examples (Devanagari/SMP/Hebrew) are non-ASCII so still collapse. Round-trip stays semantic-stable.\"}"
+    },
+    {
+      "decision": "{\"what\":\"vkey-bracket range [K_A]..[K_Z] is NOT treated as a codepoint range\",\"why\":\"neither endpoint decodes as a codepoint; classifyRange returns null so &CasedKeys vkey ranges keep legacy vkey/raw/vkey items instead of opaquing the store. A codepoint range needs at least one decodable endpoint; the C9 malformed cases all have one.\"}"
+    }
+  ],
+  "concerns": [
+    {
+      "note": "{\"what\":\"detectRangeAt has 4 near-identical decode+consumed blocks (parse.ts)\",\"severity\":\"P2\",\"disposition\":\"left as-is: each path is well-commented and independently tested (C1-C9); refactor risk outweighs benefit late in the cycle\"}"
+    }
+  ]
+}

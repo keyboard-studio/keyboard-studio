@@ -89,6 +89,8 @@ const mockRefs = vi.hoisted(() => ({
   phaseBBack: { current: null as null | (() => void) },
   mechDone: { current: null as null | (() => void) },
   mechBack: { current: null as null | (() => void) },
+  seqDone: { current: null as null | (() => void) },
+  seqBack: { current: null as null | (() => void) },
   phaseFDone: { current: null as null | ((...args: unknown[]) => void) },
   phaseFBack: { current: null as null | (() => void) },
   touchEComplete: { current: null as null | ((a: unknown[]) => void) },
@@ -295,13 +297,36 @@ vi.mock("../../src/survey/index.ts", () => ({
   buildPrefillRows: () => [],
 }));
 
+// BaseResolution mock — preview-before-commit contract. A suggestion-card
+// click fires onPreview (setLocalBase, does not advance); the "Choose this
+// keyboard" button fires onConfirm (setBaseConfirmed(true), then advances).
+// Two separate testids/clicks reproduce the two real user actions.
 vi.mock("../../src/editors/panels/BaseResolution.tsx", () => ({
-  BaseResolution: ({ onResolved, onBack }: { onResolved: (base: unknown) => void; onBack?: () => void }) => {
-    mockRefs.baseResolved.current = onResolved;
+  BaseResolution: ({
+    onPreview,
+    onConfirm,
+    previewedBase,
+    onBack,
+  }: {
+    onPreview: (base: unknown) => void;
+    onConfirm: () => void;
+    previewedBase: unknown;
+    previewStatus: string;
+    onBack?: () => void;
+  }) => {
+    mockRefs.baseResolved.current = onConfirm;
     return (
       <div data-testid="stage-base">
-        <button type="button" data-testid="base-resolved" onClick={() => onResolved(fakeBase)}>
-          base-resolved
+        <button type="button" data-testid="base-preview" onClick={() => onPreview(fakeBase)}>
+          base-preview
+        </button>
+        <button
+          type="button"
+          data-testid="base-confirm"
+          disabled={previewedBase === null}
+          onClick={onConfirm}
+        >
+          base-confirm
         </button>
         {onBack !== undefined && (
           <button type="button" data-testid="base-back" onClick={onBack}>
@@ -351,6 +376,27 @@ vi.mock("../../src/editors/assignLoop/MechanismGallery.tsx", () => ({
   },
 }));
 
+vi.mock("../../src/editors/sequences/SequenceGallery.tsx", () => ({
+  SequenceGallery: ({ onComplete, onBack }: { onComplete?: () => void; onBack?: () => void }) => {
+    mockRefs.seqDone.current = onComplete ?? null;
+    mockRefs.seqBack.current = onBack ?? null;
+    return (
+      <div data-testid="stage-sequences">
+        {onComplete !== undefined && (
+          <button type="button" data-testid="sequences-complete" onClick={onComplete}>
+            sequences-complete
+          </button>
+        )}
+        {onBack !== undefined && (
+          <button type="button" data-testid="sequences-back" onClick={onBack}>
+            sequences-back
+          </button>
+        )}
+      </div>
+    );
+  },
+}));
+
 vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () => ({
   TouchGallery: ({ onComplete, onBack }: { onComplete: (a: unknown[]) => void; onBack: () => void }) => {
     mockRefs.touchEComplete.current = onComplete;
@@ -370,6 +416,37 @@ vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () => ({
       </div>
     );
   },
+}));
+
+// Mock the touch_seed_source chooser (spec 035 T014) — registerEditorSteps.ts
+// now renders TouchSeedSourcePanel for this step (the "touch" step keeps the
+// TouchGallery mock above). A single confirm button is all the golden-walk
+// oracle needs: the panel's onComplete carries no SurveyPhaseResult shape and
+// the step is not in STEPS_WITH_APPLY_COMPLETION, so the only recorded effect
+// is the "advance" session mutation (matches __fixtures__/goldenWalk/*.json).
+vi.mock("../../src/editors/touchSeedSource/TouchSeedSourcePanel.tsx", () => ({
+  TouchSeedSourcePanel: ({
+    onComplete,
+    onBack,
+  }: {
+    onComplete: (result: unknown) => void;
+    onBack?: () => void;
+  }) => (
+    <div data-testid="stage-seed-source">
+      <button
+        type="button"
+        data-testid="seed-source-complete"
+        onClick={() => onComplete(undefined)}
+      >
+        seed-source-complete
+      </button>
+      {onBack !== undefined && (
+        <button type="button" data-testid="seed-source-back" onClick={onBack}>
+          seed-source-back
+        </button>
+      )}
+    </div>
+  ),
 }));
 
 vi.mock("../../src/components/UnsupportedScriptStub.tsx", () => ({
@@ -471,6 +548,7 @@ const SESSION_MUTATOR_NAMES = [
   "setSelectedTrack",
   "setScaffoldSpec",
   "setLocalBase",
+  "setBaseConfirmed",
   "setCharactersSubStage",
 ] as const;
 
@@ -607,20 +685,32 @@ function createRecorder() {
 // Walk drivers
 // ---------------------------------------------------------------------------
 
-type StepAction = { stepId: string; testId: string; async?: boolean };
+/**
+ * `testId` — the common case, one click per step. `testIds` — for choose_base
+ * (preview-before-commit): TWO separate clicks (preview, then confirm) folded
+ * into the SAME recorder step window, so the fixture's single "choose_base"
+ * entry captures both setLocalBase (preview) and setBaseConfirmed (confirm)
+ * in real call order, exactly as the real two-click user flow produces them.
+ */
+type StepAction =
+  | { stepId: string; testId: string; async?: boolean }
+  | { stepId: string; testIds: string[]; async?: boolean };
 
 /**
  * Drive a sequence of step actions through the recorder.
  */
 async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: StepAction[]): Promise<void> {
-  for (const { stepId, testId, async: isAsync } of steps) {
-    recorder.beginStep(stepId);
-    if (isAsync) {
-      await act(async () => {
+  for (const step of steps) {
+    const testIds = "testIds" in step ? step.testIds : [step.testId];
+    recorder.beginStep(step.stepId);
+    for (const testId of testIds) {
+      if (step.async) {
+        await act(async () => {
+          fireEvent.click(screen.getByTestId(testId));
+        });
+      } else {
         fireEvent.click(screen.getByTestId(testId));
-      });
-    } else {
-      fireEvent.click(screen.getByTestId(testId));
+      }
     }
     recorder.endStep();
   }
@@ -629,18 +719,28 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
 /**
  * Drive the full copy-track walk.
  * identity -> choose_base -> track(copy) -> project_name ->
- * characters(prefill->B) -> carve -> mechanisms -> touch -> help -> done
+ * characters(prefill->B) -> carve -> mechanisms -> sequences ->
+ * touch_seed_source -> touch -> help -> done
+ *
+ * touch_seed_source (spec 035 R4/R12) is inserted between sequences and touch
+ * on a FRESH walk because touchSeedSource starts null — advance("sequences")
+ * routes into the fork instead of straight to "touch". The fork step renders
+ * the mocked TouchSeedSourcePanel stub (T014, registerEditorSteps.ts) — driven
+ * via its own "seed-source-complete" testid — before the real "touch" step
+ * (still the TouchGallery mock, "e-complete").
  */
 async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Promise<void> {
   await driveSteps(recorder, [
     { stepId: "identity", testId: "identity-complete" },
-    { stepId: "choose_base", testId: "base-resolved" },
+    { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
     { stepId: "track", testId: "track-copy" },
     { stepId: "project_name", testId: "project-name-next" },
     { stepId: "characters/prefill", testId: "prefill-confirm" },
     { stepId: "characters/B", testId: "phaseB-complete" },
     { stepId: "carve", testId: "carve-complete" },
     { stepId: "mechanisms", testId: "mechanisms-complete" },
+    { stepId: "sequences", testId: "sequences-complete" },
+    { stepId: "touch_seed_source", testId: "seed-source-complete", async: true },
     { stepId: "touch", testId: "e-complete", async: true },
     { stepId: "help", testId: "phaseF-complete", async: true },
   ]);
@@ -649,18 +749,22 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
 /**
  * Drive the full adapt-track walk.
  * identity -> choose_base -> track(adapt) ->
- * characters(prefill->B) -> carve -> mechanisms -> touch -> help -> done
- * project_name MUST NOT appear.
+ * characters(prefill->B) -> carve -> mechanisms -> sequences ->
+ * touch_seed_source -> touch -> help -> done
+ * project_name MUST NOT appear. See driveCopyTrack's docstring for why
+ * touch_seed_source appears (spec 035 R4/R12 fork memory).
  */
 async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Promise<void> {
   await driveSteps(recorder, [
     { stepId: "identity", testId: "identity-complete" },
-    { stepId: "choose_base", testId: "base-resolved" },
+    { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
     { stepId: "track", testId: "track-adapt" },
     { stepId: "characters/prefill", testId: "prefill-confirm" },
     { stepId: "characters/B", testId: "phaseB-complete" },
     { stepId: "carve", testId: "carve-complete" },
     { stepId: "mechanisms", testId: "mechanisms-complete" },
+    { stepId: "sequences", testId: "sequences-complete" },
+    { stepId: "touch_seed_source", testId: "seed-source-complete", async: true },
     { stepId: "touch", testId: "e-complete", async: true },
     { stepId: "help", testId: "phaseF-complete", async: true },
   ]);

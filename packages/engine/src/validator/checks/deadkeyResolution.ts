@@ -1,5 +1,5 @@
 import type { LintFinding } from "@keyboard-studio/contracts";
-import { INVALID_CHAR_RE, forEachMatch } from "./_shared.js";
+import { INVALID_CHAR_RE, forEachMatch, stripNonCodeSource } from "./_shared.js";
 
 // Deadkey resolution — lint.md check #7 (Compiler.cpp:2188-2205).
 // Validates that deadkey identifiers obey identifier rules (1–255 chars, no
@@ -12,7 +12,9 @@ const DK_RE = /\b(?:dk|deadkey)\s*\(\s*([^)]*?)\s*\)/i;
 export function checkDeadkeyResolution(source: string): LintFinding[] {
   const findings: LintFinding[] = [];
 
-  forEachMatch(source, DK_RE, (match, lineIdx) => {
+  // Strip quoted-string and comment spans first so a `dk(...)` in prose (a
+  // trailing `c` comment or a quoted doc value) is not read as a deadkey call.
+  forEachMatch(stripNonCodeSource(source), DK_RE, (match, lineIdx) => {
     const name = (match[1] ?? "").trim();
 
     if (name.length === 0 || name.length > 255 || INVALID_CHAR_RE.test(name)) {

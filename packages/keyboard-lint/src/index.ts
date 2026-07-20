@@ -13,3 +13,4 @@ export { checkKeysPerRow } from "./checks/check-18-3-keys-per-row.js";
 export { checkControlKeyDrift } from "./checks/check-18-4-control-key-drift.js";
 export { checkLayerSwitchReturn } from "./checks/check-18-5-layer-switch-return.js";
 export { checkInventoryCoverage } from "./checks/check-18-6-inventory-coverage.js";
+export { checkTouchCoverage } from "./checks/check-18-6-touch-coverage.js";

@@ -78,4 +78,14 @@ describe("checkIfStoreResolution", () => {
     const findings = checkIfStoreResolution(source);
     expect(findings[0]?.message).toContain("ghostStore");
   });
+
+  // Regression — an if(...) shape inside a comment or quoted value is prose, not
+  // a real condition, and must not be resolved (false-positive guard).
+  it("ignores an if(...) shape inside a quoted value", () => {
+    expect(checkIfStoreResolution(`store(&NAME) "if(x) test doc"`)).toEqual([]);
+  });
+
+  it("ignores an if(...) shape inside a trailing c comment", () => {
+    expect(checkIfStoreResolution(`+ "a" > "b" c todo: guard with if(foo) later`)).toEqual([]);
+  });
 });

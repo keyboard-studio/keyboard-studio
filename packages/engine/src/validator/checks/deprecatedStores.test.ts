@@ -50,4 +50,14 @@ describe("checkDeprecatedStores", () => {
     expect(findings[0]?.location?.line).toBe(2);
     expect(findings[0]?.location?.column).toBeGreaterThan(0);
   });
+
+  // Regression — a deprecated &store name inside a comment or quoted value is
+  // prose, not a store reference, and must not be flagged (false-positive guard).
+  it("ignores a deprecated &store name inside a quoted value", () => {
+    expect(checkDeprecatedStores(`store(&NAME) "see doc on &language usage"`)).toEqual([]);
+  });
+
+  it("ignores a deprecated &store name inside a trailing c comment", () => {
+    expect(checkDeprecatedStores(`+ "a" > "b" c relates to &language handling`)).toEqual([]);
+  });
 });

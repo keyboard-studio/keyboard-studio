@@ -1,0 +1,27 @@
+# fallback-posture — corpus counterpart of the session facet
+# source.fallback-posture: whether a corpus keyboard relies on &baselayout
+# to fall through to the OS layout, or blocks comprehensively with its own
+# rules. Desktop-only; see content/facets/source/fallback-posture.yaml.
+
+id: fallback-posture
+title: OS-fallback reliance
+description: >
+  Whether a corpus keyboard's .kmn rules handle every key itself, or rely on
+  &baselayout to fall through to the OS default layout for keys it leaves
+  unruled. Desktop .kmn concept only; feeds the source.fallback-posture
+  session facet.
+valueType: enum
+limits:
+  values: [relies-on, blocks-comprehensively, mixed]
+  open: false
+likelihoodSemantics: >
+  the single classified value for the keyboard, based on the proportion of
+  physical keys with an explicit rule versus reliance on the &baselayout
+  fallback; likelihood is 1 for the classified value (no per-character
+  evidence to distribute over).
+derivation:
+  archetype: rule-structure
+  classifierId: fallback-posture-classifier
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: [source.fallback-posture]
+schemaVersion: 1

@@ -24,6 +24,17 @@ import { test, expect, type Page, type Download } from "playwright/test";
 import { unzipSync } from "fflate";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import {
+  driveIdentityLite,
+  pickBaseKeyboard,
+  chooseTrackCopy,
+  acceptProjectName,
+  confirmPrefill,
+  buildOneCharacterList,
+  navigateToOutput,
+  triggerDownload,
+  seedReturningVisitor,
+} from "./helpers/surveyFlow";
 
 // ---------------------------------------------------------------------------
 // Fixture
@@ -46,151 +57,99 @@ const FIXTURE = {
 };
 
 // ---------------------------------------------------------------------------
-// Page-object helpers
+// Proven-script verification fixtures (spec 034 T002 — FR-011, SC-004)
+//
+// The five PROVEN alphabetic scripts the MVP walk is verified against (spec §16
+// / lib/scriptAxes.ts LATIN_ALPHABETIC: Latn, Cyrl, Grek, Geor, Armn). Each row
+// names a codec-clean base keyboard from docs/keyboard-index.md that declares
+// the target language, so the identity -> base ranking surfaces it. These are
+// the explicit fixtures for the Cyrillic walk (T010) and the five-script smoke
+// (T011). Keep in sync with docs/keyboard-index.md.
+//
+//   Latin     — basic_kbdfr          (fr, Latn)  — also the primary FIXTURE above
+//   Cyrillic  — russian_mnemonic_r   (ru, Cyrl)
+//   Greek     — basic_kbdhe          (el, Grek)  — Windows Greek "Hellenic" basic
+//   Georgian  — basic_kbdgeo         (ka, Geor)
+//   Armenian  — armenian_mnemonic_r  (hy, Armn)
+//
+// NB: `basic_kbdgr` is GERMAN (Windows "GR" = German), NOT Greek — do not use it.
+// ---------------------------------------------------------------------------
+
+interface ProvenScriptFixture {
+  script: "Latn" | "Cyrl" | "Grek" | "Geor" | "Armn";
+  baseKeyboardId: string;
+  /** ISO 639 language subtag the base declares (drives base-suggestion ranking). */
+  languageCode: string;
+  /** BCP47 script subtag chosen at identity-lite (il_target_script). */
+  targetScript: string;
+  /** A representative character to add in Phase B for this script. */
+  charToAdd: string;
+}
+
+const PROVEN_SCRIPT_BASES: ReadonlyArray<ProvenScriptFixture> = [
+  { script: "Latn", baseKeyboardId: "basic_kbdfr",         languageCode: "fr", targetScript: "Latn", charToAdd: "é" },
+  { script: "Cyrl", baseKeyboardId: "russian_mnemonic_r",  languageCode: "ru", targetScript: "Cyrl", charToAdd: "я" },
+  { script: "Grek", baseKeyboardId: "basic_kbdhe",         languageCode: "el", targetScript: "Grek", charToAdd: "ω" },
+  { script: "Geor", baseKeyboardId: "basic_kbdgeo",        languageCode: "ka", targetScript: "Geor", charToAdd: "ქ" },
+  { script: "Armn", baseKeyboardId: "armenian_mnemonic_r", languageCode: "hy", targetScript: "Armn", charToAdd: "ա" },
+];
+
+/** Everything the walk helpers need for one script. FIXTURE (Latin) conforms. */
+interface WalkFixture {
+  autonym: string;
+  english: string;
+  languageCode: string;
+  targetScript: string;
+  baseKeyboardId: string;
+  charToAdd: string;
+}
+
+/** Build a full WalkFixture from a proven-script row (autonym seeded from the script). */
+function walkFixtureFor(f: ProvenScriptFixture): WalkFixture {
+  return {
+    autonym: `Test ${f.script}`,
+    english: `Test ${f.script}`,
+    languageCode: f.languageCode,
+    targetScript: f.targetScript,
+    baseKeyboardId: f.baseKeyboardId,
+    charToAdd: f.charToAdd,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Page-object helpers (copy-edit-specific)
 // ---------------------------------------------------------------------------
 
 /**
- * Walk the identity-lite step: answer all four required questions and click
- * the Finish button to advance to base-keyboard selection.
+ * Wrapper to call driveIdentityLite with copy-edit fixture values.
  */
-async function fillIdentityLite(page: Page): Promise<void> {
-  // Wait for the identity panel to be visible.
-  await page.waitForSelector('[data-testid="identity-panel"]', { timeout: 15_000 });
-
-  // Q1: autonym (textarea, id="il_language_autonym")
-  await page.fill("#il_language_autonym", FIXTURE.autonym);
-  await page.click('[data-testid="survey-advance"]');
-
-  // Q2: English name (textarea, id="il_language_english") — seeded with autonym.
-  // Clear the seed and type our value for determinism.
-  await page.waitForSelector("#il_language_english");
-  await page.fill("#il_language_english", FIXTURE.english);
-  await page.click('[data-testid="survey-advance"]');
-
-  // Q3: ISO language code (text, id="il_language_code") — optional, fill anyway.
-  await page.waitForSelector("#il_language_code");
-  await page.fill("#il_language_code", FIXTURE.languageCode);
-  await page.click('[data-testid="survey-advance"]');
-
-  // Q4: Target script (select, id="il_target_script") — choose Latin.
-  await page.waitForSelector("#il_target_script");
-  await page.selectOption("#il_target_script", FIXTURE.targetScript);
-  // This is the last question in the identity-lite flow (for non-CJK scripts);
-  // the button becomes "Finish".
-  await page.click('[data-testid="survey-advance"]');
+async function fillIdentityLite(page: Page, fx: WalkFixture = FIXTURE): Promise<void> {
+  await driveIdentityLite(page, {
+    english: fx.english,
+    autonym: fx.autonym,
+    script: fx.targetScript,
+  });
 }
 
 /**
- * Pick the first suggested base keyboard from the BaseResolution step.
- * For "fr" language + Latin script, basic_kbdfr should appear as the top
- * language-match suggestion.
+ * Wrapper to call pickBaseKeyboard with copy-edit fixture values.
+ * Includes wait for base picker to appear (cold server can take 20s+).
  */
-async function pickBaseKeyboard(page: Page): Promise<void> {
-  // Wait for base picker to appear.
-  await page.waitForSelector('[data-testid="base-picker"]', { timeout: 20_000 });
-
-  // Click the basic_kbdfr suggestion button (if present).
-  const suggBtn = page.getByTestId(`base-card-${FIXTURE.baseKeyboardId}`);
-  const fallbackBtn = page.getByTestId("base-picker").locator("button").first();
-
-  if (await suggBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await suggBtn.click();
-  } else {
-    // Fallback: click the first available suggestion button.
-    await fallbackBtn.click();
-  }
-}
-
-/**
- * Choose "Copy" track and advance to project_name step.
- */
-async function chooseTrackCopy(page: Page): Promise<void> {
-  await page.waitForSelector('[data-testid="track-copy"]', { timeout: 15_000 });
-  await page.click('[data-testid="track-copy"]');
-  await page.click('[data-testid="track-next"]');
-}
-
-/**
- * Accept the pre-filled project name and advance.
- * (ProjectNameStep pre-fills from the identity autonym; we accept as-is.)
- */
-async function acceptProjectName(page: Page): Promise<void> {
-  await page.waitForSelector('[data-testid="project-name-next"]', { timeout: 15_000 });
-  // The button is only enabled when the derived keyboard id is valid.
-  await expect(page.getByTestId("project-name-next")).not.toBeDisabled({ timeout: 5_000 });
-  await page.click('[data-testid="project-name-next"]');
-}
-
-/**
- * Confirm the prefill summary and advance to Phase B.
- */
-async function confirmPrefill(page: Page): Promise<void> {
-  await page.waitForSelector('[data-testid="prefill-confirm"]', { timeout: 15_000 });
-  await page.click('[data-testid="prefill-confirm"]');
+async function pickBaseKeyboardCopyEdit(page: Page, fx: WalkFixture = FIXTURE): Promise<void> {
+  // Wait for base picker to appear. BaseResolution shows a bare "Loading base
+  // keyboards..." until listAll() resolves, and the first catalog load enumerates
+  // the ENTIRE local ../keyboards clone from disk (hundreds of keyboards via the
+  // dev Vite plugin) — which can take well over 20s on a cold dev server.
+  await page.waitForSelector('[data-testid="base-picker"]', { timeout: 90_000 });
+  await pickBaseKeyboard(page, fx.baseKeyboardId);
 }
 
 /**
  * Complete Phase B using the "Add your whole alphabet" method:
  * select the method, type one character, click Add, then click Done.
  */
-async function completePhaseB(page: Page): Promise<void> {
-  // Phase B IntroChooser is shown first. "Add your whole alphabet" is the
-  // default selection — just click Continue.
-  await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 15_000 });
-  await page.click('[data-testid="phase-b-intro-next"]');
-
-  // BuildListView — type a character and add it.
-  await page.waitForSelector('[aria-label="Character to add"]', { timeout: 10_000 });
-  await page.fill('[aria-label="Character to add"]', FIXTURE.charToAdd);
-  await page.getByText("+ Add").click();
-
-  // Click Done (enabled once at least one character is in the list).
-  await page.waitForSelector('[data-testid="phase-b-done"]:not([disabled])', {
-    timeout: 5_000,
-  });
-  await page.click('[data-testid="phase-b-done"]');
-}
-
-/**
- * Navigate to the Output tab via the nav link.
- * The Output screen runs its own compile pipeline independently.
- * Wait until the download button is enabled (meaning WASM compile succeeded).
- */
-async function navigateToOutput(page: Page): Promise<void> {
-  // Click the "Output" nav link.
-  await page.click('a[href="#output"]');
-  await page.waitForSelector('[data-testid="output-screen-root"]', { timeout: 10_000 });
-}
-
-/**
- * Trigger the download and return the Download object.
- *
- * We set a generous timeout because the WASM compiler may still be initialising
- * on first load. The button becomes enabled when stage.kind === "ready", which
- * means the kmcmplib WASM compile completed without fatal errors.
- *
- * NOTE: usePreviewArtifact seeds baseKeyboard but leaves scaffoldSpec = null /
- * pickerMode = "open", so useKeyboardArtifact runs in open-base mode. The
- * compile signal therefore reflects the BASE keyboard (basic_kbdfr), not the
- * Track 1-scaffolded output. The downloaded .zip content is the working-copy
- * projection (correct), but the canDownload gate verifies the base keyboard
- * reached stage.kind === "ready". Strengthening this to verify the scaffolded
- * compile is a tracked follow-up (seed scaffoldSpec in usePreviewArtifact).
- */
-async function triggerDownload(page: Page): Promise<Download> {
-  // Wait for the download button to be enabled. This is the base-keyboard
-  // compile-clean signal: canDownload = stage.kind === "ready" && isInstantiated,
-  // and stage.kind reaches "ready" only after a successful kmcmplib compile of
-  // the base keyboard in open-base mode (scaffoldSpec is null here).
-  const downloadBtn = page.getByTestId("emit-download");
-  await expect(downloadBtn).not.toBeDisabled({ timeout: 60_000 });
-
-  const [download] = await Promise.all([
-    page.waitForEvent("download"),
-    downloadBtn.click(),
-  ]);
-
-  return download;
+async function completePhaseB(page: Page, fx: WalkFixture = FIXTURE): Promise<void> {
+  await buildOneCharacterList(page, fx.charToAdd);
 }
 
 // ---------------------------------------------------------------------------
@@ -199,6 +158,10 @@ async function triggerDownload(page: Page): Promise<Download> {
 
 test.describe("Track 1 (copy-edit) E2E", () => {
   test.beforeEach(async ({ page }) => {
+    // Seed the returning-visitor flag before navigation so a fresh browser
+    // context skips WelcomeScreen's first-visit gate (see seedReturningVisitor
+    // in helpers/surveyFlow.ts) and lands on the default hash-route ("survey").
+    await seedReturningVisitor(page);
     await page.goto("/");
     // The default hash-route is "survey" — we should land on the identity step.
   });
@@ -208,7 +171,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
   }) => {
     // Walk the wizard.
     await fillIdentityLite(page);
-    await pickBaseKeyboard(page);
+    await pickBaseKeyboardCopyEdit(page);
     await chooseTrackCopy(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
@@ -242,7 +205,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
   }) => {
     // Walk the full wizard and reach the Output screen.
     await fillIdentityLite(page);
-    await pickBaseKeyboard(page);
+    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
     await chooseTrackCopy(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
@@ -275,7 +238,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
   }) => {
     // Walk the wizard and download.
     await fillIdentityLite(page);
-    await pickBaseKeyboard(page);
+    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
     await chooseTrackCopy(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
@@ -306,5 +269,209 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     );
     expect(welcome, "zip must contain welcome.htm").toBeDefined();
     expect(welcome![1].length, "welcome.htm must be non-empty").toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 034 — proven-script walks (T010, T011) + publish paths (T016)
+//
+// Reuses the parameterized walk helpers above (fillIdentityLite / pickBaseKeyboard
+// / completePhaseB now take a WalkFixture). The download button becoming enabled
+// IS the compile-clean signal: canDownload === (stage.kind === "ready" &&
+// isInstantiated), and stage.kind reaches "ready" only after a successful
+// kmcmplib compile (see triggerDownload + the base-compile note above).
+// ---------------------------------------------------------------------------
+
+/** Walk identity → base → track(copy) → project-name → prefill → Phase B → Output tab. */
+async function walkToOutput(page: Page, fx: WalkFixture): Promise<void> {
+  await fillIdentityLite(page, fx);
+  await pickBaseKeyboardCopyEdit(page, fx);
+  await chooseTrackCopy(page);
+  await acceptProjectName(page);
+  await confirmPrefill(page);
+  await completePhaseB(page, fx);
+  await navigateToOutput(page);
+}
+
+async function walkToDownload(page: Page, fx: WalkFixture): Promise<Download> {
+  await walkToOutput(page, fx);
+  return triggerDownload(page);
+}
+
+test.describe("spec 034 proven-script walks + publish paths", () => {
+  test.beforeEach(async ({ page }) => {
+    await seedReturningVisitor(page);
+    await page.goto("/");
+  });
+
+  // --- T010: Cyrillic end-to-end walk (identity → ZIP), asserting the ZIP compiles.
+  test("T010 [US1]: Cyrillic (russian_mnemonic_r) walks identity → downloadable, compilable ZIP", async ({
+    page,
+  }) => {
+    const cyrl = PROVEN_SCRIPT_BASES.find((f) => f.script === "Cyrl")!;
+    const download = await walkToDownload(page, walkFixtureFor(cyrl));
+
+    const dlPath = await download.path();
+    expect(dlPath).not.toBeNull();
+    const zipBuf = fs.readFileSync(dlPath!);
+    expect(zipBuf.length).toBeGreaterThan(100);
+
+    // The .kmn must be present + non-empty. (Reaching the enabled download button
+    // already asserts the base compiled clean via the kmcmplib oracle.)
+    const entries = Object.entries(unzipSync(new Uint8Array(zipBuf)));
+    const kmn = entries.find(([name]) => name.endsWith(".kmn"));
+    expect(kmn, "Cyrillic zip must contain a .kmn source file").toBeDefined();
+    expect(kmn![1].length, ".kmn must be non-empty").toBeGreaterThan(0);
+  });
+
+  // --- T011: all five proven scripts reach a downloadable ZIP (FR-011, SC-004).
+  for (const fx of PROVEN_SCRIPT_BASES) {
+    test(`T011 [US1]: ${fx.script} (${fx.baseKeyboardId}) reaches a downloadable ZIP`, async ({
+      page,
+    }) => {
+      const download = await walkToDownload(page, walkFixtureFor(fx));
+      const dlPath = await download.path();
+      expect(dlPath).not.toBeNull();
+      const zipBuf = fs.readFileSync(dlPath!);
+      expect(zipBuf.length, `${fx.script} zip must be non-trivial`).toBeGreaterThan(100);
+    });
+  }
+
+  // --- T016: the output screen presents BOTH publish paths, and the PR path
+  // degrades honestly (never fakes success) when the OAuth/managed-PR backend is
+  // unreachable, while the ZIP path stays fully functional. NB: touch-STAGE
+  // reachability is pinned at the spine level by the advance/manifest unit tests
+  // (SR-3, advance.test.ts) — 034 owns reachability + wiring; touch DEPTH is 035.
+  test("T016 [US2]: output screen exposes both publish paths; PR degrades honestly, ZIP still works", async ({
+    page,
+  }) => {
+    await walkToOutput(page, FIXTURE);
+
+    // PP-1: ZIP download affordance is present and (once compiled) enabled.
+    const downloadBtn = page.getByTestId("emit-download");
+    await expect(downloadBtn).toBeVisible();
+    await expect(downloadBtn).not.toBeDisabled({ timeout: 60_000 });
+
+    // PP-2: the "submit as PR" affordance is present.
+    await expect(
+      page.getByText(/Submit to community repository/i).first(),
+    ).toBeVisible();
+
+    // PP-3: exercise the PR path with NO reachable backend (no VITE_OAUTH_BACKEND_URL
+    // in e2e → the submit POST hits a non-existent /submit/managed-pr). It must show
+    // an honest failure, NEVER a success state.
+    await page.getByRole("textbox", { name: /your name/i }).fill("E2E Author");
+    await page.getByRole("textbox", { name: /email address/i }).fill("e2e@example.com");
+    await page.getByRole("checkbox").check();
+    await page.getByRole("button", { name: /submit keyboard to community repository/i }).click();
+
+    // An error alert appears; the "your submission is being reviewed" success
+    // panel must NOT appear.
+    await expect(page.getByRole("alert").first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/your submission is being reviewed/i)).toHaveCount(0);
+
+    // PP-1 (independence): the ZIP path is still functional after a failed PR submit.
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      downloadBtn.click(),
+    ]);
+    expect(await download.path()).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 034 US3 (T028) — durable localStorage draft: reload-and-resume.
+//
+// Advances several stages (identity -> ... -> Phase B "Done", which auto-
+// advances the traversal to "carve" per the manifest spine — see
+// steps/advance.test.ts SR-1/SR-2), hard-reloads, and confirms:
+//   - AS-1/SC-003: the working copy AND activeStepId are restored (the Carve
+//     gallery reappears directly; the identity panel never does) — NOT reset
+//     to identity.
+//   - FR-010: Back stays history-consistent after restore — Back leaves the
+//     Carve gallery, and Forward from there returns to it (a round-trip that
+//     would fail if the restored `history` stack were stale/inconsistent).
+//   - G-3/AS-3: the WelcomeScreen "I'm new" affordance (StudioShell's other
+//     start-over entry point, see draftPersistence.ts clearDraft callers)
+//     clears the persisted draft, and a SUBSEQUENT reload starts fresh at
+//     identity rather than re-resuming the abandoned draft.
+// ---------------------------------------------------------------------------
+
+test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays consistent, start-over clears it", () => {
+  test.beforeEach(async ({ page }) => {
+    // Seeded so the walk below starts at identity (not WelcomeScreen) — this
+    // is draft-safe (unlike WelcomeScreen's "I'm new") and does not prevent
+    // reaching WelcomeScreen later: StudioShell's router still honors an
+    // explicit `#welcome` hash (see the "I'm new" assertion below) once the
+    // first-visit gate is satisfied — the gate only forces the redirect for
+    // a genuine first-timer.
+    await seedReturningVisitor(page);
+    await page.goto("/");
+  });
+
+  test("T028: hard reload resumes the working copy + step position; Back round-trips; 'I'm new' clears the draft", async ({
+    page,
+  }) => {
+    // Advance several stages (identity -> base -> track -> project_name ->
+    // prefill -> Phase B), mirroring the proven walkToOutput helper up to
+    // (not including) the Output-tab hop.
+    await fillIdentityLite(page);
+    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
+    await chooseTrackCopy(page);
+    await acceptProjectName(page);
+    await confirmPrefill(page);
+    await completePhaseB(page); // "Done" advances the traversal to "carve".
+
+    await page.waitForSelector('[data-testid="carve-gallery"]', { timeout: 20_000 });
+
+    // Let the ~500ms autosave debounce (Article IV — independent of the 300ms
+    // validate cycle) commit the draft before reloading.
+    await page.waitForTimeout(1_500);
+
+    // --- Hard reload ---
+    await page.reload();
+
+    // AS-1/SC-003: NOT reset to identity. The Carve gallery reappears
+    // directly on this same reloaded boot; the identity panel never renders.
+    await page.waitForSelector('[data-testid="carve-gallery"]', { timeout: 30_000 });
+    await expect(page.getByTestId("identity-panel")).toHaveCount(0);
+
+    // FR-010: Back navigates away from Carve, back onto the restored `history`
+    // stack's Phase B entry (the IntroChooser, re-entered from the top of
+    // Phase B — same UX as any other Back into a completed phase) — proving
+    // the restored `history` stack is a real, walkable path, not just a bare
+    // `activeStepId` string. (BuildListView's typed-alphabet buffer is
+    // component-LOCAL `useState` — see survey/PhaseB.tsx — so it resets on
+    // this remount regardless of the draft feature; re-adding a character
+    // below mirrors completePhaseB's own steps, not a persistence regression.)
+    const carveGallery = page.getByTestId("carve-gallery");
+    await carveGallery.getByRole("button", { name: "← Back" }).click();
+    await expect(carveGallery).toHaveCount(0);
+    await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 20_000 });
+    await page.click('[data-testid="phase-b-intro-next"]');
+
+    await page.waitForSelector('[aria-label="Character to add"]', { timeout: 10_000 });
+    await page.fill('[aria-label="Character to add"]', FIXTURE.charToAdd);
+    await page.getByRole("button", { name: "+ Add" }).click();
+    await page.waitForSelector('[data-testid="phase-b-done"]:not([disabled])', { timeout: 10_000 });
+
+    // Forward again: Back + Forward round-trips back to Carve — confirms the
+    // history/back-nav stayed coherent across the reload+restore (not merely
+    // that the CURRENT step survived).
+    await page.click('[data-testid="phase-b-done"]');
+    await page.waitForSelector('[data-testid="carve-gallery"]', { timeout: 20_000 });
+
+    // G-3/AS-3: "I'm new" (WelcomeScreen's start-over entry point) clears the
+    // durable draft and resets both stores in-place (hash-only navigation —
+    // no reload yet).
+    await page.goto("/#welcome");
+    await page.getByRole("button", { name: "I’m new" }).click();
+    await page.waitForSelector('[data-testid="identity-panel"]', { timeout: 15_000 });
+
+    // A SUBSEQUENT reload must start fresh — the cleared draft must not
+    // resurrect the abandoned carve-stage session.
+    await page.reload();
+    await page.waitForSelector('[data-testid="identity-panel"]', { timeout: 30_000 });
+    await expect(page.getByTestId("carve-gallery")).toHaveCount(0);
   });
 });

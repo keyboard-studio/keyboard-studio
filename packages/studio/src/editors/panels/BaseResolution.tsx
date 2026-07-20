@@ -8,30 +8,39 @@
 import { useEffect, useMemo, useState } from "react";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { getBaseBrowserService } from "../../lib/services.ts";
+import { suggestBases, type SuggestTarget } from "../../lib/suggestBase.ts";
 import {
-  suggestBases,
-  type SuggestReason,
-  type SuggestTarget,
-} from "../../lib/suggestBase.ts";
+  applyGenealogicalTier,
+  makeResolveLanguage,
+  type ResolvedReason,
+  type ResolvedSuggestion,
+} from "../../lib/genealogyTier.ts";
+import { getLoadedLangtags, loadLangtags } from "../../lib/langtagsDefaults.ts";
 import { BaseKeyboardPicker } from "../../components/BaseKeyboardPicker.tsx";
 import { Badge, Button } from "../../ui/index.ts";
 import type { BadgeTone } from "../../ui/Badge.tsx";
 
-const REASON_LABEL: Record<SuggestReason, string> = {
-  "language-match": "Already supports your language",
+const REASON_LABEL: Record<ResolvedReason, string> = {
+  "language-match-monolingual": "Dedicated to your language",
+  "language-match-multilingual": "Already supports your language",
+  genealogical: "Related language, same script",
   "script-match": "Matches your script",
   "language-cross-script": "Supports your language, different script",
   "us-qwerty-fallback": "Start blank (US QWERTY)",
 };
 
-// Token-mapped reason tones for Badge (exact CSS-var match verified):
-//   language-match       → Badge "success"  (var(--sil-green))
-//   script-match         → Badge "accent"   (var(--app-accent))
-//   language-cross-script→ Badge "warn"     (var(--sil-orange-dark))
-//   us-qwerty-fallback   → Badge "subtle"   (var(--app-text-subtle))
-const REASON_TONE: Record<SuggestReason, BadgeTone> = {
-  "language-match": "success",
-  "script-match": "accent",
+// Token-mapped reason tones for Badge, in descending strength:
+//   language-match-monolingual  → Badge "success" (var(--sil-green)) — dedicated
+//   language-match-multilingual → Badge "success" (var(--sil-green)) — covers it too
+//   genealogical                → Badge "accent"  (var(--app-accent))
+//   script-match                → Badge "default" (neutral) — weaker than a relative
+//   language-cross-script       → Badge "warn"    (var(--sil-orange-dark))
+//   us-qwerty-fallback          → Badge "subtle"  (var(--app-text-subtle))
+const REASON_TONE: Record<ResolvedReason, BadgeTone> = {
+  "language-match-monolingual": "success",
+  "language-match-multilingual": "success",
+  genealogical: "accent",
+  "script-match": "default",
   "language-cross-script": "warn",
   "us-qwerty-fallback": "subtle",
 };
@@ -39,22 +48,44 @@ const REASON_TONE: Record<SuggestReason, BadgeTone> = {
 export interface BaseResolutionProps {
   /** The chosen (language, script) target from identity-lite. */
   target: SuggestTarget;
-  onResolved: (base: BaseKeyboard) => void;
+  /**
+   * Fired on every search-result / suggestion-card click. Drives the LIVE
+   * preview in the right pane WITHOUT advancing the wizard or instantiating
+   * the working copy (preview-before-commit). `null` when the picker's
+   * clear action (second Escape) fires.
+   */
+  onPreview: (base: BaseKeyboard | null) => void;
+  /**
+   * Fired by the single "Choose this keyboard" button — commits the
+   * currently-previewed base and advances the wizard.
+   */
+  onConfirm: () => void;
+  /** The base currently shown in the right-pane preview, or null before any pick. */
+  previewedBase: BaseKeyboard | null;
+  /** Coarse compile-pipeline status for `previewedBase` (see stores/basePreviewStatusStore.ts). */
+  previewStatus: "idle" | "loading" | "ready" | "error";
   onBack?: () => void;
 }
 
 export function BaseResolution({
   target,
-  onResolved,
+  onPreview,
+  onConfirm,
+  previewedBase,
+  previewStatus,
   onBack,
 }: BaseResolutionProps) {
   const [bases, setBases] = useState<BaseKeyboard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [picked, setPicked] = useState<BaseKeyboard | null>(null);
   // What the top search bar looks through: the suggested bases (default) or
   // the full catalog. Widened via the toggle or the picker's zero-match action.
   const [searchScope, setSearchScope] = useState<"suggested" | "all">("suggested");
+  // Langtags backs the genealogical tier's resolveLanguage. It loads lazily (a
+  // separate chunk), so the genealogical tier is additive: until it resolves, we
+  // rank with plain suggestBases and re-rank once it lands. `tick` re-renders
+  // when the async load settles.
+  const [langtagsTick, setLangtagsTick] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -78,6 +109,24 @@ export function BaseResolution({
     };
   }, []);
 
+  // Kick off the lazy langtags load once; bump the tick when it resolves so the
+  // genealogical tier re-ranks. Safe if already loaded (idempotent).
+  useEffect(() => {
+    let live = true;
+    loadLangtags().then(
+      () => {
+        if (live) setLangtagsTick((t) => t + 1);
+      },
+      () => {
+        /* langtags unavailable → genealogical tier stays off, ranking degrades
+           gracefully to plain suggestBases. */
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+
   // Build the phonebook from the loaded bases' .languages arrays so the caller
   // need not thread a separate map. Each base's languages field (populated from
   // its .kps <Languages> block) is used as-is; bases without languages degrade
@@ -90,10 +139,21 @@ export function BaseResolution({
     [bases],
   );
 
-  const suggestions = useMemo(
-    () => suggestBases(bases, target, { languagesById }),
-    [bases, target, languagesById],
-  );
+  const suggestions = useMemo<ResolvedSuggestion[]>(() => {
+    const ranked = suggestBases(bases, target, { languagesById });
+    // Promote same-script bases that also support a close relative of the target
+    // language into the genealogical tier (spec 036 US2). Only when langtags has
+    // loaded; otherwise the plain script/language ranking stands.
+    const langtags = getLoadedLangtags();
+    if (!langtags) {
+      return ranked.map((s) => ({ base: s.base, reason: s.reason }));
+    }
+    return applyGenealogicalTier(ranked, target, {
+      resolveLanguage: makeResolveLanguage(langtags.getLanguageDefaults),
+      languagesById,
+    });
+    // langtagsTick forces a re-rank once the lazy langtags module resolves.
+  }, [bases, target, languagesById, langtagsTick]);
 
   const suggestedIds = useMemo(
     () => new Set(suggestions.map((s) => s.base.id)),
@@ -181,51 +241,65 @@ export function BaseResolution({
           })}
         </div>
         <BaseKeyboardPicker
-          value={picked}
-          onChange={setPicked}
+          value={previewedBase}
+          onChange={onPreview}
           target={target}
           label="Search keyboards"
           scopeIds={searchScope === "suggested" ? suggestedIds : undefined}
           onSearchAll={() => setSearchScope("all")}
         />
+        {/*
+          The single commit button for the step. Enabled ONLY once the
+          preview has compiled successfully (previewStatus === "ready") —
+          disabled while idle, loading, AND on error. This means an author can
+          only commit a keyboard they have actually been able to preview/test,
+          which makes the confirm-while-loading -> subsequent-compile-error
+          race structurally unreachable: there is no path from "clicked
+          confirm" to "advanced onto a base whose compile then fails".
+        */}
         <Button
           variant="secondary"
           data-testid="base-confirm"
-          disabled={picked === null}
-          onClick={() => picked !== null && onResolved(picked)}
+          disabled={previewedBase === null || previewStatus !== "ready"}
+          onClick={onConfirm}
           style={{
             marginTop: 10,
             padding: "8px 18px",
-            background: picked === null ? "transparent" : "var(--app-accent)",
+            background: previewedBase === null ? "transparent" : "var(--app-accent)",
             border: "1px solid var(--app-border)",
             borderRadius: 6,
-            color: picked === null ? "var(--app-text-subtle)" : "var(--app-text)",
+            color: previewedBase === null ? "var(--app-text-subtle)" : "var(--app-text)",
             fontSize: 13,
-            cursor: picked === null ? "not-allowed" : "pointer",
+            cursor: previewedBase === null || previewStatus !== "ready" ? "not-allowed" : "pointer",
             fontFamily: "var(--app-font)",
           }}
         >
-          Use this keyboard
+          {previewStatus === "loading" ? "Preparing preview…" : "Choose this keyboard"}
         </Button>
       </div>
 
       <div style={{ borderTop: "1px solid var(--app-border)", paddingTop: 16 }}>
         <p style={{ ...subtle, marginBottom: 8 }}>Suggested for you:</p>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {suggestions.map(({ base, reason }) => (
+          {suggestions.map(({ base, reason, relative }) => {
+            const isSelected = base.id === previewedBase?.id;
+            return (
             <Button
               key={base.id}
               variant="secondary"
               data-testid={`base-card-${base.id}`}
-              onClick={() => onResolved(base)}
+              // Preview only — does NOT advance the wizard or instantiate the
+              // working copy. Committing happens exclusively via the single
+              // "Choose this keyboard" button above.
+              onClick={() => onPreview(base)}
               style={{
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
                 gap: 12,
                 padding: "10px 14px",
-                background: "var(--app-surface)",
-                border: "1px solid var(--app-border)",
+                background: isSelected ? "var(--app-accent-subtle)" : "var(--app-surface)",
+                border: `1px solid ${isSelected ? "var(--app-accent)" : "var(--app-border)"}`,
                 borderRadius: 8,
                 color: "var(--app-text)",
                 fontSize: 14,
@@ -238,9 +312,23 @@ export function BaseResolution({
                 <strong>{base.displayName}</strong>{" "}
                 <span style={{ color: "var(--app-text-muted)", fontSize: 12 }}>({base.id})</span>
               </span>
-              <Badge tone={REASON_TONE[reason]}>{REASON_LABEL[reason]}</Badge>
+              {/* Genealogical suggestions name their closest relative and expose
+                  the numeric distance as a hover tooltip. Distance is the full
+                  path length across both legs — levels up to the nearest common
+                  ancestor plus levels back down to the relative; smaller = closer. */}
+              {reason === "genealogical" && relative !== undefined ? (
+                <Badge
+                  tone={REASON_TONE[reason]}
+                  title={`Genealogical distance ${relative.distance} — total steps to ${relative.name} across both branches (up to the nearest common ancestor, then down); smaller is closer`}
+                >
+                  Related: {relative.name}, same script
+                </Badge>
+              ) : (
+                <Badge tone={REASON_TONE[reason]}>{REASON_LABEL[reason]}</Badge>
+              )}
             </Button>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

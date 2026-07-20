@@ -79,3 +79,12 @@ utilities/hermes/repo-map*.json
 
 # Local secrets for the Hermes harness (Context7 etc.) - never commit
 utilities/hermes/.env
+
+# Vendored Unicode Character Database (UCD) raw dump — keep on disk, do not commit.
+# Only the files the facet-index classifiers need are tracked (negated below).
+lib/ucd/*
+!lib/ucd/Scripts.txt
+!lib/ucd/ScriptExtensions.txt
+!lib/ucd/PropertyValueAliases.txt
+!lib/ucd/Blocks.txt
+!lib/ucd/DerivedAge.txt

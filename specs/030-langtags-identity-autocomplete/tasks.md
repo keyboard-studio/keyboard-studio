@@ -96,7 +96,12 @@ Every checkbox below is still literally `- [ ]`, but substantial pieces of this 
 
 - [x] T029 Update order-asserting snapshots/tests to the new order + conditional region node: `packages/studio/tests/survey/__snapshots__/flow-parity.test.ts.snap`, `packages/studio/src/dashboard/buildStepGraph.test.ts`, `packages/studio/src/__tests__/stepHost.goldenWalk.test.tsx`.
 - [x] T030 [P] Provenance tagging (FR-010): mark seeded English/local-name/code/script fields with langtags provenance via `getSeedProvenance` in `IdentityLite.tsx` so the Flow Map shows "suggested — edit if needed".
-- [ ] T031 Full gate: `pnpm typecheck && pnpm -r test && pnpm lint && pnpm depcruise` (all green modulo the known Node-26-local jsdom/crypto env failures that pass on CI Node 22).
+- [x] T031 Full gate: `pnpm typecheck && pnpm -r test && pnpm lint && pnpm depcruise` — green on CI (Node 22) and against a clean sibling `../keyboards` checkout. The earlier "local red" was a false alarm; see NOTE below.
+
+> **NOTE (T031 gate — resolved, was a false alarm).**
+> A prior revision of this task recorded `classifyRemovalCapabilities.test.ts` C2b as a "durable local-only blocker" attributed to Keyman 17+ corpus drift (`store(&CasedKeys)`). That diagnosis was wrong on every count and has been retracted. Verified 2026-07-19: against the clean committed corpus (`../keyboards` HEAD `9ca2b3ced`) the full `classifyRemovalCapabilities` suite passes **24/24, C2b included**. The `&CasedKeys` store has no effect on the classifier — it never inspects store declarations; classification turns on rule shape (`isS01()` requires `output.length === 1`). The real trigger for the earlier failure was **uncommitted experimental edits in the local `../keyboards` working tree** (`+ [K_O] > U+006f U+0300` gave K_O a second output codepoint, so `isS01()` returned false and it fell to `not-removable:unknown`, plus a few scratch rules). No committed corpus commit, and no code in this repo, produces the failure; stashing the local corpus edit makes the gate green. Nothing to fix in 030 or the classifier.
+> A secondary, non-blocking observation from the same session: `packages/glottolog` `codegen-determinism.test.ts` failed on the *first* full-gate run of a session but passed on isolated re-run and on the second full run; regenerating produces a byte-identical index (`git diff --numstat` = 0). A first-invocation artifact of the codegen's write-only-on-change guard, not a persistent blocker.
+
 - [x] T032 [P] Docs: record the identity-flow redesign in `docs/spec-signoff.md` (or the survey docs) and cross-link `spec.md §8`; no keyboard-phonebook change expected (verify).
 
 ---

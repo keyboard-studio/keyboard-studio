@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { renameFilesInVfs } from "./index.js";
+import { parseKpjFlags } from "../compiler/parseKpjFlags.js";
 
 // These tests pin the scoped-rewrite behavior of renameFilesInVfs against the
 // over-rewrite risk in the previous blanket-replaceAll implementation. They
@@ -137,6 +138,95 @@ describe("renameFilesInVfs — scoped content rewriting", () => {
       // Untouched: paths that don't match `source/<baseId>.<ext>`.
       expect(vfs.get("source/welcome/welcome.htm")).not.toBeUndefined();
       expect(vfs.get("source/help/kb.css")).not.toBeUndefined();
+    });
+  });
+
+  describe("root-level .kpj rename (compiler-flags survival)", () => {
+    // A .kpj lives at the VFS root as `<baseId>.kpj`, not under source/.
+    // compile() reads it as `<keyboardId>.kpj`; if it isn't renamed the flags
+    // are silently dropped to defaults. These pin the rename + scoped rewrite.
+    const KPJ = (id: string) =>
+      `<?xml version="1.0" encoding="utf-8"?>
+<KeymanDeveloperProject>
+  <Options>
+    <CompilerWarningsAsErrors>True</CompilerWarningsAsErrors>
+    <WarnDeprecatedCode>False</WarnDeprecatedCode>
+  </Options>
+  <Files>
+    <File>
+      <ID>id_182ce1ceca069ede255f63119b64f2a5</ID>
+      <Filename>${id}.kmn</Filename>
+      <Filepath>source\\${id}.kmn</Filepath>
+      <Details><Name>Display ${id} Name</Name></Details>
+    </File>
+    <File>
+      <ID>id_ede98e4633e239f933cbfd1f4e1b766c</ID>
+      <Filename>README.md</Filename>
+      <Filepath>README.md</Filepath>
+    </File>
+  </Files>
+</KeymanDeveloperProject>`;
+
+    it("renames root <baseId>.kpj to <keyboardId>.kpj", () => {
+      const vfs = createVirtualFS();
+      vfs.set("base_id.kpj", KPJ("base_id"));
+      renameFilesInVfs(vfs, "base_id", "my_keyboard");
+      expect(vfs.get("base_id.kpj")).toBeUndefined();
+      expect(vfs.get("my_keyboard.kpj")).not.toBeUndefined();
+    });
+
+    it("keeps the base keyboard's compiler flags at the new path (not defaults)", () => {
+      const vfs = createVirtualFS();
+      vfs.set("base_id.kpj", KPJ("base_id"));
+      renameFilesInVfs(vfs, "base_id", "my_keyboard");
+      // This is exactly what compile() does: read `<keyboardId>.kpj` and parse.
+      const flags = parseKpjFlags(vfs.get("my_keyboard.kpj")!.content as string);
+      expect(flags).toEqual({
+        compilerWarningsAsErrors: true, // non-default — proves the file survived
+        warnDeprecatedCode: false, // non-default — proves it wasn't lost to defaults
+      });
+    });
+
+    it("rewrites <Filename>/<Filepath> id-basename references to the new id", () => {
+      const vfs = createVirtualFS();
+      vfs.set("base_id.kpj", KPJ("base_id"));
+      renameFilesInVfs(vfs, "base_id", "my_keyboard");
+      const out = vfs.get("my_keyboard.kpj")!.content as string;
+      expect(out).toContain("<Filename>my_keyboard.kmn</Filename>");
+      expect(out).toContain("<Filepath>source\\my_keyboard.kmn</Filepath>");
+    });
+
+    it("leaves file GUIDs, display names, and non-id files untouched", () => {
+      const vfs = createVirtualFS();
+      vfs.set("base_id.kpj", KPJ("base_id"));
+      renameFilesInVfs(vfs, "base_id", "my_keyboard");
+      const out = vfs.get("my_keyboard.kpj")!.content as string;
+      // GUID hashes never contain the base id token, but assert explicitly.
+      expect(out).toContain("<ID>id_182ce1ceca069ede255f63119b64f2a5</ID>");
+      // Display <Name> free text is preserved verbatim.
+      expect(out).toContain("<Name>Display base_id Name</Name>");
+      // Files that don't use the id as basename are untouched.
+      expect(out).toContain("<Filename>README.md</Filename>");
+    });
+
+    it("does not over-rewrite a base id that is a prefix of another token", () => {
+      const vfs = createVirtualFS();
+      vfs.set(
+        "base_id.kpj",
+        `<KeymanDeveloperProject><Files><File><Filename>base_id.kmn</Filename><Filepath>source\\base_id_extra.kmn</Filepath></File></Files></KeymanDeveloperProject>`,
+      );
+      renameFilesInVfs(vfs, "base_id", "my_keyboard");
+      const out = vfs.get("my_keyboard.kpj")!.content as string;
+      expect(out).toContain("<Filename>my_keyboard.kmn</Filename>");
+      // `base_id_extra` must NOT become `my_keyboard_extra` (word-boundary).
+      expect(out).toContain("<Filepath>source\\base_id_extra.kmn</Filepath>");
+    });
+
+    it("does nothing when no root .kpj is present", () => {
+      const vfs = createVirtualFS();
+      vfs.set("source/base_id.kmn", "store(&VERSION) '1.0'");
+      expect(() => renameFilesInVfs(vfs, "base_id", "my_keyboard")).not.toThrow();
+      expect(vfs.get("my_keyboard.kpj")).toBeUndefined();
     });
   });
 });

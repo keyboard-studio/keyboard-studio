@@ -13,6 +13,10 @@
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
 import { navigateTo } from "../lib/navigate.ts";
+import { markVisited } from "../lib/firstVisit.ts";
+import { discardActiveDraft } from "../lib/draftPersistence.ts";
+import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import {
   BG_PAGE,
   BG_CARD,
@@ -54,6 +58,15 @@ const googleButtonStyle: React.CSSProperties = {
 export function WelcomeScreen() {
   const { connect: ghConnect, error: ghError } = useGitHubAuth();
   const { connect: googleConnect, error: googleError } = useGoogleAuth();
+
+  // Any of the three actions below leaves the welcome screen: sign in (which
+  // redirects out to a provider and back to the app root) or "I'm new". Mark
+  // the browser as visited synchronously first, so the first-visit gate does
+  // not bounce the author back here on the OAuth return or a later reload.
+  const leaveWelcome = (go: () => void) => {
+    markVisited();
+    go();
+  };
 
   return (
     <div
@@ -119,7 +132,7 @@ export function WelcomeScreen() {
           <button
             type="button"
             onClick={() => {
-              void ghConnect();
+              leaveWelcome(() => void ghConnect());
             }}
             style={githubButtonStyle}
           >
@@ -130,7 +143,7 @@ export function WelcomeScreen() {
           <button
             type="button"
             onClick={() => {
-              void googleConnect();
+              leaveWelcome(() => void googleConnect());
             }}
             style={googleButtonStyle}
           >
@@ -140,7 +153,19 @@ export function WelcomeScreen() {
 
           <button
             type="button"
-            onClick={() => navigateTo("survey")}
+            onClick={() => {
+              // T024 (spec 034 US3, research D5, G-3): "I'm new" is the
+              // WelcomeScreen's fresh-start entry point. A durable draft may
+              // already have been restored at boot (main.tsx's pre-mount
+              // loadDraft) before the author ever saw this screen — honoring
+              // "I'm new" means clearing that draft (and the active-project
+              // pointer) and resetting both stores, not silently keeping the
+              // restored state around for a later boot to re-surface.
+              discardActiveDraft();
+              useSurveySessionStore.getState().reset();
+              useWorkingCopyStore.getState().reset();
+              leaveWelcome(() => navigateTo("survey"));
+            }}
             style={{
               ...providerButtonBase,
               background: "transparent",

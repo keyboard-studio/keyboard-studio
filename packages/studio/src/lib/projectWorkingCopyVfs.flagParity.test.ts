@@ -393,9 +393,15 @@ describe("projectWorkingCopyVfs — FULL-SPINE flag parity (carve + add-gallery 
     // The whole finding set (codes + severities + locations) must match exactly.
     expect(onFindings).toEqual(offFindings);
 
-    // Non-vacuous: runAllChecks produces a real, non-empty verdict over this .kmn,
-    // so the equality is checking a populated finding set, not two empty arrays.
-    expect(offFindings.length).toBeGreaterThan(0);
+    // The full-spine projected .kmn is a VALID keyboard, so a correct Layer-A
+    // validator produces ZERO findings over it. (It once produced a few, but
+    // those were false positives from keyword-shaped text — index(), deadkey(),
+    // any() — inside a `c` comment; removed by the validator's stripNonCode
+    // pass.) Keep the equality above non-vacuous by confirming the validator is
+    // actually wired: a deliberately-broken variant (an out-of-range codepoint,
+    // real code — not in a comment or quote) yields a finding.
+    expect(offFindings).toEqual([]);
+    expect(runAllChecks(off.kmn + "\n+ [K_A] > U+110000\n").length).toBeGreaterThan(0);
 
     // Mirror the dashboard's unshippablePrefixes signal: the BLOCKING subset
     // (the input checkSpinePrefixShippability reads) is likewise flag-invariant.

@@ -202,6 +202,48 @@ function isStringSafeChar(ch: string): boolean {
  *   - if the buffer contains ' but not ", use double quotes
  *   - if the buffer contains both, split on " and emit U+0022 between pieces
  */
+/**
+ * Length of the maximal run of single-codepoint `char` items starting at index
+ * `i` whose codepoints ascend by exactly +1. Used by emitStoreItems to
+ * re-collapse an expanded range (spec 042, FR-008) back to `X .. Y` notation so
+ * authored `.kmn` stays compact — the inverse of parseStoreItems' expansion.
+ */
+function ascendingRunLength(items: StoreItem[], i: number): number {
+  let n = 0;
+  let prev: number | null = null;
+  while (i + n < items.length) {
+    const it = items[i + n];
+    if (it === undefined || it.kind !== "char") break;
+    const cps = [...it.value];
+    if (cps.length !== 1) break;
+    const cp = cps[0]?.codePointAt(0);
+    if (cp === undefined) break;
+    if (prev !== null && cp !== prev + 1) break;
+    prev = cp;
+    n++;
+  }
+  return n;
+}
+
+/**
+ * True when every codepoint in an ascending run [i, i+len) is printable ASCII
+ * (U+0020–U+007E). Such a run is left for the existing string-collapse path: a
+ * quoted word like 'abc' is more human-legible than `U+0061 .. U+0063`, and
+ * this preserves dictionary/&word stores (spec 042 FR-008 "human-legible").
+ * Range re-collapse targets the non-ASCII script ranges that motivate the
+ * feature (Devanagari, historic SMP scripts, Hebrew accents), all of which
+ * fall outside this window.
+ */
+function isAllPrintableAscii(items: StoreItem[], i: number, len: number): boolean {
+  for (let k = i; k < i + len; k++) {
+    const it = items[k];
+    if (it === undefined || it.kind !== "char") return false;
+    const cp = it.value.codePointAt(0) ?? 0;
+    if (cp < 0x20 || cp > 0x7e) return false;
+  }
+  return true;
+}
+
 function emitStoreItems(items: StoreItem[]): string {
   const parts: string[] = [];
   let buf = "";
@@ -224,7 +266,23 @@ function emitStoreItems(items: StoreItem[]): string {
     buf = "";
   };
 
-  for (const item of items) {
+  for (let i = 0; i < items.length; ) {
+    // Range re-collapse: a maximal ascending +1 run of >= 3 char items becomes
+    // `first .. last` (spec 042, FR-008). All-printable-ASCII runs are left for
+    // the string path (a quoted word reads better than a codepoint range).
+    const runLen = ascendingRunLength(items, i);
+    if (runLen >= 3 && !isAllPrintableAscii(items, i, runLen)) {
+      flushBuf();
+      const first = items[i];
+      const last = items[i + runLen - 1];
+      if (first !== undefined && last !== undefined && first.kind === "char" && last.kind === "char") {
+        parts.push(`${fmtCodepoint(first.value)} .. ${fmtCodepoint(last.value)}`);
+        i += runLen;
+        continue;
+      }
+    }
+    const item = items[i];
+    if (item === undefined) { i++; continue; }
     if (item.kind === "char") {
       for (const ch of item.value) {
         if (isStringSafeChar(ch)) {
@@ -238,6 +296,7 @@ function emitStoreItems(items: StoreItem[]): string {
       flushBuf();
       parts.push(fmtStoreItem(item));
     }
+    i++;
   }
   flushBuf();
   return parts.join(" ");
@@ -246,7 +305,11 @@ function emitStoreItems(items: StoreItem[]): string {
 function emitStore(store: IRStore): string {
   const nameToken = store.isSystem ? `&${store.name}` : store.name;
   const items = emitStoreItems(store.items);
-  const line = `store(${nameToken}) ${items}`;
+  let line = `store(${nameToken}) ${items}`;
+  // Trailing `c <comment>` — same convention as emitRule.
+  if (store.trailingComment !== undefined) {
+    line = `${line} c ${store.trailingComment}`;
+  }
   // Target-selector prefix — same convention as emitRule.
   return store.targetSelector !== undefined
     ? `$${store.targetSelector}: ${line}`
@@ -525,12 +588,15 @@ export function emit(ir: KeyboardIR): string {
   const systemStores = ir.stores.filter(s => s.isSystem);
   const sysMap = new Map(systemStores.map(s => [s.name.toUpperCase(), s]));
 
+  // Look up by upper-cased key so mixed-case canonical names (e.g. "CasedKeys")
+  // match the upper-cased map keys and are emitted in their canonical slot.
   for (const name of SYSTEM_STORE_ORDER) {
-    const store = sysMap.get(name);
+    const key = name.toUpperCase();
+    const store = sysMap.get(key);
     if (store) {
       pushLeadingComments(store.nodeId, commentMap, lines);
       lines.push(emitStore(store));
-      sysMap.delete(name);
+      sysMap.delete(key);
     }
   }
   // Remaining system stores not in the canonical list, alphabetical.
@@ -631,6 +697,11 @@ export function emit(ir: KeyboardIR): string {
       const referencedStoreNames = referencedStoreNamesIn(group.rules);
       for (const store of ir.stores) {
         if (!store.isSystem && referencedStoreNames.has(store.name)) {
+          // Dedup across groups: a store referenced by rules in more than one
+          // group must be emitted only once (KMN store declarations are global;
+          // a duplicate `store(...)` is a kmcmplib error and breaks round-trip).
+          if (emittedStores.has(store.nodeId)) continue;
+          emittedStores.add(store.nodeId);
           pushLeadingComments(store.nodeId, commentMap, lines);
           lines.push(emitStore(store));
         }

@@ -595,6 +595,14 @@ describe("workingCopyStore — reset", () => {
     expect(s.desktopLocked).toBe(false);
   });
 
+  it("reset clears sequenceFlaggedChars", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á"]);
+
+    useWorkingCopyStore.getState().reset();
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual([]);
+  });
+
   it("isInstantiated returns false after reset (from instantiateFromBase)", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
@@ -1194,5 +1202,143 @@ describe("workingCopyStore — base-derived A3a seeding (spec §7.2 rule 3a, #92
     const vfs = createVirtualFS([]);
     useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: postfixBaseIr() });
     expect(useWorkingCopyStore.getState().session.axes.markInputOrder).toBe("prefix");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sequenceFlaggedChars — S-03 flag tracking (Sequence Gallery deferral)
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — sequenceFlaggedChars", () => {
+  it("starts empty", () => {
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual([]);
+  });
+
+  it("flagCharForSequence adds a char, preserving insertion order", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    useWorkingCopyStore.getState().flagCharForSequence("é");
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á", "é"]);
+  });
+
+  it("flagCharForSequence is idempotent — flagging the same char twice does not duplicate it", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á"]);
+  });
+
+  it("unflagCharForSequence removes a char", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    useWorkingCopyStore.getState().flagCharForSequence("é");
+    useWorkingCopyStore.getState().unflagCharForSequence("á");
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["é"]);
+  });
+
+  it("unflagCharForSequence on a char not in the list is a no-op", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    useWorkingCopyStore.getState().unflagCharForSequence("z");
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á"]);
+  });
+
+  it("unflagCharForSequence also strips the char's recorded multi_char_sequence assignment (P0)", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("ŋ");
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ŋ",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: "multi_char_sequence",
+            strategyId: "S-03",
+            slotValues: { firstLetterOut: "n", secondLetter: "g", collapsedChar: "ŋ" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+    expect(
+      useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C")?.assignments,
+    ).toHaveLength(1);
+
+    useWorkingCopyStore.getState().unflagCharForSequence("ŋ");
+
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual([]);
+    expect(
+      useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C")?.assignments,
+    ).toEqual([]);
+  });
+
+  it("unflagCharForSequence strips ALL recorded sequences when the assignment holds multiple PATTERN_SEQUENCE mechanisms", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("ŋ");
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ŋ",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: "multi_char_sequence",
+            strategyId: "S-03",
+            slotValues: { firstLetterOut: "n", secondLetter: "g", collapsedChar: "ŋ" },
+          },
+          {
+            patternId: "multi_char_sequence",
+            strategyId: "S-03",
+            slotValues: { firstLetterOut: "n", secondLetter: "y", collapsedChar: "ŋ" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+    expect(
+      useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C")?.assignments?.[0]
+        ?.mechanisms,
+    ).toHaveLength(2);
+
+    useWorkingCopyStore.getState().unflagCharForSequence("ŋ");
+
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual([]);
+    expect(
+      useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C")?.assignments,
+    ).toEqual([]);
+  });
+
+  it("unflagCharForSequence leaves OTHER characters' assignments (including that char's own non-sequence mechanisms) untouched", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("ŋ");
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ŋ",
+        modality: "physical",
+        mechanisms: [{ patternId: "multi_char_sequence", strategyId: "S-03" }],
+        source: "user",
+      },
+      {
+        scope: "individual",
+        target: "ñ",
+        modality: "physical",
+        mechanisms: [{ patternId: "simple_swap", strategyId: "S-01" }],
+        source: "user",
+      },
+    ]);
+
+    useWorkingCopyStore.getState().unflagCharForSequence("ŋ");
+
+    const remaining = useWorkingCopyStore
+      .getState()
+      .phaseResults.find((p) => p.phase === "C")?.assignments;
+    expect(remaining).toHaveLength(1);
+    expect(remaining?.[0]?.target).toBe("ñ");
+  });
+
+  it("instantiateFromBase clears sequenceFlaggedChars on a genuine base switch", () => {
+    const vfs = createVirtualFS([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á"]);
+
+    const otherKeyboard = { ...basicKbdus, id: "other_keyboard_id" };
+    useWorkingCopyStore.getState().instantiateFromBase(otherKeyboard, { vfs, ir: makeTestIR([]) });
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual([]);
   });
 });

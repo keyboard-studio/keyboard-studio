@@ -3,6 +3,7 @@
 import { describe, it, expect } from "vitest";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { extractIdentityLite, buildTargetBcp47 } from "./IdentityLite.tsx";
+import { advance } from "../steps/advance.ts";
 
 function result(
   targetScript: string,
@@ -75,6 +76,68 @@ describe("extractIdentityLite", () => {
   it("flags gated scripts (Ethiopic) as unsupported", () => {
     const r = extractIdentityLite(result("Ethi"));
     expect(r.supported).toBe(false);
+  });
+
+  // spec 034 T013 (SR-4, FR-012, SC-005): every gated script family flows
+  // identity -> unsupported so StepHost renders the "not supported" stub — the
+  // gallery is never silently emptied. This pins BOTH halves: extractIdentityLite
+  // sets supported:false AND advance() routes that to the "unsupported" terminal.
+  describe("gated scripts route identity -> unsupported (SR-4)", () => {
+    for (const script of ["Ethi", "Hani", "Hang"]) {
+      it(`${script}: supported === false and advance("identity") === "unsupported"`, () => {
+        const identity = extractIdentityLite(result(script, "xx"));
+        expect(identity.supported).toBe(false);
+        const outcome = advance("identity", undefined, {
+          selectedTrack: null,
+          identitySupported: identity.supported,
+        });
+        expect(outcome.next).toBe("unsupported");
+      });
+    }
+  });
+
+  // spec 034 T006a (FR-002, AS-1): identity resolution PROPOSES a BCP47
+  // (language + script) tag to confirm — it never leaves a blank identity for a
+  // typed language + chosen script. "Propose-then-confirm", never a blank form.
+  describe("proposes a BCP47 tag for confirmation, never blank (T006a)", () => {
+    it("a typed language code + proven script yields a non-blank language+script tag", () => {
+      const identity = extractIdentityLite(result("Cyrl", "ru"));
+      expect(identity.bcp47).toBe("ru-Cyrl");
+      expect(identity.bcp47).not.toBe("");
+      // The script prefill is proposed too (confirmed, not asked blank).
+      expect(identity.prefill.script).toBe("Cyrl");
+    });
+
+    it("proposes the tag across all five proven scripts (language+script), never blank", () => {
+      const cases: Array<[string, string]> = [
+        ["Latn", "ha-Latn"],
+        ["Cyrl", "ru-Cyrl"],
+        ["Grek", "el-Grek"],
+        ["Geor", "ka-Geor"],
+        ["Armn", "hy-Armn"],
+      ];
+      for (const [script, expected] of cases) {
+        const lang = expected.split("-")[0]!;
+        const identity = extractIdentityLite(result(script, lang));
+        expect(identity.bcp47).toBe(expected);
+      }
+    });
+  });
+
+  // Complement: the five proven alphabetic scripts stay supported and advance
+  // into the real spine (choose_base), never the unsupported stub (FR-011).
+  describe("proven alphabetic scripts stay supported (FR-011)", () => {
+    for (const script of ["Latn", "Cyrl", "Grek", "Geor", "Armn"]) {
+      it(`${script}: supported === true and advance("identity") === "choose_base"`, () => {
+        const identity = extractIdentityLite(result(script, "xx"));
+        expect(identity.supported).toBe(true);
+        const outcome = advance("identity", undefined, {
+          selectedTrack: null,
+          identitySupported: identity.supported,
+        });
+        expect(outcome.next).toBe("choose_base");
+      });
+    }
   });
 
   it("returns empty strings for missing answers", () => {

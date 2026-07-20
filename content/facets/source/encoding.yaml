@@ -1,0 +1,106 @@
+# source.encoding — how the source keyboard's OWN .kmn encodes each role:
+# whether input-side VK matching uses bare virtual keys or named/split
+# modifiers, and whether base/combining store literals use quoted characters
+# or \u notation. A construction-style fact about the chosen base, not a
+# preference the author holds — feeds the same pb_mark_style prefill that
+# orth.mark-composition-posture feeds, from the opposite direction (what the
+# base already does vs what the target orthography needs).
+
+id: source.encoding
+family: source
+title: Source encoding profile
+description: >
+  Per role (input VK matching, base-store literals, combining-store
+  literals), how the chosen base .kmn source is written today: bare virtual
+  keys vs named/split modifiers for input matching; quoted-character vs
+  \u-notation for base/combining store literals. Read directly off the
+  base's rules and stores before any adaptation. Prefills pb_mark_style
+  (the base's own combining-literal style is a strong prior for how the
+  adapted keyboard should be written) and proposes the encoding-normalize
+  transform when the profile is mixed.
+valueType: set
+subProfiles:
+  # A rule's INPUT is not always a key-reference like [K_E] — it can also be
+  # a char-reference matching a produced character already in the input
+  # buffer (e.g. 'e' or U+0065), which may be unreachable if no rule
+  # produces it. matchKind is the axis distinguishing these; the two
+  # spelling axes below only apply within their matching kind.
+  input:
+    matchKind: [key-ref, char-ref, mixed]
+    keyRefSpelling: [bare-vk, named-modifier, split-modifier]
+    charRefSpelling: [quoted-literal, u-notation]
+  base: [quoted-literal, u-notation, mixed]
+  combining: [quoted-literal, u-notation, mixed]
+
+modality: physical
+modalityNotes: >
+  Input-side VK/char matching only exists for desktop .kmn rules; there is
+  no touch-side equivalent, so this facet is scoped to the physical
+  modality throughout.
+
+derivations:
+  - kind: computed
+    source: "planned:source-encoding-profile-of-kmn"
+    sourceStatus: planned
+    notes: >
+      Per-role scan of the base .kmn's rule LHS (input tokens) and
+      store/rule RHS (output literals): classify each rule's input token as
+      a key-reference ([K_E], further split into bare-vk / named-modifier /
+      split-modifier) or a char-reference ('e' / U+0065, further split into
+      quoted-literal / u-notation); classify each store line as
+      quoted-literal or \u-notation.
+
+consumers:
+  prefills:
+    - pb_mark_style
+  proposes:
+    - "transform-offer:encoding-normalize"
+
+relatedAxes: [A4]
+provenanceLabel: "how your source keyboard already encodes marks and modifiers"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed
+
+notes: >
+  Sub-profiles are read independently — a base can be bare-vk on input while
+  mixed on base-store literals. The classifier is planned, not available.
+  Char-ref reachability analysis must account for base-layout fall-through
+  (&baselayout) populating the context buffer, not only characters produced
+  by this keyboard's own explicit output rules — a char-ref can be reachable
+  via the OS-fallback path even when no rule in this .kmn produces it.
+  matchKind is classified per-rule against the FINAL LHS token, and rolled
+  up per-source as an aggregate share across rules — a single rule commonly
+  mixes a char-ref context prefix with a key-ref final term, so the
+  per-rule classification looks only at the last (matched) token, not the
+  whole context.
+
+transformImpactClass: behavior-preserving
+houseTargetPolicy:
+  appliesTo: [base, combining]
+  inputs: [orth.display-difficulty]
+  rules:
+    - when: "orth.display-difficulty == poorly-supported"
+      target: u-notation
+    - when: default
+      target: quoted-literal
+invertibility: lossless
+implications: >
+  Behavior-preserving vs semantic is NOT uniform across this facet's
+  sub-profiles. Base/combining store notation (quoted-literal <-> \u) and
+  input spelling WITHIN a matching kind (bare-vk <-> named-modifier <->
+  split-modifier; quoted-literal <-> \u within char-ref) change no compiled
+  behavior — kmcmplib produces the same output either way, and this is only
+  about editor/terminal readability. Converting input match-kind itself
+  (key-ref <-> char-ref) is SEMANTIC, not behavior-preserving: a key-ref
+  matches the physical keystroke unconditionally, while a char-ref matches
+  a character only once some rule has produced it into the input buffer,
+  so it can be unreachable. The house-target policy and any automated
+  normalize transform apply only to the behavior-preserving spelling axes;
+  match-kind must never be auto-normalized and any change there must be
+  surfaced as a UX-affecting, confirmed choice.
+exceptionSites: []
+causePredicates: []

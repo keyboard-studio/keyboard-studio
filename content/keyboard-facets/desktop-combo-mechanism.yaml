@@ -1,0 +1,25 @@
+# desktop-combo-mechanism — corpus counterpart of the session facet
+# source.desktop-combo-mechanism: the mechanism distribution a corpus
+# keyboard's .kmn rules use to compose base+mark sequences on desktop.
+
+id: desktop-combo-mechanism
+title: Desktop mark-composition mechanism
+description: >
+  The distribution of mechanisms a corpus keyboard's .kmn rules use to
+  compose base+mark sequences on desktop: a dedicated direct key, a
+  modifier-key chord, a deadkey store, a context()-match rule, or
+  delegation to os-compose. Feeds the source.desktop-combo-mechanism
+  session facet.
+valueType: histogram
+limits:
+  values: [direct-key, modifier-key, deadkey, context-match, os-compose]
+  open: false
+likelihoodSemantics: >
+  each mechanism's share of the rules that compose a base+mark sequence;
+  shares sum to 1.
+derivation:
+  archetype: rule-structure
+  classifierId: desktop-combo-mechanism-classifier
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: [source.desktop-combo-mechanism]
+schemaVersion: 1

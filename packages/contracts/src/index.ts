@@ -53,6 +53,8 @@ export * from "./validator";
 // ---------------------------------------------------------------------------
 export * from "./ir/producedSet";
 export * from "./keyboardIRRoundTrip";
+export * from "./touch-coverage";
+export * from "./parseTouchLayout";
 
 // ---------------------------------------------------------------------------
 // IRPath — typed key-path over KeyboardIR (P2 contract, FR-012).

@@ -1,5 +1,5 @@
 import type { LintFinding } from "@keyboard-studio/contracts";
-import { collectDeclaredStores, forEachMatch } from "./_shared.js";
+import { collectDeclaredStores, forEachMatch, stripNonCodeSource } from "./_shared.js";
 
 // if() store resolution — lint.md check #9 (Compiler.cpp:2833-2906).
 // Every store name referenced in an if() condition must be declared somewhere
@@ -25,7 +25,11 @@ export function checkIfStoreResolution(source: string): LintFinding[] {
   const findings: LintFinding[] = [];
   const declared = collectDeclaredStores(source);
 
-  forEachMatch(source, new RegExp(IF_COND_RE.source, "gi"), (match, lineIdx) => {
+  // collectDeclaredStores runs on the ORIGINAL source (it reads quoted store
+  // bodies for length). The if()-condition scan runs on the stripped source so
+  // an `if(...)` in a trailing `c` comment or a quoted value is not read as a
+  // real condition.
+  forEachMatch(stripNonCodeSource(source), new RegExp(IF_COND_RE.source, "gi"), (match, lineIdx) => {
     const raw = (match[1] ?? "").trim();
 
     // System stores (start with &) are always valid if recognised.

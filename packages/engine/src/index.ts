@@ -81,6 +81,9 @@ export { isParallelIndexFanOut } from "./recognizer/rules/parallel-index-fanout.
 export { createScaffolderService, renameFilesInVfs } from "./scaffolder/index.js";
 export { scaffoldIR, resetIdentity } from "./scaffolder/scaffold-ir.js";
 export { scaffoldTouchLayout, buildMinimalPhoneTouchLayout } from "./scaffolder/index.js";
+// spec 035 — touch coverage guard (FR-008/SC-003).
+export { touchCoverage } from "./pattern-apply/touchCoverage.js";
+export type { TouchCoverageResult } from "./pattern-apply/touchCoverage.js";
 export type { ScaffolderServiceOptions } from "./scaffolder/index.js";
 export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffolder/scaffold-ir.js";
 
@@ -135,8 +138,60 @@ export type { MissingCharSuggestions } from "./character-discovery/suggestMissin
 export { caseCounterpart } from "./character-discovery/casePair.js";
 
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.
-export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyStoreSlotRemovals, classifyStoreSlotEdit, describeStorePairing, analyzeStores, parseSlotId, collectCharContributors, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, buildBaseRuleLines, buildCasePairRuleLines, planShiftAssignment } from "./pattern-apply/index.js";
-export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, ApplyCarveToVfsOpts, CarveKeycapRemovalInput, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason, StorePairingDescription, StoreAnalysis, CharContributors, ShiftAssignmentPlan } from "./pattern-apply/index.js";
+export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyDesktopModifications, applyDesktopModificationsToRawJson, propagateDesktopLayersToTouch, applyStoreSlotRemovals, classifyStoreSlotEdit, describeStorePairing, analyzeStores, parseSlotId, collectCharContributors, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, buildBaseRuleLines, buildCasePairRuleLines, planShiftAssignment, MODIFIER_EXCLUSIONS, canonicalizeCombo, comboToKeySpec, parseKeySpec, comboToTouchLayerId, comboToKvksShiftToken, collectModifierTokensInUse, collectLayerCombosInUse, buildComboKeyMap } from "./pattern-apply/index.js";
+export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, DesktopModifications, ApplyDesktopModificationsResult, ApplyDesktopModificationsToRawJsonResult, PropagateDesktopLayersToTouchResult, ApplyCarveToVfsOpts, CarveKeycapRemovalInput, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason, StorePairingDescription, StoreAnalysis, CharContributors, ShiftAssignmentPlan, ModifierToken } from "./pattern-apply/index.js";
+
+// Facet-transform (spec 039): switch a base's source-construction facet value on
+// the working copy — propose-then-confirm, KeyboardIR copy-return, gated commit.
+export {
+  proposeFacetTransform,
+  applyFacetTransform,
+  TRANSITION_MATRIX,
+  GATE_FACETS,
+  FACET_IMPACT_CLASS,
+  findTransition,
+  isGateFacet,
+  DEFAULT_HOUSE_TARGET_POLICY,
+  resolveHouseTarget,
+  MIGRATION_RULES,
+  foldSplitModifiersToNamed,
+  renderSourceDiff,
+  composeOutputToNfc,
+  producedSetDelta,
+  opaqueInventory,
+} from "./facet-transform/index.js";
+export type {
+  TransformImpactClass,
+  LossProfile,
+  CauseTag,
+  ConfidenceClass,
+  PreviewKind,
+  DefaultDisposition,
+  UserDisposition,
+  ProposalStatus,
+  ExceptionSite,
+  SourceFacetMeasurement,
+  FacetTransition,
+  MigrationRule as FacetMigrationRule,
+  RewriteResult,
+  SiteLedgerEntry,
+  CompanionRewrite,
+  DerivedParameterReview,
+  HouseTargetPolicyRow,
+  HouseTargetResolution,
+  AffectedSite,
+  SourceDiffRow,
+  TransformPreview,
+  TransformProposal,
+  ProducedSetDelta,
+  TransformRefusal,
+  CommitFailure,
+  CommitResult,
+  TransformRequest,
+  ProposeOptions,
+  ApplyFacetTransformOptions,
+  InjectedSimulate,
+} from "./facet-transform/index.js";
 
 // Inventory diff (spec §8): static extraction of a keyboard's produced glyph set.
 export { producedGlyphs, collectFromOutput } from "./inventory/producedGlyphs.js";

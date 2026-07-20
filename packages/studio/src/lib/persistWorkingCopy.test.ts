@@ -11,6 +11,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import {
   snapshotWorkingCopyToSession,
   rehydrateWorkingCopyFromSession,
+  snapshotWorkingCopyData,
 } from "./persistWorkingCopy.ts";
 
 // ---------------------------------------------------------------------------
@@ -96,6 +97,7 @@ describe("persistWorkingCopy", () => {
       touchLayoutJson: null,
       touchDraft: null,
       galleryIntrosSeen: { mechanism: true, touch: false },
+      sequenceFlaggedChars: ["á", "ñ"],
     });
 
     snapshotWorkingCopyToSession();
@@ -119,6 +121,7 @@ describe("persistWorkingCopy", () => {
     expect(s.undoStack).toEqual([{ k: "n", id: "node-1" }]);
     expect(s.galleryIntrosSeen.mechanism).toBe(true);
     expect(s.galleryIntrosSeen.touch).toBe(false);
+    expect(s.sequenceFlaggedChars).toEqual(["á", "ñ"]);
 
     // Key must be cleared after consume.
     expect(sessionStorage.getItem("ks.working-copy.draft")).toBeNull();
@@ -426,5 +429,57 @@ describe("persistWorkingCopy", () => {
     expect(s.deletedItemIds).toBeInstanceOf(Set);
     expect([...s.deletedNodeIds].sort()).toEqual(["a", "b", "c"]);
     expect([...s.deletedItemIds].sort()).toEqual(["x#0", "y#1"]);
+  });
+
+  // -------------------------------------------------------------------------
+  // Base-VFS serialization cache (km-review #1 — efficiency).
+  //
+  // The base VFS is set once at instantiation and never mutated in place, so
+  // its Base64 serialization is invariant for the life of a working copy. The
+  // durable-draft autosave calls snapshotWorkingCopyData on every ~500ms
+  // debounced change, so the base-VFS serialization is memoized on the baseVfs
+  // OBJECT REFERENCE: reused while the same working copy is active, recomputed
+  // when a new instantiation replaces the reference.
+  // -------------------------------------------------------------------------
+  describe("base-VFS serialization cache (efficiency)", () => {
+    const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+    const base = { id: "cache_kbd", displayName: "Cache Test", languages: ["en"] } as import("@keyboard-studio/contracts").BaseKeyboard;
+
+    it("reuses the SAME baseVfsEntries array across calls while baseVfs is unchanged (no re-serialization)", () => {
+      const vfs = createVirtualFS([
+        { path: "source/a.kmn", content: "c a\n", isBinary: false },
+        { path: "source/icon.ico", content: new Uint8Array([1, 2, 3, 4]), isBinary: true },
+      ]);
+      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs, ir });
+
+      const first = snapshotWorkingCopyData().baseVfsEntries;
+      // A store mutation that does NOT touch baseVfs (e.g. a validator write)
+      // still triggers an autosave; the base-VFS serialization must be reused.
+      useWorkingCopyStore.setState({ desktopLocked: true });
+      const second = snapshotWorkingCopyData().baseVfsEntries;
+
+      // Referential identity proves the cached array was returned, not rebuilt.
+      expect(second).toBe(first);
+      expect(first).toHaveLength(2);
+    });
+
+    it("recomputes baseVfsEntries when a new instantiation replaces the baseVfs reference", () => {
+      const vfs1 = createVirtualFS([{ path: "source/a.kmn", content: "c a\n", isBinary: false }]);
+      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs: vfs1, ir });
+      const first = snapshotWorkingCopyData().baseVfsEntries;
+
+      // A fresh instantiation installs a NEW baseVfs object — cache must miss.
+      const vfs2 = createVirtualFS([
+        { path: "source/a.kmn", content: "c a\n", isBinary: false },
+        { path: "source/b.kmn", content: "c b\n", isBinary: false },
+      ]);
+      useWorkingCopyStore.getState().reset();
+      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs: vfs2, ir });
+      const second = snapshotWorkingCopyData().baseVfsEntries;
+
+      expect(second).not.toBe(first);
+      expect(first).toHaveLength(1);
+      expect(second).toHaveLength(2);
+    });
   });
 });

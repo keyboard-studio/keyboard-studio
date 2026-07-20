@@ -12,9 +12,19 @@ All paths are under `packages/studio/`.
 
 ---
 
+> **Status note (2026-07-19, PR #1186) — all tasks LANDED via spec 028 + the spec 029
+> FlowStepHost convergence.** Shipped deliverables (crew-verified in PR #1186):
+> the generic host [packages/studio/src/components/StepHost.tsx](../../packages/studio/src/components/StepHost.tsx),
+> the pure advance policy [packages/studio/src/steps/advance.ts](../../packages/studio/src/steps/advance.ts),
+> the manifest wiring [packages/studio/src/steps/registerEditorSteps.ts](../../packages/studio/src/steps/registerEditorSteps.ts),
+> the golden-walk parity oracle [packages/studio/tests/steps/stepHost.goldenWalk.test.tsx](../../packages/studio/tests/steps/stepHost.goldenWalk.test.tsx),
+> and the `FlowStepHost` factory [packages/studio/src/survey/FlowStepHost.tsx](../../packages/studio/src/survey/FlowStepHost.tsx).
+> Per-task notes are recorded on T009 (SUPERSEDED) and T023 (LANDED); this blanket
+> note covers the remaining checkboxes rather than re-annotating each line.
+
 ## Phase 1: Setup
 
-- [ ] T001 Confirm branch `km/qu-028-generic-step-host` is forked from `main` with spec 027
+- [x] T001 Confirm branch `km/qu-028-generic-step-host` is forked from `main` with spec 027
       (Stage 4) merged; run `pnpm install` and `pnpm --filter @keyboard-studio/studio test` to
       establish a green baseline before any change.
 
@@ -25,16 +35,16 @@ All paths are under `packages/studio/`.
 **This phase must complete, be committed, and be GREEN against the current (pre-refactor) tree
 before any Phase 3+ task touches StepHost.** This is the auditable "recorded on main" oracle.
 
-- [ ] T002 Add the golden-walk RTL harness that drives a scripted survey run and records the
+- [x] T002 Add the golden-walk RTL harness that drives a scripted survey run and records the
       ordered sequence `Array<{ stepId, applyStepCompletion: string[], storeMutations: string[],
       navigateTo: string[] }>` in `src/__tests__/stepHost.goldenWalk.test.tsx` (or the package's
       test dir). Instrument by spying on `applyStepCompletion`, the session/working-copy store
       mutators, and `navigateTo` — do NOT snapshot DOM.
-- [ ] T003 [P] Record the **copy-track** fixture from the current tree into
+- [x] T003 [P] Record the **copy-track** fixture from the current tree into
       `src/__tests__/__fixtures__/goldenWalk/copy.json` and assert the harness reproduces it.
-- [ ] T004 [P] Record the **adapt-track** fixture from the current tree into
+- [x] T004 [P] Record the **adapt-track** fixture from the current tree into
       `src/__tests__/__fixtures__/goldenWalk/adapt.json` and assert `project_name` never appears.
-- [ ] T005 Run `pnpm --filter @keyboard-studio/studio test stepHost.goldenWalk` — confirm GREEN
+- [x] T005 Run `pnpm --filter @keyboard-studio/studio test stepHost.goldenWalk` — confirm GREEN
       against pre-refactor code. **Commit T002–T005 alone**:
       `test(studio): golden-walk parity fixtures for survey traversal (spec 028)`.
 
@@ -54,66 +64,66 @@ hand-placement is replaced by the generic host + advance policy.
 
 ### Advance policy (pure)
 
-- [ ] T006 [P] [US1] Create `src/steps/advance.ts`: move `manifestIndexOf` + `nextSpineStepAfter`
+- [x] T006 [P] [US1] Create `src/steps/advance.ts`: move `manifestIndexOf` + `nextSpineStepAfter`
       out of `StudioShell.tsx` and add `advance(completedStepId, result, ctx): AdvanceOutcome`
       with `AdvanceContext { selectedTrack, identitySupported }` and `AdvanceOutcome { next,
       navigate? }` per [contracts/advance-and-stephost.contract.md](./contracts/advance-and-stephost.contract.md).
       Import ONLY `./manifest.ts` + types (no stores/lib/components).
-- [ ] T007 [P] [US1] Create `src/steps/advance.test.ts` covering every case in contract §1:
+- [x] T007 [P] [US1] Create `src/steps/advance.test.ts` covering every case in contract §1:
       copy/adapt fork at `track`, `project_name→characters`, `identity` supported/unsupported,
       `help→done`+navigate, and each spine hop (skipping `spine:false`). Include an
       adapt-skips-`project_name` assertion (US2).
 
 ### Real adapters (identity + help + mechanisms self-sourcing)
 
-- [ ] T008 [P] [US1] Add `IdentityLiteAdapter` to `src/editors/adapters/panelAdapters.tsx`:
+- [x] T008 [P] [US1] Add `IdentityLiteAdapter` to `src/editors/adapters/panelAdapters.tsx`:
       satisfies `EditorStepProps`, reads `surveyContext` + derives `findingsByQuestionId` from the
       `validatorFindings` store bridge, and on completion writes `setIdentityResult` +
       `setSurveyContext` (the identity-specific effect, per research R7) then calls
       `onComplete(surveyPhaseResult)`.
-- [ ] T009 [P] [US1] Add `PhaseFAdapter` to `src/editors/adapters/panelAdapters.tsx`: reads
+- [x] T009 [P] [US1] Add `PhaseFAdapter` to `src/editors/adapters/panelAdapters.tsx`: reads
       `surveyContext` + `findingsByQuestionId` from the store bridge, emits the Phase F
-      `SurveyPhaseResult` via `onComplete`.
-- [ ] T010 [P] [US1] Move `usePlacementPriors()` into the mechanisms adapter
+      `SurveyPhaseResult` via `onComplete`. (SUPERSEDED & CLOSED: spec 029 Stage 6 replaces the bespoke PhaseFAdapter with the `makeFlowStepComponent` factory + `phase_f_helpdocs` option record in `flowStepOptions.tsx`; the adapter approach was intentionally not built — no residual work.)
+- [x] T010 [P] [US1] Move `usePlacementPriors()` into the mechanisms adapter
       (`src/editors/adapters/addPhysicalAdapter.tsx`) so it self-sources `placementMap` instead of
       receiving it as a prop.
-- [ ] T011 [US1] Point the manifest at the real components: in `src/steps/registerEditorSteps.ts`
+- [x] T011 [US1] Point the manifest at the real components: in `src/steps/registerEditorSteps.ts`
       set `identityStep.component = IdentityLiteAdapter` and `helpStep.component = PhaseFAdapter`
       (replacing the `TrackOneIdentityPanelAdapter` placeholders). Keep declared `inputs`/`writes`/
       `flowRefs` unchanged.
 
 ### Generic host
 
-- [ ] T012 [US1] Create `src/components/StepHost.tsx` per contract §2: reads `activeStepId`;
+- [x] T012 [US1] Create `src/components/StepHost.tsx` per contract §2: reads `activeStepId`;
       handles `done`/`unsupported` terminals first (survey-complete panel / `UnsupportedScriptStub`
       + `onStartOver`); otherwise resolves `manifest.find(...)` and renders `step.component` with
       the generic `onComplete`/`onBack`/`ctx`; selects full-screen vs pane chrome by `step.layout`;
       keeps the unknown-id error panel. No per-step conditional.
-- [ ] T013 [US1] Implement the centralized completion path inside StepHost: shape-guarded
+- [x] T013 [US1] Implement the centralized completion path inside StepHost: shape-guarded
       `recordPhase` + `routeAnswersThroughMutate`, then `applyStepCompletion(step.id, result,
       reducerDeps)`, then `advance(...)` → `session.advance(next)`, then `navigateTo("output")` when
       `navigate === "output"`. `onBack = session.popHistory`.
 
 ### Shell shrink (StudioShell.tsx / SurveyView)
 
-- [ ] T014 [US1] In `src/StudioShell.tsx`, delete the three full-screen early returns
+- [x] T014 [US1] In `src/StudioShell.tsx`, delete the three full-screen early returns
       (carve/mechanisms/touch), the `renderQuestionsPane` switch, and all ~15 per-step
       `handle*Complete`/`handle*Back` handlers + inline fork logic. Render `<StepHost
       reducerDeps={reducerDeps} onStartOver={handleStartOver} ctx={surveyContext} />` inside the
       pane/full-screen shell, letting StepHost pick the container.
-- [ ] T015 [US1] Keep in SurveyView (FR-009): resizable panes, OSK right pane, the single
+- [x] T015 [US1] Keep in SurveyView (FR-009): resizable panes, OSK right pane, the single
       `useValidator` call site + V3 store bridge, `oskMode`, the pattern-map projection effect, the
       `instantiatedRef` double-instantiation guard, `onInstantiate`, and `ReducerDeps` construction.
       Verify no second `useValidator`/debounce was introduced.
-- [ ] T016 [US1] Update `validateManifestShape` in `StudioShell.tsx`: the `layout:"full"` guard
+- [x] T016 [US1] Update `validateManifestShape` in `StudioShell.tsx`: the `layout:"full"` guard
       is now load-bearing (drives StepHost chrome) rather than a temporary Stage-0 assertion —
       adjust the comment; keep the assertion.
 
 ### Parity + smoke
 
-- [ ] T017 [US1] Run `stepHost.goldenWalk` (T002 test, unmodified) — copy fixture zero diff (US1).
-- [ ] T018 [US2] Confirm `stepHost.goldenWalk` adapt fixture zero diff and `project_name` skipped.
-- [ ] T019 [P] [US1] Update existing `StudioShell.test.tsx`, `dashboard/trackRouting.test.ts`, and
+- [x] T017 [US1] Run `stepHost.goldenWalk` (T002 test, unmodified) — copy fixture zero diff (US1).
+- [x] T018 [US2] Confirm `stepHost.goldenWalk` adapt fixture zero diff and `project_name` skipped.
+- [x] T019 [P] [US1] Update existing `StudioShell.test.tsx`, `dashboard/trackRouting.test.ts`, and
       any prefill-routing / `CharactersStep` tests for the new mount plumbing ONLY — no behavioural
       assertion weakened (SC-002).
 
@@ -126,11 +136,11 @@ hand-placement is replaced by the generic host + advance policy.
 **Goal**: A maintainer changes layout / order / component by editing only the manifest.
 **Independent test**: per-step render smoke shows correct component + chrome with no host branch.
 
-- [ ] T020 [US3] Create `src/__tests__/stepHost.renderSmoke.test.tsx`: for each manifest step id,
+- [x] T020 [US3] Create `src/__tests__/stepHost.renderSmoke.test.tsx`: for each manifest step id,
       mount `StepHost` at that step and assert the declared component renders in the correct chrome
       (full-screen for `layout:"full"`; two-pane otherwise), plus the two terminals render their
       panels. Assert declared component === mounted component for all ids (SC-005).
-- [ ] T021 [US3] Add a guard test (or extend manifest-shape tests) asserting SurveyView contains
+- [x] T021 [US3] Add a guard test (or extend manifest-shape tests) asserting SurveyView contains
       no per-step render branch / completion handler — e.g. assert `renderQuestionsPane` and the
       `handle*Complete` symbols are gone (SC-004).
 
@@ -138,13 +148,13 @@ hand-placement is replaced by the generic host + advance policy.
 
 ## Phase 5: Polish & cross-cutting
 
-- [ ] T022 [P] Run full gates: `pnpm typecheck`, `pnpm --filter @keyboard-studio/studio test`,
+- [x] T022 [P] Run full gates: `pnpm typecheck`, `pnpm --filter @keyboard-studio/studio test`,
       `pnpm depcruise` (confirm `steps/advance.ts` imports no stores/lib/components), and the Flow
       Map drift guardrail test (must be unchanged — SC-006).
-- [ ] T023 [P] Update `docs/architecture.md` / `docs/workflow-model.md` where they describe survey
+- [x] T023 [P] Update `docs/architecture.md` / `docs/workflow-model.md` where they describe survey
       rendering to reflect the generic-host model; note Stage 6 (FlowStepHost factory) as the
-      remaining follow-up. Keep the master-plan file's Stage 5 line accurate.
-- [ ] T024 Final review pass (km-qc / km-synthesis): confirm no dead code left in SurveyView,
+      remaining follow-up. Keep the master-plan file's Stage 5 line accurate. (DONE: docs/workflow-model.md §7 landed in spec 029; docs/architecture.md "Generic step host" spine bullet added — StepHost manifest model + FlowStepHost/makeFlowStepComponent convergence, cross-linked to specs 028/029. Stage 6 is landed, so recorded as complete rather than a pending follow-up.)
+- [x] T024 Final review pass (km-qc / km-synthesis): confirm no dead code left in SurveyView,
       adapters are DRY, and the completion path matches per-handler behaviour one-to-one.
 
 ---

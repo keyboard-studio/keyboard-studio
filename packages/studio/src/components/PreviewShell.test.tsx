@@ -16,6 +16,7 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
 import { useWorkingCopyStore } from "../stores/workingCopyStore";
+import { TOUCH_STEP_ID } from "../steps/reducer";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { Stage } from "../hooks/useKeyboardArtifact";
@@ -205,6 +206,104 @@ describe("OutputScreen — route-split AC", () => {
     render(<OutputScreen />);
     fireEvent.click(screen.getByTestId("base-picker"));
     expect(screen.queryByTestId("osk-frame")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — output-time touch-layout staleness gate.
+//
+// A mechanics edit after the Touch step was completed re-opens touch
+// staleness (staleSteps.has(TOUCH_STEP_ID)); MechanismGallery.handleUnlock
+// only marks "touch" stale when touchLayoutJson !== null, so this predicate
+// already implies the emitted source/<id>.keyman-touch-layout side-car would
+// be stale. Neither output surface may ship it: both the zip download and the
+// managed-PR submit must refuse-with-explanation while this predicate holds.
+// ---------------------------------------------------------------------------
+
+describe("OutputScreen — output-time touch-layout staleness gate", () => {
+  function renderWithReadyOutput() {
+    seedInstantiatedWorkingCopy();
+    mockSerializeResult.current = {
+      bytes: EMPTY_ZIP_BYTES,
+      warnings: [],
+      keyboardId: "basic_kbdus",
+      version: "1.0",
+    };
+    render(<OutputScreen />);
+    fireEvent.click(screen.getByTestId("base-picker"));
+  }
+
+  it("disables the download button when staleSteps contains the touch step id", () => {
+    renderWithReadyOutput();
+    act(() => {
+      useWorkingCopyStore.setState({ staleSteps: new Set([TOUCH_STEP_ID]) });
+    });
+
+    const btn = screen.getByTestId("emit-download") as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+  });
+
+  it("download button aria-label explains the touch-staleness block", () => {
+    renderWithReadyOutput();
+    act(() => {
+      useWorkingCopyStore.setState({ staleSteps: new Set([TOUCH_STEP_ID]) });
+    });
+
+    expect(
+      screen.getByRole("button", { name: /download unavailable.*touch layout is out of date/i }),
+    ).toBeTruthy();
+  });
+
+  it("renders a role=alert banner explaining the block when touch is stale", () => {
+    renderWithReadyOutput();
+    act(() => {
+      useWorkingCopyStore.setState({ staleSteps: new Set([TOUCH_STEP_ID]) });
+    });
+
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toMatch(/touch step/i);
+    expect(alert.textContent).toMatch(/out of date/i);
+  });
+
+  it("disables the managed-PR submit button when staleSteps contains the touch step id", () => {
+    renderWithReadyOutput();
+    act(() => {
+      useWorkingCopyStore.setState({ staleSteps: new Set([TOUCH_STEP_ID]) });
+    });
+
+    const submitBtn = screen.getByRole("button", {
+      name: /submit unavailable.*touch layout is out of date/i,
+    }) as HTMLButtonElement;
+    expect(submitBtn.disabled).toBe(true);
+  });
+
+  it("control: both buttons are enabled when staleSteps does NOT contain the touch step id", () => {
+    renderWithReadyOutput();
+    // Confirm the default (no staleness seeded) leaves both surfaces usable.
+    expect(useWorkingCopyStore.getState().staleSteps.has(TOUCH_STEP_ID)).toBe(false);
+
+    const downloadBtn = screen.getByTestId("emit-download") as HTMLButtonElement;
+    expect(downloadBtn.disabled).toBe(false);
+
+    // The submit button is still gated on its own form validity — fill it in
+    // so this control assertion isolates the staleness gate specifically.
+    const nameInput = screen.getByRole("textbox", { name: /your name/i });
+    fireEvent.change(nameInput, { target: { value: "Jane" } });
+    fireEvent.blur(nameInput);
+    const emailInput = screen.getByRole("textbox", { name: /email address/i });
+    fireEvent.change(emailInput, { target: { value: "jane@example.com" } });
+    fireEvent.blur(emailInput);
+    fireEvent.click(screen.getByRole("checkbox"));
+
+    const submitBtn = screen.getByRole("button", {
+      name: /submit keyboard to community repository/i,
+    }) as HTMLButtonElement;
+    expect(submitBtn.disabled).toBe(false);
+  });
+
+  it("does NOT render the staleness banner when touch is not stale", () => {
+    renderWithReadyOutput();
+    expect(screen.queryByText(/touch step/i)).toBeNull();
   });
 });
 

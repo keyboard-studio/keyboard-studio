@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+  <Info>
+    <Name value="Fixture Root Layout"/>
+    <Version value="1.0"/>
+  </Info>
+  <Keyboards>
+    <Keyboard>
+      <Name>Fixture Root Layout</Name>
+      <ID>fx_rootlayout</ID>
+      <Version>1.0</Version>
+      <Languages>
+        <Language ID="cy-Latn" Name="Welsh"/>
+      </Languages>
+      <Targets>windows</Targets>
+    </Keyboard>
+  </Keyboards>
+</Package>

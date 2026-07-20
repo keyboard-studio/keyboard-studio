@@ -25,9 +25,13 @@ The `TouchLayoutIR` the touch stage starts from. Two origins selected by the see
 
 - **Imported (US1, default)** — the base's shipped `.keyman-touch-layout`, located by
   `resolveBaseTouchJson(baseVfs)`; applied via the Case B raw-JSON path (preserves every
-  unmodified field verbatim).
-- **Reseeded (US2, fallback)** — `scaffoldTouchLayout(baseIr)` compact phone projection
-  (Case A). Keys tagged `provenance: "physical-suggested"`.
+  unmodified field verbatim — replay is a raw-JSON splice, R9; wire JSON carries no
+  provenance tags, R6).
+- **Reseeded (US2, fallback)** — `scaffoldTouchLayout({ ...baseIr, touchLayout: undefined })`
+  compact phone projection (Case A). The `touchLayout` strip is mandatory (R10):
+  `scaffoldTouchLayout` preserves-and-augments an existing `ir.touchLayout` rather than
+  discarding it, which would violate US2-AS4. Keys tagged
+  `provenance: "physical-suggested"`.
 
 **Invariant**: the seed is always derived (imported or projected) — never the empty-keyMap
 `buildMinimalPhoneTouchLayout()` fallback as the *author-facing* seed (FR-001).
@@ -46,8 +50,21 @@ interface DesktopModifications {
 }
 ```
 
-- `removals`: derived from post-lockDesktop `baseIr` rules vs the base's original rules
-  (equivalently the working copy `deletedNodeIds`/`deletedItemIds` overlay).
+- `removals`: derived from the working-copy carve overlay (`deletedNodeIds`/
+  `deletedItemIds`) as a **produced-set diff**: `buildProducedSet(baseIr)` minus
+  `buildProducedSet(projectedWorkingIR)`, where `projectedWorkingIR` is the overlay-applied
+  projection (`projectWorkingCopyForOutput` path). **Not** a "post-lockDesktop `baseIr` vs
+  original rules" diff — `baseIr` is set once at instantiation and `lockDesktop()` only
+  sets a flag, so that diff is always empty (R3). The produced-*character* diff also
+  handles carve's nul-fill: carved slots keep a `nul` rule, so the char disappears from
+  the produced set even though the rule survives. NFC caveat: `buildProducedSet`
+  run-merges consecutive char elements and NFC-normalizes on flush, so a carved
+  base+combining (NFD-emitting) sequence surfaces as its precomposed codepoint in the
+  diff — the derivation tests must pin that this is the removal the replay applies
+  (tasks.md T010). The **matching side is canonical too**: the replay NFC-normalizes
+  every layout candidate string before comparing against these NFC removals (see the
+  seed-derivation contract, Removals clause) — an NFD-stored occurrence in the layout
+  must still be matched and removed (tasks.md T005/T006).
 - `placements`: from `TouchGallery.desktopAssignments` (physical + `scope:"individual"`),
   the same source the current per-character suggestion logic reads.
 
@@ -79,8 +96,11 @@ interface TouchCoverageResult {
 }
 ```
 
-Surfaced as **Layer C touch check 18.6**; non-empty `uncovered` ⇒ error findings in the
-gallery lint summary.
+Surfaced as check code **`KM_LINT_TOUCH_UNCOVERED`** under the **existing** criterion row
+`18.6-inventory-fully-covered` — a sibling of the shipped desktop-side
+`KM_LINT_INVENTORY_UNCOVERED` check, **not** a new criteria.json row (R5). Severity model:
+**warning** findings in the gallery lint summary while editing; **blocking** at stage
+completion (non-empty `uncovered` refuses to finalize the touch stage).
 
 ## Entity 5 — Seed-source choice (session state)
 
@@ -93,6 +113,11 @@ type TouchSeedSource = "import-adapt" | "reseed-from-desktop";
 
 Default: `"import-adapt"` when `resolveBaseTouchJson(baseVfs) !== undefined`, else
 `"reseed-from-desktop"`.
+
+**Memory & staleness (R12)**: a recorded choice is remembered — `advance("mechanisms")`
+skips the fork when the choice is already set and not stale (base re-instantiation clears
+it). Changing the choice after touch edits exist clears `touchDraft` (its entries reference
+host keys of the other seed), with a warning before discarding.
 
 ---
 
@@ -107,18 +132,25 @@ locked desktop (baseIr, post-lockDesktop)  +  baseVfs
    ┌────┴─────────────────────────────┐
    │ import-adapt (US1)                │ reseed-from-desktop (US2)
    ▼                                   ▼
- resolveBaseTouchJson(baseVfs)      scaffoldTouchLayout(baseIr)      ← Entity 1 (seed)
-   │  (Case B raw JSON)                │  (Case A compact phone)
+ resolveBaseTouchJson(baseVfs)      scaffoldTouchLayout(              ← Entity 1 (seed)
+   │  (Case B raw JSON)                │   {...baseIr, touchLayout: undefined})
+   │                                   │  (Case A compact phone — strip per R10)
    ▼                                   ▼
- applyDesktopModifications(seed, {removals, placements})            ← Entity 2 replay (R3)
-   │                                   │      (tags provenance: physical-suggested — R6)
+ applyDesktopModificationsToRawJson  applyDesktopModifications        ← Entity 2 replay (R3/R9)
+   │  (raw splice, no tags — R6/R9)    │  (tags provenance: physical-suggested — R6)
    └───────────────┬───────────────────┘
                    ▼
-        applyTouchAssignments / applyTouchAssignmentsToRawJson       ← Phase E author edits (hand-set)
+        applyTouchAssignmentsToRawJson / applyTouchAssignments       ← Phase E author edits (applied LAST — R6 no-clobber by ordering)
                    ▼
-        touchCoverage(layout, inventory)  ──► 18.6 lint (FR-008)     ← Entity 4 guard (R5)
+        touchCoverage(layout, inventory) ──► KM_LINT_TOUCH_UNCOVERED (criterion 18.6, FR-008) ← Entity 4 guard (R5)
                    ▼
-        emitTouchLayout / raw-JSON string ──► VFS source/<id>.keyman-touch-layout  (output only)
+        emitTouchLayout / raw-JSON string ──► VFS source/<id>.keyman-touch-layout  (per the R11 emission matrix)
 ```
 
 All boxes above the VFS write are **pure** and run inside the single 300 ms debounce cycle.
+
+**Emission (R11)**: the derived layout is emitted even with **zero** Phase E edits —
+reseed always emits; import-adapt emits when `mods` is non-empty or a real Phase E edit
+exists; the truly-untouched import-adapt case keeps the shipped file verbatim (emit
+nothing). `json: null` still means engine failure → omit the file. Preview
+(`vfsTransform`), lint (`editedVfsForLint`), and output follow the same matrix.

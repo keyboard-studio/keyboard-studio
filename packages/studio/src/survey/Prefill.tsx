@@ -8,6 +8,7 @@
 
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import type { IdentityLiteResult } from "./IdentityLite.tsx";
+import type { FiredQuestion } from "../adaptation/firing.ts";
 import { secondaryButton, primaryButton } from "./surveyStyles.ts";
 
 /** One labelled confirmation row in the prefill summary. */
@@ -16,6 +17,28 @@ export interface PrefillRow {
   value: string;
   /** Provenance hint shown beside the value (where the confirmation came from). */
   note?: string;
+}
+
+/** Human labels for the script-alignment confirmation rows (spec 038 US1). */
+const SCRIPT_ALIGNMENT_LABELS: Record<string, string> = {
+  q_sa1_target_script_spread: "Script community",
+  q_sa2_base_script_mismatch: "Base script",
+  q_sa3_latin_flavor: "Latin sub-profile",
+};
+
+/**
+ * Build §3c confirmation rows for the script-alignment questions that fired
+ * (spec 038 US1). Each row carries the derived value and a provenance chip that
+ * NAMES the corpus evidence AND its tier — never a silent default. A fired
+ * question with a null prefill (fallback tier disallowed) shows the no-default
+ * ask form. Pure (no React) so it is unit-testable.
+ */
+export function buildScriptAlignmentRows(fired: FiredQuestion[]): PrefillRow[] {
+  return fired.map((q) => ({
+    label: SCRIPT_ALIGNMENT_LABELS[q.id] ?? q.id,
+    value: q.prefilledValue ?? "(no default — please choose)",
+    note: `${q.provenanceLabel} (${q.provenanceTier})`,
+  }));
 }
 
 /**

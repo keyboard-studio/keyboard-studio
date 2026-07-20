@@ -48,6 +48,18 @@ Owned by `/km-doc`. Update this file whenever a doc is added, archived, or re-sc
 | [`docs/keyboard-index.md`](keyboard-index.md) | Keyboard phonebook (BCP47, author, path per keyboard referenced) | Any keyboard cited or introduced in the repo | live |
 | [`docs/review-loop/STATUS.md`](review-loop/STATUS.md) | Automated review-loop iteration queue | New review-loop iterations | live |
 
+## Corpus-derived artifacts
+
+Machine-generated, committed indexes derived from the sibling `keymanapp/keyboards` corpus at build time.
+Regenerate (do not hand-edit) via each artifact's tool.
+
+| Doc | Purpose | Update Triggers | Status |
+|---|---|---|---|
+| [`docs/keyboard-facet-index.json`](keyboard-facet-index.json) | Per-keyboard facet index (spec 036): script facet + provenance/freshness per corpus keyboard. Built by [`utilities/facet-index`](../utilities/facet-index/); validated by [`utilities/facet-index-lint`](../utilities/facet-index-lint/index.js) in `pnpm lint` | Corpus rescan; new facet definition; UCD/scanner version bump | live |
+| [`docs/keyboard-facet-index.md`](keyboard-facet-index.md) | Human-readable audit companion to the facet index (build inputs, per-facet coverage, sample rows) | Regenerated with the JSON on every `facet-index` build | live |
+| [`docs/placement-priors.json`](placement-priors.json) | Data-driven character-placement priors (kbgen prototype seed) | kbgen placement algorithm or corpus signal changes | live |
+| [`docs/import-corpus.json`](import-corpus.json) | Import-fidelity corpus fixtures/results | Import-fidelity (Layer A') corpus changes | live |
+
 ## Spec amendments
 
 | Doc | Purpose | Update Triggers | Status |
@@ -71,5 +83,5 @@ Owned by `/km-doc`. Update this file whenever a doc is added, archived, or re-sc
 
 ---
 
-**Last verified:** 2026-07-11
+**Last verified:** 2026-07-15
 **Manifest owner:** `/km-doc`

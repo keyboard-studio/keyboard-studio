@@ -40,6 +40,24 @@ export const MOD_GROUP_DEFS: ModGroupDef[] = [
 /**
  * Classify the modifier set of an IRRule into a ModifierLayer bucket.
  * // parallels classifyModifiers() in scaffoldTouchLayout.ts — keep buckets in sync
+ *
+ * DISPLAY-ONLY classification, deliberately NOT routed through
+ * `modifierCombos.ts`'s `canonicalizeCombo` (chirality unification: e.g.
+ * `CTRL+RALT` and `CTRL+LALT` both demote to generic `[CTRL ALT]`; also no
+ * LCTRL handling here). This function — along with `prettyMod` and
+ * `modifierLabel` below — feeds only `CarveGlyph.modifierLayer` /
+ * `modifierLabel`, render-only inputs to the Carve Rail/Inspector's fixed
+ * 4-bucket display (base/shift/altgr/other). Nothing here reaches emitted
+ * `.kmn`, the VFS, or the S-08 combo-authoring path (that path canonicalizes
+ * via `MechanismGallery.tsx`, which does use `canonicalizeCombo`). This
+ * mirrors the same already-documented decision for `scaffoldTouchLayout.ts`'s
+ * `classifyModifiers` (see the module doc header of
+ * `packages/engine/src/pattern-apply/modifierCombos.ts`).
+ *
+ * Known cosmetic limitation from the naive per-token check: a bare
+ * `[NCAPS K_X]` rule (no other modifiers) buckets to `'other'` here rather
+ * than `'base'`, since `canonicalizeCombo`'s NCAPS-collapse isn't applied.
+ * Low-severity — left as a future follow-up rather than pulled in now.
  */
 export function ruleModifier(rule: IRRule): ModifierLayer {
   const vkeyEl = rule.context.find((el) => el.kind === 'vkey');

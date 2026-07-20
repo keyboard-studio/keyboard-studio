@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-07-11",
+  "lastUpdated": "2026-07-20",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -550,6 +550,30 @@
     "specs/033-qu-mutate-track": {
       "title": "Feature Specification: Mutate track — route the track fork through the manifest reducer/mutate seam, replacing the hand-coded StudioShell fork",
       "hash": "sha256:9e0f03bccf2c8d77",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/035-mobile-touch-derivation": {
+      "title": "Feature Specification: Mobile/touch layout derivation",
+      "hash": "sha256:f41ade5918875aec",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/040-desktop-base-layout-fallthrough": {
+      "title": "Feature Specification: Desktop base-layout fall-through in the script facet",
+      "hash": "sha256:0fc200a6c3354ce9",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/042-store-range-notation": {
+      "title": "Feature Specification: KMN store range notation (`X .. Y`)",
+      "hash": "sha256:2aa572f95f2ac91f",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

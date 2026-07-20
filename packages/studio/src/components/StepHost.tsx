@@ -15,7 +15,8 @@
 //   1. If result is SurveyPhaseResult-shaped: recordPhase(result) +
 //      routeAnswersThroughMutate(result, deps)
 //   2. If step.id in STEPS_WITH_APPLY_COMPLETION: applyStepCompletion(id, result, deps)
-//   3. advance(id, result, { selectedTrack, identitySupported }) → { next, navigate?, setCharactersSubStage? }
+//   3. advance(id, result, { selectedTrack, identitySupported, touchSeedSource }) →
+//      { next, navigate?, setCharactersSubStage? }
 //   4. session.advance(next)
 //   5. if setCharactersSubStage: session.setCharactersSubStage("prefill")
 //   6. if navigate === "output": navigateTo("output")
@@ -116,6 +117,8 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   const identityResult = useSurveySessionStore((s) => s.identityResult);
   const sessionAdvance = useSurveySessionStore((s) => s.advance);
   const sessionPopHistory = useSurveySessionStore((s) => s.popHistory);
+  // Spec 035 R12 re-entry path — see handleBack's "touch" special case below.
+  const sessionBackToTouchSeedSource = useSurveySessionStore((s) => s.backToTouchSeedSource);
   const setCharactersSubStage = useSurveySessionStore((s) => s.setCharactersSubStage);
 
   const recordPhase = useWorkingCopyStore((s) => s.recordPhase);
@@ -233,6 +236,10 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     const outcome = advance(resolvedStep.id as Parameters<typeof advance>[0], result, {
       selectedTrack: postMutationState.selectedTrack,
       identitySupported: postMutationState.identityResult?.supported ?? true,
+      // Structurally identical to advance.ts's local TouchSeedSource mirror
+      // (both "import-adapt" | "reseed-from-desktop" | null) — no cast needed,
+      // same as selectedTrack above (Track mirror).
+      touchSeedSource: postMutationState.touchSeedSource,
     });
 
     // 4. Session advance to next step.
@@ -250,8 +257,18 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     }
   }
 
-  // onBack maps to the walked-history pop (FR-005, Stage 3/4 behaviour preserved).
+  // onBack maps to the walked-history pop (FR-005, Stage 3/4 behaviour preserved),
+  // with ONE special case (spec 035 R12): the "touch" step's Back-from-first-
+  // character must always resurface the touch_seed_source chooser, not follow
+  // the generic history pop — which would land on "mechanisms" whenever the
+  // fork was skipped this pass (a recorded, non-stale choice routes advance()
+  // straight from mechanisms to touch). See surveySessionStore.backToTouchSeedSource
+  // for how this stays consistent with the chooser's own (generic) Back.
   function handleBack(): void {
+    if (resolvedStep.id === "touch") {
+      sessionBackToTouchSeedSource();
+      return;
+    }
     sessionPopHistory();
   }
 

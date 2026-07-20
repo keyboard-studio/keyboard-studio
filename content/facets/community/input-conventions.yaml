@@ -36,6 +36,7 @@ consumers:
     - pb_typing_approach
     - pb_mark_input_order
     - pb_indic_vowels_onset
+    - q_ip3_keep_script_conventions
   proposes:
     - "strategy:selection-bias"
     - "axis:A3"

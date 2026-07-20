@@ -33,6 +33,8 @@ type ActiveStepId =
   | "characters"
   | "carve"
   | "mechanisms"
+  | "sequences"
+  | "touch_seed_source"
   | "touch"
   | "help"
   | "done"
@@ -40,6 +42,13 @@ type ActiveStepId =
 
 /** Mirror of survey/index.ts Track (kept local, boundary-clean). */
 type Track = "copy" | "adapt";
+
+/**
+ * Mirror of surveySessionStore.TouchSeedSource (kept local, boundary-clean —
+ * see the module header: advance.ts imports ONLY ./manifest.ts + ./types.ts).
+ * Spec 035 FR-006 / contracts/seed-source-fork.md.
+ */
+type TouchSeedSource = "import-adapt" | "reseed-from-desktop";
 
 // ---------------------------------------------------------------------------
 // AdvanceContext — the session snapshot the advance policy branches on.
@@ -51,6 +60,12 @@ export interface AdvanceContext {
   readonly selectedTrack: Track | null;
   /** Whether the identity step's chosen script is supported in v1. */
   readonly identitySupported: boolean;
+  /**
+   * The recorded touch_seed_source fork choice, or null when none is recorded
+   * yet (spec 035 R12 fork memory). Read by the "mechanisms" case to decide
+   * whether to route into the touch_seed_source chooser or straight to touch.
+   */
+  readonly touchSeedSource: TouchSeedSource | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -189,7 +204,22 @@ export function advance(
       return { next: nextSpineStepAfter("carve") }; // mechanisms
 
     case "mechanisms":
-      return { next: nextSpineStepAfter("mechanisms") }; // touch (skips touch_seed_source)
+      return { next: nextSpineStepAfter("mechanisms") }; // sequences
+
+    case "sequences":
+      // Spec 035 R4/R12: route into the off-spine seed-source fork — but only
+      // when no valid choice is recorded yet. A remembered choice goes
+      // straight to "touch" so back-and-forth over mechanisms/sequences
+      // doesn't re-ask. nextSpineStepAfter("sequences") would skip the
+      // off-spine touch_seed_source step entirely, so the fork check happens
+      // here explicitly rather than delegating to nextSpineStepAfter.
+      return ctx.touchSeedSource === null
+        ? { next: "touch_seed_source" }
+        : { next: "touch" };
+
+    case "touch_seed_source":
+      // joinTarget is "touch"; advance there directly (mirrors project_name).
+      return { next: "touch" };
 
     case "touch":
       return { next: nextSpineStepAfter("touch") }; // help

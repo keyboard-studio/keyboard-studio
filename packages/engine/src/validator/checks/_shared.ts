@@ -112,6 +112,48 @@ export function forEachMatch(
   }
 }
 
+/**
+ * Blank the "non-code" spans of a single KMN source line — the contents of
+ * quoted string literals (`'...'` / `"..."`) and any `c ...` line comment —
+ * replacing them with spaces so a downstream regex scan never mistakes a
+ * keyword-shaped substring sitting in prose for live syntax (e.g. `U+110000`,
+ * `dk(...)`, `&language`, `if(...)`, `index(...)` appearing inside a comment or
+ * a quoted value). Length-preserving: every character keeps its column, so
+ * match offsets — and therefore reported columns — stay accurate.
+ *
+ * A KMN `c` comment starts at a standalone, unquoted `c`/`C` token (at line
+ * start or preceded by whitespace, and followed by whitespace or end of line)
+ * and runs to end of line, mirroring the kmcmplib lexer. This intentionally
+ * does NOT blank bracket/paren contents — the checks that consume it
+ * legitimately match code inside `[...]` and `(...)`.
+ */
+export function stripNonCode(line: string): string {
+  const out = line.split("");
+  let inSingle = false;
+  let inDouble = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inSingle) { out[i] = " "; if (ch === "'") inSingle = false; continue; }
+    if (inDouble) { out[i] = " "; if (ch === '"') inDouble = false; continue; }
+    if (ch === "'") { inSingle = true; out[i] = " "; continue; }
+    if (ch === '"') { inDouble = true; out[i] = " "; continue; }
+    if (
+      (ch === "c" || ch === "C") &&
+      (i === 0 || /\s/.test(line[i - 1] ?? "")) &&
+      (i === line.length - 1 || /\s/.test(line[i + 1] ?? ""))
+    ) {
+      for (let j = i; j < line.length; j++) out[j] = " ";
+      break;
+    }
+  }
+  return out.join("");
+}
+
+/** Apply {@link stripNonCode} to every line of `source` (length-preserving). */
+export function stripNonCodeSource(source: string): string {
+  return source.split("\n").map(stripNonCode).join("\n");
+}
+
 export function collectDeclaredStores(source: string): Map<string, StoreInfo> {
   const stores = new Map<string, StoreInfo>();
   const lines = source.split("\n");

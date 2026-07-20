@@ -8,7 +8,8 @@
 // SPINE ORDER (FR-012, M2):
 //   Identity → choose base → Track → [project_name (spine:false)] →
 //   Characters (Phase A/B questions) → Carve → Mechanisms → [lock: "physical"] →
-//   touch_seed_source (spine:false) → touch → [lock: "touch"] → Help → Package (reserved)
+//   Sequences → touch_seed_source (spine:false) → touch →
+//   [lock: "touch"] → Help → Package (reserved)
 //
 // Side-trail steps (spine:false) in position order:
 //   project_name — copy-track only; joinTarget: "characters"
@@ -27,6 +28,7 @@ import {
   projectNameStep,
   carveStep,
   mechanismsStep,
+  sequencesStep,
   touchSeedSourceStep,
   touchStep,
   helpStep,
@@ -74,7 +76,8 @@ const charactersStep: Step = {
 //
 // Rules encoded here:
 //   M2 — spine order: Identity → choose_base → track → Characters → Carve →
-//         Mechanisms → (lock physical) → touch → (lock touch) → Help → Package
+//         Mechanisms → (lock physical) → Sequences → touch →
+//         (lock touch) → Help → Package
 //   M3 — exactly one lock:"physical" and one lock:"touch", in that order.
 //   M4 — touch_seed_source is spine:false with joinTarget resolving to "touch".
 //   M4b — project_name is spine:false with joinTarget:"characters" (copy-track fork).
@@ -112,6 +115,13 @@ export const manifest: readonly Step[] = [
     lock: "physical",
   } satisfies Step,
 
+  // --- Sequences (Phase C follow-on: multi-key sequences, S-03) ---
+  // S-03 sequences move out of the Mechanism Gallery's method chooser into
+  // their own dedicated Sequence Gallery: it cycles the characters flagged
+  // for sequences and records a real multi_char_sequence MechanismAssignment
+  // per character on Apply. No lock (only "physical" and "touch" locks exist, M3).
+  sequencesStep,
+
   // --- Touch seed source (off-spine fork, FR-013, M4) ---
   // spine:false — side trail that lets the author choose the touch seed.
   // joinTarget: "touch" — rejoins the spine at the touch carve+add step.
@@ -131,3 +141,88 @@ export const manifest: readonly Step[] = [
   // --- Package (reserved, out of scope for v1) ---
   packageStep,
 ] as const;
+
+// ---------------------------------------------------------------------------
+// validateManifestShape — throw-on-mismatch structural guard (M2, M3, M4, M4b, M5).
+//
+// The ONE structural invariant check over the manifest. Called once at module
+// load by StudioShell (a misshapen manifest is a hard error, not a logged
+// warning — fail fast so CI catches it before any render occurs). Exported so
+// the invariant is directly unit-testable (spec 034 T003 / SR-1, SR-2, SR-5)
+// without importing the whole SPA shell; it depends only on `manifest`, so it
+// stays boundary-clean here in steps/.
+// ---------------------------------------------------------------------------
+
+export function validateManifestShape(): void {
+  const ids = manifest.map((s) => s.id);
+  const spineIds = manifest.filter((s) => s.spine !== false).map((s) => s.id);
+
+  // M2 — spine order.
+  const expectedSpine = [
+    "identity", "choose_base", "track", "characters",
+    "carve", "mechanisms", "sequences", "touch", "help", "package",
+  ];
+  for (let i = 0; i < expectedSpine.length; i++) {
+    const expected = expectedSpine[i];
+    if (expected === undefined) break;
+    const actual = spineIds[i];
+    if (actual !== expected) {
+      throw new Error(
+        `[manifest] spine[${i}] expected "${expected}", got "${actual ?? "(none)"}"`,
+      );
+    }
+  }
+
+  // M3 — exactly one lock:physical and one lock:touch, in that order.
+  const locks = manifest.filter((s) => s.lock !== undefined).map((s) => s.lock);
+  if (locks[0] !== "physical" || locks[1] !== "touch" || locks.length !== 2) {
+    throw new Error(
+      `[manifest] locks expected ["physical","touch"], got [${locks.join(",")}]`,
+    );
+  }
+
+  // M4 — touch_seed_source is spine:false with joinTarget "touch".
+  const seedSource = manifest.find((s) => s.id === "touch_seed_source");
+  if (seedSource === undefined || seedSource.spine !== false || seedSource.joinTarget !== "touch") {
+    throw new Error(`[manifest] touch_seed_source missing or misconfigured`);
+  }
+
+  // M4b — project_name is spine:false with joinTarget "characters".
+  const projName = manifest.find((s) => s.id === "project_name");
+  if (projName === undefined || projName.spine !== false || projName.joinTarget !== "characters") {
+    throw new Error(`[manifest] project_name missing or misconfigured (must be spine:false, joinTarget:"characters")`);
+  }
+
+  // M5 — unique ids.
+  const seen = new Set<string>();
+  for (const id of ids) {
+    if (seen.has(id)) {
+      throw new Error(`[manifest] duplicate step id: "${id}"`);
+    }
+    seen.add(id);
+  }
+
+  // Layout guard (spec 028 Stage 5, T016): layout:"full" is LOAD-BEARING —
+  // StepHost reads step.layout to select full-screen vs two-pane chrome (R4).
+  // EXACTLY {carve, mechanisms, sequences, touch} must declare layout:"full";
+  // all others must be "pane" or omit layout. A mismatched layout would
+  // silently change the chrome.
+  const FULL_LAYOUT_IDS = new Set(["carve", "mechanisms", "sequences", "touch"]);
+  for (const step of manifest) {
+    if (step.layout === "full") {
+      if (!FULL_LAYOUT_IDS.has(step.id)) {
+        throw new Error(
+          `[manifest] unexpected layout:"full" on step "${step.id}" — only carve/mechanisms/sequences/touch may be full-screen (spec 024 Stage 0)`,
+        );
+      }
+    }
+  }
+  for (const expectedId of FULL_LAYOUT_IDS) {
+    const step = manifest.find((s) => s.id === expectedId);
+    if (step?.layout !== "full") {
+      throw new Error(
+        `[manifest] step "${expectedId}" must declare layout:"full" (spec 024 Stage 0)`,
+      );
+    }
+  }
+}

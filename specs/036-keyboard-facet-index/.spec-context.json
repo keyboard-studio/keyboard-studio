@@ -1,0 +1,119 @@
+{
+  "workflow": "speckit",
+  "specName": "036-keyboard-facet-index",
+  "branch": "036-keyboard-facet-index",
+  "selectedAt": "2026-07-14T21:21:55.307Z",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "plan",
+      "at": "2026-07-14",
+      "artifacts": [
+        "plan.md",
+        "research.md",
+        "data-model.md",
+        "contracts/",
+        "quickstart.md"
+      ],
+      "kind": "start"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T18:07:44.848Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-17T18:07:44.870Z"
+    },
+    {
+      "step": "analyze",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-17T18:07:52.709Z"
+    },
+    {
+      "step": "analyze",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T18:08:15.896Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-17T18:07:44.935Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-17T18:12:20.000Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-17T18:15:12.252Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-17T18:15:12.257Z"
+    },
+    {
+      "step": "implement",
+      "substep": "run-tests",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-17T18:25:10.000Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-17T18:38:15.498Z"
+    }
+  ],
+  "telemetryInstanceId": "c35f0fd9-530f-4023-8ff9-45733d34de30",
+  "step_summaries": {
+    "tasks": {
+      "summary": "tasks.md already generated and fully implemented (37 tasks, all [X]); re-dispatch validated format compliance and closed the step at ready-to-implement",
+      "taskCount": 37,
+      "stories": {
+        "US1": 11,
+        "US2": 5,
+        "US3": 6
+      }
+    },
+    "implement": {
+      "summary": "All 37 tasks already implemented and merged (through #1169); implement step ran as a verification-and-reconciliation pass. Verified: facet-index vitest suite (8 files / 47 tests, all pass) and facet-index-lint (14 facet defs, 918 keyboards indexed, all X1-X7/C1-C5 checks GREEN). No new code required."
+    }
+  },
+  "verified": [
+    {
+      "what": "facet-index unit + integration test suite",
+      "command": "cd utilities/facet-index && npx vitest run",
+      "result": "8 files, 47 tests, all passed"
+    },
+    {
+      "what": "facet-index-lint artifact validator (contract X1-X7 / C1-C5)",
+      "command": "node utilities/facet-index-lint/index.js",
+      "result": "14 facet defs, 918 keyboards, all checks GREEN, exit 0"
+    }
+  ]
+}

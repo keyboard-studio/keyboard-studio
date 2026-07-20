@@ -11,7 +11,11 @@
 //   (e) empty-history popHistory() is a no-op (activeStepId stays "identity").
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { useSurveySessionStore } from "./surveySessionStore.ts";
+import {
+  useSurveySessionStore,
+  snapshotTraversal,
+  applyTraversalSnapshot,
+} from "./surveySessionStore.ts";
 
 function getStore() {
   return useSurveySessionStore.getState();
@@ -86,6 +90,7 @@ describe("surveySessionStore", () => {
     expect(s.selectedTrack).toBeNull();
     expect(s.scaffoldSpec).toBeNull();
     expect(s.localBase).toBeNull();
+    expect(s.baseConfirmed).toBe(false);
   });
 
   // identityPhaseResult round-trip — the history-pop resume payload
@@ -136,6 +141,48 @@ describe("surveySessionStore", () => {
 
     expect(getStore().activeStepId).toBe("identity");
     expect(getStore().history).toEqual([]);
+  });
+
+  // baseConfirmed — the choose_base preview-before-commit gate
+  describe("baseConfirmed", () => {
+    it("defaults to false on a fresh store", () => {
+      expect(getStore().baseConfirmed).toBe(false);
+    });
+
+    it("setBaseConfirmed toggles the flag independently of other slots", () => {
+      const store = getStore();
+      store.setBaseConfirmed(true);
+      expect(getStore().baseConfirmed).toBe(true);
+
+      store.setBaseConfirmed(false);
+      expect(getStore().baseConfirmed).toBe(false);
+    });
+
+    it("reset() clears baseConfirmed back to false", () => {
+      const store = getStore();
+      store.setBaseConfirmed(true);
+      expect(getStore().baseConfirmed).toBe(true);
+
+      store.reset();
+      expect(getStore().baseConfirmed).toBe(false);
+    });
+
+    it("survives a snapshotTraversal -> applyTraversalSnapshot round trip", () => {
+      const store = getStore();
+      store.setBaseConfirmed(true);
+
+      const snapshot = snapshotTraversal();
+      expect(snapshot.baseConfirmed).toBe(true);
+
+      // Reset, then re-apply the captured snapshot — baseConfirmed must come
+      // back exactly as it was (a restored draft that already passed
+      // choose_base must re-instantiate on restore, per the field's docstring).
+      store.reset();
+      expect(getStore().baseConfirmed).toBe(false);
+
+      applyTraversalSnapshot(snapshot);
+      expect(getStore().baseConfirmed).toBe(true);
+    });
   });
 
   // Bonus: round-trip invariant (I3 from data-model.md)
