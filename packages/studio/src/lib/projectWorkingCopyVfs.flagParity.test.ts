@@ -313,7 +313,7 @@ describe("projectWorkingCopyVfs — FULL-SPINE flag parity (carve + add-gallery 
     //   - the add-gallery mechanism injected the acute deadkey trigger.
     expect(on.kmn).not.toMatch(/group\(second\)/);
     expect(on.kmn).not.toMatch(/store\(extraX\)/);
-    expect(on.kmn).toMatch(/store\(dktX\) 'À' nul 'Z'/);
+    expect(on.kmn).toMatch(/store\(dktX\) 'ÀZ'/);
     expect(on.kmn).toMatch(/\[K_QUOTE\] > deadkey\(accent\)/);
   });
 
