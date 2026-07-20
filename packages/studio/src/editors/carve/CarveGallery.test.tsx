@@ -519,6 +519,109 @@ describe('CarveGallery — store-chip cascade (#523)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Coordinated collateral (manual-carve safety, #525/#931 follow-up). A
+// manual removal that hits a store paired via classifyStoreSlotEdit's
+// coordinatedWith ALSO drops the partner store's aligned character at the
+// same index — collectCharContributors never names that partner slot
+// directly, so this must never be silent. Fixture mirrors the Cameroon
+// `dk(1) any(dkf) > index(dkt,2)` cross-pairing idiom (same shape as the
+// engine's applyStoreSlotRemovals.test.ts and irToCarveNodes.test.ts
+// coordinatedCollateralForSlots fixtures) — collectCharContributors is
+// mocked, but classifyStoreSlotEdit/analyzeStores run for REAL against the
+// ir, so the pairing resolution itself is not faked.
+// ---------------------------------------------------------------------------
+
+function makeCrossPairedIr(dktChar: string): KeyboardIR {
+  return makeIR(
+    [{
+      nodeId: 'g-main', name: 'main', usingKeys: true, readonly: false,
+      rules: [{
+        nodeId: 'rule-fanout',
+        context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'dkf' }],
+        output: [{ kind: 'index', storeRef: 'dkt', offset: 2 }],
+      }],
+    }],
+    [
+      makeStore('store#dkf', 'dkf', ['a']),
+      makeStore('store#dkt', 'dkt', [dktChar]),
+    ],
+  );
+}
+
+describe('CarveGallery — coordinated collateral (manual carve safety, #525/#931 follow-up)', () => {
+  it('opens the dialog (no longer a silent plain-toggle) and flags a needed collateral character from the paired store', () => {
+    const ir = makeCrossPairedIr('α');
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => ({
+      ...emptyContributors(ch),
+      storeSlotIds: ['store#dkf#0'],
+    }));
+
+    renderGallery(ir);
+    // The author has confirmed 'α' as part of their inventory — it's "needed".
+    useWorkingCopyStore.setState((s) => ({ session: { ...s.session, confirmedInventory: ['α'] } }));
+
+    fireEvent.click(screen.getByTestId('carve-card-store#dkf'));
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#dkf#0')).toBe(false);
+
+    // Previously (pre-fix) this was a plain-toggle: sole producer, nothing
+    // blocked. It must now open the dialog because of the collateral.
+    fireEvent.click(screen.getByRole('button', { name: 'a' }));
+
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog).not.toBeNull();
+    expect(dialog.textContent).toContain('Remove "a" everywhere?');
+    expect(dialog.textContent).toContain('α');
+    expect(dialog.textContent).toContain('dkt');
+    expect(dialog.textContent).toContain('needed for your language');
+
+    // Awareness, not prevention — the user can still confirm.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, remove everywhere' }));
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#dkf#0')).toBe(true);
+  });
+
+  it('shows plain (non-flagged) collateral text when the partner character is not needed', () => {
+    const ir = makeCrossPairedIr('γ');
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => ({
+      ...emptyContributors(ch),
+      storeSlotIds: ['store#dkf#0'],
+    }));
+
+    renderGallery(ir);
+    useWorkingCopyStore.setState((s) => ({ session: { ...s.session, confirmedInventory: ['α'] } }));
+
+    fireEvent.click(screen.getByTestId('carve-card-store#dkf'));
+    fireEvent.click(screen.getByRole('button', { name: 'a' }));
+
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog.textContent).toContain('γ');
+    expect(dialog.textContent).toContain('dkt');
+    expect(dialog.textContent).not.toContain('needed for your language');
+  });
+
+  it('a sole-producer char with NO coordinated collateral still plain-toggles (regression guard, unpaired store)', () => {
+    // Reuses the existing #523 fixture shape: an unpaired store, no
+    // classifyStoreSlotEdit coordinatedWith partner — collateral must be [].
+    const ir = makeIR(
+      [makeGroup('g-main', 'main', [])],
+      [makeStore('store#s', 'sX', ['a'])],
+    );
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => ({
+      ...emptyContributors(ch),
+      storeSlotIds: ['store#s#0'],
+    }));
+
+    renderGallery(ir);
+    useWorkingCopyStore.setState((s) => ({ session: { ...s.session, confirmedInventory: ['α'] } }));
+
+    fireEvent.click(screen.getByTestId('carve-card-store#s'));
+    fireEvent.click(screen.getByRole('button', { name: 'a' }));
+
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#s#0')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 12. Review fix 5 — component-level test for the CLDR-driven 'high' path.
 // #525 BANNER slice update: the per-node Rail badge this test originally
 // exercised is retired; the assertions now target the green RemovalBanner

@@ -20,6 +20,7 @@ import {
   annotateRemovalRecommendations,
   recommendedRemovalChars,
   isSimpleRemovableRule,
+  coordinatedCollateralForSlots,
 } from './irToCarveNodes.ts';
 
 // ---------------------------------------------------------------------------
@@ -1563,7 +1564,22 @@ describe('annotateRemovalRecommendations', () => {
     expect(group?.recommendation).toBe('none');
   });
 
-  it("marks a store 'none' via the dependency guard when its own chars are all out-of-inventory but a rule referencing it (any()) produces a confirmed-inventory character", () => {
+  it("marks a store 'high' when its own chars are all out-of-inventory, even though a rule's any()-consumption of it also happens to produce a confirmed-inventory character via an UNRELATED literal output (#525 v2 — the over-coarse guard fix)", () => {
+    // 'composed' is never touched by index()-output anywhere, so it never
+    // enters the pairing graph: classifyStoreSlotEdit(composed, ...) resolves
+    // to {mode:'drop', coordinatedWith:[]} (no partner store to check at any
+    // shared position). Before the #525 v2 fix, the old store-LEVEL
+    // storeFeedsConfirmedChar('composed', ...) shield treated "rule-1
+    // references 'composed' via any() AND rule-1's output happens to be the
+    // needed char 'y'" as grounds to shield the WHOLE store — even though
+    // 'y' has no positional relationship to 'composed's own items at all.
+    // That is exactly the Cameroon `word`-store shape: a store whose own
+    // surplus items get shielded en masse because SOME rule referencing it
+    // also produces a needed char, regardless of whether removing a slot
+    // could ever touch that needed char. The narrower, correct guard (mirrors
+    // recommendedRemovalChars' coordinatedDropHitsNeededChar) only shields a
+    // slot when a PAIRED store's item at the SAME index is needed — 'composed'
+    // has no pair partner, so it is not shielded.
     const ir = makeIR({
       stores: [{ nodeId: 'store-1', name: 'composed', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }], isSystem: false } as IRStore],
       groups: [{
@@ -1577,12 +1593,44 @@ describe('annotateRemovalRecommendations', () => {
     });
     const nodes = toRailNodes(ir);
 
-    // 'a' and 'b' (the store's own chars) are absent from the inventory; only
-    // the dependency guard (rule-1's output 'y') should save it from 'high'.
     const result = annotateRemovalRecommendations(nodes, ir, new Set(['y']));
 
     const store = result.find((n) => n.kind === 'store' && n.name === 'composed');
-    expect(store?.recommendation).toBe('none');
+    expect(store?.recommendation).toBe('high');
+  });
+
+  it("marks a store node 'none' when a CROSS-paired partner store's same-index item IS a needed character (coordinatedDropHitsNeededChar guard fires — positive branch the self-paired `word`-store tests above don't cover), but marks a sibling cross-paired store 'high' when its own partner's same-index item is NOT needed (proves the guard discriminates rather than blanket-shielding every cross-paired store)", () => {
+    // `dk(1) any(dkf) > index(dkt,2)` cross-pairs dkf<->dkt via the pairing
+    // graph (mirrors the Cameroon `dk(003b) any(dkf003b) > index(dkt003b,2)`
+    // idiom) — dkf[0]='a' aligns with dkt[0]='α', a needed char, so a
+    // coordinated drop of dkf's slot 0 would also drop a needed char: the
+    // guard shields the WHOLE dkf store node. dkf2/dkt2 is the identical
+    // shape but dkt2[0]='γ' is NOT needed, so dkf2 is left at the ordinary
+    // 'high' recommendation — proving the guard only fires when the aligned
+    // partner slot is actually needed, not for every cross-paired store.
+    const ir = makeIR({
+      stores: [
+        { nodeId: 'store#dkf', name: 'dkf', items: [{ kind: 'char', value: 'a' }], isSystem: false } as any,
+        { nodeId: 'store#dkt', name: 'dkt', items: [{ kind: 'char', value: 'α' }], isSystem: false } as any,
+        { nodeId: 'store#dkf2', name: 'dkf2', items: [{ kind: 'char', value: 'c' }], isSystem: false } as any,
+        { nodeId: 'store#dkt2', name: 'dkt2', items: [{ kind: 'char', value: 'γ' }], isSystem: false } as any,
+      ],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          { nodeId: 'rule-fanout', context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'dkf' }], output: [{ kind: 'index', storeRef: 'dkt', offset: 2 }] },
+          { nodeId: 'rule-fanout2', context: [{ kind: 'deadkey', id: 2 }, { kind: 'any', storeRef: 'dkf2' }], output: [{ kind: 'index', storeRef: 'dkt2', offset: 2 }] },
+        ],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(['α']));
+
+    const dkf = result.find((n) => n.kind === 'store' && n.name === 'dkf');
+    const dkf2 = result.find((n) => n.kind === 'store' && n.name === 'dkf2');
+    expect(dkf?.recommendation).toBe('none');
+    expect(dkf2?.recommendation).toBe('high');
   });
 
   it("marks a group node 'none' (not 'high') when it produces only punctuation/digit characters (#525 categorical never-remove guard)", () => {
@@ -2095,21 +2143,23 @@ describe('recommendedRemovalChars', () => {
     expect(result.map((r) => r.ch)).not.toContain('y');
   });
 
-  it("shields a surplus character whose sole producer is a NON-blocked (resolved self-paired drop) store slot, when that same store also feeds a needed character elsewhere (the dependsOnNeeded guard, not the allSimple/blocked guard)", () => {
+  it("recommends a surplus character whose sole producer is a self-paired store slot, even though that SAME store also holds a needed character elsewhere (#525 v2 — the Cameroon `word`-store over-coarse-guard fix)", () => {
     const ir = makeIR({
       // S's index()-output resolves to this SAME rule's own any(S) context
-      // element (self-pair) → classifyStoreSlotEdit returns 'drop', NOT
-      // 'blocked' — this exercises the dependsOnNeeded branch specifically,
-      // distinct from the still-blocked unresolved-pairing test above.
+      // element (self-pair) → classifyStoreSlotEdit returns 'drop' with
+      // coordinatedWith: [] (no OTHER store to check at the same index) —
+      // this is exactly the Cameroon `word`-store shape: one store, self-fed,
+      // holding BOTH a surplus char ('y', at index 0) and a needed char ('q',
+      // at index 1). Before the #525 v2 fix, the old store-level
+      // storeFeedsConfirmedChar('S', ...) shield resolved index(S,1)'s output
+      // to ALL of S's own items — including needed 'q' — and shielded EVERY
+      // character S contributes to, including surplus 'y' at an UNRELATED
+      // index. The narrower guard only shields when a PAIRED store's item at
+      // the SAME index is needed; S has no partner, so 'y' is not shielded.
       stores: [{ nodeId: 'store#s', name: 'S', items: [{ kind: 'char', value: 'y' }, { kind: 'char', value: 'q' }], isSystem: false } as IRStore],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
         rules: [
-          // Sole reference to S: a self-paired index()-output rule.
-          // producedCharsOfRuleOutput resolves the WHOLE store's items (not
-          // just the targeted offset), so this single rule both produces
-          // surplus 'y' (via the slot) and needed 'q' (via the same store) —
-          // storeFeedsConfirmedChar('S', ...) is true.
           { nodeId: 'rule-fill', context: [{ kind: 'any', storeRef: 'S' }], output: [{ kind: 'index', storeRef: 'S', offset: 1 }] },
         ],
       }],
@@ -2117,7 +2167,38 @@ describe('recommendedRemovalChars', () => {
 
     const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
 
-    expect(result.map((r) => r.ch)).not.toContain('y');
+    expect(result.map((r) => r.ch)).toContain('y');
+  });
+
+  it("shields a surplus character whose CROSS-paired partner store's same-index item IS a needed character (coordinatedDropHitsNeededChar guard fires — the positive branch the self-paired `word`-store test above doesn't cover), but recommends a sibling surplus character whose partner slot is NOT needed (proves the guard discriminates rather than blanket-shielding)", () => {
+    // `dk(1) any(dkf) > index(dkt,2)` cross-pairs dkf<->dkt (mirrors the
+    // Cameroon `dk(003b) any(dkf003b) > index(dkt003b,2)` idiom): dkf[0]='a'
+    // aligns with dkt[0]='α', a needed char, so dropping dkf's slot 0 would
+    // coordinately drop a needed char — 'a' is shielded. dkf[1]='b' aligns
+    // with dkt[1]='β', NOT needed — 'b' is not shielded. A plain literal
+    // rule also emits 'a'/'b' directly so both enter the produced set
+    // (buildProducedSet only walks rule OUTPUT, never any()-context input
+    // stores) — the surplus-ness under test lives on the INPUT store slot,
+    // reached via collectCharContributors' any()-context scan.
+    const ir = makeIR({
+      stores: [
+        { nodeId: 'store#dkf', name: 'dkf', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }], isSystem: false } as any,
+        { nodeId: 'store#dkt', name: 'dkt', items: [{ kind: 'char', value: 'α' }, { kind: 'char', value: 'β' }], isSystem: false } as any,
+      ],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          { nodeId: 'rule-lit-a', context: [{ kind: 'char', value: 'p' }], output: [{ kind: 'char', value: 'a' }] },
+          { nodeId: 'rule-lit-b', context: [{ kind: 'char', value: 'q' }], output: [{ kind: 'char', value: 'b' }] },
+          { nodeId: 'rule-fanout', context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'dkf' }], output: [{ kind: 'index', storeRef: 'dkt', offset: 2 }] },
+        ],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['α']) });
+
+    expect(result.map((r) => r.ch)).not.toContain('a');
+    expect(result.map((r) => r.ch)).toContain('b');
   });
 
   it('does not recommend a character that IS in `needed`', () => {
@@ -2209,5 +2290,85 @@ describe('recommendedRemovalChars', () => {
 
       expect(result.map((r) => r.ch)).toEqual(['y']);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// coordinatedCollateralForSlots (#525/#931 follow-up — manual-carve safety)
+// ---------------------------------------------------------------------------
+
+describe('coordinatedCollateralForSlots', () => {
+  // `dk(1) any(dkf) > index(dkt,2)` cross-pairs dkf<->dkt via the pairing
+  // graph (mirrors the Cameroon `dk(003b) any(dkf003b) > index(dkt003b,2)`
+  // idiom) — dkf[0]='a' aligns with dkt[0]='α'. Removing dkf's slot 0
+  // collaterally drops dkt's slot 0 via applyStoreSlotRemovals' coordinated
+  // drop, even though the caller never named dkt#0.
+  function makeCrossPairedIr(dktChar: string): KeyboardIR {
+    return {
+      origin: 'imported',
+      header: { keyboardId: 'test', name: 'Test', bcp47: [], copyright: '', version: '1.0', targets: [], storeDirectives: [] },
+      stores: [
+        { nodeId: 'store#dkf', name: 'dkf', items: [{ kind: 'char', value: 'a' }], isSystem: false },
+        { nodeId: 'store#dkt', name: 'dkt', items: [{ kind: 'char', value: dktChar }], isSystem: false },
+      ],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule-fanout',
+          context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'dkf' }],
+          output: [{ kind: 'index', storeRef: 'dkt', offset: 2 }],
+        }],
+      }],
+      comments: [],
+      raw: [],
+      recognizedPatterns: [],
+    };
+  }
+
+  it("returns the partner store's aligned char as collateral, with isNeeded true when it's in `needed`", () => {
+    const ir = makeCrossPairedIr('α');
+
+    const collateral = coordinatedCollateralForSlots(['store#dkf#0'], ir, new Set(['α']));
+
+    expect(collateral).toEqual([{ ch: 'α', storeName: 'dkt', isNeeded: true }]);
+  });
+
+  it('isNeeded is false when the partner char is not in `needed`', () => {
+    const ir = makeCrossPairedIr('γ');
+
+    const collateral = coordinatedCollateralForSlots(['store#dkf#0'], ir, new Set(['α']));
+
+    expect(collateral).toEqual([{ ch: 'γ', storeName: 'dkt', isNeeded: false }]);
+  });
+
+  it('returns [] when the targeted slot has no coordinated partner (unpaired store)', () => {
+    const ir: KeyboardIR = {
+      origin: 'imported',
+      header: { keyboardId: 'test', name: 'Test', bcp47: [], copyright: '', version: '1.0', targets: [], storeDirectives: [] },
+      stores: [{ nodeId: 'store#lone', name: 'lone', items: [{ kind: 'char', value: 'z' }], isSystem: false }],
+      groups: [],
+      comments: [],
+      raw: [],
+      recognizedPatterns: [],
+    };
+
+    const collateral = coordinatedCollateralForSlots(['store#lone#0'], ir, new Set(['z']));
+
+    expect(collateral).toEqual([]);
+  });
+
+  it('excludes a partner slot that is already directly targeted (not a hidden surprise)', () => {
+    const ir = makeCrossPairedIr('α');
+
+    // The caller already named BOTH slots explicitly — dkt#0 is not collateral.
+    const collateral = coordinatedCollateralForSlots(['store#dkf#0', 'store#dkt#0'], ir, new Set(['α']));
+
+    expect(collateral).toEqual([]);
+  });
+
+  it('returns [] when storeSlotIds is empty', () => {
+    const ir = makeCrossPairedIr('α');
+
+    expect(coordinatedCollateralForSlots([], ir, new Set(['α']))).toEqual([]);
   });
 });

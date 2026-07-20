@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
-import { toRailNodes, nodeState, buildCharWeb, annotateRemovalRecommendations, recommendedRemovalChars } from '../../lib/irToCarveNodes.ts';
-import type { CarveNode, CharLocation, RecommendedRemovalChar } from '../../lib/irToCarveNodes.ts';
+import { toRailNodes, nodeState, buildCharWeb, annotateRemovalRecommendations, recommendedRemovalChars, coordinatedCollateralForSlots } from '../../lib/irToCarveNodes.ts';
+import type { CarveNode, CharLocation, RecommendedRemovalChar, CoordinatedCollateralChar } from '../../lib/irToCarveNodes.ts';
 import { KIND_COLOR } from '../assignLoop/parts/KindBadge.tsx';
 import { StatusBar } from '../assignLoop/parts/StatusBar.tsx';
 import type { RemovedItem } from '../assignLoop/parts/StatusBar.tsx';
@@ -31,6 +31,14 @@ interface PendingCascade {
   restoreIds: string[];
   /** contributors.ruleNodeIds is the REMOVABLE set only; blocked carries the warnings (remove mode). */
   contributors: CharContributors;
+  /**
+   * Remove mode only (always `[]` for restore) — coordinated-drop collateral
+   * this removal will ALSO cause in a PAIRED store, via
+   * classifyStoreSlotEdit's `coordinatedWith` (see coordinatedCollateralForSlots).
+   * Never silent: any non-empty collateral routes the click through this
+   * dialog even when the clicked chip is otherwise its char's sole producer.
+   */
+  collateral: CoordinatedCollateralChar[];
 }
 
 interface BuildPendingCascadeArgs {
@@ -44,6 +52,11 @@ interface BuildPendingCascadeArgs {
   isItemDeleted: (id: string) => boolean;
   removalCapabilities: Map<string, RemovalCapability>;
   nodes: CarveNode[];
+  /** Confirmed-inventory ∪ CLDR needed-set — threaded into coordinatedCollateralForSlots
+   *  so a collateral partner char can be flagged "needed" in the confirm dialog. */
+  needed: ReadonlySet<string>;
+  /** Target language, for the Turkic-aware case fold in isCharCoveredForLocale. */
+  bcp47?: string | null | undefined;
 }
 
 /**
@@ -53,9 +66,17 @@ interface BuildPendingCascadeArgs {
  * or open the cascade ConfirmDialog (returns a PendingCascade). Only the
  * caller-resolved clickedCapability/clickedLabel differ between callers —
  * store chips carry no per-rule capability, so they pass undefined / 'this character'.
+ *
+ * Manual-carve safety (#525/#931 follow-up): remove-mode ALWAYS resolves
+ * coordinatedCollateralForSlots over the store slots this removal will
+ * actually drop. Any non-empty collateral forces the ConfirmDialog open —
+ * even for what would otherwise be a "sole producer" plain toggle — because
+ * a coordinated drop can silently take a PAIRED store's aligned character
+ * (e.g. a deadkey's composed output) along with it. Awareness, not
+ * prevention: the user can still confirm and remove.
  */
 function buildPendingCascade({
-  ir, gid, targetChar, clickedCapability, clickedLabel, isItemDeleted, removalCapabilities, nodes,
+  ir, gid, targetChar, clickedCapability, clickedLabel, isItemDeleted, removalCapabilities, nodes, needed, bcp47,
 }: BuildPendingCascadeArgs): PendingCascade | null {
   // No IR to analyse → plain single-chip toggle.
   if (ir == null) return null;
@@ -72,6 +93,7 @@ function buildPendingCascade({
     return {
       gid, targetChar, mode: 'restore', actionCount: restoreIds.length, restoreIds,
       contributors: { ...found, blocked: [] },
+      collateral: [],
     };
   }
 
@@ -95,13 +117,21 @@ function buildPendingCascade({
 
   const removableCount = removableRuleIds.length + found.storeSlotIds.length;
 
+  // Coordinated collateral — resolved over the store slots that will ACTUALLY
+  // be dropped (classifyStoreSlotEdit inside the helper already filters to
+  // mode 'drop' only, so a slot classifyStoreSlotEdit would block is never
+  // reported as collateral here either).
+  const collateral = coordinatedCollateralForSlots(found.storeSlotIds, ir, needed, bcp47);
+
   // Plain toggle (no dialog) ONLY for a removable chip that is its char's sole
-  // producer with nothing blocked. A not-removable chip ALWAYS opens the dialog.
-  if (!clickedIsNotRemovable && removableCount <= 1 && blocked.length === 0) return null;
+  // producer, nothing blocked, AND no coordinated collateral. A not-removable
+  // chip, or ANY collateral (even for a sole producer), ALWAYS opens the dialog.
+  if (!clickedIsNotRemovable && removableCount <= 1 && blocked.length === 0 && collateral.length === 0) return null;
 
   return {
     gid, targetChar, mode: 'remove', actionCount: removableCount, restoreIds: [],
     contributors: { ...found, ruleNodeIds: removableRuleIds, blocked },
+    collateral,
   };
 }
 
@@ -299,10 +329,11 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
     const pending = buildPendingCascade({
       ir, gid, targetChar, clickedCapability, clickedLabel, isItemDeleted, removalCapabilities, nodes,
+      needed: neededSet, bcp47: identityBcp47,
     });
     if (pending === null) { handleToggleGlyph(gid); return; }
     setPendingCascade(pending);
-  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities]);
+  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities, neededSet, identityBcp47]);
 
   /**
    * Store-chip cascade toggle — same "remove/restore everywhere" contract as
@@ -316,10 +347,11 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
     const pending = buildPendingCascade({
       ir, gid: chipId, targetChar: ch, clickedLabel: 'this character',
       isItemDeleted, removalCapabilities, nodes,
+      needed: neededSet, bcp47: identityBcp47,
     });
     if (pending === null) { handleToggleGlyph(chipId); return; }
     setPendingCascade(pending);
-  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities]);
+  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities, neededSet, identityBcp47]);
 
   const handleCascadePrimary = useCallback(() => {
     if (!pendingCascade) return;
@@ -679,6 +711,39 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
                   );
                 })}
               </ul>
+              {/* Coordinated-removal collateral (#525/#931 follow-up) — a manual
+                  removal that hits a PAIRED store also drops that store's
+                  aligned partner character at the same position. Never
+                  silent: shown for every collateral char, with a needed one
+                  flagged prominently so the author can back out via Cancel. */}
+              {!isRestore && pendingCascade.collateral.length > 0 && (() => {
+                const anyNeeded = pendingCascade.collateral.some((c) => c.isNeeded);
+                return (
+                  <div
+                    role="alert"
+                    style={{
+                      marginTop: 8,
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      background: 'color-mix(in srgb, var(--sil-orange) 10%, var(--app-surface))',
+                      border: anyNeeded
+                        ? '1px solid var(--sil-orange)'
+                        : '1px solid color-mix(in srgb, var(--sil-orange) 40%, transparent)',
+                      fontSize: 12,
+                      color: 'var(--sil-orange-dark)',
+                    }}
+                  >
+                    <b>{anyNeeded ? '⚠ This will also remove a character you need, from a paired store:' : 'Removing this will also remove from paired stores:'}</b>{' '}
+                    {pendingCascade.collateral.map((c, i) => (
+                      <span key={i}>
+                        &quot;{c.ch}&quot; from {c.storeName}
+                        {c.isNeeded ? <b> — needed for your language</b> : null}
+                        {i < pendingCascade.collateral.length - 1 ? ', ' : ''}
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
               {pendingCascade.contributors.blocked.length > 0 && (
                 <div
                   style={{
