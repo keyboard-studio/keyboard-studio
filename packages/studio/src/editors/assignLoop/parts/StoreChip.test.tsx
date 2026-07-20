@@ -5,7 +5,7 @@
 //                            push a HoverInfo (kind: 'text') into the shared
 //                            hoverInfoStore carrying the chip's disabledReason,
 //                            mirroring GlyphCell's not-removable pattern.
-//   - "nul-fill" / "drop"  → clicking DOES call onToggle(chipId).
+//   - "drop"               → clicking DOES call onToggle(chipId).
 //
 // Hover/focus on a NON-disabled chip populates the hover panel with the
 // character + codepoint (mirroring GlyphCell's enabled-hover path), rather
@@ -58,7 +58,7 @@ describe('StoreChip — disabled action', () => {
   });
 });
 
-describe('StoreChip — toggleable actions (nul-fill / drop)', () => {
+describe('StoreChip — toggleable action (drop)', () => {
   it('clicking a drop-action chip calls onToggle(chipId)', () => {
     const onToggle = vi.fn();
     const chip = makeChip({ action: 'drop', chipId: 'store#s#3' });
@@ -66,14 +66,6 @@ describe('StoreChip — toggleable actions (nul-fill / drop)', () => {
     fireEvent.click(container.querySelector('button')!);
     expect(onToggle).toHaveBeenCalledTimes(1);
     expect(onToggle).toHaveBeenCalledWith('store#s#3');
-  });
-
-  it('clicking a nul-fill-action chip calls onToggle(chipId)', () => {
-    const onToggle = vi.fn();
-    const chip = makeChip({ action: 'nul-fill', chipId: 'store#out#1' });
-    const { container } = render(<StoreChip chip={chip} off={false} onToggle={onToggle} />);
-    fireEvent.click(container.querySelector('button')!);
-    expect(onToggle).toHaveBeenCalledWith('store#out#1');
   });
 
   it('does not mark the button aria-disabled', () => {
@@ -103,7 +95,7 @@ describe('StoreChip — toggleable actions (nul-fill / drop)', () => {
   });
 
   it('focusing an enabled chip sets hover info with codepoint content', () => {
-    const chip = makeChip({ ch: 'a', action: 'nul-fill' });
+    const chip = makeChip({ ch: 'a', action: 'drop' });
     const { container } = render(<StoreChip chip={chip} off={false} onToggle={vi.fn()} />);
     fireEvent.focus(container.querySelector('button')!);
     const info = useHoverInfoStore.getState().info;
