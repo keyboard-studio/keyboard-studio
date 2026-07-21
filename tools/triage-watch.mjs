@@ -138,13 +138,29 @@ function buildState(events, sweepId) {
     prs: new Map(),
     events: filtered,
   };
-  for (const ev of filtered) {
+  const lastIdx = filtered.length - 1;
+  let seenSweepStart = false;
+  for (let idx = 0; idx < filtered.length; idx++) {
+    const ev = filtered[idx];
     switch (ev.phase) {
       case 'sweep-start':
-        state.started_at = ev.ts;
-        if (ev.total_prs != null) state.total_prs = ev.total_prs;
+        // The wrapper (scripts/triage-linux.sh) emits ONE authoritative
+        // sweep-start — first in the sweep, full discovered PR count. Each
+        // per-PR child `claude -p "/km-triage <NUM>"` then re-emits its own
+        // sweep-start with total_prs=1 under the inherited KM_TRIAGE_SWEEP_ID.
+        // Honor only the first for the timestamp, and take the max count so a
+        // child (always 1) can never shrink the discovered total below the
+        // wrapper's real number.
+        if (!seenSweepStart) state.started_at = ev.ts;
+        seenSweepStart = true;
+        if (ev.total_prs != null) state.total_prs = Math.max(state.total_prs ?? 0, ev.total_prs);
         break;
       case 'sweep-end':
+        // Only the wrapper's terminal sweep-end (the very last event in the
+        // sweep) marks completion; child sweep-ends fire mid-run and carry
+        // single-PR counts — ignore them so the header doesn't flip to
+        // "complete" with wrong totals while the sweep is still going.
+        if (idx !== lastIdx) break;
         state.ended_at = ev.ts;
         state.sweep_end_counts = {
           approve_park: ev.approve_park ?? 0,
@@ -274,16 +290,27 @@ function renderDashboard(state) {
 
   out.push(c('bold', '-'.repeat(78)));
   out.push(c('bold', `recent events (last ${EVENT_TAIL_LINES}):`));
-  const tail = state.events.slice(-EVENT_TAIL_LINES);
+  // Drop child-process sweep boundary noise: keep only the wrapper's first
+  // sweep-start and its terminal sweep-end (see buildState for the why).
+  const firstSweepStartIdx = state.events.findIndex((e) => e.phase === 'sweep-start');
+  const lastEventIdx = state.events.length - 1;
+  const visibleEvents = state.events.filter((e, idx) => {
+    if (e.phase === 'sweep-start') return idx === firstSweepStartIdx;
+    if (e.phase === 'sweep-end') return idx === lastEventIdx;
+    return true;
+  });
+  const tail = visibleEvents.slice(-EVENT_TAIL_LINES);
   if (tail.length === 0) {
     out.push(c('dim', '  (none)'));
   } else {
     for (const ev of tail) {
       const stamp = c('dim', fmtClock(ev.ts));
-      const pr = ev.pr != null ? c('cyan', `#${ev.pr}`) : c('dim', '   ');
+      // Pad the raw text BEFORE coloring — pad() counts ANSI escape bytes as
+      // width, so padding an already-colored string truncates it mid-content.
+      const pr = c('cyan', pad(ev.pr != null ? `#${ev.pr}` : '', 7));
       const ph = c('yellow', pad(ev.phase || '?', 18));
       const rest = renderEventDetail(ev);
-      out.push(`  ${stamp}  ${pad(pr, 6)}${ph}${rest}`);
+      out.push(`  ${stamp}  ${pr}${ph}${rest}`);
     }
   }
   out.push(c('bold', '='.repeat(78)));
