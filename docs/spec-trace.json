@@ -642,6 +642,14 @@
       "implements": [],
       "decisions": [],
       "notes": ""
+    },
+    "specs/045-lens-vocabulary-source-of-truth": {
+      "title": "Feature Specification: Lens-Vocabulary Single Source of Truth",
+      "hash": "sha256:0a2e80e975208ecc",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
     }
   }
 }
