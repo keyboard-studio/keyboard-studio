@@ -577,6 +577,11 @@ describe('CarveGallery — coordinated collateral (manual carve safety, #525/#93
     // Awareness, not prevention — the user can still confirm.
     fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, remove everywhere' }));
     expect(useWorkingCopyStore.getState().isItemDeleted('store#dkf#0')).toBe(true);
+    // P1 fix: the CONFIRMED collateral partner slot ('dkt' at the same index)
+    // must ALSO be persisted as deleted — not just displayed in the dialog —
+    // so the Gallery's kept/removed state matches what export-time
+    // applyStoreSlotRemovals will actually do.
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#dkt#0')).toBe(true);
   });
 
   it('shows plain (non-flagged) collateral text when the partner character is not needed', () => {
@@ -618,6 +623,85 @@ describe('CarveGallery — coordinated collateral (manual carve safety, #525/#93
 
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(useWorkingCopyStore.getState().isItemDeleted('store#s#0')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P0 — bulk store-toggle routed through the collateral guard. A store card's
+// master ToggleBox (Rail.tsx) drops EVERY toggleable chip in the store at
+// once via handleSetManyGlyphs — this must aggregate coordinated collateral
+// across the WHOLE batch into ONE confirm dialog, not a silent bulk drop.
+// ---------------------------------------------------------------------------
+
+function makeBulkCrossPairedIr(): KeyboardIR {
+  return makeIR(
+    [{
+      nodeId: 'g-main', name: 'main', usingKeys: true, readonly: false,
+      rules: [{
+        nodeId: 'rule-fanout',
+        context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'dkf' }],
+        output: [{ kind: 'index', storeRef: 'dkt', offset: 2 }],
+      }],
+    }],
+    [
+      makeStore('store#dkf', 'dkf', ['a', 'b']),
+      makeStore('store#dkt', 'dkt', ['α', 'β']),
+    ],
+  );
+}
+
+describe('CarveGallery — bulk store-toggle collateral guard (P0)', () => {
+  it('aggregates coordinated collateral across the whole batch into ONE dialog; confirming marks BOTH the batch slots and the collateral partner slots deleted', () => {
+    const ir = makeBulkCrossPairedIr();
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => emptyContributors(ch));
+
+    renderGallery(ir);
+    useWorkingCopyStore.setState((s) => ({ session: { ...s.session, confirmedInventory: ['β'] } }));
+
+    // Master toggle for the whole 'dkf' store — drops BOTH its slots at once.
+    const dkfCard = screen.getByTestId('carve-card-store#dkf');
+    // A harmless prior interaction (select the card) forces a render flush
+    // after the setState above, mirroring the existing single-chip
+    // collateral tests' "click the card, THEN click the trigger" sequencing.
+    fireEvent.click(dkfCard);
+    fireEvent.click(within(dkfCard).getByRole('button', { name: 'Remove' }));
+
+    // Exactly one dialog, aggregating collateral for BOTH indices.
+    expect(screen.getAllByRole('alertdialog')).toHaveLength(1);
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog.textContent).toContain('α');
+    expect(dialog.textContent).toContain('β');
+    expect(dialog.textContent).toContain('dkt');
+    expect(dialog.textContent).toContain('needed for your language');
+
+    // Nothing deleted yet — the dialog gated the batch.
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#dkf#0')).toBe(false);
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#dkf#1')).toBe(false);
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, remove everywhere' }));
+
+    // Both batch slots AND both collateral partner slots are now persisted as deleted.
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#dkf#0')).toBe(true);
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#dkf#1')).toBe(true);
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#dkt#0')).toBe(true);
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#dkt#1')).toBe(true);
+  });
+
+  it('applies the batch immediately (no dialog) when the batch carries no coordinated collateral', () => {
+    const ir = makeIR(
+      [makeGroup('g-main', 'main', [])],
+      [makeStore('store#s', 'sX', ['a', 'b'])],
+    );
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => emptyContributors(ch));
+
+    renderGallery(ir);
+
+    const card = screen.getByTestId('carve-card-store#s');
+    fireEvent.click(within(card).getByRole('button', { name: 'Remove' }));
+
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#s#0')).toBe(true);
+    expect(useWorkingCopyStore.getState().isItemDeleted('store#s#1')).toBe(true);
   });
 });
 

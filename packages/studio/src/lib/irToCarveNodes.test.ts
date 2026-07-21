@@ -2303,10 +2303,10 @@ describe('coordinatedCollateralForSlots', () => {
   // idiom) — dkf[0]='a' aligns with dkt[0]='α'. Removing dkf's slot 0
   // collaterally drops dkt's slot 0 via applyStoreSlotRemovals' coordinated
   // drop, even though the caller never named dkt#0.
+  // Built via the shared makeIR(overrides) helper (see above) rather than a
+  // hand-written KeyboardIR literal, matching the neighboring tests' idiom.
   function makeCrossPairedIr(dktChar: string): KeyboardIR {
-    return {
-      origin: 'imported',
-      header: { keyboardId: 'test', name: 'Test', bcp47: [], copyright: '', version: '1.0', targets: [], storeDirectives: [] },
+    return makeIR({
       stores: [
         { nodeId: 'store#dkf', name: 'dkf', items: [{ kind: 'char', value: 'a' }], isSystem: false },
         { nodeId: 'store#dkt', name: 'dkt', items: [{ kind: 'char', value: dktChar }], isSystem: false },
@@ -2319,10 +2319,7 @@ describe('coordinatedCollateralForSlots', () => {
           output: [{ kind: 'index', storeRef: 'dkt', offset: 2 }],
         }],
       }],
-      comments: [],
-      raw: [],
-      recognizedPatterns: [],
-    };
+    });
   }
 
   it("returns the partner store's aligned char as collateral, with isNeeded true when it's in `needed`", () => {
@@ -2330,7 +2327,7 @@ describe('coordinatedCollateralForSlots', () => {
 
     const collateral = coordinatedCollateralForSlots(['store#dkf#0'], ir, new Set(['α']));
 
-    expect(collateral).toEqual([{ ch: 'α', storeName: 'dkt', isNeeded: true }]);
+    expect(collateral).toEqual([{ ch: 'α', storeName: 'dkt', isNeeded: true, slotId: 'store#dkt#0' }]);
   });
 
   it('isNeeded is false when the partner char is not in `needed`', () => {
@@ -2338,7 +2335,7 @@ describe('coordinatedCollateralForSlots', () => {
 
     const collateral = coordinatedCollateralForSlots(['store#dkf#0'], ir, new Set(['α']));
 
-    expect(collateral).toEqual([{ ch: 'γ', storeName: 'dkt', isNeeded: false }]);
+    expect(collateral).toEqual([{ ch: 'γ', storeName: 'dkt', isNeeded: false, slotId: 'store#dkt#0' }]);
   });
 
   it('returns [] when the targeted slot has no coordinated partner (unpaired store)', () => {
@@ -2370,5 +2367,71 @@ describe('coordinatedCollateralForSlots', () => {
     const ir = makeCrossPairedIr('α');
 
     expect(coordinatedCollateralForSlots([], ir, new Set(['α']))).toEqual([]);
+  });
+
+  // seenPartnerSlotIds dedup: two DIFFERENT requested slots (dkf1#0, dkf2#0)
+  // both pair, via the SAME output store's index() pairing, into one shared
+  // partner slot (dkt#0) — a two-deadkey-fan-in-to-one-output-store idiom.
+  // Each requested slot's own pair-set also names the OTHER requested slot as
+  // a coordinated partner, but that's excluded as "already directly
+  // targeted" (see the test above) — leaving dkt#0 as the only collateral,
+  // and it must appear exactly once, not twice.
+  it('dedupes a partner slot shared by two different requested slots', () => {
+    const ir = makeIR({
+      stores: [
+        { nodeId: 'store#dkf1', name: 'dkf1', items: [{ kind: 'char', value: 'a' }], isSystem: false },
+        { nodeId: 'store#dkf2', name: 'dkf2', items: [{ kind: 'char', value: 'b' }], isSystem: false },
+        { nodeId: 'store#dkt', name: 'dkt', items: [{ kind: 'char', value: 'α' }], isSystem: false },
+      ],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          {
+            nodeId: 'rule-fanout-1',
+            context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'dkf1' }],
+            output: [{ kind: 'index', storeRef: 'dkt', offset: 2 }],
+          },
+          {
+            nodeId: 'rule-fanout-2',
+            context: [{ kind: 'deadkey', id: 2 }, { kind: 'any', storeRef: 'dkf2' }],
+            output: [{ kind: 'index', storeRef: 'dkt', offset: 2 }],
+          },
+        ],
+      }],
+    });
+
+    const collateral = coordinatedCollateralForSlots(
+      ['store#dkf1#0', 'store#dkf2#0'],
+      ir,
+      new Set(['α']),
+    );
+
+    expect(collateral).toHaveLength(1);
+    expect(collateral[0]?.slotId).toBe('store#dkt#0');
+    expect(collateral).toEqual([{ ch: 'α', storeName: 'dkt', isNeeded: true, slotId: 'store#dkt#0' }]);
+  });
+
+  // Blocked-store guard: the TARGETED slot's own store classifies as
+  // 'blocked' (mode.mode !== 'drop') — e.g. a notany()-referenced store.
+  // coordinatedCollateralForSlots must never resolve collateral for a slot
+  // that classifyStoreSlotEdit itself refuses to drop.
+  it("returns [] when the targeted slot's own store classifies as 'blocked'", () => {
+    const ir = makeIR({
+      stores: [
+        { nodeId: 'store#blk', name: 'blk', items: [{ kind: 'char', value: 'a' }], isSystem: false },
+      ],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule-notany',
+          context: [{ kind: 'notany', storeRef: 'blk' }],
+          output: [{ kind: 'char', value: 'x' }],
+        }],
+      }],
+    });
+
+    const collateral = coordinatedCollateralForSlots(['store#blk#0'], ir, new Set(['a']));
+
+    expect(collateral).toEqual([]);
   });
 });

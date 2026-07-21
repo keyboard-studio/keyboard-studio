@@ -141,6 +141,10 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
     for (const rule of group.rules) {
       // Skip S-02 trigger rules (output is exactly one deadkey element) — deleting
       // one would destroy the whole deadkey family, not this single character.
+      // NOTE: this `continue` skips the WHOLE rule, including any any()-context
+      // element it carries — so a store consumed only via any() on a trigger
+      // rule (e.g. a guarded registration rule) would be missed here as a
+      // contributor. No corpus example currently exercises this shape.
       if (isTriggerRule(rule)) continue;
 
       // (0) Input-store occurrences — any() context elements ("remove everywhere",
