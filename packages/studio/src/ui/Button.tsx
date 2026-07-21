@@ -5,6 +5,7 @@ import {
   TEXT_DIM,
   FONT,
 } from "./theme.ts";
+import { mergeClassNames } from "./classNames.ts";
 
 export type ButtonVariant = "primary" | "secondary" | "back";
 
@@ -69,11 +70,7 @@ export function Button({
     <button
       type="button"
       disabled={disabled}
-      className={
-        className !== undefined
-          ? `ks-focus-ring ks-hit-target ${className}`
-          : "ks-focus-ring ks-hit-target"
-      }
+      className={mergeClassNames("ks-focus-ring ks-hit-target", className)}
       style={{ ...baseStyle, ...style }}
       {...rest}
     >

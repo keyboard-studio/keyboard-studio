@@ -11,6 +11,7 @@ import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import type { IdentityLiteResult } from "./IdentityLite.tsx";
 import type { FiredQuestion } from "../adaptation/firing.ts";
 import { secondaryButton, primaryButton } from "./surveyStyles.ts";
+import { handleEnterToAdvance } from "./enterToAdvance.ts";
 
 /** One labelled confirmation row in the prefill summary. */
 export interface PrefillRow {
@@ -79,13 +80,11 @@ export function Prefill({ identity, base, onConfirm, onBack }: PrefillProps) {
 
   // Enter-to-advance (issue #536): this step is a pure confirmation screen
   // (no free-text field to disambiguate against), so plain Enter anywhere in
-  // the panel confirms — matching Next/Finish behavior in SurveyRunner.
-  // Buttons handle their own Enter natively; skip them to avoid a double-fire.
+  // the panel confirms — matching Next/Finish behavior in SurveyRunner. Uses
+  // the shared helper with its default BUTTON skip so Back/Confirm don't
+  // double-fire; no multiline / combobox concerns on this screen.
   function handleKeyDown(e: KeyboardEvent<HTMLDivElement>): void {
-    if (e.key !== "Enter" || e.repeat) return;
-    if ((e.target as HTMLElement).tagName === "BUTTON") return;
-    e.preventDefault();
-    onConfirm();
+    handleEnterToAdvance(e, { advance: onConfirm });
   }
 
   return (

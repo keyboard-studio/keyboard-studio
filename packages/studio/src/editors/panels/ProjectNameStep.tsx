@@ -7,6 +7,7 @@ import { useState, useMemo } from "react";
 import { slugifyKeyboardId, validateKeyboardId } from "@keyboard-studio/contracts";
 import { Button, TextField, Label } from "../../ui/index.ts";
 import { TEXT_DIM, ERROR_RED } from "../../ui/theme.ts";
+import { handleEnterToAdvance } from "../../survey/enterToAdvance.ts";
 
 export interface ProjectNameStepProps {
   /** Default display name — autonym from identity_lite (il_language_autonym). */
@@ -77,14 +78,12 @@ export function ProjectNameStep({
           data-testid="project-name-input"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
-          onKeyDown={(e) => {
+          onKeyDown={(e) =>
             // Enter-to-advance (issue #536): single-line field, no Shift+Enter
-            // newline concern — plain Enter submits like clicking Next.
-            if (e.key === "Enter") {
-              e.preventDefault();
-              handleNext();
-            }
-          }}
+            // newline concern — plain Enter submits like clicking Next. Shared
+            // helper; handleNext owns the isValid gate.
+            handleEnterToAdvance(e, { advance: handleNext })
+          }
           autoComplete="off"
           spellCheck={false}
           aria-describedby="project-id-hint"

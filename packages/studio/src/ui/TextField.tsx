@@ -21,6 +21,7 @@ import {
   ERROR_BORDER,
   CSS_FONT_MONO,
 } from "./theme.ts";
+import { mergeClassNames } from "./classNames.ts";
 
 export type TextFieldProps = React.InputHTMLAttributes<HTMLInputElement> & {
   /** When true, applies ERROR_BORDER (#7a2a2a) as the border color. */
@@ -61,11 +62,7 @@ export function TextField({
   return (
     <input
       type="text"
-      className={
-        className !== undefined
-          ? `ks-control ks-focus-ring ks-hit-target ${className}`
-          : "ks-control ks-focus-ring ks-hit-target"
-      }
+      className={mergeClassNames("ks-control ks-focus-ring ks-hit-target", className)}
       style={{
         ...BASE_STYLE,
         borderColor: error ? ERROR_BORDER : BORDER,

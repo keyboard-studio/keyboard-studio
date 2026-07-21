@@ -61,6 +61,10 @@ function TextFieldControl({ question, value, onChange }: FieldProps) {
   const isMultiLine = question.type === "text";
   const strVal = stringValue(value);
   if (isMultiLine) {
+    // `type: "text"` questions are the survey's genuinely open-ended fields
+    // (long-form description prompts, e.g. phase_f_helpdocs) — the exact case
+    // Textarea reserves `resize="vertical"` for (#536). Opt in explicitly so
+    // these keep the resize handle they had before the resize:none default.
     return (
       <Textarea
         id={question.id}
@@ -68,6 +72,7 @@ function TextFieldControl({ question, value, onChange }: FieldProps) {
         value={strVal}
         onChange={(e) => onChange(e.target.value)}
         rows={4}
+        resize="vertical"
       />
     );
   }

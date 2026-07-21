@@ -22,6 +22,7 @@ import {
   FONT,
   ERROR_BORDER,
 } from "./theme.ts";
+import { mergeClassNames } from "./classNames.ts";
 
 export type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement> & {
   /** When true, applies ERROR_BORDER (#7a2a2a) as the border color. */
@@ -66,11 +67,7 @@ export function Textarea({
 }: TextareaProps): React.ReactElement {
   return (
     <textarea
-      className={
-        className !== undefined
-          ? `ks-focus-ring ks-hit-target ${className}`
-          : "ks-focus-ring ks-hit-target"
-      }
+      className={mergeClassNames("ks-focus-ring ks-hit-target", className)}
       style={{
         ...BASE_STYLE,
         borderColor: error ? ERROR_BORDER : BORDER,

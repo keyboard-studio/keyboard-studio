@@ -5,6 +5,7 @@ import {
   TEXT_MAIN,
   FONT,
 } from "./theme.ts";
+import { mergeClassNames } from "./classNames.ts";
 
 export interface DropdownOption {
   value: string;
@@ -49,11 +50,7 @@ export function Dropdown({
   return (
     <select
       onChange={(e) => onChange?.(e.target.value)}
-      className={
-        className !== undefined
-          ? `ks-control ks-focus-ring ks-hit-target ${className}`
-          : "ks-control ks-focus-ring ks-hit-target"
-      }
+      className={mergeClassNames("ks-control ks-focus-ring ks-hit-target", className)}
       style={{ ...BASE_STYLE, ...style }}
       {...rest}
     >

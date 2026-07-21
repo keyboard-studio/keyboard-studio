@@ -1,5 +1,6 @@
 import React from "react";
 import { TEXT_MAIN, ACCENT } from "./theme.ts";
+import { Checkbox } from "./Checkbox.tsx";
 
 export interface MultiSelectOption {
   value: string;
@@ -73,12 +74,10 @@ export function MultiSelect({
         const inputId = `${idPrefix}${opt.value}`;
         return (
           <label key={opt.value} htmlFor={inputId} style={OPTION_ROW_STYLE} className={OPTION_ROW_CLASSNAME}>
-            <input
-              type="checkbox"
+            <Checkbox
               id={inputId}
               checked={selected.includes(opt.value)}
               onChange={() => toggle(opt.value)}
-              className="ks-focus-ring"
               style={CHECKBOX_STYLE}
             />
             <span style={OPTION_LABEL_STYLE}>{opt.label}</span>
