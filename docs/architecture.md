@@ -95,7 +95,9 @@ pick keyboard ──▶ instantiate working copy (Track 1 copy/adapt | Track 2 i
 Authoritative detail: [`specs/008-data-flow/`](../specs/008-data-flow/spec.md)
 (the 15-step pipeline, survey phases, gallery instantiation) and
 [`specs/007-strategy-selection/`](../specs/007-strategy-selection/spec.md) (the
-A1–A7 axes + decision tree that drive the gallery defaults).
+A1–A7 axes + decision tree that drive the gallery defaults). How the four
+analytic lenses (facets, §7.1 axes, DISCUS, §18 criteria) compose across this
+pipeline as one keep-or-change flow: [docs/lens-model.md](lens-model.md).
 
 ## Validator layering
 
