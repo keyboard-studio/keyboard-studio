@@ -46,6 +46,11 @@ export function GalleryPreviewPane({
       ? stage.scaffoldWarnings
       : [];
 
+  // Runtime/parse-pipeline warnings ride their own channel (refs #467) so they
+  // render apart from the pattern-application "Apply warnings" heading.
+  const runtimeWarnings =
+    stage.kind === "ready" ? (stage.runtimeWarnings ?? []) : [];
+
   return (
     <section
       aria-label={`${heading} keyboard preview`}
@@ -101,6 +106,29 @@ export function GalleryPreviewPane({
           <strong>{warningLabel}</strong>
           <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
             {applyWarnings.map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {runtimeWarnings.length > 0 && (
+        <div
+          role="alert"
+          aria-live="polite"
+          style={{
+            background: "#2a1a00",
+            border: "1px solid #f0883e",
+            borderRadius: 6,
+            padding: "8px 12px",
+            fontSize: 12,
+            color: "#f0883e",
+            fontFamily: FONT,
+          }}
+        >
+          <strong>Pipeline warnings:</strong>
+          <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+            {runtimeWarnings.map((w, i) => (
               <li key={i}>{w}</li>
             ))}
           </ul>

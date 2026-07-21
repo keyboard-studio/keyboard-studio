@@ -98,6 +98,7 @@ import {
   galleryGhostBtn as ghostBtn,
   galleryInputStyle as inputStyle,
   galleryForwardBtnStyle as forwardBtnStyle,
+  gallerySelectStyle as selectStyle,
 } from "../../lib/galleryTheme.ts";
 import { PATTERN_SEQUENCE, PATTERN_DEADKEY, PATTERN_SWAP, PATTERN_RALT } from "./patternIds.ts";
 
@@ -438,18 +439,10 @@ const VALID_DEADKEY_TRIGGER_KEYS: ReadonlySet<string> = new Set(
   DEADKEY_OPTIONS.map((o) => o.value),
 );
 
-// Used by the S-08 layer-combo dropdowns (the modifier-token <select>s) —
-// the base-key picker itself uses KeyPickerField, which carries its own
-// internal style.
-const selectStyle: CSSProperties = {
-  background: BG_PAGE,
-  border: `1px solid ${BORDER}`,
-  borderRadius: 4,
-  color: TEXT_MAIN,
-  fontSize: 12,
-  padding: "4px 8px",
-  fontFamily: FONT,
-};
+// selectStyle — used by the S-08 layer-combo dropdowns (the modifier-token
+// <select>s); the base-key picker itself uses KeyPickerField, which carries its
+// own internal style. Imported (aliased) from ../../lib/galleryTheme.ts so it
+// stays byte-identical with TouchGallery's key/mechanism <select>s.
 
 // Static styles shared across MethodChooser renders — none depend on props or
 // state, so they are hoisted to module scope rather than recreated per render.

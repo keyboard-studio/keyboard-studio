@@ -66,6 +66,20 @@ export const galleryForwardBtnStyle: CSSProperties = {
 };
 
 /**
+ * Compact bordered `<select>` dropdown shared by the mechanism/touch galleries'
+ * key/mechanism pickers. Byte-identical const previously hand-copied into both.
+ */
+export const gallerySelectStyle: CSSProperties = {
+  background: BG_PAGE,
+  border: `1px solid ${BORDER}`,
+  borderRadius: 4,
+  color: TEXT_MAIN,
+  fontSize: 12,
+  padding: "4px 8px",
+  fontFamily: FONT,
+};
+
+/**
  * Monospace character-entry box shared by MechanismGallery's deadkey
  * trigger/base-letter boxes and SequenceGallery's Content/Indicator boxes.
  */
