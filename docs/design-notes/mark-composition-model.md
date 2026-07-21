@@ -169,7 +169,14 @@ then confirmed.**
   combinations are real and lose stack order; the attachment matrix, unwrap
   stores, and posture computation all derive from the stacks.
 - **Entry accepts any form and decomposes visibly.** Text-sample harvest
-  decomposes silently into the stores. Picker/suggested-list picks are whole
+  decomposes silently into the stores. A future paste-to-bootstrap workflow
+  (paste a text, derive the orthography) fills all three stores at once —
+  plus punctuation and **invisible characters** (ZWJ, ZWNJ, NBSP and
+  friends). Invisible characters fit neither bases nor marks (format/space
+  categories, not letters or combining marks), so the store model needs a
+  fourth slot for them — otherwise harvest silently drops exactly the
+  characters a picker can never re-discover. Recorded as a follow-on;
+  spec 046 scopes the three-store model. Picker/suggested-list picks are whole
   graphemes (the user picks é as é); the UI shows the consequence — picking
   é lights up **e** in Letters and **◌́** in Marks. That visible
   decomposition is the option-2 teaching moment without the modal
