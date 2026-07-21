@@ -1254,14 +1254,14 @@ describe("TouchGallery — Back survives a remount", () => {
 // ---------------------------------------------------------------------------
 
 describe("TouchGallery — heading", () => {
-  it("renders 'Mechanism Gallery' as the main heading with 'Touch' subheading", async () => {
+  it("renders 'Touch Gallery' as the main heading with 'Touch' subheading", async () => {
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
-    // The h1 contains both "Mechanism Gallery" and the "Touch" span as a child.
+    // The h1 contains both "Touch Gallery" and the "Touch" span as a child.
     const h1 = screen.getByRole("heading", { level: 1 });
-    expect(h1.textContent).toMatch(/Mechanism Gallery/i);
+    expect(h1.textContent).toMatch(/Touch Gallery/i);
     expect(h1.textContent).toMatch(/Touch/i);
   });
 });

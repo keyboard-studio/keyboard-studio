@@ -1,10 +1,3 @@
-// TODO(P4a shell extraction): MechanismGallery and TouchGallery share a
-// two-pane header+left+right shell. Extract AssignLoopShell.tsx (surface-
-// parameterized) with separate physicalBehavior.ts / touchBehavior.ts in P4b.
-// Kept as separate components here because the behavior divergence (modality,
-// VFS transform, lint panel, navigation stack) is deep enough to warrant a
-// dedicated extraction pass rather than risking a behavior diff in P4a.
-
 // MechanismGallery — Phase C "add a key" flow (two-pane redesign).
 //
 // On first entry a brief intro splash orients the author to the desktop
@@ -91,6 +84,7 @@ import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
+import { AssignLoopShell } from "./AssignLoopShell.tsx";
 import { RadioGroup } from "../../ui/RadioGroup.tsx";
 import {
   BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
@@ -2707,98 +2701,24 @@ export function MechanismGallery({
   // ---------------------------------------------------------------------------
 
   return (
-    <div
-      style={{
-        ...pageStyle,
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        overflow: "hidden",
-      }}
-    >
-      {/* Header bar — title + modality label only. The primary forward
-          action now sits in the top toolbar row of the left pane (see
-          leftContent), paired with the Back button, rather than here. */}
-      <div
-        style={{
-          borderBottom: `1px solid ${BORDER}`,
-          flexShrink: 0,
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "baseline",
-          gap: 16,
-          padding: "16px 24px 14px",
-        }}
-      >
-        <h1
-          style={{
-            margin: 0,
-            fontSize: "1.05rem",
-            fontWeight: 600,
-            color: ACCENT,
-            fontFamily: FONT,
-          }}
-        >
-          Mechanism Gallery
-        </h1>
-        <span
-          style={{
-            fontSize: 12,
-            color: TEXT_DIM,
-            fontFamily: FONT,
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-          }}
-        >
-          Desktop
-        </span>
-      </div>
-
-      {/* Two-pane row */}
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "row",
-          overflow: "hidden",
-        }}
-      >
-        {/* LEFT pane */}
-        <div
-          style={{
-            flexBasis: "45%",
-            flexShrink: 0,
-            borderRight: `1px solid ${BORDER}`,
-            overflowY: "auto",
-            boxSizing: "border-box",
-          }}
-        >
-          {leftContent}
-        </div>
-
-        {/* RIGHT pane */}
-        <div
-          style={{
-            flexGrow: 1,
-            overflowY: "auto",
-            padding: "24px 20px",
-            boxSizing: "border-box",
-          }}
-        >
-          {!loading && loadError === null ? (
-            <GalleryPreviewWithPatterns
-              selectedBaseKeyboard={selectedBaseKeyboard}
-              stage={artifactStage}
-              retry={artifactRetry}
-              onKeyTap={handleKeyTap}
-            />
-          ) : loading ? (
-            <p style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT }}>
-              Loading patterns...
-            </p>
-          ) : null}
-        </div>
-      </div>
-    </div>
+    <AssignLoopShell
+      headingText="Mechanism Gallery"
+      modalityLabel="Desktop"
+      leftContent={leftContent}
+      rightContent={
+        !loading && loadError === null ? (
+          <GalleryPreviewWithPatterns
+            selectedBaseKeyboard={selectedBaseKeyboard}
+            stage={artifactStage}
+            retry={artifactRetry}
+            onKeyTap={handleKeyTap}
+          />
+        ) : loading ? (
+          <p style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT }}>
+            Loading patterns...
+          </p>
+        ) : null
+      }
+    />
   );
 }
