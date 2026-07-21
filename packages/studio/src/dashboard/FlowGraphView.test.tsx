@@ -7,8 +7,24 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
+import { i18n } from "@lingui/core";
+import { I18nProvider } from "@lingui/react";
 import { FlowGraphView } from "./FlowGraphView.tsx";
 import type { FlowGraph, GraphNode, GraphEdge } from "./model.ts";
+import { messages as enMessages } from "../locales/en/messages.json?lingui";
+
+i18n.load("en", enMessages);
+i18n.activate("en");
+
+/** Render helper — FlowGraphView now uses Lingui Trans/t macros, which require
+ * an I18nProvider ancestor (see docs/i18n-spike.md). */
+function renderGraph(graph: FlowGraph) {
+  return render(
+    <I18nProvider i18n={i18n}>
+      <FlowGraphView graph={graph} />
+    </I18nProvider>,
+  );
+}
 
 afterEach(cleanup);
 
@@ -63,7 +79,7 @@ function hasCollapsedCap(container: HTMLElement): boolean {
 
 describe("FlowGraphView — full render (no collapse)", () => {
   it("a tall graph renders every node, with no Show more/less toggle and no height cap", () => {
-    const { container } = render(<FlowGraphView graph={chainGraph(8)} />);
+    const { container } = renderGraph(chainGraph(8));
     // No collapse affordance.
     expect(
       screen.queryByRole("button", { name: /show more|show less/i }),
@@ -76,7 +92,7 @@ describe("FlowGraphView — full render (no collapse)", () => {
   });
 
   it("a short graph also renders fully with no toggle", () => {
-    render(<FlowGraphView graph={chainGraph(3)} />);
+    renderGraph(chainGraph(3));
     expect(
       screen.queryByRole("button", { name: /show more|show less/i }),
     ).toBeNull();
