@@ -5,7 +5,7 @@ criteria. Details live in [data-model.md](data-model.md) and [contracts/](contra
 
 ## Prerequisites
 
-- `pnpm install` at the repo root (see [CLAUDE.md](../../CLAUDE.md) — `prebuild` fetches langtags + kmcmplib.wasm).
+- `pnpm install` at the repo root (see [CLAUDE.md](../../CLAUDE.md) — `prebuild` fetches langtags; the compiler wasm ships in the `@keymanapp/kmc-kmn` npm dependency).
 - Fixtures: real corpus keyboards from [docs/keyboard-index.md](../../docs/keyboard-index.md) plus injected
   `SourceFacetMeasurement` fixtures (037/036 output shape — [data-model.md](data-model.md) Entity 0). 037's
   live `source.*` measurements need not exist yet; the engine is exercised against fixture measurements

@@ -6,7 +6,7 @@ Runnable validation scenarios that prove 034's acceptance criteria. Detail lives
 
 ```bash
 pnpm install
-pnpm build            # runs prebuild codegen (langtags, kmcmplib.wasm, recognizer rules)
+pnpm build            # runs prebuild codegen (langtags, recognizer rules); compiler wasm ships in @keymanapp/kmc-kmn
 ```
 
 Run the studio for manual walk-throughs:

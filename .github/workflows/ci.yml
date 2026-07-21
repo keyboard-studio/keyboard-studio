@@ -35,11 +35,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Fetch kmcmplib (prod)
-        run: pnpm run fetch-kmcmplib
-        env:
-          KEYBOARD_STUDIO_KMCMPLIB_SOURCE: prod
-
       # Build before typecheck — engine/studio depend on contracts'
       # dist/*.d.ts at type-resolution time. Without this, downstream
       # typechecks fail with "Cannot find module '@keyboard-studio/contracts'"

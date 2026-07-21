@@ -17,11 +17,12 @@ Package manager is **pnpm 9** (Node ≥ 20). Run from the repo root unless noted
 | Crew-file consistency | `pnpm crew-lint` ([utilities/crew-lint/index.js](utilities/crew-lint/index.js) — 7 machine-enforced checks over `.claude/**/km-*` crew files: no python fences, no emoji, no phantom package paths, no line-number self-refs in km-triage.md, km-qc rubric agreement, roster consistency, sentinel spelling; the full check list is documented in [.claude/agents/km-README.md](.claude/agents/km-README.md); also run by `pnpm lint`) |
 | Run the studio SPA | `pnpm dev` (builds `engine`, then runs `engine` watch + `studio` Vite dev server) |
 
-**`prebuild` is not optional for a clean checkout.** `pnpm build` runs it automatically, but a bare `tsc -b` inside a package will fail without it. It does three codegen/fetch steps, all producing build artifacts you should regenerate rather than hand-edit:
+**`prebuild` is not optional for a clean checkout.** `pnpm build` runs it automatically, but a bare `tsc -b` inside a package will fail without it. It does codegen/fetch steps, all producing build artifacts you should regenerate rather than hand-edit:
 - `fetch-langtags` downloads the pinned SIL `langtags.json` (MIT; SHA-256 pinned in [scripts/langtags-version.json](scripts/langtags-version.json); raw file gitignored under `packages/engine/data/langtags/`).
 - `codegen-langtags` derives the slim lookup index into `packages/engine/src/langtags/generated/` from the downloaded data.
-- `fetch-kmcmplib` downloads the pinned `kmcmplib.wasm` into `packages/compiler/wasm/` (SHA-256 pinned in `scripts/kmcmplib-version.json`). Set `KEYBOARD_STUDIO_KMCMPLIB_SOURCE=dev` to build it from a sibling `../keyman` checkout instead of downloading.
 - `compile-recognizer-rules` codegens `content/recognizer-rules/*.yaml` → `packages/engine/src/recognizer/rules/generated/*.ts`.
+
+The compiler wasm is **not** a prebuild artifact: it ships inside the `@keymanapp/kmc-kmn` npm dependency (pinned in `packages/engine/package.json`; the pnpm lockfile is the version/integrity source of truth), loaded at runtime as a sibling of that package's `wasm-host.js`. See `packages/engine/src/compiler/index.ts` and `packages/studio/vite.config.ts` (`optimizeDeps.exclude`).
 
 **Running a subset of tests** (the test script in each package is `vitest run`):
 - One package: `pnpm --filter @keyboard-studio/engine test`
@@ -42,7 +43,6 @@ Package manager is **pnpm 9** (Node ≥ 20). Run from the repo root unless noted
 - **`@keyboard-studio/llm`** — pluggable LLM client (`backends/`) for prompt-driven assistance.
 - **`@keyboard-studio/glottolog`** — offline, pinned copy of Glottolog's language-classification tree (checked-in generated index derived from `glottolog-cldf` via `fetch-glottolog`/`codegen-glottolog`) plus the relatedness catalog and the keyboard-base bridge (`./bridge`) that turns "language X has no keyboard" into ranked bases from close relatives. Contracts-only edge (the bridge takes injected deps; no engine/studio import). See [specs/036-glottolog-catalog/](specs/036-glottolog-catalog/).
 - **`@keyboard-studio/studio`** — the React + Vite SPA (three-pane gallery / editor / preview; working-copy spine).
-- **`packages/compiler`** — holds only the fetched `kmcmplib.wasm` (no TS `package.json`); the service wrapping it lives in `engine/src/compiler`.
 
 Spec targets **not yet realised as written:** the `@keymanapp/kmn-validator` package has not been extracted — Layer A/B (and Layer A' import-fidelity) validation lives in `engine/src/validator` (see Architecture). Check a package's actual exports before referencing it.
 
