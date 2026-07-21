@@ -1,33 +1,52 @@
 /**
- * buildCharacterMap — browsable/tiered candidate builder for the "Keyman
- * character map" UI (Phase B right pane).
+ * buildCharacterMap — browsable/tiered, MULTI-SCRIPT candidate builder for the
+ * "Keyman character map" UI (Phase B right pane).
  *
  * Unlike pickerCandidates() (a flat list scoped to CLDR-or-single-script-block),
  * this returns the FULL candidate set an author can browse — CLDR main
  * exemplars, then CLDR auxiliary (loanword) exemplars, then every other
- * character belonging to the resolved script's Unicode Script_Extensions
- * property, split into a "block" tier (letters + combining marks), a "digits"
- * tier (\p{Nd}/\p{No}), and a "punctuation" tier (\p{P}/\p{S}) — grouped by
- * human-readable Unicode block name where one is curated, or a generic
- * per-tier label otherwise. Script coverage is universal (any script
- * resolveScript() can name), not limited to a hardcoded list. It reuses the
- * same CLDR loading/parsing path as pickerCandidates (loadExemplarsFromFull /
- * parseUnicodeSet in cldr.ts) rather than re-implementing CLDR loading, and
- * never mutates SCRIPT_BLOCKS or scriptBlockChars — those stay picker-scoped
- * and calibrated-test-stable.
+ * character belonging to an ENUMERATED SET of scripts' Unicode
+ * Script_Extensions property (the resolved target script, any caller-supplied
+ * base scripts, and a curated list of major living scripts — see
+ * CURATED_SCRIPTS), split into a "block" tier (letters + combining marks), a
+ * "digits" tier (\p{Nd}/\p{No}), and a "punctuation" tier (\p{P}/\p{S}) —
+ * grouped by human-readable Unicode block name where one is curated, or a
+ * generic per-tier label otherwise. It reuses the same CLDR loading/parsing
+ * path as pickerCandidates (loadExemplarsFromFull / parseUnicodeSet in
+ * cldr.ts) rather than re-implementing CLDR loading, and never mutates
+ * SCRIPT_BLOCKS or scriptBlockChars — those stay picker-scoped and
+ * calibrated-test-stable.
+ *
+ * Every returned group is tagged with its `script` — for the block/digits/
+ * punctuation tiers, the ISO 15924 code of the script WHOSE Script_Extensions
+ * enumeration surfaced the character (see categorizeScriptChars() /
+ * blockTierCandidates() and friends), so the studio's "show only my
+ * keyboard's scripts" filter hides foreign-script punctuation and combining
+ * marks along with their script — a shared char (e.g. a combining mark or
+ * punctuation mark used by several scripts) is attributed to the FIRST script
+ * in enumeration order (target, then base, then CURATED_SCRIPTS) that gathers
+ * it. The curated, genuinely script-neutral folds (COMMON_DIGIT_CHARS,
+ * COMMON_PUNCTUATION_CHARS, COMMON_MODIFIER_LETTER_CHARS) are tagged with the
+ * "Common" sentinel instead, which the studio always shows regardless of
+ * which script the author is browsing. The main/auxiliary (CLDR exemplar)
+ * tiers are tagged with the resolved target script.
  *
  * Deduplication is GLOBAL across the whole return value (not per-tier, and
  * NOT against any user inventory — the UI itself marks already-selected
  * cells): each NFC grapheme appears in exactly one cell, in the first tier
  * that introduces it (main > auxiliary > block > digits > punctuation).
+ *
+ * Each cell also carries its Unicode NAME (see `loadCharNames` below), so the
+ * studio can search the character map by name as well as by glyph.
  */
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
-import { isNoncharacterCodePoint } from "@keyboard-studio/contracts";
+import { isNoncharacterCodePoint, scriptSubtagOf } from "@keyboard-studio/contracts";
 import type { CldrFullLoader } from "./cldr.js";
 import { createFetchCldrFullLoader, loadExemplarsFromFull } from "./cldr.js";
 import { isBidiControlCodePoint } from "./CharacterDiscoveryServiceImpl.js";
 import { getLanguageDefaults } from "../langtags/index.js";
+import { loadCharNames } from "./charNames.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -40,6 +59,13 @@ export interface CharacterMapCell {
   char: string;
   /** True → the UI renders it over U+25CC dotted circle. */
   isCombiningMark: boolean;
+  /**
+   * Unicode NAME of the cell's first codepoint (see loadCharNames), e.g.
+   * "LATIN SMALL LETTER A" — undefined when the codepoint has no name in the
+   * lookup table (outside its scope, or an algorithmic/range-marker entry).
+   * Lets the studio search the character map by name, not just by glyph.
+   */
+  name?: string;
 }
 
 export interface CharacterMapGroup {
@@ -47,6 +73,16 @@ export interface CharacterMapGroup {
   block: string;
   tier: CharacterMapTier;
   cells: CharacterMapCell[];
+  /**
+   * The script that contributes the character — an ISO 15924 code
+   * identifying the target/base/curated script whose enumeration surfaced
+   * it (block/digits/punctuation tiers) or the resolved target language
+   * script (main/auxiliary tiers) — or the "Common" sentinel for the
+   * curated, universal script-neutral folds (ASCII digits, ordinary
+   * punctuation/currency, Common spacing modifier letters). Lets the studio
+   * filter/jump the character map by script.
+   */
+  script: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,22 +199,6 @@ export function isCombiningMarkChar(ch: string): boolean {
 // Script resolution
 // ---------------------------------------------------------------------------
 
-/**
- * Explicit ISO 15924 script subtag embedded in a BCP47 tag (e.g. the "Latn"
- * in "az-Latn"), if present. BCP47 script subtags are exactly 4 alpha chars,
- * appearing after the primary language subtag.
- */
-function explicitScriptSubtag(bcp47: string): string | undefined {
-  const parts = bcp47.split("-");
-  for (let i = 1; i < parts.length; i++) {
-    const part = parts[i];
-    if (part !== undefined && /^[A-Za-z]{4}$/.test(part)) {
-      return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
-    }
-  }
-  return undefined;
-}
-
 function primarySubtagOf(bcp47: string): string {
   const idx = bcp47.indexOf("-");
   return idx === -1 ? bcp47 : bcp47.slice(0, idx);
@@ -193,7 +213,68 @@ function primarySubtagOf(bcp47: string): string {
  */
 function resolveScript(bcp47: string | undefined): string | undefined {
   if (bcp47 === undefined) return undefined;
-  return explicitScriptSubtag(bcp47) ?? getLanguageDefaults(primarySubtagOf(bcp47))?.defaultScript;
+  return scriptSubtagOf(bcp47) ?? getLanguageDefaults(primarySubtagOf(bcp47))?.defaultScript;
+}
+
+// ---------------------------------------------------------------------------
+// Multi-script enumeration set
+// ---------------------------------------------------------------------------
+
+/**
+ * Major living writing systems always enumerated alongside the resolved
+ * target/base scripts, so the character map lets an author browse scripts
+ * unrelated to their target language (e.g. checking a borrowed Greek letter).
+ * Excludes the stubbed-out CJK scripts (Han/Hangul/Jpan/Kore/Hans/Hant — the
+ * "not yet supported" Three-group routing stub, spec §9) since full-script
+ * enumeration for those is neither useful nor cheap. Yiii (~1,200 codepoints)
+ * and Ethi (~500 codepoints) are the largest scans in this list.
+ */
+const CURATED_SCRIPTS: readonly string[] = [
+  "Latn",
+  "Cyrl",
+  "Grek",
+  "Armn",
+  "Geor",
+  "Hebr",
+  "Arab",
+  "Syrc",
+  "Thaa",
+  "Nkoo",
+  "Adlm",
+  "Cher",
+  "Deva",
+  "Beng",
+  "Taml",
+  "Telu",
+  "Knda",
+  "Mlym",
+  "Sinh",
+  "Thai",
+  "Laoo",
+  "Mymr",
+  "Khmr",
+  "Tibt",
+  "Ethi",
+  "Hira",
+  "Kana",
+  "Yiii",
+];
+
+/**
+ * De-duplicated union, preserving first-occurrence order — used both to build
+ * the enumeration set (target script, then caller-supplied base scripts, then
+ * CURATED_SCRIPTS) and, unchanged, as the script-group ordering priority
+ * (§4 below): the author's own scripts lead, curated scripts follow.
+ */
+function dedupeScripts(scripts: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of scripts) {
+    if (seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -216,17 +297,21 @@ const TIER_FALLBACK_LABEL: Record<CharacterMapTier, string> = {
 };
 
 /**
- * Human-readable block name for a codepoint, given the resolved script and
- * the tier it was found in. Prefers a curated CHARACTER_MAP_BLOCKS section
- * name; falls back to TIER_FALLBACK_LABEL otherwise.
+ * Human-readable block name for a codepoint, given the char's attributed
+ * script bucket (an ISO 15924 code, or the "Common" sentinel) and the tier it
+ * was found in. Prefers a curated CHARACTER_MAP_BLOCKS section name; falls
+ * back to TIER_FALLBACK_LABEL otherwise. CHARACTER_MAP_BLOCKS has no "Common"
+ * entries, so the universal script-neutral folds always fall through to the
+ * generic label. Combining marks now bucket to whichever script's
+ * Script_Extensions enumeration gathered them (e.g. Latn, Cyrl), so they DO
+ * pick up the curated "Combining Diacritical Marks" section name where that
+ * script's table carries one.
  */
-function blockNameFor(script: string | undefined, cp: number, tier: CharacterMapTier): string {
-  if (script !== undefined) {
-    const defs = CHARACTER_MAP_BLOCKS[script];
-    if (defs !== undefined) {
-      for (const def of defs) {
-        if (cp >= def.start && cp <= def.end) return def.name;
-      }
+function blockNameFor(script: string, cp: number, tier: CharacterMapTier): string {
+  const defs = CHARACTER_MAP_BLOCKS[script];
+  if (defs !== undefined) {
+    for (const def of defs) {
+      if (cp >= def.start && cp <= def.end) return def.name;
     }
   }
   return TIER_FALLBACK_LABEL[tier];
@@ -425,37 +510,69 @@ const COMMON_MODIFIER_LETTER_CHARS: readonly string[] = (() => {
 })();
 
 /**
- * Returns a defensive copy — never the live array cached inside
- * scriptCategorizedCache — since buildCharacterMap() sorts its result
- * in place. The Common-scoped modifier-letter fold (COMMON_MODIFIER_LETTER_CHARS)
- * is appended after, same pattern as digitsTierCandidates/punctuationTierCandidates,
- * regardless of the resolved script.
+ * A candidate character paired with the ISO 15924 script it is ATTRIBUTED
+ * to — for the block/digits/punctuation tiers, the script whose
+ * Script_Extensions enumeration gathered it (see categorizeScriptChars()),
+ * not necessarily the char's own primary Unicode Script property. This is
+ * what lets the studio's "show only my keyboard's scripts" filter hide a
+ * foreign script's punctuation/combining marks along with the rest of that
+ * script, rather than always showing them via a script-agnostic sentinel
+ * bucket.
  */
-function blockTierCandidates(script: string | undefined): string[] {
-  return [
-    ...(script === undefined ? [] : categorizeScriptChars(script).letters),
-    ...COMMON_MODIFIER_LETTER_CHARS,
-  ];
+interface ScriptTaggedChar {
+  char: string;
+  script: string;
 }
 
 /**
- * Script-specific digits (a defensive copy, see blockTierCandidates) plus the
- * Common-scoped ASCII digits, appended after — deduped globally downstream in
- * buildCharacterMap().
+ * Concatenates every script's letters, each tagged with the SCRIPT THAT
+ * GATHERED IT (a defensive copy of each scriptCategorizedCache entry — the
+ * live cached array is never sorted in place, since buildCharacterMap()
+ * sorts its own working arrays), across the whole enumeration set of
+ * `scripts`. A char whose Script_Extensions matches more than one enumerated
+ * script (e.g. a combining mark shared by several scripts) appears once per
+ * matching script here; the global dedupe downstream in buildCharacterMap()
+ * (stable sort + first-occurrence-wins) keeps only the FIRST script in
+ * `scripts` order to gather it. The Common-scoped modifier-letter fold
+ * (COMMON_MODIFIER_LETTER_CHARS) is appended ONCE at the end, tagged
+ * "Common" — these are genuinely script-neutral, so the enumerating-script
+ * attribution rule doesn't apply to them.
  */
-function digitsTierCandidates(script: string | undefined): string[] {
-  const scriptDigits = script === undefined ? [] : categorizeScriptChars(script).digits;
-  return [...scriptDigits, ...COMMON_DIGIT_CHARS];
+function blockTierCandidates(scripts: readonly string[]): ScriptTaggedChar[] {
+  const out: ScriptTaggedChar[] = [];
+  for (const s of scripts) {
+    for (const ch of categorizeScriptChars(s).letters) out.push({ char: ch, script: s });
+  }
+  for (const ch of COMMON_MODIFIER_LETTER_CHARS) out.push({ char: ch, script: "Common" });
+  return out;
 }
 
 /**
- * Script-specific punctuation (a defensive copy, see blockTierCandidates)
- * plus the Common-scoped punctuation, appended after — deduped globally
- * downstream in buildCharacterMap().
+ * Every script's digits, each tagged with the gathering script (see
+ * blockTierCandidates), plus the Common-scoped ASCII digits tagged "Common",
+ * appended ONCE at the end.
  */
-function punctuationTierCandidates(script: string | undefined): string[] {
-  const scriptPunctuation = script === undefined ? [] : categorizeScriptChars(script).punctuation;
-  return [...scriptPunctuation, ...COMMON_PUNCTUATION_CHARS];
+function digitsTierCandidates(scripts: readonly string[]): ScriptTaggedChar[] {
+  const out: ScriptTaggedChar[] = [];
+  for (const s of scripts) {
+    for (const ch of categorizeScriptChars(s).digits) out.push({ char: ch, script: s });
+  }
+  for (const ch of COMMON_DIGIT_CHARS) out.push({ char: ch, script: "Common" });
+  return out;
+}
+
+/**
+ * Every script's punctuation, each tagged with the gathering script (see
+ * blockTierCandidates), plus the Common-scoped punctuation tagged "Common",
+ * appended ONCE at the end.
+ */
+function punctuationTierCandidates(scripts: readonly string[]): ScriptTaggedChar[] {
+  const out: ScriptTaggedChar[] = [];
+  for (const s of scripts) {
+    for (const ch of categorizeScriptChars(s).punctuation) out.push({ char: ch, script: s });
+  }
+  for (const ch of COMMON_PUNCTUATION_CHARS) out.push({ char: ch, script: "Common" });
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -463,22 +580,29 @@ function punctuationTierCandidates(script: string | undefined): string[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Groups already-deduped, already-sorted (ascending codepoint) chars for one
- * tier into CharacterMapGroup entries, keyed by Unicode block name. Group
- * order follows first-encounter order of each block name, which — because
- * input is codepoint-sorted — comes out block-ascending for single-script
- * candidate sets.
+ * Groups already-deduped, already-sorted (ascending codepoint) chars — all
+ * belonging to the same script bucket `script` (an ISO 15924 code, or the
+ * "Common" sentinel) — for one tier into CharacterMapGroup entries, keyed by
+ * Unicode block name and tagged with `script`. Group order follows
+ * first-encounter order of each block name, which — because input is
+ * codepoint-sorted — comes out block-ascending for single-script candidate
+ * sets.
  */
 function groupByBlock(
   chars: string[],
   tier: CharacterMapTier,
-  script: string | undefined,
+  script: string,
+  names: ReadonlyMap<number, string>,
 ): CharacterMapGroup[] {
   const groups = new Map<string, CharacterMapCell[]>();
   for (const ch of chars) {
     const cp = ch.codePointAt(0) ?? 0;
     const blockName = blockNameFor(script, cp, tier);
-    const cell: CharacterMapCell = { char: ch, isCombiningMark: isCombiningMarkChar(ch) };
+    const name = names.get(cp);
+    const cell: CharacterMapCell =
+      name === undefined
+        ? { char: ch, isCombiningMark: isCombiningMarkChar(ch) }
+        : { char: ch, isCombiningMark: isCombiningMarkChar(ch), name };
     const existing = groups.get(blockName);
     if (existing !== undefined) {
       existing.push(cell);
@@ -486,11 +610,59 @@ function groupByBlock(
       groups.set(blockName, [cell]);
     }
   }
-  return [...groups.entries()].map(([block, cells]) => ({ block, tier, cells }));
+  return [...groups.entries()].map(([block, cells]) => ({ block, tier, cells, script }));
+}
+
+/**
+ * Buckets already-deduped, already-sorted, already-script-tagged chars for
+ * one tier by their attributed `script` tag, then groups each bucket via
+ * groupByBlock(). Buckets are emitted in `scriptOrder` (the enumeration set
+ * — target/base scripts first, then curated scripts — followed by
+ * "Common"); any bucket not covered by `scriptOrder` (should not happen —
+ * every tagged char's script is either "Common" or a script registered as
+ * part of the current call's enumeration set — kept as a safety net so a
+ * char is never silently dropped) is appended afterward in a deterministic
+ * (sorted) order.
+ */
+function groupTierByScript(
+  chars: readonly ScriptTaggedChar[],
+  tier: CharacterMapTier,
+  scriptOrder: readonly string[],
+  names: ReadonlyMap<number, string>,
+): CharacterMapGroup[] {
+  const byScript = new Map<string, string[]>();
+  for (const { char, script } of chars) {
+    const bucket = byScript.get(script);
+    if (bucket !== undefined) {
+      bucket.push(char);
+    } else {
+      byScript.set(script, [char]);
+    }
+  }
+
+  const out: CharacterMapGroup[] = [];
+  const emitted = new Set<string>();
+  for (const s of scriptOrder) {
+    const bucket = byScript.get(s);
+    if (bucket === undefined || emitted.has(s)) continue;
+    emitted.add(s);
+    out.push(...groupByBlock(bucket, tier, s, names));
+  }
+  for (const s of [...byScript.keys()].sort()) {
+    if (emitted.has(s)) continue;
+    const bucket = byScript.get(s);
+    if (bucket === undefined) continue;
+    out.push(...groupByBlock(bucket, tier, s, names));
+  }
+  return out;
 }
 
 function byCodepointAscending(a: string, b: string): number {
   return (a.codePointAt(0) ?? 0) - (b.codePointAt(0) ?? 0);
+}
+
+function taggedByCodepointAscending(a: ScriptTaggedChar, b: ScriptTaggedChar): number {
+  return byCodepointAscending(a.char, b.char);
 }
 
 // ---------------------------------------------------------------------------
@@ -498,39 +670,68 @@ function byCodepointAscending(a: string, b: string): number {
 // ---------------------------------------------------------------------------
 
 /**
- * Builds the tiered, browsable character-map candidate set for the character
- * map UI: CLDR main exemplars, then CLDR auxiliary exemplars, then the
- * resolved script's remaining letters (+ combining marks), then its digits,
- * then its punctuation/symbols — grouped by Unicode block name, deduplicated
- * globally (first tier to introduce a char wins).
+ * Builds the tiered, browsable, multi-script character-map candidate set for
+ * the character map UI: CLDR main exemplars, then CLDR auxiliary exemplars,
+ * then the enumerated scripts' remaining letters (+ combining marks), then
+ * their digits, then their punctuation/symbols — grouped by (script, Unicode
+ * block name), deduplicated globally (first tier to introduce a char wins).
  *
  * @param baseIr      Parsed KeyboardIR of the working-copy base. When `bcp47`
  *                    is omitted, its first header.bcp47 tag is used to resolve
- *                    CLDR exemplars and the browsing script. May be null when
+ *                    CLDR exemplars and the target script. May be null when
  *                    no base is available yet — the function then degrades to
  *                    whatever `bcp47` alone can resolve.
  * @param bcp47       Target BCP47 tag. Drives both CLDR exemplar lookup and
  *                    (via an explicit script subtag or the langtags default
- *                    script) the "block" tier's script.
+ *                    script) the resolved target script.
  * @param languageName Unused by candidate generation; accepted for interface
  *                    parity with the LLM-backed character-discovery calls
  *                    (synthesizeInventory) the studio's services layer also wires up.
- * @param loader      CldrFullLoader; defaults to the network-backed
- *                    createFetchCldrFullLoader() instance. Exposed as an
- *                    optional trailing parameter (not part of the reviewed
- *                    3-arg shape) purely for test injection — every existing
- *                    3-argument call site is unaffected.
+ * @param opts.baseScripts Additional ISO 15924 script codes to enumerate
+ *                    alongside the resolved target script — e.g. the base
+ *                    keyboard's own script(s) when adapting into a different
+ *                    target language. Included in the enumeration set (and
+ *                    the group-ordering priority) right after the target
+ *                    script and before CURATED_SCRIPTS.
+ * @param opts.loader CldrFullLoader; defaults to the network-backed
+ *                    createFetchCldrFullLoader() instance. Test-injection
+ *                    hook only.
  */
 export async function buildCharacterMap(
   baseIr: KeyboardIR | null,
   bcp47?: string,
   languageName?: string,
-  loader: CldrFullLoader = createFetchCldrFullLoader(),
+  opts?: { baseScripts?: readonly string[]; loader?: CldrFullLoader },
 ): Promise<CharacterMapGroup[]> {
   void languageName;
+  const loader = opts?.loader ?? createFetchCldrFullLoader();
+  // The Unicode name table is an OPTIONAL search enhancement (search-by-name).
+  // It must never break the whole character map: if the lazily-loaded table
+  // fails to load (bundler/asset issue, missing prebuild artifact, etc.),
+  // degrade to no names rather than rejecting buildCharacterMap() — which would
+  // surface as the pane's "Could not load the character map" error state.
+  let names: ReadonlyMap<number, string>;
+  try {
+    names = await loadCharNames();
+  } catch {
+    names = new Map<number, string>();
+  }
 
   const effectiveBcp47 = bcp47 ?? baseIr?.header.bcp47[0];
-  const script = resolveScript(effectiveBcp47);
+  const targetScript = resolveScript(effectiveBcp47);
+
+  // Enumeration set: target script (if resolved), then caller-declared base
+  // scripts, then the curated major-script list — de-duplicated union in
+  // that priority order. Also doubles as the script-group ordering priority
+  // (see groupTierByScript): the author's own scripts lead.
+  const enumerationScripts = dedupeScripts([
+    ...(targetScript === undefined ? [] : [targetScript]),
+    ...(opts?.baseScripts ?? []),
+    ...CURATED_SCRIPTS,
+  ]);
+  // The Common group (universal script-neutral folds) renders after the
+  // related script groups.
+  const scriptGroupOrder = [...enumerationScripts, "Common"];
 
   let mainRaw: string[] = [];
   let auxRaw: string[] = [];
@@ -541,40 +742,48 @@ export async function buildCharacterMap(
       auxRaw = exemplars.auxiliary.filter((ch) => !isGuardrailExcluded(ch));
     }
   }
-  const blockRaw = blockTierCandidates(script);
-  const digitsRaw = digitsTierCandidates(script);
-  const punctuationRaw = punctuationTierCandidates(script);
+  const blockRaw = blockTierCandidates(enumerationScripts);
+  const digitsRaw = digitsTierCandidates(enumerationScripts);
+  const punctuationRaw = punctuationTierCandidates(enumerationScripts);
 
   mainRaw.sort(byCodepointAscending);
   auxRaw.sort(byCodepointAscending);
-  blockRaw.sort(byCodepointAscending);
-  digitsRaw.sort(byCodepointAscending);
-  punctuationRaw.sort(byCodepointAscending);
+  blockRaw.sort(taggedByCodepointAscending);
+  digitsRaw.sort(taggedByCodepointAscending);
+  punctuationRaw.sort(taggedByCodepointAscending);
+
+  // The main/auxiliary tiers are the target language's own alphabet — every
+  // char is tagged with the resolved target script (falling back to "Common"
+  // in the unlikely case CLDR still yielded exemplars but no script resolved).
+  const mainAuxScript = targetScript ?? "Common";
+  const mainTagged: ScriptTaggedChar[] = mainRaw.map((char) => ({ char, script: mainAuxScript }));
+  const auxTagged: ScriptTaggedChar[] = auxRaw.map((char) => ({ char, script: mainAuxScript }));
 
   // Global dedupe: first tier to introduce a char wins
-  // (main > auxiliary > block > digits > punctuation).
+  // (main > auxiliary > block > digits > punctuation). The winning
+  // occurrence's script tag is the one that survives.
   const seen = new Set<string>();
-  const dedupe = (chars: string[]): string[] => {
-    const out: string[] = [];
-    for (const ch of chars) {
-      if (seen.has(ch)) continue;
-      seen.add(ch);
-      out.push(ch);
+  const dedupe = (chars: readonly ScriptTaggedChar[]): ScriptTaggedChar[] => {
+    const out: ScriptTaggedChar[] = [];
+    for (const tc of chars) {
+      if (seen.has(tc.char)) continue;
+      seen.add(tc.char);
+      out.push(tc);
     }
     return out;
   };
 
-  const mainChars = dedupe(mainRaw);
-  const auxChars = dedupe(auxRaw);
+  const mainChars = dedupe(mainTagged);
+  const auxChars = dedupe(auxTagged);
   const blockChars = dedupe(blockRaw);
   const digitsChars = dedupe(digitsRaw);
   const punctuationChars = dedupe(punctuationRaw);
 
   return [
-    ...groupByBlock(mainChars, "main", script),
-    ...groupByBlock(auxChars, "auxiliary", script),
-    ...groupByBlock(blockChars, "block", script),
-    ...groupByBlock(digitsChars, "digits", script),
-    ...groupByBlock(punctuationChars, "punctuation", script),
+    ...groupTierByScript(mainChars, "main", scriptGroupOrder, names),
+    ...groupTierByScript(auxChars, "auxiliary", scriptGroupOrder, names),
+    ...groupTierByScript(blockChars, "block", scriptGroupOrder, names),
+    ...groupTierByScript(digitsChars, "digits", scriptGroupOrder, names),
+    ...groupTierByScript(punctuationChars, "punctuation", scriptGroupOrder, names),
   ];
 }
