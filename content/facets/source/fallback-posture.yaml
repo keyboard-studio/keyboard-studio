@@ -1,24 +1,25 @@
-# source.fallback-posture — whether the chosen base's .kmn relies on
-# &baselayout to fall through to the OS default layout for keys it doesn't
-# rule itself, or blocks comprehensively with its own rule for every key.
-# Desktop-only: &baselayout has no touch-layout counterpart.
+# source.fallback-posture — whether the chosen base's .kmn rules cover every
+# physical key itself, or leaves keys unruled so they fall through to
+# whatever physical/OS layout is actually active at runtime (not read from
+# any .kmn store — see derivations notes below).
+# Desktop-only: base-layout fall-through has no touch-layout counterpart.
 
 id: source.fallback-posture
 family: source
 title: Source fallback posture
 description: >
-  Whether the chosen base .kmn relies on the &baselayout store to fall
-  through to the OS default layout for keys it leaves unruled, blocks
-  comprehensively by ruling every key itself, or mixes both across its
-  rule groups. Read directly from the base, before adaptation — a strong
-  prior for whether the adapted keyboard will inherit unhandled-key gaps.
+  Whether the chosen base .kmn rules every physical key itself, leaves some
+  keys unruled so they fall through to whatever OS layout the user actually
+  has active at runtime, or mixes both across its rule groups. Read directly
+  from the base, before adaptation — a strong prior for whether the adapted
+  keyboard will inherit unhandled-key gaps.
 
 valueType: enum
 values: [relies-on, blocks-comprehensively, mixed]
 
 modality: physical
 modalityNotes: >
-  &baselayout fallback is a desktop .kmn concept only; there is no
+  Base-layout fall-through is a desktop .kmn concept only; there is no
   touch-layout equivalent (touch layouts declare every key explicitly).
 
 derivations:
@@ -26,10 +27,14 @@ derivations:
     source: "planned:fallback-posture-of-kmn"
     sourceStatus: planned
     notes: >
-      Reads the &baselayout store value and counts explicitly ruled physical
-      keys against the keyboard's declared key range to decide whether
-      unruled keys are the common case (relies-on) or the exception
-      (blocks-comprehensively).
+      Counts explicitly-ruled physical keys (including `[K_x] > nul` blocks)
+      against the keyboard's declared key range to decide whether unruled
+      keys are the common case (relies-on) or the exception
+      (blocks-comprehensively). &baselayout is not read: it is a
+      conditional-test predicate for branching a rule per detected
+      physical/OS layout, not a declared fallback source, and the actual
+      fall-through target — whatever OS layout is active at runtime — is
+      not expressed anywhere in the .kmn.
 
 consumers:
   prefills: []
@@ -46,7 +51,8 @@ metrics:
   elicitationCost: computed
 
 notes: >
-  Desktop-only per modalityNotes; reads &baselayout.
+  Desktop-only per modalityNotes; does not read &baselayout (see
+  derivations notes).
 
 transformImpactClass: ux-changing
 houseTargetPolicy:

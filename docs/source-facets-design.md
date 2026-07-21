@@ -128,7 +128,7 @@ All start `status: candidate`.
 |---|---|
 | `source.normalization-posture` | values `{nfc, nfd, mixed}`. **Scope note:** NFC/NFD is a meaningful axis only for alphabetic families whose canonical decomposition matters at the character level (Latin/Cyrillic/Greek); for abugidas/abjads it is near-vacuous -- the real structural axis for those families is **canonical (visual/logical) ordering**, not NFC/NFD. The classifier marks those corpora "not-applicable" rather than forcing a value. **Backspace-match is a consistency/exception signal, not a value of this facet** -- whether backspace rules were written to match the chosen normalization is recorded as consistency/exception-site data (§4), the follow-through half, layered on top of the `{nfc, nfd, mixed}` value. |
 | `source.reordering-rules` | values `{none, group-reorder-swap, inline-swap, mixed}`. **Note:** Keyman has no dedicated `reorder` keyword -- reordering is a *convention* built from `group(...)` with a `use`/match-and-rewrite structure (the `group(reorder)` convention), not a distinct grammar construct, so the classifier is reading a structural pattern, not a keyword. |
-| `source.fallback-posture` | how the base handles base-layout fall-through: `relies-on` / `blocks-comprehensively` / `mixed`; **leaked keys are the exception sites**. **Scope:** modality is **physical only** -- touch has no fall-through to model (touch keys are explicit JSON with no base-layout underneath). The classifier reads the keyboard's own `&baselayout` system store rather than assuming US QWERTY; when `&baselayout` is unset, the packaging format's own default applies and is recorded as defaulted, not declared. |
+| `source.fallback-posture` | how the base handles base-layout fall-through: `relies-on` / `blocks-comprehensively` / `mixed`; **leaked keys are the exception sites**. **Scope:** modality is **physical only** -- touch has no fall-through to model (touch keys are explicit JSON with no base-layout underneath). **Corrected 2026-07-20 (#1170):** the classifier cannot read this from the `.kmn` -- Keyman's `&baselayout` is a conditional-test predicate for branching a rule per detected physical/OS layout (used exactly like `platform()`), not a declared fallback-target store. The fall-through target is whatever OS layout the user actually has active at runtime, which the `.kmn` cannot express, so the classifier assumes a fixed reference layout (e.g. US QWERTY) to model fall-through characters and records this as a modeling assumption, not a defaulted-vs-declared distinction. |
 
 **Gate:**
 
@@ -168,17 +168,24 @@ toward `U+` values. Hence a policy, not a constant.
 ## 7. Spec 037 findings (independent of the transform work)
 
 1. **Fall-through must be modeled in produced-characters (US1).** In Keyman,
-   unmapped keys fall through to the base layout named by the keyboard's own
-   `&baselayout` system store (not an assumed US QWERTY -- a keyboard may declare
-   a different base) and keep producing that layout's characters; when
-   `&baselayout` is unset, the packaging format's own default applies and is
-   recorded as defaulted, not declared. "The characters the keyboard produces"
-   therefore is **not** just what its rules emit -- it includes every un-blocked
-   base-layout character, and this is desktop-only (touch keys are explicit JSON
-   with no base-layout underneath). A non-Latin keyboard that forgot to block a
-   key (`[K_W] > nul`) technically produces a stray base-layout character (e.g.
-   Latin `W`). The script classifier must account for fall-through or it will
-   mis-score exactly the keyboards that failed to block it.
+   unmapped keys fall through to whatever physical/OS layout the user actually
+   has active at runtime and keep producing that layout's characters. This is
+   **not** named or declared anywhere in the `.kmn` -- Keyman's `&baselayout`
+   store is a conditional-test predicate (used exactly like `platform()`) for
+   branching a rule per detected physical/OS layout, not a declared
+   fallback-target store, and it says nothing about where an unhandled key's
+   output comes from (corrected 2026-07-20, #1170; supersedes the earlier
+   "reads `&baselayout`" framing). Because the analysis cannot know the real
+   active OS layout, it must assume a fixed reference layout (e.g. US QWERTY)
+   to model fall-through characters, recorded as a modeling assumption.
+   "The characters the keyboard produces" therefore is **not** just what its
+   rules emit -- it includes every un-blocked base-layout character under
+   that assumed reference layout, and this is desktop-only (touch keys are
+   explicit JSON with no base-layout underneath). A non-Latin keyboard that
+   forgot to block a key (`[K_W] > nul`) technically produces a stray
+   base-layout character (e.g. Latin `W`) under the assumed reference layout.
+   The script classifier must account for fall-through or it will mis-score
+   exactly the keyboards that failed to block it.
 2. **Construction classifiers are further rule-structure classifiers** following the
    standard 037 already sets -- no new *classifier* spec is needed (per 037's own
    out-of-scope note); they are content/engine work under spec 036 extensibility.
