@@ -132,9 +132,19 @@ function parseCodepointInput(raw: string): CodepointParseResult {
 // being truncated. The genuinely huge blocks (CJK Unified Ideographs,
 // Hangul syllables) are routed to the three-group-routing "not yet
 // supported" stub well before reaching this pane, so they never hit this cap.
-const MAX_CELLS_PER_GROUP = 3000;
+export const MAX_CELLS_PER_GROUP = 3000;
 
-export function CharacterMapPane() {
+interface CharacterMapPaneProps {
+  // Per-group render cap. Defaults to MAX_CELLS_PER_GROUP; overridable only so
+  // tests can exercise the exact slice/"Showing N of M" logic with a small cap
+  // instead of rendering thousands of DOM chips (which flakes past the timeout
+  // under full-suite parallel load). Production always uses the default.
+  maxCellsPerGroup?: number;
+}
+
+export function CharacterMapPane({
+  maxCellsPerGroup = MAX_CELLS_PER_GROUP,
+}: CharacterMapPaneProps = {}) {
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const surveyContext = useSurveySessionStore((s) => s.surveyContext);
   const bcp47 = surveyContext.bcp47_tag;
@@ -309,7 +319,7 @@ export function CharacterMapPane() {
             // ~1.1k) — cap what's drawn, not what's reachable (search above
             // narrows `group.cells` before this slice runs, and the U+XXXX
             // field reaches anything regardless of this cap).
-            const visibleCells = group.cells.slice(0, MAX_CELLS_PER_GROUP);
+            const visibleCells = group.cells.slice(0, maxCellsPerGroup);
             const hiddenCount = group.cells.length - visibleCells.length;
             return (
               <section
