@@ -98,10 +98,27 @@ compiles the JSON at import time, so only the JSON sources are committed.
 **Verify once credentials are set:** `crowdin upload sources --dry-run -b main`
 (the CLI has no offline config validation — every command authenticates).
 
+## Drift gate (step 3 — implemented)
+
+[utilities/i18n-catalog-lint/index.js](../utilities/i18n-catalog-lint/index.js) —
+a read-only plain-node checker (same shape as `facet-index-lint`), wired into
+`pnpm lint` (so CI's existing lint step runs it — no `ci.yml` change) and exposed
+as `pnpm run i18n-catalog-lint`. It:
+
+- extracts a **fresh** catalog into a temp dir (via the config's
+  `LINGUI_CATALOG_CHECK_DIR` override) so it never touches the committed
+  catalogs — safe locally and in `pnpm lint`;
+- fails if the **source** (`en`) catalog differs in keys **or values** (catches
+  added/removed strings *and edited English under an unchanged id* — the drift
+  signal the stable-id scheme would otherwise hide);
+- fails if a **target** locale's key set drifts (a new string not propagated);
+- fix on failure: `pnpm --filter @keyboard-studio/studio messages:extract`, commit.
+
+Verified: green when in sync; on an English edit under a stable id it reports
+`[en] source catalog out of date — English changed: welcome.title` and exits 1.
+
 ## Not done (next steps if we adopt)
 - Locale switcher UI + persistence; browser-language detection.
-- Decide the extraction lint gate (fail CI if `en` changed without re-sync) and
-  where it sits relative to the km-triage merge gate.
 - Convert the rest of the UI chrome; agree the id namespace convention
   (`area.component.thing`).
 - Team-boundary check: UI catalog lives under `packages/studio` (engine team);
