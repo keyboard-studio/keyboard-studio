@@ -194,6 +194,9 @@ importers:
       '@fastify/cors':
         specifier: ^10.0.1
         version: 10.1.0
+      '@keyboard-studio/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@octokit/auth-app':
         specifier: ^7.1.1
         version: 7.2.2
