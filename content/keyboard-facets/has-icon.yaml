@@ -1,0 +1,36 @@
+# has-icon — declared-metadata archetype.
+#
+# Whether the keyboard declares an icon bitmap at all: value `present` iff the
+# .kmn header declares a &BITMAP store OR the .kps bundles an icon file
+# (.ico/.bmp), else `absent`. Deliberately BROADER than package-completeness's
+# `icon` member, which credits only a .kps-bundled .ico — this also credits the
+# classic Keyman &BITMAP header declaration (the icon shown next to the keyboard
+# in the OS language switcher). Read from the parsed .kmn IR (&BITMAP store) plus
+# the .kps <Files> via the shared kps-reader. Feeds source.package-completeness.
+#
+# The deciding signal is a declaration (a header store / a bundled package file),
+# so the record tier is declared-metadata; a keyboard with neither a readable
+# .kmn nor a readable .kps defaults to `absent` at the default-fallback tier.
+id: has-icon
+title: Has icon
+description: >
+  Whether the keyboard declares an icon bitmap — present when the .kmn header
+  declares a &BITMAP store or the .kps bundles a .ico/.bmp icon file, else
+  absent. Broader than package-completeness's icon member (which credits only a
+  bundled .ico): this also credits the &BITMAP header declaration.
+valueType: enum
+limits:
+  values:
+    - present
+    - absent
+  open: false
+likelihoodSemantics: >
+  a single keyboard-level determination; the record's `notes` names which
+  signal(s) — a &BITMAP header store and/or a bundled .ico/.bmp — the value was
+  read from.
+derivation:
+  archetype: declared-metadata
+  classifierId: has-icon-classifier
+  fallbackChain: [declared-metadata, default-fallback]
+feedsSessionFacets: [source.package-completeness]
+schemaVersion: 1
