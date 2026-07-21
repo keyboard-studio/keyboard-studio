@@ -10,7 +10,8 @@
 // no mocking is needed anywhere in this file.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
+import { screen, fireEvent, act, cleanup } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { FlowStepHost } from "./FlowStepHost.tsx";
 import type { FlowDef } from "./types.ts";
 import type { LintFinding, SurveyPhaseResult } from "@keyboard-studio/contracts";

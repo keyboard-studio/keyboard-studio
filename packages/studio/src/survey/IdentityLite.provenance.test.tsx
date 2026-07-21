@@ -13,7 +13,8 @@
 // side-channel, so the tests SELECT a suggestion rather than type a code.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, cleanup, waitFor, fireEvent, screen } from "@testing-library/react";
+import { cleanup, waitFor, fireEvent, screen } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import type { LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
 
 const PROVENANCE_CAPTION = "Suggested from langtags — edit if needed";

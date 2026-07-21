@@ -25,7 +25,8 @@
 //   checks the bijection over all FLOW_SOURCES.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
+import { screen, fireEvent, act, cleanup } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { ProjectNameStepFactoryComponent } from "../editors/adapters/flowStepOptions.tsx";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";

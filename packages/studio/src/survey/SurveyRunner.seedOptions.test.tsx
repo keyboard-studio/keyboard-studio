@@ -5,7 +5,8 @@
 // the input before reading the option values. jsdom render.
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, cleanup, fireEvent } from "@testing-library/react";
+import { cleanup, fireEvent } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import type { FlowDef, FlowOption } from "./types.ts";
 

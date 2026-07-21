@@ -8,7 +8,8 @@
 //   - Verify chip presence/absence, pin/unpin toggle, and store update.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
+import { screen, fireEvent, act, cleanup } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------

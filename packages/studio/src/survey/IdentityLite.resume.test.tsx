@@ -7,7 +7,8 @@
 //     with the same extracted identity.
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { screen, fireEvent, cleanup } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import React from "react";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 

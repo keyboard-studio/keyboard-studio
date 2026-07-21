@@ -31,7 +31,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useState, useEffect } from "react";
-import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
+import { screen, fireEvent, cleanup, act } from "@testing-library/react";
+import { render } from "./test/renderWithI18n.tsx";
 import { basicKbdus, silEuroLatin, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";

@@ -11,7 +11,8 @@
 //      falls back to "Latn" instead of failing every script comparison.
 
 import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
-import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/react";
+import { screen, cleanup, waitFor, fireEvent } from "@testing-library/react";
+import { render } from "../../test/renderWithI18n.tsx";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import {
   basicKbdus,
