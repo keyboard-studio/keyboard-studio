@@ -9,7 +9,7 @@ Generated — do not edit. The machine-readable artifact is [`keyboard-facet-ind
 - **scannerVersion**: `facet-index@1;schema@1;script@3;strategy-fingerprint@1;target-mix@1`
 - **unicodeVersion**: 17.0.0
 - **corpusScope**: `release/**`
-- **corpusCommit**: `keymanapp/keyboards@435f82d69bfc926eb03c2d8632571b41b6da3266`
+- **corpusCommit**: `keyboard-studio/keyboards@435f82d69bfc926eb03c2d8632571b41b6da3266`
 - **referencePins**: 10
 
 ## Coverage by facet (provenance tier)
