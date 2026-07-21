@@ -1,6 +1,7 @@
 {
   "welcome.tagline": "Design and ship a Keyman keyboard, right in your browser.",
   "welcome.imNew": "I’m new",
+  "nav.language": "Language",
   "welcome.signIn.github": "Sign in with GitHub",
   "welcome.signIn.google": "Sign in with Google",
   "welcome.title": "Welcome to Keyboard Studio"

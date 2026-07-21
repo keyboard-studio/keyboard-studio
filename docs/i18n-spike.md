@@ -117,8 +117,20 @@ as `pnpm run i18n-catalog-lint`. It:
 Verified: green when in sync; on an English edit under a stable id it reports
 `[en] source catalog out of date — English changed: welcome.title` and exits 1.
 
+## Locale switcher (implemented)
+
+[LocaleSwitcher.tsx](../packages/studio/src/components/LocaleSwitcher.tsx) in the
+NavBar (all routes): reads the active locale from the Lingui context (so it
+re-renders on change), and on selection **persists** the choice
+(`ks.locale` in localStorage, guarded like [firstVisit.ts](../packages/studio/src/lib/firstVisit.ts))
+and **activates** it (lazy catalog load). Bootstrap resolution order:
+saved choice → browser language (`navigator.language`) → English
+(`resolveInitialLocale()` in [lib/i18n.ts](../packages/studio/src/lib/i18n.ts)).
+Option labels are each language's own autonym (not translated); the field label
+is localized. The `fr` catalog now carries **illustrative** translations so the
+switch is demonstrable — Crowdin owns the real ones later.
+
 ## Not done (next steps if we adopt)
-- Locale switcher UI + persistence; browser-language detection.
 - Convert the rest of the UI chrome; agree the id namespace convention
   (`area.component.thing`).
 - Team-boundary check: UI catalog lives under `packages/studio` (engine team);

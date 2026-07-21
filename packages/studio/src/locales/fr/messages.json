@@ -1,7 +1,8 @@
 {
-  "welcome.tagline": "",
-  "welcome.imNew": "",
-  "welcome.signIn.github": "",
-  "welcome.signIn.google": "",
-  "welcome.title": ""
+  "welcome.tagline": "Concevez et publiez un clavier Keyman, directement dans votre navigateur.",
+  "welcome.imNew": "Je débute",
+  "nav.language": "Langue",
+  "welcome.signIn.github": "Se connecter avec GitHub",
+  "welcome.signIn.google": "Se connecter avec Google",
+  "welcome.title": "Bienvenue dans Keyboard Studio"
 }
