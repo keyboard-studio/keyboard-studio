@@ -13,6 +13,7 @@ import {
   RawPatternSchema,
   CriterionSchema,
   RemovalCapabilitySchema,
+  toPattern,
 } from "./schemas";
 import { samplePatterns } from "./fixtures/patterns";
 import { ALL_CRITERIA } from "./criteriaData";
@@ -87,6 +88,122 @@ describe("RawPatternSchema (YAML-tolerant input)", () => {
   it("still rejects input missing a structurally-required field", () => {
     const { kmnFragment: _omit, ...broken } = rawYamlShaped;
     expect(RawPatternSchema.safeParse(broken).success).toBe(false);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// toPattern — RawPattern -> Pattern normalisation (issue #1002)
+//
+// Single shared implementation, imported by both the engine's node loader
+// (engine/src/pattern-library/loader.ts) and the studio's browser loader
+// (studio/src/lib/browserPatternLibrary.ts). Fixtures below mirror the shapes
+// covered by engine/src/pattern-library/__fixtures__/*.yaml (valid-pattern,
+// nullable-fragments-pattern, borderline-pattern) so this test locks the
+// pre-extraction behaviour of both now-deleted per-loader copies.
+// -----------------------------------------------------------------------------
+
+describe("toPattern (RawPattern -> Pattern normalisation)", () => {
+  it("normalises a full-featured raw pattern, coercing numeric id/date to string", () => {
+    // Mirrors engine/__fixtures__/valid-pattern.yaml plus strategy/provenance/demo fields.
+    const raw = RawPatternSchema.parse({
+      id: 42,
+      title: "Test Valid Pattern",
+      description: "A valid pattern for testing the loader.",
+      category: "substitute",
+      appliesTo: ["Latn"],
+      group_visibility: "all",
+      priority: 1,
+      strategyId: "S-01",
+      combinesWith: ["S-04"],
+      questions: [{ id: "charMap", prompt: "Map keystrokes to characters.", answerType: "text" }],
+      kmnFragment: "+ [K_Q] > U+025B\n",
+      tests: [{ input: ["[K_Q]"], expectedOutput: "ɛ", description: "Q produces ɛ" }],
+      validatedForFamilies: ["Latn"],
+      sourceKeyboards: [],
+      reviewedBy: "test-suite",
+      reviewDate: 20260101,
+      frequencyInCorpus: 3,
+      provenance: [{ keyboard: "release/basic/basic_kbdfr", rule: "+ 'a' > 'b'" }],
+      demo: { filled_kmn: "+ [K_Q] > U+025B\n" },
+    });
+
+    const pattern = toPattern(raw);
+
+    expect(pattern.id).toBe("42");
+    expect(pattern.reviewedBy).toBe("test-suite");
+    expect(pattern.reviewDate).toBe("20260101");
+    expect(pattern.category).toBe("substitute");
+    expect(pattern.strategyId).toBe("S-01");
+    expect(pattern.combinesWith).toEqual(["S-04"]);
+    expect(pattern.group_visibility).toBe("all");
+    expect(pattern.priority).toBe(1);
+    expect(pattern.frequencyInCorpus).toBe(3);
+    expect(pattern.provenance).toEqual([
+      { keyboard: "release/basic/basic_kbdfr", rule: "+ 'a' > 'b'" },
+    ]);
+    expect(pattern.demo).toEqual({ filled_kmn: "+ [K_Q] > U+025B\n" });
+    // Result must satisfy the strict schema too.
+    expect(PatternSchema.safeParse(pattern).success).toBe(true);
+  });
+
+  it("coerces explicit null touch/reorder fragments to omitted fields", () => {
+    // Mirrors engine/__fixtures__/nullable-fragments-pattern.yaml.
+    const raw = RawPatternSchema.parse({
+      id: "test_null_fragments_pattern",
+      title: "Test Null Fragments Pattern",
+      description: "Desktop pattern that marks touch/reorder fragments with explicit null.",
+      category: "desktop",
+      appliesTo: ["Latn"],
+      questions: [
+        { id: "triggerKey", prompt: "Which key triggers it?", answerType: "key-name", default: "K_QUOTE" },
+      ],
+      kmnFragment: "+ [{{triggerKey}}] > deadkey(acute)\n",
+      touchLayoutFragment: null,
+      reorderRules: null,
+      tests: [{ input: ["[K_QUOTE]"], expectedOutput: "" }],
+      validatedForFamilies: ["Latn"],
+      sourceKeyboards: [],
+      reviewedBy: "test-suite",
+      reviewDate: "2026-01-01",
+    });
+
+    const pattern = toPattern(raw);
+
+    expect("touchLayoutFragment" in pattern).toBe(false);
+    expect("reorderRules" in pattern).toBe(false);
+  });
+
+  it("omits every optional field when the raw pattern carries only required fields", () => {
+    const raw = RawPatternSchema.parse({
+      id: "minimal",
+      title: "Minimal",
+      description: "Only required fields.",
+      category: "substitute",
+      appliesTo: [],
+      questions: [],
+      kmnFragment: "",
+      tests: [],
+      validatedForFamilies: [],
+      sourceKeyboards: [],
+      reviewedBy: "test",
+      reviewDate: "2026-01-01",
+    });
+
+    const pattern = toPattern(raw);
+
+    for (const key of [
+      "strategyId",
+      "combinesWith",
+      "touchLayoutFragment",
+      "reorderRules",
+      "frequencyInCorpus",
+      "provenance",
+      "demo",
+      "group_visibility",
+      "priority",
+    ]) {
+      expect(key in pattern).toBe(false);
+    }
   });
 });
 

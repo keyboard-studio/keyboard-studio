@@ -17,12 +17,14 @@
 // @see spec.md §11 / §14 Decision 4 (Criterion four-band model)
 
 import { z } from "zod";
-import type { Pattern, PatternQuestion, TestVector, DemoObject } from "./pattern";
+import type { Pattern, PatternCategory, PatternQuestion, TestVector, DemoObject } from "./pattern";
+import { makePattern } from "./pattern";
 import type { Criterion } from "./criteria";
 import type { RemovalCapability } from "./removalCapability";
 import type { TouchKeyProvenance, TouchKeyIR, TouchLayoutIR } from "./keyboard-ir";
 import type { AxisFill, AxisFillSource } from "./axisFill";
 import type { Scale, ScriptClass } from "./axes";
+import type { StrategyId } from "./strategy";
 
 // ---------------------------------------------------------------------------
 // Leaf enums — mirror the string-literal unions in the contract types.
@@ -406,6 +408,71 @@ export const RawPatternSchema = z
   .passthrough();
 
 export type RawPattern = z.infer<typeof RawPatternSchema>;
+
+// Convenience alias for the provenance item type used in PatternInit.
+type ProvenanceItem = { keyboard: string; rule?: string; notes?: string };
+
+/**
+ * Map a validated {@link RawPattern} to the contracts {@link Pattern} shape
+ * by delegating to {@link makePattern}, which handles all optional-field
+ * spreading internally (satisfying `exactOptionalPropertyTypes`).
+ *
+ * Each optional field is hoisted into a typed local before being passed so
+ * that `exactOptionalPropertyTypes` sees a narrowed non-undefined value
+ * rather than `T | undefined`.
+ *
+ * Single source of truth for RawPattern -> Pattern normalisation, imported
+ * by both the engine's node loader (`engine/src/pattern-library/loader.ts`)
+ * and the studio's browser loader (`studio/src/lib/browserPatternLibrary.ts`)
+ * so the two environments cannot silently diverge on how a YAML pattern
+ * becomes a `Pattern`. This function has no `node:fs`/Vite dependency, so
+ * importing it into the browser bundle is safe.
+ */
+export function toPattern(data: RawPattern): Pattern {
+  // Required fields — always present after schema validation.
+  const base = {
+    id: String(data.id),
+    title: String(data.title),
+    description: String(data.description),
+    category: data.category as PatternCategory,
+    appliesTo: data.appliesTo,
+    questions: data.questions as Parameters<typeof makePattern>[0]["questions"],
+    kmnFragment: data.kmnFragment,
+    tests: data.tests as Parameters<typeof makePattern>[0]["tests"],
+    validatedForFamilies: data.validatedForFamilies,
+    sourceKeyboards: data.sourceKeyboards,
+    reviewedBy: String(data.reviewedBy),
+    reviewDate: String(data.reviewDate),
+  };
+
+  // Optional fields — each narrowed to its non-undefined type so the spread
+  // satisfies exactOptionalPropertyTypes on PatternInit.
+  const strategyId = data.strategyId as StrategyId | undefined;
+  const combinesWith = data.combinesWith as StrategyId[] | undefined;
+  const provenance = data.provenance as ProvenanceItem[] | undefined;
+  const demo = data.demo as string | DemoObject | null | undefined;
+
+  return makePattern({
+    ...base,
+    ...(strategyId !== undefined ? { strategyId } : {}),
+    ...(combinesWith !== undefined ? { combinesWith } : {}),
+    // null (authored "no fragment") and undefined both coerce to omitted —
+    // Pattern types these as `?: string`, so only a real string is forwarded.
+    ...(typeof data.touchLayoutFragment === "string"
+      ? { touchLayoutFragment: data.touchLayoutFragment }
+      : {}),
+    ...(typeof data.reorderRules === "string" ? { reorderRules: data.reorderRules } : {}),
+    ...(data.frequencyInCorpus !== undefined
+      ? { frequencyInCorpus: data.frequencyInCorpus }
+      : {}),
+    ...(provenance !== undefined ? { provenance } : {}),
+    ...(demo !== undefined ? { demo } : {}),
+    ...(data.group_visibility !== undefined
+      ? { group_visibility: data.group_visibility }
+      : {}),
+    ...(data.priority !== undefined ? { priority: data.priority } : {}),
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Compile-time drift guards.
