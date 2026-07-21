@@ -1,6 +1,6 @@
 # lineage.placement-priors — the one facet that is already ACTIVE: kbgen +
 # supportability-scanner mine per-character placements from the corpus into
-# docs/placement-priors.json; usePlacementPriors loads it; MechanismGallery
+# packages/engine/data/placement-priors.json; usePlacementPriors loads it; MechanismGallery
 # renders accept/dismiss suggestion rows; buildPlacementSeeds seeds
 # pb_special_letters_list. This record names the existing behavior so the
 # catalog starts with one proven member — and one declared gap: the priors are
@@ -27,7 +27,7 @@ derivations:
   - kind: corpus
     source: "corpus:placement-priors-json"
     sourceStatus: available
-    notes: docs/placement-priors.json via kbgen + supportability-scanner --emit-placements.
+    notes: packages/engine/data/placement-priors.json via kbgen + supportability-scanner --emit-placements.
   - kind: corpus
     source: "planned:touch-priors"
     sourceStatus: planned

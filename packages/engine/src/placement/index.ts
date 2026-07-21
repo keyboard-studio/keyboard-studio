@@ -224,3 +224,8 @@ export { corpusPriorsToPlacementMap } from "./corpus-loader.js";
 
 // Re-export the PlacementPriorsJSON type for consumers (e.g. usePlacementPriors hook).
 export type { PlacementPriorsJSON } from "./model.js";
+
+// Re-export the runtime (zod) validator for placement-priors.json, so the
+// studio can validate the raw JSON at the data boundary without importing
+// engine internals directly.
+export { parsePlacementPriorsJSON, PlacementPriorsJSONSchema } from "./schema.js";
