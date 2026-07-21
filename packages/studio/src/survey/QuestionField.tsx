@@ -511,9 +511,13 @@ function StyledCombobox({
     }
   }
 
+  // Issue #536: sized to --control-h (34px) instead of a fixed padded box;
+  // `.ks-control .ks-focus-ring .ks-hit-target` (index.css) give this the
+  // same accent-ring focus + >=44px touch target as every other single-line
+  // control (TextField, Dropdown).
   const inputStyle: React.CSSProperties = {
     width: "100%",
-    padding: "8px 10px",
+    padding: "0 10px",
     background: "#0d1117",
     border: "1px solid #30363d",
     borderRadius: 6,
@@ -545,6 +549,7 @@ function StyledCombobox({
         onFocus={openList}
         // Delay close so an option's onMouseDown registers before blur.
         onBlur={() => setTimeout(() => isMountedRef.current && setOpen(false), 120)}
+        className="ks-control ks-focus-ring ks-hit-target"
         style={inputStyle}
       />
       {showList && (

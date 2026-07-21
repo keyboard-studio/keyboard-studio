@@ -20,21 +20,18 @@
 // (D3 scope guard: the studio's one 300ms cycle belongs to the validator/WASM
 // oracle; this is a synchronous UI filter over already-loaded data).
 
-import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { parseUPlusNotation, toUPlusNotation } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { characterMapGroups, type CharacterMapGroup } from "../lib/services.ts";
 import { prefixCombiningMark } from "../lib/irToCarveNodes.ts";
+import { TextField } from "../ui/index.ts";
 import {
-  BG_PAGE,
-  BORDER,
   ACCENT,
   ERROR_RED,
   TEXT_DIM,
-  TEXT_MAIN,
-  FONT,
   mutedNote,
   sectionHeading,
   charChip,
@@ -44,6 +41,7 @@ import {
   chipIndicatorText,
   chipIndicatorColor,
   primaryButton,
+  visuallyHidden,
 } from "./surveyStyles.ts";
 
 // A single cell within a CharacterMapGroup — derived rather than imported by
@@ -62,19 +60,6 @@ type LoadState =
 // prefixCombiningMark() helper (irToCarveNodes.ts) — same formatter the carve
 // GlyphCell/InfoView/etc. use — parameterized here on cell.isCombiningMark
 // (Mn-or-Mc) rather than that helper's default Mn-only isCombining() test.
-
-// Visually-hidden but screen-reader-visible — standard clip-rect pattern.
-const visuallyHidden: CSSProperties = {
-  position: "absolute",
-  width: 1,
-  height: 1,
-  padding: 0,
-  margin: -1,
-  overflow: "hidden",
-  clip: "rect(0, 0, 0, 0)",
-  whiteSpace: "nowrap",
-  border: 0,
-};
 
 function tierLabel(tier: CharacterMapGroup["tier"]): string | null {
   if (tier === "main") return "main";
@@ -232,9 +217,8 @@ export function CharacterMapPane() {
           <label htmlFor="char-map-raw-codepoint" style={{ fontSize: 11, color: TEXT_DIM }}>
             Add any character by code point
           </label>
-          <input
+          <TextField
             id="char-map-raw-codepoint"
-            type="text"
             value={rawInput}
             onChange={(e) => {
               setRawInput(e.target.value);
@@ -243,16 +227,6 @@ export function CharacterMapPane() {
             placeholder="U+1E900"
             aria-label="Add a character by Unicode code point"
             aria-describedby={rawError !== null ? "char-map-raw-codepoint-error" : undefined}
-            style={{
-              background: BG_PAGE,
-              border: `1px solid ${BORDER}`,
-              borderRadius: 6,
-              color: TEXT_MAIN,
-              fontSize: 14,
-              fontFamily: FONT,
-              padding: "8px 12px",
-              boxSizing: "border-box",
-            }}
           />
         </div>
         <button type="submit" disabled={rawInput.trim() === ""} style={primaryButton(rawInput.trim() === "")}>
@@ -264,22 +238,11 @@ export function CharacterMapPane() {
           {rawError}
         </div>
       )}
-      <input
-        type="text"
+      <TextField
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search characters"
         aria-label="Search the character map"
-        style={{
-          background: BG_PAGE,
-          border: `1px solid ${BORDER}`,
-          borderRadius: 6,
-          color: TEXT_MAIN,
-          fontSize: 14,
-          fontFamily: FONT,
-          padding: "8px 12px",
-          boxSizing: "border-box",
-        }}
       />
       {/* Screen-reader announcer for toggle actions — visually hidden. */}
       <div aria-live="polite" style={visuallyHidden}>

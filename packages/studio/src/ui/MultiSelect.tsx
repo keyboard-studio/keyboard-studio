@@ -34,6 +34,11 @@ const OPTION_ROW_STYLE: React.CSSProperties = {
   cursor: "pointer",
 };
 
+// Issue #536: the label wraps the checkbox + its text, so it is the natural
+// hit target — bumping it (not the 16px native checkbox) to >=44px on coarse
+// pointers keeps the compact desktop layout while satisfying touch a11y.
+const OPTION_ROW_CLASSNAME = "ks-hit-target";
+
 const OPTION_LABEL_STYLE: React.CSSProperties = {
   fontSize: 13,
   color: TEXT_MAIN,
@@ -67,12 +72,13 @@ export function MultiSelect({
       {options.map((opt) => {
         const inputId = `${idPrefix}${opt.value}`;
         return (
-          <label key={opt.value} htmlFor={inputId} style={OPTION_ROW_STYLE}>
+          <label key={opt.value} htmlFor={inputId} style={OPTION_ROW_STYLE} className={OPTION_ROW_CLASSNAME}>
             <input
               type="checkbox"
               id={inputId}
               checked={selected.includes(opt.value)}
               onChange={() => toggle(opt.value)}
+              className="ks-focus-ring"
               style={CHECKBOX_STYLE}
             />
             <span style={OPTION_LABEL_STYLE}>{opt.label}</span>

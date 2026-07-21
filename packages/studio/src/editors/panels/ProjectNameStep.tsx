@@ -77,6 +77,14 @@ export function ProjectNameStep({
           data-testid="project-name-input"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter-to-advance (issue #536): single-line field, no Shift+Enter
+            // newline concern — plain Enter submits like clicking Next.
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleNext();
+            }
+          }}
           autoComplete="off"
           spellCheck={false}
           aria-describedby="project-id-hint"

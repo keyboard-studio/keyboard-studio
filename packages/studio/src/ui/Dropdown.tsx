@@ -20,7 +20,7 @@ export interface DropdownProps
 
 const BASE_STYLE: React.CSSProperties = {
   width: "100%",
-  padding: "8px 10px",
+  padding: "0 10px",
   background: BG_PAGE,
   border: `1px solid ${BORDER}`,
   borderRadius: 6,
@@ -32,17 +32,28 @@ const BASE_STYLE: React.CSSProperties = {
   cursor: "pointer",
 };
 
-/** Native <select> dropdown. Callers may override style or className; the base
- *  styles are applied first. */
+/**
+ * Native <select> dropdown — the one-of-a-set control (issue #536). Sized to
+ * `--control-h` and carries `.ks-focus-ring`/`.ks-hit-target` (index.css) for
+ * the shared focus-ring / >=44px touch-target conventions. Callers may
+ * override style or className (merged, not replaced); the base styles are
+ * applied first.
+ */
 export function Dropdown({
   options,
   onChange,
   style,
+  className,
   ...rest
 }: DropdownProps): React.ReactElement {
   return (
     <select
       onChange={(e) => onChange?.(e.target.value)}
+      className={
+        className !== undefined
+          ? `ks-control ks-focus-ring ks-hit-target ${className}`
+          : "ks-control ks-focus-ring ks-hit-target"
+      }
       style={{ ...BASE_STYLE, ...style }}
       {...rest}
     >

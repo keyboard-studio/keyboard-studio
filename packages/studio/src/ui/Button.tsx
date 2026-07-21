@@ -51,6 +51,7 @@ export function Button({
   variant = "secondary",
   disabled = false,
   style,
+  className,
   children,
   ...rest
 }: ButtonProps): React.ReactElement {
@@ -68,6 +69,11 @@ export function Button({
     <button
       type="button"
       disabled={disabled}
+      className={
+        className !== undefined
+          ? `ks-focus-ring ks-hit-target ${className}`
+          : "ks-focus-ring ks-hit-target"
+      }
       style={{ ...baseStyle, ...style }}
       {...rest}
     >
