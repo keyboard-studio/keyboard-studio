@@ -291,8 +291,9 @@ describe("useKeyboardArtifact — onInstantiate timing", () => {
 // The compile() call is independent and must still succeed, leaving the hook
 // in the "ready" stage (preview not blanked). The onInstantiate callback must
 // receive ir=null (parse gap), and the parse-gap message must appear in
-// scaffoldWarnings so the user sees "IR features unavailable: ..." without
-// losing the preview or the download path.
+// runtimeWarnings so the user sees "[ir-parse] IR features unavailable: ..."
+// without losing the preview or the download path (refs #467: routed to the
+// runtime channel, not scaffoldWarnings).
 // ---------------------------------------------------------------------------
 
 describe("useKeyboardArtifact — parseKmn graceful degradation (slice 4)", () => {
@@ -324,15 +325,20 @@ describe("useKeyboardArtifact — parseKmn graceful degradation (slice 4)", () =
     const [, calledOpts] = onInstantiate.mock.calls[0]!;
     expect(calledOpts.ir).toBeNull();
 
-    // 4. Parse-gap message must appear in scaffoldWarnings (non-fatal signal).
+    // 4. Parse-gap message must appear in runtimeWarnings (non-fatal signal),
+    //    not scaffoldWarnings, and follow the bracket-tag convention (refs #467).
     const readyStage = result.current.stage;
     expect(readyStage.kind).toBe("ready");
     if (readyStage.kind === "ready") {
-      const parseWarn = readyStage.scaffoldWarnings.find((w) =>
-        w.startsWith("IR features unavailable:"),
+      const parseWarn = (readyStage.runtimeWarnings ?? []).find((w) =>
+        w.startsWith("[ir-parse] IR features unavailable:"),
       );
       expect(parseWarn).toBeDefined();
       expect(parseWarn).toContain("codec gap: unsupported real-world construct");
+      // And it must NOT ride the scaffold/apply channel any more.
+      expect(
+        readyStage.scaffoldWarnings.some((w) => w.includes("IR features unavailable")),
+      ).toBe(false);
     }
   });
 
