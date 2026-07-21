@@ -588,22 +588,56 @@ function buildMarkdown(sorted: ScanReport[], opaque: OpaqueEntry[]): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Resolve the git SHA of the keyboards checkout for provenance. Returns
- * "keymanapp/keyboards@<sha>" or "keymanapp/keyboards@unknown" if the SHA
- * cannot be determined (not a git checkout, git unavailable, etc).
+ * Normalize a git remote URL (SSH or HTTPS github.com form) to an
+ * `<org>/<repo>` label. Returns null if the URL doesn't match a recognized
+ * github.com remote shape. Mirrors facet-index's normalizer.
  */
-function resolveKeyboardsProvenance(releaseDir: string): string {
+export function normalizeGithubRemote(remoteUrl: string): string | null {
+  const trimmed = remoteUrl.trim();
+  // https://github.com/<org>/<repo>(.git)
+  let m = /^(?:https?:\/\/)?github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(trimmed);
+  if (m) return `${m[1]}/${m[2]}`;
+  // git@github.com:<org>/<repo>(.git)
+  m = /^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(trimmed);
+  if (m) return `${m[1]}/${m[2]}`;
+  return null;
+}
+
+/**
+ * Resolve the git SHA and org/repo label of the keyboards checkout for
+ * provenance. The label is derived from the checkout's actual `origin`
+ * remote (not hardcoded) so the field reflects whichever corpus fork was
+ * actually scanned. Returns `<org>/<repo>@<sha>`, falling back to
+ * `unknown/unknown@<sha>` when the remote can't be resolved/normalized, and
+ * to `@unknown` when the SHA itself can't be determined.
+ */
+export function resolveKeyboardsProvenance(releaseDir: string): string {
+  const root = dirname(releaseDir);
+
+  let sha = "";
   try {
-    const root = dirname(releaseDir);
-    const sha = execSync("git rev-parse HEAD", {
+    sha = execSync("git rev-parse HEAD", {
       cwd: root,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
-    return sha ? `keymanapp/keyboards@${sha}` : "keymanapp/keyboards@unknown";
   } catch {
-    return "keymanapp/keyboards@unknown";
+    sha = "";
   }
+
+  let label = "unknown/unknown";
+  try {
+    const remoteUrl = execSync("git remote get-url origin", {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    label = normalizeGithubRemote(remoteUrl) ?? "unknown/unknown";
+  } catch {
+    label = "unknown/unknown";
+  }
+
+  return `${label}@${sha || "unknown"}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -719,7 +753,20 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch((err: unknown) => {
-  console.error("[ERROR]", err instanceof Error ? err.message : String(err));
-  process.exit(1);
-});
+// Guard direct execution so this module can be imported (e.g. by unit tests
+// exercising resolveKeyboardsProvenance/normalizeGithubRemote) without
+// running the full scan as a side effect of import.
+const isDirectRun = (() => {
+  try {
+    return process.argv[1] !== undefined && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+  } catch {
+    return false;
+  }
+})();
+
+if (isDirectRun) {
+  main().catch((err: unknown) => {
+    console.error("[ERROR]", err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  });
+}
