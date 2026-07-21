@@ -41,6 +41,7 @@ import { advance, STEPS_WITH_APPLY_COMPLETION } from "../steps/advance.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { UnsupportedScriptStub } from "./UnsupportedScriptStub.tsx";
 import type { SurveyContext } from "../steps/types.ts";
+import { ACCENT, ERROR_RED, TEXT_DIM, BORDER } from "../ui/theme.ts";
 
 // ---------------------------------------------------------------------------
 // isSurveyPhaseResult — shape guard for the generic completion path.
@@ -76,7 +77,7 @@ export interface StepHostProps {
 
 const TERMINAL_PANEL_STYLE: CSSProperties = {
   padding: 24,
-  border: "1px solid #30363d",
+  border: `1px solid ${BORDER}`,
   borderRadius: 8,
   display: "flex",
   flexDirection: "column",
@@ -93,15 +94,15 @@ const TERMINAL_HEADING_STYLE: CSSProperties = {
 const TERMINAL_TEXT_STYLE: CSSProperties = {
   margin: 0,
   fontSize: 13,
-  color: "#8b949e",
+  color: TEXT_DIM,
 };
 
 const START_OVER_BTN_STYLE: CSSProperties = {
   padding: "8px 18px",
   background: "transparent",
-  border: "1px solid #30363d",
+  border: `1px solid ${BORDER}`,
   borderRadius: 6,
-  color: "#8b949e",
+  color: TEXT_DIM,
   fontSize: 13,
   cursor: "pointer",
   fontFamily: "inherit",
@@ -130,7 +131,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   if (activeStepId === "done") {
     return (
       <div style={TERMINAL_PANEL_STYLE}>
-        <h2 style={{ ...TERMINAL_HEADING_STYLE, color: "#6ea8fe" }}>
+        <h2 style={{ ...TERMINAL_HEADING_STYLE, color: ACCENT }}>
           Survey complete
         </h2>
         <p style={TERMINAL_TEXT_STYLE}>
@@ -166,7 +167,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     // Fallback: identityResult is null — render a generic fallback panel.
     return (
       <div style={TERMINAL_PANEL_STYLE}>
-        <h2 style={{ ...TERMINAL_HEADING_STYLE, color: "#f85149" }}>
+        <h2 style={{ ...TERMINAL_HEADING_STYLE, color: ERROR_RED }}>
           Script not supported
         </h2>
         <p style={TERMINAL_TEXT_STYLE}>
@@ -191,7 +192,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     return (
       <div
         role="alert"
-        style={{ padding: 24, color: "#f85149", fontFamily: "monospace", fontSize: 13 }}
+        style={{ padding: 24, color: ERROR_RED, fontFamily: "monospace", fontSize: 13 }}
       >
         {`[StepHost] unhandled step id: "${String(activeStepId)}" — wire this manifest step into registerEditorSteps.ts`}
       </div>
