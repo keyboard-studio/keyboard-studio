@@ -1610,10 +1610,10 @@ describe('annotateRemovalRecommendations', () => {
     // partner slot is actually needed, not for every cross-paired store.
     const ir = makeIR({
       stores: [
-        { nodeId: 'store#dkf', name: 'dkf', items: [{ kind: 'char', value: 'a' }], isSystem: false } as any,
-        { nodeId: 'store#dkt', name: 'dkt', items: [{ kind: 'char', value: 'α' }], isSystem: false } as any,
-        { nodeId: 'store#dkf2', name: 'dkf2', items: [{ kind: 'char', value: 'c' }], isSystem: false } as any,
-        { nodeId: 'store#dkt2', name: 'dkt2', items: [{ kind: 'char', value: 'γ' }], isSystem: false } as any,
+        { nodeId: 'store#dkf', name: 'dkf', items: [{ kind: 'char', value: 'a' }], isSystem: false } as IRStore,
+        { nodeId: 'store#dkt', name: 'dkt', items: [{ kind: 'char', value: 'α' }], isSystem: false } as IRStore,
+        { nodeId: 'store#dkf2', name: 'dkf2', items: [{ kind: 'char', value: 'c' }], isSystem: false } as IRStore,
+        { nodeId: 'store#dkt2', name: 'dkt2', items: [{ kind: 'char', value: 'γ' }], isSystem: false } as IRStore,
       ],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
@@ -2182,8 +2182,8 @@ describe('recommendedRemovalChars', () => {
     // reached via collectCharContributors' any()-context scan.
     const ir = makeIR({
       stores: [
-        { nodeId: 'store#dkf', name: 'dkf', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }], isSystem: false } as any,
-        { nodeId: 'store#dkt', name: 'dkt', items: [{ kind: 'char', value: 'α' }, { kind: 'char', value: 'β' }], isSystem: false } as any,
+        { nodeId: 'store#dkf', name: 'dkf', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }], isSystem: false } as IRStore,
+        { nodeId: 'store#dkt', name: 'dkt', items: [{ kind: 'char', value: 'α' }, { kind: 'char', value: 'β' }], isSystem: false } as IRStore,
       ],
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
