@@ -3,7 +3,7 @@
   "specName": "Base-Selection & Strategy Facet Classifiers",
   "branch": "043-base-selection-facets",
   "currentStep": "implement",
-  "status": "implemented",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -624,6 +624,13 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-07-20T08:12:44.313Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-20T08:52:01.471Z"
     }
   ],
   "phaseProgress": {

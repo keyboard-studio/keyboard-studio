@@ -4,7 +4,7 @@
   "branch": "040-desktop-base-layout-fallthrough",
   "selectedAt": "2026-07-18T03:54:45.312Z",
   "currentStep": "implement",
-  "status": "implemented",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -286,6 +286,13 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-07-18T05:14:50.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-20T08:53:21.113Z"
     }
   ],
   "telemetryInstanceId": "201af921-7564-4bca-9ee6-87ee5f6f478e",
