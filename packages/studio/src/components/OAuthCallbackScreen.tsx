@@ -19,7 +19,7 @@
 //      button instead of hanging blank.
 
 import { useEffect, useState } from "react";
-import { Trans, useLingui } from "@lingui/react/macro";
+import { Trans } from "@lingui/react/macro";
 import {
   processOAuthCallbackForProvider,
   redirectTargetForResult,
@@ -91,7 +91,6 @@ const primaryBtnStyle: React.CSSProperties = {
 type Phase = "working" | "error";
 
 export function OAuthCallbackScreen({ provider }: { provider: OAuthProvider }) {
-  const { t } = useLingui();
   const [phase, setPhase] = useState<Phase>("working");
   const label = PROVIDER_LABEL[provider];
 
