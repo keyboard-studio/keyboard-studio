@@ -67,7 +67,7 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 - [ ] T017 [P] [US1] Convert editors chrome (`editor.*`) — `packages/studio/src/editors/*.tsx` (#1256)
 - [x] T018 [P] [US1] Convert dashboard chrome (`dashboard.*`) — `packages/studio/src/dashboard/*.tsx` (#1257)
 - [x] T019 [P] [US1] Localize `ui/` primitive user-facing strings + aria (`ui.*`) — `packages/studio/src/ui/*.tsx` (#1258)
-- [ ] T020 [P] [US1] Convert remaining `components/` chrome (`preview.*`/`profile.*`/`account.*`) — PreviewScreen, ProfileScreen, AccountControl, OAuthCallbackScreen, etc. (#1259)
+- [x] T020 [P] [US1] Convert remaining `components/` chrome (`preview.*`/`profile.*`/`account.*`) — PreviewScreen, ProfileScreen, AccountControl, OAuthCallbackScreen, etc. (#1259)
 - [ ] T021 [US1] Convert [lib/publishManagedPRErrorMessage.ts](../../packages/studio/src/lib/publishManagedPRErrorMessage.ts) error-copy (global `t` macro pattern) + fix its unit test (deferred from the Output area) (#1260)
 - [ ] T022 [US1] After each area: re-extract catalogs, keep the drift gate green, add illustrative `fr` for the demo — `pnpm --filter @keyboard-studio/studio messages:extract` (#1261)
 - [ ] T023 [US1] Crowdin Tier A first live `upload sources` (after T010) (#1262)

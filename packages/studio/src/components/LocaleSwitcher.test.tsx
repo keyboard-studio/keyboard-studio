@@ -6,25 +6,18 @@
 //   NODE_OPTIONS="--localstorage-file=.ls-tmp.db" pnpm exec vitest run <file>
 // CI (Node 22, no flag) is unaffected — see docs/i18n-spike.md.
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
-import { i18n } from "@lingui/core";
-import { I18nProvider } from "@lingui/react";
+import { screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { render, i18n } from "../test/renderWithI18n.tsx";
 import { LocaleSwitcher } from "./LocaleSwitcher.tsx";
-import { messages as enMessages } from "../locales/en/messages.json?lingui";
 import { loadSavedLocale, resolveInitialLocale } from "../lib/i18n.ts";
 
 function renderSwitcher() {
-  return render(
-    <I18nProvider i18n={i18n}>
-      <LocaleSwitcher />
-    </I18nProvider>,
-  );
+  return render(<LocaleSwitcher />);
 }
 
 describe("LocaleSwitcher", () => {
   beforeEach(() => {
     localStorage.clear();
-    i18n.load("en", enMessages);
     i18n.activate("en");
   });
 

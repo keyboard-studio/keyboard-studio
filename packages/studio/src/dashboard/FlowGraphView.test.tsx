@@ -6,24 +6,13 @@
 // These tests pin that contract via the real layout (no mocking).
 
 import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
-import { i18n } from "@lingui/core";
-import { I18nProvider } from "@lingui/react";
+import { screen, cleanup } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { FlowGraphView } from "./FlowGraphView.tsx";
 import type { FlowGraph, GraphNode, GraphEdge } from "./model.ts";
-import { messages as enMessages } from "../locales/en/messages.json?lingui";
 
-i18n.load("en", enMessages);
-i18n.activate("en");
-
-/** Render helper — FlowGraphView now uses Lingui Trans/t macros, which require
- * an I18nProvider ancestor (see docs/i18n-spike.md). */
 function renderGraph(graph: FlowGraph) {
-  return render(
-    <I18nProvider i18n={i18n}>
-      <FlowGraphView graph={graph} />
-    </I18nProvider>,
-  );
+  return render(<FlowGraphView graph={graph} />);
 }
 
 afterEach(cleanup);

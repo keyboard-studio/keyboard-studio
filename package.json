@@ -24,7 +24,7 @@
     "facet-lint": "node utilities/facet-lint/index.js",
     "facet-index-lint": "node utilities/facet-index-lint/index.js",
     "adaptation-catalog-lint": "node utilities/adaptation-catalog-lint/index.js",
-  "i18n-catalog-lint": "node utilities/i18n-catalog-lint/index.js",
+    "i18n-catalog-lint": "node utilities/i18n-catalog-lint/index.js",
     "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,json,md}\""
   },
   "devDependencies": {

@@ -9,11 +9,9 @@
 // docs/github-integration.md §1a).
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
-import { i18n } from "@lingui/core";
-import { I18nProvider } from "@lingui/react";
+import { cleanup, screen } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { SignUpPanel } from "./SignUpPanel.tsx";
-import { messages as enMessages } from "../locales/en/messages.json?lingui";
 import { useGitHubAuth, type UseGitHubAuthResult } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth, type UseGoogleAuthResult } from "../hooks/useGoogleAuth.ts";
 
@@ -22,17 +20,8 @@ vi.mock("../hooks/useGoogleAuth.ts", () => ({ useGoogleAuth: vi.fn() }));
 const mockedUseGitHubAuth = vi.mocked(useGitHubAuth);
 const mockedUseGoogleAuth = vi.mocked(useGoogleAuth);
 
-i18n.load("en", enMessages);
-i18n.activate("en");
-
-/** Render helper — SignUpPanel now uses Lingui Trans/t macros, which require
- * an I18nProvider ancestor (see docs/i18n-spike.md). */
 function renderPanel() {
-  return render(
-    <I18nProvider i18n={i18n}>
-      <SignUpPanel />
-    </I18nProvider>,
-  );
+  return render(<SignUpPanel />);
 }
 
 const connect = vi.fn(async () => {});

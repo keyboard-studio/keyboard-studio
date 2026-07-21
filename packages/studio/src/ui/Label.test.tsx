@@ -7,23 +7,10 @@
 //   4. required=false (default) does NOT render the asterisk marker.
 //   5. Native HTML props (htmlFor, id, style) pass through to the element.
 
-import type { ReactElement } from "react";
 import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
-import { i18n } from "@lingui/core";
-import { I18nProvider } from "@lingui/react";
-import { messages as enMessages } from "../locales/en/messages.json?lingui";
+import { screen, cleanup } from "@testing-library/react";
+import { render as renderWithI18n } from "../test/renderWithI18n.tsx";
 import { Label } from "./Label.tsx";
-
-// Label now calls useLingui() for the required-marker aria-label, so every
-// render needs an I18nProvider ancestor (see docs/i18n-spike.md). Activate the
-// source (en) catalog so t() resolves to the English text the assertions expect.
-i18n.load("en", enMessages);
-i18n.activate("en");
-
-function renderWithI18n(ui: ReactElement) {
-  return render(<I18nProvider i18n={i18n}>{ui}</I18nProvider>);
-}
 
 afterEach(() => {
   cleanup();

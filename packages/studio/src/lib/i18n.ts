@@ -7,6 +7,7 @@
 // import time. Message ids are explicit and stable — see WelcomeScreen.tsx.
 import { i18n } from "@lingui/core";
 import { messages as enMessages } from "../locales/en/messages.json?lingui";
+import { storageAvailable } from "./storageGuard.ts";
 
 export const SUPPORTED_LOCALES = { en: "English", fr: "Français" } as const;
 export type Locale = keyof typeof SUPPORTED_LOCALES;
@@ -14,15 +15,6 @@ export const DEFAULT_LOCALE: Locale = "en";
 
 /** localStorage key for the persisted UI-locale choice. */
 const LOCALE_KEY = "ks.locale";
-
-/** True when localStorage is usable (guards SSR / private-mode / disabled). */
-function storageAvailable(): boolean {
-  try {
-    return typeof localStorage !== "undefined";
-  } catch {
-    return false;
-  }
-}
 
 function isSupported(value: string): value is Locale {
   return Object.prototype.hasOwnProperty.call(SUPPORTED_LOCALES, value);

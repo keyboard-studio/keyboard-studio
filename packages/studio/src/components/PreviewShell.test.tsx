@@ -14,14 +14,12 @@
 //   - download filename
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
-import { i18n } from "@lingui/core";
-import { I18nProvider } from "@lingui/react";
+import { screen, fireEvent, act, cleanup } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore";
 import { TOUCH_STEP_ID } from "../steps/reducer";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
-import { messages as enMessages } from "../locales/en/messages.json?lingui";
 import type { Stage } from "../hooks/useKeyboardArtifact";
 
 // ---------------------------------------------------------------------------
@@ -123,19 +121,12 @@ import { OutputScreen } from "./OutputScreen.tsx";
 // Minimal valid ZIP file signature (empty ZIP, 22 bytes)
 const EMPTY_ZIP_BYTES = new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
-i18n.load("en", enMessages);
-i18n.activate("en");
-
-/** Render helper — OutputScreen now uses Lingui Trans/t macros (useLingui()),
- * which require an I18nProvider ancestor (see docs/i18n-spike.md). All
- * OutputScreen render call-sites in this file go through this helper so
- * there is exactly one place the provider is wired up. */
+/** Render helper — OutputScreen uses Lingui Trans/t macros (useLingui()),
+ * which require an I18nProvider ancestor. All OutputScreen render call-sites
+ * in this file go through this helper so there is exactly one place the
+ * provider is wired up. */
 function renderOutputScreen() {
-  return render(
-    <I18nProvider i18n={i18n}>
-      <OutputScreen />
-    </I18nProvider>,
-  );
+  return render(<OutputScreen />);
 }
 
 /** Render helper — PreviewScreen (and its DiagnosticsPanel / OSKFrame /
@@ -143,11 +134,7 @@ function renderOutputScreen() {
  * I18nProvider ancestor. All PreviewScreen render call-sites in this file go
  * through this helper so there is exactly one place the provider is wired up. */
 function renderPreviewScreen() {
-  return render(
-    <I18nProvider i18n={i18n}>
-      <PreviewScreen />
-    </I18nProvider>,
-  );
+  return render(<PreviewScreen />);
 }
 
 function seedInstantiatedWorkingCopy() {

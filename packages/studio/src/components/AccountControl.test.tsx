@@ -6,26 +6,14 @@
 // its real logic keeps the tests honest about the derived state.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
-import { i18n } from "@lingui/core";
-import { I18nProvider } from "@lingui/react";
-import { messages as enMessages } from "../locales/en/messages.json?lingui";
+import { cleanup, screen, fireEvent } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { AccountControl } from "./AccountControl.tsx";
 import { useGitHubAuth, type UseGitHubAuthResult } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth, type UseGoogleAuthResult } from "../hooks/useGoogleAuth.ts";
 
-// AccountControl now calls useLingui() (Trans/t macros), which requires an
-// I18nProvider ancestor (see docs/i18n-spike.md). Activate the source (en)
-// catalog so t()/Trans resolve to the English text the assertions expect.
-i18n.load("en", enMessages);
-i18n.activate("en");
-
 function renderAccountControl() {
-  return render(
-    <I18nProvider i18n={i18n}>
-      <AccountControl />
-    </I18nProvider>,
-  );
+  return render(<AccountControl />);
 }
 
 vi.mock("../hooks/useGitHubAuth.ts", () => ({ useGitHubAuth: vi.fn() }));

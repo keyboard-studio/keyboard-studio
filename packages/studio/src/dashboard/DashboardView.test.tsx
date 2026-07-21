@@ -2,23 +2,12 @@
 // YAML (?raw) + the engine's exported rule tables, and switch between sections.
 
 import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import { i18n } from "@lingui/core";
-import { I18nProvider } from "@lingui/react";
+import { screen, fireEvent, cleanup } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { FlowMapView } from "./DashboardView.tsx";
-import { messages as enMessages } from "../locales/en/messages.json?lingui";
 
-i18n.load("en", enMessages);
-i18n.activate("en");
-
-/** Render helper — FlowMapView now uses Lingui Trans/t macros, which require
- * an I18nProvider ancestor (see docs/i18n-spike.md). */
 function renderFlowMap(props: Parameters<typeof FlowMapView>[0] = {}) {
-  return render(
-    <I18nProvider i18n={i18n}>
-      <FlowMapView {...props} />
-    </I18nProvider>,
-  );
+  return render(<FlowMapView {...props} />);
 }
 
 afterEach(cleanup);

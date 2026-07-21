@@ -12,23 +12,12 @@
 // are mocked so the tests never touch the engine, WASM, or the backend.
 
 import { afterEach, describe, expect, it, vi, type Mock } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { i18n } from "@lingui/core";
-import { I18nProvider } from "@lingui/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { ManagedPRSubmitPanel, type ManagedPRSubmitPanelProps } from "./ManagedPRSubmitPanel.tsx";
-import { messages as enMessages } from "../locales/en/messages.json?lingui";
 
-i18n.load("en", enMessages);
-i18n.activate("en");
-
-/** Render helper — ManagedPRSubmitPanel now uses Lingui Trans/t macros, which
- * require an I18nProvider ancestor (see docs/i18n-spike.md). */
 function renderPanel(props: ManagedPRSubmitPanelProps) {
-  return render(
-    <I18nProvider i18n={i18n}>
-      <ManagedPRSubmitPanel {...props} />
-    </I18nProvider>,
-  );
+  return render(<ManagedPRSubmitPanel {...props} />);
 }
 
 // ---------------------------------------------------------------------------
