@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-07-20",
+  "lastUpdated": "2026-07-21",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -238,7 +238,7 @@
     },
     "§19": {
       "title": "19. Reference",
-      "hash": "sha256:fa3a2e620edb7356",
+      "hash": "sha256:64495957b7332fde",
       "status": "reference",
       "implements": [],
       "decisions": [],

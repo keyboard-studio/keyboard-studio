@@ -224,8 +224,10 @@ export interface Pattern {
 }
 
 /**
- * Input shape for `makePattern`. Mirrors `Pattern` but all optional fields
- * may be omitted cleanly without fighting `exactOptionalPropertyTypes`.
+ * Input shape consumed by `makePattern`, which normalizes it into a `Pattern`.
+ * Mirrors `Pattern`'s fields, but optional properties may be supplied as
+ * `undefined` or omitted entirely; `makePattern` strips the `undefined`-valued
+ * keys so the resulting `Pattern` satisfies `exactOptionalPropertyTypes`.
  */
 export type PatternInit = {
   id: string;
