@@ -61,6 +61,10 @@ function TextFieldControl({ question, value, onChange }: FieldProps) {
   const isMultiLine = question.type === "text";
   const strVal = stringValue(value);
   if (isMultiLine) {
+    // `type: "text"` questions are the survey's genuinely open-ended fields
+    // (long-form description prompts, e.g. phase_f_helpdocs) — the exact case
+    // Textarea reserves `resize="vertical"` for (#536). Opt in explicitly so
+    // these keep the resize handle they had before the resize:none default.
     return (
       <Textarea
         id={question.id}
@@ -68,6 +72,7 @@ function TextFieldControl({ question, value, onChange }: FieldProps) {
         value={strVal}
         onChange={(e) => onChange(e.target.value)}
         rows={4}
+        resize="vertical"
       />
     );
   }
@@ -511,9 +516,13 @@ function StyledCombobox({
     }
   }
 
+  // Issue #536: sized to --control-h (34px) instead of a fixed padded box;
+  // `.ks-control .ks-focus-ring .ks-hit-target` (index.css) give this the
+  // same accent-ring focus + >=44px touch target as every other single-line
+  // control (TextField, Dropdown).
   const inputStyle: React.CSSProperties = {
     width: "100%",
-    padding: "8px 10px",
+    padding: "0 10px",
     background: "#0d1117",
     border: "1px solid #30363d",
     borderRadius: 6,
@@ -545,6 +554,7 @@ function StyledCombobox({
         onFocus={openList}
         // Delay close so an option's onMouseDown registers before blur.
         onBlur={() => setTimeout(() => isMountedRef.current && setOpen(false), 120)}
+        className="ks-control ks-focus-ring ks-hit-target"
         style={inputStyle}
       />
       {showList && (

@@ -26,6 +26,7 @@ import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { nfcDedup } from "./charNormUtils.ts";
 import { suggestMissingChars } from "../lib/services.ts";
 import type { MissingCharSuggestions } from "../lib/services.ts";
+import { RadioGroup } from "../ui/index.ts";
 import {
   BG_PAGE,
   BORDER,
@@ -49,6 +50,7 @@ import {
   chipIndicator,
   chipIndicatorText,
   chipIndicatorColor,
+  visuallyHidden,
 } from "./surveyStyles.ts";
 
 // Vite ?raw import — typed via the `*.yaml?raw` declaration in src/vite-env.d.ts.
@@ -586,6 +588,7 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
               confirmedInventory: chars,
             });
           }}
+          className="ks-focus-ring ks-hit-target"
           style={primaryButton(doneDisabled)}
         >
           Done ({chars.length} character{chars.length === 1 ? "" : "s"})
@@ -740,43 +743,26 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
         The first method starts with verified suggestions and lets you type the rest of your alphabet yourself.
       </p>
 
-      <div role="radiogroup" aria-label="Discovery method">
-        {METHODS.map(({ value, label }) => {
-          const inputId = `discovery-method-${value}`;
-          return (
-            <label
-              key={value}
-              htmlFor={inputId}
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 8,
-                marginBottom: 10,
-                cursor: "pointer",
-                fontSize: 13,
-                color: TEXT_MAIN,
-              }}
-            >
-              <input
-                type="radio"
-                id={inputId}
-                name="discovery_method"
-                value={value}
-                checked={selected === value}
-                onChange={() => setSelected(value)}
-                style={{ marginTop: 2, accentColor: ACCENT }}
-              />
-              <span style={{ lineHeight: 1.5 }}>{label}</span>
-            </label>
-          );
-        })}
-      </div>
+      {/* Issue #536: shared ui/RadioGroup (accent-ring focus, >=44px touch
+          hit area on the wrapping label) instead of a hand-rolled radio list. */}
+      <span id="discovery-method-label" style={visuallyHidden}>
+        Discovery method
+      </span>
+      <RadioGroup
+        name="discovery_method"
+        value={selected}
+        options={METHODS}
+        accent={ACCENT}
+        onChange={(v) => setSelected(v as DiscoveryMethod)}
+        ariaLabelledby="discovery-method-label"
+      />
 
       <div style={{ display: "flex", gap: 8 }}>
         {onBack !== undefined && (
           <button
             type="button"
             onClick={onBack}
+            className="ks-focus-ring ks-hit-target"
             style={secondaryButton}
           >
             Back
@@ -786,6 +772,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
           type="button"
           data-testid="phase-b-intro-next"
           onClick={() => onChoose(selected)}
+          className="ks-focus-ring ks-hit-target"
           style={primaryButton(false)}
         >
           Continue

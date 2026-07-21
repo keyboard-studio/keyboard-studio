@@ -17,6 +17,7 @@ import type { SurveyAnswer, SurveyPhaseResult, LintFinding, LangtagsProvenance, 
 import { QuestionField } from "./QuestionField.tsx";
 import { debugPinsStore } from "../stores/debugPinsStore.ts";
 import { secondaryButton, primaryButton } from "./surveyStyles.ts";
+import { handleEnterToAdvance } from "./enterToAdvance.ts";
 
 // ---------------------------------------------------------------------------
 // Condition evaluator
@@ -534,10 +535,38 @@ export function SurveyRunner({
     setCurrentValue(prevEntry?.value);
   }
 
+  // Enter-to-advance (issue #536): the single keyboard-driven "do the obvious
+  // thing" handler for this runner, attached once at the container so every
+  // question type gets it for free — no per-field wiring, no second timer. The
+  // guard logic is the shared `handleEnterToAdvance` helper, wired here with the
+  // two container-only behaviours turned on:
+  //
+  //   - `multiline`: a genuinely multiline field (<textarea>) treats plain Enter
+  //     as "advance" (native newline suppressed); Shift+Enter still inserts a
+  //     newline.
+  //   - `deferIfDefaultPrevented`: the langtags/options combobox (QuestionField's
+  //     StyledCombobox) owns Enter when a row is highlighted — it calls
+  //     preventDefault() itself (before this handler runs, since it fires on the
+  //     bubble path from the focused input), so we stand down. When nothing is
+  //     highlighted the combobox does NOT preventDefault, so Enter with
+  //     unresolved free text still submits the step.
+  //
+  // Back/Next buttons are covered by the helper's default BUTTON skip.
+  function handleContainerKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    handleEnterToAdvance(e, {
+      advance: () => {
+        if (canAdvance) handleNext();
+      },
+      multiline: true,
+      deferIfDefaultPrevented: true,
+    });
+  }
+
   return (
     <div
       role="form"
       aria-label={`Survey phase ${flow.phase}`}
+      onKeyDown={handleContainerKeyDown}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -682,6 +711,7 @@ export function SurveyRunner({
             type="button"
             data-testid="survey-back"
             onClick={handleBack}
+            className="ks-focus-ring ks-hit-target"
             style={secondaryButton}
           >
             Back
@@ -693,6 +723,7 @@ export function SurveyRunner({
           onClick={handleNext}
           disabled={!canAdvance}
           aria-describedby={progressDescId}
+          className="ks-focus-ring ks-hit-target"
           style={{ ...primaryButton(!canAdvance), transition: "background 120ms ease" }}
         >
           {isLastQuestion ? "Finish" : "Next"}

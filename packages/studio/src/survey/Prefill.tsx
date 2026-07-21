@@ -6,10 +6,12 @@
 // tag are resolved later (from the base IR diff / langtags / docs stage), so they
 // are shown as deferred rather than guessed here. refs #369.
 
+import type { KeyboardEvent } from "react";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import type { IdentityLiteResult } from "./IdentityLite.tsx";
 import type { FiredQuestion } from "../adaptation/firing.ts";
 import { secondaryButton, primaryButton } from "./surveyStyles.ts";
+import { handleEnterToAdvance } from "./enterToAdvance.ts";
 
 /** One labelled confirmation row in the prefill summary. */
 export interface PrefillRow {
@@ -76,8 +78,18 @@ export interface PrefillProps {
 export function Prefill({ identity, base, onConfirm, onBack }: PrefillProps) {
   const rows = buildPrefillRows(identity, base);
 
+  // Enter-to-advance (issue #536): this step is a pure confirmation screen
+  // (no free-text field to disambiguate against), so plain Enter anywhere in
+  // the panel confirms — matching Next/Finish behavior in SurveyRunner. Uses
+  // the shared helper with its default BUTTON skip so Back/Confirm don't
+  // double-fire; no multiline / combobox concerns on this screen.
+  function handleKeyDown(e: KeyboardEvent<HTMLDivElement>): void {
+    handleEnterToAdvance(e, { advance: onConfirm });
+  }
+
   return (
     <div
+      onKeyDown={handleKeyDown}
       style={{
         background: "#0d1117",
         color: "#e6edf3",
@@ -132,6 +144,7 @@ export function Prefill({ identity, base, onConfirm, onBack }: PrefillProps) {
             type="button"
             data-testid="prefill-back"
             onClick={onBack}
+            className="ks-focus-ring ks-hit-target"
             style={secondaryButton}
           >
             ← Back
@@ -141,6 +154,7 @@ export function Prefill({ identity, base, onConfirm, onBack }: PrefillProps) {
           type="button"
           data-testid="prefill-confirm"
           onClick={onConfirm}
+          className="ks-focus-ring ks-hit-target"
           style={primaryButton(false)}
         >
           Confirm and continue

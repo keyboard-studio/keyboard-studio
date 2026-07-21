@@ -5,6 +5,7 @@ import {
   TEXT_DIM,
   FONT,
 } from "./theme.ts";
+import { mergeClassNames } from "./classNames.ts";
 
 export type ButtonVariant = "primary" | "secondary" | "back";
 
@@ -51,6 +52,7 @@ export function Button({
   variant = "secondary",
   disabled = false,
   style,
+  className,
   children,
   ...rest
 }: ButtonProps): React.ReactElement {
@@ -68,6 +70,7 @@ export function Button({
     <button
       type="button"
       disabled={disabled}
+      className={mergeClassNames("ks-focus-ring ks-hit-target", className)}
       style={{ ...baseStyle, ...style }}
       {...rest}
     >

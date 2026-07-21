@@ -65,4 +65,18 @@ describe("Checkbox", () => {
     const cb = screen.getByRole("checkbox") as HTMLInputElement;
     expect(cb.checked).toBe(false);
   });
+
+  it("carries the shared ks-focus-ring class (#536)", () => {
+    render(<Checkbox onChange={() => undefined} />);
+    const cb = screen.getByRole("checkbox");
+    expect(cb.className.split(" ")).toContain("ks-focus-ring");
+  });
+
+  it("merges a caller className with ks-focus-ring", () => {
+    render(<Checkbox className="my-cb" onChange={() => undefined} />);
+    const cb = screen.getByRole("checkbox");
+    const classes = cb.className.split(" ");
+    expect(classes).toContain("ks-focus-ring");
+    expect(classes).toContain("my-cb");
+  });
 });
