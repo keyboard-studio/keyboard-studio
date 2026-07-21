@@ -1,6 +1,6 @@
 # Feature Specification: Studio UI & Content Localization (i18n)
 
-**Feature Branch**: `045-i18n-localization`
+**Feature Branch**: `046-i18n-localization`
 
 **Created**: 2026-07-20
 
