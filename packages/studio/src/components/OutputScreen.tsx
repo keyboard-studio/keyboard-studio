@@ -13,6 +13,7 @@
 // across hash navigation so handleDownload reads the settled store regardless
 // of which screen ran the compile.
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useResizablePanes } from "../hooks/useResizablePanes.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
@@ -44,6 +45,7 @@ const warningBannerStyle: React.CSSProperties = {
 };
 
 export function OutputScreen() {
+  const { t } = useLingui();
   // Each screen runs its own independent artifact pipeline — see usePreviewArtifact.ts module comment for why this is deliberate (do not "dedupe" across screens).
   const artifact = usePreviewArtifact();
   const { containerRef, leftPct, onPointerDown } =
@@ -87,6 +89,30 @@ export function OutputScreen() {
         : {};
 
   const rightPct = 100 - leftPct;
+
+  // Download button aria-label — computed unconditionally (cheap) so the JSX
+  // below stays a single conditional, not a nested t()-per-branch call site.
+  const downloadKeyboardId =
+    baseKeyboard !== null
+      ? pickerMode === "scaffold" && scaffoldSpec !== null
+        ? scaffoldSpec.keyboardId
+        : baseKeyboard.id
+      : "";
+  const downloadAriaLabel = touchStale
+    ? t({
+        id: "output.download.aria.touchStale",
+        message:
+          "Download unavailable — the touch layout is out of date. Return to the Touch step and re-complete it before downloading.",
+      })
+    : canDownload
+      ? t({
+          id: "output.download.aria.ready",
+          message: `Download keyboard ${downloadKeyboardId} as zip`,
+        })
+      : t({
+          id: "output.download.aria.notReady",
+          message: "Download unavailable until compile completes",
+        });
 
   return (
     <div
@@ -132,7 +158,7 @@ export function OutputScreen() {
 
       {/* Right pane: download + submit controls */}
       <section
-        aria-label="Output pane"
+        aria-label={t({ id: "output.pane.label", message: "Output pane" })}
         style={{
           flexBasis: `calc(${rightPct}% - ${DIVIDER_WIDTH / 2}px)`,
           flexGrow: 1,
@@ -147,7 +173,7 @@ export function OutputScreen() {
         }}
       >
         <h2 style={{ margin: 0, fontSize: "1.1rem", color: "#6ea8fe" }}>
-          Output
+          <Trans id="output.heading">Output</Trans>
         </h2>
         {baseKeyboard !== null && (
           <>
@@ -156,13 +182,7 @@ export function OutputScreen() {
               data-testid="emit-download"
               disabled={!canDownload || downloading || touchStale}
               onClick={() => { void handleDownload(); }}
-              aria-label={
-                touchStale
-                  ? "Download unavailable — the touch layout is out of date. Return to the Touch step and re-complete it before downloading."
-                  : canDownload
-                    ? `Download keyboard ${pickerMode === "scaffold" && scaffoldSpec !== null ? scaffoldSpec.keyboardId : baseKeyboard.id} as zip`
-                    : "Download unavailable until compile completes"
-              }
+              aria-label={downloadAriaLabel}
               style={{
                 alignSelf: "flex-start",
                 marginTop: 4,
@@ -177,18 +197,25 @@ export function OutputScreen() {
                 transition: "background 0.15s",
               }}
             >
-              {downloading ? "Downloading..." : "Download .zip"}
+              {downloading ? (
+                <Trans id="output.download.button.downloading">Downloading...</Trans>
+              ) : (
+                <Trans id="output.download.button.download">Download .zip</Trans>
+              )}
             </button>
             {touchStale && (
               <div
                 role="alert"
                 style={{ ...warningBannerStyle, color: "#d29922", lineHeight: 1.5 }}
               >
-                [WARN] A mechanics change after the Touch step means the
-                on-screen (touch) keyboard layout is now out of date. Return
-                to the Touch step and re-complete it before downloading or
-                submitting — otherwise the shipped keyboard would include a
-                stale touch layout.
+                {"[WARN] "}
+                <Trans id="output.status.touchStale">
+                  A mechanics change after the Touch step means the on-screen
+                  (touch) keyboard layout is now out of date. Return to the
+                  Touch step and re-complete it before downloading or
+                  submitting — otherwise the shipped keyboard would include a
+                  stale touch layout.
+                </Trans>
               </div>
             )}
             {downloadError !== null && (
@@ -200,11 +227,17 @@ export function OutputScreen() {
               <div
                 role="status"
                 aria-live="polite"
-                aria-label="Download projection warnings"
+                aria-label={t({
+                  id: "output.download.warnings.ariaLabel",
+                  message: "Download projection warnings",
+                })}
                 style={warningBannerStyle}
               >
                 <div style={{ color: "#d29922", fontWeight: 600, marginBottom: 4 }}>
-                  [WARN] Download completed with warnings:
+                  {"[WARN] "}
+                  <Trans id="output.download.warnings.header">
+                    Download completed with warnings:
+                  </Trans>
                 </div>
                 <ul
                   style={{
@@ -226,13 +259,20 @@ export function OutputScreen() {
                 aria-live="polite"
                 style={{ fontSize: 12, color: "#d29922", marginTop: 4 }}
               >
-                [WARN] Your keyboard id is still set to the base keyboard&rsquo;s
-                id. Downloading now will name the .zip and its internal file
-                paths after the base id. Set your own keyboard name and id
-                before downloading or submitting to the community repository.{" "}
+                {"[WARN] "}
+                <Trans id="output.identity.warn">
+                  Your keyboard id is still set to the base keyboard&rsquo;s
+                  id. Downloading now will name the .zip and its internal
+                  file paths after the base id. Set your own keyboard name
+                  and id before downloading or submitting to the community
+                  repository.
+                </Trans>{" "}
                 <button
                   type="button"
-                  aria-label="Go to the keyboard name and id step"
+                  aria-label={t({
+                    id: "output.identity.warn.gotoAriaLabel",
+                    message: "Go to the keyboard name and id step",
+                  })}
                   onClick={() => {
                     const el = document.getElementById("identity-keyboard-id");
                     el?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -248,7 +288,7 @@ export function OutputScreen() {
                     font: "inherit",
                   }}
                 >
-                  Go to name &amp; id
+                  <Trans id="output.identity.warn.gotoLabel">Go to name &amp; id</Trans>
                 </button>
               </div>
             )}
@@ -261,7 +301,11 @@ export function OutputScreen() {
             <ManagedPRSubmitPanel
               canSubmit={canDownload}
               outputBlocked={touchStale}
-              outputBlockedReason="the touch layout is out of date — return to the Touch step and re-complete it"
+              outputBlockedReason={t({
+                id: "output.submit.outputBlockedReason.touchStale",
+                message:
+                  "the touch layout is out of date — return to the Touch step and re-complete it",
+              })}
               prefill={submitPrefill}
             />
 
