@@ -41,7 +41,7 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 - [x] T007 `I18nProvider` ownership in [StudioShell.tsx](../../packages/studio/src/StudioShell.tsx) (covers app + direct-render tests)
 - [x] T008 Drift gate [utilities/i18n-catalog-lint/index.js](../../utilities/i18n-catalog-lint/index.js) + wired into `pnpm lint`
 - [x] T009 Establish the `area.component.thing` id-namespace convention ([contracts/catalog-format.md](contracts/catalog-format.md))
-- [ ] T010 Provision the Crowdin project; set `CROWDIN_PROJECT_ID` / `CROWDIN_PERSONAL_TOKEN` as CI secrets; verify `crowdin upload sources --dry-run -b main` (ops; blocks the live round-trip, not the code work)
+- [ ] T010 Provision the Crowdin project; set `CROWDIN_PROJECT_ID` / `CROWDIN_PERSONAL_TOKEN` as CI secrets; verify `crowdin upload sources --dry-run -b main` (ops; blocks the live round-trip, not the code work) (#1253)
 
 **Checkpoint**: Foundation ready — user-story chrome work can proceed.
 
@@ -56,21 +56,21 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 ### Tests for User Story 1
 
 - [x] T011 [P] [US1] LocaleSwitcher tests (render / persist / activate / `resolveInitialLocale`) — [LocaleSwitcher.test.tsx](../../packages/studio/src/components/LocaleSwitcher.test.tsx)
-- [ ] T012 [P] [US1] Acceptance check: a fully-translated area renders zero English chrome under `fr` (extend a converted-area test)
+- [ ] T012 [P] [US1] Acceptance check: a fully-translated area renders zero English chrome under `fr` (extend a converted-area test) (#1254)
 
 ### Implementation for User Story 1
 
 - [x] T013 [US1] Convert WelcomeScreen chrome to `<Trans>` (`welcome.*`) — [WelcomeScreen.tsx](../../packages/studio/src/components/WelcomeScreen.tsx)
 - [x] T014 [US1] LocaleSwitcher in NavBar + persistence (`ks.locale`) + browser-language detection — [LocaleSwitcher.tsx](../../packages/studio/src/components/LocaleSwitcher.tsx)
 - [x] T015 [US1] Convert Output delivery area chrome (`output.*`) — [OutputScreen.tsx](../../packages/studio/src/components/OutputScreen.tsx), [ManagedPRSubmitPanel.tsx](../../packages/studio/src/components/ManagedPRSubmitPanel.tsx), [SignUpPanel.tsx](../../packages/studio/src/components/SignUpPanel.tsx)
-- [ ] T016 [US1] Convert survey chrome (`survey.*`) — `packages/studio/src/survey/*.tsx`. **Only hardcoded chrome** — do NOT touch Tier B text sourced from `content/` YAML records.
-- [ ] T017 [P] [US1] Convert editors chrome (`editor.*`) — `packages/studio/src/editors/*.tsx`
-- [ ] T018 [P] [US1] Convert dashboard chrome (`dashboard.*`) — `packages/studio/src/dashboard/*.tsx`
-- [ ] T019 [P] [US1] Localize `ui/` primitive user-facing strings + aria (`ui.*`) — `packages/studio/src/ui/*.tsx`
-- [ ] T020 [P] [US1] Convert remaining `components/` chrome (`preview.*`/`profile.*`/`account.*`) — PreviewScreen, ProfileScreen, AccountControl, OAuthCallbackScreen, etc.
-- [ ] T021 [US1] Convert [lib/publishManagedPRErrorMessage.ts](../../packages/studio/src/lib/publishManagedPRErrorMessage.ts) error-copy (global `t` macro pattern) + fix its unit test (deferred from the Output area)
-- [ ] T022 [US1] After each area: re-extract catalogs, keep the drift gate green, add illustrative `fr` for the demo — `pnpm --filter @keyboard-studio/studio messages:extract`
-- [ ] T023 [US1] Crowdin Tier A first live `upload sources` (after T010)
+- [ ] T016 [US1] Convert survey chrome (`survey.*`) — `packages/studio/src/survey/*.tsx`. **Only hardcoded chrome** — do NOT touch Tier B text sourced from `content/` YAML records. (#1255)
+- [ ] T017 [P] [US1] Convert editors chrome (`editor.*`) — `packages/studio/src/editors/*.tsx` (#1256)
+- [ ] T018 [P] [US1] Convert dashboard chrome (`dashboard.*`) — `packages/studio/src/dashboard/*.tsx` (#1257)
+- [ ] T019 [P] [US1] Localize `ui/` primitive user-facing strings + aria (`ui.*`) — `packages/studio/src/ui/*.tsx` (#1258)
+- [ ] T020 [P] [US1] Convert remaining `components/` chrome (`preview.*`/`profile.*`/`account.*`) — PreviewScreen, ProfileScreen, AccountControl, OAuthCallbackScreen, etc. (#1259)
+- [ ] T021 [US1] Convert [lib/publishManagedPRErrorMessage.ts](../../packages/studio/src/lib/publishManagedPRErrorMessage.ts) error-copy (global `t` macro pattern) + fix its unit test (deferred from the Output area) (#1260)
+- [ ] T022 [US1] After each area: re-extract catalogs, keep the drift gate green, add illustrative `fr` for the demo — `pnpm --filter @keyboard-studio/studio messages:extract` (#1261)
+- [ ] T023 [US1] Crowdin Tier A first live `upload sources` (after T010) (#1262)
 
 **Checkpoint**: Studio UI fully localizable; MVP demonstrable in `fr`.
 
@@ -84,17 +84,17 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 
 ### Tests for User Story 2
 
-- [ ] T024 [P] [US2] Extractor test: control fields excluded, prose extracted, from a sample pattern + adaptation-question YAML
-- [ ] T025 [P] [US2] `criteria.<lang>.json` satisfies `CriterionSchema`; the 148-row count test still reads only the canonical English `criteria.json`
+- [ ] T024 [P] [US2] Extractor test: control fields excluded, prose extracted, from a sample pattern + adaptation-question YAML (#1263)
+- [ ] T025 [P] [US2] `criteria.<lang>.json` satisfies `CriterionSchema`; the 148-row count test still reads only the canonical English `criteria.json` (#1264)
 
 ### Implementation for User Story 2
 
-- [ ] T026 [US2] **Joint engine+content session** (Article VI seam): agree per-string id derivation from a record, extractor location, and loader fallback semantics; record the decision in [research.md](research.md)
-- [ ] T027 [US2] Build extraction utility `utilities/i18n-content-extract` → flat `content/i18n/en/*.json` from content records
-- [ ] T028 [US2] Content i18n loader with English fallback (studio/engine resolves localized prose by active locale)
-- [ ] T029 [US2] Localize criteria descriptions → `packages/contracts/data/criteria.<lang>.json`; loader + schema conformance (respects T025)
-- [ ] T030 [US2] Activate the Tier B mapping in [crowdin.yml](../../crowdin.yml) (`content/i18n/**`)
-- [ ] T031 [US2] Extend the drift gate (or add a content-catalog checker) to cover Tier B extraction freshness; wire into `pnpm lint`
+- [ ] T026 [US2] **Joint engine+content session** (Article VI seam): agree per-string id derivation from a record, extractor location, and loader fallback semantics; record the decision in [research.md](research.md) (#1265)
+- [ ] T027 [US2] Build extraction utility `utilities/i18n-content-extract` → flat `content/i18n/en/*.json` from content records (#1266)
+- [ ] T028 [US2] Content i18n loader with English fallback (studio/engine resolves localized prose by active locale) (#1267)
+- [ ] T029 [US2] Localize criteria descriptions → `packages/contracts/data/criteria.<lang>.json`; loader + schema conformance (respects T025) (#1268)
+- [ ] T030 [US2] Activate the Tier B mapping in [crowdin.yml](../../crowdin.yml) (`content/i18n/**`) (#1269)
+- [ ] T031 [US2] Extend the drift gate (or add a content-catalog checker) to cover Tier B extraction freshness; wire into `pnpm lint` (#1270)
 
 **Checkpoint**: Author sees survey + guidance text translated, not just chrome.
 
@@ -108,17 +108,17 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 
 ### Tests for User Story 3
 
-- [ ] T032 [P] [US3] Region-resolution test (`pt-BR` → `pt` → `en`) for `lib/i18n.ts`
-- [ ] T033 [P] [US3] Playwright E2E locale-switch walk in `packages/studio/e2e`
+- [ ] T032 [P] [US3] Region-resolution test (`pt-BR` → `pt` → `en`) for `lib/i18n.ts` (#1271)
+- [ ] T033 [P] [US3] Playwright E2E locale-switch walk in `packages/studio/e2e` (#1272)
 
 ### Implementation for User Story 3
 
-- [ ] T034 [P] [US3] Region-specific locale resolution (`pt-BR` → `pt` → `en`) in [lib/i18n.ts](../../packages/studio/src/lib/i18n.ts) + switch to `%locale%` token in [crowdin.yml](../../crowdin.yml)
-- [ ] T035 [P] [US3] ICU plural audit; convert count-dependent strings to the `plural` macro
-- [ ] T036 [P] [US3] Add translator context (message comments / screenshots) for ambiguous ids
-- [ ] T037 [US3] CI: `upload sources` on merge to `main` (`.github/workflows`)
-- [ ] T038 [US3] CI: scheduled/webhook `download` → open a translations PR through the km-triage gate
-- [ ] T039 [P] [US3] Remove the first-paint English flash: pre-resolve persisted/detected locale before initial render
+- [ ] T034 [P] [US3] Region-specific locale resolution (`pt-BR` → `pt` → `en`) in [lib/i18n.ts](../../packages/studio/src/lib/i18n.ts) + switch to `%locale%` token in [crowdin.yml](../../crowdin.yml) (#1273)
+- [ ] T035 [P] [US3] ICU plural audit; convert count-dependent strings to the `plural` macro (#1274)
+- [ ] T036 [P] [US3] Add translator context (message comments / screenshots) for ambiguous ids (#1275)
+- [ ] T037 [US3] CI: `upload sources` on merge to `main` (`.github/workflows`) (#1276)
+- [ ] T038 [US3] CI: scheduled/webhook `download` → open a translations PR through the km-triage gate (#1277)
+- [ ] T039 [P] [US3] Remove the first-paint English flash: pre-resolve persisted/detected locale before initial render (#1278)
 
 **Checkpoint**: All stories independently functional; translation stays current with low toil.
 
@@ -126,9 +126,9 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T040 [P] Docs: keep [docs/i18n-spike.md](../../docs/i18n-spike.md) + this spec in sync; add the id-namespace convention to [CLAUDE.md](../../CLAUDE.md) Conventions
-- [ ] T041 Run [quickstart.md](quickstart.md) validation end-to-end
-- [ ] T042 [P] Completeness check (SC-004): adding a fully-translated locale requires zero code change
+- [ ] T040 [P] Docs: keep [docs/i18n-spike.md](../../docs/i18n-spike.md) + this spec in sync; add the id-namespace convention to [CLAUDE.md](../../CLAUDE.md) Conventions (#1279)
+- [ ] T041 Run [quickstart.md](quickstart.md) validation end-to-end (#1280)
+- [ ] T042 [P] Completeness check (SC-004): adding a fully-translated locale requires zero code change (#1281)
 
 ---
 
