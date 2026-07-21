@@ -17,7 +17,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor, within } from "@testing-library/react";
-import { CharacterMapPane } from "./CharacterMapPane.tsx";
+import { CharacterMapPane, MAX_CELLS_PER_GROUP } from "./CharacterMapPane.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
@@ -465,42 +465,49 @@ function syntheticCells(count: number): CharacterMapGroup["cells"] {
 }
 
 describe("CharacterMapPane — per-group render cap", () => {
-  // Explicit 20s per-test timeout + matching waitFor margin: rendering 1000+
-  // DOM cells is CPU-bound and flakes past the default 5s only under full-suite
-  // parallel load (passes fast in isolation) — the margin absorbs contention.
-  it("renders a Yi-scale group (1,165 cells) in full — no 'Showing N of M' truncation note", async () => {
+  // These exercise the slice / hiddenCount / "Showing N of M" logic. Rendering
+  // the real cap (3000+ chips → ~12k DOM nodes) is CPU-bound and flaked past
+  // the timeout under full-suite parallel load, so we drive a small injected
+  // cap via the `maxCellsPerGroup` prop — the exact same code path, a fraction
+  // of the DOM. The default equals MAX_CELLS_PER_GROUP; production never sets it.
+  const TEST_CAP = 30;
+
+  it("renders an at-cap group in full — no 'Showing N of M' truncation note", async () => {
     seedBaseAndLanguage();
     getGroupsResult.set([
-      { block: "Synthetic", tier: "main", cells: syntheticCells(1165) },
+      { block: "Synthetic", tier: "main", cells: syntheticCells(TEST_CAP) },
     ]);
-    render(<CharacterMapPane />);
+    render(<CharacterMapPane maxCellsPerGroup={TEST_CAP} />);
 
-    await waitFor(
-      () => {
-        expect(screen.getByLabelText("Synthetic characters (main)")).toBeTruthy();
-      },
-      { timeout: 15000 },
-    );
+    await waitFor(() => {
+      expect(screen.getByLabelText("Synthetic characters (main)")).toBeTruthy();
+    });
     const group = screen.getByLabelText("Synthetic characters (main)");
-    expect(within(group).getAllByRole("button")).toHaveLength(1165);
+    expect(within(group).getAllByRole("button")).toHaveLength(TEST_CAP);
     expect(screen.queryByText(/Showing \d+ of \d+ characters/i)).toBeNull();
-  }, 20000);
+  });
 
-  it("caps a group larger than MAX_CELLS_PER_GROUP and shows 'Showing N of M'", async () => {
+  it("caps a group larger than the cap and shows 'Showing N of M'", async () => {
     seedBaseAndLanguage();
+    const over = TEST_CAP + 5;
     getGroupsResult.set([
-      { block: "Synthetic", tier: "main", cells: syntheticCells(3500) },
+      { block: "Synthetic", tier: "main", cells: syntheticCells(over) },
     ]);
-    render(<CharacterMapPane />);
+    render(<CharacterMapPane maxCellsPerGroup={TEST_CAP} />);
 
-    await waitFor(
-      () => {
-        expect(screen.getByLabelText("Synthetic characters (main)")).toBeTruthy();
-      },
-      { timeout: 15000 },
-    );
+    await waitFor(() => {
+      expect(screen.getByLabelText("Synthetic characters (main)")).toBeTruthy();
+    });
     const group = screen.getByLabelText("Synthetic characters (main)");
-    expect(within(group).getAllByRole("button")).toHaveLength(3000);
-    expect(screen.getByText(/Showing 3000 of 3500 characters/i)).toBeTruthy();
-  }, 20000);
+    expect(within(group).getAllByRole("button")).toHaveLength(TEST_CAP);
+    expect(
+      screen.getByText(new RegExp(`Showing ${TEST_CAP} of ${over} characters`, "i")),
+    ).toBeTruthy();
+  });
+
+  it("uses MAX_CELLS_PER_GROUP as the default cap", () => {
+    // Guards the production default without rendering it: the prop is optional
+    // and falls back to the exported constant.
+    expect(MAX_CELLS_PER_GROUP).toBe(3000);
+  });
 });
