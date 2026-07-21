@@ -8,7 +8,7 @@ Details live in [contracts/irpath-contract.md](contracts/irpath-contract.md) and
 
 ```bash
 pnpm install
-pnpm prebuild        # fetch-kmcmplib + compile-recognizer-rules (clean-checkout requirement)
+pnpm prebuild        # fetch-langtags + compile-recognizer-rules (clean-checkout requirement); compiler wasm ships in @keymanapp/kmc-kmn
 ```
 
 ## Scenario 1 — `IRPath` enforces valid paths at compile time (G1, Design AC)

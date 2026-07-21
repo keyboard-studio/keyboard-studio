@@ -6,7 +6,7 @@ than restating implementation.
 
 ## Prerequisites
 
-- `pnpm install` at repo root; `pnpm build` (runs `prebuild` — fetches langtags + kmcmplib.wasm).
+- `pnpm install` at repo root; `pnpm build` (runs `prebuild` — fetches langtags; the compiler wasm ships in the `@keymanapp/kmc-kmn` npm dependency).
 - Bases: one keyboard that **ships** a `.keyman-touch-layout` (US1) and one that **does not**
   (US2). Locate via [docs/keyboard-index.md](../../docs/keyboard-index.md); confirm the touch
   file with `resolveBaseTouchJson` semantics (a `source/*.keyman-touch-layout` outside `tests/`).

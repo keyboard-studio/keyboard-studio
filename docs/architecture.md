@@ -126,7 +126,7 @@ not a number maintained by hand here.)
 | Pattern schema (contract) | [specs/005](../specs/005-pattern-schema/spec.md) | `packages/contracts/src/pattern.ts` (+ zod `schemas.ts`) |
 | Pattern library | spec §5 / [specs/005](../specs/005-pattern-schema/spec.md) | `packages/engine/src/pattern-library/`, `pattern-apply/` |
 | Validator (A/B/A′/C) | spec §10 | `packages/engine/src/validator/`, `packages/keyboard-lint/` |
-| Compiler (kmcmplib) | spec §4 | `packages/engine/src/compiler/`, `packages/compiler/` |
+| Compiler (kmcmplib) | spec §4 | `packages/engine/src/compiler/` (wasm ships in the `@keymanapp/kmc-kmn` npm dependency) |
 | Simulator | spec §4 | `packages/engine/src/simulator/` |
 | Output / scaffolder | spec §11 / §12 | `packages/engine/src/{output,scaffolder}/` |
 | Studio SPA | spec §4 | `packages/studio/` |
