@@ -359,11 +359,12 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
 // storeRefRole — single source of truth for "does this ONE context/output
 // element count as a store reference, and in what role." context any/notany
 // -> 'source'; context index -> 'output'; output index/outs -> 'output';
-// anything else -> null (not a store reference). Both storeRefsOf (the
-// per-rule roll-up) and ruleReferencesStore (the non-allocating presence
-// check) iterate this single classifier so the element-kind knowledge never
-// forks between the two call shapes (#952, following on #923's storeRefsOf
-// consolidation).
+// anything else -> null (not a store reference). storeRefsOf (the per-rule
+// roll-up over every store), ruleReferencesStore (the non-allocating
+// presence check for one named store), and ruleStoreRoles (the
+// non-allocating presence+role check for one named store) all iterate this
+// single classifier so the element-kind knowledge never forks between the
+// three call shapes (#952, following on #923's storeRefsOf consolidation).
 // ---------------------------------------------------------------------------
 
 type StoreRefRole = 'source' | 'output';
@@ -382,13 +383,16 @@ function storeRefRole(el: ContextElement | OutputElement, inOutput: boolean): { 
 // storeRefsOf — single source of truth for "what counts as a store
 // reference in a rule, and its role," rolled up across the whole rule.
 // Returns one entry per DISTINCT store name (first-seen order), OR-ing roles
-// across multiple refs to the same store. Shared by ruleStoreOwners and
-// analyzeStoreUsage so the "store tag" render layer and the store "Used by"
-// panel never drift on which elements count as a store reference.
+// across multiple refs to the same store. Used by ruleStoreOwners, which
+// genuinely needs the full per-store role list (it walks every store the
+// rule touches, not one named store), so the "store tag" render layer and
+// the store "Used by" panel derive from the same storeRefRole classifier.
 // (Positional consumers like describeRuleForStore that need the element
-// index keep their own scan — see the comment on that function. Presence-
-// only callers that don't need the roll-up should use ruleReferencesStore
-// instead — see its comment.)
+// index keep their own scan — see the comment on that function. Callers
+// that only care about a single named store should use ruleReferencesStore
+// (presence-only) or ruleStoreRoles (presence + role) instead — see their
+// comments; both avoid this function's Map+array allocation over every
+// store in the rule.)
 // ---------------------------------------------------------------------------
 
 function storeRefsOf(rule: IRRule): { storeName: string; asSource: boolean; asOutput: boolean }[] {
@@ -435,6 +439,36 @@ function ruleReferencesStore(rule: IRRule, storeName: string): boolean {
     if (ref && ref.storeName === storeName) return true;
   }
   return false;
+}
+
+// ---------------------------------------------------------------------------
+// ruleStoreRoles — non-allocating role lookup for ONE store: does `rule`
+// reference `storeName` as a source, an output, or both? Unlike
+// ruleReferencesStore this can't early-exit on the first match (both roles
+// must be checked), but still avoids storeRefsOf's Map+array roll-up over
+// EVERY store the rule references — it only ever tracks two booleans for
+// the single store the caller asked about. Shares storeRefRole with
+// storeRefsOf/ruleReferencesStore so the element-kind knowledge stays in
+// one place (#952). Used by analyzeStoreUsage's main per-rule usage loop,
+// which — unlike the patternRefs/groupRefs loops — needs the role, not just
+// presence.
+// ---------------------------------------------------------------------------
+
+function ruleStoreRoles(rule: IRRule, storeName: string): { asSource: boolean; asOutput: boolean } {
+  let asSource = false;
+  let asOutput = false;
+  for (const el of rule.context) {
+    const ref = storeRefRole(el, false);
+    if (ref && ref.storeName === storeName) {
+      if (ref.role === 'source') asSource = true;
+      else asOutput = true;
+    }
+  }
+  for (const el of rule.output) {
+    const ref = storeRefRole(el, true);
+    if (ref && ref.storeName === storeName) asOutput = true;
+  }
+  return { asSource, asOutput };
 }
 
 // ---------------------------------------------------------------------------
@@ -775,10 +809,10 @@ function analyzeStoreUsage(storeName: string, ir: KeyboardIR): StoreUsage {
 
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      const ref = storeRefsOf(rule).find((r) => r.storeName === storeName);
-      if (ref) {
-        if (ref.asSource) asSource = true;
-        if (ref.asOutput) asOutput = true;
+      const { asSource: ruleAsSource, asOutput: ruleAsOutput } = ruleStoreRoles(rule, storeName);
+      if (ruleAsSource || ruleAsOutput) {
+        if (ruleAsSource) asSource = true;
+        if (ruleAsOutput) asOutput = true;
         ruleCount++;
         groupNameSet.add(group.name);
       }
