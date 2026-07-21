@@ -14,6 +14,7 @@ import { parse } from "../codec/parse.js";
 import { emit } from "../codec/emit.js";
 import { detectBaseLayoutFamily } from "../placement/filters.js";
 import { scaffoldIR, sanitizeDisplayName, kmnStringEscape } from "./scaffold-ir.js";
+import { assetFileExtensions } from "../shared/siblingAssetStores.js";
 
 export { scaffoldIR, resetIdentity } from "./scaffold-ir.js";
 export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffold-ir.js";
@@ -146,17 +147,11 @@ export function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: str
   // in subdirectories (e.g. source/welcome/welcome.htm) are not touched.
   // `.css`, `.htm`, and `.js` mirror the path-bearing system stores
   // (&KMW_EMBEDCSS, &KMW_HELPFILE, &KMW_EMBEDJS) so the renamed file path
-  // matches the rewritten store reference.
-  const extensions = [
-    ".kmn",
-    ".kps",
-    ".kvks",
-    ".keyman-touch-layout",
-    ".ico",
-    ".css",
-    ".htm",
-    ".js",
-  ];
+  // matches the rewritten store reference. The asset-store extensions
+  // (`.kvks`, `.keyman-touch-layout`, `.ico`, `.css`, `.htm`, `.js`) come from
+  // the canonical siblingAssetStores table; `.kmn`/`.kps` are the keyboard's
+  // own source/project files, not asset-store entries, and stay separate.
+  const extensions = [".kmn", ".kps", ...assetFileExtensions()];
   for (const ext of extensions) {
     const oldPath = `source/${baseId}${ext}`;
     const entry = vfs.get(oldPath);
